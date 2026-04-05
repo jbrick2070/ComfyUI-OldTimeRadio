@@ -820,33 +820,12 @@ class EpisodeAssembler:
         if peak > 1e-8:
             episode_waveform = episode_waveform * (0.95 / peak)
 
-        # Save to disk — guard against empty output_dir from workflow widget
-        if not output_dir or not output_dir.strip():
-            output_dir = DEFAULT_OUT
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Features: NEVER overwrite previous outputs — append timestamp to filename
-        # e.g. episode_001_the_last_frequency.wav → episode_001_the_last_frequency_20260404_152633.wav
+        # v1.0: WAV saving disabled — final output is MP4 only via SignalLostVideo.
+        # Audio still passes through to downstream nodes in memory.
         from datetime import datetime as _dt
-        base, ext = os.path.splitext(output_filename)
-        timestamped = f"{base}_{_dt.now().strftime('%Y%m%d_%H%M%S')}{ext}"
-        output_path = os.path.join(output_dir, timestamped)
-
-        try:
-            import soundfile as sf
-            audio_np = episode_waveform.squeeze(0).numpy()
-            if audio_np.shape[0] <= 2:  # channels first
-                audio_np = audio_np.T  # transpose to (samples, channels)
-            sf.write(output_path, audio_np, sample_rate)
-            log.info(f"[EpisodeAssembler] Saved: {output_path}")
-        except ImportError:
-            log.warning("[EpisodeAssembler] soundfile not installed — WAV not saved to disk")
-            output_path = "(soundfile not available)"
-        except Exception as e:
-            log.error(f"[EpisodeAssembler] Save error: {e}")
-            output_path = f"(error: {e})"
 
         audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
+        output_path = "(video-only — no WAV saved)"
 
         total_sec = episode_waveform.shape[-1] / sample_rate
         info_dict = {
@@ -859,22 +838,6 @@ class EpisodeAssembler:
             "timestamp": _dt.now().isoformat(),
         }
         info = json.dumps(info_dict, indent=2)
-
-        # Features: Save render log alongside the WAV for auditing every run
-        try:
-            log_path = output_path.replace(".wav", "_log.txt")
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"Episode: {episode_title}\n")
-                f.write(f"Generated: {_dt.now().isoformat()}\n")
-                f.write(f"Duration: {total_sec/60:.1f} min ({total_sec:.1f}s)\n")
-                f.write(f"Output: {output_path}\n")
-                f.write(f"\n{'='*60}\n\n")
-                # Write the scene render log from upstream SceneSequencer
-                # (passed through the scene_audio dict if available)
-                f.write(info)
-            log.info(f"[EpisodeAssembler] Log: {log_path}")
-        except Exception as e:
-            log.warning(f"[EpisodeAssembler] Could not save render log: {e}")
 
         log.info(f"[EpisodeAssembler] '{episode_title}' — {total_sec/60:.1f} min")
         return (audio_out, output_path, info)

@@ -609,4 +609,32 @@ class SignalLostVideoRenderer:
                  out_path, size_mb, duration, total_frames)
         _runtime_log(f"Video: DONE — {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
-        return (out_path,)
+        # ── 7. Generate preview thumbnail for ComfyUI UI ────────────
+        # Extract a frame from ~30% into the video as a representative thumbnail.
+        # Saved alongside the MP4 so ComfyUI can display it in the node.
+        preview_results = []
+        try:
+            thumb_path = out_path.replace(".mp4", "_thumb.png")
+            seek_sec = max(0.5, duration * 0.3)
+            thumb_cmd = [
+                "ffmpeg", "-y", "-ss", f"{seek_sec:.2f}",
+                "-i", out_path, "-frames:v", "1",
+                "-q:v", "2", thumb_path,
+            ]
+            subprocess.run(thumb_cmd, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=15)
+            if os.path.exists(thumb_path):
+                # Return as ComfyUI preview image
+                out_dir = os.path.dirname(out_path)
+                fname = os.path.basename(thumb_path)
+                preview_results.append({
+                    "filename": fname,
+                    "subfolder": "",
+                    "type": "output",
+                })
+                log.info("[Video] Preview thumbnail: %s", thumb_path)
+        except Exception as e:
+            log.warning("[Video] Could not generate thumbnail: %s", e)
+
+        return {"ui": {"images": preview_results, "video_path": out_path},
+                "result": (out_path,)}
