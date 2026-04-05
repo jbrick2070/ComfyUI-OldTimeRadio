@@ -394,97 +394,26 @@ pip install websocket-client
 
 ---
 
-## OBS Automation — Hands-Free Streaming
+## Setting Up Continuous Output with OBS
 
-The SIGNAL LOST pipeline is designed for fully automated streaming. Here's how to set up OBS Studio to broadcast episodes as they render, 24/7.
+Run SIGNAL LOST as a live generative broadcast — each output episode auto-loads into OBS as it finishes.
 
-### Concept
+### Prerequisites
 
-```
-ComfyUI renders episode
-        │
-        ▼
-otr_monitor.py detects completion
-        │
-        ▼
-otr_dashboard.json → state: "COMPLETE"
-        │
-        ▼
-OBS watches output folder → auto-plays new .mp4
-        │
-        ▼
-Loop: re-queue next episode via ComfyUI API
-```
+- [OBS Studio](https://obsproject.com/download)
+- [Python 3.11.x](https://www.python.org/downloads/release/python-3119/)
+- [Media Playlist Source (OBS Plugin)](https://obsproject.com/forum/resources/media-playlist-source.1765/)
+- [Directory Sorter for OBS](https://github.com/CodeYan01/directory_sorter_for_obs)
 
-### OBS Setup
+### Setup
 
-1. **Add a VLC Video Source** (or Media Source) in OBS pointing to your output folder:
-   ```
-   C:\Users\<you>\Documents\ComfyUI\output\old_time_radio\
-   ```
-   Set it to play the most recent `.mp4` file.
+1. Install OBS and the Media Playlist Source plugin
+2. In OBS: **Tools → Scripts** → Python Settings → point to your Python 3.11 path
+3. Load the `directory_sorter_for_obs` script and point it to `ComfyUI/output/old_time_radio/`
+4. Add a **Media Playlist Source** scene item pointed to the same folder
+5. OBS will automatically pick up each new episode MP4 as soon as the Signal Lost Video node finishes rendering.
 
-2. **Add a Browser Source** pointed at the ComfyUI UI (`http://127.0.0.1:8000`) as a background layer — useful for showing the pipeline in action during renders.
-
-3. **Scene switching:** Create two OBS scenes:
-   - "NOW PLAYING" — shows the rendered MP4 with audio
-   - "RENDERING" — shows the ComfyUI graph or a "stand by" card
-
-### Auto-Queue via API
-
-To loop episodes automatically, create a script that watches `otr_dashboard.json` and re-queues when the state hits `COMPLETE`:
-
-```python
-import json, time, requests
-
-DASHBOARD = "path/to/otr_dashboard.json"
-API_URL = "http://127.0.0.1:8000/prompt"
-PROMPT_FILE = "path/to/otr_prompt_final.json"
-
-while True:
-    time.sleep(10)
-    with open(DASHBOARD) as f:
-        status = json.load(f)
-
-    if status["state"] == "COMPLETE":
-        # Wait for OBS to finish playing the episode
-        time.sleep(300)  # 5 min buffer
-
-        # Queue next episode
-        with open(PROMPT_FILE) as f:
-            prompt = json.load(f)
-        requests.post(API_URL, json={"prompt": prompt})
-        print("Queued next episode")
-```
-
-### API Prompt Format
-
-The ComfyUI API expects a different format than the workflow JSON. Each node becomes a key in the prompt dict, referenced by its node ID as a string:
-
-```json
-{
-  "1": {
-    "class_type": "OTR_Gemma4ScriptWriter",
-    "inputs": {
-      "episode_title": "The Last Frequency",
-      "genre": "hard_sci_fi",
-      "num_acts": 5,
-      "num_characters": 4,
-      "model_id": "google/gemma-4-E4B-it"
-    }
-  },
-  "2": {
-    "class_type": "OTR_Gemma4Director",
-    "inputs": {
-      "script_text": ["1", 0]
-    }
-  }
-}
-```
-
-Node connections use the format `["source_node_id", output_slot_index]`. So `["1", 0]` means "output slot 0 of node 1" which is `script_text`.
-
-> **Pro tip:** Export an API-format prompt from ComfyUI by enabling **Dev Mode** in Settings, then clicking **Save (API Format)**.
+> **Pro tip:** If your main GPU is maxed out on inference, set OBS to encode via your integrated GPU (**QSV AV1** or **HEVC**). This keeps the stream smooth while the NVIDIA GPU handles Gemma 4 and Bark inference.
 
 ---
 
