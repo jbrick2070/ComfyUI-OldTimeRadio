@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# ComfyUI artifacts
+output/
+temp/
+
+# Models (too large for git — download via HuggingFace)
+models/
+*.bin
+*.safetensors
+*.gguf
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Audio output (generated, not versioned)
+*.wav
+*.mp3
+*.flac
+!samples/*.wav

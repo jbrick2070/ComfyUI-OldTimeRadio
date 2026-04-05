@@ -1,0 +1,708 @@
+{
+  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
+  "revision": 0,
+  "last_node_id": 12,
+  "last_link_id": 18,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "OTR_Gemma4ScriptWriter",
+      "pos": [
+        50,
+        200
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "title": "Gemma 4 Script Writer",
+      "properties": {
+        "Node name for S&R": "OTR_Gemma4ScriptWriter"
+      },
+      "widgets_values": [
+        "The Last Frequency",
+        "hard_sci_fi",
+        25,
+        4,
+        "google/gemma-4-E4B-it",
+        "",
+        3,
+        0.8,
+        true
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            2,
+            12,
+            16
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [
+            18
+          ],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0
+    },
+    {
+      "id": 2,
+      "type": "OTR_Gemma4Director",
+      "pos": [
+        500,
+        200
+      ],
+      "size": [
+        400,
+        280
+      ],
+      "title": "Gemma 4 Director",
+      "properties": {
+        "Node name for S&R": "OTR_Gemma4Director"
+      },
+      "widgets_values": [
+        "",
+        "google/gemma-4-E4B-it",
+        0.4,
+        true,
+        "moderate"
+      ],
+      "inputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "links": [
+            4,
+            13,
+            17
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "voice_map_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "sfx_plan_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "music_plan_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 3
+        }
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0
+    },
+    {
+      "id": 3,
+      "type": "OTR_SceneSequencer",
+      "pos": [
+        950,
+        200
+      ],
+      "size": [
+        400,
+        300
+      ],
+      "title": "Scene Sequencer",
+      "properties": {
+        "Node name for S&R": "OTR_SceneSequencer"
+      },
+      "widgets_values": [
+        "[]",
+        "{}",
+        0,
+        999,
+        "",
+        "bark"
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 2
+        },
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "link": 4
+        },
+        {
+          "name": "tts_audio_clips",
+          "type": "AUDIO",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "scene_manifest_json",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0
+    },
+    {
+      "id": 4,
+      "type": "OTR_AudioEnhance",
+      "pos": [
+        1400,
+        200
+      ],
+      "size": [
+        380,
+        340
+      ],
+      "title": "Spatial Audio Enhance (HQ)",
+      "properties": {
+        "Node name for S&R": "OTR_AudioEnhance"
+      },
+      "widgets_values": [
+        48000,
+        0.3,
+        0.8,
+        0.15,
+        16000.0,
+        -1.0
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "enhanced_audio",
+          "type": "AUDIO",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0
+    },
+    {
+      "id": 5,
+      "type": "OTR_SFXGenerator",
+      "pos": [
+        950,
+        580
+      ],
+      "size": [
+        350,
+        200
+      ],
+      "title": "Opening Static",
+      "properties": {
+        "Node name for S&R": "OTR_SFXGenerator"
+      },
+      "widgets_values": [
+        "radio_tuning",
+        3.0,
+        48000,
+        -6.0
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "sfx_audio",
+          "type": "AUDIO",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "generation_info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0
+    },
+    {
+      "id": 6,
+      "type": "OTR_SFXGenerator",
+      "pos": [
+        950,
+        830
+      ],
+      "size": [
+        350,
+        200
+      ],
+      "title": "Theremin Theme",
+      "properties": {
+        "Node name for S&R": "OTR_SFXGenerator"
+      },
+      "widgets_values": [
+        "theremin",
+        8.0,
+        48000,
+        -9.0
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "sfx_audio",
+          "type": "AUDIO",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "generation_info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0
+    },
+    {
+      "id": 7,
+      "type": "OTR_EpisodeAssembler",
+      "pos": [
+        1850,
+        200
+      ],
+      "size": [
+        420,
+        350
+      ],
+      "title": "Episode Assembler",
+      "properties": {
+        "Node name for S&R": "OTR_EpisodeAssembler"
+      },
+      "widgets_values": [
+        "The Last Frequency",
+        "episode_001_the_last_frequency.wav",
+        "",
+        10.0,
+        8.0,
+        500
+      ],
+      "inputs": [
+        {
+          "name": "scene_audio",
+          "type": "AUDIO",
+          "link": 6
+        },
+        {
+          "name": "opening_theme_audio",
+          "type": "AUDIO",
+          "link": 7
+        },
+        {
+          "name": "closing_theme_audio",
+          "type": "AUDIO",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "episode_audio",
+          "type": "AUDIO",
+          "links": [
+            11,
+            15
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "output_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "episode_info",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0
+    },
+    {
+      "id": 10,
+      "type": "PreviewAudio",
+      "pos": [
+        2350,
+        200
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "title": "Preview Episode",
+      "properties": {
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": [],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "flags": {},
+      "order": 7,
+      "mode": 0
+    },
+    {
+      "id": 11,
+      "type": "OTR_BatchBarkGenerator",
+      "pos": [
+        500,
+        580
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "title": "Batch Bark Generator",
+      "properties": {
+        "Node name for S&R": "OTR_BatchBarkGenerator"
+      },
+      "widgets_values": [
+        "[]",
+        "{}",
+        0.7
+      ],
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 12
+        },
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "tts_audio_clips",
+          "type": "AUDIO",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "batch_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0
+    },
+    {
+      "id": 12,
+      "type": "OTR_SignalLostVideo",
+      "pos": [
+        1450,
+        600
+      ],
+      "size": [
+        400,
+        280
+      ],
+      "title": "Signal Lost Video",
+      "properties": {
+        "Node name for S&R": "OTR_SignalLostVideo"
+      },
+      "widgets_values": [
+        24,
+        "1920x1080",
+        "The Last Frequency"
+      ],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 15
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 16
+        },
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "link": 17
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_path",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 0
+        }
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      1,
+      1,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      4,
+      2,
+      0,
+      3,
+      1,
+      "STRING"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ],
+    [
+      7,
+      5,
+      0,
+      7,
+      1,
+      "AUDIO"
+    ],
+    [
+      8,
+      6,
+      0,
+      7,
+      2,
+      "AUDIO"
+    ],
+    [
+      11,
+      7,
+      0,
+      10,
+      0,
+      "AUDIO"
+    ],
+    [
+      12,
+      1,
+      1,
+      11,
+      0,
+      "STRING"
+    ],
+    [
+      13,
+      2,
+      0,
+      11,
+      1,
+      "STRING"
+    ],
+    [
+      14,
+      11,
+      0,
+      3,
+      2,
+      "AUDIO"
+    ],
+    [
+      15,
+      7,
+      0,
+      12,
+      0,
+      "AUDIO"
+    ],
+    [
+      16,
+      1,
+      1,
+      12,
+      1,
+      "STRING"
+    ],
+    [
+      17,
+      2,
+      0,
+      12,
+      2,
+      "STRING"
+    ],
+    [
+      18,
+      1,
+      2,
+      12,
+      3,
+      "STRING"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Script Generation",
+      "bounding": [
+        30,
+        120,
+        920,
+        500
+      ],
+      "color": "#2a363b",
+      "flags": {},
+      "font_size": 24
+    },
+    {
+      "title": "Audio Production + Spatial HQ",
+      "bounding": [
+        930,
+        120,
+        920,
+        500
+      ],
+      "color": "#3b2a36",
+      "flags": {},
+      "font_size": 24
+    },
+    {
+      "title": "Final Assembly",
+      "bounding": [
+        1830,
+        120,
+        500,
+        500
+      ],
+      "color": "#363b2a",
+      "flags": {},
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "info": {
+      "name": "Old-Time Radio Sci-Fi Anthology",
+      "author": "Jeffrey Brick",
+      "description": "Gemma 4 scripts + Bark TTS + Spatial Audio Enhance + Episode assembly",
+      "version": "1.0.0-hq"
+    }
+  },
+  "version": 0.4
+}

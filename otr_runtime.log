@@ -1,0 +1,265 @@
+[01:15:33] ScriptWriter: === SCENE 1 ===
+[01:15:38] ScriptWriter: ENV: sterile broadcast studio, low hum, sharp electroni
+[01:15:41] ScriptWriter: SFX #1: brief, sharp news sting
+[01:15:51] ScriptWriter: [1] ANNOUNCER: Tonight, we track a breakthrough in vascular science.
+[01:16:00] ScriptWriter: [2] ANNOUNCER: A new compound is tackling resistant hypertension.
+[01:16:00] ScriptWriter: 100 tokens | 2.3 tok/s | 1 scenes | 2 lines | 1 chars
+[01:16:05] ScriptWriter: SFX #2: keyboard click, subtle data stream noise
+[01:16:13] ScriptWriter: [3] DR_CHEN: The 10 mmHg reduction is statistically significant.
+[01:16:22] ScriptWriter: [4] DR_CHEN: But the mechanism... it’s aggressive.
+[01:16:28] ScriptWriter: 200 tokens | 2.8 tok/s | 1 scenes | 4 lines | 2 chars
+[01:16:30] ScriptWriter: [5] HAYES: Aggressive is an understatement, Doctor.
+[01:16:39] ScriptWriter: [6] ANNOUNCER: The drug targets renal salt retention, pushing past prior li
+[01:16:43] ScriptWriter: [7] DR_CHEN: [VOICE: DR_CHEN, female,
+[01:16:43] ScriptWriter DONE: 260 tokens in 86.9s (3.0 tok/s) | 1 scenes | 7 dialogue lines | Characters: ANNOUNCER, DR_CHEN, HAYES
+[01:17:15] ScriptWriter: 100 tokens | 3.1 tok/s | 0 scenes | 0 lines | 0 chars
+[01:17:39] ScriptWriter: 200 tokens | 3.5 tok/s | 0 scenes | 0 lines | 0 chars
+[01:18:05] ScriptWriter: 300 tokens | 3.7 tok/s | 0 scenes | 0 lines | 0 chars
+[01:18:30] ScriptWriter: 400 tokens | 3.7 tok/s | 0 scenes | 0 lines | 0 chars
+[01:18:31] ScriptWriter DONE: 405 tokens in 108.3s (3.7 tok/s) | 0 scenes | 0 dialogue lines | Characters: none
+[01:19:44] BatchBark: 5/6 lines complete
+[01:19:53] SceneSequencer: Starting 1.0 audio assembly...
+[01:19:53] SceneSequencer: 1.0 Mix complete (47.0s)
+[01:29:20] ScriptWriter: === SCENE 1 ===
+[01:29:24] ScriptWriter: ENV: sterile lab, low electronic hum, pressurized air
+[01:29:27] ScriptWriter: SFX #1: soft, rhythmic pulsing
+[01:29:35] ScriptWriter: [1] ANNOUNCER: Welcome to Signal Lost.
+[01:29:45] ScriptWriter: [2] DR_VOSS: They found the switch. The fear switch.
+[01:29:48] ScriptWriter: 100 tokens | 2.2 tok/s | 1 scenes | 2 lines | 2 chars
+[01:29:54] ScriptWriter: [3] HAYES: Astrocytes... controlling memory itself?
+[01:30:00] ScriptWriter: SFX #2: sharp, high-pitched tone spike
+[01:30:10] ScriptWriter: [4] DR_VOSS: Not just supporting. They are the architects... of terror.
+[01:30:18] ScriptWriter: 200 tokens | 2.6 tok/s | 1 scenes | 4 lines | 3 chars
+[01:30:20] ScriptWriter: [5] LEMMY: If you can dial it down... you can dial it up.
+[01:30:30] ScriptWriter: [6] DR_VOSS: We are learning how to rewrite the trauma response.
+[01:30:33] ScriptWriter: === SCENE 2 ===
+[01:30:34] ScriptWriter: ENV: 
+[01:30:34] ScriptWriter DONE: 260 tokens in 92.3s (2.8 tok/s) | 2 scenes | 6 dialogue lines | Characters: ANNOUNCER, DR_VOSS, HAYES, LEMMY
+[01:31:23] ScriptWriter: 100 tokens | 2.1 tok/s | 0 scenes | 0 lines | 0 chars
+[01:31:49] ScriptWriter: 200 tokens | 2.7 tok/s | 0 scenes | 0 lines | 0 chars
+[01:32:17] ScriptWriter: 300 tokens | 2.9 tok/s | 0 scenes | 0 lines | 0 chars
+[01:32:43] ScriptWriter: 400 tokens | 3.1 tok/s | 0 scenes | 0 lines | 0 chars
+[01:32:58] ScriptWriter DONE: 454 tokens in 144.0s (3.2 tok/s) | 0 scenes | 0 dialogue lines | Characters: none
+[01:34:22] BatchBark: 5/6 lines complete
+[01:34:38] SceneSequencer: Starting 1.0 audio assembly...
+[01:34:38] SceneSequencer: 1.0 Mix complete (50.1s)
+[02:00:25] ScriptWriter: === SCENE 1 ===
+[02:00:31] ScriptWriter: ENV: mission control center, high-tech hum, tense white
+[02:00:35] ScriptWriter: SFX #1: rapid keyboard clicking, system alerts
+[02:00:47] ScriptWriter: [1] ANNOUNCER: Welcome to Signal Lost.
+[02:01:06] ScriptWriter: [2] ANNOUNCER: Today, we examine the profound leap in human exploration.
+[02:01:06] ScriptWriter: 100 tokens | 1.3 tok/s | 1 scenes | 2 lines | 1 chars
+[02:01:28] ScriptWriter: [3] ANNOUNCER: NASA’s Artemis II pioneers a new era of lunar science.
+[02:01:51] ScriptWriter: [4] ANNOUNCER: But what happens when the signal from the farthest frontier.
+[02:01:57] ScriptWriter: === SCENE 2 ===
+[02:02:06] ScriptWriter: 200 tokens | 1.4 tok/s | 2 scenes | 4 lines | 1 chars
+[02:02:06] ScriptWriter: ENV: confined engineering bay, metallic echo, pressuriz
+[02:02:17] ScriptWriter: SFX #2: low-frequency power thrumming, intermittent static
+[02:02:33] ScriptWriter: [5] DR_VOSS: The spectral return is erratic.
+[02:02:54] ScriptWriter: [6] HAYES: It’s not a failure, Doctor. It’s... noise.
+[02:02:59] ScriptWriter: 300 tokens | 1.6 tok/s | 2 scenes | 6 lines | 3 chars
+[02:03:04] ScriptWriter: SFX #3: heavy wrench strike on metal pipe, single resonant
+[02:03:19] ScriptWriter: [7] LEMMY: Noise that looks like data to me.
+[02:03:40] ScriptWriter: [8] DR_VOSS: Lemmy, we need telemetry coherence. This is beyond expected 
+[02:03:52] ScriptWriter: 400 tokens | 1.6 tok/s | 2 scenes | 8 lines | 4 chars
+[02:04:01] ScriptWriter: [9] LEMMY: Coherence is what you read in the manual. I'm reading the wi
+[02:04:18] ScriptWriter: [10] HAYES: The onboard analysis suggests an external interference patte
+[02:04:37] ScriptWriter: [11] LEMMY: External? Or something they never accounted for in the flyby
+[02:04:43] ScriptWriter: === SCENE 3 ===
+[02:04:44] ScriptWriter: 500 tokens | 1.7 tok/s | 3 scenes | 11 lines | 4 chars
+[02:04:51] ScriptWriter: ENV: mission control center, flashing red lights, frant
+[02:04:59] ScriptWriter: SFX #4: high-pitched proximity alarm, console blaring
+[02:05:20] ScriptWriter: [12] DR_VOSS: The pattern is spiking. It matches no known solar or terrest
+[02:05:37] ScriptWriter: [13] HAYES: We are losing the primary visual feed...
+[02:05:37] ScriptWriter: 600 tokens | 1.7 tok/s | 3 scenes | 13 lines | 4 chars
+[02:05:56] ScriptWriter: [14] LEMMY: Don't focus on the feed. Check the subsurface harmonics.
+[02:06:16] ScriptWriter: [15] DR_VOSS: Subsurface? We are only observing from orbit!
+[02:06:32] ScriptWriter: 700 tokens | 1.7 tok/s | 3 scenes | 15 lines | 4 chars
+[02:06:42] ScriptWriter: [16] LEMMY: The moon isn't just rock, Doctor. It's a giant conductor. Li
+[02:06:54] ScriptWriter: SFX #5: alarm pitch momentarily dips, replaced by a deep, 
+[02:07:17] ScriptWriter: [17] HAYES: Wait. I... I'm picking up a secondary oscillation. It's rhyt
+[02:07:27] ScriptWriter: 800 tokens | 1.7 tok/s | 3 scenes | 17 lines | 4 chars
+[02:07:36] ScriptWriter: [18] DR_VOSS: Rhythmic? What is that frequency?
+[02:07:53] ScriptWriter: [19] LEMMY: Looks like someone finally found the right channel.
+[02:07:59] ScriptWriter: === SCENE FINAL ===
+[02:08:08] ScriptWriter: ENV: mission control center, sudden quiet, low ambient 
+[02:08:15] ScriptWriter: SFX #6: system stabilizing tone, gentle data processing ch
+[02:08:22] ScriptWriter: 900 tokens | 1.7 tok/s | 4 scenes | 19 lines | 4 chars
+[02:08:36] ScriptWriter: [20] ANNOUNCER: The signal, once lost, reveals a complex, structured echo.
+[02:08:56] ScriptWriter: [21] ANNOUNCER: The observations from Artemis II have gone beyond geology.
+[02:09:18] ScriptWriter: [22] ANNOUNCER: They have touched a resonance previously theorized only in f
+[02:09:19] ScriptWriter: 1000 tokens | 1.7 tok/s | 4 scenes | 22 lines | 4 chars
+[02:10:03] ScriptWriter: [23] ANNOUNCER: According to NASA’s New Artemis II Science Officers, publish
+[02:10:22] ScriptWriter: 1100 tokens | 1.7 tok/s | 4 scenes | 23 lines | 4 chars
+[02:10:30] ScriptWriter: [24] ANNOUNCER: This marks the next, terrifying, and profound step in our co
+[02:10:39] ScriptWriter DONE: 1125 tokens in 652.4s (1.7 tok/s) | 4 scenes | 24 dialogue lines | Characters: ANNOUNCER, DR_VOSS, HAYES, LEMMY
+[02:13:57] ScriptWriter: 100 tokens | 0.5 tok/s | 0 scenes | 0 lines | 0 chars
+[02:14:43] ScriptWriter: 200 tokens | 0.8 tok/s | 0 scenes | 0 lines | 0 chars
+[02:15:30] ScriptWriter: 300 tokens | 1.0 tok/s | 0 scenes | 0 lines | 0 chars
+[02:16:16] ScriptWriter: 400 tokens | 1.2 tok/s | 0 scenes | 0 lines | 0 chars
+[02:17:02] ScriptWriter: 500 tokens | 1.3 tok/s | 0 scenes | 0 lines | 0 chars
+[02:17:48] ScriptWriter: 600 tokens | 1.4 tok/s | 0 scenes | 0 lines | 0 chars
+[02:18:34] ScriptWriter: 700 tokens | 1.5 tok/s | 0 scenes | 0 lines | 0 chars
+[02:19:21] ScriptWriter: 800 tokens | 1.5 tok/s | 0 scenes | 0 lines | 0 chars
+[02:20:09] ScriptWriter: 900 tokens | 1.6 tok/s | 0 scenes | 0 lines | 0 chars
+[02:20:28] ScriptWriter DONE: 940 tokens in 589.5s (1.6 tok/s) | 0 scenes | 0 dialogue lines | Characters: none
+[02:22:15] BatchBark: 5/24 lines complete
+[02:24:10] BatchBark: 10/24 lines complete
+[02:25:38] BatchBark: 15/24 lines complete
+[02:26:43] BatchBark: 20/24 lines complete
+[02:27:49] SceneSequencer: Starting 1.0 audio assembly...
+[02:27:50] SceneSequencer: 1.0 Mix complete (240.1s)
+[03:10:06] Video: Starting 120 frames @ 24fps (1280x720)
+[03:10:06] Video: Analysing audio (FFT + RMS)
+[03:10:06] Video: Encoding MP4 via ffmpeg → signal_lost_video_engine_test_20260405_031006.mp4
+[03:14:41] Video: Starting 120 frames @ 24fps (1280x720)
+[03:14:41] Video: Analysing audio (FFT + RMS)
+[03:14:41] Video: Encoding MP4 via ffmpeg → signal_lost_video_engine_test_20260405_031441.mp4
+[03:14:49] Video: DONE — signal_lost_video_engine_test_20260405_031441.mp4 (1.7 MB)
+[03:17:04] Video: Starting 72 frames @ 24fps (1280x720)
+[03:17:04] Video: Analysing audio (FFT + RMS)
+[03:17:04] Video: Encoding MP4 via ffmpeg → signal_lost_output_path_test_20260405_031704.mp4
+[03:17:09] Video: DONE — signal_lost_output_path_test_20260405_031704.mp4 (1.2 MB)
+[03:25:57] ScriptWriter: === SCENE 1 ===
+[03:26:04] ScriptWriter: ENV: mission control center, low electronic hum, intens
+[03:26:09] ScriptWriter: SFX #1: steady keyboard clicks, distant radio chatter
+[03:26:21] ScriptWriter: [1] ANNOUNCER: Welcome to Signal Lost.
+[03:26:36] ScriptWriter: [2] ANNOUNCER: Tonight, we look beyond the familiar orbits.
+[03:26:37] ScriptWriter: 100 tokens | 1.1 tok/s | 1 scenes | 2 lines | 1 chars
+[03:26:53] ScriptWriter: [3] ANNOUNCER: We examine the profound potential of humanity’s return to th
+[03:27:00] ScriptWriter: SFX #2: sharp, high-pitched electronic tone
+[03:27:13] ScriptWriter: [4] KELSEY: The simulation runs are flawless, Trevor.
+[03:27:20] ScriptWriter: 200 tokens | 1.5 tok/s | 1 scenes | 4 lines | 2 chars
+[03:27:29] ScriptWriter: [5] TREVOR: The integration holds, Kelsey. Science is fully nested.
+[03:27:43] ScriptWriter: [6] ANGELA: The crew’s observation protocols are robust.
+[03:27:59] ScriptWriter: [7] KELSEY: But the data stream... it’s just observations right now.
+[03:28:06] ScriptWriter: 300 tokens | 1.7 tok/s | 1 scenes | 7 lines | 4 chars
+[03:28:16] ScriptWriter: [8] TREVOR: We are gathering context. That’s the first step.
+[03:28:30] ScriptWriter: [9] ANGELA: The sheer volume of unprocessed imagery is staggering.
+[03:28:34] ScriptWriter: === SCENE 2 ===
+[03:28:42] ScriptWriter: ENV: mission control center, increasing urgency, rapid 
+[03:28:48] ScriptWriter: SFX #3: rapid data pinging, console alerts
+[03:28:51] ScriptWriter: 400 tokens | 1.8 tok/s | 2 scenes | 9 lines | 4 chars
+[03:29:05] ScriptWriter: [10] KELSEY: We’re moving beyond observation. We need signatures.
+[03:29:19] ScriptWriter: [11] TREVOR: Signatures of what? Geologic markers are expected.
+[03:29:33] ScriptWriter: [12] ANGELA: The mission profile emphasizes surface characterization, Tre
+[03:29:35] ScriptWriter: 500 tokens | 1.9 tok/s | 2 scenes | 12 lines | 4 chars
+[03:29:49] ScriptWriter: [13] KELSEY: No. I mean anomalous readings. Beyond the visible spectrum.
+[03:29:55] ScriptWriter: SFX #4: sudden, deep resonant hum
+[03:30:12] ScriptWriter: [14] TREVOR: That’s not in the training parameters. What is that frequenc
+[03:30:19] ScriptWriter: 600 tokens | 1.9 tok/s | 2 scenes | 14 lines | 4 chars
+[03:30:27] ScriptWriter: [15] ANGELA: My sensors are spiking. It’s cyclical.
+[03:30:43] ScriptWriter: [16] KELSEY: Lock it down. Analyze the harmonic pattern immediately.
+[03:30:53] ScriptWriter: [17] TREVOR: It’s too complex for known radio emission profiles.
+[03:30:58] ScriptWriter: 700 tokens | 2.0 tok/s | 2 scenes | 17 lines | 4 chars
+[03:31:04] ScriptWriter: [18] ANGELA: It’s… repeating a sequence. Like language.
+[03:31:08] ScriptWriter: === SCENE 3 ===
+[03:31:14] ScriptWriter: ENV: mission control center, chaotic, flashing lights, 
+[03:31:19] ScriptWriter: SFX #5: escalating alarm klaxon, heavy system overload sou
+[03:31:30] ScriptWriter: 800 tokens | 2.1 tok/s | 3 scenes | 18 lines | 4 chars
+[03:31:32] ScriptWriter: [19] KELSEY: All comms, switch to secure monitoring. We are not logging t
+[03:31:55] ScriptWriter: [20] TREVOR: The lunar flyby window is closing. We can’t stabilize the fe
+[03:32:53] ScriptWriter: [21] ANGELA: The signal is intensifying. It’s drawing power from the loca
+[03:33:13] ScriptWriter: 900 tokens | 1.9 tok/s | 3 scenes | 21 lines | 4 chars
+[03:33:30] ScriptWriter: [22] KELSEY: It’s not geologic. It’s structured. It’s intelligent.
+[03:33:55] ScriptWriter: [23] TREVOR: Intelligent... but how did we miss this during all the field
+[03:34:42] ScriptWriter: [24] ANGELA: The Moon is not just a rock, Kelsey. It’s a receiver.
+[03:34:44] ScriptWriter: 1000 tokens | 1.7 tok/s | 3 scenes | 24 lines | 4 chars
+[03:34:56] ScriptWriter: SFX #6: the deep resonant hum peaks, then cuts abruptly to
+[03:35:07] ScriptWriter: [25] ANNOUNCER: The first step of observation has become the first contact.
+[03:35:20] ScriptWriter: 1100 tokens | 1.8 tok/s | 3 scenes | 25 lines | 4 chars
+[03:35:30] ScriptWriter: [26] ANNOUNCER: According to NASA’s New Artemis II Science Officers, publish
+[03:35:35] ScriptWriter DONE: 1151 tokens in 627.8s (1.8 tok/s) | 3 scenes | 26 dialogue lines | Characters: ANGELA, ANNOUNCER, KELSEY, TREVOR
+[03:36:36] ScriptWriter: 100 tokens | 1.6 tok/s | 0 scenes | 0 lines | 0 chars
+[03:38:02] ScriptWriter: 200 tokens | 1.4 tok/s | 0 scenes | 0 lines | 0 chars
+[03:38:43] ScriptWriter: 300 tokens | 1.6 tok/s | 0 scenes | 0 lines | 0 chars
+[03:41:25] ScriptWriter: 400 tokens | 1.1 tok/s | 0 scenes | 0 lines | 0 chars
+[03:42:30] ScriptWriter: 500 tokens | 1.2 tok/s | 0 scenes | 0 lines | 0 chars
+[03:44:13] ScriptWriter: 600 tokens | 1.2 tok/s | 0 scenes | 0 lines | 0 chars
+[03:45:18] ScriptWriter: 700 tokens | 1.2 tok/s | 0 scenes | 0 lines | 0 chars
+[03:46:12] ScriptWriter DONE: 783 tokens in 636.3s (1.2 tok/s) | 0 scenes | 0 dialogue lines | Characters: none
+[03:48:25] BatchBark: 5/26 lines complete
+[03:49:48] BatchBark: 10/26 lines complete
+[03:51:33] BatchBark: 15/26 lines complete
+[03:52:33] BatchBark: 20/26 lines complete
+[03:53:51] BatchBark: 25/26 lines complete
+[03:54:04] SceneSequencer: Starting 1.0 audio assembly...
+[03:54:05] SceneSequencer: 1.0 Mix complete (224.3s)
+[03:54:05] Video: Starting 5623 frames @ 24fps (1920x1080)
+[03:54:05] Video: Analysing audio (FFT + RMS)
+[03:54:06] Video: Encoding MP4 via ffmpeg → signal_lost_the_last_frequency_20260405_035406.mp4
+[03:54:40] Video: 720/5623 frames rendered
+[03:55:15] Video: 1440/5623 frames rendered
+[03:55:50] Video: 2160/5623 frames rendered
+[03:56:24] Video: 2880/5623 frames rendered
+[03:56:59] Video: 3600/5623 frames rendered
+[03:57:33] Video: 4320/5623 frames rendered
+[03:58:07] Video: 5040/5623 frames rendered
+[03:58:38] Video: DONE — signal_lost_the_last_frequency_20260405_035406.mp4 (14.7 MB)
+[04:09:38] Video: Starting 120 frames @ 24fps (1280x720)
+[04:09:38] Video: Analysing audio (FFT + RMS)
+[04:09:38] Video: Encoding MP4 via ffmpeg → signal_lost_the_last_frequency_20260405_040938.mp4
+[04:09:44] Video: DONE — signal_lost_the_last_frequency_20260405_040938.mp4 (7.3 MB)
+[04:15:36] ScriptWriter: === SCENE 1 ===
+[04:15:40] ScriptWriter: ENV: sterile broadcast studio, low electronic hum, tens
+[04:15:43] ScriptWriter: SFX #1: news jingle sting, fades under
+[04:15:55] ScriptWriter: [1] ANNOUNCER: Welcome back to Signal Lost. Tonight, a frequency we thought
+[04:16:01] ScriptWriter: 100 tokens | 2.4 tok/s | 1 scenes | 1 lines | 1 chars
+[04:16:04] ScriptWriter: [2] HAYES: Drift? How significant are we talking, David?
+[04:16:15] ScriptWriter: [3] ANNOUNCER: We are talking about metabolic thresholds, Hayes. The line b
+[04:16:26] ScriptWriter: 200 tokens | 3.0 tok/s | 1 scenes | 3 lines | 2 chars
+[04:16:27] ScriptWriter: [4] DR_VOSS: It’s not just the liver, though. The research suggests a cas
+[04:16:30] ScriptWriter: SFX #2: rapid keyboard clicking
+[04:16:37] ScriptWriter: [5] LEMMY: Cellular resilience? You mean permanent damage?
+[04:16:48] ScriptWriter: [6] DR_VOSS: Worse. We’re looking at accelerated epigenetic drift. Tiny s
+[04:16:51] ScriptWriter: === SCENE 2 ===
+[04:16:52] ScriptWriter: 300 tokens | 3.2 tok/s | 2 scenes | 6 lines | 4 chars
+[04:16:56] ScriptWriter: ENV: high-tech bio-lab, low ventilation whine, sterile 
+[04:16:59] ScriptWriter: SFX #3: steady, rhythmic drip of nutrient fluid
+[04:17:10] ScriptWriter: [7] HAYES: Show me the projections for MASLD patients. The ones who... 
+[04:17:19] ScriptWriter: 400 tokens | 3.3 tok/s | 2 scenes | 7 lines | 4 chars
+[04:17:25] ScriptWriter: [8] DR_VOSS: They are not deviating, Hayes. They are demonstrating a terr
+[04:17:31] ScriptWriter: SFX #4: sharp, high-pitched alarm chirp, quickly silenced
+[04:17:41] ScriptWriter: [9] LEMMY: Catalyst for what? Organ failure? That’s what I expected.
+[04:17:48] ScriptWriter: 500 tokens | 3.4 tok/s | 2 scenes | 9 lines | 4 chars
+[04:17:54] ScriptWriter: [10] HAYES: No. Voss, talk to me about the drift. What does epigenetic d
+[04:18:08] ScriptWriter: [11] DR_VOSS: It’s the silencing of protective genes. The machinery meant 
+[04:18:16] ScriptWriter: 600 tokens | 3.4 tok/s | 2 scenes | 11 lines | 4 chars
+[04:18:20] ScriptWriter: [12] LEMMY: So, a bad night out... permanently rewrites the blueprint? [
+[04:18:24] ScriptWriter: === SCENE 3 ===
+[04:18:27] ScriptWriter: ENV: broadcast studio, tense, focused silence
+[04:18:30] ScriptWriter: SFX #5: low, resonant synth chord holds
+[04:18:43] ScriptWriter: [13] ANNOUNCER: The data is stark. A single lapse in moderation introduces a
+[04:18:44] ScriptWriter: 700 tokens | 3.4 tok/s | 3 scenes | 13 lines | 4 chars
+[04:18:54] ScriptWriter: [14] HAYES: The implications are global. Lifestyle choices now have mole
+[04:19:09] ScriptWriter: [15] DR_VOSS: We are entering an era where history isn't just written by w
+[04:19:13] ScriptWriter: 800 tokens | 3.4 tok/s | 3 scenes | 15 lines | 4 chars
+[04:19:20] ScriptWriter: [16] LEMMY: So the signal isn't lost... it’s just being overwritten.
+[04:19:31] ScriptWriter: [17] ANNOUNCER: Indeed. The quiet accumulation of risk, amplified by metabol
+[04:19:42] ScriptWriter: 900 tokens | 3.4 tok/s | 3 scenes | 17 lines | 4 chars
+[04:19:57] ScriptWriter: [18] ANNOUNCER: This has been Signal Lost. Remember, according to ScienceDai
+[04:20:02] ScriptWriter DONE: 964 tokens in 281.9s (3.4 tok/s) | 3 scenes | 18 dialogue lines | Characters: ANNOUNCER, DR_VOSS, HAYES, LEMMY
+[04:20:10] ScriptWriter: 100 tokens | 11.3 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:17] ScriptWriter: 200 tokens | 12.7 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:25] ScriptWriter: 300 tokens | 12.5 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:33] ScriptWriter: 400 tokens | 12.9 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:40] ScriptWriter: 500 tokens | 13.1 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:47] ScriptWriter: 600 tokens | 13.3 tok/s | 0 scenes | 0 lines | 0 chars
+[04:20:55] ScriptWriter: 700 tokens | 13.2 tok/s | 0 scenes | 0 lines | 0 chars
+[04:21:03] ScriptWriter: 800 tokens | 13.1 tok/s | 0 scenes | 0 lines | 0 chars
+[04:21:05] ScriptWriter DONE: 828 tokens in 63.4s (13.1 tok/s) | 0 scenes | 0 dialogue lines | Characters: none
+[04:23:36] BatchBark: 5/18 lines complete
+[04:25:22] BatchBark: 10/18 lines complete
+[04:27:51] BatchBark: 15/18 lines complete
+[04:28:53] SceneSequencer: Starting 1.0 audio assembly...
+[04:28:54] SceneSequencer: 1.0 Mix complete (190.4s)
+[04:28:55] Video: Starting 4738 frames @ 24fps (1920x1080)
+[04:28:55] Video: Analysing audio (FFT + RMS)
+[04:28:56] Video: Encoding MP4 via ffmpeg → signal_lost_the_last_frequency_20260405_042856.mp4
+[04:29:49] Video: 720/4738 frames rendered
+[04:30:27] Video: 1440/4738 frames rendered
+[04:31:09] Video: 2160/4738 frames rendered
+[04:31:50] Video: 2880/4738 frames rendered
+[04:32:37] Video: 3600/4738 frames rendered
+[04:33:21] Video: 4320/4738 frames rendered
+[04:33:54] Video: DONE — signal_lost_the_last_frequency_20260405_042856.mp4 (59.0 MB)

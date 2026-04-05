@@ -1,0 +1,27 @@
+[project]
+name = "comfyui-old-time-radio"
+version = "1.0.0"
+description = "AI-powered sci-fi radio drama generator for ComfyUI — Gemma 4 scripts from real science news, Bark TTS voices with emotional cues, 48kHz spatial audio mastering"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
+]
+keywords = ["comfyui", "tts", "radio", "bark", "gemma", "audio", "sci-fi", "spatial"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Artistic Software",
+]
+
+[project.urls]
+Homepage = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
+Repository = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio"
+Issues = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"

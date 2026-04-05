@@ -1,0 +1,20 @@
+# ComfyUI-OldTimeRadio v1.0 dependencies
+# IMPORTANT: Do NOT pin torch — ComfyUI manages its own torch version
+# Pin loosely to avoid conflicts with other node packs
+
+# Core TTS — Bark via transformers (Gemma 4 also lives here)
+transformers>=4.40,<6.0
+
+# Audio processing — WAV I/O and DSP
+soundfile>=0.12
+numpy>=1.24
+
+# Science news fetching (REQUIRED — no fallback, pipeline will hard-fail without it)
+feedparser>=6.0
+
+# Tokenizers (required by transformers, listed for clarity)
+tokenizers>=0.15
+sentencepiece>=0.1.99
+
+# Optional: Parler-TTS (narrator voice style control — not required for core pipeline)
+# parler-tts>=0.2,<1.0

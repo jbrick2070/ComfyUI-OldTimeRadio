@@ -1,0 +1,82 @@
+"""
+ComfyUI-OldTimeRadio — AI-Powered Sci-Fi Radio Drama Generator
+================================================================
+
+Generates full-length sci-fi anthology radio dramas using:
+  - Gemma 4 local LLM (script writing from real science news + director)
+  - Bark (Suno) TTS with emotional bracket tags [sighs] [whispers] etc.
+  - 48kHz stereo spatial audio mastering (Haas effect, mid-side widening)
+  - Procedural SFX (theremin, static, room tone)
+
+Self-contained: drop into custom_nodes/ and go. No external node deps.
+
+Audio:  ScriptWriter -> Director -> BatchBark -> SceneSequencer -> AudioEnhance -> EpisodeAssembler
+Video:  EpisodeAssembler -> SignalLostVideo (procedural CRT + ffmpeg MP4)
+
+BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
+  Uses isolated per-node loading so a broken dependency in one node
+  doesn't prevent the rest from loading.
+
+v1.0  2026-04-04  Jeffrey Brick — initial release
+"""
+
+import importlib
+import logging
+
+log = logging.getLogger("OTR")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ISOLATED PER-NODE LOADING
+# If one node fails to import (e.g. missing transformers, parler_tts lib),
+# the rest still load and work. This is critical for partial installs.
+# ─────────────────────────────────────────────────────────────────────────────
+
+NODE_CLASS_MAPPINGS = {}
+NODE_DISPLAY_NAME_MAPPINGS = {}
+
+_NODE_MODULES = {
+    # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
+    # value = (module_path, class_name, display_name)
+    "OTR_Gemma4ScriptWriter": (".nodes.gemma4_orchestrator", "Gemma4ScriptWriter", "📻 Gemma 4 Script Writer"),
+    "OTR_Gemma4Director":     (".nodes.gemma4_orchestrator", "Gemma4Director",      "🎬 Gemma 4 Director"),
+    "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          "🎙️ Bark TTS (Suno)"),
+    "OTR_ParlerTTS":          (".nodes.parler_tts",         "ParlerTTSNode",        "🔊 Parler-TTS"),
+    "OTR_VintageRadioFilter": (".nodes.vintage_radio_filter", "VintageRadioFilter", "📡 Vintage Radio Filter"),
+    "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         "💥 SFX Generator"),
+    "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       "🎞️ Scene Sequencer"),
+    "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     "📼 Episode Assembler"),
+    "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         "🔊 Spatial Audio Enhance"),
+    "OTR_AudioBatcher":       (".nodes.audio_batcher",       "AudioBatcher",         "🔀 Audio Batcher"),
+    "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   "⚡ Batch Bark Generator"),
+    "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", "📺 Signal Lost Video"),
+}
+
+for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
+    try:
+        mod = importlib.import_module(module_path, package=__name__)
+        cls = getattr(mod, class_name)
+        
+        # Primary registration (OTR_ prefix)
+        NODE_CLASS_MAPPINGS[node_name] = cls
+        NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
+        
+        # Legacy alias registration
+        # If the primary ID is "OTR_NodeName", also map "NodeName" to it.
+        # This restores styled widgets in older production workflows.
+        if node_name.startswith("OTR_"):
+            legacy_name = node_name[4:]
+            if legacy_name not in NODE_CLASS_MAPPINGS:
+                NODE_CLASS_MAPPINGS[legacy_name] = cls
+                
+    except Exception as e:
+        log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
+        print(f"[OldTimeRadio] ⚠️  Skipped '{node_name}': {e}")
+
+_loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
+_total = len(_NODE_MODULES)
+if _loaded == _total:
+    print(f"[OldTimeRadio] ✓ All {_total} nodes loaded successfully")
+else:
+    print(f"[OldTimeRadio] ⚠️  Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
