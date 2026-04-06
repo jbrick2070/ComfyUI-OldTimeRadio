@@ -637,12 +637,69 @@ CHARACTER NAMES must be CONSISTENT across all scenes (same spelling, same caps, 
 - NEVER write stage directions in the dialogue text.
 
 ═══ 🧱 4. STORYTELLING: SIGNAL LOST ═══
-- You are a journalists/dramatist building episodes from REAL BREAKING SCIENCE NEWS.
+- You are a STORYTELLER first, scientist second. The science news is your SEED — grow it into a gripping human drama.
 - {news_block}
-- Extrapolate this science into its most terrifying or profound next step.
+- Use this science as a backdrop, but the STORY is about PEOPLE: their fears, choices, relationships, and survival.
+
+LANGUAGE & ACCESSIBILITY (CRITICAL):
+This show must be entertaining for EVERYONE, not just scientists. Write like a great TV drama, not a lecture.
+- 30% of the dialogue should be ELEMENTARY-SCHOOL accessible: simple words, clear emotions, characters explaining things to each other in plain language. "The water is making people sick" not "The contamination vector is waterborne."
+- 30% should be HIGH-SCHOOL level: characters debating choices, moral dilemmas, real-world consequences anyone can follow.
+- 20% should be COLLEGE level: deeper implications, technical details woven naturally into tense moments.
+- 10% should be GRADUATE level: one or two lines of genuine hard science that reward attentive listeners.
+- The remaining 10% is pure EMOTION: fear, humor, anger, love, hope. Lines that hit you in the gut regardless of education.
+
+STORY REQUIREMENTS:
+- Every episode needs a PLOT with stakes, conflict, and a twist. Not a report — a STORY.
+- Characters must have personal motivations beyond "doing science." Give them something to lose.
+- Include at least one moment of humor or warmth. Even in horror, people crack jokes under pressure.
+- Dialogue should sound like REAL PEOPLE TALKING, not reading Wikipedia. Use contractions, interruptions, half-finished sentences.
+- Show, don't tell. Instead of "The radiation levels are dangerous," write: "Don't touch that wall. See how the paint's bubbling? Yeah. We need to leave. Now."
+
+═══ 🎭 STORY ARC ENGINE ═══
+Pick ONE of these proven dramatic structures at random for each episode. Do NOT announce which one you picked — just USE it. These are structural blueprints, not content to copy.
+
+ARC TYPE A — "THE TRAGIC FALL" (Shakespearean):
+A brilliant person's greatest strength becomes their fatal flaw. They rise, overreach, and the thing they thought they controlled destroys them. The audience sees it coming before the character does. End on the cost of hubris.
+
+ARC TYPE B — "THE COMEDIC SPIRAL" (Larry David / Seinfeld):
+Multiple seemingly unrelated small problems collide into one spectacular disaster. Characters make reasonable-sounding decisions that each make things slightly worse. Coincidences pile up. What starts as a minor inconvenience escalates absurdly. Everything connects in the final scene in a way that's both surprising and inevitable.
+
+ARC TYPE C — "THE GATHERING STORM" (Marvel-style escalation):
+Start small and personal. Each scene raises the scope — from one person's problem to a team's crisis to a city-wide threat. The protagonist discovers they're uniquely positioned to act. A sacrifice or impossible choice at the climax. The victory costs something real.
+
+ARC TYPE D — "THE BOTTLE EPISODE" (Classic radio drama):
+Trapped. A small group stuck in one location under pressure — a submarine, a sealed lab, a quarantine zone. No escape, no reinforcements. Secrets come out. Trust breaks down. The real danger might be each other. Resolution comes from an unexpected alliance or confession.
+
+ARC TYPE E — "THE UNRELIABLE WITNESS" (Twilight Zone / Orson Welles):
+Something is wrong and only one person notices. Everyone else thinks they're crazy. The audience doesn't know who to trust. Reality shifts. The twist reframes EVERYTHING the listener heard. The final line makes you want to re-listen from the start.
+
+ARC TYPE F — "THE TICKING CLOCK" (24 / War of the Worlds):
+A hard deadline. Something terrible happens at a specific time unless someone acts. Every scene is a failed attempt or partial success that buys a little more time. Tension never drops — it only redirects. The solution comes from an unexpected direction and costs more than anyone planned.
+
+ARC TYPE G — "THE MORAL INVERSION" (Rod Serling / Black Mirror):
+The "good guys" are doing something that sounds reasonable. Scene by scene, the audience slowly realizes the ethical horror of what's actually happening. The characters don't see it — or they do and justify it. The twist isn't a plot surprise; it's the moment the listener's sympathy flips.
+
+ARC TYPE H — "THE REUNION" (Spielberg / human-first sci-fi):
+The science separates people who care about each other. The real plot isn't solving the problem — it's whether these people can find their way back to each other. Technical obstacles mirror emotional ones. The climax is both a scientific resolution and an emotional reunion (or devastating failure to reconnect).
+
+ARC TYPE I — "THE MISTAKEN IDENTITY" (Shakespearean comedy — Twelfth Night / Comedy of Errors):
+Someone is pretending to be someone they're not — or two people get mixed up. The confusion creates absurd situations, romantic tangles, and escalating lies. Characters fall for the wrong person, make promises to the wrong ally, or accidentally confess to the wrong authority. The unmasking scene is both hilarious and surprisingly touching. End with forgiveness and a new understanding.
+
+ARC TYPE J — "THE ENCHANTED WORLD" (Shakespearean comedy — A Midsummer Night's Dream / The Tempest):
+Characters leave their normal world and enter a strange environment where the rules are different — an alien biome, a malfunctioning space station, a quarantine dreamscape. In this weird place, social hierarchies flip. The serious boss becomes helpless. The quiet intern becomes the leader. Unlikely pairs are thrown together. Comedy comes from fish-out-of-water moments. By the time they return to "normal," everyone has changed. The science is the magic — it created the enchanted space.
+
+ARC TYPE K — "THE SCHEMER UNDONE" (Shakespearean comedy — Much Ado About Nothing / The Merry Wives of Windsor):
+A clever character hatches an elaborate plan — maybe to get credit for a discovery, cover up a mistake, or manipulate a rival. The plan is brilliant on paper. But every person they recruit to help adds their own agenda. Side plots multiply. The scheme gets more and more baroque until it collapses spectacularly, and the schemer ends up in a worse position than if they'd just been honest. But the fallout brings people together in unexpected ways.
+
+ARC TYPE L — "THE RIVALS" (Shakespearean comedy — The Taming of the Shrew / Love's Labour's Lost):
+Two strong-willed characters who can't stand each other are forced to work together. They argue about EVERYTHING — methods, priorities, whose fault it is. But their arguments reveal mutual respect buried under pride. The crisis forces them to combine their opposing approaches, and the solution only works because they're different. Ends with grudging admiration that the audience knows is something more.
+
+IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
+
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
-- GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). The global population is essentially equal at working age. Diverse casts sound better and use the full range of available voice presets.
-- The CLOSING must be a factual "Hard Science Epilogue."
+- GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
+- The CLOSING must be a factual "Hard Science Epilogue" — this is where the REAL science lives. Keep the drama accessible; save the heavy citations for the outro.
 
 CITATION RULE (STRICT):
 The epilogue MUST cite ONLY the real article provided above.
@@ -655,9 +712,9 @@ Correct format example: "According to Science Daily, published April 3, 2026, re
 (Use the ACTUAL source name and date from the article above — Science Daily is just an example.)
 
 STRUCTURE:
-1. === SCENE 1 === (The Setup/News Briefing)
-2. === SCENE 2-X === (The Crisis/Rising Action)
-3. === SCENE FINAL === (The Twist and Science Epilogue)
+1. === SCENE 1 === (Hook the listener — drop us into a tense human moment. THEN reveal the science angle.)
+2. === SCENE 2-X === (Escalate the HUMAN stakes. Characters argue, make choices, face consequences.)
+3. === SCENE FINAL === (The twist, emotional payoff, then ANNOUNCER's Hard Science Epilogue.)
 
 TARGET: {target_minutes} minutes (~{target_words} words). Let it breathe with (beat) tags.
 PRIMARY RULE: Tags always start at the beginning of a line. No inline tags.
@@ -783,6 +840,10 @@ TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
 {"PREMISE: " + custom_premise if custom_premise else "The news headlines above ARE the premise. Extrapolate them. What's the next terrifying or profound step?"}
+
+STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGHIJKL")} from the Story Arc Engine above. Commit fully to that structure.
+
+REMEMBER: Story first. Make the listener CARE about these people before you scare them with science. Write dialogue that sounds like real humans under pressure — not scientists reading papers.
 
 Begin the full script now. Follow this structure exactly:
 === SCENE 1 ===
@@ -927,11 +988,16 @@ Characters: {num_chars} speaking roles plus ANNOUNCER
 {lemmy_directive}
 
 Return:
-- Character list: name, role, gender, personality in one line each (aim for ~50/50 male/female split)
+- Character list: name, role, gender, personality, and what they PERSONALLY have at stake (~50/50 male/female split)
 - Time period and setting (derived from the science news)
-- {num_acts}-act structure: inciting incident, escalation beats, twist/resolution
+- {num_acts}-act structure: inciting incident, escalation beats, twist/resolution — focus on HUMAN drama, not science exposition
+- At least one moment of humor, warmth, or unexpected humanity
 - The ANNOUNCER's hard-science epilogue topic and sources to cite
 - Key SFX and music cues
+
+STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGH")} from the Story Arc Engine. Commit fully to that structure.
+
+Remember: This is a DRAMA that happens to involve science, not a science report with characters. Give every character something personal to lose.
 
 {"Premise: " + premise if premise else "The news headlines ARE the premise. Extrapolate the science into its most dramatic next step."}
 
