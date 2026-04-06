@@ -106,7 +106,7 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 _BARK_CACHE = {"model": None, "processor": None, "device": None}
 
 
-def _load_bark(model_id="suno/bark", device="cuda"):
+def _load_bark(model_id="suno/bark", device=None):
     """Load Bark model and processor. Caches globally with device tracking.
 
     BEST PRACTICES (per survival guide):
@@ -116,9 +116,17 @@ def _load_bark(model_id="suno/bark", device="cuda"):
 
     Use torch_dtype= (not dtype=) — BarkModel wraps its own from_pretrained
     and passes kwargs through to transformers, which expects the standard kwarg.
+
+    Device fallback: CUDA if available, CPU otherwise (with warning).
     """
     global _BARK_CACHE
     import torch
+
+    # Auto-detect device: CUDA if available, CPU fallback
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if device == "cpu":
+            log.warning("[Bark] CUDA not available. Falling back to CPU. TTS will be slow.")
 
     # Device change invalidation (Section 34)
     if (_BARK_CACHE["model"] is not None and
@@ -127,7 +135,7 @@ def _load_bark(model_id="suno/bark", device="cuda"):
         _unload_bark()
 
     if _BARK_CACHE["model"] is None:
-        log.info(f"Loading Bark model: {model_id}")
+        log.info(f"Loading Bark model: {model_id} on {device}")
         try:
             from transformers import AutoProcessor, BarkModel
 
@@ -139,41 +147,36 @@ def _load_bark(model_id="suno/bark", device="cuda"):
                 processor = AutoProcessor.from_pretrained(model_id)
                 log.info("Bark processor downloaded and cached")
 
-            # Load directly to CUDA. enable_cpu_offload() was causing two
-            # problems: (1) model.device returns 'cpu', so v.to(model.device)
-            # was moving inputs *to CPU*; (2) voice-preset tensors generated
-            # mid-pipeline on GPU couldn't be concatenated with CPU-origin
-            # numpy arrays, giving "index is on cpu" inside model.generate().
-            # RTX 5080 (16 GB) + Bark fp16 (~2.5 GB) + Gemma4 unloaded =
-            # zero VRAM pressure, so CPU offload buys nothing here.
-            # local_files_only=True — skip HuggingFace Hub ETag HTTP checks
-            # on every load. Without this, transformers attempts a safetensors
-            # conversion request to the HF API which fails with a JSONDecodeError
-            # and floods the log with noise. Model is already cached locally.
+            # Load to target device (CUDA or CPU fallback).
+            # On CUDA: Use device_map for direct CUDA load (avoids CPU intermediate state)
+            # On CPU: Standard load with dtype=torch.float32 (CPU doesn't support float16 well)
+            device_map = f"{device}:0" if device == "cuda" else device
+            dtype = torch.float16 if device == "cuda" else torch.float32
+
             try:
                 model = BarkModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16,
-                    device_map="cuda:0",
+                    torch_dtype=dtype,
+                    device_map=device_map,
                     local_files_only=True,
                 )
-                log.info("Bark model loaded from cache (no HTTP checks)")
+                log.info(f"Bark model loaded from cache on {device} (no HTTP checks)")
             except OSError:
                 model = BarkModel.from_pretrained(
                     model_id,
-                    torch_dtype=torch.float16,
-                    device_map="cuda:0",
+                    torch_dtype=dtype,
+                    device_map=device_map,
                 )
-                log.info("Bark model downloaded and cached")
+                log.info(f"Bark model downloaded and cached on {device}")
 
             # ── STRICT DEVICE SENTRY ──
-            # Force all sub-models to CUDA explicitly to prevent any internal
-            # state from being stranded on CPU.
-            model.to("cuda")
+            # Force all sub-models to target device explicitly to prevent any internal
+            # state from being stranded on wrong device.
+            model.to(device)
             for sub in ("semantic", "coarse_acoustics", "fine_acoustics"):
                 sm = getattr(model, sub, None)
                 if sm is not None:
-                    sm.to("cuda")
+                    sm.to(device)
 
             # ── FIX: Patch generation configs — parent model + all sub-models ──
             # Bark's BarkModel and its sub-models ship with max_length=20 in
@@ -314,17 +317,19 @@ class BarkTTSNode:
             log.info(f"[BarkTTS] Chunk {i+1}/{len(chunks)}: '{chunk[:40]}...'")
 
             inputs = processor(chunk, voice_preset=voice_preset)
-            # Recursively move ALL processor outputs to CUDA — including the
-            # nested 'history_prompt' dict with voice preset numpy arrays.
-            inputs = _move_to_device(inputs, torch.device("cuda"))
+            # Recursively move ALL processor outputs to target device (CUDA or CPU).
+            # Includes nested 'history_prompt' dict with voice preset numpy arrays.
+            target_device = torch.device(_BARK_CACHE["device"])
+            inputs = _move_to_device(inputs, target_device)
 
             # SENTRY AUDIT: Final verification before generation
             device_errors = []
-            if inputs["input_ids"].device.type != "cuda":
+            expected_device_type = _BARK_CACHE["device"]
+            if inputs["input_ids"].device.type != expected_device_type:
                 device_errors.append(f"input_ids on {inputs['input_ids'].device}")
             if "history_prompt" in inputs:
                 for k, v in inputs["history_prompt"].items():
-                    if torch.is_tensor(v) and v.device.type != "cuda":
+                    if torch.is_tensor(v) and v.device.type != expected_device_type:
                         device_errors.append(f"history_prompt.{k} on {v.device}")
             
             if device_errors:
