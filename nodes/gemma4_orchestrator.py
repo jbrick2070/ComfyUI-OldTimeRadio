@@ -239,13 +239,15 @@ _VOICE_PROFILES = [
     ("v2/pl_speaker_4", "female", "pl", {"warm", "energetic", "30s"}),
 ]
 
-# ANNOUNCER voice pool — randomized per episode for gender balance
+# ANNOUNCER voice pool — randomized per episode for gender balance (50/50 male/female)
 # ANNOUNCER always uses neutral English (en_speaker_*) — no accent
 _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_0", "Male, authoritative, deep"),
+    ("v2/en_speaker_1", "Male, measured, calm"),
     ("v2/en_speaker_2", "Female, clear, neutral"),
     ("v2/en_speaker_4", "Female, warm, energetic"),
     ("v2/en_speaker_9", "Female, mature, authoritative"),
+    ("v2/en_speaker_5", "Male, warm, older"),
 ]
 
 # LEMMY fixed profile — always gravelly/raspy male with British accent
