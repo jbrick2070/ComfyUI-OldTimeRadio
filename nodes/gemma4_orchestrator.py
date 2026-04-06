@@ -1568,7 +1568,13 @@ The script follows these tokens:
   }}
 }}
 
-Output ONLY the JSON block. No prose before or after it.
+CRITICAL RULES:
+- Output ONLY the JSON block. No prose, no commentary, no markdown explanation.
+- Do NOT copy, summarize, paraphrase, or include ANY dialogue from the script.
+- Do NOT add a "script" or "dialogue" or "scenes" key to your JSON.
+- Your ONLY job: extract character names, assign placeholder presets, list SFX cues, set pacing.
+- Keep the JSON as MINIMAL as possible. Short notes, short descriptions.
+- The procedural engine handles all voice casting — your presets are placeholders only.
 
 SCRIPT:
 {script_text}
