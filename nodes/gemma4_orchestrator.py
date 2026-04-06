@@ -1306,7 +1306,7 @@ The script follows these tokens:
   v2/pt_speaker_0 = Male, Portuguese accent, soft/thoughtful
   v2/pt_speaker_4 = Female, Portuguese accent, gentle/clear
 
-- ANNOUNCER should always use v2/en_speaker_0 (native English, authoritative).
+- ANNOUNCER: Randomly select ONE of {v2/en_speaker_0 (male, authoritative), v2/en_speaker_2 (female, clear), v2/en_speaker_4 (female, energetic), v2/en_speaker_9 (female, mature)} for gender balance and vocal variety. Keep it consistent within the episode.
 - Each character gets ONE preset that stays consistent for the entire episode.
 - If two characters share a gender/age, still assign DIFFERENT presets.
 - Use international presets for non-ANNOUNCER characters to add vocal diversity.
@@ -1316,8 +1316,8 @@ The script follows these tokens:
   "episode_title": "...",
   "voice_assignments": {{
     "ANNOUNCER": {{
-      "voice_preset": "v2/en_speaker_0",
-      "notes": "Male, authoritative, 50s"
+      "voice_preset": "v2/en_speaker_4",
+      "notes": "Female, energetic, authoritative"
     }},
     "HAYES": {{
       "voice_preset": "v2/en_speaker_1",
