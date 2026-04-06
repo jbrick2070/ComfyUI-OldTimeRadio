@@ -1,4 +1,4 @@
-﻿r"""
+r"""
 Scene Sequencer + Episode Assembler — Orchestrate the Full Radio Show
 ======================================================================
 
