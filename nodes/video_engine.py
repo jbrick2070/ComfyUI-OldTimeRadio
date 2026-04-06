@@ -453,6 +453,362 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TELEMETRY HUD — Post-roll treatment card
+# Rendered AFTER the episode audio ends.  No spoilers during playback.
+#
+# Layout:
+#   LEFT  (30 %) — static: title, genre, news seed, cast & voices
+#   DIV         — 1 px phosphor-green divider
+#   RIGHT (70 %) — scrolling classified transcript (scene arc + full script)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fh(font, pad=4):
+    """Line height for *font* (PIL getbbox-safe)."""
+    try:
+        bb = font.getbbox("Mg")
+        return bb[3] - bb[1] + pad
+    except Exception:
+        return 16 + pad
+
+
+def _fw(text, font):
+    """Text pixel width for *font* (PIL getbbox-safe)."""
+    if not text:
+        return 0
+    try:
+        bb = font.getbbox(str(text))
+        return max(0, bb[2] - bb[0])
+    except Exception:
+        return len(str(text)) * 8
+
+
+def _draw_wrapped(draw, text, x, y, max_w, font, fill, lh, indent=0):
+    """Word-wrap *text* into *draw* starting at (x, y). Returns new y."""
+    words = str(text).split()
+    line_buf = []
+    for word in words:
+        test = " ".join(line_buf + [word])
+        if _fw(test, font) > max_w and line_buf:
+            draw.text((x + indent, y), " ".join(line_buf), fill=fill, font=font)
+            y += lh
+            line_buf = [word]
+        else:
+            line_buf.append(word)
+    if line_buf:
+        draw.text((x + indent, y), " ".join(line_buf), fill=fill, font=font)
+        y += lh
+    return y
+
+
+def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
+                    news_used, duration_s, W, H):
+    """Return a clean data dict for *_TelemetryHUDRenderer*."""
+    import time as _t
+    try:
+        script = (json.loads(script_json_str)
+                  if isinstance(script_json_str, str) else (script_json_str or []))
+        plan   = (json.loads(production_plan_json_str)
+                  if isinstance(production_plan_json_str, str) else (production_plan_json_str or {}))
+        if not isinstance(script, list):
+            script = []
+    except Exception:
+        script, plan = [], {}
+
+    # Voice assignments — same normalisation as _write_story_treatment
+    voices = {}
+    for k, v in (plan.get("voice_assignments", {}) or {}).items():
+        if isinstance(v, dict):
+            voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", ""))))
+        else:
+            voices[str(k)] = str(v)
+
+    # News seeds (handle JSON-list format)
+    news_seeds = []
+    _nr = (news_used or "").strip()
+    if _nr.startswith("["):
+        try:
+            news_seeds = [str(s) for s in json.loads(_nr)[:2]]
+        except Exception:
+            news_seeds = [_nr[:100]]
+    elif _nr:
+        news_seeds = [_nr.split("\n")[0][:100]]
+
+    # Cast
+    cast = [{"char": c, "preset": p, "desc": _PRESET_DESC.get(p, "")}
+            for c, p in sorted(voices.items())]
+
+    # Scenes from Canonical 1.0 item stream
+    scenes, cur = [], {"scene_num": "1", "env": "", "items": []}
+    for item in script:
+        t = item.get("type", "")
+        if t == "scene_break":
+            if cur["items"] or cur["env"]:
+                scenes.append(cur)
+            cur = {"scene_num": str(item.get("scene", len(scenes) + 2)),
+                   "env": "", "items": []}
+        elif t == "environment":
+            cur["env"] = str(item.get("description", ""))
+        elif t == "dialogue":
+            char = str(item.get("character_name", item.get("character", "?")))
+            cur["items"].append({
+                "type": "dialogue",
+                "char": char,
+                "text": str(item.get("line", item.get("text", ""))),
+                "preset": voices.get(char, ""),
+            })
+        elif t == "sfx":
+            cur["items"].append({
+                "type": "sfx",
+                "text": str(item.get("description", item.get("text", ""))),
+            })
+        elif t == "pause":
+            cur["items"].append({"type": "pause"})
+    if cur["items"] or cur["env"]:
+        scenes.append(cur)
+
+    return {
+        "title":      episode_title,
+        "genre":      plan.get("genre_flavor", plan.get("genre", "sci-fi")),
+        "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
+        "duration_s": duration_s,
+        "resolution": f"{W}x{H}",
+        "news_seeds": news_seeds,
+        "cast":       cast,
+        "scenes":     scenes,
+    }
+
+
+class _TelemetryHUDRenderer:
+    """Post-roll Telemetry HUD frame generator.
+
+    Pre-renders both panels at init time; render() is cheap (crop + paste).
+    """
+
+    _SCROLL_PPS = 65  # pixels per second (comfortable reading speed)
+
+    def __init__(self, w, h, fps, data):
+        self.w, self.h, self.fps = w, h, fps
+        self.data = data
+
+        self.LEFT_W  = max(220, int(w * 0.30))
+        self.DIV_X   = self.LEFT_W
+        self.RIGHT_X = self.LEFT_W + 2
+        self.RIGHT_W = w - self.LEFT_W - 2
+        self.P       = max(8, w // 140)
+
+        self.f_head  = _load_font(max(18, h // 34))
+        self.f_label = _load_font(max(14, h // 52))
+        self.f_body  = _load_font(max(12, h // 62))
+        self.f_small = _load_font(max(10, h // 80))
+
+        self._lhH = _fh(self.f_head)
+        self._lhL = _fh(self.f_label)
+        self._lhB = _fh(self.f_body)
+        self._lhS = _fh(self.f_small)
+
+        self._left  = self._build_left()
+        self._right, self._right_h = self._build_right()
+
+        # Scanline overlay (full canvas)
+        self._scanlines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        _sl = ImageDraw.Draw(self._scanlines)
+        for sy in range(0, h, max(2, h // 360)):
+            _sl.line([(0, sy), (w, sy)], fill=(0, 0, 0, 40))
+
+    # ── Public API ────────────────────────────────────────────────────────
+
+    def hud_frames(self):
+        """Total frame count for the HUD post-roll (20–90 s)."""
+        scroll_px = max(0, self._right_h - self.h)
+        secs = scroll_px / self._SCROLL_PPS + 8.0
+        return int(max(20.0, min(90.0, secs)) * self.fps)
+
+    def render(self, fi, total_hud_frames):
+        """Return a PIL RGB Image for HUD frame *fi*."""
+        img = Image.new("RGB", (self.w, self.h), CRT_BG)
+
+        # Static left panel
+        img.paste(self._left, (0, 0))
+
+        # Divider
+        d = ImageDraw.Draw(img)
+        d.line([(self.DIV_X, 0), (self.DIV_X, self.h)], fill=CRT_DIM, width=1)
+
+        # Scrolling right panel
+        s_start = int(total_hud_frames * 0.08)
+        s_end   = int(total_hud_frames * 0.92)
+        if fi <= s_start:
+            frac = 0.0
+        elif fi >= s_end:
+            frac = 1.0
+        else:
+            frac = (fi - s_start) / max(1, s_end - s_start)
+
+        sy  = int(frac * max(0, self._right_h - self.h))
+        bot = min(sy + self.h, self._right.height)
+        if bot > sy:
+            crop = self._right.crop((0, sy, self.RIGHT_W, bot))
+            if crop.height < self.h:
+                pad_img = Image.new("RGB", (self.RIGHT_W, self.h), CRT_BG)
+                pad_img.paste(crop, (0, 0))
+                crop = pad_img
+            img.paste(crop, (self.RIGHT_X, 0))
+
+        # Fade in / out (6 % of total)
+        fade_f = max(1, int(total_hud_frames * 0.06))
+        if fi < fade_f:
+            black = Image.new("RGB", (self.w, self.h), (0, 0, 0))
+            img = Image.blend(black, img, fi / fade_f)
+        elif fi > total_hud_frames - fade_f:
+            black = Image.new("RGB", (self.w, self.h), (0, 0, 0))
+            img = Image.blend(black, img, (total_hud_frames - fi) / fade_f)
+
+        # Scanlines
+        img = Image.alpha_composite(img.convert("RGBA"),
+                                    self._scanlines).convert("RGB")
+        return img
+
+    # ── Panel builders ────────────────────────────────────────────────────
+
+    def _build_left(self):
+        img = Image.new("RGB", (self.LEFT_W, self.h), CRT_BG)
+        d, P = ImageDraw.Draw(img), self.P
+        y = P
+
+        # Title
+        d.text((P, y), "SIGNAL LOST", fill=CRT_GREEN, font=self.f_head)
+        y += self._lhH
+        d.text((P, y), "EPISODE TREATMENT", fill=CRT_DIM, font=self.f_small)
+        y += self._lhS + P
+        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
+        y += P * 2
+
+        # Metadata
+        d.text((P, y), "METADATA", fill=CRT_AMBER, font=self.f_small)
+        y += self._lhS
+        lbl_w = _fw("DATE  ", self.f_small)
+        for lbl, val in [
+            ("TITLE", self.data.get("title", "?")),
+            ("GENRE", self.data.get("genre", "?")),
+            ("LEN",   f'{self.data.get("duration_s", 0) / 60:.1f} min'),
+            ("RES",   self.data.get("resolution", "?")),
+            ("DATE",  self.data.get("produced", "")[:10]),
+        ]:
+            d.text((P, y), lbl, fill=CRT_DIM, font=self.f_small)
+            d.text((P + lbl_w, y), str(val), fill=CRT_WHITE, font=self.f_small)
+            y += self._lhS
+        y += P
+        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
+        y += P * 2
+
+        # News seed
+        d.text((P, y), "NEWS SEED", fill=CRT_AMBER, font=self.f_small)
+        y += self._lhS
+        for seed in self.data.get("news_seeds", [])[:2]:
+            y = _draw_wrapped(d, seed, P, y,
+                              self.LEFT_W - P * 2, self.f_small,
+                              CRT_DIM, self._lhS)
+            y += P // 2
+        y += P
+        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
+        y += P * 2
+
+        # Cast & voices
+        d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_small)
+        y += self._lhS
+        for m in self.data.get("cast", []):
+            d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_small)
+            y += self._lhS
+            preset = m.get("preset", "")
+            if preset:
+                d.text((P * 2, y), preset, fill=CRT_DIM, font=self.f_small)
+                y += self._lhS
+            desc = m.get("desc", "")
+            if desc:
+                char_w = max(1, _fw("m", self.f_small))
+                trunc = desc[:(self.LEFT_W - P * 3) // char_w]
+                if len(trunc) < len(desc):
+                    trunc = trunc.rstrip() + "…"
+                d.text((P * 2, y), trunc, fill=CRT_DARK, font=self.f_small)
+                y += self._lhS
+            y += P // 2
+
+        # Footer
+        fy = self.h - self._lhS - P
+        d.line([(P, fy - P), (self.LEFT_W - P, fy - P)], fill=CRT_DARK, width=1)
+        d.text((P, fy), "OTR v1.0", fill=CRT_DARK, font=self.f_small)
+        return img
+
+    def _build_right(self):
+        """Pre-render the full scrollable transcript. Returns (img, content_h)."""
+        P, RW = self.P, self.RIGHT_W
+        scenes = self.data.get("scenes", [])
+        n_items = sum(len(s.get("items", [])) for s in scenes)
+        est_h = self.h + (len(scenes) * 4 + n_items * 5) * self._lhB + self.h
+        est_h = max(est_h, self.h * 3)
+
+        img = Image.new("RGB", (RW, est_h), CRT_BG)
+        d   = ImageDraw.Draw(img)
+        y   = self.h // 4   # breathing room above first line
+
+        # Transcript header
+        d.text((P, y), "[ CLASSIFIED TRANSCRIPT ]", fill=CRT_GREEN, font=self.f_head)
+        y += self._lhH
+        d.text((P, y), f"EPISODE  //  {self.data.get('title','?').upper()}",
+               fill=CRT_AMBER, font=self.f_label)
+        y += self._lhL + P
+        d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
+        y += P * 3
+
+        for scene in scenes:
+            sc_num = scene.get("scene_num", "1")
+            env    = scene.get("env", "")
+
+            d.text((P, y), f"——  SCENE {sc_num}", fill=CRT_AMBER, font=self.f_label)
+            y += self._lhL
+            if env:
+                d.text((P * 3, y), f"ENV: {env}", fill=CRT_DIM, font=self.f_body)
+                y += self._lhB
+            y += P
+            d.line([(P, y), (RW // 2, y)], fill=CRT_DARK, width=1)
+            y += P * 2
+
+            for item in scene.get("items", []):
+                kind = item.get("type", "")
+                if kind == "dialogue":
+                    char   = item.get("char", "?")
+                    preset = item.get("preset", "")
+                    char_tag = f"{char}  [{preset}]" if preset else char
+                    d.text((P, y), char_tag, fill=CRT_GREEN, font=self.f_label)
+                    y += self._lhL
+                    y = _draw_wrapped(d, item.get("text", ""),
+                                      P * 3, y, RW - P * 4,
+                                      self.f_body, CRT_WHITE, self._lhB)
+                    y += P
+                elif kind == "sfx":
+                    d.text((P, y), f"[SFX]  {item.get('text','')[:80]}",
+                           fill=CRT_CYAN, font=self.f_body)
+                    y += self._lhB + P // 2
+                elif kind == "pause":
+                    d.text((P, y), "[ . . . ]", fill=CRT_DARK, font=self.f_body)
+                    y += self._lhB
+            y += P * 3
+
+        # Footer
+        y += P * 4
+        d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
+        y += P * 2
+        d.text((P, y), "[ END OF CLASSIFIED TRANSCRIPT ]",
+               fill=CRT_DIM, font=self.f_label)
+        y += self._lhL
+        d.text((P, y), "SIGNAL LOST  //  ALL RIGHTS RESERVED",
+               fill=CRT_DARK, font=self.f_small)
+        y += self._lhS + P * 6
+
+        return img, y
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # COMFYUI NODE
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -740,17 +1096,35 @@ class SignalLostVideoRenderer:
         _runtime_log("Video: Analysing audio (FFT + RMS)")
         volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
 
+        # ── 2b. Build post-roll Telemetry HUD (no VRAM, pure PIL) ────
+        try:
+            _hud_data     = _parse_hud_data(episode_title, script_json,
+                                            production_plan_json, news_used,
+                                            duration, W, H)
+            _hud_renderer = _TelemetryHUDRenderer(W, H, fps, _hud_data)
+            _hud_frames   = _hud_renderer.hud_frames()
+        except Exception as _he:
+            log.warning("[Video] HUD build failed (post-roll skipped): %s", _he)
+            _hud_renderer = None
+            _hud_frames   = 0
+
         # ── 3. Save audio to temp WAV for ffmpeg ─────────────────────
         import tempfile
         import wave as wave_mod
 
         tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
         pcm = (audio_np * 32767).astype(np.int16)
+        # Append silence so WAV covers the HUD post-roll duration
+        if _hud_frames > 0:
+            hud_silence = np.zeros(int(_hud_frames / fps * sr), dtype=np.int16)
+            pcm_out = np.concatenate([pcm, hud_silence])
+        else:
+            pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(sr)
-            wf.writeframes(pcm.tobytes())
+            wf.writeframes(pcm_out.tobytes())
 
         # ── 4. Determine output path ─────────────────────────────────
         out_dir = os.path.join(
@@ -766,21 +1140,24 @@ class SignalLostVideoRenderer:
 
         # ── 5. Build frame generator ─────────────────────────────────
         renderer = _CRTRenderer(W, H, episode_title)
+        total_encode_frames = total_frames + _hud_frames
 
         def _frame_gen():
+            # Main audio-reactive content
             for fi in range(total_frames):
-                frame = renderer.render(
-                    fi, total_frames, fps,
-                    volume[fi], freqs[fi], waves[fi],
-                )
-                yield frame
-
+                yield renderer.render(fi, total_frames, fps,
+                                      volume[fi], freqs[fi], waves[fi])
                 if fi % (fps * 30) == 0 and fi > 0:
                     _runtime_log(f"Video: {fi}/{total_frames} frames rendered")
+            # Post-roll Telemetry HUD (no spoilers — plays after audio ends)
+            if _hud_renderer is not None and _hud_frames > 0:
+                _runtime_log(f"Video: Treatment HUD — {_hud_frames} frames")
+                for hi in range(_hud_frames):
+                    yield _hud_renderer.render(hi, _hud_frames)
 
         # ── 6. Encode ────────────────────────────────────────────────
         _runtime_log(f"Video: Encoding MP4 via ffmpeg -> {os.path.basename(out_path)}")
-        _encode_mp4(_frame_gen(), total_frames, tmp_wav, out_path, W, H, fps)
+        _encode_mp4(_frame_gen(), total_encode_frames, tmp_wav, out_path, W, H, fps)
 
         try:
             os.remove(tmp_wav)
