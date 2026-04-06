@@ -121,7 +121,7 @@ def _bark_health_check():
 
     try:
         import numpy as np
-        from bark import generate_audio, preload_models
+        from bark import generate_audio
     except Exception as e:
         log.info("[VoiceHealth] Bark not importable (%s) — skipping health check", e)
         _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
@@ -130,16 +130,29 @@ def _bark_health_check():
     log.info("[VoiceHealth] Running 1-second Bark health check on English presets...")
     _runtime_log("VOICE_HEALTH: Starting Bark preset health check")
 
-    try:
-        preload_models()
-    except Exception as e:
-        log.warning("[VoiceHealth] preload_models failed: %s — skipping health check", e)
-        _runtime_log(f"VOICE_HEALTH_SKIPPED: preload failed ({e})")
-        return
+    # Note: intentionally NOT calling preload_models() — it has a known bug
+    # on fresh/partial model downloads where an internal tensor is None and
+    # crashes with "'NoneType' object has no attribute 'item'". The per-preset
+    # generate_audio() calls below will lazy-load everything anyway.
 
     presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
                               {p for p, _ in _ANNOUNCER_PRESETS} |
                               {_LEMMY_PROFILE["voice_preset"]})
+
+    # ── Quick smoke test on a single preset BEFORE the full sweep ──
+    # If even one synthesis call raises an exception, Bark itself is broken
+    # (fresh download race, missing weights, CUDA OOM, etc.) — NOT the preset.
+    # In that case we abort the health check entirely and leave _VOICE_PROFILES
+    # untouched, so downstream BatchBark still has every voice available.
+    try:
+        import numpy as _np_probe
+        _probe = generate_audio("Test.", history_prompt=presets_to_test[0])
+        _ = _np_probe.asarray(_probe, dtype=_np_probe.float32)
+    except Exception as e:
+        log.warning("[VoiceHealth] Bark probe failed (%s) — Bark itself appears broken, "
+                    "skipping per-preset check and leaving all voices enabled", e)
+        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark probe failed ({e}) — all presets left enabled")
+        return
 
     test_text = "Testing one two three."
     disabled = set()
