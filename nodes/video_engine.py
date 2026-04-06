@@ -502,13 +502,13 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         if not isinstance(script, list):
             script = []
 
-        # Normalize voice_assignments: values might be dicts like {"preset": "v2/en_speaker_0", ...}
+        # Normalize voice_assignments: values may be dicts like {"voice_preset": "v2/en_speaker_0", ...}
         voices_raw = plan.get("voice_assignments", {})
         voices = {}
         if isinstance(voices_raw, dict):
             for k, v in voices_raw.items():
                 if isinstance(v, dict):
-                    voices[str(k)] = str(v.get("preset", v.get("voice", str(v))))
+                    voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", str(v)))))
                 else:
                     voices[str(k)] = str(v)
 
@@ -530,10 +530,18 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(f"  Produced :  {ts}")
         W_()
 
-        # News seed
+        # News seed — may arrive as a JSON list ["headline 1", "headline 2", ...]
         W_("NEWS SEED")
         W_(BAR)
-        news_clean = (news_used or "").strip().split("\n")[0][:120]
+        _news_raw = (news_used or "").strip()
+        if _news_raw.startswith("["):
+            try:
+                _seeds = _json.loads(_news_raw)
+                news_clean = " | ".join(str(s)[:80] for s in _seeds[:3]) if _seeds else ""
+            except Exception:
+                news_clean = _news_raw[:120]
+        else:
+            news_clean = _news_raw.split("\n")[0][:120]
         W_(f"  {news_clean if news_clean else '(no news seed — custom premise used)'}")
         W_()
 
@@ -550,17 +558,24 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
             W_("  (no voice assignments recorded)")
         W_()
 
-        # Scene arc summary
+        # Scene arc summary — build from scene_break / environment / dialogue items
         scenes = {}
+        _cur_sc = "1"
+        _cur_env = ""
         for item in script:
-            sc = str(item.get("scene", 1))  # coerce to str for safe dict key
-            if sc not in scenes:
-                scenes[sc] = {"env": str(item.get("env", "")), "sfx": [], "d": 0}
             t = item.get("type", "")
-            if t == "sfx":
-                scenes[sc]["sfx"].append(item.get("text", ""))
+            if t == "scene_break":
+                _cur_sc = str(item.get("scene", _cur_sc))
+            elif t == "environment":
+                _cur_env = str(item.get("description", ""))
+            if _cur_sc not in scenes:
+                scenes[_cur_sc] = {"env": _cur_env, "sfx": [], "d": 0}
+            if t == "environment":
+                scenes[_cur_sc]["env"] = _cur_env
+            elif t == "sfx":
+                scenes[_cur_sc]["sfx"].append(str(item.get("description", item.get("text", ""))))
             elif t == "dialogue":
-                scenes[sc]["d"] += 1
+                scenes[_cur_sc]["d"] += 1
 
         W_("SCENE ARC")
         W_(BAR)
@@ -575,31 +590,56 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
             W_("  (scene data unavailable)")
             W_()
 
-        # Full script in scene order
+        # Full script in scene order — Canonical 1.0 item types:
+        #   scene_break → {"type":"scene_break","scene":"1"}
+        #   environment → {"type":"environment","description":"..."}
+        #   dialogue    → {"type":"dialogue","character_name":"...","line":"..."}
+        #   sfx         → {"type":"sfx","description":"..."}
+        #   pause       → {"type":"pause","kind":"beat","duration_ms":200}
         d_count = sum(1 for i in script if i.get("type") == "dialogue")
         s_count = sum(1 for i in script if i.get("type") == "sfx")
         W_(f"FULL SCRIPT  ({d_count} dialogue  \u00b7  {s_count} sfx cues)")
         W_(BAR)
         cur_scene = None
+        cur_env = ""
+        scene_header_written = False
         for item in script:
-            sc = str(item.get("scene", ""))  # coerce to str
-            if sc != cur_scene:
-                cur_scene = sc
-                env = (str(item.get("env") or "")).strip()
-                W_()
-                W_(f"  \u2500\u2500 SCENE {sc}  \u00b7  {env}")
-                W_()
             kind = item.get("type", "")
-            if kind == "dialogue":
-                char   = str(item.get("character", "?"))
-                text   = str(item.get("text", "")).strip()
+            if kind == "scene_break":
+                cur_scene = str(item.get("scene", cur_scene or "1"))
+                scene_header_written = False
+            elif kind == "environment":
+                cur_env = str(item.get("description", "")).strip()
+                if not scene_header_written:
+                    if cur_scene is None:
+                        cur_scene = "1"
+                    W_()
+                    W_(f"  \u2500\u2500 SCENE {cur_scene}  \u00b7  {cur_env}")
+                    W_()
+                    scene_header_written = True
+            elif kind == "dialogue":
+                if not scene_header_written:
+                    if cur_scene is None:
+                        cur_scene = "1"
+                    W_()
+                    W_(f"  \u2500\u2500 SCENE {cur_scene}  \u00b7  {cur_env}")
+                    W_()
+                    scene_header_written = True
+                char   = str(item.get("character_name", item.get("character", "?")))
+                text   = str(item.get("line", item.get("text", ""))).strip()
                 preset = voices.get(char, "")
+                desc   = _PRESET_DESC.get(preset, "")
                 vtag   = f"  [{preset}]" if preset else ""
-                W_(f"  {str(char)}{vtag}")
+                W_(f"  {char}{vtag}")
                 W_(f"    {text}")
                 W_()
             elif kind == "sfx":
-                W_(f"  [SFX]  {str(item.get('text','')).strip()}")
+                sfx_text = str(item.get("description", item.get("text", ""))).strip()
+                W_(f"  [SFX]  {sfx_text}")
+                W_()
+            elif kind == "pause":
+                pause_kind = item.get("kind", "beat")
+                W_(f"  [PAUSE/{pause_kind.upper()}]")
                 W_()
         W_()
 
