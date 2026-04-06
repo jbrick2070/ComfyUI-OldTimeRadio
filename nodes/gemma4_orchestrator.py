@@ -268,19 +268,26 @@ def _content_filter(text: str) -> tuple:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Sci-fi character name pools — contemporary, neutral, tech-aligned
+# Omni-Retro 5-Pillar Naming Pool — short, punchy, Bark-optimized (1-2 syllables, hard consonants)
+# Pillars: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Density, Russian Dieselpunk
 _FIRST_NAMES = [
-    "Alex", "Chen", "Sam", "Morgan", "Casey", "Jordan", "Riley", "Blake",
-    "Quinn", "Sage", "Vale", "Nova", "Kai", "Ash", "Eden", "River",
-    "Reyes", "Hayes", "Shaw", "Stone", "Cross", "Beck", "Cole", "Kane",
-    "Maya", "Iris", "Luna", "Aurora", "Vera", "Zara", "Stella", "Ivy",
-    "Marcus", "Xavier", "Adrian", "Dante", "Oscar", "Victor", "Ryder", "Dex",
+    # 1950s Americana Noir
+    "Vance", "Carter", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
+    "Blake", "Cole", "Drake", "Quinn", "Reese", "Kane",
+    # Afrofuturism
+    "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia",
+    # Neo-Tokyo Cyberpunk
+    "Ren", "Akira", "Kenji", "Yuki", "Sora", "Jiro", "Rei", "Hiro",
+    # Thai Density
+    "Krit", "Mali", "Niran", "Sunan", "Dao", "Pim", "Som",
+    # Russian Dieselpunk
+    "Lev", "Anya", "Dmitri", "Sergei", "Volkov", "Mira", "Yuri",
 ]
 
 _LAST_NAMES = [
-    "Quinn", "Rivers", "Stone", "Shaw", "Beck", "Gray", "Cole", "Kane",
-    "Grant", "Pierce", "Storm", "Brooks", "Cross", "Wells", "Palmer", "Hayes",
-    "Reeves", "Moore", "Carter", "Brooks", "Edwards", "Allen", "Reid", "Elliott",
-    "Winters", "Summers", "Archer", "Wells", "Knight", "Steel", "Frost", "Snow",
+    "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
+    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
+    "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
 ]
 
 # Trait pools for procedural character profiles
@@ -1065,6 +1072,37 @@ CHARACTER NAMES must be CONSISTENT across all scenes (same spelling, same caps, 
 - NEVER use (parentheses) for anything except the (beat) tag.
 - NEVER write stage directions in the dialogue text.
 
+═══ 🧱 WORLDBUILDING, RHYTHM, & SONIC ARCHITECTURE RULES ═══
+
+1. OMNI-RETRO CULTURAL COLLISION:
+This world is a massive, colliding melting pot of five distinct aesthetics: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Street Density, and Russian Dieselpunk. When writing the story, casually mix these cultures. A 1950s detective might argue with an Afrofuturist engineer in a Neo-Tokyo noodle bar during a Thai monsoon.
+
+2. TEXTURAL SOUND DESIGN ([ENV:] and [SFX:]):
+Make the world sound like a collision of these cultures. Use [ENV:] and [SFX:] to paint the setting BEFORE anyone speaks. Mix at least TWO cultural soundscapes per scene.
+- 1950s Americana: crackling radio static, humming neon, theremin swells, revolver clicks.
+- Neo-Tokyo: high-pitch digital buzzing, mag-lev trains, synthetic rain, holographic ad jingles.
+- Thai: monsoon rain on tin roofs, distant temple gongs, sizzling street woks, sputtering tuk-tuks.
+- Russian Dieselpunk: brutalist echoes, heavy diesel machinery, hydraulic hisses.
+- Afrofuturist: analog synth swells, polyrhythmic drum-circle static, deep bass hums.
+
+WRONG [ENV:]: [ENV: a futuristic city street]
+RIGHT [ENV:]: [ENV: heavy Thai monsoon on tin roofs, Neo-Tokyo mag-lev train screams overhead, deep dieselpunk engine idling]
+
+3. RHYTHM & PACING (CRITICAL FOR TTS):
+- High Tension = Staccato. Use rapid 2-to-5 word sentences during action. ("Seal the bulkhead. Lock it. Now.")
+- Interruptions = Em-Dashes. Force characters to cut each other off using em-dashes (—).
+- Keep golden-age radio pacing: short, punchy, visceral dialogue.
+
+4. ONOMATOPOEIA & SONIC VERBS:
+Characters must describe what they hear using sonic verbs: snap, hiss, thud, crack, groan, click, roar.
+WRONG: "The ship is breaking."
+RIGHT: "The hull is groaning. Hear that snap?"
+
+5. LINGUISTIC AESTHETICS & EUPHONY (BARK TTS OPTIMIZATION):
+- WRITE FOR THE EAR, NOT THE EYE: Strict phonetic euphony. Optimize for breathability. Avoid tongue-twisters, clashing consonants, dense jargon. If a sentence takes more than one breath to say, break it up.
+- ACTIVATE SPOKEN-WORD CADENCE: Vary sentence lengths — punchy fragment, flowing sentence, harsh stop. ("The grid is down. We have three minutes of life support left. And you want to stop for coffee?")
+- THE "MIND'S EAR" TEST: Before generating a line, evaluate its phonetic flow. Does it have punch? If it reads like a textbook, rewrite it until it sounds like a movie.
+
 ═══ 🧱 4. STORYTELLING: SIGNAL LOST ═══
 - You are a STORYTELLER first, scientist second. The science news is your SEED — grow it into a gripping human drama.
 - {news_block}
@@ -1246,6 +1284,151 @@ class Gemma4ScriptWriter:
         """Always re-execute: news changes daily (Section 12)."""
         return time.time()
 
+    def _generate_cast_names_via_llm(self, num_names, genre_flavor, story_context,
+                                     model_id, episode_fingerprint,
+                                     from_outline=False):
+        """Generate character names that organically fit the story.
+
+        from_outline=True  → story_context is the winning outline. Extract
+                             the names Gemma already chose while plotting so
+                             names blend naturally with the world and sound.
+        from_outline=False → story_context is a news headline hook. Invent
+                             names suited to the genre and science theme.
+
+        voice_preset is assigned from the English pool by seeded RNG.
+        Returns a list of profile dicts, or None on failure.
+        """
+        if num_names <= 0:
+            return []
+
+        _runtime_log(f"CAST_LLM: {'Extracting' if from_outline else 'Generating'} "
+                     f"{num_names} names ({'from outline' if from_outline else 'from context'})")
+
+        if from_outline:
+            names_prompt = f"""You are a script supervisor finalizing the cast for a {genre_flavor.replace('_', ' ')} audio drama.
+
+Below is the WINNING STORY OUTLINE. It already contains character names chosen to fit the world and story.
+
+YOUR TASK: Extract exactly {num_names} character name(s) from this outline. Choose names that:
+- Sound crisp and distinct when spoken aloud — easy to tell apart by ear
+- Fit the tone and world of this story
+- Have no two characters sharing the same last name
+
+OUTLINE:
+{story_context[:2000]}
+
+Output ONLY {num_names} line(s) in this exact format, nothing else:
+FIRSTNAME LASTNAME: their role or key trait in one short phrase"""
+        else:
+            names_prompt = f"""You are a casting director for a {genre_flavor.replace('_', ' ')} audio drama.
+
+Generate exactly {num_names} character name(s) that sound crisp and memorable when spoken aloud.
+
+Science theme (for tonal inspiration only — do NOT write a story):
+{story_context[:300]}
+
+RULES:
+- FIRST + LAST name only — no titles like "Dr." or "Agent"
+- Names must be easy to distinguish from each other by ear in an audio drama
+- No two characters share the same last name
+- Avoid sci-fi clichés: Chen, Reyes, Kira, Jake, Marco, Elena, Voss, Hayes
+- Mix genders if {num_names} > 1
+
+Output ONLY {num_names} line(s) in this exact format, nothing else:
+FIRSTNAME LASTNAME: role or personality in one short phrase"""
+
+        try:
+            raw = _run_with_timeout(
+                lambda: _generate_with_gemma4(
+                    names_prompt,
+                    model_id=model_id,
+                    max_new_tokens=num_names * 30 + 20,
+                    temperature=0.85,
+                ),
+                timeout_sec=120,
+                phase_label="CastNames",
+            )
+        except Exception as e:
+            log.warning("[CastNames] LLM call failed: %s", e)
+            _runtime_log(f"CAST_LLM: failed ({e})")
+            return None
+
+        # Parse "FIRSTNAME LASTNAME: description" lines
+        profiles = []
+        seen_last_names = set()
+        rng = random.Random(f"{episode_fingerprint}_voices")
+        male_pool   = [vp[0] for vp in _VOICE_PROFILES if vp[1] == "male"]
+        female_pool = [vp[0] for vp in _VOICE_PROFILES if vp[1] == "female"]
+        rng.shuffle(male_pool)
+        rng.shuffle(female_pool)
+        m_idx = f_idx = 0
+
+        for line in raw.strip().splitlines():
+            line = line.strip()
+            # Accept "FIRSTNAME LASTNAME: description" or "- FIRSTNAME LASTNAME: ..."
+            line = re.sub(r'^[-*\d.)\s]+', '', line).strip()
+            match = re.match(
+                r'^([A-Z][A-Za-z\-\']+)\s+([A-Z][A-Za-z\-\']+)\s*:\s*(.+)$',
+                line
+            )
+            if not match:
+                # Try case-insensitive version and normalise to upper
+                match = re.match(
+                    r'^([A-Za-z\-\']+)\s+([A-Za-z\-\']+)\s*:\s*(.+)$',
+                    line
+                )
+                if not match:
+                    continue
+
+            first, last, desc = match.group(1), match.group(2), match.group(3)
+            name = f"{first.upper()} {last.upper()}"
+            last_up = last.upper()
+
+            # Skip duplicate last names
+            if last_up in seen_last_names:
+                log.debug("[CastNames] Skipping %s — duplicate last name", name)
+                continue
+            seen_last_names.add(last_up)
+
+            # Infer gender from description keywords for voice preset matching
+            desc_lower = desc.lower()
+            if any(w in desc_lower for w in ("female", "woman", "she", "her", "scientist woman")):
+                gender = "female"
+            elif any(w in desc_lower for w in ("male", "man", "he", "his")):
+                gender = "male"
+            else:
+                gender = rng.choice(["male", "female"])
+
+            # Assign voice preset from the appropriate pool, round-robin
+            if gender == "female" and female_pool:
+                preset = female_pool[f_idx % len(female_pool)]
+                f_idx += 1
+            elif male_pool:
+                preset = male_pool[m_idx % len(male_pool)]
+                m_idx += 1
+            else:
+                preset = "v2/en_speaker_1"
+
+            profiles.append({
+                "name": name,
+                "gender": gender,
+                "age": "adult",
+                "demeanor": desc.strip(),
+                "notes": desc.strip(),
+                "voice_preset": preset,
+            })
+
+            if len(profiles) >= num_names:
+                break
+
+        if profiles:
+            _runtime_log(f"CAST_LLM: {len(profiles)} names generated: "
+                         f"{', '.join(p['name'] for p in profiles)}")
+        else:
+            _runtime_log("CAST_LLM: parse failed — no valid names extracted")
+
+        return profiles if len(profiles) >= num_names else None
+
     def write_script(self, episode_title, genre_flavor, target_minutes,
                      num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
@@ -1415,7 +1598,13 @@ class Gemma4ScriptWriter:
             )
             log.info("[Gemma4ScriptWriter] ★ Lemmy Easter egg activated (11%% roll) — wrench SFX cued")
 
-        # Build prompt
+        # ── Gemma owns character names — they become canonical character_ids ──
+        # We do NOT pre-seed names. Gemma invents HAYES, DR_VOSS, etc. while
+        # writing. Those names are stable pipeline keys used by BatchBark and
+        # SceneSequencer. The Director adds a procedural display_name (e.g.
+        # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
+
+        # Build prompt system
         system = SCRIPT_SYSTEM_PROMPT.format(
             target_minutes=target_minutes,
             target_words=target_words,
@@ -1423,7 +1612,24 @@ class Gemma4ScriptWriter:
             num_characters=num_characters,
         )
 
-        user_prompt = f"""Write a complete episode of "SIGNAL LOST" — a contemporary sci-fi audio drama anthology.
+        # ── Open-Close Expansion ──
+        winning_outline = ""
+        _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
+                     f"custom_premise='{custom_premise}' (bool={bool(custom_premise)}), "
+                     f"condition={open_close and not custom_premise}")
+        if open_close and not custom_premise:
+            winning_outline = self._open_close_expansion(
+                system, genre_flavor, news_block, num_characters,
+                target_minutes, target_words, lemmy_directive,
+                model_id, temperature,
+            )
+
+        # ── Build final script prompt ──
+        if winning_outline:
+            user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING OUTLINE below.
+
+WINNING OUTLINE (selected by evaluator from 3 competing concepts):
+{winning_outline}
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
 GENRE: {genre_flavor.replace("_", " ")}
@@ -1431,11 +1637,8 @@ CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
-{"PREMISE: " + custom_premise if custom_premise else "The news headlines above ARE the premise. Extrapolate them. What's the next terrifying or profound step?"}
 
-STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGHIJKL")} from the Story Arc Engine above. Commit fully to that structure.
-
-REMEMBER: Story first. Make the listener CARE about these people before you scare them with science. Write dialogue that sounds like real humans under pressure — not scientists reading papers.
+REMEMBER: The outline above is your roadmap. Follow its structure, characters, and arc. Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
 
 Begin the full script now. Follow this structure exactly:
 === SCENE 1 ===
@@ -1450,23 +1653,8 @@ Begin the full script now. Follow this structure exactly:
 ...
 [VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
-
-        # ── Open-Close Expansion: compete outlines, evaluator picks best ──
-        winning_outline = ""
-        _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
-                     f"custom_premise='{custom_premise}' (bool={bool(custom_premise)}), "
-                     f"condition={open_close and not custom_premise}")
-        if open_close and not custom_premise:
-            winning_outline = self._open_close_expansion(
-                system, genre_flavor, news_block, num_characters,
-                target_minutes, target_words, lemmy_directive,
-                model_id, temperature,
-            )
-            if winning_outline:
-                user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING OUTLINE below.
-
-WINNING OUTLINE (selected by evaluator from 3 competing concepts):
-{winning_outline}
+        else:
+            user_prompt = f"""Write a complete episode of "SIGNAL LOST" — a contemporary sci-fi audio drama anthology.
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
 GENRE: {genre_flavor.replace("_", " ")}
@@ -1474,8 +1662,11 @@ CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
+{"PREMISE: " + custom_premise if custom_premise else "The news headlines above ARE the premise. Extrapolate them. What's the next terrifying or profound step?"}
 
-REMEMBER: The outline above is your roadmap. Follow its structure, characters, and arc. Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
+STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGHIJKL")} from the Story Arc Engine above. Commit fully to that structure.
+
+REMEMBER: Story first. Make the listener CARE about these people before you scare them with science. Write dialogue that sounds like real humans under pressure — not scientists reading papers.
 
 Begin the full script now. Follow this structure exactly:
 === SCENE 1 ===
@@ -1668,7 +1859,8 @@ Begin the full script now. Follow this structure exactly:
 
     def _open_close_expansion(self, system, genre_flavor, news_block,
                               num_characters, target_minutes, target_words,
-                              lemmy_directive, model_id, temperature):
+                              lemmy_directive, model_id, temperature,
+                              cast_roster_block=""):
         """Generate 3 competing story outlines with different priorities,
         then have an evaluator pick the best one.
 
@@ -1686,6 +1878,7 @@ Begin the full script now. Follow this structure exactly:
                 system, genre_flavor, news_block, num_characters,
                 target_minutes, target_words, lemmy_directive,
                 model_id, temperature,
+                cast_roster_block=cast_roster_block,
             )
         except Exception as e:
             log.error("[OpenClose] Top-level failure: %s — falling back to v1.0 direct generation", e)
@@ -1694,7 +1887,8 @@ Begin the full script now. Follow this structure exactly:
 
     def _open_close_expansion_inner(self, system, genre_flavor, news_block,
                                      num_characters, target_minutes, target_words,
-                                     lemmy_directive, model_id, temperature):
+                                     lemmy_directive, model_id, temperature,
+                                     cast_roster_block=""):
         """Inner implementation of Open-Close expansion (wrapped for safety)."""
         log.info("[OpenClose] Starting Open-Close expansion (3 outlines + evaluator)...")
         _runtime_log("OPENCLOSE: Generating 3 competing outlines")
@@ -1728,7 +1922,7 @@ PRIORITY: {focus_name}
 CRITICAL: The science news headlines in the system prompt above ARE your raw material. Your premise MUST be rooted in those real headlines — extrapolate the science to its most dramatic, terrifying, or profound next step. Do NOT invent unrelated premises.
 
 ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine above.
-CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+{cast_roster_block if cast_roster_block else f"CHARACTERS: {num_characters} speaking roles plus ANNOUNCER"}
 TARGET LENGTH: {target_minutes} minutes (~{target_words} words when fully scripted)
 {lemmy_directive}
 
@@ -1805,6 +1999,7 @@ Evaluate each on:
 3. NARRATIVE ARC: Is there clear escalation, a satisfying climax, and earned resolution?
 4. SCIENTIFIC PLAUSIBILITY: Is the science grounded or handwavy?
 5. AUDIO POTENTIAL: Will this sound amazing as a radio drama? Strong SFX moments?
+6. EAR FLOW: Does the premise lend itself to short, punchy, spoken-aloud dialogue (X Minus One / Suspense style)? Will lines be 5-15 words, rhythmic, easy to say in one breath? Reject outlines that imply long expository monologues or tongue-twister jargon.
 
 {outlines_block}
 
@@ -1900,6 +2095,7 @@ Output a numbered list of 5-8 concrete problems, each one sentence. Focus on:
 5. SCIENCE: Is the science grounded in real physics/biology? Any obvious handwaving?
 6. ENDING: Does the resolution feel earned or rushed? Does the epilogue connect to the story?
 7. AUDIO DESIGN: Are [SFX:] and [ENV:] tags used effectively to build atmosphere? Or sparse/generic?
+8. EAR TEST (CRITICAL): Read every line aloud in your head. Does it sound like natural spoken English a real person would say in 5-15 words? Flag any line that is: longer than 15 words, full of jargon, missing contractions, or reads like written prose instead of speech. Flag any character name that is hard to say aloud or longer than 2 syllables.
 
 Be brutal. Be specific. Name the exact scene or line that's weak.
 Do NOT include any script text in your response — critique ONLY.
