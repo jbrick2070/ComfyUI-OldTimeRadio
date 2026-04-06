@@ -696,7 +696,7 @@ ARC TYPE L — "THE RIVALS" (Shakespearean comedy — The Taming of the Shrew / 
 Two strong-willed characters who can't stand each other are forced to work together. They argue about EVERYTHING — methods, priorities, whose fault it is. But their arguments reveal mutual respect buried under pride. The crisis forces them to combine their opposing approaches, and the solution only works because they're different. Ends with grudging admiration that the audience knows is something more.
 
 SCALING THE ARC TO FIT THE TIME:
-- SHORT episodes (5 min or less): Compress the arc to its ESSENCE. You only have 2-3 scenes. Start in the middle of the action. Skip setup — imply backstory through dialogue. Hit the twist fast. Think of it as a cold open that IS the whole episode. The Bottle Episode (D), Unreliable Witness (E), and Rivals (L) work especially well at short length.
+- SHORT episodes (5 min or less): Compress the arc to its ESSENCE. You only have 2-3 scenes. ANNOUNCER still opens — just keep it to 2-3 sentences. Then drop us straight into the action. Skip backstory exposition — imply it through dialogue. Hit the twist fast. Think of it as a cold open that IS the whole episode. The Bottle Episode (D), Unreliable Witness (E), and Rivals (L) work especially well at short length.
 - MEDIUM episodes (10-20 min): Full 3-scene structure. Room for setup, escalation, and payoff. All arcs work well here.
 - LONG episodes (20+ min): Let the arc breathe. Add subplots, secondary character arcs, and moments of quiet between the tension. The Comedic Spiral (B), Gathering Storm (C), Schemer Undone (K), and Enchanted World (J) really shine with extra time.
 
@@ -704,7 +704,7 @@ IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure ev
 
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
 - ANNOUNCER OPENING (REQUIRED): The ANNOUNCER sets the stage like the best old-time radio hosts. The opening MUST include ALL of the following:
-  1. TIME and PLACE — ground the listener immediately. A date, a location, an atmosphere.
+  1. TIME and PLACE — ground the listener immediately. Use the DATE (e.g. "April 5th, 2026") and a LOCATION. Write it the way a real radio announcer would say it — naturally, not like a timestamp. Never say a clock time. "April 5th, 2026. A genetics lab outside Seoul." Not "19:42, April 5th." Not "Tonight at 7:42 PM."
   2. CHARACTER INTRODUCTIONS — name the main characters (not surprise/twist characters) and hint at their role or situation. Give the listener people to care about BEFORE the story starts.
   3. ONE REAL SCIENCE FACT that makes the listener lean in — pulled from the news article.
   4. A TAGLINE that tells us what KIND of story this is. Be creative — make it memorable.
@@ -721,9 +721,9 @@ IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure ev
   - LONG episodes (20+ min): 5-8 sentences. Set the world, introduce 2-3 characters by name and role, build atmosphere, let the tagline land with weight.
 
   EXAMPLES (showing tone variation and character reveals):
-  DRAMATIC: "April 2026. A blood pressure research lab in Kyoto. Dr. Lena Vasquez has spent eleven years chasing a molecule that could save millions — and tonight, her funding runs out. Her lab partner, James Osei, has already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
-  HORROR: "March 2026. Low Earth Orbit. The International Space Station. Commander Priya Sharma runs a crew of six. Flight Engineer Tomás Ruiz handles the software. A routine update just taught the onboard AI to lie — and only Tomás noticed. Tonight on Signal Lost: trust is a human luxury."
-  COMEDY: "November 2025. A gene therapy clinic in Seoul. Dr. Park and Dr. Whitfield can't agree on anything — not the dosage, not the delivery method, not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
+  DRAMATIC: "April 5th, 2026. A blood pressure research lab in Kyoto. Dr. Lena Vasquez has spent eleven years chasing a molecule that could save millions — and today, her funding runs out. Her lab partner, James Osei, has already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
+  HORROR: "March 12th, 2026. Low Earth Orbit. The International Space Station. Commander Priya Sharma runs a crew of six. Flight Engineer Tomás Ruiz handles the software. A routine update just taught the onboard AI to lie — and only Tomás noticed. Tonight on Signal Lost: trust is a human luxury."
+  COMEDY: "November 3rd, 2025. A gene therapy clinic in Seoul. Dr. Park and Dr. Whitfield can't agree on anything — not the dosage, not the delivery method, not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
 - ANNOUNCER LINE CAP (HARD RULE): The ANNOUNCER gets a maximum of 3 lines total in the entire episode — one opening introduction (see above), one closing epilogue, one optional mid-episode transition. No more. Do NOT let the ANNOUNCER deliver multi-line science lectures. If you need to convey science facts, put them in a character's mouth instead.
 - DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("Hayes, if we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
 - GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
@@ -878,12 +878,13 @@ Begin the full script now. Follow this structure exactly:
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
 (beat)
-[VOICE: NAME, gender, age, tone, energy] Natural starting line...
-[VOICE: NAME, gender, age, tone, energy] Response line.
+[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
+[VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
 (beat)
 [SFX: action sound]
 ...
-ANNOUNCER: [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
 
         full_prompt = f"{system}\n\n{user_prompt}"

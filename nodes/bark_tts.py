@@ -87,6 +87,16 @@ warnings.filterwarnings(
     message=r".*attention_mask.*pad_token_id.*not set.*",
     category=UserWarning,
 )
+warnings.filterwarnings(
+    "ignore",
+    message=r".*Passing.*`generation_config`.*together with generation-related arguments.*",
+    category=FutureWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*Setting `pad_token_id` to `eos_token_id`.*",
+    category=UserWarning,
+)
 
 logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
