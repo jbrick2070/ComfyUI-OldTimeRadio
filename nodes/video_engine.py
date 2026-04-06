@@ -1,4 +1,4 @@
-﻿r"""
+r"""
 OTR_SignalLostVideo — Procedural Audio-Reactive Video Engine
 =============================================================
 
@@ -502,7 +502,16 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         if not isinstance(script, list):
             script = []
 
-        voices = plan.get("voice_assignments", {})
+        # Normalize voice_assignments: values might be dicts like {"preset": "v2/en_speaker_0", ...}
+        voices_raw = plan.get("voice_assignments", {})
+        voices = {}
+        if isinstance(voices_raw, dict):
+            for k, v in voices_raw.items():
+                if isinstance(v, dict):
+                    voices[str(k)] = str(v.get("preset", v.get("voice", str(v))))
+                else:
+                    voices[str(k)] = str(v)
+
         genre  = plan.get("genre_flavor", plan.get("genre", "unknown"))
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
@@ -532,11 +541,11 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_("CAST & VOICES")
         W_(BAR)
         if voices:
-            pad = max(len(k) for k in voices)
+            pad_w = max(len(str(k)) for k in voices)
             for char in sorted(voices.keys()):
                 preset = voices[char]
                 desc   = _PRESET_DESC.get(preset, preset)
-                W_(f"  {char:<{pad}}  \u2192  {preset:<24}  {desc}")
+                W_(f"  {str(char):<{pad_w}}  \u2192  {preset:<24}  {desc}")
         else:
             W_("  (no voice assignments recorded)")
         W_()
@@ -544,9 +553,9 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         # Scene arc summary
         scenes = {}
         for item in script:
-            sc = item.get("scene", 1)
+            sc = str(item.get("scene", 1))  # coerce to str for safe dict key
             if sc not in scenes:
-                scenes[sc] = {"env": item.get("env", ""), "sfx": [], "d": 0}
+                scenes[sc] = {"env": str(item.get("env", "")), "sfx": [], "d": 0}
             t = item.get("type", "")
             if t == "sfx":
                 scenes[sc]["sfx"].append(item.get("text", ""))
@@ -573,24 +582,24 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(BAR)
         cur_scene = None
         for item in script:
-            sc = item.get("scene")
+            sc = str(item.get("scene", ""))  # coerce to str
             if sc != cur_scene:
                 cur_scene = sc
-                env = (item.get("env") or "").strip()
+                env = (str(item.get("env") or "")).strip()
                 W_()
                 W_(f"  \u2500\u2500 SCENE {sc}  \u00b7  {env}")
                 W_()
             kind = item.get("type", "")
             if kind == "dialogue":
-                char   = item.get("character", "?")
-                text   = item.get("text", "").strip()
+                char   = str(item.get("character", "?"))
+                text   = str(item.get("text", "")).strip()
                 preset = voices.get(char, "")
                 vtag   = f"  [{preset}]" if preset else ""
-                W_(f"  {char}{vtag}")
+                W_(f"  {str(char)}{vtag}")
                 W_(f"    {text}")
                 W_()
             elif kind == "sfx":
-                W_(f"  [SFX]  {item.get('text','').strip()}")
+                W_(f"  [SFX]  {str(item.get('text','')).strip()}")
                 W_()
         W_()
 
