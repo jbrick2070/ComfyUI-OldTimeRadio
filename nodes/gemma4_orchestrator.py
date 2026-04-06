@@ -695,6 +695,11 @@ A clever character hatches an elaborate plan — maybe to get credit for a disco
 ARC TYPE L — "THE RIVALS" (Shakespearean comedy — The Taming of the Shrew / Love's Labour's Lost):
 Two strong-willed characters who can't stand each other are forced to work together. They argue about EVERYTHING — methods, priorities, whose fault it is. But their arguments reveal mutual respect buried under pride. The crisis forces them to combine their opposing approaches, and the solution only works because they're different. Ends with grudging admiration that the audience knows is something more.
 
+SCALING THE ARC TO FIT THE TIME:
+- SHORT episodes (5 min or less): Compress the arc to its ESSENCE. You only have 2-3 scenes. Start in the middle of the action. Skip setup — imply backstory through dialogue. Hit the twist fast. Think of it as a cold open that IS the whole episode. The Bottle Episode (D), Unreliable Witness (E), and Rivals (L) work especially well at short length.
+- MEDIUM episodes (10-20 min): Full 3-scene structure. Room for setup, escalation, and payoff. All arcs work well here.
+- LONG episodes (20+ min): Let the arc breathe. Add subplots, secondary character arcs, and moments of quiet between the tension. The Comedic Spiral (B), Gathering Storm (C), Schemer Undone (K), and Enchanted World (J) really shine with extra time.
+
 IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
 
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
