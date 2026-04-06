@@ -135,6 +135,10 @@ SCIENCE_NEWS_FEEDS = [
     "https://www.nasa.gov/rss/dyn/breaking_news.rss",     # NASA, open
     "https://www.nih.gov/news-events/news-releases.xml",  # NIH, open
     "https://www.nsf.gov/rss/rss_www_news.xml",           # NSF, open
+    # ── UCLA Newsroom (open-access institutional research) ──
+    "https://newsroom.ucla.edu/cats/health_+_behavior.xml",      # Best: full content:encoded in RSS
+    "https://newsroom.ucla.edu/cats/science_+_technology.xml",   # Open-access, URL scrape works
+    "https://newsroom.ucla.edu/cats/environment_+_climate.xml",  # Open-access, URL scrape works
     # ── Open journalism (full text accessible) ──
     "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",  # BBC, open
     "https://feeds.arstechnica.com/arstechnica/science",  # Ars, open
@@ -174,7 +178,7 @@ def _fetch_full_article(url, timeout=5):
         paragraphs = body.find_all("p")
         text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
         text = re.sub(r'\s+', ' ', text).strip()
-        return text[:8000]
+        return text[:12000]
     except Exception:
         return ""
 
@@ -218,7 +222,7 @@ def _fetch_science_news(max_feeds=10):
                 if content_candidates:
                     rss_full = content_candidates[0].get("value", "")
                     rss_full = re.sub(r'<[^>]+>', '', rss_full).strip()
-                summary = entry.get("summary", "")[:800].strip()
+                summary = entry.get("summary", "")[:2000].strip()
                 summary = re.sub(r'<[^>]+>', '', summary).strip()
                 if title:
                     data.append({
@@ -263,24 +267,47 @@ def _fetch_science_news(max_feeds=10):
 
     # Shuffle pool before choosing
     random.shuffle(pool)
-    chosen = random.choice(pool)
 
-    # Resolve full article text
-    if chosen.get("rss_full") and len(chosen["rss_full"]) > 300:
-        chosen["full_text"] = chosen["rss_full"][:8000]
-        log.info("[NewsFetcher] Full text from RSS content field: %d chars", len(chosen["full_text"]))
-    elif chosen.get("link"):
-        log.info("[NewsFetcher] Attempting to fetch full article: %s", chosen["link"])
-        fetched = _fetch_full_article(chosen["link"], timeout=5)
-        if fetched and len(fetched) > 300:
-            chosen["full_text"] = fetched
-            log.info("[NewsFetcher] Full article fetched: %d chars", len(fetched))
+    # Content quality floor: try up to 5 candidates until we get a rich article.
+    # Thin content (<400 chars) gives Gemma too little to extrapolate from —
+    # the story ends up generic rather than grounded in real science.
+    CONTENT_FLOOR = 400
+    MAX_ATTEMPTS = 5
+    chosen = None
+
+    for candidate in pool[:MAX_ATTEMPTS]:
+        result = candidate
+
+        # Resolve full article text — 3-tier: rss_full → URL scrape → summary
+        if result.get("rss_full") and len(result["rss_full"]) > 300:
+            result["full_text"] = result["rss_full"][:12000]
+            log.info("[NewsFetcher] Full text from RSS content field: %d chars", len(result["full_text"]))
+        elif result.get("link"):
+            log.info("[NewsFetcher] Attempting to fetch full article: %s", result["link"])
+            fetched = _fetch_full_article(result["link"], timeout=5)
+            if fetched and len(fetched) > 300:
+                result["full_text"] = fetched
+                log.info("[NewsFetcher] Full article fetched: %d chars", len(result["full_text"]))
+            else:
+                result["full_text"] = result["summary"]
+                log.info("[NewsFetcher] Article fetch failed or blocked — falling back to RSS summary (%d chars)", len(result["full_text"]))
         else:
-            chosen["full_text"] = chosen["summary"]
-            log.info("[NewsFetcher] Article fetch failed or blocked — falling back to RSS summary")
-    else:
-        chosen["full_text"] = chosen["summary"]
-        log.info("[NewsFetcher] No URL — using RSS summary")
+            result["full_text"] = result["summary"]
+            log.info("[NewsFetcher] No URL — using RSS summary (%d chars)", len(result["full_text"]))
+
+        if len(result.get("full_text", "")) >= CONTENT_FLOOR:
+            chosen = result
+            break
+        else:
+            log.warning("[NewsFetcher] Article too thin (%d chars) — trying next candidate: %s",
+                        len(result.get("full_text", "")), result["headline"][:60])
+
+    if chosen is None:
+        # All candidates were thin — take the richest one we found
+        chosen = max(pool[:MAX_ATTEMPTS], key=lambda x: len(x.get("full_text", x.get("summary", ""))))
+        chosen.setdefault("full_text", chosen.get("summary", ""))
+        log.warning("[NewsFetcher] All %d candidates were thin — using richest available (%d chars): %s",
+                    MAX_ATTEMPTS, len(chosen["full_text"]), chosen["headline"][:60])
 
     return [chosen]
 
