@@ -523,10 +523,6 @@ class SceneSequencer:
                     "default": 999, "min": 1, "max": 9999,
                     "tooltip": "Last line to render"
                 }),
-                "output_dir": ("STRING", {
-                    "default": DEFAULT_OUT,
-                    "tooltip": "Directory for intermediate WAV clips"
-                }),
                 "default_tts": (["bark", "parler", "kokoro"], {
                     "default": "bark",
                     "tooltip": "Default TTS engine when not specified in production plan"
@@ -752,11 +748,6 @@ class EpisodeAssembler:
             "optional": {
                 "opening_theme_audio": ("AUDIO",),
                 "closing_theme_audio": ("AUDIO",),
-                "output_filename": ("STRING", {
-                    "default": "episode_001.wav",
-                    "tooltip": "Output filename for the assembled episode"
-                }),
-                "output_dir": ("STRING", {"default": DEFAULT_OUT}),
                 "opening_duration_sec": ("FLOAT", {
                     "default": 10.0, "min": 0.0, "max": 60.0, "step": 1.0,
                     "tooltip": "Max duration of opening theme"
@@ -774,7 +765,6 @@ class EpisodeAssembler:
 
     def assemble(self, scene_audio, episode_title,
                  opening_theme_audio=None, closing_theme_audio=None,
-                 output_filename="episode_001.wav", output_dir=DEFAULT_OUT,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
                  crossfade_ms=500):
 
