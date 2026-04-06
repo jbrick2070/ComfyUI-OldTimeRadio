@@ -102,6 +102,8 @@ SceneSequencer ◄───────────────────┘
 SignalLostVideo ─────► signal_lost_<title>_<timestamp>.mp4
                   └──► signal_lost_<title>_<timestamp>_treatment.txt
                          (cast · voices · full script · production stats)
+
+          otr_runtime.log ◄── heartbeat from every node (otr_monitor.py)
 ```
 
 | Node | What It Does |
