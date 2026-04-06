@@ -168,23 +168,39 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
                 _CHARACTER_VOICE_CACHE[character] = preset
                 return preset
 
-    # Gender-aware hash fallback: use voice_traits to pick from the right pool
+    # Gender-aware hash fallback with 85/15 English-native/international ratio.
+    # Director always assigns en_speaker_*; this fallback runs only when the
+    # Director mapping is missing. ~85% chance of English native, ~15% of
+    # international accented English (adds subtle vocal variety without
+    # risking language drift — the temp cap + ASCII sanitizer handle the rest).
+    import random
     traits_lower = voice_traits.lower() if voice_traits else ""
-    if "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower:
-        pool = _FEMALE_PRESETS
+    is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
+    is_male   = "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower
+
+    # Deterministic seed per character name so same character always gets same voice
+    rng = random.Random(hash(character))
+    use_intl = rng.random() < 0.15  # 15% chance of international preset
+
+    if is_female:
+        en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _FEMALE_PRESETS if not p.startswith("v2/en_")]
         label = "female"
-    elif "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower:
-        pool = _MALE_PRESETS
+    elif is_male:
+        en_pool   = [p for p in _MALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _MALE_PRESETS if not p.startswith("v2/en_")]
         label = "male"
     else:
-        pool = _BARK_VOICE_PRESETS
+        en_pool   = [p for p in _BARK_VOICE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _BARK_VOICE_PRESETS if not p.startswith("v2/en_")]
         label = "unknown-gender"
 
-    idx = hash(character) % len(pool)
-    preset = pool[idx]
+    pool = intl_pool if (use_intl and intl_pool) else en_pool
+    preset = rng.choice(pool)
     _CHARACTER_VOICE_CACHE[character] = preset
-    log.info("[BatchBark] No Director mapping for '%s' (%s), hash-assigned %s from %s pool",
-             character, traits_lower[:30], preset, label)
+    pool_tag = "international" if (use_intl and intl_pool) else "English-native"
+    log.info("[BatchBark] No Director mapping for '%s' (%s), assigned %s from %s %s pool",
+             character, traits_lower[:30], preset, pool_tag, label)
     return preset
 
 
@@ -313,7 +329,25 @@ def _clean_text_for_bark(text):
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)
 
-    # ── Step 5: Normalize whitespace ─────────────────────────────────────────
+    # ── Step 5: Force pure ASCII English ────────────────────────────────────
+    # Non-ASCII characters (accented letters, foreign scripts, smart quotes)
+    # can trigger Bark's language detection to lock into a foreign language
+    # when using international presets (v2/fr_*, v2/de_*, etc.).
+    # Transliterate what we can, strip the rest.
+    import unicodedata
+    text = unicodedata.normalize("NFKD", text)
+    # Keep only ASCII printable chars + Bark's special tokens in brackets
+    cleaned = []
+    for ch in text:
+        if ord(ch) < 128:
+            cleaned.append(ch)
+        elif unicodedata.category(ch).startswith("M"):
+            pass  # combining marks — drop after NFKD decomposition
+        else:
+            cleaned.append("")  # drop non-ASCII entirely
+    text = "".join(cleaned)
+
+    # ── Step 6: Normalize whitespace ─────────────────────────────────────────
     text = re.sub(r'  +', ' ', text).strip()
     return text
 
@@ -360,13 +394,21 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     if not text:
         return np.zeros(2400, dtype=np.float32), 24000
 
+    # ── Language drift guard for international presets ────────────────────
+    # Foreign presets (de, fr, es, etc.) are probabilistically biased toward
+    # their native language. Cap temperature to 0.55 to keep Bark committed
+    # to the English text rather than drifting into the preset's language.
+    _is_intl = voice_preset and not voice_preset.startswith("v2/en_")
+    if _is_intl:
+        temperature = min(temperature, 0.55)
+
     if is_first_line:
         # Anchor the model before the first dialogue line of each preset.
         # [clears throat] is in Bark's supported token whitelist — it renders
         # as a brief audible cue (~0.15s) and resets the generation context
         # away from "podcast opener" toward "radio drama performance".
         text = f"[clears throat] {text}"
-        temperature = min(temperature, 0.6)
+        temperature = min(temperature, 0.5 if _is_intl else 0.6)
 
     sample_rate = model.generation_config.sample_rate
     chunks = _chunk_text_for_bark(text)

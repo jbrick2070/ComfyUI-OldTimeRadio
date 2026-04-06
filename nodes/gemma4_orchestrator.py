@@ -1273,10 +1273,11 @@ The script follows these tokens:
 ═══ 🧱 2. VOICE MAPPING RULES ═══
 - Scan all [VOICE:] tags in the script. The FIRST FIELD (before the first comma) is the CHARACTER NAME.
 - Collect every unique CHARACTER NAME. Map each to one UNIQUE voice preset.
-- You have 20 presets: 10 English native + 10 international accented English.
-  International presets speak English clearly with a subtle accent — use them
-  to give your ensemble tonal variety (a French-accented scientist, a
-  German-accented engineer, etc.). All dialogue is still written in English.
+- You have 10 English native presets. ALWAYS use English native presets (en_speaker_*).
+  Do NOT use international/foreign presets (de_*, fr_*, es_*, etc.) — they risk
+  language drift in the TTS engine. The en_speaker_* presets naturally cover a
+  wide range of vocal character: deep, warm, raspy, youthful, authoritative, etc.
+  All dialogue is always written in pure English.
 - The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
   WRONG key: "HAYES, male, 40s, calm"
   RIGHT key: "HAYES"
@@ -1294,22 +1295,10 @@ The script follows these tokens:
   v2/en_speaker_8 = Male, gravelly/raspy (good for LEMMY)
   v2/en_speaker_9 = Female, authoritative
 
-  INTERNATIONAL ACCENTED ENGLISH (renders English words with accent flavor):
-  v2/de_speaker_0 = Male, German accent, precise/clipped (scientists, engineers)
-  v2/de_speaker_4 = Female, German accent, clear/analytical
-  v2/fr_speaker_0 = Male, French accent, smooth/baritone (intellectuals)
-  v2/fr_speaker_4 = Female, French accent, warm/elegant
-  v2/es_speaker_0 = Male, Spanish accent, warm/authoritative
-  v2/es_speaker_9 = Female, Spanish accent, mature/expressive
-  v2/it_speaker_0 = Male, Italian accent, dramatic/animated
-  v2/it_speaker_4 = Female, Italian accent, expressive/warm
-  v2/pt_speaker_0 = Male, Portuguese accent, soft/thoughtful
-  v2/pt_speaker_4 = Female, Portuguese accent, gentle/clear
-
 - ANNOUNCER: Randomly select ONE of {v2/en_speaker_0 (male, authoritative), v2/en_speaker_2 (female, clear), v2/en_speaker_4 (female, energetic), v2/en_speaker_9 (female, mature)} for gender balance and vocal variety. Keep it consistent within the episode.
 - Each character gets ONE preset that stays consistent for the entire episode.
 - If two characters share a gender/age, still assign DIFFERENT presets.
-- Use international presets for non-ANNOUNCER characters to add vocal diversity.
+- ONLY use en_speaker_* presets. Never assign international presets.
 
 ═══ 🧱 3. OUTPUT FORMAT (STRICT JSON) ═══
 {{
