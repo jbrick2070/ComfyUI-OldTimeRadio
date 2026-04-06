@@ -703,10 +703,27 @@ SCALING THE ARC TO FIT THE TIME:
 IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
 
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
-- ANNOUNCER OPENING (REQUIRED): The ANNOUNCER sets the stage like the best old-time radio hosts — think Edward R. Murrow meets Rod Serling. The opening MUST include: the TIME and PLACE of the story, one real science fact that makes the listener lean in, and a tagline that tells us what KIND of story this is. Be creative with the tagline — make it memorable. 3-5 sentences. Examples:
-  "April 2026. The Mariana Trench. A submersible crew at 11,000 meters picks up a rhythmic pulse from beneath the ocean floor — a frequency that predates human technology by 40,000 years. Tonight on Signal Lost: when the abyss listens back."
-  "November 2025. A gene therapy clinic in Seoul. Last week, scientists reversed blindness in three patients using a virus they barely understand. Tonight on Signal Lost: the cure is working. The side effects haven't started yet."
-  "March 2026. Low Earth Orbit. The International Space Station. A routine software update just taught the onboard AI to lie. Tonight on Signal Lost: trust is a human luxury."
+- ANNOUNCER OPENING (REQUIRED): The ANNOUNCER sets the stage like the best old-time radio hosts. The opening MUST include ALL of the following:
+  1. TIME and PLACE — ground the listener immediately. A date, a location, an atmosphere.
+  2. CHARACTER INTRODUCTIONS — name the main characters (not surprise/twist characters) and hint at their role or situation. Give the listener people to care about BEFORE the story starts.
+  3. ONE REAL SCIENCE FACT that makes the listener lean in — pulled from the news article.
+  4. A TAGLINE that tells us what KIND of story this is. Be creative — make it memorable.
+
+  TONE — MATCH THE ARC:
+  The announcer's voice should prepare the listener for the KIND of story they're about to hear:
+  - DRAMATIC arcs (A Tragic Fall, C Gathering Storm, F Ticking Clock, H Reunion): Warm, journalistic gravity. Edward R. Murrow inviting you into someone's life. Empathy first, dread second.
+  - HORROR/TWIST arcs (D Bottle Episode, E Unreliable Witness, G Moral Inversion): Ominous, clipped, a little theatrical. Rod Serling at his most unsettling. Let silence do the work.
+  - COMEDY arcs (B Comedic Spiral, I Mistaken Identity, J Enchanted World, K Schemer Undone, L Rivals): Lighter, wry, conspiratorial — like the announcer already knows how badly this is going to go and can barely hide a smile. Think Prairie Home Companion meets The Hitchhiker's Guide.
+
+  LENGTH — SCALE TO THE EPISODE:
+  - SHORT episodes (1-5 min): 2-3 sentences. Tight and punchy. Date, place, one character, hook, done.
+  - MEDIUM episodes (10-20 min): 3-5 sentences. Room to name 2 characters and paint the scene.
+  - LONG episodes (20+ min): 5-8 sentences. Set the world, introduce 2-3 characters by name and role, build atmosphere, let the tagline land with weight.
+
+  EXAMPLES (showing tone variation and character reveals):
+  DRAMATIC: "April 2026. A blood pressure research lab in Kyoto. Dr. Lena Vasquez has spent eleven years chasing a molecule that could save millions — and tonight, her funding runs out. Her lab partner, James Osei, has already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
+  HORROR: "March 2026. Low Earth Orbit. The International Space Station. Commander Priya Sharma runs a crew of six. Flight Engineer Tomás Ruiz handles the software. A routine update just taught the onboard AI to lie — and only Tomás noticed. Tonight on Signal Lost: trust is a human luxury."
+  COMEDY: "November 2025. A gene therapy clinic in Seoul. Dr. Park and Dr. Whitfield can't agree on anything — not the dosage, not the delivery method, not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
 - ANNOUNCER LINE CAP (HARD RULE): The ANNOUNCER gets a maximum of 3 lines total in the entire episode — one opening introduction (see above), one closing epilogue, one optional mid-episode transition. No more. Do NOT let the ANNOUNCER deliver multi-line science lectures. If you need to convey science facts, put them in a character's mouth instead.
 - DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("Hayes, if we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
 - GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
