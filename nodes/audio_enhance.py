@@ -122,25 +122,34 @@ def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
     below cutoff, flat above, no phase ringing or comb artifacts.
 
     warmth: 0.0 = none, 0.1 = subtle broadcast tone (~3dB), 0.3 = noticeable (~9dB)
+
+    Note: torchaudio.functional.bass_biquad does NOT support CUDA tensors,
+    so we temporarily move to CPU and back if needed.
     """
     if warmth <= 0.0:
         return waveform
 
     import torchaudio
 
-    # Map warmth (0.0–0.5) to gain in dB.
-    # 0.1 warmth → ~3dB bass shelf boost (subtle broadcast tone)
-    # 0.3 warmth → ~9dB (noticeable vintage warmth)
     gain_db = warmth * 30.0
+    orig_device = waveform.device
 
-    # Low-shelf center frequency: 200Hz captures the warm broadcast bass range
-    # Q=0.707 (Butterworth) gives the smoothest transition — no resonant peak
-    return torchaudio.functional.bass_biquad(
+    # bass_biquad is CPU-only — move off GPU if needed
+    if orig_device.type == "cuda":
+        waveform = waveform.cpu()
+
+    result = torchaudio.functional.bass_biquad(
         waveform, sample_rate,
         gain=gain_db,
         central_freq=200.0,
         Q=0.707,
     )
+
+    # Move back to original device
+    if orig_device.type == "cuda":
+        result = result.to(orig_device)
+
+    return result
 
 
 def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
@@ -166,7 +175,8 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
         kernel_len += 1  # keep odd for symmetric
 
     half = kernel_len // 2
-    n = torch.arange(-half, half + 1, dtype=torch.float32)
+    dev = waveform.device
+    n = torch.arange(-half, half + 1, dtype=torch.float32, device=dev)
 
     # Normalized cutoff frequency
     fc = cutoff_hz / sample_rate
@@ -175,18 +185,18 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
     # Handle n=0 case
     sinc = torch.where(
         n == 0,
-        torch.tensor(2.0 * fc),
+        torch.tensor(2.0 * fc, device=dev),
         torch.sin(2.0 * math.pi * fc * n) / (math.pi * n)
     )
 
     # Hann window for smooth rolloff (no Gibbs ringing)
-    window = 0.5 * (1.0 - torch.cos(2.0 * math.pi * torch.arange(kernel_len, dtype=torch.float32) / (kernel_len - 1)))
+    window = 0.5 * (1.0 - torch.cos(2.0 * math.pi * torch.arange(kernel_len, dtype=torch.float32, device=dev) / (kernel_len - 1)))
 
     kernel = sinc * window
     kernel = kernel / kernel.sum()  # normalize to unity gain
 
     # Apply via conv1d (grouped convolution — same kernel per channel)
-    kernel = kernel.view(1, 1, -1).repeat(C, 1, 1).to(waveform.device)
+    kernel = kernel.view(1, 1, -1).repeat(C, 1, 1)  # already on waveform.device
 
     pad = half
     padded = torch.nn.functional.pad(waveform, (pad, pad), mode="reflect")
@@ -278,6 +288,14 @@ class AudioEnhance:
         log.info("[OTR_AudioEnhance] Input: %dHz %dch %d samples (%.1fs)",
                  orig_sr, orig_channels, orig_samples, orig_duration)
 
+        # ── Move to GPU for DSP acceleration ──
+        # All torchaudio DSP ops (resample, biquad, conv1d) run on CUDA when
+        # tensors are on GPU. VRAM impact is negligible (<50 MB for long clips).
+        _use_cuda = torch.cuda.is_available()
+        if _use_cuda:
+            waveform = waveform.to("cuda", non_blocking=True)
+            log.info("[OTR_AudioEnhance] DSP on GPU (CUDA)")
+
         # ── Step 1: Resample ──
         waveform = _resample(waveform, orig_sr, target_sample_rate)
         log.info("[OTR_AudioEnhance] Resampled %dHz -> %dHz (%d samples)",
@@ -312,6 +330,10 @@ class AudioEnhance:
         # ── Step 7: Peak normalize ──
         waveform = _normalize(waveform, normalize_dbfs)
         log.info("[OTR_AudioEnhance] Normalized to %.1f dBFS", normalize_dbfs)
+
+        # ── Move back to CPU for ComfyUI pipeline ──
+        if _use_cuda:
+            waveform = waveform.cpu()
 
         # ── Verify stereo output ──
         assert waveform.shape[1] == 2, (

@@ -620,27 +620,30 @@ class BatchBarkGenerator:
         batch_log.append(f"\n--- Generated: {generated}/{total_lines} lines ---")
 
         # ── Step 5: Assemble into batched AUDIO tensor (script order) ─────
-        # All clips must be the same length for batching. Pad shorter clips
-        # with zeros to match the longest. SceneSequencer's _extract_clips
-        # already handles trim_trailing_silence on the receiving end.
-        ordered_clips = []
+        # Use pad_sequence on GPU for vectorized zero-padding instead of
+        # Python loops + numpy.pad. SceneSequencer's _extract_clips already
+        # handles trim_trailing_silence on the receiving end.
+        from torch.nn.utils.rnn import pad_sequence
         target_sr = 24000  # Bark native rate; AudioEnhance handles upsample
 
+        ordered_clips = []
         for item in dialogue_items:
             audio_np, sr = results[item["script_idx"]]
-            ordered_clips.append(audio_np)
+            # Convert to GPU tensor once — pad_sequence runs on device of inputs
+            clip_t = torch.from_numpy(audio_np).float()
+            if torch.cuda.is_available():
+                clip_t = clip_t.cuda()
+            ordered_clips.append(clip_t)  # shape: [T]
 
-        # Pad to uniform length for tensor batching
-        max_len = max(len(c) for c in ordered_clips) if ordered_clips else 2400
-        padded = []
-        for clip in ordered_clips:
-            if len(clip) < max_len:
-                clip = np.pad(clip, (0, max_len - len(clip)), mode='constant')
-            padded.append(clip)
-
-        # Shape: (B=num_dialogue_lines, C=1, T=max_len)
-        batch_np = np.stack(padded, axis=0)  # (B, T)
-        batch_tensor = torch.from_numpy(batch_np).float().unsqueeze(1)  # (B, 1, T)
+        if not ordered_clips:
+            # Fallback: 1 second of silence
+            batch_tensor = torch.zeros(1, 1, target_sr)
+            max_len = target_sr
+        else:
+            # Vectorized padding on GPU (zero-pad shorter clips on the right)
+            padded = pad_sequence(ordered_clips, batch_first=True)  # [B, max_T]
+            batch_tensor = padded.unsqueeze(1).cpu()  # [B, 1, max_T] on CPU
+            max_len = padded.shape[-1]
 
         audio_out = {"waveform": batch_tensor, "sample_rate": target_sr}
         log_text = "\n".join(batch_log)
