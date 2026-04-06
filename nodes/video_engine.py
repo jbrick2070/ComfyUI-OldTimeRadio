@@ -1,4 +1,4 @@
-r"""
+﻿r"""
 OTR_SignalLostVideo — Procedural Audio-Reactive Video Engine
 =============================================================
 
@@ -455,6 +455,166 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 # ─────────────────────────────────────────────────────────────────────────────
 # COMFYUI NODE
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── Story Treatment Writer ──────────────────────────────────────────────────
+
+_PRESET_DESC = {
+    "v2/en_speaker_0": "male · authoritative · deep (ANNOUNCER voice)",
+    "v2/en_speaker_1": "male · warm · conversational",
+    "v2/en_speaker_2": "female · clear · measured",
+    "v2/en_speaker_3": "male · gruff · weathered",
+    "v2/en_speaker_4": "female · bright · energetic",
+    "v2/en_speaker_5": "male · casual · warm",
+    "v2/en_speaker_6": "male · deep · resonant",
+    "v2/en_speaker_7": "female · soft · thoughtful",
+    "v2/en_speaker_8": "male · clipped · precise",
+    "v2/en_speaker_9": "female · mature · authoritative",
+    "v2/de_speaker_0": "male · German accent · precise · clipped",
+    "v2/de_speaker_4": "female · German accent · clear · analytical",
+    "v2/fr_speaker_0": "male · French accent · smooth · baritone",
+    "v2/fr_speaker_4": "female · French accent · warm · elegant",
+    "v2/es_speaker_0": "male · Spanish accent · warm · authoritative",
+    "v2/es_speaker_9": "female · Spanish accent · mature · expressive",
+    "v2/it_speaker_0": "male · Italian accent · dramatic · animated",
+    "v2/it_speaker_4": "female · Italian accent · expressive · warm",
+    "v2/pt_speaker_0": "male · Portuguese accent · soft · thoughtful",
+    "v2/pt_speaker_4": "female · Portuguese accent · gentle · clear",
+}
+
+
+def _write_story_treatment(out_path, episode_title, script_json_str,
+                            production_plan_json_str, news_used,
+                            duration, W, H, fps, size_mb):
+    """Save a complete episode treatment alongside the MP4.
+
+    Includes full script in scene order, voice assignments with
+    human-readable descriptions, scene arc, and production stats.
+    Same information as the mission-control log but formatted as a
+    permanent show-bible record.
+    """
+    try:
+        import time as _t
+        import json as _json
+
+        script = _json.loads(script_json_str) if isinstance(script_json_str, str) else (script_json_str or [])
+        plan   = _json.loads(production_plan_json_str) if isinstance(production_plan_json_str, str) else (production_plan_json_str or {})
+        if not isinstance(script, list):
+            script = []
+
+        voices = plan.get("voice_assignments", {})
+        genre  = plan.get("genre_flavor", plan.get("genre", "unknown"))
+        ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
+        BAR    = "\u2500" * 64
+        DBAR   = "\u2550" * 64
+
+        out = []
+        W_ = lambda s="": out.append(str(s))
+
+        # Header
+        W_(DBAR)
+        W_("  SIGNAL LOST  \u00b7  EPISODE TREATMENT")
+        W_(DBAR)
+        W_()
+        W_(f'  Title    :  "{episode_title}"')
+        W_(f"  Genre    :  {genre}")
+        W_(f"  Produced :  {ts}")
+        W_()
+
+        # News seed
+        W_("NEWS SEED")
+        W_(BAR)
+        news_clean = (news_used or "").strip().split("\n")[0][:120]
+        W_(f"  {news_clean if news_clean else '(no news seed — custom premise used)'}")
+        W_()
+
+        # Cast & voices
+        W_("CAST & VOICES")
+        W_(BAR)
+        if voices:
+            pad = max(len(k) for k in voices)
+            for char in sorted(voices.keys()):
+                preset = voices[char]
+                desc   = _PRESET_DESC.get(preset, preset)
+                W_(f"  {char:<{pad}}  \u2192  {preset:<24}  {desc}")
+        else:
+            W_("  (no voice assignments recorded)")
+        W_()
+
+        # Scene arc summary
+        scenes = {}
+        for item in script:
+            sc = item.get("scene", 1)
+            if sc not in scenes:
+                scenes[sc] = {"env": item.get("env", ""), "sfx": [], "d": 0}
+            t = item.get("type", "")
+            if t == "sfx":
+                scenes[sc]["sfx"].append(item.get("text", ""))
+            elif t == "dialogue":
+                scenes[sc]["d"] += 1
+
+        W_("SCENE ARC")
+        W_(BAR)
+        if scenes:
+            for sc_num, sc in sorted(scenes.items()):
+                W_(f"  Scene {sc_num}  \u00b7  {(sc['env'] or '').strip()}")
+                for sfx in sc["sfx"]:
+                    W_(f"    [SFX]  {sfx}")
+                W_(f"    {sc['d']} dialogue lines")
+                W_()
+        else:
+            W_("  (scene data unavailable)")
+            W_()
+
+        # Full script in scene order
+        d_count = sum(1 for i in script if i.get("type") == "dialogue")
+        s_count = sum(1 for i in script if i.get("type") == "sfx")
+        W_(f"FULL SCRIPT  ({d_count} dialogue  \u00b7  {s_count} sfx cues)")
+        W_(BAR)
+        cur_scene = None
+        for item in script:
+            sc = item.get("scene")
+            if sc != cur_scene:
+                cur_scene = sc
+                env = (item.get("env") or "").strip()
+                W_()
+                W_(f"  \u2500\u2500 SCENE {sc}  \u00b7  {env}")
+                W_()
+            kind = item.get("type", "")
+            if kind == "dialogue":
+                char   = item.get("character", "?")
+                text   = item.get("text", "").strip()
+                preset = voices.get(char, "")
+                vtag   = f"  [{preset}]" if preset else ""
+                W_(f"  {char}{vtag}")
+                W_(f"    {text}")
+                W_()
+            elif kind == "sfx":
+                W_(f"  [SFX]  {item.get('text','').strip()}")
+                W_()
+        W_()
+
+        # Production
+        W_("PRODUCTION")
+        W_(BAR)
+        W_(f"  Duration    :  {duration/60:.1f} min  ({duration:.1f} s)")
+        W_(f"  Resolution  :  {W}x{H} @ {fps} fps")
+        W_(f"  File        :  {os.path.basename(out_path)}")
+        W_(f"  Size        :  {size_mb:.1f} MB")
+        W_()
+        W_(DBAR)
+
+        treatment_path = out_path.replace(".mp4", "_treatment.txt")
+        with open(treatment_path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(out))
+
+        log.info("[Video] Treatment saved: %s", os.path.basename(treatment_path))
+        return treatment_path
+
+    except Exception as exc:
+        log.warning("[Video] Story treatment write failed: %s", exc)
+        return None
+
 class SignalLostVideoRenderer:
     """Generate a procedural CRT-aesthetic MP4 from an OTR episode."""
 
@@ -582,6 +742,13 @@ class SignalLostVideoRenderer:
         log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames)",
                  out_path, size_mb, duration, total_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
+
+        # Write story treatment companion file
+        _write_story_treatment(
+            out_path, episode_title, script_json,
+            production_plan_json, news_used,
+            duration, W, H, fps, size_mb
+        )
 
         # Return using the standard ComfyUI 'gifs' key so the canvas
         # spawns an HTML5 video player widget automatically.
