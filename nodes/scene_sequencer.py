@@ -194,6 +194,7 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 
 # Default voice preset rotation for characters without explicit assignments
 _BARK_VOICE_PRESETS = [
+    # -- English (native) --
     "v2/en_speaker_0",  # Male, deep, authoritative (announcer)
     "v2/en_speaker_1",  # Male, warm, conversational
     "v2/en_speaker_2",  # Female, clear, professional
@@ -204,10 +205,32 @@ _BARK_VOICE_PRESETS = [
     "v2/en_speaker_7",  # Female, young, bright
     "v2/en_speaker_8",  # Male, deep, dramatic
     "v2/en_speaker_9",  # Female, mature, sophisticated
+    # -- International accented English --
+    # European presets render English clearly with accent flavor.
+    # Adds vocal diversity without sacrificing intelligibility.
+    "v2/de_speaker_0",  # German male, precise, clipped
+    "v2/de_speaker_4",  # German female, clear, analytical
+    "v2/fr_speaker_0",  # French male, smooth, baritone
+    "v2/fr_speaker_4",  # French female, warm, elegant
+    "v2/es_speaker_0",  # Spanish male, warm, authoritative
+    "v2/es_speaker_9",  # Spanish female, mature, expressive
+    "v2/it_speaker_0",  # Italian male, dramatic, animated
+    "v2/it_speaker_4",  # Italian female, expressive, warm
+    "v2/pt_speaker_0",  # Portuguese male, soft, thoughtful
+    "v2/pt_speaker_4",  # Portuguese female, gentle, clear
 ]
 
-_FEMALE_PRESETS = ["v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9"]
-_MALE_PRESETS   = ["v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8"]
+_FEMALE_PRESETS = [
+    "v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9",
+    "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
+    "v2/it_speaker_4", "v2/pt_speaker_4",
+]
+_MALE_PRESETS = [
+    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3",
+    "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8",
+    "v2/de_speaker_0", "v2/fr_speaker_0", "v2/es_speaker_0",
+    "v2/it_speaker_0", "v2/pt_speaker_0",
+]
 
 # Stable character→preset cache so the same character always gets the same voice
 _CHARACTER_VOICE_CACHE = {}

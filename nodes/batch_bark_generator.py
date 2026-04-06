@@ -102,17 +102,41 @@ logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 # ── Voice preset resolution (shared logic with SceneSequencer) ───────────────
 
 _BARK_VOICE_PRESETS = [
+    # -- English (native) --
     "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_2",
     "v2/en_speaker_3", "v2/en_speaker_4", "v2/en_speaker_5",
     "v2/en_speaker_6", "v2/en_speaker_7", "v2/en_speaker_8",
     "v2/en_speaker_9",
+    # -- International accented English --
+    # European language presets render English words clearly with a
+    # distinct accent/timbre. Adds vocal diversity to the ensemble
+    # without sacrificing intelligibility.
+    "v2/de_speaker_0",  # German male, precise, clipped
+    "v2/de_speaker_4",  # German female, clear, analytical
+    "v2/fr_speaker_0",  # French male, smooth, baritone
+    "v2/fr_speaker_4",  # French female, warm, elegant
+    "v2/es_speaker_0",  # Spanish male, warm, authoritative
+    "v2/es_speaker_9",  # Spanish female, mature, expressive
+    "v2/it_speaker_0",  # Italian male, dramatic, animated
+    "v2/it_speaker_4",  # Italian female, expressive, warm
+    "v2/pt_speaker_0",  # Portuguese male, soft, thoughtful
+    "v2/pt_speaker_4",  # Portuguese female, gentle, clear
 ]
 
 _CHARACTER_VOICE_CACHE = {}
 
 
-_FEMALE_PRESETS = ["v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9"]
-_MALE_PRESETS   = ["v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8"]
+_FEMALE_PRESETS = [
+    "v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9",
+    "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
+    "v2/it_speaker_4", "v2/pt_speaker_4",
+]
+_MALE_PRESETS = [
+    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3",
+    "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8",
+    "v2/de_speaker_0", "v2/fr_speaker_0", "v2/es_speaker_0",
+    "v2/it_speaker_0", "v2/pt_speaker_0",
+]
 
 
 def _voice_preset_for_character(character, voice_map, voice_traits=""):
