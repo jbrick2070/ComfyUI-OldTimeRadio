@@ -1625,12 +1625,13 @@ class Gemma4Director:
 
         log.info(f"[Gemma4Director] Generating production plan (vintage={vintage_intensity})")
 
-        # Scale max_new_tokens to script length — a 1-min script needs ~1200 tokens
-        # for the production plan, a 25-min script needs ~2500.
-        # Reduced minimum from 1200 to 800 for shorter scripts to speed up generation
-        # and prevent VRAM/System RAM swap death spirals on laptop GPUs.
+        # Scale max_new_tokens to script length.
+        # Director output is lightweight: voice_assignments (placeholder presets,
+        # procedurally overridden), sfx_plan, pacing. No dialogue duplication.
+        # A 5-character cast + 10 SFX cues = ~400–600 tokens.
+        # Budget: ~1 token per 10 chars of script (for SFX scanning) + 400 base.
         script_len = len(script_text)
-        max_tokens = min(3000, max(800, script_len // 2))
+        max_tokens = min(1500, max(500, 400 + script_len // 10))
         log.info(f"[Gemma4Director] max_new_tokens={max_tokens} (script={script_len} chars)")
 
         raw = _generate_with_gemma4(
