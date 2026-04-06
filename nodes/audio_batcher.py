@@ -95,29 +95,40 @@ class AudioBatcher:
             log.warning("[AudioBatcher] No audio inputs provided, returning silence")
             return ({"waveform": silence, "sample_rate": sample_rate}, 0)
 
-        # Ensure all clips have the same number of channels
+        # Detect common device from first clip — respect incoming GPU tensors
+        device = clips[0].device
+        dtype = clips[0].dtype
+
+        # Ensure all clips have the same number of channels + same device
         max_channels = max(c.shape[1] for c in clips)
         normalized = []
         for c in clips:
+            c = c.to(device=device, dtype=dtype)
             if c.shape[1] < max_channels:
-                # Repeat mono to match channel count
                 c = c.repeat(1, max_channels, 1)
             normalized.append(c)
 
-        # Zero-pad to max length
+        # Vectorized padding via pad_sequence on the detected device
+        # Reshape from (1, C, T) → (C*T flattened) won't work; use manual pad
+        # but stay on-device for zero-allocation padding
         max_len = max(c.shape[2] for c in normalized)
         padded = []
         for c in normalized:
             if c.shape[2] < max_len:
                 pad = torch.zeros(1, c.shape[1], max_len - c.shape[2],
-                                  dtype=c.dtype, device=c.device)
+                                  dtype=dtype, device=device)
                 c = torch.cat([c, pad], dim=2)
             padded.append(c)
 
         # Stack along batch dimension: (N, C, T_max)
         batched = torch.cat(padded, dim=0)
 
+        # Move to CPU only if downstream ComfyUI nodes require it
+        if batched.device.type == "cuda":
+            batched = batched.cpu()
+
         log.info(f"[AudioBatcher] Batched {len(padded)} clips → "
-                 f"shape {list(batched.shape)}, sr={sample_rate}")
+                 f"shape {list(batched.shape)}, sr={sample_rate}, "
+                 f"device={device.type}")
 
         return ({"waveform": batched, "sample_rate": sample_rate}, len(padded))

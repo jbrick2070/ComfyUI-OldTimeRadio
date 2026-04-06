@@ -97,21 +97,40 @@ def _iir_filter_fft(waveform, sample_rate, low_hz, high_hz):
 
 
 def _bandpass_filter(waveform, sample_rate, low_hz=300, high_hz=6000):
-    """Bandpass filter — tries scipy (fast), falls back to FFT (still fast).
+    """Bandpass filter with smart path selection for RTX 5080.
 
     AM radio bandwidth: ~300-5000Hz. We use 300-6000Hz for intelligibility.
+
+    Path selection:
+      - CUDA + long audio (>1M samples ~20s @ 48kHz) → GPU FFT (no CPU copy)
+      - CPU or short audio → scipy.signal.sosfilt (vectorized C code)
+      - No scipy → FFT fallback
     """
-    try:
-        # scipy path — ~50ms for 30 min @ 48kHz
-        waveform_np = waveform.cpu().numpy()
-        filtered_np = _iir_filter_scipy(waveform_np, sample_rate, low_hz, high_hz)
-        result = torch.from_numpy(filtered_np).to(device=waveform.device, dtype=waveform.dtype)
-        log.info("[VintageRadio] Bandpass: scipy.signal.sosfilt (vectorized)")
-        return result
-    except ImportError:
-        # FFT fallback — ~200ms for 30 min @ 48kHz, fully on GPU
-        log.info("[VintageRadio] Bandpass: FFT fallback (scipy unavailable)")
-        return _iir_filter_fft(waveform, sample_rate, low_hz, high_hz)
+    if waveform.shape[-1] == 0:
+        return waveform
+
+    device = waveform.device
+    dtype = waveform.dtype
+    N = waveform.shape[-1]
+
+    # Prefer pure-GPU FFT path on Blackwell for long audio (eliminates CPU copy)
+    use_fft = (device.type == "cuda" and N > 1_000_000)
+
+    if not use_fft:
+        try:
+            # scipy path — ~50ms for 30 min @ 48kHz (CPU-only, vectorized C)
+            waveform_np = waveform.cpu().numpy()
+            filtered_np = _iir_filter_scipy(waveform_np, sample_rate, low_hz, high_hz)
+            result = torch.from_numpy(filtered_np).to(device=device, dtype=dtype,
+                                                       non_blocking=True)
+            log.info("[VintageRadio] Bandpass: scipy.signal.sosfilt (short clip / CPU)")
+            return result
+        except ImportError:
+            pass  # fall through to FFT
+
+    # GPU FFT path — fully on device, no CPU round-trip
+    log.info("[VintageRadio] Bandpass: GPU FFT (%d samples on %s)", N, device)
+    return _iir_filter_fft(waveform, sample_rate, low_hz, high_hz)
 
 
 def _one_pole_lpf_vectorized(signal, sample_rate, cutoff_hz):
