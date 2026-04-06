@@ -43,12 +43,20 @@ log = logging.getLogger("OTR")
 # 1. Hub telemetry — disable before any transformers/huggingface_hub import
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
-# 2. transformers logging verbosity — errors only, no INFO/WARNING chatter
+# 2. transformers + huggingface_hub logging — errors only, no INFO/WARNING chatter
+#    These are two separate logging systems — both need to be silenced.
+#    The HF_TOKEN "unauthenticated requests" warning comes from huggingface_hub,
+#    not transformers. No token needed — we run local_files_only=True throughout.
 try:
     from transformers.utils import logging as hf_logging
     hf_logging.set_verbosity_error()
 except Exception:
     pass  # transformers not installed yet — will be caught at node load time
+try:
+    import huggingface_hub.utils._logging as hfh_logging
+    hfh_logging.set_verbosity_error()
+except Exception:
+    pass
 
 # 3. Python warnings — broad module-scoped filter for transformers FutureWarnings
 #    (deprecation notices for APIs we don't control, e.g. Bark's generate() kwargs)

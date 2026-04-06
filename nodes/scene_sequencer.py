@@ -836,27 +836,11 @@ class EpisodeAssembler:
         if peak > 1e-8:
             episode_waveform = episode_waveform * (0.95 / peak)
 
-        # Always save a WAV to disk — the video node is optional and may not be
-        # in the workflow. Without this, lite renders produce no file at all.
+        # Video-only pipeline — MP4 is written by OTR_SignalLostVideo.
+        # No WAV or PNG files are saved here.
+        output_path = "(video-only — MP4 written by OTR_SignalLostVideo)"
+
         from datetime import datetime as _dt
-        import soundfile as _sf
-
-        _out_dir = os.path.join(
-            os.path.expanduser("~"), "Documents", "ComfyUI",
-            "output", "old_time_radio"
-        )
-        os.makedirs(_out_dir, exist_ok=True)
-        _ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-        _safe = "".join(c if c.isalnum() or c in "_ " else "" for c in episode_title)
-        _safe = _safe.strip().replace(" ", "_").lower()[:40]
-        output_path = os.path.join(_out_dir, f"signal_lost_{_safe}_{_ts}.wav")
-
-        # Write as 48kHz stereo WAV
-        _wav_np = episode_waveform.squeeze(0).cpu().numpy().T  # (samples, channels)
-        _sf.write(output_path, _wav_np, sample_rate, subtype="PCM_16")
-        log.info("[EpisodeAssembler] Saved WAV: %s (%.1f MB)",
-                 output_path, os.path.getsize(output_path) / (1024 * 1024))
-
         audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
 
         total_sec = episode_waveform.shape[-1] / sample_rate
