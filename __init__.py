@@ -40,6 +40,19 @@ log = logging.getLogger("OTR")
 # targeted filterwarnings calls as a belt-and-suspenders fallback.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# 0. safetensors_conversion — MUST run before ANY transformers import.
+#    Replace the module in sys.modules so that when modeling_utils does
+#    `from .safetensors_conversion import auto_conversion`, it gets our no-op.
+#    The real module fires a background HTTP POST to HuggingFace on every
+#    from_pretrained() call, gets an empty response → JSONDecodeError traceback.
+import sys as _sys
+import types as _types
+_mock_sc = _types.ModuleType("transformers.safetensors_conversion")
+_mock_sc.auto_conversion = lambda *a, **kw: None
+_mock_sc.get_conversion_pr_reference = lambda *a, **kw: None
+_mock_sc.spawn_conversion = lambda *a, **kw: None
+_sys.modules["transformers.safetensors_conversion"] = _mock_sc
+
 # 1. Hub telemetry — disable before any transformers/huggingface_hub import
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
@@ -62,17 +75,6 @@ except Exception:
 #    (deprecation notices for APIs we don't control, e.g. Bark's generate() kwargs)
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"transformers\..*")
 warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\..*")
-
-# 4. transformers safetensors_conversion background thread — fires during model
-#    load and POSTs to HuggingFace to check for .safetensors conversion.
-#    Gets an empty response → JSONDecodeError in a daemon thread.
-#    Harmless to the pipeline but produces noisy tracebacks in the console.
-#    Patched to a no-op here before any node loads transformers models.
-try:
-    import transformers.safetensors_conversion as _sc
-    _sc.auto_conversion = lambda *a, **kw: None
-except Exception:
-    pass  # safe to skip — cosmetic noise suppression only
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ISOLATED PER-NODE LOADING
