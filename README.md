@@ -115,7 +115,7 @@ SignalLostVideo ─────► signal_lost_<title>_<timestamp>.mp4
 | **SceneSequencer** | Handles the deterministic `(beat)` pauses and stitches lines and SFX together. |
 | **AudioEnhance** | Masters the mix to 48kHz stereo with Haas-effect widening. |
 | **EpisodeAssembler** | Sandwiches scenes with intro/outro theme music. |
-| **SignalLostVideo** | Pure CPU rendering (no VRAM required) of audio-reactive CRT data-viz graphics. Saves a `_treatment.txt` companion file alongside the MP4 — cast list, voice assignments, full script in scene order, and production stats. |
+| **SignalLostVideo** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc` on RTX, fallback to CPU if unavailable). Saves a `_treatment.txt` companion file alongside the MP4 — cast list, voice assignments, full script in scene order, and production stats. Post-roll Telemetry HUD card (30–45 sec) with looped closing theme at 35% volume. |
 
 ---
 

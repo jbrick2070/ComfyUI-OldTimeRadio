@@ -378,6 +378,26 @@ def _find_ffmpeg():
     return None
 
 
+_NVENC_AVAILABLE = None  # cached after first check
+
+def _check_nvenc(ffmpeg_path):
+    """Return True if ffmpeg supports h264_nvenc on this system."""
+    global _NVENC_AVAILABLE
+    if _NVENC_AVAILABLE is not None:
+        return _NVENC_AVAILABLE
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-hide_banner", "-codecs"],
+            capture_output=True, text=True, timeout=5,
+        )
+        _NVENC_AVAILABLE = "h264_nvenc" in result.stdout
+    except Exception:
+        _NVENC_AVAILABLE = False
+    tag = "NVIDIA h264_nvenc" if _NVENC_AVAILABLE else "CPU libx264"
+    log.info("[Video] Encoder: %s", tag)
+    return _NVENC_AVAILABLE
+
+
 def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
                 width, height, fps):
     ffmpeg = _find_ffmpeg()
@@ -387,8 +407,7 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
             "(or add ffmpeg to PATH)"
         )
 
-    # Try NVIDIA hardware encoder first (10–20x faster on RTX). Fall back to libx264.
-    use_nvenc = True
+    use_nvenc = _check_nvenc(ffmpeg)
     cmd = [
         ffmpeg, "-y",
         "-f", "rawvideo",
@@ -402,8 +421,8 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     ]
 
     if use_nvenc:
-        # NVIDIA hardware encoder settings: quality focus, lower latency
-        cmd.extend(["-preset", "slow", "-rc", "vbr", "-cq", "19"])
+        # NVIDIA hardware encoder: quality VBR, ~8 Mbps target
+        cmd.extend(["-preset", "slow", "-rc", "vbr", "-b:v", "8M"])
     else:
         # CPU software encoder: slower but always available
         cmd.extend(["-preset", "medium", "-crf", "20"])
@@ -537,7 +556,10 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     _nr = (news_used or "").strip()
     if _nr.startswith("["):
         try:
-            news_seeds = [str(s) for s in json.loads(_nr)[:2]]
+            news_seeds = [
+                str(s.get("headline", s) if isinstance(s, dict) else s)
+                for s in json.loads(_nr)[:2]
+            ]
         except Exception:
             news_seeds = [_nr[:100]]
     elif _nr:
@@ -600,16 +622,16 @@ class _TelemetryHUDRenderer:
         self.w, self.h, self.fps = w, h, fps
         self.data = data
 
-        self.LEFT_W  = max(220, int(w * 0.30))
+        self.LEFT_W  = max(280, int(w * 0.36))
         self.DIV_X   = self.LEFT_W
         self.RIGHT_X = self.LEFT_W + 2
         self.RIGHT_W = w - self.LEFT_W - 2
-        self.P       = max(8, w // 140)
+        self.P       = max(8, w // 120)
 
-        self.f_head  = _load_font(max(18, h // 34))
-        self.f_label = _load_font(max(14, h // 52))
-        self.f_body  = _load_font(max(12, h // 62))
-        self.f_small = _load_font(max(10, h // 80))
+        self.f_head  = _load_font(max(22, h // 28))
+        self.f_label = _load_font(max(16, h // 42))
+        self.f_body  = _load_font(max(14, h // 50))
+        self.f_small = _load_font(max(13, h // 58))
 
         self._lhH = _fh(self.f_head)
         self._lhL = _fh(self.f_label)
@@ -688,15 +710,15 @@ class _TelemetryHUDRenderer:
         # Title
         d.text((P, y), "SIGNAL LOST", fill=CRT_GREEN, font=self.f_head)
         y += self._lhH
-        d.text((P, y), "EPISODE TREATMENT", fill=CRT_DIM, font=self.f_small)
-        y += self._lhS + P
+        d.text((P, y), "EPISODE TREATMENT", fill=CRT_DIM, font=self.f_body)
+        y += self._lhB + P
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
         # Metadata
-        d.text((P, y), "METADATA", fill=CRT_AMBER, font=self.f_small)
-        y += self._lhS
-        lbl_w = _fw("DATE  ", self.f_small)
+        d.text((P, y), "METADATA", fill=CRT_AMBER, font=self.f_label)
+        y += self._lhL
+        lbl_w = _fw("DATE  ", self.f_body)
         for lbl, val in [
             ("TITLE", self.data.get("title", "?")),
             ("GENRE", self.data.get("genre", "?")),
@@ -704,31 +726,31 @@ class _TelemetryHUDRenderer:
             ("RES",   self.data.get("resolution", "?")),
             ("DATE",  self.data.get("produced", "")[:10]),
         ]:
-            d.text((P, y), lbl, fill=CRT_DIM, font=self.f_small)
-            d.text((P + lbl_w, y), str(val), fill=CRT_WHITE, font=self.f_small)
-            y += self._lhS
+            d.text((P, y), lbl, fill=CRT_DIM, font=self.f_body)
+            d.text((P + lbl_w, y), str(val), fill=CRT_WHITE, font=self.f_body)
+            y += self._lhB
         y += P
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
         # News seed
-        d.text((P, y), "NEWS SEED", fill=CRT_AMBER, font=self.f_small)
-        y += self._lhS
+        d.text((P, y), "NEWS SEED", fill=CRT_AMBER, font=self.f_label)
+        y += self._lhL
         for seed in self.data.get("news_seeds", [])[:2]:
             y = _draw_wrapped(d, seed, P, y,
-                              self.LEFT_W - P * 2, self.f_small,
-                              CRT_DIM, self._lhS)
+                              self.LEFT_W - P * 2, self.f_body,
+                              CRT_DIM, self._lhB)
             y += P // 2
         y += P
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
         # Cast & voices
-        d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_small)
-        y += self._lhS
+        d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_label)
+        y += self._lhL
         for m in self.data.get("cast", []):
-            d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_small)
-            y += self._lhS
+            d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_body)
+            y += self._lhB
             preset = m.get("preset", "")
             if preset:
                 d.text((P * 2, y), preset, fill=CRT_DIM, font=self.f_small)
@@ -878,7 +900,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
                 else:
                     voices[str(k)] = str(v)
 
-        genre  = plan.get("genre_flavor", plan.get("genre", "unknown"))
+        genre  = plan.get("genre_flavor", plan.get("genre", "sci-fi radio drama"))
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64
@@ -903,7 +925,10 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         if _news_raw.startswith("["):
             try:
                 _seeds = _json.loads(_news_raw)
-                news_clean = " | ".join(str(s)[:80] for s in _seeds[:3]) if _seeds else ""
+                news_clean = " | ".join(
+                    str(s.get("headline", s) if isinstance(s, dict) else s)[:80]
+                    for s in _seeds[:3]
+                ) if _seeds else ""
             except Exception:
                 news_clean = _news_raw[:120]
         else:
