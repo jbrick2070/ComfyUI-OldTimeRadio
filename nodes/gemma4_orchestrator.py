@@ -147,14 +147,18 @@ SCIENCE_NEWS_FEEDS = [
 ]
 
 
-def _fetch_full_article(url, timeout=5):
+def _fetch_full_article(url, timeout=20):
     """Fetch the full text of a science article from its URL.
 
     Uses requests + BeautifulSoup to strip HTML boilerplate and extract
-    the article body. Returns the raw text (up to 8000 chars) so Gemma
+    the article body. Returns the raw text (up to 12000 chars) so Gemma
     gets real science content — methodology, findings, implications —
     not just the RSS teaser. Falls back to empty string on any failure
     (paywalls, bot blocks, timeouts) so the caller can degrade gracefully.
+
+    The scraper tries a cascade of CSS selectors before falling back to
+    the full document, so it handles sites that don't use semantic
+    <article>/<main> tags (e.g. UCLA Newsroom, institutional press pages).
     """
     try:
         import requests
@@ -168,15 +172,47 @@ def _fetch_full_article(url, timeout=5):
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # Remove nav, ads, footers, scripts, styles
+        # Strip boilerplate — nav, ads, footer, sidebar, scripts
         for tag in soup(["script", "style", "nav", "footer", "header",
                           "aside", "form", "noscript", "iframe"]):
             tag.decompose()
 
-        # Prefer semantic article body; fall back to all paragraphs
-        body = soup.find("article") or soup.find("main") or soup
-        paragraphs = body.find_all("p")
-        text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
+        # Cascade of content selectors — most specific to least.
+        # Covers: semantic HTML5, WordPress/CMS class conventions,
+        # institutional press release pages (UCLA, NIH, NSF, EurekaAlert).
+        _SELECTORS = [
+            "article",
+            "main",
+            '[class*="article-body"]',
+            '[class*="article__body"]',
+            '[class*="story-body"]',
+            '[class*="entry-content"]',
+            '[class*="post-content"]',
+            '[class*="content-body"]',
+            '[class*="wysiwyg"]',
+            '[class*="rich-text"]',
+            '[class*="body-copy"]',
+            '[class*="release-body"]',      # EurekaAlert press releases
+            '[class*="article-content"]',
+            '[id*="article-body"]',
+            '[id*="main-content"]',
+            "div.content",
+            "div.body",
+        ]
+
+        body = None
+        for selector in _SELECTORS:
+            body = soup.select_one(selector)
+            if body:
+                break
+        if body is None:
+            body = soup  # last resort — full stripped document
+
+        # Extract paragraphs AND headings — h2/h3 carry section context
+        # (methodology, implications, researcher quotes) that's often the
+        # richest science content buried past the lede.
+        content_tags = body.find_all(["p", "h2", "h3"])
+        text = " ".join(tag.get_text(" ", strip=True) for tag in content_tags)
         text = re.sub(r'\s+', ' ', text).strip()
         return text[:12000]
     except Exception:
