@@ -1035,18 +1035,17 @@ Every scene MUST follow this layout:
 
 CRITICAL: The first field in EVERY [VOICE:] tag is ALWAYS the CHARACTER NAME IN ALL CAPS.
 WRONG: [VOICE: male, 40s, calm] Text here.
-RIGHT: [VOICE: HAYES, male, 40s, calm, low energy] Text here.
+RIGHT: [VOICE: CHARACTERNAME, gender, age, tone, energy] Dialogue goes here.
 CHARACTER NAMES must be CONSISTENT across all scenes (same spelling, same caps, every time).
+Invent fresh, original names for every episode. Do NOT reuse names from previous episodes.
 
 ═══ 🧱 2. THE TAG SYSTEM (ONLY THESE FOUR) ═══
 - [ENV: ...] -> Background layers (e.g. [ENV: cockpit, electronic chirps, life support hum])
 - [SFX: ...] -> Individual sound effects (e.g. [SFX: metal clatter])
 - [VOICE: NAME, gender, age, tone, energy] -> MUST precede every dialogue line.
   NAME is ALWAYS FIRST — all caps, no spaces if possible.
-  Examples: [VOICE: ANNOUNCER, male, 50s, authoritative, calm]
-            [VOICE: HAYES, male, 40s, calm, low energy]
-            [VOICE: DR_VOSS, female, 30s, intense, high energy]
-            [VOICE: LEMMY, male, 50s, gruff, pragmatic]
+  The NAME must be a short, punchy, original character name you invent: 1-2 syllables, strong consonants, easy to say aloud.
+  The ANNOUNCER role always uses: [VOICE: ANNOUNCER, gender, age, tone, energy]
 - (beat) -> A 0.8s deterministic pause. Use it between lines for timing.
 
 ═══ 🧱 3. DIALOGUE RULES (BARK OPTIMIZED) ═══
