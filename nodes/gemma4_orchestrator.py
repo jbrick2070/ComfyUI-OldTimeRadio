@@ -57,6 +57,125 @@ def _runtime_log(msg):
             f.write(f"[{ts}] {msg}\n")
     except: pass
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3c: WALL-CLOCK TIMEOUT WRAPPER
+# Heavy LLM phases (Open-Close outlines, Critique, Revision) can hang if
+# Gemma 4 stalls on a malformed prompt or GPU goes sideways. We run the
+# call in a worker thread and bound it with a wall-clock budget. On timeout
+# the thread is left to drain in the background (Gemma generation is not
+# cancellable mid-token) but the caller gets control back via TimeoutError
+# and the pipeline can fall back to its last known-good artifact.
+# ─────────────────────────────────────────────────────────────────────────────
+class _LLMTimeout(Exception):
+    """Raised when an LLM phase exceeds its wall-clock budget."""
+    pass
+
+
+def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
+    """Run fn() in a worker thread with a wall-clock timeout.
+
+    Returns fn's return value on success.
+    Raises _LLMTimeout if the budget is exceeded.
+    Re-raises any exception fn raised.
+    """
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"otr-{phase_label}")
+    try:
+        future = executor.submit(fn)
+        try:
+            return future.result(timeout=timeout_sec)
+        except FuturesTimeout:
+            _runtime_log(f"TIMEOUT: {phase_label} exceeded {timeout_sec}s wall-clock budget")
+            log.warning("[Timeout] %s phase exceeded %ds — abandoning and falling back",
+                        phase_label, timeout_sec)
+            raise _LLMTimeout(f"{phase_label} exceeded {timeout_sec}s")
+    finally:
+        # Don't wait for the orphaned worker — let it drain in the background.
+        executor.shutdown(wait=False)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3d: BARK VOICE HEALTH CHECK
+# Synthesize a 1-second test clip for each active English preset at startup.
+# Any preset that returns silence or NaN gets removed from _VOICE_PROFILES
+# for the rest of the session, so the Director can never assign a broken
+# voice. Runs once per process, lazily on first ScriptWriter init so we
+# don't pay the Bark load cost in environments that only import the module.
+# ─────────────────────────────────────────────────────────────────────────────
+_BARK_HEALTH_CHECKED = False
+_BARK_HEALTH_DISABLED = set()
+
+
+def _bark_health_check():
+    """Run a 1-second synthesis test on every active en_speaker_* preset.
+
+    Mutates the module-level _VOICE_PROFILES, _ANNOUNCER_PRESETS, and
+    _LEMMY_PROFILE to remove any preset that fails. Idempotent — only
+    runs the first time it's called.
+    """
+    global _BARK_HEALTH_CHECKED, _VOICE_PROFILES, _ANNOUNCER_PRESETS, _LEMMY_PROFILE
+    if _BARK_HEALTH_CHECKED:
+        return
+    _BARK_HEALTH_CHECKED = True
+
+    try:
+        import numpy as np
+        from bark import generate_audio, preload_models
+    except Exception as e:
+        log.info("[VoiceHealth] Bark not importable (%s) — skipping health check", e)
+        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
+        return
+
+    log.info("[VoiceHealth] Running 1-second Bark health check on English presets...")
+    _runtime_log("VOICE_HEALTH: Starting Bark preset health check")
+
+    try:
+        preload_models()
+    except Exception as e:
+        log.warning("[VoiceHealth] preload_models failed: %s — skipping health check", e)
+        _runtime_log(f"VOICE_HEALTH_SKIPPED: preload failed ({e})")
+        return
+
+    presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
+                              {p for p, _ in _ANNOUNCER_PRESETS} |
+                              {_LEMMY_PROFILE["voice_preset"]})
+
+    test_text = "Testing one two three."
+    disabled = set()
+    for preset in presets_to_test:
+        t0 = time.time()
+        try:
+            audio = generate_audio(test_text, history_prompt=preset)
+            arr = np.asarray(audio, dtype=np.float32)
+            if arr.size == 0:
+                raise ValueError("empty audio")
+            if not np.isfinite(arr).all():
+                raise ValueError("NaN/Inf in output")
+            if float(np.max(np.abs(arr))) < 1e-4:
+                raise ValueError("silent output")
+            log.info("[VoiceHealth] %s OK (%.1fs)", preset, time.time() - t0)
+            _runtime_log(f"VOICE_HEALTH_OK: {preset} ({time.time()-t0:.1f}s)")
+        except Exception as e:
+            disabled.add(preset)
+            log.warning("[VoiceHealth] %s FAILED: %s — disabling for session", preset, e)
+            _runtime_log(f"VOICE_HEALTH_DISABLED: {preset} — {e}")
+
+    if disabled:
+        _BARK_HEALTH_DISABLED.update(disabled)
+        _VOICE_PROFILES[:] = [vp for vp in _VOICE_PROFILES if vp[0] not in disabled]
+        _ANNOUNCER_PRESETS[:] = [(p, n) for p, n in _ANNOUNCER_PRESETS if p not in disabled]
+        if _LEMMY_PROFILE["voice_preset"] in disabled:
+            survivors = [vp[0] for vp in _VOICE_PROFILES if vp[1] == "male"]
+            if survivors:
+                fallback = survivors[0]
+                log.warning("[VoiceHealth] LEMMY preset disabled — falling back to %s", fallback)
+                _runtime_log(f"VOICE_HEALTH_DISABLED: LEMMY preset replaced with {fallback}")
+                _LEMMY_PROFILE["voice_preset"] = fallback
+        _runtime_log(f"VOICE_HEALTH: {len(disabled)} preset(s) disabled, {len(_VOICE_PROFILES)} remain")
+    else:
+        _runtime_log(f"VOICE_HEALTH: All {len(presets_to_test)} presets passed")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LOG CLEANUP — compliant fixes handle most warnings at the source.
 # These catch residual library noise from urllib3/httpx cache checks.
@@ -1124,6 +1243,12 @@ class Gemma4ScriptWriter:
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
                      f"target_min={target_minutes} chars={num_characters}")
+
+        # Phase 3d: Bark voice health check (lazy, runs once per process)
+        try:
+            _bark_health_check()
+        except Exception as e:
+            _runtime_log(f"VOICE_HEALTH_SKIPPED: unexpected error {e}")
         log.info(f"[Gemma4ScriptWriter] Feature flags: open_close={open_close}, "
                  f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
@@ -1605,11 +1730,15 @@ Output a concise outline with:
 Keep it under 400 words. Structure only — no dialogue."""
 
             try:
-                outline_text = _generate_with_gemma4(
-                    outline_prompt,
-                    model_id=model_id,
-                    max_new_tokens=600,
-                    temperature=min(1.0, temperature + 0.1),  # Slightly higher for variety
+                outline_text = _run_with_timeout(
+                    lambda: _generate_with_gemma4(
+                        outline_prompt,
+                        model_id=model_id,
+                        max_new_tokens=600,
+                        temperature=min(1.0, temperature + 0.1),
+                    ),
+                    timeout_sec=300,
+                    phase_label=f"OpenClose-Outline-{focus_name}",
                 )
                 outlines.append((focus_name, outline_text))
                 log.info("[OpenClose] Outline %s generated (%d chars)",
@@ -1675,11 +1804,15 @@ Output the WINNING OUTLINE in full at the end, incorporating any merged elements
 Label it "FINAL OUTLINE:" on its own line before the text."""
 
         try:
-            eval_text = _generate_with_gemma4(
-                eval_prompt,
-                model_id=model_id,
-                max_new_tokens=800,
-                temperature=max(0.3, temperature - 0.3),  # Lower temp for analytical eval
+            eval_text = _run_with_timeout(
+                lambda: _generate_with_gemma4(
+                    eval_prompt,
+                    model_id=model_id,
+                    max_new_tokens=800,
+                    temperature=max(0.3, temperature - 0.3),
+                ),
+                timeout_sec=300,
+                phase_label="OpenClose-Evaluator",
             )
             log.info("[OpenClose] Evaluator complete (%d chars)", len(eval_text))
             _runtime_log(f"OPENCLOSE: Evaluator done ({len(eval_text)} chars)")
@@ -1765,11 +1898,15 @@ YOUR CRITIQUE (numbered list only):"""
 
         try:
             critique_tokens = min(800, max(300, len(draft_text) // 20))
-            critique_text = _generate_with_gemma4(
-                critique_prompt,
-                model_id=model_id,
-                max_new_tokens=critique_tokens,
-                temperature=max(0.3, temperature - 0.3),  # Lower temp for analytical critique
+            critique_text = _run_with_timeout(
+                lambda: _generate_with_gemma4(
+                    critique_prompt,
+                    model_id=model_id,
+                    max_new_tokens=critique_tokens,
+                    temperature=max(0.3, temperature - 0.3),
+                ),
+                timeout_sec=300,
+                phase_label="Critique-Pass",
             )
             log.info("[Critique] Critique pass complete (%d chars)", len(critique_text))
             _runtime_log(f"CRITIQUE: Critique pass done ({len(critique_text)} chars)")
@@ -1830,11 +1967,15 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             # Revision needs roughly the same token budget as the original draft
             revision_tokens = max(int(target_words * 2.0), 1024)
             revision_tokens = min(revision_tokens, 8192)
-            revised_text = _generate_with_gemma4(
-                revision_prompt,
-                model_id=model_id,
-                max_new_tokens=revision_tokens,
-                temperature=temperature,
+            revised_text = _run_with_timeout(
+                lambda: _generate_with_gemma4(
+                    revision_prompt,
+                    model_id=model_id,
+                    max_new_tokens=revision_tokens,
+                    temperature=temperature,
+                ),
+                timeout_sec=600,
+                phase_label="Revision-Pass",
             )
             log.info("[Critique] Revision pass complete (%d chars)", len(revised_text))
             _runtime_log(f"CRITIQUE: Revision done ({len(revised_text)} chars)")
