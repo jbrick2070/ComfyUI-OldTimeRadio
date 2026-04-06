@@ -159,21 +159,14 @@ _DEMEANORS = [
     "measured", "wry", "stoic", "anxious", "confident", "weary",
 ]
 
-# Accent pool — weighted so ~60% are neutral English, ~40% are accented English.
-# Each accent maps to a Bark language code prefix.
-# Foreign presets speak ENGLISH with that accent when given pure English text.
+# Accent pool — 100% English-native presets only.
+# Foreign presets (de_speaker, fr_speaker, etc.) caused Bark hallucinations:
+# the model generates foreign-language phonemes when given English text,
+# producing gibberish instead of accented English. Until Bark's multilingual
+# stability improves, all characters use en_speaker_* presets.
+# See: v1.1 "Test Signal" critique — Lemmy (de_speaker_0) was unintelligible.
 _ACCENTS = [
-    ("neutral",  "en", 0.60),   # Neutral English — no accent
-    ("German",   "de", 0.06),   # English with German accent
-    ("Spanish",  "es", 0.06),   # English with Spanish accent
-    ("French",   "fr", 0.05),   # English with French accent
-    ("Indian",   "hi", 0.04),   # English with Indian accent
-    ("Italian",  "it", 0.04),   # English with Italian accent
-    ("Japanese", "ja", 0.03),   # English with Japanese accent
-    ("Korean",   "ko", 0.03),   # English with Korean accent
-    ("Russian",  "ru", 0.04),   # English with Russian accent
-    ("Brazilian", "pt", 0.03),  # English with Brazilian accent
-    ("Polish",   "pl", 0.02),   # English with Polish accent
+    ("neutral",  "en", 1.00),   # English-only — no foreign presets
 ]
 
 # Voice presets mapped by gender + vocal quality + language code.
@@ -192,51 +185,23 @@ _VOICE_PROFILES = [
     ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
     ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "20s", "30s"}),
     ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
-    # ── German accent (English with German inflection) ──
-    ("v2/de_speaker_0", "male",   "de", {"authoritative", "deep", "50s", "60s"}),
-    ("v2/de_speaker_3", "male",   "de", {"calm", "measured", "30s", "40s"}),
-    ("v2/de_speaker_5", "male",   "de", {"sharp", "intense", "40s"}),
-    ("v2/de_speaker_2", "female", "de", {"warm", "confident", "30s", "40s"}),
-    ("v2/de_speaker_7", "female", "de", {"energetic", "sharp", "20s", "30s"}),
-    # ── Spanish accent ──
-    ("v2/es_speaker_0", "male",   "es", {"warm", "energetic", "30s", "40s"}),
-    ("v2/es_speaker_6", "male",   "es", {"calm", "measured", "40s", "50s"}),
-    ("v2/es_speaker_8", "male",   "es", {"intense", "confident", "30s"}),
-    ("v2/es_speaker_4", "female", "es", {"warm", "energetic", "20s", "30s"}),
-    ("v2/es_speaker_9", "female", "es", {"authoritative", "confident", "40s", "50s"}),
-    # ── French accent ──
-    ("v2/fr_speaker_1", "male",   "fr", {"calm", "wry", "30s", "40s"}),
-    ("v2/fr_speaker_5", "male",   "fr", {"warm", "measured", "50s"}),
-    ("v2/fr_speaker_2", "female", "fr", {"warm", "confident", "30s", "40s"}),
-    ("v2/fr_speaker_4", "female", "fr", {"sharp", "energetic", "20s", "30s"}),
-    # ── Indian accent ──
-    ("v2/hi_speaker_0", "male",   "hi", {"calm", "measured", "30s", "40s"}),
-    ("v2/hi_speaker_5", "male",   "hi", {"warm", "authoritative", "50s"}),
-    ("v2/hi_speaker_4", "female", "hi", {"warm", "energetic", "30s"}),
-    ("v2/hi_speaker_9", "female", "hi", {"confident", "authoritative", "40s", "50s"}),
-    # ── Italian accent ──
-    ("v2/it_speaker_0", "male",   "it", {"warm", "energetic", "30s", "40s"}),
-    ("v2/it_speaker_6", "male",   "it", {"intense", "sharp", "40s"}),
-    ("v2/it_speaker_4", "female", "it", {"warm", "confident", "30s"}),
-    ("v2/it_speaker_9", "female", "it", {"authoritative", "intense", "50s"}),
-    # ── Japanese accent ──
-    ("v2/ja_speaker_1", "male",   "ja", {"calm", "measured", "30s", "40s"}),
-    ("v2/ja_speaker_6", "male",   "ja", {"stoic", "dry", "40s", "50s"}),
-    ("v2/ja_speaker_4", "female", "ja", {"warm", "calm", "30s"}),
-    # ── Korean accent ──
-    ("v2/ko_speaker_0", "male",   "ko", {"calm", "sharp", "30s", "40s"}),
-    ("v2/ko_speaker_4", "female", "ko", {"warm", "energetic", "20s", "30s"}),
-    # ── Russian accent ──
-    ("v2/ru_speaker_0", "male",   "ru", {"authoritative", "deep", "50s", "60s"}),
-    ("v2/ru_speaker_3", "male",   "ru", {"intense", "stoic", "40s"}),
-    ("v2/ru_speaker_4", "female", "ru", {"confident", "sharp", "30s", "40s"}),
-    ("v2/ru_speaker_9", "female", "ru", {"authoritative", "weary", "50s"}),
-    # ── Brazilian/Portuguese accent ──
-    ("v2/pt_speaker_0", "male",   "pt", {"warm", "energetic", "30s", "40s"}),
-    ("v2/pt_speaker_4", "female", "pt", {"warm", "confident", "30s"}),
-    # ── Polish accent ──
-    ("v2/pl_speaker_0", "male",   "pl", {"calm", "measured", "40s"}),
-    ("v2/pl_speaker_4", "female", "pl", {"warm", "energetic", "30s"}),
+    # ── DISABLED: Foreign accent presets ──────────────────────────────
+    # These caused Bark hallucinations — the model generates foreign-language
+    # phonemes when fed English text, producing gibberish. Kept as comments
+    # for future reference if Bark's multilingual stability improves.
+    # See v1.1 "Test Signal" critique: de_speaker_0 (Lemmy) was unintelligible,
+    # fr_speaker lines also showed artifacts.
+    #
+    # German:  de_speaker_0/3/5 (male), de_speaker_2/7 (female)
+    # Spanish: es_speaker_0/6/8 (male), es_speaker_4/9 (female)
+    # French:  fr_speaker_1/5 (male), fr_speaker_2/4 (female)
+    # Indian:  hi_speaker_0/5 (male), hi_speaker_4/9 (female)
+    # Italian: it_speaker_0/6 (male), it_speaker_4/9 (female)
+    # Japanese: ja_speaker_1/6 (male), ja_speaker_4 (female)
+    # Korean:  ko_speaker_0 (male), ko_speaker_4 (female)
+    # Russian: ru_speaker_0/3 (male), ru_speaker_4/9 (female)
+    # Brazilian: pt_speaker_0 (male), pt_speaker_4 (female)
+    # Polish:  pl_speaker_0 (male), pl_speaker_4 (female)
 ]
 
 # ANNOUNCER voice pool — randomized per episode for gender balance (50/50 male/female)
@@ -250,15 +215,15 @@ _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_5", "Male, warm, older"),
 ]
 
-# LEMMY fixed profile — always gravelly/raspy male with British accent
+# LEMMY fixed profile — always gravelly/raspy male, English-native preset
 _LEMMY_PROFILE = {
     "name": "LEMMY",
     "gender": "male",
     "age": "50s",
     "demeanor": "gravelly",
-    "accent": "British",
-    "voice_preset": "v2/de_speaker_0",  # German preset produces British-style accent with gravelly tone
-    "notes": "Male, gravelly/raspy, 50s, British accent, iconic",
+    "accent": "neutral",  # English-native preset; gravelly tone comes from en_speaker_8 vocal quality
+    "voice_preset": "v2/en_speaker_8",  # English native — gravelly, confident, 40s-50s. Avoids Bark hallucination from de_speaker
+    "notes": "Male, gravelly/raspy, 50s, gruff mechanic voice, iconic",
 }
 
 
@@ -1133,6 +1098,14 @@ class Gemma4ScriptWriter:
                     "default": True,
                     "tooltip": "Include act breaks with sponsor messages (authentic style)"
                 }),
+                "self_critique": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Checks & Critiques: Draft -> Critique -> Revise loop for higher story quality (adds ~2 extra LLM passes)"
+                }),
+                "open_close": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Open-Close Expansion: generate 3 competing story outlines, evaluator picks the best before full script (adds ~4 small LLM passes)"
+                }),
             },
         }
 
@@ -1144,7 +1117,15 @@ class Gemma4ScriptWriter:
     def write_script(self, episode_title, genre_flavor, target_minutes,
                      num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
-                     include_act_breaks=True):
+                     include_act_breaks=True, self_critique=True,
+                     open_close=True):
+
+        # ── DIAGNOSTIC: log feature flags so we can confirm they're received ──
+        _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
+                     f"custom_premise={'(set)' if custom_premise else '(empty)'} "
+                     f"target_min={target_minutes} chars={num_characters}")
+        log.info(f"[Gemma4ScriptWriter] Feature flags: open_close={open_close}, "
+                 f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
         # Fetch real science news — one random story from full feed pool
         news = _fetch_science_news()
@@ -1219,6 +1200,46 @@ Begin the full script now. Follow this structure exactly:
 [VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
 
+        # ── Open-Close Expansion: compete outlines, evaluator picks best ──
+        winning_outline = ""
+        _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
+                     f"custom_premise='{custom_premise}' (bool={bool(custom_premise)}), "
+                     f"condition={open_close and not custom_premise}")
+        if open_close and not custom_premise:
+            winning_outline = self._open_close_expansion(
+                system, genre_flavor, news_block, num_characters,
+                target_minutes, target_words, lemmy_directive,
+                model_id, temperature,
+            )
+            if winning_outline:
+                user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING OUTLINE below.
+
+WINNING OUTLINE (selected by evaluator from 3 competing concepts):
+{winning_outline}
+
+EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
+GENRE: {genre_flavor.replace("_", " ")}
+CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
+{"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
+{lemmy_directive}
+
+REMEMBER: The outline above is your roadmap. Follow its structure, characters, and arc. Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
+
+Begin the full script now. Follow this structure exactly:
+=== SCENE 1 ===
+[ENV: location description, ambient noise, vibe]
+[SFX: establishing sound]
+(beat)
+[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
+[VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
+(beat)
+[SFX: action sound]
+...
+[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[MUSIC: Closing theme]"""
+
         full_prompt = f"{system}\n\n{user_prompt}"
 
         log.info(f"[Gemma4ScriptWriter] Generating {target_minutes}min episode "
@@ -1251,6 +1272,20 @@ Begin the full script now. Follow this structure exactly:
                 include_act_breaks, model_id, temperature,
                 lemmy_directive=lemmy_directive,
             )
+
+        # ── v1.1 CHECKS & CRITIQUES LOOP ─────────────────────────────────────
+        # Three-pass refinement: Draft → Critique → Revise
+        # The LLM critiques its own script for structural, scientific, and
+        # dramatic weaknesses, then rewrites based on the critique.
+        # Adds ~2 extra inference passes but significantly elevates quality.
+        # ──────────────────────────────────────────────────────────────────────
+        _runtime_log(f"ScriptWriter: CRITIQUE CHECK: self_critique={self_critique} (type={type(self_critique).__name__})")
+        if self_critique:
+            _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise")
+            script_text = self._critique_and_revise(
+                script_text, genre_flavor, target_words, model_id, temperature
+            )
+            _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
 
         # ── Content safety filter — catch anything the prompt policy missed ──
         script_text, blocked = _content_filter(script_text)
@@ -1327,6 +1362,296 @@ Begin the full script now. Follow this structure exactly:
 
         return (script_text, script_json, news_json, est_minutes)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # OPEN-CLOSE EXPANSION — 3 competing outlines → evaluator picks winner
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _open_close_expansion(self, system, genre_flavor, news_block,
+                              num_characters, target_minutes, target_words,
+                              lemmy_directive, model_id, temperature):
+        """Generate 3 competing story outlines with different priorities,
+        then have an evaluator pick the best one.
+
+        Outline A: Prioritizes character conflict and emotional stakes.
+        Outline B: Prioritizes scientific rigor and technical tension.
+        Outline C: Prioritizes atmosphere, pacing, and environmental tension.
+
+        The evaluator receives all 3 and selects the strongest narrative,
+        optionally merging the best elements from each.
+
+        Returns the winning outline text, or empty string on failure.
+        """
+        log.info("[OpenClose] Starting Open-Close expansion (3 outlines + evaluator)...")
+        _runtime_log("OPENCLOSE: Generating 3 competing outlines")
+
+        arc_choices = random.sample("ABCDEFGHIJKL", 3)
+
+        outline_focuses = [
+            ("CHARACTER-DRIVEN",
+             "Focus on intense interpersonal conflict. Give each character a secret, "
+             "a fear, and a breaking point. The science is the pressure cooker — "
+             "the people are the story. Make us feel their desperation."),
+            ("SCIENCE-DRIVEN",
+             "Focus on scientific rigor and technical problem-solving. The plot should "
+             "hinge on a real physics/biology constraint that characters must solve under "
+             "pressure. Think Apollo 13 — the math IS the drama."),
+            ("ATMOSPHERE-DRIVEN",
+             "Focus on environmental dread and sensory immersion. Use sound design cues "
+             "([SFX:], [ENV:]) heavily. Build a world the listener can HEAR — creaking metal, "
+             "distant alarms, breathing in a spacesuit. Slow-burn tension."),
+        ]
+
+        outlines = []
+        for i, (focus_name, focus_desc) in enumerate(outline_focuses):
+            outline_prompt = f"""{system}
+
+Generate a STORY OUTLINE (not a full script) for a {genre_flavor.replace("_", " ")} radio drama.
+
+PRIORITY: {focus_name}
+{focus_desc}
+
+CRITICAL: The science news headlines in the system prompt above ARE your raw material. Your premise MUST be rooted in those real headlines — extrapolate the science to its most dramatic, terrifying, or profound next step. Do NOT invent unrelated premises.
+
+ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine above.
+CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+TARGET LENGTH: {target_minutes} minutes (~{target_words} words when fully scripted)
+{lemmy_directive}
+
+Output a concise outline with:
+- PREMISE: 2-3 sentences. What's the hook? Must reference the real science from the news above.
+- CHARACTERS: Name, role, key trait, internal conflict (one line each)
+- ACT 1 (BEGINNING): Setup, inciting incident. 3-4 sentences.
+- ACT 2 (MIDDLE): Rising tension, complications, reversals. 4-5 sentences.
+- ACT 3 (END): Climax, resolution, epilogue hook. 3-4 sentences.
+- KEY SFX: 3-5 signature sound moments that define the atmosphere.
+
+Keep it under 400 words. Structure only — no dialogue."""
+
+            try:
+                outline_text = _generate_with_gemma4(
+                    outline_prompt,
+                    model_id=model_id,
+                    max_new_tokens=600,
+                    temperature=min(1.0, temperature + 0.1),  # Slightly higher for variety
+                )
+                outlines.append((focus_name, outline_text))
+                log.info("[OpenClose] Outline %s generated (%d chars)",
+                         focus_name, len(outline_text))
+                _runtime_log(f"OPENCLOSE: Outline {focus_name} done ({len(outline_text)} chars)")
+            except Exception as e:
+                log.warning("[OpenClose] Outline %s failed: %s", focus_name, e)
+                outlines.append((focus_name, ""))
+
+        # Filter out empty outlines
+        valid_outlines = [(name, text) for name, text in outlines if text and len(text) > 100]
+        if not valid_outlines:
+            log.warning("[OpenClose] All outlines failed — falling back to direct generation")
+            _runtime_log("OPENCLOSE: All outlines failed")
+            return ""
+
+        if len(valid_outlines) == 1:
+            log.info("[OpenClose] Only 1 outline survived — using it directly")
+            return valid_outlines[0][1]
+
+        # ── EVALUATOR: pick the best outline ──
+        log.info("[OpenClose] Evaluating %d outlines...", len(valid_outlines))
+        _runtime_log("OPENCLOSE: Evaluator picking winner")
+
+        outlines_block = ""
+        for idx, (name, text) in enumerate(valid_outlines, 1):
+            outlines_block += f"\n--- OUTLINE {idx} ({name}) ---\n{text}\n"
+
+        eval_prompt = f"""You are a veteran radio drama showrunner selecting the best story concept for production.
+
+Below are {len(valid_outlines)} competing outlines for a {genre_flavor.replace("_", " ")} episode.
+
+Evaluate each on:
+1. HOOK STRENGTH: Would a listener stay past the first 30 seconds?
+2. CHARACTER DEPTH: Do the characters feel real and distinct?
+3. NARRATIVE ARC: Is there clear escalation, a satisfying climax, and earned resolution?
+4. SCIENTIFIC PLAUSIBILITY: Is the science grounded or handwavy?
+5. AUDIO POTENTIAL: Will this sound amazing as a radio drama? Strong SFX moments?
+
+{outlines_block}
+
+YOUR DECISION:
+First, write ONE sentence about each outline's biggest strength and weakness.
+Then state: "WINNER: Outline N" (the number).
+Finally, if elements from a losing outline would strengthen the winner, list them as "MERGE: [element]".
+
+Output the WINNING OUTLINE in full at the end, incorporating any merged elements.
+Label it "FINAL OUTLINE:" on its own line before the text."""
+
+        try:
+            eval_text = _generate_with_gemma4(
+                eval_prompt,
+                model_id=model_id,
+                max_new_tokens=800,
+                temperature=max(0.3, temperature - 0.3),  # Lower temp for analytical eval
+            )
+            log.info("[OpenClose] Evaluator complete (%d chars)", len(eval_text))
+            _runtime_log(f"OPENCLOSE: Evaluator done ({len(eval_text)} chars)")
+        except Exception as e:
+            log.warning("[OpenClose] Evaluator failed: %s — using first outline", e)
+            return valid_outlines[0][1]
+
+        # Extract the final outline from evaluator output
+        # Look for "FINAL OUTLINE:" marker
+        final_marker = "FINAL OUTLINE:"
+        marker_idx = eval_text.upper().find(final_marker.upper())
+        if marker_idx >= 0:
+            winning = eval_text[marker_idx + len(final_marker):].strip()
+            log.info("[OpenClose] Extracted winning outline (%d chars)", len(winning))
+            return winning
+
+        # If no marker found, try to find "WINNER:" and return corresponding outline
+        winner_match = re.search(r'WINNER:\s*Outline\s*(\d)', eval_text, re.IGNORECASE)
+        if winner_match:
+            winner_idx = int(winner_match.group(1)) - 1
+            if 0 <= winner_idx < len(valid_outlines):
+                log.info("[OpenClose] Winner is Outline %d (%s)",
+                         winner_idx + 1, valid_outlines[winner_idx][0])
+                return valid_outlines[winner_idx][1]
+
+        # Fallback: return the full evaluator output (it usually contains a merged outline)
+        log.info("[OpenClose] No clean marker found — using full evaluator output as outline")
+        return eval_text
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CHECKS & CRITIQUES — Draft -> Critique -> Revise
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _critique_and_revise(self, draft_text, genre_flavor, target_words,
+                             model_id, temperature):
+        """Three-pass refinement: the LLM critiques its own draft, then revises.
+
+        Pass 1 (already done): Draft generation (the script_text we received).
+        Pass 2 (Critique):     LLM acts as a harsh script editor. Outputs a
+                               numbered improvement plan — NO rewriting.
+        Pass 3 (Revision):     LLM receives draft + critique, rewrites the
+                               script implementing the specific fixes.
+
+        Returns the revised script text, or the original draft if critique
+        fails or produces nothing useful.
+        """
+        log.info("[Critique] Starting Checks & Critiques loop (Draft -> Critique -> Revise)...")
+        _runtime_log("CRITIQUE: Starting self-critique pass")
+
+        # ── Truncate draft for critique context ──
+        # Keep the full draft but cap at ~12k chars to stay within context window.
+        # The critique doesn't need every word — it needs the structure and flow.
+        draft_for_critique = draft_text
+        if len(draft_text) > 12000:
+            # Keep first 6000 + last 6000 so critique sees beginning AND ending
+            draft_for_critique = (
+                draft_text[:6000]
+                + "\n\n[... MIDDLE SECTION OMITTED FOR BREVITY ...]\n\n"
+                + draft_text[-6000:]
+            )
+
+        # ── Pass 2: CRITIQUE ──
+        critique_prompt = f"""You are a HARSH but constructive script editor for a {genre_flavor.replace("_", " ")} radio drama.
+
+Below is a draft script. Your job is to identify SPECIFIC weaknesses. Do NOT rewrite anything.
+
+Output a numbered list of 5-8 concrete problems, each one sentence. Focus on:
+1. STORY ARC: Does it have a clear hook, rising tension, climax, and resolution? Or does it meander?
+2. CHARACTER: Do characters sound distinct? Do they have clear motivations? Or are they interchangeable talking heads?
+3. DIALOGUE: Does it sound like real humans under pressure? Or stilted/expository?
+4. PACING: Are there dead spots? Does tension build or stay flat?
+5. SCIENCE: Is the science grounded in real physics/biology? Any obvious handwaving?
+6. ENDING: Does the resolution feel earned or rushed? Does the epilogue connect to the story?
+7. AUDIO DESIGN: Are [SFX:] and [ENV:] tags used effectively to build atmosphere? Or sparse/generic?
+
+Be brutal. Be specific. Name the exact scene or line that's weak.
+Do NOT include any script text in your response — critique ONLY.
+
+DRAFT SCRIPT:
+{draft_for_critique}
+
+YOUR CRITIQUE (numbered list only):"""
+
+        try:
+            critique_tokens = min(800, max(300, len(draft_text) // 20))
+            critique_text = _generate_with_gemma4(
+                critique_prompt,
+                model_id=model_id,
+                max_new_tokens=critique_tokens,
+                temperature=max(0.3, temperature - 0.3),  # Lower temp for analytical critique
+            )
+            log.info("[Critique] Critique pass complete (%d chars)", len(critique_text))
+            _runtime_log(f"CRITIQUE: Critique pass done ({len(critique_text)} chars)")
+        except Exception as e:
+            log.warning("[Critique] Critique pass failed: %s — returning original draft", e)
+            _runtime_log(f"CRITIQUE: Failed — {e}")
+            return draft_text
+
+        # Sanity check: critique should be a numbered list, not a rewrite
+        if not critique_text or len(critique_text) < 50:
+            log.warning("[Critique] Critique too short (%d chars) — skipping revision",
+                        len(critique_text) if critique_text else 0)
+            return draft_text
+
+        # ── Pass 3: REVISION ──
+        log.info("[Critique] Starting revision pass with %d-char critique...", len(critique_text))
+        _runtime_log("CRITIQUE: Starting revision pass")
+
+        revision_prompt = f"""You are the original writer of this {genre_flavor.replace("_", " ")} radio drama script.
+A tough editor has reviewed your draft and provided specific critique.
+
+YOUR TASK: Rewrite the COMPLETE script, implementing every critique point below.
+Keep everything that already works. Fix only what the editor flagged.
+
+RULES:
+- Output the FULL revised script — not a summary, not highlights, the COMPLETE script.
+- Maintain ALL canonical formatting: [VOICE:], [SFX:], [ENV:], (beat), === SCENE N ===
+- Do NOT add new characters unless the critique specifically demands it.
+- Do NOT change character names.
+- Do NOT remove the ANNOUNCER opening or closing epilogue.
+- Keep the same approximate length (~{target_words} words).
+- Make dialogue sharper, more natural, more emotionally grounded.
+- Strengthen the story arc wherever the critique identifies weakness.
+
+EDITOR'S CRITIQUE:
+{critique_text}
+
+ORIGINAL DRAFT:
+{draft_text}
+
+REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
+
+        try:
+            # Revision needs roughly the same token budget as the original draft
+            revision_tokens = max(int(target_words * 2.0), 1024)
+            revision_tokens = min(revision_tokens, 8192)
+            revised_text = _generate_with_gemma4(
+                revision_prompt,
+                model_id=model_id,
+                max_new_tokens=revision_tokens,
+                temperature=temperature,
+            )
+            log.info("[Critique] Revision pass complete (%d chars)", len(revised_text))
+            _runtime_log(f"CRITIQUE: Revision done ({len(revised_text)} chars)")
+        except Exception as e:
+            log.warning("[Critique] Revision pass failed: %s — returning original draft", e)
+            _runtime_log(f"CRITIQUE: Revision failed — {e}")
+            return draft_text
+
+        # Sanity check: revision should be at least 60% the length of the draft.
+        # If the LLM produced a summary instead of a full rewrite, keep the draft.
+        if len(revised_text) < len(draft_text) * 0.6:
+            log.warning(
+                "[Critique] Revision too short (%d chars vs %d draft) — "
+                "LLM may have summarized instead of rewriting. Keeping original draft.",
+                len(revised_text), len(draft_text)
+            )
+            _runtime_log("CRITIQUE: Revision too short — keeping original draft")
+            return draft_text
+
+        log.info("[Critique] Checks & Critiques complete — revised script accepted.")
+        _runtime_log("CRITIQUE: Revised script accepted")
+        return revised_text
+
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
                           target_words, premise, news_block, act_breaks,
                           model_id, temperature, lemmy_directive=""):
@@ -1368,8 +1693,12 @@ Outline only — do NOT write dialogue yet."""
         outline = _generate_with_gemma4(outline_prompt, model_id=model_id,
                                          max_new_tokens=1500, temperature=temperature)
 
-        # Step 2: Generate each act
+        # Step 2: Generate each act with Context Engineering
+        # Instead of dumping raw previous text, we summarize what happened
+        # and signpost key character states for continuity.
         acts = []
+        act_summaries = []  # Running narrative memory
+
         for act_num in range(1, num_acts + 1):
             # S29: Allow users to cancel long script generation
             try:
@@ -1378,21 +1707,69 @@ Outline only — do NOT write dialogue yet."""
             except ImportError:
                 pass
 
-            previous_context = "\n\n".join(acts[-1:]) if acts else "(beginning of episode)"
+            # ── Context Engineering: curated memory instead of raw dump ──
+            if acts:
+                # Summarize previous act for tight context (not raw 2000 chars)
+                if not act_summaries:
+                    # Generate a quick summary of Act 1 for Act 2's context
+                    summary_prompt = f"""Summarize the following radio drama act in 3-5 sentences.
+Focus on: what happened, how each character's emotional state changed, what's at stake going into the next act, and any unresolved tensions.
+Do NOT include dialogue. Just narrative summary.
+
+ACT TEXT:
+{acts[-1][:3000]}
+
+SUMMARY:"""
+                    try:
+                        summary = _generate_with_gemma4(
+                            summary_prompt, model_id=model_id,
+                            max_new_tokens=200, temperature=0.3,
+                        )
+                        act_summaries.append(summary)
+                        _runtime_log(f"ScriptWriter: Act {act_num-1} summarized for context")
+                    except Exception:
+                        # Fallback: use raw truncation
+                        act_summaries.append(acts[-1][:1500])
+                else:
+                    # Summarize the latest act and append to running memory
+                    summary_prompt = f"""Summarize the following radio drama act in 3-5 sentences.
+Focus on: what happened, how each character's emotional state changed, what's at stake going into the next act, and any unresolved tensions.
+
+ACT TEXT:
+{acts[-1][:3000]}
+
+SUMMARY:"""
+                    try:
+                        summary = _generate_with_gemma4(
+                            summary_prompt, model_id=model_id,
+                            max_new_tokens=200, temperature=0.3,
+                        )
+                        act_summaries.append(summary)
+                    except Exception:
+                        act_summaries.append(acts[-1][:1500])
+
+                # Build signposted context: all summaries + last 500 chars of raw text
+                context_block = "STORY SO FAR (summaries of previous acts):\n"
+                for s_idx, s_text in enumerate(act_summaries, 1):
+                    context_block += f"  Act {s_idx}: {s_text.strip()}\n"
+                context_block += f"\nLAST LINES (for dialogue continuity):\n{acts[-1][-500:]}"
+            else:
+                context_block = "(beginning of episode)"
 
             act_prompt = f"""{system}
 
 OUTLINE:
 {outline}
 
-{"PREVIOUS ACT (for continuity):" if acts else ""}
-{previous_context[:2000] if acts else ""}
+{context_block}
 
 Now write ACT {act_num} of {num_acts} in full script format.
 Target: ~{words_per_act} words for this act. Taut dialogue — fragments, interruptions, subtext.
 {"This is the OPENING — start with [MUSIC: Opening theme] and ANNOUNCER setting time/place/characters. Then drop us IN MEDIAS RES." if act_num == 1 else ""}
 {"This is the FINAL ACT — build to the twist, then ANNOUNCER delivers the hard-science epilogue. CITATION RULE: cite ONLY the real article provided in the news block above — its exact source name and date. NEVER use numbered references like [1], [2], article #N — always say the source name directly (e.g. 'According to Science Daily, published April 3, 2026...'). Do NOT invent ArXiv IDs or paper titles. End with [MUSIC: Closing theme]." if act_num == num_acts else ""}
 {"Include an act break marker [ACT " + str(act_num + 1) + "] at the end of this act." if act_breaks and act_num < num_acts else ""}
+
+CONTINUITY CHECK: Before writing, review the story-so-far summaries above. Ensure characters reference earlier events naturally. No amnesia — people remember what just happened to them.
 
 Write Act {act_num} now:"""
 
