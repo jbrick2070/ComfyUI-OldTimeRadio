@@ -22,8 +22,38 @@ v1.0  2026-04-04  Jeffrey Brick — initial release
 
 import importlib
 import logging
+import os
+import warnings
 
 log = logging.getLogger("OTR")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GLOBAL LOG / WARNING SUPPRESSION — runs once before any node module loads.
+#
+# Three separate systems produce noise that we don't want:
+#   1. HuggingFace Hub telemetry and ETag network checks → env vars
+#   2. transformers' own logging (INFO/WARNING level) → hf_logging verbosity
+#   3. Python's warnings system (FutureWarning/UserWarning from transformers
+#      internals and Bark's hardcoded max_length=20 kwarg) → filterwarnings
+#
+# Individual node files (bark_tts.py, batch_bark_generator.py) also have
+# targeted filterwarnings calls as a belt-and-suspenders fallback.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 1. Hub telemetry — disable before any transformers/huggingface_hub import
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
+# 2. transformers logging verbosity — errors only, no INFO/WARNING chatter
+try:
+    from transformers.utils import logging as hf_logging
+    hf_logging.set_verbosity_error()
+except Exception:
+    pass  # transformers not installed yet — will be caught at node load time
+
+# 3. Python warnings — broad module-scoped filter for transformers FutureWarnings
+#    (deprecation notices for APIs we don't control, e.g. Bark's generate() kwargs)
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"transformers\..*")
+warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\..*")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ISOLATED PER-NODE LOADING
