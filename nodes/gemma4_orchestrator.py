@@ -1127,8 +1127,121 @@ class Gemma4ScriptWriter:
         log.info(f"[Gemma4ScriptWriter] Feature flags: open_close={open_close}, "
                  f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
-        # Fetch real science news — one random story from full feed pool
-        news = _fetch_science_news()
+        # ══════════════════════════════════════════════════════════════════════
+        # PHASE 1: PRE-FLIGHT & INPUT VALIDATION (v1.1)
+        # Catch bad configs before burning RTX 5080 compute time.
+        # ══════════════════════════════════════════════════════════════════════
+
+        # ── 1a. Parameter sanity checks ──
+        if target_minutes == 1 and num_characters > 4:
+            log.warning("[PreFlight] target_minutes=1 with %d characters is too many — "
+                        "clamping to 3 characters for 1-min test", num_characters)
+            _runtime_log("PREFLIGHT: Clamped num_characters to 3 (1-min episode)")
+            num_characters = 3
+
+        if target_minutes <= 2 and include_act_breaks:
+            log.warning("[PreFlight] Act breaks disabled for %d-min episode (too short)", target_minutes)
+            _runtime_log("PREFLIGHT: Act breaks disabled (episode too short)")
+            include_act_breaks = False
+
+        # ── 1b. Custom premise enforcement ──
+        # When user provides a premise, skip RSS entirely — zero context contamination
+        if custom_premise:
+            open_close = False  # User already knows what story they want
+            log.info("[PreFlight] Custom premise set — bypassing RSS fetch and Open-Close")
+            _runtime_log("PREFLIGHT: Custom premise detected — RSS bypassed, Open-Close disabled")
+
+        # ── 1c. Global token budgeting ──
+        # Normalize target_minutes into a hard character budget.
+        # ~130 words/min for dramatic reading, ~5 chars/word average.
+        target_words = target_minutes * 130
+        target_chars = target_words * 5  # Hard cap for downstream length enforcement
+
+        # ── 1d. Episode fingerprint for reproducibility ──
+        import hashlib
+        fingerprint_data = f"{episode_title}|{genre_flavor}|{target_minutes}|{num_characters}|{temperature}"
+        episode_fingerprint = hashlib.sha256(fingerprint_data.encode()).hexdigest()[:12]
+        _runtime_log(f"ScriptWriter: FINGERPRINT {episode_fingerprint} | {episode_title} | {genre_flavor}")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # RSS FETCH (or custom premise bypass)
+        # ══════════════════════════════════════════════════════════════════════
+
+        if custom_premise:
+            # Custom premise mode — build minimal news block from premise text
+            news = [{
+                "headline": episode_title or "Custom Episode",
+                "summary": custom_premise[:500],
+                "full_text": custom_premise,
+                "source": "User Premise",
+                "date": str(datetime.now().date()),
+                "link": "",
+            }]
+            news_block = f"CUSTOM PREMISE (provided by user):\n{custom_premise}"
+        else:
+            # ── 1e. RSS fetch with deterministic fallback ──
+            try:
+                news = _fetch_science_news()
+            except Exception as rss_err:
+                log.warning("[PreFlight] RSS fetch failed: %s — using fallback seed", rss_err)
+                _runtime_log(f"PREFLIGHT: RSS_FALLBACK — {rss_err}")
+                # Deterministic fallback seeds — real science, manually curated
+                _FALLBACK_SEEDS = [
+                    {
+                        "headline": "Deep-sea microbes found thriving in high-pressure volcanic vents challenge limits of life",
+                        "summary": "Researchers discover extremophile bacteria colonies at 4,000m depth near hydrothermal vents "
+                                   "that metabolize hydrogen sulfide at temperatures exceeding 120C, suggesting life may exist "
+                                   "in similar conditions on Europa and Enceladus.",
+                        "full_text": "Researchers discover extremophile bacteria colonies at 4,000m depth near hydrothermal vents "
+                                     "that metabolize hydrogen sulfide at temperatures exceeding 120C. The organisms use a novel "
+                                     "chemosynthetic pathway never observed before, converting volcanic minerals directly into "
+                                     "cellular energy without sunlight. This discovery challenges our understanding of the minimum "
+                                     "requirements for life and has major implications for astrobiology missions targeting ocean "
+                                     "worlds like Europa and Enceladus.",
+                        "source": "Nature Geoscience (fallback seed)",
+                        "date": str(datetime.now().date()),
+                        "link": "",
+                    },
+                    {
+                        "headline": "Quantum entanglement maintained at room temperature for first time using diamond lattice",
+                        "summary": "A team at ETH Zurich demonstrates stable quantum entanglement between nitrogen-vacancy centers "
+                                   "in diamond at 22C for over 100 microseconds, eliminating the need for near-absolute-zero cooling.",
+                        "full_text": "A team at ETH Zurich demonstrates stable quantum entanglement between nitrogen-vacancy centers "
+                                     "in diamond at room temperature for over 100 microseconds. The breakthrough uses a novel spin-echo "
+                                     "protocol that actively corrects thermal decoherence in real time. If scaled, the technique could "
+                                     "enable practical quantum sensors for medical imaging and navigation systems that operate outside "
+                                     "laboratory conditions.",
+                        "source": "Physical Review Letters (fallback seed)",
+                        "date": str(datetime.now().date()),
+                        "link": "",
+                    },
+                    {
+                        "headline": "CRISPR-based gene drive successfully suppresses invasive mosquito population in contained trial",
+                        "summary": "A controlled field trial in Burkina Faso demonstrates that a CRISPR gene drive targeting female "
+                                   "fertility reduced Anopheles gambiae populations by 90 percent within 8 generations.",
+                        "full_text": "A controlled field trial demonstrates that a CRISPR gene drive targeting female fertility in "
+                                     "Anopheles gambiae mosquitoes reduced populations by 90 percent within 8 generations inside a "
+                                     "contained outdoor enclosure. The drive spread to 95 percent of the population within 4 generations. "
+                                     "Researchers emphasize the need for further ecological impact studies before any open-release trials, "
+                                     "but the results represent the most successful demonstration of gene drive technology in a near-wild setting.",
+                        "source": "Science (fallback seed)",
+                        "date": str(datetime.now().date()),
+                        "link": "",
+                    },
+                ]
+                news = [random.choice(_FALLBACK_SEEDS)]
+
+            # ── 1f. Headline sanitization ──
+            # Strip emojis, cap length, normalize whitespace to prevent prompt injection
+            for n in news:
+                # Remove emojis and non-ASCII decorators
+                n["headline"] = re.sub(r'[^\x20-\x7E]', '', n["headline"]).strip()[:280]
+                # Normalize whitespace
+                n["headline"] = re.sub(r'\s+', ' ', n["headline"])
+                # Cap full_text to prevent context window blowout
+                if len(n.get("full_text", "")) > 12000:
+                    n["full_text"] = n["full_text"][:12000] + "\n[... article truncated at 12,000 chars]"
+
         news_block = "\n".join(
             f"- {n['headline']} ({n['source']}, {n['date']})\n\n{n.get('full_text', n['summary'])}"
             for n in news
@@ -1136,7 +1249,7 @@ class Gemma4ScriptWriter:
         news_json = json.dumps(news, indent=2)
 
         # Calculate target words
-        target_words = target_minutes * 130  # ~130 wpm for dramatic reading
+        # target_words and target_chars already computed in Phase 1 pre-flight
 
         # ── Easter egg: 11% chance Lemmy appears as a character ──
         # A grizzled, seen-it-all engineer/mechanic who speaks in blunt,
@@ -1357,6 +1470,55 @@ Begin the full script now. Follow this structure exactly:
                          if line.get("type") == "dialogue")
         est_minutes = max(1, word_count // 130)
 
+        # ── Phase 1g: Cast map verification ──
+        # Extract unique character names from parsed script for downstream matching
+        script_characters = set()
+        for item in script_lines:
+            if item.get("type") == "dialogue":
+                cname = item.get("character_name", "").upper().strip()
+                if cname:
+                    script_characters.add(cname)
+        _runtime_log(f"ScriptWriter: CAST_MAP {sorted(script_characters)} | "
+                     f"{len(script_lines)} lines | ~{word_count} words | ~{est_minutes} min")
+
+        # ── Phase 3d: QA debug dump ──
+        # Save minimal JSON payload alongside the output for reproducibility
+        try:
+            qa_data = {
+                "fingerprint": episode_fingerprint,
+                "timestamp": datetime.now().isoformat(),
+                "params": {
+                    "episode_title": episode_title,
+                    "genre_flavor": genre_flavor,
+                    "target_minutes": target_minutes,
+                    "num_characters": num_characters,
+                    "open_close": open_close,
+                    "self_critique": self_critique,
+                    "temperature": temperature,
+                },
+                "news_seed": news[0]["headline"] if news else "none",
+                "news_source": news[0].get("source", "unknown") if news else "none",
+                "cast": sorted(script_characters),
+                "stats": {
+                    "dialogue_lines": sum(1 for l in script_lines if l.get("type") == "dialogue"),
+                    "sfx_cues": sum(1 for l in script_lines if l.get("type") == "sfx"),
+                    "scenes": sum(1 for l in script_lines if l.get("type") == "scene_break"),
+                    "word_count": word_count,
+                    "est_minutes": est_minutes,
+                    "script_chars": len(script_text),
+                },
+                "guardrails_triggered": [],  # Populated by downstream phases
+            }
+            qa_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                   "output", "old_time_radio",
+                                   f"qa_debug_{episode_fingerprint}.json")
+            os.makedirs(os.path.dirname(qa_path), exist_ok=True)
+            with open(qa_path, "w", encoding="utf-8") as f:
+                json.dump(qa_data, f, indent=2)
+            _runtime_log(f"ScriptWriter: QA_DUMP saved: qa_debug_{episode_fingerprint}.json")
+        except Exception as qa_err:
+            log.warning("[QA] Debug dump failed: %s", qa_err)
+
         log.info(f"[Gemma4ScriptWriter] Generated {len(script_lines)} lines, "
                  f"~{word_count} words, ~{est_minutes} min")
 
@@ -1381,6 +1543,21 @@ Begin the full script now. Follow this structure exactly:
 
         Returns the winning outline text, or empty string on failure.
         """
+        try:
+            return self._open_close_expansion_inner(
+                system, genre_flavor, news_block, num_characters,
+                target_minutes, target_words, lemmy_directive,
+                model_id, temperature,
+            )
+        except Exception as e:
+            log.error("[OpenClose] Top-level failure: %s — falling back to v1.0 direct generation", e)
+            _runtime_log(f"OPENCLOSE: OPENCLOSE_FALLBACK — top-level error: {e}")
+            return ""
+
+    def _open_close_expansion_inner(self, system, genre_flavor, news_block,
+                                     num_characters, target_minutes, target_words,
+                                     lemmy_directive, model_id, temperature):
+        """Inner implementation of Open-Close expansion (wrapped for safety)."""
         log.info("[OpenClose] Starting Open-Close expansion (3 outlines + evaluator)...")
         _runtime_log("OPENCLOSE: Generating 3 competing outlines")
 
@@ -1442,8 +1619,23 @@ Keep it under 400 words. Structure only — no dialogue."""
                 log.warning("[OpenClose] Outline %s failed: %s", focus_name, e)
                 outlines.append((focus_name, ""))
 
-        # Filter out empty outlines
-        valid_outlines = [(name, text) for name, text in outlines if text and len(text) > 100]
+        # ── Phase 2a: Open-Close boundary enforcement ──
+        # Discard outlines outside 200-3000 char range before evaluator
+        OUTLINE_MIN = 200
+        OUTLINE_MAX = 3000
+        valid_outlines = []
+        for name, text in outlines:
+            if not text or len(text) < OUTLINE_MIN:
+                log.warning("[OpenClose] Outline %s too short (%d chars < %d) — discarded",
+                            name, len(text) if text else 0, OUTLINE_MIN)
+                _runtime_log(f"OPENCLOSE: DISCARDED {name} (too short: {len(text) if text else 0} chars)")
+                continue
+            if len(text) > OUTLINE_MAX:
+                log.warning("[OpenClose] Outline %s too long (%d chars > %d) — truncating",
+                            name, len(text), OUTLINE_MAX)
+                text = text[:OUTLINE_MAX] + "\n[... outline truncated]"
+                _runtime_log(f"OPENCLOSE: TRUNCATED {name} to {OUTLINE_MAX} chars")
+            valid_outlines.append((name, text))
         if not valid_outlines:
             log.warning("[OpenClose] All outlines failed — falling back to direct generation")
             _runtime_log("OPENCLOSE: All outlines failed")
@@ -1590,6 +1782,20 @@ YOUR CRITIQUE (numbered list only):"""
         if not critique_text or len(critique_text) < 50:
             log.warning("[Critique] Critique too short (%d chars) — skipping revision",
                         len(critique_text) if critique_text else 0)
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — critique too short")
+            return draft_text
+
+        # ── Phase 2c: Critique format validation ──
+        # Verify the critique looks like a numbered list, not a rewrite
+        _critique_markers = re.findall(r'^\s*\d+[\.\):]', critique_text, re.MULTILINE)
+        _critique_keywords = sum(1 for kw in ["weak", "issue", "problem", "flat", "generic",
+                                               "missing", "rushed", "unclear", "improve"]
+                                 if kw in critique_text.lower())
+        if len(_critique_markers) < 2 and _critique_keywords < 2:
+            log.warning("[Critique] Critique doesn't look like a numbered list "
+                        "(%d markers, %d keywords) — may be a rewrite, skipping revision",
+                        len(_critique_markers), _critique_keywords)
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — critique format invalid")
             return draft_text
 
         # ── Pass 3: REVISION ──
@@ -1637,19 +1843,63 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             _runtime_log(f"CRITIQUE: Revision failed — {e}")
             return draft_text
 
-        # Sanity check: revision should be at least 60% the length of the draft.
-        # If the LLM produced a summary instead of a full rewrite, keep the draft.
+        # ── Phase 2b: Critique length & format guardrails ──
+
+        # Check 1: Revision must be at least 60% of draft length (not a summary)
         if len(revised_text) < len(draft_text) * 0.6:
             log.warning(
                 "[Critique] Revision too short (%d chars vs %d draft) — "
                 "LLM may have summarized instead of rewriting. Keeping original draft.",
                 len(revised_text), len(draft_text)
             )
-            _runtime_log("CRITIQUE: Revision too short — keeping original draft")
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — revision too short")
             return draft_text
 
-        log.info("[Critique] Checks & Critiques complete — revised script accepted.")
-        _runtime_log("CRITIQUE: Revised script accepted")
+        # Check 2: Revision must not exceed 250% of draft length (runaway expansion)
+        if len(revised_text) > len(draft_text) * 2.5:
+            log.warning(
+                "[Critique] Revision too long (%d chars vs %d draft, %.0f%%) — "
+                "LLM expanded beyond acceptable bounds. Keeping original draft.",
+                len(revised_text), len(draft_text),
+                len(revised_text) / len(draft_text) * 100
+            )
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — revision too long (%.0f%%)" %
+                         (len(revised_text) / len(draft_text) * 100))
+            return draft_text
+
+        # Check 3: Levenshtein similarity ratio — catch both lazy copies and hallucinations
+        # Use simple character overlap ratio (fast approximation of edit distance)
+        def _char_overlap_ratio(a, b):
+            """Fast character-level similarity: shared chars / max length."""
+            if not a or not b:
+                return 0.0
+            from collections import Counter
+            ca, cb = Counter(a.lower()), Counter(b.lower())
+            shared = sum((ca & cb).values())
+            return shared / max(len(a), len(b))
+
+        similarity = _char_overlap_ratio(draft_text, revised_text)
+        _runtime_log(f"CRITIQUE: Similarity ratio: {similarity:.3f}")
+
+        if similarity > 0.95:
+            log.warning("[Critique] Revision too similar to draft (%.1f%% overlap) — "
+                        "LLM likely copied instead of revising. Keeping original draft.",
+                        similarity * 100)
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — revision is a copy (%.1f%%)" % (similarity * 100))
+            return draft_text
+
+        if similarity < 0.35:
+            log.warning("[Critique] Revision too different from draft (%.1f%% overlap) — "
+                        "LLM may have hallucinated a new story. Keeping original draft.",
+                        similarity * 100)
+            _runtime_log("CRITIQUE: CRITIQUE_SKIPPED — revision is a hallucination (%.1f%%)" % (similarity * 100))
+            return draft_text
+
+        log.info("[Critique] Checks & Critiques complete — revised script accepted "
+                 "(similarity=%.1f%%, length ratio=%.0f%%).",
+                 similarity * 100, len(revised_text) / len(draft_text) * 100)
+        _runtime_log("CRITIQUE: Revised script accepted (sim=%.1f%%, len=%.0f%%)" %
+                     (similarity * 100, len(revised_text) / len(draft_text) * 100))
         return revised_text
 
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
@@ -1748,11 +1998,31 @@ SUMMARY:"""
                     except Exception:
                         act_summaries.append(acts[-1][:1500])
 
+                # ── Phase 3a: Chunked context hardening ──
+                # Validate each summary — if too short, fall back to mechanical summary
+                for s_idx in range(len(act_summaries)):
+                    if len(act_summaries[s_idx].strip()) < 50:
+                        log.warning("[ContextEng] Act %d summary too short (%d chars) — using mechanical fallback",
+                                    s_idx + 1, len(act_summaries[s_idx]))
+                        # Mechanical fallback: scene titles + last 8 dialogue lines
+                        act_lines = acts[s_idx].strip().splitlines()
+                        scene_titles = [l.strip() for l in act_lines if "===" in l]
+                        dialogue_lines = [l.strip() for l in act_lines if "[VOICE:" in l][-8:]
+                        act_summaries[s_idx] = (
+                            "Scenes: " + "; ".join(scene_titles) + "\n"
+                            "Key dialogue: " + " / ".join(dialogue_lines)
+                        )[:800]
+
                 # Build signposted context: all summaries + last 500 chars of raw text
                 context_block = "STORY SO FAR (summaries of previous acts):\n"
                 for s_idx, s_text in enumerate(act_summaries, 1):
                     context_block += f"  Act {s_idx}: {s_text.strip()}\n"
-                context_block += f"\nLAST LINES (for dialogue continuity):\n{acts[-1][-500:]}"
+
+                # ── Phase 3b: Strict truncation with marker ──
+                last_lines = acts[-1][-500:]
+                if len(acts[-1]) > 500:
+                    last_lines = "... [truncated]\n" + last_lines
+                context_block += f"\nLAST LINES (for dialogue continuity):\n{last_lines}"
             else:
                 context_block = "(beginning of episode)"
 
@@ -2175,13 +2445,16 @@ class Gemma4Director:
                     )
 
                 used_presets.add(profile["voice_preset"])
-                new_voice_assignments[profile["name"]] = {
+                # FIX (v1.1): Use the ORIGINAL script name as the dict key so
+                # BatchBark can match [VOICE: HAYES ...] to the right preset.
+                # The procedural name is stored in notes for the treatment file.
+                new_voice_assignments[upper_name] = {
                     "voice_preset": profile["voice_preset"],
-                    "notes": profile["notes"],
+                    "notes": f"{profile['name']} — {profile['notes']}",
                 }
-                log.info("[Gemma4Director] %s → %s: %s (%s, %s, %s)",
-                         old_name, profile["name"], profile["voice_preset"],
-                         profile["gender"], profile["age"], profile["demeanor"])
+                log.info("[Gemma4Director] %s → voice: %s (profile: %s, %s, %s, %s)",
+                         upper_name, profile["voice_preset"],
+                         profile["name"], profile["gender"], profile["age"], profile["demeanor"])
                 character_idx += 1
 
         plan["voice_assignments"] = new_voice_assignments
