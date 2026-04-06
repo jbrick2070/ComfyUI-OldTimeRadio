@@ -703,8 +703,10 @@ SCALING THE ARC TO FIT THE TIME:
 IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
 
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
+- ANNOUNCER LINE CAP (HARD RULE): The ANNOUNCER gets a maximum of 3 lines total in the entire episode — one to open, one to close, one optional mid-episode transition. No more. The ANNOUNCER is a framing device, NOT a character. Do NOT let the ANNOUNCER deliver science lectures. If you feel the urge to write a 4th ANNOUNCER line, give it to a character instead.
+- DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("Hayes, if we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
 - GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
-- The CLOSING must be a factual "Hard Science Epilogue" — this is where the REAL science lives. Keep the drama accessible; save the heavy citations for the outro.
+- The CLOSING must be a factual "Hard Science Epilogue" — keep it to 2-3 sentences maximum. One real citation. Done.
 
 CITATION RULE (STRICT):
 The epilogue MUST cite ONLY the real article provided above.
