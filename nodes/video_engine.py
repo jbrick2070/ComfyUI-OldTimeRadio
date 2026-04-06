@@ -1210,18 +1210,35 @@ class SignalLostVideoRenderer:
         renderer = _CRTRenderer(W, H, episode_title)
         total_encode_frames = total_frames + _hud_frames
 
+        def _render_crt(fi):
+            return renderer.render(fi, total_frames, fps, volume[fi], freqs[fi], waves[fi])
+
+        def _render_hud(hi):
+            return _hud_renderer.render(hi, _hud_frames)
+
         def _frame_gen():
+            import concurrent.futures
+            max_workers = min(32, (os.cpu_count() or 4) + 4)
+            chunk_size = max_workers * 2  # Hard limit RAM footprint
+
             # Main audio-reactive content
-            for fi in range(total_frames):
-                yield renderer.render(fi, total_frames, fps,
-                                      volume[fi], freqs[fi], waves[fi])
-                if fi % (fps * 30) == 0 and fi > 0:
-                    _runtime_log(f"Video: {fi}/{total_frames} frames rendered")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                for start in range(0, total_frames, chunk_size):
+                    end = min(start + chunk_size, total_frames)
+                    for j, frame in enumerate(executor.map(_render_crt, range(start, end))):
+                        fi = start + j
+                        yield frame
+                        if fi % (fps * 30) == 0 and fi > 0:
+                            _runtime_log(f"Video: {fi}/{total_frames} frames rendered")
+
             # Post-roll Telemetry HUD (no spoilers — plays after audio ends)
             if _hud_renderer is not None and _hud_frames > 0:
                 _runtime_log(f"Video: Treatment HUD — {_hud_frames} frames")
-                for hi in range(_hud_frames):
-                    yield _hud_renderer.render(hi, _hud_frames)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    for start in range(0, _hud_frames, chunk_size):
+                        end = min(start + chunk_size, _hud_frames)
+                        for frame in executor.map(_render_hud, range(start, end)):
+                            yield frame
 
         # ── 6. Encode ────────────────────────────────────────────────
         _runtime_log(f"Video: Encoding MP4 via ffmpeg -> {os.path.basename(out_path)}")
