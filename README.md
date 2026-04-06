@@ -14,7 +14,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## What It Does
-"SIGNAL LOST" (The OldTimeRadio engine) fetches today's real science headlines via RSS, feeds them to a local Gemma 4 LLM to write a multi-act sci-fi radio drama, acts as a Director to cast specific Bark TTS voices for each character, voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4. 
+"SIGNAL LOST" (The OldTimeRadio engine) fetches today's real science headlines via RSS, feeds them to a local Gemma 4 LLM to write a multi-act sci-fi radio drama with story-first writing (30% elementary-accessible, 30% high school, 20% college, 10% graduate-level dialogue). Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies and comedies, Larry David comedic spirals, Marvel-style escalation, Twilight Zone twists, and more. The Director casts gender-balanced Bark TTS voices (roughly 50/50 male/female), voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4.
 
 Every run is a brand new, complete episode generated entirely from scratch.
 
@@ -96,7 +96,7 @@ SceneSequencer ◄───────────────────┘
  AudioEnhance
     │
     ▼
- EpisodeAssembler ───► .WAV Audio
+ EpisodeAssembler
     │
     ▼
 SignalLostVideo ─────► .MP4 Result
@@ -104,7 +104,7 @@ SignalLostVideo ─────► .MP4 Result
 
 | Node | What It Does |
 |------|-------------|
-| **ScriptWriter** | Grabs real RSS headlines and uses Gemma 4 to write a multi-act script. |
+| **ScriptWriter** | Grabs real RSS headlines and uses Gemma 4 to write a multi-act script. Randomly selects from 12 dramatic story arcs (Shakespeare tragedies and comedies, Larry David spirals, Marvel escalation, Twilight Zone twists, and more) so every episode has a different narrative structure. |
 | **Director** | Scans the script to cast voices and set the pace. |
 | **BatchBark** | Generates TTS for every line sequentially using strict explicit character voices. |
 | **SFX / Filters** | Adds procedural theremins, static, and vintage tube-saturation degradation. |
