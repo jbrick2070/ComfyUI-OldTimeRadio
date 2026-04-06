@@ -1114,10 +1114,24 @@ class SignalLostVideoRenderer:
 
         tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
         pcm = (audio_np * 32767).astype(np.int16)
-        # Append silence so WAV covers the HUD post-roll duration
+        # Append looped outro for HUD post-roll — tone-matched, no new models.
+        # Take the last ~15 s of the episode (closing theme) and loop it softly.
         if _hud_frames > 0:
-            hud_silence = np.zeros(int(_hud_frames / fps * sr), dtype=np.int16)
-            pcm_out = np.concatenate([pcm, hud_silence])
+            hud_samples  = int(_hud_frames / fps * sr)
+            loop_len     = min(len(audio_np), int(15 * sr))  # up to 15 s loop source
+            loop_src     = audio_np[-loop_len:].copy().astype(np.float32)
+            # Fade the loop source in and out so tiling is click-free
+            fade         = min(sr // 4, loop_len // 4)       # 0.25 s crossfade
+            loop_src[:fade]  *= np.linspace(0, 1, fade, dtype=np.float32)
+            loop_src[-fade:] *= np.linspace(1, 0, fade, dtype=np.float32)
+            # Tile to cover HUD duration, duck to 35 % so it feels ambient
+            tiles    = math.ceil(hud_samples / max(1, loop_len))
+            hud_wave = np.tile(loop_src, tiles)[:hud_samples] * 0.35
+            # Smooth 1-second fade-in from silence at the join point
+            join_in  = min(sr, hud_samples)
+            hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
+            hud_pcm  = np.clip(hud_wave * 32767, -32767, 32767).astype(np.int16)
+            pcm_out  = np.concatenate([pcm, hud_pcm])
         else:
             pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
