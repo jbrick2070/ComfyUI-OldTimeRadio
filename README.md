@@ -14,7 +14,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## What It Does
-"SIGNAL LOST" (The OldTimeRadio engine) fetches today's real science headlines via RSS, feeds them to a local Gemma 4 LLM to write a multi-act sci-fi radio drama with story-first writing (30% elementary-accessible, 30% high school, 20% college, 10% graduate-level dialogue). Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies and comedies, Larry David comedic spirals, Marvel-style escalation, Twilight Zone twists, and more. The Director casts gender-balanced Bark TTS voices (roughly 50/50 male/female), voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4.
+"SIGNAL LOST" (The OldTimeRadio engine) fetches today's real science headlines via RSS, feeds them to a local Gemma 4 LLM to write a multi-act sci-fi radio drama with story-first writing (30% elementary-accessible, 30% high school, 20% college, 10% graduate-level dialogue). Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies and comedies, Larry David comedic spirals, Marvel-style escalation, Twilight Zone twists, and more. Character names, gender, age, demeanor, accent, and voice model are all procedurally generated from the episode seed — every cast is unique. ~60% of characters speak neutral English; ~40% speak English with international accents (German, Spanish, French, Indian, Japanese, Korean, Russian, Brazilian, Italian, Polish) via Bark's foreign-preset-with-English-text technique, with ASCII sanitization and temperature capping to prevent language drift. The one constant: LEMMY is always LEMMY. The pipeline voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4.
 
 Every run is a brand new, complete episode generated entirely from scratch.
 
@@ -84,33 +84,38 @@ The pack ships with two workflow presets in the `workflows/` folder:
 ScriptWriter
     │
     ▼
- Director ───────────────┐
-    │  script_json       │ production_plan
-    ▼                    ▼
- BatchBark             SFX ────────┐
-    │  audio_clips       │ effects │
-    ▼                    ▼         │
-SceneSequencer ◄───────────────────┘
-    │  scene_audio
-    ▼
- AudioEnhance
+ Director
+    │  Gemma4 → JSON plan
+    │  ▼
+    │  Procedural Override ─── name · gender · age · demeanor · accent · voice model
+    │  (seeded from script hash; LEMMY stays LEMMY)
     │
-    ▼
- EpisodeAssembler
-    │
-    ▼
-SignalLostVideo ─────► signal_lost_<title>_<timestamp>.mp4
-                  └──► signal_lost_<title>_<timestamp>_treatment.txt
-                         (cast · voices · full script · production stats)
+    ├── script_json ──────► BatchBark
+    │                          │  audio_clips
+    └── production_plan ──► SFX ────────┐
+                              │ effects │
+                              ▼         │
+    SceneSequencer ◄───────────────────┘
+        │  scene_audio
+        ▼
+     AudioEnhance
+        │
+        ▼
+     EpisodeAssembler
+        │
+        ▼
+    SignalLostVideo ─────► signal_lost_<title>_<timestamp>.mp4
+                      └──► signal_lost_<title>_<timestamp>_treatment.txt
+                             (cast · voices · full script · production stats)
 
-          otr_runtime.log ◄── heartbeat from every node (otr_monitor.py)
+              otr_runtime.log ◄── heartbeat from every node (otr_monitor.py)
 ```
 
 | Node | What It Does |
 |------|-------------|
 | **ScriptWriter** | Grabs real RSS headlines and uses Gemma 4 to write a multi-act script. Randomly selects from 12 dramatic story arcs (Shakespeare tragedies and comedies, Larry David spirals, Marvel escalation, Twilight Zone twists, and more) so every episode has a different narrative structure. |
-| **Director** | Scans the script to cast voices and set the pace. |
-| **BatchBark** | Generates TTS for every line sequentially using strict explicit character voices. |
+| **Director** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are then procedurally overridden — each character gets a seeded random name, gender, age, demeanor, accent, and best-fit Bark voice preset. LEMMY always stays LEMMY (`en_speaker_8`). ANNOUNCER stays ANNOUNCER with a gender-balanced random preset per episode. International presets (de, fr, es, hi, it, ja, ko, ru, pt, pl) produce accented English — safety rails (ASCII sanitizer + temp cap) prevent language drift. |
+| **BatchBark** | Generates TTS for every line sequentially using the Director's voice assignments. Includes ASCII sanitizer (strips non-ASCII before Bark), temperature cap (0.55 for international presets, 0.5 for first lines), and GPU-accelerated batch padding. |
 | **SFX / Filters** | Adds procedural theremins, static, and vintage tube-saturation degradation. |
 | **SceneSequencer** | Handles the deterministic `(beat)` pauses and stitches lines and SFX together. |
 | **AudioEnhance** | Masters the mix to 48kHz stereo with Haas-effect widening. |

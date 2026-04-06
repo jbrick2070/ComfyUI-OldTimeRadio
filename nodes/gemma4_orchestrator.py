@@ -120,6 +120,247 @@ def _content_filter(text: str) -> tuple:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PROCEDURAL CHARACTER GENERATOR — name, age, gender, demeanor, accent, voice
+# All traits derived deterministically from episode seed + character index.
+# LEMMY stays LEMMY with fixed traits. ANNOUNCER stays ANNOUNCER.
+#
+# BARK TTS ACCENT RULES (per Suno documentation):
+#   - Foreign preset + pure English text = English spoken with that accent
+#   - en_speaker_* = neutral American/British English
+#   - de_speaker_* = English with German accent
+#   - fr_speaker_* = English with French accent
+#   - es_speaker_* = English with Spanish accent  ... etc.
+#   - ALL text is ALWAYS pure ASCII English (enforced by ASCII sanitizer
+#     in batch_bark_generator.py) — this prevents language drift
+#   - Temperature capped at 0.55 for international presets (0.5 first lines)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Sci-fi character name pools — contemporary, neutral, tech-aligned
+_FIRST_NAMES = [
+    "Alex", "Chen", "Sam", "Morgan", "Casey", "Jordan", "Riley", "Blake",
+    "Quinn", "Sage", "Vale", "Nova", "Kai", "Ash", "Eden", "River",
+    "Reyes", "Hayes", "Shaw", "Stone", "Cross", "Beck", "Cole", "Kane",
+    "Maya", "Iris", "Luna", "Aurora", "Vera", "Zara", "Stella", "Ivy",
+    "Marcus", "Xavier", "Adrian", "Dante", "Oscar", "Victor", "Ryder", "Dex",
+]
+
+_LAST_NAMES = [
+    "Quinn", "Rivers", "Stone", "Shaw", "Beck", "Gray", "Cole", "Kane",
+    "Grant", "Pierce", "Storm", "Brooks", "Cross", "Wells", "Palmer", "Hayes",
+    "Reeves", "Moore", "Carter", "Brooks", "Edwards", "Allen", "Reid", "Elliott",
+    "Winters", "Summers", "Archer", "Wells", "Knight", "Steel", "Frost", "Snow",
+]
+
+# Trait pools for procedural character profiles
+_GENDERS = ["male", "female"]
+_AGE_BRACKETS = ["20s", "30s", "40s", "50s", "60s"]
+_DEMEANORS = [
+    "calm", "intense", "warm", "sharp", "dry", "energetic",
+    "measured", "wry", "stoic", "anxious", "confident", "weary",
+]
+
+# Accent pool — weighted so ~60% are neutral English, ~40% are accented English.
+# Each accent maps to a Bark language code prefix.
+# Foreign presets speak ENGLISH with that accent when given pure English text.
+_ACCENTS = [
+    ("neutral",  "en", 0.60),   # Neutral English — no accent
+    ("German",   "de", 0.06),   # English with German accent
+    ("Spanish",  "es", 0.06),   # English with Spanish accent
+    ("French",   "fr", 0.05),   # English with French accent
+    ("Indian",   "hi", 0.04),   # English with Indian accent
+    ("Italian",  "it", 0.04),   # English with Italian accent
+    ("Japanese", "ja", 0.03),   # English with Japanese accent
+    ("Korean",   "ko", 0.03),   # English with Korean accent
+    ("Russian",  "ru", 0.04),   # English with Russian accent
+    ("Brazilian", "pt", 0.03),  # English with Brazilian accent
+    ("Polish",   "pl", 0.02),   # English with Polish accent
+]
+
+# Voice presets mapped by gender + vocal quality + language code.
+# English-native presets (en_speaker_*) have known vocal qualities.
+# International presets (xx_speaker_*) are grouped by speaker index tendencies.
+# Each entry: (preset, gender, quality_tags)
+_VOICE_PROFILES = [
+    # ── English native (neutral accent) ──
+    ("v2/en_speaker_0", "male",   "en", {"authoritative", "deep", "50s", "60s"}),
+    ("v2/en_speaker_1", "male",   "en", {"calm", "measured", "30s", "40s"}),
+    ("v2/en_speaker_3", "male",   "en", {"energetic", "sharp", "20s", "30s"}),
+    ("v2/en_speaker_5", "male",   "en", {"warm", "weary", "wry", "50s", "60s"}),
+    ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s"}),
+    ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s"}),
+    ("v2/en_speaker_2", "female", "en", {"calm", "measured", "stoic", "30s", "40s"}),
+    ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
+    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "20s", "30s"}),
+    ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
+    # ── German accent (English with German inflection) ──
+    ("v2/de_speaker_0", "male",   "de", {"authoritative", "deep", "50s", "60s"}),
+    ("v2/de_speaker_3", "male",   "de", {"calm", "measured", "30s", "40s"}),
+    ("v2/de_speaker_5", "male",   "de", {"sharp", "intense", "40s"}),
+    ("v2/de_speaker_2", "female", "de", {"warm", "confident", "30s", "40s"}),
+    ("v2/de_speaker_7", "female", "de", {"energetic", "sharp", "20s", "30s"}),
+    # ── Spanish accent ──
+    ("v2/es_speaker_0", "male",   "es", {"warm", "energetic", "30s", "40s"}),
+    ("v2/es_speaker_6", "male",   "es", {"calm", "measured", "40s", "50s"}),
+    ("v2/es_speaker_8", "male",   "es", {"intense", "confident", "30s"}),
+    ("v2/es_speaker_4", "female", "es", {"warm", "energetic", "20s", "30s"}),
+    ("v2/es_speaker_9", "female", "es", {"authoritative", "confident", "40s", "50s"}),
+    # ── French accent ──
+    ("v2/fr_speaker_1", "male",   "fr", {"calm", "wry", "30s", "40s"}),
+    ("v2/fr_speaker_5", "male",   "fr", {"warm", "measured", "50s"}),
+    ("v2/fr_speaker_2", "female", "fr", {"warm", "confident", "30s", "40s"}),
+    ("v2/fr_speaker_4", "female", "fr", {"sharp", "energetic", "20s", "30s"}),
+    # ── Indian accent ──
+    ("v2/hi_speaker_0", "male",   "hi", {"calm", "measured", "30s", "40s"}),
+    ("v2/hi_speaker_5", "male",   "hi", {"warm", "authoritative", "50s"}),
+    ("v2/hi_speaker_4", "female", "hi", {"warm", "energetic", "30s"}),
+    ("v2/hi_speaker_9", "female", "hi", {"confident", "authoritative", "40s", "50s"}),
+    # ── Italian accent ──
+    ("v2/it_speaker_0", "male",   "it", {"warm", "energetic", "30s", "40s"}),
+    ("v2/it_speaker_6", "male",   "it", {"intense", "sharp", "40s"}),
+    ("v2/it_speaker_4", "female", "it", {"warm", "confident", "30s"}),
+    ("v2/it_speaker_9", "female", "it", {"authoritative", "intense", "50s"}),
+    # ── Japanese accent ──
+    ("v2/ja_speaker_1", "male",   "ja", {"calm", "measured", "30s", "40s"}),
+    ("v2/ja_speaker_6", "male",   "ja", {"stoic", "dry", "40s", "50s"}),
+    ("v2/ja_speaker_4", "female", "ja", {"warm", "calm", "30s"}),
+    # ── Korean accent ──
+    ("v2/ko_speaker_0", "male",   "ko", {"calm", "sharp", "30s", "40s"}),
+    ("v2/ko_speaker_4", "female", "ko", {"warm", "energetic", "20s", "30s"}),
+    # ── Russian accent ──
+    ("v2/ru_speaker_0", "male",   "ru", {"authoritative", "deep", "50s", "60s"}),
+    ("v2/ru_speaker_3", "male",   "ru", {"intense", "stoic", "40s"}),
+    ("v2/ru_speaker_4", "female", "ru", {"confident", "sharp", "30s", "40s"}),
+    ("v2/ru_speaker_9", "female", "ru", {"authoritative", "weary", "50s"}),
+    # ── Brazilian/Portuguese accent ──
+    ("v2/pt_speaker_0", "male",   "pt", {"warm", "energetic", "30s", "40s"}),
+    ("v2/pt_speaker_4", "female", "pt", {"warm", "confident", "30s"}),
+    # ── Polish accent ──
+    ("v2/pl_speaker_0", "male",   "pl", {"calm", "measured", "40s"}),
+    ("v2/pl_speaker_4", "female", "pl", {"warm", "energetic", "30s"}),
+]
+
+# ANNOUNCER voice pool — randomized per episode for gender balance
+# ANNOUNCER always uses neutral English (en_speaker_*) — no accent
+_ANNOUNCER_PRESETS = [
+    ("v2/en_speaker_0", "Male, authoritative, deep"),
+    ("v2/en_speaker_2", "Female, clear, neutral"),
+    ("v2/en_speaker_4", "Female, warm, energetic"),
+    ("v2/en_speaker_9", "Female, mature, authoritative"),
+]
+
+# LEMMY fixed profile — always gravelly/raspy male, no accent
+_LEMMY_PROFILE = {
+    "name": "LEMMY",
+    "gender": "male",
+    "age": "50s",
+    "demeanor": "gravelly",
+    "accent": "neutral",
+    "voice_preset": "v2/en_speaker_8",
+    "notes": "Male, gravelly/raspy, 50s, iconic",
+}
+
+
+def _pick_accent(rng) -> tuple:
+    """Weighted random accent selection. Returns (accent_label, lang_code).
+
+    ~60% neutral English, ~40% spread across international accents.
+    Uses cumulative distribution for deterministic weighted selection.
+    """
+    roll = rng.random()
+    cumulative = 0.0
+    for label, code, weight in _ACCENTS:
+        cumulative += weight
+        if roll < cumulative:
+            return label, code
+    # Fallback (rounding errors)
+    return "neutral", "en"
+
+
+def _generate_character_profile(character_idx: int, episode_seed: str = "") -> dict:
+    """Generate a full procedural character profile — deterministic per episode.
+
+    Returns a dict with: name, gender, age, demeanor, accent, voice_preset, notes.
+    All traits are seeded so reruns of the same episode produce identical casts.
+
+    Voice preset selection:
+      1. Pick gender, age, demeanor, accent procedurally
+      2. Filter voice profiles by gender AND accent language code
+      3. Score by trait overlap (age, demeanor)
+      4. Best match wins (ties broken by RNG shuffle)
+
+    Safety rails (downstream):
+      - ASCII sanitizer strips non-ASCII from all text before Bark
+      - Temperature capped at 0.55 for international presets
+      - All dialogue is always written in pure English
+    """
+    rng = random.Random(f"{episode_seed}_char_{character_idx}")
+
+    # Generate name
+    first = rng.choice(_FIRST_NAMES)
+    last = rng.choice(_LAST_NAMES)
+    name = f"{first} {last}".upper()
+
+    # Generate traits
+    gender = rng.choice(_GENDERS)
+    age = rng.choice(_AGE_BRACKETS)
+    demeanor = rng.choice(_DEMEANORS)
+    accent_label, lang_code = _pick_accent(rng)
+
+    # Filter voice profiles by gender AND language code
+    candidates = [vp for vp in _VOICE_PROFILES
+                  if vp[1] == gender and vp[2] == lang_code]
+
+    # If no match for this gender+accent combo, fall back to same-gender English
+    if not candidates:
+        candidates = [vp for vp in _VOICE_PROFILES
+                      if vp[1] == gender and vp[2] == "en"]
+        accent_label = "neutral"
+        lang_code = "en"
+
+    # Safety net — should never happen
+    if not candidates:
+        candidates = [vp for vp in _VOICE_PROFILES if vp[2] == "en"]
+
+    # Score each candidate by how many tags overlap with character traits
+    char_tags = {age, demeanor}
+    scored = []
+    for preset, _, _, tags in candidates:
+        overlap = len(char_tags & tags)
+        scored.append((overlap, preset, tags))
+
+    # Sort by overlap (best match first), break ties with RNG shuffle
+    rng.shuffle(scored)
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_preset = scored[0][1]
+
+    # Build descriptive notes
+    accent_note = f", {accent_label} accent" if accent_label != "neutral" else ""
+    notes = f"{gender.capitalize()}, {demeanor}, {age}{accent_note}"
+
+    return {
+        "name": name,
+        "gender": gender,
+        "age": age,
+        "demeanor": demeanor,
+        "accent": accent_label,
+        "voice_preset": best_preset,
+        "notes": notes,
+    }
+
+
+def _generate_announcer_profile(episode_seed: str = "") -> dict:
+    """Pick a random ANNOUNCER voice from the balanced pool, seeded per episode.
+    ANNOUNCER always uses neutral English — no accent."""
+    rng = random.Random(f"{episode_seed}_announcer")
+    preset, notes = rng.choice(_ANNOUNCER_PRESETS)
+    return {
+        "name": "ANNOUNCER",
+        "voice_preset": preset,
+        "notes": notes,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NEWS FETCHER — pulls real science headlines to seed the story
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1273,18 +1514,19 @@ The script follows these tokens:
 ═══ 🧱 2. VOICE MAPPING RULES ═══
 - Scan all [VOICE:] tags in the script. The FIRST FIELD (before the first comma) is the CHARACTER NAME.
 - Collect every unique CHARACTER NAME. Map each to one UNIQUE voice preset.
-- You have 10 English native presets. ALWAYS use English native presets (en_speaker_*).
-  Do NOT use international/foreign presets (de_*, fr_*, es_*, etc.) — they risk
-  language drift in the TTS engine. The en_speaker_* presets naturally cover a
-  wide range of vocal character: deep, warm, raspy, youthful, authoritative, etc.
-  All dialogue is always written in pure English.
+- NOTE: Character names, voice presets, accents, and traits are PROCEDURALLY
+  OVERRIDDEN after your JSON is generated. You only need to provide reasonable
+  en_speaker_* placeholder presets so the JSON structure is valid.
+  The procedural engine handles: name randomization, accent assignment (including
+  international presets for accented English like de_speaker, fr_speaker, etc.),
+  gender/age/demeanor traits, and final voice model selection.
+  LEMMY always stays LEMMY with v2/en_speaker_8.
 - The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
   WRONG key: "HAYES, male, 40s, calm"
   RIGHT key: "HAYES"
-- Use the gender/age/tone in the tag to pick the best preset match:
+- Use any en_speaker_* preset as a placeholder:
 
-  ENGLISH NATIVE:
-  v2/en_speaker_0 = Male, authoritative, deep (best for ANNOUNCER)
+  v2/en_speaker_0 = Male, authoritative, deep
   v2/en_speaker_1 = Male, mid-range
   v2/en_speaker_2 = Female, neutral
   v2/en_speaker_3 = Male, younger
@@ -1292,13 +1534,11 @@ The script follows these tokens:
   v2/en_speaker_5 = Male, older
   v2/en_speaker_6 = Male, character voice
   v2/en_speaker_7 = Female, higher pitch
-  v2/en_speaker_8 = Male, gravelly/raspy (good for LEMMY)
+  v2/en_speaker_8 = Male, gravelly/raspy (reserved for LEMMY)
   v2/en_speaker_9 = Female, authoritative
 
-- ANNOUNCER: Randomly select ONE of {v2/en_speaker_0 (male, authoritative), v2/en_speaker_2 (female, clear), v2/en_speaker_4 (female, energetic), v2/en_speaker_9 (female, mature)} for gender balance and vocal variety. Keep it consistent within the episode.
-- Each character gets ONE preset that stays consistent for the entire episode.
-- If two characters share a gender/age, still assign DIFFERENT presets.
-- ONLY use en_speaker_* presets. Never assign international presets.
+- Each character gets ONE preset. No duplicates.
+- LEMMY always gets v2/en_speaker_8.
 
 ═══ 🧱 3. OUTPUT FORMAT (STRICT JSON) ═══
 {{
@@ -1401,6 +1641,13 @@ class Gemma4Director:
         # Extract JSON from response
         plan = self._extract_json(raw)
 
+        # Procedural character names (except LEMMY stays LEMMY)
+        # Use a deterministic seed based on script content hash
+        if plan:
+            import hashlib
+            script_hash = hashlib.sha256(script_text.encode()).hexdigest()[:16]
+            plan = self._randomize_character_names(plan, script_hash)
+
         # Override vintage settings with user's intensity choice
         if plan:
             plan["vintage_settings"] = vintage_map.get(vintage_intensity, vintage_map["moderate"])
@@ -1470,3 +1717,90 @@ class Gemma4Director:
             "vintage_settings": {},
             "pacing": {"breath_pause_ms": 400, "beat_pause_ms": 1500, "pause_ms": 2000},
         }
+
+    def _randomize_character_names(self, plan: dict, episode_seed: str) -> dict:
+        """Replace ALL character traits with procedural profiles. LEMMY stays LEMMY.
+
+        For each character in voice_assignments:
+          - LEMMY: Fixed profile (gravelly male, en_speaker_8)
+          - ANNOUNCER: Random voice from balanced announcer pool
+          - Everyone else: Full procedural profile — name, gender, age,
+            demeanor, and best-fit en_speaker_* preset, all derived
+            deterministically from the episode seed.
+
+        The Director's original name/voice picks are fully overridden.
+        English-only presets enforced at generation time.
+
+        Args:
+            plan: The parsed production plan dict
+            episode_seed: A deterministic seed (script hash) for reproducibility
+
+        Returns:
+            Modified plan with procedural names, traits, and voice presets
+        """
+        if not plan or "voice_assignments" not in plan:
+            return plan
+
+        voice_assignments = plan.get("voice_assignments", {})
+        if not voice_assignments:
+            return plan
+
+        # Track assigned presets to avoid duplicates across cast
+        used_presets = set()
+        new_voice_assignments = {}
+        character_idx = 0
+
+        for old_name in list(voice_assignments.keys()):
+            upper_name = old_name.upper().strip()
+
+            if upper_name == "LEMMY":
+                # LEMMY — fixed iconic profile, never changes
+                profile = _LEMMY_PROFILE.copy()
+                new_voice_assignments["LEMMY"] = {
+                    "voice_preset": profile["voice_preset"],
+                    "notes": profile["notes"],
+                }
+                used_presets.add(profile["voice_preset"])
+                log.info("[Gemma4Director] LEMMY: locked → %s (%s)",
+                         profile["voice_preset"], profile["notes"])
+
+            elif upper_name == "ANNOUNCER":
+                # ANNOUNCER — random from balanced pool, seeded per episode
+                ann = _generate_announcer_profile(episode_seed)
+                new_voice_assignments["ANNOUNCER"] = {
+                    "voice_preset": ann["voice_preset"],
+                    "notes": ann["notes"],
+                }
+                used_presets.add(ann["voice_preset"])
+                log.info("[Gemma4Director] ANNOUNCER: procedural → %s (%s)",
+                         ann["voice_preset"], ann["notes"])
+
+            else:
+                # Regular character — full procedural profile
+                profile = _generate_character_profile(character_idx, episode_seed)
+
+                # De-duplicate voice presets: if this preset is already taken,
+                # re-roll with offset seeds until we find an unused one.
+                attempts = 0
+                while profile["voice_preset"] in used_presets and attempts < 10:
+                    attempts += 1
+                    profile = _generate_character_profile(
+                        character_idx + attempts * 100, episode_seed
+                    )
+
+                used_presets.add(profile["voice_preset"])
+                new_voice_assignments[profile["name"]] = {
+                    "voice_preset": profile["voice_preset"],
+                    "notes": profile["notes"],
+                }
+                log.info("[Gemma4Director] %s → %s: %s (%s, %s, %s)",
+                         old_name, profile["name"], profile["voice_preset"],
+                         profile["gender"], profile["age"], profile["demeanor"])
+                character_idx += 1
+
+        plan["voice_assignments"] = new_voice_assignments
+
+        log.info("[Gemma4Director] Procedural cast complete: %d characters "
+                 "(%d unique presets)", len(new_voice_assignments), len(used_presets))
+
+        return plan
