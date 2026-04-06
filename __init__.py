@@ -63,6 +63,17 @@ except Exception:
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"transformers\..*")
 warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\..*")
 
+# 4. transformers safetensors_conversion background thread — fires during model
+#    load and POSTs to HuggingFace to check for .safetensors conversion.
+#    Gets an empty response → JSONDecodeError in a daemon thread.
+#    Harmless to the pipeline but produces noisy tracebacks in the console.
+#    Patched to a no-op here before any node loads transformers models.
+try:
+    import transformers.safetensors_conversion as _sc
+    _sc.auto_conversion = lambda *a, **kw: None
+except Exception:
+    pass  # safe to skip — cosmetic noise suppression only
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ISOLATED PER-NODE LOADING
 # If one node fails to import (e.g. missing transformers, parler_tts lib),
