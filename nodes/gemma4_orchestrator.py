@@ -641,6 +641,7 @@ CHARACTER NAMES must be CONSISTENT across all scenes (same spelling, same caps, 
 - {news_block}
 - Extrapolate this science into its most terrifying or profound next step.
 - ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
+- GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). The global population is essentially equal at working age. Diverse casts sound better and use the full range of available voice presets.
 - The CLOSING must be a factual "Hard Science Epilogue."
 
 CITATION RULE (STRICT):
@@ -926,7 +927,7 @@ Characters: {num_chars} speaking roles plus ANNOUNCER
 {lemmy_directive}
 
 Return:
-- Character list: name, role, personality in one line each
+- Character list: name, role, gender, personality in one line each (aim for ~50/50 male/female split)
 - Time period and setting (derived from the science news)
 - {num_acts}-act structure: inciting incident, escalation beats, twist/resolution
 - The ANNOUNCER's hard-science epilogue topic and sources to cite

@@ -104,14 +104,18 @@ _BARK_VOICE_PRESETS = [
 _CHARACTER_VOICE_CACHE = {}
 
 
-def _voice_preset_for_character(character, voice_map):
+_FEMALE_PRESETS = ["v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9"]
+_MALE_PRESETS   = ["v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8"]
+
+
+def _voice_preset_for_character(character, voice_map, voice_traits=""):
     """Determine Bark voice preset for a character.
 
     Priority:
       1. Cached assignment (stable across the episode)
       2. Director's voice_assignments
       3. Fuzzy match (uppercase, underscored, partial)
-      4. Stable hash-based fallback
+      4. Gender-aware hash fallback using voice_traits from script
     """
     if character in _CHARACTER_VOICE_CACHE:
         return _CHARACTER_VOICE_CACHE[character]
@@ -133,11 +137,23 @@ def _voice_preset_for_character(character, voice_map):
                 _CHARACTER_VOICE_CACHE[character] = preset
                 return preset
 
-    idx = hash(character) % len(_BARK_VOICE_PRESETS)
-    preset = _BARK_VOICE_PRESETS[idx]
+    # Gender-aware hash fallback: use voice_traits to pick from the right pool
+    traits_lower = voice_traits.lower() if voice_traits else ""
+    if "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower:
+        pool = _FEMALE_PRESETS
+        label = "female"
+    elif "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower:
+        pool = _MALE_PRESETS
+        label = "male"
+    else:
+        pool = _BARK_VOICE_PRESETS
+        label = "unknown-gender"
+
+    idx = hash(character) % len(pool)
+    preset = pool[idx]
     _CHARACTER_VOICE_CACHE[character] = preset
-    log.info("[BatchBark] No Director mapping for '%s', hash-assigned %s",
-             character, preset)
+    log.info("[BatchBark] No Director mapping for '%s' (%s), hash-assigned %s from %s pool",
+             character, traits_lower[:30], preset, label)
     return preset
 
 
@@ -420,7 +436,8 @@ class BatchBarkGenerator:
             if item.get("type") == "dialogue" and item.get("line", "").strip():
                 # Canonical 1.0+ uses the character name as the primary ID
                 character_name = item.get("character_name", "UNKNOWN")
-                preset = _voice_preset_for_character(character_name, voice_map)
+                voice_traits = item.get("voice_traits", "")
+                preset = _voice_preset_for_character(character_name, voice_map, voice_traits)
                 dialogue_items.append({
                     "script_idx": i,
                     "character_name": character_name,

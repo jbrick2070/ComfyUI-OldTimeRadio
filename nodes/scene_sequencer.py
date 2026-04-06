@@ -206,17 +206,20 @@ _BARK_VOICE_PRESETS = [
     "v2/en_speaker_9",  # Female, mature, sophisticated
 ]
 
+_FEMALE_PRESETS = ["v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9"]
+_MALE_PRESETS   = ["v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8"]
+
 # Stable character→preset cache so the same character always gets the same voice
 _CHARACTER_VOICE_CACHE = {}
 
 
-def _voice_preset_for_character(voice_tag, voice_map):
+def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
     """Determine Bark voice preset for a character/voice_tag.
 
     Priority:
       1. Cached assignment (stable across the episode)
       2. Director's voice_assignments (from Gemma4Director voice_map_json)
-      3. Stable hash-based fallback (deterministic from traits)
+      3. Gender-aware hash fallback using voice_traits from script
     """
     if voice_tag in _CHARACTER_VOICE_CACHE:
         return _CHARACTER_VOICE_CACHE[voice_tag]
@@ -228,11 +231,23 @@ def _voice_preset_for_character(voice_tag, voice_map):
         _CHARACTER_VOICE_CACHE[voice_tag] = preset
         return preset
 
-    # Stable hash-based assignment: same tag -> same voice every run
-    idx = hash(voice_tag) % len(_BARK_VOICE_PRESETS)
-    preset = _BARK_VOICE_PRESETS[idx]
+    # Gender-aware hash fallback: use voice_traits to pick from the right pool
+    traits_lower = voice_traits.lower() if voice_traits else ""
+    if "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower:
+        pool = _FEMALE_PRESETS
+        label = "female"
+    elif "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower:
+        pool = _MALE_PRESETS
+        label = "male"
+    else:
+        pool = _BARK_VOICE_PRESETS
+        label = "unknown-gender"
+
+    idx = hash(voice_tag) % len(pool)
+    preset = pool[idx]
     _CHARACTER_VOICE_CACHE[voice_tag] = preset
-    log.info(f"[VoiceMap] No Director mapping for traits '{voice_tag}', hash-assigned {preset}")
+    log.info("[VoiceMap] No Director mapping for '%s' (%s), hash-assigned %s from %s pool",
+             voice_tag, traits_lower[:30], preset, label)
     return preset
 
 
@@ -633,8 +648,9 @@ class SceneSequencer:
 
             elif item_type == "dialogue":
                 character_name = item.get("character_name", "UNKNOWN")
+                voice_traits = item.get("voice_traits", "")
                 line = item.get("line", "")
-                preset = _voice_preset_for_character(character_name, voice_map)
+                preset = _voice_preset_for_character(character_name, voice_map, voice_traits)
                 
                 if tts_clip_idx < len(tts_clips):
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
