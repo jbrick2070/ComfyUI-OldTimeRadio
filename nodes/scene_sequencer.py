@@ -1,4 +1,4 @@
-r"""
+﻿r"""
 Scene Sequencer + Episode Assembler — Orchestrate the Full Radio Show
 ======================================================================
 
@@ -523,6 +523,7 @@ class SceneSequencer:
                     "default": 999, "min": 1, "max": 9999,
                     "tooltip": "Last line to render"
                 }),
+                "output_dir": ("STRING", {"default": ""}),
                 "default_tts": (["bark", "parler", "kokoro"], {
                     "default": "bark",
                     "tooltip": "Default TTS engine when not specified in production plan"
