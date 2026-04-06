@@ -35,9 +35,11 @@ log = logging.getLogger("OTR")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LOG CLEANUP — Bark's sub-models hardcode max_length=20 as an explicit kwarg.
-# When we pass max_new_tokens, transformers fires a UserWarning on every single
-# sub-model call (~20+ per dialogue line). Cannot intercept via generation_config
-# because Bark passes max_length=20 as a direct kwarg that overrides the config.
+# When we pass max_new_tokens, transformers fires warnings on every sub-model
+# call (~20+ per dialogue line). Cannot intercept via generation_config because
+# Bark passes max_length=20 as a direct kwarg that overrides the config object.
+# The generation_config kwarg warning is a FutureWarning in transformers ≥4.45
+# — using UserWarning there silently fails to suppress it.
 # ─────────────────────────────────────────────────────────────────────────────
 warnings.filterwarnings(
     "ignore",
@@ -56,7 +58,12 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings(
     "ignore",
-    message=r".*Passing `generation_config` together with generation-related arguments.*",
+    message=r".*Passing.*`generation_config`.*together with generation-related arguments.*",
+    category=FutureWarning,  # transformers ≥4.45 emits this as FutureWarning, not UserWarning
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*Setting `pad_token_id` to `eos_token_id`.*",
     category=UserWarning,
 )
 
