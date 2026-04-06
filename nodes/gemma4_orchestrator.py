@@ -217,6 +217,33 @@ def _fetch_science_news(max_feeds=10):
 
             for entry in feed.entries[:6]:
                 title = entry.get("title", "").strip()
+                if not title:
+                    continue
+
+                # ── Headline pre-filter: reject non-article content ──────────
+                # Teaser/media headlines have no science payload for Gemma to
+                # work with. A podcast slug or video title gives Gemma 90 chars
+                # about content it can't access. Drop these at the source.
+                _SKIP_PREFIXES = (
+                    "podcast:", "watch:", "video:", "listen:", "opinion:",
+                    "q&a:", "quiz:", "gallery:", "photos:", "slideshow:",
+                    "live:", "webinar:", "event:", "in photos:",
+                )
+                _SKIP_PHRASES = (
+                    "behind-the-scenes", "tour of", "in conversation with",
+                    "ask the expert", "meet the", "alumni spotlight",
+                    "faculty spotlight", "student spotlight", "donate",
+                    "how to apply", "registration open",
+                )
+                title_lower = title.lower()
+                if any(title_lower.startswith(p) for p in _SKIP_PREFIXES):
+                    log.debug("[NewsFetcher] Skipping non-article (prefix): %s", title[:60])
+                    continue
+                if any(p in title_lower for p in _SKIP_PHRASES):
+                    log.debug("[NewsFetcher] Skipping non-article (phrase): %s", title[:60])
+                    continue
+                # ─────────────────────────────────────────────────────────────
+
                 content_candidates = entry.get("content", [])
                 rss_full = ""
                 if content_candidates:
@@ -224,15 +251,14 @@ def _fetch_science_news(max_feeds=10):
                     rss_full = re.sub(r'<[^>]+>', '', rss_full).strip()
                 summary = entry.get("summary", "")[:2000].strip()
                 summary = re.sub(r'<[^>]+>', '', summary).strip()
-                if title:
-                    data.append({
-                        "headline": title,
-                        "summary": summary,
-                        "rss_full": rss_full,
-                        "source": feed.feed.get("title", feed_url.split("/")[2]),
-                        "date": entry.get("published", str(datetime.now().date())),
-                        "link": entry.get("link", ""),
-                    })
+                data.append({
+                    "headline": title,
+                    "summary": summary,
+                    "rss_full": rss_full,
+                    "source": feed.feed.get("title", feed_url.split("/")[2]),
+                    "date": entry.get("published", str(datetime.now().date())),
+                    "link": entry.get("link", ""),
+                })
             return data
         except Exception as e:
             log.debug("[NewsFetcher] Feed failed %s: %s", feed_url, e)
