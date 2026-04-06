@@ -11,7 +11,7 @@ Generates full-length sci-fi anthology radio dramas using:
 Self-contained: drop into custom_nodes/ and go. No external node deps.
 
 Audio:  ScriptWriter -> Director -> BatchBark -> SceneSequencer -> AudioEnhance -> EpisodeAssembler
-Video:  EpisodeAssembler -> SignalLostVideo (procedural CRT + ffmpeg MP4)
+Video:  EpisodeAssembler -> SignalLostVideo -> .mp4 + _treatment.txt (cast, voices, full script, stats)
 
 BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
   Uses isolated per-node loading so a broken dependency in one node

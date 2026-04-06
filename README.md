@@ -99,7 +99,9 @@ SceneSequencer ◄───────────────────┘
  EpisodeAssembler
     │
     ▼
-SignalLostVideo ─────► .MP4 Result
+SignalLostVideo ─────► signal_lost_<title>_<timestamp>.mp4
+                  └──► signal_lost_<title>_<timestamp>_treatment.txt
+                         (cast · voices · full script · production stats)
 ```
 
 | Node | What It Does |
@@ -111,7 +113,7 @@ SignalLostVideo ─────► .MP4 Result
 | **SceneSequencer** | Handles the deterministic `(beat)` pauses and stitches lines and SFX together. |
 | **AudioEnhance** | Masters the mix to 48kHz stereo with Haas-effect widening. |
 | **EpisodeAssembler** | Sandwiches scenes with intro/outro theme music. |
-| **SignalLostVideo** | Pure CPU rendering (no VRAM required) of audio-reactive CRT data-viz graphics. |
+| **SignalLostVideo** | Pure CPU rendering (no VRAM required) of audio-reactive CRT data-viz graphics. Saves a `_treatment.txt` companion file alongside the MP4 — cast list, voice assignments, full script in scene order, and production stats. |
 
 ---
 
