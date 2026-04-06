@@ -248,15 +248,15 @@ _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_9", "Female, mature, authoritative"),
 ]
 
-# LEMMY fixed profile — always gravelly/raspy male, no accent
+# LEMMY fixed profile — always gravelly/raspy male with British accent
 _LEMMY_PROFILE = {
     "name": "LEMMY",
     "gender": "male",
     "age": "50s",
     "demeanor": "gravelly",
-    "accent": "neutral",
-    "voice_preset": "v2/en_speaker_8",
-    "notes": "Male, gravelly/raspy, 50s, iconic",
+    "accent": "British",
+    "voice_preset": "v2/de_speaker_0",  # German preset produces British-style accent with gravelly tone
+    "notes": "Male, gravelly/raspy, 50s, British accent, iconic",
 }
 
 
