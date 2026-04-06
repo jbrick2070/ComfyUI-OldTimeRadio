@@ -123,8 +123,10 @@ def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
 
     warmth: 0.0 = none, 0.1 = subtle broadcast tone (~3dB), 0.3 = noticeable (~9dB)
 
-    Note: torchaudio.functional.bass_biquad does NOT support CUDA tensors,
-    so we temporarily move to CPU and back if needed.
+    NOTE (2026): torchaudio now supports CUDA for biquad/lfilter, but IIR filters
+    are inherently sequential — GPU execution is slower than CPU due to poor
+    parallelism on Tensor Cores. CPU bounce is the tactical win: minimal overhead
+    (~microseconds per clip) while keeping the rest of DSP on GPU (RTX 5080).
     """
     if warmth <= 0.0:
         return waveform
@@ -133,23 +135,20 @@ def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
 
     gain_db = warmth * 30.0
     orig_device = waveform.device
+    orig_dtype = waveform.dtype
 
-    # bass_biquad is CPU-only — move off GPU if needed
-    if orig_device.type == "cuda":
-        waveform = waveform.cpu()
+    # Tactical bounce to CPU for the IIR step (faster than GPU IIR on Blackwell)
+    waveform_cpu = waveform.cpu()
 
     result = torchaudio.functional.bass_biquad(
-        waveform, sample_rate,
+        waveform_cpu, sample_rate,
         gain=gain_db,
         central_freq=200.0,
         Q=0.707,
     )
 
-    # Move back to original device
-    if orig_device.type == "cuda":
-        result = result.to(orig_device)
-
-    return result
+    # Back to original device & dtype (non_blocking for Blackwell pipelining)
+    return result.to(orig_device, dtype=orig_dtype, non_blocking=True)
 
 
 def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
