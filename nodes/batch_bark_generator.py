@@ -27,7 +27,6 @@ import warnings
 
 import numpy as np
 import torch
-import numpy as np
 
 from .gemma4_orchestrator import _runtime_log
 
@@ -196,6 +195,8 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
         label = "unknown-gender"
 
     pool = intl_pool if (use_intl and intl_pool) else en_pool
+    if not pool:  # safety net — should never happen with current preset lists
+        pool = _BARK_VOICE_PRESETS
     preset = rng.choice(pool)
     _CHARACTER_VOICE_CACHE[character] = preset
     pool_tag = "international" if (use_intl and intl_pool) else "English-native"
@@ -324,7 +325,9 @@ def _clean_text_for_bark(text):
     }
 
     def _filter_bracket_tag(m):
-        tag = m.group(0).lower().strip()
+        # Normalize: lowercase + collapse any internal whitespace so
+        # "[ laughter ]" matches "[laughter]" in the whitelist
+        tag = re.sub(r'\s+', '', m.group(0).lower())
         return tag if tag in _BARK_VALID_TOKENS else ""
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)

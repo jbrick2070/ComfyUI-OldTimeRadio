@@ -379,23 +379,38 @@ def _find_ffmpeg():
 
 
 _NVENC_AVAILABLE = None  # cached after first check
+_NVENC_LOCK = None       # lazy-init threading.Lock()
 
 def _check_nvenc(ffmpeg_path):
-    """Return True if ffmpeg supports h264_nvenc on this system."""
-    global _NVENC_AVAILABLE
-    if _NVENC_AVAILABLE is not None:
+    """Return True if ffmpeg supports h264_nvenc on this system.
+
+    Thread-safe: uses a lock so parallel ComfyUI workers can't race on the
+    first check. Safe when ffmpeg_path is None (returns False immediately).
+    """
+    global _NVENC_AVAILABLE, _NVENC_LOCK
+    # Lazy-init the lock to avoid import-time threading overhead
+    if _NVENC_LOCK is None:
+        import threading
+        _NVENC_LOCK = threading.Lock()
+
+    with _NVENC_LOCK:
+        if _NVENC_AVAILABLE is not None:
+            return _NVENC_AVAILABLE
+        if not ffmpeg_path:
+            _NVENC_AVAILABLE = False
+            log.info("[Video] Encoder: CPU libx264 (ffmpeg path unknown)")
+            return False
+        try:
+            result = subprocess.run(
+                [ffmpeg_path, "-hide_banner", "-codecs"],
+                capture_output=True, text=True, timeout=5,
+            )
+            _NVENC_AVAILABLE = "h264_nvenc" in result.stdout
+        except Exception:
+            _NVENC_AVAILABLE = False
+        tag = "NVIDIA h264_nvenc" if _NVENC_AVAILABLE else "CPU libx264"
+        log.info("[Video] Encoder: %s", tag)
         return _NVENC_AVAILABLE
-    try:
-        result = subprocess.run(
-            [ffmpeg_path, "-hide_banner", "-codecs"],
-            capture_output=True, text=True, timeout=5,
-        )
-        _NVENC_AVAILABLE = "h264_nvenc" in result.stdout
-    except Exception:
-        _NVENC_AVAILABLE = False
-    tag = "NVIDIA h264_nvenc" if _NVENC_AVAILABLE else "CPU libx264"
-    log.info("[Video] Encoder: %s", tag)
-    return _NVENC_AVAILABLE
 
 
 def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
@@ -745,18 +760,22 @@ class _TelemetryHUDRenderer:
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
-        # Cast & voices
-        d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_label)
-        y += self._lhL
+        # Cast & voices — stop rendering if we're close to the footer
+        footer_y = self.h - self._lhS - P * 2  # reserve space for footer
+        if y < footer_y:
+            d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_label)
+            y += self._lhL
         for m in self.data.get("cast", []):
+            if y + self._lhB >= footer_y:
+                break  # no more room — don't draw over the footer
             d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_body)
             y += self._lhB
             preset = m.get("preset", "")
-            if preset:
+            if preset and y + self._lhS < footer_y:
                 d.text((P * 2, y), preset, fill=CRT_DIM, font=self.f_small)
                 y += self._lhS
             desc = m.get("desc", "")
-            if desc:
+            if desc and y + self._lhS < footer_y:
                 char_w = max(1, _fw("m", self.f_small))
                 trunc = desc[:(self.LEFT_W - P * 3) // char_w]
                 if len(trunc) < len(desc):
@@ -765,7 +784,7 @@ class _TelemetryHUDRenderer:
                 y += self._lhS
             y += P // 2
 
-        # Footer
+        # Footer — always anchored to bottom regardless of cast overflow
         fy = self.h - self._lhS - P
         d.line([(P, fy - P), (self.LEFT_W - P, fy - P)], fill=CRT_DARK, width=1)
         d.text((P, fy), "OTR v1.0", fill=CRT_DARK, font=self.f_small)
