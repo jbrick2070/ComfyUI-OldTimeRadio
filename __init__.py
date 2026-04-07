@@ -91,13 +91,10 @@ _NODE_MODULES = {
     "OTR_Gemma4ScriptWriter": (".nodes.gemma4_orchestrator", "Gemma4ScriptWriter", "📻 Gemma 4 Script Writer"),
     "OTR_Gemma4Director":     (".nodes.gemma4_orchestrator", "Gemma4Director",      "🎬 Gemma 4 Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          "🎙️ Bark TTS (Suno)"),
-    "OTR_ParlerTTS":          (".nodes.parler_tts",         "ParlerTTSNode",        "🔊 Parler-TTS"),
-    "OTR_VintageRadioFilter": (".nodes.vintage_radio_filter", "VintageRadioFilter", "📡 Vintage Radio Filter"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         "💥 SFX Generator"),
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       "🎞️ Scene Sequencer"),
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     "📼 Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         "🔊 Spatial Audio Enhance"),
-    "OTR_AudioBatcher":       (".nodes.audio_batcher",       "AudioBatcher",         "🔀 Audio Batcher"),
     "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   "⚡ Batch Bark Generator"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", "📺 Signal Lost Video"),
 }
