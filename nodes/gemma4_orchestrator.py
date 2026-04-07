@@ -1859,6 +1859,7 @@ Begin the full script now. Follow this structure exactly:
                 target_minutes, target_words, custom_premise, news_block,
                 include_act_breaks, model_id, temperature,
                 lemmy_directive=lemmy_directive,
+                top_p=active_top_p,
             )
 
         # ── v1.1 CHECKS & CRITIQUES LOOP ─────────────────────────────────────
@@ -2471,7 +2472,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
                           target_words, premise, news_block, act_breaks,
-                          model_id, temperature, lemmy_directive=""):
+                          model_id, temperature, lemmy_directive="", top_p=0.95):
         """Generate long scripts act-by-act to avoid token truncation.
 
         Step 1: Generate an outline (characters, plot beats, act structure)
@@ -2508,7 +2509,7 @@ Outline only — do NOT write dialogue yet."""
 
         log.info(f"[ScriptWriter] Generating outline ({num_acts} acts)")
         outline = _generate_with_gemma4(outline_prompt, model_id=model_id,
-                                         max_new_tokens=1500, temperature=temperature)
+                                         max_new_tokens=1500, temperature=temperature, top_p=top_p)
 
         # Step 2: Generate each act with Context Engineering
         # Instead of dumping raw previous text, we summarize what happened
@@ -2612,7 +2613,7 @@ Write Act {act_num} now:"""
 
             _runtime_log(f"ScriptWriter: Generating Act {act_num}/{num_acts}")
             act_text = _generate_with_gemma4(act_prompt, model_id=model_id,
-                                              max_new_tokens=4096, temperature=temperature)
+                                              max_new_tokens=4096, temperature=temperature, top_p=top_p)
             acts.append(act_text)
 
         return "\n\n".join(acts)
