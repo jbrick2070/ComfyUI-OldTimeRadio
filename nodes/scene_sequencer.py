@@ -909,10 +909,13 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Assembled %d segments with %dms crossfades",
                  len(matched), crossfade_ms)
 
-        # Normalize
+        # Final peak normalize to -1.0 dBFS — runs AFTER crossfades so
+        # overlapping segments can't push the mix into clipping.
         peak = episode_waveform.abs().max()
         if peak > 1e-8:
-            episode_waveform = episode_waveform * (0.95 / peak)
+            target_linear = 10.0 ** (-1.0 / 20.0)  # -1.0 dBFS
+            episode_waveform = episode_waveform * (target_linear / peak)
+        log.info("[EpisodeAssembler] Final normalize: -1.0 dBFS (post-crossfade)")
 
         # Video-only pipeline — MP4 is written by OTR_SignalLostVideo.
         # No WAV or PNG files are saved here.
