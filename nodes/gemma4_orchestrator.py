@@ -1363,6 +1363,10 @@ class Gemma4ScriptWriter:
                     "default": "balanced",
                     "tooltip": "Creativity dial — overrides temperature/top_p (safe=0.6, balanced=0.85, wild=1.1, chaos=1.35)"
                 }),
+                "force_lemmy": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Force Lemmy to appear in every episode (testing only — set to False for production)"
+                }),
             },
         }
 
@@ -1524,7 +1528,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      target_length="medium (5 acts)",
                      style_variant="tense claustrophobic",
                      creativity="balanced",
-                     runtime_preset="📻 standard (8 min)"):
+                     runtime_preset="📻 standard (8 min)",
+                     force_lemmy=False):
 
         # ── RUNTIME PRESET → override target_minutes unless custom ──
         _preset_map = {
@@ -1730,7 +1735,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # A grizzled, seen-it-all engineer/mechanic who speaks in blunt,
         # colorful metaphors. Rare enough to be a surprise, frequent enough
         # that regulars will notice. Named after Lemmy Kilmister.
-        lemmy_roll = random.random() < 0.11
+        # force_lemmy=True overrides for testing (validates voice collision fix).
+        lemmy_roll = force_lemmy or (random.random() < 0.11)
         lemmy_directive = ""
         if lemmy_roll:
             lemmy_directive = (
