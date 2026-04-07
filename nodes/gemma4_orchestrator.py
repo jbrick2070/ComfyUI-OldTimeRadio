@@ -1309,9 +1309,13 @@ class Gemma4ScriptWriter:
                     "default": "hard_sci_fi",
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
+                "runtime_preset": (["🧪 test (1 min)", "⚡ quick (5 min)", "📻 standard (8 min)", "🎬 long (15 min)", "🎭 epic (20 min)", "🔧 custom"], {
+                    "default": "📻 standard (8 min)",
+                    "tooltip": "Friendly runtime selector — overrides target_minutes unless set to 🔧 custom"
+                }),
                 "target_minutes": ("INT", {
                     "default": 8, "min": 1, "max": 45, "step": 1,
-                    "tooltip": "Target episode length in minutes (8 = punchy default, 1 for quick test)"
+                    "tooltip": "Target minutes — only used when runtime_preset is set to 🔧 custom"
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
@@ -1519,12 +1523,24 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      open_close=True,
                      target_length="medium (5 acts)",
                      style_variant="tense claustrophobic",
-                     creativity="balanced"):
+                     creativity="balanced",
+                     runtime_preset="📻 standard (8 min)"):
+
+        # ── RUNTIME PRESET → override target_minutes unless custom ──
+        _preset_map = {
+            "🧪 test (1 min)":    1,
+            "⚡ quick (5 min)":   5,
+            "📻 standard (8 min)": 8,
+            "🎬 long (15 min)":   15,
+            "🎭 epic (20 min)":   20,
+        }
+        if runtime_preset in _preset_map:
+            target_minutes = _preset_map[runtime_preset]
 
         # ── DIAGNOSTIC: log feature flags so we can confirm they're received ──
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
-                     f"target_min={target_minutes} chars={num_characters} "
+                     f"runtime_preset={runtime_preset} target_min={target_minutes} chars={num_characters} "
                      f"length={target_length} style={style_variant} creativity={creativity}")
 
         # ══════════════════════════════════════════════════════════════════════
