@@ -183,7 +183,7 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 
         # Mains hum
         hum_freq = 50 if "euro" in desc else 60
-        hum_amp = intensity * 0.3 if ("electronic" in desc or "fluorescent" in desc or "ship" in desc) else intensity * 0.1
+        hum_amp = intensity * 0.15 if ("electronic" in desc or "fluorescent" in desc or "ship" in desc) else intensity * 0.1
         hum = torch.sin(2 * math.pi * hum_freq * t) * hum_amp
 
         # Textures
@@ -772,7 +772,7 @@ class SceneSequencer:
         # ── CANONICAL 1.0 ENVIRONMENT MIXING ──────────────────────────
         total_len = len(combined)
         final_bed = np.zeros(total_len, dtype=np.float32)
-        room_intensity = plan.get("vintage_settings", {}).get("room_tone_intensity", 0.02)
+        room_intensity = plan.get("vintage_settings", {}).get("room_tone_intensity", 0.01)
         
         for start, end, desc in env_timeline:
             span_len_sec = (end - start) / sample_rate
