@@ -468,8 +468,9 @@ def _generate_announcer_profile(episode_seed: str = "", gender_hint: str | None 
     pool = _ANNOUNCER_PRESETS
     if gender_hint:
         gh = gender_hint.lower()
+        # Use startswith to avoid "male" matching inside "female"
         filtered = [(p, n) for p, n in _ANNOUNCER_PRESETS
-                    if gh in n.lower()]
+                    if n.lower().startswith(gh)]
         if filtered:
             pool = filtered
     preset, notes = rng.choice(pool)
