@@ -21,10 +21,13 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 # stdout streamer and contaminate the visible script log. Forcing offline mode
 # eliminates the background thread entirely. Users who genuinely need to
 # download a new model can set HF_HUB_OFFLINE=0 in their shell before launch.
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-# Suppress the safetensors auto-conversion thread that crashes on JSON parse errors
-os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+# HF_HUB_OFFLINE: intentionally NOT set here. The user has HF_TOKEN configured
+# as a Windows env var (setx HF_TOKEN ...) which authenticates requests and
+# raises rate limits to 5000/hr. Forcing offline mode would override the token
+# and break model downloads. The auto_conversion background thread is suppressed
+# by the token itself (authenticated requests don't hit the unauthenticated
+# rate limit that was causing the JSONDecodeError in the background thread).
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
 
 # Ensure HuggingFace cache goes to a sensible location (Section 31)
 # Only set if not already configured by the user
