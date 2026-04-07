@@ -1693,10 +1693,14 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             )
 
         # ── Build final script prompt ──
+        # Mode label must match the logic in _open_close_expansion_inner so the
+        # downstream prompt asks the model to expand a PITCH (long episodes) or
+        # an OUTLINE (short episodes) accordingly.
+        oc_mode_label = "PITCH" if target_minutes >= 15 else "OUTLINE"
         if winning_outline:
-            user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING OUTLINE below.
+            user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING {oc_mode_label} below.
 
-WINNING OUTLINE (selected by evaluator from 3 competing concepts):
+WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 {winning_outline}
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
@@ -1706,7 +1710,7 @@ TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
 
-REMEMBER: The outline above is your roadmap. Follow its structure, characters, and arc. Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
+REMEMBER: The {oc_mode_label.lower()} above is your premise and story spine. {"Invent the full scene structure, acts, and SFX based on it." if oc_mode_label == "PITCH" else "Follow its structure, characters, and arc."} Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
 
 Begin the full script now. Follow this structure exactly:
 === SCENE 1 ===
@@ -1967,6 +1971,33 @@ Begin the full script now. Follow this structure exactly:
         log.info("[OpenClose] Starting Open-Close expansion (3 outlines + evaluator)...")
         _runtime_log("OPENCLOSE: Generating 3 competing outlines")
 
+        # ── PITCH MODE (Gemini round 3) ──
+        # For long episodes (>= 15 min) the 3 full structured outlines bottleneck
+        # the run (~10-15 min just for the open-close phase on SDPA). For long
+        # episodes we switch to "pitch mode" — a 3-5 sentence logline per concept,
+        # ~100 words, no act structure. Saves ~80% of open-close inference time.
+        # The full script generator still invents the scene structure downstream.
+        is_pitch_mode = target_minutes >= 15
+        if is_pitch_mode:
+            mode_label = "PITCH"
+            outline_max_tokens = 250
+            OUTLINE_MIN = 150
+            OUTLINE_MAX = 1500
+            _runtime_log(
+                f"OPENCLOSE: PITCH_MODE enabled for {target_minutes}m run "
+                f"(max_new_tokens={outline_max_tokens})"
+            )
+        else:
+            mode_label = "OUTLINE"
+            outline_max_tokens = 600
+            OUTLINE_MIN = 200
+            OUTLINE_MAX = 3000
+            _runtime_log(
+                f"OPENCLOSE: OUTLINE_MODE enabled for {target_minutes}m run "
+                f"(max_new_tokens={outline_max_tokens})"
+            )
+        mode_lower = mode_label.lower()
+
         arc_choices = random.sample("ABCDEFGHIJKL", 3)
 
         outline_focuses = [
@@ -1986,9 +2017,27 @@ Begin the full script now. Follow this structure exactly:
 
         outlines = []
         for i, (focus_name, focus_desc) in enumerate(outline_focuses):
-            outline_prompt = f"""{system}
+            if is_pitch_mode:
+                # PITCH mode: lightweight 3-5 sentence logline per concept
+                concept_body = f"""Generate a distinct story PITCH for a {genre_flavor.replace("_", " ")} radio drama episode.
 
-Generate a STORY OUTLINE (not a full script) for a {genre_flavor.replace("_", " ")} radio drama.
+PRIORITY: {focus_name}
+{focus_desc}
+
+CRITICAL CONSTRAINTS:
+- Exactly 3 to 5 sentences. 50-100 words total.
+- High-level logline only. No act structure. No scene breakdown. No dialogue.
+- Hook + core conflict + science angle.
+- The science must be rooted in the real headlines from the system prompt above.
+
+ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine above.
+TARGET LENGTH (downstream script): {target_minutes} minutes
+{lemmy_directive}
+
+Begin your PITCH now:"""
+            else:
+                # OUTLINE mode: full structured outline (short episodes only)
+                concept_body = f"""Generate a STORY OUTLINE (not a full script) for a {genre_flavor.replace("_", " ")} radio drama.
 
 PRIORITY: {focus_name}
 {focus_desc}
@@ -2010,29 +2059,30 @@ Output a concise outline with:
 
 Keep it under 400 words. Structure only — no dialogue."""
 
+            outline_prompt = f"{system}\n\n{concept_body}"
+
             try:
                 outline_text = _run_with_timeout(
-                    lambda: _generate_with_gemma4(
-                        outline_prompt,
+                    lambda op=outline_prompt: _generate_with_gemma4(
+                        op,
                         model_id=model_id,
-                        max_new_tokens=600,
+                        max_new_tokens=outline_max_tokens,
                         temperature=min(1.0, temperature + 0.1),
                     ),
                     timeout_sec=300,
-                    phase_label=f"OpenClose-Outline-{focus_name}",
+                    phase_label=f"OpenClose-{mode_label}-{focus_name}",
                 )
                 outlines.append((focus_name, outline_text))
-                log.info("[OpenClose] Outline %s generated (%d chars)",
-                         focus_name, len(outline_text))
-                _runtime_log(f"OPENCLOSE: Outline {focus_name} done ({len(outline_text)} chars)")
+                log.info("[OpenClose] %s %s generated (%d chars)",
+                         mode_label, focus_name, len(outline_text))
+                _runtime_log(f"OPENCLOSE: {mode_label} {focus_name} done ({len(outline_text)} chars)")
             except Exception as e:
-                log.warning("[OpenClose] Outline %s failed: %s", focus_name, e)
+                log.warning("[OpenClose] %s %s failed: %s", mode_label, focus_name, e)
                 outlines.append((focus_name, ""))
 
         # ── Phase 2a: Open-Close boundary enforcement ──
-        # Discard outlines outside 200-3000 char range before evaluator
-        OUTLINE_MIN = 200
-        OUTLINE_MAX = 3000
+        # Discard outlines outside the mode-specific char range before evaluator.
+        # OUTLINE_MIN / OUTLINE_MAX are set above based on pitch vs outline mode.
         valid_outlines = []
         for name, text in outlines:
             if not text or len(text) < OUTLINE_MIN:
@@ -2061,11 +2111,11 @@ Keep it under 400 words. Structure only — no dialogue."""
 
         outlines_block = ""
         for idx, (name, text) in enumerate(valid_outlines, 1):
-            outlines_block += f"\n--- OUTLINE {idx} ({name}) ---\n{text}\n"
+            outlines_block += f"\n--- {mode_label} {idx} ({name}) ---\n{text}\n"
 
         eval_prompt = f"""You are a veteran radio drama showrunner selecting the best story concept for production.
 
-Below are {len(valid_outlines)} competing outlines for a {genre_flavor.replace("_", " ")} episode.
+Below are {len(valid_outlines)} competing {mode_lower}s for a {genre_flavor.replace("_", " ")} episode.
 
 Evaluate each on:
 1. HOOK STRENGTH: Would a listener stay past the first 30 seconds?
@@ -2078,12 +2128,12 @@ Evaluate each on:
 {outlines_block}
 
 YOUR DECISION:
-First, write ONE sentence about each outline's biggest strength and weakness.
-Then state: "WINNER: Outline N" (the number).
-Finally, if elements from a losing outline would strengthen the winner, list them as "MERGE: [element]".
+First, write ONE sentence about each {mode_lower}'s biggest strength and weakness.
+Then state: "WINNER: {mode_label} N" (the number).
+Finally, if elements from a losing {mode_lower} would strengthen the winner, list them as "MERGE: [element]".
 
-Output the WINNING OUTLINE in full at the end, incorporating any merged elements.
-Label it "FINAL OUTLINE:" on its own line before the text."""
+Output the WINNING {mode_label} in full at the end, incorporating any merged elements.
+Label it "FINAL {mode_label}:" on its own line before the text."""
 
         try:
             eval_text = _run_with_timeout(
@@ -2102,22 +2152,28 @@ Label it "FINAL OUTLINE:" on its own line before the text."""
             log.warning("[OpenClose] Evaluator failed: %s — using first outline", e)
             return valid_outlines[0][1]
 
-        # Extract the final outline from evaluator output
-        # Look for "FINAL OUTLINE:" marker
-        final_marker = "FINAL OUTLINE:"
-        marker_idx = eval_text.upper().find(final_marker.upper())
-        if marker_idx >= 0:
-            winning = eval_text[marker_idx + len(final_marker):].strip()
-            log.info("[OpenClose] Extracted winning outline (%d chars)", len(winning))
-            return winning
+        # Extract the final concept from evaluator output.
+        # Marker is mode-specific: "FINAL PITCH:" or "FINAL OUTLINE:". Try the
+        # current mode first, then the other (in case the model picked the wrong
+        # header), then the generic fallbacks.
+        for marker in (f"FINAL {mode_label}:", "FINAL OUTLINE:", "FINAL PITCH:"):
+            marker_idx = eval_text.upper().find(marker.upper())
+            if marker_idx >= 0:
+                winning = eval_text[marker_idx + len(marker):].strip()
+                log.info("[OpenClose] Extracted winning %s via marker '%s' (%d chars)",
+                         mode_lower, marker, len(winning))
+                return winning
 
-        # If no marker found, try to find "WINNER:" and return corresponding outline
-        winner_match = re.search(r'WINNER:\s*Outline\s*(\d)', eval_text, re.IGNORECASE)
+        # If no marker found, try to find "WINNER:" and return corresponding concept
+        winner_match = re.search(
+            rf'WINNER:\s*(?:{mode_label}|Outline|Pitch)\s*(\d)',
+            eval_text, re.IGNORECASE,
+        )
         if winner_match:
             winner_idx = int(winner_match.group(1)) - 1
             if 0 <= winner_idx < len(valid_outlines):
-                log.info("[OpenClose] Winner is Outline %d (%s)",
-                         winner_idx + 1, valid_outlines[winner_idx][0])
+                log.info("[OpenClose] Winner is %s %d (%s)",
+                         mode_label, winner_idx + 1, valid_outlines[winner_idx][0])
                 return valid_outlines[winner_idx][1]
 
         # Fallback: return the full evaluator output (it usually contains a merged outline)
