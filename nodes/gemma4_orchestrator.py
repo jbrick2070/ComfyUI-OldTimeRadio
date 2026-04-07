@@ -1276,8 +1276,14 @@ STRUCTURE:
 2. === SCENE 2-X === (Escalate the HUMAN stakes. Characters argue, make choices, face consequences.)
 3. === SCENE FINAL === (The twist, emotional payoff, then ANNOUNCER's Hard Science Epilogue.)
 
-TARGET: {target_minutes} minutes (~{target_words} words). Let it breathe with (beat) tags.
+TARGET: {target_minutes} minutes (~{target_words} words). Dense, punchy dialogue — NOT padded with pauses.
 PRIMARY RULE: Tags always start at the beginning of a line. No inline tags.
+PACING RULES (CRITICAL):
+- NEVER place two (beat) or [PAUSE/BEAT] tags back-to-back. Consecutive pause tags are BANNED.
+- Use (beat) sparingly — at most one per 4 lines of dialogue, and only for genuine emotional weight.
+- If you need more runtime, WRITE MORE DIALOGUE. Do not insert pauses as filler.
+- High-tension scenes must have rapid-fire, overlapping, interrupting exchanges — not slow pauses.
+- Aim for at least 10 lines of dialogue per minute of target runtime.
 """
 
 
@@ -1304,8 +1310,8 @@ class Gemma4ScriptWriter:
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
                 "target_minutes": ("INT", {
-                    "default": 25, "min": 1, "max": 45, "step": 1,
-                    "tooltip": "Target episode length in minutes (1 for quick test)"
+                    "default": 8, "min": 1, "max": 45, "step": 1,
+                    "tooltip": "Target episode length in minutes (8 = punchy default, 1 for quick test)"
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
