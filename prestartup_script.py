@@ -14,6 +14,18 @@ import logging
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# BUG-006 fix: force HuggingFace Hub offline mode by default. All models the
+# OldTimeRadio pipeline uses (Gemma 4, Bark, Parler) are pre-cached. Allowing
+# online lookups spawns a background `Thread-auto_conversion` that prints HF
+# rate-limit warnings to stderr — those warnings interleave with Gemma's
+# stdout streamer and contaminate the visible script log. Forcing offline mode
+# eliminates the background thread entirely. Users who genuinely need to
+# download a new model can set HF_HUB_OFFLINE=0 in their shell before launch.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+# Suppress the safetensors auto-conversion thread that crashes on JSON parse errors
+os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+
 # Ensure HuggingFace cache goes to a sensible location (Section 31)
 # Only set if not already configured by the user
 if "HF_HOME" not in os.environ:
