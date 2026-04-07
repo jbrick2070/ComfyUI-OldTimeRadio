@@ -773,13 +773,22 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
             # ── Flash Attention 2 (preferred) → SDPA fallback ──
             # Flash Attention 2 gives ~40% speedup but requires `pip install flash-attn`.
             # If unavailable, fall back to SDPA which is still fast.
+            # Verify the flash-attn DISTRIBUTION is installed (not just an importable
+            # stub). Transformers checks PACKAGE_DISTRIBUTION_MAPPING['flash_attn'] and
+            # raises KeyError if the distribution metadata is missing, even if `import
+            # flash_attn` succeeds. Use importlib.metadata to be authoritative.
+            attn_impl = "sdpa"
             try:
-                import flash_attn  # noqa: F401
-                attn_impl = "flash_attention_2"
-                log.info("[Gemma4] Flash Attention 2 available — using flash_attention_2")
-            except ImportError:
-                attn_impl = "sdpa"
-                log.info("[Gemma4] Flash Attention 2 not installed — using SDPA fallback")
+                from importlib.metadata import distribution, PackageNotFoundError
+                try:
+                    distribution("flash-attn")
+                    import flash_attn  # noqa: F401
+                    attn_impl = "flash_attention_2"
+                    log.info("[Gemma4] Flash Attention 2 available — using flash_attention_2")
+                except (PackageNotFoundError, ImportError):
+                    log.info("[Gemma4] Flash Attention 2 not installed — using SDPA fallback")
+            except Exception as _fa_err:
+                log.info("[Gemma4] FA2 probe failed (%s) — using SDPA fallback", _fa_err)
 
             # ── 4-bit quantization (only enabled for very large models) ──
             # The 26B-A4B and 31B variants will OOM on a 16GB GPU at bfloat16.
@@ -1630,7 +1639,6 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # A grizzled, seen-it-all engineer/mechanic who speaks in blunt,
         # colorful metaphors. Rare enough to be a surprise, frequent enough
         # that regulars will notice. Named after Lemmy Kilmister.
-        import random
         lemmy_roll = random.random() < 0.11
         lemmy_directive = ""
         if lemmy_roll:
