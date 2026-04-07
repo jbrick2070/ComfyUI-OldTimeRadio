@@ -289,7 +289,7 @@ class VintageRadioFilter:
             "optional": {
                 "vintage_preset": (["off", "subtle", "authentic", "heavy_am",
                                     "war_era", "crystal_radio"], {
-                    "default": "authentic",
+                    "default": "subtle",
                     "tooltip": "Quick preset — or use manual controls below"
                 }),
                 "bandpass_low_hz": ("INT", {
@@ -337,10 +337,10 @@ class VintageRadioFilter:
         "crystal_radio": {"tube_warmth": 0.2, "hum_60hz": 0.15, "vinyl_crackle": 0.0, "radio_static": 0.40, "bandpass_low_hz": 600, "bandpass_high_hz": 3000, "broadcast_compression": False},
     }
 
-    def filter(self, audio, vintage_preset="authentic",
-               bandpass_low_hz=300, bandpass_high_hz=6000,
-               tube_warmth=0.7, hum_60hz=0.05, vinyl_crackle=0.1,
-               radio_static=0.15, broadcast_compression=True,
+    def filter(self, audio, vintage_preset="subtle",
+               bandpass_low_hz=200, bandpass_high_hz=8000,
+               tube_warmth=0.3, hum_60hz=0.02, vinyl_crackle=0.03,
+               radio_static=0.05, broadcast_compression=False,
                hum_frequency=60.0):
 
         # Extract waveform
