@@ -459,11 +459,20 @@ def _generate_character_profile(character_idx: int, episode_seed: str = "",
     }
 
 
-def _generate_announcer_profile(episode_seed: str = "") -> dict:
-    """Pick a random ANNOUNCER voice from the balanced pool, seeded per episode.
+def _generate_announcer_profile(episode_seed: str = "", gender_hint: str | None = None) -> dict:
+    """Pick a Announcer voice from the balanced pool, seeded per episode.
+    If gender_hint is provided (from script [VOICE: ANNOUNCER, gender, ...] tag),
+    filter the pool to matching gender first; fall back to full pool if none match.
     ANNOUNCER always uses neutral English — no accent."""
     rng = random.Random(f"{episode_seed}_announcer")
-    preset, notes = rng.choice(_ANNOUNCER_PRESETS)
+    pool = _ANNOUNCER_PRESETS
+    if gender_hint:
+        gh = gender_hint.lower()
+        filtered = [(p, n) for p, n in _ANNOUNCER_PRESETS
+                    if gh in n.lower()]
+        if filtered:
+            pool = filtered
+    preset, notes = rng.choice(pool)
     return {
         "name": "ANNOUNCER",
         "voice_preset": preset,
@@ -2945,15 +2954,17 @@ class Gemma4Director:
                          profile["voice_preset"], profile["notes"])
 
             elif upper_name == "ANNOUNCER":
-                # ANNOUNCER — random from balanced pool, seeded per episode
-                ann = _generate_announcer_profile(episode_seed)
+                # ANNOUNCER — random from balanced pool, seeded per episode.
+                # Respects gender_hint from script [VOICE: ANNOUNCER, gender, ...] tag.
+                ann_gender = gender_map.get("ANNOUNCER") if gender_map else None
+                ann = _generate_announcer_profile(episode_seed, gender_hint=ann_gender)
                 new_voice_assignments["ANNOUNCER"] = {
                     "voice_preset": ann["voice_preset"],
                     "notes": ann["notes"],
                 }
                 used_presets.add(ann["voice_preset"])
-                log.info("[Gemma4Director] ANNOUNCER: procedural → %s (%s)",
-                         ann["voice_preset"], ann["notes"])
+                log.info("[Gemma4Director] ANNOUNCER: procedural → %s (%s) [gender_hint=%s]",
+                         ann["voice_preset"], ann["notes"], ann_gender or "none")
 
             else:
                 # Regular character — full procedural profile.
