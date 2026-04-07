@@ -382,7 +382,8 @@ def _pick_accent(rng) -> tuple:
     return "neutral", "en"
 
 
-def _generate_character_profile(character_idx: int, episode_seed: str = "") -> dict:
+def _generate_character_profile(character_idx: int, episode_seed: str = "",
+                                gender_hint: str = None) -> dict:
     """Generate a full procedural character profile — deterministic per episode.
 
     Returns a dict with: name, gender, age, demeanor, accent, voice_preset, notes.
@@ -406,8 +407,13 @@ def _generate_character_profile(character_idx: int, episode_seed: str = "") -> d
     last = rng.choice(_LAST_NAMES)
     name = f"{first} {last}".upper()
 
-    # Generate traits
-    gender = rng.choice(_GENDERS)
+    # Generate traits — honor gender_hint from script's [VOICE: NAME, gender, ...] tag
+    # if provided. This is BUG-004 fix: previously the procedural cast picked random
+    # genders, producing male voices on female characters and vice versa.
+    if gender_hint and gender_hint.lower() in ("male", "female"):
+        gender = gender_hint.lower()
+    else:
+        gender = rng.choice(_GENDERS)
     age = rng.choice(_AGE_BRACKETS)
     demeanor = rng.choice(_DEMEANORS)
     accent_label, lang_code = _pick_accent(rng)
@@ -2244,6 +2250,19 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             # Revision needs roughly the same token budget as the original draft
             revision_tokens = max(int(target_words * 2.0), 1024)
             revision_tokens = min(revision_tokens, 8192)
+            # BUG-005 fix: scale wall-clock budget to episode length AND draft size.
+            # SDPA on Gemma 4 E4B runs ~2-3 tok/s, so a 22k-char revision needs
+            # ~700-1100s. The previous fixed 600s killed every long episode.
+            # Formula: max(600, target_minutes*60, len(draft)*0.05)
+            # target_words = target_minutes * 130, so target_minutes ≈ target_words / 130
+            target_minutes_est = max(1, int(target_words / 130))
+            revision_timeout = int(max(
+                600,
+                target_minutes_est * 60,
+                len(draft_text) * 0.05,
+            ))
+            log.info("[Critique] Revision wall-clock budget: %ds (target_min~%d, draft=%d chars)",
+                     revision_timeout, target_minutes_est, len(draft_text))
             revised_text = _run_with_timeout(
                 lambda: _generate_with_gemma4(
                     revision_prompt,
@@ -2251,7 +2270,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                     max_new_tokens=revision_tokens,
                     temperature=temperature,
                 ),
-                timeout_sec=600,
+                timeout_sec=revision_timeout,
                 phase_label="Revision-Pass",
             )
             log.info("[Critique] Revision pass complete (%d chars)", len(revised_text))
@@ -2487,7 +2506,10 @@ Write Act {act_num} now:"""
         _fallback_counter = [0]   # mutable so the inner closure can mutate it
 
         # OTR Canonical 1.0 RegEx Patterns
-        scene_pat = re.compile(r'^===\s*SCENE\s+(.+?)\s*===', re.IGNORECASE)
+        # BUG-009 fix: accept both `=== SCENE N ===` and `=== SCENE N ***` (Gemma
+        # occasionally uses asterisks as the closing delimiter, which silently
+        # broke scene splitting and merged Act 3 into Act 2's last scene).
+        scene_pat = re.compile(r'^===\s*SCENE\s+(.+?)\s*(?:===|\*\*\*)', re.IGNORECASE)
         env_pat   = re.compile(r'^\[ENV:\s*(.+?)\]$',          re.IGNORECASE)
         sfx_pat   = re.compile(r'^\[SFX:\s*(.+?)\]$',          re.IGNORECASE)
         # Full voice tag: [VOICE: NAME, traits...] dialogue text
@@ -2558,6 +2580,26 @@ Write Act {act_num} now:"""
             log.warning(
                 "[ScriptParser] %d malformed VOICE tag(s) detected (missing character name). "
                 "Update SCRIPT_SYSTEM_PROMPT Section 1 example if this recurs.", malformed
+            )
+
+        # BUG-010 fix: hard-abort if extraction produced an empty / no-dialogue
+        # script. Previously this silently passed ghost data into SceneSequencer
+        # which then crashed Bark / video assembly with cryptic errors. Fail
+        # loudly here so the user gets a clear root-cause message.
+        dialogue_count = sum(1 for ln in lines if ln.get("type") == "dialogue")
+        if not lines or dialogue_count == 0:
+            log.critical(
+                "[ScriptParser] FATAL: parsed %d structural lines but %d dialogue lines. "
+                "Script extraction failed — refusing to pass empty data downstream.",
+                len(lines), dialogue_count,
+            )
+            _runtime_log(
+                f"PARSE_FATAL: lines={len(lines)} dialogue={dialogue_count} "
+                f"raw_text_len={len(text)} — aborting"
+            )
+            raise ValueError(
+                f"Script parser produced 0 dialogue lines from {len(text)}-char input. "
+                "Aborting run to prevent silent audio failure."
             )
 
         return lines
@@ -2720,7 +2762,23 @@ class Gemma4Director:
         if plan:
             import hashlib
             script_hash = hashlib.sha256(script_text.encode()).hexdigest()[:16]
-            plan = self._randomize_character_names(plan, script_hash)
+
+            # BUG-004 fix: extract gender from each [VOICE: NAME, gender, ...] tag
+            # so the procedural cast generator never assigns a male voice to a
+            # female character or vice versa. First gender hint per name wins.
+            gender_map = {}
+            voice_tag_re = re.compile(
+                r"\[VOICE:\s*([A-Z][A-Z0-9_ ]*?)\s*,\s*(male|female)\b",
+                re.IGNORECASE,
+            )
+            for m in voice_tag_re.finditer(script_text):
+                name_key = m.group(1).strip().upper()
+                gender_val = m.group(2).strip().lower()
+                gender_map.setdefault(name_key, gender_val)
+            log.info("[Gemma4Director] Parsed %d gender hints from script: %s",
+                     len(gender_map), gender_map)
+
+            plan = self._randomize_character_names(plan, script_hash, gender_map=gender_map)
 
         # Override vintage settings with user's intensity choice
         if plan:
@@ -2784,7 +2842,8 @@ class Gemma4Director:
         log.critical(f"[Gemma4Director] Full raw output:\n{text[:1000]}")
         raise ValueError("Failed to parse production plan JSON. Aborting run to prevent silent audio failure.")
 
-    def _randomize_character_names(self, plan: dict, episode_seed: str) -> dict:
+    def _randomize_character_names(self, plan: dict, episode_seed: str,
+                                   gender_map: dict = None) -> dict:
         """Replace ALL character traits with procedural profiles. LEMMY stays LEMMY.
 
         For each character in voice_assignments:
@@ -2842,16 +2901,32 @@ class Gemma4Director:
                          ann["voice_preset"], ann["notes"])
 
             else:
-                # Regular character — full procedural profile
-                profile = _generate_character_profile(character_idx, episode_seed)
+                # Regular character — full procedural profile.
+                # BUG-004 fix: pull gender_hint from the script's [VOICE: NAME, gender, ...]
+                # tag so we never assign a male voice to a female character (or vice versa).
+                gender_hint = None
+                if gender_map:
+                    gender_hint = gender_map.get(upper_name)
+                profile = _generate_character_profile(
+                    character_idx, episode_seed, gender_hint=gender_hint
+                )
 
                 # De-duplicate voice presets: if this preset is already taken,
-                # re-roll with offset seeds until we find an unused one.
+                # re-roll with offset seeds until we find an unused one in the
+                # SAME gender pool (soft constraint — if pool exhausted, log and
+                # accept duplicate).
                 attempts = 0
                 while profile["voice_preset"] in used_presets and attempts < 10:
                     attempts += 1
                     profile = _generate_character_profile(
-                        character_idx + attempts * 100, episode_seed
+                        character_idx + attempts * 100, episode_seed,
+                        gender_hint=gender_hint,
+                    )
+                if profile["voice_preset"] in used_presets:
+                    log.warning(
+                        "[Gemma4Director] CAST_GENDER_POOL_EXHAUSTED: %s (%s) "
+                        "reusing preset %s — increase pool or accept duplicate",
+                        upper_name, gender_hint or "unknown", profile["voice_preset"]
                     )
 
                 used_presets.add(profile["voice_preset"])
@@ -2865,6 +2940,11 @@ class Gemma4Director:
                 log.info("[Gemma4Director] %s → voice: %s (profile: %s, %s, %s, %s)",
                          upper_name, profile["voice_preset"],
                          profile["name"], profile["gender"], profile["age"], profile["demeanor"])
+                # BUG-004 telemetry — grep CAST_GENDER_MATCH to verify per-character matching
+                _runtime_log(
+                    f"CAST_GENDER_MATCH {upper_name}={gender_hint or 'unspecified'} "
+                    f"→ {profile['voice_preset']} ({profile['gender']})"
+                )
                 character_idx += 1
 
         plan["voice_assignments"] = new_voice_assignments
