@@ -15,7 +15,7 @@
         400,
         320
       ],
-      "title": "Gemma 4 Script Writer",
+      "title": "1. Gemma Writes the Story",
       "properties": {
         "Node name for S&R": "OTR_Gemma4ScriptWriter"
       },
@@ -28,7 +28,12 @@
         "",
         3,
         0.8,
-        true
+        true,
+        true,
+        true,
+        "medium (5 acts)",
+        "tense claustrophobic",
+        "balanced"
       ],
       "inputs": [],
       "outputs": [
@@ -80,7 +85,7 @@
         400,
         280
       ],
-      "title": "Gemma 4 Director",
+      "title": "2. Gemma Directs the Show",
       "properties": {
         "Node name for S&R": "OTR_Gemma4Director"
       },
@@ -143,7 +148,7 @@
         400,
         300
       ],
-      "title": "Scene Sequencer",
+      "title": "4. Scene Builder",
       "properties": {
         "Node name for S&R": "OTR_SceneSequencer"
       },
@@ -209,7 +214,7 @@
         380,
         340
       ],
-      "title": "Spatial Audio Enhance (HQ)",
+      "title": "5. Make It Sound Awesome",
       "properties": {
         "Node name for S&R": "OTR_AudioEnhance"
       },
@@ -337,7 +342,7 @@
         420,
         350
       ],
-      "title": "Episode Assembler",
+      "title": "6. Glue Everything Together",
       "properties": {
         "Node name for S&R": "OTR_EpisodeAssembler"
       },
@@ -401,7 +406,7 @@
         400,
         200
       ],
-      "title": "Batch Bark Generator",
+      "title": "3. Voice Maker Machine",
       "properties": {
         "Node name for S&R": "OTR_BatchBarkGenerator"
       },
@@ -453,7 +458,7 @@
         400,
         280
       ],
-      "title": "Signal Lost Video",
+      "title": "7. Make the Final Video",
       "properties": {
         "Node name for S&R": "OTR_SignalLostVideo"
       },
@@ -613,38 +618,38 @@
   ],
   "groups": [
     {
-      "title": "Script Generation",
+      "title": "1. WRITE THE STORY 📝",
       "bounding": [
-        30,
-        120,
-        920,
-        500
+        20,
+        80,
+        940,
+        560
       ],
-      "color": "#2a363b",
+      "color": "#4A90E2",
       "flags": {},
       "font_size": 24
     },
     {
-      "title": "Audio Production + Spatial HQ",
+      "title": "2. MAKE THE VOICES & SOUNDS 🎙️",
       "bounding": [
-        930,
-        120,
-        920,
-        500
+        970,
+        80,
+        940,
+        560
       ],
-      "color": "#3b2a36",
+      "color": "#7ED321",
       "flags": {},
       "font_size": 24
     },
     {
-      "title": "Final Assembly",
+      "title": "3. PUT IT ALL TOGETHER 🎬",
       "bounding": [
-        1830,
-        120,
-        500,
-        500
+        1920,
+        80,
+        520,
+        560
       ],
-      "color": "#363b2a",
+      "color": "#F5A623",
       "flags": {},
       "font_size": 24
     }
