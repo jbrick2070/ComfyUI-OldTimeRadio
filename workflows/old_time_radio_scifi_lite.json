@@ -258,7 +258,7 @@
         350,
         200
       ],
-      "title": "Opening Static",
+      "title": "Opening Radio Static",
       "properties": {
         "Node name for S&R": "OTR_SFXGenerator"
       },
@@ -300,7 +300,7 @@
         350,
         200
       ],
-      "title": "Theremin Theme",
+      "title": "Closing Space Music",
       "properties": {
         "Node name for S&R": "OTR_SFXGenerator"
       },
