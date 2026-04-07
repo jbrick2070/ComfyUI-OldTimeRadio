@@ -1363,9 +1363,9 @@ class Gemma4ScriptWriter:
                     "default": "balanced",
                     "tooltip": "Creativity dial — overrides temperature/top_p (safe=0.6, balanced=0.85, wild=1.1, chaos=1.35)"
                 }),
-                "force_lemmy": ("BOOLEAN", {
+                "summon_lemmy": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Force Lemmy to appear in every episode (testing only — set to False for production)"
+                    "tooltip": "🔧 Summon Lemmy! Drags the grizzled engineer out of the garage and into every episode. Leave OFF for the rare 11% surprise."
                 }),
             },
         }
@@ -1529,7 +1529,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      style_variant="tense claustrophobic",
                      creativity="balanced",
                      runtime_preset="📻 standard (8 min)",
-                     force_lemmy=False):
+                     summon_lemmy=False):
+        force_lemmy = summon_lemmy  # internal alias for clarity below
 
         # ── RUNTIME PRESET → override target_minutes unless custom ──
         _preset_map = {
