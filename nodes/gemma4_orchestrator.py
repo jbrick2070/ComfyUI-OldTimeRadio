@@ -1555,13 +1555,15 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # These get injected into the user prompt to force dialogue VOLUME
         # rather than [PAUSE/BEAT] padding. Targets the "Zoom call pacing" bug.
         # ══════════════════════════════════════════════════════════════════════
+        # HARD MINIMUMS — Gemma chronically undershoots, so set the floor high.
+        # These are MANDATORY counts, not soft targets. Failure = revise pass.
         length_instruction = {
-            "short (3 acts)":  "Keep the entire script extremely tight — max 3 acts, 18-22 dialogue lines total, 4-minute runtime.",
-            "medium (5 acts)": "Standard radio length — 5 acts, ~35-45 dialogue lines, 7-9 minute runtime.",
-            "long (7-8 acts)": "Full-length episode — 7 or 8 acts, 60-80 dialogue lines, 12-15 minute runtime.",
-            "epic (10+ acts)": "Feature-length — 10+ acts, 100+ dialogue lines, 20+ minute runtime. Allow sub-plots.",
-        }.get(target_length, "Standard radio length.")
-        style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout."
+            "short (3 acts)":  "MANDATORY: 3 acts, MINIMUM 22 dialogue lines (NOT counting ANNOUNCER). Target 4-minute runtime. Do NOT stop until you have written at least 22 character dialogue lines.",
+            "medium (5 acts)": "MANDATORY: 5 acts, MINIMUM 45 dialogue lines (NOT counting ANNOUNCER). Target 8-minute runtime. Do NOT stop until you have written at least 45 character dialogue lines. If your first draft is shorter, EXTEND the middle acts with more conflict, more interruptions, and more reaction beats.",
+            "long (7-8 acts)": "MANDATORY: 7-8 acts, MINIMUM 75 dialogue lines (NOT counting ANNOUNCER). Target 14-minute runtime. Do NOT stop until you have written at least 75 character dialogue lines.",
+            "epic (10+ acts)": "MANDATORY: 10+ acts, MINIMUM 110 dialogue lines (NOT counting ANNOUNCER). Target 20+ minute runtime. Allow sub-plots. Do NOT stop under 110 dialogue lines.",
+        }.get(target_length, "MANDATORY: 5 acts, MINIMUM 45 dialogue lines.")
+        style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout — every line should reflect this tone."
 
         # Phase 3d: Bark voice health check (lazy, runs once per process)
         try:
@@ -3006,7 +3008,16 @@ class Gemma4Director:
         new_voice_assignments = {}
         character_idx = 0
 
-        for old_name in list(voice_assignments.keys()):
+        # FIX: Process LEMMY and ANNOUNCER FIRST so their locked presets
+        # are reserved in used_presets before regular characters draw from
+        # the pool. Otherwise a regular char can grab v2/en_speaker_8
+        # before Lemmy's branch runs, causing voice collision (Lemmy=Drake).
+        all_keys = list(voice_assignments.keys())
+        priority_keys = [k for k in all_keys if k.upper().strip() in ("LEMMY", "ANNOUNCER")]
+        regular_keys  = [k for k in all_keys if k.upper().strip() not in ("LEMMY", "ANNOUNCER")]
+        ordered_keys  = priority_keys + regular_keys
+
+        for old_name in ordered_keys:
             upper_name = old_name.upper().strip()
 
             if upper_name == "LEMMY":
