@@ -320,9 +320,9 @@ _VOICE_PROFILES = [
     ("v2/en_speaker_5", "male",   "en", {"warm", "weary", "wry", "50s", "60s"}),
     ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s"}),
     ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s"}),
-    ("v2/en_speaker_2", "female", "en", {"calm", "measured", "stoic", "30s", "40s"}),
+    ("v2/en_speaker_2", "male",   "en", {"calm", "measured", "stoic", "30s", "40s"}),  # sounds male/neutral in practice
+    ("v2/en_speaker_7", "male",   "en", {"sharp", "anxious", "20s", "30s"}),            # androgynous but reads male
     ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
-    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "20s", "30s"}),
     ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
     # ── DISABLED: Foreign accent presets ──────────────────────────────
     # These caused Bark hallucinations — the model generates foreign-language
@@ -348,7 +348,6 @@ _VOICE_PROFILES = [
 _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_0", "Male, authoritative, deep"),
     ("v2/en_speaker_1", "Male, measured, calm"),
-    ("v2/en_speaker_2", "Female, clear, neutral"),
     ("v2/en_speaker_4", "Female, warm, energetic"),
     ("v2/en_speaker_9", "Female, mature, authoritative"),
     ("v2/en_speaker_5", "Male, warm, older"),
