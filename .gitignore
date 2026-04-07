@@ -32,3 +32,14 @@ Thumbs.db
 *.mp3
 *.flac
 !samples/*.wav
+
+# runtime + scratch
+otr_runtime.log
+__pycache__/
+.pytest_cache/
+pytest-cache-files-*/
+QA_*.md
+QA_*.txt
+patch_*.py
+OTR_TECH_BRIEF.md
+SIGNAL_LOST_v*.md
