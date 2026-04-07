@@ -767,24 +767,65 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
             except OSError:
                 tokenizer = AutoProcessor.from_pretrained(model_id)
 
-            # Using bfloat16 + sdpa for maximum speed on RTX 5000-series (Ada/Blackwell) GPUs.
+            # Using bfloat16 for maximum speed on RTX 5000-series (Ada/Blackwell) GPUs.
             load_dtype = torch.bfloat16
+
+            # ── Flash Attention 2 (preferred) → SDPA fallback ──
+            # Flash Attention 2 gives ~40% speedup but requires `pip install flash-attn`.
+            # If unavailable, fall back to SDPA which is still fast.
+            try:
+                import flash_attn  # noqa: F401
+                attn_impl = "flash_attention_2"
+                log.info("[Gemma4] Flash Attention 2 available — using flash_attention_2")
+            except ImportError:
+                attn_impl = "sdpa"
+                log.info("[Gemma4] Flash Attention 2 not installed — using SDPA fallback")
+
+            # ── 4-bit quantization (only enabled for very large models) ──
+            # The 26B-A4B and 31B variants will OOM on a 16GB GPU at bfloat16.
+            # BitsAndBytesConfig 4-bit squeezes them to fit. The 4B model loads
+            # fine in bfloat16 so we skip quantization for it (better quality).
+            quant_config = None
+            needs_quant = any(tag in model_id.lower() for tag in ("26b", "31b", "27b", "12b"))
+            if needs_quant:
+                try:
+                    from transformers import BitsAndBytesConfig
+                    quant_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_quant_type="nf4",
+                    )
+                    log.info("[Gemma4] Large model detected — enabling 4-bit quantization (NF4)")
+                except ImportError:
+                    log.warning("[Gemma4] Large model but bitsandbytes not installed — "
+                                "loading at bfloat16 may OOM. Run: pip install bitsandbytes")
+
+            common_kwargs = dict(
+                dtype=load_dtype,
+                low_cpu_mem_usage=True,
+                attn_implementation=attn_impl,
+            )
+            if quant_config is not None:
+                common_kwargs["quantization_config"] = quant_config
+                common_kwargs["device_map"] = "auto"  # required by bitsandbytes
 
             try:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_id,
-                    dtype=load_dtype,
-                    low_cpu_mem_usage=True,
-                    attn_implementation="sdpa",  # Scaled Dot Product Attention — turbo speed
                     local_files_only=True,
-                ).to(device).eval()
+                    **common_kwargs,
+                )
             except OSError:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_id,
-                    dtype=load_dtype,
-                    low_cpu_mem_usage=True,
-                    attn_implementation="sdpa",
-                ).to(device).eval()
+                    **common_kwargs,
+                )
+
+            # Quantized models are placed by device_map; non-quantized go .to(device)
+            if quant_config is None:
+                model = model.to(device)
+            model = model.eval()
 
             _GEMMA4_CACHE["model"] = model
             _GEMMA4_CACHE["tokenizer"] = tokenizer
@@ -999,6 +1040,7 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
             temperature=temperature,
             top_p=top_p,
             do_sample=True,
+            repetition_penalty=1.12,  # anti-loop sweet spot for dialogue
             pad_token_id=pad_id,
             streamer=streamer,      # Enable live streaming + granular heartbeats
         )
@@ -1482,6 +1524,19 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         fingerprint_data = f"{episode_title}|{genre_flavor}|{target_minutes}|{num_characters}|{temperature}"
         episode_fingerprint = hashlib.sha256(fingerprint_data.encode()).hexdigest()[:12]
         _runtime_log(f"ScriptWriter: FINGERPRINT {episode_fingerprint} | {episode_title} | {genre_flavor}")
+
+        # ── Deterministic seeding from episode fingerprint ──
+        # Same fingerprint → same torch RNG state → reproducible Gemma generation.
+        try:
+            import torch
+            seed = int(episode_fingerprint, 16) % (2**31 - 1)
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+            random.seed(seed)
+            _runtime_log(f"ScriptWriter: SEED {seed} (from fingerprint {episode_fingerprint})")
+        except Exception as _seed_err:
+            log.warning(f"[Gemma4ScriptWriter] Could not set deterministic seed: {_seed_err}")
 
         # ══════════════════════════════════════════════════════════════════════
         # RSS FETCH (or custom premise bypass)
@@ -2717,17 +2772,9 @@ class Gemma4Director:
                 except json.JSONDecodeError:
                     continue
 
-        log.warning("[Gemma4Director] Could not parse JSON from model output — using fallback")
-        log.warning(f"[Gemma4Director] Full raw output:\n{text[:1000]}")
-        return {
-            "error": "Failed to parse production plan",
-            "raw_output": text[:2000],
-            "voice_assignments": {},
-            "sfx_plan": [],
-            "music_plan": [],
-            "vintage_settings": {},
-            "pacing": {"breath_pause_ms": 400, "beat_pause_ms": 1500, "pause_ms": 2000},
-        }
+        log.critical("[Gemma4Director] FATAL: Could not parse JSON from model output.")
+        log.critical(f"[Gemma4Director] Full raw output:\n{text[:1000]}")
+        raise ValueError("Failed to parse production plan JSON. Aborting run to prevent silent audio failure.")
 
     def _randomize_character_names(self, plan: dict, episode_seed: str) -> dict:
         """Replace ALL character traits with procedural profiles. LEMMY stays LEMMY.
