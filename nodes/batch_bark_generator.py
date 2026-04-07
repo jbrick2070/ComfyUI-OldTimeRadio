@@ -126,13 +126,15 @@ _CHARACTER_VOICE_CACHE = {}
 
 
 _FEMALE_PRESETS = [
-    "v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9",
+    # en_speaker_2 and en_speaker_7 removed — sound male/androgynous in practice
+    "v2/en_speaker_4", "v2/en_speaker_9",
     "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
     "v2/it_speaker_4", "v2/pt_speaker_4",
 ]
 _MALE_PRESETS = [
-    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3",
-    "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8",
+    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_2",
+    "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6",
+    "v2/en_speaker_7", "v2/en_speaker_8",
     "v2/de_speaker_0", "v2/fr_speaker_0", "v2/es_speaker_0",
     "v2/it_speaker_0", "v2/pt_speaker_0",
 ]
@@ -633,6 +635,12 @@ class BatchBarkGenerator:
             clip_t = torch.from_numpy(audio_np).float()
             if torch.cuda.is_available():
                 clip_t = clip_t.cuda()
+            # Per-clip peak normalize to -3 dBFS so quieter voices (e.g. Bark
+            # speaker variance) don't get buried in the mix before stitching.
+            # AudioEnhance does a final -1 dBFS pass on the assembled track.
+            peak = clip_t.abs().max()
+            if peak > 1e-6:
+                clip_t = clip_t * (10 ** (-3.0 / 20) / peak)
             ordered_clips.append(clip_t)  # shape: [T]
 
         if not ordered_clips:

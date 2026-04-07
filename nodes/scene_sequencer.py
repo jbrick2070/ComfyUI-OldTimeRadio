@@ -259,12 +259,12 @@ _BARK_VOICE_PRESETS = [
     # -- English (native) --
     "v2/en_speaker_0",  # Male, deep, authoritative (announcer)
     "v2/en_speaker_1",  # Male, warm, conversational
-    "v2/en_speaker_2",  # Female, clear, professional
+    "v2/en_speaker_2",  # Male, calm, measured (sounds male/neutral in practice)
     "v2/en_speaker_3",  # Male, young, energetic
     "v2/en_speaker_4",  # Female, warm, expressive
     "v2/en_speaker_5",  # Male, older, gravelly
     "v2/en_speaker_6",  # Male, neutral, broadcast
-    "v2/en_speaker_7",  # Female, young, bright
+    "v2/en_speaker_7",  # Male, sharp, anxious (androgynous but reads male)
     "v2/en_speaker_8",  # Male, deep, dramatic
     "v2/en_speaker_9",  # Female, mature, sophisticated
     # -- International accented English --
@@ -283,7 +283,8 @@ _BARK_VOICE_PRESETS = [
 ]
 
 _FEMALE_PRESETS = [
-    "v2/en_speaker_2", "v2/en_speaker_4", "v2/en_speaker_7", "v2/en_speaker_9",
+    # en_speaker_2 and en_speaker_7 removed — sound male/androgynous in practice
+    "v2/en_speaker_4", "v2/en_speaker_9",
     "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
     "v2/it_speaker_4", "v2/pt_speaker_4",
 ]
@@ -722,6 +723,7 @@ class SceneSequencer:
                 if sfx_clip_idx < len(sfx_clips):
                     clip_np, clip_sr = sfx_clips[sfx_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
+                    segment_np = _normalize_clip(segment_np)
                     sfx_clip_idx += 1
                     render_log.append(f"[{global_idx}] SFX: {desc}")
                 else:
