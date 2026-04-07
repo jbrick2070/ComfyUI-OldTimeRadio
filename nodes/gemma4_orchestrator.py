@@ -1850,6 +1850,12 @@ Begin the full script now. Follow this structure exactly:
         log.info(f"[Gemma4ScriptWriter] Generated {len(script_lines)} lines, "
                  f"~{word_count} words, ~{est_minutes} min")
 
+        # ── VRAM handoff: unload Gemma before Bark loads ──────────────────────
+        # Gemma and Bark cannot share 16GB VRAM comfortably. Explicitly unload
+        # now so BatchBark starts with a clean VRAM slate.
+        _unload_gemma4()
+        _runtime_log("ScriptWriter: Gemma unloaded — VRAM freed for Bark")
+
         return (script_text, script_json, news_json, est_minutes)
 
     # ─────────────────────────────────────────────────────────────────────────
