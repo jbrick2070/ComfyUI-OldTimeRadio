@@ -1347,6 +1347,18 @@ class Gemma4ScriptWriter:
                     "default": True,
                     "tooltip": "Open-Close Expansion: generate 3 competing story outlines, evaluator picks the best before full script (adds ~4 small LLM passes)"
                 }),
+                "target_length": (["short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
+                    "default": "medium (5 acts)",
+                    "tooltip": "Structural length preset — forces dialogue VOLUME (not pause padding) to fill the runtime"
+                }),
+                "style_variant": (["tense claustrophobic", "space opera epic", "psychological slow-burn", "hard-sci-fi procedural", "noir mystery", "chaotic black-mirror"], {
+                    "default": "tense claustrophobic",
+                    "tooltip": "Tonal style directive injected into the prompt"
+                }),
+                "creativity": (["safe & tight", "balanced", "wild & rough", "maximum chaos"], {
+                    "default": "balanced",
+                    "tooltip": "Creativity dial — overrides temperature/top_p (safe=0.6, balanced=0.85, wild=1.1, chaos=1.35)"
+                }),
             },
         }
 
@@ -1504,12 +1516,52 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
-                     open_close=True):
+                     open_close=True,
+                     target_length="medium (5 acts)",
+                     style_variant="tense claustrophobic",
+                     creativity="balanced"):
 
         # ── DIAGNOSTIC: log feature flags so we can confirm they're received ──
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
-                     f"target_min={target_minutes} chars={num_characters}")
+                     f"target_min={target_minutes} chars={num_characters} "
+                     f"length={target_length} style={style_variant} creativity={creativity}")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # CREATIVITY DIAL → temperature/top_p mapping
+        # The creativity widget overrides the raw temperature value with curated
+        # presets so the user doesn't have to think in floats.
+        # ══════════════════════════════════════════════════════════════════════
+        temp_map = {
+            "safe & tight": 0.6,
+            "balanced": 0.85,
+            "wild & rough": 1.1,
+            "maximum chaos": 1.35,
+        }
+        top_p_map = {
+            "safe & tight": 0.9,
+            "balanced": 0.95,
+            "wild & rough": 0.98,
+            "maximum chaos": 0.99,
+        }
+        active_temp = temp_map.get(creativity, 0.85)
+        active_top_p = top_p_map.get(creativity, 0.95)
+        # Override the temperature variable used everywhere downstream
+        temperature = active_temp
+        _runtime_log(f"ScriptWriter: CREATIVITY {creativity} → temp={active_temp} top_p={active_top_p}")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # LENGTH + STYLE DIRECTIVES
+        # These get injected into the user prompt to force dialogue VOLUME
+        # rather than [PAUSE/BEAT] padding. Targets the "Zoom call pacing" bug.
+        # ══════════════════════════════════════════════════════════════════════
+        length_instruction = {
+            "short (3 acts)":  "Keep the entire script extremely tight — max 3 acts, 18-22 dialogue lines total, 4-minute runtime.",
+            "medium (5 acts)": "Standard radio length — 5 acts, ~35-45 dialogue lines, 7-9 minute runtime.",
+            "long (7-8 acts)": "Full-length episode — 7 or 8 acts, 60-80 dialogue lines, 12-15 minute runtime.",
+            "epic (10+ acts)": "Feature-length — 10+ acts, 100+ dialogue lines, 20+ minute runtime. Allow sub-plots.",
+        }.get(target_length, "Standard radio length.")
+        style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout."
 
         # Phase 3d: Bark voice health check (lazy, runs once per process)
         try:
@@ -1715,6 +1767,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         if winning_outline:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING {oc_mode_label} below.
 
+LENGTH DIRECTIVE: {length_instruction}
+STYLE DIRECTIVE: {style_instruction}
+
 WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 {winning_outline}
 
@@ -1742,6 +1797,9 @@ Begin the full script now. Follow this structure exactly:
 [MUSIC: Closing theme]"""
         else:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" — a contemporary sci-fi audio drama anthology.
+
+LENGTH DIRECTIVE: {length_instruction}
+STYLE DIRECTIVE: {style_instruction}
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
 GENRE: {genre_flavor.replace("_", " ")}
@@ -1792,6 +1850,7 @@ Begin the full script now. Follow this structure exactly:
                 model_id=model_id,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
+                top_p=active_top_p,
             )
         else:
             # Long episodes: chunked act-by-act generation
