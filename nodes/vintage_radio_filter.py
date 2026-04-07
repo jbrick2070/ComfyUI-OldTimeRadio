@@ -222,7 +222,7 @@ def _add_vinyl_crackle(waveform, sample_rate, amount=0.1):
     return waveform + pops + surface
 
 
-def _add_radio_static(waveform, sample_rate, amount=0.15):
+def _add_radio_static(waveform, sample_rate, amount=0.075):
     """Add AM radio static — band-limited white noise.
 
     Fully vectorized FFT LPF — no Python for-loops over samples.
@@ -313,7 +313,7 @@ class VintageRadioFilter:
                     "tooltip": "Vinyl surface noise and pops"
                 }),
                 "radio_static": ("FLOAT", {
-                    "default": 0.15, "min": 0.0, "max": 0.6, "step": 0.01,
+                    "default": 0.075, "min": 0.0, "max": 0.6, "step": 0.01,
                     "tooltip": "AM radio static/hiss level"
                 }),
                 "broadcast_compression": ("BOOLEAN", {
