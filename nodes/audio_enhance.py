@@ -326,9 +326,10 @@ class AudioEnhance:
             waveform = _stereo_decorrelate(waveform, spatial_width)
             log.info("[OTR_AudioEnhance] Stereo width %.2f applied", spatial_width)
 
-        # ── Step 7: Peak normalize ──
-        waveform = _normalize(waveform, normalize_dbfs)
-        log.info("[OTR_AudioEnhance] Normalized to %.1f dBFS", normalize_dbfs)
+        # ── Step 7: Peak normalize skipped — moved to EpisodeAssembler ──
+        # Normalizing here (before crossfades) caused clipping during segment
+        # overlaps. Final -1.0 dBFS pass now runs post-crossfade in Assembler.
+        log.info("[OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)")
 
         # ── Move back to CPU for ComfyUI pipeline ──
         if _use_cuda:
