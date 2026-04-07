@@ -2526,8 +2526,8 @@ The script follows these tokens:
   gender/age/demeanor traits, and final voice model selection.
   LEMMY always stays LEMMY with v2/en_speaker_8.
 - The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
-  WRONG key: "HAYES, male, 40s, calm"
-  RIGHT key: "HAYES"
+  WRONG key: "CHARACTERNAME, male, 40s, calm"
+  RIGHT key: "CHARACTERNAME"
 - Use any en_speaker_* preset as a placeholder:
 
   v2/en_speaker_0 = Male, authoritative, deep
@@ -2552,7 +2552,7 @@ The script follows these tokens:
       "voice_preset": "v2/en_speaker_4",
       "notes": "Female, energetic, authoritative"
     }},
-    "HAYES": {{
+    "CHARACTER_A": {{
       "voice_preset": "v2/en_speaker_1",
       "notes": "Male, calm, 40s"
     }}
