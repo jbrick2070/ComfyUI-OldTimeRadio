@@ -1736,7 +1736,15 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # colorful metaphors. Rare enough to be a surprise, frequent enough
         # that regulars will notice. Named after Lemmy Kilmister.
         # force_lemmy=True overrides for testing (validates voice collision fix).
-        lemmy_roll = force_lemmy or (random.random() < 0.11)
+        _natural_roll = random.random() < 0.11
+        lemmy_roll = force_lemmy or _natural_roll
+        if force_lemmy:
+            _lemmy_source = "🔧 Lemmy was summoned by the boss (force toggle ON)"
+        elif _natural_roll:
+            _lemmy_source = "🎲 Lemmy rolled in on his own (lucky 11%)"
+        else:
+            _lemmy_source = "💤 Lemmy stayed in the garage tonight"
+        log.info(f"[Gemma4ScriptWriter] {_lemmy_source}  [force={force_lemmy}, rng_hit={_natural_roll}]")
         lemmy_directive = ""
         if lemmy_roll:
             lemmy_directive = (
