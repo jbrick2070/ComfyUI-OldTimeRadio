@@ -293,46 +293,48 @@ _FIRST_NAMES = [
     # Simpsons (sci-fi viable)
     "Nelson", "Martin", "Carl", "Lenny", "Montgomery", "Seymour", "Edna",
     "Ned", "Barney", "Moe", "Kent", "Rod", "Todd", "Jimbo", "Dolph", "Kearney",
-    # Flash Gordon
-    "Flash", "Dale", "Zarkov", "Ming", "Barin", "Aura",
-    # Buckaroo Banzai
-    "Buckaroo", "Rawhide", "Tommy", "Pinky", "Fireball",
+    # Pulp adventure (generic first names)
+    "Dale", "Tommy", "Pinky",
+    # Public domain classics (published before 1931)
+    "Alice", "Allan", "Ayesha", "Cavor", "Dracula", "Edward", "Griffin", "Gulliver",
+    "Henry", "James", "John", "Karnacki", "Leviathan", "Mina", "Nemo", "Phileas",
+    "Quasimodo", "Robinson", "Sherlock", "Smee", "Tarzan", "Victor", "Watson", "Wendy",
     # Peter O'Toole characters
     "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan",
     # Jim Carrey characters
     "Truman", "Fletcher", "Joel", "Stanley", "Walter", "Ace", "Lloyd", "Bruce",
     # Robin Williams characters
     "Mork", "Adrian", "Sean", "Andrew", "Parry", "Malcolm", "Daniel", "Chris",
-    # The Office — character first names
-    "Michael", "Dwight", "Pam", "Ryan", "Kevin", "Kelly", "Meredith",
+    # The Office — generic character first names
+    "Michael", "Pam", "Ryan", "Kevin", "Kelly", "Meredith",
     "Stanley", "Toby", "Darryl", "Erin", "Creed", "Oscar", "Phyllis",
-    # The Office — real actor first names
+    # Real actor first names
     "Steve", "Rainn", "Jenna", "Mindy", "Ellie", "Rashida", "Ed",
-    # Ray Bradbury characters
-    "Montag", "Clarisse", "Doug", "Travis", "Charlie", "Will", "Faber",
-    # Philip K. Dick characters
+    # Classic fiction characters (generic)
+    "Clarisse", "Doug", "Travis", "Charlie", "Will", "Faber",
     "Rick", "Palmer", "Glen", "Isidore", "Bob", "Donna", "Juliana",
-    "Manfred", "Ragle", "Leo",
+    "Manfred", "Leo",
+    # Richard Pryor characters
+    "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip", "Grover",
+    # Robin Williams (additional)
+    "Peter", "Popeye", "Genie",
 ]
 
 _LAST_NAMES = [
     "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
     "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
     "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
-    # Simpsons (sci-fi viable)
-    "Burns", "Hibbert", "Flanders", "Houten", "Wiggum", "Smithers",
-    "Terwilliger", "Krusty", "Bouvier", "Simpson",
-    # Flash Gordon
-    "Gordon", "Zarkov", "Ming",
-    # Buckaroo Banzai
-    "Banzai", "Carruthers", "Whorfin", "Corben",
-    # The Office — character last names
-    "Scott", "Halpert", "Schrute", "Beesly", "Howard", "Bernard", "Malone",
+    # Generic last names (scrubbed franchise-specific)
+    "Burns", "Hibbert", "Flanders", "Houten", "Smithers",
+    "Terwilliger", "Bouvier", "Simpson", "Gordon", "Ming",
+    "Carruthers", "Corben",
+    # The Office — character last names (generic ones only)
+    "Scott", "Halpert", "Beesly", "Howard", "Bernard", "Malone",
     "Kapoor", "Palmer", "Hudson", "Martin", "Flenderson", "Philbin", "Vance",
-    # Ray Bradbury
-    "Montag", "Beatty", "Spender", "Stendahl", "Eckels", "Nightshade", "Halloway",
-    # Philip K. Dick
-    "Deckard", "Runciter", "Arctor", "Bulero", "Steiner", "Childan", "Eldritch",
+    # Ray Bradbury (generic)
+    "Beatty", "Spender", "Stendahl", "Eckels", "Halloway",
+    # Misc classic (generic)
+    "Steiner",
 ]
 
 # Trait pools for procedural character profiles
