@@ -3049,6 +3049,15 @@ Write Act {act_num} now:"""
 
         opening_orig, closing_orig = bookends
 
+        # Phase A: Structural Coherence Scoring (Observability)
+        arc_score, arc_checks = self._score_arc_coherence(opening_orig, closing_orig, script_text)
+        checks_str = ", ".join(f"{k}={v}" for k, v in arc_checks.items())
+        _runtime_log(f"ARC_ENHANCER: Arc score: {arc_score}/5 ({checks_str})")
+
+        # Plot Spine Injection: extract middle-act summary so Phase B rewrite
+        # honors the journey instead of hallucinating contradictions.
+        plot_spine = self._extract_plot_spine(script_text, opening_orig, closing_orig)
+
         # Phase B: Architectural Echo call
         # We use a lower temperature (0.6) for tighter structural alignment
         echo_prompt = f"""You are a structural script editor for the radio drama anthology "SIGNAL LOST".
@@ -3060,11 +3069,15 @@ DIRECTIONS:
 3. Preserve the CHARACTER NAMES and VOICES exactly as they appear in the original text.
 4. Preserve all CANONICAL TAGS ([VOICE:], [SFX:], [ENV:], (beat)) exactly.
 5. Do NOT change the meaning of the science headline context provided.
-6. Return ONLY the rewritten blocks inside the XML tags below.
+6. Do NOT contradict the MIDDLE EVENTS summary below. The closing must honor what happened in the middle of the story — no resurrected characters, no forgotten revelations, no reversed outcomes.
+7. Return ONLY the rewritten blocks inside the XML tags below.
 
 GENRE: {genre.replace("_", " ")}
 TITLE: {title}
 SCIENCE CONTEXT: {news_block[:500]}
+
+MIDDLE EVENTS (do not contradict):
+{plot_spine}
 
 ORIGINAL OPENING BLOCK:
 {opening_orig}
@@ -3085,19 +3098,24 @@ Format your response exactly as:
                 lambda: _generate_with_gemma4(
                     echo_prompt,
                     model_id=model_id,
-                    max_new_tokens=1500,
+                    max_new_tokens=1000,
                     temperature=0.6,
                 ),
                 timeout_sec=300,
                 phase_label="Arc-Enhancer-Echo",
             )
 
-            # Phase C: Injection
+            # Phase C: Injection + Echo Phrase Extraction
             try:
                 opening_new = echo_response.split("<opening>")[1].split("</opening>")[0].strip()
                 closing_new = echo_response.split("<closing>")[1].split("</closing>")[0].strip()
 
                 if opening_new and closing_new:
+                    # Extract echo phrase: find longest common noun between opening and closing rewrite
+                    opening_nouns = set(re.findall(r'\b[A-Z][a-z]+\b', opening_new))
+                    closing_nouns = set(re.findall(r'\b[A-Z][a-z]+\b', closing_new))
+                    echo_phrase = list(opening_nouns & closing_nouns)[0] if (opening_nouns & closing_nouns) else "(no direct echo)"
+
                     # Safe replacement for opening
                     script_text = script_text.replace(opening_orig, opening_new, 1)
 
@@ -3106,7 +3124,7 @@ Format your response exactly as:
                     if len(parts) == 2:
                         script_text = parts[0] + closing_new + parts[1]
 
-                    _runtime_log("ARC_ENHANCER: Narrative coherence pass complete (seed planted & harvested)")
+                    _runtime_log(f"ARC_ENHANCER: Narrative coherence pass complete (echo phrase = {echo_phrase})")
                 else:
                     _runtime_log("ARC_ENHANCER: LLM returned empty tags — skipping injection")
             except (IndexError, ValueError):
@@ -3118,6 +3136,94 @@ Format your response exactly as:
             _runtime_log(f"ARC_ENHANCER: Failed — {e}")
 
         return script_text
+
+    def _score_arc_coherence(self, opening_text, closing_text, script_text):
+        """Phase A: Structural coherence check — 5-point scoring for narrative completeness."""
+        score = 0
+        checks = {}
+
+        # Check 1: Truncation detector — does closing end mid-sentence?
+        closing_lines = closing_text.strip().split('\n')
+        last_line = closing_lines[-1].strip() if closing_lines else ""
+        terminal_chars = {'.', '!', '?', '"'}
+        # Pass if last line ends with terminal char AND not a connective word
+        last_word = last_line.split()[-1].rstrip('.,!?;:"') if last_line.split() else ""
+        connective_words = {'the', 'and', 'to', 'a', 'an', 'or', 'but', 'as', 'is', 'of', 'in', 'be'}
+        checks['truncation'] = (bool(last_line) and
+                                any(last_line.endswith(c) for c in terminal_chars) and
+                                last_word.lower() not in connective_words)
+        if checks['truncation']:
+            score += 1
+
+        # Check 2: Weak final scene — count [VOICE:] tags, need ≥4 lines
+        voice_count = len(re.findall(r'\[VOICE:', closing_text, re.IGNORECASE))
+        checks['strong_scene'] = voice_count >= 4
+        if checks['strong_scene']:
+            score += 1
+
+        # Check 3: Premise payoff — any capitalized keyword overlap (opening → closing)
+        opening_caps = set(re.findall(r'\b[A-Z][a-z]+\b', opening_text))
+        closing_caps = set(re.findall(r'\b[A-Z][a-z]+\b', closing_text))
+        checks['payoff'] = len(opening_caps & closing_caps) > 0
+        if checks['payoff']:
+            score += 1
+
+        # Check 4: Tonal echo — repeated words (>4 chars) between opening and closing
+        opening_words = set(w.lower() for w in re.findall(r'\b\w{4,}\b', opening_text))
+        closing_words = set(w.lower() for w in re.findall(r'\b\w{4,}\b', closing_text))
+        checks['echo'] = len(opening_words & closing_words) >= 2
+        if checks['echo']:
+            score += 1
+
+        # Check 5: Epilogue presence — ANNOUNCER in final 500 chars
+        epilogue_region = script_text[-500:] if len(script_text) > 500 else script_text
+        checks['epilogue'] = 'ANNOUNCER' in epilogue_region
+        if checks['epilogue']:
+            score += 1
+
+        return score, checks
+
+    def _extract_plot_spine(self, script_text, opening_orig, closing_orig):
+        """Extract a ~50-word middle-act summary so Phase B rewrites honor continuity.
+
+        Pulls dialogue and scene headers from the region BETWEEN the opening and
+        closing blocks, then truncates to ~50 words. This gives the Phase B rewriter
+        knowledge of the middle acts without bloating the token budget.
+        """
+        # Find the middle region (everything between opening and closing)
+        open_end = script_text.find(opening_orig)
+        close_start = script_text.rfind(closing_orig)
+
+        if open_end == -1 or close_start == -1 or close_start <= open_end:
+            return "(middle events unavailable)"
+
+        middle_region = script_text[open_end + len(opening_orig):close_start]
+
+        # Extract scene markers and voice lines, strip formatting for a clean spine
+        spine_parts = []
+        for raw_line in middle_region.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            # Keep scene markers as structural anchors
+            scene_match = re.match(r'===\s*SCENE\s+(\d+)\s*===', line, re.IGNORECASE)
+            if scene_match:
+                spine_parts.append(f"[Scene {scene_match.group(1)}]")
+                continue
+            # Extract dialogue content from voice tags
+            voice_match = re.match(r'\[VOICE:\s*([^,\]]+)[^\]]*\]\s*(.+)$', line, re.IGNORECASE)
+            if voice_match:
+                speaker = voice_match.group(1).strip()
+                dialogue = voice_match.group(2).strip()
+                spine_parts.append(f"{speaker}: {dialogue}")
+
+        # Truncate to ~50 words to keep Phase B prompt lean (~60 tokens)
+        full_spine = " ".join(spine_parts)
+        words = full_spine.split()
+        if len(words) > 50:
+            full_spine = " ".join(words[:50]) + "..."
+
+        return full_spine if full_spine else "(middle events unavailable)"
 
     def _get_bookends(self, script_text):
         """Extract opening and closing dialogue blocks for the coherence pass."""
@@ -3144,7 +3250,7 @@ Format your response exactly as:
         # --- 2. CLOSING BLOCK ---
         # Find the last scene (climax)
         # We look for the last SCENE marker before the EPILOGUE or Closing Music
-        end_marker = re.search(r'===\s*EPILOGUE\s*==|\[MUSIC:\s*Closing theme\]', script_text, re.IGNORECASE)
+        end_marker = re.search(r'===\s*EPILOGUE\s*===|\[MUSIC:\s*Closing theme\]', script_text, re.IGNORECASE)
         climax_boundary = end_marker.start() if end_marker else len(script_text)
 
         climax_area = script_text[:climax_boundary]
