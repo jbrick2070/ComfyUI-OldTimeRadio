@@ -281,7 +281,7 @@ def _content_filter(text: str) -> tuple:
 _FIRST_NAMES = [
     # 1950s Americana Noir
     "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
-    "Cole", "Drake", "Quinn", "Reese", "Kane",
+    "Cole", "Drake", "Quinn", "Reese", "Kane", "Carter", "Blake",
     # Afrofuturism
     "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia",
     # Neo-Tokyo Cyberpunk
@@ -290,12 +290,49 @@ _FIRST_NAMES = [
     "Krit", "Mali", "Niran", "Sunan", "Dao", "Pim", "Som",
     # Russian Dieselpunk
     "Lev", "Anya", "Dmitri", "Sergei", "Volkov", "Mira", "Yuri",
+    # Simpsons (sci-fi viable)
+    "Nelson", "Martin", "Carl", "Lenny", "Montgomery", "Seymour", "Edna",
+    "Ned", "Barney", "Moe", "Kent", "Rod", "Todd", "Jimbo", "Dolph", "Kearney",
+    # Flash Gordon
+    "Flash", "Dale", "Zarkov", "Ming", "Barin", "Aura",
+    # Buckaroo Banzai
+    "Buckaroo", "Rawhide", "Tommy", "Pinky", "Fireball",
+    # Peter O'Toole characters
+    "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan",
+    # Jim Carrey characters
+    "Truman", "Fletcher", "Joel", "Stanley", "Walter", "Ace", "Lloyd", "Bruce",
+    # Robin Williams characters
+    "Mork", "Adrian", "Sean", "Andrew", "Parry", "Malcolm", "Daniel", "Chris",
+    # The Office — character first names
+    "Michael", "Dwight", "Pam", "Ryan", "Kevin", "Kelly", "Meredith",
+    "Stanley", "Toby", "Darryl", "Erin", "Creed", "Oscar", "Phyllis",
+    # The Office — real actor first names
+    "Steve", "Rainn", "Jenna", "Mindy", "Ellie", "Rashida", "Ed",
+    # Ray Bradbury characters
+    "Montag", "Clarisse", "Doug", "Travis", "Charlie", "Will", "Faber",
+    # Philip K. Dick characters
+    "Rick", "Palmer", "Glen", "Isidore", "Bob", "Donna", "Juliana",
+    "Manfred", "Ragle", "Leo",
 ]
 
 _LAST_NAMES = [
     "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
-    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall",
+    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
     "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
+    # Simpsons (sci-fi viable)
+    "Burns", "Hibbert", "Flanders", "Houten", "Wiggum", "Smithers",
+    "Terwilliger", "Krusty", "Bouvier", "Simpson",
+    # Flash Gordon
+    "Gordon", "Zarkov", "Ming",
+    # Buckaroo Banzai
+    "Banzai", "Carruthers", "Whorfin", "Corben",
+    # The Office — character last names
+    "Scott", "Halpert", "Schrute", "Beesly", "Howard", "Bernard", "Malone",
+    "Kapoor", "Palmer", "Hudson", "Martin", "Flenderson", "Philbin", "Vance",
+    # Ray Bradbury
+    "Montag", "Beatty", "Spender", "Stendahl", "Eckels", "Nightshade", "Halloway",
+    # Philip K. Dick
+    "Deckard", "Runciter", "Arctor", "Bulero", "Steiner", "Childan", "Eldritch",
 ]
 
 # Trait pools for procedural character profiles
@@ -1398,15 +1435,6 @@ D. FORBIDDEN CONSTRUCTS (hard bans — these are Gemma's default tics, cut them 
    - Narrating silence: "the silence stretched between them", "a heavy pause fell", or any similar
      prose describing quiet. BANNED. Silence is created by (beat), by cutting to ENV/SFX, or by
      the absence of dialogue — never by narrating the lack of sound.
-   - BAKED STOCK NAMES: the following character names are BANNED in ALL roles because Gemma
-     defaults to them and they flatten every cast into the same three people. Do NOT use them
-     as first names, last names, or call signs:
-     REX, JIAN, SARAH, JOHN, ALEX, MAYA, KAI, ZARA, NOVA, ECHO, RAVEN, CHEN, LIU, PARK, VASQUEZ,
-     REEVES, HARPER, CARTER, BLAKE, ADA, EVE, JAX.
-     The ONLY permitted recurring name is LEMMY (the radio ghost easter egg), and LEMMY appears
-     at most ONCE per episode when triggered by the Director, never invented by you.
-     Invent fresh names drawn from genuinely varied ancestries, age ranges, and regions.
-
 E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusion must be AUDIBLE.
    The tag system stays locked at four tokens: [ENV:], [SFX:], [VOICE:], (beat). Do NOT invent
    new bracket tags. The spatial filter lives in TWO places: a continuous [ENV:] that sets the
