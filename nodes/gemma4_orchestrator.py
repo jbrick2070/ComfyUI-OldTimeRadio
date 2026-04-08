@@ -846,8 +846,13 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
             # "phoning home" on every render once models are cached locally.
             try:
                 tokenizer = AutoProcessor.from_pretrained(model_id, local_files_only=True)
-            except OSError:
-                tokenizer = AutoProcessor.from_pretrained(model_id)
+            except OSError as local_err:
+                log.info("[Gemma4] local_files_only=True failed for tokenizer (%s), attempting Hub fallback...", local_err)
+                try:
+                    tokenizer = AutoProcessor.from_pretrained(model_id)
+                except Exception as hub_err:
+                    log.error("[Gemma4] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    raise RuntimeError(f"Failed to load Gemma 4 tokenizer '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # Using bfloat16 for maximum speed on RTX 5000-series (Ada/Blackwell) GPUs.
             load_dtype = torch.bfloat16
@@ -907,11 +912,16 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                     local_files_only=True,
                     **common_kwargs,
                 )
-            except OSError:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    **common_kwargs,
-                )
+            except OSError as local_err:
+                log.info("[Gemma4] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
+                try:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        model_id,
+                        **common_kwargs,
+                    )
+                except Exception as hub_err:
+                    log.error("[Gemma4] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    raise RuntimeError(f"Failed to load Gemma 4 model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # Quantized models are placed by device_map; non-quantized go .to(device)
             if quant_config is None:
@@ -1836,11 +1846,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         }.get(target_length, "MANDATORY: 5 acts, MINIMUM 45 dialogue lines.")
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout — every line should reflect this tone."
 
-        # Phase 3d: Bark voice health check (lazy, runs once per process)
-        try:
-            _bark_health_check()
-        except Exception as e:
-            _runtime_log(f"VOICE_HEALTH_SKIPPED: unexpected error {e}")
+        # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
         log.info(f"[Gemma4ScriptWriter] Feature flags: open_close={open_close}, "
                  f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
@@ -2041,6 +2047,28 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             num_characters=num_characters,
         )
 
+        # ── PRE-ROLL DETERMINISTIC CAST ROSTER ──
+        seed_str = f"{episode_title}_{target_minutes}_{style_variant}_{time.time()}"
+        cast_rng = random.Random(seed_str)
+        
+        pre_rolled_cast = []
+        seen_last = set()
+        num_non_announcers = max(1, num_characters)
+        while len(pre_rolled_cast) < num_non_announcers:
+            f_name = cast_rng.choice(_FIRST_NAMES).upper()
+            l_name = cast_rng.choice(_LAST_NAMES).upper()
+            if l_name not in seen_last:
+                seen_last.add(l_name)
+                pre_rolled_cast.append(f"{f_name} {l_name}")
+
+        cast_roster_block = (
+            "MANDATORY CAST ROSTER:\n"
+            f"You MUST use exactly these {num_non_announcers} character names and no others for your speaking roles:\n"
+            + "\n".join(f"- {n}" for n in pre_rolled_cast) + "\n"
+            "Preserve spelling exactly. Do not introduce substitute names, nicknames, or titles. "
+            "If ANNOUNCER is present, it does not count as a cast invention."
+        )
+
         # ── Open-Close Expansion ──
         winning_outline = ""
         _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
@@ -2050,7 +2078,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             winning_outline = self._open_close_expansion(
                 system, genre_flavor, news_block, num_characters,
                 target_minutes, target_words, lemmy_directive,
-                model_id, temperature,
+                model_id, temperature, cast_roster_block=cast_roster_block
             )
 
         # ── Build final script prompt ──
@@ -2070,6 +2098,7 @@ WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+{cast_roster_block}
 TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
@@ -2098,6 +2127,7 @@ STYLE DIRECTIVE: {style_instruction}
 EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+{cast_roster_block}
 TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
@@ -2154,6 +2184,7 @@ Begin the full script now. Follow this structure exactly:
                 include_act_breaks, model_id, temperature,
                 lemmy_directive=lemmy_directive,
                 top_p=active_top_p,
+                cast_roster_block=cast_roster_block
             )
 
         # ── v1.1 CHECKS & CRITIQUES LOOP ─────────────────────────────────────
@@ -2845,7 +2876,8 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
                           target_words, premise, news_block, act_breaks,
-                          model_id, temperature, lemmy_directive="", top_p=0.95):
+                          model_id, temperature, lemmy_directive="", top_p=0.95,
+                          cast_roster_block=""):
         """Generate long scripts act-by-act to avoid token truncation.
 
         Step 1: Generate an outline (characters, plot beats, act structure)
@@ -2862,6 +2894,7 @@ Create a detailed OUTLINE for a {target_min}-minute episode of "SIGNAL LOST."
 Title: {title}
 Genre: {genre.replace("_", " ")}
 Characters: {num_chars} speaking roles plus ANNOUNCER
+{cast_roster_block}
 {lemmy_directive}
 
 Return:
@@ -3359,6 +3392,13 @@ class Gemma4Director:
 
     def direct(self, script_text, model_id="google/gemma-4-E4B-it",
                temperature=0.4, prefer_bark=True, vintage_intensity="moderate"):
+
+        # Defer Bark health check until AFTER the script is written,
+        # preventing Bark from hogging VRAM while Gemma writes the script.
+        try:
+            _bark_health_check()
+        except Exception as e:
+            _runtime_log(f"VOICE_HEALTH_SKIPPED: unexpected error {e}")
 
         prompt = DIRECTOR_PROMPT.format(script_text=script_text[:6000])
 

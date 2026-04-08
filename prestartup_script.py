@@ -1,40 +1,48 @@
 """
-prestartup_script.py — Runs before ComfyUI imports any node modules.
-
-Per survival guide Section 44: Set environment variables that must be
-in place before transformers/torch read their defaults.
-
-This script is automatically detected and executed by ComfyUI at startup.
+prestartup_script.py — Runs BEFORE ComfyUI imports ANY node modules.
+Nuclear early mock for transformers/safetensors_conversion to kill
+the JSONDecodeError background thread once and for all.
 """
 
 import os
+import sys
+import types
 import logging
 
-# Suppress transformers warnings that clutter ComfyUI console
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. EARLIEST POSSIBLE MOCK — runs before ANY transformers import
+#    This is the "nuclear" part. We inject the fake module into sys.modules
+#    before ComfyUI even begins loading custom nodes.
+# ─────────────────────────────────────────────────────────────────────────────
+_mock_sc = types.ModuleType("transformers.safetensors_conversion")
+_mock_sc.auto_conversion = lambda *a, **kw: None
+_mock_sc.get_conversion_pr_reference = lambda *a, **kw: None
+_mock_sc.spawn_conversion = lambda *a, **kw: None
+# Also mock any other entry points that have appeared in recent transformers
+_mock_sc._get_conversion_pr_reference = lambda *a, **kw: None
+_mock_sc._auto_conversion = lambda *a, **kw: None
+
+sys.modules["transformers.safetensors_conversion"] = _mock_sc
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Environment variables (still useful, but now secondary)
+# ─────────────────────────────────────────────────────────────────────────────
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-
-# BUG-006 fix: force HuggingFace Hub offline mode by default. All models the
-# OldTimeRadio pipeline uses (Gemma 4, Bark, Parler) are pre-cached. Allowing
-# online lookups spawns a background `Thread-auto_conversion` that prints HF
-# rate-limit warnings to stderr — those warnings interleave with Gemma's
-# stdout streamer and contaminate the visible script log. Forcing offline mode
-# eliminates the background thread entirely. Users who genuinely need to
-# download a new model can set HF_HUB_OFFLINE=0 in their shell before launch.
-# HF_HUB_OFFLINE: intentionally NOT set here. The user has HF_TOKEN configured
-# as a Windows env var (setx HF_TOKEN ...) which authenticates requests and
-# raises rate limits to 5000/hr. Forcing offline mode would override the token
-# and break model downloads. The auto_conversion background thread is suppressed
-# by the token itself (authenticated requests don't hit the unauthenticated
-# rate limit that was causing the JSONDecodeError in the background thread).
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
 
-# Ensure HuggingFace cache goes to a sensible location (Section 31)
-# Only set if not already configured by the user
+# DO NOT set HF_HUB_OFFLINE=1 or TRANSFORMERS_OFFLINE=1 here.
+# We want download capability for future models. The mock above already
+# kills the offending background check.
+
+# Ensure HF cache lives next to ComfyUI models/
 if "HF_HOME" not in os.environ:
-    # Default: alongside ComfyUI models directory
     comfy_base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     hf_cache = os.path.join(comfy_base, "models", "huggingface")
     os.environ["HF_HOME"] = hf_cache
 
-logging.getLogger("OTR").info("OldTimeRadio prestartup: HF_HOME=%s", os.environ.get("HF_HOME"))
+logging.getLogger("OTR").info("OldTimeRadio prestartup: HF_HOME=%s | safetensors_conversion mocked EARLY", os.environ.get("HF_HOME"))
+print("✅ [OldTimeRadio] prestartup: safetensors_conversion mocked before any transformers import")

@@ -143,9 +143,14 @@ def _load_bark(model_id="suno/bark", device=None):
             try:
                 processor = AutoProcessor.from_pretrained(model_id, local_files_only=True)
                 log.info("Bark processor loaded from cache (no HTTP checks)")
-            except OSError:
-                processor = AutoProcessor.from_pretrained(model_id)
-                log.info("Bark processor downloaded and cached")
+            except OSError as local_err:
+                log.info("[Bark] local_files_only=True failed for processor (%s), attempting Hub fallback...", local_err)
+                try:
+                    processor = AutoProcessor.from_pretrained(model_id)
+                    log.info("Bark processor downloaded and cached")
+                except Exception as hub_err:
+                    log.error("[Bark] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    raise RuntimeError(f"Failed to load Bark processor '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # Load to target device (CUDA or CPU fallback).
             # On CUDA: Use device_map for direct CUDA load (avoids CPU intermediate state)
@@ -161,13 +166,18 @@ def _load_bark(model_id="suno/bark", device=None):
                     local_files_only=True,
                 )
                 log.info(f"Bark model loaded from cache on {device} (no HTTP checks)")
-            except OSError:
-                model = BarkModel.from_pretrained(
-                    model_id,
-                    torch_dtype=dtype,
-                    device_map=device_map,
-                )
-                log.info(f"Bark model downloaded and cached on {device}")
+            except OSError as local_err:
+                log.info("[Bark] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
+                try:
+                    model = BarkModel.from_pretrained(
+                        model_id,
+                        torch_dtype=dtype,
+                        device_map=device_map,
+                    )
+                    log.info(f"Bark model downloaded and cached on {device}")
+                except Exception as hub_err:
+                    log.error("[Bark] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    raise RuntimeError(f"Failed to load Bark model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # ── STRICT DEVICE SENTRY ──
             # Force all sub-models to target device explicitly to prevent any internal
