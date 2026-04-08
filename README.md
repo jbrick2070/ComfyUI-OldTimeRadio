@@ -7,9 +7,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.1](https://img.shields.io/badge/Download-OldTimeRadio_v1.1-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.2](https://img.shields.io/badge/Download-OldTimeRadio_v1.2-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.1)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
+**[Click here to download the full package (v1.2)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
 
 ---
 
@@ -20,6 +20,26 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 Character names, gender, age, demeanor, accent, and voice model are all procedurally generated from the episode seed — every cast is unique. The pipeline voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4.
 
 Every run is a brand new, complete episode generated entirely from scratch.
+
+---
+
+## What's New in v1.2
+
+### Narrative Patterns 1–6
+Six new story-craft patterns embedded in the Gemma prompt chain:
+**AISM Filter**, **Scaffolding Preamble**, **Verbalized Sampling Epilogue**, **Yes-But / No-And conflict rule**, **Vocal Blueprints**, and **Locked Decisions**. The result: tighter arcs, sharper character differentiation, and fewer "AI voice" tells in the dialogue.
+
+### 8,316 Procedural Cast Combos
+First/last name pools expanded to **154 × 54** — Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, pulp adventure, classic Simpsons/Office generics, and 24 pre-1931 public domain literary characters. Zero trademark-specific franchise names. Every episode draws a unique cast.
+
+### Lemmy Statistical Audit
+New `tests/lemmy_rng_check.py` harness runs 10,000 trials against the 11% `SystemRandom` roll with ±1.5% tolerance. Confirms the easter egg stays statistically honest across builds.
+
+### v1.2 Bug Fixes (v1.2.0.5)
+- **Revision token budget** scales from draft length (`draft_chars / 3.5 × 1.25`) instead of `target_words`, ending Scene 4 decapitation that caused "weak ending" reviews
+- **Minced oaths pool** — ContentFilter rotates through period-authentic 1940s radio euphemisms (*Stars above*, *Jiminy*, *Great Scott*, *Thunderation*) instead of `[BLEEP]`
+- **Female preset pool expansion** — `en_speaker_7` promoted to female, giving 3 distinct female voices (4 / 7 / 9) so VEX and ZARA no longer collide on the same preset
+- **NameLeakGuard post-pass** — `difflib` fuzzy-matches stray stock names in dialogue body against the real `[VOICE:]` roster, catching "Rex" → "Vex" type errors with zero hardcoded name lists
 
 ---
 
@@ -332,12 +352,12 @@ Every completed episode produces two files in `ComfyUI/output/`:
 
 ---
 
-## v1.2 Roadmap
+## v1.3 Roadmap
 
-- **Kokoro Announcer** — Route ANNOUNCER lines to Kokoro TTS (am_michael + am_adam blend) for broadcast-ready "Voice of God" cadence, replacing Bark for that one role
-- **Post-generate line-count enforcement** — Second self-critique pass conditioned on minimum dialogue lines to catch undershots before TTS render
+- **Story Arc Enhancer** — Paired opening + closing bookend rewrite. Structural arc coherence check (truncation, weak final scene, premise payoff, tonal echo) triggers a targeted Gemma call that rewrites the first few and last few dialogue lines as a matched pair, planting a seed in the opening that harvests in the closing
+- **Kokoro Announcer** — Route ANNOUNCER lines to Kokoro TTS (am_michael + am_adam blend) for broadcast-ready "Voice of God" cadence
 - **Bark health probe fix** — Replace `NoneType .item()` startup warning with proper null check
-- **Chunked context continuity** — Richer act-by-act character state summaries to maintain continuity across long multi-act runs
+- **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs
 
 ---
 
