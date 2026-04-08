@@ -134,6 +134,33 @@ class TestScriptParserCanonical:
         result = parser._parse_script("---\n[VOICE: DUMMY, male, 30s] ok.")
         assert len(result) == 1
 
+    def test_pro_qa_announcer_bookends(self, parser):
+        # QA only triggers on scripts with > 5 dialogue lines
+        filler = "\n".join(f"[VOICE: DUMMY, male, 50s] Line {i}" for i in range(6))
+        
+        # 1. Missing both
+        script1 = f"{filler}\n[VOICE: LEMMY, male, 50s, calm] Wrench."
+        res1 = parser._parse_script(script1)
+        dialogues1 = [r["character_name"] for r in res1 if r["type"] == "dialogue"]
+        assert dialogues1[0] == "ANNOUNCER"
+        assert dialogues1[-1] == "ANNOUNCER"
+
+        # 2. Missing close
+        script2 = f"[VOICE: ANNOUNCER, male, 50s] Opening.\n{filler}\n[VOICE: LEMMY, male, 50s, calm] Wrench."
+        res2 = parser._parse_script(script2)
+        dialogues2 = [r["character_name"] for r in res2 if r["type"] == "dialogue"]
+        assert dialogues2[0] == "ANNOUNCER"
+        assert dialogues2[-1] == "ANNOUNCER"
+
+        # 3. Perfectly fine - no injection!
+        script3 = f"[VOICE: ANNOUNCER, male, 50s] Opening.\n{filler}\n[VOICE: ANNOUNCER, male, 50s] Closing."
+        res3 = parser._parse_script(script3)
+        dialogues3 = [r["character_name"] for r in res3 if r["type"] == "dialogue"]
+        assert dialogues3[0] == "ANNOUNCER"
+        assert dialogues3[1] == "DUMMY" # First filler
+        assert dialogues3[-1] == "ANNOUNCER"
+        assert len(dialogues3) == 8 # 1 Open + 6 Filler + 1 Close
+
     def test_full_canonical_scene(self, parser):
         script = """=== SCENE 1 ===
 [ENV: sterile broadcast studio, low hum]
