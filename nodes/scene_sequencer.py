@@ -448,7 +448,9 @@ def _clean_text_for_bark(text):
         "[groans]", "[whistles]", "[sneezes]",
     }
     def _filter_bracket_tag(m):
-        tag = m.group(0).lower().strip()
+        inner = m.group(0)[1:-1].strip().lower()
+        inner = re.sub(r'\s+', ' ', inner)
+        tag = f"[{inner}]"
         return tag if tag in _BARK_VALID_TOKENS else ""
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)

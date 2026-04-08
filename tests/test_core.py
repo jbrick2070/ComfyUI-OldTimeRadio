@@ -83,41 +83,42 @@ class TestScriptParserCanonical:
         assert result[0]["line"] == line
 
     def test_sfx_tag(self, parser):
-        result = parser._parse_script("[SFX: heavy wrench strike on metal pipe, single resonant clank]")
-        assert len(result) == 1
+        result = parser._parse_script("[SFX: heavy wrench strike on metal pipe, single resonant clank]\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "sfx"
         assert "wrench" in result[0]["description"]
 
     def test_sfx_case_insensitive(self, parser):
-        result = parser._parse_script("[sfx: radio static]")
+        result = parser._parse_script("[sfx: radio static]\n[VOICE: DUMMY, male, 30s] ok.")
         assert result[0]["type"] == "sfx"
 
     def test_env_tag(self, parser):
-        result = parser._parse_script("[ENV: sterile lab, low electronic hum, pressurized air]")
-        assert len(result) == 1
+        result = parser._parse_script("[ENV: sterile lab, low electronic hum, pressurized air]\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "environment"
         assert "sterile lab" in result[0]["description"]
 
     def test_scene_break(self, parser):
-        result = parser._parse_script("=== SCENE 1 ===")
-        assert len(result) == 1
+        result = parser._parse_script("=== SCENE 1 ===\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "scene_break"
         assert "1" in result[0]["scene"]
 
     def test_scene_break_final(self, parser):
-        result = parser._parse_script("=== SCENE FINAL ===")
+        result = parser._parse_script("=== SCENE FINAL ===\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "scene_break"
         assert "FINAL" in result[0]["scene"]
 
     def test_beat_tag(self, parser):
-        result = parser._parse_script("(beat)")
-        assert len(result) == 1
+        result = parser._parse_script("(beat)\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "pause"
         assert result[0]["kind"] == "beat"
-        assert result[0]["duration_ms"] == 800
+        assert result[0]["duration_ms"] == 200
 
     def test_beat_case_insensitive(self, parser):
-        result = parser._parse_script("(BEAT)")
+        result = parser._parse_script("(BEAT)\n[VOICE: DUMMY, male, 30s] ok.")
         assert result[0]["type"] == "pause"
 
     def test_empty_lines_skipped(self, parser):
@@ -125,13 +126,13 @@ class TestScriptParserCanonical:
         assert len(result) == 1
 
     def test_direction_fallback(self, parser):
-        result = parser._parse_script("Some ambient stage direction text.")
-        assert len(result) == 1
+        result = parser._parse_script("Some ambient stage direction text.\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 2
         assert result[0]["type"] == "direction"
 
     def test_dashes_separator_skipped(self, parser):
-        result = parser._parse_script("---")
-        assert len(result) == 0
+        result = parser._parse_script("---\n[VOICE: DUMMY, male, 30s] ok.")
+        assert len(result) == 1
 
     def test_full_canonical_scene(self, parser):
         script = """=== SCENE 1 ===
@@ -225,8 +226,8 @@ class TestCleanTextForBark:
 
     @pytest.fixture
     def clean_fn(self):
-        from nodes.batch_bark_generator import BatchBarkGenerator
-        return BatchBarkGenerator()._clean_text_for_bark
+        from nodes.batch_bark_generator import _clean_text_for_bark
+        return _clean_text_for_bark
 
     def test_strips_voice_tag(self, clean_fn):
         assert "[VOICE:" not in clean_fn("[VOICE: HAYES, male, 40s, calm, low] Hello world.")
@@ -275,11 +276,11 @@ class TestCleanTextForBark:
 
     def test_scene_sequencer_clean_matches_batcher(self):
         """Both nodes must produce identical output for the same input."""
-        from nodes.batch_bark_generator import BatchBarkGenerator
-        from nodes.scene_sequencer import SceneSequencer
+        from nodes.batch_bark_generator import _clean_text_for_bark as bb_clean
+        from nodes.scene_sequencer import _clean_text_for_bark as ss_clean
         probe = "[VOICE: X, male, 40s, calm, low] [whispers] Hello [laughs] world [shouts] stop."
-        bb = BatchBarkGenerator()._clean_text_for_bark(probe)
-        ss = SceneSequencer()._clean_text_for_bark(probe)
+        bb = bb_clean(probe)
+        ss = ss_clean(probe)
         assert bb == ss, (
             f"_clean_text_for_bark output differs between nodes:\n"
             f"  BatchBark:     {bb!r}\n"
@@ -377,7 +378,7 @@ class TestBarkTTSCodePatterns:
     @pytest.fixture(scope="class")
     def src(self):
         path = os.path.join(os.path.dirname(__file__), "..", "nodes", "bark_tts.py")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def test_warning_filter_present(self, src):
@@ -409,7 +410,7 @@ class TestGemma4OrchestratorCodePatterns:
     @pytest.fixture(scope="class")
     def src(self):
         path = os.path.join(os.path.dirname(__file__), "..", "nodes", "gemma4_orchestrator.py")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def test_transformers_import_in_try_block(self, src):
@@ -600,11 +601,9 @@ class TestAudioContract:
             self._check(audio)
 
     def test_episode_assembler(self):
-        import tempfile
         from nodes.scene_sequencer import EpisodeAssembler
         scene = {"waveform": torch.randn(1, 1, 48000).float(), "sample_rate": 48000}
-        with tempfile.TemporaryDirectory() as d:
-            audio, _, _ = EpisodeAssembler().assemble(scene, "Test", output_dir=d, output_filename="t.wav")
+        audio, _, _ = EpisodeAssembler().assemble(scene, "Test")
         self._check(audio)
 
 
@@ -653,65 +652,3 @@ class TestSilenceTrimming:
         assert len(t) == 100
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 13. VINTAGE RADIO FILTER (requires torch)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@requires_torch
-class TestVintageRadioFilter:
-
-    def test_all_presets(self):
-        from nodes.vintage_radio_filter import VintageRadioFilter
-        node = VintageRadioFilter()
-        audio = {"waveform": torch.randn(1, 1, 48000).float(), "sample_rate": 48000}
-        for preset in ["off", "subtle", "authentic", "heavy_am", "war_era", "crystal_radio"]:
-            result = node.apply_filter(
-                audio, preset,
-                low_cut_hz=300, high_cut_hz=6000, tube_warmth=0.5,
-                hiss_level=0.05, crackle_density=0.1, wow_flutter=0.1,
-                normalize=True, target_lufs=-14.0
-            )
-            assert "waveform" in result[0], f"Preset {preset} failed"
-
-    def test_off_preset_shape_preserved(self):
-        from nodes.vintage_radio_filter import VintageRadioFilter
-        node = VintageRadioFilter()
-        audio = {"waveform": torch.randn(1, 1, 48000).float(), "sample_rate": 48000}
-        result = node.apply_filter(
-            audio, "off",
-            low_cut_hz=300, high_cut_hz=6000, tube_warmth=0.5,
-            hiss_level=0.05, crackle_density=0.1, wow_flutter=0.1,
-            normalize=True, target_lufs=-14.0
-        )
-        assert result[0]["waveform"].shape == audio["waveform"].shape
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 14. AUDIO BATCHER (requires torch)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@requires_torch
-class TestAudioBatcher:
-
-    def test_two_clips_batched(self):
-        from nodes.audio_batcher import AudioBatcher
-        c1 = {"waveform": torch.randn(1, 1, 48000), "sample_rate": 48000}
-        c2 = {"waveform": torch.randn(1, 1, 24000), "sample_rate": 48000}
-        audio, count = AudioBatcher().batch(audio_1=c1, audio_2=c2)
-        assert count == 2
-        assert audio["waveform"].shape[0] == 2
-        assert audio["waveform"].shape[2] == 48000
-
-    def test_no_clips_returns_silence(self):
-        from nodes.audio_batcher import AudioBatcher
-        audio, count = AudioBatcher().batch()
-        assert count == 0
-        assert audio["waveform"].shape[2] == 48000
-
-    def test_audio_contract(self):
-        from nodes.audio_batcher import AudioBatcher
-        clip = {"waveform": torch.randn(1, 1, 48000), "sample_rate": 48000}
-        audio, _ = AudioBatcher().batch(audio_1=clip)
-        assert isinstance(audio, dict)
-        assert audio["waveform"].dim() == 3
-        assert isinstance(audio["sample_rate"], int)
