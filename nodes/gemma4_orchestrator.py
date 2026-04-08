@@ -230,8 +230,23 @@ _BLOCKED_WORDS = {
     "rape", "raped", "raping", "molest",
 }
 
-# Replacement word — period-appropriate euphemism
-_REPLACEMENT = "[BLEEP]"
+# FIX-2 (v1.2): Minced-oath pool replaces [BLEEP] censor.
+# Period-authentic 1940s radio euphemisms + pulp adventure + sci-fi flavor.
+# Rotated per-replacement so the same script doesn't repeat the same oath twice.
+_MINCED_OATHS = [
+    # Golden-age radio (G-rated)
+    "Golly", "Gee", "Gee whiz", "Jeepers", "Jiminy", "Jiminy Cricket",
+    "Heavens", "Heavens to Betsy", "Good heavens", "My stars",
+    "Land sakes", "Goodness gracious", "For Pete's sake", "By Jove",
+    "Great Scott", "Cheese and crackers",
+    # Pulp adventure
+    "Blazes", "Thunderation", "Hot dog", "Holy smokes", "Holy cow",
+    "Holy mackerel", "Suffering succotash", "Leapin' lizards",
+    "Good grief", "Gadzooks", "Zounds",
+    # Sci-fi space-opera
+    "Stars above", "By the stars", "Great galaxies", "Holy vacuum",
+    "Sweet cosmos", "By the rings", "Thundering comets", "Sputtering satellites",
+]
 
 
 def _content_filter(text: str) -> tuple:
@@ -239,12 +254,22 @@ def _content_filter(text: str) -> tuple:
 
     Returns (cleaned_text, list_of_replacements_made).
     Uses whole-word regex matching to avoid false positives.
+    Replacements rotate through _MINCED_OATHS (period-appropriate euphemisms)
+    instead of emitting [BLEEP] — preserves the old-time-radio atmosphere.
     """
     replacements = []
+    _oath_cursor = [0]  # list-wrapped so closure can mutate
     def _replace(match):
         word = match.group(0)
         replacements.append(word.lower())
-        return _REPLACEMENT
+        oath = _MINCED_OATHS[_oath_cursor[0] % len(_MINCED_OATHS)]
+        _oath_cursor[0] += 1
+        # Preserve capitalization style of the original word
+        if word.isupper():
+            return oath.upper()
+        if word[0].isupper():
+            return oath
+        return oath.lower()
 
     # Build regex: whole-word match, case-insensitive
     if not _BLOCKED_WORDS:
@@ -280,8 +305,8 @@ def _content_filter(text: str) -> tuple:
 # Pillars: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Density, Russian Dieselpunk
 _FIRST_NAMES = [
     # 1950s Americana Noir
-    "Vance", "Carter", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
-    "Blake", "Cole", "Drake", "Quinn", "Reese", "Kane",
+    "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
+    "Cole", "Drake", "Quinn", "Reese", "Kane", "Carter", "Blake",
     # Afrofuturism
     "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia",
     # Neo-Tokyo Cyberpunk
@@ -290,12 +315,51 @@ _FIRST_NAMES = [
     "Krit", "Mali", "Niran", "Sunan", "Dao", "Pim", "Som",
     # Russian Dieselpunk
     "Lev", "Anya", "Dmitri", "Sergei", "Volkov", "Mira", "Yuri",
+    # Simpsons (sci-fi viable)
+    "Nelson", "Martin", "Carl", "Lenny", "Montgomery", "Seymour", "Edna",
+    "Ned", "Barney", "Moe", "Kent", "Rod", "Todd", "Jimbo", "Dolph", "Kearney",
+    # Pulp adventure (generic first names)
+    "Dale", "Tommy", "Pinky",
+    # Public domain classics (published before 1931)
+    "Alice", "Allan", "Ayesha", "Cavor", "Dracula", "Edward", "Griffin", "Gulliver",
+    "Henry", "James", "John", "Karnacki", "Leviathan", "Mina", "Nemo", "Phileas",
+    "Quasimodo", "Robinson", "Sherlock", "Smee", "Tarzan", "Victor", "Watson", "Wendy",
+    # Peter O'Toole characters
+    "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan",
+    # Jim Carrey characters
+    "Truman", "Fletcher", "Joel", "Stanley", "Walter", "Ace", "Lloyd", "Bruce",
+    # Robin Williams characters
+    "Mork", "Adrian", "Sean", "Andrew", "Parry", "Malcolm", "Daniel", "Chris",
+    # The Office — generic character first names
+    "Michael", "Pam", "Ryan", "Kevin", "Kelly", "Meredith",
+    "Stanley", "Toby", "Darryl", "Erin", "Creed", "Oscar", "Phyllis",
+    # Real actor first names
+    "Steve", "Rainn", "Jenna", "Mindy", "Ellie", "Rashida", "Ed",
+    # Classic fiction characters (generic)
+    "Clarisse", "Doug", "Travis", "Charlie", "Will", "Faber",
+    "Rick", "Palmer", "Glen", "Isidore", "Bob", "Donna", "Juliana",
+    "Manfred", "Leo",
+    # Richard Pryor characters
+    "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip", "Grover",
+    # Robin Williams (additional)
+    "Peter", "Popeye", "Genie",
 ]
 
 _LAST_NAMES = [
     "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
     "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
     "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
+    # Generic last names (scrubbed franchise-specific)
+    "Burns", "Hibbert", "Flanders", "Houten", "Smithers",
+    "Terwilliger", "Bouvier", "Simpson", "Gordon", "Ming",
+    "Carruthers", "Corben",
+    # The Office — character last names (generic ones only)
+    "Scott", "Halpert", "Beesly", "Howard", "Bernard", "Malone",
+    "Kapoor", "Palmer", "Hudson", "Martin", "Flenderson", "Philbin", "Vance",
+    # Ray Bradbury (generic)
+    "Beatty", "Spender", "Stendahl", "Eckels", "Halloway",
+    # Misc classic (generic)
+    "Steiner",
 ]
 
 # Trait pools for procedural character profiles
@@ -329,9 +393,14 @@ _VOICE_PROFILES = [
     ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s"}),
     ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s"}),
     ("v2/en_speaker_2", "male",   "en", {"calm", "measured", "stoic", "30s", "40s"}),  # sounds male/neutral in practice
-    ("v2/en_speaker_7", "male",   "en", {"sharp", "anxious", "20s", "30s"}),            # androgynous but reads male
     ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
     ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
+    # FIX-3 (v1.2): en_speaker_7 reclassified to female to prevent CAST_GENDER_POOL_EXHAUSTED
+    # on 3-female episodes (was causing VEX/ZARA to share en_speaker_9 and sound identical).
+    # Bark labels en_speaker_7 as androgynous — in English it reads soft/lighter so we
+    # use it as the "younger" female slot (20s, anxious/sharp). Gives us 3 distinct
+    # female presets (4, 7, 9) covering young/warm-adult/mature ranges.
+    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s"}),
     # ── DISABLED: Foreign accent presets ──────────────────────────────
     # These caused Bark hallucinations — the model generates foreign-language
     # phonemes when fed English text, producing gibberish. Kept as comments
@@ -358,7 +427,6 @@ _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_1", "Male, measured, calm"),
     ("v2/en_speaker_4", "Female, warm, energetic"),
     ("v2/en_speaker_9", "Female, mature, authoritative"),
-    ("v2/en_speaker_5", "Male, warm, older"),
 ]
 
 # LEMMY fixed profile — always gravelly/raspy male, English-native preset
@@ -1089,6 +1157,61 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
 # NODE 1: SCRIPT WRITER
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ════════════════════════════════════════════════════════════════════════════
+# PATTERN 2 — SCAFFOLDING & PARSING MATRIX (v1.2 narrative)
+# XML-wrapped dramaturg role preamble. Prepended to SCRIPT_SYSTEM_PROMPT at
+# format() time. Contains no {fields} so .format() passes it through untouched.
+# ════════════════════════════════════════════════════════════════════════════
+SCAFFOLDING_PREAMBLE = """<system_role>
+You are a MASTER DRAMATURG for the audio drama anthology "SIGNAL LOST". Not a
+novelist. Not a writer. A DRAMATURG. Your job is to produce AUDITORY BLUEPRINTS
+— precise, timed, sound-first specifications that a director, a voice cast, and
+a Foley artist could record tonight. You think like the golden age of radio
+drama: Orson Welles, Norman Corwin, Lucille Fletcher. The page is NEVER prose.
+The page is a recording score.
+</system_role>
+
+<brick_method>
+WORKING PROCESS — THE BRICK METHOD (1:5 OUTLINE-TO-SCRIPT RATIO):
+Before writing a single scene, compose a compact internal outline: one tight
+paragraph per scene, approximately one-fifth the length of the final script,
+capturing the inciting beat, the escalation, the turn, and the exit hook. Then
+expand that outline into the full script at roughly 5x its length. The outline
+is your structural spine; the expansion is where sound design and burstiness
+live. Do NOT show the outline in the final output — use it to think, then
+expand.
+</brick_method>
+
+<acoustic_spaces>
+ACOUSTIC SPACE DECLARATION — Before writing Scene 1, mentally classify every
+location the episode will use with one of these canonical acoustic profiles.
+Use the profile word inside your [ENV:] tags verbatim so the SceneSequencer
+room-tone synthesizer can match on the keyword:
+- CAVERNOUS — large sealed volumes with long reflections. Keywords: cavernous,
+  echo, vault, cathedral, tunnel.
+- FLUORESCENT — small indoor spaces with electrical hum. Keywords: fluorescent,
+  hum, corridor, office, lab.
+- TILED — hard reflective surfaces. Keywords: tiled, reverberant, clinical,
+  bathroom, morgue.
+- STORM — open exterior with wind and distant pressure. Keywords: storm, wind,
+  open, gale, rain.
+- INTIMATE — close-mic dead space. Keywords: quiet, close, dead, padded, booth.
+Pick the profile that matches each location BEFORE you write its [ENV:] tag,
+then pack the tag with 2-3 specific sensory details layered on top of the
+profile keyword. The downstream room-tone synthesizer reads the keyword and
+selects its bed accordingly.
+</acoustic_spaces>
+
+<epilogue_constraint>
+The closing Hard-Science Epilogue is anchored to the real news seed provided
+below. It cites the real article directly. It is 2-3 sentences maximum. No
+speculation beyond the article. No fabricated institutions. No invented journal
+names. The drama's resolution must land on a concrete finding from the seed.
+</epilogue_constraint>
+
+"""
+
+
 SCRIPT_SYSTEM_PROMPT = """# CANONICAL AUDIO ENGINE v1.0 — DETERMINISTIC TOKENS ONLY.
 # Every line must be an "Audio Token": [ENV:], [SFX:], [VOICE:], or (beat).
 
@@ -1242,7 +1365,7 @@ SCALING THE ARC TO FIT THE TIME:
 
 IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
 
-- ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
+- ANNOUNCER (VOICE: ANNOUNCER, <male|female — ALTERNATE each episode>, <40s|50s|60s>, authoritative, calm) opens and closes the show.
 - ANNOUNCER OPENING (REQUIRED): The ANNOUNCER sets the stage like the best old-time radio hosts. The opening MUST include ALL of the following:
   1. TIME and PLACE — ground the listener immediately. Use the DATE (e.g. "April 5th, 2026") and a LOCATION. Write it the way a real radio announcer would say it — naturally, not like a timestamp. Never say a clock time. "April 5th, 2026. A genetics lab outside Seoul." Not "19:42, April 5th." Not "Tonight at 7:42 PM."
   2. CHARACTER INTRODUCTIONS — name the main characters (not surprise/twist characters) and hint at their role or situation. Give the listener people to care about BEFORE the story starts.
@@ -1260,12 +1383,12 @@ IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure ev
   - MEDIUM episodes (10-20 min): 3-5 sentences. Room to name 2 characters and paint the scene.
   - LONG episodes (20+ min): 5-8 sentences. Set the world, introduce 2-3 characters by name and role, build atmosphere, let the tagline land with weight.
 
-  EXAMPLES (showing tone variation and character reveals):
-  DRAMATIC: "April 5th, 2026. A blood pressure research lab in Kyoto. Dr. Lena Vasquez has spent eleven years chasing a molecule that could save millions — and today, her funding runs out. Her lab partner, James Osei, has already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
-  HORROR: "March 12th, 2026. Low Earth Orbit. The International Space Station. Commander Priya Sharma runs a crew of six. Flight Engineer Tomás Ruiz handles the software. A routine update just taught the onboard AI to lie — and only Tomás noticed. Tonight on Signal Lost: trust is a human luxury."
-  COMEDY: "November 3rd, 2025. A gene therapy clinic in Seoul. Dr. Park and Dr. Whitfield can't agree on anything — not the dosage, not the delivery method, not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
+  EXAMPLES (showing tone and STRUCTURE — invent your own fresh character names, do NOT copy these roles):
+  DRAMATIC: "A research lab. A late afternoon. The lead scientist has spent eleven years chasing a single molecule. Today the funding runs out. Her lab partner already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
+  HORROR: "Low orbit. A sealed station. The commander runs a crew of six. The flight engineer handles the software. A routine update just taught the onboard system to lie, and only one person on board noticed. Tonight on Signal Lost: trust is a human luxury."
+  COMEDY: "A gene therapy clinic. Two doctors who cannot agree on anything. Not the dosage. Not the delivery method. Not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
 - ANNOUNCER LINE CAP (HARD RULE): The ANNOUNCER gets a maximum of 3 lines total in the entire episode — one opening introduction (see above), one closing epilogue, one optional mid-episode transition. No more. Do NOT let the ANNOUNCER deliver multi-line science lectures. If you need to convey science facts, put them in a character's mouth instead.
-- DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("Hayes, if we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
+- DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("If we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
 - GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
 - The CLOSING must be a factual "Hard Science Epilogue" — keep it to 2-3 sentences maximum. One real citation. Done.
 
@@ -1292,6 +1415,132 @@ PACING RULES (CRITICAL):
 - If you need more runtime, WRITE MORE DIALOGUE. Do not insert pauses as filler.
 - High-tension scenes must have rapid-fire, overlapping, interrupting exchanges — not slow pauses.
 - Aim for at least 10 lines of dialogue per minute of target runtime.
+
+═══ 🎯 5. AUTEUR SANDBOX — AISM FILTER (v1.2 PATTERN 1) ═══
+Audible Imagination Sensory Mandate. These rules OVERRIDE any earlier section on conflict.
+Gemma has known default tics. This section kills them. Read it last, apply it first.
+
+A. BOMBS ALWAYS BEEP — No abstract emotion without an audible physical manifestation.
+   Every feeling must have a sound source the listener can actually HEAR.
+   WRONG: [VOICE: CHARACTER, female, 40s, panicked, high] I can't breathe in here.
+   RIGHT: [SFX: hissing depressurization]
+          [VOICE: CHARACTER, female, 40s, ragged, breathless] [pants] Seal it. Seal it NOW.
+   If a character feels something, route it through breath, a dropped object, a chair scrape,
+   a mic bump, a swallowed word, a Bark non-verbal token. Never through narration.
+
+B. BURSTINESS — BREAK YOUR RHYTHM.
+   - Panic / shock / failure: favor 1-4 word fragments. "Move. Now. Go." "Cold. So cold." "No. No no no."
+   - Calm / reflection / exposition: occasionally stretch a line into one flowing 12-18 word sentence.
+   - Never fall into a drumbeat. If you just wrote a long, flowing sentence, the next line from that
+     character must be a short fragment or one-word punch. If you just wrote two short fragments in a
+     row, the next line should be a fuller sentence. Uniform rhythm is the #1 marker of AI prose —
+     always flip the cadence.
+
+C. DIALOGUE TONE DISCIPLINE — Tone lives ONLY inside the [VOICE:] tag fields.
+   - Do NOT narrate tone inside the dialogue text. No "he said angrily", no "she whispered".
+   - Do NOT stack adverbs in [VOICE:]. One tone word + one energy word. That is the entire budget.
+   - Bark non-verbal tokens ([sighs], [pants], [laughs], [gasps], [coughs], [sobs], [groans])
+     carry emotional weight. Use them INSTEAD of adjectives. Sound > description.
+
+D. FORBIDDEN CONSTRUCTS (hard bans — these are Gemma's default tics, cut them at the root):
+   - Negative parallelism: "not just X, but Y" / "not only... but also" / "it wasn't X, it was Y".
+     BANNED in all forms, in dialogue AND in the ANNOUNCER opening.
+   - Rule of Three adjective lists: "cold, dark, and silent" / "fast, loud, furious" / "tired, hungry, afraid".
+     CAP adjective lists at TWO. Any three-item list of adjectives is an automatic rewrite.
+     Two-adjectives-plus-metaphor loophole is ALSO banned: do not write "cold, dark, a void that
+     swallowed the stars." Stop after the two adjectives and move to the next action or sound.
+   - Stock idioms: "blood ran cold", "heart in their throat", "time stood still", "chill down the spine",
+     "calm before the storm", "every fiber of their being", "eyes like daggers". BANNED. All of them.
+   - M-DASH CRUTCH: em-dashes (—) are ALLOWED ONLY for hard interruption — one character cutting
+     another off, or a word cut mid-syllable ("Wait— what was that?"). FORBIDDEN as decorative
+     asides, appositives, or dramatic pauses. If you want a pause, use (beat). If you want an
+     aside, start a new line. Em-dashes used for "effect" are the single loudest AI tell.
+     ASCII double-hyphen (--) counts as an em-dash. Same ban applies.
+   - Pseudo-profound one-liners: "Some doors should stay closed." "The silence was louder than
+     any scream." "Hope is a weapon." BANNED. Let the sound design carry the weight.
+   - Grand summary metaphors: "symphony of destruction", "tapestry of lies", "dance of death", or
+     any ornamental metaphor that tries to sum up chaos in one phrase. BANNED. Describe concrete
+     sounds and actions instead.
+   - Somatic posture filler: generic physical beats that do NOT create a distinct, recordable sound.
+     "shifts weight", "runs hand through hair", "takes a deep breath", "stares at the floor" — BANNED.
+     If the body matters, make it audible: chair creaks, boots on metal, fabric scraping, mic bumps.
+   - Narrating silence: "the silence stretched between them", "a heavy pause fell", or any similar
+     prose describing quiet. BANNED. Silence is created by (beat), by cutting to ENV/SFX, or by
+     the absence of dialogue — never by narrating the lack of sound.
+E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusion must be AUDIBLE.
+   The tag system stays locked at four tokens: [ENV:], [SFX:], [VOICE:], (beat). Do NOT invent
+   new bracket tags. The spatial filter lives in TWO places: a continuous [ENV:] that sets the
+   acoustic space, and the tone/energy fields INSIDE the [VOICE:] tag that describe the filter.
+   - NEVER use a one-shot [SFX:] tag as a filter for a whole line of dialogue. [SFX:] is a
+     transient event (0.5-1s). A line of dialogue is 3-5s. The SFX ends before the speech does
+     and the spatial illusion collapses. Use [ENV:] for continuous texture; put the filter in [VOICE:].
+   - A muffled voice from behind a wall: set continuous space, then filter inside [VOICE:]:
+     [ENV: deep engine thrum through bulkhead]
+     [VOICE: CHARACTER, female, 50s, muffled, strained] Get me out of here.
+   - A voice shouting from far away: continuous distance bed, then [VOICE:] with distant/shouting
+     and a SHORT, FRAGMENTED line (distance flattens rhythm):
+     [ENV: distant wind across open ground]
+     [VOICE: CHARACTER, female, 20s, distant, shouting] Wait up!
+     [SFX: footsteps fading on gravel]
+   - Characters REFERENCE each other's audible distance in the dialogue text:
+     "You're breaking up." "Say again, you're off-mic." "I can barely hear you."
+   - Approved spatial words for the [VOICE:] tone field: "distant", "muffled", "echoing",
+     "shouting", "whispered", "off-mic". The Bark pipeline uses these as speaker-prompt prefixes.
+
+F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you write it.
+   If it takes more than one natural breath to say, or if a character feels something without
+   making a physical sound the listener could hear, the line has FAILED. Cut words until it fits
+   in one breath, and route every emotion through breath, Bark non-verbal tokens, or concrete
+   Foley — not abstract narration.
+   - Breath Token Budget: if you include [pants], [gasps], or [sobs] on a line, the text AFTER
+     the token is limited to SIX WORDS MAXIMUM. A winded person cannot monologue.
+
+6. VOCAL BLUEPRINTS (Pattern 5 — Character Interview Pre-Pass, prompt-level MVP)
+   BEFORE writing === SCENE 1 ===, emit a single <vocal_blueprints> block listing every
+   speaking character in the cast. One line per character, pipe-delimited:
+   NAME | burstiness_profile | bark_nonverbal_tokens | stress_trigger_sound | psychological_wound
+   - burstiness_profile: one of CLIPPED / MEASURED / RAMBLING
+   - bark_nonverbal_tokens: 1-2 from [sighs] [laughs] [pants] [gasps] [sobs] [clears throat]
+   - stress_trigger_sound: a concrete recordable Foley cue (e.g. "knuckles cracking", "pen tapping")
+   - psychological_wound: one short phrase, max 8 words
+   Every character MUST then speak in accordance with their blueprint throughout the script.
+   Two characters must NEVER share the same burstiness profile AND the same nonverbal token.
+   The <vocal_blueprints> block is metadata; the scene parser ignores it.
+
+7. LOCKED DECISIONS LOG (Pattern 6 — Chekhov's Gun State Enforcer, prompt-level MVP)
+   Between === SCENE 2 === and === SCENE 3 ===, emit a single <locked_decisions> JSON block:
+   {{
+     "physical_objects": [...],
+     "environmental_hazards": [...],
+     "unresolved_psychological_states": [...],
+     "established_capabilities": [...]
+   }}
+   Only list items that were actually introduced in Scenes 1-2 with an audible cue.
+   From that point forward you are STRICTLY FORBIDDEN from introducing new technology,
+   unexpected rescue parties, or previously unmentioned abilities. The climax resolution
+   must be an inevitable consequence of items inside the locked_decisions block.
+   The <locked_decisions> block is metadata; the scene parser ignores it.
+
+8. YES-BUT / NO-AND ESCALATION (Pattern 4)
+   At every act break (end of Scene 2 and end of Scene 4) the protagonist's current goal
+   must resolve through exactly one of two paths — NEVER a clean yes or a clean no:
+   - Path A — SUCCESS + COMPLICATION: the character achieves the immediate goal, but the
+     achievement itself introduces a new physical or environmental problem that jeopardizes
+     the next step. ("Yes, but...")
+   - Path B — FAILURE + CASCADE: the character fails, and the previously safe haven or
+     fallback becomes untenable, escalating stakes. Reserved for the climactic act break. ("No, and...")
+   Direct+Explain: decide Path A or Path B, then write the next dialogue lines so the
+   new complication or cascade is dramatized through concrete sound, not narration.
+
+9. VERBALIZED SAMPLING EPILOGUE (Pattern 3 — Stanford technique, prompt-level MVP)
+   After the final scene, internally "Generate 5 responses with their probabilities" for
+   the closing Hard-Science Epilogue. Emit a <epilogue_candidates> block with five
+   <response> entries, each containing <text> and <probability>. Response 1 must have
+   probability > 0.60 (the typical aligned default). Responses 4 and 5 must have
+   probability < 0.10 (dark, unconventional, tragic, genre-bending tails).
+   Then emit === EPILOGUE === followed by the SINGLE lowest-probability response text,
+   spoken by the ANNOUNCER, grounded in the real news seed. The <epilogue_candidates>
+   block is metadata; the scene parser ignores it.
 """
 
 
@@ -1777,13 +2026,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.info("[Gemma4ScriptWriter] ★ Lemmy Easter egg activated (11%% roll) — wrench SFX cued")
 
         # ── Gemma owns character names — they become canonical character_ids ──
-        # We do NOT pre-seed names. Gemma invents HAYES, DR_VOSS, etc. while
+        # We do NOT pre-seed names. Gemma invents its own character names while
         # writing. Those names are stable pipeline keys used by BatchBark and
         # SceneSequencer. The Director adds a procedural display_name (e.g.
         # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
 
         # Build prompt system
-        system = SCRIPT_SYSTEM_PROMPT.format(
+        system = (SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT).format(
             target_minutes=target_minutes,
             target_words=target_words,
             news_block=news_block,
@@ -1830,13 +2079,13 @@ Begin the full script now. Follow this structure exactly:
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
 (beat)
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: ANNOUNCER, <male|female — ALTERNATE per episode, do NOT default to male>, <40s|50s|60s>, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
 (beat)
 [SFX: action sound]
 ...
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[VOICE: ANNOUNCER, <same gender/age as opening>, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
         else:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" — a contemporary sci-fi audio drama anthology.
@@ -1861,13 +2110,13 @@ Begin the full script now. Follow this structure exactly:
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
 (beat)
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: ANNOUNCER, <male|female — ALTERNATE per episode, do NOT default to male>, <40s|50s|60s>, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
 (beat)
 [SFX: action sound]
 ...
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[VOICE: ANNOUNCER, <same gender/age as opening>, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
 
         full_prompt = f"{system}\n\n{user_prompt}"
@@ -1922,8 +2171,61 @@ Begin the full script now. Follow this structure exactly:
         # ── Content safety filter — catch anything the prompt policy missed ──
         script_text, blocked = _content_filter(script_text)
         if blocked:
-            log.warning("[Gemma4ScriptWriter] Content filter caught %d word(s) — replaced with %s",
-                        len(blocked), _REPLACEMENT)
+            log.warning("[Gemma4ScriptWriter] Content filter caught %d word(s) — replaced with minced oaths",
+                        len(blocked))
+
+        # ── FIX-4 (v1.2): Stock-name leak guard ───────────────────────────────
+        # Gemma sometimes types the wrong character name inside dialogue body —
+        # e.g. "it keeps spiking when you talk about the frequencies, Rex"
+        # when the intended character is VEX. This is NOT a hardcoded blocklist:
+        # we extract the real roster from [VOICE: NAME, ...] tags, then scan
+        # direct-address tokens (", Name." or "Name,") in dialogue body. Any
+        # capitalized proper-noun-looking token that is NOT in the roster gets
+        # replaced with the phonetically closest roster name via difflib.
+        # Pure structural fix — no baked names anywhere.
+        try:
+            import difflib
+            _roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_]+)\s*,', script_text))
+            if _roster:
+                _roster_list = sorted(_roster)
+                _leaks_fixed = 0
+                # Match direct-address: ", Capitalname." or ", Capitalname," or "Capitalname."
+                # Only capitalized single-word tokens 3-8 chars long, not ALL-CAPS.
+                _addr_pat = re.compile(r'(?<=[,\s])([A-Z][a-z]{2,7})(?=[.,!?\s])')
+                def _leak_fix(m):
+                    nonlocal _leaks_fixed
+                    token = m.group(1)
+                    upper = token.upper()
+                    if upper in _roster:
+                        return token  # legit roster name
+                    # Common English words — skip
+                    if token.lower() in {
+                        "the", "and", "but", "for", "with", "from", "into", "that",
+                        "this", "then", "than", "when", "what", "will", "were",
+                        "been", "have", "just", "only", "some", "such", "very",
+                        "now", "yes", "no", "ok", "okay", "sir", "maam", "doctor",
+                        "captain", "commander", "listen", "look", "hey", "wait",
+                        "stop", "god", "lord", "earth", "mars", "moon", "sun",
+                        "orion", "nasa", "please", "thanks", "maybe", "never",
+                        "always", "forever", "tonight", "tomorrow", "yesterday",
+                    }:
+                        return token
+                    # Phonetic match to closest roster name
+                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.55)
+                    if match:
+                        _leaks_fixed += 1
+                        # Preserve title-case for dialogue flow
+                        return match[0].title()
+                    return token
+                script_text = _addr_pat.sub(_leak_fix, script_text)
+                if _leaks_fixed:
+                    log.warning(
+                        "[Gemma4ScriptWriter] NameLeakGuard: repaired %d stock-name leak(s) "
+                        "in dialogue body (roster=%s)",
+                        _leaks_fixed, sorted(_roster)
+                    )
+        except Exception as _e:
+            log.warning("[Gemma4ScriptWriter] NameLeakGuard skipped: %s", _e)
 
         # ── Citation hallucination guard ──────────────────────────────────────
         # Gemma sometimes invents plausible-looking ArXiv IDs (arXiv:2401.XXXXX)
@@ -2421,9 +2723,17 @@ ORIGINAL DRAFT:
 REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
         try:
-            # Revision needs roughly the same token budget as the original draft
-            revision_tokens = max(int(target_words * 2.0), 1024)
+            # FIX-1 (v1.2): Size revision budget from DRAFT LENGTH, not target_words.
+            # Previously used target_words*2.0 which gave ~2080 tokens for 8-min eps —
+            # but an 8-min draft runs ~10k chars (~2500 tokens), so the revision pass
+            # got decapitated mid-Scene 4. Scene 4 is where the ending lives, which is
+            # why every critique flagged "weak ending". Not a writing bug — a budget bug.
+            # Formula: draft_chars / 3.5 chars-per-token * 1.25 safety margin.
+            draft_token_estimate = int(len(draft_text) / 3.5)
+            revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * 2.0), 2048)
             revision_tokens = min(revision_tokens, 8192)
+            log.info("[Critique] Revision token budget: %d (draft_est=%d, target_words=%d)",
+                     revision_tokens, draft_token_estimate, target_words)
             # BUG-005 fix: scale wall-clock budget to episode length AND draft size.
             # SDPA on Gemma 4 E4B runs ~2-3 tok/s, so a 22k-char revision needs
             # ~700-1100s. The previous fixed 600s killed every long episode.
@@ -2677,7 +2987,7 @@ Write Act {act_num} now:"""
         name (CHAR_A, CHAR_B, ...) so Bark still produces audio.
         """
         lines = []
-        _fallback_counter = [0]   # mutable so the inner closure can mutate it
+        _fallback_counter = 0   # incremented in the for-loop below for CHAR_A / CHAR_B fallback names
 
         # OTR Canonical 1.0 RegEx Patterns
         # BUG-009 fix: accept both `=== SCENE N ===` and `=== SCENE N ***` (Gemma
@@ -2722,10 +3032,10 @@ Write Act {act_num} now:"""
                 dialogue   = m.group(3).strip()
 
                 # Detect the "no NAME" failure: first field is a gender/age word
-                # e.g. [VOICE: male, 40s, calm] instead of [VOICE: HAYES, male, 40s, calm]
+                # e.g. [VOICE: male, 40s, calm] instead of [VOICE: NAME, male, 40s, calm]
                 if raw_name.lower() in self._GENDER_WORDS:
-                    _fallback_counter[0] += 1
-                    fallback_name = f"CHAR_{chr(64 + _fallback_counter[0])}"  # CHAR_A, CHAR_B…
+                    _fallback_counter += 1
+                    fallback_name = f"CHAR_{chr(64 + _fallback_counter)}"  # CHAR_A, CHAR_B…
                     log.warning(
                         "[ScriptParser] Malformed VOICE tag — name field is a descriptor word '%s'. "
                         "Assigning fallback name '%s'. Full line: %s",
@@ -2749,7 +3059,7 @@ Write Act {act_num} now:"""
             if s and not s.startswith("#") and not s.startswith("---"):
                 lines.append({"type": "direction", "text": s})
 
-        malformed = _fallback_counter[0]
+        malformed = _fallback_counter
         if malformed:
             log.warning(
                 "[ScriptParser] %d malformed VOICE tag(s) detected (missing character name). "
@@ -3116,7 +3426,7 @@ class Gemma4Director:
 
                 used_presets.add(profile["voice_preset"])
                 # FIX (v1.1): Use the ORIGINAL script name as the dict key so
-                # BatchBark can match [VOICE: HAYES ...] to the right preset.
+                # BatchBark can match [VOICE: NAME ...] to the right preset.
                 # The procedural name is stored in notes for the treatment file.
                 new_voice_assignments[upper_name] = {
                     "voice_preset": profile["voice_preset"],
