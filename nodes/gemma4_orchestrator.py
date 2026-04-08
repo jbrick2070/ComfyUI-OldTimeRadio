@@ -1611,9 +1611,9 @@ class Gemma4ScriptWriter:
                     "default": "balanced",
                     "tooltip": "Creativity dial — overrides temperature/top_p (safe=0.6, balanced=0.85, wild=1.1, chaos=1.35)"
                 }),
-                "summon_lemmy": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "🔧 Summon Lemmy! Drags the grizzled engineer out of the garage and into every episode. Leave OFF for the rare 11% surprise."
+                "arc_enhancer": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Structural coherence pass: rewrites the opening & closing dialogue to ensure a 'seed' in the intro pays off in the finale."
                 }),
             },
         }
@@ -1777,7 +1777,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      style_variant="tense claustrophobic",
                      creativity="balanced",
                      runtime_preset="📻 standard (8 min)",
-                     summon_lemmy=False):
+                     summon_lemmy=False,
+                     arc_enhancer=True):
         force_lemmy = summon_lemmy  # internal alias for clarity below
 
         # ── RUNTIME PRESET → override target_minutes unless custom ──
@@ -1795,7 +1796,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
                      f"runtime_preset={runtime_preset} target_min={target_minutes} chars={num_characters} "
-                     f"length={target_length} style={style_variant} creativity={creativity}")
+                     f"length={target_length} style={style_variant} creativity={creativity} arc_enhancer={arc_enhancer}")
 
         # ══════════════════════════════════════════════════════════════════════
         # CREATIVITY DIAL → temperature/top_p mapping
@@ -2168,6 +2169,16 @@ Begin the full script now. Follow this structure exactly:
                 script_text, genre_flavor, target_words, model_id, temperature
             )
             _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
+
+        # ── ARC ENHANCER (v1.3 flagship feature) ──────────────────────────────
+        # Paired opening + closing bookend rewrite to ensure narrative coherence.
+        # ──────────────────────────────────────────────────────────────────────
+        if arc_enhancer:
+            _runtime_log("ScriptWriter: >>> ENTERING arc_enhancer")
+            script_text = self._execute_arc_enhancer(
+                script_text, genre_flavor, episode_title, news_block, model_id, temperature
+            )
+            _runtime_log("ScriptWriter: <<< EXITED arc_enhancer")
 
         # ── Content safety filter — catch anything the prompt policy missed ──
         script_text, blocked = _content_filter(script_text)
@@ -2979,6 +2990,138 @@ Write Act {act_num} now:"""
             acts.append(act_text)
 
         return "\n\n".join(acts)
+
+    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature):
+        """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence."""
+        _runtime_log("ARC_ENHANCER: Starting structural coherence pass")
+
+        # Phase A: Extraction
+        bookends = self._get_bookends(script_text)
+        if not bookends:
+            _runtime_log("ARC_ENHANCER: Failed to extract bookends — skipping pass")
+            return script_text
+
+        opening_orig, closing_orig = bookends
+
+        # Phase B: Architectural Echo call
+        # We use a lower temperature (0.6) for tighter structural alignment
+        echo_prompt = f"""You are a structural script editor for the radio drama anthology "SIGNAL LOST".
+YOUR TASK: Rewrite the OPENING and CLOSING dialogue blocks below to create a "narrative echo".
+
+DIRECTIONS:
+1. Plant a NARRATIVE SEED in the Opening Block. This can be a cryptic mention of an object, a specific fear, a recurring sound cue, or a foreshadowed choice.
+2. Harvest the PAYOFF in the Closing Block. The seed MUST resolve, pivot, or be explained in a way that provides emotional or structural closure to the episode.
+3. Preserve the CHARACTER NAMES and VOICES exactly as they appear in the original text.
+4. Preserve all CANONICAL TAGS ([VOICE:], [SFX:], [ENV:], (beat)) exactly.
+5. Do NOT change the meaning of the science headline context provided.
+6. Return ONLY the rewritten blocks inside the XML tags below.
+
+GENRE: {genre.replace("_", " ")}
+TITLE: {title}
+SCIENCE CONTEXT: {news_block[:500]}
+
+ORIGINAL OPENING BLOCK:
+{opening_orig}
+
+ORIGINAL CLOSING BLOCK:
+{closing_orig}
+
+Format your response exactly as:
+<opening>
+[Revised Opening Block]
+</opening>
+<closing>
+[Revised Closing Block]
+</closing>"""
+
+        try:
+            echo_response = _run_with_timeout(
+                lambda: _generate_with_gemma4(
+                    echo_prompt,
+                    model_id=model_id,
+                    max_new_tokens=1500,
+                    temperature=0.6,
+                ),
+                timeout_sec=300,
+                phase_label="Arc-Enhancer-Echo",
+            )
+
+            # Phase C: Injection
+            try:
+                opening_new = echo_response.split("<opening>")[1].split("</opening>")[0].strip()
+                closing_new = echo_response.split("<closing>")[1].split("</closing>")[0].strip()
+
+                if opening_new and closing_new:
+                    # Safe replacement for opening
+                    script_text = script_text.replace(opening_orig, opening_new, 1)
+
+                    # Safe replacement for closing (work from the end to avoid collisions)
+                    parts = script_text.rsplit(closing_orig, 1)
+                    if len(parts) == 2:
+                        script_text = parts[0] + closing_new + parts[1]
+
+                    _runtime_log("ARC_ENHANCER: Narrative coherence pass complete (seed planted & harvested)")
+                else:
+                    _runtime_log("ARC_ENHANCER: LLM returned empty tags — skipping injection")
+            except (IndexError, ValueError):
+                log.warning("[ArcEnhancer] Failed to parse XML tags from echo response")
+                _runtime_log("ARC_ENHANCER: Parsing error — response format invalid")
+
+        except Exception as e:
+            log.warning("[ArcEnhancer] Echo pass failed: %s", e)
+            _runtime_log(f"ARC_ENHANCER: Failed — {e}")
+
+        return script_text
+
+    def _get_bookends(self, script_text):
+        """Extract opening and closing dialogue blocks for the coherence pass."""
+        # --- 1. OPENING BLOCK ---
+        # Find Scene 1
+        scene1_match = re.search(r'===\s*SCENE\s+1\s*===', script_text, re.IGNORECASE)
+        if not scene1_match:
+            return None
+
+        # Focus on the first ~25 lines of Scene 1 to find dialogue
+        body_start = script_text[scene1_match.end():]
+        # Find all Voice tags in the first 4000 chars of Scene 1
+        voices = list(re.finditer(r'\[VOICE:', body_start[:4000], re.IGNORECASE))
+        if len(voices) < 4:
+            return None
+
+        # Opening block: from first voice to end of 8th voice (or last available)
+        v_count = min(len(voices), 8)
+        target_v = voices[v_count - 1]
+        line_end = body_start.find("\n", target_v.end())
+        if line_end == -1: line_end = len(body_start)
+        opening_block = body_start[:line_end].strip()
+
+        # --- 2. CLOSING BLOCK ---
+        # Find the last scene (climax)
+        # We look for the last SCENE marker before the EPILOGUE or Closing Music
+        end_marker = re.search(r'===\s*EPILOGUE\s*==|\[MUSIC:\s*Closing theme\]', script_text, re.IGNORECASE)
+        climax_boundary = end_marker.start() if end_marker else len(script_text)
+
+        climax_area = script_text[:climax_boundary]
+        scenes = list(re.finditer(r'===\s*SCENE\s+\d+\s*===', climax_area, re.IGNORECASE))
+        if not scenes:
+            return None
+
+        last_scene_body = climax_area[scenes[-1].end():]
+        # Find voice tags in the last scene
+        last_voices = list(re.finditer(r'\[VOICE:', last_scene_body, re.IGNORECASE))
+        if len(last_voices) < 3:
+            return None
+
+        # Closing block: pull at most the last 8 dialogue lines
+        v_count_climax = min(len(last_voices), 8)
+        start_idx = last_voices[-v_count_climax].start()
+        closing_block = last_scene_body[start_idx:].strip()
+
+        # Sanity check: ensure these blocks actually exist in the text (for later replace)
+        if opening_block in script_text and closing_block in script_text:
+            return opening_block, closing_block
+
+        return None
 
     # Descriptor words that indicate a missing character name (Gemma dropped the NAME field)
     _GENDER_WORDS = frozenset([
