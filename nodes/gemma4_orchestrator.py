@@ -2465,7 +2465,7 @@ Begin the full script now. Follow this structure exactly:
             )
         else:
             mode_label = "OUTLINE"
-            outline_max_tokens = 600
+            outline_max_tokens = 450   # was 600 — trimmed to stay inside SDPA ~420s budget
             OUTLINE_MIN = 200
             OUTLINE_MAX = 3000
             _runtime_log(
@@ -2553,7 +2553,7 @@ Keep it under 400 words. Structure only — no dialogue."""
                         max_new_tokens=outline_max_tokens,
                         temperature=min(1.0, temperature + 0.1),
                     ),
-                    timeout_sec=300,
+                    timeout_sec=480,   # was 300 — raised to 8min for SDPA @ ~2 tok/s
                     phase_label=f"OpenClose-{mode_label}-{focus_name}",
                 )
                 outlines.append((focus_name, outline_text))
