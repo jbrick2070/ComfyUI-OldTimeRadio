@@ -1305,11 +1305,13 @@ A. BOMBS ALWAYS BEEP — No abstract emotion without an audible physical manifes
    If a character feels something, route it through breath, a dropped object, a chair scrape,
    a mic bump, a swallowed word, a Bark non-verbal token. Never through narration.
 
-B. BURSTINESS — Sentence lengths must radically vary inside a single character's dialogue.
-   - Panic / shock / failure: 1-4 word fragments. "Move. Now. Go." "Cold. So cold." "No. No no no."
-   - Calm / reflection / exposition: may extend to 12-18 words in one flowing line.
-   - BANNED: three back-to-back lines of similar length from the same character.
-     Uniform rhythm is the #1 marker of AI prose. Break the pattern.
+B. BURSTINESS — BREAK YOUR RHYTHM.
+   - Panic / shock / failure: favor 1-4 word fragments. "Move. Now. Go." "Cold. So cold." "No. No no no."
+   - Calm / reflection / exposition: occasionally stretch a line into one flowing 12-18 word sentence.
+   - Never fall into a drumbeat. If you just wrote a long, flowing sentence, the next line from that
+     character must be a short fragment or one-word punch. If you just wrote two short fragments in a
+     row, the next line should be a fuller sentence. Uniform rhythm is the #1 marker of AI prose —
+     always flip the cadence.
 
 C. DIALOGUE TONE DISCIPLINE — Tone lives ONLY inside the [VOICE:] tag fields.
    - Do NOT narrate tone inside the dialogue text. No "he said angrily", no "she whispered".
@@ -1322,30 +1324,54 @@ D. FORBIDDEN CONSTRUCTS (hard bans — these are Gemma's default tics, cut them 
      BANNED in all forms, in dialogue AND in the ANNOUNCER opening.
    - Rule of Three adjective lists: "cold, dark, and silent" / "fast, loud, furious" / "tired, hungry, afraid".
      CAP adjective lists at TWO. Any three-item list of adjectives is an automatic rewrite.
+     Two-adjectives-plus-metaphor loophole is ALSO banned: do not write "cold, dark, a void that
+     swallowed the stars." Stop after the two adjectives and move to the next action or sound.
    - Stock idioms: "blood ran cold", "heart in their throat", "time stood still", "chill down the spine",
      "calm before the storm", "every fiber of their being", "eyes like daggers". BANNED. All of them.
    - M-DASH CRUTCH: em-dashes (—) are ALLOWED ONLY for hard interruption — one character cutting
      another off, or a word cut mid-syllable ("Wait— what was that?"). FORBIDDEN as decorative
      asides, appositives, or dramatic pauses. If you want a pause, use (beat). If you want an
      aside, start a new line. Em-dashes used for "effect" are the single loudest AI tell.
+     ASCII double-hyphen (--) counts as an em-dash. Same ban applies.
    - Pseudo-profound one-liners: "Some doors should stay closed." "The silence was louder than
      any scream." "Hope is a weapon." BANNED. Let the sound design carry the weight.
+   - Grand summary metaphors: "symphony of destruction", "tapestry of lies", "dance of death", or
+     any ornamental metaphor that tries to sum up chaos in one phrase. BANNED. Describe concrete
+     sounds and actions instead.
+   - Somatic posture filler: generic physical beats that do NOT create a distinct, recordable sound.
+     "shifts weight", "runs hand through hair", "takes a deep breath", "stares at the floor" — BANNED.
+     If the body matters, make it audible: chair creaks, boots on metal, fabric scraping, mic bumps.
+   - Narrating silence: "the silence stretched between them", "a heavy pause fell", or any similar
+     prose describing quiet. BANNED. Silence is created by (beat), by cutting to ENV/SFX, or by
+     the absence of dialogue — never by narrating the lack of sound.
 
 E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusion must be AUDIBLE.
    The tag system stays locked at four tokens: [ENV:], [SFX:], [VOICE:], (beat). Do NOT invent
-   new bracket tags. Route spatial information through the channels you already have:
-   - A voice from another room: precede with [SFX: muffled shout through bulkhead] then [VOICE: ...].
-   - A voice shouting from far away: precede with [SFX: distant voice echoing down the tunnel]
-     then a SHORT, FRAGMENTED [VOICE: ...] line — distance flattens rhythm.
+   new bracket tags. The spatial filter lives in TWO places: a continuous [ENV:] that sets the
+   acoustic space, and the tone/energy fields INSIDE the [VOICE:] tag that describe the filter.
+   - NEVER use a one-shot [SFX:] tag as a filter for a whole line of dialogue. [SFX:] is a
+     transient event (0.5-1s). A line of dialogue is 3-5s. The SFX ends before the speech does
+     and the spatial illusion collapses. Use [ENV:] for continuous texture; put the filter in [VOICE:].
+   - A muffled voice from behind a wall: set continuous space, then filter inside [VOICE:]:
+     [ENV: deep engine thrum through bulkhead]
+     [VOICE: CHARACTER, male, 30s, muffled, strained] Get me out of here.
+   - A voice shouting from far away: continuous distance bed, then [VOICE:] with distant/shouting
+     and a SHORT, FRAGMENTED line (distance flattens rhythm):
+     [ENV: distant wind across open ground]
+     [VOICE: CHARACTER, female, 20s, distant, shouting] Wait up!
+     [SFX: footsteps fading on gravel]
    - Characters REFERENCE each other's audible distance in the dialogue text:
-     "You're breaking up." "Say again — you're off-mic." "I can barely hear you."
-   - Tone/energy fields inside [VOICE:] can carry spatial energy: "distant", "muffled", "shouting".
+     "You're breaking up." "Say again, you're off-mic." "I can barely hear you."
+   - Approved spatial words for the [VOICE:] tone field: "distant", "muffled", "echoing",
+     "shouting", "whispered", "off-mic". The Bark pipeline uses these as speaker-prompt prefixes.
 
-F. SELF-AUDIT before emitting any dialogue line. Ask in this exact order:
-   1. Does this line have a physical sound source the listener can hear?
-   2. Is the rhythm different from the previous two lines of this character's dialogue?
-   3. Does it contain a banned construct from Section D?
-   If the answer to (3) is yes, rewrite before writing.
+F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you write it.
+   If it takes more than one natural breath to say, or if a character feels something without
+   making a physical sound the listener could hear, the line has FAILED. Cut words until it fits
+   in one breath, and route every emotion through breath, Bark non-verbal tokens, or concrete
+   Foley — not abstract narration.
+   - Breath Token Budget: if you include [pants], [gasps], or [sobs] on a line, the text AFTER
+     the token is limited to SIX WORDS MAXIMUM. A winded person cannot monologue.
 """
 
 
