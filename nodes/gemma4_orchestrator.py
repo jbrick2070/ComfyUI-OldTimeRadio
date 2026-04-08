@@ -1292,6 +1292,60 @@ PACING RULES (CRITICAL):
 - If you need more runtime, WRITE MORE DIALOGUE. Do not insert pauses as filler.
 - High-tension scenes must have rapid-fire, overlapping, interrupting exchanges — not slow pauses.
 - Aim for at least 10 lines of dialogue per minute of target runtime.
+
+═══ 🎯 5. AUTEUR SANDBOX — AISM FILTER (v1.2 PATTERN 1) ═══
+Audible Imagination Sensory Mandate. These rules OVERRIDE any earlier section on conflict.
+Gemma has known default tics. This section kills them. Read it last, apply it first.
+
+A. BOMBS ALWAYS BEEP — No abstract emotion without an audible physical manifestation.
+   Every feeling must have a sound source the listener can actually HEAR.
+   WRONG: [VOICE: REX, male, 30s, panicked, high] I can't breathe in here.
+   RIGHT: [SFX: hissing depressurization]
+          [VOICE: REX, male, 30s, ragged, breathless] [pants] Seal it. Seal it NOW.
+   If a character feels something, route it through breath, a dropped object, a chair scrape,
+   a mic bump, a swallowed word, a Bark non-verbal token. Never through narration.
+
+B. BURSTINESS — Sentence lengths must radically vary inside a single character's dialogue.
+   - Panic / shock / failure: 1-4 word fragments. "Move. Now. Go." "Cold. So cold." "No. No no no."
+   - Calm / reflection / exposition: may extend to 12-18 words in one flowing line.
+   - BANNED: three back-to-back lines of similar length from the same character.
+     Uniform rhythm is the #1 marker of AI prose. Break the pattern.
+
+C. DIALOGUE TONE DISCIPLINE — Tone lives ONLY inside the [VOICE:] tag fields.
+   - Do NOT narrate tone inside the dialogue text. No "he said angrily", no "she whispered".
+   - Do NOT stack adverbs in [VOICE:]. One tone word + one energy word. That is the entire budget.
+   - Bark non-verbal tokens ([sighs], [pants], [laughs], [gasps], [coughs], [sobs], [groans])
+     carry emotional weight. Use them INSTEAD of adjectives. Sound > description.
+
+D. FORBIDDEN CONSTRUCTS (hard bans — these are Gemma's default tics, cut them at the root):
+   - Negative parallelism: "not just X, but Y" / "not only... but also" / "it wasn't X, it was Y".
+     BANNED in all forms, in dialogue AND in the ANNOUNCER opening.
+   - Rule of Three adjective lists: "cold, dark, and silent" / "fast, loud, furious" / "tired, hungry, afraid".
+     CAP adjective lists at TWO. Any three-item list of adjectives is an automatic rewrite.
+   - Stock idioms: "blood ran cold", "heart in their throat", "time stood still", "chill down the spine",
+     "calm before the storm", "every fiber of their being", "eyes like daggers". BANNED. All of them.
+   - M-DASH CRUTCH: em-dashes (—) are ALLOWED ONLY for hard interruption — one character cutting
+     another off, or a word cut mid-syllable ("Wait— what was that?"). FORBIDDEN as decorative
+     asides, appositives, or dramatic pauses. If you want a pause, use (beat). If you want an
+     aside, start a new line. Em-dashes used for "effect" are the single loudest AI tell.
+   - Pseudo-profound one-liners: "Some doors should stay closed." "The silence was louder than
+     any scream." "Hope is a weapon." BANNED. Let the sound design carry the weight.
+
+E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusion must be AUDIBLE.
+   The tag system stays locked at four tokens: [ENV:], [SFX:], [VOICE:], (beat). Do NOT invent
+   new bracket tags. Route spatial information through the channels you already have:
+   - A voice from another room: precede with [SFX: muffled shout through bulkhead] then [VOICE: ...].
+   - A voice shouting from far away: precede with [SFX: distant voice echoing down the tunnel]
+     then a SHORT, FRAGMENTED [VOICE: ...] line — distance flattens rhythm.
+   - Characters REFERENCE each other's audible distance in the dialogue text:
+     "You're breaking up." "Say again — you're off-mic." "I can barely hear you."
+   - Tone/energy fields inside [VOICE:] can carry spatial energy: "distant", "muffled", "shouting".
+
+F. SELF-AUDIT before emitting any dialogue line. Ask in this exact order:
+   1. Does this line have a physical sound source the listener can hear?
+   2. Is the rhythm different from the previous two lines of this character's dialogue?
+   3. Does it contain a banned construct from Section D?
+   If the answer to (3) is yes, rewrite before writing.
 """
 
 
