@@ -280,8 +280,8 @@ def _content_filter(text: str) -> tuple:
 # Pillars: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Density, Russian Dieselpunk
 _FIRST_NAMES = [
     # 1950s Americana Noir
-    "Vance", "Carter", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
-    "Blake", "Cole", "Drake", "Quinn", "Reese", "Kane",
+    "Vance", "Stone", "Margot", "Nora", "Sully", "Mac", "Hayes",
+    "Cole", "Drake", "Quinn", "Reese", "Kane",
     # Afrofuturism
     "Malik", "Zuri", "Chidi", "Ayo", "Oya", "Kael", "Tariq", "Nia",
     # Neo-Tokyo Cyberpunk
@@ -294,7 +294,7 @@ _FIRST_NAMES = [
 
 _LAST_NAMES = [
     "Stone", "Shaw", "Cross", "Wells", "Steele", "Frost", "Pierce", "Vaughn",
-    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall", "Reeves",
+    "Black", "Drake", "Hayes", "Kane", "Voss", "Cranston", "Kendall",
     "Volkov", "Sato", "Tanaka", "Okafor", "Diallo", "Sirikit", "Petrov",
 ]
 
@@ -1296,7 +1296,7 @@ SCALING THE ARC TO FIT THE TIME:
 
 IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure every time. Comedy arcs (B, I, J, K, L) should appear just as often as dramatic ones. Surprise the listener.
 
-- ANNOUNCER (VOICE: male, 50s, authoritative, calm) opens and closes the show.
+- ANNOUNCER (VOICE: ANNOUNCER, <male|female — ALTERNATE each episode>, <40s|50s|60s>, authoritative, calm) opens and closes the show.
 - ANNOUNCER OPENING (REQUIRED): The ANNOUNCER sets the stage like the best old-time radio hosts. The opening MUST include ALL of the following:
   1. TIME and PLACE — ground the listener immediately. Use the DATE (e.g. "April 5th, 2026") and a LOCATION. Write it the way a real radio announcer would say it — naturally, not like a timestamp. Never say a clock time. "April 5th, 2026. A genetics lab outside Seoul." Not "19:42, April 5th." Not "Tonight at 7:42 PM."
   2. CHARACTER INTRODUCTIONS — name the main characters (not surprise/twist characters) and hint at their role or situation. Give the listener people to care about BEFORE the story starts.
@@ -1353,9 +1353,9 @@ Gemma has known default tics. This section kills them. Read it last, apply it fi
 
 A. BOMBS ALWAYS BEEP — No abstract emotion without an audible physical manifestation.
    Every feeling must have a sound source the listener can actually HEAR.
-   WRONG: [VOICE: CHARACTER, male, 30s, panicked, high] I can't breathe in here.
+   WRONG: [VOICE: CHARACTER, female, 40s, panicked, high] I can't breathe in here.
    RIGHT: [SFX: hissing depressurization]
-          [VOICE: CHARACTER, male, 30s, ragged, breathless] [pants] Seal it. Seal it NOW.
+          [VOICE: CHARACTER, female, 40s, ragged, breathless] [pants] Seal it. Seal it NOW.
    If a character feels something, route it through breath, a dropped object, a chair scrape,
    a mic bump, a swallowed word, a Bark non-verbal token. Never through narration.
 
@@ -1416,7 +1416,7 @@ E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusi
      and the spatial illusion collapses. Use [ENV:] for continuous texture; put the filter in [VOICE:].
    - A muffled voice from behind a wall: set continuous space, then filter inside [VOICE:]:
      [ENV: deep engine thrum through bulkhead]
-     [VOICE: CHARACTER, male, 30s, muffled, strained] Get me out of here.
+     [VOICE: CHARACTER, female, 50s, muffled, strained] Get me out of here.
    - A voice shouting from far away: continuous distance bed, then [VOICE:] with distant/shouting
      and a SHORT, FRAGMENTED line (distance flattens rhythm):
      [ENV: distant wind across open ground]
@@ -2025,7 +2025,7 @@ Begin the full script now. Follow this structure exactly:
 (beat)
 [SFX: action sound]
 ...
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[VOICE: ANNOUNCER, <same gender/age as opening>, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
         else:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" — a contemporary sci-fi audio drama anthology.
@@ -2056,7 +2056,7 @@ Begin the full script now. Follow this structure exactly:
 (beat)
 [SFX: action sound]
 ...
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
+[VOICE: ANNOUNCER, <same gender/age as opening>, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
 
         full_prompt = f"{system}\n\n{user_prompt}"
