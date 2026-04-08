@@ -31,6 +31,7 @@ from random import SystemRandom
 # 11% roll into "always on" or "always off" for any given widget config.
 # SystemRandom is unaffected by random.seed() and gives a true ~11% per run.
 _LEMMY_RNG = SystemRandom()
+_LEMMY_HISTORY = []  # Rolling window of recent Lemmy coin flips (True/False)
 import re
 import socket
 import time
@@ -129,8 +130,9 @@ def _bark_health_check():
 
     try:
         import numpy as np
-        from bark import generate_audio
-    except Exception as e:
+        from .bark_tts import _load_bark
+        from .batch_bark_generator import _generate_single_line
+    except ImportError as e:
         log.info("[VoiceHealth] Bark not importable (%s) — skipping health check", e)
         _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
         return
@@ -138,24 +140,14 @@ def _bark_health_check():
     log.info("[VoiceHealth] Running 1-second Bark health check on English presets...")
     _runtime_log("VOICE_HEALTH: Starting Bark preset health check")
 
-    # Note: intentionally NOT calling preload_models() — it has a known bug
-    # on fresh/partial model downloads where an internal tensor is None and
-    # crashes with "'NoneType' object has no attribute 'item'". The per-preset
-    # generate_audio() calls below will lazy-load everything anyway.
-
     presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
                               {p for p, _ in _ANNOUNCER_PRESETS} |
                               {_LEMMY_PROFILE["voice_preset"]})
 
     # ── Quick smoke test on a single preset BEFORE the full sweep ──
-    # If even one synthesis call raises an exception, Bark itself is broken
-    # (fresh download race, missing weights, CUDA OOM, etc.) — NOT the preset.
-    # In that case we abort the health check entirely and leave _VOICE_PROFILES
-    # untouched, so downstream BatchBark still has every voice available.
     try:
-        import numpy as _np_probe
-        _probe = generate_audio("Test.", history_prompt=presets_to_test[0])
-        _ = _np_probe.asarray(_probe, dtype=_np_probe.float32)
+        model, processor = _load_bark()
+        _probe, _ = _generate_single_line("Test.", presets_to_test[0], model, processor, temperature=0.6)
     except Exception as e:
         log.warning("[VoiceHealth] Bark probe failed (%s) — Bark itself appears broken, "
                     "skipping per-preset check and leaving all voices enabled", e)
@@ -167,8 +159,7 @@ def _bark_health_check():
     for preset in presets_to_test:
         t0 = time.time()
         try:
-            audio = generate_audio(test_text, history_prompt=preset)
-            arr = np.asarray(audio, dtype=np.float32)
+            arr, _ = _generate_single_line(test_text, preset, model, processor, temperature=0.6)
             if arr.size == 0:
                 raise ValueError("empty audio")
             if not np.isfinite(arr).all():
@@ -1997,6 +1988,16 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # Use _LEMMY_RNG (SystemRandom) instead of seeded `random` so the 11%
         # is actually 11% per run, not frozen by the per-episode fingerprint seed.
         _natural_roll = _LEMMY_RNG.random() < 0.11
+        
+        # Lemmy Telemetry Counter
+        global _LEMMY_HISTORY
+        _LEMMY_HISTORY.append(_natural_roll)
+        if len(_LEMMY_HISTORY) > 50:
+            _LEMMY_HISTORY.pop(0)
+        _hits = sum(_LEMMY_HISTORY)
+        _rate = (_hits / len(_LEMMY_HISTORY)) * 100
+        _runtime_log(f"TELEMETRY: Lemmy hit rate [{_hits}/{len(_LEMMY_HISTORY)}] = {_rate:.1f}%")
+        
         lemmy_roll = force_lemmy or _natural_roll
         if force_lemmy:
             _lemmy_source = "🔧 Lemmy was summoned by the boss (force toggle ON)"
@@ -2434,6 +2435,14 @@ Begin the full script now. Follow this structure exactly:
              "([SFX:], [ENV:]) heavily. Build a world the listener can HEAR — creaking metal, "
              "distant alarms, breathing in a spacesuit. Slow-burn tension."),
         ]
+
+        # Feature flag to mitigate concurrent token interleaving corruption.
+        ENABLE_3_OUTLINE_EVALUATOR = False
+
+        if not ENABLE_3_OUTLINE_EVALUATOR:
+            outline_focuses = [
+                ("STORY-DRIVEN", "Focus on a balanced narrative arc, strong characters, and scientific plausibility.")
+            ]
 
         outlines = []
         for i, (focus_name, focus_desc) in enumerate(outline_focuses):
