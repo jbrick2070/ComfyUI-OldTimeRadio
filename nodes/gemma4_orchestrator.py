@@ -23,6 +23,14 @@ import json
 import logging
 import os
 import random
+from random import SystemRandom
+
+# OS-backed RNG for the Lemmy easter-egg coin flip.
+# We can't use the seeded module-level `random` because it's seeded per-episode
+# from the fingerprint (for reproducible Gemma behavior), which would freeze the
+# 11% roll into "always on" or "always off" for any given widget config.
+# SystemRandom is unaffected by random.seed() and gives a true ~11% per run.
+_LEMMY_RNG = SystemRandom()
 import re
 import socket
 import time
@@ -1737,7 +1745,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # colorful metaphors. Rare enough to be a surprise, frequent enough
         # that regulars will notice. Named after Lemmy Kilmister.
         # force_lemmy=True overrides for testing (validates voice collision fix).
-        _natural_roll = random.random() < 0.11
+        # Use _LEMMY_RNG (SystemRandom) instead of seeded `random` so the 11%
+        # is actually 11% per run, not frozen by the per-episode fingerprint seed.
+        _natural_roll = _LEMMY_RNG.random() < 0.11
         lemmy_roll = force_lemmy or _natural_roll
         if force_lemmy:
             _lemmy_source = "🔧 Lemmy was summoned by the boss (force toggle ON)"
