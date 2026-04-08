@@ -2054,6 +2054,12 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         pre_rolled_cast = []
         seen_last = set()
         num_non_announcers = max(1, num_characters)
+        
+        # Injected Lemmy: if he rolled in, he occupies one of the cast slots 
+        # so he appears in the MANDATORY CAST ROSTER (ensuring Gemma uses him).
+        if lemmy_roll:
+            pre_rolled_cast.append("LEMMY")
+
         while len(pre_rolled_cast) < num_non_announcers:
             f_name = cast_rng.choice(_FIRST_NAMES).upper()
             l_name = cast_rng.choice(_LAST_NAMES).upper()
@@ -2232,9 +2238,15 @@ Begin the full script now. Follow this structure exactly:
             if _roster:
                 _roster_list = sorted(_roster)
                 _leaks_fixed = 0
-                # Match direct-address: ", Capitalname." or ", Capitalname," or "Capitalname."
-                # Only capitalized single-word tokens 3-8 chars long, not ALL-CAPS.
-                _addr_pat = re.compile(r'(?<=[,\s])([A-Z][a-z]{2,7})(?=[.,!?\s])')
+                # Match direct-address tokens in dialogue body.
+                # 1. Title-case: "Rex." or ", Maya," — common in narrative speech.
+                # 2. ALL-CAPS: "REX" or "MAYA" — common in direct address inside dialogue.
+                # Token length 2-8 chars, followed by punctuation or whitespace.
+                _addr_pat = re.compile(
+                    r'(?<=[,\s])'
+                    r'([A-Z][a-z]{1,7}|[A-Z]{2,8})'
+                    r'(?=[.,!?\s])'
+                )
                 def _leak_fix(m):
                     nonlocal _leaks_fixed
                     token = m.group(1)
@@ -2253,8 +2265,9 @@ Begin the full script now. Follow this structure exactly:
                         "always", "forever", "tonight", "tomorrow", "yesterday",
                     }:
                         return token
-                    # Phonetic match to closest roster name
-                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.55)
+                    # Phonetic match to closest roster name (cutoff 0.60 — more precise
+                    # than 0.55 to prevent false replacements of legitimate names).
+                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.60)
                     if match:
                         _leaks_fixed += 1
                         # Preserve title-case for dialogue flow
@@ -3270,6 +3283,37 @@ Format your response exactly as:
                 f"Script parser produced 0 dialogue lines from {len(text)}-char input. "
                 "Aborting run to prevent silent audio failure."
             )
+
+        # ── PRO QA: Enforce ANNOUNCER bookends ──
+        # Guarantees the Announcer always opens and closes the show, even if the LLM forgets.
+        # Only applies to full scripts (heuristically > 5 lines) to avoid polluting unit tests.
+        dialogue_indices = [i for i, ln in enumerate(lines) if ln.get("type") == "dialogue"]
+        if len(dialogue_indices) > 5:
+            first_idx = dialogue_indices[0]
+            last_idx = dialogue_indices[-1]
+            
+            if lines[first_idx]["character_name"] != "ANNOUNCER":
+                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER opening. Auto-injecting.")
+                _runtime_log("QA_REPAIR: Missing ANNOUNCER opening auto-injected")
+                lines.insert(first_idx, {
+                    "type": "dialogue",
+                    "character_name": "ANNOUNCER",
+                    "voice_traits": "male, 50s, authoritative, calm",
+                    "line": "Welcome to Signal Lost. Tonight's broadcast takes us into the unknown."
+                })
+                # Re-evaluate indices
+                dialogue_indices = [i for i, ln in enumerate(lines) if ln.get("type") == "dialogue"]
+                last_idx = dialogue_indices[-1]
+
+            if lines[last_idx]["character_name"] != "ANNOUNCER":
+                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER closing. Auto-injecting.")
+                _runtime_log("QA_REPAIR: Missing ANNOUNCER closing auto-injected")
+                lines.insert(last_idx + 1, {
+                    "type": "dialogue",
+                    "character_name": "ANNOUNCER",
+                    "voice_traits": "male, 50s, authoritative, calm",
+                    "line": "And so the transmission ends. This has been Signal Lost. Stay safe."
+                })
 
         return lines
 
