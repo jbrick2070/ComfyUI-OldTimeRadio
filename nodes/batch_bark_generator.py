@@ -327,9 +327,11 @@ def _clean_text_for_bark(text):
     }
 
     def _filter_bracket_tag(m):
-        # Normalize: lowercase + collapse any internal whitespace so
-        # "[ laughter ]" matches "[laughter]" in the whitelist
-        tag = re.sub(r'\s+', '', m.group(0).lower())
+        # Normalize: lowercase + collapse any internal whitespace to single spaces so
+        # "[ clears  throat ]" matches "[clears throat]" in the whitelist
+        inner = m.group(0)[1:-1].strip().lower()
+        inner = re.sub(r'\s+', ' ', inner)
+        tag = f"[{inner}]"
         return tag if tag in _BARK_VALID_TOKENS else ""
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)
