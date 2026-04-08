@@ -194,7 +194,7 @@ Three workflows ship in the `workflows/` folder:
 
 ## The LEMMY Easter Egg
 
-There's an 11% chance per run that a character named **LEMMY** — a grizzled, wrench-wielding engineer named after Lemmy Kilmister — crashes the episode. He always gets `v2/en_speaker_8` (gravelly, English, 50s), always has a signature wrench-clank SFX on his first line, and always speaks in blunt, colorful mechanic metaphors.
+There's an 11% chance per run that a character named **LEMMY** — a grizzled, wrench-wielding engineer — crashes the episode. He always gets `v2/en_speaker_8` (gravelly, English, 50s), always has a signature wrench-clank SFX on his first line, and always speaks in blunt, colorful mechanic metaphors.
 
 Watch for this in the ComfyUI console:
 ```
@@ -202,6 +202,18 @@ Watch for this in the ComfyUI console:
 ```
 
 For testing, flip the `summon_lemmy` toggle on Node 1 to guarantee his appearance.
+
+### Lemmy's Lineage — A Tribute Across Three Generations
+
+Our Lemmy is the third link in a chain that stretches back to the dawn of sci-fi radio drama:
+
+**1. Lemuel "Lemmy" Barnet** — the cockney engineer in Charles Chilton's BBC radio serial *Journey into Space* (1953–1958), the original British sci-fi audio epic. The role was voiced across the original *Journey to the Moon*, *The Red Planet*, and *The World in Peril* arcs by Andrew Faulds, Guy Kingsley Poynter, Bruce Beeby, David Kossoff, Don Sharp, Alfie Bass, David Williams, John Pullen, Ed Bishop, Nigel Graham, and Anthony Hall — and later in the modern revivals (*Frozen in Time*, *The Host*) by David Jacobs, Alan Marriott, Michael Beckley, Chris Moran, Toby Stephens, Jot Davies, and Chris Pavlo.
+
+**2. Ian "Lemmy" Kilmister** — Motörhead founder and rock icon. Chose his stage name directly after Lemmy Barnet from *Journey into Space*, which he listened to as a kid in the 1950s. ([source](https://www.reddit.com/r/todayilearned/comments/mdeffs/til_lemmy_chose_his_name_after_a_character_from/))
+
+**3. Our Lemmy** — the 11% ghost in the SIGNAL LOST pipeline. Grizzled, wrench-wielding, gravel-voiced, crashes episodes unannounced. Stands on the shoulders of every actor who ever climbed into Jet Morgan's rocket, and the rock legend who took the name to the stage.
+
+It's radio drama → rock and roll → AI radio drama. History works in strange loops. SIGNAL LOST is fundamentally a love letter to the *Journey into Space* era, and the 11% Lemmy roll is how we keep the ghost on the bridge.
 
 ---
 
