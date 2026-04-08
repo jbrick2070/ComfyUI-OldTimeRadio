@@ -358,7 +358,6 @@ _ANNOUNCER_PRESETS = [
     ("v2/en_speaker_1", "Male, measured, calm"),
     ("v2/en_speaker_4", "Female, warm, energetic"),
     ("v2/en_speaker_9", "Female, mature, authoritative"),
-    ("v2/en_speaker_5", "Male, warm, older"),
 ]
 
 # LEMMY fixed profile — always gravelly/raspy male, English-native preset
@@ -2020,7 +2019,7 @@ Begin the full script now. Follow this structure exactly:
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
 (beat)
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: ANNOUNCER, <male|female — ALTERNATE per episode, do NOT default to male>, <40s|50s|60s>, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
 (beat)
@@ -2051,7 +2050,7 @@ Begin the full script now. Follow this structure exactly:
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
 (beat)
-[VOICE: ANNOUNCER, male, 50s, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
+[VOICE: ANNOUNCER, <male|female — ALTERNATE per episode, do NOT default to male>, <40s|50s|60s>, authoritative, calm] [Opening introduction — time, place, character names and roles, science hook, tagline. REQUIRED. Always first.]
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] First dramatic line — drop us in medias res.
 [VOICE: CHARACTER_NAME, gender, age, tone, energy] Response line.
 (beat)
