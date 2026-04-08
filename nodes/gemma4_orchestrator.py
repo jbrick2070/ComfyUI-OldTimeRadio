@@ -2859,7 +2859,7 @@ Write Act {act_num} now:"""
         name (CHAR_A, CHAR_B, ...) so Bark still produces audio.
         """
         lines = []
-        _fallback_counter = [0]   # mutable so the inner closure can mutate it
+        _fallback_counter = 0   # incremented in the for-loop below for CHAR_A / CHAR_B fallback names
 
         # OTR Canonical 1.0 RegEx Patterns
         # BUG-009 fix: accept both `=== SCENE N ===` and `=== SCENE N ***` (Gemma
@@ -2906,8 +2906,8 @@ Write Act {act_num} now:"""
                 # Detect the "no NAME" failure: first field is a gender/age word
                 # e.g. [VOICE: male, 40s, calm] instead of [VOICE: NAME, male, 40s, calm]
                 if raw_name.lower() in self._GENDER_WORDS:
-                    _fallback_counter[0] += 1
-                    fallback_name = f"CHAR_{chr(64 + _fallback_counter[0])}"  # CHAR_A, CHAR_B…
+                    _fallback_counter += 1
+                    fallback_name = f"CHAR_{chr(64 + _fallback_counter)}"  # CHAR_A, CHAR_B…
                     log.warning(
                         "[ScriptParser] Malformed VOICE tag — name field is a descriptor word '%s'. "
                         "Assigning fallback name '%s'. Full line: %s",
@@ -2931,7 +2931,7 @@ Write Act {act_num} now:"""
             if s and not s.startswith("#") and not s.startswith("---"):
                 lines.append({"type": "direction", "text": s})
 
-        malformed = _fallback_counter[0]
+        malformed = _fallback_counter
         if malformed:
             log.warning(
                 "[ScriptParser] %d malformed VOICE tag(s) detected (missing character name). "
