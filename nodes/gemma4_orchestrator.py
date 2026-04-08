@@ -1399,6 +1399,14 @@ D. FORBIDDEN CONSTRUCTS (hard bans — these are Gemma's default tics, cut them 
    - Narrating silence: "the silence stretched between them", "a heavy pause fell", or any similar
      prose describing quiet. BANNED. Silence is created by (beat), by cutting to ENV/SFX, or by
      the absence of dialogue — never by narrating the lack of sound.
+   - BAKED STOCK NAMES: the following character names are BANNED in ALL roles because Gemma
+     defaults to them and they flatten every cast into the same three people. Do NOT use them
+     as first names, last names, or call signs:
+     REX, JIAN, SARAH, JOHN, ALEX, MAYA, KAI, ZARA, NOVA, ECHO, RAVEN, CHEN, LIU, PARK, VASQUEZ,
+     REEVES, HARPER, CARTER, BLAKE, ADA, EVE, JAX.
+     The ONLY permitted recurring name is LEMMY (the radio ghost easter egg), and LEMMY appears
+     at most ONCE per episode when triggered by the Director, never invented by you.
+     Invent fresh names drawn from genuinely varied ancestries, age ranges, and regions.
 
 E. SPATIAL LAYERING THROUGH EXISTING TOKENS — Distance, direction, and occlusion must be AUDIBLE.
    The tag system stays locked at four tokens: [ENV:], [SFX:], [VOICE:], (beat). Do NOT invent
