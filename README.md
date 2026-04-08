@@ -23,6 +23,16 @@ Every run is a brand new, complete episode generated entirely from scratch.
 
 ---
 
+## Current Realities & Beta Quirks
+
+While SIGNAL LOST aims for a fully automated pipeline, **we are bound by the realities of local hardware.** Generating a complete 5-act to 10-act radio drama entirely from scratch is a massive computational lift. 
+
+Please be aware: **Full epic episodes can take over an hour to render on local hardware.** Because of the sequential generation of tokens, voices, Foley effects, and CRT filters, the pipeline runs deep.
+
+Our advice? **Queue the prompt, walk away, and let it cook.** The results are worth the wait.
+
+---
+
 ## What's New in v1.2
 
 ### Narrative Patterns 1–6
