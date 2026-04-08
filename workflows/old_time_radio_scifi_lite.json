@@ -35,7 +35,7 @@
         "medium (5 acts)",
         "tense claustrophobic",
         "balanced",
-        false,
+        true,
         true
       ],
       "inputs": [],
