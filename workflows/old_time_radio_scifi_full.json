@@ -22,7 +22,7 @@
       "widgets_values": [
         "The Last Frequency",
         "hard_sci_fi",
-        "📻 standard (8 min)",
+        "\ud83d\udcfb standard (8 min)",
         8,
         4,
         "google/gemma-4-E4B-it",
@@ -35,7 +35,8 @@
         "medium (5 acts)",
         "tense claustrophobic",
         "balanced",
-        false
+        false,
+        true
       ],
       "inputs": [],
       "outputs": [
@@ -620,7 +621,7 @@
   ],
   "groups": [
     {
-      "title": "1. WRITE THE STORY 📝",
+      "title": "1. WRITE THE STORY \ud83d\udcdd",
       "bounding": [
         20,
         80,
@@ -632,7 +633,7 @@
       "font_size": 24
     },
     {
-      "title": "2. MAKE THE VOICES & SOUNDS 🎙️",
+      "title": "2. MAKE THE VOICES & SOUNDS \ud83c\udf99\ufe0f",
       "bounding": [
         970,
         80,
@@ -644,7 +645,7 @@
       "font_size": 24
     },
     {
-      "title": "3. PUT IT ALL TOGETHER 🎬",
+      "title": "3. PUT IT ALL TOGETHER \ud83c\udfac",
       "bounding": [
         1920,
         80,

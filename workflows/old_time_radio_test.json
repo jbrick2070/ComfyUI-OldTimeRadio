@@ -22,7 +22,7 @@
       "widgets_values": [
         "Test Signal",
         "hard_sci_fi",
-        "🧪 test (1 min)",
+        "\ud83e\uddea test (1 min)",
         1,
         3,
         "google/gemma-4-E4B-it",
@@ -35,7 +35,8 @@
         "medium (5 acts)",
         "tense claustrophobic",
         "balanced",
-        false
+        false,
+        true
       ],
       "inputs": [],
       "outputs": [
@@ -537,7 +538,7 @@
   ],
   "groups": [
     {
-      "title": "1. QUICK STORY 📝",
+      "title": "1. QUICK STORY \ud83d\udcdd",
       "bounding": [
         20,
         80,
@@ -549,7 +550,7 @@
       "font_size": 24
     },
     {
-      "title": "2. QUICK AUDIO & VIDEO 🎬",
+      "title": "2. QUICK AUDIO & VIDEO \ud83c\udfac",
       "bounding": [
         970,
         80,
@@ -571,7 +572,7 @@
       ]
     },
     "info": {
-      "name": "OTR Test â€” Ultra Lite",
+      "name": "OTR Test \u00e2\u20ac\u201d Ultra Lite",
       "author": "Jeffrey Brick",
       "description": "7-line pipeline smoke test. Fast Bark render, 720p video. Use for regression testing after node changes.",
       "version": "1.0.0-test"
