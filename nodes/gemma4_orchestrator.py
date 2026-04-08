@@ -1260,12 +1260,12 @@ IMPORTANT: Vary the arc across episodes. Do NOT default to the same structure ev
   - MEDIUM episodes (10-20 min): 3-5 sentences. Room to name 2 characters and paint the scene.
   - LONG episodes (20+ min): 5-8 sentences. Set the world, introduce 2-3 characters by name and role, build atmosphere, let the tagline land with weight.
 
-  EXAMPLES (showing tone variation and character reveals):
-  DRAMATIC: "April 5th, 2026. A blood pressure research lab in Kyoto. Dr. Lena Vasquez has spent eleven years chasing a molecule that could save millions — and today, her funding runs out. Her lab partner, James Osei, has already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
-  HORROR: "March 12th, 2026. Low Earth Orbit. The International Space Station. Commander Priya Sharma runs a crew of six. Flight Engineer Tomás Ruiz handles the software. A routine update just taught the onboard AI to lie — and only Tomás noticed. Tonight on Signal Lost: trust is a human luxury."
-  COMEDY: "November 3rd, 2025. A gene therapy clinic in Seoul. Dr. Park and Dr. Whitfield can't agree on anything — not the dosage, not the delivery method, not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
+  EXAMPLES (showing tone and STRUCTURE — invent your own fresh character names, do NOT copy these roles):
+  DRAMATIC: "A research lab. A late afternoon. The lead scientist has spent eleven years chasing a single molecule. Today the funding runs out. Her lab partner already packed his desk. But the data from this afternoon's trial is doing something no one predicted. Tonight on Signal Lost: the breakthrough came too late. Or did it?"
+  HORROR: "Low orbit. A sealed station. The commander runs a crew of six. The flight engineer handles the software. A routine update just taught the onboard system to lie, and only one person on board noticed. Tonight on Signal Lost: trust is a human luxury."
+  COMEDY: "A gene therapy clinic. Two doctors who cannot agree on anything. Not the dosage. Not the delivery method. Not whose turn it is to refill the coffee. Last week they accidentally reversed blindness in three patients using a virus they barely understand. Now every hospital on Earth is calling. Tonight on Signal Lost: the cure works. The partnership might not survive it."
 - ANNOUNCER LINE CAP (HARD RULE): The ANNOUNCER gets a maximum of 3 lines total in the entire episode — one opening introduction (see above), one closing epilogue, one optional mid-episode transition. No more. Do NOT let the ANNOUNCER deliver multi-line science lectures. If you need to convey science facts, put them in a character's mouth instead.
-- DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("Hayes, if we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
+- DIALOGUE RATIO (HARD RULE): At least 80% of all lines must be spoken by non-ANNOUNCER characters. Science exposition delivered as character dialogue ("If we don't reroute the coolant in 60 seconds, the whole lab goes dark") counts as drama. An ANNOUNCER reading facts does not.
 - GENDER BALANCE: Aim for roughly 50/50 male and female characters (excluding ANNOUNCER). Diverse casts sound better and use the full range of available voice presets.
 - The CLOSING must be a factual "Hard Science Epilogue" — keep it to 2-3 sentences maximum. One real citation. Done.
 
@@ -1299,9 +1299,9 @@ Gemma has known default tics. This section kills them. Read it last, apply it fi
 
 A. BOMBS ALWAYS BEEP — No abstract emotion without an audible physical manifestation.
    Every feeling must have a sound source the listener can actually HEAR.
-   WRONG: [VOICE: REX, male, 30s, panicked, high] I can't breathe in here.
+   WRONG: [VOICE: CHARACTER, male, 30s, panicked, high] I can't breathe in here.
    RIGHT: [SFX: hissing depressurization]
-          [VOICE: REX, male, 30s, ragged, breathless] [pants] Seal it. Seal it NOW.
+          [VOICE: CHARACTER, male, 30s, ragged, breathless] [pants] Seal it. Seal it NOW.
    If a character feels something, route it through breath, a dropped object, a chair scrape,
    a mic bump, a swallowed word, a Bark non-verbal token. Never through narration.
 
@@ -1831,7 +1831,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.info("[Gemma4ScriptWriter] ★ Lemmy Easter egg activated (11%% roll) — wrench SFX cued")
 
         # ── Gemma owns character names — they become canonical character_ids ──
-        # We do NOT pre-seed names. Gemma invents HAYES, DR_VOSS, etc. while
+        # We do NOT pre-seed names. Gemma invents its own character names while
         # writing. Those names are stable pipeline keys used by BatchBark and
         # SceneSequencer. The Director adds a procedural display_name (e.g.
         # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
@@ -2776,7 +2776,7 @@ Write Act {act_num} now:"""
                 dialogue   = m.group(3).strip()
 
                 # Detect the "no NAME" failure: first field is a gender/age word
-                # e.g. [VOICE: male, 40s, calm] instead of [VOICE: HAYES, male, 40s, calm]
+                # e.g. [VOICE: male, 40s, calm] instead of [VOICE: NAME, male, 40s, calm]
                 if raw_name.lower() in self._GENDER_WORDS:
                     _fallback_counter[0] += 1
                     fallback_name = f"CHAR_{chr(64 + _fallback_counter[0])}"  # CHAR_A, CHAR_B…
@@ -3170,7 +3170,7 @@ class Gemma4Director:
 
                 used_presets.add(profile["voice_preset"])
                 # FIX (v1.1): Use the ORIGINAL script name as the dict key so
-                # BatchBark can match [VOICE: HAYES ...] to the right preset.
+                # BatchBark can match [VOICE: NAME ...] to the right preset.
                 # The procedural name is stored in notes for the treatment file.
                 new_voice_assignments[upper_name] = {
                     "voice_preset": profile["voice_preset"],
