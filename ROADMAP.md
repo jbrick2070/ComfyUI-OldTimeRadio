@@ -100,6 +100,30 @@ When v1.3 ships and it's time to update [comfyui-custom-node-survival-guide](htt
 
 Order matches the dev workflow: scaffold → register → wire → run → cache → serialize → pipe → test → ship. Tag/area search still works; the reordering is purely so cold-start AI sessions hit the right entries in the right order. Also fold in any new bugs found during v1.3 development.
 
+### 🔥 Issues observed in batch run 2026-04-07 23:59 (v1.2.0 production) — RAMP FOR v1.3, do not solution yet
+
+Real production log evidence captured during overnight batch. All of these need investigation in the v1.3 cycle:
+
+1. **Name leak guard appears non-functional.** Despite v1.2.0.5 FIX-4 (difflib NameLeakGuard against [VOICE: NAME] roster), the latest run still surfaced REX, MAYA, ZARA, KYRA, KYO, KAI, BRUX, BRYN as character names. Need to verify: (a) is the guard actually being called on the final script, (b) is it called BEFORE or AFTER the cast assignment, (c) are these names leaking from the procedural pool itself (i.e. the pool still contains baked names) rather than from LLM hallucination. Suspect the pool is the source — these names look pool-shaped, not hallucinated. Audit `_FIRST_NAMES` for any of: REX, MAYA, ZARA, KYRA, KYO, KAI, BRUX, BRYN. If found, remove and replace with cleaner pool entries. Standing rule: **no baked character names**.
+
+2. **Lemmy stayed in garage — confirm Lemmy actually fires.** Log shows `[Gemma4ScriptWriter] 💤 Lemmy stayed in the garage tonight [force=False, rng_hit=False]`. Need to verify Lemmy is actually firing at the documented ~11% rate across a real batch (not just the synthetic RNG harness). Add a counter that logs Lemmy hit rate over the last N episodes so the next run can confirm the easter egg is alive. If 0/N hits, the integration is broken even though the RNG harness passes.
+
+3. **OpenClose 3-outline parallel generator is producing garbled interleaved output then timing out.** All three outline phases (CHARACTER-DRIVEN, SCIENCE-DRIVEN, ATMOSPHERE-DRIVEN) hit the 300s timeout, then each outline was discarded as "too short (0 chars < 200)" — but the actual log shows the three streams were **interleaving tokens into a single garbled blob** (premise/character text from all three outlines mixed token-by-token in the live stream). Suspect: the parallel inference path is sharing a single output buffer or stdout sink across the three Gemma4 calls, which corrupts each individual stream's parser. Either (a) properly isolate the three streams with separate buffers, (b) serialize them sequentially as a fallback, or (c) gate the parallel path behind a feature flag while it's broken. Falling back to direct generation works but loses the 3-outline evaluator quality lift the feature was designed for.
+
+4. **VoiceHealth Bark probe broken.** `[VoiceHealth] Bark probe failed ('NoneType' object has no attribute 'item') — Bark itself appears broken, skipping per-preset check and leaving all voices enabled`. The 1-second Bark health check is throwing on a None.item() call somewhere — likely an unwrapped tensor result from a probe that returned no audio. The graceful fallback (skip check, leave voices enabled) is the right behavior, but the underlying probe needs to be fixed so we actually validate voice presets before a real run starts.
+
+5. **Inference times are very high.** 1131s + 1048s + 862s + 718s for the four observed Gemma4 calls in this run = ~62 minutes of pure LLM time before the script even gets to revision/critique. Log notes `Flash Attention 2 not installed — using SDPA fallback`. Investigate whether installing flash-attn would meaningfully cut inference time on the RTX 5080 Laptop, or whether smaller `max_new_tokens` budgets per phase (the 600-token outline calls are the worst offenders relative to their output) would help more. Also consider whether the 3-outline parallel path (issue #3) is actually slower than serial when it's broken.
+
+6. **Outline calls budgeted at 600 tokens but stuck producing garbled streams that never converge.** Even after timeout, the outlines came back as 0-char discards. Token budget of 600 may not be the issue if the stream itself is corrupt — fix issue #3 first, then re-evaluate budgets.
+
+**Suggested v1.3 priority order:**
+1. Pool audit for baked names (issue 1) — fastest, highest user-visible win
+2. OpenClose parallel stream corruption (issue 3) — biggest quality regression
+3. Lemmy hit-rate telemetry (issue 2) — easy to add, confirms the easter egg
+4. VoiceHealth probe fix (issue 4) — small, isolated, important for next batch
+5. Flash Attention 2 evaluation (issue 5) — performance, not correctness
+6. Re-evaluate token budgets after #3 is fixed (issue 6)
+
 ### Standing rules (Jeffrey's preferences — DO NOT VIOLATE)
 
 - **No baked character names anywhere in code or comments.** Procedural pools only. The only exceptions are LEMMY and ANNOUNCER (which are structural, not character-content).
