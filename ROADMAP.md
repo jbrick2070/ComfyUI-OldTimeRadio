@@ -1,8 +1,107 @@
 # ComfyUI-OldTimeRadio — Roadmap
 
-**Current shipped:** v1.1 (tagged `v1.1`)
-**In flight:** v1.2 narrative beta on `v1.2-narrative-beta` at commit `e2f210a` — all 6 patterns merged as prompt-level MVP, awaiting boot test
+**Current shipped:** v1.2.0 stable (tagged `v1.2.0`, merge commit `7b67bae`, README polish `ce07e70`) — live on `main`
+**Next branch:** `v1.3-arc-enhancer` (NOT YET CREATED — branch tomorrow off clean `main`)
 **Hardware ceiling:** RTX 5080 Laptop, 16GB VRAM. Gemma 4 E4B only — 27B does NOT fit. No API keys, no paid services, 100% local open-source.
+
+---
+
+## 🤖 NEW CONVERSATION HANDOFF — READ THIS FIRST
+
+If you are a fresh Claude opening this repo with no prior conversation context, this section is your continuity brief. Read it before doing anything else.
+
+### Where we are (end of session 2026-04-08)
+
+**v1.2.0 is SHIPPED to main.** Tag `v1.2.0` exists. README is polished. The four critical bug fixes from v1.2.0.5 are locked in:
+
+| Commit | What landed |
+|--------|-------------|
+| `ce07e70` | README v1.2 polish (Narrative Patterns 1-6, 8316 cast combos, Lemmy audit, v1.2.0.5 bug fixes, v1.3 roadmap) |
+| `7b67bae` | Merge `v1.2-narrative-beta` → `main`, tagged `v1.2.0` |
+| `d9a03f8` | **v1.2.0.5 bug fixes** — revision token budget + minced oaths + female pool + name leak guard |
+| `3d152bf` | Final scrub: 8316 cast combos + Lemmy RNG sanity test (10k trials, ±1.5%) |
+
+### The four v1.2.0.5 bug fixes inside `nodes/gemma4_orchestrator.py`
+
+1. **FIX-1: Revision token budget** (~line 2651) — `draft_token_estimate = int(len(draft_text) / 3.5)` then `revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * 2.0), 2048)`. Sizes from draft length, not target_words. Fixes Scene 4 decapitation.
+
+2. **FIX-2: Minced oaths pool** (~line 234) — `_MINCED_OATHS` list of 34 period-authentic oaths (Stars above, Jiminy, Great Scott, Thunderation, etc.). `_content_filter` rotates through them with capitalization preservation instead of emitting `[BLEEP]`.
+
+3. **FIX-3: Female preset pool** (~line 403) — `en_speaker_7` reclassified from male/androgynous to female. Now 3 distinct female presets (4 / 7 / 9). Stops VEX/ZARA from colliding on `en_speaker_9`.
+
+4. **FIX-4: NameLeakGuard** (~line 2177) — post-`_content_filter` pass extracts roster from `[VOICE: NAME, ...]` tags, scans dialogue body for capitalized direct-address tokens not in roster, fuzzy-matches via `difflib.get_close_matches` (cutoff=0.55) against the real roster. Catches "Rex" → "Vex" type errors. Zero hardcoded names.
+
+### What's queued for v1.3 (TOMORROW'S WORK — START HERE)
+
+**Top priority: v1.3-A Story Arc Enhancer** — this is the feature reviewers are gating narrative signoff on. v1.2 ships solid plumbing but reviewers keep flagging "weak ending" because Gemma's openings and closings don't earn each other. Build this on a new branch `v1.3-arc-enhancer`.
+
+#### The Arc Enhancer spec (designed but not yet built)
+
+**Phase A — Arc Coherence Check** (post-revision, pre-content-filter)
+
+After `_critique_and_revise` returns, run a structural scan on the script. Inspect TWO windows:
+
+- **Opening window** — first ANNOUNCER line + first 2-3 character `[VOICE:]` lines
+- **Closing window** — last 2-3 character `[VOICE:]` lines + epilogue ANNOUNCER line
+
+Check 5 things:
+
+1. **Truncation detector** — last line ends mid-sentence? (no terminal `.`, `!`, `?`, `"`, or ends on connective word like "the", "and", "to")
+2. **Weak final scene** — does the last `=== SCENE N ===` block have ≥4 dialogue lines? (Scene 4 with only 2 lines = the repeated reviewer complaint)
+3. **Premise payoff** — does any keyword from the outline's climax/twist beat appear in the closing window?
+4. **Tonal echo / seed plant** — does any noun/image/sound from the opening window reappear (transformed) in the closing window?
+5. **Epilogue presence** — `[VOICE: ANNOUNCER` in the last 500 chars of script?
+
+Score = count of passes / 5. If score < 4 → trigger Phase B.
+
+**Phase B — Paired Bookend Rewrite** (~800 token Gemma call, only fires when triggered)
+
+Send Gemma the opening window + closing window + which checks failed + this prompt:
+
+> "This script's opening and closing don't earn each other. Rewrite BOTH — the first 3 dialogue lines AND the last 3 dialogue lines — so they form a complete arc. Plant a line, image, or sensation in the opening that pays off transformed in the closing. Options for the echo: (a) same words, new meaning (b) same sound, new source (c) same character, no longer the same person. The opening must contain the seed of the ending. The ending must honor the opening's promise. Keep all middle scenes unchanged. Commit to the bold beat — NO fake-outs, NO 'it was just space debris', NO truncation."
+
+Splice the rewritten opening and closing back into the script in place of the original windows.
+
+**Phase C — Telemetry**
+
+Log everything so the user can see what happened:
+```
+[ArcCheck] Opening window: 4 lines, 89 words
+[ArcCheck] Closing window: 3 lines, 47 words
+[ArcCheck] Arc score: 3/5 (truncation=False, weak_scene4=True, payoff=False, echo=False, epilogue=True)
+[ArcCheck] TRIGGERED — rewriting bookends as matched pair
+[ArcCheck] Rewrite complete: opening +12 words, closing +38 words, echo phrase = "the vacuum sings"
+```
+
+#### Where to plug it in
+
+In `gemma4_orchestrator.py`, add a new method `_arc_check_and_rewrite_bookends(script_text, outline_text, ...)` on the `Gemma4ScriptWriter` class. Call it AFTER `_critique_and_revise` returns, BEFORE `_content_filter` runs (so the arc rewrite gets minced-oath scrubbed too). Around line 2170 in the current file.
+
+#### Optional v1.3 backport to v1.2 (low risk)
+
+Diagnostic-only mode: run Phase A arc score logging on every episode, NEVER call Phase B. Pure observability — gives user a quantified arc health reading on tonight's batch without changing any output. Decide tomorrow whether this is worth backporting before the full v1.3 lands.
+
+### Standing rules (Jeffrey's preferences — DO NOT VIOLATE)
+
+- **No baked character names anywhere in code or comments.** Procedural pools only. The only exceptions are LEMMY and ANNOUNCER (which are structural, not character-content).
+- **No hardcoded blocklists for names.** Use difflib / structural detection instead.
+- **No curse words anywhere** — in code, comments, or output. Minced oaths only.
+- **SFW, non-violent content** — no exceptions even for "research" framing.
+- **Clean code, clean logs** — meaningful names, story arcs with start/middle/end, no dev artifacts in repo.
+- **Jeffrey runs ALL git commands manually in PowerShell.** Never use the Bash tool to push/commit. Always hand back a PowerShell block with `cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio` baked in (he may not be in the right directory).
+- **After every push, verify GitHub HEAD lockstep against local.** Scan for 0-byte files, BOM corruption, missing node registrations. Check the survival guide: https://github.com/jbrick2070/comfyui-custom-node-survival-guide/blob/main/DETAILED_GUIDE.md
+- **Always regression-test for widget bugs.** AST parse + Lemmy RNG check (`python tests/lemmy_rng_check.py`) before declaring done.
+- **Lemmy RNG is sacred.** `_LEMMY_RNG = SystemRandom()` at line ~33 of `gemma4_orchestrator.py`. Threshold 0.11. Unseeded. Statistically verified at 10.88% over 10k trials. Do not touch.
+
+### First moves for tomorrow's session
+
+1. Confirm `git status` is clean on `main` and `git pull origin main` is up to date
+2. Branch: `git checkout -b v1.3-arc-enhancer`
+3. Build `_arc_check_and_rewrite_bookends()` per the spec above
+4. Add a unit test for the arc score detector with synthetic good/bad scripts in `tests/`
+5. Run regression: AST parse + Lemmy RNG check
+6. Hand Jeffrey a PowerShell push block (with `cd` baked in)
+7. Verify GitHub lockstep after he pushes
 
 ---
 
@@ -203,4 +302,4 @@ Research-backed diversity increase: up to 2.1x. This alone breaks the "ambiguous
 
 ---
 
-*Roadmap updated 2026-04-07 — v1.2 narrative beta merged (commit `e2f210a`); v1.3 hot with N1–N23 (10 hardening items from v1.2 peer review + 13 items curated from the Generation Improvements spec) plus production polish P1–P7. Fluff and architectural overhauls punted to v1.4.*
+*Roadmap updated 2026-04-07 — v1.2 narrative beta merged (commit `e2f210a`); v
