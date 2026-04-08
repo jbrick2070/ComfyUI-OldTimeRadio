@@ -230,8 +230,23 @@ _BLOCKED_WORDS = {
     "rape", "raped", "raping", "molest",
 }
 
-# Replacement word — period-appropriate euphemism
-_REPLACEMENT = "[BLEEP]"
+# FIX-2 (v1.2): Minced-oath pool replaces [BLEEP] censor.
+# Period-authentic 1940s radio euphemisms + pulp adventure + sci-fi flavor.
+# Rotated per-replacement so the same script doesn't repeat the same oath twice.
+_MINCED_OATHS = [
+    # Golden-age radio (G-rated)
+    "Golly", "Gee", "Gee whiz", "Jeepers", "Jiminy", "Jiminy Cricket",
+    "Heavens", "Heavens to Betsy", "Good heavens", "My stars",
+    "Land sakes", "Goodness gracious", "For Pete's sake", "By Jove",
+    "Great Scott", "Cheese and crackers",
+    # Pulp adventure
+    "Blazes", "Thunderation", "Hot dog", "Holy smokes", "Holy cow",
+    "Holy mackerel", "Suffering succotash", "Leapin' lizards",
+    "Good grief", "Gadzooks", "Zounds",
+    # Sci-fi space-opera
+    "Stars above", "By the stars", "Great galaxies", "Holy vacuum",
+    "Sweet cosmos", "By the rings", "Thundering comets", "Sputtering satellites",
+]
 
 
 def _content_filter(text: str) -> tuple:
@@ -239,12 +254,22 @@ def _content_filter(text: str) -> tuple:
 
     Returns (cleaned_text, list_of_replacements_made).
     Uses whole-word regex matching to avoid false positives.
+    Replacements rotate through _MINCED_OATHS (period-appropriate euphemisms)
+    instead of emitting [BLEEP] — preserves the old-time-radio atmosphere.
     """
     replacements = []
+    _oath_cursor = [0]  # list-wrapped so closure can mutate
     def _replace(match):
         word = match.group(0)
         replacements.append(word.lower())
-        return _REPLACEMENT
+        oath = _MINCED_OATHS[_oath_cursor[0] % len(_MINCED_OATHS)]
+        _oath_cursor[0] += 1
+        # Preserve capitalization style of the original word
+        if word.isupper():
+            return oath.upper()
+        if word[0].isupper():
+            return oath
+        return oath.lower()
 
     # Build regex: whole-word match, case-insensitive
     if not _BLOCKED_WORDS:
@@ -368,9 +393,14 @@ _VOICE_PROFILES = [
     ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s"}),
     ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s"}),
     ("v2/en_speaker_2", "male",   "en", {"calm", "measured", "stoic", "30s", "40s"}),  # sounds male/neutral in practice
-    ("v2/en_speaker_7", "male",   "en", {"sharp", "anxious", "20s", "30s"}),            # androgynous but reads male
     ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
     ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
+    # FIX-3 (v1.2): en_speaker_7 reclassified to female to prevent CAST_GENDER_POOL_EXHAUSTED
+    # on 3-female episodes (was causing VEX/ZARA to share en_speaker_9 and sound identical).
+    # Bark labels en_speaker_7 as androgynous — in English it reads soft/lighter so we
+    # use it as the "younger" female slot (20s, anxious/sharp). Gives us 3 distinct
+    # female presets (4, 7, 9) covering young/warm-adult/mature ranges.
+    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s"}),
     # ── DISABLED: Foreign accent presets ──────────────────────────────
     # These caused Bark hallucinations — the model generates foreign-language
     # phonemes when fed English text, producing gibberish. Kept as comments
@@ -2141,8 +2171,61 @@ Begin the full script now. Follow this structure exactly:
         # ── Content safety filter — catch anything the prompt policy missed ──
         script_text, blocked = _content_filter(script_text)
         if blocked:
-            log.warning("[Gemma4ScriptWriter] Content filter caught %d word(s) — replaced with %s",
-                        len(blocked), _REPLACEMENT)
+            log.warning("[Gemma4ScriptWriter] Content filter caught %d word(s) — replaced with minced oaths",
+                        len(blocked))
+
+        # ── FIX-4 (v1.2): Stock-name leak guard ───────────────────────────────
+        # Gemma sometimes types the wrong character name inside dialogue body —
+        # e.g. "it keeps spiking when you talk about the frequencies, Rex"
+        # when the intended character is VEX. This is NOT a hardcoded blocklist:
+        # we extract the real roster from [VOICE: NAME, ...] tags, then scan
+        # direct-address tokens (", Name." or "Name,") in dialogue body. Any
+        # capitalized proper-noun-looking token that is NOT in the roster gets
+        # replaced with the phonetically closest roster name via difflib.
+        # Pure structural fix — no baked names anywhere.
+        try:
+            import difflib
+            _roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_]+)\s*,', script_text))
+            if _roster:
+                _roster_list = sorted(_roster)
+                _leaks_fixed = 0
+                # Match direct-address: ", Capitalname." or ", Capitalname," or "Capitalname."
+                # Only capitalized single-word tokens 3-8 chars long, not ALL-CAPS.
+                _addr_pat = re.compile(r'(?<=[,\s])([A-Z][a-z]{2,7})(?=[.,!?\s])')
+                def _leak_fix(m):
+                    nonlocal _leaks_fixed
+                    token = m.group(1)
+                    upper = token.upper()
+                    if upper in _roster:
+                        return token  # legit roster name
+                    # Common English words — skip
+                    if token.lower() in {
+                        "the", "and", "but", "for", "with", "from", "into", "that",
+                        "this", "then", "than", "when", "what", "will", "were",
+                        "been", "have", "just", "only", "some", "such", "very",
+                        "now", "yes", "no", "ok", "okay", "sir", "maam", "doctor",
+                        "captain", "commander", "listen", "look", "hey", "wait",
+                        "stop", "god", "lord", "earth", "mars", "moon", "sun",
+                        "orion", "nasa", "please", "thanks", "maybe", "never",
+                        "always", "forever", "tonight", "tomorrow", "yesterday",
+                    }:
+                        return token
+                    # Phonetic match to closest roster name
+                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.55)
+                    if match:
+                        _leaks_fixed += 1
+                        # Preserve title-case for dialogue flow
+                        return match[0].title()
+                    return token
+                script_text = _addr_pat.sub(_leak_fix, script_text)
+                if _leaks_fixed:
+                    log.warning(
+                        "[Gemma4ScriptWriter] NameLeakGuard: repaired %d stock-name leak(s) "
+                        "in dialogue body (roster=%s)",
+                        _leaks_fixed, sorted(_roster)
+                    )
+        except Exception as _e:
+            log.warning("[Gemma4ScriptWriter] NameLeakGuard skipped: %s", _e)
 
         # ── Citation hallucination guard ──────────────────────────────────────
         # Gemma sometimes invents plausible-looking ArXiv IDs (arXiv:2401.XXXXX)
@@ -2640,9 +2723,17 @@ ORIGINAL DRAFT:
 REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
         try:
-            # Revision needs roughly the same token budget as the original draft
-            revision_tokens = max(int(target_words * 2.0), 1024)
+            # FIX-1 (v1.2): Size revision budget from DRAFT LENGTH, not target_words.
+            # Previously used target_words*2.0 which gave ~2080 tokens for 8-min eps —
+            # but an 8-min draft runs ~10k chars (~2500 tokens), so the revision pass
+            # got decapitated mid-Scene 4. Scene 4 is where the ending lives, which is
+            # why every critique flagged "weak ending". Not a writing bug — a budget bug.
+            # Formula: draft_chars / 3.5 chars-per-token * 1.25 safety margin.
+            draft_token_estimate = int(len(draft_text) / 3.5)
+            revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * 2.0), 2048)
             revision_tokens = min(revision_tokens, 8192)
+            log.info("[Critique] Revision token budget: %d (draft_est=%d, target_words=%d)",
+                     revision_tokens, draft_token_estimate, target_words)
             # BUG-005 fix: scale wall-clock budget to episode length AND draft size.
             # SDPA on Gemma 4 E4B runs ~2-3 tok/s, so a 22k-char revision needs
             # ~700-1100s. The previous fixed 600s killed every long episode.
