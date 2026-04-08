@@ -81,6 +81,25 @@ In `gemma4_orchestrator.py`, add a new method `_arc_check_and_rewrite_bookends(s
 
 Diagnostic-only mode: run Phase A arc score logging on every episode, NEVER call Phase B. Pure observability — gives user a quantified arc health reading on tonight's batch without changing any output. Decide tomorrow whether this is worth backporting before the full v1.3 lands.
 
+#### End-of-v1.3 task: reorganize the survival guide Bug Bible
+
+When v1.3 ships and it's time to update [comfyui-custom-node-survival-guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide), **reorganize `BUG_BIBLE.yaml` in the order an AI actually writes and debugs a node pack** (not the current loose grouping). The intended logical flow:
+
+1. Project bootstrap — repo layout, sync protocol, prestartup, env vars
+2. First import — isolated loading, namespace, deps, transformers compat
+3. Writing the node — INPUT_TYPES, hidden inputs, validation, lazy, list execution
+4. Tensors & models — class selection, dtype/device, AUDIO contract, VRAM, LRU
+5. Caching & state — IS_CHANGED, signature safety, bounded caches, paths
+6. Workflow JSON — counters, links, widgets_values audits, migration aliases
+7. Pipelines & content — multi-layer sync, safety filters, name leak guards, pool sizing
+8. LLM integration — token budgets, revision passes, critique loops
+9. Subprocess & I/O — pipe deadlocks, ffmpeg, output paths
+10. Testing & regression — ast.parse, pure functions, RNG harness, 15-step checklist
+11. Git & deployment — encoding, BOM, LFS, Defender, lockstep verification
+12. AI workflow — autonomy, batching, ROADMAP handoff, repo hygiene
+
+Order matches the dev workflow: scaffold → register → wire → run → cache → serialize → pipe → test → ship. Tag/area search still works; the reordering is purely so cold-start AI sessions hit the right entries in the right order. Also fold in any new bugs found during v1.3 development.
+
 ### Standing rules (Jeffrey's preferences — DO NOT VIOLATE)
 
 - **No baked character names anywhere in code or comments.** Procedural pools only. The only exceptions are LEMMY and ANNOUNCER (which are structural, not character-content).
