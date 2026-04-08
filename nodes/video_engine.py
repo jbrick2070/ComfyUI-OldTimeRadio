@@ -1127,7 +1127,20 @@ class SignalLostVideoRenderer:
 
         from .gemma4_orchestrator import _runtime_log
 
-        # ── 1. Parse inputs ──────────────────────────────────────────
+        # ── 1. Parse inputs & Extract Smart Title ───────────────────
+        import json as _json
+        try:
+            # Check if script_json contains a specific title override from Gemma
+            _script_data = _json.loads(script_json) if isinstance(script_json, str) else (script_json or [])
+            # Search for title in list of dicts (Canonical 1.0) or dict-wrapped script
+            if isinstance(_script_data, dict) and "title" in _script_data:
+                episode_title = _script_data["title"]
+            elif isinstance(_script_data, list):
+                # Check for a specific 'title' or 'metadata' block if we ever add one
+                pass
+        except Exception:
+            pass # Fall back to widget title
+
         waveform = audio["waveform"]
         sr = audio["sample_rate"]
 
@@ -1250,8 +1263,8 @@ class SignalLostVideoRenderer:
             pass
 
         size_mb = os.path.getsize(out_path) / (1024 * 1024)
-        log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames)",
-                 out_path, size_mb, duration, total_frames)
+        log.info("[Video] Saved: %s (%.1f MB, %.1fs, %d frames total)",
+                 out_path, size_mb, duration + (_hud_frames / fps), total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
         # Write story treatment companion file

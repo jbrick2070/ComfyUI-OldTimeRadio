@@ -40,18 +40,10 @@ log = logging.getLogger("OTR")
 # targeted filterwarnings calls as a belt-and-suspenders fallback.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# 0. safetensors_conversion — MUST run before ANY transformers import.
-#    Replace the module in sys.modules so that when modeling_utils does
-#    `from .safetensors_conversion import auto_conversion`, it gets our no-op.
-#    The real module fires a background HTTP POST to HuggingFace on every
-#    from_pretrained() call, gets an empty response → JSONDecodeError traceback.
-import sys as _sys
-import types as _types
-_mock_sc = _types.ModuleType("transformers.safetensors_conversion")
-_mock_sc.auto_conversion = lambda *a, **kw: None
-_mock_sc.get_conversion_pr_reference = lambda *a, **kw: None
-_mock_sc.spawn_conversion = lambda *a, **kw: None
-_sys.modules["transformers.safetensors_conversion"] = _mock_sc
+# ─────────────────────────────────────────────────────────────────────────────
+# SAFETENSORS CONVERSION MOCK — NOW HANDLED IN prestartup_script.py (earlier)
+# ─────────────────────────────────────────────────────────────────────────────
+# (the nuclear mock runs before this file is even executed)
 
 # 1. Hub telemetry — disable before any transformers/huggingface_hub import
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
