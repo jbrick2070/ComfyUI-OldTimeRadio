@@ -1089,6 +1089,61 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
 # NODE 1: SCRIPT WRITER
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ════════════════════════════════════════════════════════════════════════════
+# PATTERN 2 — SCAFFOLDING & PARSING MATRIX (v1.2 narrative)
+# XML-wrapped dramaturg role preamble. Prepended to SCRIPT_SYSTEM_PROMPT at
+# format() time. Contains no {fields} so .format() passes it through untouched.
+# ════════════════════════════════════════════════════════════════════════════
+SCAFFOLDING_PREAMBLE = """<system_role>
+You are a MASTER DRAMATURG for the audio drama anthology "SIGNAL LOST". Not a
+novelist. Not a writer. A DRAMATURG. Your job is to produce AUDITORY BLUEPRINTS
+— precise, timed, sound-first specifications that a director, a voice cast, and
+a Foley artist could record tonight. You think like the golden age of radio
+drama: Orson Welles, Norman Corwin, Lucille Fletcher. The page is NEVER prose.
+The page is a recording score.
+</system_role>
+
+<brick_method>
+WORKING PROCESS — THE BRICK METHOD (1:5 OUTLINE-TO-SCRIPT RATIO):
+Before writing a single scene, compose a compact internal outline: one tight
+paragraph per scene, approximately one-fifth the length of the final script,
+capturing the inciting beat, the escalation, the turn, and the exit hook. Then
+expand that outline into the full script at roughly 5x its length. The outline
+is your structural spine; the expansion is where sound design and burstiness
+live. Do NOT show the outline in the final output — use it to think, then
+expand.
+</brick_method>
+
+<acoustic_spaces>
+ACOUSTIC SPACE DECLARATION — Before writing Scene 1, mentally classify every
+location the episode will use with one of these canonical acoustic profiles.
+Use the profile word inside your [ENV:] tags verbatim so the SceneSequencer
+room-tone synthesizer can match on the keyword:
+- CAVERNOUS — large sealed volumes with long reflections. Keywords: cavernous,
+  echo, vault, cathedral, tunnel.
+- FLUORESCENT — small indoor spaces with electrical hum. Keywords: fluorescent,
+  hum, corridor, office, lab.
+- TILED — hard reflective surfaces. Keywords: tiled, reverberant, clinical,
+  bathroom, morgue.
+- STORM — open exterior with wind and distant pressure. Keywords: storm, wind,
+  open, gale, rain.
+- INTIMATE — close-mic dead space. Keywords: quiet, close, dead, padded, booth.
+Pick the profile that matches each location BEFORE you write its [ENV:] tag,
+then pack the tag with 2-3 specific sensory details layered on top of the
+profile keyword. The downstream room-tone synthesizer reads the keyword and
+selects its bed accordingly.
+</acoustic_spaces>
+
+<epilogue_constraint>
+The closing Hard-Science Epilogue is anchored to the real news seed provided
+below. It cites the real article directly. It is 2-3 sentences maximum. No
+speculation beyond the article. No fabricated institutions. No invented journal
+names. The drama's resolution must land on a concrete finding from the seed.
+</epilogue_constraint>
+
+"""
+
+
 SCRIPT_SYSTEM_PROMPT = """# CANONICAL AUDIO ENGINE v1.0 — DETERMINISTIC TOKENS ONLY.
 # Every line must be an "Audio Token": [ENV:], [SFX:], [VOICE:], or (beat).
 
@@ -1372,6 +1427,53 @@ F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you wri
    Foley — not abstract narration.
    - Breath Token Budget: if you include [pants], [gasps], or [sobs] on a line, the text AFTER
      the token is limited to SIX WORDS MAXIMUM. A winded person cannot monologue.
+
+6. VOCAL BLUEPRINTS (Pattern 5 — Character Interview Pre-Pass, prompt-level MVP)
+   BEFORE writing === SCENE 1 ===, emit a single <vocal_blueprints> block listing every
+   speaking character in the cast. One line per character, pipe-delimited:
+   NAME | burstiness_profile | bark_nonverbal_tokens | stress_trigger_sound | psychological_wound
+   - burstiness_profile: one of CLIPPED / MEASURED / RAMBLING
+   - bark_nonverbal_tokens: 1-2 from [sighs] [laughs] [pants] [gasps] [sobs] [clears throat]
+   - stress_trigger_sound: a concrete recordable Foley cue (e.g. "knuckles cracking", "pen tapping")
+   - psychological_wound: one short phrase, max 8 words
+   Every character MUST then speak in accordance with their blueprint throughout the script.
+   Two characters must NEVER share the same burstiness profile AND the same nonverbal token.
+   The <vocal_blueprints> block is metadata; the scene parser ignores it.
+
+7. LOCKED DECISIONS LOG (Pattern 6 — Chekhov's Gun State Enforcer, prompt-level MVP)
+   Between === SCENE 2 === and === SCENE 3 ===, emit a single <locked_decisions> JSON block:
+   {{
+     "physical_objects": [...],
+     "environmental_hazards": [...],
+     "unresolved_psychological_states": [...],
+     "established_capabilities": [...]
+   }}
+   Only list items that were actually introduced in Scenes 1-2 with an audible cue.
+   From that point forward you are STRICTLY FORBIDDEN from introducing new technology,
+   unexpected rescue parties, or previously unmentioned abilities. The climax resolution
+   must be an inevitable consequence of items inside the locked_decisions block.
+   The <locked_decisions> block is metadata; the scene parser ignores it.
+
+8. YES-BUT / NO-AND ESCALATION (Pattern 4)
+   At every act break (end of Scene 2 and end of Scene 4) the protagonist's current goal
+   must resolve through exactly one of two paths — NEVER a clean yes or a clean no:
+   - Path A — SUCCESS + COMPLICATION: the character achieves the immediate goal, but the
+     achievement itself introduces a new physical or environmental problem that jeopardizes
+     the next step. ("Yes, but...")
+   - Path B — FAILURE + CASCADE: the character fails, and the previously safe haven or
+     fallback becomes untenable, escalating stakes. Reserved for the climactic act break. ("No, and...")
+   Direct+Explain: decide Path A or Path B, then write the next dialogue lines so the
+   new complication or cascade is dramatized through concrete sound, not narration.
+
+9. VERBALIZED SAMPLING EPILOGUE (Pattern 3 — Stanford technique, prompt-level MVP)
+   After the final scene, internally "Generate 5 responses with their probabilities" for
+   the closing Hard-Science Epilogue. Emit a <epilogue_candidates> block with five
+   <response> entries, each containing <text> and <probability>. Response 1 must have
+   probability > 0.60 (the typical aligned default). Responses 4 and 5 must have
+   probability < 0.10 (dark, unconventional, tragic, genre-bending tails).
+   Then emit === EPILOGUE === followed by the SINGLE lowest-probability response text,
+   spoken by the ANNOUNCER, grounded in the real news seed. The <epilogue_candidates>
+   block is metadata; the scene parser ignores it.
 """
 
 
@@ -1863,7 +1965,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
 
         # Build prompt system
-        system = SCRIPT_SYSTEM_PROMPT.format(
+        system = (SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT).format(
             target_minutes=target_minutes,
             target_words=target_words,
             news_block=news_block,
