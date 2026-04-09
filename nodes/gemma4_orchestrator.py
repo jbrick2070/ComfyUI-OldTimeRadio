@@ -905,6 +905,14 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
     # Strip [BETA] labels used in the UI dropdown
     model_id = model_id.split(" ")[0]
 
+    # Pre-emptive VRAM sanitation: Evict any lingering ComfyUI image models
+    try:
+        import comfy.model_management
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache()
+    except Exception as e:
+        pass
+
     """Load Gemma 4 via transformers. Caches globally with device tracking.
 
     BEST PRACTICES applied (per survival guide):
