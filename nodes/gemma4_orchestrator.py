@@ -2541,13 +2541,37 @@ Begin the full script now. Follow this structure exactly:
              "distant alarms, breathing in a spacesuit. Slow-burn tension."),
         ]
 
-        # Feature flag to mitigate concurrent token interleaving corruption.
-        ENABLE_3_OUTLINE_EVALUATOR = False
+        # v1.4 Theme B — 3-outline evaluator re-enabled.
+        #
+        # History: this flag was introduced in v1.3 to mitigate token-stream
+        # corruption from CONCURRENT generation across threads. The underlying
+        # _generate_with_gemma4 shares a single cached model, a single streamer,
+        # and a single CUDA context, so parallel calls are undefined behavior.
+        #
+        # The ROADMAP hard rule is "Sequential execution only. ComfyUI manages
+        # the queue." So we re-enable the evaluator in SEQUENTIAL mode — the
+        # three outlines are generated one at a time through the loop below.
+        # Per-outline budget is already tuned: 450 tok / 480s wall. Three
+        # serial outlines at ~2 tok/s ≈ 12 minutes worst case for OUTLINE mode,
+        # under 3 minutes for PITCH mode. This is the cost of diversity: the
+        # evaluator gets three genuinely different focuses (CHARACTER-DRIVEN,
+        # SCIENCE-DRIVEN, ATMOSPHERE-DRIVEN) and picks the strongest one.
+        #
+        # Do NOT wrap the loop in a ThreadPoolExecutor. Parallel generation on
+        # a shared Gemma model will corrupt the token streams — the same bug
+        # this flag was originally put in place to prevent.
+        ENABLE_3_OUTLINE_EVALUATOR = True
 
         if not ENABLE_3_OUTLINE_EVALUATOR:
             outline_focuses = [
                 ("STORY-DRIVEN", "Focus on a balanced narrative arc, strong characters, and scientific plausibility.")
             ]
+        else:
+            _runtime_log(
+                f"OPENCLOSE: 3-outline evaluator ACTIVE (sequential) — "
+                f"{len(outline_focuses)} focuses: "
+                f"{', '.join(name for name, _ in outline_focuses)}"
+            )
 
         outlines = []
         for i, (focus_name, focus_desc) in enumerate(outline_focuses):
