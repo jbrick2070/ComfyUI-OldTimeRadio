@@ -4245,4 +4245,4 @@ class Gemma4Director:
         log.info("[Gemma4Director] Procedural cast complete: %d characters "
                  "(%d unique presets)", len(new_voice_assignments), len(used_presets))
 
-        return pla
+        return plan
