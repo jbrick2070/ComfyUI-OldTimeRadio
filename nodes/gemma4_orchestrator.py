@@ -1166,6 +1166,120 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# v1.4 Theme B — Sentence-boundary truncation helpers
+#
+# Replace the old `acts[-1][:3000]` / `acts[-1][-500:]` hard slices with
+# boundary-aware truncation so the chunked context never hands Phase B a
+# half-sentence. Both helpers fall back to hard truncation if no sentence
+# boundary is found within a reasonable scan window — telemetry, not magic.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Sentence-ending punctuation recognized by the boundary walkers.
+_SENTENCE_END_CHARS = ".!?"
+# How far to walk looking for a boundary before giving up and hard-cutting.
+_BOUNDARY_SCAN_WINDOW = 300
+
+
+def _truncate_at_sentence_boundary(text, max_chars):
+    """Truncate `text` at the last sentence boundary before `max_chars`.
+
+    Walks backward from the cut point looking for sentence-ending punctuation
+    (`.`, `!`, `?`) followed by whitespace or end-of-string, or a blank-line
+    paragraph break. If nothing is found in the last `_BOUNDARY_SCAN_WINDOW`
+    characters the function falls back to a hard cut so the caller never gets
+    an oversized string.
+    """
+    if not text or len(text) <= max_chars:
+        return text
+    snippet = text[:max_chars]
+    lower_bound = max(0, len(snippet) - _BOUNDARY_SCAN_WINDOW)
+    for i in range(len(snippet) - 1, lower_bound, -1):
+        ch = snippet[i]
+        if ch in _SENTENCE_END_CHARS:
+            next_ch = snippet[i + 1] if i + 1 < len(snippet) else ""
+            if next_ch in ("", " ", "\n", "\r", "\t", '"', "'"):
+                return snippet[: i + 1]
+        if ch == "\n" and i + 1 < len(snippet) and snippet[i + 1] == "\n":
+            return snippet[:i]
+    return snippet
+
+
+def _tail_at_sentence_boundary(text, max_chars):
+    """Return the trailing region of `text` starting at a sentence boundary.
+
+    Used for the "last N chars for dialogue continuity" case. Walks forward
+    from `len(text) - max_chars` looking for the start of a fresh sentence so
+    the caller never receives a tail that begins mid-word. If no sentence
+    boundary is found within the scan window, falls back to the next word
+    boundary (space or newline) so the tail still never starts mid-word.
+    """
+    if not text or len(text) <= max_chars:
+        return text
+    start = len(text) - max_chars
+    snippet = text[start:]
+    scan = min(_BOUNDARY_SCAN_WINDOW, len(snippet) - 1)
+    for i in range(scan):
+        ch = snippet[i]
+        if ch in _SENTENCE_END_CHARS:
+            next_ch = snippet[i + 1] if i + 1 < len(snippet) else ""
+            if next_ch in (" ", "\n", "\r", "\t"):
+                return snippet[i + 2 :].lstrip()
+        if ch == "\n" and i + 1 < len(snippet) and snippet[i + 1] == "\n":
+            return snippet[i + 2 :].lstrip()
+    # Word-boundary fallback: no sentence end found in the window, so at least
+    # start from the next whitespace so the tail is not mid-word.
+    for i in range(min(50, len(snippet))):
+        if snippet[i] in (" ", "\n", "\r", "\t"):
+            return snippet[i + 1 :].lstrip()
+    return snippet
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v1.4 Theme B — Automatic scene transitions
+#
+# When Gemma writes back-to-back scenes without any handoff cue, the audio
+# engine has nothing to work with and the result sounds like a hard cut. This
+# helper detects adjacent `=== SCENE N ===` markers with no transition in
+# between and injects a `[TRANSITION: brief pause]` placeholder. Downstream
+# SceneSequencer and BatchBark treat transition cues as audio beats.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SCENE_MARKER_RE = re.compile(r"===\s*SCENE\s+\S+\s*===", re.IGNORECASE)
+_HANDOFF_CUE_RE = re.compile(
+    r"\[TRANSITION:|\[FADE\b|\[SFX:[^\]]*transition",
+    re.IGNORECASE,
+)
+
+
+def _inject_scene_transitions(script_text):
+    """Inject `[TRANSITION: brief pause]` between scenes lacking a handoff cue.
+
+    Walks adjacent scene markers in reverse so each insertion does not disturb
+    the offsets of earlier matches. Returns a tuple of (new_text, injections).
+    """
+    if not script_text:
+        return script_text, 0
+    matches = list(_SCENE_MARKER_RE.finditer(script_text))
+    if len(matches) < 2:
+        return script_text, 0
+
+    injections = 0
+    for idx in range(len(matches) - 1, 0, -1):
+        prev_end = matches[idx - 1].end()
+        curr_start = matches[idx].start()
+        gap = script_text[prev_end:curr_start]
+        if _HANDOFF_CUE_RE.search(gap):
+            continue
+        script_text = (
+            script_text[:curr_start]
+            + "[TRANSITION: brief pause]\n\n"
+            + script_text[curr_start:]
+        )
+        injections += 1
+    return script_text, injections
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # NODE 1: SCRIPT WRITER
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -3023,12 +3137,13 @@ Outline only — do NOT write dialogue yet."""
                 # Summarize previous act for tight context (not raw 2000 chars)
                 if not act_summaries:
                     # Generate a quick summary of Act 1 for Act 2's context
+                    _act_text_for_summary = _truncate_at_sentence_boundary(acts[-1], 3000)
                     summary_prompt = f"""Summarize the following radio drama act in 3-5 sentences.
 Focus on: what happened, how each character's emotional state changed, what's at stake going into the next act, and any unresolved tensions.
 Do NOT include dialogue. Just narrative summary.
 
 ACT TEXT:
-{acts[-1][:3000]}
+{_act_text_for_summary}
 
 SUMMARY:"""
                     try:
@@ -3039,15 +3154,16 @@ SUMMARY:"""
                         act_summaries.append(summary)
                         _runtime_log(f"ScriptWriter: Act {act_num-1} summarized for context")
                     except Exception:
-                        # Fallback: use raw truncation
-                        act_summaries.append(acts[-1][:1500])
+                        # Fallback: sentence-boundary truncation (no mid-sentence cuts)
+                        act_summaries.append(_truncate_at_sentence_boundary(acts[-1], 1500))
                 else:
                     # Summarize the latest act and append to running memory
+                    _act_text_for_summary = _truncate_at_sentence_boundary(acts[-1], 3000)
                     summary_prompt = f"""Summarize the following radio drama act in 3-5 sentences.
 Focus on: what happened, how each character's emotional state changed, what's at stake going into the next act, and any unresolved tensions.
 
 ACT TEXT:
-{acts[-1][:3000]}
+{_act_text_for_summary}
 
 SUMMARY:"""
                     try:
@@ -3057,7 +3173,7 @@ SUMMARY:"""
                         )
                         act_summaries.append(summary)
                     except Exception:
-                        act_summaries.append(acts[-1][:1500])
+                        act_summaries.append(_truncate_at_sentence_boundary(acts[-1], 1500))
 
                 # ── Phase 3a: Chunked context hardening ──
                 # Validate each summary — if too short, fall back to mechanical summary
@@ -3079,8 +3195,10 @@ SUMMARY:"""
                 for s_idx, s_text in enumerate(act_summaries, 1):
                     context_block += f"  Act {s_idx}: {s_text.strip()}\n"
 
-                # ── Phase 3b: Strict truncation with marker ──
-                last_lines = acts[-1][-500:]
+                # ── Phase 3b: Sentence-boundary tail (v1.4 Theme B) ──
+                # Walks forward from the cut point to the next sentence start so
+                # the Gemma prompt never sees a tail that begins mid-word.
+                last_lines = _tail_at_sentence_boundary(acts[-1], 500)
                 if len(acts[-1]) > 500:
                     last_lines = "... [truncated]\n" + last_lines
                 context_block += f"\nLAST LINES (for dialogue continuity):\n{last_lines}"
@@ -3284,6 +3402,22 @@ Format your response exactly as:
         except Exception as e:
             log.warning("[ArcEnhancer] Echo pass failed: %s", e)
             _runtime_log(f"ARC_ENHANCER: Failed — {e}")
+
+        # v1.4 Theme B — automatic scene transition injection.
+        # Runs regardless of how Phase B/C fared so even a failed arc pass
+        # still gets the structural handoff benefit for downstream audio.
+        try:
+            script_text, _transition_count = _inject_scene_transitions(script_text)
+            if _transition_count > 0:
+                _runtime_log(
+                    f"ARC_ENHANCER: Injected {_transition_count} scene transition "
+                    f"cue(s) at weak handoffs"
+                )
+            else:
+                _runtime_log("ARC_ENHANCER: No weak scene handoffs detected")
+        except Exception as transition_err:
+            log.warning("[ArcEnhancer] Scene transition injection failed: %s", transition_err)
+            _runtime_log(f"ARC_ENHANCER: Transition injection failed — {transition_err}")
 
         return script_text
 
