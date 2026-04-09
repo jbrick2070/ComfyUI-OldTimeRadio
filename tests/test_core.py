@@ -54,7 +54,7 @@ def parser():
 
 def _load_workflow(name):
     path = os.path.join(os.path.dirname(__file__), "..", "workflows", name)
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         return json.load(f)
 
 
