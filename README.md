@@ -183,7 +183,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 | Node | What It Does |
 |------|-------------|
-| **1. Gemma Writes the Story** | Fetches real RSS science headlines, then uses Gemma 4 to write a multi-act script. Open-Close expansion generates 3 competing outlines and picks the best. Self-critique loop revises the draft. 12 dramatic story arc templates (Shakespeare, Larry David, Marvel, Twilight Zone, and more). |
+| **1. Gemma Writes the Story** | Fetches real RSS science headlines, then uses Gemma 4 to write a multi-act script. Open-Close expansion generates 3 competing outlines and picks the best. Self-critique loop revises the draft. 12 dramatic story arc templates (Shakespearian, Comedic Spiral, Heroic Epic, Twilight Mind-Bender, and more). |
 | **2. Gemma Directs the Show** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. |
 | **3. Voice Maker Machine** | Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. |
 | **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends. |
