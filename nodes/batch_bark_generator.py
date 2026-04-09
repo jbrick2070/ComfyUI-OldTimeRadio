@@ -511,11 +511,19 @@ class BatchBarkGenerator:
         voice_map = plan.get("voice_assignments", {})
 
         # ── Step 1: Extract all dialogue lines with their script index ────
+        # ANNOUNCER lines are intentionally skipped — they are rendered by the
+        # dedicated KokoroAnnouncer node on a separate bus. Keeping them out
+        # of the Bark pool eliminates Bark's "ums" and "ahs" from the
+        # broadcast-ready opening and closing bookends.
         dialogue_items = []
+        skipped_announcer = 0
         for i, item in enumerate(script):
             if item.get("type") == "dialogue" and item.get("line", "").strip():
                 # Canonical 1.0+ uses the character name as the primary ID
                 character_name = item.get("character_name", "UNKNOWN")
+                if character_name.strip().upper() == "ANNOUNCER":
+                    skipped_announcer += 1
+                    continue
                 voice_traits = item.get("voice_traits", "")
                 preset = _voice_preset_for_character(character_name, voice_map, voice_traits)
                 dialogue_items.append({
@@ -526,8 +534,9 @@ class BatchBarkGenerator:
                 })
 
         total_lines = len(dialogue_items)
-        log.info("[BatchBark] Found %d dialogue lines in Canonical 1.0 format",
-                 total_lines)
+        log.info("[BatchBark] Found %d dialogue lines in Canonical 1.0 format "
+                 "(skipped %d ANNOUNCER lines — routed to Kokoro bus)",
+                 total_lines, skipped_announcer)
 
         if total_lines == 0:
             empty = {"waveform": torch.zeros(1, 1, 2400), "sample_rate": 24000}

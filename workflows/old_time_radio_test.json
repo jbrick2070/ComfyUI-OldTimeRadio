@@ -1,8 +1,8 @@
 {
   "id": "b1e2f3a4-c5d6-7890-abcd-ef1234567890",
   "revision": 0,
-  "last_node_id": 12,
-  "last_link_id": 18,
+  "last_node_id": 13,
+  "last_link_id": 20,
   "nodes": [
     {
       "id": 1,
@@ -53,7 +53,8 @@
           "type": "STRING",
           "links": [
             2,
-            16
+            16,
+            19
           ],
           "slot_index": 1
         },
@@ -171,6 +172,12 @@
           "name": "production_plan_json",
           "type": "STRING",
           "link": 4
+        },
+        {
+          "name": "announcer_audio_clips",
+          "type": "AUDIO",
+          "link": 20,
+          "shape": 7
         }
       ],
       "outputs": [
@@ -444,6 +451,62 @@
       "flags": {},
       "order": 10,
       "mode": 0
+    },
+    {
+      "id": 13,
+      "type": "OTR_KokoroAnnouncer",
+      "pos": [
+        950,
+        460
+      ],
+      "size": [
+        360,
+        130
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 19,
+          "widget": {
+            "name": "script_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "announcer_audio_clips",
+          "type": "AUDIO",
+          "links": [
+            20
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        },
+        {
+          "name": "chosen_voice",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_KokoroAnnouncer"
+      },
+      "widgets_values": [
+        "[]",
+        "",
+        "random",
+        0.95
+      ]
     }
   ],
   "links": [
@@ -534,6 +597,22 @@
       12,
       3,
       "STRING"
+    ],
+    [
+      19,
+      1,
+      1,
+      13,
+      0,
+      "STRING"
+    ],
+    [
+      20,
+      13,
+      0,
+      3,
+      2,
+      "AUDIO"
     ]
   ],
   "groups": [

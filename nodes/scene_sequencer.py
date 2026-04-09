@@ -574,7 +574,14 @@ class SceneSequencer:
                     "tooltip": "Pre-rendered TTS audio clips (from Bark/Parler batch). "
                                "If provided, dialogue lines use these clips instead of "
                                "placeholder silence. Clips are matched to dialogue lines "
-                               "in order."
+                               "in order. ANNOUNCER lines are NOT expected here — they "
+                               "flow through announcer_audio_clips on a separate bus."
+                }),
+                "announcer_audio_clips": ("AUDIO", {
+                    "tooltip": "Pre-rendered ANNOUNCER audio clips from KokoroAnnouncer. "
+                               "Consumed in script order for dialogue lines whose "
+                               "character_name is ANNOUNCER. Keeps the Voice of God "
+                               "bookends separated from the Bark character pool."
                 }),
                 "sfx_audio_clips": ("AUDIO", {
                     "tooltip": "Pre-rendered SFX audio clips (from SFXGenerator batch). "
@@ -635,6 +642,7 @@ class SceneSequencer:
 
     def sequence(self, script_json, production_plan_json,
                  tts_audio_clips=None, sfx_audio_clips=None,
+                 announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
                  default_tts="bark"):
 
@@ -668,9 +676,14 @@ class SceneSequencer:
         # Extract pre-rendered clips from batched AUDIO inputs
         tts_clips = self._extract_clips_from_audio(tts_audio_clips)
         sfx_clips = self._extract_clips_from_audio(sfx_audio_clips)
+        announcer_clips = self._extract_clips_from_audio(announcer_audio_clips)
         tts_clip_idx = 0
         sfx_clip_idx = 0
-        log.info(f"[SceneSequencer] Pre-rendered clips: {len(tts_clips)} TTS, {len(sfx_clips)} SFX")
+        announcer_clip_idx = 0
+        log.info(
+            "[SceneSequencer] Pre-rendered clips: %d TTS, %d SFX, %d ANNOUNCER",
+            len(tts_clips), len(sfx_clips), len(announcer_clips),
+        )
 
         # We accumulate silence/audio segments as numpy arrays
         sample_rate = 48000  # standardize output
@@ -737,19 +750,29 @@ class SceneSequencer:
                 voice_traits = item.get("voice_traits", "")
                 line = item.get("line", "")
                 preset = _voice_preset_for_character(character_name, voice_map, voice_traits)
-                
-                if tts_clip_idx < len(tts_clips):
+
+                is_announcer = character_name.strip().upper() == "ANNOUNCER"
+
+                if is_announcer and announcer_clip_idx < len(announcer_clips):
+                    # Dedicated Kokoro announcer bus — clean, no Bark filler sounds.
+                    clip_np, clip_sr = announcer_clips[announcer_clip_idx]
+                    segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
+                    segment_np = _normalize_clip(segment_np)
+                    announcer_clip_idx += 1
+                    render_log.append(f"[{global_idx}] ANNOUNCER (Kokoro): {line[:40]}...")
+                elif tts_clip_idx < len(tts_clips):
                     clip_np, clip_sr = tts_clips[tts_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _normalize_clip(segment_np)
                     tts_clip_idx += 1
+                    render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
                 else:
                     log.info(f"[SceneSequencer] Inline Bark [{global_idx}] {character_name}")
                     bark_np, bark_sr = _generate_bark_for_line(line, preset)
                     segment_np = _resample_audio(bark_np, bark_sr, sample_rate)
                     segment_np = _normalize_clip(segment_np)
-                
-                render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
+                    render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
+
                 current_character_name = character_name
 
             elif item_type == "direction":

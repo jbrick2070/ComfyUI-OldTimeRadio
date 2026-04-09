@@ -402,7 +402,7 @@ The Flash Attention 2 probe now logs a precise platform message instead of a gen
 ---
 
 ## v1.4 Roadmap
-- **Kokoro Announcer** — Route ANNOUNCER lines to Kokoro TTS for broadcast-ready "Voice of God" cadence.
+- **Kokoro Announcer (shipped, in progress)** — Dedicated non-Bark narrator bus. ANNOUNCER dialogue lines are routed to Kokoro v1.0 via the new `🎙️ Kokoro Announcer` node, eliminating Bark's "ums" and "ahs" from the opening and closing bookends. Voice is picked per episode from a curated 4-voice British grab bag (`bm_george`, `bm_fable`, `bf_emma`, `bf_lily`), seeded from the episode seed so the same episode always draws the same narrator. `BatchBarkGenerator` now skips ANNOUNCER lines, and `SceneSequencer` consumes the Kokoro clips on a separate `announcer_audio_clips` bus. Voice `.pt` files are lazy-downloaded from `1038lab/KokoroTTS` on first use.
 - **OpenClose parallel evaluator** — Re-enable the 3-outline race when faster attention backends land.
 - **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs.
 - **Automatic Scene Transitions** — Procedural crossfades based on [ENV:] tag changes.
