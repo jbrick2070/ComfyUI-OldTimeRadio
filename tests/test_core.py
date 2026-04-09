@@ -48,8 +48,8 @@ requires_torch = pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 
 @pytest.fixture(scope="module")
 def parser():
-    from nodes.gemma4_orchestrator import Gemma4ScriptWriter
-    return Gemma4ScriptWriter()
+    from nodes.story_orchestrator import LLMScriptWriter
+    return LLMScriptWriter()
 
 
 def _load_workflow(name):
@@ -429,14 +429,14 @@ class TestBarkTTSCodePatterns:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 7. GEMMA4 ORCHESTRATOR — Static Code Checks
+# 7. STORY ORCHESTRATOR — Static Code Checks
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestGemma4OrchestratorCodePatterns:
+class TestStoryOrchestratorCodePatterns:
 
     @pytest.fixture(scope="class")
     def src(self):
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "gemma4_orchestrator.py")
+        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "story_orchestrator.py")
         with open(path, encoding="utf-8") as f:
             return f.read()
 

@@ -901,9 +901,9 @@ def _fetch_science_news(max_feeds=10):
 # GEMMA 4 INFERENCE WRAPPER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
-    # Strip [BETA] labels used in the UI dropdown
-    model_id = model_id.split(" ")[0]
+def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
+    # Strip [BETA] or [8-bit] labels used in the UI dropdown
+    model_id = model_id_full.split(" ")[0]
 
     # Pre-emptive VRAM sanitation: Evict any lingering ComfyUI image models
     try:
@@ -923,20 +923,20 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
       - Section 47: No device_map="auto" (conflicts with ComfyUI's torch.set_default_device)
       - Section 49: No trust_remote_code=True (Gemma 4 is natively supported)
     """
-    global _GEMMA4_CACHE
+    global _LLM_CACHE
 
     # Check for device change — invalidate if needed
-    if (_GEMMA4_CACHE["model"] is not None and
-            str(_GEMMA4_CACHE["device"]) != str(device)):
-        log.info("Gemma 4 device changed %s → %s, reloading", _GEMMA4_CACHE["device"], device)
-        _unload_gemma4()
+    if (_LLM_CACHE["model"] is not None and
+            str(_LLM_CACHE["device"]) != str(device)):
+        log.info("Gemma 4 device changed %s → %s, reloading", _LLM_CACHE["device"], device)
+        _unload_llm()
 
-    if _GEMMA4_CACHE["model"] is None:
+    if _LLM_CACHE["model"] is None:
         log.info(f"Loading Gemma 4 model: {model_id}")
         try:
             # Lazy import — only pay the cost when actually generating
             import torch
-            from transformers import AutoProcessor, AutoModelForCausalLM
+            from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
 
             # Enable TF32 for faster matmuls on Ampere/Ada/Blackwell GPUs
             torch.backends.cuda.matmul.allow_tf32 = True
@@ -946,18 +946,23 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
             gc.collect()
             torch.cuda.empty_cache()
 
-            # gemma-4-E4B-it uses AutoProcessor (handles text+vision+audio)
-            # local_files_only=True stops HF Hub ETag HEAD requests — no
-            # "phoning home" on every render once models are cached locally.
+            is_gemma = "gemma" in model_id.lower()
+
             try:
-                tokenizer = AutoProcessor.from_pretrained(model_id, local_files_only=True)
+                if is_gemma:
+                    tokenizer = AutoProcessor.from_pretrained(model_id, local_files_only=True)
+                else:
+                    tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
             except OSError as local_err:
-                log.info("[Gemma4] local_files_only=True failed for tokenizer (%s), attempting Hub fallback...", local_err)
+                log.info("[StoryOrchestrator] local_files_only=True failed for tokenizer (%s)", local_err)
                 try:
-                    tokenizer = AutoProcessor.from_pretrained(model_id)
+                    if is_gemma:
+                        tokenizer = AutoProcessor.from_pretrained(model_id)
+                    else:
+                        tokenizer = AutoTokenizer.from_pretrained(model_id)
                 except Exception as hub_err:
-                    log.error("[Gemma4] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
-                    raise RuntimeError(f"Failed to load Gemma 4 tokenizer '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
+                    log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    raise RuntimeError(f"Failed to load Tokenizer '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # Using bfloat16 for maximum speed on RTX 5000-series (Ada/Blackwell) GPUs.
             load_dtype = torch.bfloat16
@@ -976,23 +981,32 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                     distribution("flash-attn")
                     import flash_attn  # noqa: F401
                     attn_impl = "flash_attention_2"
-                    log.info("[Gemma4] Flash Attention 2 available — using flash_attention_2")
+                    log.info("[StoryOrchestrator] Flash Attention 2 available — using flash_attention_2")
                 except (PackageNotFoundError, ImportError):
                     log.info(
-                        "[Gemma4] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists "
+                        "[StoryOrchestrator] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists "
                         "for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. "
                         "SageAttention + SDPA active. Performance unaffected. Do not attempt install."
                     )
             except Exception as _fa_err:
-                log.info("[Gemma4] FA2 probe failed (%s) — using SDPA fallback", _fa_err)
+                log.info("[StoryOrchestrator] FA2 probe failed (%s) — using SDPA fallback", _fa_err)
 
             # ── 4-bit quantization (only enabled for very large models) ──
             # The 26B-A4B and 31B variants will OOM on a 16GB GPU at bfloat16.
             # BitsAndBytesConfig 4-bit squeezes them to fit. The 4B model loads
             # fine in bfloat16 so we skip quantization for it (better quality).
             quant_config = None
-            needs_quant = any(tag in model_id.lower() for tag in ("26b", "31b", "27b", "12b", "a4b"))
-            if needs_quant:
+            needs_8bit = "8-bit" in model_id_full.lower()
+            needs_4bit = "4-bit" in model_id_full.lower() or any(tag in model_id_full.lower() for tag in ("26b", "31b", "27b", "12b", "a4b"))
+            
+            if needs_8bit:
+                try:
+                    from transformers import BitsAndBytesConfig
+                    quant_config = BitsAndBytesConfig(load_in_8bit=True)
+                    log.info("[StoryOrchestrator] Enabling 8-bit quantization")
+                except ImportError:
+                    log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed!")
+            elif needs_4bit:
                 try:
                     from transformers import BitsAndBytesConfig
                     quant_config = BitsAndBytesConfig(
@@ -1001,9 +1015,9 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                         bnb_4bit_use_double_quant=True,
                         bnb_4bit_quant_type="nf4",
                     )
-                    log.info("[Gemma4] Large model detected — enabling 4-bit quantization (NF4)")
+                    log.info("[StoryOrchestrator] Enabling 4-bit quantization (NF4)")
                 except ImportError:
-                    log.warning("[Gemma4] Large model but bitsandbytes not installed — "
+                    log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed — "
                                 "loading at bfloat16 may OOM. Run: pip install bitsandbytes")
 
             common_kwargs = dict(
@@ -1022,14 +1036,14 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                     **common_kwargs,
                 )
             except OSError as local_err:
-                log.info("[Gemma4] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
+                log.info("[StoryOrchestrator] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
                 try:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id,
                         **common_kwargs,
                     )
                 except Exception as hub_err:
-                    log.error("[Gemma4] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
+                    log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
                     raise RuntimeError(f"Failed to load Gemma 4 model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
             # Quantized models are placed by device_map; non-quantized go .to(device)
@@ -1037,21 +1051,21 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                 model = model.to(device)
             model = model.eval()
 
-            _GEMMA4_CACHE["model"] = model
-            _GEMMA4_CACHE["tokenizer"] = tokenizer
-            _GEMMA4_CACHE["device"] = device
+            _LLM_CACHE["model"] = model
+            _LLM_CACHE["tokenizer"] = tokenizer
+            _LLM_CACHE["device"] = device
             log.info("Gemma 4 loaded: %s on %s", type(model).__name__, device)
         except Exception as e:
             log.exception("Failed to load Gemma 4: %s", e)  # Section 49: log.exception for full traceback
             raise
-    return _GEMMA4_CACHE["model"], _GEMMA4_CACHE["tokenizer"]
+    return _LLM_CACHE["model"], _LLM_CACHE["tokenizer"]
 
 
 # Bounded model cache with device tracking (Section 34)
-_GEMMA4_CACHE = {"model": None, "tokenizer": None, "device": None}
+_LLM_CACHE = {"model": None, "tokenizer": None, "device": None}
 
 
-def _unload_gemma4():
+def _unload_llm():
     """Explicitly unload Gemma 4 to free VRAM (v1.3.1 OOM FIX).
 
     The v1.3 version did del + gc.collect() + empty_cache(), but that
@@ -1073,19 +1087,19 @@ def _unload_gemma4():
       4. empty_cache()       — return freed VRAM to the allocator
       5. telemetry           — prove VRAM actually dropped
     """
-    global _GEMMA4_CACHE
+    global _LLM_CACHE
     import gc
     import torch
-    if _GEMMA4_CACHE["model"] is not None:
+    if _LLM_CACHE["model"] is not None:
         # Step 1: force weights off GPU before dropping the reference.
         try:
-            _GEMMA4_CACHE["model"].cpu()
+            _LLM_CACHE["model"].cpu()
         except Exception as cpu_err:
-            log.warning("[Gemma4] model.cpu() during unload failed: %s", cpu_err)
+            log.warning("[StoryOrchestrator] model.cpu() during unload failed: %s", cpu_err)
         # Step 2: drop references from the module-level cache.
-        del _GEMMA4_CACHE["model"]
-        del _GEMMA4_CACHE["tokenizer"]
-        _GEMMA4_CACHE = {"model": None, "tokenizer": None, "device": None}
+        del _LLM_CACHE["model"]
+        del _LLM_CACHE["tokenizer"]
+        _LLM_CACHE = {"model": None, "tokenizer": None, "device": None}
         # Step 3 + 4: gc and return VRAM to the allocator.
         gc.collect()
         torch.cuda.empty_cache()
@@ -1251,19 +1265,26 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
-def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
+def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92):
     """Generate text with Gemma 4."""
     import torch
 
-    model, tokenizer = _load_gemma4(model_id)
+    model, tokenizer = _load_llm(model_id)
 
-    # Gemma4Processor expects structured content (multimodal processor)
-    messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+    # Multimodal vs Text-Only wrapper
+    is_gemma = "gemma" in model_id.lower()
+    if is_gemma:
+        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+    else:
+        messages = [{"role": "user", "content": prompt}]
+        
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    # MUST use keyword arg — Gemma4Processor.__call__ signature is (images=, text=, ...)
-    # Passing text positionally sets images=text, leaving text=None → subscript crash
-    inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
+    
+    if is_gemma:
+        inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
+    else:
+        inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
     # ── FIX: Ensure attention_mask is present ──
     if "attention_mask" not in inputs and "input_ids" in inputs:
@@ -1273,8 +1294,8 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
     eos_id = model.generation_config.eos_token_id
     pad_id = eos_id[0] if isinstance(eos_id, list) else eos_id
 
-    log.info(f"[Gemma4] Starting inference (max_new_tokens={max_new_tokens})...")
-    log.info("[Gemma4] Live output will stream below:")
+    log.info(f"[StoryOrchestrator] Starting inference (max_new_tokens={max_new_tokens})...")
+    log.info("[StoryOrchestrator] Live output will stream below:")
     start_inference = time.time()
 
     # Initialize streamer for live feedback in the terminal + heartbeat logs.
@@ -1297,7 +1318,7 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
             )
 
         inference_time = time.time() - start_inference
-        log.info(f"[Gemma4] Inference complete in {inference_time:.1f}s.")
+        log.info(f"[StoryOrchestrator] Inference complete in {inference_time:.1f}s.")
 
         # Decode only the new tokens (skip the prompt).
         new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
@@ -1358,7 +1379,7 @@ def _truncate_at_sentence_boundary(text, max_chars):
 # This lets the Director automatically inherit the exact same model memory
 # space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
 # ─────────────────────────────────────────────────────────────────────────────
-_CURRENT_GEMMA_MODEL = "google/gemma-4-E4B-it"
+_CURRENT_LLM_MODEL = "google/gemma-4-E4B-it"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1834,7 +1855,7 @@ F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you wri
 """
 
 
-class Gemma4ScriptWriter:
+class LLMScriptWriter:
     """Fetches real science news, generates a full radio drama script via Gemma 4."""
 
     CATEGORY = "OldTimeRadio"
@@ -1870,9 +1891,9 @@ class Gemma4ScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Nemo-Instruct-2407 [8-bit]", "mistralai/Mistral-Nemo-Instruct-2407 [4-bit]"], {
                     "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
+                    "tooltip": "Hugging Face model ID for Gemma 4 or Nemo 12B"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -1982,7 +2003,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         try:
             raw = _run_with_timeout(
-                lambda: _generate_with_gemma4(
+                lambda: _generate_with_llm(
                     names_prompt,
                     model_id=model_id,
                     max_new_tokens=num_names * 30 + 20,
@@ -2086,8 +2107,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         # ── MASTER SWITCH INHERITANCE ──
         # Save explicitly chosen model so Director can use it automatically.
-        global _CURRENT_GEMMA_MODEL
-        _CURRENT_GEMMA_MODEL = model_id
+        global _CURRENT_LLM_MODEL
+        _CURRENT_LLM_MODEL = model_id
 
 
         # ── PROJECT STATE (v1.4 Theme C) ──
@@ -2168,7 +2189,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout — every line should reflect this tone."
 
         # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
-        log.info(f"[Gemma4ScriptWriter] Feature flags: open_close={open_close}, "
+        log.info(f"[LLMScriptWriter] Feature flags: open_close={open_close}, "
                  f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
         # ══════════════════════════════════════════════════════════════════════
@@ -2218,7 +2239,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             random.seed(seed)
             _runtime_log(f"ScriptWriter: SEED {seed} (from fingerprint {episode_fingerprint})")
         except Exception as _seed_err:
-            log.warning(f"[Gemma4ScriptWriter] Could not set deterministic seed: {_seed_err}")
+            log.warning(f"[LLMScriptWriter] Could not set deterministic seed: {_seed_err}")
 
         # ══════════════════════════════════════════════════════════════════════
         # RSS FETCH (or custom premise bypass)
@@ -2333,7 +2354,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             _lemmy_source = "🎲 Lemmy rolled in on his own (lucky 11%)"
         else:
             _lemmy_source = "💤 Lemmy stayed in the garage tonight"
-        log.info(f"[Gemma4ScriptWriter] {_lemmy_source}  [force={force_lemmy}, rng_hit={_natural_roll}]")
+        log.info(f"[LLMScriptWriter] {_lemmy_source}  [force={force_lemmy}, rng_hit={_natural_roll}]")
         lemmy_directive = ""
         if lemmy_roll:
             lemmy_directive = (
@@ -2352,7 +2373,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 "[SFX: heavy wrench strike on metal pipe, single resonant clank]\n"
                 "This is his signature sound — it plays once, the first time he appears, nowhere else.\n"
             )
-            log.info("[Gemma4ScriptWriter] ★ Lemmy Easter egg activated (11%% roll) — wrench SFX cued")
+            log.info("[LLMScriptWriter] ★ Lemmy Easter egg activated (11%% roll) — wrench SFX cued")
 
         # ── Gemma owns character names — they become canonical character_ids ──
         # We do NOT pre-seed names. Gemma invents its own character names while
@@ -2486,9 +2507,9 @@ Begin the full script now. Follow this structure exactly:
         else:
             full_prompt = f"{system}\n\n{user_prompt}"
 
-        log.info(f"[Gemma4ScriptWriter] Generating {target_minutes}min episode "
+        log.info(f"[LLMScriptWriter] Generating {target_minutes}min episode "
                  f"'{episode_title}' ({genre_flavor})")
-        log.info(f"[Gemma4ScriptWriter] News seed: {news[0]['headline']} | {news[0]['source']}")
+        log.info(f"[LLMScriptWriter] News seed: {news[0]['headline']} | {news[0]['source']}")
 
         # For episodes > 5 min, generate act-by-act to avoid token truncation.
         # 8,192 max_new_tokens ≈ 6,000 words. A 25-min episode needs ~3,250 words
@@ -2502,7 +2523,7 @@ Begin the full script now. Follow this structure exactly:
             # Without the floor, 1-min = 260 tokens, which truncates mid-scene.
             max_new_tokens = max(int(target_words * 2.0), 1024)
             max_new_tokens = min(max_new_tokens, 8192)
-            script_text = _generate_with_gemma4(
+            script_text = _generate_with_llm(
                 full_prompt,
                 model_id=model_id,
                 max_new_tokens=max_new_tokens,
@@ -2547,7 +2568,7 @@ Begin the full script now. Follow this structure exactly:
         # ── Content safety filter — catch anything the prompt policy missed ──
         script_text, blocked = _content_filter(script_text)
         if blocked:
-            log.warning("[Gemma4ScriptWriter] Content filter caught %d word(s) — replaced with minced oaths",
+            log.warning("[LLMScriptWriter] Content filter caught %d word(s) — replaced with minced oaths",
                         len(blocked))
 
         # ── FIX-4 (v1.2): Stock-name leak guard ───────────────────────────────
@@ -2603,12 +2624,12 @@ Begin the full script now. Follow this structure exactly:
                 script_text = _addr_pat.sub(_leak_fix, script_text)
                 if _leaks_fixed:
                     log.warning(
-                        "[Gemma4ScriptWriter] NameLeakGuard: repaired %d stock-name leak(s) "
+                        "[LLMScriptWriter] NameLeakGuard: repaired %d stock-name leak(s) "
                         "in dialogue body (roster=%s)",
                         _leaks_fixed, sorted(_roster)
                     )
         except Exception as _e:
-            log.warning("[Gemma4ScriptWriter] NameLeakGuard skipped: %s", _e)
+            log.warning("[LLMScriptWriter] NameLeakGuard skipped: %s", _e)
 
         # ── Citation hallucination guard ──────────────────────────────────────
         # Gemma sometimes invents plausible-looking ArXiv IDs (arXiv:2401.XXXXX)
@@ -2723,13 +2744,13 @@ Begin the full script now. Follow this structure exactly:
         except Exception as qa_err:
             log.warning("[QA] Debug dump failed: %s", qa_err)
 
-        log.info(f"[Gemma4ScriptWriter] Generated {len(script_lines)} lines, "
+        log.info(f"[LLMScriptWriter] Generated {len(script_lines)} lines, "
                  f"~{word_count} words, ~{est_minutes} min")
 
         # ── VRAM handoff: unload Gemma before Bark loads ──────────────────────
         # Gemma and Bark cannot share 16GB VRAM comfortably. Explicitly unload
         # now so BatchBark starts with a clean VRAM slate.
-        _unload_gemma4()
+        _unload_llm()
         _runtime_log("ScriptWriter: Gemma unloaded — VRAM freed for Bark")
 
         # v1.4 Theme C — exit snapshot after Gemma unload. This should be
@@ -2827,7 +2848,7 @@ Begin the full script now. Follow this structure exactly:
         #
         # History: this flag was introduced in v1.3 to mitigate token-stream
         # corruption from CONCURRENT generation across threads. The underlying
-        # _generate_with_gemma4 shares a single cached model, a single streamer,
+        # _generate_with_llm shares a single cached model, a single streamer,
         # and a single CUDA context, so parallel calls are undefined behavior.
         #
         # The ROADMAP hard rule is "Sequential execution only. ComfyUI manages
@@ -2903,7 +2924,7 @@ Keep it under 400 words. Structure only — no dialogue."""
 
             try:
                 outline_text = _run_with_timeout(
-                    lambda op=outline_prompt: _generate_with_gemma4(
+                    lambda op=outline_prompt: _generate_with_llm(
                         op,
                         model_id=model_id,
                         max_new_tokens=outline_max_tokens,
@@ -2977,7 +2998,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
 
         try:
             eval_text = _run_with_timeout(
-                lambda: _generate_with_gemma4(
+                lambda: _generate_with_llm(
                     eval_prompt,
                     model_id=model_id,
                     max_new_tokens=800,
@@ -3078,7 +3099,7 @@ YOUR CRITIQUE (numbered list only):"""
         try:
             critique_tokens = min(800, max(300, len(draft_text) // 20))
             critique_text = _run_with_timeout(
-                lambda: _generate_with_gemma4(
+                lambda: _generate_with_llm(
                     critique_prompt,
                     model_id=model_id,
                     max_new_tokens=critique_tokens,
@@ -3168,7 +3189,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             log.info("[Critique] Revision wall-clock budget: %ds (target_min~%d, draft=%d chars)",
                      revision_timeout, target_minutes_est, len(draft_text))
             revised_text = _run_with_timeout(
-                lambda: _generate_with_gemma4(
+                lambda: _generate_with_llm(
                     revision_prompt,
                     model_id=model_id,
                     max_new_tokens=revision_tokens,
@@ -3283,7 +3304,7 @@ Remember: This is a DRAMA that happens to involve science, not a science report 
 Outline only — do NOT write dialogue yet."""
 
         log.info(f"[ScriptWriter] Generating outline ({num_acts} acts)")
-        outline = _generate_with_gemma4(outline_prompt, model_id=model_id,
+        outline = _generate_with_llm(outline_prompt, model_id=model_id,
                                          max_new_tokens=1500, temperature=temperature, top_p=top_p)
 
         # Step 2: Generate each act with Context Engineering
@@ -3315,7 +3336,7 @@ ACT TEXT:
 
 SUMMARY:"""
                     try:
-                        summary = _generate_with_gemma4(
+                        summary = _generate_with_llm(
                             summary_prompt, model_id=model_id,
                             max_new_tokens=200, temperature=0.3,
                         )
@@ -3335,7 +3356,7 @@ ACT TEXT:
 
 SUMMARY:"""
                     try:
-                        summary = _generate_with_gemma4(
+                        summary = _generate_with_llm(
                             summary_prompt, model_id=model_id,
                             max_new_tokens=200, temperature=0.3,
                         )
@@ -3391,7 +3412,7 @@ CONTINUITY CHECK: Before writing, review the story-so-far summaries above. Ensur
 Write Act {act_num} now:"""
 
             _runtime_log(f"ScriptWriter: Generating Act {act_num}/{num_acts}")
-            act_text = _generate_with_gemma4(act_prompt, model_id=model_id,
+            act_text = _generate_with_llm(act_prompt, model_id=model_id,
                                               max_new_tokens=4096, temperature=temperature, top_p=top_p)
             acts.append(act_text)
 
@@ -3464,7 +3485,7 @@ Format your response exactly as:
 
         try:
             echo_response = _run_with_timeout(
-                lambda: _generate_with_gemma4(
+                lambda: _generate_with_llm(
                     echo_prompt,
                     model_id=model_id,
                     max_new_tokens=1000,
@@ -3522,7 +3543,7 @@ Format your response exactly as:
                             )
                             try:
                                 retry_response = _run_with_timeout(
-                                    lambda: _generate_with_gemma4(
+                                    lambda: _generate_with_llm(
                                         retry_prompt,
                                         model_id=model_id,
                                         max_new_tokens=1000,
@@ -4012,7 +4033,7 @@ KOKORO_VOICE_RULES = """- Scan all [VOICE:] tags in the script. The FIRST FIELD 
 - LEMMY always gets am_michael."""
 
 
-class Gemma4Director:
+class LLMDirector:
     """Takes a script and generates a full production plan via Gemma 4."""
 
     CATEGORY = "OldTimeRadio"
@@ -4050,8 +4071,8 @@ class Gemma4Director:
                project_state=None):
         # ── MASTER SWITCH INHERITANCE ──
         # Inherently use the chosen model from ScriptWriter.
-        global _CURRENT_GEMMA_MODEL
-        model_id = _CURRENT_GEMMA_MODEL
+        global _CURRENT_LLM_MODEL
+        model_id = _CURRENT_LLM_MODEL
 
         # Defer Bark health check until AFTER the script is written,
         # preventing Bark from hogging VRAM while Gemma writes the script.
@@ -4095,7 +4116,7 @@ class Gemma4Director:
             "extreme":  {"radio_static_amount": 0.40, "vinyl_crackle": 0.35, "tube_warmth": 1.0, "frequency_rolloff_hz": 3500, "hum_60hz": 0.12},
         }
 
-        log.info(f"[Gemma4Director] Generating production plan (vintage={vintage_intensity})")
+        log.info(f"[LLMDirector] Generating production plan (vintage={vintage_intensity})")
 
         # Scale max_new_tokens to script length.
         # Director output: voice_assignments (placeholder presets, procedurally
@@ -4104,9 +4125,9 @@ class Gemma4Director:
         # Budget: ~1 token per 10 chars of script (for SFX scanning) + 550 base.
         script_len = len(script_text)
         max_tokens = min(1700, max(650, 550 + script_len // 10))
-        log.info(f"[Gemma4Director] max_new_tokens={max_tokens} (script={script_len} chars)")
+        log.info(f"[LLMDirector] max_new_tokens={max_tokens} (script={script_len} chars)")
 
-        raw = _generate_with_gemma4(
+        raw = _generate_with_llm(
             prompt,
             model_id=model_id,
             max_new_tokens=max_tokens,
@@ -4134,7 +4155,7 @@ class Gemma4Director:
                 name_key = m.group(1).strip().upper()
                 gender_val = m.group(2).strip().lower()
                 gender_map.setdefault(name_key, gender_val)
-            log.info("[Gemma4Director] Parsed %d gender hints from script: %s",
+            log.info("[LLMDirector] Parsed %d gender hints from script: %s",
                      len(gender_map), gender_map)
 
             plan = self._randomize_character_names(plan, script_hash, gender_map=gender_map)
@@ -4148,7 +4169,7 @@ class Gemma4Director:
         sfx_json = json.dumps(plan.get("sfx_plan", []), indent=2)
         music_json = json.dumps(plan.get("music_plan", []), indent=2)
 
-        log.info(f"[Gemma4Director] Plan: {len(plan.get('voice_assignments', {}))} voices, "
+        log.info(f"[LLMDirector] Plan: {len(plan.get('voice_assignments', {}))} voices, "
                  f"{len(plan.get('sfx_plan', []))} SFX cues, "
                  f"{len(plan.get('music_plan', []))} music cues")
 
@@ -4159,8 +4180,8 @@ class Gemma4Director:
 
     def _extract_json(self, text):
         """Extract JSON object from LLM output (handles markdown fences, truncation)."""
-        log.info(f"[Gemma4Director] Raw output length: {len(text)} chars")
-        log.info(f"[Gemma4Director] Raw output preview: {text[:200]}...")
+        log.info(f"[LLMDirector] Raw output length: {len(text)} chars")
+        log.info(f"[LLMDirector] Raw output preview: {text[:200]}...")
 
         # Try to find JSON block
         patterns = [
@@ -4181,12 +4202,12 @@ class Gemma4Director:
                     open_braces = candidate.count('{') - candidate.count('}')
                     open_brackets = candidate.count('[') - candidate.count(']')
                     if open_braces > 0 or open_brackets > 0:
-                        log.info(f"[Gemma4Director] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
+                        log.info(f"[LLMDirector] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
                         candidate += ']' * open_brackets + '}' * open_braces
                         try:
                             return json.loads(candidate)
                         except json.JSONDecodeError as e:
-                            log.warning(f"[Gemma4Director] JSON repair failed: {e}")
+                            log.warning(f"[LLMDirector] JSON repair failed: {e}")
                     continue
 
         # Last resort: find the first { and try to build valid JSON from there
@@ -4200,8 +4221,8 @@ class Gemma4Director:
                 except json.JSONDecodeError:
                     continue
 
-        log.critical("[Gemma4Director] FATAL: Could not parse JSON from model output.")
-        log.critical(f"[Gemma4Director] Full raw output:\n{text[:1000]}")
+        log.critical("[LLMDirector] FATAL: Could not parse JSON from model output.")
+        log.critical(f"[LLMDirector] Full raw output:\n{text[:1000]}")
         raise ValueError("Failed to parse production plan JSON. Aborting run to prevent silent audio failure.")
 
     def _randomize_character_names(self, plan: dict, episode_seed: str,
@@ -4257,7 +4278,7 @@ class Gemma4Director:
                     "notes": profile["notes"],
                 }
                 used_presets.add(profile["voice_preset"])
-                log.info("[Gemma4Director] LEMMY: locked → %s (%s)",
+                log.info("[LLMDirector] LEMMY: locked → %s (%s)",
                          profile["voice_preset"], profile["notes"])
 
             elif upper_name == "ANNOUNCER":
@@ -4270,7 +4291,7 @@ class Gemma4Director:
                     "notes": ann["notes"],
                 }
                 used_presets.add(ann["voice_preset"])
-                log.info("[Gemma4Director] ANNOUNCER: procedural → %s (%s) [gender_hint=%s]",
+                log.info("[LLMDirector] ANNOUNCER: procedural → %s (%s) [gender_hint=%s]",
                          ann["voice_preset"], ann["notes"], ann_gender or "none")
 
             else:
@@ -4297,7 +4318,7 @@ class Gemma4Director:
                     )
                 if profile["voice_preset"] in used_presets:
                     log.warning(
-                        "[Gemma4Director] CAST_GENDER_POOL_EXHAUSTED: %s (%s) "
+                        "[LLMDirector] CAST_GENDER_POOL_EXHAUSTED: %s (%s) "
                         "reusing preset %s — increase pool or accept duplicate",
                         upper_name, gender_hint or "unknown", profile["voice_preset"]
                     )
@@ -4310,7 +4331,7 @@ class Gemma4Director:
                     "voice_preset": profile["voice_preset"],
                     "notes": f"{profile['name']} — {profile['notes']}",
                 }
-                log.info("[Gemma4Director] %s → voice: %s (profile: %s, %s, %s, %s)",
+                log.info("[LLMDirector] %s → voice: %s (profile: %s, %s, %s, %s)",
                          upper_name, profile["voice_preset"],
                          profile["name"], profile["gender"], profile["age"], profile["demeanor"])
                 # BUG-004 telemetry — grep CAST_GENDER_MATCH to verify per-character matching
@@ -4322,7 +4343,7 @@ class Gemma4Director:
 
         plan["voice_assignments"] = new_voice_assignments
 
-        log.info("[Gemma4Director] Procedural cast complete: %d characters "
+        log.info("[LLMDirector] Procedural cast complete: %d characters "
                  "(%d unique presets)", len(new_voice_assignments), len(used_presets))
 
         return plan

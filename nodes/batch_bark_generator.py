@@ -28,7 +28,7 @@ import warnings
 import numpy as np
 import torch
 
-from .gemma4_orchestrator import _runtime_log
+from .story_orchestrator import _runtime_log
 
 log = logging.getLogger("OTR")
 
@@ -544,8 +544,8 @@ class BatchBarkGenerator:
 
         # ── Step 2: Free Gemma4 VRAM — Bark needs GPU headroom ────────────
         try:
-            from .gemma4_orchestrator import _unload_gemma4
-            _unload_gemma4()
+            from .story_orchestrator import _unload_llm
+            _unload_llm()
             log.info("[BatchBark] Freed Gemma4 VRAM for batch TTS")
         except Exception:
             pass
