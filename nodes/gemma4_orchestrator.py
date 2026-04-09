@@ -158,6 +158,9 @@ class _LLMTimeout(Exception):
     pass
 
 
+import threading
+_TIMEOUT_CTX = threading.local()
+
 def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     """Run fn() in a worker thread with a wall-clock timeout.
 
@@ -167,9 +170,19 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     """
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
     vram_reset_peak(phase_label)
+
+    def _worker():
+        _TIMEOUT_CTX.deadline = time.time() + timeout_sec
+        try:
+            return fn()
+        finally:
+            if hasattr(_TIMEOUT_CTX, "deadline"):
+                del _TIMEOUT_CTX.deadline
+
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"otr-{phase_label}")
+
     try:
-        future = executor.submit(fn)
+        future = executor.submit(_worker)
         try:
             res = future.result(timeout=timeout_sec)
             vram_snapshot(phase_label)
@@ -1117,6 +1130,10 @@ class GemmaHeartbeatStreamer(BaseStreamer):
 
     def put(self, value):
         """Processes a new batch of tokens."""
+        # Check strict streaming timeout to prevent VRAM leaks from abandoned threads
+        if hasattr(_TIMEOUT_CTX, "deadline") and time.time() > _TIMEOUT_CTX.deadline:
+            raise TimeoutError("Streaming deadline exceeded — gracefully aborting generator")
+
         # Standard console output
         self.print_streamer.put(value)
 
@@ -1249,37 +1266,38 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
     raw_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
     streamer = GemmaHeartbeatStreamer(raw_tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-    with torch.no_grad():
-        output = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            max_length=None,
-            temperature=temperature,
-            top_p=top_p,
-            do_sample=True,
-            repetition_penalty=1.12,  # anti-loop sweet spot for dialogue
-            pad_token_id=pad_id,
-            streamer=streamer,      # Enable live streaming + granular heartbeats
-        )
+    try:
+        with torch.no_grad():
+            output = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                max_length=None,
+                temperature=temperature,
+                top_p=top_p,
+                do_sample=True,
+                repetition_penalty=1.12,  # anti-loop sweet spot for dialogue
+                pad_token_id=pad_id,
+                streamer=streamer,      # Enable live streaming + granular heartbeats
+            )
 
-    inference_time = time.time() - start_inference
-    log.info(f"[Gemma4] Inference complete in {inference_time:.1f}s.")
+        inference_time = time.time() - start_inference
+        log.info(f"[Gemma4] Inference complete in {inference_time:.1f}s.")
 
-    # Decode only the new tokens (skip the prompt).
-    # Move the slice to CPU BEFORE decoding so the GPU tensors can be
-    # released immediately after. Decoding reads the token ids into a
-    # Python string, after which output/inputs/streamer are garbage.
-    new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
-    decoded = tokenizer.decode(new_tokens_cpu, skip_special_tokens=True)
-
-    # v1.3.1 OOM FIX: explicit GPU tensor cleanup. The generate() call
-    # leaves behind the full output tensor and the KV cache in VRAM.
-    # These are local vars and would normally be freed on return, but
-    # if a timeout fallback path ever re-enters this function while
-    # the old frame is still alive, the residency stacks. Release now.
-    del new_tokens_cpu, output, inputs, streamer
-    torch.cuda.empty_cache()
-    return decoded
+        # Decode only the new tokens (skip the prompt).
+        new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
+        decoded = tokenizer.decode(new_tokens_cpu, skip_special_tokens=True)
+        return decoded
+    finally:
+        # v1.4 Theme B/C: GUARANTEED VRAM RECOVERY
+        # Whether generation completes normally, OOMs, or is aborted by the
+        # streamer's TimeoutError, we MUST clear these tensors so the thread
+        # local variables don't hold the graph and the KV cache captive.
+        if 'new_tokens_cpu' in locals():
+            del new_tokens_cpu
+        if 'output' in locals():
+            del output
+        del inputs, streamer
+        torch.cuda.empty_cache()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
