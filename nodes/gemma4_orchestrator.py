@@ -39,6 +39,10 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+# Project State (v1.4 Theme C) — series bible for cross-episode consistency.
+# Read-only during generation. See nodes/project_state.py for the write path.
+from .project_state import ProjectState
+
 # Lazy heavy imports (Section 8) — torch, numpy, transformers inside methods/classes only
 
 log = logging.getLogger("OTR")
@@ -1629,6 +1633,11 @@ class Gemma4ScriptWriter:
                     "default": True,
                     "tooltip": "Structural coherence pass: rewrites the opening & closing dialogue to ensure a 'seed' in the intro pays off in the finale."
                 }),
+                # v1.4 Theme C — optional series bible. Socket input only, no widget,
+                # so widgets_values length is unchanged and v1.3 workflows load clean.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
+                }),
             },
         }
 
@@ -1792,8 +1801,25 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      creativity="balanced",
                      runtime_preset="📻 standard (8 min)",
                      summon_lemmy=False,
-                     arc_enhancer=True):
+                     arc_enhancer=True,
+                     project_state=None):
         force_lemmy = summon_lemmy  # internal alias for clarity below
+
+        # ── PROJECT STATE (v1.4 Theme C) ──
+        # Resolve the series bible. If the socket is wired, use the dict from
+        # the upstream ProjectStateLoader. Otherwise fall back to the on-disk
+        # project_state.json (or defaults if the file does not exist).
+        # This call is read-only and cheap — safe for the generation path.
+        try:
+            if project_state is None:
+                _project_state_obj = ProjectState.load()
+            else:
+                _project_state_obj = ProjectState.from_dict(project_state)
+            project_state_preamble = _project_state_obj.prompt_preamble()
+        except Exception as e:
+            _runtime_log(f"ScriptWriter: project_state load failed, continuing without preamble: {e}")
+            project_state_preamble = ""
+        _runtime_log(f"ScriptWriter: project_state_preamble_chars={len(project_state_preamble)}")
 
         # ── RUNTIME PRESET → override target_minutes unless custom ──
         _preset_map = {
@@ -2161,7 +2187,13 @@ Begin the full script now. Follow this structure exactly:
 [VOICE: ANNOUNCER, <same gender/age as opening>, authoritative, calm] [Hard-science epilogue — cite ONLY the real article provided above. Headline, source, date. No invented IDs.]
 [MUSIC: Closing theme]"""
 
-        full_prompt = f"{system}\n\n{user_prompt}"
+        # v1.4 Theme C — prepend the series bible preamble so every downstream
+        # phase (outline, draft, critique, revise, arc enhancer) sees the same
+        # locked decisions. Empty preamble degrades gracefully to v1.3 behavior.
+        if project_state_preamble:
+            full_prompt = f"[SERIES BIBLE]\n{project_state_preamble}\n\n{system}\n\n{user_prompt}"
+        else:
+            full_prompt = f"{system}\n\n{user_prompt}"
 
         log.info(f"[Gemma4ScriptWriter] Generating {target_minutes}min episode "
                  f"'{episode_title}' ({genre_flavor})")
@@ -3541,11 +3573,16 @@ class Gemma4Director:
                     "default": "moderate",
                     "tooltip": "How vintage/degraded should the final audio sound"
                 }),
+                # v1.4 Theme C — optional series bible, socket input only.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
+                }),
             },
         }
 
     def direct(self, script_text, model_id="google/gemma-4-E4B-it",
-               temperature=0.4, prefer_bark=True, vintage_intensity="moderate"):
+               temperature=0.4, prefer_bark=True, vintage_intensity="moderate",
+               project_state=None):
 
         # Defer Bark health check until AFTER the script is written,
         # preventing Bark from hogging VRAM while Gemma writes the script.
@@ -3554,7 +3591,21 @@ class Gemma4Director:
         except Exception as e:
             _runtime_log(f"VOICE_HEALTH_SKIPPED: unexpected error {e}")
 
+        # v1.4 Theme C — resolve series bible (read-only).
+        try:
+            if project_state is None:
+                _director_state = ProjectState.load()
+            else:
+                _director_state = ProjectState.from_dict(project_state)
+            _director_preamble = _director_state.prompt_preamble()
+        except Exception as e:
+            _runtime_log(f"Director: project_state load failed, continuing without preamble: {e}")
+            _director_preamble = ""
+        _runtime_log(f"Director: project_state_preamble_chars={len(_director_preamble)}")
+
         prompt = DIRECTOR_PROMPT.format(script_text=script_text[:6000])
+        if _director_preamble:
+            prompt = f"[SERIES BIBLE]\n{_director_preamble}\n\n{prompt}"
 
         if not prefer_bark:
             prompt += "\nNOTE: Prefer Parler-TTS for all characters (more control over voice style)."
@@ -3793,4 +3844,4 @@ class Gemma4Director:
         log.info("[Gemma4Director] Procedural cast complete: %d characters "
                  "(%d unique presets)", len(new_voice_assignments), len(used_presets))
 
-        return plan
+        return pla
