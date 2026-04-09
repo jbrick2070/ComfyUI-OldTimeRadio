@@ -7,9 +7,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.2](https://img.shields.io/badge/Download-OldTimeRadio_v1.2-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.3](https://img.shields.io/badge/Download-OldTimeRadio_v1.3-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.2)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
+**[Click here to download the full package (v1.3)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
 
 ---
 
@@ -362,39 +362,48 @@ Every completed episode produces two files in `ComfyUI/output/`:
 
 ---
 
-## What's New in v1.3 (BETA - In Progress)
+## What's New in v1.3
 
-### The "Nuclear" Early Mock (Stability)
-Implemented `prestartup_script.py` to inject a no-op mock for `transformers.safetensors_conversion` into `sys.modules` *before* ComfyUI even starts importing nodes. This permanently kills the `JSONDecodeError` crashes caused by Hugging Face's background network telemetry in offline/air-gapped environments.
+### Arc Enhancer — Full Phase A/B/C Pipeline
+The Arc Enhancer is now fully instrumented and on by default in all three workflows.
 
-### VRAM Health Deferral
-Bark's initial hardware health probe has been decoupled from the script writing phase and deferred to the `Gemma4Director` stage. This ensures Gemma 4 has 100% of available VRAM during its most intensive "Arc Enhancer" operations, eliminating OOM crashes on 16GB cards.
+**Phase A — Structural Coherence Scoring:** Before any rewrite, the system scores the draft arc across 5 checks: truncation guard, strong scene (≥4 distinct voices), payoff (keyword overlap between opening and closing), echo (shared thematic words), and epilogue (ANNOUNCER present in final 500 characters). Score and all 5 check values are logged per-episode so you can see exactly what the arc looks like before Phase B touches it.
 
-### Arc Enhancer Flagship Feature
-Implemented the paired bookend rewrite pass. Gemma now extracts the opening and closing of a draft and rewrites them as matched pairs to ensure narrative setup and payoff. "What is planted in Act 1 is harvested in Act 5."
+**Phase B — Plot Spine Injection:** The middle acts are summarized into a ~50-word "plot spine" and injected directly into the Phase B bookend rewrite prompt. Phase B can no longer hallucinate an ending that contradicts what actually happened in the middle of the episode.
 
-### Authoritative Name-Registry Injection
-Moved the procedural character naming ("name-locking") to occur *before* the script is generated. Gemma 4 now receives a pre-baked roster of names it **must** use, rather than being asked to "generate interesting names" on the fly, eliminating stock name hallucinations (like "Vex" → "Rex").
+**Phase C — Echo Phrase Logging:** After the bookend rewrite, the system extracts the shared noun that bridges the new opening and closing lines and logs it — the concrete thematic echo that ties the episode together.
 
-### Smart Title & Output Hardening
-- **SignalLost Video Title Override:** The video engine now intelligently parses the script JSON to find the AI-generated episode title, automatically using it for CRT overlays and filenames instead of widget defaults.
-- **WAV/PNG Cleanup:** Implementation confirmed as "Video-Only" — all intermediate audio/image files are handled via system temp directories and purged immediately after ffmpeg muxing.
-- **Regression Suite:** Re-baselined `tests/test_core.py` for v1.3 architecture. All 88 tests pass.
+### OpenClose Stability Fix
+Reduced outline token budget from 600 to 450 tokens and raised the generation wall from 300s to 480s. Eliminates the timeout failure that was hitting when SDPA inference ran at ~2 tok/sec on long outline passes.
+
+### Test Workflow Speed Pass
+Test workflow now runs `short (3 acts)` instead of `medium (5 acts)` — cuts smoke-test time by roughly half while retaining 100% feature coverage including Arc Enhancer, Plot Spine, and echo logging.
+
+### Attention Backend Clarity
+The Flash Attention 2 probe now logs a precise platform message instead of a generic "not installed" warning:
+```
+[Gemma4] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention + SDPA active. Performance unaffected. Do not attempt install.
+```
+
+### Stability (from v1.3-beta)
+`prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `Gemma4Director` stage so Gemma has full VRAM during Arc Enhancer operations.
 
 ---
 
 ## 🛠️ Developer Note: Architecture Gotchas
 *For the next AI assistant or contributor:*
 
-1.  **Offline First:** This project is designed for air-gapped performance. **NEVER** add code that relies on real-time `transformers` Hub pings or `requests.get` to remote servers without the safety mocks in `prestartup_script.py`. 
-2.  **VRAM Sequencing:** Do not load Bark models while Gemma is active. The `Gemma4Director` is the bridge where Gemma unloads and Bark prepares. Keep this boundary clean.
-3.  **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py` for architecture flexibility. **Any change to one MUST be applied to both** (see the 13-token Bark whitelist).
-4.  **Test Sovereignty:** Always run `python -m pytest tests/test_core.py -v` before committing. If the script parser changes, the tests *will* break — update the test data, don't just skip the tests.
+1. **Offline First:** This project is designed for air-gapped performance. Never add code that relies on real-time `transformers` Hub pings or `requests.get` to remote servers without the safety mocks in `prestartup_script.py`.
+2. **VRAM Sequencing:** Do not load Bark models while Gemma is active. The `Gemma4Director` is the bridge where Gemma unloads and Bark prepares. Keep this boundary clean.
+3. **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py`. Any change to one must be applied to both.
+4. **Test Sovereignty:** Run `python -m pytest tests/` before committing. The arc coherence tests in `tests/test_arc_check.py` cover Phase A scoring and Plot Spine extraction — do not skip them.
+5. **Flash Attention 2:** No prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention is already active. Do not attempt FA2 installation on this platform.
 
 ---
 
-## v1.3 Remaining Roadmap
+## v1.4 Roadmap
 - **Kokoro Announcer** — Route ANNOUNCER lines to Kokoro TTS for broadcast-ready "Voice of God" cadence.
+- **OpenClose parallel evaluator** — Re-enable the 3-outline race when faster attention backends land.
 - **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs.
 - **Automatic Scene Transitions** — Procedural crossfades based on [ENV:] tag changes.
 
