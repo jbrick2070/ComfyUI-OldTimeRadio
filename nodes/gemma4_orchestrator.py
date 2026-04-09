@@ -1089,6 +1089,14 @@ def _unload_gemma4():
         # Step 3 + 4: gc and return VRAM to the allocator.
         gc.collect()
         torch.cuda.empty_cache()
+        
+        # Evict from ComfyUI's internal cache tracking as well
+        try:
+            import comfy.model_management
+            comfy.model_management.soft_empty_cache()
+        except Exception:
+            pass
+
         # Step 5: telemetry — prove it worked.
         allocated_gib = torch.cuda.memory_allocated() / 1e9
         reserved_gib = torch.cuda.memory_reserved() / 1e9
