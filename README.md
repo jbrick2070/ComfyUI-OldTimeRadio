@@ -33,83 +33,6 @@ Our advice? **Queue the prompt, walk away, and let it cook.** The results are wo
 
 ---
 
-## What's New in v1.4
-
-### Pro-Tier Model Support & 1-Click Master Switch
-You are no longer locked to the 4-Billion parameter Gemma. Added ad-hoc support for `google/gemma-4-26b-a4b-it` (BETA) for users with extreme hardware. To support this gracefully, we implemented a **True Single Switch Architecture**: the `Gemma4Director` node no longer has a dropdown or requires messy external wiring. Set your desired model solely on the `Gemma4ScriptWriter` and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM. 
-
-### VRAM Leak Hardening
-Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 
-
-### Project State 'Bible' Reader
-Support for `.json`/YAML project state files. Lock character voices, set canonical lore, and build continuous episodic shows without the AI forgetting who characters are.
-
-### Kokoro & MusicGen (Theme A / C)
-New modular nodes for `KokoroAnnouncer` and `MusicGenTheme`, seamlessly snapping into the pipeline to execute specialized audio workloads while Gemma is safely unloaded.
-
-### Subtle Pacing & Clean Load Protocol
-Implemented a **50% Pacing Overhaul** across the audio engine, halving all dramatic beats and "breath" buffers for a tighter, more modern radio sound. Also scrubbed the deprecated Model Selector for a literal "one switch" experience and 100% clean boot logs.
-
----
-
-## What's New in v1.2
-
-### Narrative Patterns 1–6
-Six new story-craft patterns embedded in the Gemma prompt chain:
-**AISM Filter**, **Scaffolding Preamble**, **Verbalized Sampling Epilogue**, **Yes-But / No-And conflict rule**, **Vocal Blueprints**, and **Locked Decisions**. The result: tighter arcs, sharper character differentiation, and fewer "AI voice" tells in the dialogue.
-
-### 8,316 Procedural Cast Combos
-First/last name pools expanded to **154 × 54** — Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, pulp adventure, classic Simpsons/Office generics, and 24 pre-1931 public domain literary characters. Zero trademark-specific franchise names. Every episode draws a unique cast.
-
-### Lemmy Statistical Audit
-New `tests/lemmy_rng_check.py` harness runs 10,000 trials against the 11% `SystemRandom` roll with ±1.5% tolerance. Confirms the easter egg stays statistically honest across builds.
-
-### v1.2 Bug Fixes (v1.2.0.5)
-- **Revision token budget** scales from draft length (`draft_chars / 3.5 × 1.25`) instead of `target_words`, ending Scene 4 decapitation that caused "weak ending" reviews
-- **Minced oaths pool** — ContentFilter rotates through period-authentic 1940s radio euphemisms (*Stars above*, *Jiminy*, *Great Scott*, *Thunderation*) instead of `[BLEEP]`
-- **Female preset pool expansion** — `en_speaker_7` promoted to female, giving 3 distinct female voices (4 / 7 / 9) so VEX and ZARA no longer collide on the same preset
-- **NameLeakGuard post-pass** — `difflib` fuzzy-matches stray stock names in dialogue body against the real `[VOICE:]` roster, catching "Rex" → "Vex" type errors with zero hardcoded name lists
-
----
-
-## What's New in v1.1
-
-### Friendlier UI — 5th-Grader Approved
-All three workflows now use numbered nodes with emojis and color-coded groups so anyone can follow the pipeline at a glance:
-
-- **Blue zone** → `1. WRITE THE STORY 📝`
-- **Green zone** → `2. MAKE THE VOICES & SOUNDS 🎙️`
-- **Orange zone** → `3. PUT IT ALL TOGETHER 🎬`
-
-Node names: `1. Gemma Writes the Story` → `2. Gemma Directs the Show` → `3. Voice Maker Machine` → `4. Scene Builder` → `5. Make It Sound Awesome` → `6. Glue Everything Together` → `7. Make the Final Video`
-
-### Three New Control Dials on Node 1
-| Widget | Options | What It Does |
-|--------|---------|-------------|
-| `runtime_preset` | 🧪 test / ⚡ quick / 📻 standard / 🎬 long / 🎭 epic / 🔧 custom | Pick your episode length without typing numbers |
-| `target_length` | short (3 acts) / medium (5 acts) / long (7-8 acts) / epic (10+) | Controls act count and mandatory dialogue volume |
-| `style_variant` | tense claustrophobic / space opera epic / psychological slow-burn / hard-sci-fi procedural / noir mystery / chaotic black-mirror | Injects a tonal directive into the script prompt |
-| `creativity` | safe & tight / balanced / wild & rough / maximum chaos | Maps to temperature/top_p (0.6 → 0.85 → 1.1 → 1.35) |
-
-### The Lemmy Fix
-LEMMY — the 11% easter-egg engineer named after Lemmy Kilmister — had two bugs in v1.0:
-
-1. **Voice collision**: Drake could steal his `v2/en_speaker_8` preset before Lemmy's locked branch ran. Fixed with two-pass cast iteration (LEMMY and ANNOUNCER processed first).
-2. **Deterministic freeze**: The per-episode RNG seed was freezing the 11% roll, so the same widget config always hit or always missed. Fixed by routing the Lemmy coin flip to `SystemRandom` (OS entropy, immune to `random.seed()`).
-
-New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OFF in production — he stays a genuine 11% surprise.
-
-### Pacing Overhaul
-- Banned consecutive `[PAUSE/BEAT]` tags at the system-prompt level
-- Hardened length directives to MANDATORY minimum line counts (not soft targets)
-- Default `target_minutes` lowered 25 → 8 for punchy, dense dialogue out of the box
-- `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
-
-### Lean Node Count
-Removed unused nodes from the repo: `parler_tts.py`, `vintage_radio_filter.py`, `audio_batcher.py`. Node count: 12 → **9**. Boot log confirms: `[OldTimeRadio] ✓ All 9 nodes loaded successfully`.
-
----
-
 ## New to ComfyUI? Start Here
 
 ComfyUI is a free, node-based interface for running AI models locally on your GPU.
@@ -382,9 +305,35 @@ Every completed episode produces two files in `ComfyUI/output/`:
 
 ---
 
-## What's New in v1.3
+## Change Log
 
-### Arc Enhancer — Full Phase A/B/C Pipeline
+### What's New in v1.4
+
+#### Pro-Tier Model Support & 1-Click Master Switch
+You are no longer locked to the 4-Billion parameter Gemma. Added ad-hoc support for `google/gemma-4-26b-a4b-it` (BETA) for users with extreme hardware. To support this gracefully, we implemented a **True Single Switch Architecture**: the `Gemma4Director` node no longer has a dropdown or requires messy external wiring. Set your desired model solely on the `Gemma4ScriptWriter` and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM. 
+
+#### VRAM Leak Hardening
+Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 
+
+#### Project State 'Bible' Reader
+Support for `.json`/YAML project state files. Lock character voices, set canonical lore, and build continuous episodic shows without the AI forgetting who characters are.
+
+#### Kokoro & MusicGen (Theme A / C)
+New modular nodes for `KokoroAnnouncer` and `MusicGenTheme`, seamlessly snapping into the pipeline to execute specialized audio workloads while Gemma is safely unloaded.
+
+#### Subtle Pacing & Clean Load Protocol
+Implemented a **50% Pacing Overhaul** across the audio engine, halving all dramatic beats and "breath" buffers for a tighter, more modern radio sound. Also scrubbed the deprecated Model Selector for a literal "one switch" experience and 100% clean boot logs.
+
+### v1.4 Roadmap
+- **Kokoro Announcer (shipped, in progress)** — Dedicated non-Bark narrator bus. ANNOUNCER dialogue lines are routed to Kokoro v1.0 via the new `🎙️ Kokoro Announcer` node, eliminating Bark's "ums" and "ahs" from the opening and closing bookends. Voice is picked per episode from a curated 4-voice British grab bag (`bm_george`, `bm_fable`, `bf_emma`, `bf_lily`), seeded from the episode seed so the same episode always draws the same narrator. `BatchBarkGenerator` now skips ANNOUNCER lines, and `SceneSequencer` consumes the Kokoro clips on a separate `announcer_audio_clips` bus. Voice `.pt` files are lazy-downloaded from `1038lab/KokoroTTS` on first use.
+- **MusicGen Theme (shipped, in progress)** — Real instrumental music for opening and closing bookends plus an act-break interstitial. The new `🎺 MusicGen Theme` node reads a `music_plan` (three cues: opening, closing, interstitial) that `Gemma4Director` now writes into `production_plan_json` with prompts tailored to the episode's tone, then renders each cue with `facebook/musicgen-medium` via the `transformers` MusicGen API. No `audiocraft` dependency — keeps Windows installs clean. Each `(cue_id, prompt, duration, episode_seed)` tuple is SHA-256 hashed to a `.wav` in `models/musicgen_cache/`, so re-runs of the same episode reuse the same music and the model is not reloaded. Cues feed directly into `EpisodeAssembler.opening_theme_audio` and `closing_theme_audio`, replacing the old procedural-noise stubs that previously supplied those inputs.
+- **OpenClose parallel evaluator** — Re-enable the 3-outline race when faster attention backends land.
+- **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs.
+- **Automatic Scene Transitions** — Procedural crossfades based on [ENV:] tag changes.
+
+### What's New in v1.3
+
+#### Arc Enhancer — Full Phase A/B/C Pipeline
 The Arc Enhancer is now fully instrumented and on by default in all three workflows.
 
 **Phase A — Structural Coherence Scoring:** Before any rewrite, the system scores the draft arc across 5 checks: truncation guard, strong scene (≥4 distinct voices), payoff (keyword overlap between opening and closing), echo (shared thematic words), and epilogue (ANNOUNCER present in final 500 characters). Score and all 5 check values are logged per-episode so you can see exactly what the arc looks like before Phase B touches it.
@@ -393,26 +342,80 @@ The Arc Enhancer is now fully instrumented and on by default in all three workfl
 
 **Phase C — Echo Phrase Logging:** After the bookend rewrite, the system extracts the shared noun that bridges the new opening and closing lines and logs it — the concrete thematic echo that ties the episode together.
 
-### OpenClose Stability Fix
+#### OpenClose Stability Fix
 Reduced outline token budget from 600 to 450 tokens and raised the generation wall from 300s to 480s. Eliminates the timeout failure that was hitting when SDPA inference ran at ~2 tok/sec on long outline passes.
 
-### Test Workflow Speed Pass
+#### Test Workflow Speed Pass
 Test workflow now runs `short (3 acts)` instead of `medium (5 acts)` — cuts smoke-test time by roughly half while retaining 100% feature coverage including Arc Enhancer, Plot Spine, and echo logging.
 
-### Attention Backend Clarity
+#### Attention Backend Clarity
 The Flash Attention 2 probe now logs a precise platform message instead of a generic "not installed" warning:
 ```
 [Gemma4] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention + SDPA active. Performance unaffected. Do not attempt install.
 ```
 
-### Stability (from v1.3-beta)
+#### Stability (from v1.3-beta)
 `prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `Gemma4Director` stage so Gemma has full VRAM during Arc Enhancer operations.
 
-### Gemma 4 VRAM Release Fix (v1.3 final)
+#### Gemma 4 VRAM Release Fix (v1.3 final)
 `_unload_gemma4` now calls `model.cpu()` before dropping references, and `_generate_with_gemma4` detaches output tensors to CPU and explicitly frees GPU tensors plus the streamer before returning. Root cause was abandoned `_run_with_timeout` ThreadPoolExecutor threads holding live Gemma model references, preventing garbage collection and causing a 31.70 GiB allocation on a 16 GB card. Verified end to end: telemetry reads `VRAM allocated=0.03 GiB` after unload, and the full sci-fi workflow completes in approximately 1h 14m producing a 457 MB MP4.
 
-### Known issues carried into v1.4 (RESOLVED IN BETA)
+#### Known issues carried into v1.4 (RESOLVED IN BETA)
 The Critique Revision pass (600s wall) and Arc-Enhancer-Echo pass (300s wall) previously hit timeouts on long runs and interleaved fallback text with the script body. **(Fixed in v1.4-beta: We now use a strict `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]` tag that cleanly bypasses downstream assembly logic, protecting script structural flow).**
+
+### What's New in v1.2
+
+#### Narrative Patterns 1–6
+Six new story-craft patterns embedded in the Gemma prompt chain:
+**AISM Filter**, **Scaffolding Preamble**, **Verbalized Sampling Epilogue**, **Yes-But / No-And conflict rule**, **Vocal Blueprints**, and **Locked Decisions**. The result: tighter arcs, sharper character differentiation, and fewer "AI voice" tells in the dialogue.
+
+#### 8,316 Procedural Cast Combos
+First/last name pools expanded to **154 × 54** — Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, pulp adventure, classic Simpsons/Office generics, and 24 pre-1931 public domain literary characters. Zero trademark-specific franchise names. Every episode draws a unique cast.
+
+#### Lemmy Statistical Audit
+New `tests/lemmy_rng_check.py` harness runs 10,000 trials against the 11% `SystemRandom` roll with ±1.5% tolerance. Confirms the easter egg stays statistically honest across builds.
+
+#### v1.2 Bug Fixes (v1.2.0.5)
+- **Revision token budget** scales from draft length (`draft_chars / 3.5 × 1.25`) instead of `target_words`, ending Scene 4 decapitation that caused "weak ending" reviews
+- **Minced oaths pool** — ContentFilter rotates through period-authentic 1940s radio euphemisms (*Stars above*, *Jiminy*, *Great Scott*, *Thunderation*) instead of `[BLEEP]`
+- **Female preset pool expansion** — `en_speaker_7` promoted to female, giving 3 distinct female voices (4 / 7 / 9) so VEX and ZARA no longer collide on the same preset
+- **NameLeakGuard post-pass** — `difflib` fuzzy-matches stray stock names in dialogue body against the real `[VOICE:]` roster, catching "Rex" → "Vex" type errors with zero hardcoded name lists
+
+### What's New in v1.1
+
+#### Friendlier UI — 5th-Grader Approved
+All three workflows now use numbered nodes with emojis and color-coded groups so anyone can follow the pipeline at a glance:
+
+- **Blue zone** → `1. WRITE THE STORY 📝`
+- **Green zone** → `2. MAKE THE VOICES & SOUNDS 🎙️`
+- **Orange zone** → `3. PUT IT ALL TOGETHER 🎬`
+
+Node names: `1. Gemma Writes the Story` → `2. Gemma Directs the Show` → `3. Voice Maker Machine` → `4. Scene Builder` → `5. Make It Sound Awesome` → `6. Glue Everything Together` → `7. Make the Final Video`
+
+#### Three New Control Dials on Node 1
+| Widget | Options | What It Does |
+|--------|---------|-------------|
+| `runtime_preset` | 🧪 test / ⚡ quick / 📻 standard / 🎬 long / 🎭 epic / 🔧 custom | Pick your episode length without typing numbers |
+| `target_length` | short (3 acts) / medium (5 acts) / long (7-8 acts) / epic (10+) | Controls act count and mandatory dialogue volume |
+| `style_variant` | tense claustrophobic / space opera epic / psychological slow-burn / hard-sci-fi procedural / noir mystery / chaotic black-mirror | Injects a tonal directive into the script prompt |
+| `creativity` | safe & tight / balanced / wild & rough / maximum chaos | Maps to temperature/top_p (0.6 → 0.85 → 1.1 → 1.35) |
+
+#### The Lemmy Fix
+LEMMY — the 11% easter-egg engineer named after Lemmy Kilmister — had two bugs in v1.0:
+
+1. **Voice collision**: Drake could steal his `v2/en_speaker_8` preset before Lemmy's locked branch ran. Fixed with two-pass cast iteration (LEMMY and ANNOUNCER processed first).
+2. **Deterministic freeze**: The per-episode RNG seed was freezing the 11% roll, so the same widget config always hit or always missed. Fixed by routing the Lemmy coin flip to `SystemRandom` (OS entropy, immune to `random.seed()`).
+
+New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OFF in production — he stays a genuine 11% surprise.
+
+#### Pacing Overhaul
+- Banned consecutive `[PAUSE/BEAT]` tags at the system-prompt level
+- Hardened length directives to MANDATORY minimum line counts (not soft targets)
+- Default `target_minutes` lowered 25 → 8 for punchy, dense dialogue out of the box
+- `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
+
+#### Lean Node Count
+Removed unused nodes from the repo: `parler_tts.py`, `vintage_radio_filter.py`, `audio_batcher.py`. Node count: 12 → **9**. Boot log confirms: `[OldTimeRadio] ✓ All 9 nodes loaded successfully`.
 
 ---
 
@@ -424,15 +427,6 @@ The Critique Revision pass (600s wall) and Arc-Enhancer-Echo pass (300s wall) pr
 3. **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py`. Any change to one must be applied to both.
 4. **Test Sovereignty:** Run `python -m pytest tests/` before committing. The arc coherence tests in `tests/test_arc_check.py` cover Phase A scoring and Plot Spine extraction — do not skip them.
 5. **Flash Attention 2:** No prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention is already active. Do not attempt FA2 installation on this platform.
-
----
-
-## v1.4 Roadmap
-- **Kokoro Announcer (shipped, in progress)** — Dedicated non-Bark narrator bus. ANNOUNCER dialogue lines are routed to Kokoro v1.0 via the new `🎙️ Kokoro Announcer` node, eliminating Bark's "ums" and "ahs" from the opening and closing bookends. Voice is picked per episode from a curated 4-voice British grab bag (`bm_george`, `bm_fable`, `bf_emma`, `bf_lily`), seeded from the episode seed so the same episode always draws the same narrator. `BatchBarkGenerator` now skips ANNOUNCER lines, and `SceneSequencer` consumes the Kokoro clips on a separate `announcer_audio_clips` bus. Voice `.pt` files are lazy-downloaded from `1038lab/KokoroTTS` on first use.
-- **MusicGen Theme (shipped, in progress)** — Real instrumental music for opening and closing bookends plus an act-break interstitial. The new `🎺 MusicGen Theme` node reads a `music_plan` (three cues: opening, closing, interstitial) that `Gemma4Director` now writes into `production_plan_json` with prompts tailored to the episode's tone, then renders each cue with `facebook/musicgen-medium` via the `transformers` MusicGen API. No `audiocraft` dependency — keeps Windows installs clean. Each `(cue_id, prompt, duration, episode_seed)` tuple is SHA-256 hashed to a `.wav` in `models/musicgen_cache/`, so re-runs of the same episode reuse the same music and the model is not reloaded. Cues feed directly into `EpisodeAssembler.opening_theme_audio` and `closing_theme_audio`, replacing the old procedural-noise stubs that previously supplied those inputs.
-- **OpenClose parallel evaluator** — Re-enable the 3-outline race when faster attention backends land.
-- **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs.
-- **Automatic Scene Transitions** — Procedural crossfades based on [ENV:] tag changes.
 
 ---
 
