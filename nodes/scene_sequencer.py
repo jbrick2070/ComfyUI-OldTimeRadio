@@ -878,7 +878,7 @@ class EpisodeAssembler:
 
         # Opening theme
         if opening_theme_audio is not None:
-            opening = self._extract_waveform(opening_theme_audio)
+            opening = self._extract_waveform(opening_theme_audio, target_sr=sample_rate)
             max_samples = int(opening_duration_sec * sample_rate)
             if opening.shape[-1] > max_samples:
                 opening = opening[:, :, :max_samples]
@@ -889,7 +889,7 @@ class EpisodeAssembler:
 
         # Closing theme
         if closing_theme_audio is not None:
-            closing = self._extract_waveform(closing_theme_audio)
+            closing = self._extract_waveform(closing_theme_audio, target_sr=sample_rate)
             max_samples = int(closing_duration_sec * sample_rate)
             if closing.shape[-1] > max_samples:
                 closing = closing[:, :, :max_samples]
@@ -964,14 +964,42 @@ class EpisodeAssembler:
         log.info(f"[EpisodeAssembler] '{episode_title}' — {total_sec/60:.1f} min")
         return (audio_out, output_path, info)
 
-    def _extract_waveform(self, audio):
-        """Extract waveform tensor from AUDIO input."""
+    def _extract_waveform(self, audio, target_sr=None):
+        """Extract waveform tensor from AUDIO input, resampling to target_sr if needed.
+
+        MusicGen emits at 32 kHz, Bark at 24 kHz, Kokoro at 24 kHz, and the
+        main scene bus runs at 48 kHz. Themes coming in on the opening /
+        closing inputs must be rate-matched before they can be concatenated
+        with the main content, otherwise they play at the wrong speed and
+        pitch. Resampling happens here at the concatenation boundary — the
+        same pattern SceneSequencer uses for TTS clips via _resample_audio.
+        """
         if isinstance(audio, dict):
             wf = audio.get("waveform")
+            src_sr = int(audio.get("sample_rate") or 0) or None
         else:
             wf = audio
+            src_sr = None
         if wf.dim() == 1:
             wf = wf.unsqueeze(0).unsqueeze(0)
         elif wf.dim() == 2:
             wf = wf.unsqueeze(0)
+
+        if target_sr and src_sr and src_sr != target_sr:
+            # Use torchaudio if available for high-quality resampling, fall
+            # back to numpy-based _resample_audio (already imported in this
+            # module for the TTS bus) for correctness without an extra dep.
+            try:
+                import torchaudio.functional as AF
+                wf = AF.resample(wf, src_sr, target_sr)
+            except Exception:
+                import numpy as _np
+                chans = []
+                for c in range(wf.shape[1]):
+                    clip_np = wf[0, c].cpu().numpy().astype(_np.float32)
+                    resampled = _resample_audio(clip_np, src_sr, target_sr)
+                    chans.append(torch.from_numpy(resampled).float())
+                wf = torch.stack(chans, dim=0).unsqueeze(0)
+            log.info("[EpisodeAssembler] Resampled theme %d Hz -> %d Hz",
+                     src_sr, target_sr)
         return wf
