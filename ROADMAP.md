@@ -2,6 +2,34 @@
 
 ---
 
+## NEW CONVERSATION HANDOFF - READ THIS FIRST
+
+### 1) Current Shipped State
+- **Last shipped:** `v1.3`
+- **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta)
+
+### 2) Recent Commits & Changes (v1.4-beta hardening)
+- **Timeout Sentinel Fix:** `nodes/gemma4_orchestrator.py` now injects `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]` instead of raw text concatenation, preventing downstream structural breakage (fixes the massive Theme B blocker).
+- **VRAM Telemetry Phase:** Integrated per-pass `vram_reset_peak()` and `vram_snapshot()` calls in the execution wrappers.
+- **Workflow / debt scrub:** Purged orphaned `OTR_SFXGenerator` nodes from all `.json` workflows, mapped nodes to cohesive aesthetic grids, and dropped the UTF-8 BOM from `gemma4_orchestrator.py`.
+- **Bug Bible Updates:** Synchronized `BUG_BIBLE.yaml` covering vram leaks (12.19) and sentinel fallback parsing (12.20).
+
+### 3) Next Priority Feature
+- **Hardware Run & VRAM validation:** `Theme C` mandates we run the physical `tests/vram_profile_test.py` to assert the 14.5 GB peak while running the newly completed Kokoro/MusicGen node phases. 
+
+### 4) Standing Rules (DO NOT VIOLATE)
+- 16 GB VRAM ceiling, 14.5 GB real-world target.
+- 100% local, open source, offline-first.
+- Flash Attention 2 is NOT available on this architecture (Windows sm_120).
+- Lockstep verify local HEAD vs GitHub HEAD after every push.
+- Zero trailing BOM signatures.
+
+### 5) First Moves for Next Session
+- Run `git status` to guarantee you're on `v1.4-voice-arc-infra`.
+- Wire up the actual physical node paths in `tests/vram_profile_test.py` and run it locally to verify footprints.
+
+---
+
 ## Current state (as of 2026-04-08)
 
 - **Last shipped tag:** `v1.3` → `ddbed87` (v1.3 final, includes Gemma 4 VRAM release fix)
@@ -48,21 +76,21 @@ Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no
 - **Bark female voice pool expansion** (Bug Bible `10.06`). Not started. Add at least one additional distinct female preset, keep the 3-female safety rule.
 
 ### Theme B — Arc Enhancer 2.0
-- **Timeout fallback sentinel path (BLOCKER).** Critique Revision (600s) and Arc-Enhancer-Echo (300s) currently inject fallback text directly into the script body on timeout, corrupting downstream structure. Fix: route timeout fallbacks through a sentinel that is detected and skipped by the assembler, not concatenated. This must land before any other Theme B work.
+- **[COMPLETED] Timeout fallback sentinel path.** Critique Revision (600s) and Arc-Enhancer-Echo (300s) successfully route timeout fallbacks through a `SYSTEM_SENTINEL` block that is intercepted by the assembler.
 - **Phase A score floor retry.** If arc score < 3/5, auto-retry Phase B once. Log both attempts.
 - **Plot Spine visible in `_runtime_log`.** Currently fed to Phase B silently.
 - **OpenClose parallel evaluator re-enable.** Currently gated (`ENABLE_3_OUTLINE_EVALUATOR = False`). Re-activate with v1.3 timeout/budget fixes as per-outline contract.
-- **Chunked context continuity.** Replace `acts[-1][:3000]` with sentence-boundary-aware truncation.
-- **Automatic scene transitions.** Programmatic `[TRANSITION: ...]` injection on weak handoffs.
+- **[COMPLETED] Chunked context continuity.** Replaced arbitrary truncation with sentence-boundary-aware logic (`_truncate_at_sentence_boundary`, `_tail_at_sentence_boundary`).
+- **[COMPLETED] Automatic scene transitions.** Programmatic `[TRANSITION: ...]` injection on weak handoffs handled via `_inject_scene_transitions()`.
 
 ### Theme C — Infrastructure (start here per roadmap order)
-- **Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log`. Prerequisite for the VRAM profile test.
-- **VRAM profile test.** `tests/vram_profile_test.py` snapshotting VRAM between major nodes, assert ≤ 14.5 GB peak.
+- **[COMPLETED] Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log` is successfully logging footprints per phase.
+- **VRAM profile test.** `tests/vram_profile_test.py` snapshotting VRAM between major nodes, assert ≤ 14.5 GB peak. (Currently stubbed; needs to be wired to the physical nodes).
 - **Project State JSON.** Per-series "bible" file. Read-only during generation, writable between episodes. Character voice locks, forbidden patterns, tone contracts.
 
 ### Cleanup debt
-- **BOM on `nodes/gemma4_orchestrator.py`.** Pre-existing UTF-8 BOM violates the CLAUDE.md no-BOM rule. Strip it.
-- **Dangling procedural SFX theme nodes** in all three shipped workflows. `OTR_SFXGenerator` stubs that used to feed opening/closing theme audio are still present but disconnected. Remove them for a clean v1.4 JSON.
+- **[COMPLETED] BOM on `nodes/gemma4_orchestrator.py`.** Removed permanently.
+- **[COMPLETED] Dangling procedural SFX theme nodes** in all three shipped workflows are purged. Bonus: Workflows upgraded to aesthetic horizontal grids across colored type bounds.
 
 ### v1.4-beta → v1.4 ship criteria
 - Timeout sentinel fallback fix landed and verified on a long run.
