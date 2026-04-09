@@ -889,6 +889,9 @@ def _fetch_science_news(max_feeds=10):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
+    # Strip [BETA] labels used in the UI dropdown
+    model_id = model_id.split(" ")[0]
+
     """Load Gemma 4 via transformers. Caches globally with device tracking.
 
     BEST PRACTICES applied (per survival guide):
@@ -967,7 +970,7 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
             # BitsAndBytesConfig 4-bit squeezes them to fit. The 4B model loads
             # fine in bfloat16 so we skip quantization for it (better quality).
             quant_config = None
-            needs_quant = any(tag in model_id.lower() for tag in ("26b", "31b", "27b", "12b"))
+            needs_quant = any(tag in model_id.lower() for tag in ("26b", "31b", "27b", "12b", "a4b"))
             if needs_quant:
                 try:
                     from transformers import BitsAndBytesConfig
@@ -1820,9 +1823,9 @@ class Gemma4ScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": ("STRING", {
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
                     "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4"
+                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -3952,8 +3955,9 @@ class Gemma4Director:
                 "script_text": ("STRING", {"multiline": True, "default": ""}),
             },
             "optional": {
-                "model_id": ("STRING", {
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
                     "default": "google/gemma-4-E4B-it",
+                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
                 }),
                 "temperature": ("FLOAT", {
                     "default": 0.4, "min": 0.1, "max": 1.0, "step": 0.05,

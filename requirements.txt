@@ -15,3 +15,5 @@ feedparser>=6.0
 # Tokenizers (required by transformers, listed for clarity)
 tokenizers>=0.15
 sentencepiece>=0.1.99
+
+bitsandbytes>=0.42.0

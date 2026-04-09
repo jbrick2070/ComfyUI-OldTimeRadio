@@ -110,8 +110,9 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Gemma 4 E4B** | ~5 GB | Default LLM. Auto-downloads to `models/huggingface/` |
-| **Gemma 4 12B** | ~24 GB | Optional higher-quality LLM |
+| **Gemma 4 E4B** | ~5 GB | **Default LLM.** Auto-downloads to `models/huggingface/` |
+| **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
+| **Gemma 4 31B [BETA]** | ~17 GB (4-bit) | Dense state-of-the-art LLM. Requires 4-bit. **Optional.** |
 | **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run |
 
 > VRAM management is automatic. The pipeline unloads Gemma before loading Bark so you never run out of memory.
