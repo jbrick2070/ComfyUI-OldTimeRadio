@@ -102,6 +102,24 @@ Three workflows ship in the `workflows/` folder:
 | Recommended | RTX 5080 / 4090 | 16 GB+ |
 | Minimum | RTX 4070 / 3060 | 8 GB |
 
+### Step 5 — Continuous 24/7 Broadcast (OBS Automation)
+
+Run SIGNAL LOST as a live generative broadcast — each output episode auto-loads into OBS as it finishes.
+
+**Prerequisites:**
+- [OBS Studio](https://obsproject.com/download)
+- [Media Playlist Source (OBS Plugin)](https://obsproject.com/forum/resources/media-playlist-source.1765/)
+- [Directory Sorter for OBS](https://github.com/CodeYan01/directory_sorter_for_obs)
+
+**Setup:**
+1. Install OBS and the Media Playlist Source plugin.
+2. In OBS: **Tools → Scripts → Python Settings** → point to your Python path.
+3. Load the `directory_sorter_for_obs` script → point to `ComfyUI/output/old_time_radio/`.
+4. Add a **Media Playlist Source** scene item pointed to the same folder.
+5. OBS picks up each new MP4 automatically as Signal Lost Video finishes.
+
+> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Gemma 4 and Bark.
+
 ---
 
 ## Pipeline Architecture
@@ -212,26 +230,6 @@ python otr_monitor.py
 
 ---
 
-## Setting Up Continuous Output with OBS
-
-Run SIGNAL LOST as a live generative broadcast — each output episode auto-loads into OBS as it finishes.
-
-**Prerequisites:**
-- [OBS Studio](https://obsproject.com/download)
-- [Media Playlist Source (OBS Plugin)](https://obsproject.com/forum/resources/media-playlist-source.1765/)
-- [Directory Sorter for OBS](https://github.com/CodeYan01/directory_sorter_for_obs)
-
-**Setup:**
-1. Install OBS and the Media Playlist Source plugin
-2. In OBS: **Tools → Scripts → Python Settings** → point to your Python path
-3. Load the `directory_sorter_for_obs` script → point to `ComfyUI/output/old_time_radio/`
-4. Add a **Media Playlist Source** scene item pointed to the same folder
-5. OBS picks up each new MP4 automatically as Signal Lost Video finishes
-
-> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Gemma 4 and Bark.
-
----
-
 ## Troubleshooting
 
 <details>
@@ -299,18 +297,6 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 **RNG Architecture** — Two separate RNG systems prevent determinism leaking into places it shouldn't:
 - `random` (seeded per-episode from fingerprint) — used for reproducible story arc selection, Open-Close arc choices, character voice pool draws
 - `SystemRandom` (`_LEMMY_RNG`) — OS entropy, used only for the Lemmy 11% coin flip so it stays genuinely random across repeated runs of the same config
-
-**Canonical 1.0 Token Format** — Highly deterministic script parsing relying on `[VOICE: NAME, traits]`, `[SFX:]`, `[ENV:]`, and `(beat)` tags. Tags always start at the beginning of a line. Consecutive `(beat)` / `[PAUSE/BEAT]` tags are banned at the prompt level.
-
-**VRAM Sentry** — Automatic `gc.collect()` and CUDA cache flush between Gemma 4 and Bark model lifetimes. Chunked generation for long episodes (>5 min) prevents OOM on 8–12 GB cards.
-
-**Voice Collision Prevention** — LEMMY and ANNOUNCER are assigned voice presets before regular characters draw from the pool. Regular characters use a 10-attempt re-roll loop to avoid duplicates. Pool exhaustion is logged with a warning rather than crashing.
-
-### Output Files
-
-Every completed episode produces two files in `ComfyUI/output/`:
-- `signal_lost_<title>_<timestamp>.mp4` — the final video
-- `signal_lost_<title>_<timestamp>_treatment.txt` — full cast list, voice assignments, complete script in scene order, and production stats (duration, resolution, file size)
 
 ---
 
