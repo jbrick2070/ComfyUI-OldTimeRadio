@@ -143,16 +143,14 @@ def _run_node(node_class, **overrides):
 def _run_gemma4_script_writer() -> None:
     from nodes.gemma4_orchestrator import Gemma4ScriptWriter
     res = _run_node(Gemma4ScriptWriter,
-                    topic="The Last Frequency",
-                    subgenre="hard_sci_fi",
-                    target_duration_setting="🧪 test (1 min)",
-                    number_of_episodes=1,
-                    seed=3,
-                    llm_model="google/gemma-4-E4B-it",
-                    api_key="",
-                    max_retries=1,
+                    episode_title="The Last Frequency",
+                    genre_flavor="hard_sci_fi",
+                    runtime_preset="🧪 test (1 min)",
+                    target_minutes=1,
+                    num_characters=2,
+                    model_id="google/gemma-4-E4B-it",
                     temperature=0.7,
-                    advanced_toggle=False)
+                    arc_enhancer=True)
     _ctx["script_text"] = res[0]
     _ctx["script_json"] = res[1]
 
@@ -168,7 +166,7 @@ def _run_kokoro_announcer() -> None:
 
 def _run_musicgen_theme() -> None:
     from nodes.musicgen_theme import MusicGenTheme
-    res = _run_node(MusicGenTheme, production_plan_json=_ctx["production_plan_json"], duration_seconds=3.0)
+    res = _run_node(MusicGenTheme, production_plan_json=_ctx["production_plan_json"], episode_seed=42)
     _ctx["opening_theme_audio"] = res[0]
     _ctx["closing_theme_audio"] = res[1]
 
@@ -204,7 +202,8 @@ def _run_video_engine() -> None:
     res = _run_node(SignalLostVideoRenderer, 
                     audio=_ctx["episode_audio"],
                     script_json=_ctx["script_json"],
-                    production_plan_json=_ctx["production_plan_json"])
+                    production_plan_json=_ctx["production_plan_json"],
+                    episode_title="Test Episode")
     _ctx["video_path"] = res[0]
 
 PHASE_RUNNERS: List[tuple] = [
