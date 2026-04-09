@@ -43,6 +43,9 @@ from datetime import datetime
 # Read-only during generation. See nodes/project_state.py for the write path.
 from .project_state import ProjectState
 
+# Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
+from ._vram_log import vram_snapshot, vram_reset_peak
+
 # Lazy heavy imports (Section 8) — torch, numpy, transformers inside methods/classes only
 
 log = logging.getLogger("OTR")
@@ -1821,6 +1824,12 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             project_state_preamble = ""
         _runtime_log(f"ScriptWriter: project_state_preamble_chars={len(project_state_preamble)}")
 
+        # v1.4 Theme C — VRAM telemetry. Reset peak so the per-phase high
+        # water mark reflects this script writer run only, then snapshot on
+        # entry, after model load (via best-effort hook below), and on exit.
+        vram_reset_peak("script_writer_entry")
+        vram_snapshot("script_writer_entry")
+
         # ── RUNTIME PRESET → override target_minutes unless custom ──
         _preset_map = {
             "🧪 test (1 min)":    1,
@@ -2440,6 +2449,11 @@ Begin the full script now. Follow this structure exactly:
         # now so BatchBark starts with a clean VRAM slate.
         _unload_gemma4()
         _runtime_log("ScriptWriter: Gemma unloaded — VRAM freed for Bark")
+
+        # v1.4 Theme C — exit snapshot after Gemma unload. This should be
+        # close to the idle baseline; a large value here means the unload
+        # path left memory on the table and needs investigation.
+        vram_snapshot("script_writer_exit_after_unload")
 
         return (script_text, script_json, news_json, est_minutes)
 
@@ -3603,6 +3617,10 @@ class Gemma4Director:
             _director_preamble = ""
         _runtime_log(f"Director: project_state_preamble_chars={len(_director_preamble)}")
 
+        # v1.4 Theme C — director entry snapshot + peak reset.
+        vram_reset_peak("director_entry")
+        vram_snapshot("director_entry")
+
         prompt = DIRECTOR_PROMPT.format(script_text=script_text[:6000])
         if _director_preamble:
             prompt = f"[SERIES BIBLE]\n{_director_preamble}\n\n{prompt}"
@@ -3673,6 +3691,9 @@ class Gemma4Director:
         log.info(f"[Gemma4Director] Plan: {len(plan.get('voice_assignments', {}))} voices, "
                  f"{len(plan.get('sfx_plan', []))} SFX cues, "
                  f"{len(plan.get('music_plan', []))} music cues")
+
+        # v1.4 Theme C — director exit snapshot.
+        vram_snapshot("director_exit")
 
         return (plan_json, voice_json, sfx_json, music_json)
 
