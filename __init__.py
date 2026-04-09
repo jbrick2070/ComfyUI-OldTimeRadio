@@ -91,6 +91,7 @@ _NODE_MODULES = {
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", "📺 Signal Lost Video"),
     "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      "📖 Project State Loader"),
     "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
+    "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

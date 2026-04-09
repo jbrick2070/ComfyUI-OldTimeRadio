@@ -3773,10 +3773,35 @@ The script follows these tokens:
       "generation_prompt": "Foley style prompt for audio generator"
     }}
   ],
+  "music_plan": [
+    {{
+      "cue_id": "opening",
+      "duration_sec": 12,
+      "generation_prompt": "1940s old time radio opening theme, warm brass fanfare, upright bass, snare brushes, mono AM radio character, tube saturation, confident and mysterious, ends on a held chord"
+    }},
+    {{
+      "cue_id": "closing",
+      "duration_sec": 8,
+      "generation_prompt": "1940s old time radio closing sting, brass and strings, resolving cadence, warm tube saturation, fades to silence"
+    }},
+    {{
+      "cue_id": "interstitial",
+      "duration_sec": 4,
+      "generation_prompt": "short old time radio act-break stinger, single brass hit with cymbal swell, mono, tube warmth"
+    }}
+  ],
   "pacing": {{
     "beat_pause_ms": 200
   }}
 }}
+
+═══ 🎵 MUSIC PLAN RULES ═══
+- ALWAYS include exactly three music cues: opening, closing, interstitial. Cue ids are fixed strings.
+- Tailor each generation_prompt to the TONE of THIS episode. A noir thriller gets minor-key brass and upright bass. A comedic episode gets brighter brass, a wink of pizzicato strings, a lighter tempo. A cosmic horror piece gets low drones and distant timpani. Match the story.
+- Keep every prompt musically specific: name instruments, tempo feel, mood, era, and a recording character (mono AM radio, tube saturation). No generic "scary music" or "happy music."
+- Keep prompts under 35 words each.
+- duration_sec is fixed: opening=12, closing=8, interstitial=4. Do not change these numbers.
+- The music model is instrumental-only. Never ask for vocals, lyrics, or singing.
 
 CRITICAL RULES:
 - Output ONLY the JSON block. No prose, no commentary, no markdown explanation.
@@ -3872,12 +3897,12 @@ class Gemma4Director:
         log.info(f"[Gemma4Director] Generating production plan (vintage={vintage_intensity})")
 
         # Scale max_new_tokens to script length.
-        # Director output is lightweight: voice_assignments (placeholder presets,
-        # procedurally overridden), sfx_plan, pacing. No dialogue duplication.
-        # A 5-character cast + 10 SFX cues = ~400–600 tokens.
-        # Budget: ~1 token per 10 chars of script (for SFX scanning) + 400 base.
+        # Director output: voice_assignments (placeholder presets, procedurally
+        # overridden), sfx_plan, music_plan (3 fixed cues), pacing. No dialogue
+        # duplication. A 5-character cast + 10 SFX cues + 3 music cues = ~600–800 tokens.
+        # Budget: ~1 token per 10 chars of script (for SFX scanning) + 550 base.
         script_len = len(script_text)
-        max_tokens = min(1500, max(500, 400 + script_len // 10))
+        max_tokens = min(1700, max(650, 550 + script_len // 10))
         log.info(f"[Gemma4Director] max_new_tokens={max_tokens} (script={script_len} chars)")
 
         raw = _generate_with_gemma4(

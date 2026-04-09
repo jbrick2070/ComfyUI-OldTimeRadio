@@ -1,8 +1,8 @@
 {
   "id": "da0beab7-5804-4aca-9d7e-975bcb72870b",
   "revision": 0,
-  "last_node_id": 13,
-  "last_link_id": 20,
+  "last_node_id": 14,
+  "last_link_id": 23,
   "nodes": [
     {
       "id": 1,
@@ -114,7 +114,8 @@
           "links": [
             4,
             13,
-            17
+            17,
+            21
           ],
           "slot_index": 0
         },
@@ -283,9 +284,7 @@
         {
           "name": "sfx_audio",
           "type": "AUDIO",
-          "links": [
-            7
-          ],
+          "links": null,
           "slot_index": 0
         },
         {
@@ -325,9 +324,7 @@
         {
           "name": "sfx_audio",
           "type": "AUDIO",
-          "links": [
-            8
-          ],
+          "links": null,
           "slot_index": 0
         },
         {
@@ -371,12 +368,12 @@
         {
           "name": "opening_theme_audio",
           "type": "AUDIO",
-          "link": 7
+          "link": 22
         },
         {
           "name": "closing_theme_audio",
           "type": "AUDIO",
-          "link": 8
+          "link": 23
         }
       ],
       "outputs": [
@@ -566,6 +563,70 @@
         "random",
         0.95
       ]
+    },
+    {
+      "id": 14,
+      "type": "OTR_MusicGenTheme",
+      "pos": [
+        980,
+        460
+      ],
+      "size": [
+        380,
+        160
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "link": 21,
+          "widget": {
+            "name": "production_plan_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "opening_audio",
+          "type": "AUDIO",
+          "links": [
+            22
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "closing_audio",
+          "type": "AUDIO",
+          "links": [
+            23
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "interstitial_audio",
+          "type": "AUDIO",
+          "links": null,
+          "slot_index": 2
+        },
+        {
+          "name": "render_log",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_MusicGenTheme"
+      },
+      "widgets_values": [
+        "{}",
+        "",
+        "facebook/musicgen-medium",
+        3.0
+      ]
     }
   ],
   "links": [
@@ -607,22 +668,6 @@
       0,
       7,
       0,
-      "AUDIO"
-    ],
-    [
-      7,
-      5,
-      0,
-      7,
-      1,
-      "AUDIO"
-    ],
-    [
-      8,
-      6,
-      0,
-      7,
-      2,
       "AUDIO"
     ],
     [
@@ -695,6 +740,30 @@
       0,
       3,
       3,
+      "AUDIO"
+    ],
+    [
+      21,
+      2,
+      0,
+      14,
+      0,
+      "STRING"
+    ],
+    [
+      22,
+      14,
+      0,
+      7,
+      1,
+      "AUDIO"
+    ],
+    [
+      23,
+      14,
+      1,
+      7,
+      2,
       "AUDIO"
     ]
   ],
