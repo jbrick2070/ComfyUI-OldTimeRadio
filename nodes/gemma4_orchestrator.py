@@ -1,4 +1,4 @@
-﻿r"""
+r"""
 Gemma 4 Orchestrator — Script Writer + Director for "SIGNAL LOST"
 ===================================================================
 
@@ -73,6 +73,76 @@ def _runtime_log(msg):
             f.write(f"[{ts}] {msg}\n")
     except: pass
 
+def _truncate_at_sentence_boundary(text: str, max_chars: int) -> str:
+    """Truncate text to max_chars, trying to back up to the nearest sentence boundary."""
+    if len(text) <= max_chars:
+        return text
+    
+    truncated = text[:max_chars]
+    # Look for the last terminal punctuation
+    match = re.search(r'([.!?])(?=\s|$)[^.!?]*$', truncated)
+    if match:
+        return truncated[:match.end()]
+    
+    # If no punctuation found, just back up to last space
+    last_space = truncated.rfind(' ')
+    if last_space > 0:
+        return truncated[:last_space] + '...'
+    return truncated + '...'
+
+def _tail_at_sentence_boundary(text: str, target_chars: int) -> str:
+    """Take the LAST target_chars of text, walking forward to the next sentence start."""
+    if len(text) <= target_chars:
+        return text
+        
+    tail = text[-target_chars:]
+    # Find the FIRST terminal punctuation in the tail
+    match = re.search(r'[.!?]\s+', tail)
+    if match:
+        return tail[match.end():]
+        
+    # If no punctuation, walk forward to first space
+    first_space = tail.find(' ')
+    if first_space > 0:
+        return tail[first_space+1:]
+    return tail
+
+def _inject_scene_transitions(script_text: str) -> tuple:
+    """Detect '=== SCENE ===' boundaries and inject transition SFX where lacking.
+    Returns (modified_text, transition_count).
+    """
+    lines = script_text.split('\n')
+    out_lines = []
+    transition_count = 0
+    idx = 0
+    
+    while idx < len(lines):
+        line = lines[idx]
+        out_lines.append(line)
+        
+        # Check if line is a scene boundary (but don't inject after Scene 1 which has opening music)
+        if re.match(r'^===\s*SCENE\s+(?![1]\b)(.+?)\s*(?:===|\*\*\*)', line.strip(), re.IGNORECASE):
+            # Look ahead at the next non-empty line
+            lookahead = idx + 1
+            while lookahead < len(lines):
+                next_line = lines[lookahead].strip()
+                if not next_line:
+                    lookahead += 1
+                    continue
+                
+                # If the next thing is just dialogue, inject a transition
+                if next_line.startswith('[VOICE:'):
+                    out_lines.append("")
+                    out_lines.append("[SFX: Scene transition — low bass sweep or static crossfade]")
+                    out_lines.append("(beat)")
+                    transition_count += 1
+                break
+                
+        idx += 1
+        
+    return "\n".join(out_lines), transition_count
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 3c: WALL-CLOCK TIMEOUT WRAPPER
@@ -96,15 +166,19 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
     Re-raises any exception fn raised.
     """
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+    vram_reset_peak(phase_label)
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"otr-{phase_label}")
     try:
         future = executor.submit(fn)
         try:
-            return future.result(timeout=timeout_sec)
+            res = future.result(timeout=timeout_sec)
+            vram_snapshot(phase_label)
+            return res
         except FuturesTimeout:
             _runtime_log(f"TIMEOUT: {phase_label} exceeded {timeout_sec}s wall-clock budget")
             log.warning("[Timeout] %s phase exceeded %ds — abandoning and falling back",
                         phase_label, timeout_sec)
+            vram_snapshot(f"{phase_label}_timeout")
             raise _LLMTimeout(f"{phase_label} exceeded {timeout_sec}s")
     finally:
         # Don't wait for the orphaned worker — let it drain in the background.
@@ -384,21 +458,21 @@ _ACCENTS = [
 # Each entry: (preset, gender, quality_tags)
 _VOICE_PROFILES = [
     # ── English native (neutral accent) ──
-    ("v2/en_speaker_0", "male",   "en", {"authoritative", "deep", "50s", "60s"}),
-    ("v2/en_speaker_1", "male",   "en", {"calm", "measured", "30s", "40s"}),
-    ("v2/en_speaker_3", "male",   "en", {"energetic", "sharp", "20s", "30s"}),
-    ("v2/en_speaker_5", "male",   "en", {"warm", "weary", "wry", "50s", "60s"}),
-    ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s"}),
-    ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s"}),
-    ("v2/en_speaker_2", "male",   "en", {"calm", "measured", "stoic", "30s", "40s"}),  # sounds male/neutral in practice
-    ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s"}),
-    ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s"}),
+    ("v2/en_speaker_0", "male",   "en", {"authoritative", "deep", "50s", "60s", "announcer", "commander"}),
+    ("v2/en_speaker_1", "male",   "en", {"calm", "measured", "30s", "40s", "technical", "pilot"}),
+    ("v2/en_speaker_3", "male",   "en", {"energetic", "sharp", "20s", "30s", "rebel", "technician"}),
+    ("v2/en_speaker_5", "male",   "en", {"warm", "weary", "wry", "50s", "60s", "doctor", "scientist"}),
+    ("v2/en_speaker_6", "male",   "en", {"intense", "dry", "stoic", "40s", "officer", "android"}),
+    ("v2/en_speaker_8", "male",   "en", {"gravelly", "anxious", "confident", "40s", "50s", "engineer", "mechanic"}),
+    # English native (female)
+    ("v2/en_speaker_2", "female", "en", {"clipped", "precise", "30s", "40s", "officer", "neutral-british"}), # Sounds precise/British-adjacent
+    ("v2/en_speaker_4", "female", "en", {"warm", "energetic", "wry", "30s", "40s", "pilot", "explorer"}),
+    ("v2/en_speaker_9", "female", "en", {"authoritative", "confident", "intense", "50s", "60s", "commander", "senator"}),
     # FIX-3 (v1.2): en_speaker_7 reclassified to female to prevent CAST_GENDER_POOL_EXHAUSTED
     # on 3-female episodes (was causing VEX/ZARA to share en_speaker_9 and sound identical).
     # Bark labels en_speaker_7 as androgynous — in English it reads soft/lighter so we
-    # use it as the "younger" female slot (20s, anxious/sharp). Gives us 3 distinct
-    # female presets (4, 7, 9) covering young/warm-adult/mature ranges.
-    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s"}),
+    # use it as the "younger" female slot (20s, anxious/sharp/technician).
+    ("v2/en_speaker_7", "female", "en", {"sharp", "anxious", "nervous", "20s", "30s", "technician", "hacker"}),
     # ── DISABLED: Foreign accent presets ──────────────────────────────
     # These caused Bark hallucinations — the model generates foreign-language
     # phonemes when fed English text, producing gibberish. Kept as comments
@@ -2964,7 +3038,7 @@ YOUR CRITIQUE (numbered list only):"""
         except Exception as e:
             log.warning("[Critique] Critique pass failed: %s — returning original draft", e)
             _runtime_log(f"CRITIQUE: Failed — {e}")
-            return draft_text
+            return f"{draft_text}\n\n[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]"
 
         # Sanity check: critique should be a numbered list, not a rewrite
         if not critique_text or len(critique_text) < 50:
@@ -3054,7 +3128,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
         except Exception as e:
             log.warning("[Critique] Revision pass failed: %s — returning original draft", e)
             _runtime_log(f"CRITIQUE: Revision failed — {e}")
-            return draft_text
+            return f"{draft_text}\n\n[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]"
 
         # ── Phase 2b: Critique length & format guardrails ──
 
@@ -3442,6 +3516,7 @@ Format your response exactly as:
         except Exception as e:
             log.warning("[ArcEnhancer] Echo pass failed: %s", e)
             _runtime_log(f"ARC_ENHANCER: Failed — {e}")
+            script_text = f"{script_text}\n\n[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]"
 
         # v1.4 Theme B — automatic scene transition injection.
         # Runs regardless of how Phase B/C fared so even a failed arc pass
@@ -3631,6 +3706,12 @@ Format your response exactly as:
         for raw_line in text.strip().splitlines():
             s = raw_line.strip()
             if not s:
+                continue
+
+            # v1.4 Theme B — Timeout fallback sentinel path.
+            # Skip any timeout feedback injected by upstream phases to prevent them
+            # from leaking into the structured script output and causing audio failure.
+            if s.startswith("[SYSTEM_SENTINEL:"):
                 continue
 
             m = scene_pat.match(s)
