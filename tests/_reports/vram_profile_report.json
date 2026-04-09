@@ -1,0 +1,73 @@
+{
+  "device_name": "NVIDIA GeForce RTX 5080 Laptop GPU",
+  "ceiling_bytes": 15569256448,
+  "hardware_bytes": 17179869184,
+  "phases": [
+    {
+      "name": "gemma4_script_writer",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 1.3376853999980085,
+      "notes": "runner_error: TypeError: Gemma4ScriptWriter.write_script() got an unexpected keyword argument 'topic'"
+    },
+    {
+      "name": "gemma4_director",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 5.899997631786391e-06,
+      "notes": "runner_error: KeyError: 'script_text'"
+    },
+    {
+      "name": "kokoro_announcer",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0006100000027799979,
+      "notes": "runner_error: KeyError: 'script_json'"
+    },
+    {
+      "name": "musicgen_theme",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0004716000003099907,
+      "notes": "runner_error: KeyError: 'production_plan_json'"
+    },
+    {
+      "name": "batch_bark_generator",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.000900399998499779,
+      "notes": "runner_error: AttributeError: 'BatchBarkGenerator' object has no attribute 'process'"
+    },
+    {
+      "name": "scene_sequencer",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0006167000028654002,
+      "notes": "runner_error: KeyError: 'script_json'"
+    },
+    {
+      "name": "audio_enhance",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0004441999990376644,
+      "notes": "runner_error: KeyError: 'scene_audio'"
+    },
+    {
+      "name": "episode_assembler",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 2.9000002541579306e-06,
+      "notes": "runner_error: KeyError: 'enhanced_audio'"
+    },
+    {
+      "name": "video_engine",
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.004995700001018122,
+      "notes": "runner_error: AttributeError: 'SignalLostVideoRenderer' object has no attribute 'render'"
+    }
+  ],
+  "overall_peak_bytes": 0,
+  "overall_peak_gb": 0.0,
+  "ceiling_gb": 14.5
+}

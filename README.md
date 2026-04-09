@@ -90,6 +90,8 @@ Three workflows ship in the `workflows/` folder:
 | **Test** | 🧪 1 min | Smoke testing after code changes | `old_time_radio_test.json` |
 | **Lite** | 📻 5 min | Quick episodes, `open_close` OFF | `old_time_radio_scifi_lite.json` |
 | **Full** | 📻 8 min | Production episodes, all features ON | `old_time_radio_scifi_full.json` |
+| **8GB Optimized** | 📻 8 min | **Safest choice for 8GB cards.** Pre-set to E2B + MusicGen Small. | `old_time_radio_scifi_8gb.json` |
+| **Obsidian (4GB)** | 📻 5 min | **4GB ultra-low VRAM.** All-Kokoro TTS + E2B + MusicGen Small. | `old_time_radio_scifi_4gb_obsidian.json` |
 
 1. Open ComfyUI at `http://127.0.0.1:8000`
 2. Click **Load** → select a workflow
@@ -100,7 +102,14 @@ Three workflows ship in the `workflows/` folder:
 | Setup | GPU | VRAM |
 |-------|-----|------|
 | Recommended | RTX 5080 / 4090 | 16 GB+ |
-| Minimum (E2B) | RTX 4070 / 3060 | 8 GB |
+| 8GB Mode | RTX 4070 / 3060 | 8 GB |
+| Obsidian Mode | RTX 3050 | 4 GB |
+
+> [!TIP]
+> **8GB VRAM Survival:** If you have an 8GB card, use the **`old_time_radio_scifi_8gb.json`** workflow. It uses **Gemma 4 E2B**, which reduces the peak VRAM footprint during script generation, leaving enough headroom for Bark TTS and Video encoding without swapping to system RAM.
+
+> [!TIP]
+> **4GB Obsidian Edition:** If you have 4GB or simply want ultra-fast generation without Bark's erratic emotion, use **`old_time_radio_scifi_4gb_obsidian.json`**. It cuts out Bark entirely, rendering all character voices through the 1.5GB Kokoro neural engine for broadcast-ready stability.
 
 ### Step 5 — Continuous 24/7 Broadcast (OBS Automation)
 
@@ -189,6 +198,8 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **3. Voice Maker Machine** | Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. |
 | **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends. |
 | **🎺 MusicGen Theme** | Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations. |
+| **🔊 SFX Maker Machine (AudioGen)** | Generates high-fidelity Foley sound effects from Director prompts using `facebook/audiogen-medium`, natively cached to save VRAM. |
+| **🔊 SFX Maker Machine (Procedural)** | Zero-VRAM fallback generator for 4GB Obsidian users, synthesizing clean procedural effects without loading heavy audio models. |
 | **4. Scene Builder** | Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in script order. |
 | **5. Make It Sound Awesome** | Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization. |
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
@@ -413,8 +424,8 @@ New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OF
 - Default `target_minutes` lowered 25 → 8 for punchy, dense dialogue out of the box
 - `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
 
-#### Lean Node Count
-Removed unused nodes from the repo: `parler_tts.py`, `vintage_radio_filter.py`, `audio_batcher.py`. Node count: 12 → **9**. Boot log confirms: `[OldTimeRadio] ✓ All 9 nodes loaded successfully`.
+#### Strict Node Count Discipline
+Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] ✓ All 15 nodes loaded successfully` (expanded from 9 in v1.3 to include AudioGen, Kokoro, MusicGen, and fast Procedural fallback generators).
 
 ---
 

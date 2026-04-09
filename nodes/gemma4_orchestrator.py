@@ -3899,33 +3899,7 @@ The script follows these tokens:
 - (beat)
 
 ═══ 🧱 2. VOICE MAPPING RULES ═══
-- Scan all [VOICE:] tags in the script. The FIRST FIELD (before the first comma) is the CHARACTER NAME.
-- Collect every unique CHARACTER NAME. Map each to one UNIQUE voice preset.
-- NOTE: Character names, voice presets, accents, and traits are PROCEDURALLY
-  OVERRIDDEN after your JSON is generated. You only need to provide reasonable
-  en_speaker_* placeholder presets so the JSON structure is valid.
-  The procedural engine handles: name randomization, accent assignment (including
-  international presets for accented English like de_speaker, fr_speaker, etc.),
-  gender/age/demeanor traits, and final voice model selection.
-  LEMMY always stays LEMMY with v2/en_speaker_8.
-- The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
-  WRONG key: "CHARACTERNAME, male, 40s, calm"
-  RIGHT key: "CHARACTERNAME"
-- Use any en_speaker_* preset as a placeholder:
-
-  v2/en_speaker_0 = Male, authoritative, deep
-  v2/en_speaker_1 = Male, mid-range
-  v2/en_speaker_2 = Female, neutral
-  v2/en_speaker_3 = Male, younger
-  v2/en_speaker_4 = Female, warmer
-  v2/en_speaker_5 = Male, older
-  v2/en_speaker_6 = Male, character voice
-  v2/en_speaker_7 = Female, higher pitch
-  v2/en_speaker_8 = Male, gravelly/raspy (reserved for LEMMY)
-  v2/en_speaker_9 = Female, authoritative
-
-- Each character gets ONE preset. No duplicates.
-- LEMMY always gets v2/en_speaker_8.
+{voice_mapping_rules}
 
 ═══ 🧱 3. OUTPUT FORMAT (STRICT JSON) ═══
 {{
@@ -3941,34 +3915,45 @@ The script follows these tokens:
     }}
   }},
   "sfx_plan": [
-    {{
+    {
       "cue_id": "sfx_001",
-      "type": "env|sfx",
-      "description": "...",
-      "generation_prompt": "Foley style prompt for audio generator"
-    }}
+      "type": "sfx",
+      "description": "Distant thunder rolling behind heavy rain",
+      "generation_prompt": "Low rumble of distant thunder, heavy rain pattering on a tin roof, outdoor perspective, cinematic sound design"
+    }
   ],
   "music_plan": [
-    {{
+    {
       "cue_id": "opening",
       "duration_sec": 12,
       "generation_prompt": "1940s old time radio opening theme, warm brass fanfare, upright bass, snare brushes, mono AM radio character, tube saturation, confident and mysterious, ends on a held chord"
-    }},
-    {{
+    },
+    {
       "cue_id": "closing",
       "duration_sec": 8,
       "generation_prompt": "1940s old time radio closing sting, brass and strings, resolving cadence, warm tube saturation, fades to silence"
-    }},
-    {{
+    },
+    {
       "cue_id": "interstitial",
       "duration_sec": 4,
       "generation_prompt": "short old time radio act-break stinger, single brass hit with cymbal swell, mono, tube warmth"
-    }}
+    }
   ],
-  "pacing": {{
+  "pacing": {
     "beat_pause_ms": 100
-  }}
-}}
+  }
+}
+
+═══ 🔊 SFX PLAN RULES ═══
+- Scan all [SFX:] tags in the script. Create one dictionary entry per tag in the sfx_plan list.
+- Keep the `description` brief (for manual reference).
+- The `generation_prompt` is for an AI Foley engine. Be highly descriptive about the textures, the environment, and the distance.
+- Examples: 
+  - "Footsteps crunching on dry autumn leaves, slow and deliberate, close-up perspective"
+  - "A futuristic sliding door swoosh followed by a metallic latching sound"
+  - "Old wooden floorboards creaking under weight in a silent room"
+- Match the SFX to the story's setting (noir, sci-fi, etc.).
+- Keep prompts under 25 words. Do NOT mention music or voices in SFX prompts.
 
 ═══ 🎵 MUSIC PLAN RULES ═══
 - ALWAYS include exactly three music cues: opening, closing, interstitial. Cue ids are fixed strings.
@@ -3991,6 +3976,42 @@ SCRIPT:
 """
 
 
+BARK_VOICE_RULES = """- Scan all [VOICE:] tags in the script. The FIRST FIELD (before the first comma) is the CHARACTER NAME.
+- Collect every unique CHARACTER NAME. Map each to one UNIQUE voice preset.
+- NOTE: Character names, voice presets, accents, and traits are PROCEDURALLY OVERRIDDEN after your JSON is generated.
+  You only need to provide reasonable en_speaker_* placeholder presets so the JSON structure is valid.
+  The procedural engine handles everything else. LEMMY always stays LEMMY with v2/en_speaker_8.
+- The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
+- Use any en_speaker_* preset as a placeholder:
+  v2/en_speaker_0 = Male, authoritative, deep
+  v2/en_speaker_1 = Male, mid-range
+  v2/en_speaker_2 = Female, neutral
+  v2/en_speaker_3 = Male, younger
+  v2/en_speaker_4 = Female, warmer
+  v2/en_speaker_5 = Male, older
+  v2/en_speaker_6 = Male, character voice
+  v2/en_speaker_7 = Female, higher pitch
+  v2/en_speaker_8 = Male, gravelly/raspy (reserved for LEMMY)
+  v2/en_speaker_9 = Female, authoritative
+- Each character gets ONE preset. No duplicates.
+- LEMMY always gets v2/en_speaker_8."""
+
+KOKORO_VOICE_RULES = """- Scan all [VOICE:] tags in the script. The FIRST FIELD (before the first comma) is the CHARACTER NAME.
+- Collect every unique CHARACTER NAME. Map each to one UNIQUE voice preset from the Kokoro valid voices below.
+- NOTE: Character names and traits are procedurally overridden, but the voice preset you choose WILL be used directly by the Kokoro engine.
+  LEMMY always stays LEMMY with am_michael.
+- The JSON key MUST be the CHARACTER NAME EXACTLY AS IT APPEARS (all caps, no descriptors).
+- Use ONLY these exact valid Kokoro presets (1 per character, no duplicates):
+  af_bella = Female, energetic
+  af_sky = Female, neutral
+  af_nicole = Female, whispery
+  am_adam = Male, younger
+  am_onyx = Male, deep
+  am_michael = Male, older/authoritative (reserved for LEMMY)
+- Each character gets ONE preset. No duplicates.
+- LEMMY always gets am_michael."""
+
+
 class Gemma4Director:
     """Takes a script and generates a full production plan via Gemma 4."""
 
@@ -4010,9 +4031,9 @@ class Gemma4Director:
                     "default": 0.4, "min": 0.1, "max": 1.0, "step": 0.05,
                     "tooltip": "Lower = more consistent JSON output"
                 }),
-                "prefer_bark": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Prefer Bark for main characters (more expressive)"
+                "tts_engine": (["bark (standard 8GB)", "kokoro (obsidian 4GB)"], {
+                    "default": "bark (standard 8GB)",
+                    "tooltip": "Bark for generative voices. Kokoro for low-VRAM neural voices."
                 }),
                 "vintage_intensity": (["subtle", "moderate", "heavy", "extreme"], {
                     "default": "subtle",
@@ -4025,7 +4046,7 @@ class Gemma4Director:
             },
         }
 
-    def direct(self, script_text, temperature=0.4, prefer_bark=True, vintage_intensity="subtle",
+    def direct(self, script_text, temperature=0.4, tts_engine="bark (standard 8GB)", vintage_intensity="subtle",
                project_state=None):
         # ── MASTER SWITCH INHERITANCE ──
         # Inherently use the chosen model from ScriptWriter.
@@ -4055,12 +4076,17 @@ class Gemma4Director:
         vram_reset_peak("director_entry")
         vram_snapshot("director_entry")
 
-        prompt = DIRECTOR_PROMPT.format(script_text=script_text[:6000])
+        if "kokoro" in tts_engine.lower():
+            vrules = KOKORO_VOICE_RULES
+        else:
+            vrules = BARK_VOICE_RULES
+
+        prompt = DIRECTOR_PROMPT.format(
+            script_text=script_text[:6000],
+            voice_mapping_rules=vrules
+        )
         if _director_preamble:
             prompt = f"[SERIES BIBLE]\n{_director_preamble}\n\n{prompt}"
-
-        if not prefer_bark:
-            prompt += "\nNOTE: Prefer Parler-TTS for all characters (more control over voice style)."
 
         vintage_map = {
             "subtle":   {"radio_static_amount": 0.05, "vinyl_crackle": 0.03, "tube_warmth": 0.4, "frequency_rolloff_hz": 8000, "hum_60hz": 0.02},

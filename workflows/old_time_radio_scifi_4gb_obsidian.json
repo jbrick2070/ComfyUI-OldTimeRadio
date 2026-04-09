@@ -1,5 +1,5 @@
 {
-    "id": "da0beab7-5804-4aca-9d7e-975bcb72870b",
+    "id": "3b216c58-4107-425b-80be-b43e5c9a7522",
     "revision": 0,
     "last_node_id": 15,
     "last_link_id": 25,
@@ -15,23 +15,23 @@
                 400,
                 320
             ],
-            "title": "1. Gemma Writes the Story",
+            "title": "1. Gemma Writes the Story (OBSIDIAN 4GB)",
             "properties": {
                 "Node name for S&R": "OTR_Gemma4ScriptWriter"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "The Obsidian Frequency",
                 "hard_sci_fi",
-                "\ud83d\udcfb standard (8 min)",
-                5,
+                "📻 standard (8 min)",
+                8,
                 4,
                 "google/gemma-4-E4B-it",
                 "",
                 3,
                 0.8,
-                false,
                 true,
-                false,
+                true,
+                true,
                 "medium (5 acts)",
                 "tense claustrophobic",
                 "balanced",
@@ -98,7 +98,7 @@
             "widgets_values": [
                 "",
                 0.4,
-                true,
+                "kokoro (obsidian 4GB)",
                 "subtle"
             ],
             "inputs": [
@@ -284,7 +284,7 @@
                 "Node name for S&R": "OTR_EpisodeAssembler"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "The Obsidian Frequency",
                 10.0,
                 8.0,
                 500
@@ -336,7 +336,7 @@
         },
         {
             "id": 11,
-            "type": "OTR_BatchBarkGenerator",
+            "type": "OTR_BatchKokoroGenerator",
             "pos": [
                 480,
                 600
@@ -345,12 +345,12 @@
                 400,
                 200
             ],
-            "title": "3. Voice Maker Machine",
+            "title": "3. Voice Maker Machine (KOKORO 4GB)",
             "properties": {
-                "Node name for S&R": "OTR_BatchBarkGenerator"
+                "Node name for S&R": "OTR_BatchKokoroGenerator"
             },
             "widgets_values": [
-                "[]"
+                1.0
             ],
             "inputs": [
                 {
@@ -404,7 +404,7 @@
             "widgets_values": [
                 24,
                 "1920x1080",
-                "The Last Frequency"
+                "The Obsidian Frequency"
             ],
             "inputs": [
                 {
@@ -559,31 +559,31 @@
             "widgets_values": [
                 "{}",
                 "",
-                "facebook/musicgen-medium"
+                "facebook/musicgen-small"
             ],
             "color": "#234035",
             "bgcolor": "#162821"
         },
         {
             "id": 15,
-            "type": "OTR_BatchAudioGenGenerator",
+            "type": "OTR_BatchProceduralSFX",
             "pos": [
                 480,
                 800
             ],
             "size": [
-                400,
-                160
+                360,
+                140
             ],
-            "title": "3c. SFX Maker Machine (AudioGen)",
+            "title": "3c. SFX Maker Machine (Procedural)",
             "properties": {
-                "Node name for S&R": "OTR_BatchAudioGenGenerator"
+                "Node name for S&R": "OTR_BatchProceduralSFX"
             },
             "widgets_values": [
-                "",
-                "facebook/audiogen-medium",
-                3.0,
-                3.0
+                "[]",
+                "{}",
+                2.0,
+                0.0
             ],
             "inputs": [
                 {
@@ -594,7 +594,7 @@
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 4
+                    "link": 13
                 }
             ],
             "outputs": [
@@ -776,7 +776,7 @@
     ],
     "groups": [
         {
-            "title": "1. WRITE THE STORY \ud83d\udcdd",
+            "title": "1. WRITE THE STORY (OBSIDIAN 4GB) \ud83d\udcdd",
             "bounding": [
                 20,
                 80,
@@ -822,10 +822,10 @@
             ]
         },
         "info": {
-            "name": "Old-Time Radio Sci-Fi Anthology",
+            "name": "Old-Time Radio Sci-Fi (Obsidian 4GB)",
             "author": "Jeffrey Brick",
-            "description": "Gemma 4 scripts + Bark TTS + Spatial Audio Enhance + Episode assembly",
-            "version": "1.0.0-hq"
+            "description": "4GB VRAM Optimized: Gemma 4 E2B + All-Kokoro TTS + MusicGen Small",
+            "version": "1.0.0-4gb"
         }
     },
     "version": 0.4

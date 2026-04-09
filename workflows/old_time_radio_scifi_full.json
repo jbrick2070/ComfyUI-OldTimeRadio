@@ -1,8 +1,8 @@
 {
     "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
     "revision": 0,
-    "last_node_id": 14,
-    "last_link_id": 23,
+    "last_node_id": 15,
+    "last_link_id": 25,
     "nodes": [
         {
             "id": 1,
@@ -54,7 +54,8 @@
                         2,
                         12,
                         16,
-                        19
+                        19,
+                        24
                     ],
                     "slot_index": 1
                 },
@@ -186,6 +187,11 @@
                     "type": "AUDIO",
                     "link": 20,
                     "shape": 7
+                },
+                {
+                    "name": "sfx_audio_clips",
+                    "type": "AUDIO",
+                    "link": 25
                 }
             ],
             "outputs": [
@@ -557,6 +563,61 @@
             ],
             "color": "#234035",
             "bgcolor": "#162821"
+        },
+        {
+            "id": 15,
+            "type": "OTR_BatchAudioGenGenerator",
+            "pos": [
+                480,
+                800
+            ],
+            "size": [
+                400,
+                160
+            ],
+            "title": "3c. SFX Maker Machine (AudioGen)",
+            "properties": {
+                "Node name for S&R": "OTR_BatchAudioGenGenerator"
+            },
+            "widgets_values": [
+                "",
+                "facebook/audiogen-medium",
+                3.0,
+                3.0
+            ],
+            "inputs": [
+                {
+                    "name": "script_json",
+                    "type": "STRING",
+                    "link": 24
+                },
+                {
+                    "name": "production_plan_json",
+                    "type": "STRING",
+                    "link": 4
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "sfx_audio_clips",
+                    "type": "AUDIO",
+                    "links": [
+                        25
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "batch_log",
+                    "type": "STRING",
+                    "links": [],
+                    "slot_index": 1
+                }
+            ],
+            "flags": {},
+            "order": 2,
+            "mode": 0,
+            "color": "#234035",
+            "bgcolor": "#162821"
         }
     ],
     "links": [
@@ -694,6 +755,22 @@
             1,
             7,
             2,
+            "AUDIO"
+        ],
+        [
+            24,
+            1,
+            1,
+            15,
+            0,
+            "STRING"
+        ],
+        [
+            25,
+            15,
+            0,
+            3,
+            4,
             "AUDIO"
         ]
     ],
