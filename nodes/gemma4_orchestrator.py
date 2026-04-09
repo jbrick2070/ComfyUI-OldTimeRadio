@@ -2059,19 +2059,18 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         return profiles if len(profiles) >= num_names else None
 
-    def write_script(self, episode_title, genre_flavor, target_minutes,
-                     num_characters, model_id="google/gemma-4-E4B-it",
+    def write_script(self, episode_title, genre_flavor, runtime_preset,
+                     target_minutes, num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,
                      target_length="medium (5 acts)",
                      style_variant="tense claustrophobic",
                      creativity="balanced",
-                     runtime_preset="📻 standard (8 min)",
-                     summon_lemmy=False,
                      arc_enhancer=True,
                      project_state=None):
-        force_lemmy = summon_lemmy  # internal alias for clarity below
+        force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
+
 
         # ── PROJECT STATE (v1.4 Theme C) ──
         # Resolve the series bible. If the socket is wired, use the dict from
