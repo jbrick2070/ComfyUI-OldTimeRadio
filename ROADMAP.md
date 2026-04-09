@@ -85,6 +85,7 @@ Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no
 
 ### Theme C — Infrastructure (start here per roadmap order)
 - **[COMPLETED] Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log` is successfully logging footprints per phase.
+- **[COMPLETED] Experimental High-VRAM Tier (BETA).** Added ad-hoc dropdown support for Gemma 4 26B-A4B and 31B models with automated 4-bit `bitsandbytes` quantization. Not recommended for general production use.
 - **VRAM profile test.** `tests/vram_profile_test.py` snapshotting VRAM between major nodes, assert ≤ 14.5 GB peak. (Currently stubbed; needs to be wired to the physical nodes).
 - **Project State JSON.** Per-series "bible" file. Read-only during generation, writable between episodes. Character voice locks, forbidden patterns, tone contracts.
 
