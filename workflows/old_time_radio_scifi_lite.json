@@ -76,13 +76,15 @@
       ],
       "flags": {},
       "order": 0,
-      "mode": 0
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     },
     {
       "id": 2,
       "type": "OTR_Gemma4Director",
       "pos": [
-        500,
+        480,
         200
       ],
       "size": [
@@ -140,7 +142,9 @@
       ],
       "flags": {},
       "order": 1,
-      "mode": 0
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     },
     {
       "id": 3,
@@ -212,13 +216,15 @@
       ],
       "flags": {},
       "order": 2,
-      "mode": 0
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
     },
     {
       "id": 4,
       "type": "OTR_AudioEnhance",
       "pos": [
-        1400,
+        1950,
         200
       ],
       "size": [
@@ -256,93 +262,15 @@
       ],
       "flags": {},
       "order": 3,
-      "mode": 0
-    },
-    {
-      "id": 5,
-      "type": "OTR_SFXGenerator",
-      "pos": [
-        950,
-        580
-      ],
-      "size": [
-        350,
-        200
-      ],
-      "title": "Opening Radio Static",
-      "properties": {
-        "Node name for S&R": "OTR_SFXGenerator"
-      },
-      "widgets_values": [
-        "radio_tuning",
-        3.0,
-        48000,
-        -6.0
-      ],
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "sfx_audio",
-          "type": "AUDIO",
-          "links": null,
-          "slot_index": 0
-        },
-        {
-          "name": "generation_info",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0
-    },
-    {
-      "id": 6,
-      "type": "OTR_SFXGenerator",
-      "pos": [
-        950,
-        830
-      ],
-      "size": [
-        350,
-        200
-      ],
-      "title": "Closing Space Music",
-      "properties": {
-        "Node name for S&R": "OTR_SFXGenerator"
-      },
-      "widgets_values": [
-        "theremin",
-        8.0,
-        48000,
-        -9.0
-      ],
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "sfx_audio",
-          "type": "AUDIO",
-          "links": null,
-          "slot_index": 0
-        },
-        {
-          "name": "generation_info",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
     },
     {
       "id": 7,
       "type": "OTR_EpisodeAssembler",
       "pos": [
-        1850,
+        1450,
         200
       ],
       "size": [
@@ -400,14 +328,16 @@
       ],
       "flags": {},
       "order": 6,
-      "mode": 0
+      "mode": 0,
+      "color": "#4A2B4D",
+      "bgcolor": "#301C32"
     },
     {
       "id": 11,
       "type": "OTR_BatchBarkGenerator",
       "pos": [
-        500,
-        580
+        480,
+        600
       ],
       "size": [
         400,
@@ -452,14 +382,16 @@
       ],
       "flags": {},
       "order": 2,
-      "mode": 0
+      "mode": 0,
+      "color": "#234035",
+      "bgcolor": "#162821"
     },
     {
       "id": 12,
       "type": "OTR_SignalLostVideo",
       "pos": [
-        1450,
-        600
+        2450,
+        200
       ],
       "size": [
         400,
@@ -506,14 +438,16 @@
       ],
       "flags": {},
       "order": 10,
-      "mode": 0
+      "mode": 0,
+      "color": "#5B3A29",
+      "bgcolor": "#3C261B"
     },
     {
       "id": 13,
       "type": "OTR_KokoroAnnouncer",
       "pos": [
-        500,
-        840
+        480,
+        950
       ],
       "size": [
         360,
@@ -562,14 +496,16 @@
         "",
         "random",
         0.95
-      ]
+      ],
+      "color": "#234035",
+      "bgcolor": "#162821"
     },
     {
       "id": 14,
       "type": "OTR_MusicGenTheme",
       "pos": [
-        980,
-        460
+        950,
+        600
       ],
       "size": [
         380,
@@ -626,7 +562,9 @@
         "",
         "facebook/musicgen-medium",
         3.0
-      ]
+      ],
+      "color": "#234035",
+      "bgcolor": "#162821"
     }
   ],
   "links": [

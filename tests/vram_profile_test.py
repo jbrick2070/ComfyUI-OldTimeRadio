@@ -31,6 +31,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import time
 import unittest
 from dataclasses import dataclass, field, asdict
@@ -117,32 +120,103 @@ class VramReport:
 # Phase runner registry
 # ---------------------------------------------------------------------------
 
-# Each entry is (phase_name, callable). The callable should run the phase end
-# to end on the real node, using the same code path ComfyUI would hit. It must
-# return when the phase is quiescent so the peak reading is meaningful.
-#
-# TODO(v1.4-theme-c): wire these to the real nodes. For the initial scaffold
-# we register no-op placeholders so the test file is importable and the
-# test harness is exercised end to end in CI without a real GPU session.
+_ctx = {}
 
-def _phase_noop(label: str) -> Callable[[], None]:
-    def _run() -> None:
-        # Intentionally cheap. Replaced by real phase runners in follow-up
-        # commits for Gemma4ScriptWriter, Gemma4Director, BatchBark, SFXGen,
-        # SceneSequencer, VideoEngine.
-        time.sleep(0.01)
-    _run.__name__ = f"phase_noop_{label}"
-    return _run
+def _run_node(node_class, **overrides):
+    import inspect
+    node = node_class()
+    sig = node.INPUT_TYPES()
+    kwargs = {}
+    for group in ["required", "optional", "hidden"]:
+        for k, v in sig.get(group, {}).items():
+            # v is typically (TYPE_STRING, {"default": value}) or (["list", "of", "strings"], {"default": value})
+            if isinstance(v[0], list):
+                kwargs[k] = v[1].get("default", v[0][0]) if len(v) > 1 and isinstance(v[1], dict) else v[0][0]
+            else:
+                kwargs[k] = v[1].get("default", None) if len(v) > 1 and isinstance(v[1], dict) else None
+    kwargs.update(overrides)
+    func = getattr(node, node.FUNCTION)
+    accepted = inspect.signature(func).parameters
+    final_kwargs = {k: v for k, v in kwargs.items() if k in accepted}
+    return func(**final_kwargs)
 
+def _run_gemma4_script_writer() -> None:
+    from nodes.gemma4_orchestrator import Gemma4ScriptWriter
+    res = _run_node(Gemma4ScriptWriter,
+                    topic="The Last Frequency",
+                    subgenre="hard_sci_fi",
+                    target_duration_setting="🧪 test (1 min)",
+                    number_of_episodes=1,
+                    seed=3,
+                    llm_model="google/gemma-4-E4B-it",
+                    api_key="",
+                    max_retries=1,
+                    temperature=0.7,
+                    advanced_toggle=False)
+    _ctx["script_text"] = res[0]
+    _ctx["script_json"] = res[1]
+
+def _run_gemma4_director() -> None:
+    from nodes.gemma4_orchestrator import Gemma4Director
+    res = _run_node(Gemma4Director, script_text=_ctx["script_text"])
+    _ctx["production_plan_json"] = res[0]
+
+def _run_kokoro_announcer() -> None:
+    from nodes.kokoro_announcer import KokoroAnnouncer
+    res = _run_node(KokoroAnnouncer, script_json=_ctx["script_json"])
+    _ctx["announcer_audio_clips"] = res[0]
+
+def _run_musicgen_theme() -> None:
+    from nodes.musicgen_theme import MusicGenTheme
+    res = _run_node(MusicGenTheme, production_plan_json=_ctx["production_plan_json"], duration_seconds=3.0)
+    _ctx["opening_theme_audio"] = res[0]
+    _ctx["closing_theme_audio"] = res[1]
+
+def _run_batch_bark_generator() -> None:
+    from nodes.batch_bark_generator import BatchBarkGenerator
+    res = _run_node(BatchBarkGenerator, script_json=_ctx["script_json"], production_plan_json=_ctx["production_plan_json"])
+    _ctx["tts_audio_clips"] = res[0]
+
+def _run_scene_sequencer() -> None:
+    from nodes.scene_sequencer import SceneSequencer
+    res = _run_node(SceneSequencer, 
+                    script_json=_ctx["script_json"], 
+                    production_plan_json=_ctx["production_plan_json"], 
+                    tts_audio_clips=_ctx["tts_audio_clips"],
+                    announcer_audio_clips=_ctx.get("announcer_audio_clips"))
+    _ctx["scene_audio"] = res[0]
+
+def _run_audio_enhance() -> None:
+    from nodes.audio_enhance import AudioEnhance
+    res = _run_node(AudioEnhance, audio=_ctx["scene_audio"])
+    _ctx["enhanced_audio"] = res[0]
+
+def _run_episode_assembler() -> None:
+    from nodes.scene_sequencer import EpisodeAssembler
+    res = _run_node(EpisodeAssembler, 
+                    scene_audio=_ctx["enhanced_audio"],
+                    opening_theme_audio=_ctx.get("opening_theme_audio"),
+                    closing_theme_audio=_ctx.get("closing_theme_audio"))
+    _ctx["episode_audio"] = res[0]
+
+def _run_video_engine() -> None:
+    from nodes.video_engine import SignalLostVideoRenderer
+    res = _run_node(SignalLostVideoRenderer, 
+                    audio=_ctx["episode_audio"],
+                    script_json=_ctx["script_json"],
+                    production_plan_json=_ctx["production_plan_json"])
+    _ctx["video_path"] = res[0]
 
 PHASE_RUNNERS: List[tuple] = [
-    ("gemma4_script_writer", _phase_noop("gemma4_script_writer")),
-    ("gemma4_director",      _phase_noop("gemma4_director")),
-    ("batch_bark_generator", _phase_noop("batch_bark_generator")),
-    ("sfx_generator",        _phase_noop("sfx_generator")),
-    ("scene_sequencer",      _phase_noop("scene_sequencer")),
-    ("audio_enhance",        _phase_noop("audio_enhance")),
-    ("video_engine",         _phase_noop("video_engine")),
+    ("gemma4_script_writer", _run_gemma4_script_writer),
+    ("gemma4_director",      _run_gemma4_director),
+    ("kokoro_announcer",     _run_kokoro_announcer),
+    ("musicgen_theme",       _run_musicgen_theme),
+    ("batch_bark_generator", _run_batch_bark_generator),
+    ("scene_sequencer",      _run_scene_sequencer),
+    ("audio_enhance",        _run_audio_enhance),
+    ("episode_assembler",    _run_episode_assembler),
+    ("video_engine",         _run_video_engine),
 ]
 
 

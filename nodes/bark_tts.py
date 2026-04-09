@@ -249,16 +249,16 @@ class BarkTTSNode:
 
     # Bark speaker descriptions for UI reference
     SPEAKER_DESCRIPTIONS = {
-        "v2/en_speaker_0": "Male, deep, authoritative",
-        "v2/en_speaker_1": "Male, warm, conversational",
-        "v2/en_speaker_2": "Female, clear, professional",
-        "v2/en_speaker_3": "Male, young, energetic",
-        "v2/en_speaker_4": "Female, warm, expressive",
-        "v2/en_speaker_5": "Male, older, gravelly",
-        "v2/en_speaker_6": "Male, neutral, broadcast",
-        "v2/en_speaker_7": "Female, young, bright",
-        "v2/en_speaker_8": "Male, deep, dramatic",
-        "v2/en_speaker_9": "Female, mature, sophisticated",
+        "v2/en_speaker_0": "Male, deep, authoritative (commander)",
+        "v2/en_speaker_1": "Male, warm, conversational (pilot)",
+        "v2/en_speaker_2": "Female, clipped, precise (officer/british-adjacent)",
+        "v2/en_speaker_3": "Male, young, energetic (rebel)",
+        "v2/en_speaker_4": "Female, warm, expressive (explorer)",
+        "v2/en_speaker_5": "Male, older, gravelly (scientist)",
+        "v2/en_speaker_6": "Male, neutral, broadcast (android)",
+        "v2/en_speaker_7": "Female, young, bright (hacker)",
+        "v2/en_speaker_8": "Male, deep, dramatic (engineer/LEMMY)",
+        "v2/en_speaker_9": "Female, mature, sophisticated (senator)",
     }
 
     @classmethod
