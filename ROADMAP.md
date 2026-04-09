@@ -4,10 +4,30 @@
 
 ## Current state (as of 2026-04-08)
 
-- **Last shipped tag:** v1.3 (main)
-- **Active branch:** `v1.4-voice-arc-infra`
-- **Status:** v1.4 partial. Two Theme A nodes landed in code but **NOT battle-tested**. A v1.3 full-workflow OOM regression was observed on the RTX 5080 Laptop and must be investigated before any v1.4 hardware pass.
+- **Last shipped tag:** `v1.3` → `ddbed87` (v1.3 final, includes Gemma 4 VRAM release fix)
+- **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta until explicit ship signoff)
 - **Repo:** https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+- **Sister repo (bug bible):** https://github.com/jbrick2070/comfyui-custom-node-survival-guide
+
+### What v1.3 ships
+- Arc Enhancer full Phase A/B/C pipeline, on by default in all workflows
+- Phase A structural coherence scoring (5 checks, full telemetry)
+- Plot Spine Injection (middle-act summary passed to Phase B so it cannot contradict the middle)
+- Echo phrase logging in Phase C
+- OpenClose timeout fix (450 tok budget, 480s wall) — parallel 3-outline evaluator is gated OFF
+- Test workflow speed pass (short 3-act, 100% feature parity)
+- Flash Attention 2 platform-accurate warning message
+- PRO QA announcer bookends
+- NameLeakGuard (difflib fuzzy, ALL-CAPS aware)
+- Lemmy RNG statistical verification
+- All v1.3-beta stability fixes from Antigravity (prestartup mock, VRAM deferral)
+- **Gemma 4 VRAM release fix.** `_unload_gemma4` now calls `model.cpu()` before dropping references, and `_generate_with_gemma4` detaches output tensors to CPU and explicitly frees GPU tensors plus the streamer before returning. Root cause was abandoned `_run_with_timeout` ThreadPoolExecutor threads holding live Gemma model references, preventing GC and causing a 31.70 GiB allocation on a 16 GB card. Verified end to end: telemetry reads `VRAM allocated=0.03 GiB` after unload, full sci-fi workflow completes in ~1h 14m producing a 457 MB MP4.
+
+### Known v1.3 issues carried into v1.4 (must be fixed in v1.4-beta)
+These shipped in v1.3 final because the OOM fix was the blocker. They are real and must be addressed as part of v1.4, not deferred to v1.5:
+- **Critique Revision pass timeout at 600s.** Fallback text interleaves with the script body and causes downstream structural corruption.
+- **Arc-Enhancer-Echo timeout at 300s.** Same failure mode — timeout fallback text leaks into the script.
+- **Script structural corruption from timeout text injection.** Timeout fallbacks need a clean sentinel path that does not contaminate script output. This is the single biggest narrative-quality regression on long runs and is a Theme B blocker.
 
 ### Hardware reality (do not violate)
 - RTX 5080 Laptop, 16 GB VRAM, Blackwell sm_120
@@ -18,22 +38,9 @@
 
 ---
 
-## v1.3 full-workflow OOM — BLOCKER
+## v1.4-beta — what is LEFT
 
-The v1.3 full workflow OOM'd on the 5080 after v1.4 branch work. This must be root-caused and fixed before v1.4 hardware regression can run. Until this is resolved, all v1.4 end-to-end testing is blocked.
-
-Investigation checklist:
-- Repro on clean `main` (tag `v1.3`) to confirm this is a v1.3 regression and not a v1.4 branch side-effect.
-- VRAM snapshot between Gemma unload → BatchBark load (suspect: Gemma not fully releasing).
-- Check `torch.cuda.empty_cache()` call sites in `gemma4_orchestrator.py` and `batch_bark_generator.py`.
-- Confirm MusicGen / Kokoro code paths are NOT active in the failing run (v1.3 full should not touch them).
-- Bisect: `v1.3` tag → `v1.4-voice-arc-infra` HEAD.
-
----
-
-## v1.4 — what is LEFT
-
-Two nodes landed in code but are unverified on hardware. Everything else in the original v1.4 plan is still open.
+Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no `v1.4.1`, no `-arc` suffix. Clean line: stays beta until explicitly signed off as `v1.4`, then straight to main.
 
 ### Theme A — Voice & Narration
 - **Kokoro Announcer end-to-end test.** Node shipped. Needs full-episode hardware run with measured VRAM delta.
@@ -41,28 +48,30 @@ Two nodes landed in code but are unverified on hardware. Everything else in the 
 - **Bark female voice pool expansion** (Bug Bible `10.06`). Not started. Add at least one additional distinct female preset, keep the 3-female safety rule.
 
 ### Theme B — Arc Enhancer 2.0
+- **Timeout fallback sentinel path (BLOCKER).** Critique Revision (600s) and Arc-Enhancer-Echo (300s) currently inject fallback text directly into the script body on timeout, corrupting downstream structure. Fix: route timeout fallbacks through a sentinel that is detected and skipped by the assembler, not concatenated. This must land before any other Theme B work.
 - **Phase A score floor retry.** If arc score < 3/5, auto-retry Phase B once. Log both attempts.
 - **Plot Spine visible in `_runtime_log`.** Currently fed to Phase B silently.
 - **OpenClose parallel evaluator re-enable.** Currently gated (`ENABLE_3_OUTLINE_EVALUATOR = False`). Re-activate with v1.3 timeout/budget fixes as per-outline contract.
 - **Chunked context continuity.** Replace `acts[-1][:3000]` with sentence-boundary-aware truncation.
 - **Automatic scene transitions.** Programmatic `[TRANSITION: ...]` injection on weak handoffs.
 
-### Theme C — Infrastructure
-- **Project State JSON.** Per-series "bible" file. Read-only during generation, writable between episodes. Character voice locks, forbidden patterns, tone contracts.
+### Theme C — Infrastructure (start here per roadmap order)
+- **Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log`. Prerequisite for the VRAM profile test.
 - **VRAM profile test.** `tests/vram_profile_test.py` snapshotting VRAM between major nodes, assert ≤ 14.5 GB peak.
-- **Per-node VRAM snapshot logging** in `_runtime_log`.
+- **Project State JSON.** Per-series "bible" file. Read-only during generation, writable between episodes. Character voice locks, forbidden patterns, tone contracts.
 
 ### Cleanup debt
 - **BOM on `nodes/gemma4_orchestrator.py`.** Pre-existing UTF-8 BOM violates the CLAUDE.md no-BOM rule. Strip it.
 - **Dangling procedural SFX theme nodes** in all three shipped workflows. `OTR_SFXGenerator` stubs that used to feed opening/closing theme audio are still present but disconnected. Remove them for a clean v1.4 JSON.
 
-### v1.4 Ship Criteria
-- v1.3 OOM root-caused and fixed.
+### v1.4-beta → v1.4 ship criteria
+- Timeout sentinel fallback fix landed and verified on a long run.
+- Kokoro Announcer + MusicGen Theme verified end-to-end on real hardware with VRAM telemetry ≤ 14.5 GB peak.
 - All Theme A/B/C items landed OR explicitly punted to v1.5 with VRAM numbers.
-- Kokoro Announcer + MusicGen Theme verified end-to-end on real hardware.
 - OpenClose parallel evaluator stable across a 10-batch run.
-- `tests/vram_profile_test.py` green (≤ 14.5 GB peak).
-- Full regression sweep: AST parse, Lemmy RNG check, arc coherence check, VRAM profile test.
+- `tests/vram_profile_test.py` green.
+- Full regression sweep: AST parse, Lemmy RNG check, arc coherence check, VRAM profile test, widget audit, BOM scan.
+- **Jeffrey personally confirms ship.** Only then: merge to main and tag `v1.4`.
 
 ---
 

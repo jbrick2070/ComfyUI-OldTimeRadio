@@ -388,6 +388,12 @@ The Flash Attention 2 probe now logs a precise platform message instead of a gen
 ### Stability (from v1.3-beta)
 `prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `Gemma4Director` stage so Gemma has full VRAM during Arc Enhancer operations.
 
+### Gemma 4 VRAM Release Fix (v1.3 final)
+`_unload_gemma4` now calls `model.cpu()` before dropping references, and `_generate_with_gemma4` detaches output tensors to CPU and explicitly frees GPU tensors plus the streamer before returning. Root cause was abandoned `_run_with_timeout` ThreadPoolExecutor threads holding live Gemma model references, preventing garbage collection and causing a 31.70 GiB allocation on a 16 GB card. Verified end to end: telemetry reads `VRAM allocated=0.03 GiB` after unload, and the full sci-fi workflow completes in approximately 1h 14m producing a 457 MB MP4.
+
+### Known issues carried into v1.4
+The Critique Revision pass (600s wall) and Arc-Enhancer-Echo pass (300s wall) can still hit their timeouts on long runs, and the current fallback path interleaves fallback text with the script body, causing downstream structural corruption. A sentinel-based timeout fallback that the assembler can detect and skip is the first Theme B task in v1.4. See `ROADMAP.md`.
+
 ---
 
 ## 🛠️ Developer Note: Architecture Gotchas
