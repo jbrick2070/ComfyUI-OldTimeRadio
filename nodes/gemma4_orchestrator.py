@@ -1000,7 +1000,6 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                         bnb_4bit_compute_dtype=torch.bfloat16,
                         bnb_4bit_use_double_quant=True,
                         bnb_4bit_quant_type="nf4",
-                        llm_int8_enable_fp32_cpu_offload=True,
                     )
                     log.info("[Gemma4] Large model detected — enabling 4-bit quantization (NF4)")
                 except ImportError:
