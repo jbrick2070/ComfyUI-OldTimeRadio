@@ -96,7 +96,8 @@
             "widgets_values": [
                 "",
                 0.4,
-                true
+                true,
+                "subtle"
             ],
             "inputs": [
                 {

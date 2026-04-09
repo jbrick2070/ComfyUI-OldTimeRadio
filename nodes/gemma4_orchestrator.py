@@ -4015,7 +4015,7 @@ class Gemma4Director:
                     "tooltip": "Prefer Bark for main characters (more expressive)"
                 }),
                 "vintage_intensity": (["subtle", "moderate", "heavy", "extreme"], {
-                    "default": "moderate",
+                    "default": "subtle",
                     "tooltip": "How vintage/degraded should the final audio sound"
                 }),
                 # v1.4 Theme C — optional series bible, socket input only.
@@ -4025,7 +4025,7 @@ class Gemma4Director:
             },
         }
 
-    def direct(self, script_text, temperature=0.4, prefer_bark=True, vintage_intensity="moderate",
+    def direct(self, script_text, temperature=0.4, prefer_bark=True, vintage_intensity="subtle",
                project_state=None):
         # ── MASTER SWITCH INHERITANCE ──
         # Inherently use the chosen model from ScriptWriter.
