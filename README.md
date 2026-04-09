@@ -59,7 +59,8 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Gemma 4 E4B** | ~5 GB | **Default LLM.** Auto-downloads to `models/huggingface/` |
+| **Gemma 4 E2B** | ~3 GB | **Recommended for 8GB VRAM.** Lighter weight, faster at low context. |
+| **Gemma 4 E4B** | ~5 GB | **Default LLM.** Balanced performance. |
 | **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
 | **Gemma 4 31B [BETA]** | ~17 GB (4-bit) | Dense state-of-the-art LLM. Requires 4-bit. **Optional.** |
 | **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run |
@@ -99,7 +100,7 @@ Three workflows ship in the `workflows/` folder:
 | Setup | GPU | VRAM |
 |-------|-----|------|
 | Recommended | RTX 5080 / 4090 | 16 GB+ |
-| Minimum | RTX 4070 / 3060 | 8 GB |
+| Minimum (E2B) | RTX 4070 / 3060 | 8 GB |
 
 ### Step 5 — Continuous 24/7 Broadcast (OBS Automation)
 
