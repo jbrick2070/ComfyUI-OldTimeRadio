@@ -33,6 +33,22 @@ Our advice? **Queue the prompt, walk away, and let it cook.** The results are wo
 
 ---
 
+## What's New in v1.4
+
+### Pro-Tier Model Support & 1-Click Master Switch
+You are no longer locked to the 4-Billion parameter Gemma. Added ad-hoc support for `google/gemma-4-26b-a4b-it` (BETA) for users with extreme hardware. To support this gracefully, we implemented a **True Single Switch Architecture**: the `Gemma4Director` node no longer has a dropdown or requires messy external wiring. Set your desired model solely on the `Gemma4ScriptWriter` and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM. 
+
+### VRAM Leak Hardening
+Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 
+
+### Project State 'Bible' Reader
+Support for `.json`/YAML project state files. Lock character voices, set canonical lore, and build continuous episodic shows without the AI forgetting who characters are.
+
+### Kokoro & MusicGen (Theme A / C)
+New modular nodes for `KokoroAnnouncer` and `MusicGenTheme`, seamlessly snapping into the pipeline to execute specialized audio workloads while Gemma is safely unloaded.
+
+---
+
 ## What's New in v1.2
 
 ### Narrative Patterns 1–6
