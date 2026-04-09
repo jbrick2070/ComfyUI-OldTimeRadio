@@ -7,9 +7,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.3](https://img.shields.io/badge/Download-OldTimeRadio_v1.3-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.4](https://img.shields.io/badge/Download-OldTimeRadio_v1.4-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.3)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
+**[Click here to download the full package (v1.4)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
 
 ---
 
@@ -46,6 +46,9 @@ Support for `.json`/YAML project state files. Lock character voices, set canonic
 
 ### Kokoro & MusicGen (Theme A / C)
 New modular nodes for `KokoroAnnouncer` and `MusicGenTheme`, seamlessly snapping into the pipeline to execute specialized audio workloads while Gemma is safely unloaded.
+
+### Subtle Pacing & Clean Load Protocol
+Implemented a **50% Pacing Overhaul** across the audio engine, halving all dramatic beats and "breath" buffers for a tighter, more modern radio sound. Also scrubbed the deprecated Model Selector for a literal "one switch" experience and 100% clean boot logs.
 
 ---
 

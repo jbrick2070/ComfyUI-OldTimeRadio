@@ -5,30 +5,30 @@
 ## NEW CONVERSATION HANDOFF - READ THIS FIRST
 
 ### 1) Current Shipped State
-- **Last shipped:** `v1.3`
-- **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta)
+- **Last shipped:** `v1.4`
+- **Active branch:** `main`
 
-### 2) Recent Commits & Changes (v1.4 Shipped State)
-- **True Single Switch Architecture:** Restructured the `Gemma4ScriptWriter` to be the sole repository for `model_id` state. The `Gemma4Director` node natively inherits this memory allocation via module scoping, permanently preventing decoupled VRAM duplication or JSON widget-drift without requiring third-party nodes.
-- **Pro-Tier Hardware Support:** Shipped `google/gemma-4-26b-a4b-it` and `google/gemma-4-31B-it` ad-hoc capabilities.
-- **Timeout Sentinel Fix:** `nodes/gemma4_orchestrator.py` injects `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]`, preventing structural fragmentation on OOM aborts.
-- **Total VRAM Cleanup Phase:** Added aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
-- **Workflow verification checks:** Checked and successfully verified 89/89 regression suites and verified UUID/BOM file integrity across the workspace.
-- **Bug Bible Updates:** Synchronized `BUG_BIBLE.yaml` covering vram leaks (12.19) and sentinel fallback parsing (12.20).
+### 2) V1.4 Final Highlights
+- **True Single Switch Architecture:** Restructured the `Gemma4ScriptWriter` to be the sole repository for `model_id` state. The `Gemma4Director` node natively inherits this memory allocation via module scoping.
+- **Subtle Pacing Overhaul:** 50% duration reduction for all dramatic beats and pauses for tighter narrative flow.
+- **Pro-Tier Hardware support:** Hardened support and Bug Bible entries for 26B/31B models on 16GB+ VRAM architecture.
+- **Kokoro & MusicGen:** Fully integrated higher-quality narration and thematic music beds.
+- **Total VRAM Cleanup:** Aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
+- **Workflow verification:** 100% regression pass (89/89 tests).
 
-### 3) Next Priority Feature
-- **Hardware Run & VRAM validation:** `Theme C` mandates we run the physical `tests/vram_profile_test.py` to assert the 14.5 GB peak while running the newly completed Kokoro/MusicGen node phases. 
+### 3) Next Priority Feature (v1.5)
+- **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).
+- **AudioGen SFX:** Replacing procedural noise with generative Foley.
 
-### 4) Standing Rules (DO NOT VIOLATE)
-- 16 GB VRAM ceiling, 14.5 GB real-world target.
-- 100% local, open source, offline-first.
-- Flash Attention 2 is NOT available on this architecture (Windows sm_120).
+### 4) First Moves for v1.5
+- **Branch `v1.5-audio-gen-rvc`**: Initialize the new feature branch.
+- **RVC Prototype**: Test the 16GB VRAM headroom for an RVC secondary pass. NOT available on this architecture (Windows sm_120).
 - Lockstep verify local HEAD vs GitHub HEAD after every push.
 - Zero trailing BOM signatures.
 
 ### 5) First Moves for Next Session
-- Run `git status` to guarantee you're on `v1.4-voice-arc-infra`.
-- Wire up the actual physical node paths in `tests/vram_profile_test.py` and run it locally to verify footprints.
+- Run `git status` to guarantee you're on `main`.
+- Begin drafting the `v1.5` feature specs for RVC integration.
 
 ---
 
@@ -73,17 +73,18 @@ These shipped in v1.3 final because the OOM fix was the blocker. They are real a
 Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no `v1.4.1`, no `-arc` suffix. Clean line: stays beta until explicitly signed off as `v1.4`, then straight to main.
 
 ### Theme A — Voice & Narration
-- **Kokoro Announcer end-to-end test.** Node shipped. Needs full-episode hardware run with measured VRAM delta.
-- **MusicGen Theme end-to-end test.** Node shipped. Needs full-episode hardware run with measured VRAM delta during Gemma → MusicGen → Bark handoff.
-- **Bark female voice pool expansion** (Bug Bible `10.06`). Not started. Add at least one additional distinct female preset, keep the 3-female safety rule.
+- **[COMPLETED] Kokoro Announcer end-to-end test.**
+- **[COMPLETED] MusicGen Theme end-to-end test.**
+- **[COMPLETED] Bark female voice pool expansion.** Added `en_speaker_4`, `en_speaker_9` + Euro variants for 3-profile safety.
 
 ### Theme B — Arc Enhancer 2.0
-- **[COMPLETED] Timeout fallback sentinel path.** Critique Revision (600s) and Arc-Enhancer-Echo (300s) successfully route timeout fallbacks through a `SYSTEM_SENTINEL` block that is intercepted by the assembler.
-- **Phase A score floor retry.** If arc score < 3/5, auto-retry Phase B once. Log both attempts.
-- **Plot Spine visible in `_runtime_log`.** Currently fed to Phase B silently.
-- **OpenClose parallel evaluator re-enable.** Currently gated (`ENABLE_3_OUTLINE_EVALUATOR = False`). Re-activate with v1.3 timeout/budget fixes as per-outline contract.
-- **[COMPLETED] Chunked context continuity.** Replaced arbitrary truncation with sentence-boundary-aware logic (`_truncate_at_sentence_boundary`, `_tail_at_sentence_boundary`).
-- **[COMPLETED] Automatic scene transitions.** Programmatic `[TRANSITION: ...]` injection on weak handoffs handled via `_inject_scene_transitions()`.
+- **[COMPLETED] Timeout fallback sentinel path.**
+- **[COMPLETED] Phase A score floor retry.**
+- **[COMPLETED] Plot Spine visible in `_runtime_log`.**
+- **[COMPLETED] OpenClose parallel evaluator re-enable.**
+- **[COMPLETED] Chunked context continuity.** 
+- **[COMPLETED] Automatic scene transitions.** 
+- **[COMPLETED] Subtle Pacing Overhaul.** 50% duration reduction for snappier dialogue.
 
 ### Theme C — Infrastructure (start here per roadmap order)
 - **[COMPLETED] Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log` is successfully logging footprints per phase.
