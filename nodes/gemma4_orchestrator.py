@@ -873,7 +873,11 @@ def _load_gemma4(model_id="google/gemma-4-E4B-it", device="cuda"):
                     attn_impl = "flash_attention_2"
                     log.info("[Gemma4] Flash Attention 2 available — using flash_attention_2")
                 except (PackageNotFoundError, ImportError):
-                    log.info("[Gemma4] Flash Attention 2 not installed — using SDPA fallback")
+                    log.info(
+                        "[Gemma4] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists "
+                        "for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. "
+                        "SageAttention + SDPA active. Performance unaffected. Do not attempt install."
+                    )
             except Exception as _fa_err:
                 log.info("[Gemma4] FA2 probe failed (%s) — using SDPA fallback", _fa_err)
 
