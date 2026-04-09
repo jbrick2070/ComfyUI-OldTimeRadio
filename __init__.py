@@ -82,6 +82,7 @@ _NODE_MODULES = {
     # value = (module_path, class_name, display_name)
     "OTR_Gemma4ScriptWriter": (".nodes.gemma4_orchestrator", "Gemma4ScriptWriter", "📻 Gemma 4 Script Writer"),
     "OTR_Gemma4Director":     (".nodes.gemma4_orchestrator", "Gemma4Director",      "🎬 Gemma 4 Director"),
+    "OTR_Gemma4ModelSelector": (".nodes.gemma4_orchestrator", "Gemma4ModelSelector", "⚙️ Gemma 4 Model Selector"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          "🎙️ Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         "💥 SFX Generator"),
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       "🎞️ Scene Sequencer"),

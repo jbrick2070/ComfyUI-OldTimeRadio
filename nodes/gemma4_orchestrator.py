@@ -1821,6 +1821,28 @@ F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you wri
 """
 
 
+class Gemma4ModelSelector:
+    """Master switch for Gemma 4 model tier to guarantee pipeline synchronization."""
+    CATEGORY = "OldTimeRadio"
+    FUNCTION = "select_model"
+    RETURN_TYPES = ("GEMMA_MODEL_ID",)
+    RETURN_NAMES = ("model_id",)
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
+                    "default": "google/gemma-4-E4B-it",
+                    "tooltip": "Master switch to synchronize Gemma 4 tiers across all OldTimeRadio nodes."
+                })
+            }
+        }
+
+    def select_model(self, model_id):
+        return (model_id,)
+
+
 class Gemma4ScriptWriter:
     """Fetches real science news, generates a full radio drama script via Gemma 4."""
 
@@ -1857,9 +1879,8 @@ class Gemma4ScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
+                "model_id": ("GEMMA_MODEL_ID", {
+                    "tooltip": "Wire to the Gemma4ModelSelector master switch"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -3988,9 +4009,8 @@ class Gemma4Director:
                 "script_text": ("STRING", {"multiline": True, "default": ""}),
             },
             "optional": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
+                "model_id": ("GEMMA_MODEL_ID", {
+                    "tooltip": "Wire to the Gemma4ModelSelector master switch"
                 }),
                 "temperature": ("FLOAT", {
                     "default": 0.4, "min": 0.1, "max": 1.0, "step": 0.05,
