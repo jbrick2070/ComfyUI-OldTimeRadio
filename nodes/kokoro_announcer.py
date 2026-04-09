@@ -244,6 +244,17 @@ class KokoroAnnouncer:
 
         audio_out = {"waveform": waveform, "sample_rate": KOKORO_SAMPLE_RATE}
         render_log.append(f"--- {len(clips)} announcer clips rendered ---")
+        
+        # Bug Bible 12.19: explicitly drop model refs to return VRAM.
+        try:
+            del pipeline
+        except Exception:
+            pass
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         log_text = "\n".join(render_log)
         return (audio_out, log_text, voice_id)
 

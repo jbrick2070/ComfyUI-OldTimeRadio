@@ -295,9 +295,13 @@ class MusicGenTheme:
                     )
             finally:
                 # Always unload to return VRAM to Bark, even if generation failed.
+                # Bug Bible 12.19 VRAM leak fix — explicit .cpu() before dropping references
                 try:
-                    del model
-                    del processor
+                    if 'model' in locals():
+                        model.cpu()
+                        del model
+                    if 'processor' in locals():
+                        del processor
                 except Exception:
                     pass
                 gc.collect()
