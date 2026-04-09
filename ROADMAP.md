@@ -9,7 +9,7 @@
 - **Active branch:** `main`
 
 ### 2) V1.4 Final Highlights
-- **True Single Switch Architecture:** Restructured the `Gemma4ScriptWriter` to be the sole repository for `model_id` state. The `Gemma4Director` node natively inherits this memory allocation via module scoping.
+- **True Single Switch Architecture:** Restructured the `LLMScriptWriter` to be the sole repository for `model_id` state. The `LLMDirector` node natively inherits this memory allocation via module scoping.
 - **Subtle Pacing Overhaul:** 50% duration reduction for all dramatic beats and pauses for tighter narrative flow.
 - **Pro-Tier Hardware support:** Hardened support and Bug Bible entries for 26B/31B models on 16GB+ VRAM architecture.
 - **Kokoro & MusicGen:** Fully integrated higher-quality narration and thematic music beds.
@@ -17,6 +17,7 @@
 - **Workflow verification:** 100% regression pass (89/89 tests).
 
 ### 3) Next Priority Feature (v1.5)
+- **[COMPLETED] Model-Independent Story Orchestrator:** Dynamic multi-model support allowing swapping between Gemma 4 and Mistral-Nemo-12B, completely rewriting nodes into `story_orchestrator.py` while maintaining retroactive JSON workflow compatibility.
 - **[COMPLETED] Obsidian Architecture (4GB VRAM):** All-Kokoro pipeline (`OTR_BatchKokoroGenerator`) completely separated from the 8GB Bark defaults via `tts_engine` toggle.
 - **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator` and procedural fallback.
 - **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).

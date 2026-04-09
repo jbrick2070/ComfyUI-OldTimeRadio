@@ -141,8 +141,8 @@ def _run_node(node_class, **overrides):
     return func(**final_kwargs)
 
 def _run_gemma4_script_writer() -> None:
-    from nodes.gemma4_orchestrator import Gemma4ScriptWriter
-    res = _run_node(Gemma4ScriptWriter,
+    from nodes.story_orchestrator import LLMScriptWriter
+    res = _run_node(LLMScriptWriter,
                     episode_title="The Last Frequency",
                     genre_flavor="hard_sci_fi",
                     runtime_preset="🧪 test (1 min)",
@@ -155,8 +155,8 @@ def _run_gemma4_script_writer() -> None:
     _ctx["script_json"] = res[1]
 
 def _run_gemma4_director() -> None:
-    from nodes.gemma4_orchestrator import Gemma4Director
-    res = _run_node(Gemma4Director, script_text=_ctx["script_text"])
+    from nodes.story_orchestrator import LLMDirector
+    res = _run_node(LLMDirector, script_text=_ctx["script_text"])
     _ctx["production_plan_json"] = res[0]
 
 def _run_kokoro_announcer() -> None:

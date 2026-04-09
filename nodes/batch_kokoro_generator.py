@@ -18,7 +18,7 @@ import gc
 import numpy as np
 import torch
 
-from .gemma4_orchestrator import _runtime_log
+from .story_orchestrator import _runtime_log
 from .kokoro_announcer import _kokoro_model_dir, _ensure_voice_file, KOKORO_SAMPLE_RATE
 
 log = logging.getLogger("OTR")
@@ -138,8 +138,8 @@ class BatchKokoroGenerator:
 
         # Unload Gemma
         try:
-            from .gemma4_orchestrator import _unload_gemma4
-            _unload_gemma4()
+            from .story_orchestrator import _unload_llm
+            _unload_llm()
         except Exception:
             pass
 

@@ -27,7 +27,7 @@ import re
 import numpy as np
 import torch
 
-from .gemma4_orchestrator import _runtime_log
+from .story_orchestrator import _runtime_log
 
 log = logging.getLogger("OTR")
 
@@ -667,8 +667,8 @@ class SceneSequencer:
         # Free Gemma4 VRAM before TTS generation — Bark needs GPU headroom.
         # Gemma4 is done by this point (script + plan already generated).
         try:
-            from .gemma4_orchestrator import _unload_gemma4
-            _unload_gemma4()
+            from .story_orchestrator import _unload_llm
+            _unload_llm()
             log.info("[SceneSequencer] Freed Gemma4 VRAM for inline TTS")
         except Exception:
             pass  # Gemma4 may already be unloaded or not imported

@@ -80,8 +80,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
-    "OTR_Gemma4ScriptWriter": (".nodes.gemma4_orchestrator", "Gemma4ScriptWriter", "📻 Gemma 4 Script Writer"),
-    "OTR_Gemma4Director":     (".nodes.gemma4_orchestrator", "Gemma4Director",      "🎬 Gemma 4 Director"),
+    "OTR_Gemma4ScriptWriter": (".nodes.story_orchestrator", "LLMScriptWriter", "📻 LLM Story Writer"),
+    "OTR_Gemma4Director":     (".nodes.story_orchestrator", "LLMDirector",      "🎬 LLM Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          "🎙️ Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         "💥 SFX Generator"),
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       "🎞️ Scene Sequencer"),

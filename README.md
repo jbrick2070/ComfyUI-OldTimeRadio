@@ -1,6 +1,6 @@
 # ComfyUI-OldTimeRadio (SIGNAL LOST)
 
-**Real science news → Gemma 4 Scriptwriting → Kokoro Narration → Bark TTS Voice Acting → MusicGen Themes → Procedural SFX → 48kHz Master → CRT Video.**
+**Real science news → Model-Independent LLM Scriptwriting → Kokoro Narration → Bark TTS Voice Acting → MusicGen Themes → Procedural SFX → 48kHz Master → CRT Video.**
 
 Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
@@ -24,7 +24,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Gemma 4** LLM chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM (Gemma 4 or Nemo 12B)** chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 

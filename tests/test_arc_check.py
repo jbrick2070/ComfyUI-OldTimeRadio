@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Import the Gemma4ScriptWriter to access the scorer
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from nodes.gemma4_orchestrator import Gemma4ScriptWriter
+from nodes.story_orchestrator import LLMScriptWriter
 
 
 class TestArcCoherence:
@@ -12,7 +12,7 @@ class TestArcCoherence:
 
     def test_good_script_all_checks_pass(self):
         """Synthetic good script should score 5/5."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         # Good script: complete, coherent, strong ending
         opening = """[VOICE: ANNOUNCER, female, 50s, authoritative] Deep within the void, signals echo.
@@ -38,7 +38,7 @@ class TestArcCoherence:
 
     def test_bad_script_multiple_failures(self):
         """Synthetic bad script should score low (≤2/5)."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         # Bad script: truncated, weak ending, no epilogue
         opening = """[VOICE: CONTROL, female, 50s, authoritative] Into the depths we go.
@@ -60,7 +60,7 @@ class TestArcCoherence:
 
     def test_weak_final_scene(self):
         """Script with only 1-2 dialogue lines in closing should fail strong_scene check."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = """[VOICE: ANNOUNCER, female, 50s] Beginning.
 [VOICE: AGENT, male, 40s] Status check.
@@ -77,7 +77,7 @@ class TestArcCoherence:
 
     def test_no_shared_keywords(self):
         """Script with no keyword overlap should fail payoff check."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = """[VOICE: ANNOUNCER, female, 50s] The journey begins.
 [VOICE: ALPHA, male, 40s] Let's go to Mars.
@@ -95,7 +95,7 @@ class TestArcCoherence:
 
     def test_strong_echo_detection(self):
         """Script with repeated long words should pass echo check."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = """[VOICE: ANNOUNCER, female, 50s] The frequency keeps spiking.
 [VOICE: TECH, male, 40s] frequency analysis shows anomalies.
@@ -113,7 +113,7 @@ class TestArcCoherence:
 
     def test_epilogue_detection_edge_case(self):
         """ANNOUNCER anywhere in final 500 chars should pass epilogue check."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = """[VOICE: ANNOUNCER, female, 50s] We begin.
 [VOICE: CHAR, male, 40s] Let's go."""
@@ -134,7 +134,7 @@ class TestPlotSpine:
 
     def test_extracts_middle_events(self):
         """Plot spine should capture middle-act dialogue and scene markers."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = "[VOICE: ANNOUNCER, female, 50s] The station is failing."
         closing = "[VOICE: CHEN, male, 40s] We survived."
@@ -158,7 +158,7 @@ class TestPlotSpine:
 
     def test_truncates_to_fifty_words(self):
         """Plot spine should truncate to ~50 words to stay under token budget."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = "[VOICE: ANNOUNCER, female, 50s] Start."
         closing = "[VOICE: CHEN, male, 40s] End."
@@ -178,7 +178,7 @@ class TestPlotSpine:
 
     def test_handles_missing_middle(self):
         """Plot spine should gracefully handle empty or missing middle content."""
-        writer = Gemma4ScriptWriter()
+        writer = LLMScriptWriter()
 
         opening = "[VOICE: ANNOUNCER, female, 50s] Start."
         closing = "[VOICE: CHEN, male, 40s] End."
