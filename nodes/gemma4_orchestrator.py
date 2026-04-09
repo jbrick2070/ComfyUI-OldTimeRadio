@@ -1355,6 +1355,19 @@ def _truncate_at_sentence_boundary(text, max_chars):
     return snippet
 
 
+# This lets the Director automatically inherit the exact same model memory
+# space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
+# ─────────────────────────────────────────────────────────────────────────────
+_CURRENT_GEMMA_MODEL = "google/gemma-4-E4B-it"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# SHARED INFERENCE ENGINE
+# Both nodes call this loader. It caches the model in VRAM and tracks the peak
+# memory watermark for diagnostics.
+# ════════════════════════════════════════════════════════════════════════════
+
+
 def _tail_at_sentence_boundary(text, max_chars):
     """Return the trailing region of `text` starting at a sentence boundary.
 
@@ -1821,28 +1834,6 @@ F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you wri
 """
 
 
-class Gemma4ModelSelector:
-    """Master switch for Gemma 4 model tier to guarantee pipeline synchronization."""
-    CATEGORY = "OldTimeRadio"
-    FUNCTION = "select_model"
-    RETURN_TYPES = ("GEMMA_MODEL_ID",)
-    RETURN_NAMES = ("model_id",)
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Master switch to synchronize Gemma 4 tiers across all OldTimeRadio nodes."
-                })
-            }
-        }
-
-    def select_model(self, model_id):
-        return (model_id,)
-
-
 class Gemma4ScriptWriter:
     """Fetches real science news, generates a full radio drama script via Gemma 4."""
 
@@ -1927,9 +1918,6 @@ class Gemma4ScriptWriter:
                 # so widgets_values length is unchanged and v1.3 workflows load clean.
                 "project_state": ("PROJECT_STATE", {
                     "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
-                }),
-                "master_model": ("GEMMA_MODEL_ID", {
-                    "tooltip": "Optional master switch override. If wired, ignores the model_id dropdown."
                 }),
             },
         }
@@ -2093,13 +2081,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      style_variant="tense claustrophobic",
                      creativity="balanced",
                      arc_enhancer=True,
-                     project_state=None,
-                     master_model=None):
+                     project_state=None):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
 
-        # ── MASTER SWITCH OVERRIDE ──
-        if master_model:
-            model_id = master_model
+        # ── MASTER SWITCH INHERITANCE ──
+        # Save explicitly chosen model so Director can use it automatically.
+        global _CURRENT_GEMMA_MODEL
+        _CURRENT_GEMMA_MODEL = model_id
 
 
         # ── PROJECT STATE (v1.4 Theme C) ──
@@ -2276,10 +2264,10 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                         "summary": "A team at ETH Zurich demonstrates stable quantum entanglement between nitrogen-vacancy centers "
                                    "in diamond at 22C for over 100 microseconds, eliminating the need for near-absolute-zero cooling.",
                         "full_text": "A team at ETH Zurich demonstrates stable quantum entanglement between nitrogen-vacancy centers "
-                                     "in diamond at room temperature for over 100 microseconds. The breakthrough uses a novel spin-echo "
-                                     "protocol that actively corrects thermal decoherence in real time. If scaled, the technique could "
-                                     "enable practical quantum sensors for medical imaging and navigation systems that operate outside "
-                                     "laboratory conditions.",
+                                   "in diamond at room temperature for over 100 microseconds. The breakthrough uses a novel spin-echo "
+                                   "protocol that actively corrects thermal decoherence in real time. If scaled, the technique could "
+                                   "enable practical quantum sensors for medical imaging and navigation systems that operate outside "
+                                   "laboratory conditions.",
                         "source": "Physical Review Letters (fallback seed)",
                         "date": str(datetime.now().date()),
                         "link": "",
@@ -4018,10 +4006,6 @@ class Gemma4Director:
                 "script_text": ("STRING", {"multiline": True, "default": ""}),
             },
             "optional": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
-                }),
                 "temperature": ("FLOAT", {
                     "default": 0.4, "min": 0.1, "max": 1.0, "step": 0.05,
                     "tooltip": "Lower = more consistent JSON output"
@@ -4041,9 +4025,12 @@ class Gemma4Director:
             },
         }
 
-    def direct(self, script_text, model_id="google/gemma-4-E4B-it",
-               temperature=0.4, prefer_bark=True, vintage_intensity="moderate",
+    def direct(self, script_text, temperature=0.4, prefer_bark=True, vintage_intensity="moderate",
                project_state=None):
+        # ── MASTER SWITCH INHERITANCE ──
+        # Inherently use the chosen model from ScriptWriter.
+        global _CURRENT_GEMMA_MODEL
+        model_id = _CURRENT_GEMMA_MODEL
 
         # Defer Bark health check until AFTER the script is written,
         # preventing Bark from hogging VRAM while Gemma writes the script.
