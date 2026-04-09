@@ -3108,6 +3108,15 @@ Write Act {act_num} now:"""
         # honors the journey instead of hallucinating contradictions.
         plot_spine = self._extract_plot_spine(script_text, opening_orig, closing_orig)
 
+        # v1.4 Theme B — surface the spine in the runtime log so the showrunner
+        # can see exactly what the bookend rewriter was told about the middle.
+        _runtime_log(f"ARC_ENHANCER: Plot spine: {plot_spine[:150]}")
+
+        # Phase A score floor flag — if score < 3/5, the first Phase B pass will
+        # be followed by one automatic retry. The retry threshold is the same
+        # contract used by tests/vram_profile_test.py for the arc coherence check.
+        _arc_retry_warranted = arc_score < 3
+
         # Phase B: Architectural Echo call
         # We use a lower temperature (0.6) for tighter structural alignment
         echo_prompt = f"""You are a structural script editor for the radio drama anthology "SIGNAL LOST".
@@ -3174,7 +3183,74 @@ Format your response exactly as:
                     if len(parts) == 2:
                         script_text = parts[0] + closing_new + parts[1]
 
-                    _runtime_log(f"ARC_ENHANCER: Narrative coherence pass complete (echo phrase = {echo_phrase})")
+                    _runtime_log(f"ARC_ENHANCER: Pass 1 complete (echo phrase = {echo_phrase})")
+
+                    # v1.4 Theme B — Phase A score floor retry.
+                    # If the initial arc score was below the 3/5 floor, run a
+                    # second Phase B+C pass using the already-injected script as
+                    # the new base. One retry only — more would drift the text.
+                    if _arc_retry_warranted:
+                        _runtime_log(
+                            f"ARC_ENHANCER: Score was {arc_score}/5 (below 3/5 floor) "
+                            f"— triggering retry pass"
+                        )
+                        retry_bookends = self._get_bookends(script_text)
+                        if retry_bookends:
+                            opening_retry, closing_retry = retry_bookends
+                            retry_spine = self._extract_plot_spine(
+                                script_text, opening_retry, closing_retry
+                            )
+                            retry_prompt = echo_prompt.replace(
+                                f"ORIGINAL OPENING BLOCK:\n{opening_orig}",
+                                f"ORIGINAL OPENING BLOCK:\n{opening_retry}",
+                            ).replace(
+                                f"ORIGINAL CLOSING BLOCK:\n{closing_orig}",
+                                f"ORIGINAL CLOSING BLOCK:\n{closing_retry}",
+                            ).replace(
+                                f"{plot_spine}",
+                                f"{retry_spine}",
+                            )
+                            try:
+                                retry_response = _run_with_timeout(
+                                    lambda: _generate_with_gemma4(
+                                        retry_prompt,
+                                        model_id=model_id,
+                                        max_new_tokens=1000,
+                                        temperature=0.6,
+                                    ),
+                                    timeout_sec=300,
+                                    phase_label="Arc-Enhancer-Retry",
+                                )
+                                opening_r = retry_response.split("<opening>")[1].split("</opening>")[0].strip()
+                                closing_r = retry_response.split("<closing>")[1].split("</closing>")[0].strip()
+                                if opening_r and closing_r:
+                                    script_text = script_text.replace(opening_retry, opening_r, 1)
+                                    parts_r = script_text.rsplit(closing_retry, 1)
+                                    if len(parts_r) == 2:
+                                        script_text = parts_r[0] + closing_r + parts_r[1]
+                                    # Re-score so the log tells the truth about the
+                                    # final state, not just the initial state.
+                                    retry_score, retry_checks = self._score_arc_coherence(
+                                        opening_r, closing_r, script_text
+                                    )
+                                    retry_checks_str = ", ".join(
+                                        f"{k}={v}" for k, v in retry_checks.items()
+                                    )
+                                    _runtime_log(
+                                        f"ARC_ENHANCER: Pass 2 complete "
+                                        f"arc_score={retry_score}/5 ({retry_checks_str})"
+                                    )
+                                else:
+                                    _runtime_log("ARC_ENHANCER: Retry returned empty tags — keeping pass 1 result")
+                            except Exception as retry_err:
+                                log.warning("[ArcEnhancer] Retry pass failed: %s", retry_err)
+                                _runtime_log(f"ARC_ENHANCER: Retry failed — keeping pass 1 result ({retry_err})")
+                        else:
+                            _runtime_log("ARC_ENHANCER: Retry skipped — could not re-extract bookends after pass 1")
+                    else:
+                        _runtime_log(
+                            f"ARC_ENHANCER: Score {arc_score}/5 meets floor — no retry needed"
+                        )
                 else:
                     _runtime_log("ARC_ENHANCER: LLM returned empty tags — skipping injection")
             except (IndexError, ValueError):
