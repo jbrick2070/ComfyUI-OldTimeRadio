@@ -652,12 +652,12 @@ class SceneSequencer:
 
         voice_map = plan.get("voice_assignments", {})
         pacing = plan.get("pacing", {})
-        # PACING: Breath buffer + dramatic pauses
-        breath_ms = pacing.get("breath_pause_ms", 400)          # between every dialogue line
-        beat_pause_ms = pacing.get("beat_pause_ms", 1500)       # [BEAT] tag — dramatic beat
-        pause_ms = pacing.get("pause_ms", 2000)                 # [PAUSE] tag — longer pause
-        scene_transition_ms = pacing.get("scene_transition_ms", 2500)
-        act_break_ms = pacing.get("act_break_ms", 5000)
+        # PACING: Breath buffer + dramatic pauses (v1.4 - 50% duration reduction)
+        breath_ms = pacing.get("breath_pause_ms", 200)          # between every dialogue line
+        beat_pause_ms = pacing.get("beat_pause_ms", 750)        # [BEAT] tag — dramatic beat
+        pause_ms = pacing.get("pause_ms", 1000)                 # [PAUSE] tag — longer pause
+        scene_transition_ms = pacing.get("scene_transition_ms", 1250)
+        act_break_ms = pacing.get("act_break_ms", 2500)
 
         # Guard: fall back to DEFAULT_OUT if output_dir is empty/None
         if not output_dir or not output_dir.strip():
@@ -723,13 +723,13 @@ class SceneSequencer:
                 continue
 
             elif item_type == "scene_break":
-                segment_np = np.zeros(int(sample_rate * 1.0), dtype=np.float32)
+                segment_np = np.zeros(int(sample_rate * 0.5), dtype=np.float32)
                 render_log.append(f"[{global_idx}] === SCENE {item.get('scene', '?')} ===")
 
             elif item_type == "pause":
-                dur_ms = item.get("duration_ms", 800)
-                # Cap beats at 200ms — prevents dead air stacking
-                dur_ms = min(dur_ms, 200)
+                # Default to beat_pause_ms if duration not in script.
+                # Remove the legacy 200ms cap (confused with beat_pause_ms name).
+                dur_ms = item.get("duration_ms", beat_pause_ms)
                 segment_np = np.zeros(int(sample_rate * dur_ms / 1000), dtype=np.float32)
                 render_log.append(f"[{global_idx}] (beat) {dur_ms}ms")
 
@@ -742,7 +742,7 @@ class SceneSequencer:
                     sfx_clip_idx += 1
                     render_log.append(f"[{global_idx}] SFX: {desc}")
                 else:
-                    segment_np = np.zeros(int(sample_rate * 1.5), dtype=np.float32)
+                    segment_np = np.zeros(int(sample_rate * 0.75), dtype=np.float32)
                     render_log.append(f"[{global_idx}] SFX: {desc} (MISSING)")
 
             elif item_type == "dialogue":
