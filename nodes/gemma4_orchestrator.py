@@ -1879,8 +1879,9 @@ class Gemma4ScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": ("GEMMA_MODEL_ID", {
-                    "tooltip": "Wire to the Gemma4ModelSelector master switch"
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
+                    "default": "google/gemma-4-E4B-it",
+                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -1926,6 +1927,9 @@ class Gemma4ScriptWriter:
                 # so widgets_values length is unchanged and v1.3 workflows load clean.
                 "project_state": ("PROJECT_STATE", {
                     "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
+                }),
+                "master_model": ("GEMMA_MODEL_ID", {
+                    "tooltip": "Optional master switch override. If wired, ignores the model_id dropdown."
                 }),
             },
         }
@@ -2089,8 +2093,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      style_variant="tense claustrophobic",
                      creativity="balanced",
                      arc_enhancer=True,
-                     project_state=None):
+                     project_state=None,
+                     master_model=None):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
+
+        # ── MASTER SWITCH OVERRIDE ──
+        if master_model:
+            model_id = master_model
 
 
         # ── PROJECT STATE (v1.4 Theme C) ──
@@ -4009,8 +4018,9 @@ class Gemma4Director:
                 "script_text": ("STRING", {"multiline": True, "default": ""}),
             },
             "optional": {
-                "model_id": ("GEMMA_MODEL_ID", {
-                    "tooltip": "Wire to the Gemma4ModelSelector master switch"
+                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]"], {
+                    "default": "google/gemma-4-E4B-it",
+                    "tooltip": "Hugging Face model ID for Gemma 4 (BETA: 26B/31B require bitsandbytes 4-bit quant)"
                 }),
                 "temperature": ("FLOAT", {
                     "default": 0.4, "min": 0.1, "max": 1.0, "step": 0.05,
