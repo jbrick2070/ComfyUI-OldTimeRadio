@@ -3966,7 +3966,7 @@ The script follows these tokens:
     }}
   ],
   "pacing": {{
-    "beat_pause_ms": 200
+    "beat_pause_ms": 100
   }}
 }}
 
