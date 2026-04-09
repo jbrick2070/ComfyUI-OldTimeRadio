@@ -22,7 +22,7 @@
       "widgets_values": [
         "The Last Frequency",
         "hard_sci_fi",
-        "\ud83d\udcfb standard (8 min)",
+        "📻 standard (8 min)",
         8,
         4,
         "google/gemma-4-E4B-it",
@@ -35,7 +35,6 @@
         "medium (5 acts)",
         "tense claustrophobic",
         "balanced",
-        true,
         true
       ],
       "inputs": [],
@@ -99,8 +98,7 @@
         "",
         "google/gemma-4-E4B-it",
         0.4,
-        true,
-        "moderate"
+        true
       ],
       "inputs": [
         {
@@ -165,9 +163,7 @@
         "[]",
         "{}",
         0,
-        999,
-        "",
-        "bark"
+        999
       ],
       "inputs": [
         {
@@ -348,9 +344,7 @@
         "Node name for S&R": "OTR_BatchBarkGenerator"
       },
       "widgets_values": [
-        "[]",
-        "{}",
-        0.7
+        "[]"
       ],
       "inputs": [
         {
@@ -494,8 +488,7 @@
       "widgets_values": [
         "[]",
         "",
-        "random",
-        0.95
+        "random"
       ],
       "color": "#234035",
       "bgcolor": "#162821"
@@ -560,8 +553,7 @@
       "widgets_values": [
         "{}",
         "",
-        "facebook/musicgen-medium",
-        3.0
+        "facebook/musicgen-medium"
       ],
       "color": "#234035",
       "bgcolor": "#162821"
@@ -707,7 +699,7 @@
   ],
   "groups": [
     {
-      "title": "1. WRITE THE STORY \ud83d\udcdd",
+      "title": "1. WRITE THE STORY 📝",
       "bounding": [
         20,
         80,
@@ -719,7 +711,7 @@
       "font_size": 24
     },
     {
-      "title": "2. MAKE THE VOICES & SOUNDS \ud83c\udf99\ufe0f",
+      "title": "2. MAKE THE VOICES & SOUNDS 🎙️",
       "bounding": [
         970,
         80,
@@ -731,7 +723,7 @@
       "font_size": 24
     },
     {
-      "title": "3. PUT IT ALL TOGETHER \ud83c\udfac",
+      "title": "3. PUT IT ALL TOGETHER 🎬",
       "bounding": [
         1920,
         80,
