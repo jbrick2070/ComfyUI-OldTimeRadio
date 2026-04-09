@@ -954,23 +954,51 @@ _GEMMA4_CACHE = {"model": None, "tokenizer": None, "device": None}
 
 
 def _unload_gemma4():
-    """Explicitly unload Gemma 4 to free VRAM (Section 3, Section 40).
+    """Explicitly unload Gemma 4 to free VRAM (v1.3.1 OOM FIX).
 
-    gc.collect() forces Python to destroy the model object before
-    torch.cuda.empty_cache() runs. Without it, Python's lazy GC may
-    leave dead tensors in VRAM when Bark tries to load — OOM on
-    long 25+ minute renders.
+    The v1.3 version did del + gc.collect() + empty_cache(), but that
+    is a no-op when abandoned worker threads from _run_with_timeout
+    still hold the model as a local variable in their stack frame.
+    Symptom: second load attempt sees VRAM at 31.70 GiB on a 16 GB
+    card because the first model never actually left the GPU.
+
+    The fix is to call model.cpu() BEFORE dropping references. That
+    moves the weights from VRAM to RAM immediately, even when other
+    strong refs exist. Abandoned generate() threads will then error
+    out on device mismatch, which is acceptable because their results
+    are already being discarded by the timeout fallback path.
+
+    Order of operations is load-bearing:
+      1. model.cpu()         — move weights off GPU even with live refs
+      2. del cache entries   — drop the primary reference
+      3. gc.collect()        — destroy the object if no other refs
+      4. empty_cache()       — return freed VRAM to the allocator
+      5. telemetry           — prove VRAM actually dropped
     """
     global _GEMMA4_CACHE
     import gc
     import torch
     if _GEMMA4_CACHE["model"] is not None:
+        # Step 1: force weights off GPU before dropping the reference.
+        try:
+            _GEMMA4_CACHE["model"].cpu()
+        except Exception as cpu_err:
+            log.warning("[Gemma4] model.cpu() during unload failed: %s", cpu_err)
+        # Step 2: drop references from the module-level cache.
         del _GEMMA4_CACHE["model"]
         del _GEMMA4_CACHE["tokenizer"]
         _GEMMA4_CACHE = {"model": None, "tokenizer": None, "device": None}
-        gc.collect()              # force Python to destroy the object NOW
-        torch.cuda.empty_cache()  # THEN release the VRAM
-        log.info("Gemma 4 unloaded, VRAM freed (gc.collect + empty_cache)")
+        # Step 3 + 4: gc and return VRAM to the allocator.
+        gc.collect()
+        torch.cuda.empty_cache()
+        # Step 5: telemetry — prove it worked.
+        allocated_gib = torch.cuda.memory_allocated() / 1e9
+        reserved_gib = torch.cuda.memory_reserved() / 1e9
+        log.info(
+            "Gemma 4 unloaded: VRAM allocated=%.2f GiB reserved=%.2f GiB "
+            "(cpu + gc.collect + empty_cache)",
+            allocated_gib, reserved_gib,
+        )
 
 
 class GemmaHeartbeatStreamer(BaseStreamer):
@@ -1160,9 +1188,21 @@ def _generate_with_gemma4(prompt, model_id="google/gemma-4-E4B-it",
     inference_time = time.time() - start_inference
     log.info(f"[Gemma4] Inference complete in {inference_time:.1f}s.")
 
-    # Decode only the new tokens (skip the prompt)
-    new_tokens = output[0][inputs["input_ids"].shape[-1]:]
-    return tokenizer.decode(new_tokens, skip_special_tokens=True)
+    # Decode only the new tokens (skip the prompt).
+    # Move the slice to CPU BEFORE decoding so the GPU tensors can be
+    # released immediately after. Decoding reads the token ids into a
+    # Python string, after which output/inputs/streamer are garbage.
+    new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
+    decoded = tokenizer.decode(new_tokens_cpu, skip_special_tokens=True)
+
+    # v1.3.1 OOM FIX: explicit GPU tensor cleanup. The generate() call
+    # leaves behind the full output tensor and the KV cache in VRAM.
+    # These are local vars and would normally be freed on return, but
+    # if a timeout fallback path ever re-enters this function while
+    # the old frame is still alive, the residency stacks. Release now.
+    del new_tokens_cpu, output, inputs, streamer
+    torch.cuda.empty_cache()
+    return decoded
 
 
 # ─────────────────────────────────────────────────────────────────────────────
