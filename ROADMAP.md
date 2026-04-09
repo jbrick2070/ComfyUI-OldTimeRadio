@@ -17,8 +17,9 @@
 - **Workflow verification:** 100% regression pass (89/89 tests).
 
 ### 3) Next Priority Feature (v1.5)
+- **[COMPLETED] Obsidian Architecture (4GB VRAM):** All-Kokoro pipeline (`OTR_BatchKokoroGenerator`) completely separated from the 8GB Bark defaults via `tts_engine` toggle.
+- **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator` and procedural fallback.
 - **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).
-- **AudioGen SFX:** Replacing procedural noise with generative Foley.
 
 ### 4) First Moves for v1.5
 - **Branch `v1.5-audio-gen-rvc`**: Initialize the new feature branch.
