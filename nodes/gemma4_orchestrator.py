@@ -408,7 +408,7 @@ _FIRST_NAMES = [
     # Public domain classics (published before 1931)
     "Alice", "Allan", "Ayesha", "Cavor", "Dracula", "Edward", "Griffin", "Gulliver",
     "Henry", "James", "John", "Karnacki", "Leviathan", "Mina", "Nemo", "Phileas",
-    "Quasimodo", "Robinson", "Sherlock", "Smee", "Tarzan", "Victor", "Watson", "Wendy",
+    "Quasimodo", "Robinson", "Sherlock", "Smee", "Tarkon", "Victor", "Watson", "Wendy",
     # Peter O'Toole characters
     "Lawrence", "Reginald", "Anton", "Priam", "Maurice", "Alan",
     # Jim Carrey characters
@@ -427,7 +427,7 @@ _FIRST_NAMES = [
     # Richard Pryor characters
     "Gus", "Monty", "Duane", "Rufus", "Leroy", "Skip", "Grover",
     # Robin Williams (additional)
-    "Peter", "Popeye", "Genie",
+    "Peter", "Sailor", "Djinn",
 ]
 
 _LAST_NAMES = [
