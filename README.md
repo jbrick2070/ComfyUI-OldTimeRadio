@@ -1,6 +1,6 @@
 # ComfyUI-OldTimeRadio (SIGNAL LOST)
 
-**Real science news → AI radio drama script → Bark TTS voice acting → procedural SFX → 48kHz stereo master → audio-reactive CRT video.**
+**Real science news → Gemma 4 Scriptwriting → Kokoro Narration → Bark TTS Voice Acting → MusicGen Themes → Procedural SFX → 48kHz Master → CRT Video.**
 
 Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
@@ -24,11 +24,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, feeds them to a local Gemma 4 LLM to write a multi-act sci-fi radio drama with story-first writing. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies and comedies, Larry David comedic spirals, Marvel-style escalation, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Gemma 4** LLM chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
-Character names, gender, age, demeanor, accent, and voice model are all procedurally generated from the episode seed — every cast is unique. The pipeline voices every line with expressive emotions (sighs, laughs, whispers), adds procedural theremins and radio tuning, masters the final mix with spatial audio, and renders a procedural CRT-aesthetic MP4.
-
-Every run is a brand new, complete episode generated entirely from scratch.
+The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
 ---
 
