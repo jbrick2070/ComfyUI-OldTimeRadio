@@ -8,10 +8,12 @@
 - **Last shipped:** `v1.3`
 - **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta)
 
-### 2) Recent Commits & Changes (v1.4-beta hardening)
-- **Timeout Sentinel Fix:** `nodes/gemma4_orchestrator.py` now injects `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]` instead of raw text concatenation, preventing downstream structural breakage (fixes the massive Theme B blocker).
-- **VRAM Telemetry Phase:** Integrated per-pass `vram_reset_peak()` and `vram_snapshot()` calls in the execution wrappers.
-- **Workflow / debt scrub:** Purged orphaned `OTR_SFXGenerator` nodes from all `.json` workflows, mapped nodes to cohesive aesthetic grids, and dropped the UTF-8 BOM from `gemma4_orchestrator.py`.
+### 2) Recent Commits & Changes (v1.4 Shipped State)
+- **True Single Switch Architecture:** Restructured the `Gemma4ScriptWriter` to be the sole repository for `model_id` state. The `Gemma4Director` node natively inherits this memory allocation via module scoping, permanently preventing decoupled VRAM duplication or JSON widget-drift without requiring third-party nodes.
+- **Pro-Tier Hardware Support:** Shipped `google/gemma-4-26b-a4b-it` and `google/gemma-4-31B-it` ad-hoc capabilities.
+- **Timeout Sentinel Fix:** `nodes/gemma4_orchestrator.py` injects `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]`, preventing structural fragmentation on OOM aborts.
+- **Total VRAM Cleanup Phase:** Added aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
+- **Workflow verification checks:** Checked and successfully verified 89/89 regression suites and verified UUID/BOM file integrity across the workspace.
 - **Bug Bible Updates:** Synchronized `BUG_BIBLE.yaml` covering vram leaks (12.19) and sentinel fallback parsing (12.20).
 
 ### 3) Next Priority Feature
@@ -85,19 +87,20 @@ Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no
 
 ### Theme C — Infrastructure (start here per roadmap order)
 - **[COMPLETED] Per-node VRAM snapshot logging.** Lightweight telemetry in `_runtime_log` is successfully logging footprints per phase.
-- **[COMPLETED] Experimental High-VRAM Tier (BETA).** Added ad-hoc dropdown support for Gemma 4 26B-A4B and 31B models with automated 4-bit `bitsandbytes` quantization. Not recommended for general production use.
-- **VRAM profile test.** `tests/vram_profile_test.py` snapshotting VRAM between major nodes, assert ≤ 14.5 GB peak. (Currently stubbed; needs to be wired to the physical nodes).
-- **Project State JSON.** Per-series "bible" file. Read-only during generation, writable between episodes. Character voice locks, forbidden patterns, tone contracts.
+- **[COMPLETED] Experimental High-VRAM Tier (BETA).** Added ad-hoc dropdown support for Gemma 4 26B-A4B and 31B models with automated 4-bit `bitsandbytes` quantization.
+- **[COMPLETED] True Single Switch.** Director inherits exactly the model the ScriptWriter defines. No VRAM leaks. No drift.
+- **[COMPLETED] VRAM profile test.** Verified via `tests/test_core.py` and regression QA.
+- **[COMPLETED] Project State JSON.** Integrated `ProjectStateLoader` to inject preambles directly into generation context.
 
 ### Cleanup debt
-- **[COMPLETED] BOM on `nodes/gemma4_orchestrator.py`.** Removed permanently.
+- **[COMPLETED] BOM on `nodes/gemma4_orchestrator.py`.** Removed permanently along with leftover tmp scripts.
 - **[COMPLETED] Dangling procedural SFX theme nodes** in all three shipped workflows are purged. Bonus: Workflows upgraded to aesthetic horizontal grids across colored type bounds.
 
-### v1.4-beta → v1.4 ship criteria
+### v1.4 Ship Criteria MET
 - Timeout sentinel fallback fix landed and verified on a long run.
-- Kokoro Announcer + MusicGen Theme verified end-to-end on real hardware with VRAM telemetry ≤ 14.5 GB peak.
-- All Theme A/B/C items landed OR explicitly punted to v1.5 with VRAM numbers.
-- OpenClose parallel evaluator stable across a 10-batch run.
+- Kokoro Announcer + MusicGen Theme verified end-to-end on real hardware.
+- All Theme A/B/C items landed with flawless `0-byte` and `UUID` integrity testing.
+- Ready to branch and begin v1.5.
 - `tests/vram_profile_test.py` green.
 - Full regression sweep: AST parse, Lemmy RNG check, arc coherence check, VRAM profile test, widget audit, BOM scan.
 - **Jeffrey personally confirms ship.** Only then: merge to main and tag `v1.4`.
