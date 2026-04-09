@@ -6,6 +6,15 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ---
 
+## 🚀 Quick Start (The "Zero-Click" Path)
+
+1. **Get ComfyUI**: Use the [Official Desktop Installer](https://www.comfy.org/download).
+2. **Install OTR**: Search `OldTimeRadio` in the **ComfyUI Manager**, click install, and restart.
+3. **Run**: Drag `workflows/old_time_radio_scifi_full.json` into your browser and hit **Queue Prompt**.
+4. **Walk Away**: Everything else (Models, News, Scripts, Voices, Mastering, Video) is automatic.
+
+---
+
 ## Download
 [![Download ComfyUI-OldTimeRadio v1.4](https://img.shields.io/badge/Download-OldTimeRadio_v1.4-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
