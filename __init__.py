@@ -18,7 +18,7 @@ BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
   doesn't prevent the rest from loading.
 
 v1.0  2026-04-04  Jeffrey Brick — initial release
-v1.4  2026-04-10  Jeffrey Brick — VRAM Hardening (v1.4.9 Stable, 4GB Shelved)
+v1.4  2026-04-10  Jeffrey Brick — VRAM Hardening (v1.4 Flagship, 2GB Sovereignty)
 """
 
 import importlib

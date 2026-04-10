@@ -24,7 +24,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM (Gemma 2, Gemma 4, or Nemo 12B)** chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Gemma 4 E4B**, **Mistral Nemo 12B** (v1.4 flagship default), and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
@@ -59,12 +59,14 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Gemma 4 E4B** | ~5 GB | **Standard LLM.** Balanced performance for 12GB+ cards. |
+| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.4 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
+| **Gemma 4 E4B** | ~5 GB | Balanced performer for 12GB+ cards. |
 | **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
-| **Gemma 4 31B [BETA]** | ~17 GB (4-bit) | Dense state-of-the-art LLM. Requires 4-bit. **Optional.** |
-| **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run |
+| **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run. |
+| **MusicGen Medium** | ~6 GB | Instrumental theme generator. Auto-downloads on first run. |
+| **Kokoro 82M** | ~0.3 GB | British narrator voice engine. Auto-downloads on first run. |
 
-> VRAM management is automatic. The pipeline unloads Gemma before loading Bark so you never run out of memory.
+> VRAM management is automatic. The pipeline unloads the LLM before loading audio models so you never run out of memory.
 
 ### Step 3 — Install ComfyUI-OldTimeRadio
 
@@ -312,30 +314,26 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 
 ### What's New in v1.4
 
+#### Mistral Nemo 12B — Flagship Narrative Engine
+The default LLM is now **Mistral Nemo 12B** (`mistralai/Mistral-Nemo-Instruct-2407`), delivering richer, more cinematic script output at 18 tok/s on RTX 5080. 4-bit NF4 quantization fits the full 12.4B parameter model inside a 7 GB VRAM envelope with a 2 GB sovereignty buffer. Gemma 4 E4B remains available as an alternative.
+
+#### Zero-Prime Cache Hardening
+All model loaders (LLM, Bark, MusicGen, Kokoro) now explicitly bind `cache_dir` to the local `ComfyUI/models/huggingface/hub` directory via the `HF_HOME` environment variable. This eliminates redundant Hub fetches, `.incomplete` file deadlocks, and Windows symlink resolution failures that plagued earlier versions. Models load instantly from NVMe with zero internet dependency after first download.
+
 #### Pro-Tier Model Support & 1-Click Master Switch
-You are no longer locked to the 4-Billion parameter Gemma. Added ad-hoc support for `google/gemma-4-26b-a4b-it` (BETA) for users with extreme hardware. To support this gracefully, we implemented a **True Single Switch Architecture**: the `Gemma4Director` node no longer has a dropdown or requires messy external wiring. Set your desired model solely on the `Gemma4ScriptWriter` and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM. 
+You are no longer locked to a single model. The **True Single Switch Architecture** lets you set your desired model solely on the `LLMScriptWriter` node and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM.
 
 #### VRAM Leak Hardening
-Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 
+Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 2 GB Sovereignty Buffer enforced on 16 GB cards.
+
+#### Kokoro & MusicGen Audio Engine
+New modular nodes for `KokoroAnnouncer` (British narrator) and `MusicGenTheme` (orchestral cues), seamlessly snapping into the pipeline to execute specialized audio workloads while the LLM is safely unloaded.
 
 #### Obsidian "One-Shot" Optimization
-Added an **Optimization Profile** master switch to the Script Writer. Selecting "Obsidian (Low VRAM/Fast)" now automatically disables all iterative LLM passes (Critique, Open-Close, Arc Enhancer). This ensures 4GB GPUs only perform a single prompt-response cycle, eliminating the "sluggish crawl" caused by repeated model offloading.
-
-#### Project State 'Bible' Reader
-Support for `.json`/YAML project state files. Lock character voices, set canonical lore, and build continuous episodic shows without the AI forgetting who characters are.
-
-#### Kokoro & MusicGen (Theme A / C)
-New modular nodes for `KokoroAnnouncer` and `MusicGenTheme`, seamlessly snapping into the pipeline to execute specialized audio workloads while Gemma is safely unloaded.
+Added an **Optimization Profile** master switch. Selecting "Obsidian (Low VRAM/Fast)" disables all iterative LLM passes for 4GB GPUs.
 
 #### Subtle Pacing & Clean Load Protocol
-Implemented a **50% Pacing Overhaul** across the audio engine, halving all dramatic beats and "breath" buffers for a tighter, more modern radio sound. Also scrubbed the deprecated Model Selector for a literal "one switch" experience and 100% clean boot logs.
-
-### v1.4 Roadmap
-- **Kokoro Announcer (shipped, in progress)** — Dedicated non-Bark narrator bus. ANNOUNCER dialogue lines are routed to Kokoro v1.0 via the new `🎙️ Kokoro Announcer` node, eliminating Bark's "ums" and "ahs" from the opening and closing bookends. Voice is picked per episode from a curated 4-voice British grab bag (`bm_george`, `bm_fable`, `bf_emma`, `bf_lily`), seeded from the episode seed so the same episode always draws the same narrator. `BatchBarkGenerator` now skips ANNOUNCER lines, and `SceneSequencer` consumes the Kokoro clips on a separate `announcer_audio_clips` bus. Voice `.pt` files are lazy-downloaded from `1038lab/KokoroTTS` on first use.
-- **MusicGen Theme (shipped, in progress)** — Real instrumental music for opening and closing bookends plus an act-break interstitial. The new `🎺 MusicGen Theme` node reads a `music_plan` (three cues: opening, closing, interstitial) that `Gemma4Director` now writes into `production_plan_json` with prompts tailored to the episode's tone, then renders each cue with `facebook/musicgen-medium` via the `transformers` MusicGen API. No `audiocraft` dependency — keeps Windows installs clean. Each `(cue_id, prompt, duration, episode_seed)` tuple is SHA-256 hashed to a `.wav` in `models/musicgen_cache/`, so re-runs of the same episode reuse the same music and the model is not reloaded. Cues feed directly into `EpisodeAssembler.opening_theme_audio` and `closing_theme_audio`, replacing the old procedural-noise stubs that previously supplied those inputs.
-- **OpenClose parallel evaluator** — Re-enable the 3-outline race when faster attention backends land.
-- **Chunked context continuity** — Richer act-by-act character state summaries for long multi-act runs.
-- **Automatic Scene Transitions** — Procedural crossfades based on [ENV:] tag changes.
+Implemented a **50% Pacing Overhaul** across the audio engine for a tighter, more modern radio sound.
 
 ### What's New in v1.3
 
@@ -429,10 +427,12 @@ Continually monitoring the footprint and removing unused nodes. Boot log confirm
 *For the next AI assistant or contributor:*
 
 1. **Offline First:** This project is designed for air-gapped performance. Never add code that relies on real-time `transformers` Hub pings or `requests.get` to remote servers without the safety mocks in `prestartup_script.py`.
-2. **VRAM Sequencing:** Do not load Bark models while Gemma is active. The `Gemma4Director` is the bridge where Gemma unloads and Bark prepares. Keep this boundary clean.
-3. **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py`. Any change to one must be applied to both.
-4. **Test Sovereignty:** Run `python -m pytest tests/` before committing. The arc coherence tests in `tests/test_arc_check.py` cover Phase A scoring and Plot Spine extraction — do not skip them.
-5. **Flash Attention 2:** No prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention is already active. Do not attempt FA2 installation on this platform.
+2. **cache_dir is MANDATORY:** Every `from_pretrained()` call in the codebase MUST pass `cache_dir` explicitly (derived from `HF_HOME` env var). Relying on implicit HF_HOME resolution or `__file__`-relative dirname counting WILL break on Windows symlinks and ComfyUI Desktop App environments. The v1.4 lesson: 3 `os.path.dirname()` calls resolved to `custom_nodes/models/` (wrong), not `ComfyUI/models/` (correct).
+3. **VRAM Sequencing:** Do not load Bark models while the LLM is active. The `LLMDirector` is the bridge where the LLM unloads and Bark prepares. Keep this boundary clean.
+4. **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py`. Any change to one must be applied to both.
+5. **Test Sovereignty:** Run `python -m pytest tests/` before committing. The arc coherence tests in `tests/test_arc_check.py` cover Phase A scoring and Plot Spine extraction — do not skip them.
+6. **Flash Attention 2:** No prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention is already active. Do not attempt FA2 installation on this platform.
+7. **trust_remote_code=False:** Enforced globally on all model loaders. Do not change this without explicit security review.
 
 ---
 
@@ -440,7 +440,10 @@ Continually monitoring the footprint and removing unused nodes. Boot log confirm
 
 MIT License
 
+- **Mistral Nemo 12B** by [Mistral AI](https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407)
 - **Bark** by [Suno AI](https://github.com/suno-ai/bark)
-- **Gemma 2 / 4** by [Google DeepMind](https://ai.google.dev/gemma)
+- **Gemma 4** by [Google DeepMind](https://ai.google.dev/gemma)
+- **Kokoro TTS** by [hexgrad](https://huggingface.co/hexgrad/Kokoro-82M)
+- **MusicGen** by [Meta AI](https://huggingface.co/facebook/musicgen-medium)
 - Built with patterns from the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide)
 - Created by [Jeffrey Brick](https://github.com/jbrick2070)

@@ -544,6 +544,46 @@ def _draw_wrapped(draw, text, x, y, max_w, font, fill, lh, indent=0):
     return y
 
 
+def _get_latest_telemetry():
+    """Parse the otr_runtime.log for the most recent VRAM and Speed stats."""
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "otr_runtime.log")
+    
+    # Defaults
+    peak_gb = "???"
+    speed = "???"
+    model = "UNKNOWN CORE"
+    
+    if not os.path.exists(log_path):
+        return peak_gb, speed, model
+        
+    try:
+        import re
+        re_vram = re.compile(r"VRAM_SNAPSHOT.*?peak_gb=([0-9.]+)")
+        re_speed = re.compile(r"DONE:\s+.*?([0-9.]+)\s+tok/s")
+        re_llm = re.compile(r"LLM loaded:\s+([^\s]+)")
+        
+        # Read last ~200 lines (enough for one generation cycle)
+        with open(log_path, "r", encoding="utf-8") as f:
+            f.seek(0, 2)
+            end_pos = f.tell()
+            f.seek(max(0, end_pos - 15000))
+            lines = f.readlines()
+            
+        for line in lines:
+            m_vram = re_vram.search(line)
+            if m_vram: peak_gb = m_vram.group(1)
+            
+            m_speed = re_speed.search(line)
+            if m_speed: speed = m_speed.group(1)
+            
+            m_llm = re_llm.search(line)
+            if m_llm: model = m_llm.group(1).split("/")[-1].upper()
+            
+    except Exception as e:
+        log.warning(f"[Telemetry] Parser failed: {e}")
+        
+    return peak_gb, speed, model
+
 def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
                     news_used, duration_s, W, H):
     """Return a clean data dict for *_TelemetryHUDRenderer*."""
@@ -613,6 +653,8 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     if cur["items"] or cur["env"]:
         scenes.append(cur)
 
+    peak_gb, speed, model = _get_latest_telemetry()
+    
     return {
         "title":      episode_title,
         "genre":      plan.get("genre_flavor", plan.get("genre", "sci-fi")),
@@ -622,6 +664,7 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
         "news_seeds": news_seeds,
         "cast":       cast,
         "scenes":     scenes,
+        "telemetry":  {"peak": peak_gb, "speed": speed, "model": model}
     }
 
 
@@ -752,10 +795,30 @@ class _TelemetryHUDRenderer:
         d.text((P, y), "NEWS SEED", fill=CRT_AMBER, font=self.f_label)
         y += self._lhL
         for seed in self.data.get("news_seeds", [])[:2]:
-            y = _draw_wrapped(d, seed, P, y,
-                              self.LEFT_W - P * 2, self.f_body,
-                              CRT_DIM, self._lhB)
-            y += P // 2
+            d.text((P, y), seed, fill=CRT_DIM, font=self.f_body)
+            y += self._lhB + P // 2
+        y += P
+        d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
+        y += P * 2
+
+        # Telemetry Block
+        d.text((P, y), "SYSTEM TELEMETRY", fill=CRT_AMBER, font=self.f_label)
+        y += self._lhL
+        
+        telemetry = self.data.get("telemetry", {})
+        speed_raw = telemetry.get('speed', '???')
+        # Ensure it fits elegantly
+        speed_str = f"{float(speed_raw):.1f} T/s" if speed_raw.replace('.', '', 1).isdigit() else f"{speed_raw}"
+        
+        for lbl, val in [
+            ("CORE",  telemetry.get("model", "UNKNOWN")),
+            ("FLUX",  speed_str),
+            ("MEM",   f"{telemetry.get('peak', '???')} GB")
+        ]:
+            d.text((P, y), lbl, fill=CRT_DARK, font=self.f_body)
+            d.text((P + lbl_w, y), str(val), fill=CRT_GREEN, font=self.f_body)
+            y += self._lhB
+            
         y += P
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
@@ -845,6 +908,12 @@ class _TelemetryHUDRenderer:
                     y += self._lhB
             y += P * 3
 
+        # Sci-Fi Telemetry Easter Egg
+        telemetry = self.data.get("telemetry", {})
+        y += P * 2
+        easter_egg = f">> DIAGNOSTIC MEMORY ALLOCATION PEAKED AT {telemetry.get('peak', '???')}GB. NEURAL FLUX MAINTAINED AT {telemetry.get('speed', '???')} T/S. CONTAINMENT FIELD HOLDING."
+        y = _draw_wrapped(d, easter_egg, P, y, RW - P * 4, self.f_body, CRT_CYAN, self._lhB)
+        
         # Footer
         y += P * 4
         d.line([(P, y), (RW - P, y)], fill=CRT_DIM, width=1)
@@ -1062,6 +1131,11 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(f"  Size        :  {size_mb:.1f} MB")
         W_()
         W_(DBAR)
+        W_()
+        
+        peak_gb, speed, model = _get_latest_telemetry()
+        W_(f">> DIAGNOSTIC MEMORY ALLOCATION PEAKED AT {peak_gb}GB. NEURAL FLUX MAINTAINED AT {speed} T/S. CONTAINMENT FIELD HOLDING.")
+        W_()
 
         treatment_path = out_path.replace(".mp4", "_treatment.txt")
         with open(treatment_path, "w", encoding="utf-8") as fh:

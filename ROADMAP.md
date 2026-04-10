@@ -9,9 +9,13 @@
 - **Active branch:** `main`
 
 ### 2) V1.4 Final Highlights
-- **16GB Flagship Hardening**: Zero-Prime loading logic, 2GB Sovereignty Buffer, and 4-bit NF4 "Wing Ding Protection" verified on RTX 5080/Blackwell (13.1 tok/s peak).
+- **Mistral Nemo 12B Flagship**: Default LLM upgraded to `mistralai/Mistral-Nemo-Instruct-2407`. 18.1 tok/s on RTX 5080 with 4-bit NF4 quantization. 12.4B parameters in a 7 GB VRAM envelope.
+- **Zero-Prime Cache Hardening**: All `from_pretrained()` calls (LLM, Bark, MusicGen) now explicitly pass `cache_dir` derived from `HF_HOME`. Eliminates redundant Hub fetches, `.incomplete` deadlocks, and Windows symlink issues. Models load instantly from NVMe after first download.
+- **16GB Flagship Hardening**: Zero-Prime loading logic, 2GB Sovereignty Buffer, and 4-bit NF4 "Wing Ding Protection" verified on RTX 5080/Blackwell (18.1 tok/s peak).
+- **Kokoro Announcer**: `repo_id` explicitly locked to `hexgrad/Kokoro-82M` to suppress migration warnings.
+- **208 GB Global Cache Cleanup**: Identified and purged duplicate model weights from `~/.cache/huggingface/hub` that were wasting disk space.
 - **First-Name Shield**: Roster generation hardened to prevent character name collisions/hallucinations.
-- **VoiceHealth & Telemetry Fixes**: Forced CUDA for health checks and fixed case-sensitive tracking for 9B/12B/27B models.
+- **VoiceHealth & Telemetry Fixes**: Forced CUDA for health checks and fixed case-sensitive tracking for 9B/12B/14B models.
 - **True Single Switch Architecture**: Restructured the `LLMScriptWriter` to be the sole repository for `model_id` state.
 - **Subtle Pacing Overhaul**: 50% duration reduction for all dramatic beats and pauses for tighter narrative flow.
 - **Total VRAM Cleanup**: Aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
@@ -35,10 +39,10 @@
 
 ---
 
-## Current state (as of 2026-04-09)
+## Current state (as of 2026-04-10)
 
-- **Last shipped tag:** `v1.3` → `ddbed87` (v1.3 final, includes Gemma 4 VRAM release fix)
-- **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta until explicit ship signoff)
+- **Last shipped tag:** `v1.4` — Mistral Nemo 12B flagship, Zero-Prime cache hardening
+- **Active branch:** `main`
 - **Repo:** https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 - **Sister repo (bug bible):** https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
@@ -73,7 +77,7 @@ These shipped in v1.3 final because the OOM fix was the blocker. They are real a
 
 ## v1.4-beta — what is LEFT
 
-Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no `v1.4.1`, no `-arc` suffix. Clean line: stays beta until explicitly signed off as `v1.4`, then straight to main.
+Work continues on `v1.4-voice-arc-infra` as **v1.4-beta**. No point releases, no `v1.4`, no `-arc` suffix. Clean line: stays beta until explicitly signed off as `v1.4`, then straight to main.
 
 ### Theme A — Voice & Narration
 - **[COMPLETED] Kokoro Announcer end-to-end test.**
