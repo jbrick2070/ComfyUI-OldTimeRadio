@@ -48,17 +48,19 @@ Every code change must pass a regression sweep before being considered complete:
   - Repo: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
   - File: `BUG_BIBLE.yaml`
   - Key bugs to always check: BUG-010 (0-dialogue hard abort), widget connection drops, VRAM spills, cache deadlocks.
-- **QA Peer Review Guide**: Follow the protocols in `QA_PEER_REVIEW_GUIDE.md` for every PR.
 - **VRAM ceiling**: Peak VRAM must stay at or below 14.5 GB. Run `vram_profile_test.py` to confirm.
 - Create **scratch scripts** (in `scratch/` directory) to help validate edge cases. These are disposable — delete when done.
 
 ---
 
-## 4. Bug Log Protocol
+## 4. Bug Log and QA Guide Lifecycle
 
+- **No QA guides or bug logs exist unless there are active bugs.** Zero stale docs.
 - If the **same bug appears 3 times**, create a formal bug log file (e.g., `BUG_LOG_v1.5.md`) in the repo root.
+- A QA guide may be created alongside the bug log to document testing protocols for that specific bug.
 - The bug log exists for **peer review** — Jeffrey may share it with reviewers.
-- **Delete the bug log** once the bug is resolved and the fix is verified. Keep the repo clean.
+- **Delete both the bug log AND the QA guide** once the bug is resolved and the fix is verified.
+- The Bug Bible (`BUG_BIBLE.yaml` in the survival guide repo) is the permanent record. Local QA docs are temporary.
 
 ---
 
@@ -97,7 +99,6 @@ Generated stories and narrative content must follow these rules:
 | **OldTimeRadio Repo** | https://github.com/jbrick2070/ComfyUI-OldTimeRadio |
 | **Bug Bible (Survival Guide)** | https://github.com/jbrick2070/comfyui-custom-node-survival-guide |
 | **Bug Bible YAML** | https://github.com/jbrick2070/comfyui-custom-node-survival-guide/blob/main/BUG_BIBLE.yaml |
-| **QA Peer Review Guide** | `QA_PEER_REVIEW_GUIDE.md` (in this repo) |
 | **ROADMAP** | `ROADMAP.md` (in this repo) |
 
 ---
