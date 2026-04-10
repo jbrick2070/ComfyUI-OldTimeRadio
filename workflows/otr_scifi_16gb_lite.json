@@ -107,7 +107,10 @@
                 {
                     "name": "script_text",
                     "type": "STRING",
-                    "link": 1
+                    "link": 1,
+                    "widget": {
+                        "name": "script_text"
+                    }
                 }
             ],
             "outputs": [
@@ -172,12 +175,18 @@
                 {
                     "name": "script_json",
                     "type": "STRING",
-                    "link": 2
+                    "link": 2,
+                    "widget": {
+                        "name": "script_json"
+                    }
                 },
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 4
+                    "link": 4,
+                    "widget": {
+                        "name": "production_plan_json"
+                    }
                 },
                 {
                     "name": "tts_audio_clips",
@@ -358,12 +367,18 @@
                 {
                     "name": "script_json",
                     "type": "STRING",
-                    "link": 12
+                    "link": 12,
+                    "widget": {
+                        "name": "script_json"
+                    }
                 },
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 13
+                    "link": 13,
+                    "widget": {
+                        "name": "production_plan_json"
+                    }
                 }
             ],
             "outputs": [
@@ -417,17 +432,26 @@
                 {
                     "name": "script_json",
                     "type": "STRING",
-                    "link": 16
+                    "link": 16,
+                    "widget": {
+                        "name": "script_json"
+                    }
                 },
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 17
+                    "link": 17,
+                    "widget": {
+                        "name": "production_plan_json"
+                    }
                 },
                 {
                     "name": "news_used",
                     "type": "STRING",
-                    "link": 18
+                    "link": 18,
+                    "widget": {
+                        "name": "news_used"
+                    }
                 }
             ],
             "outputs": [
@@ -592,12 +616,18 @@
                 {
                     "name": "script_json",
                     "type": "STRING",
-                    "link": 24
+                    "link": 24,
+                    "widget": {
+                        "name": "script_json"
+                    }
                 },
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 4
+                    "link": 4,
+                    "widget": {
+                        "name": "production_plan_json"
+                    }
                 }
             ],
             "outputs": [
