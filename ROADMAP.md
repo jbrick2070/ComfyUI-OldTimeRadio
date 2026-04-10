@@ -32,12 +32,12 @@
 ### 4) Next Priority Feature (v1.5)
 **AudioGen ↔ SceneSequencer Integration (priority 1):** Wire the `BatchAudioGenGenerator` SFX output into the `SceneSequencer` audio assembly timeline so generated Foley actually plays in the episode.
 
-### 5) First Moves for v1.5
-- **Branch `v1.5-audiogen-dsp`**: Initialize the new feature branch.
-- **SceneSequencer SFX bus**: Implement the audio insertion logic that consumes the batched AudioGen waveforms.
-- **Tape emulation DSP**: Add analog tape saturation filters to `audio_enhance.py`.
-- **OTR_VRAMGuardian node**: Promote `force_vram_offload()` to a wirable ComfyUI node.
-- Run full 89-test regression sweep against the parser v3/v4 changes.
+### 5) First Moves for v1.5 (Phase 1)
+- **Branch `v1.5-audiogen-dsp`** off `main`.
+- **OTR_VRAMGuardian node**: Wrap `force_vram_offload()` as a wirable ComfyUI node (1 day).
+- **Parser v5**: Unify SFX cue extraction into canonical `_parse_script()` (2-3 days).
+- **Regression sweep**: Run full 89-test suite + new SFX parser tests (1 day).
+- Pass **Phase 1 Test Gate** → advance to Phase 2 (Audio Pipeline).
 
 ---
 
@@ -67,57 +67,101 @@
 
 ---
 
-## v1.5 — Feature Plan
+## v1.5 — Phased Build Plan
 
-### Priority Order (April–May 2026)
+v1.5 is delivered in **3 phases**. Each phase ends with a test gate — no advancing until the gate passes. Dependencies flow downward: Phase 2 depends on Phase 1 plumbing, Phase 3 depends on Phase 2 audio.
 
-| Priority | Feature | VRAM Impact | Status | Effort | Target |
-|----------|---------|-------------|--------|--------|--------|
-| **1** | **AudioGen ↔ SceneSequencer SFX bus** | 0 GB | Not started | Medium (3-5 days) | 2026-04-25 |
-| **2** | **OTR_VRAMGuardian node** | 0 GB | Not started (infra exists in `_vram_log.py`) | Small (1 day) | 2026-04-18 |
-| **3** | **Tape Emulation DSP** | 0 GB (CPU-only) | Not started | Medium (3-4 days) | 2026-05-01 |
-| **4** | **Parser v5 — unified SFX cue extraction** | 0 GB | Not started | Medium (2-3 days) | 2026-05-05 |
-| **5** | **Video Engine — Adaptive Brightness Gating** | 0 GB | Not started | Small (1-2 days) | 2026-05-08 |
-| **6** | **TA_Offset Pins** (timecode offsets on SceneSequencer) | 0 GB | Not started | Small (1 day) | 2026-05-10 |
-| **7** | **Full Regression + New Parser Test Cases** | 0 GB | Not started | Small (1 day) | Ship gate |
+### Phase Overview
 
-### Feature Details
+| Phase | Name | Features | Effort | Target |
+|-------|------|----------|--------|--------|
+| **1** | **Plumbing & Infrastructure** | VRAMGuardian node, Parser v5 (unified SFX), Regression tests | ~4-5 days | 2026-04-18 |
+| **2** | **Audio Pipeline** | AudioGen ↔ SceneSequencer SFX bus, Tape Emulation DSP | ~6-9 days | 2026-05-02 |
+| **3** | **Video Polish & Ship** | Adaptive Brightness Gating, TA_Offset Pins, Final regression + ship sign-off | ~3-4 days | 2026-05-10 |
 
-#### Priority 1 — AudioGen ↔ SceneSequencer SFX Bus
-The `BatchAudioGenGenerator` node already generates high-quality SFX via `facebook/audiogen-medium` and outputs a batched waveform tensor. But `SceneSequencer` (`scene_sequencer.py`, 45 KB) does not consume it. This wiring is the single most valuable v1.5 deliverable — it makes the AudioGen investment audible in the final episode.
+---
 
-**Files:** `scene_sequencer.py`, `batch_audiogen_generator.py`
-**Success Criteria:** SFX clips appear at correct timecodes in the final MP4 audio track.
+### Phase 1 — Plumbing & Infrastructure
+*Branch: `v1.5-audiogen-dsp` off `main`*
 
-#### Priority 2 — OTR_VRAMGuardian Node
-Promote the existing `force_vram_offload()` function from `_vram_log.py` into a standalone ComfyUI node (`OTR_VRAMGuardian`). Users can then wire explicit VRAM flush points into their workflow graphs — useful for long multi-episode batch runs.
+This phase builds the foundation that Phase 2 depends on. The VRAMGuardian node is standalone, but Parser v5 **must** land first because the SFX bus wiring in Phase 2 needs canonical `{"type": "sfx"}` items in the script JSON — not the duplicate regex currently in BatchAudioGen.
 
-**Files:** New `nodes/vram_guardian.py`, update `__init__.py`
-**Success Criteria:** Node appears in ComfyUI node picker, executes a full VRAM flush when triggered, passes VRAM profile test.
+| Item | VRAM | Files | Effort |
+|------|------|-------|--------|
+| **OTR_VRAMGuardian node** | 0 GB | New `nodes/vram_guardian.py`, update `__init__.py` | 1 day |
+| **Parser v5 — unified SFX cue extraction** | 0 GB | `nodes/story_orchestrator.py`, `nodes/batch_audiogen_generator.py` | 2-3 days |
+| **Regression + new parser test cases** | 0 GB | `tests/test_core.py` | 1 day |
 
-#### Priority 3 — Tape Emulation DSP
-Add analog tape emulation filters to `audio_enhance.py`: tape saturation (soft clipping), wow/flutter (pitch modulation), tape hiss (filtered noise injection), and optional high-frequency rolloff. All CPU-only numpy/scipy, zero VRAM. Core aesthetic feature for the "old time radio" brand.
+**OTR_VRAMGuardian node:** Wrap `force_vram_offload()` from `_vram_log.py` into a first-class ComfyUI node. Users wire it into workflow graphs for explicit VRAM flush points between heavy nodes. Passthrough design — accepts any input, flushes VRAM, forwards the input unchanged.
 
-**Files:** `nodes/audio_enhance.py`
-**Success Criteria:** Audible analog warmth on A/B comparison. No peak clipping. No VRAM usage.
+**Parser v5 — Unified SFX Cue Extraction:** Currently `_parse_script()` in `story_orchestrator.py` handles dialogue but ignores `[SFX:]` tags. `BatchAudioGenGenerator` has its own duplicate regex extraction (lines 130-136). Unify: the canonical parser emits `{"type": "sfx", "description": "...", "index": N}` items inline with dialogue. BatchAudioGen then consumes them directly from `script_json` instead of re-parsing raw text.
 
-#### Priority 4 — Parser v5 — Unified SFX Cue Extraction
-Currently `_parse_script()` in `story_orchestrator.py` handles dialogue parsing, but `BatchAudioGenGenerator` has its own separate `[SFX:]` regex extraction. Unify SFX cue extraction into the canonical parser so both dialogue and SFX flow through one pipeline.
+**Regression Tests:** Extend `tests/test_core.py` with test cases for the v3/v4 parser patterns that landed post-v1.4, plus new SFX extraction tests. All 89+ existing tests must stay green.
 
-**Files:** `nodes/story_orchestrator.py`, `nodes/batch_audiogen_generator.py`
-**Success Criteria:** SFX cues appear in the canonical script JSON as `{"type": "sfx", ...}` items. BatchAudioGen consumes them instead of re-parsing.
+#### Phase 1 Test Gate ✓
+- [ ] `OTR_VRAMGuardian` visible in ComfyUI node picker
+- [ ] VRAMGuardian triggers `force_vram_offload()` and logs to `otr_runtime.log`
+- [ ] Script JSON output contains `{"type": "sfx"}` items for all `[SFX:]` tags
+- [ ] BatchAudioGen reads SFX from script JSON (no internal regex)
+- [ ] 89+ regression tests green
+- [ ] VRAM ≤ 14.5 GB
+- [ ] UTF-8 no BOM on all new files
 
-#### Priority 5 — Adaptive Brightness Gating
-Extend `video_engine.py`'s CRT renderer to auto-adjust scene brightness based on audio energy phases (quiet scenes dim, loud scenes brighten). The per-frame volume curve already exists in `_analyze_audio()` — this is a small extension to the render pass.
+---
 
-**Files:** `nodes/video_engine.py`
-**Success Criteria:** Visible brightness variation between quiet/loud scenes in output video.
+### Phase 2 — Audio Pipeline
+*Depends on: Phase 1 (Parser v5 provides clean SFX items)*
 
-#### Priority 6 — TA_Offset Pins
-Expose time-alignment offset inputs on SceneSequencer nodes for fine-grained audio-video sync tuning. Simple float inputs that shift audio clip placement on the assembly timeline.
+This is the big payload. After this phase, episodes **sound different** — AudioGen SFX is mixed into the timeline and tape emulation adds analog warmth. These two features are independent of each other but grouped here because they both touch the audio assembly path.
 
-**Files:** `nodes/scene_sequencer.py`
-**Success Criteria:** Offset values shift audio placement. Tested with ±0.5s offsets.
+| Item | VRAM | Files | Effort |
+|------|------|-------|--------|
+| **AudioGen ↔ SceneSequencer SFX bus** | 0 GB | `nodes/scene_sequencer.py`, `nodes/batch_audiogen_generator.py` | 3-5 days |
+| **Tape Emulation DSP** | 0 GB (CPU-only) | `nodes/audio_enhance.py` | 3-4 days |
+
+**AudioGen ↔ SceneSequencer SFX Bus:** The `BatchAudioGenGenerator` outputs a batched waveform tensor, but `SceneSequencer` (45 KB) does not consume it. Wire an `sfx_audio` input into the sequencer that overlays SFX clips at the timecodes matching their `{"type": "sfx"}` positions in the script. The sequencer already processes `dialogue`, `pause`, `environment`, and `scene_break` items — SFX becomes the 5th item type.
+
+**Tape Emulation DSP:** Add analog tape emulation to `audio_enhance.py`: tape saturation (soft-clipping waveshaper), wow/flutter (low-frequency pitch modulation), tape hiss (band-limited noise injection), and high-frequency rolloff (gentle low-pass). All CPU-only numpy/scipy. Exposed as a node with intensity controls (`off`, `subtle`, `medium`, `heavy`). This is the signature aesthetic feature.
+
+#### Phase 2 Test Gate ✓
+- [ ] SFX clips audible at correct timecodes in final episode MP4
+- [ ] SFX volume balanced against dialogue (no drowning out voices)
+- [ ] Tape emulation audibly warm on A/B comparison
+- [ ] No peak clipping on tape-processed audio
+- [ ] No VRAM usage from DSP (CPU-only verified)
+- [ ] Full regression green (89+ tests)
+- [ ] VRAM ≤ 14.5 GB on full episode run
+
+---
+
+### Phase 3 — Video Polish & Ship
+*Depends on: Phase 2 (audio pipeline stable)*
+
+Small targeted improvements to the video engine and audio sync, followed by the final ship verification sweep. Low risk, low effort — this is the "tighten the bolts" phase.
+
+| Item | VRAM | Files | Effort |
+|------|------|-------|--------|
+| **Adaptive Brightness Gating** | 0 GB | `nodes/video_engine.py` | 1-2 days |
+| **TA_Offset Pins** | 0 GB | `nodes/scene_sequencer.py` | 1 day |
+| **Final regression + ship criteria** | 0 GB | All | 1 day |
+
+**Adaptive Brightness Gating:** Extend the CRT renderer to auto-adjust scene brightness based on audio energy. Quiet scenes dim toward dark navy; loud scenes brighten toward full phosphor green. The per-frame `volume_curve` from `_analyze_audio()` already provides the data — this adds a global brightness multiplier to the render pass. Subtle by default; dramatic on high-energy scenes.
+
+**TA_Offset Pins:** Expose `sfx_offset_ms` and `dialogue_offset_ms` float inputs on SceneSequencer. These shift audio clip placement on the assembly timeline for fine-grained sync tuning. Default 0. Tested with ±500ms offsets.
+
+**Final Regression & Ship:** Full 89+ test sweep, `vram_profile_test.py` green, end-to-end episode generation with all new features enabled, UTF-8 no BOM scan. Jeffrey confirms ship → merge to `main` → tag `v1.5`.
+
+#### Phase 3 Test Gate ✓ (Ship Gate)
+- [ ] Brightness variation visible between quiet/loud scenes
+- [ ] TA_Offset pins shift audio placement correctly (±0.5s test)
+- [ ] Full regression sweep: 89+ tests green
+- [ ] `tests/vram_profile_test.py` green
+- [ ] VRAM peak ≤ 14.5 GB on full episode run
+- [ ] UTF-8 no BOM on all new/modified files
+- [ ] End-to-end episode: script → audio → SFX → video → MP4 (all features on)
+- [ ] **Jeffrey personally confirms ship.** Merge to main, tag `v1.5`.
+
+---
 
 ### Already Shipped (not in scope — do not re-implement)
 These features were proposed by external analysis as v1.5 work but **already exist**:
@@ -158,17 +202,10 @@ Formally deferred out of v1.5 scope. Not started, not blocked, not forgotten.
 
 ## v1.5 Ship Criteria
 
-- [ ] AudioGen SFX clips audible in final episode MP4.
-- [ ] `OTR_VRAMGuardian` node visible in ComfyUI picker and functional.
-- [ ] Tape emulation audibly warm on A/B test.
-- [ ] SFX cues flow through canonical parser (no duplicate regex).
-- [ ] Adaptive brightness gating visible in video output.
-- [ ] TA_Offset pins shift audio placement correctly.
-- [ ] Full regression sweep: 89+ tests green.
-- [ ] VRAM peak ≤ 14.5 GB on full episode run.
-- [ ] `tests/vram_profile_test.py` green.
-- [ ] UTF-8 no BOM on all new files.
-- [ ] **Jeffrey personally confirms ship.** Only then: merge to main and tag `v1.5`.
+Ship criteria are defined per-phase above. All three test gates must pass:
+- **Phase 1 Gate** — VRAMGuardian functional, SFX in canonical parser, regression green.
+- **Phase 2 Gate** — SFX audible in MP4, tape emulation warm, no clipping.
+- **Phase 3 Gate (Ship)** — Brightness gating visible, TA_Offset working, full end-to-end episode, Jeffrey confirms ship → merge to `main` → tag `v1.5`.
 
 ---
 
