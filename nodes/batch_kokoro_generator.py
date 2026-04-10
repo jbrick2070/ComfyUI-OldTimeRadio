@@ -218,6 +218,8 @@ class BatchKokoroGenerator:
         batch_log.append(f"--- Generated: {generated}/{total_lines} lines ---")
         
         try:
+            if hasattr(pipeline, "model"):
+                pipeline.model.to("cpu")
             del pipeline
         except Exception:
             pass
