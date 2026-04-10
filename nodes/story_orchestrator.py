@@ -1999,7 +1999,7 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "google/gemma-2-27b-it [ALPHA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Small-24B-Instruct-2501 [ALPHA]", "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
+                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "mistralai/Mistral-Nemo-Instruct-2407", "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
                     "default": "google/gemma-4-E4B-it",
                     "tooltip": "Hugging Face model ID for LLM (Gemma series, Nemo, Qwen, etc.)"
                 }),
