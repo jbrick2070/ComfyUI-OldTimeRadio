@@ -561,7 +561,8 @@
             "widgets_values": [
                 "{}",
                 "",
-                "facebook/musicgen-medium"
+                "facebook/musicgen-medium",
+                3.0
             ],
             "color": "#234035",
             "bgcolor": "#162821"
