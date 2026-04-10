@@ -7,7 +7,7 @@
 ### 1) Current Shipped State
 - **Last shipped:** `v1.4` (tagged 2026-03-15)
 - **Active branch:** `main`
-- **Post-v1.4 hotfixes merged:** Parser v3/v4 hardening, QA Peer Review Guide, workflow JSON widget fixes (6 commits post-tag on `main`)
+- **Post-v1.4 hotfixes merged:** Parser v3/v4 hardening, workflow JSON widget fixes (6 commits post-tag on `main`)
 
 ### 2) v1.4 Final Highlights
 - **Mistral Nemo 12B Flagship**: Default LLM upgraded to `mistralai/Mistral-Nemo-Instruct-2407`. 18.1 tok/s on RTX 5080 with 4-bit NF4 quantization. 12.4B parameters in a 7 GB VRAM envelope.
@@ -25,7 +25,6 @@
 
 ### 3) Post-v1.4 Hotfixes (already on main)
 - **Parser v3/v4 Rewrite**: `_parse_script()` now handles next-line dialogue (Mistral Nemo style) and shorthand `[CHAR, traits]` tags. Blocklist uses first-word check to reject stage directions (`ACT 1`, `SCENE 3`, `CONTINUED`).
-- **QA Peer Review Guide**: `QA_PEER_REVIEW_GUIDE.md` added with VRAM validation, parser fault tolerance, workflow JSON integrity, and regression test protocols.
 - **Workflow JSON Fixes**: Added missing `widget` mapping blocks and `guidance_scale` values across all 3 shipped workflow JSONs.
 - **MusicGen Load Fix**: `device` and `dtype` defined before model load to prevent initialization errors.
 
@@ -56,7 +55,6 @@
 - All v1.3 timeout / corruption fixes verified
 - AudioGen generative Foley (`batch_audiogen_generator.py`) with SHA-256 caching
 - Parser v3/v4 multi-format support (hotfixed post-tag)
-- QA Peer Review Guide (hotfixed post-tag)
 
 ### Hardware Reality (do not violate)
 - RTX 5080 Laptop, 16 GB VRAM, Blackwell sm_120
@@ -172,7 +170,6 @@ These features were proposed by external analysis as v1.5 work but **already exi
 - ✅ FFmpeg video encoding with NVENC auto-detection
 - ✅ Telemetry HUD post-roll credits
 - ✅ Multi-format script parser (v3/v4 patterns)
-- ✅ QA Peer Review Guide
 
 ---
 
