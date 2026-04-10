@@ -96,6 +96,7 @@ _NODE_MODULES = {
     "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      "📖 Project State Loader"),
     "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
+    "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            "🛡️ VRAM Guardian"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
