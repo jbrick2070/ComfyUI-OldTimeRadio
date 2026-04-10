@@ -252,7 +252,9 @@ class MusicGenTheme:
 
             # v1.4.10 Hardening: Force cache_dir to our local Hub directory
             cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
-            
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            dtype = torch.float16 if device == "cuda" else torch.float32
+
             processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir_path)
             model = MusicgenForConditionalGeneration.from_pretrained(
                 model_id, torch_dtype=dtype, cache_dir=cache_dir_path
