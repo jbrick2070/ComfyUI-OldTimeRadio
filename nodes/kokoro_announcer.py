@@ -247,6 +247,8 @@ class KokoroAnnouncer:
         
         # Bug Bible 12.19: explicitly drop model refs to return VRAM.
         try:
+            if hasattr(pipeline, "model"):
+                pipeline.model.to("cpu")
             del pipeline
         except Exception:
             pass
