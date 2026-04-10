@@ -126,17 +126,14 @@ class BatchAudioGenGenerator:
 
         sfx_plan = plan.get("sfx_plan", [])
         
-        # 1. Extract all [SFX:] tags from the script in order
-        sfx_tags = []
-        for line in script:
-            content = line.get("content", "")
-            # Look for [SFX: description] pattern
-            matches = re.findall(r'\[SFX:\s*(.*?)\]', content)
-            for m in matches:
-                sfx_tags.append(m.strip())
+        # v1.5: Consume SFX cues directly from the canonical parser output.
+        # The parser emits {"type": "sfx", "description": "..."} items inline
+        # with dialogue. No duplicate regex — single source of truth.
+        sfx_items = [item for item in script if item.get("type") == "sfx"]
+        sfx_tags = [item.get("description", "") for item in sfx_items]
         
         if not sfx_tags:
-            batch_log.append("No [SFX:] tags found in script. Returning silence.")
+            batch_log.append("No SFX cues found in script_json. Returning silence.")
             return ({"waveform": torch.zeros(1, 1, 10), "sample_rate": 32000}, "\n".join(batch_log))
 
         batch_log.append(f"Found {len(sfx_tags)} SFX cues in script.")
