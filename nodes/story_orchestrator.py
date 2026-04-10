@@ -2538,6 +2538,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         cast_rng = random.Random(seed_str)
         
         pre_rolled_cast = []
+        seen_first = set()
         seen_last = set()
         num_non_announcers = max(1, num_characters)
         
@@ -2545,11 +2546,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # so he appears in the MANDATORY CAST ROSTER (ensuring Gemma uses him).
         if lemmy_roll:
             pre_rolled_cast.append("LEMMY")
+            seen_first.add("LEMMY")
 
         while len(pre_rolled_cast) < num_non_announcers:
             f_name = cast_rng.choice(_FIRST_NAMES).upper()
             l_name = cast_rng.choice(_LAST_NAMES).upper()
-            if l_name not in seen_last:
+            if f_name not in seen_first and l_name not in seen_last:
+                seen_first.add(f_name)
                 seen_last.add(l_name)
                 pre_rolled_cast.append(f"{f_name} {l_name}")
 
