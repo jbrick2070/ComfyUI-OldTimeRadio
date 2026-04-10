@@ -9,18 +9,18 @@
 - **Active branch:** `main`
 
 ### 2) V1.4 Final Highlights
-- **True Single Switch Architecture:** Restructured the `LLMScriptWriter` to be the sole repository for `model_id` state. The `LLMDirector` node natively inherits this memory allocation via module scoping.
-- **Subtle Pacing Overhaul:** 50% duration reduction for all dramatic beats and pauses for tighter narrative flow.
-- **Pro-Tier Hardware support:** Hardened support and Bug Bible entries for 26B/31B models on 16GB+ VRAM architecture.
-- **Kokoro & MusicGen:** Fully integrated higher-quality narration and thematic music beds.
-- **Total VRAM Cleanup:** Aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
-- **Workflow verification:** 100% regression pass (89/89 tests).
+- **16GB Flagship Hardening**: Zero-Prime loading logic, 2GB Sovereignty Buffer, and 4-bit NF4 "Wing Ding Protection" verified on RTX 5080/Blackwell (13.1 tok/s peak).
+- **First-Name Shield**: Roster generation hardened to prevent character name collisions/hallucinations.
+- **VoiceHealth & Telemetry Fixes**: Forced CUDA for health checks and fixed case-sensitive tracking for 9B/12B/27B models.
+- **True Single Switch Architecture**: Restructured the `LLMScriptWriter` to be the sole repository for `model_id` state.
+- **Subtle Pacing Overhaul**: 50% duration reduction for all dramatic beats and pauses for tighter narrative flow.
+- **Total VRAM Cleanup**: Aggressive explicit `model.cpu()`, inline Python `del` sweeping, and ComfyUI `soft_empty_cache()` inside the GC block.
+- **Workflow verification**: 100% regression pass (89/89 tests).
 
 ### 3) Next Priority Feature (v1.5)
-- [x] **16GB Flagship Hardening**. Zero-Prime loading, 4GB Sovereignty Buffer, and Case-Insensitive Telemetry verified on RTX 5080 (11.5 tok/s at 137W).
-- [x] **VoiceHealth & Telemetry Fixes**. Forced CUDA for health checks and fixed case-sensitive tracking for 9B models.
-- **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator` and procedural fallback.
+- **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator`.
 - **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).
+- **Flash Attention 2**: Optional opt-in for platforms that support it (currently disabled for Blackwell sm_120).
 
 ### 4) First Moves for v1.5
 - **Branch `v1.5-audio-gen-rvc`**: Initialize the new feature branch.
