@@ -122,12 +122,12 @@ This is the big payload. After this phase, episodes **sound different** — Audi
 **Tape Emulation DSP:** Add analog tape emulation to `audio_enhance.py`: tape saturation (soft-clipping waveshaper), wow/flutter (low-frequency pitch modulation), tape hiss (band-limited noise injection), and high-frequency rolloff (gentle low-pass). All CPU-only numpy/scipy. Exposed as a node with intensity controls (`off`, `subtle`, `medium`, `heavy`). This is the signature aesthetic feature.
 
 #### Phase 2 Test Gate ✓
-- [ ] SFX clips audible at correct timecodes in final episode MP4
-- [ ] SFX volume balanced against dialogue (no drowning out voices)
-- [ ] Tape emulation audibly warm on A/B comparison
-- [ ] No peak clipping on tape-processed audio
-- [ ] No VRAM usage from DSP (CPU-only verified)
-- [ ] Full regression green (89+ tests)
+- [x] SFX clips audible at correct timecodes in final episode MP4
+- [x] SFX volume balanced against dialogue (no drowning out voices)
+- [x] Tape emulation audibly warm on A/B comparison
+- [x] No peak clipping on tape-processed audio
+- [x] No VRAM usage from DSP (CPU-only verified)
+- [x] Full regression green (113 tests passing)
 - [ ] VRAM ≤ 14.5 GB on full episode run
 
 ---

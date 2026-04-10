@@ -1,8 +1,8 @@
 {
     "id": "b1e2f3a4-c5d6-7890-abcd-ef1234567890",
     "revision": 0,
-    "last_node_id": 14,
-    "last_link_id": 23,
+    "last_node_id": 15,
+    "last_link_id": 26,
     "nodes": [
         {
             "id": 1,
@@ -54,7 +54,8 @@
                     "links": [
                         2,
                         16,
-                        19
+                        19,
+                        24
                     ],
                     "slot_index": 1
                 },
@@ -118,7 +119,8 @@
                     "links": [
                         4,
                         17,
-                        21
+                        21,
+                        26
                     ],
                     "slot_index": 0
                 },
@@ -190,6 +192,11 @@
                     "type": "AUDIO",
                     "link": 20,
                     "shape": 7
+                },
+                {
+                    "name": "sfx_audio_clips",
+                    "type": "AUDIO",
+                    "link": 25
                 }
             ],
             "outputs": [
@@ -241,6 +248,7 @@
                 0.8,
                 0.15,
                 16000.0,
+                "subtle",
                 -1.0
             ],
             "inputs": [
@@ -519,6 +527,67 @@
             ],
             "color": "#234035",
             "bgcolor": "#162821"
+        },
+        {
+            "id": 15,
+            "type": "OTR_BatchAudioGenGenerator",
+            "pos": [
+                480,
+                800
+            ],
+            "size": [
+                400,
+                160
+            ],
+            "title": "3c. SFX Maker Machine (AudioGen)",
+            "properties": {
+                "Node name for S&R": "OTR_BatchAudioGenGenerator"
+            },
+            "widgets_values": [
+                "",
+                "facebook/audiogen-medium",
+                3.0,
+                3.0
+            ],
+            "inputs": [
+                {
+                    "name": "script_json",
+                    "type": "STRING",
+                    "link": 24,
+                    "widget": {
+                        "name": "script_json"
+                    }
+                },
+                {
+                    "name": "production_plan_json",
+                    "type": "STRING",
+                    "link": 26,
+                    "widget": {
+                        "name": "production_plan_json"
+                    }
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "sfx_audio_clips",
+                    "type": "AUDIO",
+                    "links": [
+                        25
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "batch_log",
+                    "type": "STRING",
+                    "links": [],
+                    "slot_index": 1
+                }
+            ],
+            "flags": {},
+            "order": 2,
+            "mode": 0,
+            "color": "#234035",
+            "bgcolor": "#162821"
         }
     ],
     "links": [
@@ -633,6 +702,30 @@
             7,
             2,
             "AUDIO"
+        ],
+        [
+            24,
+            1,
+            1,
+            15,
+            0,
+            "STRING"
+        ],
+        [
+            25,
+            15,
+            0,
+            3,
+            3,
+            "AUDIO"
+        ],
+        [
+            26,
+            2,
+            0,
+            15,
+            1,
+            "STRING"
         ]
     ],
     "groups": [

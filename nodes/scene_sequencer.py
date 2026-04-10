@@ -688,6 +688,7 @@ class SceneSequencer:
         # We accumulate silence/audio segments as numpy arrays
         sample_rate = 48000  # standardize output
         all_segments = []
+        sfx_timeline = []
         render_log = []
         manifest = []
         
@@ -737,13 +738,16 @@ class SceneSequencer:
                 desc = item.get("description", "unknown sound")
                 if sfx_clip_idx < len(sfx_clips):
                     clip_np, clip_sr = sfx_clips[sfx_clip_idx]
-                    segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
-                    segment_np = _normalize_clip(segment_np)
+                    sfx_segment = _resample_audio(clip_np, clip_sr, sample_rate)
+                    sfx_segment = _normalize_clip(sfx_segment, target_peak=0.85)
                     sfx_clip_idx += 1
-                    render_log.append(f"[{global_idx}] SFX: {desc}")
+                    sfx_timeline.append((current_sample_pos, sfx_segment, desc))
+                    render_log.append(f"[{global_idx}] SFX Overlay: {desc}")
                 else:
-                    segment_np = np.zeros(int(sample_rate * 0.75), dtype=np.float32)
                     render_log.append(f"[{global_idx}] SFX: {desc} (MISSING)")
+                    
+                # Add a tiny 0.1s breath to dialogue timeline to give SFX impact room
+                segment_np = np.zeros(int(sample_rate * 0.1), dtype=np.float32)
 
             elif item_type == "dialogue":
                 character_name = item.get("character_name", "UNKNOWN")
@@ -808,6 +812,28 @@ class SceneSequencer:
             
         combined = combined + final_bed
         render_log.append(f"--- Layered {len(env_timeline)} environment segments")
+
+        # ── SFX DUCKING & OVERLAY ──────────────────────────────────────────
+        max_sfx_end = 0
+        for start_pos, sfx_np, _ in sfx_timeline:
+            end_pos = start_pos + len(sfx_np)
+            if end_pos > max_sfx_end:
+                max_sfx_end = end_pos
+                
+        if max_sfx_end > len(combined):
+            pad = np.zeros(max_sfx_end - len(combined), dtype=np.float32)
+            combined = np.concatenate([combined, pad])
+            
+        if sfx_timeline:
+            render_log.append(f"--- Overlaying {len(sfx_timeline)} SFX cues with ducking")
+            for start_pos, sfx_np, desc in sfx_timeline:
+                end_pos = start_pos + len(sfx_np)
+                # Duck main mix (dialogue+bed) down to 70% underneath SFX
+                combined[start_pos:end_pos] *= 0.7
+                # Mix in SFX at 85% to prevent clipping
+                combined[start_pos:end_pos] += sfx_np * 0.85
+
+        total_len = len(combined)
         total_sec = total_len / sample_rate
         _runtime_log(f"SceneSequencer: 1.0 Mix complete ({total_sec:.1f}s)")
 

@@ -211,6 +211,68 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
     return filtered
 
 
+def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_str: str) -> torch.Tensor:
+    """Apply analog tape emulation (saturation, hiss, wow/flutter) using numpy/scipy."""
+    if intensity_str == "off":
+        return waveform
+
+    import numpy as np
+
+    intensities = {
+        "subtle": {"sat": 1.2, "hiss": 0.002, "wow": 0.0005},
+        "medium": {"sat": 1.5, "hiss": 0.005, "wow": 0.0015},
+        "heavy":  {"sat": 2.0, "hiss": 0.010, "wow": 0.003},
+    }
+    params = intensities.get(intensity_str, intensities["subtle"])
+
+    orig_device = waveform.device
+    orig_dtype = waveform.dtype
+
+    # Tactical bounce to CPU for numpy operations
+    waveform_np = waveform.cpu().numpy()
+    B, C, N = waveform_np.shape
+
+    # 1. Tape Saturation (soft clipping waveshaper)
+    drive = params["sat"]
+    # tanh(x * drive) / tanh(drive) limits peak to 1.0 but adds harmonic warmth
+    waveform_np = np.tanh(waveform_np * drive) / np.tanh(drive)
+
+    # 2. Tape Hiss (simple noise approx via LP filtered white noise)
+    hiss_amp = params["hiss"]
+    noise = np.random.randn(B, C, N).astype(np.float32)
+    try:
+        from scipy.signal import butter, sosfilt
+        # Gentle 4000Hz lowpass to make noise sound more like tape hiss than digital static
+        sos = butter(2, 4000, btype='lowpass', fs=sample_rate, output='sos')
+        noise = sosfilt(sos, noise).astype(np.float32)
+    except ImportError:
+        pass # fallback to white noise if scipy missing
+    waveform_np += noise * hiss_amp
+
+    # 3. Wow and Flutter (pitch modulation via delay line interpolation)
+    wow_depth = params["wow"]
+    if wow_depth > 0:
+        try:
+            from scipy.interpolate import interp1d
+            t = np.arange(N) / sample_rate
+            # 1.5 Hz slow wow + 5 Hz flutter
+            mod = np.sin(2 * np.pi * 1.5 * t) * 0.7 + np.sin(2 * np.pi * 5.0 * t) * 0.3
+            # Delay in seconds
+            delay_sec = mod * wow_depth
+            delay_samples = delay_sec * sample_rate
+            
+            indices = np.arange(N) - delay_samples
+            
+            for b in range(B):
+                for c in range(C):
+                    interpolator = interp1d(np.arange(N), waveform_np[b, c], kind='linear', bounds_error=False, fill_value=0.0)
+                    waveform_np[b, c] = interpolator(indices)
+        except ImportError:
+            pass # Skip wow/flutter if scipy unavailable
+
+    return torch.from_numpy(waveform_np.astype(np.float32)).to(orig_device, dtype=orig_dtype, non_blocking=True)
+
+
 # ── ComfyUI Node ──────────────────────────────────────────────────────────────
 
 class AudioEnhance:
@@ -248,6 +310,10 @@ class AudioEnhance:
                     "default": 16000.0, "min": 8000.0, "max": 24000.0, "step": 1000.0,
                     "tooltip": "Low-pass filter cutoff Hz — kills Bark chirp artifacts (0=off, 16000=default)"
                 }),
+                "tape_emulation": (["off", "subtle", "medium", "heavy"], {
+                    "default": "off",
+                    "tooltip": "Analog tape emulation intensity"
+                }),
                 "normalize_dbfs": ("FLOAT", {
                     "default": -1.0, "min": -12.0, "max": 0.0, "step": 0.5,
                     "tooltip": "Peak normalization target dBFS (-1.0 = broadcast)"
@@ -257,7 +323,7 @@ class AudioEnhance:
 
     def enhance(self, audio, target_sample_rate=48000, spatial_width=0.3,
                 haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
-                normalize_dbfs=-1.0):
+                normalize_dbfs=-1.0, tape_emulation="off"):
 
         # ── Extract waveform & sample rate ──
         if isinstance(audio, tuple):
@@ -320,6 +386,11 @@ class AudioEnhance:
         if haas_delay_ms > 0:
             waveform = _haas_delay(waveform, target_sample_rate, haas_delay_ms)
             log.info("[OTR_AudioEnhance] Haas delay %.1fms applied", haas_delay_ms)
+
+        # ── Step 5.5: Tape Emulation (Analog Warmth) ──
+        if tape_emulation != "off":
+            waveform = _apply_tape_emulation(waveform, target_sample_rate, tape_emulation)
+            log.info("[OTR_AudioEnhance] Tape emulation '%s' applied", tape_emulation)
 
         # ── Step 6: Mid-side stereo widening ──
         if spatial_width > 0:

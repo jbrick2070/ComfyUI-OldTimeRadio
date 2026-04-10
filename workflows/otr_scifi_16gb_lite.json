@@ -2,7 +2,7 @@
     "id": "da0beab7-5804-4aca-9d7e-975bcb72870b",
     "revision": 0,
     "last_node_id": 15,
-    "last_link_id": 25,
+    "last_link_id": 26,
     "nodes": [
         {
             "id": 1,
@@ -121,7 +121,8 @@
                         4,
                         13,
                         17,
-                        21
+                        21,
+                        26
                     ],
                     "slot_index": 0
                 },
@@ -254,6 +255,7 @@
                 0.8,
                 0.15,
                 16000.0,
+                "subtle",
                 -1.0
             ],
             "inputs": [
@@ -624,7 +626,7 @@
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 4,
+                    "link": 26,
                     "widget": {
                         "name": "production_plan_json"
                     }
@@ -805,6 +807,14 @@
             3,
             4,
             "AUDIO"
+        ],
+        [
+            26,
+            2,
+            0,
+            15,
+            1,
+            "STRING"
         ]
     ],
     "groups": [
