@@ -1067,20 +1067,18 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
 
             if is_unstable_quant:
                 _runtime_log(f"[StoryOrchestrator] 🛡️ WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
-
-            # v1.5 Flagship Tuning: 8-bit upgrade on 16GB hardware
-            # 4-bit NF4 is safe but slow — 8-bit kernels are ~2x faster on Ada/Blackwell
-            # and still fit comfortably within 16GB VRAM with the sovereignty buffer.
-            # Only upgrade if NOT an unstable quant (those stay at 4-bit for safety).
-            if needs_4bit and not is_unstable_quant and total_vram >= 15.0:
-                needs_8bit = True
-                needs_4bit = False
-                _runtime_log(f"[StoryOrchestrator] FLAGSHIP TUNING: 8-bit upgrade for {model_id_full} (16GB hardware, faster kernels)")
+            elif needs_4bit:
+                _runtime_log(f"[StoryOrchestrator] Quantizing: 4-bit NF4 for {model_id_full}")
 
             if needs_8bit:
                 try:
                     from transformers import BitsAndBytesConfig
-                    quant_config = BitsAndBytesConfig(load_in_8bit=True)
+                    # llm_int8_enable_fp32_cpu_offload=True required when device_map=auto
+                    # may dispatch some layers to CPU (e.g. sovereignty buffer limits VRAM).
+                    quant_config = BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        llm_int8_enable_fp32_cpu_offload=True,
+                    )
                     log.info("[StoryOrchestrator] Enabling 8-bit quantization")
                 except ImportError:
                     log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed!")
