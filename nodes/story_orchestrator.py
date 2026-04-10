@@ -3977,79 +3977,145 @@ Format your response exactly as:
         scene_pat = re.compile(r'^===\s*SCENE\s+(.+?)\s*(?:===|\*\*\*)', re.IGNORECASE)
         env_pat   = re.compile(r'^\[ENV:\s*(.+?)\]',          re.IGNORECASE)
         sfx_pat   = re.compile(r'^\[SFX:\s*(.+?)\]',          re.IGNORECASE)
-        # Full voice tag: [VOICE: NAME, traits...] dialogue text
-        voice_pat = re.compile(r'^\[VOICE:\s*(.+?),\s*(.+?)\]\s*(.+)$', re.IGNORECASE)
         beat_pat  = re.compile(r'^\(beat\)$', re.IGNORECASE)
 
-        for raw_line in text.strip().splitlines():
+        # Voice patterns — ordered from most to least specific:
+        # v1 (canonical): [VOICE: NAME, traits] dialogue on same line
+        voice_inline_pat = re.compile(r'^\[VOICE:\s*(.+?),\s*(.+?)\]\s*(.+)$', re.IGNORECASE)
+        # v2 (no-traits): [VOICE: NAME] dialogue on same line
+        voice_notrait_pat = re.compile(r'^\[VOICE:\s*([A-Z][A-Z0-9_ ]+?)\]\s*(.+)$', re.IGNORECASE)
+        # v3 (tag only): [VOICE: NAME, traits] with dialogue on NEXT line
+        voice_tagonly_pat = re.compile(r'^\[VOICE:\s*(.+?)(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
+        # v4 (shorthand): [ANNOUNCER, traits] or [ANNOUNCER] as a standalone tag (Mistral Nemo style)
+        voice_shorthand_pat = re.compile(r'^\[([A-Z][A-Z0-9_ ]{1,20})(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
+
+        raw_lines = text.strip().splitlines()
+        i = 0
+        while i < len(raw_lines):
+            raw_line = raw_lines[i]
             s = raw_line.strip()
             # v1.4 Markdown Bolding Hallucination Fix:
             # Gemma 2B often generates **[VOICE:...]** or **=== SCENE ===**
             # Strip outer asterisks before matching tags.
             s = re.sub(r'^\*+|(?<=\])\*+$', '', s).strip()
-            
+            # Also strip italic markers flanking a tag: *[VOICE:..]* or _[VOICE:..]_
+            s = re.sub(r'^[_*]+|[_*]+$', '', s).strip()
+
             if not s:
+                i += 1
                 continue
 
             # v1.4 Theme B — Timeout fallback sentinel path.
-            # Skip any timeout feedback injected by upstream phases to prevent them
-            # from leaking into the structured script output and causing audio failure.
             if s.startswith("[SYSTEM_SENTINEL:"):
+                i += 1
                 continue
 
             m = scene_pat.match(s)
             if m:
                 lines.append({"type": "scene_break", "scene": m.group(1)})
+                i += 1
                 continue
 
             m = env_pat.match(s)
             if m:
                 lines.append({"type": "environment", "description": m.group(1)})
+                i += 1
                 continue
 
             m = sfx_pat.match(s)
             if m:
                 lines.append({"type": "sfx", "description": m.group(1)})
+                i += 1
                 continue
 
             m = beat_pat.match(s)
             if m:
                 lines.append({"type": "pause", "kind": "beat", "duration_ms": 200})
+                i += 1
                 continue
 
-            m = voice_pat.match(s)
-            if m:
-                raw_name   = m.group(1).strip()
-                voice_traits = m.group(2).strip()
-                dialogue   = m.group(3).strip()
+            # ── VOICE TAG MATCHING (4 variants) ──────────────────────────
 
-                # Detect the "no NAME" failure: first field is a gender/age word
-                # e.g. [VOICE: male, 40s, calm] instead of [VOICE: NAME, male, 40s, calm]
+            # v1: [VOICE: NAME, traits] dialogue — inline
+            m = voice_inline_pat.match(s)
+            if m:
+                raw_name     = m.group(1).strip()
+                voice_traits = m.group(2).strip()
+                dialogue     = m.group(3).strip().strip('"\u201c\u201d*_')
                 if raw_name.lower() in self._GENDER_WORDS:
                     _fallback_counter += 1
-                    fallback_name = f"CHAR_{chr(64 + _fallback_counter)}"  # CHAR_A, CHAR_B…
-                    log.warning(
-                        "[ScriptParser] Malformed VOICE tag — name field is a descriptor word '%s'. "
-                        "Assigning fallback name '%s'. Full line: %s",
-                        raw_name, fallback_name, s[:120]
-                    )
-                    # Reconstruct voice_traits: prepend the dropped name-word back
+                    fallback_name = f"CHAR_{chr(64 + _fallback_counter)}"
+                    log.warning("[ScriptParser] Malformed VOICE tag — name field is a descriptor word '%s'. Assigning fallback '%s'.", raw_name, fallback_name)
                     voice_traits = f"{raw_name}, {voice_traits}"
                     character_name = fallback_name
                 else:
                     character_name = raw_name.upper()
-
-                lines.append({
-                    "type": "dialogue",
-                    "character_name": character_name,
-                    "voice_traits": voice_traits,
-                    "line": dialogue,
-                })
+                lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": voice_traits, "line": dialogue})
+                i += 1
                 continue
 
-            # Fallback for structured text that might miss a tag
+            # v2: [VOICE: NAME] dialogue — no traits, inline
+            m = voice_notrait_pat.match(s)
+            if m:
+                character_name = m.group(1).strip().upper()
+                dialogue = m.group(2).strip().strip('"\u201c\u201d*_')
+                lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": "", "line": dialogue})
+                i += 1
+                continue
+
+            # v3: [VOICE: NAME, traits] tag-only — look ahead for dialogue on NEXT line
+            m = voice_tagonly_pat.match(s)
+            if m:
+                raw_name     = m.group(1).strip()
+                voice_traits = (m.group(2) or "").strip()
+                # Skip non-VOICE bracket tags that could match (e.g. [MUSIC:...])
+                # Only handle if the raw_name looks like a real character name (uppercase letters)
+                if re.match(r'^[A-Z][A-Z0-9_ ]*$', raw_name, re.IGNORECASE) and raw_name.upper() not in (
+                    "MUSIC", "SFX", "ENV", "BEAT", "PAUSE", "SYSTEM_SENTINEL"
+                ):
+                    # Peek at next non-empty line for dialogue
+                    j = i + 1
+                    while j < len(raw_lines) and not raw_lines[j].strip():
+                        j += 1
+                    next_s = raw_lines[j].strip() if j < len(raw_lines) else ""
+                    next_s_clean = re.sub(r'^[*_]+|[*_]+$', '', next_s).strip()
+                    # Accept as dialogue if next line is NOT a tag and not empty
+                    if next_s_clean and not next_s_clean.startswith('[') and not next_s_clean.startswith('='):
+                        dialogue = next_s_clean.strip('"\u201c\u201d*_')
+                        if raw_name.lower() in self._GENDER_WORDS:
+                            _fallback_counter += 1
+                            character_name = f"CHAR_{chr(64 + _fallback_counter)}"
+                        else:
+                            character_name = raw_name.upper()
+                        lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": voice_traits, "line": dialogue})
+                        i = j + 1  # consume both tag line and dialogue line
+                        continue
+                    # else: fall through as direction
+
+            # v4: [CHARACTER, traits] shorthand (e.g. [ANNOUNCER, female, 50s, calm])
+            # Used by Mistral Nemo when it omits the VOICE: prefix
+            m = voice_shorthand_pat.match(s)
+            if m:
+                raw_name     = m.group(1).strip()
+                voice_traits = (m.group(2) or "").strip()
+                # Must look like a character name (not a known structural tag)
+                upper_name = raw_name.upper()
+                if upper_name not in ("ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE"):
+                    j = i + 1
+                    while j < len(raw_lines) and not raw_lines[j].strip():
+                        j += 1
+                    next_s = raw_lines[j].strip() if j < len(raw_lines) else ""
+                    next_s_clean = re.sub(r'^[*_]+|[*_]+$', '', next_s).strip()
+                    if next_s_clean and not next_s_clean.startswith('[') and not next_s_clean.startswith('='):
+                        dialogue = next_s_clean.strip('"\u201c\u201d*_')
+                        lines.append({"type": "dialogue", "character_name": upper_name, "voice_traits": voice_traits, "line": dialogue})
+                        i = j + 1
+                        continue
+
+            # Fallback: treat as structural direction
             if s and not s.startswith("#") and not s.startswith("---"):
                 lines.append({"type": "direction", "text": s})
+            i += 1
 
         malformed = _fallback_counter
         if malformed:
