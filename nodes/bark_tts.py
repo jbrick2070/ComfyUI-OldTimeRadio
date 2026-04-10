@@ -135,6 +135,20 @@ def _load_bark(model_id="suno/bark", device=None):
         _unload_bark()
 
     if _BARK_CACHE["model"] is None:
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        # ── VRAM Hardening v1.4.6: Strict Handoff ──
+        # If Gemma is in VRAM, evict it now before loading Bark.
+        try:
+            from .story_orchestrator import _unload_llm
+            _unload_llm()
+        except ImportError:
+            pass
+        except Exception as handoff_err:
+            log.warning("[Bark] LLM handoff failed: %s", handoff_err)
+
         log.info(f"Loading Bark model: {model_id} on {device}")
         try:
             from transformers import AutoProcessor, BarkModel

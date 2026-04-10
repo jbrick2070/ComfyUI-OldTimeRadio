@@ -113,3 +113,35 @@ def vram_snapshot(label: str) -> dict:
     except Exception as exc:
         log.debug("vram_snapshot(%s) failed: %s", label, exc)
     return result
+
+_CLEANUP_CALLBACKS = []
+
+def register_vram_cleanup(callback):
+    """Register a custom cleanup function (e.g. to clear LLM caches)."""
+    if callback not in _CLEANUP_CALLBACKS:
+        _CLEANUP_CALLBACKS.append(callback)
+
+def force_vram_offload():
+    """Aggressively clear VRAM of non-OTR models and internal fragmentation."""
+    # Step 1: Run registered OTR-specific cleanups (e.g. clear LLM cache)
+    for callback in _CLEANUP_CALLBACKS:
+        try:
+            callback()
+        except Exception:
+            pass
+
+    # Step 2: Tell ComfyUI to kick out its models (Diffusion, VAE, etc.)
+    try:
+        import comfy.model_management
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache()
+    except Exception:
+        pass
+    
+    # Step 3: Explicit Python and PyTorch garbage collection
+    import gc
+    import torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()

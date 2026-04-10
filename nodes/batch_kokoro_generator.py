@@ -19,6 +19,7 @@ import numpy as np
 import torch
 
 from .story_orchestrator import _runtime_log
+from ._vram_log import force_vram_offload
 from .kokoro_announcer import _kokoro_model_dir, _ensure_voice_file, KOKORO_SAMPLE_RATE
 
 log = logging.getLogger("OTR")
@@ -108,6 +109,10 @@ class BatchKokoroGenerator:
         }
 
     def generate_batch(self, script_json, production_plan_json, speed=1.0):
+
+        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        force_vram_offload()
+
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
         plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json
         voice_map = plan.get("voice_assignments", {})

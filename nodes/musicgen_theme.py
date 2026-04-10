@@ -38,6 +38,8 @@ import os
 import numpy as np
 import torch
 
+from ._vram_log import force_vram_offload
+
 log = logging.getLogger("OTR")
 
 
@@ -185,6 +187,9 @@ class MusicGenTheme:
 
     def render(self, production_plan_json, episode_seed="",
                model_id=MUSICGEN_MODEL_ID, guidance_scale=3.0):
+
+        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        force_vram_offload()
 
         try:
             plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json

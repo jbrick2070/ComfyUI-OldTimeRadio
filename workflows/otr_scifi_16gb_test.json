@@ -1,8 +1,8 @@
 {
-    "id": "da0beab7-5804-4aca-9d7e-975bcb72870b",
+    "id": "b1e2f3a4-c5d6-7890-abcd-ef1234567890",
     "revision": 0,
-    "last_node_id": 15,
-    "last_link_id": 25,
+    "last_node_id": 14,
+    "last_link_id": 23,
     "nodes": [
         {
             "id": 1,
@@ -15,27 +15,28 @@
                 400,
                 320
             ],
-            "title": "1. Gemma Writes the Story",
+            "title": "1. LLM Story Writer",
             "properties": {
                 "Node name for S&R": "OTR_Gemma4ScriptWriter"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "Test Signal",
                 "hard_sci_fi",
-                "\ud83d\udcfb standard (8 min)",
-                5,
-                4,
-                "google/gemma-4-E4B-it",
-                "",
+                "\ud83e\uddea test (1 min)",
+                1,
                 3,
-                0.8,
+                "google/gemma-4-26b-a4b-it [BETA]",
+                "",
+                1,
+                0.7,
                 false,
-                true,
                 false,
-                "medium (5 acts)",
+                false,
+                "short (3 acts)",
                 "tense claustrophobic",
                 "balanced",
-                true
+                true,
+                "Standard"
             ],
             "inputs": [],
             "outputs": [
@@ -52,10 +53,8 @@
                     "type": "STRING",
                     "links": [
                         2,
-                        12,
                         16,
-                        19,
-                        24
+                        19
                     ],
                     "slot_index": 1
                 },
@@ -91,15 +90,16 @@
                 400,
                 280
             ],
-            "title": "2. Gemma Directs the Show",
+            "title": "2. LLM Director",
             "properties": {
                 "Node name for S&R": "OTR_Gemma4Director"
             },
             "widgets_values": [
                 "",
                 0.4,
-                true,
-                "subtle"
+                "bark (standard 8GB)",
+                "subtle",
+                "Standard"
             ],
             "inputs": [
                 {
@@ -114,7 +114,6 @@
                     "type": "STRING",
                     "links": [
                         4,
-                        13,
                         17,
                         21
                     ],
@@ -178,20 +177,10 @@
                     "link": 4
                 },
                 {
-                    "name": "tts_audio_clips",
-                    "type": "AUDIO",
-                    "link": 14
-                },
-                {
                     "name": "announcer_audio_clips",
                     "type": "AUDIO",
                     "link": 20,
                     "shape": 7
-                },
-                {
-                    "name": "sfx_audio_clips",
-                    "type": "AUDIO",
-                    "link": 25
                 }
             ],
             "outputs": [
@@ -277,17 +266,17 @@
             ],
             "size": [
                 420,
-                350
+                320
             ],
             "title": "6. Glue Everything Together",
             "properties": {
                 "Node name for S&R": "OTR_EpisodeAssembler"
             },
             "widgets_values": [
-                "The Last Frequency",
-                10.0,
-                8.0,
-                500
+                "Test Signal",
+                2.0,
+                4.0,
+                300
             ],
             "inputs": [
                 {
@@ -335,58 +324,6 @@
             "bgcolor": "#301C32"
         },
         {
-            "id": 11,
-            "type": "OTR_BatchBarkGenerator",
-            "pos": [
-                480,
-                600
-            ],
-            "size": [
-                400,
-                200
-            ],
-            "title": "3. Voice Maker Machine",
-            "properties": {
-                "Node name for S&R": "OTR_BatchBarkGenerator"
-            },
-            "widgets_values": [
-                "[]"
-            ],
-            "inputs": [
-                {
-                    "name": "script_json",
-                    "type": "STRING",
-                    "link": 12
-                },
-                {
-                    "name": "production_plan_json",
-                    "type": "STRING",
-                    "link": 13
-                }
-            ],
-            "outputs": [
-                {
-                    "name": "tts_audio_clips",
-                    "type": "AUDIO",
-                    "links": [
-                        14
-                    ],
-                    "slot_index": 0
-                },
-                {
-                    "name": "batch_log",
-                    "type": "STRING",
-                    "links": [],
-                    "slot_index": 1
-                }
-            ],
-            "flags": {},
-            "order": 2,
-            "mode": 0,
-            "color": "#234035",
-            "bgcolor": "#162821"
-        },
-        {
             "id": 12,
             "type": "OTR_SignalLostVideo",
             "pos": [
@@ -403,8 +340,8 @@
             },
             "widgets_values": [
                 24,
-                "1920x1080",
-                "The Last Frequency"
+                "1280x720",
+                "Test Signal"
             ],
             "inputs": [
                 {
@@ -563,61 +500,6 @@
             ],
             "color": "#234035",
             "bgcolor": "#162821"
-        },
-        {
-            "id": 15,
-            "type": "OTR_BatchAudioGenGenerator",
-            "pos": [
-                480,
-                800
-            ],
-            "size": [
-                400,
-                160
-            ],
-            "title": "3c. SFX Maker Machine (AudioGen)",
-            "properties": {
-                "Node name for S&R": "OTR_BatchAudioGenGenerator"
-            },
-            "widgets_values": [
-                "",
-                "facebook/audiogen-medium",
-                3.0,
-                3.0
-            ],
-            "inputs": [
-                {
-                    "name": "script_json",
-                    "type": "STRING",
-                    "link": 24
-                },
-                {
-                    "name": "production_plan_json",
-                    "type": "STRING",
-                    "link": 4
-                }
-            ],
-            "outputs": [
-                {
-                    "name": "sfx_audio_clips",
-                    "type": "AUDIO",
-                    "links": [
-                        25
-                    ],
-                    "slot_index": 0
-                },
-                {
-                    "name": "batch_log",
-                    "type": "STRING",
-                    "links": [],
-                    "slot_index": 1
-                }
-            ],
-            "flags": {},
-            "order": 2,
-            "mode": 0,
-            "color": "#234035",
-            "bgcolor": "#162821"
         }
     ],
     "links": [
@@ -659,30 +541,6 @@
             0,
             7,
             0,
-            "AUDIO"
-        ],
-        [
-            12,
-            1,
-            1,
-            11,
-            0,
-            "STRING"
-        ],
-        [
-            13,
-            2,
-            0,
-            11,
-            1,
-            "STRING"
-        ],
-        [
-            14,
-            11,
-            0,
-            3,
-            2,
             "AUDIO"
         ],
         [
@@ -730,7 +588,7 @@
             13,
             0,
             3,
-            3,
+            2,
             "AUDIO"
         ],
         [
@@ -756,27 +614,11 @@
             7,
             2,
             "AUDIO"
-        ],
-        [
-            24,
-            1,
-            1,
-            15,
-            0,
-            "STRING"
-        ],
-        [
-            25,
-            15,
-            0,
-            3,
-            4,
-            "AUDIO"
         ]
     ],
     "groups": [
         {
-            "title": "1. WRITE THE STORY \ud83d\udcdd",
+            "title": "1. QUICK STORY \ud83d\udcdd",
             "bounding": [
                 20,
                 80,
@@ -788,23 +630,11 @@
             "font_size": 24
         },
         {
-            "title": "2. MAKE THE VOICES & SOUNDS \ud83c\udf99\ufe0f",
+            "title": "2. QUICK AUDIO & VIDEO \ud83c\udfac",
             "bounding": [
                 970,
                 80,
-                940,
-                560
-            ],
-            "color": "#7ED321",
-            "flags": {},
-            "font_size": 24
-        },
-        {
-            "title": "3. PUT IT ALL TOGETHER \ud83c\udfac",
-            "bounding": [
-                1920,
-                80,
-                520,
+                1470,
                 560
             ],
             "color": "#F5A623",
@@ -822,10 +652,10 @@
             ]
         },
         "info": {
-            "name": "Old-Time Radio Sci-Fi Anthology",
+            "name": "OTR Test \u00e2\u20ac\u201d Ultra Lite",
             "author": "Jeffrey Brick",
-            "description": "Gemma 4 scripts + Bark TTS + Spatial Audio Enhance + Episode assembly",
-            "version": "1.0.0-hq"
+            "description": "7-line pipeline smoke test. Fast Bark render, 720p video. Use for regression testing after node changes.",
+            "version": "1.0.0-test"
         }
     },
     "version": 0.4

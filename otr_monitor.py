@@ -61,8 +61,8 @@ RUNTIME_LOG_PATH = os.path.join(BASE_DIR, "otr_runtime.log")
 # ─────────────────────────────────────────────────────────────────────────────
 
 _NODE_NAMES = {
-    "1":  "Gemma4 ScriptWriter",
-    "2":  "Gemma4 Director",
+    "1":  "LLM ScriptWriter",
+    "2":  "LLM Director",
     "3":  "Scene Sequencer",
     "4":  "Audio Enhance",
     "5":  "SFX: Opening Theme",
@@ -175,7 +175,7 @@ class OTRMonitor:
 
         # ── OTR-specific log parsing ─────────────────────────────────
         # News headline
-        m = re.search(r'\[Gemma4ScriptWriter\] News seed:\s*(.+?)(?:\s*\|)', line)
+        m = re.search(r'\[LLMScriptWriter\] News seed:\s*(.+?)(?:\s*\|)', line)
         if m:
             self.status["news_headline"] = m.group(1).strip()[:120]
 

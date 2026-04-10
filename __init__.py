@@ -3,7 +3,7 @@ ComfyUI-OldTimeRadio — AI-Powered Sci-Fi Radio Drama Generator
 ================================================================
 
 Generates full-length sci-fi anthology radio dramas using:
-  - Gemma 4 local LLM (script writing from real science news + director)
+  - LLM local inference (Gemma series, Nemo, etc.) for story writing + director
   - Bark (Suno) TTS with emotional bracket tags [sighs] [whispers] etc.
   - 48kHz stereo spatial audio mastering (Haas effect, mid-side widening)
   - Procedural SFX (theremin, static, room tone)
@@ -18,6 +18,7 @@ BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
   doesn't prevent the rest from loading.
 
 v1.0  2026-04-04  Jeffrey Brick — initial release
+v1.4  2026-04-10  Jeffrey Brick — VRAM Hardening (v1.4.9 Stable, 4GB Shelved)
 """
 
 import importlib

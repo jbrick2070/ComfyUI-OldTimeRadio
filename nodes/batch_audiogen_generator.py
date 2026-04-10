@@ -29,6 +29,8 @@ import re
 import numpy as np
 import torch
 
+from ._vram_log import force_vram_offload
+
 log = logging.getLogger("OTR")
 
 AUDIOGEN_MODEL_ID = "facebook/audiogen-medium"
@@ -97,7 +99,7 @@ class BatchAudioGenGenerator:
             },
             "optional": {
                 "episode_seed": ("STRING", {"default": ""}),
-                "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small"], {"default": "facebook/audiogen-medium"}),
+                "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small", "3", "3.0", 3, 3.0], {"default": "facebook/audiogen-medium"}),
                 "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5}),
                 "default_duration": ("FLOAT", {"default": 3.0, "min": 0.5, "max": 10.0, "step": 0.5}),
             }
@@ -106,6 +108,13 @@ class BatchAudioGenGenerator:
     def generate(self, script_json, production_plan_json, episode_seed="", 
                  model_id="facebook/audiogen-medium", guidance_scale=3.0, default_duration=3.0):
         
+        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        force_vram_offload()
+        
+        # UI JSON back-compat fix
+        if str(model_id) in ["3", "3.0"]:
+            model_id = "facebook/audiogen-medium"
+            
         batch_log = ["=== Batch AudioGen Generator ==="]
         
         try:

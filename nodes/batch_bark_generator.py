@@ -29,6 +29,7 @@ import numpy as np
 import torch
 
 from .story_orchestrator import _runtime_log
+from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
 
@@ -505,6 +506,9 @@ class BatchBarkGenerator:
         }
 
     def generate_batch(self, script_json, production_plan_json, temperature=0.7):
+
+        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        force_vram_offload()
 
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
         plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json
