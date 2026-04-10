@@ -5,69 +5,69 @@
   "phases": [
     {
       "name": "gemma4_script_writer",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 1459.4624129000003,
-      "notes": "runner_error: RuntimeError: Failed to load Gemma 4 model 'google/gemma-4-E4B-it'. Is it downloaded? Hub error: The paging file is too small for this operation to complete. (os error 1455)"
+      "peak_bytes": 9761212416,
+      "current_bytes_after": 17040384,
+      "wall_seconds": 785.9889372999969,
+      "notes": ""
     },
     {
       "name": "gemma4_director",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 9.489999865763821e-05,
-      "notes": "runner_error: KeyError: 'script_text'"
+      "peak_bytes": 10170041856,
+      "current_bytes_after": 17040384,
+      "wall_seconds": 691.4285126999966,
+      "notes": ""
     },
     {
       "name": "kokoro_announcer",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 0.02224470000146539,
-      "notes": "runner_error: KeyError: 'script_json'"
+      "peak_bytes": 867087872,
+      "current_bytes_after": 18088960,
+      "wall_seconds": 4.259912699999404,
+      "notes": ""
     },
     {
       "name": "musicgen_theme",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 0.004507900001044618,
-      "notes": "runner_error: KeyError: 'production_plan_json'"
+      "peak_bytes": 4503355392,
+      "current_bytes_after": 18088960,
+      "wall_seconds": 103.23702880000201,
+      "notes": ""
     },
     {
       "name": "batch_bark_generator",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 3.6000019463244826e-06,
-      "notes": "runner_error: KeyError: 'script_json'"
+      "peak_bytes": 2463936000,
+      "current_bytes_after": 2287432192,
+      "wall_seconds": 498.9517793999985,
+      "notes": ""
     },
     {
       "name": "scene_sequencer",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 7.799997547408566e-06,
-      "notes": "runner_error: KeyError: 'script_json'"
+      "peak_bytes": 2296479232,
+      "current_bytes_after": 2287432192,
+      "wall_seconds": 0.38103099999716505,
+      "notes": ""
     },
     {
       "name": "audio_enhance",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 0.016400699998484924,
-      "notes": "runner_error: KeyError: 'scene_audio'"
+      "peak_bytes": 2437164544,
+      "current_bytes_after": 2287432192,
+      "wall_seconds": 1.5537020999981905,
+      "notes": ""
     },
     {
       "name": "episode_assembler",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 7.899998308857903e-06,
-      "notes": "runner_error: KeyError: 'enhanced_audio'"
+      "peak_bytes": 2287432192,
+      "current_bytes_after": 2287432192,
+      "wall_seconds": 0.015274799996404909,
+      "notes": ""
     },
     {
       "name": "video_engine",
-      "peak_bytes": 23200206848,
-      "current_bytes_after": 23200206848,
-      "wall_seconds": 0.027655500001856126,
-      "notes": "runner_error: KeyError: 'episode_audio'"
+      "peak_bytes": 2287432192,
+      "current_bytes_after": 2287432192,
+      "wall_seconds": 71.48872069999925,
+      "notes": "runner_error: KeyError: 0"
     }
   ],
-  "overall_peak_bytes": 23200206848,
-  "overall_peak_gb": 21.606876373291016,
+  "overall_peak_bytes": 10170041856,
+  "overall_peak_gb": 9.4715895652771,
   "ceiling_gb": 14.5
 }
