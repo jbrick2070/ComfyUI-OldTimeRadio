@@ -17,9 +17,8 @@
 - **Workflow verification:** 100% regression pass (89/89 tests).
 
 ### 3) Next Priority Feature (v1.5)
-- [x] v1.4.9 Update: **[COMPLETED] 16GB Flagship Hardening**. Zero-Prime loading, 4GB Sovereignty Buffer, and Case-Insensitive Telemetry verified on RTX 5080 (11.5 tok/s at 137W).
-- [x] v1.4.9 Update: **[ABANDONED] 4GB/8GB Hardware Support**. Extensive profiling confirms that even 2B/9B models consume ~16GB of VRAM after drivers and buffers, leading to unusable system lag on lower-tier hardware.
-- [x] v1.4.9 Update: **[COMPLETED] VoiceHealth & Telemetry Fixes**. Forced CUDA for health checks and fixed case-sensitive tracking for 9B models.
+- [x] **16GB Flagship Hardening**. Zero-Prime loading, 4GB Sovereignty Buffer, and Case-Insensitive Telemetry verified on RTX 5080 (11.5 tok/s at 137W).
+- [x] **VoiceHealth & Telemetry Fixes**. Forced CUDA for health checks and fixed case-sensitive tracking for 9B models.
 - **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator` and procedural fallback.
 - **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).
 
