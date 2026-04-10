@@ -139,7 +139,7 @@ def _load_bark(model_id="suno/bark", device=None):
         gc.collect()
         torch.cuda.empty_cache()
 
-        # ── VRAM Hardening v1.4.6: Strict Handoff ──
+        # ── VRAM Hardening v1.4: Strict Handoff ──
         # If Gemma is in VRAM, evict it now before loading Bark.
         try:
             from .story_orchestrator import _unload_llm
@@ -150,17 +150,21 @@ def _load_bark(model_id="suno/bark", device=None):
             log.warning("[Bark] LLM handoff failed: %s", handoff_err)
 
         log.info(f"Loading Bark model: {model_id} on {device}")
+        
+        # v1.4.10 Hardening: Force cache_dir to our local Hub directory
+        cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+        
         try:
             from transformers import AutoProcessor, BarkModel
 
             # First load: download & cache. Subsequent loads: skip HTTP checks.
             try:
-                processor = AutoProcessor.from_pretrained(model_id, local_files_only=True)
+                processor = AutoProcessor.from_pretrained(model_id, local_files_only=True, cache_dir=cache_dir_path)
                 log.info("Bark processor loaded from cache (no HTTP checks)")
             except OSError as local_err:
                 log.info("[Bark] local_files_only=True failed for processor (%s), attempting Hub fallback...", local_err)
                 try:
-                    processor = AutoProcessor.from_pretrained(model_id)
+                    processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir_path)
                     log.info("Bark processor downloaded and cached")
                 except Exception as hub_err:
                     log.error("[Bark] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
@@ -178,6 +182,7 @@ def _load_bark(model_id="suno/bark", device=None):
                     torch_dtype=dtype,
                     device_map=device_map,
                     local_files_only=True,
+                    cache_dir=cache_dir_path,
                 )
                 log.info(f"Bark model loaded from cache on {device} (no HTTP checks)")
             except OSError as local_err:
@@ -187,6 +192,7 @@ def _load_bark(model_id="suno/bark", device=None):
                         model_id,
                         torch_dtype=dtype,
                         device_map=device_map,
+                        cache_dir=cache_dir_path,
                     )
                     log.info(f"Bark model downloaded and cached on {device}")
                 except Exception as hub_err:

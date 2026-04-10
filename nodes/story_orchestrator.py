@@ -922,10 +922,15 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
 
     # Check for device change OR quantization mismatch OR budget profile mismatch
     is_obsidian = "Obsidian" in optimization_profile
+    
+    # v1.4: Centralized "Large Model" Tags for VRAM Hardening
+    # These models MUST be quantized to fit within flagship (16GB) or ultra-lite (4GB) targets.
+    vram_safe_tags = ("9b", "12b", "14b", "24b", "26b", "27b", "31b", "70b", "e4b", "4b-it", "a4b", "2b", "2b-it", "efficiency", "nemo", "qwen", "mistral", "instruct", "gemma")
+    
     requested_quantized = is_obsidian or "4-bit" in model_id_full.lower() or \
-                          any(tag in model_id_full.lower() for tag in ("9b", "12b", "26b", "27b", "31b", "70b", "e4b", "4b-it", "a4b", "2b", "efficiency"))
+                          any(tag in model_id_full.lower() for tag in vram_safe_tags)
 
-    # v1.4.7 Audit: Also check if the model object itself has been moved to CPU
+    # v1.4 Audit: Also check if the model object itself has been moved to CPU
     current_model_device = "cpu"
     if _LLM_CACHE["model"] is not None:
         try:
@@ -938,9 +943,9 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
              _LLM_CACHE["quantized"] != requested_quantized or
              _LLM_CACHE["model_id"] != model_id or
              _LLM_CACHE.get("budget_profile") != optimization_profile or
-             _LLM_CACHE.get("VERSION") != "v1.4.9" or
+             _LLM_CACHE.get("VERSION") != "v1.4" or
              ("cuda" in str(device) and "cpu" in current_model_device))):
-        _runtime_log(f"Gemma cache mismatch or version update (v1.4.9) — reloading to enforce budget")
+        _runtime_log(f"Gemma cache mismatch or version update (v1.4) — reloading to enforce budget")
         _unload_llm()
 
     if _LLM_CACHE["model"] is None:
@@ -950,7 +955,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             import torch
             from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
 
-            # ── Zero-Prime VRAM Hardening (v1.4.9) ──
+            # ── Zero-Prime VRAM Hardening (v1.4) ──
             # We MUST detect hardware and purge memory BEFORE loading even the Tokenizer
             # to prevent the 15GB transient spike on 16GB cards.
             
@@ -995,7 +1000,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
 
-            # ── VRAM Hardening v1.4.6: Strict Handoff ──
+            # ── VRAM Hardening v1.4: Strict Handoff ──
             # If Bark is in VRAM, evict it now before loading LLM.
             try:
                 from .bark_tts import _unload_bark
@@ -1008,7 +1013,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             is_gemma = "gemma" in model_id.lower()
 
             try:
-                # v1.4.7 FIX: Revert to AutoTokenizer. AutoProcessor was causing 
+                # v1.4 FIX: Revert to AutoTokenizer. AutoProcessor was causing 
                 # decode offsets to fail on non-multimodal 2B models.
                 tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
             except OSError as local_err:
@@ -1051,19 +1056,17 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             # Large models (26B+) also require 4-bit to fit in 16GB.
             quant_config = None
             needs_8bit = "8-bit" in model_id_full.lower()
-            # Large models (9B, 12B, 26B, 27B+) MUST use 4-bit NF4 to fit safely in 16GB
-            # with context headroom and active Audio/TTS models.
-            # We also treat '2bit' and '3bit' as 'Broken' bit-depths and force them to 4-bit
-            # to prevent the 'Wing Ding' corruption (Model Stroke).
+            
+            # v1.4 Universal Hardening: Centralized tags
             is_unstable_quant = any(tag in model_id_full.lower() for tag in ("2bit", "3bit", "2-bit", "3-bit"))
             needs_4bit = requested_quantized or is_unstable_quant or \
-                         any(tag in model_id_full.lower() for tag in ("9b", "12b", "14b", "24b", "26b", "27b", "31b", "70b", "e4b"))
-            
+                         any(tag in model_id_full.lower() for tag in vram_safe_tags)
+
             if is_unstable_quant:
                 _runtime_log(f"[StoryOrchestrator] 🛡️ WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
             elif needs_4bit and not requested_quantized:
                 _runtime_log(f"[StoryOrchestrator] VRAM SAFETY: Forcing 4-bit (NF4) for Large Model ({model_id_full})")
-            
+
             if needs_8bit:
                 try:
                     from transformers import BitsAndBytesConfig
@@ -1086,27 +1089,33 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
                     log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed — "
                                 "loading at bfloat16 may OOM. Run: pip install bitsandbytes")
 
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+
+            cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+            try:
+                # v1.4 Hardening: Explicitly trust_remote_code=False for flagship security
+                tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True, trust_remote_code=False, cache_dir=cache_dir_path)
+                _runtime_log("LLM tokenizer loaded from cache (no HTTP checks)")
+            except Exception as local_err:
+                _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for tokenizer ({local_err}), attempting Hub fallback...")
+                tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False, cache_dir=cache_dir_path)
 
             common_kwargs = dict(
-                dtype=load_dtype,
+                cache_dir=cache_dir_path,
+                trust_remote_code=False,  # v1.4 Hardening: strict security
                 low_cpu_mem_usage=True,
-                attn_implementation=attn_impl,
-                max_memory=max_memory,
+                attn_implementation="sdpa"  # v1.4 Blackwell/Flash-Replacement
             )
             if quant_config is not None:
                 common_kwargs["quantization_config"] = quant_config
                 
-                # FLAGSHIP 16GB OVERRIDE: 2B models fit easily. Accelerate's "auto" is 
-                # often too cautious on laptops, causing a "CPU offload" crash.
-                # Force GPU-only if we have the headroom.
+                # FLAGSHIP 16GB OVERRIDE: 2B models fit easily. Force GPU-only to avoid CPU intermediate bloat.
                 if total_vram >= 15.0 and is_actually_2b:
                     common_kwargs["device_map"] = {"": 0} 
                     _runtime_log("[StoryOrchestrator] Flagship Override: Forcing CUDA:0 (Direct GPU) for 2B model")
                 else:
-                    common_kwargs["device_map"] = "auto"  # required by bitsandbytes
+                    common_kwargs["device_map"] = "auto"
             elif max_memory is not None:
-                # VRAM budgeting requires device_map even without quantization,
-                # otherwise max_memory is silently ignored and .to(device) is used.
                 common_kwargs["device_map"] = "auto"
 
             try:
@@ -1115,8 +1124,9 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
                     local_files_only=True,
                     **common_kwargs,
                 )
-            except OSError as local_err:
-                log.info("[StoryOrchestrator] local_files_only=True failed for model (%s), attempting Hub fallback...", local_err)
+                _runtime_log("LLM model loaded from cache (no HTTP checks)")
+            except (OSError, ValueError) as local_err:
+                _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for model ({local_err}), attempting Hub fallback...")
                 try:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id,
@@ -1126,8 +1136,6 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
                     log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
                     raise RuntimeError(f"Failed to load LLM model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
-            # Quantized models and budget-capped models are placed by device_map;
-            # non-quantized, non-budgeted go .to(device) manually.
             if quant_config is None and max_memory is None:
                 model = model.to(device)
             model = model.eval()
@@ -1135,11 +1143,12 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             _LLM_CACHE["model"] = model
             _LLM_CACHE["tokenizer"] = tokenizer
             _LLM_CACHE["device"] = device
-            _LLM_CACHE["quantized"] = requested_quantized
+            _LLM_CACHE["quantized"] = (quant_config is not None)
             _LLM_CACHE["model_id"] = model_id
             _LLM_CACHE["budget_profile"] = optimization_profile
             _LLM_CACHE["VERSION"] = "v1.4"
-            _runtime_log(f"LLM loaded: {model_id} (quantized={requested_quantized}, budget={optimization_profile}) [v1.4]")
+            actual_quant = (quant_config is not None)
+            _runtime_log(f"LLM loaded: {model_id} (quantized={actual_quant}, budget={optimization_profile}) [v1.4]")
         except Exception as e:
             log.exception("Failed to load LLM: %s", e)  # Section 49: log.exception for full traceback
             raise
@@ -1408,7 +1417,7 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
 
     try:
         with torch.no_grad():
-            # v1.4.9: Tune penalty for 2B models to prevent SFX loops
+            # v1.4: Tune penalty for 2B models to prevent SFX loops
             final_penalty = 1.12
             if "2b" in model_id.lower():
                 final_penalty = 1.25  # Firmer hand for the small model
@@ -2515,7 +2524,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
 
         # ── Phase 1b: Model Selection & Prompting ──
-        # v1.4.9 Fix: Small models (2B) suffer from "Model Collapse" if the
+        # v1.4 Fix: Small models (2B) suffer from "Model Collapse" if the
         # prompt is too complex. We swap to a "LITE" version for these.
         # Check for 2B specifically (avoiding false hits on 26b or 31b)
         is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
@@ -2744,7 +2753,7 @@ Begin the full script now. Follow this structure exactly:
         # Pure structural fix — no baked names anywhere.
         try:
             import difflib
-            # v1.4.9 HACK: Strip markdown ** bolding before roster extraction
+            # v1.4 HACK: Strip markdown ** bolding before roster extraction
             _clean_script = re.sub(r'\*\*(\[.*?\])\*\*', r'\1', script_text)
             _roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_ -]+)\s*,', _clean_script))
             if _roster:
@@ -3974,7 +3983,7 @@ Format your response exactly as:
 
         for raw_line in text.strip().splitlines():
             s = raw_line.strip()
-            # v1.4.9 Markdown Bolding Hallucination Fix:
+            # v1.4 Markdown Bolding Hallucination Fix:
             # Gemma 2B often generates **[VOICE:...]** or **=== SCENE ===**
             # Strip outer asterisks before matching tags.
             s = re.sub(r'^\*+|(?<=\])\*+$', '', s).strip()

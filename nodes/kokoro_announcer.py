@@ -195,7 +195,8 @@ class KokoroAnnouncer:
             return (empty, f"Kokoro voice fetch failed: {exc}", voice_id)
 
         # lang_code 'b' = British English in Kokoro v1.0
-        pipeline = KPipeline(lang_code="b", device="cuda")
+        # v1.4.10: Explicitly specify repo_id to suppress migration warnings and ensure local-only stability.
+        pipeline = KPipeline(lang_code="b", device="cuda", repo_id='hexgrad/Kokoro-82M')
 
         clips = []
         render_log = [f"=== Kokoro Announcer ({voice_id}, speed={speed}) ==="]
