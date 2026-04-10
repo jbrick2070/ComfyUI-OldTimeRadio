@@ -4070,8 +4070,10 @@ Format your response exactly as:
                 voice_traits = (m.group(2) or "").strip()
                 # Skip non-VOICE bracket tags that could match (e.g. [MUSIC:...])
                 # Only handle if the raw_name looks like a real character name (uppercase letters)
-                if re.match(r'^[A-Z][A-Z0-9_ ]*$', raw_name, re.IGNORECASE) and raw_name.upper() not in (
-                    "MUSIC", "SFX", "ENV", "BEAT", "PAUSE", "SYSTEM_SENTINEL"
+                _first_word_v3 = raw_name.upper().split()[0] if raw_name.strip() else ""
+                if re.match(r'^[A-Z][A-Z0-9_ ]*$', raw_name, re.IGNORECASE) and _first_word_v3 not in (
+                    "MUSIC", "SFX", "ENV", "BEAT", "PAUSE", "SYSTEM_SENTINEL",
+                    "ACT", "SCENE", "TRANSITION", "CONTINUED", "CONT", "END",
                 ):
                     # Peek at next non-empty line for dialogue
                     j = i + 1
@@ -4100,7 +4102,11 @@ Format your response exactly as:
                 voice_traits = (m.group(2) or "").strip()
                 # Must look like a character name (not a known structural tag)
                 upper_name = raw_name.upper()
-                if upper_name not in ("ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE"):
+                _first_word_v4 = upper_name.split()[0] if upper_name.strip() else ""
+                if _first_word_v4 not in (
+                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                    "TRANSITION", "CONTINUED", "CONT", "END",
+                ):
                     j = i + 1
                     while j < len(raw_lines) and not raw_lines[j].strip():
                         j += 1
