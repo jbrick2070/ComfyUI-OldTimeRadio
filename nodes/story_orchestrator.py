@@ -1,10 +1,10 @@
 r"""
-Gemma 4 Orchestrator — Script Writer + Director for "SIGNAL LOST"
+OTR Orchestrator — Script Writer + Director for "SIGNAL LOST"
 ===================================================================
 
 Two nodes:
   1. Gemma4ScriptWriter — Fetches real daily science news via RSS, feeds it to
-     Gemma 4 to generate a full audio drama script. Contemporary sci-fi anthology
+     LLM to generate a full audio drama script. Contemporary sci-fi anthology
      format (Black Mirror / NPR Invisibilia / Arrival). News-as-spine: real
      headlines become the inciting incident, extrapolated to dramatic extremes.
      Includes a hard-science epilogue citing real sources (ArXiv, Nature, etc.).
@@ -13,7 +13,7 @@ Two nodes:
      TTS voice assignments, SFX cue list, music cues, timing, and spatial audio
      settings. Outputs structured JSON that drives all downstream nodes.
 
-Gemma 4 runs via transformers (local GPU). Content safety filter catches
+LLM runs via transformers (local GPU). Content safety filter catches
 profanity/NSFW that slips past the prompt policy.
 
 v1.0  2026-04-04  Jeffrey Brick
@@ -44,7 +44,7 @@ from datetime import datetime
 from .project_state import ProjectState
 
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
-from ._vram_log import vram_snapshot, vram_reset_peak
+from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 
 # Lazy heavy imports (Section 8) — torch, numpy, transformers inside methods/classes only
 
@@ -147,7 +147,7 @@ def _inject_scene_transitions(script_text: str) -> tuple:
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 3c: WALL-CLOCK TIMEOUT WRAPPER
 # Heavy LLM phases (Open-Close outlines, Critique, Revision) can hang if
-# Gemma 4 stalls on a malformed prompt or GPU goes sideways. We run the
+# LLM stalls on a malformed prompt or GPU goes sideways. We run the
 # call in a worker thread and bound it with a wall-clock budget. On timeout
 # the thread is left to drain in the background (Gemma generation is not
 # cancellable mid-token) but the caller gets control back via TimeoutError
@@ -240,7 +240,7 @@ def _bark_health_check():
 
     # ── Quick smoke test on a single preset BEFORE the full sweep ──
     try:
-        model, processor = _load_bark()
+        model, processor = _load_bark(device="cuda")
         _probe, _ = _generate_single_line("Test.", presets_to_test[0], model, processor, temperature=0.6)
     except Exception as e:
         log.warning("[VoiceHealth] Bark probe failed (%s) — Bark itself appears broken, "
@@ -898,22 +898,17 @@ def _fetch_science_news(max_feeds=10):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GEMMA 4 INFERENCE WRAPPER
+# LLM INFERENCE WRAPPER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
+def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization_profile="Standard"):
     # Strip [BETA] or [8-bit] labels used in the UI dropdown
     model_id = model_id_full.split(" ")[0]
 
-    # Pre-emptive VRAM sanitation: Evict any lingering ComfyUI image models
-    try:
-        import comfy.model_management
-        comfy.model_management.unload_all_models()
-        comfy.model_management.soft_empty_cache()
-    except Exception as e:
-        pass
+    # Pre-emptive VRAM sanitation is now handled at the node entry points
+    # for better visibility and consistency.
 
-    """Load Gemma 4 via transformers. Caches globally with device tracking.
+    """Load LLM via transformers. Caches globally with device tracking.
 
     BEST PRACTICES applied (per survival guide):
       - Section 3:  Lazy loading — never load at import time
@@ -921,45 +916,105 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
       - Section 34: Cache invalidation on device change
       - Section 40: Manual VRAM management since we're outside ComfyUI model registry
       - Section 47: No device_map="auto" (conflicts with ComfyUI's torch.set_default_device)
-      - Section 49: No trust_remote_code=True (Gemma 4 is natively supported)
+      - Section 49: No trust_remote_code=True (Gemma is natively supported)
     """
     global _LLM_CACHE
 
-    # Check for device change — invalidate if needed
+    # Check for device change OR quantization mismatch OR budget profile mismatch
+    is_obsidian = "Obsidian" in optimization_profile
+    requested_quantized = is_obsidian or "4-bit" in model_id_full.lower() or \
+                          any(tag in model_id_full.lower() for tag in ("9b", "12b", "26b", "27b", "31b", "70b", "e4b", "4b-it", "a4b", "2b", "efficiency"))
+
+    # v1.4.7 Audit: Also check if the model object itself has been moved to CPU
+    current_model_device = "cpu"
+    if _LLM_CACHE["model"] is not None:
+        try:
+            current_model_device = str(next(_LLM_CACHE["model"].parameters()).device)
+        except StopIteration:
+            pass
+
     if (_LLM_CACHE["model"] is not None and
-            str(_LLM_CACHE["device"]) != str(device)):
-        log.info("Gemma 4 device changed %s → %s, reloading", _LLM_CACHE["device"], device)
+            (str(_LLM_CACHE["device"]) != str(device) or 
+             _LLM_CACHE["quantized"] != requested_quantized or
+             _LLM_CACHE["model_id"] != model_id or
+             _LLM_CACHE.get("budget_profile") != optimization_profile or
+             _LLM_CACHE.get("VERSION") != "v1.4.9" or
+             ("cuda" in str(device) and "cpu" in current_model_device))):
+        _runtime_log(f"Gemma cache mismatch or version update (v1.4.9) — reloading to enforce budget")
         _unload_llm()
 
     if _LLM_CACHE["model"] is None:
-        log.info(f"Loading Gemma 4 model: {model_id}")
+        log.info(f"Loading LLM model: {model_id} (quantized={requested_quantized})")
         try:
             # Lazy import — only pay the cost when actually generating
             import torch
             from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
 
-            # Enable TF32 for faster matmuls on Ampere/Ada/Blackwell GPUs
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
+            # ── Zero-Prime VRAM Hardening (v1.4.9) ──
+            # We MUST detect hardware and purge memory BEFORE loading even the Tokenizer
+            # to prevent the 15GB transient spike on 16GB cards.
+            
+            # Detect Hardware
+            total_vram = 0
+            if torch.cuda.is_available():
+                total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                
+            # Nuclear Power Wash (Global Eviction)
+            try:
+                import comfy.model_management
+                comfy.model_management.unload_all_models()
+                comfy.model_management.soft_empty_cache()
+                _runtime_log("[StoryOrchestrator] Zero-Prime: ComfyUI Models Evicted.")
+            except: pass
 
             import gc
             gc.collect()
             torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+            
+            # Post-Wash Analytics
+            if torch.cuda.is_available():
+                free_gb = (torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0)) / (1024**3)
+                _runtime_log(f"[StoryOrchestrator] Zero-Prime VRAM State: {free_gb:.1f}GB Free. Capacity: {total_vram:.1f}GB")
+
+            # ── VRAM Budgeting (Early Allocation) ──
+            max_memory = None
+            is_actually_2b = any(tag in model_id.lower() for tag in ("2b-it", "2b_it")) or model_id.lower().endswith("2b")
+            
+            if total_vram >= 12.0:
+                # FLAGSHIP 4GB SOVEREIGNTY BUFFER
+                budget_gb = total_vram - 4.0
+                max_memory = {0: f"{budget_gb:.1f}GiB", "cpu": "32GiB"}
+                _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {budget_gb:.1f}GB Budget")
+            elif is_actually_2b:
+                max_memory = {0: "3.2GiB", "cpu": "32GiB"}
+            elif any(tag in model_id.lower() for tag in ("9b", "12b", "e4b", "4b-it")):
+                max_memory = {0: "6.8GiB", "cpu": "32GiB"}
+
+            # Enable TF32 for faster matmuls on Ampere/Ada/Blackwell GPUs
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+
+            # ── VRAM Hardening v1.4.6: Strict Handoff ──
+            # If Bark is in VRAM, evict it now before loading LLM.
+            try:
+                from .bark_tts import _unload_bark
+                _unload_bark()
+            except ImportError:
+                pass
+            except Exception as handoff_err:
+                log.warning("[StoryOrchestrator] Bark handoff failed: %s", handoff_err)
 
             is_gemma = "gemma" in model_id.lower()
 
             try:
-                if is_gemma:
-                    tokenizer = AutoProcessor.from_pretrained(model_id, local_files_only=True)
-                else:
-                    tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+                # v1.4.7 FIX: Revert to AutoTokenizer. AutoProcessor was causing 
+                # decode offsets to fail on non-multimodal 2B models.
+                tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
             except OSError as local_err:
                 log.info("[StoryOrchestrator] local_files_only=True failed for tokenizer (%s)", local_err)
                 try:
-                    if is_gemma:
-                        tokenizer = AutoProcessor.from_pretrained(model_id)
-                    else:
-                        tokenizer = AutoTokenizer.from_pretrained(model_id)
+                    tokenizer = AutoTokenizer.from_pretrained(model_id)
                 except Exception as hub_err:
                     log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
                     raise RuntimeError(f"Failed to load Tokenizer '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
@@ -991,13 +1046,23 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
             except Exception as _fa_err:
                 log.info("[StoryOrchestrator] FA2 probe failed (%s) — using SDPA fallback", _fa_err)
 
-            # ── 4-bit quantization (only enabled for very large models) ──
-            # The 26B-A4B and 31B variants will OOM on a 16GB GPU at bfloat16.
-            # BitsAndBytesConfig 4-bit squeezes them to fit. The 4B model loads
-            # fine in bfloat16 so we skip quantization for it (better quality).
+            # ── 4-bit quantization (forced for Obsidian or large models) ──
+            # The Obsidian profile mandates 4-bit to fit on 4GB-8GB GPUs.
+            # Large models (26B+) also require 4-bit to fit in 16GB.
             quant_config = None
             needs_8bit = "8-bit" in model_id_full.lower()
-            needs_4bit = "4-bit" in model_id_full.lower() or any(tag in model_id_full.lower() for tag in ("26b", "31b", "27b", "12b", "a4b"))
+            # Large models (9B, 12B, 26B, 27B+) MUST use 4-bit NF4 to fit safely in 16GB
+            # with context headroom and active Audio/TTS models.
+            # We also treat '2bit' and '3bit' as 'Broken' bit-depths and force them to 4-bit
+            # to prevent the 'Wing Ding' corruption (Model Stroke).
+            is_unstable_quant = any(tag in model_id_full.lower() for tag in ("2bit", "3bit", "2-bit", "3-bit"))
+            needs_4bit = requested_quantized or is_unstable_quant or \
+                         any(tag in model_id_full.lower() for tag in ("9b", "12b", "26b", "27b", "31b", "70b", "e4b"))
+            
+            if is_unstable_quant:
+                _runtime_log(f"[StoryOrchestrator] 🛡️ WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
+            elif needs_4bit and not requested_quantized:
+                _runtime_log(f"[StoryOrchestrator] VRAM SAFETY: Forcing 4-bit (NF4) for Large Model ({model_id_full})")
             
             if needs_8bit:
                 try:
@@ -1015,19 +1080,34 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
                         bnb_4bit_use_double_quant=True,
                         bnb_4bit_quant_type="nf4",
                     )
-                    log.info("[StoryOrchestrator] Enabling 4-bit quantization (NF4)")
+                    log.info("[StoryOrchestrator] 🚀 Enabling 4-bit quantization (NF4) for Ultra-Low VRAM")
+                    _runtime_log("[StoryOrchestrator] 🚀 4-bit NF4 active")
                 except ImportError:
                     log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed — "
                                 "loading at bfloat16 may OOM. Run: pip install bitsandbytes")
+
 
             common_kwargs = dict(
                 dtype=load_dtype,
                 low_cpu_mem_usage=True,
                 attn_implementation=attn_impl,
+                max_memory=max_memory,
             )
             if quant_config is not None:
                 common_kwargs["quantization_config"] = quant_config
-                common_kwargs["device_map"] = "auto"  # required by bitsandbytes
+                
+                # FLAGSHIP 16GB OVERRIDE: 2B models fit easily. Accelerate's "auto" is 
+                # often too cautious on laptops, causing a "CPU offload" crash.
+                # Force GPU-only if we have the headroom.
+                if total_vram >= 15.0 and is_actually_2b:
+                    common_kwargs["device_map"] = {"": 0} 
+                    _runtime_log("[StoryOrchestrator] Flagship Override: Forcing CUDA:0 (Direct GPU) for 2B model")
+                else:
+                    common_kwargs["device_map"] = "auto"  # required by bitsandbytes
+            elif max_memory is not None:
+                # VRAM budgeting requires device_map even without quantization,
+                # otherwise max_memory is silently ignored and .to(device) is used.
+                common_kwargs["device_map"] = "auto"
 
             try:
                 model = AutoModelForCausalLM.from_pretrained(
@@ -1044,29 +1124,34 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda"):
                     )
                 except Exception as hub_err:
                     log.error("[StoryOrchestrator] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
-                    raise RuntimeError(f"Failed to load Gemma 4 model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
+                    raise RuntimeError(f"Failed to load LLM model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
-            # Quantized models are placed by device_map; non-quantized go .to(device)
-            if quant_config is None:
+            # Quantized models and budget-capped models are placed by device_map;
+            # non-quantized, non-budgeted go .to(device) manually.
+            if quant_config is None and max_memory is None:
                 model = model.to(device)
             model = model.eval()
 
             _LLM_CACHE["model"] = model
             _LLM_CACHE["tokenizer"] = tokenizer
             _LLM_CACHE["device"] = device
-            log.info("Gemma 4 loaded: %s on %s", type(model).__name__, device)
+            _LLM_CACHE["quantized"] = requested_quantized
+            _LLM_CACHE["model_id"] = model_id
+            _LLM_CACHE["budget_profile"] = optimization_profile
+            _LLM_CACHE["VERSION"] = "v1.4.9"
+            _runtime_log(f"LLM loaded: {model_id} (quantized={requested_quantized}, budget={optimization_profile}) [v1.4.9]")
         except Exception as e:
-            log.exception("Failed to load Gemma 4: %s", e)  # Section 49: log.exception for full traceback
+            log.exception("Failed to load LLM: %s", e)  # Section 49: log.exception for full traceback
             raise
     return _LLM_CACHE["model"], _LLM_CACHE["tokenizer"]
 
 
 # Bounded model cache with device tracking (Section 34)
-_LLM_CACHE = {"model": None, "tokenizer": None, "device": None}
+_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.4.9"}
 
 
 def _unload_llm():
-    """Explicitly unload Gemma 4 to free VRAM (v1.3.1 OOM FIX).
+    """Explicitly unload LLM to free VRAM (v1.3.1 OOM FIX).
 
     The v1.3 version did del + gc.collect() + empty_cache(), but that
     is a no-op when abandoned worker threads from _run_with_timeout
@@ -1099,7 +1184,7 @@ def _unload_llm():
         # Step 2: drop references from the module-level cache.
         del _LLM_CACHE["model"]
         del _LLM_CACHE["tokenizer"]
-        _LLM_CACHE = {"model": None, "tokenizer": None, "device": None}
+        _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None}
         # Step 3 + 4: gc and return VRAM to the allocator.
         gc.collect()
         torch.cuda.empty_cache()
@@ -1115,10 +1200,15 @@ def _unload_llm():
         allocated_gib = torch.cuda.memory_allocated() / 1e9
         reserved_gib = torch.cuda.memory_reserved() / 1e9
         log.info(
-            "Gemma 4 unloaded: VRAM allocated=%.2f GiB reserved=%.2f GiB "
+            "LLM unloaded: VRAM allocated=%.2f GiB reserved=%.2f GiB "
             "(cpu + gc.collect + empty_cache)",
             allocated_gib, reserved_gib,
         )
+
+# Register the LLM unloader with the VRAM Power Wash system so that
+# force_vram_offload() at node entry points also evicts Gemma.
+from ._vram_log import register_vram_cleanup
+register_vram_cleanup(_unload_llm)
 
 
 class GemmaHeartbeatStreamer(BaseStreamer):
@@ -1230,13 +1320,21 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return
 
         # ── Voice tag: [VOICE: NAME, traits] dialogue ────────────────
-        if "[VOICE:" in line:
+        if "[VOICE:" in line.upper():
             self.dialogue_count += 1
             try:
-                tag_content = line.split("[VOICE:", 1)[1].split("]", 1)[0]
+                # Case-insensitive tag extraction
+                line_up = line.upper()
+                start_idx = line_up.find("[VOICE:") + 7
+                end_idx = line.find("]", start_idx)
+                tag_content = line[start_idx:end_idx]
+                
                 name = tag_content.split(",", 1)[0].strip().upper()
                 self.characters_seen.add(name)
-                _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {line.split(']',1)[-1].strip()[:60]}")
+                
+                # Dynamic log update
+                clean_dialogue = line[end_idx+1:].strip()[:60]
+                _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
             except (IndexError, ValueError):
                 _runtime_log(f"ScriptWriter: Voice line #{self.dialogue_count}")
             return
@@ -1266,22 +1364,27 @@ class GemmaHeartbeatStreamer(BaseStreamer):
 
 
 def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
-                          max_new_tokens=4096, temperature=0.8, top_p=0.92):
-    """Generate text with Gemma 4."""
+                          max_new_tokens=4096, temperature=0.8, top_p=0.92,
+                          optimization_profile="Standard"):
+    """Generate text with LLM."""
     import torch
 
-    model, tokenizer = _load_llm(model_id)
+    model, tokenizer = _load_llm(model_id, optimization_profile=optimization_profile)
+    is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
 
     # Multimodal vs Text-Only wrapper
     is_gemma = "gemma" in model_id.lower()
-    if is_gemma:
+    
+    # BUG-011 FIX: Verify tokenizer supports the multimodal list-of-dicts format.
+    supports_multimodal = hasattr(tokenizer, "tokenizer") or hasattr(tokenizer, "image_processor")
+    if is_gemma and supports_multimodal:
         messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
     else:
         messages = [{"role": "user", "content": prompt}]
         
     text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     
-    if is_gemma:
+    if is_gemma and supports_multimodal:
         inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
     else:
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
@@ -1290,7 +1393,7 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
     if "attention_mask" not in inputs and "input_ids" in inputs:
         inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
 
-    # Gemma 4 eos_token_id is a list — extract first element for pad_token_id
+    # LLM eos_token_id is a list — extract first element for pad_token_id
     eos_id = model.generation_config.eos_token_id
     pad_id = eos_id[0] if isinstance(eos_id, list) else eos_id
 
@@ -1305,6 +1408,11 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
 
     try:
         with torch.no_grad():
+            # v1.4.9: Tune penalty for 2B models to prevent SFX loops
+            final_penalty = 1.12
+            if "2b" in model_id.lower():
+                final_penalty = 1.25  # Firmer hand for the small model
+                
             output = model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
@@ -1312,7 +1420,7 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
                 temperature=temperature,
                 top_p=top_p,
                 do_sample=True,
-                repetition_penalty=1.12,  # anti-loop sweet spot for dialogue
+                repetition_penalty=final_penalty,
                 pad_token_id=pad_id,
                 streamer=streamer,      # Enable live streaming + granular heartbeats
             )
@@ -1856,7 +1964,7 @@ F. THE EAR TEST (FINAL WARNING) — Read each line aloud in your head as you wri
 
 
 class LLMScriptWriter:
-    """Fetches real science news, generates a full radio drama script via Gemma 4."""
+    """Fetches real science news, generates a full radio drama script via LLM."""
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "write_script"
@@ -1891,9 +1999,9 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Nemo-Instruct-2407 [8-bit]", "mistralai/Mistral-Nemo-Instruct-2407 [4-bit]"], {
+                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Nemo-Instruct-2407 [8-bit]", "mistralai/Mistral-Nemo-Instruct-2407 [4-bit]"], {
                     "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for Gemma 4 or Nemo 12B"
+                    "tooltip": "Hugging Face model ID for LLM (Gemma series, Nemo, etc.)"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -1939,6 +2047,10 @@ class LLMScriptWriter:
                 # so widgets_values length is unchanged and v1.3 workflows load clean.
                 "project_state": ("PROJECT_STATE", {
                     "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
+                }),
+                "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
+                    "default": "Standard",
+                    "tooltip": "Master switch for multi-pass generation. Obsidian is for 4GB hardware only; it is unstable and disables all iterative passes."
                 }),
             },
         }
@@ -2102,8 +2214,29 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      style_variant="tense claustrophobic",
                      creativity="balanced",
                      arc_enhancer=True,
-                     project_state=None):
+                     project_state=None,
+                     optimization_profile="Standard"):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
+
+        # ── OPTIMIZATION PROFILE OVERRIDES ──
+        # Obsidian mode is "One-Shot": no critique, no open-close, no arc-enhancer.
+        # This prevents the "slow to a crawl" effect on 4GB cards where multiple
+        # LLM passes cause excessive offloading overhead.
+        if optimization_profile == "Obsidian (Low VRAM/Fast)":
+            _runtime_log("ScriptWriter: OBSIDIAN PROFILE ACTIVE — forcing One-Shot mode. NOTE: 4GB hardware may still see ~9GB total footprint.")
+            log.warning("[LLMScriptWriter] Obsidian Profile: 4GB VRAM IS CURRENTLY UNSTABLE. Total usage will likely exceed physical VRAM.")
+            self_critique = False
+            open_close = False
+            arc_enhancer = False
+        elif optimization_profile == "Standard":
+            # Standard skips Open-Close (very heavy) but keeps Critique and Arc Enhancer
+            # for reasonable quality.
+            if open_close:
+                log.info("[LLMScriptWriter] Standard Profile: Open-Close was ON but typically skipped in Standard. Allowing user's True choice.")
+            else:
+                open_close = False
+        
+        # Pro (Ultra) keeps whatever the widgets say (defaults to all ON).
 
         # ── MASTER SWITCH INHERITANCE ──
         # Save explicitly chosen model so Director can use it automatically.
@@ -2381,8 +2514,19 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # SceneSequencer. The Director adds a procedural display_name (e.g.
         # "BLAKE ARCHER") for human-facing output only — never as a pipeline key.
 
-        # Build prompt system
-        system = (SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT).format(
+        # ── Phase 1b: Model Selection & Prompting ──
+        # v1.4.9 Fix: Small models (2B) suffer from "Model Collapse" if the
+        # prompt is too complex. We swap to a "LITE" version for these.
+        # Check for 2B specifically (avoiding false hits on 26b or 31b)
+        is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
+        
+        system_base = SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
+        if is_small_model:
+            # Gemma 2B Lite role prevents prose and header hallucinations
+            lite_role = "<system_role>STRICT OTR TAGS ONLY. No prose. Start every line with a tag.</system_role>"
+            system_base = lite_role + "\n\n" + SCRIPT_SYSTEM_PROMPT
+            
+        system = system_base.format(
             target_minutes=target_minutes,
             target_words=target_words,
             news_block=news_block,
@@ -2508,7 +2652,7 @@ Begin the full script now. Follow this structure exactly:
             full_prompt = f"{system}\n\n{user_prompt}"
 
         log.info(f"[LLMScriptWriter] Generating {target_minutes}min episode "
-                 f"'{episode_title}' ({genre_flavor})")
+                 f"'{episode_title}' ({genre_flavor}) using {model_id}")
         log.info(f"[LLMScriptWriter] News seed: {news[0]['headline']} | {news[0]['source']}")
 
         # For episodes > 5 min, generate act-by-act to avoid token truncation.
@@ -2516,19 +2660,31 @@ Begin the full script now. Follow this structure exactly:
         # which fits, but 45-min needs ~5,850 which is tight. Chunked generation
         # ensures we never hit the ceiling and produces more coherent long scripts.
 
-        if target_minutes <= 5:
-            # Short episodes: single-pass generation.
+        if target_minutes <= 5 or optimization_profile == "Obsidian (Low VRAM/Fast)":
+            # Short episodes (or Obsidian 4GB tier): single-pass generation.
             # Floor at 1024 — even a 1-min episode needs enough tokens to
             # complete canonical structure (ENV, SFX, VOICE tags, beats).
             # Without the floor, 1-min = 260 tokens, which truncates mid-scene.
-            max_new_tokens = max(int(target_words * 2.0), 1024)
-            max_new_tokens = min(max_new_tokens, 8192)
+            
+            # BUG-012 FIX: Cap KV cache for direct generation in Obsidian profile.
+            # Standard: 8192 limit. Obsidian: 2500 limit (protects 4GB VRAM ceiling).
+            if optimization_profile == "Obsidian (Low VRAM/Fast)":
+                if target_minutes > 5:
+                    log.warning("[LLMScriptWriter] Obsidian profile forced single-pass on %d min target. "
+                                "Expect shorter overall length.", target_minutes)
+                max_new_tokens = max(int(target_words * 2.0), 1024)
+                max_new_tokens = min(max_new_tokens, 2500)
+            else:
+                max_new_tokens = max(int(target_words * 2.0), 1024)
+                max_new_tokens = min(max_new_tokens, 8192)
+
             script_text = _generate_with_llm(
                 full_prompt,
                 model_id=model_id,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
                 top_p=active_top_p,
+                optimization_profile=optimization_profile
             )
         else:
             # Long episodes: chunked act-by-act generation
@@ -2538,7 +2694,8 @@ Begin the full script now. Follow this structure exactly:
                 include_act_breaks, model_id, temperature,
                 lemmy_directive=lemmy_directive,
                 top_p=active_top_p,
-                cast_roster_block=cast_roster_block
+                cast_roster_block=cast_roster_block,
+                optimization_profile=optimization_profile
             )
 
         # ── v1.1 CHECKS & CRITIQUES LOOP ─────────────────────────────────────
@@ -2551,7 +2708,8 @@ Begin the full script now. Follow this structure exactly:
         if self_critique:
             _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise")
             script_text = self._critique_and_revise(
-                script_text, genre_flavor, target_words, model_id, temperature
+                script_text, genre_flavor, target_words, model_id, temperature,
+                optimization_profile=optimization_profile
             )
             _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
 
@@ -2561,7 +2719,8 @@ Begin the full script now. Follow this structure exactly:
         if arc_enhancer:
             _runtime_log("ScriptWriter: >>> ENTERING arc_enhancer")
             script_text = self._execute_arc_enhancer(
-                script_text, genre_flavor, episode_title, news_block, model_id, temperature
+                script_text, genre_flavor, episode_title, news_block, model_id, temperature,
+                optimization_profile=optimization_profile
             )
             _runtime_log("ScriptWriter: <<< EXITED arc_enhancer")
 
@@ -2582,7 +2741,9 @@ Begin the full script now. Follow this structure exactly:
         # Pure structural fix — no baked names anywhere.
         try:
             import difflib
-            _roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_]+)\s*,', script_text))
+            # v1.4.9 HACK: Strip markdown ** bolding before roster extraction
+            _clean_script = re.sub(r'\*\*(\[.*?\])\*\*', r'\1', script_text)
+            _roster = set(re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_ -]+)\s*,', _clean_script))
             if _roster:
                 _roster_list = sorted(_roster)
                 _leaks_fixed = 0
@@ -2613,9 +2774,10 @@ Begin the full script now. Follow this structure exactly:
                         "always", "forever", "tonight", "tomorrow", "yesterday",
                     }:
                         return token
-                    # Phonetic match to closest roster name (cutoff 0.60 — more precise
-                    # than 0.55 to prevent false replacements of legitimate names).
-                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.60)
+                    # Phonetic match to closest roster name (cutoff 0.80 — strictly
+                    # tuned to catch typos like 'Marten'->'Martin' without falsely
+                    # capturing normal English prose or SFX tags).
+                    match = difflib.get_close_matches(upper, _roster_list, n=1, cutoff=0.80)
                     if match:
                         _leaks_fixed += 1
                         # Preserve title-case for dialogue flow
@@ -2624,7 +2786,7 @@ Begin the full script now. Follow this structure exactly:
                 script_text = _addr_pat.sub(_leak_fix, script_text)
                 if _leaks_fixed:
                     log.warning(
-                        "[LLMScriptWriter] NameLeakGuard: repaired %d stock-name leak(s) "
+                        "[LLMScriptWriter] NameLeakGuard: repaired %d typo/leak(s) "
                         "in dialogue body (roster=%s)",
                         _leaks_fixed, sorted(_roster)
                     )
@@ -2767,7 +2929,7 @@ Begin the full script now. Follow this structure exactly:
     def _open_close_expansion(self, system, genre_flavor, news_block,
                               num_characters, target_minutes, target_words,
                               lemmy_directive, model_id, temperature,
-                              cast_roster_block=""):
+                              cast_roster_block="", optimization_profile="Standard"):
         """Generate 3 competing story outlines with different priorities,
         then have an evaluator pick the best one.
 
@@ -2786,6 +2948,7 @@ Begin the full script now. Follow this structure exactly:
                 target_minutes, target_words, lemmy_directive,
                 model_id, temperature,
                 cast_roster_block=cast_roster_block,
+                optimization_profile=optimization_profile
             )
         except Exception as e:
             log.error("[OpenClose] Top-level failure: %s — falling back to v1.0 direct generation", e)
@@ -2795,7 +2958,7 @@ Begin the full script now. Follow this structure exactly:
     def _open_close_expansion_inner(self, system, genre_flavor, news_block,
                                      num_characters, target_minutes, target_words,
                                      lemmy_directive, model_id, temperature,
-                                     cast_roster_block=""):
+                                     cast_roster_block="", optimization_profile="Standard"):
         """Inner implementation of Open-Close expansion (wrapped for safety)."""
         log.info("[OpenClose] Starting Open-Close expansion (3 outlines + evaluator)...")
         _runtime_log("OPENCLOSE: Generating 3 competing outlines")
@@ -2929,6 +3092,7 @@ Keep it under 400 words. Structure only — no dialogue."""
                         model_id=model_id,
                         max_new_tokens=outline_max_tokens,
                         temperature=min(1.0, temperature + 0.1),
+                        optimization_profile=optimization_profile
                     ),
                     timeout_sec=480,   # was 300 — raised to 8min for SDPA @ ~2 tok/s
                     phase_label=f"OpenClose-{mode_label}-{focus_name}",
@@ -3003,6 +3167,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
                     model_id=model_id,
                     max_new_tokens=800,
                     temperature=max(0.3, temperature - 0.3),
+                    optimization_profile=optimization_profile
                 ),
                 timeout_sec=300,
                 phase_label="OpenClose-Evaluator",
@@ -3046,7 +3211,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
     # ─────────────────────────────────────────────────────────────────────────
 
     def _critique_and_revise(self, draft_text, genre_flavor, target_words,
-                             model_id, temperature):
+                             model_id, temperature, optimization_profile="Standard"):
         """Three-pass refinement: the LLM critiques its own draft, then revises.
 
         Pass 1 (already done): Draft generation (the script_text we received).
@@ -3103,7 +3268,9 @@ YOUR CRITIQUE (numbered list only):"""
                     critique_prompt,
                     model_id=model_id,
                     max_new_tokens=critique_tokens,
-                    temperature=max(0.3, temperature - 0.3),
+                    temperature=0.3,
+                    top_p=0.9,
+                    optimization_profile=optimization_profile
                 ),
                 timeout_sec=300,
                 phase_label="Critique-Pass",
@@ -3176,7 +3343,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             log.info("[Critique] Revision token budget: %d (draft_est=%d, target_words=%d)",
                      revision_tokens, draft_token_estimate, target_words)
             # BUG-005 fix: scale wall-clock budget to episode length AND draft size.
-            # SDPA on Gemma 4 E4B runs ~2-3 tok/s, so a 22k-char revision needs
+            # SDPA on 4-expert MoE models runs ~2-3 tok/s, so a 22k-char revision needs
             # ~700-1100s. The previous fixed 600s killed every long episode.
             # Formula: max(600, target_minutes*60, len(draft)*0.05)
             # target_words = target_minutes * 130, so target_minutes ≈ target_words / 130
@@ -3194,6 +3361,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                     model_id=model_id,
                     max_new_tokens=revision_tokens,
                     temperature=temperature,
+                    optimization_profile=optimization_profile
                 ),
                 timeout_sec=revision_timeout,
                 phase_label="Revision-Pass",
@@ -3267,7 +3435,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
                           target_words, premise, news_block, act_breaks,
                           model_id, temperature, lemmy_directive="", top_p=0.95,
-                          cast_roster_block=""):
+                          cast_roster_block="", optimization_profile="Standard"):
         """Generate long scripts act-by-act to avoid token truncation.
 
         Step 1: Generate an outline (characters, plot beats, act structure)
@@ -3303,9 +3471,16 @@ Remember: This is a DRAMA that happens to involve science, not a science report 
 
 Outline only — do NOT write dialogue yet."""
 
-        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts)")
+        # BUG-011 FIX: Reduce KV Cache allocation overhead.
+        # Outline is instructed to be under 400 words. max_new_tokens=1500 pre-allocates
+        # excessive KV cache, which immediately overflows the 4GB ceiling and causes 100% GPU
+        # PCIe memory thrashing (0.1 tok/sec behavior, appearing as a hang).
+        outline_budget = 600 if optimization_profile == "Obsidian (Low VRAM/Fast)" else 1200
+        
+        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}]")
         outline = _generate_with_llm(outline_prompt, model_id=model_id,
-                                         max_new_tokens=1500, temperature=temperature, top_p=top_p)
+                                         max_new_tokens=outline_budget, temperature=temperature, top_p=top_p,
+                                         optimization_profile=optimization_profile)
 
         # Step 2: Generate each act with Context Engineering
         # Instead of dumping raw previous text, we summarize what happened
@@ -3339,6 +3514,7 @@ SUMMARY:"""
                         summary = _generate_with_llm(
                             summary_prompt, model_id=model_id,
                             max_new_tokens=200, temperature=0.3,
+                            optimization_profile=optimization_profile
                         )
                         act_summaries.append(summary)
                         _runtime_log(f"ScriptWriter: Act {act_num-1} summarized for context")
@@ -3359,6 +3535,7 @@ SUMMARY:"""
                         summary = _generate_with_llm(
                             summary_prompt, model_id=model_id,
                             max_new_tokens=200, temperature=0.3,
+                            optimization_profile=optimization_profile
                         )
                         act_summaries.append(summary)
                     except Exception:
@@ -3412,15 +3589,26 @@ CONTINUITY CHECK: Before writing, review the story-so-far summaries above. Ensur
 Write Act {act_num} now:"""
 
             _runtime_log(f"ScriptWriter: Generating Act {act_num}/{num_acts}")
+            
+            # BUG-011 FIX: Reduce KV Cache allocation overhead for Act chunks.
+            # 4096 pre-allocates too much VRAM on 4GB cards. Scale it to the act size.
+            # 1 word ~ 1.5 tokens. We grant a 2x buffer (3.0 * words).
+            if optimization_profile == "Obsidian (Low VRAM/Fast)":
+                act_budget = min(2048, int(words_per_act * 3.0))
+            else:
+                act_budget = 4096
+                
             act_text = _generate_with_llm(act_prompt, model_id=model_id,
-                                              max_new_tokens=4096, temperature=temperature, top_p=top_p)
+                                              max_new_tokens=act_budget, temperature=temperature, top_p=top_p,
+                                              optimization_profile=optimization_profile)
             acts.append(act_text)
 
         return "\n\n".join(acts)
 
-    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature):
+    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature, optimization_profile="Standard"):
         """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence."""
-        _runtime_log("ARC_ENHANCER: Starting structural coherence pass")
+        _runtime_log("ARC_EN_HANCER: Starting structural coherence pass")
+        original_script_backup = script_text
 
         # Phase A: Extraction
         bookends = self._get_bookends(script_text)
@@ -3490,6 +3678,7 @@ Format your response exactly as:
                     model_id=model_id,
                     max_new_tokens=1000,
                     temperature=0.6,
+                    optimization_profile=optimization_profile
                 ),
                 timeout_sec=300,
                 phase_label="Arc-Enhancer-Echo",
@@ -3548,6 +3737,7 @@ Format your response exactly as:
                                         model_id=model_id,
                                         max_new_tokens=1000,
                                         temperature=0.6,
+                                        optimization_profile=optimization_profile
                                     ),
                                     timeout_sec=300,
                                     phase_label="Arc-Enhancer-Retry",
@@ -3589,9 +3779,10 @@ Format your response exactly as:
                 _runtime_log("ARC_ENHANCER: Parsing error — response format invalid")
 
         except Exception as e:
-            log.warning("[ArcEnhancer] Echo pass failed: %s", e)
-            _runtime_log(f"ARC_ENHANCER: Failed — {e}")
-            script_text = f"{script_text}\n\n[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]"
+            log.warning("[ArcEnhancer] Phase B/C pass failed: %s", e)
+            _runtime_log(f"ARC_ENHANCER: Failed — {e} (reverting to original)")
+            # Revert to raw LLM output to prevent len(text)=1 crash
+            return original_script_backup
 
         # v1.4 Theme B — automatic scene transition injection.
         # Runs regardless of how Phase B/C fared so even a failed arc pass
@@ -3772,14 +3963,19 @@ Format your response exactly as:
         # occasionally uses asterisks as the closing delimiter, which silently
         # broke scene splitting and merged Act 3 into Act 2's last scene).
         scene_pat = re.compile(r'^===\s*SCENE\s+(.+?)\s*(?:===|\*\*\*)', re.IGNORECASE)
-        env_pat   = re.compile(r'^\[ENV:\s*(.+?)\]$',          re.IGNORECASE)
-        sfx_pat   = re.compile(r'^\[SFX:\s*(.+?)\]$',          re.IGNORECASE)
+        env_pat   = re.compile(r'^\[ENV:\s*(.+?)\]',          re.IGNORECASE)
+        sfx_pat   = re.compile(r'^\[SFX:\s*(.+?)\]',          re.IGNORECASE)
         # Full voice tag: [VOICE: NAME, traits...] dialogue text
         voice_pat = re.compile(r'^\[VOICE:\s*(.+?),\s*(.+?)\]\s*(.+)$', re.IGNORECASE)
         beat_pat  = re.compile(r'^\(beat\)$', re.IGNORECASE)
 
         for raw_line in text.strip().splitlines():
             s = raw_line.strip()
+            # v1.4.9 Markdown Bolding Hallucination Fix:
+            # Gemma 2B often generates **[VOICE:...]** or **=== SCENE ===**
+            # Strip outer asterisks before matching tags.
+            s = re.sub(r'^\*+|(?<=\])\*+$', '', s).strip()
+            
             if not s:
                 continue
 
@@ -3852,9 +4048,29 @@ Format your response exactly as:
 
         # BUG-010 fix: hard-abort if extraction produced an empty / no-dialogue
         # script. Previously this silently passed ghost data into SceneSequencer
-        # which then crashed Bark / video assembly with cryptic errors. Fail
-        # loudly here so the user gets a clear root-cause message.
+        # which then crashed Bark / video assembly with cryptic errors.
         dialogue_count = sum(1 for ln in lines if ln.get("type") == "dialogue")
+        
+        # v1.4 Theme B - Failsafe for 2B models that strip [VOICE:] tags
+        # If no dialogue was found but we see `NAME: dialogue` structure, attempt recovery
+        if dialogue_count == 0 and len(lines) > 0:
+            log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
+            _recovered = 0
+            for ln in lines:
+                if ln.get("type") == "direction":
+                    text = ln["text"]
+                    # Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
+                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text)
+                    if m:
+                        ln["type"] = "dialogue"
+                        ln["character_name"] = m.group(1).strip()
+                        ln["voice_traits"] = "unspecified"
+                        ln["line"] = m.group(2).strip()
+                        _recovered += 1
+            if _recovered > 0:
+                log.info(f"[ScriptParser] Permissive fallback recovered {_recovered} dialogue lines!")
+                dialogue_count = _recovered
+
         if not lines or dialogue_count == 0:
             log.critical(
                 "[ScriptParser] FATAL: parsed %d structural lines but %d dialogue lines. "
@@ -3865,6 +4081,8 @@ Format your response exactly as:
                 f"PARSE_FATAL: lines={len(lines)} dialogue={dialogue_count} "
                 f"raw_text_len={len(text)} — aborting"
             )
+            with open("FAILED_SCRIPT_DUMP.txt", "w", encoding="utf-8") as f:
+                f.write(text)
             raise ValueError(
                 f"Script parser produced 0 dialogue lines from {len(text)}-char input. "
                 "Aborting run to prevent silent audio failure."
@@ -3936,34 +4154,34 @@ The script follows these tokens:
     }}
   }},
   "sfx_plan": [
-    {
+    {{
       "cue_id": "sfx_001",
       "type": "sfx",
       "description": "Distant thunder rolling behind heavy rain",
       "generation_prompt": "Low rumble of distant thunder, heavy rain pattering on a tin roof, outdoor perspective, cinematic sound design"
-    }
+    }}
   ],
   "music_plan": [
-    {
+    {{
       "cue_id": "opening",
       "duration_sec": 12,
       "generation_prompt": "1940s old time radio opening theme, warm brass fanfare, upright bass, snare brushes, mono AM radio character, tube saturation, confident and mysterious, ends on a held chord"
-    },
-    {
+    }},
+    {{
       "cue_id": "closing",
       "duration_sec": 8,
       "generation_prompt": "1940s old time radio closing sting, brass and strings, resolving cadence, warm tube saturation, fades to silence"
-    },
-    {
+    }},
+    {{
       "cue_id": "interstitial",
       "duration_sec": 4,
       "generation_prompt": "short old time radio act-break stinger, single brass hit with cymbal swell, mono, tube warmth"
-    }
+    }}
   ],
-  "pacing": {
+  "pacing": {{
     "beat_pause_ms": 100
-  }
-}
+  }}
+}}
 
 ═══ 🔊 SFX PLAN RULES ═══
 - Scan all [SFX:] tags in the script. Create one dictionary entry per tag in the sfx_plan list.
@@ -4034,7 +4252,7 @@ KOKORO_VOICE_RULES = """- Scan all [VOICE:] tags in the script. The FIRST FIELD 
 
 
 class LLMDirector:
-    """Takes a script and generates a full production plan via Gemma 4."""
+    """Takes a script and generates a full production plan via LLM."""
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "direct"
@@ -4064,11 +4282,15 @@ class LLMDirector:
                 "project_state": ("PROJECT_STATE", {
                     "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
                 }),
+                "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
+                    "default": "Standard",
+                    "tooltip": "Consistency widget. Obsidian is unstable; on 4GB cards, ensure 'kokoro' is used for TTS below."
+                }),
             },
         }
 
     def direct(self, script_text, temperature=0.4, tts_engine="bark (standard 8GB)", vintage_intensity="subtle",
-               project_state=None):
+               project_state=None, optimization_profile="Standard"):
         # ── MASTER SWITCH INHERITANCE ──
         # Inherently use the chosen model from ScriptWriter.
         global _CURRENT_LLM_MODEL
@@ -4132,6 +4354,7 @@ class LLMDirector:
             model_id=model_id,
             max_new_tokens=max_tokens,
             temperature=temperature,
+            optimization_profile=optimization_profile
         )
 
         # Extract JSON from response
@@ -4172,6 +4395,12 @@ class LLMDirector:
         log.info(f"[LLMDirector] Plan: {len(plan.get('voice_assignments', {}))} voices, "
                  f"{len(plan.get('sfx_plan', []))} SFX cues, "
                  f"{len(plan.get('music_plan', []))} music cues")
+
+        # BUG-012 FIX: Explicitly unload Gemma from VRAM at the end of the director phase.
+        # Otherwise it stays resident during the audio generation phases, causing VRAM OOM
+        # or massive PCIe swapping on 4GB hardware.
+        _unload_llm()
+        _runtime_log("Director: Gemma unloaded — VRAM freed for Audio/TTS")
 
         # v1.4 Theme C — director exit snapshot.
         vram_snapshot("director_exit")

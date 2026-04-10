@@ -1,5 +1,5 @@
 {
-    "id": "7f8b9e12-c231-41db-9087-8d074e2d2165",
+    "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
     "revision": 0,
     "last_node_id": 15,
     "last_link_id": 25,
@@ -15,17 +15,17 @@
                 400,
                 320
             ],
-            "title": "1. Gemma Writes the Story (8GB OPTIMIZED)",
+            "title": "1. LLM Story Writer",
             "properties": {
                 "Node name for S&R": "OTR_Gemma4ScriptWriter"
             },
             "widgets_values": [
-                "The 8GB Frequency",
+                "The Last Frequency",
                 "hard_sci_fi",
-                "📻 standard (8 min)",
+                "\ud83d\udcfb standard (8 min)",
                 8,
                 4,
-                "google/gemma-4-E4B-it",
+                "google/gemma-4-26b-a4b-it [BETA]",
                 "",
                 3,
                 0.8,
@@ -35,7 +35,8 @@
                 "medium (5 acts)",
                 "tense claustrophobic",
                 "balanced",
-                true
+                true,
+                "Pro (Ultra Quality)"
             ],
             "inputs": [],
             "outputs": [
@@ -91,15 +92,16 @@
                 400,
                 280
             ],
-            "title": "2. Gemma Directs the Show",
+            "title": "2. LLM Director",
             "properties": {
                 "Node name for S&R": "OTR_Gemma4Director"
             },
             "widgets_values": [
                 "",
                 0.4,
-                true,
-                "subtle"
+                "bark (standard 8GB)",
+                "subtle",
+                "Pro (Ultra Quality)"
             ],
             "inputs": [
                 {
@@ -284,7 +286,7 @@
                 "Node name for S&R": "OTR_EpisodeAssembler"
             },
             "widgets_values": [
-                "The 8GB Frequency",
+                "The Last Frequency",
                 10.0,
                 8.0,
                 500
@@ -404,7 +406,7 @@
             "widgets_values": [
                 24,
                 "1920x1080",
-                "The 8GB Frequency"
+                "The Last Frequency"
             ],
             "inputs": [
                 {
@@ -559,7 +561,7 @@
             "widgets_values": [
                 "{}",
                 "",
-                "facebook/musicgen-small"
+                "facebook/musicgen-medium"
             ],
             "color": "#234035",
             "bgcolor": "#162821"
@@ -776,7 +778,7 @@
     ],
     "groups": [
         {
-            "title": "1. WRITE THE STORY (8GB OPTIMIZED) \ud83d\udcdd",
+            "title": "1. WRITE THE STORY \ud83d\udcdd",
             "bounding": [
                 20,
                 80,
@@ -822,10 +824,10 @@
             ]
         },
         "info": {
-            "name": "Old-Time Radio Sci-Fi (8GB Optimized)",
+            "name": "Old-Time Radio Sci-Fi Anthology",
             "author": "Jeffrey Brick",
-            "description": "8GB VRAM Optimized: Gemma 4 E2B + MusicGen Small + Sequential Handoff",
-            "version": "1.0.0-8gb"
+            "description": "Gemma 4 scripts + Bark TTS + Spatial Audio Enhance + Episode assembly",
+            "version": "1.0.0-hq"
         }
     },
     "version": 0.4

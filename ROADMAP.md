@@ -17,8 +17,9 @@
 - **Workflow verification:** 100% regression pass (89/89 tests).
 
 ### 3) Next Priority Feature (v1.5)
-- **[COMPLETED] Model-Independent Story Orchestrator:** Dynamic multi-model support allowing swapping between Gemma 4 and Mistral-Nemo-12B, completely rewriting nodes into `story_orchestrator.py` while maintaining retroactive JSON workflow compatibility.
-- **[COMPLETED] Obsidian Architecture (4GB VRAM):** All-Kokoro pipeline (`OTR_BatchKokoroGenerator`) completely separated from the 8GB Bark defaults via `tts_engine` toggle.
+- [x] v1.4.9 Update: **[COMPLETED] 16GB Flagship Hardening**. Zero-Prime loading, 4GB Sovereignty Buffer, and Case-Insensitive Telemetry verified on RTX 5080 (11.5 tok/s at 137W).
+- [x] v1.4.9 Update: **[ABANDONED] 4GB/8GB Hardware Support**. Extensive profiling confirms that even 2B/9B models consume ~16GB of VRAM after drivers and buffers, leading to unusable system lag on lower-tier hardware.
+- [x] v1.4.9 Update: **[COMPLETED] VoiceHealth & Telemetry Fixes**. Forced CUDA for health checks and fixed case-sensitive tracking for 9B models.
 - **[COMPLETED] AudioGen SFX:** Replacing procedural noise with generative Foley via `OTR_BatchAudioGenGenerator` and procedural fallback.
 - **RVC Voice Locking:** Post-generation timbre-locking for canonical characters (Lemmy, etc.).
 
@@ -29,12 +30,13 @@
 - Zero trailing BOM signatures.
 
 ### 5) First Moves for Next Session
-- Run `git status` to guarantee you're on `main`.
-- Begin drafting the `v1.5` feature specs for RVC integration.
+- Check test results again. 4GB Obsidian profile and workflow JSONs are now verified and hardened.
+- Run `git status` and verify changes are pushed/clean.
+- Begin drafting the `v1.5` feature specs for RVC integration (timbre locking).
 
 ---
 
-## Current state (as of 2026-04-08)
+## Current state (as of 2026-04-09)
 
 - **Last shipped tag:** `v1.3` → `ddbed87` (v1.3 final, includes Gemma 4 VRAM release fix)
 - **Active branch:** `v1.4-voice-arc-infra` (working as v1.4-beta until explicit ship signoff)

@@ -24,7 +24,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM (Gemma 4 or Nemo 12B)** chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM (Gemma 2, Gemma 4, or Nemo 12B)** chain to write a refined sci-fi radio drama. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
@@ -59,8 +59,7 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Gemma 4 E2B** | ~3 GB | **Recommended for 8GB VRAM.** Lighter weight, faster at low context. |
-| **Gemma 4 E4B** | ~5 GB | **Default LLM.** Balanced performance. |
+| **Gemma 4 E4B** | ~5 GB | **Standard LLM.** Balanced performance for 12GB+ cards. |
 | **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
 | **Gemma 4 31B [BETA]** | ~17 GB (4-bit) | Dense state-of-the-art LLM. Requires 4-bit. **Optional.** |
 | **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run |
@@ -87,11 +86,9 @@ Three workflows ship in the `workflows/` folder:
 
 | Workflow | Runtime Preset | Best For | File |
 |----------|---------------|----------|------|
-| **Test** | 🧪 1 min | Smoke testing after code changes | `old_time_radio_test.json` |
-| **Lite** | 📻 5 min | Quick episodes, `open_close` OFF | `old_time_radio_scifi_lite.json` |
-| **Full** | 📻 8 min | Production episodes, all features ON | `old_time_radio_scifi_full.json` |
-| **8GB Optimized** | 📻 8 min | **Safest choice for 8GB cards.** Pre-set to E2B + MusicGen Small. | `old_time_radio_scifi_8gb.json` |
-| **Obsidian (4GB)** | 📻 5 min | **4GB ultra-low VRAM.** All-Kokoro TTS + E2B + MusicGen Small. | `old_time_radio_scifi_4gb_obsidian.json` |
+| **Test** | 🧪 1 min | Smoke testing after code changes | `otr_scifi_16gb_test.json` |
+| **Lite** | 📻 5 min | Quick episodes, `open_close` OFF | `otr_scifi_16gb_lite.json` |
+| **Full** | 📻 8 min | Production episodes, all features ON | `otr_scifi_16gb_full.json` |
 
 1. Open ComfyUI at `http://127.0.0.1:8000`
 2. Click **Load** → select a workflow
@@ -102,14 +99,10 @@ Three workflows ship in the `workflows/` folder:
 | Setup | GPU | VRAM |
 |-------|-----|------|
 | Recommended | RTX 5080 / 4090 | 16 GB+ |
-| 8GB Mode | RTX 4070 / 3060 | 8 GB |
-| Obsidian Mode | RTX 3050 | 4 GB |
+| Minimum | RTX 4070 / 3060 | 12 GB |
 
-> [!TIP]
-> **8GB VRAM Survival:** If you have an 8GB card, use the **`old_time_radio_scifi_8gb.json`** workflow. It uses **Gemma 4 E2B**, which reduces the peak VRAM footprint during script generation, leaving enough headroom for Bark TTS and Video encoding without swapping to system RAM.
-
-> [!TIP]
-> **4GB Obsidian Edition:** If you have 4GB or simply want ultra-fast generation without Bark's erratic emotion, use **`old_time_radio_scifi_4gb_obsidian.json`**. It cuts out Bark entirely, rendering all character voices through the 1.5GB Kokoro neural engine for broadcast-ready stability.
+> [!IMPORTANT]
+> **SIGNAL LOST is a 16GB VRAM Project.** While we offer lower-parameter models in the node options, real-world profiling confirms that the total pipeline footprint (Weights + KV Cache + Activation Buffers + TTS + Video Encoding) requires a minimum of 12-16GB VRAM to run at full speed without swapping to system RAM.
 
 ### Step 5 — Continuous 24/7 Broadcast (OBS Automation)
 
@@ -138,7 +131,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 │ 1. WRITE THE STORY 📝                                                                              │
 │                                                                                                    │
 │ ┌──────────────────────────────┐                  ┌──────────────────────────────────────┐        │
-│ │ 1. Gemma Writes the Story    │─────────────────►│ 2. Gemma Directs the Show            │        │
+│ │ 1. LLM Story Writer        │─────────────────►│ 2. LLM Director              │        │
 │ │ (OTR_Gemma4ScriptWriter)     │                  │ (OTR_Gemma4Director)                 │        │
 │ │ RSS → Gemma 4 → Script       │                  │ Procedural cast • voices • SFX • music │        │
 │ │ Open-Close expansion         │                  │ LEMMY stays LEMMY (en_speaker_8)     │        │
@@ -193,8 +186,8 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 | Node | What It Does |
 |------|-------------|
-| **1. Gemma Writes the Story** | Fetches real RSS science headlines, then uses Gemma 4 to write a multi-act script. Open-Close expansion generates 3 competing outlines and picks the best. Self-critique loop revises the draft. 12 dramatic story arc templates (Shakespearian, Comedic Spiral, Heroic Epic, Twilight Mind-Bender, and more). |
-| **2. Gemma Directs the Show** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. |
+| **1. LLM Story Writer** | Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. Open-Close expansion generates 3 competing outlines and picks the best. Self-critique loop revises the draft. 12 dramatic story arc templates (Shakespearian, Comedic Spiral, Heroic Epic, Twilight Mind-Bender, and more). |
+| **2. LLM Director** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. |
 | **3. Voice Maker Machine** | Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. |
 | **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends. |
 | **🎺 MusicGen Theme** | Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations. |
@@ -325,6 +318,9 @@ You are no longer locked to the 4-Billion parameter Gemma. Added ad-hoc support 
 #### VRAM Leak Hardening
 Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 
 
+#### Obsidian "One-Shot" Optimization
+Added an **Optimization Profile** master switch to the Script Writer. Selecting "Obsidian (Low VRAM/Fast)" now automatically disables all iterative LLM passes (Critique, Open-Close, Arc Enhancer). This ensures 4GB GPUs only perform a single prompt-response cycle, eliminating the "sluggish crawl" caused by repeated model offloading.
+
 #### Project State 'Bible' Reader
 Support for `.json`/YAML project state files. Lock character voices, set canonical lore, and build continuous episodic shows without the AI forgetting who characters are.
 
@@ -445,6 +441,6 @@ Continually monitoring the footprint and removing unused nodes. Boot log confirm
 MIT License
 
 - **Bark** by [Suno AI](https://github.com/suno-ai/bark)
-- **Gemma 4** by [Google DeepMind](https://ai.google.dev/gemma)
+- **Gemma 2 / 4** by [Google DeepMind](https://ai.google.dev/gemma)
 - Built with patterns from the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide)
 - Created by [Jeffrey Brick](https://github.com/jbrick2070)
