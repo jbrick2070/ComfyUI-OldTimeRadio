@@ -1057,7 +1057,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             # to prevent the 'Wing Ding' corruption (Model Stroke).
             is_unstable_quant = any(tag in model_id_full.lower() for tag in ("2bit", "3bit", "2-bit", "3-bit"))
             needs_4bit = requested_quantized or is_unstable_quant or \
-                         any(tag in model_id_full.lower() for tag in ("9b", "12b", "26b", "27b", "31b", "70b", "e4b"))
+                         any(tag in model_id_full.lower() for tag in ("9b", "12b", "14b", "24b", "26b", "27b", "31b", "70b", "e4b"))
             
             if is_unstable_quant:
                 _runtime_log(f"[StoryOrchestrator] 🛡️ WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
@@ -1138,8 +1138,8 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             _LLM_CACHE["quantized"] = requested_quantized
             _LLM_CACHE["model_id"] = model_id
             _LLM_CACHE["budget_profile"] = optimization_profile
-            _LLM_CACHE["VERSION"] = "v1.4.9"
-            _runtime_log(f"LLM loaded: {model_id} (quantized={requested_quantized}, budget={optimization_profile}) [v1.4.9]")
+            _LLM_CACHE["VERSION"] = "v1.4"
+            _runtime_log(f"LLM loaded: {model_id} (quantized={requested_quantized}, budget={optimization_profile}) [v1.4]")
         except Exception as e:
             log.exception("Failed to load LLM: %s", e)  # Section 49: log.exception for full traceback
             raise
@@ -1147,7 +1147,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
 
 
 # Bounded model cache with device tracking (Section 34)
-_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.4.9"}
+_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.4"}
 
 
 def _unload_llm():
@@ -1999,9 +1999,9 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "google/gemma-4-26b-a4b-it [BETA]", "google/gemma-4-31B-it [BETA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Nemo-Instruct-2407 [8-bit]", "mistralai/Mistral-Nemo-Instruct-2407 [4-bit]"], {
+                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "google/gemma-2-27b-it [ALPHA]", "mistralai/Mistral-Nemo-Instruct-2407", "mistralai/Mistral-Small-24B-Instruct-2501 [ALPHA]", "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
                     "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for LLM (Gemma series, Nemo, etc.)"
+                    "tooltip": "Hugging Face model ID for LLM (Gemma series, Nemo, Qwen, etc.)"
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
