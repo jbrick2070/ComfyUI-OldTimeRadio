@@ -982,8 +982,8 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             is_actually_2b = any(tag in model_id.lower() for tag in ("2b-it", "2b_it")) or model_id.lower().endswith("2b")
             
             if total_vram >= 12.0:
-                # FLAGSHIP 4GB SOVEREIGNTY BUFFER
-                budget_gb = total_vram - 4.0
+                # FLAGSHIP 2GB SOVEREIGNTY BUFFER
+                budget_gb = total_vram - 2.0
                 max_memory = {0: f"{budget_gb:.1f}GiB", "cpu": "32GiB"}
                 _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {budget_gb:.1f}GB Budget")
             elif is_actually_2b:
