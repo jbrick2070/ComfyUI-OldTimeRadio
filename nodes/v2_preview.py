@@ -24,6 +24,8 @@ import json
 import logging
 import math
 import os
+import re
+import shutil
 import struct
 import tempfile
 
@@ -44,6 +46,46 @@ _NEG_SCENE = (
     "blurry, low quality, watermark, text, signature, ugly, deformed, "
     "worst quality, jpeg artifacts, cartoon, anime, illustration"
 )
+
+
+# ---------------------------------------------------------------------------
+# STARTUP JANITOR — clean orphaned preview_tmp dirs from interrupted renders
+# (try/finally cannot clean up after kill -9)
+# ---------------------------------------------------------------------------
+
+def _cleanup_orphaned_preview_tmp():
+    """Remove stale otr_v2_* temp dirs left by crashed/killed renders."""
+    try:
+        import folder_paths
+        output_dir = folder_paths.get_output_directory()
+    except ImportError:
+        return  # Outside ComfyUI, nothing to clean
+    preview_root = os.path.join(output_dir, "preview_tmp")
+    if not os.path.isdir(preview_root):
+        return
+    cleaned = 0
+    for entry in os.listdir(preview_root):
+        entry_path = os.path.join(preview_root, entry)
+        if os.path.isdir(entry_path) and entry.startswith("otr_v2_"):
+            try:
+                shutil.rmtree(entry_path, ignore_errors=True)
+                cleaned += 1
+            except Exception:
+                pass
+    if cleaned:
+        log.info("[v2.0] Startup janitor: removed %d orphaned preview_tmp dirs", cleaned)
+
+_cleanup_orphaned_preview_tmp()
+
+
+# ---------------------------------------------------------------------------
+# FILENAME SANITIZATION
+# ---------------------------------------------------------------------------
+
+def _safe_name(name, max_len=80):
+    """Strip filesystem-unsafe characters from an output filename."""
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", name).strip(" .")
+    return (name or "untitled")[:max_len]
 
 
 # ---------------------------------------------------------------------------
@@ -81,22 +123,34 @@ def _encode_prompt(clip, text):
     """
     tokens = clip.tokenize(text)
     output = clip.encode_from_tokens(tokens, return_pooled=True, return_dict=True)
+    output = dict(output)  # shallow copy — do not mutate the encoder's cached dict
     cond = output.pop("cond")
     # Remaining keys (pooled_output, etc.) become the extras dict
     return [[cond, output]]
 
 
 def _generate_image(model, clip, vae, prompt, negative_prompt,
-                    width, height, seed, steps=20, cfg=7.0):
+                    width, height, seed, steps=20, cfg=7.0,
+                    sampler_name="euler", scheduler="normal"):
     """Generate a single image using the full ComfyUI sampling pipeline.
 
-    Uses comfy.sample internals directly for maximum compatibility.
+    Uses comfy.sample internals with keyword args for version safety.
     Handles SD 1.5, SDXL, SD 3.5, and Flux latent channel differences
     automatically via fix_empty_latent_channels.
     """
+    from nodes.safety_filter import classify_prompt
+
     import comfy.sample
     import comfy.model_management
     import comfy.utils
+
+    # Content safety pre-check — block before any GPU work
+    safety = classify_prompt(prompt)
+    if safety["result"] == "block":
+        log.warning("[v2.0] Prompt BLOCKED by safety filter: %s", safety["reason"])
+        # Return a dim gray placeholder frame — no GPU resources consumed
+        placeholder = torch.full([1, height, width, 3], 0.15, dtype=torch.float32)
+        return placeholder
 
     # Encode positive and negative prompts
     positive = _encode_prompt(clip, prompt)
@@ -118,9 +172,13 @@ def _generate_image(model, clip, vae, prompt, negative_prompt,
 
     samples = comfy.sample.sample(
         model, noise, steps, cfg,
-        "euler", "normal",
-        positive, negative, latent_image,
-        denoise=1.0, seed=seed
+        sampler_name=sampler_name,
+        scheduler=scheduler,
+        positive=positive,
+        negative=negative,
+        latent_image=latent_image,
+        denoise=1.0,
+        seed=seed
     )
 
     # Decode latent to pixel space
@@ -229,14 +287,33 @@ class CharacterForge:
                 "reference_image": ("IMAGE", {
                     "tooltip": "Reference image for IP-Adapter style consistency",
                 }),
+                "vram_power_wash": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Unload all models and flush VRAM before visual phase. "
+                               "Recommended True on 16GB cards to reclaim audio-phase memory.",
+                }),
+                "debug_vram_snapshots": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Emit VRAM_SNAPSHOT markers at entry/exit for QA.",
+                }),
             },
         }
 
     def forge(self, model, clip, vae, production_plan_json="{}",
              seed=42, portrait_size="512x512", steps=20, cfg=3.5,
-             reference_image=None):
+             reference_image=None, vram_power_wash=True,
+             debug_vram_snapshots=False):
 
-        _vram_snapshot("CharacterForge-entry")
+        # VRAM power-wash: reclaim memory from audio phase before visual work
+        if vram_power_wash:
+            import comfy.model_management as mm
+            log.info("[CharacterForge] VRAM power-wash: unloading all models + flushing cache")
+            mm.unload_all_models()
+            mm.soft_empty_cache()
+            _flush_vram("power-wash")
+
+        if debug_vram_snapshots:
+            _vram_snapshot("CharacterForge-entry")
 
         # Parse dimensions
         w, h = [int(x) for x in portrait_size.split("x")]
@@ -288,7 +365,8 @@ class CharacterForge:
         forge_log = "\n".join(log_lines)
 
         _flush_vram("CharacterForge-complete")
-        _vram_snapshot("CharacterForge-exit")
+        if debug_vram_snapshots:
+            _vram_snapshot("CharacterForge-exit")
 
         log.info("[CharacterForge] Complete: %d portraits", len(char_names))
         return (portraits, forge_log)
@@ -358,14 +436,19 @@ class ScenePainter:
                 "anchor_image": ("IMAGE", {
                     "tooltip": "Anchor frame for IP-Adapter visual consistency",
                 }),
+                "debug_vram_snapshots": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Emit VRAM_SNAPSHOT markers at entry/exit for QA.",
+                }),
             },
         }
 
     def paint(self, model, clip, vae, production_plan_json="{}",
              width=1280, height=720, seed=42, steps=20, cfg=3.5,
-             anchor_image=None):
+             anchor_image=None, debug_vram_snapshots=False):
 
-        _vram_snapshot("ScenePainter-entry")
+        if debug_vram_snapshots:
+            _vram_snapshot("ScenePainter-entry")
 
         # Parse the visual plan
         try:
@@ -419,7 +502,8 @@ class ScenePainter:
         painter_log = "\n".join(log_lines)
 
         _flush_vram("ScenePainter-complete")
-        _vram_snapshot("ScenePainter-exit")
+        if debug_vram_snapshots:
+            _vram_snapshot("ScenePainter-exit")
 
         log.info("[ScenePainter] Complete: %d scene backgrounds", len(scene_ids))
         return (backgrounds, painter_log)
@@ -581,11 +665,7 @@ class VisualCompositor:
         g = ImageEnhance.Brightness(g).enhance(1.05)
         img = Image.merge("RGB", (r, g, b))
 
-        # Scanlines - every other row gets slightly darkened
-        draw = ImageDraw.Draw(img)
-        for y in range(0, h, 2):
-            draw.line([(0, y), (w, y)], fill=None, width=0)
-        # Darken even rows subtly
+        # Scanlines - darken every third row subtly
         scanline_overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         scan_draw = ImageDraw.Draw(scanline_overlay)
         for y in range(0, h, 3):
@@ -662,6 +742,15 @@ class ProductionBus:
                     "default": "otr_v2_episode",
                     "tooltip": "Output filename (without extension)",
                 }),
+                "preview_mode": (["none", "keyframes", "full"], {
+                    "default": "keyframes",
+                    "tooltip": "none=skip video, keyframes=1 frame/scene (fast), full=all frames",
+                }),
+                "encoding_profile": (["preview", "balanced", "quality"], {
+                    "default": "preview",
+                    "tooltip": "preview=fast/crf23, balanced=medium/crf20, quality=slow/crf18. "
+                               "All use yuv420p for maximum playback compatibility.",
+                }),
             },
             "optional": {
                 "composited_frames": ("IMAGE", {
@@ -673,25 +762,46 @@ class ProductionBus:
                 "compositor_log": ("STRING", {
                     "tooltip": "Log from VisualCompositor for diagnostics",
                 }),
+                "output_subdir": ("STRING", {
+                    "default": "",
+                    "tooltip": "Subdirectory under ComfyUI output root. "
+                               "Empty = write to output root. e.g. 'otr_v2' -> output/otr_v2/",
+                }),
+                "debug_vram_snapshots": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Emit VRAM_SNAPSHOT markers at entry/exit of every phase. "
+                               "Enable for repeatable QA on 16 GB hardware.",
+                }),
             },
         }
 
     def assemble(self, script_json="[]", production_plan_json="{}",
                  fps=24, output_name="otr_v2_episode",
+                 preview_mode="keyframes", encoding_profile="preview",
                  composited_frames=None, episode_audio=None,
-                 compositor_log=None):
+                 compositor_log=None, output_subdir="",
+                 debug_vram_snapshots=False):
 
         import subprocess
         from PIL import Image
 
         log.info("[ProductionBus] Starting v2.0 assembly")
 
-        # Determine output directory (same as SignalLostVideo)
-        output_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "..", "..", "output"
-        )
-        output_dir = os.path.normpath(output_dir)
+        if debug_vram_snapshots:
+            _vram_snapshot("ProductionBus-entry")
+
+        # Use ComfyUI-native output resolution (Bug Bible 01.02/01.03)
+        try:
+            import folder_paths
+            output_dir = folder_paths.get_output_directory()
+        except ImportError:
+            # Fallback for standalone testing outside ComfyUI
+            output_dir = os.path.normpath(os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "..", "..", "output"
+            ))
+        if output_subdir:
+            output_dir = os.path.join(output_dir, _safe_name(output_subdir))
         os.makedirs(output_dir, exist_ok=True)
 
         # If we have no visual frames, return early with status
@@ -721,7 +831,7 @@ class ProductionBus:
 
                 # Save audio to temp WAV for FFmpeg
                 import torchaudio
-                audio_path = os.path.join(output_dir, f"{output_name}_temp_audio.wav")
+                audio_path = os.path.join(output_dir, f"{_safe_name(output_name)}_temp_audio.wav")
                 # waveform shape: [batch, channels, samples] or [channels, samples]
                 if waveform.dim() == 3:
                     waveform_save = waveform[0]
@@ -739,85 +849,115 @@ class ProductionBus:
         total_frames = int(audio_duration_s * fps)
         frames_per_scene = max(1, total_frames // num_frames)
 
-        log.info("[ProductionBus] Rendering %d total frames (%d per scene, %.1fs)",
-                 total_frames, frames_per_scene, audio_duration_s)
+        # --- preview_mode gate ---
+        if preview_mode == "none":
+            log.info("[ProductionBus] preview_mode=none, skipping video render")
+            return ("", "ProductionBus: preview_mode=none, video skipped.")
 
-        # Write frames to temp directory for FFmpeg
-        temp_dir = tempfile.mkdtemp(prefix="otr_v2_")
-        frame_pattern = os.path.join(temp_dir, "frame_%06d.png")
-
-        frame_idx = 0
-        for scene_idx in range(num_frames):
-            # Get scene frame
-            frame_np = (composited_frames[scene_idx].cpu().numpy() * 255).astype(np.uint8)
-            frame_pil = Image.fromarray(frame_np, "RGB")
-
-            # Repeat this frame for its duration
-            for _ in range(frames_per_scene):
-                if frame_idx >= total_frames:
-                    break
-                frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
-                frame_pil.save(frame_path)
-                frame_idx += 1
-
-        # Pad remaining frames with last scene
-        if frame_idx < total_frames and num_frames > 0:
-            last_np = (composited_frames[-1].cpu().numpy() * 255).astype(np.uint8)
-            last_pil = Image.fromarray(last_np, "RGB")
-            while frame_idx < total_frames:
-                frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
-                last_pil.save(frame_path)
-                frame_idx += 1
-
-        # Encode with FFmpeg
-        video_path = os.path.join(output_dir, f"{output_name}.mp4")
-        ffmpeg_cmd = [
-            "ffmpeg", "-y",
-            "-framerate", str(fps),
-            "-i", os.path.join(temp_dir, "frame_%06d.png"),
-        ]
-
-        if audio_path and os.path.exists(audio_path):
-            ffmpeg_cmd.extend(["-i", audio_path])
-            ffmpeg_cmd.extend([
-                "-c:v", "libx264",
-                "-preset", "medium",
-                "-crf", "20",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-shortest",
-                video_path
-            ])
+        # In keyframes mode, write 1 frame per scene (fast preview).
+        # In full mode, write every frame (production quality).
+        if preview_mode == "keyframes":
+            effective_fps = max(1, num_frames / max(1.0, audio_duration_s))
+            frames_per_scene = 1
+            total_frames = num_frames
+            log.info("[ProductionBus] keyframes mode: %d frames (1 per scene)", total_frames)
         else:
-            ffmpeg_cmd.extend([
-                "-c:v", "libx264",
-                "-preset", "medium",
-                "-crf", "20",
-                "-pix_fmt", "yuv420p",
-                video_path
-            ])
+            log.info("[ProductionBus] full mode: %d total frames (%d per scene, %.1fs)",
+                     total_frames, frames_per_scene, audio_duration_s)
 
-        log.info("[ProductionBus] FFmpeg encoding: %s", " ".join(ffmpeg_cmd[-4:]))
-        try:
-            result = subprocess.run(
-                ffmpeg_cmd, capture_output=True, text=True, timeout=300
+        # Hard cap to prevent disk bombs (~12 min at 24 fps)
+        MAX_FRAMES = 18000
+        if total_frames > MAX_FRAMES:
+            raise RuntimeError(
+                f"Refusing to write {total_frames} frames (cap {MAX_FRAMES}). "
+                f"Use preview_mode=keyframes for long episodes."
             )
-            if result.returncode != 0:
-                log.error("[ProductionBus] FFmpeg failed: %s", result.stderr[-500:])
-                video_path = ""
-        except Exception as e:
-            log.error("[ProductionBus] FFmpeg error: %s", e)
-            video_path = ""
 
-        # Cleanup temp files
+        # Use a project-local preview_tmp/ so leftovers are obvious, not hidden in %TEMP%
+        preview_root = os.path.join(output_dir, "preview_tmp")
+        os.makedirs(preview_root, exist_ok=True)
+        temp_dir = tempfile.mkdtemp(prefix="otr_v2_", dir=preview_root)
+        video_path = ""
+
         try:
-            import shutil
+            frame_idx = 0
+            for scene_idx in range(num_frames):
+                # Get scene frame
+                frame_np = (composited_frames[scene_idx].cpu().numpy() * 255).astype(np.uint8)
+                frame_pil = Image.fromarray(frame_np, "RGB")
+
+                # Repeat this frame for its duration
+                for _ in range(frames_per_scene):
+                    if frame_idx >= total_frames:
+                        break
+                    frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
+                    frame_pil.save(frame_path)
+                    frame_idx += 1
+
+            # Pad remaining frames with last scene (full mode only)
+            if frame_idx < total_frames and num_frames > 0:
+                last_np = (composited_frames[-1].cpu().numpy() * 255).astype(np.uint8)
+                last_pil = Image.fromarray(last_np, "RGB")
+                while frame_idx < total_frames:
+                    frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
+                    last_pil.save(frame_path)
+                    frame_idx += 1
+
+            # Encode with FFmpeg — encoding_profile controls preset/crf,
+            # yuv420p is always used for maximum playback compatibility.
+            _ENC_PROFILES = {
+                "preview":  ("fast",   "23"),
+                "balanced": ("medium", "20"),
+                "quality":  ("slow",   "18"),
+            }
+            enc_preset, enc_crf = _ENC_PROFILES.get(encoding_profile, ("fast", "23"))
+
+            video_path = os.path.join(output_dir, f"{_safe_name(output_name)}.mp4")
+            render_fps = fps if preview_mode == "full" else max(1, num_frames // max(1, int(audio_duration_s)))
+            ffmpeg_cmd = [
+                "ffmpeg", "-y",
+                "-framerate", str(render_fps if preview_mode == "keyframes" else fps),
+                "-i", os.path.join(temp_dir, "frame_%06d.png"),
+            ]
+
+            if audio_path and os.path.exists(audio_path):
+                ffmpeg_cmd.extend(["-i", audio_path])
+                ffmpeg_cmd.extend([
+                    "-c:v", "libx264",
+                    "-preset", enc_preset,
+                    "-crf", enc_crf,
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "192k",
+                    "-shortest",
+                    video_path
+                ])
+            else:
+                ffmpeg_cmd.extend([
+                    "-c:v", "libx264",
+                    "-preset", enc_preset,
+                    "-crf", enc_crf,
+                    "-pix_fmt", "yuv420p",
+                    video_path
+                ])
+
+            log.info("[ProductionBus] FFmpeg encoding: %s", " ".join(ffmpeg_cmd[-4:]))
+            try:
+                result = subprocess.run(
+                    ffmpeg_cmd, capture_output=True, text=True, timeout=300
+                )
+                if result.returncode != 0:
+                    log.error("[ProductionBus] FFmpeg failed: %s", result.stderr[-500:])
+                    video_path = ""
+            except Exception as e:
+                log.error("[ProductionBus] FFmpeg error: %s", e)
+                video_path = ""
+
+        finally:
+            # Crash-safe cleanup: always runs, even on OOM or kill
             shutil.rmtree(temp_dir, ignore_errors=True)
             if audio_path and os.path.exists(audio_path):
                 os.remove(audio_path)
-        except Exception:
-            pass
 
         # Build log
         bus_lines = [
@@ -829,7 +969,21 @@ class ProductionBus:
         ]
         if compositor_log:
             bus_lines.append(f"\n--- Compositor Report ---\n{compositor_log}")
+
+        # Machine-readable QA metrics line for regression parsing
+        qa_metrics = {
+            "preview_mode": preview_mode,
+            "audio_duration_s": round(audio_duration_s, 2),
+            "total_frames": total_frames,
+            "resolution": f"{frame_w}x{frame_h}",
+            "video_path_status": "ok" if video_path else "failed",
+            "fps": fps,
+        }
+        bus_lines.append(f"\nQA_METRICS: {json.dumps(qa_metrics)}")
         bus_log = "\n".join(bus_lines)
+
+        if debug_vram_snapshots:
+            _vram_snapshot("ProductionBus-exit")
 
         log.info("[ProductionBus] Complete: %s", video_path or "FAILED")
         return (video_path, bus_log)

@@ -17,3 +17,11 @@ tokenizers>=0.15
 sentencepiece>=0.1.99
 
 bitsandbytes>=0.42.0
+
+# ── Alpha 2.0 platform pin (Section 8 Q4) ──
+# BUG-002 fix relies on comfy.sample.sample() accepting sampler_name/scheduler
+# as kwargs. Pinning the known-good ComfyUI commit to prevent API drift.
+# Platform: Python 3.12, torch 2.10.0, CUDA 13.0, RTX 5080 (sm_120)
+# ComfyUI commit: pin to your current HEAD after confirming T1-T7 pass.
+# Uncomment and fill in after live validation:
+# comfyui_commit_pin: TBD  # e.g. abc1234

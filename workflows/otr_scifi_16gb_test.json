@@ -612,7 +612,9 @@
                 42,
                 "512x512",
                 20,
-                3.5
+                3.5,
+                true,
+                false
             ],
             "inputs": [
                 {
@@ -683,7 +685,8 @@
                 720,
                 42,
                 20,
-                3.5
+                3.5,
+                false
             ],
             "inputs": [
                 {
@@ -815,7 +818,9 @@
                 "[]",
                 "{}",
                 24,
-                "otr_v2_episode"
+                "otr_v2_episode",
+                "keyframes",
+                "preview"
             ],
             "inputs": [
                 {
