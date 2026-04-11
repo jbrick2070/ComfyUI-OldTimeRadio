@@ -46,6 +46,28 @@ from .project_state import ProjectState
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 
+
+def _flush_vram_keep_llm():
+    """Lightweight VRAM flush: clears KV cache fragments and fragmentation
+    but keeps the LLM model weights on GPU.
+
+    Use between LLM phases within a single write_script() run where the same
+    model will be called again immediately. Avoids the ~13s-per-reload penalty
+    caused by force_vram_offload() evicting the model from VRAM.
+
+    force_vram_offload() is still used at node BOUNDARIES where we need to
+    hand off GPU to a different model (e.g., LLM → Bark TTS).
+    """
+    import gc
+    try:
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        gc.collect()
+
+
 # Lazy heavy imports (Section 8) — torch, numpy, transformers inside methods/classes only
 
 log = logging.getLogger("OTR")
@@ -938,14 +960,20 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
         except StopIteration:
             pass
 
+    # v1.5.1: Context cap tuning. History: 2048 (format loss), 4096 (still
+    # truncated), 8192 (19GB VRAM spike, 2.9 tok/s). 6144 is the sweet spot:
+    # keeps format instructions (~6k tokens) while peak VRAM stays ~12-13 GB.
+    _cap = 6144 if any(kw in str(model_id_full).lower() for kw in ("nemo", "12b", "14b")) else 8192
+
     if (_LLM_CACHE["model"] is not None and
             (str(_LLM_CACHE["device"]) != str(device) or 
              _LLM_CACHE["quantized"] != requested_quantized or
              _LLM_CACHE["model_id"] != model_id or
              _LLM_CACHE.get("budget_profile") != optimization_profile or
-             _LLM_CACHE.get("VERSION") != "v1.4" or
+             _LLM_CACHE.get("VERSION") != "v1.5" or
+             _LLM_CACHE.get("context_cap") != _cap or
              ("cuda" in str(device) and "cpu" in current_model_device))):
-        _runtime_log(f"Gemma cache mismatch or version update (v1.4) — reloading to enforce budget")
+        _runtime_log(f"LLM cache mismatch (Context Cap: {_cap}) — reloading to enforce budget")
         _unload_llm()
 
     if _LLM_CACHE["model"] is None:
@@ -987,18 +1015,22 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             is_actually_2b = any(tag in model_id.lower() for tag in ("2b-it", "2b_it")) or model_id.lower().endswith("2b")
             
             if total_vram >= 12.0:
-                # FLAGSHIP 2GB SOVEREIGNTY BUFFER
-                budget_gb = total_vram - 2.0
+                # FLAGSHIP 2.5GB SOVEREIGNTY BUFFER (v1.5 CLEAN: expanded for 12B stability)
+                budget_gb = total_vram - 2.5
                 max_memory = {0: f"{budget_gb:.1f}GiB", "cpu": "32GiB"}
                 _runtime_log(f"[StoryOrchestrator] Sovereignty Buffer Active: {budget_gb:.1f}GB Budget")
             elif is_actually_2b:
                 max_memory = {0: "3.2GiB", "cpu": "32GiB"}
             elif any(tag in model_id.lower() for tag in ("9b", "12b", "e4b", "4b-it")):
+                # Fallback for 8GB-10GB cards ONLY. If we have 16GB, we use the buffer above.
                 max_memory = {0: "6.8GiB", "cpu": "32GiB"}
 
             # Enable TF32 for faster matmuls on Ampere/Ada/Blackwell GPUs
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
+            # v1.5 Blackwell Tuning: High precision matmul
+            if torch.cuda.get_device_capability()[0] >= 8:
+                torch.set_float32_matmul_precision('high')
 
             # ── VRAM Hardening v1.4: Strict Handoff ──
             # If Bark is in VRAM, evict it now before loading LLM.
@@ -1064,13 +1096,18 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
 
             if is_unstable_quant:
                 _runtime_log(f"[StoryOrchestrator] 🛡️ WING DING PROTECTION: Unstable Bit-Depth ({model_id_full}) UPGRADED to 4-bit NF4")
-            elif needs_4bit and not requested_quantized:
-                _runtime_log(f"[StoryOrchestrator] VRAM SAFETY: Forcing 4-bit (NF4) for Large Model ({model_id_full})")
+            elif needs_4bit:
+                _runtime_log(f"[StoryOrchestrator] Quantizing: 4-bit NF4 for {model_id_full}")
 
             if needs_8bit:
                 try:
                     from transformers import BitsAndBytesConfig
-                    quant_config = BitsAndBytesConfig(load_in_8bit=True)
+                    # llm_int8_enable_fp32_cpu_offload=True required when device_map=auto
+                    # may dispatch some layers to CPU (e.g. sovereignty buffer limits VRAM).
+                    quant_config = BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        llm_int8_enable_fp32_cpu_offload=True,
+                    )
                     log.info("[StoryOrchestrator] Enabling 8-bit quantization")
                 except ImportError:
                     log.warning("[StoryOrchestrator] Large model but bitsandbytes not installed!")
@@ -1104,24 +1141,45 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
                 cache_dir=cache_dir_path,
                 trust_remote_code=False,  # v1.4 Hardening: strict security
                 low_cpu_mem_usage=True,
+                torch_dtype=load_dtype,   # v1.5 FIX: halved initial footprint
                 attn_implementation="sdpa"  # v1.4 Blackwell/Flash-Replacement
             )
+
+            # v1.5 FIX: Explicitly pass max_memory (Sovereignty Buffer) to from_pretrained.
+            # Previously it was calculated but ignored, causing 23GB spikes.
+            if max_memory is not None:
+                common_kwargs["max_memory"] = max_memory
+                common_kwargs["device_map"] = "auto"
+
             if quant_config is not None:
                 common_kwargs["quantization_config"] = quant_config
                 
-                # FLAGSHIP 16GB OVERRIDE: 2B models fit easily. Force GPU-only to avoid CPU intermediate bloat.
-                if total_vram >= 15.0 and is_actually_2b:
+                # FLAGSHIP 16GB OVERRIDE: 2B and 12B models fit easily if context is capped.
+                # Force GPU-only to avoid sneaky CPU offloading by 'auto' device_map.
+                if total_vram >= 15.0:
                     common_kwargs["device_map"] = {"": 0} 
-                    _runtime_log("[StoryOrchestrator] Flagship Override: Forcing CUDA:0 (Direct GPU) for 2B model")
-                else:
-                    common_kwargs["device_map"] = "auto"
-            elif max_memory is not None:
-                common_kwargs["device_map"] = "auto"
+                    _runtime_log(f"[StoryOrchestrator] Flagship Sovereignty: Forcing 100% GPU for {model_id}")
+                # else: device_map already set to "auto" in max_memory block above
 
             try:
+                # v1.5 CLEAN Hardware Hardening: Constrain 128k models to reduce
+                # KV cache memory spikes on 16GB hardware.
+                model_config = None
+                try:
+                    from transformers import AutoConfig
+                    _cfg_kwargs = {"trust_remote_code": False, "cache_dir": cache_dir_path}
+                    model_config = AutoConfig.from_pretrained(model_id, **_cfg_kwargs)
+                    # v1.5 CLEAN: Constrain 128k models to 2k window during spine phase
+                    if hasattr(model_config, "max_position_embeddings") and model_config.max_position_embeddings > _cap:
+                        _runtime_log(f"[StoryOrchestrator] Hardening: Capping 128k context to {_cap} (Saves ~6GB VRAM)")
+                        model_config.max_position_embeddings = _cap
+                except Exception as _cfg_err:
+                    log.warning("[StoryOrchestrator] Config hardening failed: %s", _cfg_err)
+
                 model = AutoModelForCausalLM.from_pretrained(
                     model_id,
                     local_files_only=True,
+                    config=model_config,
                     **common_kwargs,
                 )
                 _runtime_log("LLM model loaded from cache (no HTTP checks)")
@@ -1130,6 +1188,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
                 try:
                     model = AutoModelForCausalLM.from_pretrained(
                         model_id,
+                        config=model_config,
                         **common_kwargs,
                     )
                 except Exception as hub_err:
@@ -1146,9 +1205,36 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
             _LLM_CACHE["quantized"] = (quant_config is not None)
             _LLM_CACHE["model_id"] = model_id
             _LLM_CACHE["budget_profile"] = optimization_profile
-            _LLM_CACHE["VERSION"] = "v1.4"
+            _LLM_CACHE["VERSION"] = "v1.5"
+            _LLM_CACHE["context_cap"] = _cap # v1.5 CLEAN hardening state
             actual_quant = (quant_config is not None)
-            _runtime_log(f"LLM loaded: {model_id} (quantized={actual_quant}, budget={optimization_profile}) [v1.4]")
+            _runtime_log(f"LLM loaded: {model_id} (quantized={actual_quant}, budget={optimization_profile}) [v1.5]")
+
+            # ── v1.5.1: CUDA KERNEL WARMUP ──────────────────────────────
+            # The first model.generate() call on Blackwell (sm_120) with
+            # SDPA + BitsAndBytes 4-bit triggers JIT compilation of CUDA
+            # kernels — causing a 30-60s stall before the first token.
+            # This 1-token warmup absorbs that cost here so the real
+            # generation starts immediately.
+            try:
+                _warmup_start = time.time()
+                _runtime_log("WARMUP: Starting 1-token CUDA kernel warmup...")
+                _warmup_ids = tokenizer("Test.", return_tensors="pt")["input_ids"].to(model.device)
+                with torch.no_grad():
+                    model.generate(
+                        _warmup_ids,
+                        max_new_tokens=1,
+                        do_sample=False,
+                    )
+                del _warmup_ids
+                torch.cuda.empty_cache()
+                _warmup_sec = time.time() - _warmup_start
+                _runtime_log(f"WARMUP: CUDA kernels compiled in {_warmup_sec:.1f}s — generation will start instantly")
+                log.info("[StoryOrchestrator] CUDA warmup complete (%.1fs) — first generate will not stall", _warmup_sec)
+            except Exception as _warmup_err:
+                log.warning("[StoryOrchestrator] CUDA warmup failed (non-fatal): %s", _warmup_err)
+                _runtime_log(f"WARMUP: Failed (non-fatal): {_warmup_err}")
+
         except Exception as e:
             log.exception("Failed to load LLM: %s", e)  # Section 49: log.exception for full traceback
             raise
@@ -1156,7 +1242,7 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
 
 
 # Bounded model cache with device tracking (Section 34)
-_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.4"}
+_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.5"}
 
 
 def _unload_llm():
@@ -1242,7 +1328,12 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self.tokenizer = tokenizer
         self.skip_prompt = skip_prompt
         self.decode_kwargs = decode_kwargs
+        
+        # v1.5: Incremental decoding state (Resolves O(N^2) complexity)
         self.token_cache = []
+        self.print_len = 0
+        self.line_buffer = ""
+        
         self.on_prompt_end = True
         self.print_streamer = TextStreamer(tokenizer, skip_prompt=skip_prompt, **decode_kwargs)
 
@@ -1258,15 +1349,15 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self._last_speed_report = 0
 
     def put(self, value):
-        """Processes a new batch of tokens."""
-        # Check strict streaming timeout to prevent VRAM leaks from abandoned threads
+        """Processes a new batch of tokens incrementally."""
+        # Check strict streaming timeout
         if hasattr(_TIMEOUT_CTX, "deadline") and time.time() > _TIMEOUT_CTX.deadline:
             raise TimeoutError("Streaming deadline exceeded — gracefully aborting generator")
 
         # Standard console output
         self.print_streamer.put(value)
 
-        # Heartbeat logic
+        # ── Token-level processing ──
         if len(value.shape) > 1 and value.shape[0] > 1:
             raise ValueError("GemmaHeartbeatStreamer only supports batch size 1")
         elif len(value.shape) > 1:
@@ -1280,15 +1371,25 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self.token_cache.extend(token_list)
         self.total_tokens += len(token_list)
 
+        # v1.5: Incremental decoding logic (adapted from transformers.TextStreamer)
+        # Instead of decoding EVERYTHING every token, we only decode the new slice.
         text = self.tokenizer.decode(self.token_cache, **self.decode_kwargs)
-
-        # If a newline is detected, process the completed line
+        
+        # Determine the "new" text generated in this step
         if text.endswith("\n") or text.endswith("\r"):
-            self._process_line(text.strip())
-            self.token_cache = []
-
-        # Report speed every 100 tokens
-        if self.total_tokens - self._last_speed_report >= 100:
+            new_text = text[self.print_len:]
+            self.line_buffer += new_text
+            self._process_line(self.line_buffer.strip())
+            self.line_buffer = ""
+            self.print_len = len(text)
+        elif text.endswith(" ") or text.endswith(".") or text.endswith("!") or text.endswith("?"):
+            # Partial line update
+            new_text = text[self.print_len:]
+            self.line_buffer += new_text
+            self.print_len = len(text)
+        
+        # Report speed every 25 tokens (v1.5 CLEAN: higher heartbeat frequency)
+        if self.total_tokens - self._last_speed_report >= 25:
             elapsed = time.time() - self._start_time
             if elapsed > 0:
                 tps = self.total_tokens / elapsed
@@ -1303,10 +1404,16 @@ class GemmaHeartbeatStreamer(BaseStreamer):
     def end(self):
         """Flush the remaining buffer and report final stats."""
         self.print_streamer.end()
+        # v1.5: Flush any remaining incremental line_buffer content
         if self.token_cache:
             text = self.tokenizer.decode(self.token_cache, **self.decode_kwargs)
-            self._process_line(text.strip())
+            remaining = text[self.print_len:]
+            self.line_buffer += remaining
+        if self.line_buffer.strip():
+            self._process_line(self.line_buffer.strip())
         self.token_cache = []
+        self.line_buffer = ""
+        self.print_len = 0
 
         elapsed = time.time() - self._start_time
         tps = self.total_tokens / elapsed if elapsed > 0 else 0
@@ -1398,7 +1505,30 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
     else:
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
-    # ── FIX: Ensure attention_mask is present ──
+    # ── v1.5.1: PROMPT LENGTH GUARD ─────────────────────────────────────
+    # NeMo 12B has a 128k native context, but we cap max_position_embeddings
+    # to 2048 at load time to limit KV cache VRAM. However, transformers does
+    # NOT enforce this at the input level — it still accepts a 3000-token prompt
+    # and pre-fills the full KV cache, causing the 110s stall and 25GB VRAM spike.
+    # We must truncate the input explicitly to leave room for output tokens.
+    _context_cap = _LLM_CACHE.get("context_cap", 8192)
+    _max_input_tokens = max(64, _context_cap - max_new_tokens)
+    _input_len = inputs["input_ids"].shape[-1]
+    if _input_len > _max_input_tokens:
+        _trunc = _input_len - _max_input_tokens
+        inputs["input_ids"] = inputs["input_ids"][:, _trunc:]
+        if "attention_mask" in inputs:
+            inputs["attention_mask"] = inputs["attention_mask"][:, _trunc:]
+        _runtime_log(
+            f"PROMPT_GUARD: Truncated {_input_len} -> {_max_input_tokens} tokens "
+            f"(context_cap={_context_cap}, max_new_tokens={max_new_tokens})"
+        )
+        log.info(
+            "[StoryOrchestrator] Prompt truncated: %d -> %d tokens to fit context cap %d",
+            _input_len, _max_input_tokens, _context_cap,
+        )
+
+
     if "attention_mask" not in inputs and "input_ids" in inputs:
         inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
 
@@ -1994,8 +2124,8 @@ class LLMScriptWriter:
                     "default": "hard_sci_fi",
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
-                "runtime_preset": (["🧪 test (1 min)", "⚡ quick (5 min)", "📻 standard (8 min)", "🎬 long (15 min)", "🎭 epic (20 min)", "🔧 custom"], {
-                    "default": "📻 standard (8 min)",
+                "runtime_preset": (["🧪 test (1 min)", "⚡ quick (5 min)", "📻 standard (12 min)", "🎬 long (15 min)", "🎭 epic (20 min)", "🔧 custom"], {
+                    "default": "📻 standard (12 min)",
                     "tooltip": "Friendly runtime selector — overrides target_minutes unless set to 🔧 custom"
                 }),
                 "target_minutes": ("INT", {
@@ -2279,7 +2409,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         _preset_map = {
             "🧪 test (1 min)":    1,
             "⚡ quick (5 min)":   5,
-            "📻 standard (8 min)": 8,
+            "📻 standard (12 min)": 8,
             "🎬 long (15 min)":   15,
             "🎭 epic (20 min)":   20,
         }
@@ -2704,6 +2834,7 @@ Begin the full script now. Follow this structure exactly:
                 system, episode_title, genre_flavor, num_characters,
                 target_minutes, target_words, custom_premise, news_block,
                 include_act_breaks, model_id, temperature,
+                target_length=target_length,
                 lemmy_directive=lemmy_directive,
                 top_p=active_top_p,
                 cast_roster_block=cast_roster_block,
@@ -2712,27 +2843,50 @@ Begin the full script now. Follow this structure exactly:
 
         # ── v1.1 CHECKS & CRITIQUES LOOP ─────────────────────────────────────
         # Three-pass refinement: Draft → Critique → Revise
-        # The LLM critiques its own script for structural, scientific, and
-        # dramatic weaknesses, then rewrites based on the critique.
-        # Adds ~2 extra inference passes but significantly elevates quality.
+        # v1.5 HARDENING: For long scripts (>3 acts), run CRITIQUE-ONLY
+        # (structural analysis without global rewrite) to avoid the
+        # "Summarization Collapse" where the LLM condensed 5 acts into ~30 lines.
+        # The critique findings feed into the Arc Enhancer's spine for
+        # targeted opening/closing polish.
         # ──────────────────────────────────────────────────────────────────────
-        _runtime_log(f"ScriptWriter: CRITIQUE CHECK: self_critique={self_critique} (type={type(self_critique).__name__})")
-        if self_critique:
-            _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise")
+        _runtime_log(f"ScriptWriter: CRITIQUE CHECK: self_critique={self_critique}")
+        
+        # Determine act count for critique strategy
+        actual_act_count = 1
+        if "target_length" in locals() and target_length:
+            _act_map = {"short (3 acts)": 3, "medium (5 acts)": 5, "long (7-8 acts)": 8, "epic (10+ acts)": 12}
+            actual_act_count = _act_map.get(target_length, 1)
+
+        if self_critique and actual_act_count <= 3:
+            # Short scripts: full critique + revision (safe — script fits in context)
+            _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise (full)")
             script_text = self._critique_and_revise(
                 script_text, genre_flavor, target_words, model_id, temperature,
                 optimization_profile=optimization_profile
             )
             _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
+        elif self_critique:
+            # v1.5: For long scripts, critique now runs UPSTREAM in the Story Editor
+            # (before act generation), not as a post-generation pass. The critique
+            # guides each act's writing via per-act briefs. The findings are already
+            # stored on self._last_critique_findings from _generate_chunked().
+            _runtime_log(f"ScriptWriter: Critique ran upstream via Story Editor ({actual_act_count} acts)")
+
 
         # ── ARC ENHANCER (v1.3 flagship feature) ──────────────────────────────
         # Paired opening + closing bookend rewrite to ensure narrative coherence.
         # ──────────────────────────────────────────────────────────────────────
         if arc_enhancer:
             _runtime_log("ScriptWriter: >>> ENTERING arc_enhancer")
+            # v1.5: Pass critique findings (if any) so the Arc Enhancer
+            # can address structural weaknesses when polishing start/end.
+            _findings = getattr(self, '_last_critique_findings', '') or ''
+            _act_sums = getattr(self, '_last_act_summaries', []) or []
             script_text = self._execute_arc_enhancer(
                 script_text, genre_flavor, episode_title, news_block, model_id, temperature,
-                optimization_profile=optimization_profile
+                optimization_profile=optimization_profile,
+                critique_findings=_findings,
+                act_summaries=_act_sums
             )
             _runtime_log("ScriptWriter: <<< EXITED arc_enhancer")
 
@@ -2981,23 +3135,29 @@ Begin the full script now. Follow this structure exactly:
         # episodes we switch to "pitch mode" — a 3-5 sentence logline per concept,
         # ~100 words, no act structure. Saves ~80% of open-close inference time.
         # The full script generator still invents the scene structure downstream.
+        # v1.5: 7-Line Micro-Spine Protocol
+        # Instead of generating full ~450-token outlines that blow the KV cache
+        # and take ~4 min each, we generate ultra-condensed 7-line structural
+        # spines (~100 tokens). This cuts Open-Close from ~12 min to ~2 min,
+        # eliminates VRAM_CEILING_EXCEEDED warnings during outline generation,
+        # and produces tighter narrative structures for act expansion.
         is_pitch_mode = target_minutes >= 15
         if is_pitch_mode:
             mode_label = "PITCH"
             outline_max_tokens = 250
-            OUTLINE_MIN = 150
+            OUTLINE_MIN = 100
             OUTLINE_MAX = 1500
             _runtime_log(
                 f"OPENCLOSE: PITCH_MODE enabled for {target_minutes}m run "
                 f"(max_new_tokens={outline_max_tokens})"
             )
         else:
-            mode_label = "OUTLINE"
-            outline_max_tokens = 450   # was 600 — trimmed to stay inside SDPA ~420s budget
-            OUTLINE_MIN = 200
-            OUTLINE_MAX = 3000
+            mode_label = "SPINE"
+            outline_max_tokens = 150   # 7-line spine: ~100 tokens actual output
+            OUTLINE_MIN = 80
+            OUTLINE_MAX = 1200
             _runtime_log(
-                f"OPENCLOSE: OUTLINE_MODE enabled for {target_minutes}m run "
+                f"OPENCLOSE: SPINE_MODE enabled for {target_minutes}m run "
                 f"(max_new_tokens={outline_max_tokens})"
             )
         mode_lower = mode_label.lower()
@@ -3072,28 +3232,37 @@ TARGET LENGTH (downstream script): {target_minutes} minutes
 
 Begin your PITCH now:"""
             else:
-                # OUTLINE mode: full structured outline (short episodes only)
-                concept_body = f"""Generate a STORY OUTLINE (not a full script) for a {genre_flavor.replace("_", " ")} radio drama.
+                # SPINE mode: 7-line micro-variation protocol
+                # Each line maps to a foundational dramatic function:
+                # 1=Inciting Incident, 2=Protagonist Goal, 3=First Obstacle,
+                # 4=Midpoint Twist, 5=Climax Prep, 6=Climax, 7=Epilogue
+                concept_body = f"""Generate a 7-LINE STORY SPINE for a {genre_flavor.replace("_", " ")} radio drama.
 
 PRIORITY: {focus_name}
 {focus_desc}
 
-CRITICAL: The science news headlines in the system prompt above ARE your raw material. Your premise MUST be rooted in those real headlines — extrapolate the science to its most dramatic, terrifying, or profound next step. Do NOT invent unrelated premises.
+CRITICAL: The science news headlines in the system prompt above ARE your raw material. Your premise MUST be rooted in those real headlines — extrapolate the science to its most dramatic, terrifying, or profound next step.
 
-ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine above.
+ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine.
 {cast_roster_block if cast_roster_block else f"CHARACTERS: {num_characters} speaking roles plus ANNOUNCER"}
-TARGET LENGTH: {target_minutes} minutes (~{target_words} words when fully scripted)
+TARGET LENGTH: {target_minutes} minutes
 {lemmy_directive}
 
-Output a concise outline with:
-- PREMISE: 2-3 sentences. What's the hook? Must reference the real science from the news above.
-- CHARACTERS: Name, role, key trait, internal conflict (one line each)
-- ACT 1 (BEGINNING): Setup, inciting incident. 3-4 sentences.
-- ACT 2 (MIDDLE): Rising tension, complications, reversals. 4-5 sentences.
-- ACT 3 (END): Climax, resolution, epilogue hook. 3-4 sentences.
-- KEY SFX: 3-5 signature sound moments that define the atmosphere.
+RULES:
+- Output EXACTLY 7 numbered lines. No more, no fewer.
+- No dialogue. No scene descriptions. Pure structural beats.
+- Each line is ONE sentence describing WHAT HAPPENS.
 
-Keep it under 400 words. Structure only — no dialogue."""
+FORMAT:
+1. INCITING INCIDENT: [What disrupts the status quo — rooted in the real science headline]
+2. PROTAGONIST GOAL: [What the lead character must achieve to resolve/contain the incident]
+3. FIRST OBSTACLE: [Primary conflict, antagonistic force, or system failure driving tension]
+4. MIDPOINT TWIST: [Reversal that changes everything — hidden pattern or critical new info]
+5. CLIMAX PREPARATION: [Stakes are set for the final confrontation — consequences are clear]
+6. CLIMAX: [Definitive resolution of the core conflict — earned, not ambiguous]
+7. SCIENTIFIC EPILOGUE: [Real-world grounding — cite the actual science source]
+
+Write your 7-line spine now:"""
 
             outline_prompt = f"{system}\n\n{concept_body}"
 
@@ -3113,9 +3282,14 @@ Keep it under 400 words. Structure only — no dialogue."""
                 log.info("[OpenClose] %s %s generated (%d chars)",
                          mode_label, focus_name, len(outline_text))
                 _runtime_log(f"OPENCLOSE: {mode_label} {focus_name} done ({len(outline_text)} chars)")
+                
+                # v1.5.1: Lightweight flush — clear KV cache fragments between spines
+                # but keep LLM weights on GPU to avoid the ~13s reload penalty.
+                _flush_vram_keep_llm()
             except Exception as e:
                 log.warning("[OpenClose] %s %s failed: %s", mode_label, focus_name, e)
                 outlines.append((focus_name, ""))
+                _flush_vram_keep_llm()
 
         # ── Phase 2a: Open-Close boundary enforcement ──
         # Discard outlines outside the mode-specific char range before evaluator.
@@ -3147,6 +3321,7 @@ Keep it under 400 words. Structure only — no dialogue."""
         _runtime_log("OPENCLOSE: Evaluator picking winner")
 
         outlines_block = ""
+
         for idx, (name, text) in enumerate(valid_outlines, 1):
             outlines_block += f"\n--- {mode_label} {idx} ({name}) ---\n{text}\n"
 
@@ -3186,8 +3361,12 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
             )
             log.info("[OpenClose] Evaluator complete (%d chars)", len(eval_text))
             _runtime_log(f"OPENCLOSE: Evaluator done ({len(eval_text)} chars)")
+            
+            # v1.5.1: Lightweight flush — keep LLM on GPU for story editor.
+            _flush_vram_keep_llm()
         except Exception as e:
             log.warning("[OpenClose] Evaluator failed: %s — using first outline", e)
+            _flush_vram_keep_llm()
             return valid_outlines[0][1]
 
         # Extract the final concept from evaluator output.
@@ -3221,6 +3400,81 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
     # ─────────────────────────────────────────────────────────────────────────
     # CHECKS & CRITIQUES — Draft -> Critique -> Revise
     # ─────────────────────────────────────────────────────────────────────────
+
+    def _run_critique_only(self, draft_text, genre_flavor, target_words,
+                           model_id, temperature, optimization_profile="Standard"):
+        """Critique-only pass for long scripts (>3 acts).
+
+        Runs the same structural critique as _critique_and_revise Pass 2,
+        but SKIPS Pass 3 (global rewrite) to prevent summarization collapse.
+        The critique findings are returned as text and stored on self so the
+        Arc Enhancer can incorporate them into its opening/closing polish.
+
+        Returns the critique text, or empty string on failure.
+        """
+        log.info("[Critique] Starting critique-only pass (no rewrite — long script protection)")
+        _runtime_log("CRITIQUE_ONLY: Generating structural analysis")
+
+        # Truncate for critique context — keep first 4000 + last 4000 chars
+        # to see beginning AND ending without blowing the context window.
+        draft_for_critique = draft_text
+        if len(draft_text) > 8000:
+            draft_for_critique = (
+                draft_text[:4000]
+                + "\n\n[... MIDDLE ACTS OMITTED FOR BREVITY ...]\n\n"
+                + draft_text[-4000:]
+            )
+
+        critique_prompt = f"""You are a HARSH but constructive script editor for a {genre_flavor.replace("_", " ")} radio drama.
+
+Below is a multi-act draft script. Your job is to identify SPECIFIC weaknesses. Do NOT rewrite anything.
+
+Output a numbered list of 5-8 concrete problems, each one sentence. Focus on:
+1. OPENING HOOK: Does the first 30 seconds grab the listener? Is the announcer's intro compelling?
+2. STORY ARC: Does tension rise across acts? Is the climax earned? Does anything feel skipped?
+3. CHARACTER VOICE: Do characters sound distinct from each other? Or interchangeable?
+4. DIALOGUE QUALITY: Natural spoken English? 5-15 words per line? Contractions used?
+5. ENDING PAYOFF: Does the closing connect back to the opening? Is the epilogue grounded in real science?
+6. PACING: Any dead spots or rushed sections between acts?
+7. AUDIO DESIGN: Are [SFX:] and [ENV:] tags specific and atmospheric?
+8. START-TO-END COHERENCE: Does the final act honor the promises made in Act 1?
+
+Be brutal. Be specific. Name the exact act or line that's weak.
+Do NOT include any script text in your response — critique ONLY.
+
+DRAFT SCRIPT:
+{draft_for_critique}
+
+YOUR CRITIQUE (numbered list only):"""
+
+        try:
+            critique_tokens = min(600, max(200, len(draft_text) // 25))
+            critique_text = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    critique_prompt,
+                    model_id=model_id,
+                    max_new_tokens=critique_tokens,
+                    temperature=0.3,
+                    top_p=0.9,
+                    optimization_profile=optimization_profile
+                ),
+                timeout_sec=180,
+                phase_label="Critique-Only",
+            )
+            log.info("[Critique] Critique-only pass complete (%d chars)", len(critique_text))
+            _runtime_log(f"CRITIQUE_ONLY: Complete ({len(critique_text)} chars)")
+
+            # Validate it looks like a critique, not a rewrite
+            _markers = re.findall(r'^\s*\d+[\.)\:]', critique_text, re.MULTILINE)
+            if len(_markers) < 2:
+                log.warning("[Critique] Critique-only output doesn't look like a numbered list — discarding")
+                return ""
+
+            return critique_text
+        except Exception as e:
+            log.warning("[Critique] Critique-only pass failed: %s", e)
+            _runtime_log(f"CRITIQUE_ONLY: Failed — {e}")
+            return ""
 
     def _critique_and_revise(self, draft_text, genre_flavor, target_words,
                              model_id, temperature, optimization_profile="Standard"):
@@ -3446,7 +3700,8 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
     def _generate_chunked(self, system, title, genre, num_chars, target_min,
                           target_words, premise, news_block, act_breaks,
-                          model_id, temperature, lemmy_directive="", top_p=0.95,
+                          model_id, temperature, target_length="medium (5 acts)",
+                          lemmy_directive="", top_p=0.95,
                           cast_roster_block="", optimization_profile="Standard"):
         """Generate long scripts act-by-act to avoid token truncation.
 
@@ -3454,8 +3709,21 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
         Step 2: Generate each act using the outline + previous act as context
         Step 3: Concatenate into the final script
         """
-        num_acts = 3 if target_min >= 20 else 2
-        words_per_act = target_words // num_acts
+        # v1.5 FIX: Respect the target_length widget for act counts
+        # Map: short=3, medium=5, long=8, epic=12
+        _act_map = {
+            "short (3 acts)":  3,
+            "medium (5 acts)": 5,
+            "long (7-8 acts)": 8,
+            "epic (10+ acts)": 12
+        }
+        num_acts = _act_map.get(target_length, 5)
+        
+        # v1.5 FIX: Increased inflation factor to 1.5 (from 1.2).
+        # Gemma/Nemo aggressively summarize if not pushed. 1.5x target ensures
+        # that even with 'lazy' generation, we land near the user's intent.
+        inflated_target = int(target_words * 1.5)
+        words_per_act = inflated_target // num_acts
 
         # Step 1: Outline
         outline_prompt = f"""{system}
@@ -3499,6 +3767,83 @@ Outline only — do NOT write dialogue yet."""
         # and signpost key character states for continuity.
         acts = []
         act_summaries = []  # Running narrative memory
+
+        # ── Step 1b: CRITIQUE THE OUTLINE (v1.5 — Story Editor) ──────────
+        # Before writing ANY dialogue, have the LLM critique its own outline.
+        # This catches structural weaknesses BEFORE they infect the acts.
+        # The critique generates per-act briefs that guide each act's writing.
+        # Key insight from research: critique guides writing, not patches it.
+        outline_critique = ""
+        act_briefs = {}  # {act_num: "brief for what this act should accomplish"}
+        
+        try:
+            # v1.5.1: Lightweight flush — keep LLM on GPU for critique.
+            _flush_vram_keep_llm()
+            
+            _runtime_log("STORY_EDITOR: Critiquing outline before act generation")
+            _brief_lines = []
+            for n in range(1, num_acts + 1):
+                _brief_lines.append(f"ACT {n} BRIEF: [What Act {n} must accomplish dramatically — 1-2 sentences]")
+            _brief_format = "\n".join(_brief_lines)
+            
+            editor_prompt = f"""You are a veteran radio drama story editor. Below is an outline for a {num_acts}-act episode.
+
+OUTLINE:
+{_truncate_at_sentence_boundary(outline, 2000)}
+
+YOUR TASK: Briefly critique this outline, then write a 1-2 sentence BRIEF for each act describing what it must accomplish dramatically.
+
+FORMAT YOUR RESPONSE EXACTLY AS:
+CRITIQUE: [2-3 sentences identifying the outline's biggest weakness and how to fix it]
+
+{_brief_format}
+
+QUALITY TARGETS:
+- Each brief should specify the EMOTIONAL STATE characters should be in
+- Each brief should name a KEY DRAMATIC MOMENT that must happen
+- Each brief should note any SFX or atmosphere cues that would enhance the scene"""
+            
+            editor_text = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    editor_prompt,
+                    model_id=model_id,
+                    max_new_tokens=min(600, 80 * num_acts),
+                    temperature=0.3,
+                    top_p=0.9,
+                    optimization_profile=optimization_profile
+                ),
+                timeout_sec=120,
+                phase_label="Story-Editor",
+            )
+            
+            # v1.5.1: Lightweight flush — keep LLM on GPU for act generation.
+            _flush_vram_keep_llm()
+            
+            # Parse act briefs from the editor text
+            critique_match = re.search(r'CRITIQUE:\s*(.+?)(?=ACT \d+ BRIEF:)', editor_text, re.DOTALL | re.IGNORECASE)
+            if critique_match:
+                outline_critique = critique_match.group(1).strip()
+                _runtime_log(f"STORY_EDITOR: Critique: {outline_critique[:120]}")
+            
+            # Extract per-act briefs
+            for act_n in range(1, num_acts + 1):
+                brief_match = re.search(
+                    rf'ACT {act_n} BRIEF:\s*(.+?)(?=ACT \d+ BRIEF:|$)',
+                    editor_text, re.DOTALL | re.IGNORECASE
+                )
+                if brief_match:
+                    act_briefs[act_n] = brief_match.group(1).strip()[:300]
+            
+            _runtime_log(f"STORY_EDITOR: Generated {len(act_briefs)} act briefs")
+            log.info("[StoryEditor] Outline critique complete: %d chars, %d act briefs",
+                     len(outline_critique), len(act_briefs))
+            
+            # Store critique for downstream Arc Enhancer
+            self._last_critique_findings = outline_critique
+            
+        except Exception as _editor_err:
+            log.warning("[StoryEditor] Story editor pass failed: %s — continuing without briefs", _editor_err)
+            _runtime_log(f"STORY_EDITOR: Failed — {_editor_err}")
 
         for act_num in range(1, num_acts + 1):
             # S29: Allow users to cancel long script generation
@@ -3583,15 +3928,30 @@ SUMMARY:"""
             else:
                 context_block = "(beginning of episode)"
 
-            act_prompt = f"""{system}
+            # v1.5 FIX: Truncate outline for later acts to reduce KV cache pressure.
+            # Acts 1-2 get the full outline; Acts 3+ get a compressed version.
+            act_outline = outline if act_num <= 2 else _truncate_at_sentence_boundary(outline, 800)
+
+            # v1.5: Build Story Editor guidance block for this act
+            editor_guidance = ""
+            act_brief = act_briefs.get(act_num, "")
+            if act_brief or outline_critique:
+                editor_guidance = "\nSTORY EDITOR GUIDANCE:\n"
+                if outline_critique:
+                    editor_guidance += f"Overall note: {outline_critique[:200]}\n"
+                if act_brief:
+                    editor_guidance += f"THIS ACT must accomplish: {act_brief}\n"
+
+            act_prompt = f"""You are writing Act {act_num} of {num_acts} for a radio drama called "SIGNAL LOST".
 
 OUTLINE:
-{outline}
-
+{act_outline}
+{editor_guidance}
 {context_block}
 
 Now write ACT {act_num} of {num_acts} in full script format.
-Target: ~{words_per_act} words for this act. Taut dialogue — fragments, interruptions, subtext.
+Target: ~{words_per_act} words for this act. 
+STRICT REQUIREMENT: Focus on deep character reactions and atmospheric descriptions. If you run out of plot, expand the dialogue with conflicting emotions and technical disagreements. Do NOT summarize. Do NOT skip any plot points. Write every single beat in full dialogue form. Every character must have space to breathe and react.
 {"This is the OPENING — start with [MUSIC: Opening theme] and ANNOUNCER setting time/place/characters. Then drop us IN MEDIAS RES." if act_num == 1 else ""}
 {"This is the FINAL ACT — build to the twist, then ANNOUNCER delivers the hard-science epilogue. CITATION RULE: cite ONLY the real article provided in the news block above — its exact source name and date. NEVER use numbered references like [1], [2], article #N — always say the source name directly (e.g. 'According to Science Daily, published April 3, 2026...'). Do NOT invent ArXiv IDs or paper titles. End with [MUSIC: Closing theme]." if act_num == num_acts else ""}
 {"Include an act break marker [ACT " + str(act_num + 1) + "] at the end of this act." if act_breaks and act_num < num_acts else ""}
@@ -3600,25 +3960,42 @@ CONTINUITY CHECK: Before writing, review the story-so-far summaries above. Ensur
 
 Write Act {act_num} now:"""
 
+
             _runtime_log(f"ScriptWriter: Generating Act {act_num}/{num_acts}")
             
-            # BUG-011 FIX: Reduce KV Cache allocation overhead for Act chunks.
-            # 4096 pre-allocates too much VRAM on 4GB cards. Scale it to the act size.
-            # 1 word ~ 1.5 tokens. We grant a 2x buffer (3.0 * words).
+            # v1.5: Dynamic act token budget based on words_per_act.
+            # Formula: words_per_act * 2.5 (1.3 tok/word + formatting + safety margin)
+            # Clamped between 1024 (floor for short acts) and 2048 (VRAM ceiling).
+            # Previous hardcoded 1536 was often too tight for 500+ word acts.
             if optimization_profile == "Obsidian (Low VRAM/Fast)":
                 act_budget = min(2048, int(words_per_act * 3.0))
             else:
-                act_budget = 4096
+                act_budget = max(1024, min(2048, int(words_per_act * 2.5)))
                 
             act_text = _generate_with_llm(act_prompt, model_id=model_id,
                                               max_new_tokens=act_budget, temperature=temperature, top_p=top_p,
                                               optimization_profile=optimization_profile)
             acts.append(act_text)
 
+            # v1.5.1: Lightweight flush — keep LLM on GPU between acts.
+            # Full model eviction here was causing ~13s reload per act (up to 8 acts).
+            _flush_vram_keep_llm()
+            _runtime_log(f"ScriptWriter: Act {act_num} VRAM flushed (lightweight -- LLM retained)")
+
+        # v1.5: Store act summaries for the Arc Enhancer to use when
+        # polishing the opening/closing. These are richer than the plot spine
+        # the Arc Enhancer extracts on its own.
+        self._last_act_summaries = act_summaries
+
         return "\n\n".join(acts)
 
-    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature, optimization_profile="Standard"):
-        """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence."""
+    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature, optimization_profile="Standard", critique_findings="", act_summaries=None):
+        """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence.
+        
+        v1.5: Now accepts optional critique_findings and act_summaries.
+        When present, these give the bookend rewriter a complete picture of
+        the story's structure so the opening and closing mesh perfectly.
+        """
         _runtime_log("ARC_EN_HANCER: Starting structural coherence pass")
         original_script_backup = script_text
 
@@ -3650,6 +4027,23 @@ Write Act {act_num} now:"""
 
         # Phase B: Architectural Echo call
         # We use a lower temperature (0.6) for tighter structural alignment
+        # v1.5: Inject critique findings + act summaries if available
+        critique_block = ""
+        if critique_findings:
+            critique_block += f"""\nEDITOR CRITIQUE (address these weaknesses in your rewrite):
+{critique_findings[:800]}
+"""
+            _runtime_log(f"ARC_ENHANCER: Injecting {len(critique_findings)} chars of critique findings")
+        
+        # v1.5: If act summaries are available from chunked generation,
+        # they provide a richer story picture than the extracted plot spine.
+        act_summary_block = ""
+        if act_summaries:
+            act_summary_block = "\nACT-BY-ACT JOURNEY (use this to ensure opening seeds and closing payoffs match the actual story):\n"
+            for s_idx, s_text in enumerate(act_summaries, 1):
+                act_summary_block += f"  Act {s_idx}: {s_text.strip()}\n"
+            _runtime_log(f"ARC_ENHANCER: Injecting {len(act_summaries)} act summaries for start/end coherence")
+
         echo_prompt = f"""You are a structural script editor for the radio drama anthology "SIGNAL LOST".
 YOUR TASK: Rewrite the OPENING and CLOSING dialogue blocks below to create a "narrative echo".
 
@@ -3668,7 +4062,7 @@ SCIENCE CONTEXT: {news_block[:500]}
 
 MIDDLE EVENTS (do not contradict):
 {plot_spine}
-
+{act_summary_block}{critique_block}
 ORIGINAL OPENING BLOCK:
 {opening_orig}
 
@@ -4140,20 +4534,101 @@ Format your response exactly as:
         if dialogue_count == 0 and len(lines) > 0:
             log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
             _recovered = 0
+
+            # Pass 1: Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
             for ln in lines:
                 if ln.get("type") == "direction":
-                    text = ln["text"]
-                    # Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
-                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text)
+                    text_d = ln["text"]
+                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text_d)
                     if m:
                         ln["type"] = "dialogue"
                         ln["character_name"] = m.group(1).strip()
                         ln["voice_traits"] = "unspecified"
                         ln["line"] = m.group(2).strip()
                         _recovered += 1
+
+            # Pass 2: Screenplay format (NeMo 12B natural style)
+            # Matches: **NAME** or **NAME:** on its own line, followed by optional
+            # (parenthetical), then dialogue text on subsequent line(s).
+            if _recovered < 3:
+                _screenplay_name_pat = re.compile(
+                    r'^\*\*([A-Z][A-Z0-9_ ]{0,20})\*\*\s*:?\s*$'
+                )
+                _paren_pat = re.compile(r'^\(.*\)\s*$')
+                # Structural lines that should NOT be treated as dialogue
+                _structural_prefixes = (
+                    "INT.", "EXT.", "===", "---", "[", "*", "ACT ", "SCENE ",
+                    "FADE ", "CUT ", "END ", "TO BE", "**ACT", "**SCENE",
+                )
+                # Re-parse from raw text since the direction items lost structure
+                raw_lines_2 = text.strip().splitlines()
+                _new_items = []
+                k = 0
+                while k < len(raw_lines_2):
+                    raw_s = raw_lines_2[k].strip()
+                    # Strip markdown bold/italic wrappers
+                    clean_s = re.sub(r'^[*_]+|[*_]+$', '', raw_s).strip()
+                    nm = _screenplay_name_pat.match(raw_s)
+                    if nm:
+                        char_name = nm.group(1).strip().upper()
+                        # Skip known structural words
+                        _fw = char_name.split()[0] if char_name else ""
+                        if _fw in ("ACT", "SCENE", "INT", "EXT", "FADE", "CUT",
+                                   "END", "MUSIC", "SFX", "ENV", "BEAT", "PAUSE",
+                                   "TRANSITION", "CONTINUED", "CONT"):
+                            k += 1
+                            continue
+                        # Collect dialogue lines after the name
+                        k += 1
+                        # Skip optional parenthetical(s)
+                        while k < len(raw_lines_2):
+                            next_l = raw_lines_2[k].strip()
+                            next_clean = re.sub(r'^[*_]+|[*_]+$', '', next_l).strip()
+                            if _paren_pat.match(next_clean):
+                                k += 1
+                            else:
+                                break
+                        # Collect dialogue lines until we hit a blank, another name, or structural
+                        _dial_parts = []
+                        while k < len(raw_lines_2):
+                            dl = raw_lines_2[k].strip()
+                            dl_clean = re.sub(r'^[*_]+|[*_]+$', '', dl).strip()
+                            if not dl_clean:
+                                break
+                            if _screenplay_name_pat.match(dl):
+                                break
+                            if _paren_pat.match(dl_clean):
+                                k += 1
+                                continue
+                            if any(dl_clean.upper().startswith(p) for p in _structural_prefixes):
+                                break
+                            _dial_parts.append(dl_clean.strip('"\u201c\u201d'))
+                            k += 1
+                        if _dial_parts:
+                            # Join multi-line dialogue into one
+                            full_dialogue = " ".join(_dial_parts)
+                            _new_items.append({
+                                "type": "dialogue",
+                                "character_name": char_name,
+                                "voice_traits": "unspecified",
+                                "line": full_dialogue,
+                            })
+                            _recovered += 1
+                    else:
+                        k += 1
+                if _new_items:
+                    # Replace the lines list with screenplay-parsed items
+                    # Keep non-direction items (scene_break, sfx, etc.) and add new dialogue
+                    structural = [ln for ln in lines if ln.get("type") != "direction"]
+                    lines.clear()
+                    lines.extend(structural)
+                    lines.extend(_new_items)
+                    log.info(f"[ScriptParser] Screenplay format: recovered {len(_new_items)} dialogue lines from **NAME** patterns")
+
             if _recovered > 0:
                 log.info(f"[ScriptParser] Permissive fallback recovered {_recovered} dialogue lines!")
                 dialogue_count = _recovered
+
 
         if not lines or dialogue_count == 0:
             log.critical(

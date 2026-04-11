@@ -170,10 +170,10 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
                 _CHARACTER_VOICE_CACHE[character] = preset
                 return preset
 
-    # Gender-aware hash fallback with 85/15 English-native/international ratio.
+    # Gender-aware hash fallback with 93/7 English-native/international ratio.
     # Director always assigns en_speaker_*; this fallback runs only when the
-    # Director mapping is missing. ~85% chance of English native, ~15% of
-    # international accented English (adds subtle vocal variety without
+    # Director mapping is missing. ~93% chance of English native, ~7% of
+    # international accented English (rare accent for vocal variety without
     # risking language drift — the temp cap + ASCII sanitizer handle the rest).
     import random
     traits_lower = voice_traits.lower() if voice_traits else ""
@@ -182,7 +182,7 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
 
     # Deterministic seed per character name so same character always gets same voice
     rng = random.Random(hash(character))
-    use_intl = rng.random() < 0.15  # 15% chance of international preset
+    use_intl = rng.random() < 0.07  # 7% chance of international preset
 
     if is_female:
         en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]

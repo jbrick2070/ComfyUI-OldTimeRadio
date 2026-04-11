@@ -84,13 +84,12 @@ pip install transformers soundfile numpy feedparser tokenizers sentencepiece
 
 ### Step 4 — Load a Workflow
 
-Three workflows ship in the `workflows/` folder:
+Two workflows ship in the `workflows/` folder:
 
 | Workflow | Runtime Preset | Best For | File |
 |----------|---------------|----------|------|
 | **Test** | 🧪 1 min | Smoke testing after code changes | `otr_scifi_16gb_test.json` |
-| **Lite** | 📻 5 min | Quick episodes, `open_close` OFF | `otr_scifi_16gb_lite.json` |
-| **Full** | 📻 8 min | Production episodes, all features ON | `otr_scifi_16gb_full.json` |
+| **Full** | 📻 12 min | Production episodes, all features ON, Pro profile | `otr_scifi_16gb_full.json` |
 
 1. Open ComfyUI at `http://127.0.0.1:8000`
 2. Click **Load** → select a workflow
@@ -180,6 +179,26 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 │ │    + _treatment.txt (cast • voices • full script • stats)                                   │ │
 │ └──────────────────────────────────────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — RESEARCH PHASE]
+│                                                                                                    │
+  ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌────────────────────────┐
+│ │ 8. Character Forge          │   │ 9. Scene Painter             │   │ 10. Visual Compositor  │   │
+  │ (OTR_CharacterForge)  [v2] │   │ (OTR_ScenePainter)     [v2] │   │ (OTR_VisualMix)  [v2] │
+│ │ TripoSR: img → 3D mesh     │   │ Wan 2.1: text → 5s clip     │   │ 3D + diffusion + CRT  │   │
+  │ Consistent character refs  │   │ Establishing shots           │   │ Synced to audio bus   │
+│ └─────────────────────────────┘   └─────────────────────────────┘   └────────────────────────┘   │
+                 │                              │                              │
+│                └──────────────────────────────┼──────────────────────────────┘                    │
+                                                ▼
+│                              ┌────────────────────────────────┐                                   │
+                               │ 11. Production Bus             │
+│                              │ (OTR_ProductionBus)      [v2]  │                                   │
+                               │ visual_plan + audio timeline   │
+│                              │ → unified episode render       │                                   │
+                               └────────────────────────────────┘
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
 ---
@@ -188,7 +207,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 | Node | What It Does |
 |------|-------------|
-| **1. LLM Story Writer** | Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. Open-Close expansion generates 3 competing outlines and picks the best. Self-critique loop revises the draft. 12 dramatic story arc templates (Shakespearian, Comedic Spiral, Heroic Epic, Twilight Mind-Bender, and more). |
+| **1. LLM Story Writer** | Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. **v1.5 Story Editor** critiques the outline before writing and generates per-act briefs that guide each act's dialogue. Open-Close expansion generates 3 competing 7-line micro-spines and picks the best. Arc Enhancer polishes opening/closing using act summaries + critique findings for start-to-end coherence. 12 dramatic story arc templates. |
 | **2. LLM Director** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. |
 | **3. Voice Maker Machine** | Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. |
 | **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends. |
@@ -199,6 +218,12 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **5. Make It Sound Awesome** | Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization. |
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
 | **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
+| | |
+| **v2.0 — Visual Drama Engine** | **[RESEARCH PHASE — Not yet implemented]** |
+| **8. Character Forge** `[v2.0]` | Single reference image → 3D character mesh via TripoSR. Generates consistent turntable renders for every cast member. Sequential VRAM handoff after audio generation completes. |
+| **9. Scene Painter** `[v2.0]` | Text-to-video establishing shots via Wan 2.1 (1.3B). Takes scene descriptions from the Director's `visual_plan` and generates 5-second cinematic clips per scene. |
+| **10. Visual Compositor** `[v2.0]` | Layers 3D character renders over diffusion backgrounds with CRT overlay as aesthetic post-process. Syncs visual frames to the audio timeline at per-scene granularity. |
+| **11. Production Bus** `[v2.0]` | Unified assembly node merging `visual_plan` + audio timeline into a single episode render. Extends the existing SceneSequencer pattern with a visual track. |
 
 ---
 
@@ -279,7 +304,7 @@ python otr_monitor.py
 
 **Cause:** Gemma occasionally undershoots even with MANDATORY line count directives.
 
-**Fix:** Try `creativity = wild & rough` or `maximum chaos` to push more generation. The self-critique loop will catch the worst undershots. A post-generate line-count enforcement loop is planned for v1.2.
+**Fix:** v1.5 addresses this with the Story Editor (per-act briefs that prevent lazy generation), 1.5x dialogue inflation, and prompt hardening. Try `creativity = wild & rough` for even more output. The `self_critique` toggle enables structural analysis that guides writing quality.
 </details>
 
 ---
@@ -311,6 +336,23 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 ---
 
 ## Change Log
+
+### What's New in v1.5 — CLEAN (Story Editor & Pipeline Hardening)
+
+#### Story Editor (Critique-Guided Writing)
+The pipeline now **critiques the outline before writing dialogue**. After generating the structural outline, a veteran "Story Editor" pass analyzes weaknesses and generates per-act briefs describing what each act must accomplish dramatically. Every act prompt receives its brief + the overall critique, producing stronger, more purposeful dialogue from the first draft.
+
+#### 7-Line Micro-Spine Protocol
+Open-Close expansion now generates ultra-condensed 7-line structural spines (~100 tokens) instead of full outlines (~450 tokens). Cuts the Open-Close phase from ~12 minutes to ~2 minutes while producing tighter narrative structures.
+
+#### Arc Enhancer v2 — Critique + Act Summaries
+The Arc Enhancer now receives both the Story Editor's critique findings AND the act-by-act narrative summaries from chunked generation. This gives the bookend rewriter a complete picture of the story when polishing the opening and closing for start-to-end coherence.
+
+#### Dynamic Token Budgets
+Act token budgets now scale dynamically with `words_per_act × 2.5` instead of being hardcoded to 1536, clamped between 1024-2048. Longer episodes get proportionally more generation headroom.
+
+#### VRAM Stability
+`force_vram_offload()` replaces raw `gc.collect()`/`torch.cuda.empty_cache()` between acts. The 3-step teardown (registered callbacks → ComfyUI model unload → PyTorch cache purge) ensures clean memory between every generation step.
 
 ### What's New in v1.4
 

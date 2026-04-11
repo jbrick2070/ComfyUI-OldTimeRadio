@@ -317,23 +317,38 @@ def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
         _CHARACTER_VOICE_CACHE[voice_tag] = preset
         return preset
 
-    # Gender-aware hash fallback: use voice_traits to pick from the right pool
+    # Gender-aware hash fallback with 93/7 English-native/international ratio.
+    # ~93% chance of English native, ~7% of international accented English.
+    import random as _rng_mod
     traits_lower = voice_traits.lower() if voice_traits else ""
-    if "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower:
-        pool = _FEMALE_PRESETS
+    is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
+    is_male   = "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower
+
+    # Deterministic seed per voice_tag so same character always gets same voice
+    rng = _rng_mod.Random(hash(voice_tag))
+    use_intl = rng.random() < 0.07  # 7% chance of international preset
+
+    if is_female:
+        en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _FEMALE_PRESETS if not p.startswith("v2/en_")]
         label = "female"
-    elif "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower:
-        pool = _MALE_PRESETS
+    elif is_male:
+        en_pool   = [p for p in _MALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _MALE_PRESETS if not p.startswith("v2/en_")]
         label = "male"
     else:
-        pool = _BARK_VOICE_PRESETS
+        en_pool   = [p for p in _BARK_VOICE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _BARK_VOICE_PRESETS if not p.startswith("v2/en_")]
         label = "unknown-gender"
 
-    idx = hash(voice_tag) % len(pool)
-    preset = pool[idx]
+    pool = intl_pool if (use_intl and intl_pool) else en_pool
+    if not pool:
+        pool = _BARK_VOICE_PRESETS
+    preset = rng.choice(pool)
     _CHARACTER_VOICE_CACHE[voice_tag] = preset
-    log.info("[VoiceMap] No Director mapping for '%s' (%s), hash-assigned %s from %s pool",
-             voice_tag, traits_lower[:30], preset, label)
+    pool_tag = "international" if (use_intl and intl_pool) else "English-native"
+    log.info("[VoiceMap] No Director mapping for '%s' (%s), assigned %s from %s %s pool",
+             voice_tag, traits_lower[:30], preset, pool_tag, label)
     return preset
 
 
@@ -600,6 +615,17 @@ class SceneSequencer:
                     "default": "bark",
                     "tooltip": "Default TTS engine when not specified in production plan"
                 }),
+                # v1.5 Phase 3: Time-Alignment Offset Pins
+                "dialogue_offset_ms": ("FLOAT", {
+                    "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
+                    "tooltip": "Shift all dialogue clips on the timeline (ms). "
+                               "Positive = delay, negative = advance."
+                }),
+                "sfx_offset_ms": ("FLOAT", {
+                    "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
+                    "tooltip": "Shift all SFX clips on the timeline (ms). "
+                               "Positive = delay, negative = advance."
+                }),
             },
         }
 
@@ -644,7 +670,8 @@ class SceneSequencer:
                  tts_audio_clips=None, sfx_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
-                 default_tts="bark"):
+                 default_tts="bark",
+                 dialogue_offset_ms=0.0, sfx_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
@@ -688,6 +715,7 @@ class SceneSequencer:
         # We accumulate silence/audio segments as numpy arrays
         sample_rate = 48000  # standardize output
         all_segments = []
+        sfx_timeline = []
         render_log = []
         manifest = []
         
@@ -695,6 +723,12 @@ class SceneSequencer:
         current_character_name = None
         current_env = "silent room"
         env_timeline = []  # List of (start_sample, end_sample, desc)
+
+        # v1.5 Phase 3: Convert TA offset from ms to samples
+        dialogue_offset_samples = int(dialogue_offset_ms * sample_rate / 1000.0)
+        sfx_offset_samples = int(sfx_offset_ms * sample_rate / 1000.0)
+        if dialogue_offset_ms != 0.0 or sfx_offset_ms != 0.0:
+            _runtime_log(f"SceneSequencer: TA_Offset active: dialogue={dialogue_offset_ms:+.0f}ms, sfx={sfx_offset_ms:+.0f}ms")
 
         lines_to_render = script[start_line:end_line]
         log.info(f"[SceneSequencer] Rendering Canonical 1.0 items {start_line}-{min(end_line, len(script))}")
@@ -737,13 +771,18 @@ class SceneSequencer:
                 desc = item.get("description", "unknown sound")
                 if sfx_clip_idx < len(sfx_clips):
                     clip_np, clip_sr = sfx_clips[sfx_clip_idx]
-                    segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
-                    segment_np = _normalize_clip(segment_np)
+                    sfx_segment = _resample_audio(clip_np, clip_sr, sample_rate)
+                    sfx_segment = _normalize_clip(sfx_segment, target_peak=0.85)
                     sfx_clip_idx += 1
-                    render_log.append(f"[{global_idx}] SFX: {desc}")
+                    # v1.5: Apply SFX TA_Offset
+                    sfx_pos = max(0, current_sample_pos + sfx_offset_samples)
+                    sfx_timeline.append((sfx_pos, sfx_segment, desc))
+                    render_log.append(f"[{global_idx}] SFX Overlay: {desc}")
                 else:
-                    segment_np = np.zeros(int(sample_rate * 0.75), dtype=np.float32)
                     render_log.append(f"[{global_idx}] SFX: {desc} (MISSING)")
+                    
+                # Add a tiny 0.1s breath to dialogue timeline to give SFX impact room
+                segment_np = np.zeros(int(sample_rate * 0.1), dtype=np.float32)
 
             elif item_type == "dialogue":
                 character_name = item.get("character_name", "UNKNOWN")
@@ -780,6 +819,14 @@ class SceneSequencer:
 
             # ── Accumulate Audio and Track Environment Span ──────────────
             if segment_np is not None:
+                # v1.5: Apply dialogue TA_Offset for dialogue/announcer items
+                if item_type == "dialogue" and dialogue_offset_samples != 0:
+                    offset_silence = max(0, dialogue_offset_samples)
+                    if offset_silence > 0:
+                        segment_np = np.concatenate([
+                            np.zeros(offset_silence, dtype=np.float32),
+                            segment_np
+                        ])
                 seg_len = len(segment_np)
                 env_timeline.append((current_sample_pos, current_sample_pos + seg_len, current_env))
                 all_segments.append(segment_np)
@@ -808,6 +855,28 @@ class SceneSequencer:
             
         combined = combined + final_bed
         render_log.append(f"--- Layered {len(env_timeline)} environment segments")
+
+        # ── SFX DUCKING & OVERLAY ──────────────────────────────────────────
+        max_sfx_end = 0
+        for start_pos, sfx_np, _ in sfx_timeline:
+            end_pos = start_pos + len(sfx_np)
+            if end_pos > max_sfx_end:
+                max_sfx_end = end_pos
+                
+        if max_sfx_end > len(combined):
+            pad = np.zeros(max_sfx_end - len(combined), dtype=np.float32)
+            combined = np.concatenate([combined, pad])
+            
+        if sfx_timeline:
+            render_log.append(f"--- Overlaying {len(sfx_timeline)} SFX cues with ducking")
+            for start_pos, sfx_np, desc in sfx_timeline:
+                end_pos = start_pos + len(sfx_np)
+                # Duck main mix (dialogue+bed) down to 70% underneath SFX
+                combined[start_pos:end_pos] *= 0.7
+                # Mix in SFX at 85% to prevent clipping
+                combined[start_pos:end_pos] += sfx_np * 0.85
+
+        total_len = len(combined)
         total_sec = total_len / sample_rate
         _runtime_log(f"SceneSequencer: 1.0 Mix complete ({total_sec:.1f}s)")
 
