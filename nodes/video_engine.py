@@ -1,9 +1,9 @@
 r"""
-OTR_SignalLostVideo — Procedural Audio-Reactive Video Engine
+OTR_SignalLostVideo - Procedural Audio-Reactive Video Engine
 =============================================================
 
 Generates a length-perfect MP4 from a finished SIGNAL LOST episode.
-No AI video generation — pure math-driven procedural CRT aesthetic
+No AI video generation - pure math-driven procedural CRT aesthetic
 rendered frame-by-frame and piped to ffmpeg.
 
 Architecture:
@@ -13,7 +13,7 @@ Architecture:
      frequency bars, oscilloscope, scan lines, vignette
   4. MP4 Encoder: raw RGB frames piped to ffmpeg stdin + audio mux
 
-The centre area is PURE PROCEDURAL ART — no script text, no lyrics,
+The centre area is PURE PROCEDURAL ART - no script text, no lyrics,
 no dialogue cards.  All visuals are driven by audio energy + math.
 
 VRAM cost: zero. Runs entirely on CPU (numpy + PIL).
@@ -35,9 +35,9 @@ import torch
 
 log = logging.getLogger("OTR")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # LAZY PIL IMPORT
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -46,9 +46,9 @@ except ImportError:
         "Run: pip install Pillow"
     )
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # CONSTANTS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 CRT_BG        = (8, 8, 16)         # deep navy-black
 CRT_GREEN     = (0, 255, 65)       # phosphor green
 CRT_AMBER     = (255, 176, 0)      # amber accent
@@ -59,9 +59,9 @@ CRT_WHITE     = (180, 200, 180)    # faded CRT white
 CRT_CYAN      = (0, 200, 200)      # cyan accent
 CRT_MAGENTA   = (200, 0, 200)      # magenta accent
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # FONT LOADING
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 _FONT_CACHE = {}
 
 def _load_font(size):
@@ -97,9 +97,9 @@ def _load_font(size):
     return font
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AUDIO ANALYSIS — per-frame RMS + FFT
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# AUDIO ANALYSIS - per-frame RMS + FFT
+# -----------------------------------------------------------------------------
 def _analyze_audio(audio_np, sample_rate, total_frames, fps):
     """Return (volume_curve, freq_data, waveform_chunks).
 
@@ -121,7 +121,7 @@ def _analyze_audio(audio_np, sample_rate, total_frames, fps):
         rms = float(np.sqrt(np.mean(chunk ** 2))) if len(chunk) > 0 else 0.0
         volume.append(rms)
 
-        # FFT — 32 bins
+        # FFT - 32 bins
         if len(chunk) > 0:
             fft = np.abs(np.fft.rfft(chunk))
             n = len(fft)
@@ -153,9 +153,9 @@ def _analyze_audio(audio_np, sample_rate, total_frames, fps):
     return volume, freqs, waves
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CRT FRAME RENDERER — Pure Procedural Art
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# CRT FRAME RENDERER - Pure Procedural Art
+# -----------------------------------------------------------------------------
 class _CRTRenderer:
     """Generates audio-reactive procedural CRT frames.
 
@@ -191,13 +191,13 @@ class _CRTRenderer:
         self._ring_cy = int(h * 0.42)
         self._ring_r = min(w, h) // 5
 
-        # v1.5 Adaptive Brightness Gating — EMA smoothed volume tracker
+        # v1.5 Adaptive Brightness Gating - EMA smoothed volume tracker
         # Quiet scenes dim toward dark navy; loud scenes brighten to full phosphor.
         # EMA smoothing prevents flickering on transient spikes.
         self._brightness_ema = 0.5  # start at mid-brightness
         self._brightness_alpha = 0.08  # EMA smoothing factor (lower = smoother)
 
-    # ── Public ──────────────────────────────────────────────────────────
+    # -- Public ----------------------------------------------------------
 
     def render(self, fi, total, fps, vol, freq, wave):
         """Render frame *fi* and return a PIL RGB Image."""
@@ -207,7 +207,7 @@ class _CRTRenderer:
         dur = total / fps
         pad = self.w // 48
 
-        # ── 1. Title bar ─────────────────────────────────────────────
+        # -- 1. Title bar ---------------------------------------------
         draw.text((pad, pad // 2), "=== SIGNAL LOST ===",
                   fill=CRT_GREEN, font=self.f_title)
         sub = f'"{self.title}"'
@@ -222,7 +222,7 @@ class _CRTRenderer:
         draw.text((self.w - pad - self.w // 10, pad // 2),
                   f"{mm:02d}:{ss:02d}", fill=CRT_DIM, font=self.f_sub)
 
-        # ── 2. CIRCULAR FREQUENCY RING (centre) ─────────────────────
+        # -- 2. CIRCULAR FREQUENCY RING (centre) ---------------------
         cx, cy, base_r = self._ring_cx, self._ring_cy, self._ring_r
         r = base_r + int(vol * base_r * 0.3)
         n_bars = min(32, len(freq))
@@ -244,7 +244,7 @@ class _CRTRenderer:
         bbox = [(cx - r, cy - r), (cx + r, cy + r)]
         draw.ellipse(bbox, outline=ring_col, width=2)
 
-        # ── 3. ORBITING PARTICLES ──────────────────────────────────
+        # -- 3. ORBITING PARTICLES ----------------------------------
         n_particles = 12
         for p in range(n_particles):
             phase = 2 * math.pi * p / n_particles
@@ -266,7 +266,7 @@ class _CRTRenderer:
             draw.ellipse([(px - size, py - size), (px + size, py + size)],
                          fill=pcol)
 
-        # ── 4. GEOMETRIC GRID ────────────────────────────────────────
+        # -- 4. GEOMETRIC GRID ----------------------------------------
         grid_step = max(40, self.w // 24)
         grid_alpha = max(8, int(15 + vol * 25))
         grid_col = (0, grid_alpha, int(grid_alpha * 0.4))
@@ -279,21 +279,21 @@ class _CRTRenderer:
             draw.line([(pad + wobble, gy), (self.w - pad - wobble, gy)],
                       fill=grid_col, width=1)
 
-        # ── 5. MIRRORED WAVEFORM ─────────────────────────────────────
+        # -- 5. MIRRORED WAVEFORM -------------------------------------
         wave_y = int(self.h * 0.72)
         wave_h = int(self.h * 0.12)
         if wave is not None and len(wave) > 1:
             self._waveform_mirror(draw, wave, pad, wave_y,
                                   self.w - pad * 2, wave_h, vol, t)
 
-        # ── 6. FREQUENCY BARS ────────────────────────────────────────
+        # -- 6. FREQUENCY BARS ----------------------------------------
         bar_y = int(self.h * 0.86)
         bar_h = int(self.h * 0.06)
         if freq is not None:
             self._freq_bars_wide(draw, freq, pad, bar_y,
                                  self.w - pad * 2, bar_h, vol)
 
-        # ── 7. Bottom bar ────────────────────────────────────────────
+        # -- 7. Bottom bar --------------------------------------------
         by = self.h - pad
         draw.line([(pad, by - pad // 3), (self.w - pad, by - pad // 3)],
                   fill=CRT_DARK, width=1)
@@ -304,14 +304,14 @@ class _CRTRenderer:
                   f"frame {fi:05d}/{total:05d}",
                   fill=CRT_DARK, font=self.f_small)
 
-        # ── 8. CRT post-processing ──────────────────────────────────
+        # -- 8. CRT post-processing ----------------------------------
         img = Image.alpha_composite(img.convert("RGBA"),
                                      self._scanlines).convert("RGB")
 
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
 
-        # ── 8b. Adaptive Brightness Gating — DISABLED ──────────────
+        # -- 8b. Adaptive Brightness Gating - DISABLED --------------
         # Removed in v1.5.1: dimmed the CRT text to unreadable levels.
         # Full brightness preserved (matches v1.4 behavior).
 
@@ -327,7 +327,7 @@ class _CRTRenderer:
 
         return img
 
-    # ── Private drawing helpers ─────────────────────────────────────
+    # -- Private drawing helpers -------------------------------------
 
     def _waveform_mirror(self, draw, wave, x, y, w, h, vol, t):
         mid = y + h // 2
@@ -373,9 +373,9 @@ class _CRTRenderer:
             draw.rectangle([(bx, by), (bx + bw, y + h)], fill=col)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # FFMPEG ENCODER
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 def _find_ffmpeg():
     path = shutil.which("ffmpeg")
     if path:
@@ -507,15 +507,15 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
     return output_path
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TELEMETRY HUD — Post-roll treatment card
+# -----------------------------------------------------------------------------
+# TELEMETRY HUD - Post-roll treatment card
 # Rendered AFTER the episode audio ends.  No spoilers during playback.
 #
 # Layout:
-#   LEFT  (30 %) — static: title, genre, news seed, cast & voices
-#   DIV         — 1 px phosphor-green divider
-#   RIGHT (70 %) — scrolling classified transcript (scene arc + full script)
-# ─────────────────────────────────────────────────────────────────────────────
+#   LEFT  (30 %) - static: title, genre, news seed, cast & voices
+#   DIV         - 1 px phosphor-green divider
+#   RIGHT (70 %) - scrolling classified transcript (scene arc + full script)
+# -----------------------------------------------------------------------------
 
 def _fh(font, pad=4):
     """Line height for *font* (PIL getbbox-safe)."""
@@ -609,7 +609,7 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     except Exception:
         script, plan = [], {}
 
-    # Voice assignments — same normalisation as _write_story_treatment
+    # Voice assignments - same normalisation as _write_story_treatment
     voices = {}
     for k, v in (plan.get("voice_assignments", {}) or {}).items():
         if isinstance(v, dict):
@@ -716,10 +716,10 @@ class _TelemetryHUDRenderer:
         for sy in range(0, h, max(2, h // 360)):
             _sl.line([(0, sy), (w, sy)], fill=(0, 0, 0, 40))
 
-    # ── Public API ────────────────────────────────────────────────────────
+    # -- Public API --------------------------------------------------------
 
     def hud_frames(self):
-        """Total frame count for the HUD post-roll (20–90 s)."""
+        """Total frame count for the HUD post-roll (20-90 s)."""
         scroll_px = max(0, self._right_h - self.h)
         secs = scroll_px / self._SCROLL_PPS + 8.0
         return int(max(20.0, min(90.0, secs)) * self.fps)
@@ -769,7 +769,7 @@ class _TelemetryHUDRenderer:
                                     self._scanlines).convert("RGB")
         return img
 
-    # ── Panel builders ────────────────────────────────────────────────────
+    # -- Panel builders ----------------------------------------------------
 
     def _build_left(self):
         img = Image.new("RGB", (self.LEFT_W, self.h), CRT_BG)
@@ -834,14 +834,14 @@ class _TelemetryHUDRenderer:
         d.line([(P, y), (self.LEFT_W - P, y)], fill=CRT_DARK, width=1)
         y += P * 2
 
-        # Cast & voices — stop rendering if we're close to the footer
+        # Cast & voices - stop rendering if we're close to the footer
         footer_y = self.h - self._lhS - P * 2  # reserve space for footer
         if y < footer_y:
             d.text((P, y), "CAST & VOICES", fill=CRT_AMBER, font=self.f_label)
             y += self._lhL
         for m in self.data.get("cast", []):
             if y + self._lhB >= footer_y:
-                break  # no more room — don't draw over the footer
+                break  # no more room - don't draw over the footer
             d.text((P, y), m.get("char", "?"), fill=CRT_GREEN, font=self.f_body)
             y += self._lhB
             preset = m.get("preset", "")
@@ -853,12 +853,12 @@ class _TelemetryHUDRenderer:
                 char_w = max(1, _fw("m", self.f_small))
                 trunc = desc[:(self.LEFT_W - P * 3) // char_w]
                 if len(trunc) < len(desc):
-                    trunc = trunc.rstrip() + "…"
+                    trunc = trunc.rstrip() + "-"
                 d.text((P * 2, y), trunc, fill=CRT_DARK, font=self.f_small)
                 y += self._lhS
             y += P // 2
 
-        # Footer — always anchored to bottom regardless of cast overflow
+        # Footer - always anchored to bottom regardless of cast overflow
         fy = self.h - self._lhS - P
         d.line([(P, fy - P), (self.LEFT_W - P, fy - P)], fill=CRT_DARK, width=1)
         d.text((P, fy), "OTR v1.0", fill=CRT_DARK, font=self.f_small)
@@ -889,7 +889,7 @@ class _TelemetryHUDRenderer:
             sc_num = scene.get("scene_num", "1")
             env    = scene.get("env", "")
 
-            d.text((P, y), f"——  SCENE {sc_num}", fill=CRT_AMBER, font=self.f_label)
+            d.text((P, y), f"--  SCENE {sc_num}", fill=CRT_AMBER, font=self.f_label)
             y += self._lhL
             if env:
                 d.text((P * 3, y), f"ENV: {env}", fill=CRT_DIM, font=self.f_body)
@@ -939,34 +939,34 @@ class _TelemetryHUDRenderer:
         return img, y
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # COMFYUI NODE
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
 
-# ── Story Treatment Writer ──────────────────────────────────────────────────
+# -- Story Treatment Writer --------------------------------------------------
 
 _PRESET_DESC = {
-    "v2/en_speaker_0": "male · authoritative · deep (ANNOUNCER voice)",
-    "v2/en_speaker_1": "male · warm · conversational",
-    "v2/en_speaker_2": "male · calm · measured",
-    "v2/en_speaker_3": "male · gruff · weathered",
-    "v2/en_speaker_4": "female · bright · energetic",
-    "v2/en_speaker_5": "male · casual · warm",
-    "v2/en_speaker_6": "male · deep · resonant",
-    "v2/en_speaker_7": "male · sharp · anxious",
-    "v2/en_speaker_8": "male · clipped · precise",
-    "v2/en_speaker_9": "female · mature · authoritative",
-    "v2/de_speaker_0": "male · German accent · precise · clipped",
-    "v2/de_speaker_4": "female · German accent · clear · analytical",
-    "v2/fr_speaker_0": "male · French accent · smooth · baritone",
-    "v2/fr_speaker_4": "female · French accent · warm · elegant",
-    "v2/es_speaker_0": "male · Spanish accent · warm · authoritative",
-    "v2/es_speaker_9": "female · Spanish accent · mature · expressive",
-    "v2/it_speaker_0": "male · Italian accent · dramatic · animated",
-    "v2/it_speaker_4": "female · Italian accent · expressive · warm",
-    "v2/pt_speaker_0": "male · Portuguese accent · soft · thoughtful",
-    "v2/pt_speaker_4": "female · Portuguese accent · gentle · clear",
+    "v2/en_speaker_0": "male * authoritative * deep (ANNOUNCER voice)",
+    "v2/en_speaker_1": "male * warm * conversational",
+    "v2/en_speaker_2": "male * calm * measured",
+    "v2/en_speaker_3": "male * gruff * weathered",
+    "v2/en_speaker_4": "female * bright * energetic",
+    "v2/en_speaker_5": "male * casual * warm",
+    "v2/en_speaker_6": "male * deep * resonant",
+    "v2/en_speaker_7": "male * sharp * anxious",
+    "v2/en_speaker_8": "male * clipped * precise",
+    "v2/en_speaker_9": "female * mature * authoritative",
+    "v2/de_speaker_0": "male * German accent * precise * clipped",
+    "v2/de_speaker_4": "female * German accent * clear * analytical",
+    "v2/fr_speaker_0": "male * French accent * smooth * baritone",
+    "v2/fr_speaker_4": "female * French accent * warm * elegant",
+    "v2/es_speaker_0": "male * Spanish accent * warm * authoritative",
+    "v2/es_speaker_9": "female * Spanish accent * mature * expressive",
+    "v2/it_speaker_0": "male * Italian accent * dramatic * animated",
+    "v2/it_speaker_4": "female * Italian accent * expressive * warm",
+    "v2/pt_speaker_0": "male * Portuguese accent * soft * thoughtful",
+    "v2/pt_speaker_4": "female * Portuguese accent * gentle * clear",
 }
 
 
@@ -1017,7 +1017,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(f"  Produced :  {ts}")
         W_()
 
-        # News seed — may arrive as a JSON list ["headline 1", "headline 2", ...]
+        # News seed - may arrive as a JSON list ["headline 1", "headline 2", ...]
         W_("NEWS SEED")
         W_(BAR)
         _news_raw = (news_used or "").strip()
@@ -1032,7 +1032,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
                 news_clean = _news_raw[:120]
         else:
             news_clean = _news_raw.split("\n")[0][:120]
-        W_(f"  {news_clean if news_clean else '(no news seed — custom premise used)'}")
+        W_(f"  {news_clean if news_clean else '(no news seed - custom premise used)'}")
         W_()
 
         # Cast & voices
@@ -1048,7 +1048,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
             W_("  (no voice assignments recorded)")
         W_()
 
-        # Scene arc summary — build from scene_break / environment / dialogue items
+        # Scene arc summary - build from scene_break / environment / dialogue items
         scenes = {}
         _cur_sc = "1"
         _cur_env = ""
@@ -1080,12 +1080,12 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
             W_("  (scene data unavailable)")
             W_()
 
-        # Full script in scene order — Canonical 1.0 item types:
-        #   scene_break → {"type":"scene_break","scene":"1"}
-        #   environment → {"type":"environment","description":"..."}
-        #   dialogue    → {"type":"dialogue","character_name":"...","line":"..."}
-        #   sfx         → {"type":"sfx","description":"..."}
-        #   pause       → {"type":"pause","kind":"beat","duration_ms":200}
+        # Full script in scene order - Canonical 1.0 item types:
+        #   scene_break - {"type":"scene_break","scene":"1"}
+        #   environment - {"type":"environment","description":"..."}
+        #   dialogue    - {"type":"dialogue","character_name":"...","line":"..."}
+        #   sfx         - {"type":"sfx","description":"..."}
+        #   pause       - {"type":"pause","kind":"beat","duration_ms":200}
         d_count = sum(1 for i in script if i.get("type") == "dialogue")
         s_count = sum(1 for i in script if i.get("type") == "sfx")
         W_(f"FULL SCRIPT  ({d_count} dialogue  \u00b7  {s_count} sfx cues)")
@@ -1215,7 +1215,7 @@ class SignalLostVideoRenderer:
 
         from .story_orchestrator import _runtime_log
 
-        # ── 1. Parse inputs & Extract Smart Title ───────────────────
+        # -- 1. Parse inputs & Extract Smart Title -------------------
         import json as _json
         try:
             # Check if script_json contains a specific title override from Gemma
@@ -1247,11 +1247,11 @@ class SignalLostVideoRenderer:
                  duration, total_frames, fps, resolution)
         _runtime_log(f"Video: Starting {total_frames} frames @ {fps}fps ({resolution})")
 
-        # ── 2. Audio analysis ────────────────────────────────────────
+        # -- 2. Audio analysis ----------------------------------------
         _runtime_log("Video: Analysing audio (FFT + RMS)")
         volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
 
-        # ── 2b. Build post-roll Telemetry HUD (no VRAM, pure PIL) ────
+        # -- 2b. Build post-roll Telemetry HUD (no VRAM, pure PIL) ----
         try:
             _hud_data     = _parse_hud_data(episode_title, script_json,
                                             production_plan_json, news_used,
@@ -1263,7 +1263,7 @@ class SignalLostVideoRenderer:
             _hud_renderer = None
             _hud_frames   = 0
 
-        # ── 3. Save audio to temp WAV for ffmpeg ─────────────────────
+        # -- 3. Save audio to temp WAV for ffmpeg ---------------------
         import tempfile
         import wave as wave_mod
 
@@ -1274,7 +1274,7 @@ class SignalLostVideoRenderer:
         if _hud_frames > 0:
             hud_samples = int(_hud_frames / fps * sr)
             if closing_audio is not None:
-                # ── Unique closing music from MusicGen ────────────────────
+                # -- Unique closing music from MusicGen --------------------
                 _cw = closing_audio["waveform"]
                 _csr = closing_audio["sample_rate"]
                 if _cw.dim() == 3:
@@ -1309,7 +1309,7 @@ class SignalLostVideoRenderer:
                 log.info("[Video] Credits music: unique MusicGen closing cue (%.1fs)",
                          len(hud_wave) / sr)
             else:
-                # ── Fallback: gentle one-shot decay from episode tail ─────
+                # -- Fallback: gentle one-shot decay from episode tail -----
                 # Take last ~10s, apply a long exponential fade-out so it
                 # decays naturally into silence. NO looping.
                 tail_len = min(len(audio_np), int(10 * sr))
@@ -1338,7 +1338,7 @@ class SignalLostVideoRenderer:
             wf.setframerate(sr)
             wf.writeframes(pcm_out.tobytes())
 
-        # ── 4. Determine output path ─────────────────────────────────
+        # -- 4. Determine output path ---------------------------------
         out_dir = os.path.join(
             os.path.expanduser("~"), "Documents", "ComfyUI",
             "output", "old_time_radio"
@@ -1350,7 +1350,7 @@ class SignalLostVideoRenderer:
         safe_title = safe_title.strip().replace(" ", "_").lower()[:40]
         out_path = os.path.join(out_dir, f"signal_lost_{safe_title}_{ts}.mp4")
 
-        # ── 5. Build frame generator ─────────────────────────────────
+        # -- 5. Build frame generator ---------------------------------
         renderer = _CRTRenderer(W, H, episode_title)
         total_encode_frames = total_frames + _hud_frames
 
@@ -1375,16 +1375,16 @@ class SignalLostVideoRenderer:
                         if fi % (fps * 30) == 0 and fi > 0:
                             _runtime_log(f"Video: {fi}/{total_frames} frames rendered")
 
-            # Post-roll Telemetry HUD (no spoilers — plays after audio ends)
+            # Post-roll Telemetry HUD (no spoilers - plays after audio ends)
             if _hud_renderer is not None and _hud_frames > 0:
-                _runtime_log(f"Video: Treatment HUD — {_hud_frames} frames")
+                _runtime_log(f"Video: Treatment HUD - {_hud_frames} frames")
                 with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
                     for start in range(0, _hud_frames, chunk_size):
                         end = min(start + chunk_size, _hud_frames)
                         for frame in executor.map(_render_hud, range(start, end)):
                             yield frame
 
-        # ── 6. Encode ────────────────────────────────────────────────
+        # -- 6. Encode ------------------------------------------------
         _runtime_log(f"Video: Encoding MP4 via ffmpeg -> {os.path.basename(out_path)}")
         _encode_mp4(_frame_gen(), total_encode_frames, tmp_wav, out_path, W, H, fps)
 
