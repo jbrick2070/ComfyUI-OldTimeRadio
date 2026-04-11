@@ -16,9 +16,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.4](https://img.shields.io/badge/Download-OldTimeRadio_v1.4-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.5](https://img.shields.io/badge/Download-OldTimeRadio_v1.5-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.4)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes all three workflow JSONs + this guide.
+**[Click here to download the full package (v1.5)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
 
 ---
 
@@ -59,7 +59,7 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.4 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
+| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.5 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
 | **Gemma 4 E4B** | ~5 GB | Balanced performer for 12GB+ cards. |
 | **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
 | **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run. |
@@ -181,13 +181,13 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
-  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — RESEARCH PHASE]
+  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — ALPHA]
 │                                                                                                    │
   ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌────────────────────────┐
 │ │ 8. Character Forge          │   │ 9. Scene Painter             │   │ 10. Visual Compositor  │   │
-  │ (OTR_CharacterForge)  [v2] │   │ (OTR_ScenePainter)     [v2] │   │ (OTR_VisualMix)  [v2] │
-│ │ TripoSR: img → 3D mesh     │   │ Wan 2.1: text → 5s clip     │   │ 3D + diffusion + CRT  │   │
-  │ Consistent character refs  │   │ Establishing shots           │   │ Synced to audio bus   │
+  │ (OTR_CharacterForge)  [v2] │   │ (OTR_ScenePainter)     [v2] │   │ (OTR_VisualCompositor) │
+│ │ Flux/SD: portrait per char  │   │ Flux/SD: cinematic bg/scene │   │ PIL composite + CRT   │   │
+  │ Consistent character seeds │   │ Establishing shots           │   │ Synced to audio bus   │
 │ └─────────────────────────────┘   └─────────────────────────────┘   └────────────────────────┘   │
                  │                              │                              │
 │                └──────────────────────────────┼──────────────────────────────┘                    │
@@ -196,7 +196,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
                                │ 11. Production Bus             │
 │                              │ (OTR_ProductionBus)      [v2]  │                                   │
                                │ visual_plan + audio timeline   │
-│                              │ → unified episode render       │                                   │
+│                              │ → FFmpeg MP4 episode render    │                                   │
                                └────────────────────────────────┘
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
@@ -219,11 +219,11 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
 | **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
 | | |
-| **v2.0 — Visual Drama Engine** | **[RESEARCH PHASE — Not yet implemented]** |
-| **8. Character Forge** `[v2.0]` | Single reference image → 3D character mesh via TripoSR. Generates consistent turntable renders for every cast member. Sequential VRAM handoff after audio generation completes. |
-| **9. Scene Painter** `[v2.0]` | Text-to-video establishing shots via Wan 2.1 (1.3B). Takes scene descriptions from the Director's `visual_plan` and generates 5-second cinematic clips per scene. |
-| **10. Visual Compositor** `[v2.0]` | Layers 3D character renders over diffusion backgrounds with CRT overlay as aesthetic post-process. Syncs visual frames to the audio timeline at per-scene granularity. |
-| **11. Production Bus** `[v2.0]` | Unified assembly node merging `visual_plan` + audio timeline into a single episode render. Extends the existing SceneSequencer pattern with a visual track. |
+| **v2.0 — Visual Drama Engine** | **[ALPHA — Functional on `v2.0-visual-engine` branch]** |
+| **8. Character Forge** `[v2.0]` | Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes. |
+| **9. Scene Painter** `[v2.0]` | Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation. |
+| **10. Visual Compositor** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
+| **11. Production Bus** `[v2.0]` | FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track. |
 
 ---
 
@@ -327,7 +327,7 @@ sentencepiece>=0.1.99
 
 Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide).
 
-**Isolated Module Loading** — A failing dependency in one node will not crash the rest of the pack. Each of the 9 nodes loads independently with per-node exception handling.
+**Isolated Module Loading** — A failing dependency in one node will not crash the rest of the pack. Each of the 19 nodes loads independently with per-node exception handling.
 
 **RNG Architecture** — Two separate RNG systems prevent determinism leaking into places it shouldn't:
 - `random` (seeded per-episode from fingerprint) — used for reproducible story arc selection, Open-Close arc choices, character voice pool draws
@@ -461,7 +461,7 @@ New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OF
 - `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
 
 #### Strict Node Count Discipline
-Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] ✓ All 15 nodes loaded successfully` (expanded from 9 in v1.3 to include AudioGen, Kokoro, MusicGen, and fast Procedural fallback generators).
+Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] All 19 nodes loaded successfully` (expanded from 15 in v1.4 to include the v2.0 Visual Drama Engine nodes: CharacterForge, ScenePainter, VisualCompositor, ProductionBus).
 
 ---
 
