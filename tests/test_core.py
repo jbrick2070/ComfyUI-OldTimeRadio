@@ -521,7 +521,7 @@ class TestWorkflowJSONFull:
             seen[k] = lid
 
     def test_node_types_otr_or_known(self, wf):
-        known = {"PreviewAudio", "PreviewImage", "Note"}
+        known = {"PreviewAudio", "PreviewImage", "Note", "CheckpointLoaderSimple"}
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known
 
@@ -573,7 +573,7 @@ class TestWorkflowJSONLite:
             seen[k] = lid
 
     def test_node_types_otr_or_known(self, wf):
-        known = {"PreviewAudio", "PreviewImage", "Note"}
+        known = {"PreviewAudio", "PreviewImage", "Note", "CheckpointLoaderSimple"}
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known
 

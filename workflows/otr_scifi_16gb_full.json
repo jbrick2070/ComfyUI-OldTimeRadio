@@ -1,8 +1,8 @@
 {
     "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
     "revision": 0,
-    "last_node_id": 19,
-    "last_link_id": 30,
+    "last_node_id": 24,
+    "last_link_id": 46,
     "nodes": [
         {
             "id": 1,
@@ -57,7 +57,6 @@
                         16,
                         19,
                         24,
-                        27,
                         30
                     ],
                     "slot_index": 1
@@ -125,8 +124,8 @@
                         17,
                         21,
                         26,
-                        28,
-                        29
+                        45,
+                        46
                     ],
                     "slot_index": 0
                 },
@@ -674,22 +673,32 @@
                 "Node name for S&R": "OTR_CharacterForge"
             },
             "widgets_values": [
-                "[]",
-                "{}"
+                "{}",
+                42,
+                "512x512",
+                20,
+                3.5
             ],
             "inputs": [
                 {
-                    "name": "script_json",
-                    "type": "STRING",
-                    "link": 27,
-                    "widget": {
-                        "name": "script_json"
-                    }
+                    "name": "model",
+                    "type": "MODEL",
+                    "link": 31
+                },
+                {
+                    "name": "clip",
+                    "type": "CLIP",
+                    "link": 32
+                },
+                {
+                    "name": "vae",
+                    "type": "VAE",
+                    "link": 33
                 },
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 28,
+                    "link": 45,
                     "widget": {
                         "name": "production_plan_json"
                     }
@@ -697,15 +706,24 @@
             ],
             "outputs": [
                 {
-                    "name": "status",
+                    "name": "character_portraits",
+                    "type": "IMAGE",
+                    "links": [
+                        37,
+                        39
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "forge_log",
                     "type": "STRING",
                     "links": [],
-                    "slot_index": 0
+                    "slot_index": 1
                 }
             ],
             "flags": {},
             "order": 11,
-            "mode": 4,
+            "mode": 0,
             "color": "#1A6B5A",
             "bgcolor": "#0E3D33"
         },
@@ -726,13 +744,32 @@
             },
             "widgets_values": [
                 "{}",
-                "hybrid"
+                1280,
+                720,
+                42,
+                20,
+                3.5
             ],
             "inputs": [
                 {
+                    "name": "model",
+                    "type": "MODEL",
+                    "link": 34
+                },
+                {
+                    "name": "clip",
+                    "type": "CLIP",
+                    "link": 35
+                },
+                {
+                    "name": "vae",
+                    "type": "VAE",
+                    "link": 36
+                },
+                {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": 29,
+                    "link": 46,
                     "widget": {
                         "name": "production_plan_json"
                     }
@@ -740,15 +777,24 @@
             ],
             "outputs": [
                 {
-                    "name": "status",
+                    "name": "scene_backgrounds",
+                    "type": "IMAGE",
+                    "links": [
+                        38,
+                        40
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "painter_log",
                     "type": "STRING",
                     "links": [],
-                    "slot_index": 0
+                    "slot_index": 1
                 }
             ],
             "flags": {},
             "order": 12,
-            "mode": 4,
+            "mode": 0,
             "color": "#1A6B5A",
             "bgcolor": "#0E3D33"
         },
@@ -769,29 +815,49 @@
             },
             "widgets_values": [
                 "{}",
-                true
+                true,
+                0.3
             ],
             "inputs": [
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": null,
+                    "link": 41,
                     "widget": {
                         "name": "production_plan_json"
                     }
+                },
+                {
+                    "name": "character_renders",
+                    "type": "IMAGE",
+                    "link": 39
+                },
+                {
+                    "name": "scene_backgrounds",
+                    "type": "IMAGE",
+                    "link": 40
                 }
             ],
             "outputs": [
                 {
-                    "name": "status",
+                    "name": "composited_frames",
+                    "type": "IMAGE",
+                    "links": [
+                        43,
+                        42
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "compositor_log",
                     "type": "STRING",
                     "links": [],
-                    "slot_index": 0
+                    "slot_index": 1
                 }
             ],
             "flags": {},
             "order": 13,
-            "mode": 4,
+            "mode": 0,
             "color": "#1A6B5A",
             "bgcolor": "#0E3D33"
         },
@@ -812,7 +878,9 @@
             },
             "widgets_values": [
                 "[]",
-                "{}"
+                "{}",
+                24,
+                "otr_v2_episode"
             ],
             "inputs": [
                 {
@@ -826,52 +894,527 @@
                 {
                     "name": "production_plan_json",
                     "type": "STRING",
-                    "link": null,
+                    "link": 44,
                     "widget": {
                         "name": "production_plan_json"
                     }
+                },
+                {
+                    "name": "composited_frames",
+                    "type": "IMAGE",
+                    "link": 42
                 }
             ],
             "outputs": [
                 {
-                    "name": "status",
+                    "name": "video_path",
                     "type": "STRING",
                     "links": [],
                     "slot_index": 0
+                },
+                {
+                    "name": "bus_log",
+                    "type": "STRING",
+                    "links": [],
+                    "slot_index": 1
                 }
             ],
             "flags": {},
             "order": 14,
-            "mode": 4,
+            "mode": 0,
             "color": "#1A6B5A",
             "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 20,
+            "type": "CheckpointLoaderSimple",
+            "pos": [
+                50,
+                1550
+            ],
+            "size": [
+                380,
+                100
+            ],
+            "title": "Visual: Flux (Portraits)",
+            "properties": {
+                "Node name for S&R": "CheckpointLoaderSimple"
+            },
+            "widgets_values": [
+                "flux1-dev-fp8.safetensors"
+            ],
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "MODEL",
+                    "type": "MODEL",
+                    "links": [
+                        31
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "CLIP",
+                    "type": "CLIP",
+                    "links": [
+                        32
+                    ],
+                    "slot_index": 1
+                },
+                {
+                    "name": "VAE",
+                    "type": "VAE",
+                    "links": [
+                        33
+                    ],
+                    "slot_index": 2
+                }
+            ],
+            "flags": {},
+            "order": 15,
+            "mode": 0,
+            "color": "#1A6B5A",
+            "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 21,
+            "type": "CheckpointLoaderSimple",
+            "pos": [
+                50,
+                1700
+            ],
+            "size": [
+                380,
+                100
+            ],
+            "title": "Visual: Flux (Scenes)",
+            "properties": {
+                "Node name for S&R": "CheckpointLoaderSimple"
+            },
+            "widgets_values": [
+                "flux1-dev-fp8.safetensors"
+            ],
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "MODEL",
+                    "type": "MODEL",
+                    "links": [
+                        34
+                    ],
+                    "slot_index": 0
+                },
+                {
+                    "name": "CLIP",
+                    "type": "CLIP",
+                    "links": [
+                        35
+                    ],
+                    "slot_index": 1
+                },
+                {
+                    "name": "VAE",
+                    "type": "VAE",
+                    "links": [
+                        36
+                    ],
+                    "slot_index": 2
+                }
+            ],
+            "flags": {},
+            "order": 16,
+            "mode": 0,
+            "color": "#1A6B5A",
+            "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 22,
+            "type": "PreviewImage",
+            "pos": [
+                950,
+                1550
+            ],
+            "size": [
+                300,
+                300
+            ],
+            "title": "Preview: Portraits",
+            "properties": {
+                "Node name for S&R": "PreviewImage"
+            },
+            "widgets_values": [],
+            "inputs": [
+                {
+                    "name": "images",
+                    "type": "IMAGE",
+                    "link": 37
+                }
+            ],
+            "outputs": [],
+            "flags": {},
+            "order": 17,
+            "mode": 0,
+            "color": "#5B3A29",
+            "bgcolor": "#3C261B"
+        },
+        {
+            "id": 23,
+            "type": "PreviewImage",
+            "pos": [
+                1300,
+                1550
+            ],
+            "size": [
+                300,
+                300
+            ],
+            "title": "Preview: Backgrounds",
+            "properties": {
+                "Node name for S&R": "PreviewImage"
+            },
+            "widgets_values": [],
+            "inputs": [
+                {
+                    "name": "images",
+                    "type": "IMAGE",
+                    "link": 38
+                }
+            ],
+            "outputs": [],
+            "flags": {},
+            "order": 17,
+            "mode": 0,
+            "color": "#5B3A29",
+            "bgcolor": "#3C261B"
+        },
+        {
+            "id": 24,
+            "type": "PreviewImage",
+            "pos": [
+                1650,
+                1550
+            ],
+            "size": [
+                300,
+                300
+            ],
+            "title": "Preview: Composited",
+            "properties": {
+                "Node name for S&R": "PreviewImage"
+            },
+            "widgets_values": [],
+            "inputs": [
+                {
+                    "name": "images",
+                    "type": "IMAGE",
+                    "link": 43
+                }
+            ],
+            "outputs": [],
+            "flags": {},
+            "order": 17,
+            "mode": 0,
+            "color": "#5B3A29",
+            "bgcolor": "#3C261B"
         }
     ],
     "links": [
-        [1,  1, 0,  2,  0, "STRING"],
-        [2,  1, 1,  3,  0, "STRING"],
-        [4,  2, 0,  3,  1, "STRING"],
-        [5,  3, 0,  4,  0, "AUDIO"],
-        [6,  4, 0,  7,  0, "AUDIO"],
-        [12, 1, 1, 11,  0, "STRING"],
-        [13, 2, 0, 11,  1, "STRING"],
-        [14,11, 0,  3,  2, "AUDIO"],
-        [15, 7, 0, 12,  0, "AUDIO"],
-        [16, 1, 1, 12,  1, "STRING"],
-        [17, 2, 0, 12,  2, "STRING"],
-        [18, 1, 2, 12,  3, "STRING"],
-        [19, 1, 1, 13,  0, "STRING"],
-        [20,13, 0,  3,  3, "AUDIO"],
-        [21, 2, 0, 14,  0, "STRING"],
-        [22,14, 0,  7,  1, "AUDIO"],
-        [23,14, 1,  7,  2, "AUDIO"],
-        [24, 1, 1, 15,  0, "STRING"],
-        [25,15, 0,  3,  4, "AUDIO"],
-        [26, 2, 0, 15,  1, "STRING"],
-        [27, 1, 1, 16,  0, "STRING"],
-        [28, 2, 0, 16,  1, "STRING"],
-        [29, 2, 0, 17,  0, "STRING"],
-        [30, 1, 1, 19,  0, "STRING"]
+        [
+            1,
+            1,
+            0,
+            2,
+            0,
+            "STRING"
+        ],
+        [
+            2,
+            1,
+            1,
+            3,
+            0,
+            "STRING"
+        ],
+        [
+            4,
+            2,
+            0,
+            3,
+            1,
+            "STRING"
+        ],
+        [
+            5,
+            3,
+            0,
+            4,
+            0,
+            "AUDIO"
+        ],
+        [
+            6,
+            4,
+            0,
+            7,
+            0,
+            "AUDIO"
+        ],
+        [
+            12,
+            1,
+            1,
+            11,
+            0,
+            "STRING"
+        ],
+        [
+            13,
+            2,
+            0,
+            11,
+            1,
+            "STRING"
+        ],
+        [
+            14,
+            11,
+            0,
+            3,
+            2,
+            "AUDIO"
+        ],
+        [
+            15,
+            7,
+            0,
+            12,
+            0,
+            "AUDIO"
+        ],
+        [
+            16,
+            1,
+            1,
+            12,
+            1,
+            "STRING"
+        ],
+        [
+            17,
+            2,
+            0,
+            12,
+            2,
+            "STRING"
+        ],
+        [
+            18,
+            1,
+            2,
+            12,
+            3,
+            "STRING"
+        ],
+        [
+            19,
+            1,
+            1,
+            13,
+            0,
+            "STRING"
+        ],
+        [
+            20,
+            13,
+            0,
+            3,
+            3,
+            "AUDIO"
+        ],
+        [
+            21,
+            2,
+            0,
+            14,
+            0,
+            "STRING"
+        ],
+        [
+            22,
+            14,
+            0,
+            7,
+            1,
+            "AUDIO"
+        ],
+        [
+            23,
+            14,
+            1,
+            7,
+            2,
+            "AUDIO"
+        ],
+        [
+            24,
+            1,
+            1,
+            15,
+            0,
+            "STRING"
+        ],
+        [
+            25,
+            15,
+            0,
+            3,
+            4,
+            "AUDIO"
+        ],
+        [
+            26,
+            2,
+            0,
+            15,
+            1,
+            "STRING"
+        ],
+        [
+            30,
+            1,
+            1,
+            19,
+            0,
+            "STRING"
+        ],
+        [
+            31,
+            20,
+            0,
+            16,
+            0,
+            "MODEL"
+        ],
+        [
+            32,
+            20,
+            1,
+            16,
+            1,
+            "CLIP"
+        ],
+        [
+            33,
+            20,
+            2,
+            16,
+            2,
+            "VAE"
+        ],
+        [
+            34,
+            21,
+            0,
+            17,
+            0,
+            "MODEL"
+        ],
+        [
+            35,
+            21,
+            1,
+            17,
+            1,
+            "CLIP"
+        ],
+        [
+            36,
+            21,
+            2,
+            17,
+            2,
+            "VAE"
+        ],
+        [
+            37,
+            16,
+            0,
+            22,
+            0,
+            "IMAGE"
+        ],
+        [
+            38,
+            17,
+            0,
+            23,
+            0,
+            "IMAGE"
+        ],
+        [
+            39,
+            16,
+            0,
+            18,
+            1,
+            "IMAGE"
+        ],
+        [
+            40,
+            17,
+            0,
+            18,
+            2,
+            "IMAGE"
+        ],
+        [
+            41,
+            2,
+            0,
+            18,
+            0,
+            "STRING"
+        ],
+        [
+            42,
+            18,
+            0,
+            19,
+            2,
+            "IMAGE"
+        ],
+        [
+            43,
+            18,
+            0,
+            24,
+            0,
+            "IMAGE"
+        ],
+        [
+            44,
+            2,
+            0,
+            19,
+            1,
+            "STRING"
+        ],
+        [
+            45,
+            2,
+            0,
+            16,
+            3,
+            "STRING"
+        ],
+        [
+            46,
+            2,
+            0,
+            17,
+            3,
+            "STRING"
+        ]
     ],
     "groups": [
         {
@@ -911,12 +1454,12 @@
             "font_size": 24
         },
         {
-            "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0 \u2014 RESEARCH PHASE]",
+            "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0 \u2014 ALPHA]",
             "bounding": [
                 20,
                 1130,
-                1740,
-                380
+                2050,
+                780
             ],
             "color": "#2DD4BF",
             "flags": {},
