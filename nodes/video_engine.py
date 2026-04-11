@@ -191,6 +191,12 @@ class _CRTRenderer:
         self._ring_cy = int(h * 0.42)
         self._ring_r = min(w, h) // 5
 
+        # v1.5 Adaptive Brightness Gating — EMA smoothed volume tracker
+        # Quiet scenes dim toward dark navy; loud scenes brighten to full phosphor.
+        # EMA smoothing prevents flickering on transient spikes.
+        self._brightness_ema = 0.5  # start at mid-brightness
+        self._brightness_alpha = 0.08  # EMA smoothing factor (lower = smoother)
+
     # ── Public ──────────────────────────────────────────────────────────
 
     def render(self, fi, total, fps, vol, freq, wave):
@@ -304,7 +310,15 @@ class _CRTRenderer:
 
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
-        img = Image.fromarray(arr.astype(np.uint8))
+
+        # ── 8b. v1.5 Adaptive Brightness Gating ─────────────────────
+        # Smooth the volume with EMA to avoid frame-to-frame flickering.
+        # Map to a brightness range: 0.35 (silence) → 1.0 (peak energy).
+        self._brightness_ema += self._brightness_alpha * (vol - self._brightness_ema)
+        brightness = 0.35 + self._brightness_ema * 0.65
+        arr *= brightness
+
+        img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
 
         if vol > 0.3:
             arr = np.array(img, dtype=np.int16)

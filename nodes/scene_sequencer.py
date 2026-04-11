@@ -600,6 +600,17 @@ class SceneSequencer:
                     "default": "bark",
                     "tooltip": "Default TTS engine when not specified in production plan"
                 }),
+                # v1.5 Phase 3: Time-Alignment Offset Pins
+                "dialogue_offset_ms": ("FLOAT", {
+                    "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
+                    "tooltip": "Shift all dialogue clips on the timeline (ms). "
+                               "Positive = delay, negative = advance."
+                }),
+                "sfx_offset_ms": ("FLOAT", {
+                    "default": 0.0, "min": -500.0, "max": 500.0, "step": 10.0,
+                    "tooltip": "Shift all SFX clips on the timeline (ms). "
+                               "Positive = delay, negative = advance."
+                }),
             },
         }
 
@@ -644,7 +655,8 @@ class SceneSequencer:
                  tts_audio_clips=None, sfx_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
-                 default_tts="bark"):
+                 default_tts="bark",
+                 dialogue_offset_ms=0.0, sfx_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
@@ -697,6 +709,12 @@ class SceneSequencer:
         current_env = "silent room"
         env_timeline = []  # List of (start_sample, end_sample, desc)
 
+        # v1.5 Phase 3: Convert TA offset from ms to samples
+        dialogue_offset_samples = int(dialogue_offset_ms * sample_rate / 1000.0)
+        sfx_offset_samples = int(sfx_offset_ms * sample_rate / 1000.0)
+        if dialogue_offset_ms != 0.0 or sfx_offset_ms != 0.0:
+            _runtime_log(f"SceneSequencer: TA_Offset active: dialogue={dialogue_offset_ms:+.0f}ms, sfx={sfx_offset_ms:+.0f}ms")
+
         lines_to_render = script[start_line:end_line]
         log.info(f"[SceneSequencer] Rendering Canonical 1.0 items {start_line}-{min(end_line, len(script))}")
 
@@ -741,7 +759,9 @@ class SceneSequencer:
                     sfx_segment = _resample_audio(clip_np, clip_sr, sample_rate)
                     sfx_segment = _normalize_clip(sfx_segment, target_peak=0.85)
                     sfx_clip_idx += 1
-                    sfx_timeline.append((current_sample_pos, sfx_segment, desc))
+                    # v1.5: Apply SFX TA_Offset
+                    sfx_pos = max(0, current_sample_pos + sfx_offset_samples)
+                    sfx_timeline.append((sfx_pos, sfx_segment, desc))
                     render_log.append(f"[{global_idx}] SFX Overlay: {desc}")
                 else:
                     render_log.append(f"[{global_idx}] SFX: {desc} (MISSING)")
@@ -784,6 +804,14 @@ class SceneSequencer:
 
             # ── Accumulate Audio and Track Environment Span ──────────────
             if segment_np is not None:
+                # v1.5: Apply dialogue TA_Offset for dialogue/announcer items
+                if item_type == "dialogue" and dialogue_offset_samples != 0:
+                    offset_silence = max(0, dialogue_offset_samples)
+                    if offset_silence > 0:
+                        segment_np = np.concatenate([
+                            np.zeros(offset_silence, dtype=np.float32),
+                            segment_np
+                        ])
                 seg_len = len(segment_np)
                 env_timeline.append((current_sample_pos, current_sample_pos + seg_len, current_env))
                 all_segments.append(segment_np)
