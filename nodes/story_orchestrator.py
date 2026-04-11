@@ -960,10 +960,10 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
         except StopIteration:
             pass
 
-    # v1.5 CLEAN Hardware Hardening: Constrain 128k models to 2k window
-    # during the pre-production (spine) phase to prevent VRAM spikes.
-    # We will expand this back to 8k for the actual full Script Acts.
-    _cap = 2048 if any(kw in str(model_id_full).lower() for kw in ("nemo", "12b", "14b")) else 8192
+    # v1.5.1: Context cap tuning. History: 2048 (format loss), 4096 (still
+    # truncated), 8192 (19GB VRAM spike, 2.9 tok/s). 6144 is the sweet spot:
+    # keeps format instructions (~6k tokens) while peak VRAM stays ~12-13 GB.
+    _cap = 6144 if any(kw in str(model_id_full).lower() for kw in ("nemo", "12b", "14b")) else 8192
 
     if (_LLM_CACHE["model"] is not None and
             (str(_LLM_CACHE["device"]) != str(device) or 
@@ -1520,11 +1520,11 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
         if "attention_mask" in inputs:
             inputs["attention_mask"] = inputs["attention_mask"][:, _trunc:]
         _runtime_log(
-            f"PROMPT_GUARD: Truncated {_input_len} → {_max_input_tokens} tokens "
+            f"PROMPT_GUARD: Truncated {_input_len} -> {_max_input_tokens} tokens "
             f"(context_cap={_context_cap}, max_new_tokens={max_new_tokens})"
         )
         log.info(
-            "[StoryOrchestrator] Prompt truncated: %d → %d tokens to fit context cap %d",
+            "[StoryOrchestrator] Prompt truncated: %d -> %d tokens to fit context cap %d",
             _input_len, _max_input_tokens, _context_cap,
         )
 
@@ -3980,7 +3980,7 @@ Write Act {act_num} now:"""
             # v1.5.1: Lightweight flush — keep LLM on GPU between acts.
             # Full model eviction here was causing ~13s reload per act (up to 8 acts).
             _flush_vram_keep_llm()
-            _runtime_log(f"ScriptWriter: Act {act_num} VRAM flushed (lightweight — LLM retained)")
+            _runtime_log(f"ScriptWriter: Act {act_num} VRAM flushed (lightweight -- LLM retained)")
 
         # v1.5: Store act summaries for the Arc Enhancer to use when
         # polishing the opening/closing. These are richer than the plot spine
@@ -4534,20 +4534,101 @@ Format your response exactly as:
         if dialogue_count == 0 and len(lines) > 0:
             log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
             _recovered = 0
+
+            # Pass 1: Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
             for ln in lines:
                 if ln.get("type") == "direction":
-                    text = ln["text"]
-                    # Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
-                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text)
+                    text_d = ln["text"]
+                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text_d)
                     if m:
                         ln["type"] = "dialogue"
                         ln["character_name"] = m.group(1).strip()
                         ln["voice_traits"] = "unspecified"
                         ln["line"] = m.group(2).strip()
                         _recovered += 1
+
+            # Pass 2: Screenplay format (NeMo 12B natural style)
+            # Matches: **NAME** or **NAME:** on its own line, followed by optional
+            # (parenthetical), then dialogue text on subsequent line(s).
+            if _recovered < 3:
+                _screenplay_name_pat = re.compile(
+                    r'^\*\*([A-Z][A-Z0-9_ ]{0,20})\*\*\s*:?\s*$'
+                )
+                _paren_pat = re.compile(r'^\(.*\)\s*$')
+                # Structural lines that should NOT be treated as dialogue
+                _structural_prefixes = (
+                    "INT.", "EXT.", "===", "---", "[", "*", "ACT ", "SCENE ",
+                    "FADE ", "CUT ", "END ", "TO BE", "**ACT", "**SCENE",
+                )
+                # Re-parse from raw text since the direction items lost structure
+                raw_lines_2 = text.strip().splitlines()
+                _new_items = []
+                k = 0
+                while k < len(raw_lines_2):
+                    raw_s = raw_lines_2[k].strip()
+                    # Strip markdown bold/italic wrappers
+                    clean_s = re.sub(r'^[*_]+|[*_]+$', '', raw_s).strip()
+                    nm = _screenplay_name_pat.match(raw_s)
+                    if nm:
+                        char_name = nm.group(1).strip().upper()
+                        # Skip known structural words
+                        _fw = char_name.split()[0] if char_name else ""
+                        if _fw in ("ACT", "SCENE", "INT", "EXT", "FADE", "CUT",
+                                   "END", "MUSIC", "SFX", "ENV", "BEAT", "PAUSE",
+                                   "TRANSITION", "CONTINUED", "CONT"):
+                            k += 1
+                            continue
+                        # Collect dialogue lines after the name
+                        k += 1
+                        # Skip optional parenthetical(s)
+                        while k < len(raw_lines_2):
+                            next_l = raw_lines_2[k].strip()
+                            next_clean = re.sub(r'^[*_]+|[*_]+$', '', next_l).strip()
+                            if _paren_pat.match(next_clean):
+                                k += 1
+                            else:
+                                break
+                        # Collect dialogue lines until we hit a blank, another name, or structural
+                        _dial_parts = []
+                        while k < len(raw_lines_2):
+                            dl = raw_lines_2[k].strip()
+                            dl_clean = re.sub(r'^[*_]+|[*_]+$', '', dl).strip()
+                            if not dl_clean:
+                                break
+                            if _screenplay_name_pat.match(dl):
+                                break
+                            if _paren_pat.match(dl_clean):
+                                k += 1
+                                continue
+                            if any(dl_clean.upper().startswith(p) for p in _structural_prefixes):
+                                break
+                            _dial_parts.append(dl_clean.strip('"\u201c\u201d'))
+                            k += 1
+                        if _dial_parts:
+                            # Join multi-line dialogue into one
+                            full_dialogue = " ".join(_dial_parts)
+                            _new_items.append({
+                                "type": "dialogue",
+                                "character_name": char_name,
+                                "voice_traits": "unspecified",
+                                "line": full_dialogue,
+                            })
+                            _recovered += 1
+                    else:
+                        k += 1
+                if _new_items:
+                    # Replace the lines list with screenplay-parsed items
+                    # Keep non-direction items (scene_break, sfx, etc.) and add new dialogue
+                    structural = [ln for ln in lines if ln.get("type") != "direction"]
+                    lines.clear()
+                    lines.extend(structural)
+                    lines.extend(_new_items)
+                    log.info(f"[ScriptParser] Screenplay format: recovered {len(_new_items)} dialogue lines from **NAME** patterns")
+
             if _recovered > 0:
                 log.info(f"[ScriptParser] Permissive fallback recovered {_recovered} dialogue lines!")
                 dialogue_count = _recovered
+
 
         if not lines or dialogue_count == 0:
             log.critical(

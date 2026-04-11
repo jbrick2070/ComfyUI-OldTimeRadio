@@ -1,8 +1,8 @@
 {
     "id": "b1e2f3a4-c5d6-7890-abcd-ef1234567890",
     "revision": 0,
-    "last_node_id": 15,
-    "last_link_id": 26,
+    "last_node_id": 19,
+    "last_link_id": 30,
     "nodes": [
         {
             "id": 1,
@@ -55,7 +55,9 @@
                         2,
                         16,
                         19,
-                        24
+                        24,
+                        27,
+                        30
                     ],
                     "slot_index": 1
                 },
@@ -120,7 +122,9 @@
                         4,
                         17,
                         21,
-                        26
+                        26,
+                        28,
+                        29
                     ],
                     "slot_index": 0
                 },
@@ -588,6 +592,68 @@
             "mode": 0,
             "color": "#234035",
             "bgcolor": "#162821"
+        },
+        {
+            "id": 16,
+            "type": "OTR_CharacterForge",
+            "pos": [50, 1250],
+            "size": [380, 200],
+            "title": "\ud83c\udfad 8. Character Forge [v2.0]",
+            "properties": {"Node name for S&R": "OTR_CharacterForge"},
+            "widgets_values": ["[]", "{}"],
+            "inputs": [
+                {"name": "script_json", "type": "STRING", "link": 27, "widget": {"name": "script_json"}},
+                {"name": "production_plan_json", "type": "STRING", "link": 28, "widget": {"name": "production_plan_json"}}
+            ],
+            "outputs": [{"name": "status", "type": "STRING", "links": [], "slot_index": 0}],
+            "flags": {}, "order": 11, "mode": 4,
+            "color": "#1A6B5A", "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 17,
+            "type": "OTR_ScenePainter",
+            "pos": [480, 1250],
+            "size": [380, 200],
+            "title": "\ud83c\udfa8 9. Scene Painter [v2.0]",
+            "properties": {"Node name for S&R": "OTR_ScenePainter"},
+            "widgets_values": ["{}", "hybrid"],
+            "inputs": [
+                {"name": "production_plan_json", "type": "STRING", "link": 29, "widget": {"name": "production_plan_json"}}
+            ],
+            "outputs": [{"name": "status", "type": "STRING", "links": [], "slot_index": 0}],
+            "flags": {}, "order": 12, "mode": 4,
+            "color": "#1A6B5A", "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 18,
+            "type": "OTR_VisualCompositor",
+            "pos": [910, 1250],
+            "size": [380, 200],
+            "title": "\ud83d\uddbc\ufe0f 10. Visual Compositor [v2.0]",
+            "properties": {"Node name for S&R": "OTR_VisualCompositor"},
+            "widgets_values": ["{}", true],
+            "inputs": [
+                {"name": "production_plan_json", "type": "STRING", "link": null, "widget": {"name": "production_plan_json"}}
+            ],
+            "outputs": [{"name": "status", "type": "STRING", "links": [], "slot_index": 0}],
+            "flags": {}, "order": 13, "mode": 4,
+            "color": "#1A6B5A", "bgcolor": "#0E3D33"
+        },
+        {
+            "id": 19,
+            "type": "OTR_ProductionBus",
+            "pos": [1340, 1250],
+            "size": [380, 200],
+            "title": "\ud83c\udfac 11. Production Bus [v2.0]",
+            "properties": {"Node name for S&R": "OTR_ProductionBus"},
+            "widgets_values": ["[]", "{}"],
+            "inputs": [
+                {"name": "script_json", "type": "STRING", "link": 30, "widget": {"name": "script_json"}},
+                {"name": "production_plan_json", "type": "STRING", "link": null, "widget": {"name": "production_plan_json"}}
+            ],
+            "outputs": [{"name": "status", "type": "STRING", "links": [], "slot_index": 0}],
+            "flags": {}, "order": 14, "mode": 4,
+            "color": "#1A6B5A", "bgcolor": "#0E3D33"
         }
     ],
     "links": [
@@ -719,14 +785,11 @@
             3,
             "AUDIO"
         ],
-        [
-            26,
-            2,
-            0,
-            15,
-            1,
-            "STRING"
-        ]
+        [26, 2, 0, 15, 1, "STRING"],
+        [27, 1, 1, 16, 0, "STRING"],
+        [28, 2, 0, 16, 1, "STRING"],
+        [29, 2, 0, 17, 0, "STRING"],
+        [30, 1, 1, 19, 0, "STRING"]
     ],
     "groups": [
         {
@@ -752,6 +815,13 @@
             "color": "#F5A623",
             "flags": {},
             "font_size": 24
+        },
+        {
+            "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0]",
+            "bounding": [20, 1130, 1740, 380],
+            "color": "#2DD4BF",
+            "flags": {},
+            "font_size": 24
         }
     ],
     "config": {},
@@ -766,8 +836,8 @@
         "info": {
             "name": "OTR Test \u00e2\u20ac\u201d Ultra Lite",
             "author": "Jeffrey Brick",
-            "description": "7-line pipeline smoke test. Fast Bark render, 720p video. Use for regression testing after node changes.",
-            "version": "1.0.0-test"
+            "description": "7-line pipeline smoke test. Fast Bark render, 720p video. v2.0 Visual Drama Engine placeholders included.",
+            "version": "1.5.0-test"
         }
     },
     "version": 0.4

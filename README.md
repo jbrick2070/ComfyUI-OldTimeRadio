@@ -179,6 +179,26 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 │ │    + _treatment.txt (cast • voices • full script • stats)                                   │ │
 │ └──────────────────────────────────────────────────────────────────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
+  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — RESEARCH PHASE]
+│                                                                                                    │
+  ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌────────────────────────┐
+│ │ 8. Character Forge          │   │ 9. Scene Painter             │   │ 10. Visual Compositor  │   │
+  │ (OTR_CharacterForge)  [v2] │   │ (OTR_ScenePainter)     [v2] │   │ (OTR_VisualMix)  [v2] │
+│ │ TripoSR: img → 3D mesh     │   │ Wan 2.1: text → 5s clip     │   │ 3D + diffusion + CRT  │   │
+  │ Consistent character refs  │   │ Establishing shots           │   │ Synced to audio bus   │
+│ └─────────────────────────────┘   └─────────────────────────────┘   └────────────────────────┘   │
+                 │                              │                              │
+│                └──────────────────────────────┼──────────────────────────────┘                    │
+                                                ▼
+│                              ┌────────────────────────────────┐                                   │
+                               │ 11. Production Bus             │
+│                              │ (OTR_ProductionBus)      [v2]  │                                   │
+                               │ visual_plan + audio timeline   │
+│                              │ → unified episode render       │                                   │
+                               └────────────────────────────────┘
+└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
 ---
@@ -198,6 +218,12 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **5. Make It Sound Awesome** | Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization. |
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
 | **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
+| | |
+| **v2.0 — Visual Drama Engine** | **[RESEARCH PHASE — Not yet implemented]** |
+| **8. Character Forge** `[v2.0]` | Single reference image → 3D character mesh via TripoSR. Generates consistent turntable renders for every cast member. Sequential VRAM handoff after audio generation completes. |
+| **9. Scene Painter** `[v2.0]` | Text-to-video establishing shots via Wan 2.1 (1.3B). Takes scene descriptions from the Director's `visual_plan` and generates 5-second cinematic clips per scene. |
+| **10. Visual Compositor** `[v2.0]` | Layers 3D character renders over diffusion backgrounds with CRT overlay as aesthetic post-process. Syncs visual frames to the audio timeline at per-scene granularity. |
+| **11. Production Bus** `[v2.0]` | Unified assembly node merging `visual_plan` + audio timeline into a single episode render. Extends the existing SceneSequencer pattern with a visual track. |
 
 ---
 

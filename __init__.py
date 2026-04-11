@@ -97,6 +97,11 @@ _NODE_MODULES = {
     "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            "🛡️ VRAM Guardian"),
+    # ── v2.0 Visual Drama Engine (Placeholders) ──────────────────────
+    "OTR_CharacterForge":     (".nodes.v2_preview",             "CharacterForge",          "🎭 8. Character Forge [v2.0]"),
+    "OTR_ScenePainter":       (".nodes.v2_preview",             "ScenePainter",            "🎨 9. Scene Painter [v2.0]"),
+    "OTR_VisualCompositor":   (".nodes.v2_preview",             "VisualCompositor",        "🖼️ 10. Visual Compositor [v2.0]"),
+    "OTR_ProductionBus":      (".nodes.v2_preview",             "ProductionBus",           "🎬 11. Production Bus [v2.0]"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
