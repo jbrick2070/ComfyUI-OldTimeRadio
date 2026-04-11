@@ -47,8 +47,12 @@ Every code change must pass a regression sweep before being considered complete:
 - **Bug Bible regression**: Cross-reference changes against the Bug Bible:
   - Repo: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
   - File: `BUG_BIBLE.yaml`
-  - Key bugs to always check: BUG-010 (0-dialogue hard abort), widget connection drops, VRAM spills, cache deadlocks.
+  - Key bugs to always check: BUG-010 (0-dialogue hard abort), BUG-12.33 (Oversized prompt pre-fill stall/VRAM spike), widget connection drops, VRAM spills, cache deadlocks.
 - **VRAM ceiling**: Peak VRAM must stay at or below 14.5 GB. Run `vram_profile_test.py` to confirm.
+- **VRAM & Context Etiquette**:
+  - **Never use `force_vram_offload()` between LLM phases** within the same script-writing pass. Use `_flush_vram_keep_llm()` to retain weights while clearing KV cache.
+  - **Always enforce Prompt Truncation** against `context_cap` before calling `model.generate()`. If prompt > cap, truncate head.
+  - **Warmup Mandatory**: All LLM loaders must perform a 1-token warmup pass to front-load CUDA kernel JIT compilation.
 - Create **scratch scripts** (in `scratch/` directory) to help validate edge cases. These are disposable — delete when done.
 
 ---

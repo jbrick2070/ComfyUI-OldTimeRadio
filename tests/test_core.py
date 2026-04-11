@@ -12,7 +12,7 @@ Coverage:
   - AudioContract (waveform shape/dtype/rate — requires torch)
   - SceneSequencer (clip wiring, resampling, silence trim — requires torch)
   - VintageRadioFilter (all presets — requires torch)
-  - WorkflowJSON  (both full + lite: integrity, node IDs, links, parity)
+  - WorkflowJSON  (full: integrity, node IDs, links, parity)
   - AudioBatcher  (batch/pad/unpack — requires torch)
 
 Run in ComfyUI venv for full coverage:

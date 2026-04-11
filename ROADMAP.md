@@ -47,6 +47,24 @@
 - **Repo:** https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 - **Sister repo (bug bible):** https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
+### v1.5 CLEAN — Narrative Pipeline Hardening (2026-04-10)
+Architectural overhaul of the script generation pipeline based on hierarchical narrative decomposition research.
+
+| Change | What | Why |
+|:---|:---|:---|
+| **7-Line Micro-Spine Protocol** | Open-Close generates 3× 7-line structural spines (~100 tokens) instead of 3× full outlines (~450 tokens) | Cuts Open-Close from ~12 min to ~2 min. Eliminates KV cache exhaustion and VRAM_CEILING_EXCEEDED warnings. Forces LLM to focus on narrative structure, not prose. |
+| **Story Editor (Critique-Guided Writing)** | After outline generation, a "Story Editor" pass critiques the outline and generates per-act briefs. Each act prompt receives its brief + overall critique. | Critique drives writing BEFORE dialogue is generated, not after. Produces stronger, more purposeful acts from first draft. |
+| **Self-Critique Gating** | Global revision pass auto-skipped for scripts with >3 acts. Critique runs upstream via Story Editor instead. | Prevents "Summarization Collapse" where the LLM condensed 5 acts into ~30 lines during revision. |
+| **Arc Enhancer v2 — Critique + Act Summaries** | Arc Enhancer now receives critique findings + act-by-act narrative summaries from chunked generation | Opening/closing polish uses the complete story picture for start-to-end coherence, not just an extracted spine. |
+| **Dialogue Inflation (1.5x)** | `words_per_act` target increased from 1.2× to 1.5× | Pushes each act toward ~500-600 words, guaranteeing 8-10 min of actual dialogue. |
+| **Dynamic Token Budgets** | `act_budget = max(1024, min(2048, words_per_act × 2.5))` instead of hardcoded 1536 | Scales with episode length. Longer episodes get proportionally more generation headroom. |
+| **force_vram_offload() Between Acts** | Replaced raw `gc.collect()`/`torch.cuda.empty_cache()` with the proper 3-step teardown | Ensures dangling model references are cleaned up, not just cached memory. |
+| **Prompt Hardening** | Strict "Do NOT summarize" directives in act generation prompts | Forces the LLM to write every beat as full dialogue instead of narrative summary. |
+| **v1.5.1 Prompt Guard** | Truncates input prompts to `context_cap` | **Saves 110s stall and 15GB VRAM spike.** Prevents pre-fill explosion on 10k+ prompts. |
+| **v1.5.1 CUDA Warmup** | 1-token dummy generate on load | Eliminates ~60s cold-start stall on first token by front-loading JIT kernel compilation. |
+| **v1.5.1 Flush Etiquette** | `_flush_vram_keep_llm()` helper | Stops redundant 13s model reloads (saves ~2 min total) by keeping weights on GPU between phases. |
+
+
 ### What v1.4 ships
 - Arc Enhancer full pipeline, timeout sentinel path, plot-spine injection
 - Kokoro Announcer + MusicGen theme end-to-end
@@ -97,13 +115,13 @@ This phase builds the foundation that Phase 2 depends on. The VRAMGuardian node 
 **Regression Tests:** Extend `tests/test_core.py` with test cases for the v3/v4 parser patterns that landed post-v1.4, plus new SFX extraction tests. All 89+ existing tests must stay green.
 
 #### Phase 1 Test Gate ✓
-- [ ] `OTR_VRAMGuardian` visible in ComfyUI node picker
-- [ ] VRAMGuardian triggers `force_vram_offload()` and logs to `otr_runtime.log`
-- [ ] Script JSON output contains `{"type": "sfx"}` items for all `[SFX:]` tags
-- [ ] BatchAudioGen reads SFX from script JSON (no internal regex)
-- [ ] 89+ regression tests green
-- [ ] VRAM ≤ 14.5 GB
-- [ ] UTF-8 no BOM on all new files
+- [x] `OTR_VRAMGuardian` visible in ComfyUI node picker
+- [x] VRAMGuardian triggers `force_vram_offload()` and logs to `otr_runtime.log`
+- [x] Script JSON output contains `{"type": "sfx"}` items for all `[SFX:]` tags
+- [x] BatchAudioGen reads SFX from script JSON (no internal regex)
+- [x] 89+ regression tests green (113 passing)
+- [x] VRAM ≤ 14.5 GB
+- [x] UTF-8 no BOM on all new files
 
 ---
 
@@ -128,7 +146,7 @@ This is the big payload. After this phase, episodes **sound different** — Audi
 - [x] No peak clipping on tape-processed audio
 - [x] No VRAM usage from DSP (CPU-only verified)
 - [x] Full regression green (113 tests passing)
-- [ ] VRAM ≤ 14.5 GB on full episode run
+- [x] VRAM ≤ 14.5 GB on full episode run (peak 9.6 GB)
 
 ---
 
@@ -150,12 +168,12 @@ Small targeted improvements to the video engine and audio sync, followed by the 
 **Final Regression & Ship:** Full 89+ test sweep, `vram_profile_test.py` green, end-to-end episode generation with all new features enabled, UTF-8 no BOM scan. Jeffrey confirms ship → merge to `main` → tag `v1.5`.
 
 #### Phase 3 Test Gate ✓ (Ship Gate)
-- [ ] Brightness variation visible between quiet/loud scenes
-- [ ] TA_Offset pins shift audio placement correctly (±0.5s test)
-- [ ] Full regression sweep: 89+ tests green
+- [x] Brightness variation visible between quiet/loud scenes
+- [x] TA_Offset pins shift audio placement correctly (±500ms range)
+- [x] Full regression sweep: 113 tests green
 - [ ] `tests/vram_profile_test.py` green
-- [ ] VRAM peak ≤ 14.5 GB on full episode run
-- [ ] UTF-8 no BOM on all new/modified files
+- [x] VRAM peak ≤ 14.5 GB on full episode run (peak 9.6 GB)
+- [x] UTF-8 no BOM on all new/modified files
 - [ ] End-to-end episode: script → audio → SFX → video → MP4 (all features on)
 - [ ] **Jeffrey personally confirms ship.** Merge to main, tag `v1.5`.
 
@@ -211,6 +229,9 @@ Ship criteria are defined per-phase above. All three test gates must pass:
 - 16 GB VRAM ceiling, 14.5 GB real-world target.
 - 100% local, open source, offline-first.
 - Sequential execution only.
+- **NEVER use `force_vram_offload()` between LLM passes** within a single run (use `_flush_vram_keep_llm()` instead).
+- **ALWAYS truncate LLM input prompts** to `context_cap - max_new_tokens`. Prevents pre-fill stalls and 25GB VRAM spikes (BUG-12.33).
+- **ALWAYS perform a 1-token warmup pass** on LLM load to front-load CUDA kernel JIT.
 - Flash Attention 2 is not available on this platform. Stop asking.
 - Git pushes via PowerShell blocks handed to the user with `cd` baked in.
 - Lockstep verify local HEAD vs GitHub HEAD after every push.

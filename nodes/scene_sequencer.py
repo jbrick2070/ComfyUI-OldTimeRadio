@@ -317,23 +317,38 @@ def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
         _CHARACTER_VOICE_CACHE[voice_tag] = preset
         return preset
 
-    # Gender-aware hash fallback: use voice_traits to pick from the right pool
+    # Gender-aware hash fallback with 93/7 English-native/international ratio.
+    # ~93% chance of English native, ~7% of international accented English.
+    import random as _rng_mod
     traits_lower = voice_traits.lower() if voice_traits else ""
-    if "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower:
-        pool = _FEMALE_PRESETS
+    is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
+    is_male   = "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower
+
+    # Deterministic seed per voice_tag so same character always gets same voice
+    rng = _rng_mod.Random(hash(voice_tag))
+    use_intl = rng.random() < 0.07  # 7% chance of international preset
+
+    if is_female:
+        en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _FEMALE_PRESETS if not p.startswith("v2/en_")]
         label = "female"
-    elif "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower:
-        pool = _MALE_PRESETS
+    elif is_male:
+        en_pool   = [p for p in _MALE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _MALE_PRESETS if not p.startswith("v2/en_")]
         label = "male"
     else:
-        pool = _BARK_VOICE_PRESETS
+        en_pool   = [p for p in _BARK_VOICE_PRESETS if p.startswith("v2/en_")]
+        intl_pool = [p for p in _BARK_VOICE_PRESETS if not p.startswith("v2/en_")]
         label = "unknown-gender"
 
-    idx = hash(voice_tag) % len(pool)
-    preset = pool[idx]
+    pool = intl_pool if (use_intl and intl_pool) else en_pool
+    if not pool:
+        pool = _BARK_VOICE_PRESETS
+    preset = rng.choice(pool)
     _CHARACTER_VOICE_CACHE[voice_tag] = preset
-    log.info("[VoiceMap] No Director mapping for '%s' (%s), hash-assigned %s from %s pool",
-             voice_tag, traits_lower[:30], preset, label)
+    pool_tag = "international" if (use_intl and intl_pool) else "English-native"
+    log.info("[VoiceMap] No Director mapping for '%s' (%s), assigned %s from %s %s pool",
+             voice_tag, traits_lower[:30], preset, pool_tag, label)
     return preset
 
 
