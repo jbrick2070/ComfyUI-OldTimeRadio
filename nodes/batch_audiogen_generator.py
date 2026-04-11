@@ -1,5 +1,5 @@
 """
-Batch AudioGen Generator — high-fidelity generative Foley for "Signal Lost".
+Batch AudioGen Generator - high-fidelity generative Foley for "Signal Lost".
 ==========================================================================
 
 Replaces the previous "silence" or procedural-only SFX with high-quality sound
@@ -16,7 +16,7 @@ Architectural Highlights:
   - Native transformers implementation: Low friction, no complex audiocraft 
     dependency issues.
 
-v1.5 AudioGen Integration — Jeffrey Brick
+v1.5 AudioGen Integration - Jeffrey Brick
 """
 
 import gc
@@ -108,7 +108,7 @@ class BatchAudioGenGenerator:
     def generate(self, script_json, production_plan_json, episode_seed="", 
                  model_id="facebook/audiogen-medium", guidance_scale=3.0, default_duration=3.0):
         
-        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
         force_vram_offload()
         
         # UI JSON back-compat fix
@@ -128,7 +128,7 @@ class BatchAudioGenGenerator:
         
         # v1.5: Consume SFX cues directly from the canonical parser output.
         # The parser emits {"type": "sfx", "description": "..."} items inline
-        # with dialogue. No duplicate regex — single source of truth.
+        # with dialogue. No duplicate regex - single source of truth.
         sfx_items = [item for item in script if item.get("type") == "sfx"]
         sfx_tags = [item.get("description", "") for item in sfx_items]
         
@@ -243,4 +243,4 @@ class BatchAudioGenGenerator:
         return ({"waveform": batched_waveform, "sample_rate": AUDIOGEN_SAMPLE_RATE}, "\n".join(batch_log))
 
 NODE_CLASS_MAPPINGS = {"OTR_BatchAudioGenGenerator": BatchAudioGenGenerator}
-NODE_DISPLAY_NAME_MAPPINGS = {"OTR_BatchAudioGenGenerator": "⚡ Batch AudioGen (Foley)"}
+NODE_DISPLAY_NAME_MAPPINGS = {"OTR_BatchAudioGenGenerator": "[FAST] Batch AudioGen (Foley)"}

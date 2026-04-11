@@ -1,15 +1,15 @@
 r"""
-Scene Sequencer + Episode Assembler — Orchestrate the Full Radio Show
+Scene Sequencer + Episode Assembler - Orchestrate the Full Radio Show
 ======================================================================
 
 Two nodes:
-  1. SceneSequencer — Takes a parsed script JSON and production plan,
+  1. SceneSequencer - Takes a parsed script JSON and production plan,
      renders each line through the appropriate TTS engine (Bark or Parler),
      inserts SFX/music cues at the right moments, and outputs a scene.
      Features: Intelligent pacing (breath buffers, BEAT/PAUSE tags), continuous
      room tone bed, Gemma Director voice_map dispatch.
 
-  2. EpisodeAssembler — Takes multiple rendered scenes, adds act breaks,
+  2. EpisodeAssembler - Takes multiple rendered scenes, adds act breaks,
      opening/closing themes, and assembles the complete episode WAV.
 
 These nodes tie together the Gemma 4 Director output with all the
@@ -37,7 +37,7 @@ def _move_to_device(obj, device):
 
     BarkProcessor returns voice presets as a nested dict ('history_prompt')
     containing numpy arrays for semantic/coarse/fine prompts. A flat
-    dict comprehension misses these — this walks the full tree.
+    dict comprehension misses these - this walks the full tree.
     """
     if torch.is_tensor(obj):
         return obj.to(device)
@@ -54,9 +54,9 @@ def _move_to_device(obj, device):
     return obj
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LOG CLEANUP — suppress urllib3/httpx cache-check spam from HuggingFace
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# LOG CLEANUP - suppress urllib3/httpx cache-check spam from HuggingFace
+# -----------------------------------------------------------------------------
 logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
@@ -76,10 +76,10 @@ def _trim_trailing_silence(clip_np, threshold=1e-4, min_samples=100):
     # Find last sample above noise floor
     above = np.where(abs_amp > threshold)[0]
     if len(above) == 0:
-        # Entire clip is below threshold — return a tiny slice
+        # Entire clip is below threshold - return a tiny slice
         return clip_np[:min_samples] if len(clip_np) > min_samples else clip_np
     last_idx = above[-1]
-    # Keep a small tail (50ms at 48kHz ≈ 2400 samples) for natural decay
+    # Keep a small tail (50ms at 48kHz - 2400 samples) for natural decay
     tail_pad = min(2400, len(clip_np) - last_idx - 1)
     end = min(last_idx + tail_pad + 1, len(clip_np))
     return clip_np[:end]
@@ -97,7 +97,7 @@ def _normalize_clip(clip_np, target_peak=0.85):
     """
     peak = np.abs(clip_np).max()
     if peak < 1e-6:
-        return clip_np  # silence — don't amplify noise floor
+        return clip_np  # silence - don't amplify noise floor
     return (clip_np * (target_peak / peak)).astype(np.float32)
 
 
@@ -105,10 +105,10 @@ def _resample_audio(clip_np, src_rate, dst_rate):
     """Resample a 1-D float32 numpy array.
 
     Path selection (RTX 5080 optimized):
-      - CUDA available + clip > 5s → torchaudio.functional.resample on GPU
+      - CUDA available + clip > 5s - torchaudio.functional.resample on GPU
         (8-12x faster than scipy for full scenes, sinc-interpolated)
-      - Otherwise → scipy.signal.resample_poly (high-quality CPU path)
-      - No scipy → np.interp linear fallback
+      - Otherwise - scipy.signal.resample_poly (high-quality CPU path)
+      - No scipy - np.interp linear fallback
     """
     if src_rate == dst_rate:
         return clip_np.astype(np.float32)
@@ -120,7 +120,7 @@ def _resample_audio(clip_np, src_rate, dst_rate):
         if torch.cuda.is_available() and len(clip_np) > int(src_rate * 5):
             wav = torch.from_numpy(clip_np).unsqueeze(0).float().cuda()  # [1, T]
             resampled = torchaudio.functional.resample(wav, src_rate, dst_rate)
-            log.info("[SceneSequencer] Resample %dHz→%dHz: GPU torchaudio (%d samples)",
+            log.info("[SceneSequencer] Resample %dHz-%dHz: GPU torchaudio (%d samples)",
                      src_rate, dst_rate, len(clip_np))
             return resampled.squeeze(0).cpu().numpy().astype(np.float32)
     except ImportError:
@@ -135,7 +135,7 @@ def _resample_audio(clip_np, src_rate, dst_rate):
         from scipy.signal import resample_poly
         return resample_poly(clip_np, up, down).astype(np.float32)
     except ImportError:
-        log.warning("[SceneSequencer] scipy not available — falling back to linear "
+        log.warning("[SceneSequencer] scipy not available - falling back to linear "
                     "interpolation for resampling. Install scipy for proper anti-aliasing.")
         new_len = int(len(clip_np) * dst_rate / src_rate)
         return np.interp(
@@ -147,9 +147,9 @@ def _resample_audio(clip_np, src_rate, dst_rate):
 DEFAULT_OUT = os.path.join(os.path.expanduser("~"), "Documents", "ComfyUI", "output", "old_time_radio")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ROOM TONE BED — continuous background that fills silence between dialogue
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# ROOM TONE BED - continuous background that fills silence between dialogue
+# -----------------------------------------------------------------------------
 
 def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descriptors=""):
     """Generate a dynamic background bed based on Canonical 1.0 ENV descriptors.
@@ -158,8 +158,8 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
     the noise profile and add textures like wind, sirens, or electronic hums.
 
     Path selection (RTX 5080 optimized):
-      - CUDA + duration > 60s → GPU torch path (noise + sin on Tensor Cores)
-      - Otherwise → CPU numpy path (low overhead for short beds)
+      - CUDA + duration > 60s - GPU torch path (noise + sin on Tensor Cores)
+      - Otherwise - CPU numpy path (low overhead for short beds)
     """
     import torch
     n_samples = int(duration_sec * sample_rate)
@@ -167,7 +167,7 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
     _use_gpu = (torch.cuda.is_available() and duration_sec >= 60)
 
     if _use_gpu:
-        # ── GPU path: all noise + trig on CUDA ──────────────────────────────
+        # -- GPU path: all noise + trig on CUDA ------------------------------
         dev = torch.device("cuda")
         t = torch.arange(n_samples, dtype=torch.float32, device=dev) / sample_rate
 
@@ -194,7 +194,7 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
             siren_mod = torch.sin(2 * math.pi * 0.2 * t) * 100 + 400
             texture += torch.sin(2 * math.pi * siren_mod * t) * (intensity * 0.05)
 
-        # Sporadic crackle (stays on CPU — tiny loop, negligible cost)
+        # Sporadic crackle (stays on CPU - tiny loop, negligible cost)
         crackle = np.zeros(n_samples, dtype=np.float32)
         n_pops = int(duration_sec * (8 if "vinyl" in desc else 3))
         pop_positions = np.random.randint(0, n_samples, size=n_pops)
@@ -208,7 +208,7 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
         log.info("[SceneSequencer] Room tone: GPU path (%.1fs, %d samples)", duration_sec, n_samples)
         return result.cpu().numpy()
 
-    # ── CPU path: numpy (low overhead for short beds) ───────────────────────
+    # -- CPU path: numpy (low overhead for short beds) -----------------------
     hiss = np.random.randn(n_samples).astype(np.float32)
     if "wind" in desc or "storm" in desc:
         cutoff = 800
@@ -250,9 +250,9 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
     return hiss + hum + texture + crackle
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# INLINE BARK TTS — called by SceneSequencer for dynamic dialogue generation
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# INLINE BARK TTS - called by SceneSequencer for dynamic dialogue generation
+# -----------------------------------------------------------------------------
 
 # Default voice preset rotation for characters without explicit assignments
 _BARK_VOICE_PRESETS = [
@@ -283,7 +283,7 @@ _BARK_VOICE_PRESETS = [
 ]
 
 _FEMALE_PRESETS = [
-    # en_speaker_2 and en_speaker_7 removed — sound male/androgynous in practice
+    # en_speaker_2 and en_speaker_7 removed - sound male/androgynous in practice
     "v2/en_speaker_4", "v2/en_speaker_9",
     "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
     "v2/it_speaker_4", "v2/pt_speaker_4",
@@ -295,7 +295,7 @@ _MALE_PRESETS = [
     "v2/it_speaker_0", "v2/pt_speaker_0",
 ]
 
-# Stable character→preset cache so the same character always gets the same voice
+# Stable character-preset cache so the same character always gets the same voice
 _CHARACTER_VOICE_CACHE = {}
 
 
@@ -361,7 +361,7 @@ def _clean_text_for_bark(text):
          [SFX:], [MUSIC:], === scene headers ===)
       2. Converts common parenthetical stage directions to Bark token equivalents
       3. Converts asterisk actions (*laughs*) to Bark tokens
-      4. Preserves ♪ music notation (Bark renders humming/singing)
+      4. Preserves - music notation (Bark renders humming/singing)
       5. Preserves valid Bark non-verbal tokens already in the text
       6. Strips any remaining unrecognized square-bracket tags
       7. Collapses whitespace
@@ -380,19 +380,19 @@ def _clean_text_for_bark(text):
       [groans]        pain or frustration groan
       [whistles]      whistle
       [sneezes]       sneeze
-    ♪ text ♪         sung / hummed phrase
+    - text -         sung / hummed phrase
 
-    Tokens NOT supported by Bark (spoken as literal words — must be stripped):
+    Tokens NOT supported by Bark (spoken as literal words - must be stripped):
       [whispers] [shouts] [nervous laugh] etc.
     """
     import re
 
-    # ── Step 1: Strip structural / non-Bark tags ─────────────────────────────
+    # -- Step 1: Strip structural / non-Bark tags -----------------------------
     text = re.sub(r'\[VOICE:[^\]]*\]', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\[(?:ENV|SFX|MUSIC):[^\]]*\]', '', text, flags=re.IGNORECASE)
     text = re.sub(r'===.*?===', '', text)
 
-    # ── Step 2: Parenthetical stage directions → Bark tokens ─────────────────
+    # -- Step 2: Parenthetical stage directions - Bark tokens -----------------
     _PAREN_TO_BARK = [
         ("laughter",        "[laughter]"),
         ("laugh",           "[laughs]"),
@@ -414,7 +414,7 @@ def _clean_text_for_bark(text):
         ("moan",            "[groans]"),
         ("whistle",         "[whistles]"),
         ("sneeze",          "[sneezes]"),
-        # Unsupported tokens — drop direction, let voice preset carry the tone
+        # Unsupported tokens - drop direction, let voice preset carry the tone
         ("whisper",         ""),
         ("quiet",           ""),
         ("soft",            ""),
@@ -436,7 +436,7 @@ def _clean_text_for_bark(text):
 
     text = re.sub(r'\(([^)]{1,80})\)\s*', _translate_paren, text)
 
-    # ── Step 3: Asterisk actions → Bark tokens ───────────────────────────────
+    # -- Step 3: Asterisk actions - Bark tokens -------------------------------
     _ASTERISK_TO_BARK = [
         ("laugh",   "[laughs]"),
         ("chuckl",  "[laughs]"),
@@ -456,7 +456,7 @@ def _clean_text_for_bark(text):
 
     text = re.sub(r'\*([^*]{1,60})\*', _translate_asterisk, text)
 
-    # ── Step 4: Strip unrecognized bracket tags ───────────────────────────────
+    # -- Step 4: Strip unrecognized bracket tags -------------------------------
     _BARK_VALID_TOKENS = {
         "[laughter]", "[laughs]", "[sighs]", "[music]", "[gasps]",
         "[clears throat]", "[coughs]", "[pants]", "[sobs]", "[grunts]",
@@ -470,7 +470,7 @@ def _clean_text_for_bark(text):
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)
 
-    # ── Step 5: Normalize whitespace ─────────────────────────────────────────
+    # -- Step 5: Normalize whitespace -----------------------------------------
     text = re.sub(r'  +', ' ', text).strip()
     return text
 
@@ -506,7 +506,7 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
     # Clean the text: strip parenthetical directions, keep Bark-compatible tags
     text = _clean_text_for_bark(text)
     if not text:
-        # Nothing left after cleaning — return tiny silence
+        # Nothing left after cleaning - return tiny silence
         return np.zeros(2400, dtype=np.float32), 24000
 
     # Import the shared Bark loader from our bark_tts module
@@ -521,7 +521,7 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
 
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)
-        # Recursively move ALL processor outputs to CUDA — including the
+        # Recursively move ALL processor outputs to CUDA - including the
         # nested 'history_prompt' dict with voice preset numpy arrays.
         inputs = _move_to_device(inputs, torch.device("cuda"))
 
@@ -589,7 +589,7 @@ class SceneSequencer:
                     "tooltip": "Pre-rendered TTS audio clips (from Bark/Parler batch). "
                                "If provided, dialogue lines use these clips instead of "
                                "placeholder silence. Clips are matched to dialogue lines "
-                               "in order. ANNOUNCER lines are NOT expected here — they "
+                               "in order. ANNOUNCER lines are NOT expected here - they "
                                "flow through announcer_audio_clips on a separate bus."
                 }),
                 "announcer_audio_clips": ("AUDIO", {
@@ -681,8 +681,8 @@ class SceneSequencer:
         pacing = plan.get("pacing", {})
         # PACING: Breath buffer + dramatic pauses (v1.4 - 50% duration reduction)
         breath_ms = pacing.get("breath_pause_ms", 200)          # between every dialogue line
-        beat_pause_ms = pacing.get("beat_pause_ms", 750)        # [BEAT] tag — dramatic beat
-        pause_ms = pacing.get("pause_ms", 1000)                 # [PAUSE] tag — longer pause
+        beat_pause_ms = pacing.get("beat_pause_ms", 750)        # [BEAT] tag - dramatic beat
+        pause_ms = pacing.get("pause_ms", 1000)                 # [PAUSE] tag - longer pause
         scene_transition_ms = pacing.get("scene_transition_ms", 1250)
         act_break_ms = pacing.get("act_break_ms", 2500)
 
@@ -691,7 +691,7 @@ class SceneSequencer:
             output_dir = DEFAULT_OUT
         os.makedirs(output_dir, exist_ok=True)
 
-        # Free Gemma4 VRAM before TTS generation — Bark needs GPU headroom.
+        # Free Gemma4 VRAM before TTS generation - Bark needs GPU headroom.
         # Gemma4 is done by this point (script + plan already generated).
         try:
             from .story_orchestrator import _unload_llm
@@ -749,7 +749,7 @@ class SceneSequencer:
 
             segment_np = None
             
-            # ── CANONICAL 1.0 TOKENS ──────────────────────────────────────
+            # -- CANONICAL 1.0 TOKENS --------------------------------------
             
             if item_type == "environment":
                 current_env = item.get("description", "default room")
@@ -793,7 +793,7 @@ class SceneSequencer:
                 is_announcer = character_name.strip().upper() == "ANNOUNCER"
 
                 if is_announcer and announcer_clip_idx < len(announcer_clips):
-                    # Dedicated Kokoro announcer bus — clean, no Bark filler sounds.
+                    # Dedicated Kokoro announcer bus - clean, no Bark filler sounds.
                     clip_np, clip_sr = announcer_clips[announcer_clip_idx]
                     segment_np = _resample_audio(clip_np, clip_sr, sample_rate)
                     segment_np = _normalize_clip(segment_np)
@@ -817,7 +817,7 @@ class SceneSequencer:
             elif item_type == "direction":
                 render_log.append(f"[{global_idx}] DIRECTION: {item.get('text', '')[:50]}")
 
-            # ── Accumulate Audio and Track Environment Span ──────────────
+            # -- Accumulate Audio and Track Environment Span --------------
             if segment_np is not None:
                 # v1.5: Apply dialogue TA_Offset for dialogue/announcer items
                 if item_type == "dialogue" and dialogue_offset_samples != 0:
@@ -841,7 +841,7 @@ class SceneSequencer:
         else:
             combined = np.zeros(int(sample_rate * 1), dtype=np.float32)
 
-        # ── CANONICAL 1.0 ENVIRONMENT MIXING ──────────────────────────
+        # -- CANONICAL 1.0 ENVIRONMENT MIXING --------------------------
         total_len = len(combined)
         final_bed = np.zeros(total_len, dtype=np.float32)
         room_intensity = plan.get("vintage_settings", {}).get("room_tone_intensity", 0.01)
@@ -856,7 +856,7 @@ class SceneSequencer:
         combined = combined + final_bed
         render_log.append(f"--- Layered {len(env_timeline)} environment segments")
 
-        # ── SFX DUCKING & OVERLAY ──────────────────────────────────────────
+        # -- SFX DUCKING & OVERLAY ------------------------------------------
         max_sfx_end = 0
         for start_pos, sfx_np, _ in sfx_timeline:
             end_pos = start_pos + len(sfx_np)
@@ -1003,7 +1003,7 @@ class EpisodeAssembler:
         log.info("[EpisodeAssembler] Assembled %d segments with %dms crossfades",
                  len(matched), crossfade_ms)
 
-        # Final peak normalize to -1.0 dBFS — runs AFTER crossfades so
+        # Final peak normalize to -1.0 dBFS - runs AFTER crossfades so
         # overlapping segments can't push the mix into clipping.
         peak = episode_waveform.abs().max()
         if peak > 1e-8:
@@ -1011,9 +1011,9 @@ class EpisodeAssembler:
             episode_waveform = episode_waveform * (target_linear / peak)
         log.info("[EpisodeAssembler] Final normalize: -1.0 dBFS (post-crossfade)")
 
-        # Video-only pipeline — MP4 is written by OTR_SignalLostVideo.
+        # Video-only pipeline - MP4 is written by OTR_SignalLostVideo.
         # No WAV or PNG files are saved here.
-        output_path = "(video-only — MP4 written by OTR_SignalLostVideo)"
+        output_path = "(video-only - MP4 written by OTR_SignalLostVideo)"
 
         from datetime import datetime as _dt
         audio_out = {"waveform": episode_waveform, "sample_rate": sample_rate}
@@ -1030,7 +1030,7 @@ class EpisodeAssembler:
         }
         info = json.dumps(info_dict, indent=2)
 
-        log.info(f"[EpisodeAssembler] '{episode_title}' — {total_sec/60:.1f} min")
+        log.info(f"[EpisodeAssembler] '{episode_title}' - {total_sec/60:.1f} min")
         return (audio_out, output_path, info)
 
     def _extract_waveform(self, audio, target_sr=None):
@@ -1040,7 +1040,7 @@ class EpisodeAssembler:
         main scene bus runs at 48 kHz. Themes coming in on the opening /
         closing inputs must be rate-matched before they can be concatenated
         with the main content, otherwise they play at the wrong speed and
-        pitch. Resampling happens here at the concatenation boundary — the
+        pitch. Resampling happens here at the concatenation boundary - the
         same pattern SceneSequencer uses for TTS clips via _resample_audio.
         """
         if isinstance(audio, dict):
