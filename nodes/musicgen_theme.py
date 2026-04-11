@@ -1,5 +1,5 @@
 """
-MusicGen Theme — dedicated instrumental music bus for opening, closing, and
+MusicGen Theme - dedicated instrumental music bus for opening, closing, and
 act-break interstitial cues.
 
 Replaces the previous "no music at all" hole in the OTR pipeline. Reads the
@@ -11,7 +11,7 @@ closing_theme_audio inputs, plus an interstitial clip for future act-break use.
 
 Design notes (see ROADMAP v1.4 Theme A):
   - NO audiocraft dependency. Uses transformers.MusicgenForConditionalGeneration
-    and AutoProcessor — both already installed in the OTR venv via the main
+    and AutoProcessor - both already installed in the OTR venv via the main
     transformers package. Clean install, no MSVC, no spacy pin, no av conflict.
   - Per-episode caching. Each (prompt, duration) pair is SHA-256 hashed to a
     .wav filename under models/musicgen_cache/. If the cache file exists the
@@ -19,14 +19,14 @@ Design notes (see ROADMAP v1.4 Theme A):
   - Sequential VRAM discipline. Model loads only if at least one cue is
     uncached. After generation it is explicitly unloaded and cuda cache is
     flushed, so Bark has its full VRAM window when BatchBark runs next.
-  - musicgen-medium is ~6 GB VRAM — fits cleanly inside the 14.5 GB ceiling
+  - musicgen-medium is ~6 GB VRAM - fits cleanly inside the 14.5 GB ceiling
     once Gemma4 has been unloaded (which happens automatically at the
     Gemma4Director exit, before this node runs).
-  - 32 kHz native sample rate, mono. SceneSequencer output is 48 kHz — the
+  - 32 kHz native sample rate, mono. SceneSequencer output is 48 kHz - the
     EpisodeAssembler downstream already handles rate matching, so we leave
     the 32 kHz rate intact in the returned AUDIO dict.
 
-Jeffrey Brick — v1.4 Theme A
+Jeffrey Brick - v1.4 Theme A
 """
 
 import gc
@@ -145,7 +145,7 @@ def _silent_audio_dict(sample_rate: int = MUSICGEN_SAMPLE_RATE) -> dict:
 
 
 class MusicGenTheme:
-    """OTR v1.4 — instrumental music generator for opening, closing, and
+    """OTR v1.4 - instrumental music generator for opening, closing, and
     act-break interstitial cues.
 
     Reads the three music cues written by Gemma4Director into
@@ -188,7 +188,7 @@ class MusicGenTheme:
     def render(self, production_plan_json, episode_seed="",
                model_id=MUSICGEN_MODEL_ID, guidance_scale=3.0):
 
-        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
         force_vram_offload()
 
         try:
@@ -230,7 +230,7 @@ class MusicGenTheme:
                 render_log.append(f"  [{cue_id}] CACHE HIT ({os.path.basename(cache_path)})")
             else:
                 to_generate.append(cue_id)
-                render_log.append(f"  [{cue_id}] MISS — will generate ({cue['duration_sec']}s)")
+                render_log.append(f"  [{cue_id}] MISS - will generate ({cue['duration_sec']}s)")
 
         if to_generate:
             try:
@@ -303,7 +303,7 @@ class MusicGenTheme:
                     )
             finally:
                 # Always unload to return VRAM to Bark, even if generation failed.
-                # Bug Bible 12.19 VRAM leak fix — explicit .cpu() before dropping references
+                # Bug Bible 12.19 VRAM leak fix - explicit .cpu() before dropping references
                 try:
                     if 'model' in locals():
                         model.cpu()
@@ -317,7 +317,7 @@ class MusicGenTheme:
                     torch.cuda.empty_cache()
                 render_log.append("model unloaded, cuda cache cleared")
         else:
-            render_log.append("all cues cached — MusicGen model not loaded")
+            render_log.append("all cues cached - MusicGen model not loaded")
 
         render_log.append(
             f"--- 3 music cues ready (opening, closing, interstitial) ---"
@@ -332,4 +332,4 @@ class MusicGenTheme:
 
 
 NODE_CLASS_MAPPINGS = {"MusicGenTheme": MusicGenTheme}
-NODE_DISPLAY_NAME_MAPPINGS = {"MusicGenTheme": "🎺 MusicGen Theme"}
+NODE_DISPLAY_NAME_MAPPINGS = {"MusicGenTheme": "[EMOJI] MusicGen Theme"}

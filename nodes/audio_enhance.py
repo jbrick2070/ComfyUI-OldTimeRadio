@@ -1,17 +1,17 @@
 """
-OTR_AudioEnhance — Broadcast-quality spatial audio enhancement.
+OTR_AudioEnhance - Broadcast-quality spatial audio enhancement.
 
 Upscales mono TTS audio (typically 24kHz from Bark) to stereo at a target
 sample rate with faux-spatial widening, bass warmth, and peak normalization.
 
-Pipeline position:  SceneSequencer → AudioEnhance → EpisodeAssembler
+Pipeline position:  SceneSequencer - AudioEnhance - EpisodeAssembler
 
 Processing chain:
-  1. Resample to target rate (sinc-interpolated via torchaudio — zero aliasing)
-  2. Mono → Stereo duplication
-  3. Low-frequency warmth (bass biquad shelf filter — no comb ripples)
-  4. High-frequency cleanup — gentle LPF at 16kHz kills Bark "chirp" artifacts
-  5. Haas-effect spatial widening (delay one channel 0.2–0.8 ms)
+  1. Resample to target rate (sinc-interpolated via torchaudio - zero aliasing)
+  2. Mono - Stereo duplication
+  3. Low-frequency warmth (bass biquad shelf filter - no comb ripples)
+  4. High-frequency cleanup - gentle LPF at 16kHz kills Bark "chirp" artifacts
+  5. Haas-effect spatial widening (delay one channel 0.2-0.8 ms)
   6. Mid-side stereo decorrelation for image width
   7. Peak-normalize to target dBFS
 
@@ -30,13 +30,13 @@ import torch
 log = logging.getLogger("OTR.AudioEnhance")
 
 
-# ── DSP building blocks (all vectorized) ─────────────────────────────────────
+# -- DSP building blocks (all vectorized) -------------------------------------
 
 def _resample(waveform: torch.Tensor, orig_sr: int, target_sr: int) -> torch.Tensor:
     """Resample waveform using sinc interpolation (torchaudio.transforms.Resample).
 
     Sinc interpolation mathematically reconstructs the analog waveform before
-    resampling — zero foldover aliasing, unlike linear interpolation which
+    resampling - zero foldover aliasing, unlike linear interpolation which
     draws straight lines between samples and creates high-frequency distortion.
 
     Expects input shape (B, C, N), returns (B, C, new_N).
@@ -53,7 +53,7 @@ def _resample(waveform: torch.Tensor, orig_sr: int, target_sr: int) -> torch.Ten
         new_freq=target_sr,
     ).to(waveform.device)
 
-    # Resample expects (*, time) — our (B, C, N) shape works directly.
+    # Resample expects (*, time) - our (B, C, N) shape works directly.
     return resampler(waveform.float())
 
 
@@ -69,7 +69,7 @@ def _haas_delay(waveform: torch.Tensor, sample_rate: int,
     """Apply Haas effect: delay the right channel by delay_ms milliseconds.
 
     Creates spatial width perception without loudness change.
-    0.2–0.8 ms = natural spatial image for speech.
+    0.2-0.8 ms = natural spatial image for speech.
     """
     delay_samples = int(sample_rate * delay_ms / 1000.0)
     if delay_samples < 1 or waveform.shape[1] < 2:
@@ -124,7 +124,7 @@ def _apply_bass_warmth(waveform: torch.Tensor, sample_rate: int,
     warmth: 0.0 = none, 0.1 = subtle broadcast tone (~3dB), 0.3 = noticeable (~9dB)
 
     NOTE (2026): torchaudio now supports CUDA for biquad/lfilter, but IIR filters
-    are inherently sequential — GPU execution is slower than CPU due to poor
+    are inherently sequential - GPU execution is slower than CPU due to poor
     parallelism on Tensor Cores. CPU bounce is the tactical win: minimal overhead
     (~microseconds per clip) while keeping the rest of DSP on GPU (RTX 5080).
     """
@@ -156,7 +156,7 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
     """Gentle low-pass filter at cutoff_hz to kill Bark TTS "chirp" artifacts.
 
     Bark sometimes produces high-frequency ringing above 16kHz that gets
-    amplified during 24k→48k upsampling. A smooth rolloff above 16kHz
+    amplified during 24k-48k upsampling. A smooth rolloff above 16kHz
     removes these digital chirps without affecting vocal clarity.
 
     Uses a windowed-sinc FIR filter (Hann window) for clean phase response.
@@ -194,7 +194,7 @@ def _lowpass_16k(waveform: torch.Tensor, sample_rate: int,
     kernel = sinc * window
     kernel = kernel / kernel.sum()  # normalize to unity gain
 
-    # Apply via conv1d (grouped convolution — same kernel per channel)
+    # Apply via conv1d (grouped convolution - same kernel per channel)
     kernel = kernel.view(1, 1, -1).repeat(C, 1, 1)  # already on waveform.device
 
     pad = half
@@ -273,7 +273,7 @@ def _apply_tape_emulation(waveform: torch.Tensor, sample_rate: int, intensity_st
     return torch.from_numpy(waveform_np.astype(np.float32)).to(orig_device, dtype=orig_dtype, non_blocking=True)
 
 
-# ── ComfyUI Node ──────────────────────────────────────────────────────────────
+# -- ComfyUI Node --------------------------------------------------------------
 
 class AudioEnhance:
     """Broadcast-quality spatial audio enhancement for TTS output."""
@@ -308,7 +308,7 @@ class AudioEnhance:
                 }),
                 "lpf_cutoff_hz": ("FLOAT", {
                     "default": 16000.0, "min": 8000.0, "max": 24000.0, "step": 1000.0,
-                    "tooltip": "Low-pass filter cutoff Hz — kills Bark chirp artifacts (0=off, 16000=default)"
+                    "tooltip": "Low-pass filter cutoff Hz - kills Bark chirp artifacts (0=off, 16000=default)"
                 }),
                 "tape_emulation": (["off", "subtle", "medium", "heavy"], {
                     "default": "off",
@@ -325,7 +325,7 @@ class AudioEnhance:
                 haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
                 normalize_dbfs=-1.0, tape_emulation="off"):
 
-        # ── Extract waveform & sample rate ──
+        # -- Extract waveform & sample rate --
         if isinstance(audio, tuple):
             audio = audio[0]
 
@@ -337,7 +337,7 @@ class AudioEnhance:
             orig_sr = 24000
 
         if waveform is None:
-            log.warning("[OTR_AudioEnhance] No waveform data — passing through")
+            log.warning("[OTR_AudioEnhance] No waveform data - passing through")
             return (audio,)
 
         # Ensure 3D: (batch, channels, samples)
@@ -353,7 +353,7 @@ class AudioEnhance:
         log.info("[OTR_AudioEnhance] Input: %dHz %dch %d samples (%.1fs)",
                  orig_sr, orig_channels, orig_samples, orig_duration)
 
-        # ── Move to GPU for DSP acceleration ──
+        # -- Move to GPU for DSP acceleration --
         # All torchaudio DSP ops (resample, biquad, conv1d) run on CUDA when
         # tensors are on GPU. VRAM impact is negligible (<50 MB for long clips).
         _use_cuda = torch.cuda.is_available()
@@ -361,52 +361,52 @@ class AudioEnhance:
             waveform = waveform.to("cuda", non_blocking=True)
             log.info("[OTR_AudioEnhance] DSP on GPU (CUDA)")
 
-        # ── Step 1: Resample ──
+        # -- Step 1: Resample --
         waveform = _resample(waveform, orig_sr, target_sample_rate)
         log.info("[OTR_AudioEnhance] Resampled %dHz -> %dHz (%d samples)",
                  orig_sr, target_sample_rate, waveform.shape[-1])
 
-        # ── Step 2: Mono → Stereo ──
+        # -- Step 2: Mono - Stereo --
         waveform = _mono_to_stereo(waveform)
         log.info("[OTR_AudioEnhance] Channels: %d -> %d",
                  orig_channels, waveform.shape[1])
 
-        # ── Step 3: Bass warmth (before spatial — centered) ──
+        # -- Step 3: Bass warmth (before spatial - centered) --
         if bass_warmth > 0:
             waveform = _apply_bass_warmth(waveform, target_sample_rate, bass_warmth)
             log.info("[OTR_AudioEnhance] Bass warmth %.2f applied", bass_warmth)
 
-        # ── Step 4: High-frequency cleanup (kill Bark chirps) ──
+        # -- Step 4: High-frequency cleanup (kill Bark chirps) --
         if lpf_cutoff_hz > 0 and lpf_cutoff_hz < target_sample_rate / 2:
             waveform = _lowpass_16k(waveform, target_sample_rate, lpf_cutoff_hz)
             log.info("[OTR_AudioEnhance] LPF at %.0fHz applied (chirp cleanup)",
                      lpf_cutoff_hz)
 
-        # ── Step 5: Haas spatial delay ──
+        # -- Step 5: Haas spatial delay --
         if haas_delay_ms > 0:
             waveform = _haas_delay(waveform, target_sample_rate, haas_delay_ms)
             log.info("[OTR_AudioEnhance] Haas delay %.1fms applied", haas_delay_ms)
 
-        # ── Step 5.5: Tape Emulation (Analog Warmth) ──
+        # -- Step 5.5: Tape Emulation (Analog Warmth) --
         if tape_emulation != "off":
             waveform = _apply_tape_emulation(waveform, target_sample_rate, tape_emulation)
             log.info("[OTR_AudioEnhance] Tape emulation '%s' applied", tape_emulation)
 
-        # ── Step 6: Mid-side stereo widening ──
+        # -- Step 6: Mid-side stereo widening --
         if spatial_width > 0:
             waveform = _stereo_decorrelate(waveform, spatial_width)
             log.info("[OTR_AudioEnhance] Stereo width %.2f applied", spatial_width)
 
-        # ── Step 7: Peak normalize skipped — moved to EpisodeAssembler ──
+        # -- Step 7: Peak normalize skipped - moved to EpisodeAssembler --
         # Normalizing here (before crossfades) caused clipping during segment
         # overlaps. Final -1.0 dBFS pass now runs post-crossfade in Assembler.
         log.info("[OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)")
 
-        # ── Move back to CPU for ComfyUI pipeline ──
+        # -- Move back to CPU for ComfyUI pipeline --
         if _use_cuda:
             waveform = waveform.cpu()
 
-        # ── Verify stereo output ──
+        # -- Verify stereo output --
         assert waveform.shape[1] == 2, (
             f"[OTR_AudioEnhance] BUG: expected 2 channels, got {waveform.shape[1]}"
         )

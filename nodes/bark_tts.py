@@ -1,22 +1,22 @@
 r"""
-Bark TTS Node for ComfyUI — Old-Time Radio Edition
+Bark TTS Node for ComfyUI - Old-Time Radio Edition
 ====================================================
 
 Wraps Suno's Bark model for expressive character voice generation.
-Bark excels at emotional delivery, laughs, sighs, and dramatic pauses —
+Bark excels at emotional delivery, laughs, sighs, and dramatic pauses -
 perfect for radio drama characters.
 
 Bark voice presets:
-  v2/en_speaker_0 through v2/en_speaker_9 — varied English voices
+  v2/en_speaker_0 through v2/en_speaker_9 - varied English voices
   Each preset has a distinct timbre, pitch, and speaking style.
 
 Special Bark tokens (insert in text):
-  [laughter]  — laughing
-  [laughs]    — brief laugh
-  [sighs]     — sigh
-  [music]     — musical interlude
-  [gasps]     — gasp
-  ...         — hesitation/ellipsis
+  [laughter]  - laughing
+  [laughs]    - brief laugh
+  [sighs]     - sigh
+  [music]     - musical interlude
+  [gasps]     - gasp
+  ...         - hesitation/ellipsis
 
 v1.0  2026-04-04  Jeffrey Brick
 """
@@ -29,7 +29,7 @@ import warnings
 
 import numpy as np
 
-# BEST PRACTICE (Section 8): Lazy heavy imports — torch, numpy, transformers
+# BEST PRACTICE (Section 8): Lazy heavy imports - torch, numpy, transformers
 # imported inside methods only. Node registers instantly at startup.
 
 log = logging.getLogger("OTR")
@@ -40,7 +40,7 @@ def _move_to_device(obj, device):
 
     BarkProcessor returns voice presets as a nested dict ('history_prompt')
     containing numpy arrays for semantic/coarse/fine prompts. A flat
-    dict comprehension misses these — this walks the full tree.
+    dict comprehension misses these - this walks the full tree.
     """
     import torch
     if torch.is_tensor(obj):
@@ -57,8 +57,8 @@ def _move_to_device(obj, device):
         return obj.to(device)
     return obj
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LOG CLEANUP — compliant fixes handle most warnings at the source.
+# -----------------------------------------------------------------------------
+# LOG CLEANUP - compliant fixes handle most warnings at the source.
 # These catch any residual library noise (urllib3/httpx cache-check spam,
 # edge-case transformers warnings from Bark's internal sub-model pipeline).
 #
@@ -70,7 +70,7 @@ def _move_to_device(obj, device):
 #   We cannot intercept this via generation_config patching because Bark passes
 #   max_length=20 as a direct kwarg that overrides the config object.
 #   The only clean fix without forking Bark is filterwarnings() at module load.
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 import warnings
 warnings.filterwarnings(
     "ignore",
@@ -114,7 +114,7 @@ def _load_bark(model_id="suno/bark", device=None):
       - Section 5:  Device alignment via cache tracking
       - Section 40: Manual VRAM management
 
-    Use torch_dtype= (not dtype=) — BarkModel wraps its own from_pretrained
+    Use torch_dtype= (not dtype=) - BarkModel wraps its own from_pretrained
     and passes kwargs through to transformers, which expects the standard kwarg.
 
     Device fallback: CUDA if available, CPU otherwise (with warning).
@@ -139,7 +139,7 @@ def _load_bark(model_id="suno/bark", device=None):
         gc.collect()
         torch.cuda.empty_cache()
 
-        # ── VRAM Hardening v1.4: Strict Handoff ──
+        # -- VRAM Hardening v1.4: Strict Handoff --
         # If Gemma is in VRAM, evict it now before loading Bark.
         try:
             from .story_orchestrator import _unload_llm
@@ -199,7 +199,7 @@ def _load_bark(model_id="suno/bark", device=None):
                     log.error("[Bark] Hub fallback failed. Ensure model is downloaded or Hub is reachable: %s", hub_err)
                     raise RuntimeError(f"Failed to load Bark model '{model_id}'. Is it downloaded? Hub error: {hub_err}") from hub_err
 
-            # ── STRICT DEVICE SENTRY ──
+            # -- STRICT DEVICE SENTRY --
             # Force all sub-models to target device explicitly to prevent any internal
             # state from being stranded on wrong device.
             model.to(device)
@@ -208,7 +208,7 @@ def _load_bark(model_id="suno/bark", device=None):
                 if sm is not None:
                     sm.to(device)
 
-            # ── FIX: Patch generation configs — parent model + all sub-models ──
+            # -- FIX: Patch generation configs - parent model + all sub-models --
             # Bark's BarkModel and its sub-models ship with max_length=20 in
             # their GenerationConfig. When we call model.generate() with
             # max_new_tokens, transformers sees BOTH and logs a deprecation
@@ -297,7 +297,7 @@ class BarkTTSNode:
                     "v2/en_speaker_9",
                 ], {
                     "default": "v2/en_speaker_6",
-                    "tooltip": "Bark speaker preset — each has unique voice character"
+                    "tooltip": "Bark speaker preset - each has unique voice character"
                 }),
             },
             "optional": {

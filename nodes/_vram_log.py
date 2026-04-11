@@ -1,7 +1,7 @@
 """
 _vram_log.py
 
-Theme C / v1.4 — Per-phase VRAM snapshot logging.
+Theme C / v1.4 - Per-phase VRAM snapshot logging.
 
 Lightweight telemetry for the Gemma 4 orchestrator and any future node that
 wants to record its VRAM high-water mark. The snapshot lines are written to
@@ -44,7 +44,7 @@ log = logging.getLogger("OTR")
 
 VRAM_CEILING_GB: float = 14.5
 
-# Runtime log path — same file the orchestrator uses. Kept local to this
+# Runtime log path - same file the orchestrator uses. Kept local to this
 # module so callers do not have to thread a path through.
 _RUNTIME_LOG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

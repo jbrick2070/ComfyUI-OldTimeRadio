@@ -1,5 +1,5 @@
 r"""
-OTR_BatchKokoroGenerator — Character-Grouped Parallel TTS Generation
+OTR_BatchKokoroGenerator - Character-Grouped Parallel TTS Generation
 ====================================================================
 
 Pre-computes ALL dialogue TTS audio before the SceneSequencer runs,
@@ -110,7 +110,7 @@ class BatchKokoroGenerator:
 
     def generate_batch(self, script_json, production_plan_json, speed=1.0):
 
-        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
         force_vram_offload()
 
         script = json.loads(script_json) if isinstance(script_json, str) else script_json

@@ -1,5 +1,5 @@
 r"""
-OTR_BatchBarkGenerator — Character-Grouped Parallel TTS Generation
+OTR_BatchBarkGenerator - Character-Grouped Parallel TTS Generation
 ====================================================================
 
 Pre-computes ALL dialogue TTS audio before the SceneSequencer runs.
@@ -7,11 +7,11 @@ Instead of generating Line 1, Line 2, Line 3 sequentially (stop-start
 GPU thrashing), this node:
 
   1. Parses the script JSON for all dialogue lines
-  2. Groups lines by character → voice preset (minimizes preset switches)
+  2. Groups lines by character - voice preset (minimizes preset switches)
   3. Generates all lines per character in a single pass (GPU stays hot)
   4. Returns clips in original script order as batched AUDIO
 
-Pipeline position:  Director → BatchBarkGenerator → SceneSequencer
+Pipeline position:  Director - BatchBarkGenerator - SceneSequencer
 
 The SceneSequencer receives pre-rendered clips via its `tts_audio_clips`
 input and skips inline Bark calls entirely. Result: 60-70% faster renders
@@ -33,14 +33,14 @@ from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LOG CLEANUP — Bark's sub-models hardcode max_length=20 as an explicit kwarg.
+# -----------------------------------------------------------------------------
+# LOG CLEANUP - Bark's sub-models hardcode max_length=20 as an explicit kwarg.
 # When we pass max_new_tokens, transformers fires warnings on every sub-model
 # call (~20+ per dialogue line). Cannot intercept via generation_config because
 # Bark passes max_length=20 as a direct kwarg that overrides the config object.
-# The generation_config kwarg warning is a FutureWarning in transformers ≥4.45
-# — using UserWarning there silently fails to suppress it.
-# ─────────────────────────────────────────────────────────────────────────────
+# The generation_config kwarg warning is a FutureWarning in transformers -4.45
+# - using UserWarning there silently fails to suppress it.
+# -----------------------------------------------------------------------------
 warnings.filterwarnings(
     "ignore",
     message=r".*Both.*`max_new_tokens`.*`max_length`.*",
@@ -59,7 +59,7 @@ warnings.filterwarnings(
 warnings.filterwarnings(
     "ignore",
     message=r".*Passing.*`generation_config`.*together with generation-related arguments.*",
-    category=FutureWarning,  # transformers ≥4.45 emits this as FutureWarning, not UserWarning
+    category=FutureWarning,  # transformers -4.45 emits this as FutureWarning, not UserWarning
 )
 warnings.filterwarnings(
     "ignore",
@@ -73,7 +73,7 @@ def _move_to_device(obj, device):
 
     BarkProcessor returns voice presets as a nested dict ('history_prompt')
     containing numpy arrays for semantic/coarse/fine prompts. A flat
-    dict comprehension misses these — this walks the full tree.
+    dict comprehension misses these - this walks the full tree.
     Handles tensors, dicts, lists, tuples, numpy arrays, and any object
     with a .to() method (e.g. nn.Module).
     """
@@ -91,15 +91,15 @@ def _move_to_device(obj, device):
         return obj.to(device)
     return obj
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LOG CLEANUP — suppress urllib3/httpx cache-check spam from HuggingFace
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# LOG CLEANUP - suppress urllib3/httpx cache-check spam from HuggingFace
+# -----------------------------------------------------------------------------
 logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 
 
-# ── Voice preset resolution (shared logic with SceneSequencer) ───────────────
+# -- Voice preset resolution (shared logic with SceneSequencer) ---------------
 
 _BARK_VOICE_PRESETS = [
     # -- English (native) --
@@ -127,7 +127,7 @@ _CHARACTER_VOICE_CACHE = {}
 
 
 _FEMALE_PRESETS = [
-    # en_speaker_2 and en_speaker_7 removed — sound male/androgynous in practice
+    # en_speaker_2 and en_speaker_7 removed - sound male/androgynous in practice
     "v2/en_speaker_4", "v2/en_speaker_9",
     "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
     "v2/it_speaker_4", "v2/pt_speaker_4",
@@ -174,7 +174,7 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
     # Director always assigns en_speaker_*; this fallback runs only when the
     # Director mapping is missing. ~93% chance of English native, ~7% of
     # international accented English (rare accent for vocal variety without
-    # risking language drift — the temp cap + ASCII sanitizer handle the rest).
+    # risking language drift - the temp cap + ASCII sanitizer handle the rest).
     import random
     traits_lower = voice_traits.lower() if voice_traits else ""
     is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
@@ -198,7 +198,7 @@ def _voice_preset_for_character(character, voice_map, voice_traits=""):
         label = "unknown-gender"
 
     pool = intl_pool if (use_intl and intl_pool) else en_pool
-    if not pool:  # safety net — should never happen with current preset lists
+    if not pool:  # safety net - should never happen with current preset lists
         pool = _BARK_VOICE_PRESETS
     preset = rng.choice(pool)
     _CHARACTER_VOICE_CACHE[character] = preset
@@ -217,7 +217,7 @@ def _clean_text_for_bark(text):
          [SFX:], [MUSIC:], === scene headers ===)
       2. Converts common parenthetical stage directions to Bark token equivalents
       3. Converts asterisk actions (*laughs*) to Bark tokens
-      4. Preserves ♪ music notation (Bark renders humming/singing)
+      4. Preserves - music notation (Bark renders humming/singing)
       5. Preserves valid Bark non-verbal tokens already in the text
       6. Strips any remaining unrecognized square-bracket tags
       7. Collapses whitespace
@@ -236,22 +236,22 @@ def _clean_text_for_bark(text):
       [groans]        pain or frustration groan
       [whistles]      whistle
       [sneezes]       sneeze
-    ♪ text ♪         sung / hummed phrase
+    - text -         sung / hummed phrase
 
     Tokens NOT supported by Bark (will be spoken as words, so strip them):
-      [whispers] [shouts] [nervously] [quietly] — these get cleaned.
+      [whispers] [shouts] [nervously] [quietly] - these get cleaned.
     """
     import re
 
-    # ── Step 1: Strip structural / non-Bark tags ─────────────────────────────
+    # -- Step 1: Strip structural / non-Bark tags -----------------------------
     # [VOICE: ...] tags (catch any that slipped through the parser)
     text = re.sub(r'\[VOICE:[^\]]*\]', '', text, flags=re.IGNORECASE)
-    # [ENV: ...], [SFX: ...], [MUSIC: ...] — not TTS content
+    # [ENV: ...], [SFX: ...], [MUSIC: ...] - not TTS content
     text = re.sub(r'\[(?:ENV|SFX|MUSIC):[^\]]*\]', '', text, flags=re.IGNORECASE)
     # === SCENE ... === headers
     text = re.sub(r'===.*?===', '', text)
 
-    # ── Step 2: Parenthetical stage directions → Bark tokens ────────────────
+    # -- Step 2: Parenthetical stage directions - Bark tokens ----------------
     # e.g. (sighs), (nervous laugh), (clears throat), (whispers softly)
     _PAREN_TO_BARK = [
         # Exact / strong matches first (ordered by specificity)
@@ -275,7 +275,7 @@ def _clean_text_for_bark(text):
         ("moan",            "[groans]"),
         ("whistle",         "[whistles]"),
         ("sneeze",          "[sneezes]"),
-        # Unsupported but common — convert to nearest Bark equivalent
+        # Unsupported but common - convert to nearest Bark equivalent
         ("whisper",         ""),        # Bark can't whisper; drop the direction, tone stays
         ("quiet",           ""),
         ("soft",            ""),
@@ -293,11 +293,11 @@ def _clean_text_for_bark(text):
         for stem, token in _PAREN_TO_BARK:
             if stem in inner:
                 return (token + " ") if token else ""
-        return ""  # unknown direction — drop it
+        return ""  # unknown direction - drop it
 
     text = re.sub(r'\(([^)]{1,80})\)\s*', _translate_paren, text)
 
-    # ── Step 3: Asterisk actions → Bark tokens ───────────────────────────────
+    # -- Step 3: Asterisk actions - Bark tokens -------------------------------
     # e.g. *laughs* *sighs deeply*
     _ASTERISK_TO_BARK = [
         ("laugh",   "[laughs]"),
@@ -314,12 +314,12 @@ def _clean_text_for_bark(text):
         for stem, token in _ASTERISK_TO_BARK:
             if stem in inner:
                 return token + " "
-        return ""  # unknown action — drop
+        return ""  # unknown action - drop
 
     text = re.sub(r'\*([^*]{1,60})\*', _translate_asterisk, text)
 
-    # ── Step 4: Strip remaining unrecognized square-bracket tags ─────────────
-    # Bark speaks unrecognized bracket content as literal words — bad.
+    # -- Step 4: Strip remaining unrecognized square-bracket tags -------------
+    # Bark speaks unrecognized bracket content as literal words - bad.
     # Whitelist the known-good tokens and drop everything else.
     _BARK_VALID_TOKENS = {
         "[laughter]", "[laughs]", "[sighs]", "[music]", "[gasps]",
@@ -337,7 +337,7 @@ def _clean_text_for_bark(text):
 
     text = re.sub(r'\[[^\]]{1,40}\]', _filter_bracket_tag, text)
 
-    # ── Step 5: Force pure ASCII English ────────────────────────────────────
+    # -- Step 5: Force pure ASCII English ------------------------------------
     # Non-ASCII characters (accented letters, foreign scripts, smart quotes)
     # can trigger Bark's language detection to lock into a foreign language
     # when using international presets (v2/fr_*, v2/de_*, etc.).
@@ -350,12 +350,12 @@ def _clean_text_for_bark(text):
         if ord(ch) < 128:
             cleaned.append(ch)
         elif unicodedata.category(ch).startswith("M"):
-            pass  # combining marks — drop after NFKD decomposition
+            pass  # combining marks - drop after NFKD decomposition
         else:
             cleaned.append("")  # drop non-ASCII entirely
     text = "".join(cleaned)
 
-    # ── Step 6: Normalize whitespace ─────────────────────────────────────────
+    # -- Step 6: Normalize whitespace -----------------------------------------
     text = re.sub(r'  +', ' ', text).strip()
     return text
 
@@ -387,14 +387,14 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     is_first_line=True activates two hallucination guards for the opening line
     of each voice preset:
 
-      1. Prepend ``[clears throat]`` — a valid Bark non-verbal token that forces
+      1. Prepend ``[clears throat]`` - a valid Bark non-verbal token that forces
          the model into "about to read text" mode before the dialogue starts.
          Without this anchor, Bark's training data (saturated with podcast/YouTube
          intros that match authoritative male speaker_0) causes the model to
          autocomplete with phrases like "click the link in the description"
          instead of reading the actual script.
 
-      2. Temperature floor of 0.6 — reduces randomness on the first line so the
+      2. Temperature floor of 0.6 - reduces randomness on the first line so the
          model commits to the text rather than hallucinating continuations.
          Subsequent lines in the same preset keep the user-set temperature.
     """
@@ -402,7 +402,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
     if not text:
         return np.zeros(2400, dtype=np.float32), 24000
 
-    # ── Language drift guard for international presets ────────────────────
+    # -- Language drift guard for international presets --------------------
     # Foreign presets (de, fr, es, etc.) are probabilistically biased toward
     # their native language. Cap temperature to 0.55 to keep Bark committed
     # to the English text rather than drifting into the preset's language.
@@ -412,7 +412,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 
     if is_first_line:
         # Anchor the model before the first dialogue line of each preset.
-        # [clears throat] is in Bark's supported token whitelist — it renders
+        # [clears throat] is in Bark's supported token whitelist - it renders
         # as a brief audible cue (~0.15s) and resets the generation context
         # away from "podcast opener" toward "radio drama performance".
         text = f"[clears throat] {text}"
@@ -425,7 +425,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 
     for chunk in chunks:
         inputs = processor(chunk, voice_preset=voice_preset)
-        # Recursively move ALL processor outputs to CUDA — including the
+        # Recursively move ALL processor outputs to CUDA - including the
         # nested 'history_prompt' dict that contains semantic/coarse/fine
         # numpy arrays from the voice preset NPZ file.
         inputs = _move_to_device(inputs, torch.device("cuda"))
@@ -439,7 +439,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
         # Bark's internal sub-model loops call these without a device argument,
         # which defaults to CPU and causes the index_select device mismatch.
         # Context managers and set_default_device don't reach inside Bark's
-        # C-level ops — patching the Python functions is the only reliable fix.
+        # C-level ops - patching the Python functions is the only reliable fix.
         _orig_tensor = torch.tensor
         _orig_arange = torch.arange
         def _tensor_cuda(*args, **kwargs):
@@ -507,15 +507,15 @@ class BatchBarkGenerator:
 
     def generate_batch(self, script_json, production_plan_json, temperature=0.7):
 
-        # 🚿 MANDATORY VRAM POWER WASH (Clean slate before start)
+        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
         force_vram_offload()
 
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
         plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json
         voice_map = plan.get("voice_assignments", {})
 
-        # ── Step 1: Extract all dialogue lines with their script index ────
-        # ANNOUNCER lines are intentionally skipped — they are rendered by the
+        # -- Step 1: Extract all dialogue lines with their script index ----
+        # ANNOUNCER lines are intentionally skipped - they are rendered by the
         # dedicated KokoroAnnouncer node on a separate bus. Keeping them out
         # of the Bark pool eliminates Bark's "ums" and "ahs" from the
         # broadcast-ready opening and closing bookends.
@@ -539,14 +539,14 @@ class BatchBarkGenerator:
 
         total_lines = len(dialogue_items)
         log.info("[BatchBark] Found %d dialogue lines in Canonical 1.0 format "
-                 "(skipped %d ANNOUNCER lines — routed to Kokoro bus)",
+                 "(skipped %d ANNOUNCER lines - routed to Kokoro bus)",
                  total_lines, skipped_announcer)
 
         if total_lines == 0:
             empty = {"waveform": torch.zeros(1, 1, 2400), "sample_rate": 24000}
             return (empty, "No dialogue lines found")
 
-        # ── Step 2: Free Gemma4 VRAM — Bark needs GPU headroom ────────────
+        # -- Step 2: Free Gemma4 VRAM - Bark needs GPU headroom ------------
         try:
             from .story_orchestrator import _unload_llm
             _unload_llm()
@@ -554,7 +554,7 @@ class BatchBarkGenerator:
         except Exception:
             pass
 
-        # ── Step 3: Group by voice preset for efficient generation ────────
+        # -- Step 3: Group by voice preset for efficient generation --------
         # Same preset = same speaker embeddings loaded = no thrashing
         from collections import OrderedDict
         preset_groups = OrderedDict()
@@ -568,11 +568,11 @@ class BatchBarkGenerator:
                  len(preset_groups),
                  ", ".join(f"{k}({len(v)} lines)" for k, v in preset_groups.items()))
 
-        # ── Step 4: Load Bark once, generate all lines per preset ─────────
+        # -- Step 4: Load Bark once, generate all lines per preset ---------
         from .bark_tts import _load_bark
         model, processor = _load_bark("suno/bark")
 
-        # Results dict: script_idx → (audio_np, sample_rate)
+        # Results dict: script_idx - (audio_np, sample_rate)
         results = {}
         batch_log = []
         generated = 0
@@ -603,7 +603,7 @@ class BatchBarkGenerator:
                 is_first = preset not in _presets_started
                 if is_first:
                     _presets_started.add(preset)
-                    log.info("[BatchBark] First line for preset %s — activating "
+                    log.info("[BatchBark] First line for preset %s - activating "
                              "hallucination guard ([clears throat] + temp floor 0.6)",
                              preset)
 
@@ -627,7 +627,7 @@ class BatchBarkGenerator:
 
                 except Exception as e:
                     log.warning("[BatchBark] Failed [%d] %s: %s", idx, character_name, e)
-                    batch_log.append(f"  [{idx}] {character_name}: FAILED — {e}")
+                    batch_log.append(f"  [{idx}] {character_name}: FAILED - {e}")
                     # Silence placeholder
                     word_count = len(line.split())
                     est_dur = max(1.0, word_count / 2.5)
@@ -636,7 +636,7 @@ class BatchBarkGenerator:
         log.info("[BatchBark] Generated %d/%d lines", generated, total_lines)
         batch_log.append(f"\n--- Generated: {generated}/{total_lines} lines ---")
 
-        # ── Step 5: Assemble into batched AUDIO tensor (script order) ─────
+        # -- Step 5: Assemble into batched AUDIO tensor (script order) -----
         # Use pad_sequence on GPU for vectorized zero-padding instead of
         # Python loops + numpy.pad. SceneSequencer's _extract_clips already
         # handles trim_trailing_silence on the receiving end.
@@ -646,7 +646,7 @@ class BatchBarkGenerator:
         ordered_clips = []
         for item in dialogue_items:
             audio_np, sr = results[item["script_idx"]]
-            # Convert to GPU tensor once — pad_sequence runs on device of inputs
+            # Convert to GPU tensor once - pad_sequence runs on device of inputs
             clip_t = torch.from_numpy(audio_np).float()
             if torch.cuda.is_available():
                 clip_t = clip_t.cuda()

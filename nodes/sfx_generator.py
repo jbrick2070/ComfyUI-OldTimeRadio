@@ -1,5 +1,5 @@
 r"""
-SFX Generator — Sound Effects via Procedural Synthesis
+SFX Generator - Sound Effects via Procedural Synthesis
 ========================================================
 
 Generates common radio drama sound effects without requiring an external model
@@ -74,10 +74,10 @@ def _generate_noise(duration_sec, sample_rate, color="white"):
     return white * 0.3
 
 
-# ─── SFX LIBRARY ─────────────────────────────────────────────────────────────
+# --- SFX LIBRARY -------------------------------------------------------------
 
 def _sfx_radio_tuning(duration_sec, sample_rate):
-    """Radio dial tuning — sweeping frequencies with static bursts."""
+    """Radio dial tuning - sweeping frequencies with static bursts."""
     t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), dtype=np.float32)
     freq_sweep = 400 + 800 * np.sin(2 * np.pi * 0.5 * t)
     signal = np.sin(2 * np.pi * freq_sweep * t / sample_rate * np.cumsum(np.ones_like(t))) * 0.3
@@ -88,7 +88,7 @@ def _sfx_radio_tuning(duration_sec, sample_rate):
 
 
 def _sfx_sci_fi_beep(duration_sec, sample_rate):
-    """Sci-fi computer beep sequence — layered tones with digital character."""
+    """Sci-fi computer beep sequence - layered tones with digital character."""
     t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), dtype=np.float32)
     n = len(t)
 
@@ -103,7 +103,7 @@ def _sfx_sci_fi_beep(duration_sec, sample_rate):
 
 
 def _sfx_theremin(duration_sec, sample_rate):
-    """Theremin-like sci-fi warble — the sound of 1950s sci-fi."""
+    """Theremin-like sci-fi warble - the sound of 1950s sci-fi."""
     t = np.linspace(0, duration_sec, int(sample_rate * duration_sec), dtype=np.float32)
     # Vibrato + portamento
     freq = 440 + 200 * np.sin(2 * np.pi * 5 * t) + 100 * np.sin(2 * np.pi * 0.3 * t)
@@ -118,7 +118,7 @@ def _sfx_theremin(duration_sec, sample_rate):
 
 
 def _sfx_explosion(duration_sec, sample_rate):
-    """Distant explosion — noise burst with exponential decay."""
+    """Distant explosion - noise burst with exponential decay."""
     n = int(sample_rate * duration_sec)
     noise = np.random.randn(n).astype(np.float32)
     # Exponential decay
@@ -137,7 +137,7 @@ def _sfx_explosion(duration_sec, sample_rate):
 
 
 def _sfx_footsteps(duration_sec, sample_rate):
-    """Footsteps — regular impulse clicks with resonance."""
+    """Footsteps - regular impulse clicks with resonance."""
     n = int(sample_rate * duration_sec)
     signal = np.zeros(n, dtype=np.float32)
     step_interval = int(sample_rate * 0.5)  # ~2 steps/sec
@@ -154,7 +154,7 @@ def _sfx_footsteps(duration_sec, sample_rate):
 
 
 def _sfx_heartbeat(duration_sec, sample_rate):
-    """Heartbeat — low-frequency thumps."""
+    """Heartbeat - low-frequency thumps."""
     n = int(sample_rate * duration_sec)
     t = np.linspace(0, duration_sec, n, dtype=np.float32)
     signal = np.zeros(n, dtype=np.float32)
@@ -193,7 +193,7 @@ def _sfx_door_knock(duration_sec, sample_rate):
 
 
 def _sfx_wind(duration_sec, sample_rate):
-    """Wind ambience — filtered noise with slow modulation."""
+    """Wind ambience - filtered noise with slow modulation."""
     n = int(sample_rate * duration_sec)
     noise = np.random.randn(n).astype(np.float32)
 
@@ -211,7 +211,7 @@ def _sfx_wind(duration_sec, sample_rate):
 
 
 def _sfx_siren(duration_sec, sample_rate):
-    """Air raid siren — sweeping frequency."""
+    """Air raid siren - sweeping frequency."""
     n = int(sample_rate * duration_sec)
     t = np.linspace(0, duration_sec, n, dtype=np.float32)
     freq = 400 + 300 * np.sin(2 * np.pi * 0.5 * t)
@@ -220,7 +220,7 @@ def _sfx_siren(duration_sec, sample_rate):
 
 
 def _sfx_ticking_clock(duration_sec, sample_rate):
-    """Clock ticking — sharp clicks at regular intervals."""
+    """Clock ticking - sharp clicks at regular intervals."""
     n = int(sample_rate * duration_sec)
     signal = np.zeros(n, dtype=np.float32)
     tick_interval = int(sample_rate * 1.0)  # 1 tick/sec

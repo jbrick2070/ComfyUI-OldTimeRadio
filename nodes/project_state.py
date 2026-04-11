@@ -1,7 +1,7 @@
 """
 project_state.py
 
-Theme C / v1.4 — Project State JSON ("series bible").
+Theme C / v1.4 - Project State JSON ("series bible").
 
 Purpose
 -------
@@ -62,7 +62,7 @@ PROJECT_STATE_PATH = os.path.join(_REPO_ROOT, "project_state.json")
 
 
 # ---------------------------------------------------------------------------
-# Default state — used when no project_state.json exists yet.
+# Default state - used when no project_state.json exists yet.
 # ---------------------------------------------------------------------------
 
 def _default_state_dict() -> Dict[str, Any]:
@@ -159,7 +159,7 @@ class ProjectState:
         return target
 
     # ------------------------------------------------------------------
-    # Prompt helpers — used by Gemma4ScriptWriter / Gemma4Director
+    # Prompt helpers - used by Gemma4ScriptWriter / Gemma4Director
     # ------------------------------------------------------------------
 
     def prompt_preamble(self) -> str:

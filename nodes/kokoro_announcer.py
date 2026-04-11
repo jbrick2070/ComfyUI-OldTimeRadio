@@ -1,10 +1,10 @@
 """
-Kokoro Announcer — dedicated non-Bark narrator bus.
+Kokoro Announcer - dedicated non-Bark narrator bus.
 
 Routes every ANNOUNCER dialogue line in the script to Kokoro v1.0 instead of
 Bark, eliminating Bark's "ums" and "ahs" and restroom-reverb throat clears
 from the "Voice of God" bookends. Kokoro is clean, broadcast-ready, and costs
-about 1.5 GB VRAM — well inside our 14.5 GB real-world ceiling.
+about 1.5 GB VRAM - well inside our 14.5 GB real-world ceiling.
 
 Design notes (see ROADMAP v1.4 Theme A):
   - Picks ONE British voice per episode from a curated grab bag of 4
@@ -13,12 +13,12 @@ Design notes (see ROADMAP v1.4 Theme A):
   - Lazy-imports `kokoro` and `KPipeline` so a missing install does not
     break the rest of the OTR node load.
   - Voice .pt files are pulled on demand from 1038lab/KokoroTTS via
-    huggingface_hub — the grab-bag only needs 4 files total (~12 MB).
+    huggingface_hub - the grab-bag only needs 4 files total (~12 MB).
   - Output is a batched AUDIO tensor in script order (ANNOUNCER lines only),
     which SceneSequencer consumes via a separate announcer_clip_idx counter.
     Non-announcer dialogue still flows through BatchBark as before.
 
-Jeffrey Brick — v1.4 Theme A
+Jeffrey Brick - v1.4 Theme A
 """
 
 import logging
@@ -32,7 +32,7 @@ log = logging.getLogger("OTR")
 
 
 # British grab bag, 2 male + 2 female, BBC authoritative + documentary relaxed.
-# Keep this list small and intentional — the whole point is a clean, curated
+# Keep this list small and intentional - the whole point is a clean, curated
 # announcer pool instead of sharing Bark's 10-preset crowd.
 ANNOUNCER_VOICE_POOL = [
     "bm_george",   # BBC authoritative male
@@ -114,7 +114,7 @@ def _extract_announcer_lines(script) -> list:
 
 
 class KokoroAnnouncer:
-    """OTR v1.4 — dedicated Kokoro-based ANNOUNCER bus.
+    """OTR v1.4 - dedicated Kokoro-based ANNOUNCER bus.
 
     Reads the script JSON, extracts ANNOUNCER lines only, renders them with
     Kokoro v1.0 (British voice, seeded grab bag), and emits a batched AUDIO
@@ -180,7 +180,7 @@ class KokoroAnnouncer:
                 "sample_rate": KOKORO_SAMPLE_RATE,
             }
             return (empty,
-                    "kokoro package not installed — run: pip install kokoro",
+                    "kokoro package not installed - run: pip install kokoro",
                     voice_id)
 
         try:
@@ -263,4 +263,4 @@ class KokoroAnnouncer:
 
 
 NODE_CLASS_MAPPINGS = {"KokoroAnnouncer": KokoroAnnouncer}
-NODE_DISPLAY_NAME_MAPPINGS = {"KokoroAnnouncer": "🎙️ Kokoro Announcer"}
+NODE_DISPLAY_NAME_MAPPINGS = {"KokoroAnnouncer": "[EMOJI]- Kokoro Announcer"}

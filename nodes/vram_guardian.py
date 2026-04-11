@@ -1,5 +1,5 @@
 """
-OTR_VRAMGuardian — Explicit VRAM flush node for workflow graphs.
+OTR_VRAMGuardian - Explicit VRAM flush node for workflow graphs.
 ================================================================
 
 Wraps the existing `force_vram_offload()` infrastructure from `_vram_log.py`
@@ -14,7 +14,7 @@ Design:
     the actual reclaim.
   - Zero VRAM footprint. The node itself is pure Python orchestration.
 
-v1.5 Phase 1 — Jeffrey Brick
+v1.5 Phase 1 - Jeffrey Brick
 """
 
 import logging
@@ -66,4 +66,4 @@ class VRAMGuardian:
 
 
 NODE_CLASS_MAPPINGS = {"OTR_VRAMGuardian": VRAMGuardian}
-NODE_DISPLAY_NAME_MAPPINGS = {"OTR_VRAMGuardian": "🛡️ VRAM Guardian"}
+NODE_DISPLAY_NAME_MAPPINGS = {"OTR_VRAMGuardian": "[EMOJI]- VRAM Guardian"}
