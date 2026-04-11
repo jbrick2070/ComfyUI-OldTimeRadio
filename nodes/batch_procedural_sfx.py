@@ -1,5 +1,5 @@
 """
-Batch Procedural SFX — lightweight, zero-VRAM Foley for "Signal Lost".
+Batch Procedural SFX - lightweight, zero-VRAM Foley for "Signal Lost".
 =====================================================================
 
 Designed for the Obsidian Edition (4GB VRAM). Mirroring the BatchAudioGen
@@ -7,7 +7,7 @@ logic, this node parses the script and generates SFX cues, but uses the
 existing procedural synthesis engine (math-based) instead of a generative 
 model.
 
-v1.5 AudioGen Integration — Jeffrey Brick
+v1.5 AudioGen Integration - Jeffrey Brick
 """
 
 import json
@@ -118,4 +118,4 @@ class BatchProceduralSFX:
         return ({"waveform": batched_waveform, "sample_rate": SAMPLE_RATE}, "\n".join(batch_log))
 
 NODE_CLASS_MAPPINGS = {"OTR_BatchProceduralSFX": BatchProceduralSFX}
-NODE_DISPLAY_NAME_MAPPINGS = {"OTR_BatchProceduralSFX": "⚡ Batch Procedural SFX (Obsidian)"}
+NODE_DISPLAY_NAME_MAPPINGS = {"OTR_BatchProceduralSFX": "[FAST] Batch Procedural SFX (Obsidian)"}

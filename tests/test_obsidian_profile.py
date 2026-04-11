@@ -78,6 +78,7 @@ def test_pro_profile_respects_flags():
                             genre_flavor="scifi",
                             runtime_preset="🧪 test (1 min)",
                             target_minutes=1,
+                            target_length="short (3 acts)",
                             num_characters=2,
                             self_critique=True,
                             open_close=False, # We'll skip OC for this test to keep it simple
