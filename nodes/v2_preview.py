@@ -763,9 +763,9 @@ class ProductionBus:
                     "tooltip": "Log from VisualCompositor for diagnostics",
                 }),
                 "output_subdir": ("STRING", {
-                    "default": "",
+                    "default": "old_time_radio",
                     "tooltip": "Subdirectory under ComfyUI output root. "
-                               "Empty = write to output root. e.g. 'otr_v2' -> output/otr_v2/",
+                               "Default 'old_time_radio' -> output/old_time_radio/. Empty = write to output root.",
                 }),
                 "debug_vram_snapshots": ("BOOLEAN", {
                     "default": False,
@@ -779,7 +779,7 @@ class ProductionBus:
                  fps=24, output_name="otr_v2_episode",
                  preview_mode="keyframes", encoding_profile="preview",
                  composited_frames=None, episode_audio=None,
-                 compositor_log=None, output_subdir="",
+                 compositor_log=None, output_subdir="old_time_radio",
                  debug_vram_snapshots=False):
 
         import subprocess
