@@ -12,7 +12,7 @@ Coverage:
   - AudioContract (waveform shape/dtype/rate — requires torch)
   - SceneSequencer (clip wiring, resampling, silence trim — requires torch)
   - VintageRadioFilter (all presets — requires torch)
-  - WorkflowJSON  (both full + lite: integrity, node IDs, links, parity)
+  - WorkflowJSON  (full: integrity, node IDs, links, parity)
   - AudioBatcher  (batch/pad/unpack — requires torch)
 
 Run in ComfyUI venv for full coverage:
@@ -483,7 +483,7 @@ class TestWorkflowJSONFull:
 
     @pytest.fixture(scope="class")
     def wf(self):
-        return _load_workflow("old_time_radio_scifi_full.json")
+        return _load_workflow("otr_scifi_16gb_full.json")
 
     def test_required_keys(self, wf):
         for k in ["nodes", "links", "last_node_id", "last_link_id"]:
@@ -543,7 +543,7 @@ class TestWorkflowJSONLite:
 
     @pytest.fixture(scope="class")
     def wf(self):
-        return _load_workflow("old_time_radio_scifi_lite.json")
+        return _load_workflow("otr_scifi_16gb_lite.json")
 
     def test_required_keys(self, wf):
         for k in ["nodes", "links", "last_node_id", "last_link_id"]:
@@ -587,8 +587,8 @@ class TestWorkflowJSONLite:
         assert not (required - types), f"Missing in lite: {required - types}"
 
     def test_lite_otr_nodes_match_full(self):
-        lite = _load_workflow("old_time_radio_scifi_lite.json")
-        full = _load_workflow("old_time_radio_scifi_full.json")
+        lite = _load_workflow("otr_scifi_16gb_lite.json")
+        full = _load_workflow("otr_scifi_16gb_full.json")
         lite_otr = {n["type"] for n in lite["nodes"] if n["type"].startswith("OTR_")}
         full_otr = {n["type"] for n in full["nodes"] if n["type"].startswith("OTR_")}
         assert lite_otr == full_otr, (
@@ -673,9 +673,240 @@ class TestSilenceTrimming:
         assert len(t) < 55000
         assert len(t) > 47000
 
+
     def test_all_silence_returns_min_samples(self):
         from nodes.scene_sequencer import _trim_trailing_silence
         t = _trim_trailing_silence(np.zeros(48000, dtype=np.float32), threshold=1e-4)
         assert len(t) == 100
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 13. VRAM GUARDIAN NODE — v1.5 Phase 1
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestVRAMGuardianNode:
+    """Verify OTR_VRAMGuardian node is importable and structurally correct."""
+
+    def test_import(self):
+        from nodes.vram_guardian import VRAMGuardian
+        assert VRAMGuardian is not None
+
+    def test_category(self):
+        from nodes.vram_guardian import VRAMGuardian
+        assert VRAMGuardian.CATEGORY == "OldTimeRadio"
+
+    def test_function_name(self):
+        from nodes.vram_guardian import VRAMGuardian
+        assert VRAMGuardian.FUNCTION == "flush"
+
+    def test_return_types(self):
+        from nodes.vram_guardian import VRAMGuardian
+        assert VRAMGuardian.RETURN_TYPES == ("STRING",)
+
+    def test_input_types_valid(self):
+        from nodes.vram_guardian import VRAMGuardian
+        inputs = VRAMGuardian.INPUT_TYPES()
+        assert "required" in inputs
+        assert "optional" in inputs
+        assert "trigger" in inputs["optional"]
+
+    @requires_torch
+    def test_passthrough_returns_input(self):
+        from nodes.vram_guardian import VRAMGuardian
+        node = VRAMGuardian()
+        result = node.flush(trigger="test_value")
+        assert result == ("test_value",)
+
+    @requires_torch
+    def test_passthrough_empty_default(self):
+        from nodes.vram_guardian import VRAMGuardian
+        node = VRAMGuardian()
+        result = node.flush()
+        assert result == ("",)
+
+    def test_registered_in_init(self):
+        """VRAMGuardian must be in __init__.py NODE_CLASS_MAPPINGS."""
+        init_path = os.path.join(os.path.dirname(__file__), "..", "__init__.py")
+        with open(init_path, encoding="utf-8") as f:
+            src = f.read()
+        assert "OTR_VRAMGuardian" in src
+        assert "vram_guardian" in src
+
+    def test_node_class_mappings(self):
+        from nodes.vram_guardian import NODE_CLASS_MAPPINGS
+        assert "OTR_VRAMGuardian" in NODE_CLASS_MAPPINGS
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 14. PARSER v5 — SFX EXTRACTION TESTS (v1.5 Phase 1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestParserV5SFXExtraction:
+    """Verify SFX cues are emitted as {"type": "sfx"} items by _parse_script."""
+
+    def test_sfx_has_description_field(self, parser):
+        result = parser._parse_script("[SFX: heavy metal clang]\n[VOICE: DUMMY, male, 30s] ok.")
+        sfx_items = [r for r in result if r["type"] == "sfx"]
+        assert len(sfx_items) == 1
+        assert "description" in sfx_items[0]
+        assert "metal clang" in sfx_items[0]["description"]
+
+    def test_multiple_sfx_preserved_in_order(self, parser):
+        script = "\n".join([
+            "[SFX: door slam]",
+            "[VOICE: A, male, 30s] Hello.",
+            "[SFX: glass breaking]",
+            "[VOICE: B, female, 30s] Watch out.",
+            "[SFX: alarm siren]",
+        ])
+        result = parser._parse_script(script)
+        sfx_items = [r for r in result if r["type"] == "sfx"]
+        assert len(sfx_items) == 3
+        assert sfx_items[0]["description"] == "door slam"
+        assert sfx_items[1]["description"] == "glass breaking"
+        assert sfx_items[2]["description"] == "alarm siren"
+
+    def test_sfx_interleaved_with_dialogue(self, parser):
+        """SFX items should appear at the correct positions in the output list."""
+        script = "[VOICE: A, male, 30s] First.\n[SFX: footsteps]\n[VOICE: A, male, 30s] Second."
+        result = parser._parse_script(script)
+        types = [r["type"] for r in result]
+        # Find the sfx position — should be between the two dialogue items
+        sfx_idx = types.index("sfx")
+        dialogue_indices = [i for i, t in enumerate(types) if t == "dialogue"]
+        assert sfx_idx > dialogue_indices[0]
+
+    def test_sfx_with_complex_description(self, parser):
+        result = parser._parse_script(
+            "[SFX: distant thunder rolling behind heavy rain, cinematic]\n"
+            "[VOICE: DUMMY, male, 30s] ok."
+        )
+        sfx_items = [r for r in result if r["type"] == "sfx"]
+        assert len(sfx_items) == 1
+        assert "thunder" in sfx_items[0]["description"]
+        assert "rain" in sfx_items[0]["description"]
+
+    def test_sfx_case_insensitive_extraction(self, parser):
+        """All case variants of [SFX:] should produce type=sfx items."""
+        for tag in ["[SFX: beep]", "[sfx: beep]", "[Sfx: beep]"]:
+            result = parser._parse_script(f"{tag}\n[VOICE: DUMMY, male, 30s] ok.")
+            sfx_items = [r for r in result if r["type"] == "sfx"]
+            assert len(sfx_items) == 1, f"Failed for tag: {tag}"
+
+    def test_sfx_in_full_scene(self, parser):
+        """SFX cues in a full canonical scene should be preserved."""
+        script = """=== SCENE 1 ===
+[ENV: dark corridor, dripping water]
+[SFX: heavy door creaking open]
+[VOICE: HAYES, male, 40s, tense, medium] Did you hear that?
+(beat)
+[SFX: footsteps echoing]
+[VOICE: DR_CHEN, female, 40s, calm, low] Just the pipes.
+[SFX: distant alarm]
+=== SCENE 2 ===
+[VOICE: ANNOUNCER, male, 50s, calm] And so it continues.
+"""
+        result = parser._parse_script(script)
+        sfx_items = [r for r in result if r["type"] == "sfx"]
+        assert len(sfx_items) == 3
+        assert sfx_items[0]["description"] == "heavy door creaking open"
+        assert sfx_items[1]["description"] == "footsteps echoing"
+        assert sfx_items[2]["description"] == "distant alarm"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 15. AUDIOGEN CANONICAL SFX CONSUMPTION (v1.5 Phase 1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestAudioGenCanonicalSFX:
+    """Verify BatchAudioGenGenerator consumes canonical parser SFX items."""
+
+    def test_audiogen_no_regex_import(self):
+        """AudioGen should NOT use its own SFX regex anymore."""
+        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        # The old duplicate regex pattern should be gone
+        assert "re.findall(r'\\[SFX:" not in src, (
+            "AudioGen still contains duplicate SFX regex. "
+            "It should consume canonical parser output instead."
+        )
+
+    def test_audiogen_reads_type_sfx(self):
+        """AudioGen source should reference type == sfx for extraction."""
+        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        assert '"type"' in src and '"sfx"' in src, (
+            "AudioGen should filter script items by type == sfx"
+        )
+
+    def test_audiogen_reads_description_field(self):
+        """AudioGen source should read the 'description' field from SFX items."""
+        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        assert '"description"' in src, (
+            "AudioGen should read the 'description' field from canonical SFX items"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 16. PARSER V3/V4 PATTERN REGRESSION (v1.5 Phase 1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestParserV3V4Patterns:
+    """Regression tests for the post-v1.4 parser patterns."""
+
+    def test_v3_next_line_dialogue(self, parser):
+        """v3: [VOICE: NAME, traits] on one line, dialogue on next."""
+        script = "[VOICE: HAYES, male, 40s, tense, medium]\nDid you hear that?"
+        result = parser._parse_script(script)
+        dialogues = [r for r in result if r["type"] == "dialogue"]
+        assert len(dialogues) >= 1
+        assert dialogues[0]["character_name"] == "HAYES"
+        assert "Did you hear that?" in dialogues[0]["line"]
+
+    def test_v4_shorthand_tag(self, parser):
+        """v4: [ANNOUNCER, traits] shorthand without VOICE: prefix."""
+        script = "[ANNOUNCER, male, 50s, calm]\nWelcome to Signal Lost."
+        result = parser._parse_script(script)
+        dialogues = [r for r in result if r["type"] == "dialogue"]
+        assert len(dialogues) >= 1
+        assert dialogues[0]["character_name"] == "ANNOUNCER"
+
+    def test_v3_next_line_skips_empty_lines(self, parser):
+        """v3 lookahead should skip blank lines between tag and dialogue."""
+        script = "[VOICE: CHEN, female, 40s, calm]\n\n\nThe readings are stable."
+        result = parser._parse_script(script)
+        dialogues = [r for r in result if r["type"] == "dialogue"]
+        assert len(dialogues) >= 1
+        assert dialogues[0]["character_name"] == "CHEN"
+
+    def test_stage_direction_blocklist(self, parser):
+        """ACT, SCENE, CONTINUED in v3/v4 position should NOT create dialogue."""
+        for tag in ["[ACT 1]", "[SCENE 3]", "[CONTINUED]"]:
+            script = f"{tag}\nSome text.\n[VOICE: DUMMY, male, 30s] ok."
+            result = parser._parse_script(script)
+            dialogues = [r for r in result if r["type"] == "dialogue"]
+            # None of the blocklisted tags should produce dialogue with that name
+            for d in dialogues:
+                assert d["character_name"] not in ("ACT", "SCENE", "CONTINUED"), (
+                    f"Blocklisted tag {tag} created dialogue with name {d['character_name']}"
+                )
+
+    def test_markdown_bold_stripped(self, parser):
+        """Parser should strip **bold** markers from voice tags."""
+        script = "**[VOICE: HAYES, male, 40s, calm, low]** The readings are in."
+        result = parser._parse_script(script)
+        dialogues = [r for r in result if r["type"] == "dialogue"]
+        assert len(dialogues) >= 1
+        assert dialogues[0]["character_name"] == "HAYES"
+
+    def test_v2_no_traits_inline(self, parser):
+        """v2: [VOICE: NAME] dialogue — no traits specified."""
+        result = parser._parse_script("[VOICE: COMMANDER] All units stand down.")
+        dialogues = [r for r in result if r["type"] == "dialogue"]
+        assert len(dialogues) >= 1
+        assert dialogues[0]["character_name"] == "COMMANDER"
+        assert "stand down" in dialogues[0]["line"]

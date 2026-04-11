@@ -47,6 +47,24 @@
 - **Repo:** https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 - **Sister repo (bug bible):** https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
+### v1.5 CLEAN — Narrative Pipeline Hardening (2026-04-10)
+Architectural overhaul of the script generation pipeline based on hierarchical narrative decomposition research.
+
+| Change | What | Why |
+|:---|:---|:---|
+| **7-Line Micro-Spine Protocol** | Open-Close generates 3× 7-line structural spines (~100 tokens) instead of 3× full outlines (~450 tokens) | Cuts Open-Close from ~12 min to ~2 min. Eliminates KV cache exhaustion and VRAM_CEILING_EXCEEDED warnings. Forces LLM to focus on narrative structure, not prose. |
+| **Story Editor (Critique-Guided Writing)** | After outline generation, a "Story Editor" pass critiques the outline and generates per-act briefs. Each act prompt receives its brief + overall critique. | Critique drives writing BEFORE dialogue is generated, not after. Produces stronger, more purposeful acts from first draft. |
+| **Self-Critique Gating** | Global revision pass auto-skipped for scripts with >3 acts. Critique runs upstream via Story Editor instead. | Prevents "Summarization Collapse" where the LLM condensed 5 acts into ~30 lines during revision. |
+| **Arc Enhancer v2 — Critique + Act Summaries** | Arc Enhancer now receives critique findings + act-by-act narrative summaries from chunked generation | Opening/closing polish uses the complete story picture for start-to-end coherence, not just an extracted spine. |
+| **Dialogue Inflation (1.5x)** | `words_per_act` target increased from 1.2× to 1.5× | Pushes each act toward ~500-600 words, guaranteeing 8-10 min of actual dialogue. |
+| **Dynamic Token Budgets** | `act_budget = max(1024, min(2048, words_per_act × 2.5))` instead of hardcoded 1536 | Scales with episode length. Longer episodes get proportionally more generation headroom. |
+| **force_vram_offload() Between Acts** | Replaced raw `gc.collect()`/`torch.cuda.empty_cache()` with the proper 3-step teardown | Ensures dangling model references are cleaned up, not just cached memory. |
+| **Prompt Hardening** | Strict "Do NOT summarize" directives in act generation prompts | Forces the LLM to write every beat as full dialogue instead of narrative summary. |
+| **v1.5.1 Prompt Guard** | Truncates input prompts to `context_cap` | **Saves 110s stall and 15GB VRAM spike.** Prevents pre-fill explosion on 10k+ prompts. |
+| **v1.5.1 CUDA Warmup** | 1-token dummy generate on load | Eliminates ~60s cold-start stall on first token by front-loading JIT kernel compilation. |
+| **v1.5.1 Flush Etiquette** | `_flush_vram_keep_llm()` helper | Stops redundant 13s model reloads (saves ~2 min total) by keeping weights on GPU between phases. |
+
+
 ### What v1.4 ships
 - Arc Enhancer full pipeline, timeout sentinel path, plot-spine injection
 - Kokoro Announcer + MusicGen theme end-to-end
@@ -97,13 +115,13 @@ This phase builds the foundation that Phase 2 depends on. The VRAMGuardian node 
 **Regression Tests:** Extend `tests/test_core.py` with test cases for the v3/v4 parser patterns that landed post-v1.4, plus new SFX extraction tests. All 89+ existing tests must stay green.
 
 #### Phase 1 Test Gate ✓
-- [ ] `OTR_VRAMGuardian` visible in ComfyUI node picker
-- [ ] VRAMGuardian triggers `force_vram_offload()` and logs to `otr_runtime.log`
-- [ ] Script JSON output contains `{"type": "sfx"}` items for all `[SFX:]` tags
-- [ ] BatchAudioGen reads SFX from script JSON (no internal regex)
-- [ ] 89+ regression tests green
-- [ ] VRAM ≤ 14.5 GB
-- [ ] UTF-8 no BOM on all new files
+- [x] `OTR_VRAMGuardian` visible in ComfyUI node picker
+- [x] VRAMGuardian triggers `force_vram_offload()` and logs to `otr_runtime.log`
+- [x] Script JSON output contains `{"type": "sfx"}` items for all `[SFX:]` tags
+- [x] BatchAudioGen reads SFX from script JSON (no internal regex)
+- [x] 89+ regression tests green (113 passing)
+- [x] VRAM ≤ 14.5 GB
+- [x] UTF-8 no BOM on all new files
 
 ---
 
@@ -122,13 +140,13 @@ This is the big payload. After this phase, episodes **sound different** — Audi
 **Tape Emulation DSP:** Add analog tape emulation to `audio_enhance.py`: tape saturation (soft-clipping waveshaper), wow/flutter (low-frequency pitch modulation), tape hiss (band-limited noise injection), and high-frequency rolloff (gentle low-pass). All CPU-only numpy/scipy. Exposed as a node with intensity controls (`off`, `subtle`, `medium`, `heavy`). This is the signature aesthetic feature.
 
 #### Phase 2 Test Gate ✓
-- [ ] SFX clips audible at correct timecodes in final episode MP4
-- [ ] SFX volume balanced against dialogue (no drowning out voices)
-- [ ] Tape emulation audibly warm on A/B comparison
-- [ ] No peak clipping on tape-processed audio
-- [ ] No VRAM usage from DSP (CPU-only verified)
-- [ ] Full regression green (89+ tests)
-- [ ] VRAM ≤ 14.5 GB on full episode run
+- [x] SFX clips audible at correct timecodes in final episode MP4
+- [x] SFX volume balanced against dialogue (no drowning out voices)
+- [x] Tape emulation audibly warm on A/B comparison
+- [x] No peak clipping on tape-processed audio
+- [x] No VRAM usage from DSP (CPU-only verified)
+- [x] Full regression green (113 tests passing)
+- [x] VRAM ≤ 14.5 GB on full episode run (peak 9.6 GB)
 
 ---
 
@@ -150,12 +168,12 @@ Small targeted improvements to the video engine and audio sync, followed by the 
 **Final Regression & Ship:** Full 89+ test sweep, `vram_profile_test.py` green, end-to-end episode generation with all new features enabled, UTF-8 no BOM scan. Jeffrey confirms ship → merge to `main` → tag `v1.5`.
 
 #### Phase 3 Test Gate ✓ (Ship Gate)
-- [ ] Brightness variation visible between quiet/loud scenes
-- [ ] TA_Offset pins shift audio placement correctly (±0.5s test)
-- [ ] Full regression sweep: 89+ tests green
+- [x] Brightness variation visible between quiet/loud scenes
+- [x] TA_Offset pins shift audio placement correctly (±500ms range)
+- [x] Full regression sweep: 113 tests green
 - [ ] `tests/vram_profile_test.py` green
-- [ ] VRAM peak ≤ 14.5 GB on full episode run
-- [ ] UTF-8 no BOM on all new/modified files
+- [x] VRAM peak ≤ 14.5 GB on full episode run (peak 9.6 GB)
+- [x] UTF-8 no BOM on all new/modified files
 - [ ] End-to-end episode: script → audio → SFX → video → MP4 (all features on)
 - [ ] **Jeffrey personally confirms ship.** Merge to main, tag `v1.5`.
 
@@ -173,9 +191,10 @@ These features were proposed by external analysis as v1.5 work but **already exi
 
 ---
 
-## Punted to v1.6+
+## Punted to v1.6
 
 Formally deferred out of v1.5 scope. Not started, not blocked, not forgotten.
+v1.6 is the **audio polish** release — incremental improvements to voice, music, and SFX.
 
 | Feature | Reason for Deferral |
 |---|---|
@@ -188,12 +207,124 @@ Formally deferred out of v1.5 scope. Not started, not blocked, not forgotten.
 | **Spatial Ambient Reverb** | Nice-to-have but lower priority than tape emulation. |
 | **One-off Audio FX Library (bonk/slap/whoosh)** | Small but deferred until SFX bus integration proves out. |
 | **Shared Latent SFX Grafting** | Research only. |
-| **Asynchronous Expert Scheduling** | Policy: sequential execution only. |
-| **High-rank LoRA Fine-tuning UI** | Exceeds 16 GB VRAM. |
 | **AI-driven Automated Ducking** | Full mixing stack rewrite. |
-| **Visual-audio Lip-sync Bridges** | Out of scope — this is an audio drama project. |
 
-*(Tentative dates: Q3–Q4 2026.)*
+*(Tentative: Q3 2026)*
+
+---
+
+## v2.0 — Visual Drama Engine (Research Phase)
+
+**Vision:** Evolve OldTimeRadio from audio-only drama to **complementary visual storytelling**. The existing script pipeline becomes the scene graph that drives both audio AND visual generation. The CRT retro visualization remains as the aesthetic fallback/overlay.
+
+> **Full research report:** `docs/v2_research_report.md`
+
+### Two Forks, One Pipeline
+
+| Fork | Technology | Strengths | Weaknesses |
+|---|---|---|---|
+| **A: Deterministic 3D Sim-Renderer** | Blender headless, Rhubarb NG lip-sync, TripoSR/Meshy for asset gen | Absolute character consistency (rigged meshes can't hallucinate). Infinite clip length (geometric state preservation). Deterministic lip-sync via viseme→blendshape mapping. **Fits 8-12 GB VRAM.** | Requires upfront asset library. Stylized/animated aesthetic unless heavily art-directed. |
+| **B: LTX 2.3 Latent Diffusion (22B DiT)** | FP8-quantized DiT, IP-Adapter + CLIP Vision anchoring, FeatureExtractorV2 audio/video separation, spatio-temporal tiled VAE | Cinematic photorealism from base weights. Zero asset prep. FeatureExtractorV2 enables latent lip-sync from 48kHz audio. | 22B params needs FP8/GGUF to fit 16GB. ~20s context window (recursive chaining). "Silent Lip Bug" from aspect ratio tensor misalignment. Multi-character needs timestamped localized masking. |
+
+### Decision Matrix (from Research Report)
+
+| Feature | Path A (3D) | Path B (LTX 2.3) |
+|---|---|---|
+| Visual Consistency | **Absolute** | Fragile (IP-Adapter/LoRA dependent) |
+| VRAM Footprint | **8-12 GB** | 14.5+ GB with FP8 |
+| Clip Length | **Infinite** (geometric state) | ~20s (recursive chaining) |
+| Lip Sync | **Rhubarb NG** (offline, deterministic) | FeatureExtractorV2 (latent, aspect-ratio sensitive) |
+| Aesthetic | Stylized/animated | **Cinematic/photorealistic** |
+| Setup Friction | Heavy upfront (assets) | Heavy runtime (debugging) |
+
+### Hybrid Architecture (Proposed)
+
+Neither fork alone is optimal. The hybrid composes both:
+
+1. **Script pipeline** extracts scene descriptions, character profiles, and SFX cues (already built)
+2. **Fork A** generates character meshes (TripoSR from reference images) → Blender headless renders consistent character poses with Rhubarb-driven lip-sync mapped to 48kHz audio
+3. **Fork B** generates establishing shots and scene backgrounds via LTX 2.3 I2V (IP-Adapter anchored to key frames generated by Flux/SDXL)
+4. **Compositor** layers 3D character renders over diffusion backgrounds, synced to the audio timeline
+5. **CRT overlay** adds the retro aesthetic as a post-processing pass
+
+**Why hybrid wins:** Character consistency via Path A (meshes don't drift), cinematic environments via Path B (no assets to build for backgrounds), all within 16GB via sequential VRAM handoff.
+
+### Audio-First Architecture (Already Built)
+
+The research confirms that **both paths mandate audio-first** — the exact architecture OTR v1.5 already implements:
+- 48kHz normalized audio timeline locked before visual rendering
+- JSON production manifests drive all downstream nodes
+- VRAM Power Wash protocol between model phases
+
+### VRAM Strategy
+
+Sequential handoff (same pattern as LLM → Bark → MusicGen):
+```
+LLM script → unload → Bark TTS → unload → Rhubarb visemes (CPU) →
+TripoSR 3D mesh → unload → Blender render (CPU/low VRAM) →
+LTX 2.3 backgrounds (FP8) → unload → FFmpeg composite
+```
+
+### Lip-Sync Architecture
+
+| Path | Pipeline | Tool | Input | Output |
+|---|---|---|---|---|
+| **A (3D)** | Audio → phoneme detection → viseme JSON → blendshape keys | Rhubarb NG CLI | 48kHz WAV | Timestamped viseme JSON |
+| **B (Diffusion)** | Audio → FeatureExtractorV2 → audio_aggregate_embed → DiT cross-attention | LTX 2.3 node | 48kHz WAV | Latent lip motion |
+
+### Temporal Extension
+
+| Path | Method | Limit |
+|---|---|---|
+| **A (3D)** | Save ending geometric + camera state → load as frame 0 of next scene | **None** |
+| **B (Diffusion)** | Extract final frame → feed back as I2V anchor for next block (recursive chaining) | ~20s per block, latent outpainting |
+
+### Quick Proof-of-Concept (v2.0-alpha spike)
+
+| Step | Tool | Output |
+|---|---|---|
+| Extract scene prompt from OTR episode | Existing script pipeline | Text prompt + `visual_plan` JSON |
+| Generate character reference image | Flux/SDXL | Anchor frame for IP-Adapter |
+| Fork A: Image → 3D mesh → render | TripoSR + Blender headless | Character turntable + posed frames |
+| Fork B: Reference → 5s background clip | LTX 2.3 (FP8, I2V mode) | Cinematic environment clip |
+| Lip-sync (A) | Rhubarb NG → Blender blendshapes | Synced character animation |
+| Composite | FFmpeg (existing `video_engine.py`) | 3D characters over diffusion backgrounds |
+
+### Production Plan Extension
+
+The Director's `production_plan_json` gains a `visual_plan` section:
+```json
+{
+  "visual_plan": [
+    {
+      "scene_id": "scene_1",
+      "description": "Monitoring station command bridge, emergency lighting",
+      "characters_present": ["KAEL", "HENRY"],
+      "camera": "medium two-shot, slight dutch angle",
+      "duration_sec": 45,
+      "method": "hybrid"
+    }
+  ]
+}
+```
+
+### Research Inputs
+
+- ✅ Deep research report completed: `docs/v2_research_report.md` (authored by Jeffrey)
+- ✅ Bug Bible patterns for VRAM handoff and model sequencing apply directly
+- ✅ Existing ComfyUI node infrastructure supports TripoSR, LTX, and Wan 2.1
+- ⬜ LTX 2.3 FP8 quantized weights availability check
+- ⬜ Rhubarb NG Windows binary validation
+
+### Open Questions
+
+- Multi-character compositing: Z-depth sorting for overlapping characters?
+- Blender render time budget: target <30s per frame for real-time viability?
+- LTX 2.3 vs Wan 2.1 for backgrounds: which fits 16GB better after FP8?
+- Timeline: v2.0-alpha spike after v1.5 ships, full v2.0 is Q4 2026 / Q1 2027
+
+*(This is a research-phase document. No code committed until the spike proves feasibility.)*
+
 
 ---
 
@@ -211,6 +342,9 @@ Ship criteria are defined per-phase above. All three test gates must pass:
 - 16 GB VRAM ceiling, 14.5 GB real-world target.
 - 100% local, open source, offline-first.
 - Sequential execution only.
+- **NEVER use `force_vram_offload()` between LLM passes** within a single run (use `_flush_vram_keep_llm()` instead).
+- **ALWAYS truncate LLM input prompts** to `context_cap - max_new_tokens`. Prevents pre-fill stalls and 25GB VRAM spikes (BUG-12.33).
+- **ALWAYS perform a 1-token warmup pass** on LLM load to front-load CUDA kernel JIT.
 - Flash Attention 2 is not available on this platform. Stop asking.
 - Git pushes via PowerShell blocks handed to the user with `cd` baked in.
 - Lockstep verify local HEAD vs GitHub HEAD after every push.

@@ -191,6 +191,12 @@ class _CRTRenderer:
         self._ring_cy = int(h * 0.42)
         self._ring_r = min(w, h) // 5
 
+        # v1.5 Adaptive Brightness Gating — EMA smoothed volume tracker
+        # Quiet scenes dim toward dark navy; loud scenes brighten to full phosphor.
+        # EMA smoothing prevents flickering on transient spikes.
+        self._brightness_ema = 0.5  # start at mid-brightness
+        self._brightness_alpha = 0.08  # EMA smoothing factor (lower = smoother)
+
     # ── Public ──────────────────────────────────────────────────────────
 
     def render(self, fi, total, fps, vol, freq, wave):
@@ -304,7 +310,12 @@ class _CRTRenderer:
 
         arr = np.array(img, dtype=np.float32)
         arr *= self._vignette[:, :, np.newaxis]
-        img = Image.fromarray(arr.astype(np.uint8))
+
+        # ── 8b. Adaptive Brightness Gating — DISABLED ──────────────
+        # Removed in v1.5.1: dimmed the CRT text to unreadable levels.
+        # Full brightness preserved (matches v1.4 behavior).
+
+        img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
 
         if vol > 0.3:
             arr = np.array(img, dtype=np.int16)
@@ -1188,6 +1199,9 @@ class SignalLostVideoRenderer:
                     "default": "The Last Frequency",
                     "tooltip": "Episode title for the title bar"
                 }),
+                "closing_audio": ("AUDIO", {
+                    "tooltip": "Unique closing music from MusicGen for the credits post-roll. If not connected, a gentle decay from the episode audio is used instead of looping."
+                }),
             },
         }
 
@@ -1197,7 +1211,7 @@ class SignalLostVideoRenderer:
 
     def render_video(self, audio, script_json, production_plan_json,
                      news_used, fps=24, resolution="1920x1080",
-                     episode_title="The Last Frequency"):
+                     episode_title="The Last Frequency", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
 
@@ -1255,24 +1269,67 @@ class SignalLostVideoRenderer:
 
         tmp_wav = os.path.join(tempfile.gettempdir(), "otr_video_audio.wav")
         pcm = (audio_np * 32767).astype(np.int16)
-        # Append looped outro for HUD post-roll — tone-matched, no new models.
-        # Take the last ~15 s of the episode (closing theme) and loop it softly.
+        # Use unique closing music for HUD post-roll instead of looping.
+        # Priority: closing_audio from MusicGen > gentle decay from episode tail.
         if _hud_frames > 0:
-            hud_samples  = int(_hud_frames / fps * sr)
-            loop_len     = min(len(audio_np), int(15 * sr))  # up to 15 s loop source
-            loop_src     = audio_np[-loop_len:].copy().astype(np.float32)
-            # Fade the loop source in and out so tiling is click-free
-            fade         = min(sr // 4, loop_len // 4)       # 0.25 s crossfade
-            loop_src[:fade]  *= np.linspace(0, 1, fade, dtype=np.float32)
-            loop_src[-fade:] *= np.linspace(1, 0, fade, dtype=np.float32)
-            # Tile to cover HUD duration, duck to 35 % so it feels ambient
-            tiles    = math.ceil(hud_samples / max(1, loop_len))
-            hud_wave = np.tile(loop_src, tiles)[:hud_samples] * 0.35
-            # Smooth 1-second fade-in from silence at the join point
-            join_in  = min(sr, hud_samples)
-            hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
-            hud_pcm  = np.clip(hud_wave * 32767, -32767, 32767).astype(np.int16)
-            pcm_out  = np.concatenate([pcm, hud_pcm])
+            hud_samples = int(_hud_frames / fps * sr)
+            if closing_audio is not None:
+                # ── Unique closing music from MusicGen ────────────────────
+                _cw = closing_audio["waveform"]
+                _csr = closing_audio["sample_rate"]
+                if _cw.dim() == 3:
+                    _c_np = _cw[0].mean(dim=0).cpu().numpy()
+                elif _cw.dim() == 2:
+                    _c_np = _cw.mean(dim=0).cpu().numpy()
+                else:
+                    _c_np = _cw.cpu().numpy()
+                # Resample to episode SR if needed
+                if _csr != sr:
+                    import scipy.signal as _sig
+                    _c_np = _sig.resample(
+                        _c_np, int(len(_c_np) * sr / _csr)
+                    ).astype(np.float32)
+                # If closing cue is shorter than HUD duration, pad with
+                # a gentle tail decay (NOT a loop) then silence.
+                if len(_c_np) < hud_samples:
+                    # Fade out the last 2 seconds of the cue
+                    fade_out = min(int(2 * sr), len(_c_np) // 2)
+                    _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
+                    # Pad remainder with silence
+                    _c_np = np.pad(_c_np, (0, hud_samples - len(_c_np)))
+                else:
+                    _c_np = _c_np[:hud_samples]
+                    # Fade out last 2 seconds
+                    fade_out = min(int(2 * sr), hud_samples // 4)
+                    _c_np[-fade_out:] *= np.linspace(1, 0, fade_out, dtype=np.float32)
+                hud_wave = _c_np * 0.45  # duck to 45% (louder than old 35% loop)
+                # Smooth 1-second crossfade from episode audio
+                join_in = min(sr, hud_samples)
+                hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
+                log.info("[Video] Credits music: unique MusicGen closing cue (%.1fs)",
+                         len(hud_wave) / sr)
+            else:
+                # ── Fallback: gentle one-shot decay from episode tail ─────
+                # Take last ~10s, apply a long exponential fade-out so it
+                # decays naturally into silence. NO looping.
+                tail_len = min(len(audio_np), int(10 * sr))
+                tail_src = audio_np[-tail_len:].copy().astype(np.float32)
+                # Apply exponential decay over the entire tail
+                decay = np.exp(-np.linspace(0, 5, tail_len)).astype(np.float32)
+                tail_src *= decay
+                # Pad with silence to fill HUD duration
+                if len(tail_src) < hud_samples:
+                    tail_src = np.pad(tail_src, (0, hud_samples - len(tail_src)))
+                else:
+                    tail_src = tail_src[:hud_samples]
+                hud_wave = tail_src * 0.35
+                # Smooth join
+                join_in = min(sr, hud_samples)
+                hud_wave[:join_in] *= np.linspace(0, 1, join_in, dtype=np.float32)
+                log.info("[Video] Credits music: episode tail decay (no loop, %.1fs)",
+                         len(hud_wave) / sr)
+            hud_pcm = np.clip(hud_wave * 32767, -32767, 32767).astype(np.int16)
+            pcm_out = np.concatenate([pcm, hud_pcm])
         else:
             pcm_out = pcm
         with wave_mod.open(tmp_wav, "w") as wf:
