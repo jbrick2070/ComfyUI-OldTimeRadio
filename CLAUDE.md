@@ -43,6 +43,10 @@ Pushing to GitHub frequently fails. Follow this exact sequence every time:
 Every code change must pass a regression sweep before being considered complete:
 
 - **Run the full test suite** (`tests/test_core.py`, `tests/vram_profile_test.py`).
+- **Run the Bug Bible regression suite** against this pack:
+  ```bash
+  python -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -v --pack-dir .
+  ```
 - **Widget error testing**: Verify all nodes load without widget errors in ComfyUI. Check that all `INPUT_TYPES` return valid type specs and that workflow JSONs have explicit `{"widget": "string"}` mapping blocks for string inputs.
 - **Bug Bible regression**: Cross-reference changes against the Bug Bible:
   - Repo: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
@@ -118,6 +122,7 @@ Generated stories and narrative content must follow these rules:
 [ ] All workflow JSONs have widget mapping blocks for string inputs
 [ ] vram_profile_test.py passes
 [ ] Full test suite passes (89+ tests)
+[ ] Bug Bible regression passes (python -m pytest <survival-guide>/tests/bug_bible_regression.py -v --pack-dir .)
 ```
 
 ---
