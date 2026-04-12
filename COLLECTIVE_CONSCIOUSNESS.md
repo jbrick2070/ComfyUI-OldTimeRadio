@@ -8,6 +8,15 @@
 
 ---
 
+## AGENTS
+
+| Name | Platform | Role | Status | Log Mirror |
+|---|---|---|---|---|
+| claude | Claude / Cowork | architect | active | logs/claude_mirror.log |
+| antigravity | Gemini / Antigravity | operator | active | logs/antigravity_mirror.log |
+
+---
+
 ## NORTH STAR
 
 **The canonical spec is `V2_BUILD_ORDER.md`.** Every architectural decision, every refactor, every bug fix must trace back to this document. It defines the task order (T1-T13), the promotion gates (A/B/C), the failure matrix, the forbidden list, and the definition of done. If something contradicts the BUILD ORDER, the BUILD ORDER wins.
