@@ -310,8 +310,16 @@ def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
     if voice_tag in _CHARACTER_VOICE_CACHE:
         return _CHARACTER_VOICE_CACHE[voice_tag]
 
-    # Direct match from Director's voice map (Director maps Tag -> Preset)
-    voice_info = voice_map.get(voice_tag, {})
+    # Direct match from Director's voice map (Director maps Tag -> Preset).
+    # Try both space form ("VANCE MARTIN") and underscore form ("VANCE_MARTIN")
+    # because the LLM Director sometimes emits underscored keys even when the
+    # script uses space-separated character names.
+    voice_info = (
+        voice_map.get(voice_tag)
+        or voice_map.get(voice_tag.replace(" ", "_"))
+        or voice_map.get(voice_tag.replace("_", " "))
+        or {}
+    )
     preset = voice_info.get("voice_preset") or voice_info.get("bark_preset")
     if preset and preset.startswith("v2/"):
         _CHARACTER_VOICE_CACHE[voice_tag] = preset

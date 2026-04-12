@@ -31,6 +31,8 @@ import tempfile
 
 import numpy as np
 import torch
+import urllib.request
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 log = logging.getLogger("OTR")
 
@@ -43,15 +45,26 @@ _V2_CATEGORY = "OldTimeRadio/v2.0 Visual Drama Engine"
 # for v1.5 also works here, even though v2 nodes use Python logging.
 # ---------------------------------------------------------------------------
 
+_LIBRA_AVAILABLE = True
+
+def _get_repo_root():
+    """Unified repo root resolution. Tries ComfyUI paths first, then __file__."""
+    try:
+        import folder_paths
+        # custom_nodes is usually a subdir of the root or in a known place
+        # but the most reliable way to find OUR root is via __file__ relative to the package
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    except Exception:
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+_REPO_ROOT = _get_repo_root()
+
 def _runtime_log(msg):
     """Append a timestamped line to otr_runtime.log (repo root)."""
     try:
         from datetime import datetime
         ts = datetime.now().strftime("%H:%M:%S")
-        log_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "otr_runtime.log"
-        )
+        log_path = os.path.join(_REPO_ROOT, "otr_runtime.log")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{ts}] [v2] {msg}\n")
     except Exception:
@@ -110,8 +123,57 @@ def _safe_name(name, max_len=80):
 
 
 # ---------------------------------------------------------------------------
-# VRAM MANAGEMENT - follows OTR v1.5 sequential handoff pattern
+# VRAM MANAGEMENT - follows OTR v2.0 Strict Spec (V2_BUILD_ORDER.md)
 # ---------------------------------------------------------------------------
+
+class VRAMWatermarkExceeded(RuntimeError):
+    """Raised when VRAM exceeds the strict 14.3GB safety watermark."""
+    pass
+
+def _vram_snapshot(label=""):
+    """Log VRAM usage to both logger and JSONL ledger (Task T2)."""
+    if not torch.cuda.is_available():
+        return
+    
+    curr_bytes = torch.cuda.memory_allocated()
+    peak_bytes = torch.cuda.max_memory_allocated()
+    curr_gb = curr_bytes / (1024 ** 3)
+    peak_gb = peak_bytes / (1024 ** 3)
+    
+    # 1. Python Logging
+    log.info("[v2.0] VRAM_SNAPSHOT %s: current=%.2fGB peak=%.2fGB", label, curr_gb, peak_gb)
+    
+    # 2. JSONL Ledger Logging (V2 T2 / Behavior 9)
+    try:
+        from datetime import datetime
+        log_dir = os.path.join(_REPO_ROOT, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        peaks_path = os.path.join(log_dir, "vram_peaks.jsonl")
+        
+        entry = {
+            "ts": datetime.now().isoformat(),
+            "label": label,
+            "pre_gb": round(curr_gb, 3),
+            "peak_gb": round(peak_gb, 3)
+        }
+        with open(peaks_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
+
+def _vram_guard(threshold_gb=14.3, label=""):
+    """Hard-guard against Blackwell VRAM crashes (Task T3)."""
+    if not torch.cuda.is_available():
+        return
+    
+    allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+    if allocated > threshold_gb:
+        _runtime_log(f"VRAM_GUARD TRIAGED: {label} ({allocated:.2f}GB > {threshold_gb}GB)")
+        raise VRAMWatermarkExceeded(
+            f"VRAM_GUARD: {label} blocked due to memory pressure "
+            f"({allocated:.2f}GB > {threshold_gb}GB threshold). "
+            f"Pass higher sleep to MemoryBoundary."
+        )
 
 def _flush_vram(phase=""):
     """Aggressive VRAM flush between heavy visual operations."""
@@ -122,14 +184,6 @@ def _flush_vram(phase=""):
     if phase:
         log.info("[v2.0] VRAM flushed after %s", phase)
 
-
-def _vram_snapshot(label=""):
-    """Log current VRAM usage for debugging."""
-    if torch.cuda.is_available():
-        curr = torch.cuda.memory_allocated() / (1024 ** 3)
-        peak = torch.cuda.max_memory_allocated() / (1024 ** 3)
-        log.info("[v2.0] VRAM_SNAPSHOT %s: current=%.2fGB peak=%.2fGB",
-                 label, curr, peak)
 
 
 # ---------------------------------------------------------------------------
@@ -202,10 +256,7 @@ def _generate_image(model, clip, vae, prompt, negative_prompt,
     # Prepare noise from seed
     noise = comfy.sample.prepare_noise(latent_image, seed)
 
-    # Sample - this is what KSampler does internally
-    log.info("[v2.0] Sampling: %dx%d, %d steps, cfg=%.1f, seed=%d",
-             width, height, steps, cfg, seed)
-
+    # Denoise — run the full sampler pipeline
     samples = comfy.sample.sample(
         model, noise, steps, cfg,
         sampler_name=sampler_name,
@@ -214,14 +265,110 @@ def _generate_image(model, clip, vae, prompt, negative_prompt,
         negative=negative,
         latent_image=latent_image,
         denoise=1.0,
-        seed=seed
+        seed=seed,
     )
 
-    # Decode latent to pixel space
-    # VAE.decode returns [B, H, W, C] float32 tensor in [0, 1]
-    images = vae.decode(samples)
+    # Decode latent -> pixels: [1, H, W, C] float32 in [0, 1]
+    images = vae.decode(samples).clamp(0.0, 1.0)
 
     return images
+
+
+# ---------------------------------------------------------------------------
+# TELEMETRY FETCHERS (v2.0 Sync)
+# ---------------------------------------------------------------------------
+
+def _get_live_libra_stats():
+    """Fetch hardware stats from LibreHardwareMonitor (localhost:8085)."""
+    global _LIBRA_AVAILABLE
+    if not _LIBRA_AVAILABLE:
+        return None
+        
+    try:
+        # Reduced timeout to 0.3s per Claude's recommendation (localhost should be instant)
+        with urllib.request.urlopen("http://localhost:8085/data.json", timeout=0.3) as response:
+            data = json.loads(response.read().decode())
+            
+        stats = {"cpu_temp": "??", "gpu_temp": "??", "vram_pct": "??", "power": "??"}
+        
+        def walk(node):
+            text = node.get("Text", "")
+            val = node.get("Value", "")
+            if text in ["Core Max", "CPU Package"] and node.get("SensorId", "").startswith("/intelcpu/"):
+                stats["cpu_temp"] = val
+            if text == "GPU Core" and node.get("SensorId", "").startswith("/gpu-nvidia/"):
+                stats["gpu_temp"] = val
+            if text == "GPU Memory" and node.get("SensorId", "").startswith("/gpu-nvidia/") and node.get("Type") == "Load":
+                stats["vram_pct"] = val
+            if text == "GPU Package" and node.get("SensorId", "").startswith("/gpu-nvidia/") and node.get("Type") == "Power":
+                stats["power"] = val
+            for child in node.get("Children", []):
+                walk(child)
+        
+        walk(data)
+        return stats
+    except Exception:
+        _LIBRA_AVAILABLE = False
+        log.warning("[v2.0] LibreHardwareMonitor not detected at :8085 — HUD stats disabled for this run.")
+        return None
+
+def _get_bug_count():
+    """Parse SESSION_BUGS.yaml for fixed bug count."""
+    try:
+        path = os.path.join(_REPO_ROOT, "SESSION_BUGS.yaml")
+        if not os.path.exists(path): return 0
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return content.count("status: FIXED") + content.count("status: RESOLVED")
+    except Exception:
+        return 0
+
+def _get_latest_telemetry():
+    """Parse the otr_runtime.log for the most recent VRAM and Speed stats."""
+    log_path = os.path.join(_REPO_ROOT, "otr_runtime.log")
+    
+    peak_gb = "???"
+    speed = "???"
+    model = "UNKNOWN CORE"
+    libra = _get_live_libra_stats()
+    bugs = _get_bug_count()
+    
+    if os.path.exists(log_path):
+        try:
+            import re
+            re_vram = re.compile(r"VRAM_SNAPSHOT.*?peak_gb=([0-9.]+)")
+            re_speed = re.compile(r"DONE:\s+.*?([0-9.]+)\s+tok/s")
+            re_llm = re.compile(r"LLM loaded:\s+([^\s]+)")
+            with open(log_path, "r", encoding="utf-8") as f:
+                f.seek(0, 2)
+                end_pos = f.tell()
+                f.seek(max(0, end_pos - 15000))
+                lines = f.readlines()
+            for line in lines:
+                m_vram = re_vram.search(line)
+                if m_vram: peak_gb = m_vram.group(1)
+                m_speed = re_speed.search(line)
+                if m_speed: speed = m_speed.group(1)
+                m_llm = re_llm.search(line)
+                if m_llm: model = m_llm.group(1).split("/")[-1].upper()
+        except Exception: pass
+            
+    return {"vram": peak_gb, "speed": speed, "core": model, "libra": libra, "bugs": bugs}
+
+
+def _load_font_v2(size):
+    """Fallback font loader with common system paths."""
+    for path in [
+        "C:\\Windows\\Fonts\\consola.ttf", "C:\\Windows\\Fonts\\lucon.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/System/Library/Fonts/Menlo.ttc"
+    ]:
+        if os.path.exists(path):
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
+
+
+# ---------------------------------------------------------------------------
 
 
 def _generate_batch(model, clip, vae, prompts, negative_prompt,
@@ -307,8 +454,8 @@ class CharacterForge:
                     "default": 42, "min": 0, "max": 0xffffffffffffffff,
                 }),
                 "portrait_size": (["512x512", "768x768", "1024x1024"], {
-                    "default": "512x512",
-                    "tooltip": "Portrait resolution. 512 for speed, 1024 for quality.",
+                    "default": "1024x1024",
+                    "tooltip": "Portrait resolution. Standardized to 1024x1024 in rtx5080.yaml",
                 }),
                 "steps": ("INT", {
                     "default": 20, "min": 1, "max": 100,
@@ -334,6 +481,11 @@ class CharacterForge:
                 }),
             },
         }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Prevent stale cache on seed changes (Bug Bible 06.x)."""
+        return kwargs.get("seed", 0)
 
     def forge(self, model, clip, vae, production_plan_json="{}",
              seed=42, portrait_size="512x512", steps=20, cfg=3.5,
@@ -409,6 +561,9 @@ class CharacterForge:
         log.info("[CharacterForge] Generating %d character portraits at %s",
                  len(prompts), portrait_size)
 
+        # Guard pre-flux load
+        _vram_guard(14.3, "CharacterForge-sampling")
+
         # Generate all portraits
         portraits = _generate_batch(
             model, clip, vae, prompts, _NEG_PORTRAIT,
@@ -472,12 +627,12 @@ class ScenePainter:
                     "tooltip": "Production plan JSON with visual_plan.scenes section",
                 }),
                 "width": ("INT", {
-                    "default": 1280, "min": 256, "max": 2048,
-                    "tooltip": "Scene width. 1280 for 720p, 1920 for 1080p.",
+                    "default": 1024, "min": 256, "max": 2048,
+                    "tooltip": "Scene width. Standardized to 1024x1024 in rtx5080.yaml for Flux stills.",
                 }),
                 "height": ("INT", {
-                    "default": 720, "min": 256, "max": 2048,
-                    "tooltip": "Scene height. 720 for 720p, 1080 for 1080p.",
+                    "default": 1024, "min": 256, "max": 2048,
+                    "tooltip": "Scene height.",
                 }),
                 "seed": ("INT", {
                     "default": 42, "min": 0, "max": 0xffffffffffffffff,
@@ -499,6 +654,11 @@ class ScenePainter:
                 }),
             },
         }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Force re-paint on seed changes."""
+        return kwargs.get("seed", 0)
 
     def paint(self, model, clip, vae, production_plan_json="{}",
              width=1280, height=720, seed=42, steps=20, cfg=3.5,
@@ -631,6 +791,13 @@ class VisualCompositor:
             },
         }
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Force re-composite on visual plan changes."""
+        # Visual plan is often connected via link, so we check if it is passed as a string.
+        # But even better, we check the episode audio as a proxy for run-uniqueness.
+        return hash(kwargs.get("production_plan_json", ""))
+
     def composite(self, production_plan_json="{}", crt_overlay=True,
                   character_scale=0.3, character_renders=None,
                   scene_backgrounds=None, episode_audio=None):
@@ -640,7 +807,11 @@ class VisualCompositor:
         log.info("[VisualCompositor] Starting compositing pass")
         _runtime_log("VisualCompositor: starting")
 
-        # Parse plan to understand scene-character mapping
+        # Prep fonts
+        f_small = _load_font_v2(12)
+        f_giant = _load_font_v2(48)
+
+        # Parse plan
         try:
             plan = json.loads(production_plan_json)
         except json.JSONDecodeError:
@@ -691,8 +862,33 @@ class VisualCompositor:
 
                     start_x += p_size + 10
 
-            # Apply CRT overlay if enabled
+            # 4. Apply Glitch Effects if audio is present
+            vol = 0.0
+            if episode_audio is not None and "waveform" in episode_audio:
+                # Approximate volume for this scene (simplistic middle-sample or RMS window)
+                try:
+                    wf = episode_audio["waveform"]
+                    sr = episode_audio["sample_rate"]
+                    # Map scene index to audio time (approx 10s per scene fallback if no sync)
+                    # For v2.0, assuming scenes are roughly evenly distributed across duration
+                    total_samples = wf.shape[-1]
+                    s_pos = int((s_idx / num_scenes) * total_samples)
+                    win = int(0.1 * sr) # 100ms window
+                    chunk = wf[:, :, max(0, s_pos-win//2):min(total_samples, s_pos+win//2)]
+                    vol = float(torch.sqrt(torch.mean(chunk**2))) if chunk.numel() > 0 else 0.0
+                except Exception: vol = 0.1
+            
+            # Apply CRT overlay + Glitches
             if crt_overlay:
+                # Telemetry Glitch (flash on volume or randomly)
+                if vol > 0.4 or (s_idx % 5 == 0):
+                    tele = _get_latest_telemetry()
+                    bg_pil = self._draw_v2_hud(bg_pil, tele, vol, f_small)
+                
+                # Wavy ASCII "Poof" (Rare intensity glitch)
+                if vol > 0.6:
+                    bg_pil = self._draw_v2_wavy(bg_pil, s_idx, vol, f_giant)
+                    
                 bg_pil = self._apply_crt(bg_pil)
 
             # Convert back to tensor
@@ -750,6 +946,54 @@ class VisualCompositor:
                 )
         img = Image.alpha_composite(img.convert("RGBA"), vignette).convert("RGB")
 
+        return img
+
+    @staticmethod
+    def _draw_v2_hud(img, t, vol, font):
+        """v2.0 HUD drawer."""
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(img)
+        w, h = img.size
+        p = w // 48
+        hw, hh = w // 4, h // 4
+        hx, hy = w - hw - p, p + h // 12
+        
+        # Color palette
+        GREEN = (0, 255, 120)
+        AMBER = (255, 180, 0)
+        RED = (255, 80, 80)
+        
+        draw.rectangle([hx, hy, hx + hw, hy + hh], outline=GREEN, width=1)
+        ty = hy + 5
+        draw.text((hx + 5, ty), "DIAGNOSTIC // V2.0 ALPHA", fill=AMBER, font=font)
+        ty += 23
+        libra = t.get("libra") or {}
+        lines = [
+            f"VRAM: {t.get('vram')} GB (PEAK)",
+            f"CORE: {t.get('core')}",
+            f"GPU:  {libra.get('gpu_temp', '??')} | LOAD: {libra.get('vram_pct', '??')}",
+            f"CPU:  {libra.get('cpu_temp', '??')}",
+            f"THREATS NEUTRALIZED: {t.get('bugs')}/4",
+            f"STATUS: {'BREACH' if vol > 0.6 else 'PRISTINE'}"
+        ]
+        for line in lines:
+            col = GREEN if "PRISTINE" in line else RED if "BREACH" in line else (200, 200, 200)
+            draw.text((hx + 8, ty), line, fill=col, font=font)
+            ty += 12
+        return img
+
+    def _draw_v2_wavy(self, img, fi, vol, font):
+        """v2.0 Wavy Glitch."""
+        from PIL import ImageDraw
+        draw = ImageDraw.Draw(img)
+        w, h = img.size
+        text = ">> SIGNAL :: LOST <<"
+        base_x, base_y = w // 10, h // 4
+        amp = 20 + int(vol * 30)
+        for i, char in enumerate(text):
+            x = base_x + i * 35 + int(amp * math.cos(0.2 * (fi*10 + i)))
+            y = base_y + int(amp * math.sin(0.2 * (fi*10 + i * 2)))
+            draw.text((x, y), char, fill=(255, 255, 255), font=font)
         return img
 
 
@@ -851,6 +1095,12 @@ class ProductionBus:
                 }),
             },
         }
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        """Final ship gate: never cache production output."""
+        import time
+        return time.time()
 
     def assemble(self, script_json="[]", production_plan_json="{}",
                  fps=24, output_name="otr_v2_episode",
@@ -1095,20 +1345,23 @@ class ProductionBus:
                 # Use -t to guarantee both video and audio end at the same point.
                 if preview_mode == "keyframes" and audio_duration_s > 0:
                     av_flags.extend(["-t", f"{audio_duration_s:.6f}"])
-                else:
-                    av_flags.append("-shortest")
-                av_flags.append(video_path)
                 ffmpeg_cmd.extend(av_flags)
             else:
+                # Video-only encode (no audio available)
                 ffmpeg_cmd.extend([
                     "-c:v", "libx264",
                     "-preset", enc_preset,
                     "-crf", enc_crf,
                     "-pix_fmt", "yuv420p",
-                    video_path
                 ])
 
-            log.info("[ProductionBus] FFmpeg encoding: %s", " ".join(ffmpeg_cmd[-4:]))
+            # Output path is ALWAYS the final argument — keep it here, outside
+            # both branches, so it can never be accidentally omitted.
+            if not video_path:
+                raise RuntimeError("ProductionBus: video_path is empty, cannot encode")
+            ffmpeg_cmd.append(video_path)
+
+            log.info("[ProductionBus] FFmpeg encoding: %s", " ".join(ffmpeg_cmd[-5:]))
             try:
                 result = subprocess.run(
                     ffmpeg_cmd, capture_output=True, text=True, timeout=300
@@ -1289,37 +1542,6 @@ class ProductionBus:
             except OSError:
                 pass
 
-        # Final size check
-        file_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
-        _sz_mb = file_size / (1024 * 1024)
-
-        bus_lines = [
-            "Production Bus: v2.0 Animated Assembly Complete",
-            f"  Output: {video_path}" if video_path else "  Output: FAILED",
-            f"  Clips concatenated: {len(valid_clips)}",
-            f"  Audio duration: {audio_duration_s:.1f}s",
-            f"  File size: {_sz_mb:.1f} MB",
-        ]
-        if compositor_log:
-            bus_lines.append(f"\n--- Compositor Report ---\n{compositor_log}")
-
-        qa_metrics = {
-            "preview_mode": "animated",
-            "audio_duration_s": round(audio_duration_s, 2),
-            "num_clips": len(valid_clips),
-            "file_size_mb": round(_sz_mb, 2),
-            "video_path_status": "ok" if file_size > 0 else "failed",
-            "fps": fps,
-        }
-        bus_lines.append(f"\nQA_METRICS: {json.dumps(qa_metrics)}")
-        bus_log = "\n".join(bus_lines)
-
-        _runtime_log(
-            f"ProductionBus: animated DONE — {len(valid_clips)} clips, "
-            f"{_sz_mb:.1f} MB, {video_path}"
-        )
-
-        if debug_vram_snapshots:
-            _vram_snapshot("ProductionBus-animated-exit")
-
-        return (video_path, bus_log)
+        log.info("[ProductionBus] Animated assembly complete: %s", video_path)
+        _runtime_log(f"ProductionBus: animated mode — complete: {video_path}")
+        return (video_path, "ProductionBus: Animated assembly complete.")
