@@ -1,0 +1,27 @@
+# Session Bug Log - OldTimeRadio v2.0 Alpha Restoration
+# Current Date: 2026-04-12
+# Format: id, status, symptom, cause, fix
+
+- id: "BUG-12.36"
+  status: FIXED
+  symptom: Regression test suite fails with false-positive 0-byte/cleanup errors on internal .venv files.
+  cause: Automated file discovery (os.walk) was traversing into third-party library virtual environments.
+  fix: Patched bug_bible_regression.py to explicitly exclude .venv/venv directories.
+
+- id: "BUG-09.02"
+  status: RESOLVED (FALSE-POSITIVE)
+  symptom: Flagged missing Popen cleanup for _scilab_builtins.py.
+  cause: File was inside .venv (third party). 
+  fix: Resolved via BUG-12.36 (directory exclusion). Project source code is clean.
+
+- id: "BUG-12.37-USER-REQUEST"
+  status: FIXED
+  symptom: 8GB and 4GB Obsidian JSON workflows were present in the repo.
+  cause: Accidental recovery during Alpha v2.0 restoration.
+  fix: Force removed both JSON files from git, committed, and pushed to remote to ensure they never appear there.
+
+- id: "BUG-12.38-USER-REQUEST"
+  status: FIXED
+  symptom: Lite workflow also remained in the repo after removing 4GB and 8GB models.
+  cause: Leftover from previous step.
+  fix: Force removed lite JSON file from git, committed, and pushed.
