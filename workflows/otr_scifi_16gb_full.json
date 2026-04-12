@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 24,
-  "last_link_id": 46,
+  "last_link_id": 47,
   "nodes": [
     {
       "id": 1,
@@ -327,7 +327,8 @@
           "name": "episode_audio",
           "type": "AUDIO",
           "links": [
-            15
+            15,
+            47
           ],
           "slot_index": 0
         },
@@ -910,6 +911,11 @@
           "name": "composited_frames",
           "type": "IMAGE",
           "link": 42
+        },
+        {
+          "name": "episode_audio",
+          "type": "AUDIO",
+          "link": 47
         }
       ],
       "outputs": [
@@ -1421,6 +1427,14 @@
       17,
       3,
       "STRING"
+    ],
+    [
+      47,
+      7,
+      0,
+      19,
+      2,
+      "AUDIO"
     ]
   ],
   "groups": [

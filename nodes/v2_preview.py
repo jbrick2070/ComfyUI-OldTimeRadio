@@ -36,6 +36,27 @@ log = logging.getLogger("OTR")
 
 _V2_CATEGORY = "OldTimeRadio/v2.0 Visual Drama Engine"
 
+
+# ---------------------------------------------------------------------------
+# PERSISTENT RUNTIME LOG — mirrors v1.5 _runtime_log for live monitoring
+# Writes to <repo_root>/otr_runtime.log so the same tail/grep that works
+# for v1.5 also works here, even though v2 nodes use Python logging.
+# ---------------------------------------------------------------------------
+
+def _runtime_log(msg):
+    """Append a timestamped line to otr_runtime.log (repo root)."""
+    try:
+        from datetime import datetime
+        ts = datetime.now().strftime("%H:%M:%S")
+        log_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "otr_runtime.log"
+        )
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [v2] {msg}\n")
+    except Exception:
+        pass
+
 # Negative prompts tuned for each use case
 _NEG_PORTRAIT = (
     "blurry, low quality, deformed, ugly, bad anatomy, extra fingers, "
@@ -323,14 +344,35 @@ class CharacterForge:
             plan = json.loads(production_plan_json)
         except json.JSONDecodeError as e:
             log.error("[CharacterForge] Invalid JSON: %s", e)
+            _runtime_log(f"CharacterForge ERROR: invalid JSON - {e}")
             dummy = torch.zeros([1, h, w, 3], dtype=torch.float32)
             return (dummy, f"ERROR: Invalid production plan JSON - {e}")
 
+        # Dump the plan to disk for offline inspection (first 4 KB only)
+        try:
+            _debug_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "otr_v2_debug_plan.json"
+            )
+            with open(_debug_path, "w", encoding="utf-8") as _df:
+                json.dump(plan, _df, indent=2)
+        except Exception:
+            pass
+
         visual_plan = plan.get("visual_plan", {})
         characters = visual_plan.get("characters", {})
+        scenes_in_plan = visual_plan.get("scenes", [])
+
+        _runtime_log(
+            f"CharacterForge: plan keys={list(plan.keys())} | "
+            f"visual_plan keys={list(visual_plan.keys())} | "
+            f"characters={list(characters.keys())} | "
+            f"scenes={len(scenes_in_plan)}"
+        )
 
         if not characters:
             log.info("[CharacterForge] No characters in visual_plan - returning placeholder")
+            _runtime_log("CharacterForge: NO characters in visual_plan — check Director output")
             dummy = torch.zeros([1, h, w, 3], dtype=torch.float32)
             return (dummy, "No characters found in visual_plan. "
                           "Ensure the Director is generating a visual_plan section.")
@@ -461,8 +503,13 @@ class ScenePainter:
         visual_plan = plan.get("visual_plan", {})
         scenes = visual_plan.get("scenes", [])
 
+        _runtime_log(
+            f"ScenePainter: scenes={len(scenes)} in visual_plan"
+        )
+
         if not scenes:
             log.info("[ScenePainter] No scenes in visual_plan - returning placeholder")
+            _runtime_log("ScenePainter: NO scenes in visual_plan — check Director output")
             dummy = torch.zeros([1, height, width, 3], dtype=torch.float32)
             return (dummy, "No scenes found in visual_plan. "
                           "Ensure the Director is generating a visual_plan section.")
@@ -576,6 +623,7 @@ class VisualCompositor:
         from PIL import Image, ImageDraw, ImageFilter
 
         log.info("[VisualCompositor] Starting compositing pass")
+        _runtime_log("VisualCompositor: starting")
 
         # Parse plan to understand scene-character mapping
         try:
@@ -647,6 +695,7 @@ class VisualCompositor:
         compositor_log = "\n".join(log_lines)
 
         log.info("[VisualCompositor] Complete: %d composited frames", num_scenes)
+        _runtime_log(f"VisualCompositor: done — {num_scenes} frames at {scene_w}x{scene_h}")
         return (result, compositor_log)
 
     @staticmethod
@@ -786,6 +835,7 @@ class ProductionBus:
         from PIL import Image
 
         log.info("[ProductionBus] Starting v2.0 assembly")
+        _runtime_log("ProductionBus: starting assembly")
 
         if debug_vram_snapshots:
             _vram_snapshot("ProductionBus-entry")
@@ -806,11 +856,16 @@ class ProductionBus:
 
         # If we have no visual frames, return early with status
         if composited_frames is None:
+            _runtime_log("ProductionBus: composited_frames is None — VisualCompositor not ready")
             return ("", "ProductionBus: Waiting for composited frames from VisualCompositor...")
 
         num_frames = composited_frames.shape[0]
         frame_h = composited_frames.shape[1]
         frame_w = composited_frames.shape[2]
+        _runtime_log(
+            f"ProductionBus: composited_frames={num_frames} frames at {frame_w}x{frame_h} | "
+            f"episode_audio={'PRESENT' if episode_audio is not None else 'NONE'}"
+        )
 
         # Parse scene data to calculate frame timing
         try:
@@ -838,12 +893,19 @@ class ProductionBus:
                 else:
                     waveform_save = waveform
                 torchaudio.save(audio_path, waveform_save.cpu(), sample_rate)
+                _runtime_log(
+                    f"ProductionBus: audio WAV saved — {audio_duration_s:.1f}s, "
+                    f"shape={waveform_save.shape}, sr={sample_rate}"
+                )
             except Exception as e:
                 log.warning("[ProductionBus] Audio processing failed: %s", e)
+                _runtime_log(f"ProductionBus: audio FAILED — {e}")
+                audio_path = None  # ensure no stale path after failure
                 audio_duration_s = num_frames / fps  # Fallback
 
         if audio_duration_s == 0:
             audio_duration_s = max(10.0, num_frames * 5.0)  # 5s per scene minimum
+            _runtime_log(f"ProductionBus: no audio — using fallback duration {audio_duration_s:.1f}s")
 
         # Calculate how many output frames we need
         total_frames = int(audio_duration_s * fps)
@@ -861,6 +923,10 @@ class ProductionBus:
             frames_per_scene = 1
             total_frames = num_frames
             log.info("[ProductionBus] keyframes mode: %d frames (1 per scene)", total_frames)
+            _runtime_log(
+                f"ProductionBus: keyframes mode — {total_frames} frames, "
+                f"audio={audio_duration_s:.1f}s, audio_path={'set' if audio_path else 'none'}"
+            )
         else:
             log.info("[ProductionBus] full mode: %d total frames (%d per scene, %.1fs)",
                      total_frames, frames_per_scene, audio_duration_s)
@@ -879,46 +945,79 @@ class ProductionBus:
         temp_dir = tempfile.mkdtemp(prefix="otr_v2_", dir=preview_root)
         video_path = ""
 
+        # Encode with FFmpeg — encoding_profile controls preset/crf,
+        # yuv420p is always used for maximum playback compatibility.
+        _ENC_PROFILES = {
+            "preview":  ("fast",   "23"),
+            "balanced": ("medium", "20"),
+            "quality":  ("slow",   "18"),
+        }
+        enc_preset, enc_crf = _ENC_PROFILES.get(encoding_profile, ("fast", "23"))
+        video_path = os.path.join(output_dir, f"{_safe_name(output_name)}.mp4")
+
         try:
-            frame_idx = 0
-            for scene_idx in range(num_frames):
-                # Get scene frame
-                frame_np = (composited_frames[scene_idx].cpu().numpy() * 255).astype(np.uint8)
-                frame_pil = Image.fromarray(frame_np, "RGB")
-
-                # Repeat this frame for its duration
-                for _ in range(frames_per_scene):
-                    if frame_idx >= total_frames:
-                        break
-                    frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
+            if preview_mode == "keyframes":
+                # KEYFRAMES MODE: write 1 PNG per scene, then use FFmpeg concat
+                # demuxer to assign each frame an explicit duration so the output
+                # video is exactly audio_duration_s long regardless of scene count.
+                # This is the only reliable way to get e.g. 1 frame = 202 seconds.
+                duration_per_scene = audio_duration_s / max(1, num_frames)
+                concat_lines = ["ffconcat version 1.0"]
+                for scene_idx in range(num_frames):
+                    frame_np = (composited_frames[scene_idx].cpu().numpy() * 255).astype(np.uint8)
+                    frame_pil = Image.fromarray(frame_np, "RGB")
+                    frame_path = os.path.join(temp_dir, f"frame_{scene_idx:06d}.png")
                     frame_pil.save(frame_path)
-                    frame_idx += 1
+                    concat_lines.append(f"file '{frame_path}'")
+                    concat_lines.append(f"duration {duration_per_scene:.6f}")
+                # Duplicate last entry (FFmpeg concat encoder flush trick —
+                # without this the final frame is sometimes dropped)
+                last_frame_path = os.path.join(temp_dir, f"frame_{num_frames - 1:06d}.png")
+                concat_lines.append(f"file '{last_frame_path}'")
 
-            # Pad remaining frames with last scene (full mode only)
-            if frame_idx < total_frames and num_frames > 0:
-                last_np = (composited_frames[-1].cpu().numpy() * 255).astype(np.uint8)
-                last_pil = Image.fromarray(last_np, "RGB")
-                while frame_idx < total_frames:
-                    frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
-                    last_pil.save(frame_path)
-                    frame_idx += 1
+                concat_path = os.path.join(temp_dir, "concat.txt")
+                with open(concat_path, "w", encoding="utf-8") as cf:
+                    cf.write("\n".join(concat_lines) + "\n")
 
-            # Encode with FFmpeg — encoding_profile controls preset/crf,
-            # yuv420p is always used for maximum playback compatibility.
-            _ENC_PROFILES = {
-                "preview":  ("fast",   "23"),
-                "balanced": ("medium", "20"),
-                "quality":  ("slow",   "18"),
-            }
-            enc_preset, enc_crf = _ENC_PROFILES.get(encoding_profile, ("fast", "23"))
+                log.info("[ProductionBus] keyframes concat: %d scenes x %.2fs = %.1fs total",
+                         num_frames, duration_per_scene, audio_duration_s)
+                _runtime_log(
+                    f"ProductionBus: concat — {num_frames} scenes x {duration_per_scene:.1f}s "
+                    f"= {audio_duration_s:.1f}s target, audio_path={'set' if audio_path else 'none'}"
+                )
 
-            video_path = os.path.join(output_dir, f"{_safe_name(output_name)}.mp4")
-            render_fps = fps if preview_mode == "full" else max(1, num_frames // max(1, int(audio_duration_s)))
-            ffmpeg_cmd = [
-                "ffmpeg", "-y",
-                "-framerate", str(render_fps if preview_mode == "keyframes" else fps),
-                "-i", os.path.join(temp_dir, "frame_%06d.png"),
-            ]
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-f", "concat", "-safe", "0",
+                    "-i", concat_path,
+                ]
+            else:
+                # FULL MODE: write one frame per fps tick, repeat scene frames
+                frame_idx = 0
+                for scene_idx in range(num_frames):
+                    frame_np = (composited_frames[scene_idx].cpu().numpy() * 255).astype(np.uint8)
+                    frame_pil = Image.fromarray(frame_np, "RGB")
+                    for _ in range(frames_per_scene):
+                        if frame_idx >= total_frames:
+                            break
+                        frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
+                        frame_pil.save(frame_path)
+                        frame_idx += 1
+
+                # Pad remaining frames with last scene
+                if frame_idx < total_frames and num_frames > 0:
+                    last_np = (composited_frames[-1].cpu().numpy() * 255).astype(np.uint8)
+                    last_pil = Image.fromarray(last_np, "RGB")
+                    while frame_idx < total_frames:
+                        frame_path = os.path.join(temp_dir, f"frame_{frame_idx:06d}.png")
+                        last_pil.save(frame_path)
+                        frame_idx += 1
+
+                ffmpeg_cmd = [
+                    "ffmpeg", "-y",
+                    "-framerate", str(fps),
+                    "-i", os.path.join(temp_dir, "frame_%06d.png"),
+                ]
 
             if audio_path and os.path.exists(audio_path):
                 ffmpeg_cmd.extend(["-i", audio_path])
@@ -948,9 +1047,17 @@ class ProductionBus:
                 )
                 if result.returncode != 0:
                     log.error("[ProductionBus] FFmpeg failed: %s", result.stderr[-500:])
+                    _runtime_log(f"ProductionBus: FFmpeg FAILED rc={result.returncode} — {result.stderr[-200:]}")
                     video_path = ""
+                else:
+                    _sz = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+                    _runtime_log(
+                        f"ProductionBus: FFmpeg OK — {video_path} ({_sz // 1024} KB, "
+                        f"{total_frames} frames, {audio_duration_s:.1f}s)"
+                    )
             except Exception as e:
                 log.error("[ProductionBus] FFmpeg error: %s", e)
+                _runtime_log(f"ProductionBus: FFmpeg EXCEPTION — {e}")
                 video_path = ""
 
         finally:
