@@ -30,6 +30,14 @@ Jeffrey must never be the middleman for a push. Exhaust every autonomous option 
 3. **Bash sandbox git** — works if the repo is mounted and credentials are cached.
 4. **Last resort only:** hand Jeffrey a PowerShell block. This should be rare. If it happens, note in COLLECTIVE_CONSCIOUSNESS.md why all three methods failed so the next session can fix the root cause.
 
+**After a version bump on agent-handshake:** Always create the tag AND the GitHub release via the API in the same step as the push. Do not leave a badge pointing to a release that does not exist. Use:
+```python
+# Create tag
+api(f"https://api.github.com/repos/{REPO}/git/refs", {"ref": "refs/tags/v{VERSION}", "sha": main_sha})
+# Create release
+api(f"https://api.github.com/repos/{REPO}/releases", {"tag_name": f"v{VERSION}", "name": "...", "body": "...", "draft": False, "prerelease": False})
+```
+
 **After every push, always run the integrity checklist:**
    - Verify local HEAD matches `origin/main` (or the target branch) — lockstep check.
    - Scan for **0-byte files** in the repo.
