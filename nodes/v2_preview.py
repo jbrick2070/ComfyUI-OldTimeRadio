@@ -159,19 +159,34 @@ def _generate_image(model, clip, vae, prompt, negative_prompt,
     Handles SD 1.5, SDXL, SD 3.5, and Flux latent channel differences
     automatically via fix_empty_latent_channels.
     """
-    from nodes.safety_filter import classify_prompt
+    # Safety filter import: try relative, then absolute, then skip gracefully.
+    # ComfyUI does not resolve "from nodes.X" reliably inside custom-node packages.
+    try:
+        from .safety_filter import classify_prompt
+    except ImportError:
+        try:
+            import importlib, pathlib
+            _sf_path = pathlib.Path(__file__).with_name("safety_filter.py")
+            _spec = importlib.util.spec_from_file_location("safety_filter", _sf_path)
+            _sf_mod = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_sf_mod)
+            classify_prompt = _sf_mod.classify_prompt
+        except Exception as _sf_err:
+            log.warning("[v2.0] safety_filter unavailable (%s) — prompts will not be pre-screened", _sf_err)
+            classify_prompt = None
 
     import comfy.sample
     import comfy.model_management
     import comfy.utils
 
     # Content safety pre-check — block before any GPU work
-    safety = classify_prompt(prompt)
-    if safety["result"] == "block":
-        log.warning("[v2.0] Prompt BLOCKED by safety filter: %s", safety["reason"])
-        # Return a dim gray placeholder frame — no GPU resources consumed
-        placeholder = torch.full([1, height, width, 3], 0.15, dtype=torch.float32)
-        return placeholder
+    if classify_prompt is not None:
+        safety = classify_prompt(prompt)
+        if safety["result"] == "block":
+            log.warning("[v2.0] Prompt BLOCKED by safety filter: %s", safety["reason"])
+            # Return a dim gray placeholder frame — no GPU resources consumed
+            placeholder = torch.full([1, height, width, 3], 0.15, dtype=torch.float32)
+            return placeholder
 
     # Encode positive and negative prompts
     positive = _encode_prompt(clip, prompt)
@@ -850,8 +865,10 @@ class ProductionBus:
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 "..", "..", "output"
             ))
-        if output_subdir:
-            output_dir = os.path.join(output_dir, _safe_name(output_subdir))
+        # Guard against boolean False being coerced to string "False" by ComfyUI
+        _subdir_clean = str(output_subdir).strip() if output_subdir else ""
+        if _subdir_clean and _subdir_clean.lower() not in ("false", "none", "0", ""):
+            output_dir = os.path.join(output_dir, _safe_name(_subdir_clean))
         os.makedirs(output_dir, exist_ok=True)
 
         # If we have no visual frames, return early with status
@@ -884,15 +901,37 @@ class ProductionBus:
                 audio_duration_s = waveform.shape[-1] / sample_rate
                 log.info("[ProductionBus] Audio: %.1fs at %dHz", audio_duration_s, sample_rate)
 
-                # Save audio to temp WAV for FFmpeg
-                import torchaudio
-                audio_path = os.path.join(output_dir, f"{_safe_name(output_name)}_temp_audio.wav")
                 # waveform shape: [batch, channels, samples] or [channels, samples]
                 if waveform.dim() == 3:
                     waveform_save = waveform[0]
                 else:
                     waveform_save = waveform
-                torchaudio.save(audio_path, waveform_save.cpu(), sample_rate)
+
+                # Save audio to temp WAV for FFmpeg.
+                # Uses raw PCM WAV writer (struct + numpy) to avoid torchaudio
+                # backend issues (torchcodec not available on this platform).
+                audio_path = os.path.join(output_dir, f"{_safe_name(output_name)}_temp_audio.wav")
+                _wav_data = (waveform_save.cpu().float().numpy().T * 32767).clip(
+                    -32768, 32767
+                ).astype(np.int16)
+                _n_samples, _n_channels = _wav_data.shape
+                _data_bytes = _wav_data.tobytes()
+                with open(audio_path, "wb") as _wf:
+                    _wf.write(b"RIFF")
+                    _wf.write(struct.pack("<I", 36 + len(_data_bytes)))
+                    _wf.write(b"WAVE")
+                    _wf.write(b"fmt ")
+                    _wf.write(struct.pack("<I", 16))
+                    _wf.write(struct.pack("<H", 1))               # PCM
+                    _wf.write(struct.pack("<H", _n_channels))
+                    _wf.write(struct.pack("<I", sample_rate))
+                    _wf.write(struct.pack("<I", sample_rate * _n_channels * 2))
+                    _wf.write(struct.pack("<H", _n_channels * 2))
+                    _wf.write(struct.pack("<H", 16))              # 16-bit
+                    _wf.write(b"data")
+                    _wf.write(struct.pack("<I", len(_data_bytes)))
+                    _wf.write(_data_bytes)
+
                 _runtime_log(
                     f"ProductionBus: audio WAV saved — {audio_duration_s:.1f}s, "
                     f"shape={waveform_save.shape}, sr={sample_rate}"
@@ -901,7 +940,8 @@ class ProductionBus:
                 log.warning("[ProductionBus] Audio processing failed: %s", e)
                 _runtime_log(f"ProductionBus: audio FAILED — {e}")
                 audio_path = None  # ensure no stale path after failure
-                audio_duration_s = num_frames / fps  # Fallback
+                # Do NOT overwrite audio_duration_s here — the correct duration
+                # was already computed from the waveform tensor above.
 
         if audio_duration_s == 0:
             audio_duration_s = max(10.0, num_frames * 5.0)  # 5s per scene minimum
@@ -1021,16 +1061,23 @@ class ProductionBus:
 
             if audio_path and os.path.exists(audio_path):
                 ffmpeg_cmd.extend(["-i", audio_path])
-                ffmpeg_cmd.extend([
+                av_flags = [
                     "-c:v", "libx264",
                     "-preset", enc_preset,
                     "-crf", enc_crf,
                     "-pix_fmt", "yuv420p",
                     "-c:a", "aac",
                     "-b:a", "192k",
-                    "-shortest",
-                    video_path
-                ])
+                ]
+                # In keyframes mode the concat demuxer sets video duration via explicit
+                # per-frame durations; do NOT use -shortest (it clips the longer stream).
+                # Use -t to guarantee both video and audio end at the same point.
+                if preview_mode == "keyframes" and audio_duration_s > 0:
+                    av_flags.extend(["-t", f"{audio_duration_s:.6f}"])
+                else:
+                    av_flags.append("-shortest")
+                av_flags.append(video_path)
+                ffmpeg_cmd.extend(av_flags)
             else:
                 ffmpeg_cmd.extend([
                     "-c:v", "libx264",

@@ -144,4 +144,33 @@ After T1-T7 green: run 12.02 regression checklist, tag Alpha 2.0 RC1.
 
 ---
 
+---
+
+### BUG-TOOL-1 — otr_queue.py hangs due to per-node /object_info HTTP calls
+
+**Priority:** P1 tooling — blocked live queueing every session
+**Status:** Fixed 2026-04-11 — candidate for Bug Bible entry
+
+**Root cause:**
+`otr_queue.py` called `GET /object_info/<node_type>` twice per node (once in `get_param_order`,
+once inside `build_node`). With ~14 node types that is 28 separate HTTP round-trips.
+Under Windows MCP's 60s tool timeout this caused every queue attempt to abort.
+Additionally the `runtime_preset` widget value was stored as emoji `🧪 test (1 min)` in the
+workflow JSON but the node's dropdown now uses the literal string `[EMOJI] test (1 min)`,
+causing ComfyUI validation failure on every queue.
+
+**Fix applied:**
+- Replaced 28 per-call fetches with single `GET /object_info` (all schemas, one call).
+- Fixed `otr_scifi_16gb_test.json` node 1 `runtime_preset`: `🧪 test (1 min)` → `[EMOJI] custom`.
+- Fixed same workflow nodes 20 & 21 `ckpt_name`: `flux1-dev-fp8.safetensors` →
+  `sd3.5_large_fp8_scaled.safetensors` (Flux not present on this system).
+
+**Bug Bible candidate rule:**
+Any `otr_queue.py` equivalent must bulk-fetch `/object_info` once at startup, not per-node.
+Workflow JSONs storing emoji characters in dropdown widget values will fail validation after
+any node refactor that replaces emoji with plain-text placeholders — always audit
+`widgets_values` against live `object_info` schema after node edits.
+
+---
+
 *Active issues only. No change log. Last updated 2026-04-11.*

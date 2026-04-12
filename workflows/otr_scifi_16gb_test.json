@@ -22,7 +22,7 @@
       "widgets_values": [
         "Dead Signal",
         "hard_sci_fi",
-        "\ud83e\uddea test (1 min)",
+        "[EMOJI] custom",
         3,
         3,
         "mistralai/Mistral-Nemo-Instruct-2407",
@@ -604,7 +604,7 @@
         380,
         200
       ],
-      "title": "\ud83c\udfad 8. Character Forge [v2.0]",
+      "title": "🎭 8. Character Forge [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_CharacterForge"
       },
@@ -676,7 +676,7 @@
         380,
         200
       ],
-      "title": "\ud83c\udfa8 9. Scene Painter [v2.0]",
+      "title": "🎨 9. Scene Painter [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_ScenePainter"
       },
@@ -748,7 +748,7 @@
         380,
         200
       ],
-      "title": "\ud83d\uddbc\ufe0f 10. Visual Compositor [v2.0]",
+      "title": "🖼️ 10. Visual Compositor [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_VisualCompositor"
       },
@@ -811,7 +811,7 @@
         380,
         200
       ],
-      "title": "\ud83c\udfac 11. Production Bus [v2.0]",
+      "title": "🎬 11. Production Bus [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_ProductionBus"
       },
@@ -823,7 +823,7 @@
         "keyframes",
         "preview",
         "old_time_radio",
-        false
+        "old_time_radio"
       ],
       "inputs": [
         {
@@ -889,7 +889,7 @@
         "Node name for S&R": "CheckpointLoaderSimple"
       },
       "widgets_values": [
-        "flux1-dev-fp8.safetensors"
+        "sd3.5_large_fp8_scaled.safetensors"
       ],
       "inputs": [],
       "outputs": [
@@ -940,7 +940,7 @@
         "Node name for S&R": "CheckpointLoaderSimple"
       },
       "widgets_values": [
-        "flux1-dev-fp8.safetensors"
+        "sd3.5_large_fp8_scaled.safetensors"
       ],
       "inputs": [],
       "outputs": [
@@ -1350,7 +1350,7 @@
   ],
   "groups": [
     {
-      "title": "1. QUICK STORY \ud83d\udcdd",
+      "title": "1. QUICK STORY 📝",
       "bounding": [
         20,
         80,
@@ -1362,7 +1362,7 @@
       "font_size": 24
     },
     {
-      "title": "2. QUICK AUDIO & VIDEO \ud83c\udfac",
+      "title": "2. QUICK AUDIO & VIDEO 🎬",
       "bounding": [
         970,
         80,
@@ -1374,7 +1374,7 @@
       "font_size": 24
     },
     {
-      "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0]",
+      "title": "4. VISUAL DRAMA ENGINE 🎥 [v2.0]",
       "bounding": [
         20,
         1130,
@@ -1396,7 +1396,7 @@
       ]
     },
     "info": {
-      "name": "OTR Test \u00e2\u20ac\u201d Ultra Lite",
+      "name": "OTR Test â€” Ultra Lite",
       "author": "Jeffrey Brick",
       "description": "7-line pipeline smoke test. Fast Bark render, 720p video. v2.0 Visual Drama Engine placeholders included.",
       "version": "1.5.0-test"
