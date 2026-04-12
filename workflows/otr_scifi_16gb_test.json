@@ -1,8 +1,8 @@
 {
   "id": "b1e2f3a4-c5d6-7890-abcd-ef1234567890",
   "revision": 0,
-  "last_node_id": 24,
-  "last_link_id": 47,
+  "last_node_id": 27,
+  "last_link_id": 58,
   "nodes": [
     {
       "id": 1,
@@ -56,7 +56,8 @@
             16,
             19,
             24,
-            30
+            30,
+            57
           ],
           "slot_index": 1
         },
@@ -123,7 +124,9 @@
             21,
             26,
             45,
-            46
+            46,
+            51,
+            56
           ],
           "slot_index": 0
         },
@@ -604,7 +607,7 @@
         380,
         200
       ],
-      "title": "🎭 8. Character Forge [v2.0]",
+      "title": "\ud83c\udfad 8. Character Forge [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_CharacterForge"
       },
@@ -676,7 +679,7 @@
         380,
         200
       ],
-      "title": "🎨 9. Scene Painter [v2.0]",
+      "title": "\ud83c\udfa8 9. Scene Painter [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_ScenePainter"
       },
@@ -748,7 +751,7 @@
         380,
         200
       ],
-      "title": "🖼️ 10. Visual Compositor [v2.0]",
+      "title": "\ud83d\uddbc\ufe0f 10. Visual Compositor [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_VisualCompositor"
       },
@@ -783,7 +786,8 @@
           "type": "IMAGE",
           "links": [
             43,
-            42
+            42,
+            50
           ],
           "slot_index": 0
         },
@@ -811,7 +815,7 @@
         380,
         200
       ],
-      "title": "🎬 11. Production Bus [v2.0]",
+      "title": "\ud83c\udfac 11. Production Bus [v2.0]",
       "properties": {
         "Node name for S&R": "OTR_ProductionBus"
       },
@@ -820,7 +824,7 @@
         "{}",
         24,
         "otr_v2_episode",
-        "keyframes",
+        "animated",
         "preview",
         "old_time_radio",
         "old_time_radio"
@@ -851,6 +855,14 @@
           "name": "episode_audio",
           "type": "AUDIO",
           "link": 47
+        },
+        {
+          "name": "video_clips_json",
+          "type": "STRING",
+          "link": 58,
+          "widget": {
+            "name": "video_clips_json"
+          }
         }
       ],
       "outputs": [
@@ -1064,6 +1076,210 @@
       "mode": 0,
       "color": "#5B3A29",
       "bgcolor": "#3C261B"
+    },
+    {
+      "id": 25,
+      "type": "OTR_MemoryBoundary",
+      "pos": [
+        1340,
+        1600
+      ],
+      "size": [
+        380,
+        180
+      ],
+      "title": "12. Memory Boundary [v2.0]",
+      "properties": {
+        "Node name for S&R": "OTR_MemoryBoundary"
+      },
+      "widgets_values": [
+        1.8,
+        "sd35_to_ltx",
+        "{}"
+      ],
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 50
+        },
+        {
+          "name": "json_data",
+          "type": "STRING",
+          "link": 51,
+          "widget": {
+            "name": "json_data"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images_passthrough",
+          "type": "IMAGE",
+          "links": [
+            52
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "json_passthrough",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "post_vram_gb",
+          "type": "FLOAT",
+          "links": [],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "color": "#8B0000",
+      "bgcolor": "#4A0000"
+    },
+    {
+      "id": 26,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        1340,
+        1850
+      ],
+      "size": [
+        380,
+        100
+      ],
+      "title": "LTX-Video 22B FP8 (Animation)",
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "ltx-2.3-22b-distilled-fp8.safetensors"
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            53
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            55
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            54
+          ],
+          "slot_index": 2
+        }
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "color": "#2E5090",
+      "bgcolor": "#1A2D50"
+    },
+    {
+      "id": 27,
+      "type": "OTR_SceneAnimator",
+      "pos": [
+        1800,
+        1600
+      ],
+      "size": [
+        420,
+        400
+      ],
+      "title": "13. Scene Animator [v2.0]",
+      "properties": {
+        "Node name for S&R": "OTR_SceneAnimator"
+      },
+      "widgets_values": [
+        "{}",
+        1337,
+        20,
+        3.5,
+        768,
+        512,
+        65,
+        25,
+        0.9,
+        "[]",
+        "",
+        "old_time_radio",
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "ltx_model",
+          "type": "MODEL",
+          "link": 53
+        },
+        {
+          "name": "ltx_vae",
+          "type": "VAE",
+          "link": 54
+        },
+        {
+          "name": "production_plan_json",
+          "type": "STRING",
+          "link": 56,
+          "widget": {
+            "name": "production_plan_json"
+          }
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 57,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "ltx_clip",
+          "type": "CLIP",
+          "link": 55
+        },
+        {
+          "name": "anchor_images",
+          "type": "IMAGE",
+          "link": 52
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_clips_json",
+          "type": "STRING",
+          "links": [
+            58
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "animator_log",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "color": "#1A6B5A",
+      "bgcolor": "#0E3D33"
     }
   ],
   "links": [
@@ -1346,11 +1562,83 @@
       19,
       2,
       "AUDIO"
+    ],
+    [
+      50,
+      18,
+      0,
+      25,
+      0,
+      "IMAGE"
+    ],
+    [
+      51,
+      2,
+      0,
+      25,
+      1,
+      "STRING"
+    ],
+    [
+      52,
+      25,
+      0,
+      27,
+      5,
+      "IMAGE"
+    ],
+    [
+      53,
+      26,
+      0,
+      27,
+      0,
+      "MODEL"
+    ],
+    [
+      54,
+      26,
+      2,
+      27,
+      1,
+      "VAE"
+    ],
+    [
+      55,
+      26,
+      1,
+      27,
+      4,
+      "CLIP"
+    ],
+    [
+      56,
+      2,
+      0,
+      27,
+      2,
+      "STRING"
+    ],
+    [
+      57,
+      1,
+      1,
+      27,
+      3,
+      "STRING"
+    ],
+    [
+      58,
+      27,
+      0,
+      19,
+      4,
+      "STRING"
     ]
   ],
   "groups": [
     {
-      "title": "1. QUICK STORY 📝",
+      "title": "1. QUICK STORY \ud83d\udcdd",
       "bounding": [
         20,
         80,
@@ -1362,7 +1650,7 @@
       "font_size": 24
     },
     {
-      "title": "2. QUICK AUDIO & VIDEO 🎬",
+      "title": "2. QUICK AUDIO & VIDEO \ud83c\udfac",
       "bounding": [
         970,
         80,
@@ -1374,7 +1662,7 @@
       "font_size": 24
     },
     {
-      "title": "4. VISUAL DRAMA ENGINE 🎥 [v2.0]",
+      "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0]",
       "bounding": [
         20,
         1130,
@@ -1396,7 +1684,7 @@
       ]
     },
     "info": {
-      "name": "OTR Test â€” Ultra Lite",
+      "name": "OTR Test \u00e2\u20ac\u201d Ultra Lite",
       "author": "Jeffrey Brick",
       "description": "7-line pipeline smoke test. Fast Bark render, 720p video. v2.0 Visual Drama Engine placeholders included.",
       "version": "1.5.0-test"

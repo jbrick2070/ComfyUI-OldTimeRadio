@@ -203,13 +203,13 @@ class SceneAnimator:
                 "ltx_vae": ("VAE", {
                     "tooltip": "LTX-Video VAE from checkpoint loader",
                 }),
-                "scene_prompts_json": ("STRING", {
+                "production_plan_json": ("STRING", {
                     "multiline": True,
-                    "default": "[]",
+                    "default": "{}",
                     "tooltip": (
-                        "JSON array of scene prompt dicts from PromptBuilder. "
-                        "Each dict has: scene_id, anchor_prompt, motion_prompt, "
-                        "motion, duration_s."
+                        "Production plan from Director. Contains visual_plan "
+                        "with scenes and characters. Used to auto-build prompts "
+                        "via SceneSegmenter + PromptBuilder."
                     ),
                 }),
                 "seed": ("INT", {
@@ -259,6 +259,22 @@ class SceneAnimator:
                 }),
             },
             "optional": {
+                "script_json": ("STRING", {
+                    "multiline": True,
+                    "default": "[]",
+                    "tooltip": (
+                        "Script JSON from ScriptWriter. Used with production_plan_json "
+                        "to auto-segment scenes and build prompts."
+                    ),
+                }),
+                "scene_prompts_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": (
+                        "Pre-built scene prompts JSON (overrides auto-build). "
+                        "If empty, auto-generates from script_json + production_plan_json."
+                    ),
+                }),
                 "ltx_clip": ("CLIP", {
                     "tooltip": (
                         "LTX text encoder. If not provided, motion_prompt "
@@ -285,11 +301,12 @@ class SceneAnimator:
             },
         }
 
-    def animate(self, ltx_model, ltx_vae, scene_prompts_json="[]",
+    def animate(self, ltx_model, ltx_vae, production_plan_json="{}",
                 seed=1337, steps=_DEFAULT_STEPS, cfg=_DEFAULT_CFG,
                 width=_DEFAULT_WIDTH, height=_DEFAULT_HEIGHT,
                 num_frames=_DEFAULT_NUM_FRAMES, fps=_DEFAULT_FPS,
                 i2v_strength=_DEFAULT_STRENGTH,
+                script_json="[]", scene_prompts_json="",
                 ltx_clip=None, anchor_images=None,
                 output_subdir="old_time_radio", fallback_clip_path=""):
 
@@ -317,16 +334,37 @@ class SceneAnimator:
         clips_dir = os.path.join(output_dir, "v2_clips")
         os.makedirs(clips_dir, exist_ok=True)
 
-        # Parse scene prompts
-        try:
-            scene_prompts = json.loads(scene_prompts_json) if isinstance(
-                scene_prompts_json, str) else scene_prompts_json
-        except (json.JSONDecodeError, TypeError):
-            scene_prompts = []
+        # --- Build scene prompts ---
+        # Priority: explicit scene_prompts_json > auto-build from script + plan
+        scene_prompts = []
+        if scene_prompts_json and scene_prompts_json.strip():
+            try:
+                scene_prompts = json.loads(scene_prompts_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        if not scene_prompts:
+            # Auto-build: run SceneSegmenter + PromptBuilder
+            _runtime_log("SceneAnimator: auto-building prompts from script + plan")
+            try:
+                from ..orchestrator.scene_segmenter import segment_scenes
+                from ..orchestrator.prompt_builder import build_prompt_matrix
+
+                scenes = segment_scenes(script_json, production_plan_json)
+                plan = json.loads(production_plan_json) if isinstance(
+                    production_plan_json, str) else production_plan_json
+                scene_prompts = build_prompt_matrix(scenes, plan)
+                _runtime_log(
+                    f"SceneAnimator: auto-built {len(scene_prompts)} scene prompts"
+                )
+            except Exception as e:
+                log.error("[SceneAnimator] Auto-build failed: %s", e, exc_info=True)
+                _runtime_log(f"SceneAnimator: auto-build FAILED — {e}")
 
         if not scene_prompts:
             _runtime_log("SceneAnimator: no scene prompts — returning empty")
-            return ("[]", "SceneAnimator: No scene prompts provided.")
+            return ("[]", "SceneAnimator: No scene prompts. Wire script_json + "
+                          "production_plan_json from ScriptWriter/Director.")
 
         # Validate frame count
         num_frames = _valid_frame_count(num_frames)
