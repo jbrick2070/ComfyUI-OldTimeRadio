@@ -44,3 +44,9 @@ patch_*.py
 OTR_TECH_BRIEF.md
 SIGNAL_LOST_v*.md
 !QA_GUIDE_v1.4.md
+
+# Agent prompt files (local operational config, not public docs)
+CLAUDE.md
+ANTIGRAVITY_PROMPT.md
+COLLECTIVE_CONSCIOUSNESS.md
+*_PROMPT.md
