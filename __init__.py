@@ -103,8 +103,8 @@ _NODE_MODULES = {
     "OTR_VisualCompositor":   (".nodes.v2_preview",             "VisualCompositor",        "🖼️ 10. Visual Compositor [v2.0]"),
     "OTR_ProductionBus":      (".nodes.v2_preview",             "ProductionBus",           "🎬 11. Production Bus [v2.0]"),
     # ── v2.0 Animation Pipeline (LTX-Video I2V) ─────────────────────
-    "OTR_MemoryBoundary":     (".v2.nodes.memory_boundary",     "MemoryBoundaryNode",      "🧹 12. Memory Boundary [v2.0]"),
-    "OTR_SceneAnimator":      (".v2.nodes.scene_animator",       "SceneAnimator",           "🎥 13. Scene Animator [v2.0]"),
+    "OTR_MemoryBoundary":     (".nodes.memory_boundary",     "MemoryBoundaryNode",      "🧹 12. Memory Boundary [v2.0]"),
+    "OTR_SceneAnimator":      (".nodes.scene_animator",       "SceneAnimator",           "🎥 13. Scene Animator [v2.0]"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

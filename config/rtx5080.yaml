@@ -1,0 +1,53 @@
+mode: safe                     # safe | experiment
+
+boundaries:
+  llm_to_audio_s: 1.2
+  audio_to_visual_s: 1.8
+  forge_to_painter_s: 1.8
+  sd_to_ltx_s: 2.3
+  drift_flush_every_n_scenes: 10
+  drift_flush_s: 3.0
+
+vram:
+  watermark_gb: 14.3
+  peak_fail_gb: 14.5
+
+image:
+  model: sd3.5_medium_gguf_q8_0
+  loader: ComfyUI-GGUF
+  resolution: [1024, 1024]
+
+video:                         # EXPERIMENT only
+  model: ltx-2.3-22b-distilled-fp8
+  loader: ComfyUI-LTXVideo
+  precision: fp8_e4m3fn        # e5m2 -> hard-fail
+  resolution: [768, 512]
+  fps: 25
+  duration_s_range: [2.0, 4.0]
+
+audio:
+  master_sample_rate: 48000
+  master_bit_depth: 24
+  resample_method: sox_vhq
+
+scenes:
+  segmenter_trigger_lines: 8
+  lines_per_scene_when_chunking: 4
+
+reconcile:
+  av_duration_policy: hold_last_frame   # hold_last_frame|loop|crossfade_black|timestretch
+  av_tolerance_ms: 150
+  av_drift_fail_ms: 500
+
+fallback:
+  clip: assets/signal_lost_prerender.mp4
+  max_per_episode: 2
+
+ffmpeg:
+  static_clip_timeout_s: 30
+  concat_timeout_s: 120
+
+comfyui_required_args:
+  - --highvram
+  - --force-fp16
+  - --cuda-malloc
