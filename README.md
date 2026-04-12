@@ -22,7 +22,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 **[Click here to download the full package (v1.5)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
 
-**[Checkout v2.0-visual-engine branch](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine)** — next-gen animation pipeline with LTX-Video I2V, VRAM optimization, and 93-entry regression test suite.
+**Latest Beta (Following along?):** [Checkout the v2.0-visual-engine branch](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-visual-engine) — next-gen animation pipeline with Flux CharacterForge, ScenePainter, and ProductionBus. Fully validated against the latest **94-entry regression test suite** (including BUG-12.36 venv isolation).
 
 ---
 
