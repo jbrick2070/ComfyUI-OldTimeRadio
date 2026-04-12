@@ -1,210 +1,86 @@
-# OldTimeRadio — Rules of the Road
+# OldTimeRadio — Project Rules
 
-These are the permanent operating rules for any AI assistant working on this project.
-Violating these rules is grounds for immediate rollback.
+## Branch & Shipping
 
----
+- All v2 work on `v2.0-alpha`. Do not touch `main`.
+- Only Jeffrey merges to `main` and tags releases.
 
-## 1. Branching and Versioning
+## Git Push
 
-- **All v2 work lives on `v2.0-alpha`**, never on `main`, until Jeffrey says ship.
-- v1.5 is shipped and stable on `main`. Do not modify `main`.
-- **No changelogs until v2.0 ships.** Keep the `ROADMAP.md` updated with current status instead.
-- **Only Jeffrey ships.** Merge to `main` and tag a release only when Jeffrey personally confirms.
-
----
-
-## 2. Git Push Protocol
-
-Pushing to GitHub frequently fails. Follow this exact sequence every time:
-
-1. **Try the push once** programmatically (quick, no fuss).
-2. **If it fails**, immediately hand Jeffrey a PowerShell block to paste. The block **must include the `cd` command** because he may not be in the right directory:
+1. Try push once. If it fails, hand Jeffrey a PowerShell block with `cd` included:
    ```
    cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
-   git add -A
-   git commit -m "your message here"
-   git push
+   git add -A && git commit -m "message" && git push
    ```
-3. **After push (whether automatic or manual), always run the integrity checklist:**
-   - Verify local HEAD matches `origin/main` (or the target branch) — lockstep check.
-   - Scan for **0-byte files** in the repo.
-   - Scan for **BOM signatures** (UTF-8 only, no BOM on Windows).
-   - Check for **truncated files** (compare expected line counts).
-   - Verify **all node classes are registered** in `__init__.py` `NODE_CLASS_MAPPINGS`.
-   - Check for **missing widget mapping blocks** in workflow JSON files.
-4. **If any check fails**, fix it and repeat from step 1.
-5. **Do not declare done until lockstep is confirmed.**
+2. After every push, verify lockstep (`local HEAD == origin HEAD`), no 0-byte files, no BOM, all node classes registered in `__init__.py`, workflow JSONs valid.
 
----
+## Testing
 
-## 3. Regression Testing (Non-Negotiable)
+Run all three before committing:
 
-Every code change must pass a regression sweep before being considered complete:
+```bash
+# Core + VRAM
+pytest tests/test_core.py tests/vram_profile_test.py -v
 
-- **Run the full test suite** (`tests/test_core.py`, `tests/vram_profile_test.py`).
-- **Run the Bug Bible regression suite** against this pack:
-  ```bash
-  python -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -v --pack-dir .
-  ```
-- **Widget error testing**: Verify all nodes load without widget errors in ComfyUI. Check that all `INPUT_TYPES` return valid type specs and that workflow JSONs have explicit `{"widget": "string"}` mapping blocks for string inputs.
-- **Bug Bible regression**: Cross-reference changes against the Bug Bible:
-  - Repo: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
-  - File: `BUG_BIBLE.yaml`
-  - Key bugs to always check: BUG-010 (0-dialogue hard abort), BUG-12.33 (Oversized prompt pre-fill stall/VRAM spike), widget connection drops, VRAM spills, cache deadlocks.
-- **VRAM ceiling**: Peak VRAM must stay at or below 14.5 GB. Run `vram_profile_test.py` to confirm.
-- **VRAM & Context Etiquette**:
-  - **Never use `force_vram_offload()` between LLM phases** within the same script-writing pass. Use `_flush_vram_keep_llm()` to retain weights while clearing KV cache.
-  - **Always enforce Prompt Truncation** against `context_cap` before calling `model.generate()`. If prompt > cap, truncate head.
-  - **Warmup Mandatory**: All LLM loaders must perform a 1-token warmup pass to front-load CUDA kernel JIT compilation.
-- Create **scratch scripts** (in `scratch/` directory) to help validate edge cases. These are disposable — delete when done.
+# Bug Bible regression
+python -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -v --pack-dir .
 
----
+# v2 audio regression (Phase 0+)
+pytest tests/v2/test_audio_byte_identical.py -v
+```
 
-## 4. Bug Log and Bug Bible Pipeline
+**VRAM ceiling:** 14.5 GB peak. Never use `force_vram_offload()` between LLM phases — use `_flush_vram_keep_llm()`. Always enforce prompt truncation against `context_cap`. All LLM loaders must do a 1-token warmup pass.
 
-### Local Bug Log (`BUG_LOG.md`)
+## Bug Log Pipeline
 
-Maintain a running bug log at `BUG_LOG.md` in the repo root during active development. Every bug encountered gets logged immediately — don't wait for repeats.
-
-**Format for each entry:**
+Log every bug immediately in `BUG_LOG.md`:
 
 ```markdown
-### BUG-LOCAL-NNN: Short title
-- **Date:** YYYY-MM-DD
-- **Phase:** Which v2 build phase (0-6) this was hit during
-- **Symptom:** What you saw (exact error, behavior, output)
-- **Cause:** Why it happened (root cause, not just the trigger)
-- **Fix:** What resolved it (code change, config change, workaround)
-- **Verify:** How to confirm it's fixed (test command, manual check)
-- **Tags:** searchable keywords (e.g., vram, widget-drift, ffmpeg, subprocess)
-- **Bible candidate:** yes/no — is this a general ComfyUI lesson or OTR-specific?
+### BUG-LOCAL-NNN: Title
+- **Date:** YYYY-MM-DD | **Phase:** 0-6 | **Bible candidate:** yes/no
+- **Symptom:** exact error/behavior
+- **Cause:** root cause
+- **Fix:** what resolved it
+- **Verify:** how to confirm
+- **Tags:** vram, widget-drift, ffmpeg, subprocess, etc.
 ```
 
-**Rules:**
-- Log bugs **as you find them**, not after the fact. The log is a live document.
-- Include the exact error message or traceback — don't summarize.
-- If a bug is OTR-specific (e.g., a typo in a prompt template), mark `Bible candidate: no`.
-- If a bug is a general ComfyUI lesson that other node authors would hit, mark `Bible candidate: yes`.
-- Don't delete entries when bugs are fixed — mark them as `[FIXED]` in the title. The log is a record of what happened during the v2 build.
+Mark `[FIXED]` when resolved — don't delete entries. When `Bible candidate: yes` and fix is verified, promote to the survival guide repo (`C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`):
+1. Add entry to `BUG_BIBLE.yaml` (schema: `id`, `phase`, `area`, `symptom`, `cause`, `fix`, `verify`, `tags`, `legacy_id`)
+2. Add regression test to `tests/bug_bible_regression.py`
+3. Update `README.md` entry count
+4. Run three-file contract test to confirm sync
 
-### Promoting to the Bug Bible
+## Content Standards
 
-The Bug Bible lives in the survival guide repo:
-- **Repo:** `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`
-- **YAML:** `BUG_BIBLE.yaml`
-- **Tests:** `tests/bug_bible_regression.py`
+Safe for work. No profanity. Good narrative arc (beginning, middle, end). Non-violent.
 
-When a bug is marked `Bible candidate: yes` and the fix is verified:
+## References
 
-1. **Add a new entry to `BUG_BIBLE.yaml`** following the existing schema (`id`, `phase`, `area`, `symptom`, `cause`, `fix`, `verify`, `tags`, `legacy_id`). Use the next available ID in the appropriate phase (e.g., `09.03` for a new subprocess bug).
-2. **Add a matching test to `tests/bug_bible_regression.py`** if the verify step can be checked by static file analysis (most can). Follow the existing test patterns — pure static analysis, no ComfyUI runtime needed.
-3. **Update `README.md`** in the survival guide repo with the new entry count.
-4. **Run the three-file contract test** to confirm everything is in sync:
-   ```bash
-   cd "C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide"
-   python -m pytest tests/bug_bible_regression.py -v --pack-dir "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
-   ```
-5. All three files (YAML, test .py, README) must stay in sync — this is the **Three-File Contract** (BUG-12.35).
-
-### QA Guides
-
-- QA guides are temporary and only created for complex bugs that need a multi-step reproduction protocol.
-- **Delete the QA guide** once the bug is resolved and the fix is verified. The Bug Bible entry is the permanent record.
+| Resource | Location |
+|----------|----------|
+| OTR Repo | https://github.com/jbrick2070/ComfyUI-OldTimeRadio |
+| Bug Bible | https://github.com/jbrick2070/comfyui-custom-node-survival-guide |
+| v2 Design Spec | `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md` |
 
 ---
 
-## 5. Code Quality Standards
+## v2.0 Constraints
 
-- **Clean code.** Every function, variable, and file should make sense to a reader on first pass.
-- **Clean logs.** Log messages should be informative, structured, and greppable. No noise, no spam.
-- **Meaningful comments.** Explain the *why*, not the *what*.
-- **Perfection is the target.** If something looks half-done, finish it.
-
----
-
-## 6. Content Standards
-
-Generated stories and narrative content must follow these rules:
-
-- **Safe for work.** No explicit, violent, or disturbing content.
-- **No profanity.** Zero tolerance for curse words in code, comments, logs, or generated output.
-- **Good narrative structure.** Every story should have a clear beginning, middle, and end with a satisfying arc.
-- **Non-violent.** Drama and tension are fine, but no graphic violence.
-
----
-
-## 7. Security Awareness
-
-- **Assume compromise.** Always verify that the right files are updated and that nothing unexpected has changed.
-- **After every push**, visually confirm on GitHub (via web) that the pushed files match what was intended.
-- **Check file integrity** — 0-byte files, unexpected modifications, or missing files could indicate a problem.
-
----
-
-## 8. Reference Links
-
-| Resource | URL |
-|----------|-----|
-| **OldTimeRadio Repo** | https://github.com/jbrick2070/ComfyUI-OldTimeRadio |
-| **Bug Bible (Survival Guide)** | https://github.com/jbrick2070/comfyui-custom-node-survival-guide |
-| **Bug Bible YAML** | https://github.com/jbrick2070/comfyui-custom-node-survival-guide/blob/main/BUG_BIBLE.yaml |
-| **ROADMAP** | `ROADMAP.md` (in this repo) |
-
----
-
-## 9. Integrity Checklist (Run After Every Push)
-
-```
-[ ] Local HEAD == origin HEAD (lockstep)
-[ ] No 0-byte files in repo
-[ ] No BOM signatures (UTF-8 only)
-[ ] No truncated files
-[ ] All node classes registered in __init__.py NODE_CLASS_MAPPINGS
-[ ] All workflow JSONs have widget mapping blocks for string inputs
-[ ] vram_profile_test.py passes
-[ ] Full test suite passes (89+ tests)
-[ ] Bug Bible regression passes (python -m pytest <survival-guide>/tests/bug_bible_regression.py -v --pack-dir .)
-```
-
----
-
-## 10. v2.0 Visual Sidecar — Inviolable Constraints
-
-**Audio is king. The full narrative story output must never break, shorten, or degrade.**
-
-The v2 visual sidecar adds video generation alongside the audio pipeline. The audio pipeline is frozen — it must produce byte-identical output to v1.5 at every step. If adding video breaks audio in any way, revert immediately.
-
-**Design spec:** `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+**Audio is king. Full narrative output must never break, shorten, or degrade. If video breaks audio, revert immediately.**
 
 | ID | Rule |
 |----|------|
-| C1 | **No new inputs** on `OTR_BatchBarkGenerator`, `OTR_SceneSequencer`, `OTR_KokoroAnnouncer`, `OTR_AudioEnhance`, `OTR_EpisodeAssembler`, `OTR_MusicGenTheme`, `OTR_BatchAudioGenGenerator`, `OTR_Gemma4ScriptWriter`, `OTR_Gemma4Director`. Adding inputs shifts `widgets_values` indices and silently corrupts seeds/voices. |
-| C2 | **No `CheckpointLoaderSimple`** or stock diffusion nodes in the main graph. They load checkpoints into the ComfyUI process while audio models hold residual VRAM — OOM on 16 GB. |
-| C3 | All visual generation runs in **subprocesses** spawned with `multiprocessing.get_context("spawn")`. OS-level VRAM reclaim is the only reliable boundary across PyTorch + Blender. |
-| C4 | LTX-2.3 clips capped at **10-12 seconds** (257 frames @ 24fps). Longer shots auto-chunk + ffmpeg crossfade. |
-| C5 | LTX-2.3 must use Blackwell-native `torch.float8_e4m3fn`. |
-| C6 | IP-Adapter is for **environments only**, never characters with lipsync (causes "Silent Lip Bug"). |
-| C7 | Episode audio output must be **byte-identical** to v1.5 baseline at every gate. Full-length episode, full narrative arc, no truncation, no hash changes. |
+| C1 | **No new inputs** on any v1.5 node (`OTR_BatchBarkGenerator`, `OTR_SceneSequencer`, `OTR_KokoroAnnouncer`, `OTR_AudioEnhance`, `OTR_EpisodeAssembler`, `OTR_MusicGenTheme`, `OTR_BatchAudioGenGenerator`, `OTR_Gemma4ScriptWriter`, `OTR_Gemma4Director`). Shifts `widgets_values` indices, silently corrupts seeds/voices. |
+| C2 | **No `CheckpointLoaderSimple`** or stock diffusion nodes in the main graph. OOM on 16 GB. |
+| C3 | All visual generation in **subprocesses** via `multiprocessing.get_context("spawn")`. |
+| C4 | LTX-2.3 clips **max 10-12 s** (257 frames @ 24fps). Auto-chunk + ffmpeg crossfade. |
+| C5 | LTX-2.3 uses `torch.float8_e4m3fn` (Blackwell-native). |
+| C6 | IP-Adapter for **environments only**, never characters (Silent Lip Bug). |
+| C7 | Audio output **byte-identical** to v1.5 baseline at every gate. |
 
-### Audio Regression Gate
+**Only legal v1.5 modification:** `OTR_SignalLostVideo` (#12) gets one optional `visual_overlay` input (STRING, last slot). Byte-identical when unwired.
 
-Before committing any v2 change, run:
+**Hardware:** RTX 5080, 16 GB VRAM, Blackwell, single GPU, no cloud.
 
-```bash
-pytest tests/v2/test_audio_byte_identical.py
-```
-
-If it fails, **revert immediately**. The audio path is non-negotiable.
-
-### The Only Legal v1.5 Node Modification
-
-`OTR_SignalLostVideo` (node #12) may gain **one** new optional input: `visual_overlay` (STRING — path to MP4). It must be the **last** input slot. When unwired, output must be byte-identical to v1.5. No other v1.5 node may be modified.
-
-### Hardware
-
-RTX 5080, 16 GB VRAM, Blackwell, single GPU, no cloud. LTX-2.3 at FP8 uses ~11 GB, leaving 5 GB for audio residuals + OS + ffmpeg.
-
-### What Went Wrong Last Time (v2.0-visual-engine branch)
-
-The previous v2 attempt broke audio output by modifying existing node inputs, causing widget drift that silently corrupted seeds and voices. It also tried to load diffusion models in-process, causing OOM. That branch is preserved as reference but should not be merged. This fresh attempt uses a sidecar architecture that is physically incapable of modifying the audio DAG.
+**Previous attempt failed** (`v2.0-visual-engine`, deleted) by modifying node inputs (widget drift) and loading diffusion in-process (OOM). This sidecar architecture prevents both.
