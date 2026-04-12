@@ -4380,7 +4380,10 @@ Format your response exactly as:
         voice_notrait_pat = re.compile(r'^\[VOICE:\s*([A-Z][A-Z0-9_ ]+?)\]\s*(.+)$', re.IGNORECASE)
         # v3 (tag only): [VOICE: NAME, traits] with dialogue on NEXT line
         voice_tagonly_pat = re.compile(r'^\[VOICE:\s*(.+?)(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
-        # v4 (shorthand): [ANNOUNCER, traits] or [ANNOUNCER] as a standalone tag (Mistral Nemo style)
+        # v4a (shorthand inline): [NAME, traits] dialogue on same line (no VOICE: prefix)
+        # Catches critique-revision LLM output like: [WILL BOUVIER, female, 40s, determined] "dialogue"
+        voice_shorthand_inline_pat = re.compile(r'^\[([A-Z][A-Z0-9_ ]{1,20}),\s*(.+?)\]\s*(.+)$', re.IGNORECASE)
+        # v4b (shorthand tag-only): [ANNOUNCER, traits] or [ANNOUNCER] as a standalone tag (Mistral Nemo style)
         voice_shorthand_pat = re.compile(r'^\[([A-Z][A-Z0-9_ ]{1,20})(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
 
         raw_lines = text.strip().splitlines()
@@ -4488,7 +4491,30 @@ Format your response exactly as:
                         continue
                     # else: fall through as direction
 
-            # v4: [CHARACTER, traits] shorthand (e.g. [ANNOUNCER, female, 50s, calm])
+            # v4a: [CHARACTER, traits] dialogue on same line (no VOICE: prefix)
+            # Catches critique-revision output: [WILL BOUVIER, female, 40s, determined] "dialogue"
+            m = voice_shorthand_inline_pat.match(s)
+            if m:
+                raw_name     = m.group(1).strip()
+                voice_traits = m.group(2).strip()
+                dialogue     = m.group(3).strip().strip('"\u201c\u201d*_')
+                upper_name   = raw_name.upper()
+                _first_word  = upper_name.split()[0] if upper_name.strip() else ""
+                if _first_word not in (
+                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                    "TRANSITION", "CONTINUED", "CONT", "END", "SYSTEM_SENTINEL",
+                ):
+                    if raw_name.lower() in self._GENDER_WORDS:
+                        _fallback_counter += 1
+                        character_name = f"CHAR_{chr(64 + _fallback_counter)}"
+                        voice_traits = f"{raw_name}, {voice_traits}"
+                    else:
+                        character_name = upper_name
+                    lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": voice_traits, "line": dialogue})
+                    i += 1
+                    continue
+
+            # v4b: [CHARACTER, traits] shorthand tag-only (e.g. [ANNOUNCER, female, 50s, calm])
             # Used by Mistral Nemo when it omits the VOICE: prefix
             m = voice_shorthand_pat.match(s)
             if m:
@@ -4712,6 +4738,20 @@ The script follows these tokens:
       "notes": "Male, calm, 40s"
     }}
   }},
+  "visual_plan": {{
+    "characters": {{
+      "CHARACTER_A": {{
+        "portrait_prompt": "Cinematic portrait of a male, 40s, rugged, futuristic coat, ambient blue light, high fidelity"
+      }}
+    }},
+    "scenes": [
+      {{
+        "scene_id": "scene_1",
+        "shot_description": "Rain-slicked neon street",
+        "visual_prompt": "Cinematic shot of a rainy neon cyberpunk street, puddles on asphalt, glowing signs, atmospheric, photorealistic"
+      }}
+    ]
+  }},
   "sfx_plan": [
     {{
       "cue_id": "sfx_001",
@@ -4739,20 +4779,6 @@ The script follows these tokens:
   ],
   "pacing": {{
     "beat_pause_ms": 100
-  }},
-  "visual_plan": {{
-    "characters": {{
-      "CHARACTER_A": {{
-        "portrait_prompt": "Cinematic portrait of a male, 40s, rugged, futuristic coat, ambient blue light, high fidelity"
-      }}
-    }},
-    "scenes": [
-      {{
-        "scene_id": "scene_1",
-        "shot_description": "Rain-slicked neon street",
-        "visual_prompt": "Cinematic shot of a rainy neon cyberpunk street, puddles on asphalt, glowing signs, atmospheric, photorealistic"
-      }}
-    ]
   }}
 }}
 
@@ -4922,11 +4948,12 @@ class LLMDirector:
 
         # Scale max_new_tokens to script length.
         # Director output: voice_assignments (placeholder presets, procedurally
-        # overridden), sfx_plan, music_plan (3 fixed cues), pacing. No dialogue
-        # duplication. A 5-character cast + 10 SFX cues + 3 music cues = ~600-800 tokens.
-        # Budget: ~1 token per 10 chars of script (for SFX scanning) + 550 base.
+        # overridden), visual_plan (characters + scenes), sfx_plan, music_plan
+        # (3 fixed cues), pacing, vintage_settings. No dialogue duplication.
+        # v2.0 visual_plan adds ~300 tokens (portrait_prompt per char + visual_prompt
+        # per scene). Budget: ~1 token per 10 chars of script + 850 base.
         script_len = len(script_text)
-        max_tokens = min(1700, max(650, 550 + script_len // 10))
+        max_tokens = min(2400, max(950, 850 + script_len // 10))
         log.info(f"[LLMDirector] max_new_tokens={max_tokens} (script={script_len} chars)")
 
         raw = _generate_with_llm(
@@ -4972,9 +4999,18 @@ class LLMDirector:
         sfx_json = json.dumps(plan.get("sfx_plan", []), indent=2)
         music_json = json.dumps(plan.get("music_plan", []), indent=2)
 
+        vp = plan.get("visual_plan", {})
         log.info(f"[LLMDirector] Plan: {len(plan.get('voice_assignments', {}))} voices, "
                  f"{len(plan.get('sfx_plan', []))} SFX cues, "
-                 f"{len(plan.get('music_plan', []))} music cues")
+                 f"{len(plan.get('music_plan', []))} music cues, "
+                 f"{len(vp.get('characters', {}))} chars, "
+                 f"{len(vp.get('scenes', []))} scenes")
+        _runtime_log(
+            f"Director: plan keys={sorted(plan.keys())} | "
+            f"visual_plan={'YES' if vp else 'MISSING'} | "
+            f"chars={list(vp.get('characters', {}).keys())} | "
+            f"scenes={len(vp.get('scenes', []))}"
+        )
 
         # BUG-012 FIX: Explicitly unload Gemma from VRAM at the end of the director phase.
         # Otherwise it stays resident during the audio generation phases, causing VRAM OOM
