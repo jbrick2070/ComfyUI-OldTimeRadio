@@ -61,14 +61,56 @@ Every code change must pass a regression sweep before being considered complete:
 
 ---
 
-## 4. Bug Log and QA Guide Lifecycle
+## 4. Bug Log and Bug Bible Pipeline
 
-- **No QA guides or bug logs exist unless there are active bugs.** Zero stale docs.
-- If the **same bug appears 3 times**, create a formal bug log file (e.g., `BUG_LOG_v1.5.md`) in the repo root.
-- A QA guide may be created alongside the bug log to document testing protocols for that specific bug.
-- The bug log exists for **peer review** — Jeffrey may share it with reviewers.
-- **Delete both the bug log AND the QA guide** once the bug is resolved and the fix is verified.
-- The Bug Bible (`BUG_BIBLE.yaml` in the survival guide repo) is the permanent record. Local QA docs are temporary.
+### Local Bug Log (`BUG_LOG.md`)
+
+Maintain a running bug log at `BUG_LOG.md` in the repo root during active development. Every bug encountered gets logged immediately — don't wait for repeats.
+
+**Format for each entry:**
+
+```markdown
+### BUG-LOCAL-NNN: Short title
+- **Date:** YYYY-MM-DD
+- **Phase:** Which v2 build phase (0-6) this was hit during
+- **Symptom:** What you saw (exact error, behavior, output)
+- **Cause:** Why it happened (root cause, not just the trigger)
+- **Fix:** What resolved it (code change, config change, workaround)
+- **Verify:** How to confirm it's fixed (test command, manual check)
+- **Tags:** searchable keywords (e.g., vram, widget-drift, ffmpeg, subprocess)
+- **Bible candidate:** yes/no — is this a general ComfyUI lesson or OTR-specific?
+```
+
+**Rules:**
+- Log bugs **as you find them**, not after the fact. The log is a live document.
+- Include the exact error message or traceback — don't summarize.
+- If a bug is OTR-specific (e.g., a typo in a prompt template), mark `Bible candidate: no`.
+- If a bug is a general ComfyUI lesson that other node authors would hit, mark `Bible candidate: yes`.
+- Don't delete entries when bugs are fixed — mark them as `[FIXED]` in the title. The log is a record of what happened during the v2 build.
+
+### Promoting to the Bug Bible
+
+The Bug Bible lives in the survival guide repo:
+- **Repo:** `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`
+- **YAML:** `BUG_BIBLE.yaml`
+- **Tests:** `tests/bug_bible_regression.py`
+
+When a bug is marked `Bible candidate: yes` and the fix is verified:
+
+1. **Add a new entry to `BUG_BIBLE.yaml`** following the existing schema (`id`, `phase`, `area`, `symptom`, `cause`, `fix`, `verify`, `tags`, `legacy_id`). Use the next available ID in the appropriate phase (e.g., `09.03` for a new subprocess bug).
+2. **Add a matching test to `tests/bug_bible_regression.py`** if the verify step can be checked by static file analysis (most can). Follow the existing test patterns — pure static analysis, no ComfyUI runtime needed.
+3. **Update `README.md`** in the survival guide repo with the new entry count.
+4. **Run the three-file contract test** to confirm everything is in sync:
+   ```bash
+   cd "C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide"
+   python -m pytest tests/bug_bible_regression.py -v --pack-dir "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
+   ```
+5. All three files (YAML, test .py, README) must stay in sync — this is the **Three-File Contract** (BUG-12.35).
+
+### QA Guides
+
+- QA guides are temporary and only created for complex bugs that need a multi-step reproduction protocol.
+- **Delete the QA guide** once the bug is resolved and the fix is verified. The Bug Bible entry is the permanent record.
 
 ---
 
