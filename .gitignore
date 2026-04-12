@@ -33,9 +33,9 @@ Thumbs.db
 *.flac
 !samples/*.wav
 
-# runtime + scratch
+# Runtime + scratch
 otr_runtime.log
-__pycache__/
+scratch/
 .pytest_cache/
 pytest-cache-files-*/
 QA_*.md
@@ -43,4 +43,11 @@ QA_*.txt
 patch_*.py
 OTR_TECH_BRIEF.md
 SIGNAL_LOST_v*.md
-!QA_GUIDE_v1.4.md
+
+# Virtual environments
+.venv/
+venv/
+
+# v2 generated artifacts
+*.mp4
+!assets/*.mp4
