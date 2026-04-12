@@ -1,127 +1,124 @@
-# Alpha 2.0 QA Report — Round 7 Final (with Addendum)
+# Alpha 2.0 QA Report — Active Issues
 
 **Project:** ComfyUI-OldTimeRadio v2.0 Visual Drama Engine
-**File under test:** `nodes/v2_preview.py` (989 lines, was 835)
+**File under active work:** `nodes/v2_preview.py`
 **Date:** 2026-04-11
-**QA performed by:** Claude Opus (Cowork session, sandbox)
 **Hardware target:** RTX 5080 / 16 GB VRAM / 64 GB RAM (Legion Pro 7i Gen 10)
-**Reviewer:** 17
 
 ---
 
-## Executive Summary
+## Active Bugs
 
-All 9 bugs from the Round 7 Action Plan have been addressed. 6 code fixes applied, 1 dead-code deletion, 2 closed as not-reproducible. A new content safety module was created. Additionally, all 6 required edits from the V2_PREVIEW_ADDENDUM (Reviewer 17 / Gemini Deep Research) have been implemented, plus 2 nice-to-have improvements. A 57-test suite (unit + integration) passes in 0.18s. Both workflow JSONs were updated for widget compatibility. Bug Bible cross-check caught and fixed a widget-value positional mismatch that would have silently broken workflow loads.
+### BUG-A1 — ProductionBus: keyframes mode produced 1-second video instead of full-length episode
 
-**Live testing on the RTX 5080 has not yet been performed.** All sandbox-verifiable work is complete.
+**Priority:** P0 — breaks deliverable entirely
+**Status:** Fix applied, awaiting live validation
 
----
+**Root cause:** In keyframes mode, `render_fps` was clamped to `max(1, ...)`, so with 1 scene and 202s
+audio the video came out as 1 frame at 1 fps = 1 second. The `-shortest` flag then cut to the shorter
+stream, dropping the audio entirely.
 
-## Bug Disposition
+**Fix applied (2026-04-11):** Replaced the broken `render_fps` path with FFmpeg concat demuxer. Each
+scene frame is now assigned an explicit `duration = audio_duration_s / num_scenes` in a `concat.txt`
+file. FFmpeg reads this as a timed slideshow, so the output is exactly `audio_duration_s` long regardless
+of scene count. Even 1 scene = full 202s episode.
 
-| Bug | Priority | Status | Summary |
-|-----|----------|--------|---------|
-| BUG-002 | P0 | Fixed | `comfy.sample.sample()` call converted from fragile positional args to keyword args. Matches canonical KSampler pattern. |
-| BUG-007 | P0 | Fixed | Temp frame cleanup wrapped in `try/finally`. Moved to project-local `preview_tmp/`. Added 18K frame hard cap. New `preview_mode` input (none/keyframes/full, default keyframes). |
-| BUG-012 | P0 | Fixed | New `nodes/safety_filter.py` with regex denylist. `classify_prompt()` API returns allow/flag/block. Hooked into `_generate_image()` before any GPU work. 10/10 bad prompts blocked in acceptance test. |
-| BUG-001 | P1 | Fixed | `_encode_prompt()` now shallow-copies the dict from `clip.encode_from_tokens()` before `.pop("cond")`. Prevents shared-dict mutation across back-to-back encodes. |
-| BUG-010 | P1 | Fixed | New `vram_power_wash` BOOLEAN on CharacterForge (default True). Calls `mm.unload_all_models()` + `mm.soft_empty_cache()` at visual phase entry to reclaim audio-phase VRAM. |
-| BUG-006 | P1 | Fixed | New `_safe_name()` helper strips `\/:*?"<>|` and control chars, caps at 80 chars. Applied at all `output_name` interpolation sites (temp WAV + final MP4). |
-| BUG-005 | P2 | Fixed | Deleted 4-line dead scanline loop (`draw.line(fill=None, width=0)`). Real scanline effect at lines 626+ untouched. |
-| BUG-003 | P2 | Closed | Grepped all node files for `error_image`/`error_frame` — not found. No dedicated error-image generator exists. Closed as not-reproducible. |
-| BUG-004 | P2 | Closed | No Flux-specific stacking loop in `v2_preview.py`. Encoder is generic. Closed per action plan. |
+**Validation needed (RTX 5080):**
+- T2: 720p / 1 min, keyframes — duration matches audio, MP4 plays
+- T3: 720p / 10 min stress — full episode length, no OOM
 
 ---
 
-## New Files Created
+### BUG-A2 — v2 nodes invisible to otr_runtime.log (diagnostic gap)
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `nodes/safety_filter.py` | Content safety regex denylist + classify_prompt() API | 141 |
-| `tests/unit/test_encode_prompt.py` | BUG-001 regression tests (mock CLIP, no GPU) | 86 |
-| `tests/unit/test_safe_name.py` | BUG-006 regression tests (filename sanitization) | 76 |
-| `tests/unit/test_safety_filter.py` | BUG-012 regression tests (block/flag/allow) | 131 |
-| `tests/integration/test_stress_harness.py` | REQ-4: OOM/cleanup/adversarial stress tests | 170 |
-| `tests/safety/bad_prompts.txt` | 10 known-bad prompts for safety acceptance | 11 |
+**Priority:** P1 — not a user-facing failure, but masks all other bugs
+**Status:** Fix applied, awaiting live validation
 
----
+**Root cause:** v2 nodes log to Python `logging` (ComfyUI stdout), not to `otr_runtime.log`. All
+CharacterForge, ScenePainter, VisualCompositor, and ProductionBus failures were silent from the outside.
 
-## Test Results
-
-```
-57 passed in 0.18s
-
-  unit/test_encode_prompt.py          4 tests  PASSED
-  unit/test_safe_name.py             16 tests  PASSED
-  unit/test_safety_filter.py         25 tests  PASSED
-  integration/test_stress_harness.py 12 tests  PASSED
-```
-
-No GPU, no ComfyUI, no torch dependency (except numpy for placeholder test). Run with `python -m pytest tests/ -v`.
+**Fix applied (2026-04-11):** Added `_runtime_log()` helper to `v2_preview.py` (mirrors v1.5 pattern).
+Instrumented all four nodes with checkpoints: plan keys, scene/character counts, audio status (present /
+duration / WAV save result), FFmpeg return code, output file size. Also dumps Director `production_plan_json`
+to `otr_v2_debug_plan.json` at CharacterForge entry for offline inspection.
 
 ---
 
-## Bug Bible Cross-Check
+### BUG-A3 — Unknown: Director visual_plan scene count (1 scene observed)
 
-Cross-referenced all changes against `BUG_BIBLE.yaml` (96 entries, 12 phases). **No Bug Bible updates made** — read-only until confirmed in prod.
+**Priority:** P1 — directly limits visual quality
+**Status:** Under investigation — awaiting first instrumented run
 
-**Found and fixed:** Bug Bible 04.01/04.02 — both workflow JSONs had stale `widgets_values` after we added `preview_mode` (ProductionBus) and `vram_power_wash` (CharacterForge). Appended default values to correct positions in both `otr_scifi_16gb_full.json` and `otr_scifi_16gb_test.json`.
+**Symptom:** Previous run produced only 1 composited frame. If the Director LLM is only generating
+1 scene in `visual_plan.scenes`, the entire visual pipeline produces 1 frame regardless.
 
-**Pre-existing flags (not regressions):**
-- 01.02/01.03: **Now fixed by REQ-1.** ProductionBus uses `folder_paths.get_output_directory()` with ImportError fallback.
-- 09.02: FFmpeg subprocess uses `capture_output=True`. Low risk for our use case (frame files, not piped video). Monitor during T3 stress test.
+**Possible causes:**
+1. `OTR_Gemma4Director` is outputting a `visual_plan` with only 1 `scenes` entry
+2. `OTR_Gemma4Director` output JSON is missing `visual_plan` entirely (ScenePainter falls back to
+   placeholder 1-frame dummy)
+3. `OTR_SceneSequencer` (node 3) is not forwarding `production_plan_json` correctly
+
+**Diagnostic in place:** `_runtime_log` now reports scene count and plan keys at CharacterForge and
+ScenePainter entry. `otr_v2_debug_plan.json` will be written to repo root on next run.
+
+**To resolve:** After next run, read `otr_v2_debug_plan.json` and `otr_runtime.log` to see exactly
+what the Director produced.
 
 ---
 
-## V2_PREVIEW_ADDENDUM (Reviewer 17 / Gemini Deep Research)
+### BUG-A4 — Unknown: episode_audio None or missing at ProductionBus
 
-All 6 required edits implemented. 2 nice-to-haves also completed.
+**Priority:** P1 — no audio in output video
+**Status:** Under investigation — awaiting first instrumented run
 
-| Edit | Description | Status |
-|------|-------------|--------|
-| REQ-1 | Output path via `folder_paths.get_output_directory()` with ImportError fallback | Done |
-| REQ-2 | `output_subdir` optional STRING input on ProductionBus | Done |
-| REQ-3 | `debug_vram_snapshots` BOOLEAN on CharacterForge, ScenePainter, ProductionBus (gates all `_vram_snapshot()` calls) | Done |
-| REQ-4 | Stress harness: `tests/integration/test_stress_harness.py` (12 tests: orphan cleanup, crash-safety, MAX_FRAMES, adversarial filenames, QA toggles, QA_METRICS, placeholder frames) | Done |
-| REQ-5 | Startup janitor `_cleanup_orphaned_preview_tmp()` at module load (kill -9 recovery) | Done |
-| REQ-6 | QA toggles exposed as node inputs (preview_mode, encoding_profile, debug_vram_snapshots) | Done |
-| NICE | `encoding_profile` combo: preview/balanced/quality with `_ENC_PROFILES` FFmpeg preset+crf lookup | Done |
-| NICE | `QA_METRICS` JSON line in bus_log (greppable for CI) | Done |
+**Symptom:** Previous run produced MP4 with no audio stream. Node 7 (EpisodeAssembler) is connected
+to ProductionBus via link 47, and otr_queue.py correctly maps `episode_audio = ["7", 0]` in API format.
 
-**Not implemented (offered as future work):**
-- Explicit timeline duration fields from script_json/production_plan_json (currently uses heuristic)
-- RTX 5080 validation envelope note for fps/width/height limits
+**Possible causes:**
+1. EpisodeAssembler is failing or returning a malformed AUDIO dict
+2. torchaudio.save is failing silently (exception path now fixed to clear `audio_path`)
+3. The waveform tensor is zero-length or shape is unexpected
+
+**Diagnostic in place:** `_runtime_log` reports `episode_audio=PRESENT/NONE` at ProductionBus entry,
+then logs WAV save success (with shape and duration) or exception.
+
+---
+
+## Open Perplexities
+
+**P1 — Why does SceneSequencer receive audio from multiple sources?**
+Node 3 (OTR_SceneSequencer) receives AUDIO from nodes 4 (SFX), 13 (KokoroAnnouncer), 15
+(BatchAudioGenGenerator), and 20 (KokoroAnnouncer again). But it also receives `production_plan_json`
+via STRING link. The relationship between the sequencer's multi-source audio mixing and the Director's
+visual plan is unclear — SceneSequencer may be the correct orchestration point or it may be a legacy
+artifact from v1.5 that conflicts with v2 flow.
+
+**P2 — Node 15 model_id receives value 3.0 instead of model name string**
+BatchAudioGenGenerator (node 15) has `widgets_values = ["", "facebook/audiogen-medium", 3.0, 3.0]`
+with no placeholder slots for its connected STRING inputs. The current mapper assigns `model_id = 3.0`
+(the value at index 2), which happens to pass validation only because `3.0` is literally in the combo
+list. The correct value should be `"facebook/audiogen-medium"`. This needs a count-based detection fix
+to distinguish nodes that were created with connections already wired (no placeholder slots) vs nodes
+where connections were added after creation (placeholder slots present).
 
 ---
 
 ## What Remains Before Tagging Alpha 2.0
 
-All of these require Jeffrey's RTX 5080 rig:
+All require RTX 5080 live run with instrumented build:
 
 | # | Test | Pass criteria | Status |
 |---|------|---------------|--------|
 | T1 | Audio-only smoke | WAV written, VRAM <8 GB | Not run |
-| T2 | 720p / 1 min, keyframes | Completes <5 min, MP4 plays, VRAM <12 GB | Not run |
+| T2 | 720p / 1 min, keyframes | Full-length MP4 with audio, VRAM <12 GB | Not run |
 | T3 | 720p / 10 min stress | No OOM, preview_tmp/ cleared, VRAM <14 GB | Not run |
-| T4 | 1080p dual-checkpoint | vram_power_wash=True, peak VRAM ≤14.5 GB | Not run |
+| T4 | 1080p dual-checkpoint | vram_power_wash=True, peak VRAM <=14.5 GB | Not run |
 | T5 | Safety spot-check | 10 bad prompts blocked, run completes | Passed (sandbox) |
-| T6 | Crash-safety | kill -9 mid-render, preview_tmp/ empty on next launch | Not run |
+| T6 | Crash-safety | kill -9 mid-render, preview_tmp/ empty on restart | Not run |
 | T7 | Filename fuzz | Weird output_name writes safely | Passed (sandbox) |
 
-After T1-T7 green: fill in ComfyUI commit SHA in `requirements.txt`, run the 12.02 regression checklist, tag Alpha 2.0 RC1.
+After T1-T7 green: run 12.02 regression checklist, tag Alpha 2.0 RC1.
 
 ---
 
-## Rollback
-
-One-step rollback to pre-Round-7 state:
-```powershell
-cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
-copy nodes\v2_preview.py.backup_round6 nodes\v2_preview.py
-```
-
-New files (`safety_filter.py`, `tests/`) can be deleted independently without affecting the rollback.
-
----
-
-*End of QA Report. Generated 2026-04-11. All sandbox-verifiable work complete. Awaiting live validation on RTX 5080.*
+*Active issues only. No change log. Last updated 2026-04-11.*
