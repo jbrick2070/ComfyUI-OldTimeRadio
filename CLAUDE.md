@@ -16,24 +16,26 @@
 
 ## Testing
 
-Run all three before committing:
+**Run the Bug Bible regression regularly** — after every code change, not just at commit time. This is the primary quality gate.
 
 ```bash
+# Bug Bible regression (run this FREQUENTLY)
+python -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -v --pack-dir .
+
 # Core + VRAM
 pytest tests/test_core.py tests/vram_profile_test.py -v
-
-# Bug Bible regression
-python -m pytest "C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py" -v --pack-dir .
 
 # v2 audio regression (Phase 0+)
 pytest tests/v2/test_audio_byte_identical.py -v
 ```
 
+If Bug Bible regression fails after a change, fix it before moving on. New failures are bugs — log them immediately (see below).
+
 **VRAM ceiling:** 14.5 GB peak. Never use `force_vram_offload()` between LLM phases — use `_flush_vram_keep_llm()`. Always enforce prompt truncation against `context_cap`. All LLM loaders must do a 1-token warmup pass.
 
 ## Bug Log Pipeline
 
-Log every bug immediately in `BUG_LOG.md`:
+**Maintain `BUG_LOG.md` actively throughout development.** Every bug gets logged the moment it's found — don't batch, don't wait. This is a live document that tracks the v2 build history.
 
 ```markdown
 ### BUG-LOCAL-NNN: Title
