@@ -7,9 +7,9 @@ Violating these rules is grounds for immediate rollback.
 
 ## 1. Branching and Versioning
 
-- **All v1.5 work lives on a beta branch** (`v1.5-audiogen-dsp`), never on `main`, until Jeffrey says ship.
-- **No point releases.** Stay at v1.5 — no 1.5.1, no 1.5.2. Just keep iterating.
-- **No changelogs.** Keep the `ROADMAP.md` updated with current status instead.
+- **All v2 work lives on `v2.0-alpha`**, never on `main`, until Jeffrey says ship.
+- v1.5 is shipped and stable on `main`. Do not modify `main`.
+- **No changelogs until v2.0 ships.** Keep the `ROADMAP.md` updated with current status instead.
 - **Only Jeffrey ships.** Merge to `main` and tag a release only when Jeffrey personally confirms.
 
 ---
@@ -119,3 +119,45 @@ Generated stories and narrative content must follow these rules:
 [ ] vram_profile_test.py passes
 [ ] Full test suite passes (89+ tests)
 ```
+
+---
+
+## 10. v2.0 Visual Sidecar — Inviolable Constraints
+
+**Audio is king. The full narrative story output must never break, shorten, or degrade.**
+
+The v2 visual sidecar adds video generation alongside the audio pipeline. The audio pipeline is frozen — it must produce byte-identical output to v1.5 at every step. If adding video breaks audio in any way, revert immediately.
+
+**Design spec:** `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+
+| ID | Rule |
+|----|------|
+| C1 | **No new inputs** on `OTR_BatchBarkGenerator`, `OTR_SceneSequencer`, `OTR_KokoroAnnouncer`, `OTR_AudioEnhance`, `OTR_EpisodeAssembler`, `OTR_MusicGenTheme`, `OTR_BatchAudioGenGenerator`, `OTR_Gemma4ScriptWriter`, `OTR_Gemma4Director`. Adding inputs shifts `widgets_values` indices and silently corrupts seeds/voices. |
+| C2 | **No `CheckpointLoaderSimple`** or stock diffusion nodes in the main graph. They load checkpoints into the ComfyUI process while audio models hold residual VRAM — OOM on 16 GB. |
+| C3 | All visual generation runs in **subprocesses** spawned with `multiprocessing.get_context("spawn")`. OS-level VRAM reclaim is the only reliable boundary across PyTorch + Blender. |
+| C4 | LTX-2.3 clips capped at **10-12 seconds** (257 frames @ 24fps). Longer shots auto-chunk + ffmpeg crossfade. |
+| C5 | LTX-2.3 must use Blackwell-native `torch.float8_e4m3fn`. |
+| C6 | IP-Adapter is for **environments only**, never characters with lipsync (causes "Silent Lip Bug"). |
+| C7 | Episode audio output must be **byte-identical** to v1.5 baseline at every gate. Full-length episode, full narrative arc, no truncation, no hash changes. |
+
+### Audio Regression Gate
+
+Before committing any v2 change, run:
+
+```bash
+pytest tests/v2/test_audio_byte_identical.py
+```
+
+If it fails, **revert immediately**. The audio path is non-negotiable.
+
+### The Only Legal v1.5 Node Modification
+
+`OTR_SignalLostVideo` (node #12) may gain **one** new optional input: `visual_overlay` (STRING — path to MP4). It must be the **last** input slot. When unwired, output must be byte-identical to v1.5. No other v1.5 node may be modified.
+
+### Hardware
+
+RTX 5080, 16 GB VRAM, Blackwell, single GPU, no cloud. LTX-2.3 at FP8 uses ~11 GB, leaving 5 GB for audio residuals + OS + ffmpeg.
+
+### What Went Wrong Last Time (v2.0-visual-engine branch)
+
+The previous v2 attempt broke audio output by modifying existing node inputs, causing widget drift that silently corrupted seeds and voices. It also tried to load diffusion models in-process, causing OOM. That branch is preserved as reference but should not be merged. This fresh attempt uses a sidecar architecture that is physically incapable of modifying the audio DAG.
