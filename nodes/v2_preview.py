@@ -806,9 +806,13 @@ class ProductionBus:
                     "default": "otr_v2_episode",
                     "tooltip": "Output filename (without extension)",
                 }),
-                "preview_mode": (["none", "keyframes", "full"], {
+                "preview_mode": (["none", "keyframes", "animated", "full"], {
                     "default": "keyframes",
-                    "tooltip": "none=skip video, keyframes=1 frame/scene (fast), full=all frames",
+                    "tooltip": (
+                        "none=skip video, keyframes=1 frame/scene (fast), "
+                        "animated=concat LTX-Video clips from SceneAnimator, "
+                        "full=all frames (production)"
+                    ),
                 }),
                 "encoding_profile": (["preview", "balanced", "quality"], {
                     "default": "preview",
@@ -831,6 +835,15 @@ class ProductionBus:
                     "tooltip": "Subdirectory under ComfyUI output root. "
                                "Default 'old_time_radio' -> output/old_time_radio/. Empty = write to output root.",
                 }),
+                "video_clips_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": (
+                        "JSON array of MP4 clip paths from SceneAnimator. "
+                        "Used in animated mode. If empty, animated mode "
+                        "falls back to keyframes."
+                    ),
+                }),
                 "debug_vram_snapshots": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Emit VRAM_SNAPSHOT markers at entry/exit of every phase. "
@@ -844,7 +857,7 @@ class ProductionBus:
                  preview_mode="keyframes", encoding_profile="preview",
                  composited_frames=None, episode_audio=None,
                  compositor_log=None, output_subdir="old_time_radio",
-                 debug_vram_snapshots=False):
+                 video_clips_json="", debug_vram_snapshots=False):
 
         import subprocess
         from PIL import Image
@@ -955,6 +968,14 @@ class ProductionBus:
         if preview_mode == "none":
             log.info("[ProductionBus] preview_mode=none, skipping video render")
             return ("", "ProductionBus: preview_mode=none, video skipped.")
+
+        # --- ANIMATED MODE: concat SceneAnimator MP4 clips ---
+        if preview_mode == "animated":
+            return self._assemble_animated(
+                video_clips_json, audio_path, audio_duration_s,
+                output_dir, output_name, encoding_profile,
+                fps, compositor_log, debug_vram_snapshots,
+            )
 
         # In keyframes mode, write 1 frame per scene (fast preview).
         # In full mode, write every frame (production quality).
@@ -1140,4 +1161,165 @@ class ProductionBus:
             _vram_snapshot("ProductionBus-exit")
 
         log.info("[ProductionBus] Complete: %s", video_path or "FAILED")
+        return (video_path, bus_log)
+
+    def _assemble_animated(self, video_clips_json, audio_path, audio_duration_s,
+                           output_dir, output_name, encoding_profile,
+                           fps, compositor_log, debug_vram_snapshots):
+        """Concat SceneAnimator MP4 clips into a single video with audio.
+
+        This is the v2.0 animated output path. SceneAnimator generates
+        one LTX-Video I2V clip per scene. This method concats them using
+        FFmpeg concat demuxer, then muxes with the episode audio.
+        """
+        import subprocess
+
+        _runtime_log("ProductionBus: animated mode — concat video clips")
+
+        # Parse clip paths
+        clip_paths = []
+        try:
+            if video_clips_json and video_clips_json.strip():
+                clip_paths = json.loads(video_clips_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        if not clip_paths:
+            _runtime_log("ProductionBus: animated mode — no clips, falling back to keyframes")
+            return ("", "ProductionBus: animated mode but no video_clips_json — "
+                        "wire SceneAnimator output to video_clips_json input.")
+
+        # Validate clip files exist
+        valid_clips = [p for p in clip_paths if os.path.isfile(p)]
+        if not valid_clips:
+            _runtime_log("ProductionBus: animated — all clip paths missing on disk")
+            return ("", f"ProductionBus: {len(clip_paths)} clip paths given but none found on disk.")
+
+        _runtime_log(f"ProductionBus: animated — {len(valid_clips)} clips to concat")
+
+        _ENC_PROFILES = {
+            "preview":  ("fast",   "23"),
+            "balanced": ("medium", "20"),
+            "quality":  ("slow",   "18"),
+        }
+        enc_preset, enc_crf = _ENC_PROFILES.get(encoding_profile, ("fast", "23"))
+        video_path = os.path.join(output_dir, f"{_safe_name(output_name)}.mp4")
+
+        # Build FFmpeg concat file
+        concat_dir = os.path.join(output_dir, "preview_tmp")
+        os.makedirs(concat_dir, exist_ok=True)
+        concat_path = os.path.join(concat_dir, "animated_concat.txt")
+        with open(concat_path, "w", encoding="utf-8") as cf:
+            cf.write("ffconcat version 1.0\n")
+            for clip in valid_clips:
+                # Escape single quotes in path for ffconcat format
+                safe_path = clip.replace("'", "'\\''")
+                cf.write(f"file '{safe_path}'\n")
+
+        # Step 1: Concat clips into a single video (no audio yet)
+        concat_video = os.path.join(concat_dir, "concat_noaudio.mp4")
+        ffmpeg_concat = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", concat_path,
+            "-c:v", "libx264",
+            "-preset", enc_preset,
+            "-crf", enc_crf,
+            "-pix_fmt", "yuv420p",
+            concat_video,
+        ]
+
+        try:
+            result = subprocess.run(
+                ffmpeg_concat, capture_output=True, text=True, timeout=300
+            )
+            if result.returncode != 0:
+                log.error("[ProductionBus] Animated concat failed: %s",
+                          result.stderr[-500:])
+                _runtime_log(f"ProductionBus: animated concat FAILED — {result.stderr[-200:]}")
+                return ("", f"ProductionBus: FFmpeg concat failed: {result.stderr[-200:]}")
+        except Exception as e:
+            _runtime_log(f"ProductionBus: animated concat EXCEPTION — {e}")
+            return ("", f"ProductionBus: FFmpeg concat error: {e}")
+
+        # Step 2: Mux with audio (if available)
+        if audio_path and os.path.exists(audio_path):
+            ffmpeg_mux = [
+                "ffmpeg", "-y",
+                "-i", concat_video,
+                "-i", audio_path,
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "192k",
+            ]
+            # Use -t to match audio duration
+            if audio_duration_s > 0:
+                ffmpeg_mux.extend(["-t", f"{audio_duration_s:.6f}"])
+            else:
+                ffmpeg_mux.append("-shortest")
+            ffmpeg_mux.append(video_path)
+
+            try:
+                result = subprocess.run(
+                    ffmpeg_mux, capture_output=True, text=True, timeout=300
+                )
+                if result.returncode != 0:
+                    log.error("[ProductionBus] Animated mux failed: %s",
+                              result.stderr[-500:])
+                    # Fall back to video-only
+                    shutil.copy2(concat_video, video_path)
+            except Exception as e:
+                log.error("[ProductionBus] Animated mux error: %s", e)
+                shutil.copy2(concat_video, video_path)
+        else:
+            # No audio — just use the concat video
+            shutil.copy2(concat_video, video_path)
+
+        # Cleanup temp concat file (keep clips for debugging)
+        try:
+            os.remove(concat_video)
+            os.remove(concat_path)
+        except OSError:
+            pass
+
+        # Clean up audio temp file
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except OSError:
+                pass
+
+        # Final size check
+        file_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
+        _sz_mb = file_size / (1024 * 1024)
+
+        bus_lines = [
+            "Production Bus: v2.0 Animated Assembly Complete",
+            f"  Output: {video_path}" if video_path else "  Output: FAILED",
+            f"  Clips concatenated: {len(valid_clips)}",
+            f"  Audio duration: {audio_duration_s:.1f}s",
+            f"  File size: {_sz_mb:.1f} MB",
+        ]
+        if compositor_log:
+            bus_lines.append(f"\n--- Compositor Report ---\n{compositor_log}")
+
+        qa_metrics = {
+            "preview_mode": "animated",
+            "audio_duration_s": round(audio_duration_s, 2),
+            "num_clips": len(valid_clips),
+            "file_size_mb": round(_sz_mb, 2),
+            "video_path_status": "ok" if file_size > 0 else "failed",
+            "fps": fps,
+        }
+        bus_lines.append(f"\nQA_METRICS: {json.dumps(qa_metrics)}")
+        bus_log = "\n".join(bus_lines)
+
+        _runtime_log(
+            f"ProductionBus: animated DONE — {len(valid_clips)} clips, "
+            f"{_sz_mb:.1f} MB, {video_path}"
+        )
+
+        if debug_vram_snapshots:
+            _vram_snapshot("ProductionBus-animated-exit")
+
         return (video_path, bus_log)
