@@ -4,10 +4,32 @@ Nuclear early mock for transformers/safetensors_conversion to kill
 the JSONDecodeError background thread once and for all.
 """
 
+import io
 import os
 import sys
 import types
 import logging
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 0. UTF-8 ENFORCEMENT — prevent Windows cp1252 from truncating/crashing logs.
+#    ComfyUI Desktop's app/logger.py defaults to console encoding on Windows.
+#    Non-ASCII in model names, prompts, or emoji will throw UnicodeEncodeError,
+#    silently truncate, or crash. Force UTF-8 with replace before anything runs.
+# ─────────────────────────────────────────────────────────────────────────────
+os.environ.setdefault("PYTHONUTF8", "1")
+os.environ["PYTHONIOENCODING"] = "utf-8:replace"
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+if hasattr(sys, "__stdout__"):
+    sys.__stdout__ = sys.stdout
+if hasattr(sys, "__stderr__"):
+    sys.__stderr__ = sys.stderr
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. EARLIEST POSSIBLE MOCK — runs before ANY transformers import
