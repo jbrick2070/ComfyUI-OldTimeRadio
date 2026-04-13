@@ -181,6 +181,30 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** Run 8-min target. Check runtime log for `WORD_ENFORCEMENT:` lines showing word count vs target, and `WORD_EXTEND:` if extension fires. Final output should be closer to 8 min than 3.7 min.
 - **Tags:** duration, word-count, enforcement, extension-pass, bark-wpm, pipeline-reorder, phase-0.5
 
+### BUG-LOCAL-019: Gender assignment inversion in LLMDirector procedural cast
+- **Date:** 2026-04-13 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** LLMDirector JSON plan specifies correct genders (e.g. COMMANDER_MC: "Male, 50s") but procedural cast assigns the opposite gender voice preset. In soak Run 77 (maximum chaos, post_apocalyptic, 2100w): COMMANDER_MC (male) got FLETCHER HUDSON (female, 60s), TARKON_TS (male) got GULLIVER KAPOOR (female, 50s), PALMER_PR (female) got RASHIDA CORBEN (male, 20s). All 4 non-announcer characters had inverted gender assignments.
+- **Cause:** Pending investigation. The Director JSON `gender_hints` parse returned 0 hints (`Parsed 0 gender hints from script: {}`), causing procedural cast to ignore the Director's own voice_assignments and assign randomly from the pool. Likely the gender hint regex does not match the maximum-chaos script format.
+- **Fix:** pending
+- **Verify:** pending
+- **Tags:** gender, llm-director, procedural-cast, maximum-chaos, soak
+
+### BUG-LOCAL-020: Name squish and character drift under maximum chaos
+- **Date:** 2026-04-13 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** Character "Nemo Sirikit" appears in LLMDirector plan as `NEIMO_NEMEO_SIRIKIT` (hallucinated spelling). In the script body the same character appears as `NS`, `NEMO`, and `NEMO SIRIKIT`. BatchBark cannot map `NS` or `NEMO` to the Director plan, so both fall back to `v2/en_speaker_9` (already assigned to COMMANDER_MC). Result: 3 characters share one voice, 2 voices unused.
+- **Cause:** Maximum chaos creativity (highest temperature/top_p) causes the LLM to hallucinate variant spellings of character names. The Director name-matching is exact-match only and cannot reconcile `NEIMO_NEMEO_SIRIKIT` with `NEMO` or `NS`.
+- **Fix:** pending
+- **Verify:** pending
+- **Tags:** name-squish, character-drift, maximum-chaos, batch-bark, voice-collapse, soak
+
+### BUG-LOCAL-021: Act count exceeds target_length ceiling under maximum chaos
+- **Date:** 2026-04-13 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** Config specified `medium (5 acts)` but the generated script contains 8 acts (ACT 1 through ACT 8). The act-by-act generation loop did not enforce the target ceiling.
+- **Cause:** Pending investigation. The act-by-act chunked generation may not hard-cap the number of iterations, relying on the LLM to self-terminate. Under maximum chaos temperature the LLM keeps generating new acts instead of concluding.
+- **Fix:** pending
+- **Verify:** pending
+- **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
+
 ### BUG-LOCAL-018: test_dropdown_guardrails.py references removed runtime_preset [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** no
 - **Symptom:** `pytest tests/test_dropdown_guardrails.py` fails with `KeyError: 'runtime_preset'` during collection. 1 additional NameError at runtime for `RUNTIME_PRESETS` variable.
