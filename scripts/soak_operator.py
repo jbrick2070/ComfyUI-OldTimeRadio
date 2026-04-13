@@ -393,68 +393,68 @@ def scan_treatment(path):
 
 
 # ---------------------------------------------------------------------------
-# STATLER & WALDORF -- Balcony Preview (before each run)
+# BABA & BOOEY -- Balcony Preview (before each run)
 # ---------------------------------------------------------------------------
 HECKLES = {
     "hard_sci_fi": [
-        "Statler: Hard sci-fi? The only hard part is staying awake!",
-        "Waldorf: I once read hard sci-fi. Took me three naps to finish!",
-        "Statler: They say hard sci-fi is scientifically accurate. Accurately boring!",
+        "Baba: Hard sci-fi? The only hard part is staying awake!",
+        "Booey: I once read hard sci-fi. Took me three naps to finish!",
+        "Baba: They say hard sci-fi is scientifically accurate. Accurately boring!",
     ],
     "space_opera": [
-        "Waldorf: Space opera? I prefer the regular opera -- at least I can sleep in a nice chair!",
-        "Statler: The last space opera I saw, the best performance was the vacuum of space!",
-        "Waldorf: Space opera -- where no one can hear you yawn!",
+        "Booey: Space opera? I prefer the regular opera -- at least I can sleep in a nice chair!",
+        "Baba: The last space opera I saw, the best performance was the vacuum of space!",
+        "Booey: Space opera -- where no one can hear you yawn!",
     ],
     "dystopian": [
-        "Statler: A dystopian story? Just describe this theater!",
-        "Waldorf: Dystopian? I have been living one since they put us in this balcony!",
-        "Statler: Another dystopia. As if watching this show was not punishment enough!",
+        "Baba: A dystopian story? Just describe this theater!",
+        "Booey: Dystopian? I have been living one since they put us in this balcony!",
+        "Baba: Another dystopia. As if watching this show was not punishment enough!",
     ],
     "time_travel": [
-        "Waldorf: Time travel? I wish I could travel to before I agreed to watch this!",
-        "Statler: If I had a time machine, I would skip to the end credits!",
-        "Waldorf: Time travel -- the only way to get those 30 minutes back!",
+        "Booey: Time travel? I wish I could travel to before I agreed to watch this!",
+        "Baba: If I had a time machine, I would skip to the end credits!",
+        "Booey: Time travel -- the only way to get those 30 minutes back!",
     ],
     "first_contact": [
-        "Statler: First contact? The aliens took one look and left!",
-        "Waldorf: First contact with this show? More like last contact!",
-        "Statler: Even the aliens have better things to watch!",
+        "Baba: First contact? The aliens took one look and left!",
+        "Booey: First contact with this show? More like last contact!",
+        "Baba: Even the aliens have better things to watch!",
     ],
     "cosmic_horror": [
-        "Waldorf: Cosmic horror? The real horror is we are still up here watching!",
-        "Statler: They say cosmic horror is unknowable. Just like why we keep coming back!",
-        "Waldorf: Lovecraft never imagined anything as terrifying as this balcony seat!",
+        "Booey: Cosmic horror? The real horror is we are still up here watching!",
+        "Baba: They say cosmic horror is unknowable. Just like why we keep coming back!",
+        "Booey: Lovecraft never imagined anything as terrifying as this balcony seat!",
     ],
     "cyberpunk": [
-        "Statler: Cyberpunk? I can barely work the remote!",
-        "Waldorf: High tech, low life -- just like this theater!",
-        "Statler: In cyberpunk, everyone has implants. I just need new knees!",
+        "Baba: Cyberpunk? I can barely work the remote!",
+        "Booey: High tech, low life -- just like this theater!",
+        "Baba: In cyberpunk, everyone has implants. I just need new knees!",
     ],
     "post_apocalyptic": [
-        "Waldorf: Post-apocalyptic? Looks like the budget already survived one!",
-        "Statler: After the apocalypse, only two things survive -- cockroaches and us!",
-        "Waldorf: Post-apocalyptic -- finally a setting that matches this theater!",
+        "Booey: Post-apocalyptic? Looks like the budget already survived one!",
+        "Baba: After the apocalypse, only two things survive -- cockroaches and us!",
+        "Booey: Post-apocalyptic -- finally a setting that matches this theater!",
     ],
 }
 
 WORD_HECKLES = {
-    350: "Statler: 350 words? That is shorter than my grocery list!",
-    700: "Waldorf: 700 words? Just enough rope to hang itself!",
-    1050: "Statler: 1050 words? Getting ambitious, are we?",
-    1400: "Waldorf: 1400 words? I will need a second nap for that!",
-    2100: "Statler: 2100 words? They are writing a novel up there! Waldorf: A novel way to bore us!",
+    350: "Baba: 350 words? That is shorter than my grocery list!",
+    700: "Booey: 700 words? Just enough rope to hang itself!",
+    1050: "Baba: 1050 words? Getting ambitious, are we?",
+    1400: "Booey: 1400 words? I will need a second nap for that!",
+    2100: "Baba: 2100 words? They are writing a novel up there! Booey: A novel way to bore us!",
 }
 
 LENGTH_HECKLES = {
-    "short (3 acts)": "Waldorf: Three acts? Even Shakespeare needed five! Statler: Shakespeare also had talent!",
-    "medium (5 acts)": "Statler: Five acts. The perfect number -- of chances to walk out!",
-    "long (7-8 acts)": "Waldorf: Seven acts? Statler: Wake me for the curtain call!",
+    "short (3 acts)": "Booey: Three acts? Even Shakespeare needed five! Baba: Shakespeare also had talent!",
+    "medium (5 acts)": "Baba: Five acts. The perfect number -- of chances to walk out!",
+    "long (7-8 acts)": "Booey: Seven acts? Baba: Wake me for the curtain call!",
 }
 
 
 def balcony_preview(config):
-    """Statler and Waldorf heckle the upcoming episode from the balcony."""
+    """Baba and Booey heckle the upcoming episode from the balcony."""
     genre = config["genre"]
     words = config["words"]
     length = config["length"]
@@ -462,29 +462,29 @@ def balcony_preview(config):
     lines = []
     lines.append("")
     lines.append("*" * 50)
-    lines.append("  FROM THE BALCONY  --  Statler & Waldorf")
+    lines.append("  FROM THE BALCONY -- Baba & Booey")
     lines.append("*" * 50)
     lines.append("")
 
     # Genre heckle
-    genre_lines = HECKLES.get(genre, ["Statler: What is this? Waldorf: I have no idea!"])
+    genre_lines = HECKLES.get(genre, ["Baba: What is this? Booey: I have no idea!"])
     lines.append(random.choice(genre_lines))
 
     # Word count heckle
-    wh = WORD_HECKLES.get(words, f"Waldorf: {words} words? That is a number, all right!")
+    wh = WORD_HECKLES.get(words, f"Booey: {words} words? That is a number, all right!")
     lines.append(wh)
 
     # Length heckle
-    lh = LENGTH_HECKLES.get(length, "Statler: However many acts, it is too many!")
+    lh = LENGTH_HECKLES.get(length, "Baba: However many acts, it is too many!")
     lines.append(lh)
 
     # Closing zinger
     closers = [
-        "Both: Dohohoho!",
-        "Waldorf: Why do we keep coming back? Statler: Beats me!",
-        "Statler: Well, here we go again! Waldorf: Same time, same suffering!",
+        "Both: Hehehehe!",
+        "Booey: Why do we keep coming back? Baba: Beats me!",
+        "Baba: Well, here we go again! Booey: Same time, same suffering!",
         "Both: Bravo! ...Just kidding!",
-        "Waldorf: Ready? Statler: I was born ready. Ready to leave!",
+        "Booey: Ready? Baba: I was born ready. Ready to leave!",
     ]
     lines.append(random.choice(closers))
     lines.append("")
@@ -833,7 +833,7 @@ def run_iteration(run_num):
                       f"creativity={config['creativity']} | profile={config['profile']}")
         print_f(f"CONFIG: {config_str}")
 
-        # 3b. Balcony preview (Statler & Waldorf heckle)
+        # 3b. Balcony preview (Baba & Booey heckle)
         heckle_text = balcony_preview(config)
         append_to_log(heckle_text)
 
