@@ -1260,6 +1260,47 @@ _TOKEN_RATIO_OUTLINE = 2.2     # outlines, pitches, descriptions
 _TOKEN_RATIO_ACT_CHUNK = 2.0   # per-act chunked generation (needs slack for act boundaries)
 _TOKEN_RATIO_ACT_OBSIDIAN = 2.5  # Obsidian 4GB: wider slack for constrained KV cache
 
+
+# ── Intelligent Dialogue Name Normalizer (BUG-023) ──────────────────────────
+# LLMs at high temperature produce creative dialogue formatting that breaks
+# the standard NAME: regex. This normalizer strips ALL variants down to
+# canonical FIRSTNAME LASTNAME: format before any word-count or parsing runs.
+#
+# Handles:
+#   **FIRST LAST**, concerned: text    → FIRST LAST: text
+#   *FIRST LAST*(angry): text          → FIRST LAST: text
+#   __FIRST LAST__: text               → FIRST LAST: text
+#   FIRST_LAST: text                   → FIRST LAST: text
+#   *FIRST_LAST*, whispering: text     → FIRST LAST: text
+#
+# Standard NAME: lines pass through unchanged (regex only fires on decorated
+# names — plain uppercase + colon is a no-op match that rewrites identically).
+_RE_LLM_DIALOGUE_NAME = re.compile(
+    r'^'
+    r'[*_]{0,2}'                           # leading **, *, __, _
+    r'([A-Z][A-Z0-9_ ]{0,25})'            # character name (may have underscores)
+    r'[*_]{0,2}'                           # trailing **, *, __, _
+    r'(?:\s*[,(]\s*[a-z][a-z ]*[)]?)?'    # optional emotion: ", concerned" or "(angry)"
+    r':(?=\s)',                             # colon followed by whitespace (avoid SFX:rumble)
+    re.MULTILINE
+)
+
+
+def _normalize_dialogue_names(text):
+    """Intelligent LLM output normalizer — strips all creative formatting
+    variants down to canonical NAME: format in one pass.
+
+    Called once before WORD_EXTEND (Step 0) and once on extension LLM output.
+    All downstream consumers (word-count regex, FORMAT_NORM, PARSE) see clean text.
+    """
+    def _clean(m):
+        name = m.group(1).strip().replace('_', ' ')
+        # Collapse multiple spaces (from stripped underscores or padding)
+        name = ' '.join(name.split())
+        return f'{name}:'
+    return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
+
+
 # Bounded model cache with device tracking (Section 34)
 _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.5"}
 
@@ -1496,7 +1537,9 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         # -- Bare "CHARACTER: dialogue" format (BUG-007 format) --------
         # The LLM often writes "DALE: I heard something" instead of
         # [VOICE: DALE, traits] tags. Detect NAME: at start of line.
+        # BUG-023: normalize Markdown bold before matching
         import re
+        line = _normalize_dialogue_names(line)
         bare_match = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', line)
         if bare_match:
             name = bare_match.group(1).strip()
@@ -2523,13 +2566,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[PreFlight] target_words=%d with %d characters is too many - "
                         "clamping to 4 characters for short episode", target_words, num_characters)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 4 ({target_words}-word episode)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 4 characters ({target_words}-word episode max: 4)")
+            guardrail_warnings.append(f"[!] Auto-clamped {num_characters} -> 4 characters ({target_words}-word episode max: 4)")
             num_characters = 4
         if target_words <= 420 and num_characters > 3:
             log.warning("[PreFlight] target_words=%d with %d characters is too many - "
                         "clamping to 3 characters for very short episode", target_words, num_characters)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 ({target_words}-word episode)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_words}-word episode max: 3)")
+            guardrail_warnings.append(f"[!] Auto-clamped {num_characters} -> 3 characters ({target_words}-word episode max: 3)")
             num_characters = 3
 
         # Long episodes: too few characters can't sustain narrative tension
@@ -2539,13 +2582,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[PreFlight] %d characters too few for %s - clamping to 3",
                         num_characters, target_length)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 (too few for {target_length})")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_length} requires minimum 3)")
+            guardrail_warnings.append(f"[!] Auto-clamped {num_characters} -> 3 characters ({target_length} requires minimum 3)")
             num_characters = 3
 
         if target_words <= 420 and include_act_breaks:
             log.warning("[PreFlight] Act breaks disabled for %d-word episode (too short)", target_words)
             _runtime_log("PREFLIGHT: Act breaks disabled (episode too short)")
-            guardrail_warnings.append("⚠️ Act breaks disabled (too short for <=420-word episodes)")
+            guardrail_warnings.append("[!] Act breaks disabled (too short for <=420-word episodes)")
             include_act_breaks = False
 
         # Obsidian profile + long episode = severe truncation (2500 token cap)
@@ -2553,7 +2596,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[PreFlight] Obsidian profile with %d-word episode will truncate badly - "
                         "clamping to 1400 words", target_words)
             _runtime_log(f"PREFLIGHT: Clamped target_words from {target_words} to 1400 (Obsidian token cap)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {target_words} -> 1400 words (Obsidian profile max: 1400)")
+            guardrail_warnings.append(f"[!] Auto-clamped {target_words} -> 1400 words (Obsidian profile max: 1400)")
             target_words = 1400
 
         # -- 1b. Custom premise enforcement --
@@ -3097,6 +3140,14 @@ Begin the full script now. Follow this structure exactly:
         #   3. FORMAT_NORM  — clean up everything into canonical format
         #   4. PARSE        — parse clean text into structured JSON
         # ══════════════════════════════════════════════════════════════
+
+        # -- STEP 0: NORMALIZE BOLD DIALOGUE NAMES (BUG-023 fix) --------
+        # LLMs at high temperature produce **NAME**, emotion: format.
+        # Strip to canonical NAME: before any word-count regex runs.
+        _pre_norm_len = len(script_text)
+        script_text = _normalize_dialogue_names(script_text)
+        if len(script_text) != _pre_norm_len:
+            _runtime_log("BOLD_NORM: Stripped Markdown bold from dialogue names")
 
         # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020 fix) ---------
         # Count dialogue words in raw text using regex (no parse needed).
@@ -4575,34 +4626,26 @@ Format your response exactly as:
 
         _runtime_log("FORMAT_NORM: Script needs normalization - running strict reformat pass")
 
-        normalize_prompt = f"""You are a script formatting tool. Your ONLY job is to reformat
-the dialogue below into STRICT radio drama format. Do NOT change any words,
-do NOT add or remove dialogue, do NOT rewrite content. ONLY reformat.
+        normalize_prompt = f"""You are a strict script normalizer. Your only task is to reformat messy script text into the canonical format below.
+CRITICAL: Never add, remove, or rewrite dialogue. Reformat only. Output plain text ONLY. Absolutely NO Markdown.
 
-STRICT FORMAT RULES:
-1. Every scene starts with: === SCENE N ===
-2. Environment lines: [ENV: description]
-3. Sound effects: [SFX: description]
-4. Every dialogue line MUST be exactly: CHARACTER_NAME: "their dialogue here"
-   - Character name in ALL CAPS, no asterisks, no parenthetical emotions
-   - Colon after name, then a space, then the dialogue in quotes
-   - Stage directions like (angry) or (whispering) go INSIDE the quotes at the start
-5. Announcer lines: ANNOUNCER: "their line here"
-6. Remove any markdown formatting (bold, italic, asterisks around names)
-7. Keep ALL dialogue content exactly as written - just reformat the structure
+FORMATTING RULES:
+1. Strip all Markdown (**, *, _, etc.) and remove quotation marks around dialogue.
+2. Character Names: ALL CAPS, spaces instead of underscores. Change NARRATOR to ANNOUNCER.
+3. Dialogue Format: Must match one of these patterns:
+   [VOICE: CHARACTER NAME, traits] dialogue text
+   CHARACTER NAME: dialogue text
+4. Stage Directions: Move loose emotions (e.g. NAME, angrily:) inside parentheses at the start of the dialogue text.
+5. Tags: Must be uppercase, inside square brackets, with a colon:
+   [SFX: description]
+   [ENV: description]
+   [MUSIC: description]
+6. Scene Headers: Format strictly as === SCENE N: Title ===
 
-EXAMPLE INPUT:
-*HIRO*(urgent): We need to move now!
-**MALCOLM** (frustrated): I'm working on it!
-
-EXAMPLE OUTPUT:
-HIRO: "(urgent) We need to move now!"
-MALCOLM: "(frustrated) I'm working on it!"
+Fix mixed-case names, lowercase tags, and incorrect separators (like hyphens instead of colons). Output NOTHING but the normalized script.
 
 SCRIPT TO REFORMAT:
-{script_text}
-
-OUTPUT THE REFORMATTED SCRIPT ONLY. No commentary, no explanation."""
+{script_text}"""
 
         # BUG-019 FIX: Tighter token budget + timeout for FORMAT_NORM.
         # The LLM is reformatting, not creating content. Output should be
@@ -4727,6 +4770,9 @@ OUTPUT ONLY THE NEW DIALOGUE LINES, one per line:"""
             if not extended_text or len(extended_text.strip()) < 50:
                 _runtime_log("WORD_EXTEND: Extension returned too little text - keeping original")
                 return script_text
+
+            # Normalize bold dialogue in extension output before filtering
+            extended_text = _normalize_dialogue_names(extended_text)
 
             # Filter extension output — only keep valid dialogue lines
             valid_lines = []
