@@ -1301,6 +1301,47 @@ def _normalize_dialogue_names(text):
     return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
 
 
+# ── Dual-format dialogue extraction ─────────────────────────────
+# Scripts may contain dialogue in EITHER format:
+#   Bare:  NAME: dialogue text
+#   VOICE: [VOICE: NAME, emotion] "dialogue text"
+# The word-count regex and WORD_EXTEND character extraction must
+# recognize BOTH to avoid false zero-dialogue detection (BUG-025).
+
+_RE_BARE_DIALOGUE = re.compile(
+    r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', re.MULTILINE
+)
+_RE_VOICE_TAG_DIALOGUE = re.compile(
+    r'^\[VOICE:\s*([A-Z][A-Z0-9_ ]+)[,\]].*?\]\s*["\u201C]?(.+?)["\u201D]?\s*$',
+    re.MULTILINE
+)
+
+_DIALOGUE_FALSE_POSITIVES = frozenset({
+    "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+    "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+    "ANNOUNCER"
+})
+
+
+def _extract_all_dialogue(text):
+    """Extract (name, dialogue) pairs from both bare and VOICE-tag formats.
+
+    Returns a list of (character_name, dialogue_text) tuples with false
+    positives (SFX, ENV, SCENE, ANNOUNCER, etc.) already filtered out.
+    """
+    bare = [
+        (name.strip(), dialogue)
+        for name, dialogue in _RE_BARE_DIALOGUE.findall(text)
+        if name.strip() not in _DIALOGUE_FALSE_POSITIVES
+    ]
+    voice = [
+        (name.strip(), dialogue)
+        for name, dialogue in _RE_VOICE_TAG_DIALOGUE.findall(text)
+        if name.strip() not in _DIALOGUE_FALSE_POSITIVES
+    ]
+    return bare + voice
+
+
 # Bounded model cache with device tracking (Section 34)
 _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.5"}
 
@@ -3206,25 +3247,20 @@ Begin the full script now. Follow this structure exactly:
         if len(script_text) != _pre_norm_len:
             _runtime_log("BOLD_NORM: Stripped Markdown bold from dialogue names")
 
-        # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020 fix) ---------
-        # Count dialogue words in raw text using regex (no parse needed).
-        # If under 70% of target, run LLM extension on raw text.
+        # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020/025 fix) -----
+        # Count dialogue words in raw text using dual-format extraction.
+        # Recognizes both bare "NAME: text" AND "[VOICE: NAME, emotion] text"
+        # so VOICE-tag scripts are not falsely detected as zero-dialogue.
         _target_words = target_words  # Direct from widget — no conversion needed
-        _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
-                                 "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
-                                 "ANNOUNCER"}
-        _raw_dialogue_matches = re.findall(
-            r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
-        )
+        _raw_dialogue_pairs = _extract_all_dialogue(script_text)
         _raw_dialogue_words = sum(
-            len(dialogue.split())
-            for name, dialogue in _raw_dialogue_matches
-            if name.strip() not in _false_positive_names
+            len(dialogue.split()) for _, dialogue in _raw_dialogue_pairs
         )
         _word_ratio = _raw_dialogue_words / max(1, _target_words)
         _runtime_log(
             f"WORD_ENFORCEMENT: {_raw_dialogue_words} words vs {_target_words} target "
-            f"({_word_ratio:.0%}) | @140wpm -> ~{_raw_dialogue_words / 140:.1f} min"
+            f"({_word_ratio:.0%}) | @140wpm -> ~{_raw_dialogue_words / 140:.1f} min "
+            f"[{len(_raw_dialogue_pairs)} lines detected]"
         )
 
         # BUG-024: Zero-dialogue detection — creative generation produced
@@ -3252,14 +3288,10 @@ Begin the full script now. Follow this structure exactly:
                 model_id, genre_flavor, optimization_profile,
                 fallback_cast=pre_rolled_cast
             )
-            # Recount after extension
-            _raw_dialogue_matches = re.findall(
-                r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
-            )
+            # Recount after extension (dual-format)
+            _raw_dialogue_pairs = _extract_all_dialogue(script_text)
             _raw_dialogue_words = sum(
-                len(dialogue.split())
-                for name, dialogue in _raw_dialogue_matches
-                if name.strip() not in _false_positive_names
+                len(dialogue.split()) for _, dialogue in _raw_dialogue_pairs
             )
             _word_ratio = _raw_dialogue_words / max(1, _target_words)
             _runtime_log(
@@ -3281,12 +3313,9 @@ Begin the full script now. Follow this structure exactly:
                 f"ANNOUNCER_RAW: Missing bookends (open={_has_announcer_open}, "
                 f"close={_has_announcer_close}) - generating via LLM"
             )
-            # Extract character names from raw text for context
-            _char_names = {
-                name.strip()
-                for name, _ in _raw_dialogue_matches
-                if name.strip() not in _false_positive_names
-            }
+            # Extract character names from raw text for context (BUG-025:
+            # uses dual-format extraction so VOICE-tag names are included)
+            _char_names = {name for name, _ in _raw_dialogue_pairs}
             # Extract news headline
             _news_head = ""
             for nb_line in news_block.split("\n"):
@@ -4833,20 +4862,13 @@ SCRIPT TO REFORMAT:
         """
         _runtime_log(f"WORD_EXTEND: Starting dialogue extension (deficit={deficit_words} words)")
 
-        # Extract characters and dialogue preview from raw text
-        _false_positives = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
-                            "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
-                            "ANNOUNCER"}
-        _matches = re.findall(
-            r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
-        )
-        characters = sorted({
-            name.strip() for name, _ in _matches
-            if name.strip() not in _false_positives
-        })
+        # Extract characters and dialogue preview from raw text (BUG-025:
+        # dual-format extraction covers both bare NAME: and [VOICE: NAME] formats)
+        _all_dialogue = _extract_all_dialogue(script_text)
+        characters = sorted({name for name, _ in _all_dialogue})
 
         # BUG-024 fix: When script has zero character dialogue (only SFX/ANNOUNCER),
-        # the regex extraction returns an empty character list. Fall back to the
+        # the extraction returns an empty character list. Fall back to the
         # pre-rolled cast names so the extension LLM knows WHO to write dialogue for.
         if not characters and fallback_cast:
             characters = sorted(fallback_cast)
@@ -4856,9 +4878,8 @@ SCRIPT TO REFORMAT:
             )
 
         existing_dialogue = [
-            f"{name.strip()}: {dialogue[:80]}"
-            for name, dialogue in _matches
-            if name.strip() not in _false_positives
+            f"{name}: {dialogue[:80]}"
+            for name, dialogue in _all_dialogue
         ]
         existing_preview = "\n".join(existing_dialogue[:40])
         num_scenes = max(1, len(re.findall(r'=== SCENE', script_text)))
