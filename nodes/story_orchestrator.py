@@ -4626,23 +4626,66 @@ Format your response exactly as:
 
         _runtime_log("FORMAT_NORM: Script needs normalization - running strict reformat pass")
 
-        normalize_prompt = f"""You are a strict script normalizer. Your only task is to reformat messy script text into the canonical format below.
-CRITICAL: Never add, remove, or rewrite dialogue. Reformat only. Output plain text ONLY. Absolutely NO Markdown.
+        normalize_prompt = f"""You are a strict script normalizer. Your ONLY task is to reformat input text into the exact canonical format defined below.
 
-FORMATTING RULES:
-1. Strip all Markdown (**, *, _, etc.) and remove quotation marks around dialogue.
-2. Character Names: ALL CAPS, spaces instead of underscores. Change NARRATOR to ANNOUNCER.
-3. Dialogue Format: Must match one of these patterns:
-   [VOICE: CHARACTER NAME, traits] dialogue text
-   CHARACTER NAME: dialogue text
-4. Stage Directions: Move loose emotions (e.g. NAME, angrily:) inside parentheses at the start of the dialogue text.
-5. Tags: Must be uppercase, inside square brackets, with a colon:
-   [SFX: description]
-   [ENV: description]
-   [MUSIC: description]
-6. Scene Headers: Format strictly as === SCENE N: Title ===
+HARD CONSTRAINTS:
+- Do NOT add, remove, summarize, or rewrite ANY dialogue or content.
+- Do NOT infer missing text.
+- Do NOT paraphrase.
+- Only transform formatting.
+- Output plain text ONLY.
+- Do NOT use Markdown, code blocks, or quotes.
+- If something is unclear, preserve it as-is but formatted.
 
-Fix mixed-case names, lowercase tags, and incorrect separators (like hyphens instead of colons). Output NOTHING but the normalized script.
+CANONICAL FORMAT RULES:
+
+1. STRIP FORMATTING
+- Remove ALL Markdown symbols (*, **, _, `, etc.).
+- Remove ALL quotation marks around dialogue.
+
+2. CHARACTER NAMES
+- Convert all character names to ALL CAPS.
+- Replace underscores with spaces.
+- Standardize NARRATOR to ANNOUNCER.
+- Do NOT rename any other characters.
+
+3. DIALOGUE STRUCTURE (STRICT)
+Each dialogue line MUST be one of these two forms only:
+[VOICE: CHARACTER NAME, traits] dialogue text
+OR
+CHARACTER NAME: dialogue text
+- Use colon only (never hyphens or other separators).
+- Ensure exactly one space after colon.
+
+4. STAGE DIRECTIONS / EMOTIONS
+- If a line contains emotional cues like:
+  NAME, angrily: dialogue
+  NAME (angry): dialogue
+- Move the emotion into parentheses at the START of the dialogue text:
+  CHARACTER NAME: (angrily) dialogue
+- Do NOT invent emotions. Only relocate existing ones.
+
+5. TAGS (STRICT)
+Only these tags are allowed:
+[SFX: description]
+[ENV: description]
+[MUSIC: description]
+- Tags MUST be uppercase.
+- Tags MUST use colon.
+- Tags MUST be on their own line.
+- Convert malformed tags (e.g. sfx-, Sound:, etc.) into correct format.
+
+6. SCENE HEADERS
+Format EXACTLY as: === SCENE N: Title ===
+
+7. ERROR NORMALIZATION
+- Fix inconsistent casing.
+- Fix spacing.
+- Replace incorrect separators (-, =, etc.) with correct ones.
+- Do NOT delete malformed content -- normalize it.
+
+FINAL RULE:
+Output ONLY the normalized script. No explanations. No extra text. No commentary.
 
 SCRIPT TO REFORMAT:
 {script_text}"""
