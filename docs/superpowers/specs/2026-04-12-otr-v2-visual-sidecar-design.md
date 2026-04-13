@@ -130,7 +130,6 @@ custom_nodes/ComfyUI-OldTimeRadio/
 - **OOM during LTX run:** Reduce clip cap from 12s to 8s in `ltx_runner.py`. Do NOT increase VRAM by killing audio models.
 - **Audio regression test fails:** Revert the change immediately. The audio path is non-negotiable.
 - **Subprocess won't release VRAM:** Check `CUDA_VISIBLE_DEVICES` is inherited and `start_method="spawn"` is set explicitly. Never use `fork`.
-- **Widget drift suspected:** Diff `widgets_values` arrays before/after. If any v1.5 node's array changed length, the change violates C1.
 - **`visual_plan` missing from Director output:** Graceful degrade to empty plan. Episode ships audio-only with black visual track. Never crash the audio pipeline.
 
 ## Out of Scope

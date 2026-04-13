@@ -82,12 +82,10 @@ System `python` is NOT on PATH. Always use full path or activate venv first.
 - Phase 0 validation: test real-world minimum config (2 chars, 3 acts, 5 min, hard sci-fi) to confirm guardrails and prompt enforcement work
 
 ### v2.0 Hard Constraints (from CLAUDE.md)
-- **C1**: No new inputs on any v1.5 node — causes widget drift
 - **C2**: No CheckpointLoaderSimple in main graph — OOM
 - **C3**: All visual generation in subprocesses (`multiprocessing.get_context("spawn")`)
 - **C4**: LTX-2.3 clips max 10-12s
 - **C7**: Audio output byte-identical to v1.5 baseline at every gate
-- Only legal v1.5 modification: `OTR_SignalLostVideo` gets one optional `visual_overlay` input (last slot)
 
 ### Episode Length Settings
 - `runtime_preset`: `[FAST] quick (5 min)` — 5-min target (workflow default)
