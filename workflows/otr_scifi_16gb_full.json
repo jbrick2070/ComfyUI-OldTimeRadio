@@ -22,7 +22,7 @@
             "widgets_values": [
                 "The Last Frequency",
                 "hard_sci_fi",
-                "\ud83d\udcfb standard (12 min)",
+                "[FAST] quick (5 min)",
                 8,
                 4,
                 "mistralai/Mistral-Nemo-Instruct-2407",
@@ -32,7 +32,7 @@
                 true,
                 true,
                 true,
-                "medium (5 acts)",
+                "short (3 acts)",
                 "tense claustrophobic",
                 "balanced",
                 true,

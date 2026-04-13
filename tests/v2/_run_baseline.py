@@ -305,7 +305,14 @@ def _submit_prompt(prompt, base_url):
 
 
 def _poll_for_completion(prompt_id, base_url, timeout_s=POLL_TIMEOUT_S):
-    """Poll /history until the prompt completes or times out."""
+    """Poll /history until the prompt completes or times out.
+
+    ComfyUI Desktop may return history entries with varied status structures.
+    We treat a prompt as complete if ANY of these are true:
+      - status["completed"] is True
+      - status["status_str"] == "success"
+      - outputs dict is non-empty (execution produced results)
+    """
     import requests
 
     start = time.time()
@@ -326,10 +333,23 @@ def _poll_for_completion(prompt_id, base_url, timeout_s=POLL_TIMEOUT_S):
         if prompt_id in history:
             entry = history[prompt_id]
             status = entry.get("status", {})
-            if status.get("completed", False) or status.get("status_str") == "success":
+            outputs = entry.get("outputs", {})
+
+            # Log status on first hit for debugging
+            log.debug("History status: %s", json.dumps(status))
+
+            completed = (
+                status.get("completed", False)
+                or status.get("status_str") == "success"
+                or bool(outputs)  # non-empty outputs = execution finished
+            )
+            if completed:
                 elapsed = time.time() - start
-                print(f"Execution completed in {elapsed/60:.1f} minutes.")
+                print(f"\nExecution completed in {elapsed/60:.1f} minutes.")
+                if not outputs:
+                    print("  WARNING: completed but outputs dict is empty")
                 return entry
+
             if status.get("status_str") == "error":
                 raise RuntimeError(
                     f"ComfyUI execution failed: {json.dumps(status, indent=2)}"
