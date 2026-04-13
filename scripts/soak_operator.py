@@ -153,6 +153,137 @@ def count_treatments():
         return 0
 
 
+def find_newest_treatment():
+    """Return path to the most recently modified treatment file, or None."""
+    try:
+        treatments = [
+            os.path.join(OUTPUT_DIR, f)
+            for f in os.listdir(OUTPUT_DIR)
+            if f.endswith("_treatment.txt")
+        ]
+        if not treatments:
+            return None
+        return max(treatments, key=os.path.getmtime)
+    except Exception:
+        return None
+
+
+def scan_treatment(path):
+    """Read-only scan of a treatment file. Returns list of flag strings.
+    Never modifies files. Never tries to fix anything."""
+    flags = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except Exception as exc:
+        return [f"READ_FAIL: Could not read treatment: {exc}"]
+
+    filename = os.path.basename(path)
+
+    # 1. Missing LLM closing
+    if "__NEEDS_LLM_CLOSING__" in text:
+        flags.append("NEEDS_LLM_CLOSING: Announcer sign-off never generated")
+
+    # 2. Parse cast
+    cast = {}
+    cast_section = re.search(
+        r"CAST & VOICES\n[-]+\n(.*?)(?:\n\n|\nSCENE ARC)", text, re.DOTALL)
+    if cast_section:
+        for line in cast_section.group(1).strip().split("\n"):
+            m = re.match(r"\s*(\S+(?:\s+\S+)*?)\s+(?:->|-->)\s+(\S+)\s+(.*)", line)
+            if m:
+                cast[m.group(1).strip()] = {
+                    "preset": m.group(2).strip(),
+                    "traits": m.group(3).strip(),
+                }
+    if not cast:
+        flags.append("EMPTY_CAST: No characters found in CAST section")
+
+    # 3. Duplicate voice presets
+    presets_seen = {}
+    for name, info in cast.items():
+        p = info["preset"]
+        if p in presets_seen:
+            flags.append(f"DUPLICATE_VOICE: {name} and {presets_seen[p]} share {p}")
+        presets_seen[p] = name
+
+    # 4. Gender mismatch (trait says female but name profile says male, etc.)
+    for name, info in cast.items():
+        traits = info["traits"].lower()
+        # Check for contradictions like "male * anxious" on a female-hinted name
+        has_male = "male" in traits and "female" not in traits
+        has_female = "female" in traits
+        # Flag if both appear (shouldn't happen but check)
+        if has_male and has_female:
+            flags.append(f"GENDER_CONFLICT: {name} traits say both male and female")
+
+    # 5. Scene arc dialogue counts
+    scene_arc = re.search(
+        r"SCENE ARC\n[-]+\n(.*?)(?:\n\nFULL SCRIPT)", text, re.DOTALL)
+    total_dialogue = 0
+    if scene_arc:
+        for m in re.finditer(r"Scene\s+(\d+).*?(\d+)\s+dialogue lines", scene_arc.group(1)):
+            dl = int(m.group(2))
+            total_dialogue += dl
+            if dl == 0:
+                flags.append(f"ZERO_DIALOGUE: Scene {m.group(1)} has 0 lines")
+    else:
+        flags.append("NO_SCENE_ARC: Scene arc section missing or unparseable")
+
+    # 6. Full script checks
+    script_section = re.search(
+        r"FULL SCRIPT.*?\n[-]+\n(.*?)(?:\nPRODUCTION)", text, re.DOTALL)
+    script_body = script_section.group(1).strip() if script_section else ""
+
+    if not script_body:
+        flags.append("EMPTY_SCRIPT: Full script section is blank")
+
+    sfx_count = len(re.findall(r"\[SFX\]", script_body))
+    if sfx_count == 0 and script_body:
+        flags.append("NO_SFX: Script has zero [SFX] cues")
+
+    # 7. Production stats
+    m = re.search(r"Duration\s*:\s*([\d.]+)\s*min\s*\(([\d.]+)\s*s\)", text)
+    duration_s = float(m.group(2)) if m else 0
+    if 0 < duration_s < 30:
+        flags.append(f"SHORT_DURATION: Only {duration_s}s")
+
+    m = re.search(r"Size\s*:\s*([\d.]+)\s*MB", text)
+    size_mb = float(m.group(1)) if m else 0
+    if 0 < size_mb < 5:
+        flags.append(f"TINY_FILE: Only {size_mb}MB -- possible empty render")
+    if size_mb > 500:
+        flags.append(f"HUGE_FILE: {size_mb}MB -- possible runaway render")
+
+    # 8. VRAM
+    m = re.search(r"PEAKED AT ([\d.]+)GB", text)
+    vram = float(m.group(1)) if m else 0
+    if vram > 14.5:
+        flags.append(f"VRAM_OVER: {vram}GB exceeds 14.5GB ceiling")
+
+    # 9. Character name drift (cast vs script body)
+    if cast and script_body:
+        cast_upper = set()
+        for name in cast:
+            cast_upper.add(name.upper())
+            cast_upper.add(name.upper().replace(" ", ""))
+        script_chars = set()
+        for line in script_body.split("\n"):
+            m = re.match(r"^\s+([A-Z][A-Z\s]+?)(?:\s+\[.*\])?\s*$", line)
+            if m:
+                cname = m.group(1).strip()
+                if cname not in ("SFX", "PAUSE", "BEAT", "SCENE"):
+                    script_chars.add(cname)
+        script_chars.discard("ANNOUNCER")
+        cast_upper.discard("ANNOUNCER")
+        for sc in script_chars:
+            compressed = sc.replace(" ", "")
+            if sc not in cast_upper and compressed not in cast_upper:
+                flags.append(f"NAME_DRIFT: '{sc}' in script but not in cast list")
+
+    return flags
+
+
 # ---------------------------------------------------------------------------
 # STATLER & WALDORF -- Balcony Preview (before each run)
 # ---------------------------------------------------------------------------
@@ -554,6 +685,28 @@ def run_iteration(run_num):
         review_text = critic_review(
             config, title, dialogue, vram, has_treatment, duration)
         append_to_log(review_text)
+
+    # 10c. Treatment scan (read-only, flags only, never fixes)
+    if result == "SUCCESS":
+        newest = find_newest_treatment()
+        if newest:
+            scan_flags = scan_treatment(newest)
+            if scan_flags:
+                scan_text = (
+                    "\n" + "!" * 50 + "\n"
+                    "  TREATMENT SCAN -- FLAGS DETECTED\n"
+                    + "!" * 50 + "\n"
+                    f"  File: {os.path.basename(newest)}\n"
+                )
+                for flag in scan_flags:
+                    scan_text += f"  >> {flag}\n"
+                scan_text += "!" * 50 + "\n"
+                print_f(scan_text)
+                append_to_log(scan_text)
+            else:
+                clean_msg = "  TREATMENT SCAN: Clean -- no flags.\n"
+                print_f(clean_msg)
+                append_to_log(clean_msg)
 
     # 11. Cooldown
     print_f(f"Cooldown: {COOLDOWN_S}s")
