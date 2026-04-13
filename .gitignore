@@ -36,6 +36,9 @@ Thumbs.db
 !tests/v2/fixtures/baseline_v1.5.wav
 !tests/v2/fixtures/baseline_v1.5.sha256
 
+# AI project rules (local only, not for public repo)
+CLAUDE.md
+
 # Runtime + scratch
 otr_runtime.log
 scratch/
