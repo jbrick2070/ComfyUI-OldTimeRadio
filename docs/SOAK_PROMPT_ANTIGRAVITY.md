@@ -195,7 +195,7 @@ Append every run to: `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldT
 
 ```markdown
 ### RUN NNN — YYYY-MM-DD HH:MM:SS
-- **Config:** genre=X | words=N | length=X | style=X | creativity=X
+- **Config:** genre=X | words=N | length=X | style=X | creativity=X | profile=X
 - **Result:** SUCCESS | FAIL | TIMEOUT | REBOOT
 - **Duration:** Xs
 - **Episode:** (title from treatment file if available)
@@ -205,6 +205,30 @@ Append every run to: `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldT
 - **Error:** (if FAIL — paste the error message, max 3 lines)
 - **Notes:** (anything unusual — warnings, slow phases, VRAM spikes)
 ```
+
+## CRITIC REVIEW (after each SUCCESS)
+
+After each successful episode, read the most recent `_treatment.txt` from
+`C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio\` during the 30-second
+cooldown period. Then append a review to the soak log:
+
+```markdown
+#### CRITIC REVIEW — RUN NNN
+> haiku line 1  (5 syllables)
+> haiku line 2  (7 syllables)
+> haiku line 3  (5 syllables)
+
+Score: NN% | FRESH / ROTTEN
+Verdict: (one line — would you listen to this?)
+```
+
+**Scoring guide:**
+- Judge on narrative arc, dialogue quality, character voice variety, and whether it feels like a real radio drama
+- 75%+ = FRESH (solid episode, would listen again)
+- Below 75% = ROTTEN (structural issues, flat dialogue, broken arc)
+- The haiku should be inspired by the actual plot, not generic
+
+Do NOT stop the soak script to write reviews. Do this during cooldown only.
 
 ## BUG CLASSIFICATION
 
@@ -248,6 +272,7 @@ P2/P3 go in the soak log notes only — don't clutter BUG_LOG.md with cosmetic i
 A good soak night produces:
 - 30+ episodes run
 - Soak log with every run documented
+- Critic review (haiku + score) for every successful episode
 - Any P0/P1 bugs logged in BUG_LOG.md
 - ComfyUI still running in the morning (rebooted as needed)
 - Zero code changes (you're an observer, not a fixer)
