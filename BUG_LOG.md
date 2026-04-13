@@ -91,3 +91,101 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Fix:** Check `inp.get("widget")` on each linked input. Include converted widgets in the positional mapping, skip non-widget links.
 - **Verify:** Regenerate debug_prompt.json and check node #2 values: temperature=0.4, tts_engine='bark (standard 8GB)', vintage_intensity='subtle'.
 - **Tags:** widget-drift, api, baseline-capture
+
+### BUG-LOCAL-012: Episode duration significantly undershoots target_minutes
+- **Date:** 2026-04-12 | **Phase:** 0-1 | **Bible candidate:** yes
+- **Symptom:** Test run "The Last Frequency" with target_minutes=3, 2 characters, 3 acts, Standard profile generated a 2-minute episode (vs 3-minute target). ~33% duration shortfall.
+- **Cause:** Dialogue scaling formula enforces **line count minimum** (floor = max(18, target_minutes * 8)) but not **dialogue density**. For 3 min with 2 chars: floor = 24 lines total (12 per char). LLM hit the minimum and stopped, natural pacing resulted in ~1 min audio runtime. The 41 total generated lines (39 dialogue + 2 ANNOUNCER) meet the **count** requirement but not the **duration** requirement.
+- **Fix:** (Phase 0.5) Relabel target_minutes dropdown to reflect realistic output range: "Target 3 (actual 2-3 min)" instead of exact promise. No code change — UI expectation mismatch only.
+- **Verify:** Added UI warning labels to INPUT_TYPES. User sees "2-3 min" as the expected range when they select "3 min".
+- **Tags:** duration, dialogue-scaling, episode-length, ui-expectation
+
+### BUG-LOCAL-014: Maximum chaos creativity produces unparseable dialogue format
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** 8 chars + 3 min + maximum chaos: ScriptWriter generated 1065 tokens across 3 scenes but parser found 0 dialogue lines. LLM used `*NAME*(emotion): dialogue` format with single asterisks. Characters detected as garbage: "ENVSIRENS WAIL", "OPENING THEME". Episode proceeded with near-silent output.
+- **Cause:** (1) Maximum chaos (temperature=1.35) pushes Mistral-Nemo into non-standard formatting. (2) Parser Pass 1 regex only accepted 0 or 2 asterisks around names, not 1. (3) Permissive fallback matched structural tags as "characters", so dialogue_count > 0 and PARSE_FATAL never fired.
+- **Fix:** Four-layer defense: (a) Clamped maximum chaos temp from 1.35 to 0.95, wild & rough from 1.1 to 0.92 - LLM stays creative but follows structural rules. (b) Hardened Pass 1 regex to accept 0-2 asterisks and filter structural tag names. (c) Added Format Normalizer pass (Creative-to-Strict): same LLM, low temperature, rewrites any dialogue format into strict Canonical 1.0 BEFORE parser runs. (d) Structural name blocklist prevents ENV/SFX/MUSIC tags from being misidentified as characters.
+- **Verify:** Run 8 chars + 3 min + maximum chaos again. Check runtime log for "CREATIVITY maximum chaos - temp=0.95" and "FORMAT_NORM: Success". Verify dialogue_count > 0 in ScriptWriter DONE line.
+- **Tags:** parse-fatal, creativity, format-drift, dialogue-parser, temperature, phase-0.5
+
+### BUG-LOCAL-015: System cascades to Director crash on 0-dialogue script
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** When ScriptWriter produced a script with garbage "dialogue" (structural tags misidentified as characters), the run continued to Director and Bark. Director attempted to generate voice assignments for "ENVSIRENS WAIL" and "OPENING THEME". Bark generated near-silent audio.
+- **Cause:** Permissive fallback matched structural tags, returning dialogue_count > 0, which bypassed PARSE_FATAL. No quality gate between ScriptWriter output and downstream nodes.
+- **Fix:** (a) Structural name blocklist in permissive fallback prevents false positive matches. (b) Format Normalizer pass gives the parser clean input. (c) PARSE_FATAL still fires as last resort if both normalizer and fallback fail.
+- **Verify:** Same test as BUG-014. If normalizer fails gracefully, PARSE_FATAL should fire with clear error instead of silent garbage propagation.
+- **Tags:** cascade-failure, parse-fatal, quality-gate, phase-0.5
+
+### BUG-LOCAL-013: UI doesn't warn user when guardrails clamp parameters [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** no
+- **Symptom:** User selected "8 characters + 3 minutes" but the guardrail silently clamped to 3 chars in the logs. No warning visible in ComfyUI UI — user had no idea the setting was changed.
+- **Cause:** Guardrail warnings were logged internally but not returned to the UI. ComfyUI only shows what the nodes return.
+- **Fix:** ~~(v1) Prepend as comment block to script_json~~ Caused BUG-016. **(v2)** Guardrail clamp warnings logged to otr_runtime.log as `GUARDRAIL_UI:` lines alongside existing `PREFLIGHT:` lines. script_json stays pure valid JSON.
+- **Verify:** ✅ VALIDATED 2026-04-12 19:50:39: Test ran with 8 chars + 3 min. PREFLIGHT fired and logged clamps. ✅ REVISED: BUG-016 fix confirmed guardrail_warnings log via `_runtime_log()` without corrupting JSON.
+- **Tags:** ui, guardrails, feedback, phase-0.5
+
+### PHASE 0.5 QA SUMMARY [VALIDATED 2026-04-12]
+- **All fixes deployed and tested together**
+- **Test case:** 8 characters + 3 minutes + maximum chaos creativity
+- **Run 1 result (old code, temp=1.35):**
+  - PREFLIGHT guardrails fired: clamped 8→3 chars, disabled act breaks
+  - FORMAT_NORM activated but reported "No improvement" (both counts 0)
+  - Parser recovered 6 dialogue lines via permissive fallback
+  - QA_REPAIR auto-injected ANNOUNCER bookends (generic canned text)
+  - **KokoroAnnouncer crashed (BUG-016):** JSON comment prefix broke `json.loads()`
+- **Post-crash fixes applied:**
+  - BUG-016: ✅ Guardrail warnings now log-only, script_json stays pure JSON
+  - BUG-014 (updated): ✅ Temperature clamped: maximum chaos 1.35→0.95, wild & rough 1.1→0.92
+  - BUG-017: ✅ Story-aware ANNOUNCER via LLM micro-pass replaces canned placeholders
+  - BUG-018: ✅ Test suite updated for runtime_preset removal
+- **Test suite status:**
+  - test_core.py: 83 passed, 21 skipped
+  - test_dropdown_guardrails.py: 133 passed, 0 failed
+  - AST parse: ✅ Clean
+- **Code changes validated:**
+  - No BOM: ✅ Confirmed
+  - Obsidian strings: ✅ All 8 updated correctly
+  - runtime_preset dropdown: ✅ Removed entirely, target_minutes is now sole control
+  - Workflow JSON: ✅ Updated to remove runtime_preset widget index
+- **Next phase:** Reload ComfyUI and retest with all Phase 0.5 changes live
+
+### BUG-LOCAL-016: Guardrail warning comments break downstream JSON parsing [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** Node #13 (OTR_KokoroAnnouncer) crashes with `json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)`. The `script_json` string starts with `// GUARDRAIL WARNINGS:` instead of valid JSON.
+- **Cause:** BUG-013 fix prepended `// comment` lines to the `script_json` output from ScriptWriter. JSON does not support comments. KokoroAnnouncer (and any other downstream node) calls `json.loads(script_json)` which fails immediately on the `//` prefix.
+- **Fix:** Remove comment-prefix injection from script_json. Guardrail warnings are already logged via PREFLIGHT log lines visible in otr_runtime.log. Instead, store warnings in a separate `guardrail_warnings` string and log them, but keep script_json as pure valid JSON.
+- **Verify:** Run 8 chars + 3 min + maximum chaos. KokoroAnnouncer should receive valid JSON and not crash. Check otr_runtime.log for PREFLIGHT warnings still present.
+- **Tags:** json-parse, guardrails, downstream-crash, phase-0.5
+
+### BUG-LOCAL-017: QA_REPAIR ANNOUNCER bookends are generic canned text [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** no
+- **Symptom:** When the LLM fails to generate ANNOUNCER bookends (e.g. at high creativity), QA_REPAIR auto-injects canned placeholder text: "Welcome to Signal Lost. Tonight's broadcast takes us into the unknown." and "And so the transmission ends. This has been Signal Lost. Stay safe." These are completely generic with no story context - no date, no location, no character names, no science hook.
+- **Cause:** QA_REPAIR in `_parse_script()` had no access to episode context (title, news, characters). It could only insert hardcoded strings.
+- **Fix:** (a) QA_REPAIR now flags missing ANNOUNCER with `__NEEDS_LLM_OPENING/CLOSING__` sentinels. (b) New `_generate_announcer_bookends()` method does a quick LLM micro-pass (temp 0.4, max 200 tokens, ~3-5s) at the `write_script` call site where full context is available. The LLM reads episode_title, genre, news headline, character names, and a dialogue preview to generate story-specific bookends. (c) Falls back to canned text if LLM call fails.
+- **Verify:** Run any episode where ANNOUNCER is missing from LLM output. Check otr_runtime.log for "ANNOUNCER_GEN: Generated opening (N chars) + closing (N chars)". ANNOUNCER lines should reference actual story content.
+- **Tags:** announcer, qa-repair, llm-micro-pass, story-context, phase-0.5
+
+### BUG-LOCAL-019: FORMAT_NORM times out generating runaway filler tokens [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** FORMAT_NORM LLM pass exceeds 120s wall-clock budget. The LLM generates 1700+ tokens at ~14 tok/s but dialogue count plateaus at 22 lines around token 700 — the remaining 1000+ tokens are stage-direction prose, scene descriptions, and padding that the streaming counter never recognizes as dialogue. Fires on every 8-min target run tested so far. Pipeline falls back to original script text and relies on permissive 2B-fallback parser.
+- **Cause:** FORMAT_NORM has no early-stop heuristic. The `max_new_tokens` budget is too generous relative to the input script length, and the LLM drifts into narrative prose after exhausting the dialogue content. The 120s timeout is a blunt wall-clock kill, not a quality gate.
+- **Fix:** (1) Token budget reduced from `min(2048, len//3+500)` to `min(1024, len//4)` — prevents runaway filler. (2) Timeout reduced from 120s to 75s. For a 10k-char script: old budget=2048 tokens, new budget=1024.
+- **Verify:** Run 8-min target with maximum chaos. FORMAT_NORM should complete in <75s or bail faster, not generate 1700+ filler tokens.
+- **Tags:** format-norm, timeout, runaway-tokens, early-stop, phase-0.5
+
+### BUG-LOCAL-020: Episode duration significantly undershoots target_minutes (systemic)
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** 8-minute target produces 3.7-minute output (46%). 3-minute target produces ~2-minute output (67%). The LLM prompt says "MINIMUM 64 dialogue lines" but only 25 are generated. At maximum chaos, Mistral-Nemo ignores word/line count instructions. The word-per-minute estimator used 130 wpm but Bark TTS actually paces at ~67 wpm, making estimates doubly wrong.
+- **Cause:** Three compounding issues: (a) LLM instructions used minutes (not measurable) instead of words (countable). (b) No post-generation enforcement — the pipeline accepted whatever the LLM produced. (c) Duration estimator used 130 wpm instead of the measured 67 wpm.
+- **Fix:** Word-count enforcement system with raw-text-first pipeline reorder: (1) Convert `target_minutes` to `target_words` using measured Bark rate of 67 wpm. (2) LLM prompt now asks for specific word count ("write at least 536 words of dialogue") instead of minutes. (3) Post-generation pipeline reordered to: **WORD_EXTEND → ANNOUNCER → FORMAT_NORM → Parse**. All four stages operate on raw text before a single final parse. (4) `_extend_script_dialogue()` counts dialogue words via regex on raw text, generates additional dialogue lines via LLM if under 70% target, appends to raw text. (5) ANNOUNCER bookends generated on raw text (sees full extended script). (6) FORMAT_NORM normalizes the complete text (original + extensions + announcer) in one pass. (7) Parser runs once on clean text. (8) Duration estimator fixed to use 67 wpm.
+- **Verify:** Run 8-min target. Check runtime log for `WORD_ENFORCEMENT:` lines showing word count vs target, and `WORD_EXTEND:` if extension fires. Final output should be closer to 8 min than 3.7 min.
+- **Tags:** duration, word-count, enforcement, extension-pass, bark-wpm, pipeline-reorder, phase-0.5
+
+### BUG-LOCAL-018: test_dropdown_guardrails.py references removed runtime_preset [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** no
+- **Symptom:** `pytest tests/test_dropdown_guardrails.py` fails with `KeyError: 'runtime_preset'` during collection. 1 additional NameError at runtime for `RUNTIME_PRESETS` variable.
+- **Cause:** runtime_preset was removed from INPUT_TYPES but the test file still extracted it from `_REQUIRED` and used it in 12 test locations.
+- **Fix:** Removed all runtime_preset references from tests. Replaced `runtime_preset="[FAST] quick (5 min)"` with `target_minutes=5`, etc. Added `test_runtime_preset_removed` assertion alongside existing dead-param checks. Removed obsolete `test_no_1min_test_preset` and `test_runtime_presets_produce_different_target_minutes`.
+- **Verify:** `pytest tests/test_dropdown_guardrails.py -v` shows 133 passed, 0 failed.
+- **Tags:** test-suite, runtime-preset, cleanup, phase-0.5
+

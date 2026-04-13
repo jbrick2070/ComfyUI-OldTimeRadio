@@ -1474,6 +1474,22 @@ class GemmaHeartbeatStreamer(BaseStreamer):
                 pass
             return
 
+        # -- Bare "CHARACTER: dialogue" format (BUG-007 format) --------
+        # The LLM often writes "DALE: I heard something" instead of
+        # [VOICE: DALE, traits] tags. Detect NAME: at start of line.
+        import re
+        bare_match = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', line)
+        if bare_match:
+            name = bare_match.group(1).strip()
+            # Skip false positives like "SCENE:", "SFX:", "ENV:", "NOTE:"
+            if name not in ("SCENE", "SFX", "ENV", "NOTE", "NARRATOR",
+                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE"):
+                self.dialogue_count += 1
+                self.characters_seen.add(name)
+                clean_dialogue = bare_match.group(2).strip()[:60]
+                _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
+                return
+
         # -- Beat pause -----------------------------------------------
         if "(beat)" in line.lower():
             return  # beats are too frequent to log individually
@@ -2124,13 +2140,9 @@ class LLMScriptWriter:
                     "default": "hard_sci_fi",
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
-                "runtime_preset": (["[FAST] quick (5 min)", "[EMOJI] standard (12 min)", "[EMOJI] long (15 min)", "[EMOJI] epic (20 min)", "[EMOJI] custom"], {
-                    "default": "[EMOJI] standard (12 min)",
-                    "tooltip": "Friendly runtime selector - overrides target_minutes unless set to [EMOJI] custom"
-                }),
                 "target_minutes": ("INT", {
                     "default": 8, "min": 3, "max": 45, "step": 1,
-                    "tooltip": "Target minutes - only used when runtime_preset is set to [EMOJI] custom (minimum 3)"
+                    "tooltip": "Target episode duration in minutes. Bark TTS pacing typically adds 50-100% (e.g. 3 -> 5-6 min, 8 -> 12-15 min)"
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
@@ -2172,7 +2184,7 @@ class LLMScriptWriter:
                 }),
                 "creativity": (["safe & tight", "balanced", "wild & rough", "maximum chaos"], {
                     "default": "balanced",
-                    "tooltip": "Creativity dial - overrides temperature/top_p (safe=0.6, balanced=0.85, wild=1.1, chaos=1.35)"
+                    "tooltip": "Creativity dial - overrides temperature/top_p (safe=0.6, balanced=0.85, wild=0.92, chaos=0.95)"
                 }),
                 "arc_enhancer": ("BOOLEAN", {
                     "default": True,
@@ -2340,7 +2352,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         return profiles if len(profiles) >= num_names else None
 
-    def write_script(self, episode_title, genre_flavor, runtime_preset,
+    def write_script(self, episode_title, genre_flavor,
                      target_minutes, num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
@@ -2401,20 +2413,10 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         vram_reset_peak("script_writer_entry")
         vram_snapshot("script_writer_entry")
 
-        # -- RUNTIME PRESET - override target_minutes unless custom --
-        _preset_map = {
-            "[FAST] quick (5 min)":      5,
-            "[EMOJI] standard (12 min)": 8,
-            "[EMOJI] long (15 min)":    15,
-            "[EMOJI] epic (20 min)":    20,
-        }
-        if runtime_preset in _preset_map:
-            target_minutes = _preset_map[runtime_preset]
-
         # -- DIAGNOSTIC: log feature flags so we can confirm they're received --
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
-                     f"runtime_preset={runtime_preset} target_min={target_minutes} chars={num_characters} "
+                     f"target_min={target_minutes} chars={num_characters} "
                      f"length={target_length} style={style_variant} creativity={creativity} arc_enhancer={arc_enhancer}")
 
         # ======================================================================
@@ -2425,8 +2427,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         temp_map = {
             "safe & tight": 0.6,
             "balanced": 0.85,
-            "wild & rough": 1.1,
-            "maximum chaos": 1.35,
+            "wild & rough": 0.92,
+            "maximum chaos": 0.95,  # BUG-014: 1.35 caused total format collapse; 0.95 stays creative but respects structure
         }
         top_p_map = {
             "safe & tight": 0.9,
@@ -2445,17 +2447,19 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # These get injected into the user prompt to force dialogue VOLUME
         # rather than [PAUSE/BEAT] padding. Targets the "Zoom call pacing" bug.
         # ======================================================================
-        # HARD MINIMUMS - Gemma chronically undershoots, so set the floor high.
-        # These are MANDATORY counts, not soft targets. Failure = revise pass.
-        # Dialogue line floor scales with target_minutes (~8 lines/min with 40%
-        # inflation because Gemma undershoots). Act count comes from target_length.
+        # HARD MINIMUMS - word-count based enforcement (BUG-012/019 fix).
+        # Bark TTS paces at ~67 wpm. We target words, not minutes, because
+        # words are countable post-generation and enforceable via extension pass.
+        # The LLM understands "write 500 words" better than "target 8 minutes".
+        _BARK_WPM = 67  # measured: 247 words -> 3.7 min = 66.8 wpm
+        _target_words = int(target_minutes * _BARK_WPM)
+        _min_lines = max(18, int(target_minutes * 8))  # line floor still useful as structural hint
         _act_label = {
             "short (3 acts)": "3 acts",
             "medium (5 acts)": "5 acts",
             "long (7-8 acts)": "7-8 acts",
             "epic (10+ acts)": "10+ acts",
         }.get(target_length, "5 acts")
-        _min_lines = max(18, int(target_minutes * 8))  # ~8 inflated lines/min, floor 18
         _extend_hint = (" If your first draft is shorter, EXTEND the middle acts "
                         "with more conflict, more interruptions, and more reaction beats."
                         if target_minutes >= 8 else "")
@@ -2473,11 +2477,15 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 "this format. Even with only 3 acts, every line must be tagged."
             )
         length_instruction = (
-            f"MANDATORY: {_act_label}, MINIMUM {_min_lines} dialogue lines "
-            f"(NOT counting ANNOUNCER). Target {target_minutes}-minute runtime.{_subplot_hint} "
-            f"Do NOT stop until you have written at least {_min_lines} character dialogue lines."
+            f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
+            f"(minimum {_min_lines} dialogue lines, NOT counting ANNOUNCER).{_subplot_hint} "
+            f"This script will be read aloud by voice actors at ~67 words per minute, "
+            f"so {_target_words} words = ~{target_minutes} minutes of audio. "
+            f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
             f"{_extend_hint}{_format_hint}"
         )
+        # Store target for post-generation enforcement
+        self._target_dialogue_words = _target_words
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
         # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
@@ -2489,17 +2497,22 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # Catch bad configs before burning RTX 5080 compute time.
         # ======================================================================
 
+        # Collect guardrail warnings to display in UI
+        guardrail_warnings = []
+
         # -- 1a. Parameter sanity checks --
         # Short episodes: too many characters starves dialogue per character
         if target_minutes <= 5 and num_characters > 4:
             log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
                         "clamping to 4 characters for short episode", target_minutes, num_characters)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 4 ({target_minutes}-min episode)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 4 characters ({target_minutes}-min episode max: 4)")
             num_characters = 4
         if target_minutes <= 3 and num_characters > 3:
             log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
                         "clamping to 3 characters for very short episode", target_minutes, num_characters)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 ({target_minutes}-min episode)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_minutes}-min episode max: 3)")
             num_characters = 3
 
         # Long episodes: too few characters can't sustain narrative tension
@@ -2509,11 +2522,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[PreFlight] %d characters too few for %s - clamping to 3",
                         num_characters, target_length)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 (too few for {target_length})")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_length} requires minimum 3)")
             num_characters = 3
 
         if target_minutes <= 3 and include_act_breaks:
             log.warning("[PreFlight] Act breaks disabled for %d-min episode (too short)", target_minutes)
             _runtime_log("PREFLIGHT: Act breaks disabled (episode too short)")
+            guardrail_warnings.append("⚠️ Act breaks disabled (too short for 3-min episodes)")
             include_act_breaks = False
 
         # Obsidian profile + long episode = severe truncation (2500 token cap)
@@ -2521,6 +2536,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[PreFlight] Obsidian profile with %d-min episode will truncate badly - "
                         "clamping to 10 minutes", target_minutes)
             _runtime_log(f"PREFLIGHT: Clamped target_minutes from {target_minutes} to 10 (Obsidian token cap)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {target_minutes} -> 10 minutes (Obsidian profile max: 10)")
             target_minutes = 10
 
         # -- 1b. Custom premise enforcement --
@@ -3056,14 +3072,139 @@ Begin the full script now. Follow this structure exactly:
             )
             script_text = stripped_text
 
-        # Parse into structured JSON
-        script_lines = self._parse_script(script_text)
+        # ══════════════════════════════════════════════════════════════
+        # POST-GENERATION PIPELINE (all on raw text, then parse once)
+        #
+        # Order matters:
+        #   1. WORD_EXTEND  — count dialogue words, extend if under 70%
+        #   2. ANNOUNCER    — add bookends (sees full extended script)
+        #   3. FORMAT_NORM  — clean up everything into canonical format
+        #   4. PARSE        — parse clean text into structured JSON
+        # ══════════════════════════════════════════════════════════════
+
+        # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020 fix) ---------
+        # Count dialogue words in raw text using regex (no parse needed).
+        # If under 70% of target, run LLM extension on raw text.
+        _target_words = getattr(self, "_target_dialogue_words", int(target_minutes * 67))
+        _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+                                 "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+                                 "ANNOUNCER"}
+        _raw_dialogue_matches = re.findall(
+            r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
+        )
+        _raw_dialogue_words = sum(
+            len(dialogue.split())
+            for name, dialogue in _raw_dialogue_matches
+            if name.strip() not in _false_positive_names
+        )
+        _word_ratio = _raw_dialogue_words / max(1, _target_words)
+        _runtime_log(
+            f"WORD_ENFORCEMENT: {_raw_dialogue_words} words vs {_target_words} target "
+            f"({_word_ratio:.0%}) | Bark@67wpm -> ~{_raw_dialogue_words / 67:.1f} min"
+        )
+
+        if _word_ratio < 0.70 and _target_words > 150:
+            _deficit = _target_words - _raw_dialogue_words
+            _runtime_log(
+                f"WORD_ENFORCEMENT: UNDER THRESHOLD ({_word_ratio:.0%} < 70%) - "
+                f"deficit {_deficit} words - running extension pass"
+            )
+            script_text = self._extend_script_dialogue(
+                script_text, _deficit, _target_words,
+                model_id, genre_flavor, optimization_profile
+            )
+            # Recount after extension
+            _raw_dialogue_matches = re.findall(
+                r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
+            )
+            _raw_dialogue_words = sum(
+                len(dialogue.split())
+                for name, dialogue in _raw_dialogue_matches
+                if name.strip() not in _false_positive_names
+            )
+            _word_ratio = _raw_dialogue_words / max(1, _target_words)
+            _runtime_log(
+                f"WORD_ENFORCEMENT: Post-extension: {_raw_dialogue_words} words "
+                f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 67:.1f} min"
+            )
+
+        # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
+        # Check if ANNOUNCER lines exist. If not, generate and inject.
+        # Runs after word extension so the ANNOUNCER sees the full story.
+        _has_announcer_open = bool(re.search(
+            r'^ANNOUNCER\s*:', script_text[:500], re.MULTILINE
+        ))
+        _has_announcer_close = bool(re.search(
+            r'^ANNOUNCER\s*:', script_text[-500:], re.MULTILINE
+        ))
+        if not _has_announcer_open or not _has_announcer_close:
+            _runtime_log(
+                f"ANNOUNCER_RAW: Missing bookends (open={_has_announcer_open}, "
+                f"close={_has_announcer_close}) - generating via LLM"
+            )
+            # Extract character names from raw text for context
+            _char_names = {
+                name.strip()
+                for name, _ in _raw_dialogue_matches
+                if name.strip() not in _false_positive_names
+            }
+            # Extract news headline
+            _news_head = ""
+            for nb_line in news_block.split("\n"):
+                clean = nb_line.strip()
+                if clean and not clean.startswith("CUSTOM") and not clean.startswith("---"):
+                    _news_head = clean[:300]
+                    break
+            opening_text, closing_text = self._generate_announcer_bookends(
+                [], episode_title, genre_flavor,
+                _news_head, _char_names, model_id, optimization_profile,
+            )
+            if not _has_announcer_open and opening_text:
+                script_text = f"ANNOUNCER: {opening_text}\n\n{script_text}"
+                _runtime_log(f"ANNOUNCER_RAW: Prepended opening ({len(opening_text)} chars)")
+            if not _has_announcer_close and closing_text:
+                script_text = f"{script_text}\n\nANNOUNCER: {closing_text}"
+                _runtime_log(f"ANNOUNCER_RAW: Appended closing ({len(closing_text)} chars)")
+
+        # -- STEP 3: FORMAT NORMALIZER (Creative → Strict) ------------
+        # Now the script has extensions + announcer. One pass cleans
+        # everything into canonical format before the parser runs.
+        script_text = self._normalize_script_format(
+            script_text, model_id, optimization_profile
+        )
+
+        # -- STEP 4: PARSE into structured JSON -----------------------
+        # Single parse on the fully prepared text.
+        # LLM_RESCUE fires only if parser gets 0 dialogue lines.
+        try:
+            script_lines = self._parse_script(script_text)
+        except ValueError as parse_err:
+            if "0 dialogue lines" in str(parse_err) and len(script_text) > 500:
+                _runtime_log("LLM_RESCUE: Parser found 0 dialogue - attempting LLM reparse")
+                rescued_text = self._llm_reparse_rescue(
+                    script_text, model_id, optimization_profile
+                )
+                if rescued_text and rescued_text != script_text:
+                    _runtime_log(f"LLM_RESCUE: Got {len(rescued_text)} chars back - retrying parse")
+                    script_lines = self._parse_script(rescued_text)
+                    _runtime_log(f"LLM_RESCUE: Reparse recovered {len([l for l in script_lines if l.get('type') == 'dialogue'])} dialogue lines")
+                else:
+                    _runtime_log("LLM_RESCUE: Rescue pass returned nothing useful - re-raising")
+                    raise
+            else:
+                raise
+
+        # Log guardrail warnings (visible in otr_runtime.log) but keep script_json as pure JSON
+        # BUG-016: Never prepend comments to script_json - downstream nodes call json.loads() on it
+        if guardrail_warnings:
+            for w in guardrail_warnings:
+                _runtime_log(f"GUARDRAIL_UI: {w}")
         script_json = json.dumps(script_lines, indent=2)
 
-        # Estimate actual minutes
+        # Estimate actual minutes (Bark TTS paces at ~67 wpm, not 130)
         word_count = sum(len(line.get("line", "").split()) for line in script_lines
                          if line.get("type") == "dialogue")
-        est_minutes = max(1, word_count // 130)
+        est_minutes = max(1, round(word_count / 67, 1))
 
         # -- Phase 1g: Cast map verification --
         # Extract unique character names from parsed script for downstream matching
@@ -3622,7 +3763,7 @@ Keep everything that already works. Fix only what the editor flagged.
 
 RULES:
 - Output the FULL revised script - not a summary, not highlights, the COMPLETE script.
-- Maintain ALL canonical formatting: [VOICE:], [SFX:], [ENV:], (beat), === SCENE N ===
+- CRITICAL: Every spoken line MUST use the format 'CHARACTER_NAME: dialogue text' (all caps name, colon, space, then dialogue). Also preserve [SFX:], [ENV:], (beat), === SCENE N === tags.
 - Do NOT add new characters unless the critique specifically demands it.
 - Do NOT change character names.
 - Do NOT remove the ANNOUNCER opening or closing epilogue.
@@ -4388,6 +4529,408 @@ Format your response exactly as:
 
         return None
 
+    def _normalize_script_format(self, script_text, model_id, optimization_profile="Standard"):
+        """Creative-to-Strict pass: reformat any dialogue style into Canonical 1.0.
+
+        Uses the same LLM (already loaded in VRAM) at low temperature to
+        rewrite the script into strict format. This prevents PARSE_FATAL when
+        the creative pass produces non-standard dialogue formatting.
+
+        Returns the normalized script text, or the original if normalization fails.
+        """
+        # Quick check: if the script already has [VOICE:] tags, skip normalization
+        voice_tag_count = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
+        if voice_tag_count >= 3:
+            _runtime_log(f"FORMAT_NORM: Skipped - script already has {voice_tag_count} [VOICE:] tags")
+            return script_text
+
+        # Quick check: if script has enough CHARACTER_NAME: lines, skip.
+        # Exclude false positives like SCENE:, ACT:, NOTE:, TARGET:, STYLE:
+        _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+                                 "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC"}
+        _all_canonical = re.findall(
+            r'^([A-Z][A-Z0-9_ ]{1,25}):\s+.+$', script_text, re.MULTILINE
+        )
+        canonical_count = sum(1 for name in _all_canonical
+                              if name.strip() not in _false_positive_names)
+        # Threshold: at least 5 real dialogue lines, or 10% of total lines
+        total_lines = max(1, script_text.count('\n'))
+        min_threshold = max(5, int(total_lines * 0.10))
+        if canonical_count >= min_threshold:
+            _runtime_log(f"FORMAT_NORM: Skipped - script already has {canonical_count} canonical dialogue lines (threshold: {min_threshold})")
+            return script_text
+
+        _runtime_log("FORMAT_NORM: Script needs normalization - running strict reformat pass")
+
+        normalize_prompt = f"""You are a script formatting tool. Your ONLY job is to reformat
+the dialogue below into STRICT radio drama format. Do NOT change any words,
+do NOT add or remove dialogue, do NOT rewrite content. ONLY reformat.
+
+STRICT FORMAT RULES:
+1. Every scene starts with: === SCENE N ===
+2. Environment lines: [ENV: description]
+3. Sound effects: [SFX: description]
+4. Every dialogue line MUST be exactly: CHARACTER_NAME: "their dialogue here"
+   - Character name in ALL CAPS, no asterisks, no parenthetical emotions
+   - Colon after name, then a space, then the dialogue in quotes
+   - Stage directions like (angry) or (whispering) go INSIDE the quotes at the start
+5. Announcer lines: ANNOUNCER: "their line here"
+6. Remove any markdown formatting (bold, italic, asterisks around names)
+7. Keep ALL dialogue content exactly as written - just reformat the structure
+
+EXAMPLE INPUT:
+*HIRO*(urgent): We need to move now!
+**MALCOLM** (frustrated): I'm working on it!
+
+EXAMPLE OUTPUT:
+HIRO: "(urgent) We need to move now!"
+MALCOLM: "(frustrated) I'm working on it!"
+
+SCRIPT TO REFORMAT:
+{script_text}
+
+OUTPUT THE REFORMATTED SCRIPT ONLY. No commentary, no explanation."""
+
+        # BUG-019 FIX: Tighter token budget + timeout for FORMAT_NORM.
+        # The LLM is reformatting, not creating content. Output should be
+        # roughly the same length as the dialogue portion of the input.
+        # Old budget: min(2048, len//3 + 500) gave 2048 for a 10k-char script.
+        # New budget: min(1024, len//4) gives ~1024, preventing runaway filler.
+        # Timeout reduced from 120s to 75s - if it can't finish in 75s, bail.
+        _norm_max_tokens = min(1024, max(256, len(script_text) // 4))
+        _runtime_log(f"FORMAT_NORM: Token budget = {_norm_max_tokens} (input chars = {len(script_text)})")
+
+        try:
+            normalized = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    normalize_prompt,
+                    model_id=model_id,
+                    max_new_tokens=_norm_max_tokens,
+                    temperature=0.3,
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=75,
+                phase_label="FormatNorm",
+            )
+
+            if not normalized or len(normalized.strip()) < len(script_text) * 0.3:
+                _runtime_log(f"FORMAT_NORM: Output too short ({len(normalized or '')} chars vs {len(script_text)} input) - keeping original")
+                return script_text
+
+            # Verify normalization improved dialogue detection
+            new_canonical = len(re.findall(
+                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', normalized, re.MULTILINE
+            ))
+            new_voice = len(re.findall(r'\[VOICE:', normalized, re.IGNORECASE))
+
+            if new_canonical + new_voice > canonical_count + voice_tag_count:
+                _runtime_log(f"FORMAT_NORM: Success - {new_canonical} canonical + {new_voice} VOICE tags (was {canonical_count} + {voice_tag_count})")
+                return normalized.strip()
+            else:
+                _runtime_log(f"FORMAT_NORM: No improvement ({new_canonical} canonical vs {canonical_count}) - keeping original")
+                return script_text
+
+        except Exception as e:
+            log.warning("[FormatNorm] Normalization pass failed: %s", e)
+            _runtime_log(f"FORMAT_NORM: Failed ({e}) - keeping original")
+            return script_text
+
+    def _extend_script_dialogue(self, script_text, deficit_words,
+                                 target_words, model_id, genre_flavor,
+                                 optimization_profile="Standard"):
+        """LLM extension pass: add more dialogue to raw script text.
+
+        Called when raw text dialogue word count is <70% of target.
+        The LLM reads the existing script and generates additional dialogue
+        that fits the existing scenes, characters, and narrative arc.
+        New dialogue is appended to the end of the raw script text.
+
+        Returns the extended raw script text (or original on failure).
+        """
+        _runtime_log(f"WORD_EXTEND: Starting dialogue extension (deficit={deficit_words} words)")
+
+        # Extract characters and dialogue preview from raw text
+        _false_positives = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+                            "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+                            "ANNOUNCER"}
+        _matches = re.findall(
+            r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)$', script_text, re.MULTILINE
+        )
+        characters = sorted({
+            name.strip() for name, _ in _matches
+            if name.strip() not in _false_positives
+        })
+        existing_dialogue = [
+            f"{name.strip()}: {dialogue[:80]}"
+            for name, dialogue in _matches
+            if name.strip() not in _false_positives
+        ]
+        existing_preview = "\n".join(existing_dialogue[:40])
+        num_scenes = max(1, len(re.findall(r'=== SCENE', script_text)))
+
+        # Calculate how many new lines we need (avg ~10 words per dialogue line)
+        new_lines_needed = max(10, deficit_words // 10)
+
+        extend_prompt = f"""You are extending a {genre_flavor.replace("_", " ")} radio drama script.
+The current script has {len(existing_dialogue)} dialogue lines but needs approximately {new_lines_needed} MORE lines
+to reach the target of {target_words} words of spoken dialogue.
+
+CHARACTERS IN THE STORY: {", ".join(characters)}
+NUMBER OF SCENES: {num_scenes}
+
+EXISTING SCRIPT PREVIEW:
+{existing_preview}
+
+TASK: Write {new_lines_needed} NEW dialogue lines that continue and deepen the story.
+- Use ONLY the existing characters listed above
+- Every line MUST use format: CHARACTER_NAME: dialogue text
+- Add conflict, tension, emotional beats, reactions, and reveals
+- Develop character relationships — disagreements, alliances, secrets
+- Include stage directions in parentheses: (angry), (whispering), (pause)
+- Do NOT repeat existing lines
+- Do NOT add new characters
+- Do NOT write ANNOUNCER lines
+- Do NOT write scene headers, SFX, or ENV tags — ONLY dialogue lines
+
+OUTPUT ONLY THE NEW DIALOGUE LINES, one per line:"""
+
+        try:
+            # Token budget: ~4 chars per token, ~10 words per line, ~50 chars per line
+            _max_tokens = min(2048, max(512, new_lines_needed * 20))
+            _runtime_log(f"WORD_EXTEND: Requesting {new_lines_needed} lines, budget={_max_tokens} tokens")
+
+            extended_text = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    extend_prompt,
+                    model_id=model_id,
+                    max_new_tokens=_max_tokens,
+                    temperature=0.5,  # Moderate - creative but follows instructions
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=90,
+                phase_label="WordExtend",
+            )
+
+            if not extended_text or len(extended_text.strip()) < 50:
+                _runtime_log("WORD_EXTEND: Extension returned too little text - keeping original")
+                return script_text
+
+            # Filter extension output — only keep valid dialogue lines
+            valid_lines = []
+            for raw_line in extended_text.strip().split("\n"):
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                m = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', raw_line)
+                if m:
+                    name = m.group(1).strip()
+                    if name not in _false_positives and name in characters:
+                        valid_lines.append(raw_line)
+
+            if len(valid_lines) < 3:
+                _runtime_log(f"WORD_EXTEND: Only {len(valid_lines)} valid lines - keeping original")
+                return script_text
+
+            # Append new dialogue to end of raw script text
+            new_block = "\n".join(valid_lines)
+            new_word_count = sum(len(line.split()) for line in valid_lines)
+            script_text = f"{script_text.rstrip()}\n\n{new_block}\n"
+            _runtime_log(
+                f"WORD_EXTEND: Appended {len(valid_lines)} lines "
+                f"({new_word_count} words) to raw script text"
+            )
+            return script_text
+
+        except Exception as e:
+            log.warning("[WordExtend] Extension pass failed: %s", e)
+            _runtime_log(f"WORD_EXTEND: Failed ({e}) - keeping original")
+            return script_text
+
+    def _llm_reparse_rescue(self, raw_script, model_id, optimization_profile="Standard"):
+        """LLM rescue pass: extract dialogue from a script the regex parser cannot handle.
+
+        Fires ONLY when _parse_script() returns 0 dialogue lines from substantial text.
+        The LLM reads the raw script (prose, screenplay, novel-style, whatever format
+        the creative pass produced) and extracts every spoken line into strict
+        CHARACTER_NAME: dialogue format.
+
+        Same model already in VRAM, low temperature (0.3), focused extraction task.
+        Typically completes in 10-20 seconds. Returns reformatted text or None on failure.
+        """
+        import time
+
+        _runtime_log("LLM_RESCUE: Starting dialogue extraction rescue pass")
+
+        # Truncate input to avoid blowing context - keep first 8000 chars
+        truncated = raw_script[:8000]
+
+        rescue_prompt = f"""Extract all spoken dialogue from the script below and reformat into EXACTLY this structure:
+
+=== SCENE 1 ===
+[ENV: location description]
+[SFX: sound effect description]
+CHARACTER_NAME: Their exact spoken dialogue.
+CHARACTER_NAME: Their exact reply.
+(beat)
+=== SCENE 2 ===
+CHARACTER_NAME: Next scene dialogue.
+
+FORMAT RULES:
+- Scene breaks: === SCENE N ===
+- Environment: [ENV: description]
+- Sound effects: [SFX: description]
+- Dialogue: CHARACTER_NAME: exact words (name in ALL CAPS, colon, space, dialogue)
+- Pauses: (beat)
+- First and last dialogue lines should be ANNOUNCER
+- Preserve exact dialogue words. Do not rewrite, summarize, or add new lines.
+- Output ONLY the reformatted script. No commentary.
+
+SCRIPT:
+{truncated}
+
+REFORMATTED:"""
+
+        try:
+            start = time.time()
+            rescued = _generate_with_llm(
+                rescue_prompt,
+                model_id=model_id,
+                max_new_tokens=min(4096, int(len(truncated) / 2.5)),
+                temperature=0.3,
+                top_p=0.9,
+                optimization_profile=optimization_profile,
+            )
+            elapsed = time.time() - start
+            _runtime_log(f"LLM_RESCUE: Completed in {elapsed:.1f}s ({len(rescued)} chars)")
+
+            if not rescued or len(rescued) < 100:
+                _runtime_log("LLM_RESCUE: Output too short - rescue failed")
+                return None
+
+            # Sanity check - count dialogue in ANY recognizable format
+            import re
+            # Pattern 1: CHARACTER_NAME: dialogue
+            bare_count = len(re.findall(r'^[A-Z][A-Z0-9_ ]{1,25}:\s+.+', rescued, re.MULTILINE))
+            # Pattern 2: [VOICE: NAME, ...] dialogue
+            voice_count = len(re.findall(r'\[VOICE:', rescued, re.IGNORECASE))
+            dialogue_count = bare_count + voice_count
+            _runtime_log(f"LLM_RESCUE: Found {dialogue_count} dialogue lines ({bare_count} bare + {voice_count} [VOICE:])")
+
+            if dialogue_count < 3:
+                _runtime_log("LLM_RESCUE: Too few dialogue lines in rescue - giving up")
+                return None
+
+            return rescued
+
+        except Exception as e:
+            log.warning("[LLM_RESCUE] Rescue pass failed: %s", e)
+            _runtime_log(f"LLM_RESCUE: Failed ({e})")
+            return None
+
+    def _generate_announcer_bookends(self, script_lines, episode_title,
+                                     genre_flavor, news_headline, character_names,
+                                     model_id, optimization_profile="Standard"):
+        """LLM micro-pass: generate story-specific ANNOUNCER opening and closing.
+
+        Called by QA_REPAIR when the parser detects missing ANNOUNCER bookends.
+        Uses the same loaded LLM at low temperature for a fast ~50-token generation.
+        Returns (opening_line, closing_line) as plain strings.
+        Falls back to generic canned text if the LLM call fails.
+        """
+        # Build a brief story summary from the first few dialogue lines
+        dialogue_preview = []
+        for ln in script_lines:
+            if ln.get("type") == "dialogue" and ln.get("character_name") != "ANNOUNCER":
+                dialogue_preview.append(f"{ln['character_name']}: {ln.get('line', '')[:80]}")
+                if len(dialogue_preview) >= 4:
+                    break
+        story_glimpse = "\n".join(dialogue_preview) if dialogue_preview else "(no dialogue preview)"
+
+        chars_list = ", ".join(sorted(character_names - {"ANNOUNCER"})) if character_names else "unknown"
+
+        prompt = f"""You are the ANNOUNCER for the radio drama "Signal Lost".
+Write exactly TWO lines - an OPENING and a CLOSING - for tonight's episode.
+
+EPISODE: {episode_title}
+GENRE: {genre_flavor}
+NEWS SEED: {news_headline[:300] if news_headline else 'science fiction'}
+CHARACTERS: {chars_list}
+STORY PREVIEW:
+{story_glimpse}
+
+RULES:
+- OPENING: 2-4 sentences. Include today's date naturally (say "April 12th, 2026" not a timestamp). Name the setting. Mention 1-2 characters by name. End with a hook/tagline. Match the genre tone.
+- CLOSING: 1-2 sentences. Wrap up with "This has been Signal Lost" and a brief real-science epilogue tied to the news seed.
+- Write ONLY the two lines, labeled OPENING: and CLOSING:
+- No stage directions, no [VOICE:] tags, just the spoken words.
+
+OPENING:
+"""
+        try:
+            result = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    prompt,
+                    model_id=model_id,
+                    max_new_tokens=200,
+                    temperature=0.4,
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=30,
+                phase_label="AnnouncerGen",
+            )
+
+            if not result or len(result.strip()) < 20:
+                _runtime_log("ANNOUNCER_GEN: LLM output too short - using fallback")
+                return self._announcer_fallback()
+
+            # Parse OPENING: and CLOSING: from result
+            opening = ""
+            closing = ""
+            current = None
+            for raw_line in result.strip().splitlines():
+                stripped = raw_line.strip()
+                if stripped.upper().startswith("OPENING:"):
+                    current = "opening"
+                    text_after = stripped[len("OPENING:"):].strip().strip('"')
+                    if text_after:
+                        opening = text_after
+                elif stripped.upper().startswith("CLOSING:"):
+                    current = "closing"
+                    text_after = stripped[len("CLOSING:"):].strip().strip('"')
+                    if text_after:
+                        closing = text_after
+                elif current == "opening" and not opening:
+                    opening = stripped.strip('"')
+                elif current == "opening" and opening and not stripped.upper().startswith("CLOSING"):
+                    opening += " " + stripped.strip('"')
+                elif current == "closing":
+                    if closing:
+                        closing += " " + stripped.strip('"')
+                    else:
+                        closing = stripped.strip('"')
+
+            if not opening or len(opening) < 15:
+                _runtime_log("ANNOUNCER_GEN: Could not parse opening - using fallback")
+                return self._announcer_fallback()
+            if not closing or len(closing) < 10:
+                closing = f"And so the transmission ends. This has been Signal Lost. {episode_title}. Stay safe."
+
+            _runtime_log(f"ANNOUNCER_GEN: Generated opening ({len(opening)} chars) + closing ({len(closing)} chars)")
+            return (opening, closing)
+
+        except Exception as e:
+            log.warning("[AnnouncerGen] LLM micro-pass failed: %s", e)
+            _runtime_log(f"ANNOUNCER_GEN: Failed ({e}) - using fallback")
+            return self._announcer_fallback()
+
+    @staticmethod
+    def _announcer_fallback():
+        """Canned ANNOUNCER text when LLM generation fails."""
+        return (
+            "Welcome to Signal Lost. Tonight's broadcast takes us into the unknown.",
+            "And so the transmission ends. This has been Signal Lost. Stay safe.",
+        )
+
     # Descriptor words that indicate a missing character name (Gemma dropped the NAME field)
     _GENDER_WORDS = frozenset([
         "male", "female", "man", "woman", "boy", "girl", "nonbinary",
@@ -4577,16 +5120,30 @@ Format your response exactly as:
             log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
             _recovered = 0
 
-            # Pass 1: Match 'NAME: dialogue' or '**NAME:** dialogue' or 'NAME (angry): dialogue'
+            # Pass 1: Match 'NAME: dialogue' or '*NAME*: dialogue' or '**NAME:** dialogue'
+            #         or 'NAME(angry): dialogue' or '*NAME*(angry): dialogue'
+            # BUG-014 fix: accept 0-2 asterisks (not just 0 or 2) around names.
+            # Maximum chaos creativity produces *NAME*(emotion): format with single asterisks.
+            _structural_names = {
+                "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
+                "INT", "EXT", "OPENING", "CLOSING", "INTERSTITIAL",
+            }
             for ln in lines:
                 if ln.get("type") == "direction":
                     text_d = ln["text"]
-                    m = re.match(r'^(?:\*\*)?([A-Z\s]{2,20})(?:\*\*)?(?:\s*\([^)]*\))?\s*:\s*(.+)$', text_d)
+                    # Strip any leading/trailing asterisks or underscores from the direction text
+                    text_d_clean = re.sub(r'^[*_]+\s*|\s*[*_]+$', '', text_d).strip()
+                    m = re.match(r'^(?:\*{0,2})([A-Z][A-Z0-9 ]{0,19})(?:\*{0,2})(?:\s*\([^)]*\))?\s*:\s*(.+)$', text_d_clean)
                     if m:
+                        cname = m.group(1).strip()
+                        # Reject structural tag names that look like characters
+                        if cname.split()[0] in _structural_names:
+                            continue
                         ln["type"] = "dialogue"
-                        ln["character_name"] = m.group(1).strip()
+                        ln["character_name"] = cname
                         ln["voice_traits"] = "unspecified"
-                        ln["line"] = m.group(2).strip()
+                        ln["line"] = m.group(2).strip().strip('"*_\u201c\u201d')
                         _recovered += 1
 
             # Pass 2: Screenplay format (NeMo 12B natural style)
@@ -4689,35 +5246,35 @@ Format your response exactly as:
                 "Aborting run to prevent silent audio failure."
             )
 
-        # -- PRO QA: Enforce ANNOUNCER bookends --
-        # Guarantees the Announcer always opens and closes the show, even if the LLM forgets.
-        # Only applies to full scripts (heuristically > 5 lines) to avoid polluting unit tests.
+        # -- PRO QA: Flag missing ANNOUNCER bookends --
+        # Detection only - actual injection happens at call site via _generate_announcer_bookends()
+        # which has access to episode context (title, news, characters) for story-aware text.
+        # Fallback canned injection kept for callers that don't use the LLM path (e.g. unit tests).
         dialogue_indices = [i for i, ln in enumerate(lines) if ln.get("type") == "dialogue"]
         if len(dialogue_indices) > 5:
             first_idx = dialogue_indices[0]
             last_idx = dialogue_indices[-1]
-            
+
             if lines[first_idx]["character_name"] != "ANNOUNCER":
-                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER opening. Auto-injecting.")
-                _runtime_log("QA_REPAIR: Missing ANNOUNCER opening auto-injected")
+                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER opening - flagged for LLM repair")
+                _runtime_log("QA_REPAIR: Missing ANNOUNCER opening - flagged for LLM generation")
                 lines.insert(first_idx, {
                     "type": "dialogue",
                     "character_name": "ANNOUNCER",
                     "voice_traits": "male, 50s, authoritative, calm",
-                    "line": "Welcome to Signal Lost. Tonight's broadcast takes us into the unknown."
+                    "line": "__NEEDS_LLM_OPENING__",
                 })
-                # Re-evaluate indices
                 dialogue_indices = [i for i, ln in enumerate(lines) if ln.get("type") == "dialogue"]
                 last_idx = dialogue_indices[-1]
 
             if lines[last_idx]["character_name"] != "ANNOUNCER":
-                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER closing. Auto-injecting.")
-                _runtime_log("QA_REPAIR: Missing ANNOUNCER closing auto-injected")
+                log.warning("[ScriptParser] PRO QA: Missing ANNOUNCER closing - flagged for LLM repair")
+                _runtime_log("QA_REPAIR: Missing ANNOUNCER closing - flagged for LLM generation")
                 lines.insert(last_idx + 1, {
                     "type": "dialogue",
                     "character_name": "ANNOUNCER",
                     "voice_traits": "male, 50s, authoritative, calm",
-                    "line": "And so the transmission ends. This has been Signal Lost. Stay safe."
+                    "line": "__NEEDS_LLM_CLOSING__",
                 })
 
         return lines

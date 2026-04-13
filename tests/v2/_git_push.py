@@ -23,7 +23,7 @@ if os.path.exists(lock):
 # Stage real changes only (not CRLF noise)
 files = [
     "CLAUDE.md",
-    "nodes/v2_preview.py",
+    # nodes/v2_preview.py removed (sidecar architecture pending)
     "tests/test_core.py",
     "BUG_LOG.md",
     "otr_v2/__init__.py",

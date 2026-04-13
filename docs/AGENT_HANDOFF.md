@@ -1,8 +1,8 @@
 # OTR v2.0 Agent Handoff Document
 
-**Last updated:** 2026-04-12 (guardrail sweep)  
+**Last updated:** 2026-04-12 (Phase 0 complete, all cleanup done)  
 **Active branch:** `v2.0-alpha`  
-**Last confirmed remote commit:** `30ce8b3` (guardrail changes uncommitted)
+**Last confirmed remote commit:** `03808b9`
 
 ---
 
@@ -12,9 +12,13 @@
 - All v2.0 Phase 0 code written and pushed to `v2.0-alpha`
 - Bug Bible regression: **109 passed, 25 skipped, 2 xfailed** — clean
 - `tests/test_core.py`: 83 passed — clean
-- 10 bugs found and fixed (see BUG_LOG.md — BUG-LOCAL-001 through 010)
-- **Pre-flight guardrail sweep (BUG-009/010):** runtime presets auto-clamp target_length, dialogue line minimums scale dynamically with target_minutes, character counts clamped per episode length, Obsidian profile capped at 10 min, outline temp capped at model max, dead widgets (news_headlines, temperature) marked DEPRECATED
+- 11 bugs found and fixed (see BUG_LOG.md — BUG-LOCAL-001 through 011)
+- **Pre-flight guardrail sweep (BUG-009/010):** dialogue line minimums scale dynamically with target_minutes, character counts clamped per episode length, Obsidian profile capped at 10 min, outline temp capped at model max
+- **BUG-007 root cause fixed:** Short (3 acts) prompt now explicitly enforces `CHARACTER:` dialogue format so LLM can't fall into narration mode
+- **BUG-011 fixed:** Obsidian profile string mismatch — code now checks for correct `"Obsidian (UNSTABLE/4GB)"` string
+- **Dead widgets removed:** `news_headlines` and `temperature` completely removed from INPUT_TYPES (never had functional effect, now cleaned from UI and workflow JSON)
 - 1-min test preset removed, minimum runtime = 3 minutes
+- User's `target_length` choice is now respected — no silent auto-clamping
 - `otr_v2/` package scaffolded (subprocess runner + visual plan schema)
 - `tests/v2/test_audio_byte_identical.py` — Phase 0 regression gate
 - `tests/v2/_run_baseline.py` — ComfyUI HTTP API integration
@@ -68,6 +72,14 @@ System `python` is NOT on PATH. Always use full path or activate venv first.
 - Port: `8000` (not the default 8188)
 - API base: `http://127.0.0.1:8000`
 - History evicts completed prompts — use `_extract_from_history.py <prompt_id>` immediately after completion
+
+### Live Test Monitoring Protocol
+- AI does not have real-time console access — requires manual log capture and paste
+- When running episode tests, user provides console output → AI analyzes for bugs
+- Test run format: episode name, parameters (preset, target_length, num_chars, genre, style, creativity, profile), expected runtime
+- Analysis captures: PARSE_FATAL errors, dialogue line counts, guardrail activation (character count clamps, Obsidian caps, outline temp ceiling), VRAM usage, FFmpeg timing, audio extraction success
+- Any bugs found during live test logged immediately in BUG_LOG.md with console excerpt in "Symptom" field
+- Phase 0 validation: test real-world minimum config (2 chars, 3 acts, 5 min, hard sci-fi) to confirm guardrails and prompt enforcement work
 
 ### v2.0 Hard Constraints (from CLAUDE.md)
 - **C1**: No new inputs on any v1.5 node — causes widget drift

@@ -73,7 +73,6 @@ _INPUT_TYPES = LLMScriptWriter.INPUT_TYPES()
 _REQUIRED = _INPUT_TYPES["required"]
 _OPTIONAL = _INPUT_TYPES["optional"]
 
-RUNTIME_PRESETS = _REQUIRED["runtime_preset"][0]
 GENRE_FLAVORS = _REQUIRED["genre_flavor"][0]
 TARGET_LENGTHS = _OPTIONAL["target_length"][0]
 STYLE_VARIANTS = _OPTIONAL["style_variant"][0]
@@ -103,13 +102,10 @@ def _run_preflight(writer, **overrides):
     defaults = {
         "episode_title": "Test Episode",
         "genre_flavor": "hard_sci_fi",
-        "runtime_preset": "[EMOJI] standard (12 min)",
         "target_minutes": 8,
         "num_characters": 4,
         "model_id": "google/gemma-4-E4B-it",
         "custom_premise": "",
-        "news_headlines": 3,
-        "temperature": 0.8,
         "include_act_breaks": True,
         "self_critique": True,
         "open_close": True,
@@ -174,14 +170,6 @@ def writer():
 class TestAllDropdownsAccepted:
     """Every single dropdown value must run through pre-flight without error."""
 
-    @pytest.mark.parametrize("preset", RUNTIME_PRESETS)
-    def test_runtime_preset_accepted(self, writer, preset):
-        if preset == "[EMOJI] custom":
-            logs = _run_preflight(writer, runtime_preset=preset, target_minutes=10)
-        else:
-            logs = _run_preflight(writer, runtime_preset=preset)
-        assert any("ScriptWriter:" in l for l in logs), f"No log output for preset {preset}"
-
     @pytest.mark.parametrize("genre", GENRE_FLAVORS)
     def test_genre_flavor_accepted(self, writer, genre):
         logs = _run_preflight(writer, genre_flavor=genre)
@@ -213,22 +201,6 @@ class TestAllDropdownsAccepted:
 # ===========================================================================
 class TestDropdownsHaveEffect:
     """Every dropdown must produce a measurable difference in the log output."""
-
-    def test_runtime_presets_produce_different_target_minutes(self, writer):
-        """Each non-custom preset maps to a distinct target_minutes."""
-        seen_minutes = set()
-        for preset in RUNTIME_PRESETS:
-            if preset == "[EMOJI] custom":
-                continue
-            logs = _run_preflight(writer, runtime_preset=preset)
-            # Find target_min= in diagnostic log
-            for l in logs:
-                m = re.search(r"target_min=(\d+)", l)
-                if m:
-                    seen_minutes.add(int(m.group(1)))
-                    break
-        # Should have 4 distinct values (5, 8, 15, 20)
-        assert len(seen_minutes) == 4, f"Expected 4 distinct minutes, got {seen_minutes}"
 
     def test_creativity_produces_different_temps(self, writer):
         """Each creativity tier maps to a distinct temperature."""
@@ -280,7 +252,7 @@ class TestGuardrails:
         """User's target_length choice is never overridden by preset."""
         for tl in TARGET_LENGTHS:
             logs = _run_preflight(writer,
-                                  runtime_preset="[FAST] quick (5 min)",
+                                  target_minutes=5,
                                   target_length=tl)
             # Verify the PARAMS log shows the user's chosen target_length
             for l in logs:
@@ -295,7 +267,7 @@ class TestGuardrails:
     def test_short_3_acts_with_quick_preset_accepted(self, writer):
         """short (3 acts) + quick (5 min) must work without PARSE_FATAL."""
         logs = _run_preflight(writer,
-                              runtime_preset="[FAST] quick (5 min)",
+                              target_minutes=5,
                               target_length="short (3 acts)")
         # Should log 3 acts in the PARAMS line
         assert any("length=short (3 acts)" in l for l in logs)
@@ -303,14 +275,13 @@ class TestGuardrails:
     def test_too_many_chars_short_episode(self, writer):
         """8 characters + 5 min -> clamped to 4."""
         logs = _run_preflight(writer,
-                              runtime_preset="[FAST] quick (5 min)",
+                              target_minutes=5,
                               num_characters=8)
         assert any("Clamped num_characters to 4" in l for l in logs)
 
     def test_too_many_chars_very_short_episode(self, writer):
         """8 characters + 3 min (custom) -> clamped to 3."""
         logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] custom",
                               target_minutes=3,
                               num_characters=8)
         # Should clamp to 4 first (<=5 min), then to 3 (<=3 min)
@@ -319,7 +290,7 @@ class TestGuardrails:
     def test_too_few_chars_long_episode(self, writer):
         """2 characters + long (7-8 acts) -> clamped to 3."""
         logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] long (15 min)",
+                              target_minutes=15,
                               target_length="long (7-8 acts)",
                               num_characters=2)
         assert any("Clamped num_characters to 3" in l for l in logs)
@@ -327,7 +298,7 @@ class TestGuardrails:
     def test_obsidian_caps_runtime(self, writer):
         """Obsidian + 20 min -> clamped to 10 min."""
         logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] epic (20 min)",
+                              target_minutes=20,
                               optimization_profile="Obsidian (UNSTABLE/4GB)")
         assert any("Obsidian token cap" in l for l in logs) or \
                any("Obsidian" in l and "10" in l for l in logs), \
@@ -351,7 +322,6 @@ class TestGuardrails:
     def test_act_breaks_disabled_short_episode(self, writer):
         """Act breaks disabled for <=3 min episodes."""
         logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] custom",
                               target_minutes=3,
                               include_act_breaks=True)
         assert any("Act breaks disabled" in l for l in logs)
@@ -404,6 +374,10 @@ class TestObsidianStringMatch:
 class TestNoDeadOptions:
     """Verify deprecated parameters are marked and active ones are not."""
 
+    def test_runtime_preset_removed(self):
+        assert "runtime_preset" not in _REQUIRED and "runtime_preset" not in _OPTIONAL, \
+            "runtime_preset should be removed from INPUT_TYPES (replaced by target_minutes)"
+
     def test_news_headlines_removed(self):
         assert "news_headlines" not in _OPTIONAL, \
             "news_headlines should be removed from INPUT_TYPES (dead param)"
@@ -419,11 +393,6 @@ class TestNoDeadOptions:
     def test_target_length_not_deprecated(self):
         tooltip = _OPTIONAL["target_length"][1].get("tooltip", "")
         assert "DEPRECATED" not in tooltip, "target_length should NOT be deprecated"
-
-    def test_no_1min_test_preset(self):
-        """The 1-min test preset should no longer exist."""
-        assert not any("1 min" in p for p in RUNTIME_PRESETS), \
-            "1-min test preset should have been removed"
 
     def test_minimum_target_minutes_is_3(self):
         """target_minutes min must be 3, not 1."""

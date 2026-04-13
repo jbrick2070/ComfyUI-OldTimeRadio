@@ -190,15 +190,10 @@ def _dropdown_text_match(workflow_val, schema_val):
     return strip_prefix(workflow_val) == strip_prefix(schema_val)
 
 
-# v2 placeholder node types that are NOT part of the audio pipeline.
-# Strip these from the prompt to avoid validation errors from missing
-# MODEL/CLIP/VAE inputs that aren't connected in the workflow.
-_V2_PLACEHOLDER_TYPES = {
-    "OTR_CharacterForge",
-    "OTR_ScenePainter",
-    "OTR_VisualCompositor",
-    "OTR_ProductionBus",
-}
+# v2 visual nodes have been removed (sidecar architecture pending).
+# This set is kept empty for backwards compatibility with any code
+# that references it during prompt stripping.
+_V2_PLACEHOLDER_TYPES = set()
 
 
 def _dump_schema_for_node(schemas, node_type, out_path):
