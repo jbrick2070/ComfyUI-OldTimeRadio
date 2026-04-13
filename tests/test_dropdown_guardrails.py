@@ -276,44 +276,29 @@ class TestDropdownsHaveEffect:
 class TestGuardrails:
     """Cross-combo guardrails must clamp dangerous parameter pairs."""
 
-    def test_short_preset_clamps_target_length_from_short(self, writer):
-        """quick (5 min) + short (3 acts) -> auto-clamped to medium (5 acts)."""
+    def test_user_target_length_respected(self, writer):
+        """User's target_length choice is never overridden by preset."""
+        for tl in TARGET_LENGTHS:
+            logs = _run_preflight(writer,
+                                  runtime_preset="[FAST] quick (5 min)",
+                                  target_length=tl)
+            # Verify the PARAMS log shows the user's chosen target_length
+            for l in logs:
+                if "PARAMS" in l and f"length={tl}" in l:
+                    break
+            else:
+                pytest.fail(f"target_length '{tl}' not found in PARAMS log: {logs}")
+            # Verify NO auto-clamp fired
+            assert not any("Auto-clamped target_length" in l for l in logs), \
+                f"target_length '{tl}' should not be auto-clamped"
+
+    def test_short_3_acts_with_quick_preset_accepted(self, writer):
+        """short (3 acts) + quick (5 min) must work without PARSE_FATAL."""
         logs = _run_preflight(writer,
                               runtime_preset="[FAST] quick (5 min)",
                               target_length="short (3 acts)")
-        assert any("Auto-clamped target_length" in l and "medium (5 acts)" in l for l in logs), \
-            f"Expected auto-clamp log, got: {logs}"
-
-    def test_standard_preset_keeps_medium(self, writer):
-        """standard (12 min) + medium (5 acts) -> no clamp needed."""
-        logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] standard (12 min)",
-                              target_length="medium (5 acts)")
-        assert not any("Auto-clamped target_length" in l for l in logs), \
-            "Should not clamp medium for standard preset"
-
-    def test_long_preset_clamps_to_long_acts(self, writer):
-        """long (15 min) + medium (5 acts) -> clamped to long (7-8 acts)."""
-        logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] long (15 min)",
-                              target_length="medium (5 acts)")
-        assert any("Auto-clamped target_length" in l and "long (7-8 acts)" in l for l in logs)
-
-    def test_epic_preset_clamps_to_epic_acts(self, writer):
-        """epic (20 min) + medium (5 acts) -> clamped to epic (10+ acts)."""
-        logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] epic (20 min)",
-                              target_length="medium (5 acts)")
-        assert any("Auto-clamped target_length" in l and "epic (10+ acts)" in l for l in logs)
-
-    def test_custom_preset_no_clamp(self, writer):
-        """custom preset does not auto-clamp target_length."""
-        logs = _run_preflight(writer,
-                              runtime_preset="[EMOJI] custom",
-                              target_minutes=10,
-                              target_length="short (3 acts)")
-        assert not any("Auto-clamped target_length" in l for l in logs), \
-            "Custom preset should not auto-clamp"
+        # Should log 3 acts in the PARAMS line
+        assert any("length=short (3 acts)" in l for l in logs)
 
     def test_too_many_chars_short_episode(self, writer):
         """8 characters + 5 min -> clamped to 4."""
@@ -335,6 +320,7 @@ class TestGuardrails:
         """2 characters + long (7-8 acts) -> clamped to 3."""
         logs = _run_preflight(writer,
                               runtime_preset="[EMOJI] long (15 min)",
+                              target_length="long (7-8 acts)",
                               num_characters=2)
         assert any("Clamped num_characters to 3" in l for l in logs)
 

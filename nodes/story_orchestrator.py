@@ -2415,24 +2415,6 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         if runtime_preset in _preset_map:
             target_minutes = _preset_map[runtime_preset]
 
-        # -- SAFE PRESET AUTO-CLAMP (BUG-LOCAL-007 prevention) --
-        # Each runtime_preset implies a safe target_length. Override whatever
-        # the user/workflow set so that dangerous combos (e.g. short+5min)
-        # never reach the LLM. "custom" preset = user is on their own.
-        _safe_length_for_preset = {
-            "[FAST] quick (5 min)":       "medium (5 acts)",   # proven safe - Phase 0 baseline
-            "[EMOJI] standard (12 min)":  "medium (5 acts)",   # battle-tested default
-            "[EMOJI] long (15 min)":      "long (7-8 acts)",   # enough runtime for 75+ lines
-            "[EMOJI] epic (20 min)":      "epic (10+ acts)",   # full arc, sub-plots
-        }
-        if runtime_preset in _safe_length_for_preset:
-            safe_length = _safe_length_for_preset[runtime_preset]
-            if target_length != safe_length:
-                _runtime_log(f"PREFLIGHT: Auto-clamped target_length from '{target_length}' to '{safe_length}' (safe for {runtime_preset})")
-                log.info("[PreFlight] Auto-clamped target_length '%s' -> '%s' for preset '%s'",
-                         target_length, safe_length, runtime_preset)
-                target_length = safe_length
-
         # -- DIAGNOSTIC: log feature flags so we can confirm they're received --
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
@@ -2482,10 +2464,23 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                         "with more conflict, more interruptions, and more reaction beats."
                         if target_minutes >= 8 else "")
         _subplot_hint = " Allow sub-plots." if target_minutes >= 18 else ""
+        # BUG-007 root cause fix: short acts + short runtime made the LLM
+        # produce narration instead of tagged dialogue. Force the format
+        # explicitly when act count is low.
+        _format_hint = ""
+        if _act_label == "3 acts":
+            _format_hint = (
+                " CRITICAL FORMAT RULE: Every spoken line MUST use the format "
+                "'CHARACTER_NAME: dialogue text'. Do NOT write prose narration, "
+                "do NOT write untagged dialogue, do NOT write stage directions "
+                "without a CHARACTER: tag. The parser REJECTS lines without "
+                "this format. Even with only 3 acts, every line must be tagged."
+            )
         length_instruction = (
             f"MANDATORY: {_act_label}, MINIMUM {_min_lines} dialogue lines "
             f"(NOT counting ANNOUNCER). Target {target_minutes}-minute runtime.{_subplot_hint} "
-            f"Do NOT stop until you have written at least {_min_lines} character dialogue lines.{_extend_hint}"
+            f"Do NOT stop until you have written at least {_min_lines} character dialogue lines."
+            f"{_extend_hint}{_format_hint}"
         )
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
