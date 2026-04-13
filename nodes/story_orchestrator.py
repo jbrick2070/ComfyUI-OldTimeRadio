@@ -3088,11 +3088,17 @@ Begin the full script now. Follow this structure exactly:
             _act_map = {"short (3 acts)": 3, "medium (5 acts)": 5, "long (7-8 acts)": 8, "epic (10+ acts)": 12}
             actual_act_count = _act_map.get(target_length, 1)
 
+        # BUG-021 FIX: Critique and arc enhancer are structural passes, not
+        # creative ones. Cap their temperature so maximum chaos creativity
+        # does not produce sloppy formatting in post-generation cleanup.
+        _structural_temp = min(temperature, 0.6)
+        _runtime_log(f"ScriptWriter: structural_temp={_structural_temp} (creativity temp={temperature})")
+
         if self_critique and actual_act_count <= 3:
             # Short scripts: full critique + revision (safe - script fits in context)
             _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise (full)")
             script_text = self._critique_and_revise(
-                script_text, genre_flavor, target_words, model_id, temperature,
+                script_text, genre_flavor, target_words, model_id, _structural_temp,
                 optimization_profile=optimization_profile
             )
             _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
@@ -3114,7 +3120,7 @@ Begin the full script now. Follow this structure exactly:
             _findings = getattr(self, '_last_critique_findings', '') or ''
             _act_sums = getattr(self, '_last_act_summaries', []) or []
             script_text = self._execute_arc_enhancer(
-                script_text, genre_flavor, episode_title, news_block, model_id, temperature,
+                script_text, genre_flavor, episode_title, news_block, model_id, _structural_temp,
                 optimization_profile=optimization_profile,
                 critique_findings=_findings,
                 act_summaries=_act_sums
@@ -4197,9 +4203,16 @@ Outline only - do NOT write dialogue yet."""
         # PCIe memory thrashing (0.1 tok/sec behavior, appearing as a hang).
         outline_budget = 600 if optimization_profile == "Obsidian (UNSTABLE/4GB)" else 1200
         
-        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}]")
+        # BUG-021 FIX: Cap outline temperature at 0.7. The outline is the
+        # structural skeleton -- character names, act structure, plot beats.
+        # Under maximum chaos the outline hallucinates names and sprawling
+        # act counts that infect every downstream act. Creative acts can
+        # improvise wildly on top of a solid outline.
+        _outline_temp = min(temperature, 0.7)
+        _outline_top_p = min(top_p, 0.95)
+        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}] [temp={_outline_temp}]")
         outline = _generate_with_llm(outline_prompt, model_id=model_id,
-                                         max_new_tokens=outline_budget, temperature=temperature, top_p=top_p,
+                                         max_new_tokens=outline_budget, temperature=_outline_temp, top_p=_outline_top_p,
                                          optimization_profile=optimization_profile)
 
         # Step 2: Generate each act with Context Engineering
@@ -4426,7 +4439,22 @@ Write Act {act_num} now:"""
         # the Arc Enhancer extracts on its own.
         self._last_act_summaries = act_summaries
 
-        return "\n\n".join(acts)
+        # BUG-021 FIX: Strip hallucinated act markers beyond the target count.
+        # Under maximum chaos, the LLM may inject [ACT N] markers for acts
+        # beyond num_acts within a single act's output text. Remove them so
+        # downstream parsers see the correct act structure.
+        combined = "\n\n".join(acts)
+        for phantom_act in range(num_acts + 1, num_acts + 20):
+            combined = re.sub(
+                rf'\[ACT\s+{phantom_act}\]',
+                '',
+                combined,
+                flags=re.IGNORECASE
+            )
+        _hallucinated = len(re.findall(r'\[ACT\s+\d+\]', combined, re.IGNORECASE))
+        _runtime_log(f"ScriptWriter: Act marker cleanup done ({num_acts} target, {_hallucinated} markers remain)")
+
+        return combined
 
     def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature, optimization_profile="Standard", critique_findings="", act_summaries=None):
         """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence.
