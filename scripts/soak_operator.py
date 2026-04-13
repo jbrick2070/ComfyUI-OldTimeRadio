@@ -41,6 +41,8 @@ STYLES = [
     "noir mystery", "chaotic black-mirror",
 ]
 CREATIVITIES = ["safe & tight", "balanced", "wild & rough"]
+OPT_PROFILES = ["Pro (Ultra Quality)", "Standard"]
+# NOTE: "Obsidian (UNSTABLE/4GB)" excluded -- not valid on 16 GB hardware
 
 # Node 1 (OTR_Gemma4ScriptWriter) widgets_values index map:
 #   [0] episode_title       [1] genre_flavor       [2] target_words
@@ -53,6 +55,7 @@ WV_TARGET_WORDS = 2
 WV_TARGET_LENGTH = 9
 WV_STYLE = 10
 WV_CREATIVITY = 11
+WV_OPT_PROFILE = 13
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +255,7 @@ def run_iteration(run_num):
             "length": random.choice(TARGET_LENGTHS),
             "style": random.choice(STYLES),
             "creativity": random.choice(CREATIVITIES),
+            "profile": random.choice(OPT_PROFILES),
         }
         for node in workflow.get("nodes", []):
             if node.get("id") == 1 and node.get("type") == "OTR_Gemma4ScriptWriter":
@@ -261,11 +265,12 @@ def run_iteration(run_num):
                 wv[WV_TARGET_LENGTH] = config["length"]
                 wv[WV_STYLE] = config["style"]
                 wv[WV_CREATIVITY] = config["creativity"]
+                wv[WV_OPT_PROFILE] = config["profile"]
                 break
 
         config_str = (f"genre={config['genre']} | words={config['words']} | "
                       f"length={config['length']} | style={config['style']} | "
-                      f"creativity={config['creativity']}")
+                      f"creativity={config['creativity']} | profile={config['profile']}")
         print_f(f"CONFIG: {config_str}")
 
         # 4. Convert web format to API format
