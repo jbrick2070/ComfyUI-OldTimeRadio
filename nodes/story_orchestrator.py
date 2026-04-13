@@ -1241,6 +1241,25 @@ def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization
     return _LLM_CACHE["model"], _LLM_CACHE["tokenizer"]
 
 
+# ── Token Budget Ratios ──────────────────────────────────────────────────────
+# target_words * ratio = max_new_tokens. Different content types tokenize at
+# different rates. Radio drama is dialogue-dominant (~60% character lines),
+# so structural overhead (VOICE tags, SFX, ENV, scene headers) is lower than
+# a screenplay or narration-heavy format.
+#
+# Breakdown for dialogue-dominant OTR scripts:
+#   tokenizer overhead:  ~1.3 tokens per English word
+#   script markup:       ~1.2x (VOICE/SFX/ENV tags, scene headers, beats)
+#   combined:            1.3 * 1.2 = 1.56 → round to 1.6
+#
+# Revision/rewrite passes include structural reorganization → higher overhead.
+# Outlines and pitches are almost entirely non-dialogue description.
+_TOKEN_RATIO_DIALOGUE = 1.6    # dialogue-dominant (OTR radio drama default)
+_TOKEN_RATIO_MIXED = 2.0       # revision/rewrite passes, structural changes
+_TOKEN_RATIO_OUTLINE = 2.2     # outlines, pitches, descriptions
+_TOKEN_RATIO_ACT_CHUNK = 2.0   # per-act chunked generation (needs slack for act boundaries)
+_TOKEN_RATIO_ACT_OBSIDIAN = 2.5  # Obsidian 4GB: wider slack for constrained KV cache
+
 # Bounded model cache with device tracking (Section 34)
 _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.5"}
 
@@ -2869,10 +2888,10 @@ Begin the full script now. Follow this structure exactly:
                 if target_words > 700:
                     log.warning("[LLMScriptWriter] Obsidian profile forced single-pass on %d-word target. "
                                 "Expect shorter overall length.", target_words)
-                max_new_tokens = max(int(target_words * 2.0), 1024)
+                max_new_tokens = max(int(target_words * _TOKEN_RATIO_DIALOGUE), 1024)
                 max_new_tokens = min(max_new_tokens, 2500)
             else:
-                max_new_tokens = max(int(target_words * 2.0), 1024)
+                max_new_tokens = max(int(target_words * _TOKEN_RATIO_DIALOGUE), 1024)
                 max_new_tokens = min(max_new_tokens, 8192)
 
             script_text = _generate_with_llm(
@@ -3784,7 +3803,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             # why every critique flagged "weak ending". Not a writing bug - a budget bug.
             # Formula: draft_chars / 3.5 chars-per-token * 1.25 safety margin.
             draft_token_estimate = int(len(draft_text) / 3.5)
-            revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * 2.0), 2048)
+            revision_tokens = max(int(draft_token_estimate * 1.25), int(target_words * _TOKEN_RATIO_MIXED), 2048)
             revision_tokens = min(revision_tokens, 8192)
             log.info("[Critique] Revision token budget: %d (draft_est=%d, target_words=%d)",
                      revision_tokens, draft_token_estimate, target_words)
@@ -4141,14 +4160,13 @@ Write Act {act_num} now:"""
 
             _runtime_log(f"ScriptWriter: Generating Act {act_num}/{num_acts}")
             
-            # v1.5: Dynamic act token budget based on words_per_act.
-            # Formula: words_per_act * 2.5 (1.3 tok/word + formatting + safety margin)
-            # Clamped between 1024 (floor for short acts) and 2048 (VRAM ceiling).
-            # Previous hardcoded 1536 was often too tight for 500+ word acts.
+            # v2.0: Content-aware act token budget using _TOKEN_RATIO constants.
+            # Standard ceiling raised from 2048 to 4096 to prevent silent truncation
+            # on long acts (epic 10+ act episodes). Obsidian stays at 2048 for VRAM.
             if optimization_profile == "Obsidian (UNSTABLE/4GB)":
-                act_budget = min(2048, int(words_per_act * 3.0))
+                act_budget = min(2048, int(words_per_act * _TOKEN_RATIO_ACT_OBSIDIAN))
             else:
-                act_budget = max(1024, min(2048, int(words_per_act * 2.5)))
+                act_budget = max(1024, min(4096, int(words_per_act * _TOKEN_RATIO_ACT_CHUNK)))
                 
             act_text = _generate_with_llm(act_prompt, model_id=model_id,
                                               max_new_tokens=act_budget, temperature=temperature, top_p=top_p,

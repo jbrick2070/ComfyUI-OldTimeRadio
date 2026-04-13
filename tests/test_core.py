@@ -320,41 +320,45 @@ class TestCleanTextForBark:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestTokenBudget:
-    """Verify max_new_tokens formula without running any model."""
+    """Verify max_new_tokens formula without running any model.
 
-    def _compute(self, target_words):
-        if target_words <= 700:
-            tokens = max(int(target_words * 2.0), 1024)
-            tokens = min(tokens, 8192)
-        else:
-            tokens = 4096  # chunked per-act ceiling
-        return tokens
+    Uses _TOKEN_RATIO_DIALOGUE (1.6) for single-pass and
+    _TOKEN_RATIO_ACT_CHUNK (2.0) for chunked per-act generation.
+    """
+    RATIO_DIALOGUE = 1.6   # must match _TOKEN_RATIO_DIALOGUE
+    RATIO_ACT = 2.0        # must match _TOKEN_RATIO_ACT_CHUNK
+
+    def _compute_single(self, target_words):
+        tokens = max(int(target_words * self.RATIO_DIALOGUE), 1024)
+        return min(tokens, 8192)
+
+    def _compute_act(self, words_per_act):
+        return max(1024, min(4096, int(words_per_act * self.RATIO_ACT)))
 
     def test_350w_hits_floor(self):
-        assert self._compute(350) == 1024  # 350*2=700 < 1024 -> floor
+        assert self._compute_single(350) == 1024  # 350*1.6=560 < 1024 -> floor
 
     def test_420w_hits_floor(self):
-        assert self._compute(420) >= 1024
+        assert self._compute_single(420) >= 1024
 
-    def test_500w_below_ceiling(self):
-        assert self._compute(500) == 1024  # 500*2=1000 < 1024 -> floor
+    def test_500w_hits_floor(self):
+        assert self._compute_single(500) == 1024  # 500*1.6=800 < 1024 -> floor
 
     def test_700w_above_floor(self):
-        t = self._compute(700)
-        assert 1024 <= t <= 8192  # 700*2=1400
+        t = self._compute_single(700)
+        assert t == 1120  # 700*1.6=1120
 
     def test_no_episode_below_1024(self):
         for w in [350, 420, 500, 600, 700]:
-            assert self._compute(w) >= 1024, f"{w}w budget {self._compute(w)} < 1024"
+            assert self._compute_single(w) >= 1024, f"{w}w budget {self._compute_single(w)} < 1024"
 
-    def test_1120w_uses_chunked(self):
-        assert self._compute(1120) == 4096
-
-    def test_3500w_chunked(self):
-        assert self._compute(3500) == 4096
+    def test_act_budget_scales(self):
+        assert self._compute_act(200) == 1024   # 200*2.0=400 < 1024 -> floor
+        assert self._compute_act(600) == 1200   # 600*2.0=1200
+        assert self._compute_act(2500) == 4096  # 2500*2.0=5000 > 4096 -> cap
 
     def test_ceiling_8192(self):
-        assert self._compute(700) <= 8192
+        assert self._compute_single(700) <= 8192
 
 
 # ─────────────────────────────────────────────────────────────────────────────
