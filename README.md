@@ -20,6 +20,10 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 **[Click here to download the full package (v1.6.0)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
 
+[![v2.0 Alpha — Visual Drama Engine](https://img.shields.io/badge/v2.0_Alpha-Visual_Drama_Engine-orange?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-alpha)
+
+AI-generated video for every episode. LTX-2.3 runs in isolated subprocesses so the audio pipeline stays byte-identical. 507 soak runs validated the audio foundation — now building the visual layer on top.
+
 ---
 
 ## What It Does
@@ -494,3 +498,4 @@ MIT License
 - **MusicGen** by [Meta AI](https://huggingface.co/facebook/musicgen-medium)
 - Built with patterns from the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide)
 - Created by [Jeffrey Brick](https://github.com/jbrick2070)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
