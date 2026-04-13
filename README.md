@@ -10,21 +10,21 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 1. **Get ComfyUI**: Use the [Official Desktop Installer](https://www.comfy.org/download).
 2. **Install OTR**: Use **Install via Git URL** in the ComfyUI Manager and paste our repo link.
-3. **Run**: Drag `workflows/old_time_radio_scifi_full.json` into your browser and hit **Queue Prompt**.
+3. **Run**: Drag `workflows/otr_scifi_16gb_full.json` into your browser and hit **Queue Prompt**.
 4. **Walk Away**: Everything else (Models, News, Scripts, Voices, Mastering, Video) is automatic.
 
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.5](https://img.shields.io/badge/Download-OldTimeRadio_v1.5-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.6.0](https://img.shields.io/badge/Download-OldTimeRadio_v1.6.0-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.5)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
+**[Click here to download the full package (v1.6.0)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
 
 ---
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Gemma 4 E4B**, **Mistral Nemo 12B** (v1.4 flagship default), and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, summarizes them through a dedicated LLM pass optimized for dramatic potential, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Gemma 4 E4B**, **Mistral Nemo 12B** (v1.4 flagship default), and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
@@ -88,8 +88,7 @@ Two workflows ship in the `workflows/` folder:
 
 | Workflow | Runtime Preset | Best For | File |
 |----------|---------------|----------|------|
-| **Test** | 🧪 1 min | Smoke testing after code changes | `otr_scifi_16gb_test.json` |
-| **Full** | 📻 12 min | Production episodes, all features ON, Pro profile | `otr_scifi_16gb_full.json` |
+| **Full** | 📻 5 min (default) | Production episodes, all features ON | `otr_scifi_16gb_full.json` |
 
 1. Open ComfyUI at `http://127.0.0.1:8000`
 2. Click **Load** → select a workflow
@@ -181,23 +180,10 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐
-  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — ALPHA]
+  4. VISUAL DRAMA ENGINE 🎥  [v2.0 — IN DEVELOPMENT]
 │                                                                                                    │
-  ┌─────────────────────────────┐   ┌─────────────────────────────┐   ┌────────────────────────┐
-│ │ 8. Character Forge          │   │ 9. Scene Painter             │   │ 10. Visual Compositor  │   │
-  │ (OTR_CharacterForge)  [v2] │   │ (OTR_ScenePainter)     [v2] │   │ (OTR_VisualCompositor) │
-│ │ Flux/SD: portrait per char  │   │ Flux/SD: cinematic bg/scene │   │ PIL composite + CRT   │   │
-  │ Consistent character seeds │   │ Establishing shots           │   │ Synced to audio bus   │
-│ └─────────────────────────────┘   └─────────────────────────────┘   └────────────────────────┘   │
-                 │                              │                              │
-│                └──────────────────────────────┼──────────────────────────────┘                    │
-                                                ▼
-│                              ┌────────────────────────────────┐                                   │
-                               │ 11. Production Bus             │
-│                              │ (OTR_ProductionBus)      [v2]  │                                   │
-                               │ visual_plan + audio timeline   │
-│                              │ → FFmpeg MP4 episode render    │                                   │
-                               └────────────────────────────────┘
+  LTX-2.3 video generation via subprocess sidecar architecture.
+│ Audio pipeline unchanged. See v2.0-alpha branch for progress.                                      │
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
@@ -219,11 +205,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
 | **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
 | | |
-| **v2.0 — Visual Drama Engine** | **[ALPHA — Functional on `v2.0-visual-engine` branch]** |
-| **8. Character Forge** `[v2.0]` | Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes. |
-| **9. Scene Painter** `[v2.0]` | Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation. |
-| **10. Visual Compositor** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
-| **11. Production Bus** `[v2.0]` | FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track. |
+| **v2.0 — Visual Drama Engine** | **[In development on `v2.0-alpha` branch]** — Sidecar architecture for LTX-2.3 video generation in subprocesses. Audio pipeline unchanged. See `docs/superpowers/specs/` for the full 6-phase design spec. |
 
 ---
 
@@ -249,19 +231,6 @@ Our Lemmy is the third link in a chain that stretches back to the dawn of sci-fi
 **3. Our Lemmy** — the 11% ghost in the SIGNAL LOST pipeline. Grizzled, wrench-wielding, gravel-voiced, crashes episodes unannounced. Stands on the shoulders of every actor who ever climbed into Jet Morgan's rocket, and the rock legend who took the name to the stage.
 
 It's radio drama → rock and roll → AI radio drama. History works in strange loops. SIGNAL LOST is fundamentally a love letter to the *Journey into Space* era, and the 11% Lemmy roll is how we keep the ghost on the bridge.
-
----
-
-## Live Render Monitor
-
-Long renders without visual feedback can feel like a black box. SIGNAL LOST includes a built-in heartbeat observability system.
-
-Run in a terminal during renders to watch the AI write the script in real time:
-
-```bash
-cd custom_nodes/ComfyUI-OldTimeRadio
-python otr_monitor.py
-```
 
 ---
 
@@ -302,9 +271,9 @@ python otr_monitor.py
 <details>
 <summary><strong>Script is too short / under-running the target runtime</strong></summary>
 
-**Cause:** Gemma occasionally undershoots even with MANDATORY line count directives.
+**Cause:** The LLM occasionally undershoots even with MANDATORY line count directives.
 
-**Fix:** v1.5 addresses this with the Story Editor (per-act briefs that prevent lazy generation), 1.5x dialogue inflation, and prompt hardening. Try `creativity = wild & rough` for even more output. The `self_critique` toggle enables structural analysis that guides writing quality.
+**Fix:** v1.6.0 addresses this with word-count enforcement (140 wpm pacing), automatic WORD_EXTEND that adds dialogue when under target, dual-format dialogue extraction, and FORMAT_NORM hardening. The pipeline now detects zero-dialogue scripts and generates from the cast roster automatically.
 </details>
 
 ---
@@ -327,7 +296,7 @@ sentencepiece>=0.1.99
 
 Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide).
 
-**Isolated Module Loading** — A failing dependency in one node will not crash the rest of the pack. Each of the 19 nodes loads independently with per-node exception handling.
+**Isolated Module Loading** — A failing dependency in one node will not crash the rest of the pack. Each of the 16 nodes loads independently with per-node exception handling.
 
 **RNG Architecture** — Two separate RNG systems prevent determinism leaking into places it shouldn't:
 - `random` (seeded per-episode from fingerprint) — used for reproducible story arc selection, Open-Close arc choices, character voice pool draws
@@ -336,6 +305,42 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 ---
 
 ## Change Log
+
+### What's New in v1.6.0 — SOAK VALIDATED (Pipeline Hardening & Script Quality)
+
+Validated with 507 consecutive soak test episodes (overnight automated runs, zero human intervention).
+
+#### Word-Count Enforcement & Pacing
+Episode length is now controlled by `target_words` (INT spinner, 350-10000) using 140 wpm radio drama pacing. The pipeline enforces word counts with automatic WORD_EXTEND that adds dialogue when under target, and content-aware token budget ratios that scale with episode length.
+
+#### News Article Summarization
+A dedicated LLM pass now summarizes RSS news articles before script generation, extracting human stakes, dramatic tension, sensory details, and usable quotes. Replaces raw article truncation with dense, drama-optimized context.
+
+#### Dual-Format Dialogue Extraction (BUG-025)
+Word-count and character extraction now handle both bare `NAME: text` and VOICE-tag `[VOICE: NAME, emotion] "text"` formats via a unified `_extract_all_dialogue()` helper. Fixes false zero-dialogue detection when the LLM outputs VOICE-tag format.
+
+#### Scene Deduplication (BUG-026)
+Post-processing pass detects and removes duplicate scenes caused by LLM revision loops. Uses dialogue fingerprint comparison with a 75% similarity threshold, then renumbers remaining scenes sequentially.
+
+#### AISM Filter (AI Slop Mitigation)
+The script generation prompt now includes a strictly enforced ban list targeting generic LLM output patterns: rule-of-three adjective lists, stock idioms, decorative em-dashes, pseudo-profound one-liners, and somatic posture filler. Replacement rules enforce audible physical cues, varied cadence, and natural breath-length lines.
+
+#### FORMAT_NORM Hardening
+Three rounds of prompt hardening for the Mistral-Nemo 12B format normalizer: explicit VOICE spacing rules, VFX-to-ENV conversion, scene number preservation, and act-break retention. Eliminates format drift that caused downstream parse failures.
+
+#### Intelligent Dialogue Name Normalizer (BUG-023)
+Step 0 regex normalizer handles `**NAME**`, `*NAME*`, `__NAME__`, underscores, and emotion tags before the LLM-based FORMAT_NORM pass runs. Catches formatting variants that the LLM normalizer missed.
+
+#### Zero-Dialogue Fallback (BUG-024)
+WORD_EXTEND now accepts a fallback cast roster for scripts containing only SFX/atmosphere with no character dialogue. Generates full dialogue from scratch using the pre-rolled cast.
+
+#### Dropdown Guardrails
+56 regression tests covering all dropdowns, guardrails, and edge cases. Pre-flight sweep enforces dynamic dialogue line floors, character count clamps, Obsidian 10-min cap, and outline temp ceiling.
+
+#### Cleanup
+Removed dead widgets (`news_headlines`, `temperature`), removed 1-min test preset (minimum 3 minutes), removed v2.0 preview placeholder nodes from main. User's `target_length` choice is now respected without silent auto-clamping.
+
+---
 
 ### What's New in v1.5 — CLEAN (Story Editor & Pipeline Hardening)
 
@@ -372,7 +377,7 @@ Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now
 New modular nodes for `KokoroAnnouncer` (British narrator) and `MusicGenTheme` (orchestral cues), seamlessly snapping into the pipeline to execute specialized audio workloads while the LLM is safely unloaded.
 
 #### Obsidian "One-Shot" Optimization
-Added an **Optimization Profile** master switch. Selecting "Obsidian (Low VRAM/Fast)" disables all iterative LLM passes for 4GB GPUs.
+Added an **Optimization Profile** master switch. Selecting "Obsidian (UNSTABLE/4GB)" disables all iterative LLM passes for 4GB GPUs.
 
 #### Subtle Pacing & Clean Load Protocol
 Implemented a **50% Pacing Overhaul** across the audio engine for a tighter, more modern radio sound.
@@ -461,7 +466,7 @@ New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OF
 - `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
 
 #### Strict Node Count Discipline
-Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] All 19 nodes loaded successfully` (expanded from 15 in v1.4 to include the v2.0 Visual Drama Engine nodes: CharacterForge, ScenePainter, VisualCompositor, ProductionBus).
+Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] All 16 nodes loaded successfully`. v2.0 preview nodes removed from main — visual engine development continues on `v2.0-alpha`.
 
 ---
 
