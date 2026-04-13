@@ -17,7 +17,6 @@ import json, requests, time, random, uuid, os, subprocess, re, sys
 COMFYUI = "http://127.0.0.1:8000"
 WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json"
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
-BUG_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\BUG_LOG.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
 COMFYUI_EXE = r"C:\Users\jeffr\AppData\Local\Programs\comfyui-electron\ComfyUI.exe"
@@ -94,18 +93,6 @@ def append_to_log(text):
     os.makedirs(os.path.dirname(SOAK_LOG), exist_ok=True)
     with open(SOAK_LOG, "a", encoding="utf-8") as f:
         f.write(text + "\n")
-
-
-def log_bug(run_num, priority, symptom, tags):
-    with open(BUG_LOG, "a", encoding="utf-8") as f:
-        f.write(f"\n### BUG-SOAK-{run_num:03d}: Soak failure\n")
-        f.write(f"- **Date:** {time.strftime('%Y-%m-%d')} | "
-                f"**Soak run:** {run_num} | **Priority:** {priority}\n")
-        f.write(f"- **Symptom:** {symptom}\n")
-        f.write("- **Cause:** unknown (soak observer -- no diagnosis)\n")
-        f.write("- **Fix:** pending\n")
-        f.write("- **Verify:** pending\n")
-        f.write(f"- **Tags:** soak, {tags}\n")
 
 
 def get_runtime_details():
@@ -353,12 +340,6 @@ def run_iteration(run_num):
     )
     append_to_log(log_entry)
     print_f(log_entry)
-
-    # Log bugs for failures
-    if result == "FAIL":
-        log_bug(run_num, "P0", error_msg, "crash, fail")
-    elif result == "TIMEOUT":
-        log_bug(run_num, "P1", "Episode timed out after 30 mins", "timeout")
 
     # 11. Cooldown
     print_f(f"Cooldown: {COOLDOWN_S}s")
