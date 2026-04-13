@@ -1,8 +1,8 @@
 # OTR v2.0 Agent Handoff Document
 
-**Last updated:** 2026-04-12  
+**Last updated:** 2026-04-12 (guardrail sweep)  
 **Active branch:** `v2.0-alpha`  
-**Last confirmed remote commit:** `30ce8b3`
+**Last confirmed remote commit:** `30ce8b3` (guardrail changes uncommitted)
 
 ---
 
@@ -12,7 +12,9 @@
 - All v2.0 Phase 0 code written and pushed to `v2.0-alpha`
 - Bug Bible regression: **109 passed, 25 skipped, 2 xfailed** — clean
 - `tests/test_core.py`: 83 passed — clean
-- 8 bugs found and fixed (see BUG_LOG.md — BUG-LOCAL-001 through 008)
+- 10 bugs found and fixed (see BUG_LOG.md — BUG-LOCAL-001 through 010)
+- **Pre-flight guardrail sweep (BUG-009/010):** runtime presets auto-clamp target_length, dialogue line minimums scale dynamically with target_minutes, character counts clamped per episode length, Obsidian profile capped at 10 min, outline temp capped at model max, dead widgets (news_headlines, temperature) marked DEPRECATED
+- 1-min test preset removed, minimum runtime = 3 minutes
 - `otr_v2/` package scaffolded (subprocess runner + visual plan schema)
 - `tests/v2/test_audio_byte_identical.py` — Phase 0 regression gate
 - `tests/v2/_run_baseline.py` — ComfyUI HTTP API integration
@@ -57,7 +59,7 @@ System `python` is NOT on PATH. Always use full path or activate venv first.
 | `tests/v2/_extract_from_history.py` | Audio extraction by prompt_id |
 | `tests/v2/fixtures/baseline_v1.5.wav` | Baseline WAV (12.9 MB) |
 | `tests/v2/fixtures/baseline_v1.5.sha256` | SHA-256 gate hash |
-| `BUG_LOG.md` | Live bug log — 8 entries, all fixed |
+| `BUG_LOG.md` | Live bug log — 10 entries, all fixed |
 | `nodes/v2_preview.py` | 4 placeholder nodes (CharacterForge, ScenePainter, VisualCompositor, ProductionBus) |
 | `otr_v2/schema/visual_plan.schema.json` | JSON Schema for Phase 1 visual plan |
 | `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md` | Full 6-phase design spec |

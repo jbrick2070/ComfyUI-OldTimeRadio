@@ -60,6 +60,22 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** Check `debug_prompt.json` after run — node #15 should show `episode_seed: "", model_id: "facebook/audiogen-medium"`.
 - **Tags:** widget-drift, api, baseline-capture, schema-ordering
 
+### BUG-LOCAL-009: Preset/target_length mismatch causes wrong dialogue line targets
+- **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** `runtime_preset=[FAST] quick (5 min)` paired with `target_length=medium (5 acts)` tells the LLM "Target 8-minute runtime, MINIMUM 45 dialogue lines" even though the actual runtime is 5 minutes. LLM overshoots or gets confused by conflicting length signals.
+- **Cause:** `length_instruction` dict was hardcoded per `target_length` with fixed runtime targets and dialogue line minimums that did not scale with `target_minutes`. Also, the 1-min test preset was prone to PARSE_FATAL (see BUG-LOCAL-007).
+- **Fix:** (1) Removed 1-min test preset, set minimum to 3 minutes. (2) Added `_safe_length_for_preset` auto-clamp: each runtime_preset forces the safe `target_length` (e.g. quick->medium, long->long 7-8 acts, epic->epic 10+ acts). (3) Made `length_instruction` dynamic: dialogue line floor = `max(18, target_minutes * 8)`, act label from `target_length`, runtime target from actual `target_minutes`.
+- **Verify:** Run with each preset. Check runtime log for "PREFLIGHT: Auto-clamped target_length" when mismatch detected. Verify `length_instruction` shows correct minute target and proportional line count.
+- **Tags:** preset, length-scaling, parse-fatal-prevention
+
+### BUG-LOCAL-010: Full pre-flight guardrail sweep [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** no
+- **Symptom:** Multiple unguarded parameter combos could cause silent failures or PARSE_FATAL: (a) 2 characters + 7+ acts = dialogue starvation, (b) 8 characters + 5 min = too many voices for runtime, (c) "maximum chaos" + chunked outline pushes temp above model max, (d) Obsidian + 20 min = 2500 token cap truncates 60% of script, (e) `news_headlines` widget has zero effect, (f) `temperature` widget silently overridden by `creativity`.
+- **Cause:** Pre-flight validation only checked 1-min edge case. No guardrails for character count vs episode length, no profile-aware runtime cap, no temp ceiling in outline gen.
+- **Fix:** (a) Clamp chars to 4 if <=5 min, to 3 if <=3 min. Floor chars to 3 if >=7 acts. (b) Obsidian profile caps target_minutes at 10. (c) Outline gen temp no longer adds +0.1 when already >= 1.0. (d) Deprecated tooltips on news_headlines and temperature widgets.
+- **Verify:** AST parse clean. Check PREFLIGHT log lines for each clamp scenario.
+- **Tags:** guardrails, pre-flight, parameter-validation
+
 ### BUG-LOCAL-006: Converted widget alignment in widgets_values mapping [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Node #2 (Gemma4Director) gets `tts_engine: 0.4` (should be dropdown string). Widget values shifted by 1.
