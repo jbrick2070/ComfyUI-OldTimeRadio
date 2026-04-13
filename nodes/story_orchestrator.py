@@ -4672,18 +4672,23 @@ Only the following tags are allowed, and they MUST appear on their own line:
   [SFX: description]
   [ENV: description]
   [MUSIC: description]
+  [ACT TWO], [ACT THREE], etc. (act break markers -- word-form numbers, no colon)
 Rules:
 - Tags MUST be uppercase.
-- Tags MUST use a colon after the tag name.
+- Tags with descriptions (SFX, ENV, MUSIC) MUST use a colon after the tag name.
+- Act break markers use word-form numbers with NO colon: [ACT TWO] not [ACT: 2].
 - Normalize malformed tags (for example: sfx-, Sound:, etc.) into one of the allowed forms above.
 - Convert any unsupported scene/visual tags (for example: [VFX: ...], [LIGHTING: ...], [CAMERA: ...]) into [ENV: ...] with the same description.
+- Preserve act break markers exactly as-is. Do NOT convert them to scene headers or ENV tags.
 
-6. SCENE HEADERS
-Format scene headers EXACTLY as: === SCENE N: Title ===
+6. SCENE AND ACT HEADERS
+Scene headers: Format EXACTLY as === SCENE N: Title ===
+Act break markers: Format EXACTLY as [ACT TWO], [ACT THREE], etc. (on their own line)
 Rules:
 - Preserve the scene number N if it exists in the input.
-- If numbering is missing in the input, keep the original scene title text but apply this header format without inventing a new number.
-- Do NOT invent or remove scene numbers or titles; only normalize their formatting.
+- If numbering is missing in the input, keep the original scene title text but apply the header format without inventing a new number.
+- Do NOT invent or remove scene numbers, act numbers, or titles; only normalize their formatting.
+- Scenes and acts are different structures. Do NOT merge or convert one into the other.
 
 7. ERROR NORMALIZATION
 - Fix inconsistent casing (for example, tag names, character names that are obviously the same).
