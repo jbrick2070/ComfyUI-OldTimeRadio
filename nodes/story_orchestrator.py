@@ -2361,7 +2361,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # Obsidian mode is "One-Shot": no critique, no open-close, no arc-enhancer.
         # This prevents the "slow to a crawl" effect on 4GB cards where multiple
         # LLM passes cause excessive offloading overhead.
-        if optimization_profile == "Obsidian (Low VRAM/Fast)":
+        if optimization_profile == "Obsidian (UNSTABLE/4GB)":
             _runtime_log("ScriptWriter: OBSIDIAN PROFILE ACTIVE - forcing One-Shot mode. NOTE: 4GB hardware may still see ~9GB total footprint.")
             log.warning("[LLMScriptWriter] Obsidian Profile: 4GB VRAM IS CURRENTLY UNSTABLE. Total usage will likely exceed physical VRAM.")
             self_critique = False
@@ -2526,7 +2526,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             include_act_breaks = False
 
         # Obsidian profile + long episode = severe truncation (2500 token cap)
-        if optimization_profile == "Obsidian (Low VRAM/Fast)" and target_minutes > 10:
+        if optimization_profile == "Obsidian (UNSTABLE/4GB)" and target_minutes > 10:
             log.warning("[PreFlight] Obsidian profile with %d-min episode will truncate badly - "
                         "clamping to 10 minutes", target_minutes)
             _runtime_log(f"PREFLIGHT: Clamped target_minutes from {target_minutes} to 10 (Obsidian token cap)")
@@ -2853,7 +2853,7 @@ Begin the full script now. Follow this structure exactly:
         # which fits, but 45-min needs ~5,850 which is tight. Chunked generation
         # ensures we never hit the ceiling and produces more coherent long scripts.
 
-        if target_minutes <= 5 or optimization_profile == "Obsidian (Low VRAM/Fast)":
+        if target_minutes <= 5 or optimization_profile == "Obsidian (UNSTABLE/4GB)":
             # Short episodes (or Obsidian 4GB tier): single-pass generation.
             # Floor at 1024 - even a 1-min episode needs enough tokens to
             # complete canonical structure (ENV, SFX, VOICE tags, beats).
@@ -2861,7 +2861,7 @@ Begin the full script now. Follow this structure exactly:
             
             # BUG-012 FIX: Cap KV cache for direct generation in Obsidian profile.
             # Standard: 8192 limit. Obsidian: 2500 limit (protects 4GB VRAM ceiling).
-            if optimization_profile == "Obsidian (Low VRAM/Fast)":
+            if optimization_profile == "Obsidian (UNSTABLE/4GB)":
                 if target_minutes > 5:
                     log.warning("[LLMScriptWriter] Obsidian profile forced single-pass on %d min target. "
                                 "Expect shorter overall length.", target_minutes)
@@ -3806,7 +3806,7 @@ Outline only - do NOT write dialogue yet."""
         # Outline is instructed to be under 400 words. max_new_tokens=1500 pre-allocates
         # excessive KV cache, which immediately overflows the 4GB ceiling and causes 100% GPU
         # PCIe memory thrashing (0.1 tok/sec behavior, appearing as a hang).
-        outline_budget = 600 if optimization_profile == "Obsidian (Low VRAM/Fast)" else 1200
+        outline_budget = 600 if optimization_profile == "Obsidian (UNSTABLE/4GB)" else 1200
         
         log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}]")
         outline = _generate_with_llm(outline_prompt, model_id=model_id,
@@ -4018,7 +4018,7 @@ Write Act {act_num} now:"""
             # Formula: words_per_act * 2.5 (1.3 tok/word + formatting + safety margin)
             # Clamped between 1024 (floor for short acts) and 2048 (VRAM ceiling).
             # Previous hardcoded 1536 was often too tight for 500+ word acts.
-            if optimization_profile == "Obsidian (Low VRAM/Fast)":
+            if optimization_profile == "Obsidian (UNSTABLE/4GB)":
                 act_budget = min(2048, int(words_per_act * 3.0))
             else:
                 act_budget = max(1024, min(2048, int(words_per_act * 2.5)))

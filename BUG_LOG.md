@@ -68,6 +68,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** Run with each preset. Check runtime log for "PREFLIGHT: Auto-clamped target_length" when mismatch detected. Verify `length_instruction` shows correct minute target and proportional line count.
 - **Tags:** preset, length-scaling, parse-fatal-prevention
 
+### BUG-LOCAL-011: Obsidian profile string mismatch - all guardrails dead [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Selecting "Obsidian (UNSTABLE/4GB)" in ComfyUI had zero effect - no one-shot mode, no token cap, no runtime clamp. Obsidian users got full Pro behavior, then OOM on 4GB cards.
+- **Cause:** Code checked for `"Obsidian (Low VRAM/Fast)"` (6 locations in story_orchestrator.py) but INPUT_TYPES dropdown value is `"Obsidian (UNSTABLE/4GB)"`. String never matched. Likely a rename in the UI that was never propagated to the runtime code.
+- **Fix:** Replace all 6 occurrences of `"Obsidian (Low VRAM/Fast)"` with `"Obsidian (UNSTABLE/4GB)"` to match INPUT_TYPES. Caught by new `test_dropdown_guardrails.py` regression suite (59 tests).
+- **Verify:** Run `pytest tests/test_dropdown_guardrails.py -v` — TestGuardrails::test_obsidian_disables_multipass and test_obsidian_caps_runtime must pass.
+- **Tags:** string-mismatch, obsidian, guardrails, dead-code
+
 ### BUG-LOCAL-010: Full pre-flight guardrail sweep [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** no
 - **Symptom:** Multiple unguarded parameter combos could cause silent failures or PARSE_FATAL: (a) 2 characters + 7+ acts = dialogue starvation, (b) 8 characters + 5 min = too many voices for runtime, (c) "maximum chaos" + chunked outline pushes temp above model max, (d) Obsidian + 20 min = 2500 token cap truncates 60% of script, (e) `news_headlines` widget has zero effect, (f) `temperature` widget silently overridden by `creativity`.
