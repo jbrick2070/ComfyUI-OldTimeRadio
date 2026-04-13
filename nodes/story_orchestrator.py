@@ -830,7 +830,7 @@ def _fetch_science_news(max_feeds=10):
                 if content_candidates:
                     rss_full = content_candidates[0].get("value", "")
                     rss_full = re.sub(r'<[^>]+>', '', rss_full).strip()
-                summary = entry.get("summary", "")[:2000].strip()
+                summary = entry.get("summary", "").strip()
                 summary = re.sub(r'<[^>]+>', '', summary).strip()
                 data.append({
                     "headline": title,
@@ -887,7 +887,7 @@ def _fetch_science_news(max_feeds=10):
 
         # Resolve full article text - 3-tier: rss_full - URL scrape - summary
         if result.get("rss_full") and len(result["rss_full"]) > 300:
-            result["full_text"] = result["rss_full"][:12000]
+            result["full_text"] = result["rss_full"]
             log.info("[NewsFetcher] Full text from RSS content field: %d chars", len(result["full_text"]))
         elif result.get("link"):
             log.info("[NewsFetcher] Attempting to fetch full article: %s", result["link"])
@@ -2704,9 +2704,66 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 n["headline"] = re.sub(r'[^\x20-\x7E]', '', n["headline"]).strip()[:280]
                 # Normalize whitespace
                 n["headline"] = re.sub(r'\s+', ' ', n["headline"])
-                # Cap full_text to prevent context window blowout
-                if len(n.get("full_text", "")) > 12000:
-                    n["full_text"] = n["full_text"][:12000] + "\n[... article truncated at 12,000 chars]"
+            # -- 1g. NEWS SUMMARIZATION PASS --
+            # Instead of jamming raw article text (often 5K-20K chars of prose,
+            # ads, boilerplate) into the script prompt, distill it into a dense
+            # fact summary. This gives the script LLM ALL the science without
+            # blowing the context window.
+            for n in news:
+                _raw = n.get("full_text", n.get("summary", ""))
+                if len(_raw) < 500:
+                    # Short text — no summarization needed
+                    continue
+                _runtime_log(
+                    f"NEWS_SUMMARY: Summarizing '{n['headline'][:60]}' "
+                    f"({len(_raw)} chars) via LLM"
+                )
+                _summary_prompt = (
+                    "You are a science news analyst preparing source material for a radio drama writer.\n"
+                    "The writer will turn this article into a dramatic audio story with characters and dialogue.\n\n"
+                    "Extract EVERY important fact into a dense bullet-point summary, organized for storytelling.\n\n"
+                    "RULES:\n"
+                    "- Keep ALL names, numbers, dates, locations, institutions, and technical terms\n"
+                    "- Keep ALL cause-and-effect relationships and scientific mechanisms\n"
+                    "- Keep quotes from researchers or officials — these become character dialogue\n"
+                    "- Highlight human stakes: who benefits, who is at risk, what could go wrong\n"
+                    "- Highlight dramatic tension: ethical dilemmas, competing interests, unknowns\n"
+                    "- Note sensory details useful for audio drama: sounds, environments, settings\n"
+                    "- Remove ads, navigation text, subscription prompts, and boilerplate\n"
+                    "- Remove repetitive phrasing — say each fact exactly once\n"
+                    "- Output ONLY the bullet-point summary, no preamble\n\n"
+                    f"HEADLINE: {n['headline']}\n"
+                    f"SOURCE: {n['source']}\n\n"
+                    f"FULL ARTICLE TEXT:\n{_raw}\n\n"
+                    "DENSE FACT SUMMARY FOR RADIO DRAMA WRITER:"
+                )
+                try:
+                    _summarized = _run_with_timeout(
+                        lambda: _generate_with_llm(
+                            _summary_prompt,
+                            model_id=model_id,
+                            max_new_tokens=800,
+                            temperature=0.2,
+                            optimization_profile=optimization_profile,
+                        ),
+                        timeout_sec=60,
+                        phase_label="NewsSummary",
+                    )
+                    if _summarized and len(_summarized.strip()) > 100:
+                        _runtime_log(
+                            f"NEWS_SUMMARY: Distilled {len(_raw)} chars -> "
+                            f"{len(_summarized.strip())} chars"
+                        )
+                        n["full_text"] = _summarized.strip()
+                    else:
+                        _runtime_log("NEWS_SUMMARY: Summary too short, keeping original text")
+                        # Fall back to capped original
+                        if len(_raw) > 12000:
+                            n["full_text"] = _raw[:12000] + "\n[... article truncated at 12,000 chars]"
+                except Exception as _e:
+                    log.warning("[NEWS_SUMMARY] Summarization failed: %s — keeping original text", _e)
+                    if len(_raw) > 12000:
+                        n["full_text"] = _raw[:12000] + "\n[... article truncated at 12,000 chars]"
 
         news_block = "\n".join(
             f"- {n['headline']} ({n['source']}, {n['date']})\n\n{n.get('full_text', n['summary'])}"
@@ -4320,7 +4377,7 @@ DIRECTIONS:
 
 GENRE: {genre.replace("_", " ")}
 TITLE: {title}
-SCIENCE CONTEXT: {news_block[:500]}
+SCIENCE CONTEXT: {news_block}
 
 MIDDLE EVENTS (do not contradict):
 {plot_spine}
