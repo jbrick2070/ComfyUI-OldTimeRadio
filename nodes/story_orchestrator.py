@@ -3121,6 +3121,81 @@ Begin the full script now. Follow this structure exactly:
             )
             _runtime_log("ScriptWriter: <<< EXITED arc_enhancer")
 
+        # -- SCENE DEDUPLICATION (BUG-026 fix) --------------------------------
+        # LLMs sometimes place the climax mid-script AND at the end, or the
+        # revision/extension pass duplicates closing sequences. Detect near-
+        # identical scenes and remove the earlier copy (the last occurrence is
+        # structurally correct for a climax/closing).
+        _scene_splits = re.split(r'(===\s*SCENE\s+\d+\s*===)', script_text, flags=re.IGNORECASE)
+        if len(_scene_splits) >= 5:  # At least 2 full scenes (header+body pairs)
+            # Reassemble into (header, body) pairs
+            _scenes = []
+            for i in range(1, len(_scene_splits) - 1, 2):
+                _scenes.append((_scene_splits[i], _scene_splits[i + 1]))
+            _preamble = _scene_splits[0]  # Text before first scene header
+
+            # Compare dialogue content between scenes (strip whitespace/tags for comparison)
+            def _dialogue_fingerprint(body):
+                """Extract just dialogue words for similarity comparison."""
+                lines = _extract_all_dialogue(body)
+                return " ".join(d.strip().lower() for _, d in lines)
+
+            _dupes_removed = 0
+            _keep = list(range(len(_scenes)))  # indices to keep
+            for i in range(len(_scenes)):
+                if i not in _keep:
+                    continue
+                fp_i = _dialogue_fingerprint(_scenes[i][1])
+                if len(fp_i) < 50:  # Too short to compare meaningfully
+                    continue
+                for j in range(i + 1, len(_scenes)):
+                    if j not in _keep:
+                        continue
+                    fp_j = _dialogue_fingerprint(_scenes[j][1])
+                    if len(fp_j) < 50:
+                        continue
+                    # Check similarity using simple overlap ratio
+                    _shorter = min(len(fp_i), len(fp_j))
+                    _longer = max(len(fp_i), len(fp_j))
+                    if _shorter == 0:
+                        continue
+                    # If one fingerprint contains 80%+ of the other, it's a dupe
+                    _common = sum(1 for c1, c2 in zip(fp_i, fp_j) if c1 == c2)
+                    _similarity = _common / _longer
+                    if _similarity > 0.75:
+                        # Remove the EARLIER scene (keep the later one as the climax)
+                        _keep.remove(i)
+                        _dupes_removed += 1
+                        _runtime_log(
+                            f"DEDUP: Scene {i+1} is {_similarity:.0%} similar to "
+                            f"Scene {j+1} - removing earlier copy"
+                        )
+                        break  # Scene i is already removed, move on
+
+            if _dupes_removed > 0:
+                # Rebuild script with remaining scenes, renumbering
+                _new_parts = [_preamble]
+                for new_num, orig_idx in enumerate(_keep, 1):
+                    header, body = _scenes[orig_idx]
+                    # Renumber the scene header
+                    renumbered = re.sub(
+                        r'===\s*SCENE\s+\d+\s*===',
+                        f'=== SCENE {new_num} ===',
+                        header, flags=re.IGNORECASE
+                    )
+                    _new_parts.append(renumbered)
+                    _new_parts.append(body)
+                script_text = "".join(_new_parts)
+                _runtime_log(
+                    f"DEDUP: Removed {_dupes_removed} duplicate scene(s), "
+                    f"renumbered {len(_keep)} remaining scenes"
+                )
+                log.warning(
+                    "[BUG-026] Removed %d duplicate scene(s) from script. "
+                    "LLM placed climax mid-script and repeated it at the end.",
+                    _dupes_removed
+                )
+
         # -- Content safety filter - catch anything the prompt policy missed --
         script_text, blocked = _content_filter(script_text)
         if blocked:
