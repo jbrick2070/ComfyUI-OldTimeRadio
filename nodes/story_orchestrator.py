@@ -3640,6 +3640,14 @@ Begin the full script now. Follow this structure exactly:
         # Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
         script_text = _cleanup_character_names(script_text, _cast_config_path, pre_rolled_cast)
 
+        # -- STEP 3c: GRAMMARIAN (final logic + grammar polish) -------
+        # Light LLM pass at temp 0.3. Fixes grammar, catches logic gaps,
+        # ensures dialogue reads naturally. Does NOT add content, rename
+        # characters, or change the story. Pure copy-edit.
+        script_text = self._grammarian_pass(
+            script_text, model_id, optimization_profile
+        )
+
         # -- STEP 4: PARSE into structured JSON -----------------------
         # Single parse on the fully prepared text.
         # LLM_RESCUE fires only if parser gets 0 dialogue lines.
@@ -5166,6 +5174,107 @@ SCRIPT TO REFORMAT:
         except Exception as e:
             log.warning("[FormatNorm] Normalization pass failed: %s", e)
             _runtime_log(f"FORMAT_NORM: Failed ({e}) - keeping original")
+            return script_text
+
+    def _grammarian_pass(self, script_text, model_id,
+                         optimization_profile="Standard"):
+        """Final copy-edit pass: grammar, logic, and readability polish.
+
+        Runs at temp 0.3 (structural). The grammarian does NOT:
+          - Add new content, scenes, or dialogue lines
+          - Rename characters or change the cast
+          - Alter SFX/ENV tags or scene structure
+          - Change the story arc or plot
+
+        The grammarian DOES:
+          - Fix grammar, punctuation, and spelling in dialogue
+          - Smooth awkward phrasing so lines read naturally aloud
+          - Flag and fix logic gaps (character in two places at once, etc.)
+          - Ensure dialogue attributions are consistent
+          - Clean up run-on sentences for radio pacing
+
+        Returns the polished script, or the original if the pass fails.
+        """
+        # Skip for very short scripts (not worth the VRAM cost)
+        if len(script_text) < 500:
+            _runtime_log("GRAMMARIAN: Skipped - script too short")
+            return script_text
+
+        # Count dialogue lines before - we must not lose any
+        _pre_lines = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', script_text, re.MULTILINE
+        ))
+        _pre_voice = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
+        _pre_total = _pre_lines + _pre_voice
+
+        grammarian_prompt = f"""You are a radio drama copy editor. Your ONLY job is to polish
+the script below for grammar, punctuation, and natural spoken flow.
+
+RULES:
+1. Fix grammar, spelling, and punctuation errors in dialogue lines.
+2. Smooth awkward phrasing so every line sounds natural when read aloud.
+3. Fix logic errors (character referenced before introduction, contradictions).
+4. Break run-on sentences into punchy radio-paced delivery.
+5. Keep all character names EXACTLY as they are. Do not rename anyone.
+6. Keep ALL [SFX:], [ENV:], [VOICE:], and scene markers EXACTLY as they are.
+7. Do NOT add new dialogue lines, scenes, or content.
+8. Do NOT remove any dialogue lines - every character line must survive.
+9. Do NOT add commentary, notes, or explanations.
+10. Output ONLY the polished script. Nothing else.
+
+SCRIPT TO POLISH:
+{script_text}"""
+
+        # Token budget: same as input (we're polishing, not expanding)
+        _gram_max_tokens = min(2048, max(256, len(script_text) // 3))
+        _runtime_log(
+            f"GRAMMARIAN: Starting polish pass | {_pre_total} dialogue lines | "
+            f"token budget={_gram_max_tokens}"
+        )
+
+        try:
+            polished = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    grammarian_prompt,
+                    model_id=model_id,
+                    max_new_tokens=_gram_max_tokens,
+                    temperature=0.3,
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=75,
+                phase_label="Grammarian",
+            )
+
+            if not polished or len(polished.strip()) < len(script_text) * 0.5:
+                _runtime_log(
+                    f"GRAMMARIAN: Output too short ({len(polished or '')} chars "
+                    f"vs {len(script_text)} input) - keeping original"
+                )
+                return script_text
+
+            # Safety check: did we lose dialogue lines?
+            _post_lines = len(re.findall(
+                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', polished, re.MULTILINE
+            ))
+            _post_voice = len(re.findall(r'\[VOICE:', polished, re.IGNORECASE))
+            _post_total = _post_lines + _post_voice
+
+            if _post_total < _pre_total * 0.8:
+                _runtime_log(
+                    f"GRAMMARIAN: Rejected - lost too many lines "
+                    f"({_post_total} vs {_pre_total}) - keeping original"
+                )
+                return script_text
+
+            _runtime_log(
+                f"GRAMMARIAN: Success | lines {_pre_total}->{_post_total} | "
+                f"chars {len(script_text)}->{len(polished.strip())}"
+            )
+            return polished.strip()
+
+        except Exception as e:
+            log.warning("[Grammarian] Polish pass failed: %s", e)
+            _runtime_log(f"GRAMMARIAN: Failed ({e}) - keeping original")
             return script_text
 
     def _extend_script_dialogue(self, script_text, deficit_words,
