@@ -1981,7 +1981,7 @@ STRUCTURE:
 2. === SCENE 2-X === (Escalate the HUMAN stakes. Characters argue, make choices, face consequences.)
 3. === SCENE FINAL === (The twist, emotional payoff, then ANNOUNCER's Hard Science Epilogue.)
 
-TARGET: {target_minutes} minutes (~{target_words} words). Dense, punchy dialogue - NOT padded with pauses.
+TARGET: {target_words} words (~{approx_minutes} minutes at radio pacing). Dense, punchy dialogue - NOT padded with pauses.
 PRIMARY RULE: Tags always start at the beginning of a line. No inline tags.
 PACING RULES (CRITICAL):
 - NEVER place two (beat) or [PAUSE/BEAT] tags back-to-back. Consecutive pause tags are BANNED.
@@ -2146,7 +2146,7 @@ class LLMScriptWriter:
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
-                    "tooltip": "Number of speaking characters (plus announcer)"
+                    "tooltip": "Speaking characters (plus announcer). Auto-clamped to 4 when target_words <= 700, or 3 when <= 420."
                 }),
             },
             "optional": {
@@ -2176,7 +2176,7 @@ class LLMScriptWriter:
                 }),
                 "target_length": (["short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
                     "default": "medium (5 acts)",
-                    "tooltip": "Structural length preset - forces dialogue VOLUME (not pause padding) to fill the runtime"
+                    "tooltip": "Act structure preset. Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
                 }),
                 "style_variant": (["tense claustrophobic", "space opera epic", "psychological slow-burn", "hard-sci-fi procedural", "noir mystery", "chaotic black-mirror"], {
                     "default": "tense claustrophobic",
@@ -2365,10 +2365,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      optimization_profile="Standard"):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
 
-        # Derive target_minutes from target_words for internal use (~140 wpm radio pacing)
         target_words = int(target_words)
-        target_minutes = max(3, round(target_words / 140))
-        _runtime_log(f"ScriptWriter: target_words={target_words} -> target_minutes={target_minutes}")
+        _runtime_log(f"ScriptWriter: target_words={target_words} (~{max(1, round(target_words / 140))} min at 140 wpm)")
 
         # -- OPTIMIZATION PROFILE OVERRIDES --
         # Obsidian mode is "One-Shot": no critique, no open-close, no arc-enhancer.
@@ -2421,7 +2419,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # -- DIAGNOSTIC: log feature flags so we can confirm they're received --
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
-                     f"target_min={target_minutes} chars={num_characters} "
+                     f"target_words={target_words} chars={num_characters} "
                      f"length={target_length} style={style_variant} creativity={creativity} arc_enhancer={arc_enhancer}")
 
         # ======================================================================
@@ -2455,7 +2453,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # HARD MINIMUMS - word-count based enforcement (BUG-012/020 fix).
         # Widget is now target_words directly. No conversion needed.
         _target_words = target_words
-        _min_lines = max(18, int(target_minutes * 8))  # line floor still useful as structural hint
+        _min_lines = max(18, target_words // 18)  # ~8 lines per minute at 140 wpm
         _act_label = {
             "short (3 acts)": "3 acts",
             "medium (5 acts)": "5 acts",
@@ -2464,8 +2462,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         }.get(target_length, "5 acts")
         _extend_hint = (" If your first draft is shorter, EXTEND the middle acts "
                         "with more conflict, more interruptions, and more reaction beats."
-                        if target_minutes >= 8 else "")
-        _subplot_hint = " Allow sub-plots." if target_minutes >= 18 else ""
+                        if target_words >= 1120 else "")
+        _subplot_hint = " Allow sub-plots." if target_words >= 2520 else ""
         # BUG-007 root cause fix: short acts + short runtime made the LLM
         # produce narration instead of tagged dialogue. Force the format
         # explicitly when act count is low.
@@ -2482,7 +2480,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
             f"(minimum {_min_lines} dialogue lines, NOT counting ANNOUNCER).{_subplot_hint} "
             f"This script will be read aloud by voice actors at ~140 words per minute, "
-            f"so {_target_words} words = ~{target_minutes} minutes of audio. "
+            f"so {_target_words} words = ~{max(1, round(_target_words / 140))} minutes of audio. "
             f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
             f"{_extend_hint}{_format_hint}"
         )
@@ -2502,17 +2500,17 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         # -- 1a. Parameter sanity checks --
         # Short episodes: too many characters starves dialogue per character
-        if target_minutes <= 5 and num_characters > 4:
-            log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
-                        "clamping to 4 characters for short episode", target_minutes, num_characters)
-            _runtime_log(f"PREFLIGHT: Clamped num_characters to 4 ({target_minutes}-min episode)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 4 characters ({target_minutes}-min episode max: 4)")
+        if target_words <= 700 and num_characters > 4:
+            log.warning("[PreFlight] target_words=%d with %d characters is too many - "
+                        "clamping to 4 characters for short episode", target_words, num_characters)
+            _runtime_log(f"PREFLIGHT: Clamped num_characters to 4 ({target_words}-word episode)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 4 characters ({target_words}-word episode max: 4)")
             num_characters = 4
-        if target_minutes <= 3 and num_characters > 3:
-            log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
-                        "clamping to 3 characters for very short episode", target_minutes, num_characters)
-            _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 ({target_minutes}-min episode)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_minutes}-min episode max: 3)")
+        if target_words <= 420 and num_characters > 3:
+            log.warning("[PreFlight] target_words=%d with %d characters is too many - "
+                        "clamping to 3 characters for very short episode", target_words, num_characters)
+            _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 ({target_words}-word episode)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_words}-word episode max: 3)")
             num_characters = 3
 
         # Long episodes: too few characters can't sustain narrative tension
@@ -2525,19 +2523,19 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             guardrail_warnings.append(f"⚠️ Auto-clamped {num_characters} -> 3 characters ({target_length} requires minimum 3)")
             num_characters = 3
 
-        if target_minutes <= 3 and include_act_breaks:
-            log.warning("[PreFlight] Act breaks disabled for %d-min episode (too short)", target_minutes)
+        if target_words <= 420 and include_act_breaks:
+            log.warning("[PreFlight] Act breaks disabled for %d-word episode (too short)", target_words)
             _runtime_log("PREFLIGHT: Act breaks disabled (episode too short)")
-            guardrail_warnings.append("⚠️ Act breaks disabled (too short for 3-min episodes)")
+            guardrail_warnings.append("⚠️ Act breaks disabled (too short for <=420-word episodes)")
             include_act_breaks = False
 
         # Obsidian profile + long episode = severe truncation (2500 token cap)
-        if optimization_profile == "Obsidian (UNSTABLE/4GB)" and target_minutes > 10:
-            log.warning("[PreFlight] Obsidian profile with %d-min episode will truncate badly - "
-                        "clamping to 10 minutes", target_minutes)
-            _runtime_log(f"PREFLIGHT: Clamped target_minutes from {target_minutes} to 10 (Obsidian token cap)")
-            guardrail_warnings.append(f"⚠️ Auto-clamped {target_minutes} -> 10 minutes (Obsidian profile max: 10)")
-            target_minutes = 10
+        if optimization_profile == "Obsidian (UNSTABLE/4GB)" and target_words > 1400:
+            log.warning("[PreFlight] Obsidian profile with %d-word episode will truncate badly - "
+                        "clamping to 1400 words", target_words)
+            _runtime_log(f"PREFLIGHT: Clamped target_words from {target_words} to 1400 (Obsidian token cap)")
+            guardrail_warnings.append(f"⚠️ Auto-clamped {target_words} -> 1400 words (Obsidian profile max: 1400)")
+            target_words = 1400
 
         # -- 1b. Custom premise enforcement --
         # When user provides a premise, skip RSS entirely - zero context contamination
@@ -2547,14 +2545,12 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             _runtime_log("PREFLIGHT: Custom premise detected - RSS bypassed, Open-Close disabled")
 
         # -- 1c. Global token budgeting --
-        # Normalize target_minutes into a hard character budget.
-        # ~130 words/min for dramatic reading, ~5 chars/word average.
-        target_words = target_minutes * 130
+        # target_words comes directly from the widget. ~5 chars/word average.
         target_chars = target_words * 5  # Hard cap for downstream length enforcement
 
         # -- 1d. Episode fingerprint for reproducibility --
         import hashlib
-        fingerprint_data = f"{episode_title}|{genre_flavor}|{target_minutes}|{num_characters}|{temperature}"
+        fingerprint_data = f"{episode_title}|{genre_flavor}|{target_words}|{num_characters}|{temperature}"
         episode_fingerprint = hashlib.sha256(fingerprint_data.encode()).hexdigest()[:12]
         _runtime_log(f"ScriptWriter: FINGERPRINT {episode_fingerprint} | {episode_title} | {genre_flavor}")
 
@@ -2723,15 +2719,16 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             lite_role = "<system_role>STRICT OTR TAGS ONLY. No prose. Start every line with a tag.</system_role>"
             system_base = lite_role + "\n\n" + SCRIPT_SYSTEM_PROMPT
             
+        approx_minutes = max(1, round(target_words / 140))
         system = system_base.format(
-            target_minutes=target_minutes,
+            approx_minutes=approx_minutes,
             target_words=target_words,
             news_block=news_block,
             num_characters=num_characters,
         )
 
         # -- PRE-ROLL DETERMINISTIC CAST ROSTER --
-        seed_str = f"{episode_title}_{target_minutes}_{style_variant}_{time.time()}"
+        seed_str = f"{episode_title}_{target_words}_{style_variant}_{time.time()}"
         cast_rng = random.Random(seed_str)
         
         pre_rolled_cast = []
@@ -2769,7 +2766,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         if open_close and not custom_premise:
             winning_outline = self._open_close_expansion(
                 system, genre_flavor, news_block, num_characters,
-                target_minutes, target_words, lemmy_directive,
+                target_words, lemmy_directive,
                 model_id, temperature, cast_roster_block=cast_roster_block
             )
 
@@ -2777,7 +2774,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # Mode label must match the logic in _open_close_expansion_inner so the
         # downstream prompt asks the model to expand a PITCH (long episodes) or
         # an OUTLINE (short episodes) accordingly.
-        oc_mode_label = "PITCH" if target_minutes >= 15 else "OUTLINE"
+        oc_mode_label = "PITCH" if target_words >= 2100 else "OUTLINE"
         if winning_outline:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING {oc_mode_label} below.
 
@@ -2791,7 +2788,7 @@ EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evo
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
-TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
+TARGET LENGTH: ~{target_words} words
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
 
@@ -2820,7 +2817,7 @@ EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evo
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
-TARGET LENGTH: ~{target_words} words ({target_minutes} minutes)
+TARGET LENGTH: ~{target_words} words
 {"STRUCTURAL BREAKS: Include 2-3 act breaks marked with [ACT TWO], [ACT THREE] etc." if include_act_breaks else ""}
 {lemmy_directive}
 {"PREMISE: " + custom_premise if custom_premise else "The news headlines above ARE the premise. Extrapolate them. What's the next terrifying or profound step?"}
@@ -2851,7 +2848,7 @@ Begin the full script now. Follow this structure exactly:
         else:
             full_prompt = f"{system}\n\n{user_prompt}"
 
-        log.info(f"[LLMScriptWriter] Generating {target_minutes}min episode "
+        log.info(f"[LLMScriptWriter] Generating {target_words}-word episode "
                  f"'{episode_title}' ({genre_flavor}) using {model_id}")
         log.info(f"[LLMScriptWriter] News seed: {news[0]['headline']} | {news[0]['source']}")
 
@@ -2860,7 +2857,7 @@ Begin the full script now. Follow this structure exactly:
         # which fits, but 45-min needs ~5,850 which is tight. Chunked generation
         # ensures we never hit the ceiling and produces more coherent long scripts.
 
-        if target_minutes <= 5 or optimization_profile == "Obsidian (UNSTABLE/4GB)":
+        if target_words <= 700 or optimization_profile == "Obsidian (UNSTABLE/4GB)":
             # Short episodes (or Obsidian 4GB tier): single-pass generation.
             # Floor at 1024 - even a 1-min episode needs enough tokens to
             # complete canonical structure (ENV, SFX, VOICE tags, beats).
@@ -2869,9 +2866,9 @@ Begin the full script now. Follow this structure exactly:
             # BUG-012 FIX: Cap KV cache for direct generation in Obsidian profile.
             # Standard: 8192 limit. Obsidian: 2500 limit (protects 4GB VRAM ceiling).
             if optimization_profile == "Obsidian (UNSTABLE/4GB)":
-                if target_minutes > 5:
-                    log.warning("[LLMScriptWriter] Obsidian profile forced single-pass on %d min target. "
-                                "Expect shorter overall length.", target_minutes)
+                if target_words > 700:
+                    log.warning("[LLMScriptWriter] Obsidian profile forced single-pass on %d-word target. "
+                                "Expect shorter overall length.", target_words)
                 max_new_tokens = max(int(target_words * 2.0), 1024)
                 max_new_tokens = min(max_new_tokens, 2500)
             else:
@@ -2890,7 +2887,7 @@ Begin the full script now. Follow this structure exactly:
             # Long episodes: chunked act-by-act generation
             script_text = self._generate_chunked(
                 system, episode_title, genre_flavor, num_characters,
-                target_minutes, target_words, custom_premise, news_block,
+                target_words, custom_premise, news_block,
                 include_act_breaks, model_id, temperature,
                 target_length=target_length,
                 lemmy_directive=lemmy_directive,
@@ -3226,7 +3223,7 @@ Begin the full script now. Follow this structure exactly:
                 "params": {
                     "episode_title": episode_title,
                     "genre_flavor": genre_flavor,
-                    "target_minutes": target_minutes,
+                    "target_words": target_words,
                     "num_characters": num_characters,
                     "open_close": open_close,
                     "self_critique": self_critique,
@@ -3276,7 +3273,7 @@ Begin the full script now. Follow this structure exactly:
     # -------------------------------------------------------------------------
 
     def _open_close_expansion(self, system, genre_flavor, news_block,
-                              num_characters, target_minutes, target_words,
+                              num_characters, target_words,
                               lemmy_directive, model_id, temperature,
                               cast_roster_block="", optimization_profile="Standard"):
         """Generate 3 competing story outlines with different priorities,
@@ -3294,7 +3291,7 @@ Begin the full script now. Follow this structure exactly:
         try:
             return self._open_close_expansion_inner(
                 system, genre_flavor, news_block, num_characters,
-                target_minutes, target_words, lemmy_directive,
+                target_words, lemmy_directive,
                 model_id, temperature,
                 cast_roster_block=cast_roster_block,
                 optimization_profile=optimization_profile
@@ -3305,7 +3302,7 @@ Begin the full script now. Follow this structure exactly:
             return ""
 
     def _open_close_expansion_inner(self, system, genre_flavor, news_block,
-                                     num_characters, target_minutes, target_words,
+                                     num_characters, target_words,
                                      lemmy_directive, model_id, temperature,
                                      cast_roster_block="", optimization_profile="Standard"):
         """Inner implementation of Open-Close expansion (wrapped for safety)."""
@@ -3324,14 +3321,14 @@ Begin the full script now. Follow this structure exactly:
         # spines (~100 tokens). This cuts Open-Close from ~12 min to ~2 min,
         # eliminates VRAM_CEILING_EXCEEDED warnings during outline generation,
         # and produces tighter narrative structures for act expansion.
-        is_pitch_mode = target_minutes >= 15
+        is_pitch_mode = target_words >= 2100
         if is_pitch_mode:
             mode_label = "PITCH"
             outline_max_tokens = 250
             OUTLINE_MIN = 100
             OUTLINE_MAX = 1500
             _runtime_log(
-                f"OPENCLOSE: PITCH_MODE enabled for {target_minutes}m run "
+                f"OPENCLOSE: PITCH_MODE enabled for {target_words}-word run "
                 f"(max_new_tokens={outline_max_tokens})"
             )
         else:
@@ -3340,7 +3337,7 @@ Begin the full script now. Follow this structure exactly:
             OUTLINE_MIN = 80
             OUTLINE_MAX = 1200
             _runtime_log(
-                f"OPENCLOSE: SPINE_MODE enabled for {target_minutes}m run "
+                f"OPENCLOSE: SPINE_MODE enabled for {target_words}-word run "
                 f"(max_new_tokens={outline_max_tokens})"
             )
         mode_lower = mode_label.lower()
@@ -3410,7 +3407,7 @@ CRITICAL CONSTRAINTS:
 - The science must be rooted in the real headlines from the system prompt above.
 
 ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine above.
-TARGET LENGTH (downstream script): {target_minutes} minutes
+TARGET LENGTH (downstream script): {target_words} words
 {lemmy_directive}
 
 Begin your PITCH now:"""
@@ -3428,7 +3425,7 @@ CRITICAL: The science news headlines in the system prompt above ARE your raw mat
 
 ARC TYPE: Use Arc Type {arc_choices[i]} from the Story Arc Engine.
 {cast_roster_block if cast_roster_block else f"CHARACTERS: {num_characters} speaking roles plus ANNOUNCER"}
-TARGET LENGTH: {target_minutes} minutes
+TARGET LENGTH: {target_words} words
 {lemmy_directive}
 
 RULES:
@@ -3794,16 +3791,14 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             # BUG-005 fix: scale wall-clock budget to episode length AND draft size.
             # SDPA on 4-expert MoE models runs ~2-3 tok/s, so a 22k-char revision needs
             # ~700-1100s. The previous fixed 600s killed every long episode.
-            # Formula: max(600, target_minutes*60, len(draft)*0.05)
-            # target_words = target_minutes * 130, so target_minutes - target_words / 130
-            target_minutes_est = max(1, int(target_words / 130))
+            # Formula: max(600, target_words/2.3, len(draft)*0.05)
             revision_timeout = int(max(
                 600,
-                target_minutes_est * 60,
+                target_words / 2.3,  # ~60s per 140 words
                 len(draft_text) * 0.05,
             ))
-            log.info("[Critique] Revision wall-clock budget: %ds (target_min~%d, draft=%d chars)",
-                     revision_timeout, target_minutes_est, len(draft_text))
+            log.info("[Critique] Revision wall-clock budget: %ds (target_words=%d, draft=%d chars)",
+                     revision_timeout, target_words, len(draft_text))
             revised_text = _run_with_timeout(
                 lambda: _generate_with_llm(
                     revision_prompt,
@@ -3881,7 +3876,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                      (similarity * 100, len(revised_text) / len(draft_text) * 100))
         return revised_text
 
-    def _generate_chunked(self, system, title, genre, num_chars, target_min,
+    def _generate_chunked(self, system, title, genre, num_chars,
                           target_words, premise, news_block, act_breaks,
                           model_id, temperature, target_length="medium (5 acts)",
                           lemmy_directive="", top_p=0.95,
@@ -3911,7 +3906,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
         # Step 1: Outline
         outline_prompt = f"""{system}
 
-Create a detailed OUTLINE for a {target_min}-minute episode of "SIGNAL LOST."
+Create a detailed OUTLINE for a {target_words}-word episode of "SIGNAL LOST."
 Title: {title}
 Genre: {genre.replace("_", " ")}
 Characters: {num_chars} speaking roles plus ANNOUNCER

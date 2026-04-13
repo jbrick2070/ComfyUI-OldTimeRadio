@@ -322,40 +322,39 @@ class TestCleanTextForBark:
 class TestTokenBudget:
     """Verify max_new_tokens formula without running any model."""
 
-    def _compute(self, target_minutes):
-        target_words = target_minutes * 130
-        if target_minutes <= 5:
+    def _compute(self, target_words):
+        if target_words <= 700:
             tokens = max(int(target_words * 2.0), 1024)
             tokens = min(tokens, 8192)
         else:
             tokens = 4096  # chunked per-act ceiling
         return tokens
 
-    def test_1min_hits_floor(self):
-        assert self._compute(1) == 1024
+    def test_350w_hits_floor(self):
+        assert self._compute(350) == 1024  # 350*2=700 < 1024 -> floor
 
-    def test_2min_hits_floor(self):
-        assert self._compute(2) >= 1024
+    def test_420w_hits_floor(self):
+        assert self._compute(420) >= 1024
 
-    def test_3min_hits_floor(self):
-        assert self._compute(3) == 1024  # 390 words → 780 tokens → floor
+    def test_500w_below_ceiling(self):
+        assert self._compute(500) == 1024  # 500*2=1000 < 1024 -> floor
 
-    def test_5min_above_floor(self):
-        t = self._compute(5)
-        assert 1024 <= t <= 8192
+    def test_700w_above_floor(self):
+        t = self._compute(700)
+        assert 1024 <= t <= 8192  # 700*2=1400
 
     def test_no_episode_below_1024(self):
-        for m in [1, 2, 3, 4, 5]:
-            assert self._compute(m) >= 1024, f"{m}min budget {self._compute(m)} < 1024"
+        for w in [350, 420, 500, 600, 700]:
+            assert self._compute(w) >= 1024, f"{w}w budget {self._compute(w)} < 1024"
 
-    def test_6min_uses_chunked(self):
-        assert self._compute(6) == 4096
+    def test_1120w_uses_chunked(self):
+        assert self._compute(1120) == 4096
 
-    def test_25min_chunked(self):
-        assert self._compute(25) == 4096
+    def test_3500w_chunked(self):
+        assert self._compute(3500) == 4096
 
     def test_ceiling_8192(self):
-        assert self._compute(5) <= 8192
+        assert self._compute(700) <= 8192
 
 
 # ─────────────────────────────────────────────────────────────────────────────

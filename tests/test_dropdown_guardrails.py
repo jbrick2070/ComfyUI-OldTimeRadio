@@ -331,26 +331,23 @@ class TestGuardrails:
 # TEST SUITE 4: Dynamic dialogue line scaling
 # ===========================================================================
 class TestDialogueLineScaling:
-    """length_instruction must scale proportionally with derived target_minutes."""
+    """length_instruction must scale proportionally with target_words."""
 
-    @pytest.mark.parametrize("words,expected_minutes,expected_min_lines", [
-        (350, 3, 24),     # 350/140=2.5 -> round=3, 3*8=24
-        (700, 5, 40),     # 700/140=5, 5*8=40
-        (1120, 8, 64),    # 1120/140=8, 8*8=64
-        (2100, 15, 120),  # 2100/140=15, 15*8=120
-        (2800, 20, 160),  # 2800/140=20, 20*8=160
+    @pytest.mark.parametrize("words,expected_min_lines", [
+        (350, 19),    # 350//18=19
+        (700, 38),    # 700//18=38
+        (1120, 62),   # 1120//18=62
+        (2100, 116),  # 2100//18=116
+        (2800, 155),  # 2800//18=155
     ])
-    def test_min_lines_formula(self, words, expected_minutes, expected_min_lines):
-        """Dialogue floor = max(18, derived_target_minutes * 8)."""
-        derived_minutes = max(3, round(words / 140))
-        assert derived_minutes == expected_minutes
-        result = max(18, int(derived_minutes * 8))
+    def test_min_lines_formula(self, words, expected_min_lines):
+        """Dialogue floor = max(18, target_words // 18)."""
+        result = max(18, words // 18)
         assert result == expected_min_lines
 
     def test_floor_never_below_18(self):
         """Even at minimum word count, floor is 18 lines."""
-        derived_minutes = max(3, round(350 / 140))
-        result = max(18, int(derived_minutes * 8))
+        result = max(18, 350 // 18)
         assert result >= 18
 
 
