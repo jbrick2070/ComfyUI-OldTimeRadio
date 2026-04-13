@@ -39,7 +39,7 @@ STYLES = [
     "psychological slow-burn", "hard-sci-fi procedural",
     "noir mystery", "chaotic black-mirror",
 ]
-CREATIVITIES = ["safe & tight", "balanced", "wild & rough"]
+CREATIVITIES = ["safe & tight", "balanced", "wild & rough", "maximum chaos"]
 OPT_PROFILES = ["Pro (Ultra Quality)", "Standard"]
 # NOTE: "Obsidian (UNSTABLE/4GB)" excluded -- not valid on 16 GB hardware
 
