@@ -1976,6 +1976,22 @@ RIGHT: "The hull is groaning. Hear that snap?"
 - ACTIVATE SPOKEN-WORD CADENCE: Vary sentence lengths - punchy fragment, flowing sentence, harsh stop. ("The grid is down. We have three minutes of life support left. And you want to stop for coffee?")
 - THE "MIND'S EAR" TEST: Before generating a line, evaluate its phonetic flow. Does it have punch? If it reads like a textbook, rewrite it until it sounds like a movie.
 
+6. AISM FILTER (AI SLOP MITIGATION - STRICTLY ENFORCED):
+BANNED PATTERNS - these are hallmarks of generic LLM output. NEVER use them:
+- "not just X, but Y" / "not only... but also" constructions
+- Rule-of-three adjective lists (cap adjective runs at TWO)
+- Stock idioms ("blood ran cold", "heart skipped a beat", "silence was deafening")
+- Decorative em-dashes (em-dash is ONLY for interruptions between speakers)
+- Pseudo-profound one-liners that sound deep but say nothing
+- Grand summary metaphors at the end of scenes
+- Somatic posture filler ("she clenched her fists", "he squared his shoulders")
+- Narrating silence ("the room fell quiet", "a heavy silence descended")
+REPLACEMENT RULES:
+- Bombs beep. No abstract emotion without an audible physical cue via [SFX:] or sonic verb.
+- Break cadence constantly. Vary line lengths. Never let three consecutive lines have similar rhythm.
+- Tone lives ONLY inside the [VOICE:] tag parameters, not in dialogue prose.
+- Every line must fit in one natural breath when spoken aloud.
+
 === [EMOJI] 4. STORYTELLING: SIGNAL LOST ===
 - You are a STORYTELLER first, scientist second. The science news is your SEED - grow it into a gripping human drama.
 - {news_block}
