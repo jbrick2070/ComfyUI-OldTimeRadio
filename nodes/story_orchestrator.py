@@ -1301,6 +1301,186 @@ def _normalize_dialogue_names(text):
     return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
 
 
+# ── Name cleanup (fuzzy match against canonical cast) ────────────
+# BUG-020 fix: Under maximum chaos, LLMs hallucinate variant spellings
+# (NEMEO_SIRIKIT instead of NEMO SIRIKIT). This pure-Python pass reads
+# the canonical cast from config/episode_cast.txt and fuzzy-matches
+# every CHARACTER: line against the roster. No LLM call, no VRAM cost.
+
+def _name_similarity(a: str, b: str) -> float:
+    """Simple character-level similarity ratio (0.0 to 1.0).
+    Uses longest common subsequence length / max length.
+    Good enough for catching NEMEO->NEMO without pulling in difflib."""
+    a, b = a.upper(), b.upper()
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    # Levenshtein-style: count matching chars in order
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    matches = 0
+    last_idx = -1
+    for ch in shorter:
+        for j in range(last_idx + 1, len(longer)):
+            if longer[j] == ch:
+                matches += 1
+                last_idx = j
+                break
+    return matches / max(len(a), len(b))
+
+
+def _cleanup_character_names(script_text: str, cast_config_path: str,
+                             pre_rolled_cast: list) -> str:
+    """Consistency-focused name cleanup for LLM-generated scripts.
+
+    Two jobs:
+      1. CONSISTENCY: If the same character appears as both "NEMO" (50 lines)
+         and "NEMEO" (2 lines), collapse the rare variant into the dominant one.
+      2. GARBLE DETECTION: If a name is very close to a canonical cast name
+         (similarity > 0.75) but misspelled, fix it. This catches maximum-chaos
+         hallucinations like NEMEO_SIRIKIT -> NEMO SIRIKIT.
+
+    Does NOT force names to match the roster rigidly. "DR NEMO" or "CAPTAIN NEMO"
+    are fine as long as the LLM uses them consistently.
+
+    Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
+
+    Args:
+        script_text: The full script after FORMAT_NORM
+        cast_config_path: Path to config/episode_cast.txt
+        pre_rolled_cast: Fallback list of canonical names
+
+    Returns:
+        Script text with corrected character names
+    """
+    # Build canonical name set from config file or fallback
+    canonical_names = set()
+    try:
+        with open(cast_config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                name_part = line.split("|")[0].strip().upper()
+                if name_part:
+                    canonical_names.add(name_part)
+    except (FileNotFoundError, OSError):
+        pass
+
+    if not canonical_names and pre_rolled_cast:
+        canonical_names = {n.upper() for n in pre_rolled_cast}
+
+    # Always include fixed names that should never be "corrected"
+    canonical_names.update({"LEMMY", "ANNOUNCER"})
+
+    # Names that should never be touched (structural, not characters)
+    _skip_names = frozenset({
+        "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+        "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+        "VOICE", "SOUND", "FADE", "CUT", "TRANSITION",
+    })
+
+    # Extract all unique names from the script WITH occurrence counts
+    bare_names = re.findall(r'^([A-Z][A-Z0-9_ ]{1,30}):', script_text, re.MULTILINE)
+    voice_names = re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_ ]+)[,\]]', script_text)
+    all_occurrences = [n.strip().upper() for n in bare_names + voice_names]
+
+    # Count occurrences per name
+    name_counts = {}
+    for n in all_occurrences:
+        if n not in _skip_names:
+            name_counts[n] = name_counts.get(n, 0) + 1
+
+    if not name_counts:
+        _runtime_log("NAME_CLEANUP: No character names found in script - skipping")
+        return script_text
+
+    # --- PASS 1: CONSISTENCY ---
+    # Group similar names together. If one variant has 2 uses and another
+    # has 40, the rare one is a typo. Collapse into the dominant variant.
+    replacements = {}
+    processed = set()
+
+    # Sort by frequency (most common first) so dominant names anchor groups
+    sorted_names = sorted(name_counts.items(), key=lambda x: -x[1])
+
+    for dominant_name, dominant_count in sorted_names:
+        if dominant_name in processed or dominant_name in _skip_names:
+            continue
+        processed.add(dominant_name)
+
+        for rare_name, rare_count in sorted_names:
+            if rare_name in processed or rare_name in _skip_names:
+                continue
+            if rare_name == dominant_name:
+                continue
+
+            sim = _name_similarity(rare_name, dominant_name)
+            # High similarity + dominant name is much more frequent = typo
+            if sim >= 0.75 and dominant_count >= rare_count * 3:
+                replacements[rare_name] = dominant_name
+                processed.add(rare_name)
+                _runtime_log(
+                    f"NAME_CLEANUP: CONSISTENCY '{rare_name}' ({rare_count}x) -> "
+                    f"'{dominant_name}' ({dominant_count}x) [sim={sim:.2f}]"
+                )
+
+    # --- PASS 2: GARBLE DETECTION (against canonical roster) ---
+    # Only for names not already handled in pass 1 and not in canonical set.
+    for script_name, count in name_counts.items():
+        if script_name in processed or script_name in canonical_names:
+            continue
+        if script_name in _skip_names:
+            continue
+
+        best_match = None
+        best_score = 0.0
+        for canon in canonical_names:
+            if canon in _skip_names:
+                continue
+            score = _name_similarity(script_name, canon)
+            if score > best_score:
+                best_score = score
+                best_match = canon
+
+        # Only fix if very high similarity (0.75+) - this catches
+        # NEMEO->NEMO but leaves DR NEMO alone (low similarity to NEMO)
+        if best_match and best_score >= 0.75 and count <= 3:
+            replacements[script_name] = best_match
+            _runtime_log(
+                f"NAME_CLEANUP: GARBLE '{script_name}' ({count}x) -> "
+                f"'{best_match}' [sim={best_score:.2f}]"
+            )
+
+    if not replacements:
+        _runtime_log(
+            f"NAME_CLEANUP: {len(name_counts)} unique names, all consistent - "
+            f"no fixes needed"
+        )
+        return script_text
+
+    # Apply replacements (longest first to avoid partial matches)
+    for bad_name, good_name in sorted(replacements.items(), key=lambda x: -len(x[0])):
+        # Replace in bare format: BADNAME: -> GOODNAME:
+        script_text = re.sub(
+            rf'^{re.escape(bad_name)}:', f'{good_name}:',
+            script_text, flags=re.MULTILINE
+        )
+        # Replace in VOICE tags: [VOICE: BADNAME, -> [VOICE: GOODNAME,
+        script_text = script_text.replace(
+            f'[VOICE: {bad_name},', f'[VOICE: {good_name},'
+        )
+        script_text = script_text.replace(
+            f'[VOICE: {bad_name}]', f'[VOICE: {good_name}]'
+        )
+
+    _runtime_log(
+        f"NAME_CLEANUP: Fixed {len(replacements)} name variant(s): "
+        f"{', '.join(f'{k}->{v}' for k, v in replacements.items())}"
+    )
+    return script_text
+
+
 # ── Dual-format dialogue extraction ─────────────────────────────
 # Scripts may contain dialogue in EITHER format:
 #   Bare:  NAME: dialogue text
@@ -2934,6 +3114,22 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             "If ANNOUNCER is present, it does not count as a cast invention."
         )
 
+        # -- Write canonical cast to config/episode_cast.txt --
+        # Single source of truth for the name cleanup pass downstream.
+        _cast_config_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "config", "episode_cast.txt"
+        )
+        try:
+            os.makedirs(os.path.dirname(_cast_config_path), exist_ok=True)
+            with open(_cast_config_path, "w", encoding="utf-8") as _cf:
+                _cf.write("# Episode Cast - auto-generated per episode\n")
+                for _cname in pre_rolled_cast:
+                    # Gender not known yet at pre-roll; will be resolved by Director
+                    _cf.write(f"{_cname} | unknown\n")
+            _runtime_log(f"ScriptWriter: CAST_CONFIG written: {len(pre_rolled_cast)} characters -> {_cast_config_path}")
+        except Exception as _cast_err:
+            log.warning("[ScriptWriter] Failed to write cast config: %s", _cast_err)
+
         # -- Open-Close Expansion --
         winning_outline = ""
         _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
@@ -3437,6 +3633,12 @@ Begin the full script now. Follow this structure exactly:
         script_text = self._normalize_script_format(
             script_text, model_id, optimization_profile
         )
+
+        # -- STEP 3b: NAME CLEANUP (Python fuzzy match) ---------------
+        # Read canonical cast from config/episode_cast.txt and fix any
+        # hallucinated name variants the LLM produced under high creativity.
+        # Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
+        script_text = _cleanup_character_names(script_text, _cast_config_path, pre_rolled_cast)
 
         # -- STEP 4: PARSE into structured JSON -----------------------
         # Single parse on the fully prepared text.
