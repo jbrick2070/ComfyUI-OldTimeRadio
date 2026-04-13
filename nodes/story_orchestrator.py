@@ -4203,9 +4203,16 @@ Outline only - do NOT write dialogue yet."""
         # PCIe memory thrashing (0.1 tok/sec behavior, appearing as a hang).
         outline_budget = 600 if optimization_profile == "Obsidian (UNSTABLE/4GB)" else 1200
         
-        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}]")
+        # BUG-021 FIX: Cap outline temperature at 0.7. The outline is the
+        # structural skeleton -- character names, act structure, plot beats.
+        # Under maximum chaos the outline hallucinates names and sprawling
+        # act counts that infect every downstream act. Creative acts can
+        # improvise wildly on top of a solid outline.
+        _outline_temp = min(temperature, 0.7)
+        _outline_top_p = min(top_p, 0.95)
+        log.info(f"[ScriptWriter] Generating outline ({num_acts} acts) [KV Budget: {outline_budget}] [temp={_outline_temp}]")
         outline = _generate_with_llm(outline_prompt, model_id=model_id,
-                                         max_new_tokens=outline_budget, temperature=temperature, top_p=top_p,
+                                         max_new_tokens=outline_budget, temperature=_outline_temp, top_p=_outline_top_p,
                                          optimization_profile=optimization_profile)
 
         # Step 2: Generate each act with Context Engineering
