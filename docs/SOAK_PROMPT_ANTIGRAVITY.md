@@ -206,6 +206,30 @@ Append every run to: `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldT
 - **Notes:** (anything unusual — warnings, slow phases, VRAM spikes)
 ```
 
+## BALCONY PREVIEW (before each episode)
+
+After the soak script prints the CONFIG line for a new run, take on the role of
+**Statler and Waldorf** (the cranky old Muppets in the theater balcony). Based
+ONLY on the config parameters, predict what the episode will be like and heckle
+it. Keep it to 2-3 lines max, in character. Append to the soak log:
+
+```markdown
+#### BALCONY PREVIEW — RUN NNN
+**Statler:** (one line predicting/heckling the episode based on config)
+**Waldorf:** (one line response)
+**Both:** "Do ho ho ho ho!"
+```
+
+Example:
+```markdown
+#### BALCONY PREVIEW — RUN 613
+**Statler:** Cyberpunk, 350 words, 8 acts? That's less dialogue than my grocery list!
+**Waldorf:** At least your grocery list has a satisfying ending!
+**Both:** "Do ho ho ho ho!"
+```
+
+Do this IMMEDIATELY when you see the config — do not wait for the episode to finish.
+
 ## CRITIC REVIEW (after each SUCCESS)
 
 After each successful episode, read the most recent `_treatment.txt` from
@@ -272,6 +296,7 @@ P2/P3 go in the soak log notes only — don't clutter BUG_LOG.md with cosmetic i
 A good soak night produces:
 - 30+ episodes run
 - Soak log with every run documented
+- Balcony preview (Statler and Waldorf heckle) for every run
 - Critic review (haiku + score) for every successful episode
 - Any P0/P1 bugs logged in BUG_LOG.md
 - ComfyUI still running in the morning (rebooted as needed)
