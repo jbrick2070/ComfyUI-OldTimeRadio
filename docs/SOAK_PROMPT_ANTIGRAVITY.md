@@ -92,6 +92,11 @@ for node in workflow.get("nodes", []):
             "safe & tight", "balanced", "wild & rough"
         ])
 
+        # Randomize optimization profile
+        wv[13] = random.choice([
+            "Pro (Ultra Quality)", "Standard"
+        ])
+
         # --- LOCKED VALUES (do NOT change these) ---
         # wv[4]  model_id          = keep as-is (Mistral Nemo 12B)
         # wv[5]  custom_premise    = keep empty
@@ -99,7 +104,6 @@ for node in workflow.get("nodes", []):
         # wv[7]  self_critique     = True
         # wv[8]  open_close        = True
         # wv[12] arc_enhancer      = True
-        # wv[13] optimization_profile = keep as-is
 
         print(f"SOAK CONFIG: genre={wv[1]} words={wv[2]} "
               f"length={wv[9]} style={wv[10]} creativity={wv[11]}")
