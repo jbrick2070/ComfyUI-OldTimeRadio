@@ -102,7 +102,7 @@ def _run_preflight(writer, **overrides):
     defaults = {
         "episode_title": "Test Episode",
         "genre_flavor": "hard_sci_fi",
-        "target_minutes": 8,
+        "target_words": 1120,
         "num_characters": 4,
         "model_id": "google/gemma-4-E4B-it",
         "custom_premise": "",
@@ -252,7 +252,7 @@ class TestGuardrails:
         """User's target_length choice is never overridden by preset."""
         for tl in TARGET_LENGTHS:
             logs = _run_preflight(writer,
-                                  target_minutes=5,
+                                  target_words=700,
                                   target_length=tl)
             # Verify the PARAMS log shows the user's chosen target_length
             for l in logs:
@@ -267,7 +267,7 @@ class TestGuardrails:
     def test_short_3_acts_with_quick_preset_accepted(self, writer):
         """short (3 acts) + quick (5 min) must work without PARSE_FATAL."""
         logs = _run_preflight(writer,
-                              target_minutes=5,
+                              target_words=700,
                               target_length="short (3 acts)")
         # Should log 3 acts in the PARAMS line
         assert any("length=short (3 acts)" in l for l in logs)
@@ -275,14 +275,14 @@ class TestGuardrails:
     def test_too_many_chars_short_episode(self, writer):
         """8 characters + 5 min -> clamped to 4."""
         logs = _run_preflight(writer,
-                              target_minutes=5,
+                              target_words=700,
                               num_characters=8)
         assert any("Clamped num_characters to 4" in l for l in logs)
 
     def test_too_many_chars_very_short_episode(self, writer):
         """8 characters + 3 min (custom) -> clamped to 3."""
         logs = _run_preflight(writer,
-                              target_minutes=3,
+                              target_words=420,
                               num_characters=8)
         # Should clamp to 4 first (<=5 min), then to 3 (<=3 min)
         assert any("Clamped num_characters to 3" in l for l in logs)
@@ -290,7 +290,7 @@ class TestGuardrails:
     def test_too_few_chars_long_episode(self, writer):
         """2 characters + long (7-8 acts) -> clamped to 3."""
         logs = _run_preflight(writer,
-                              target_minutes=15,
+                              target_words=2100,
                               target_length="long (7-8 acts)",
                               num_characters=2)
         assert any("Clamped num_characters to 3" in l for l in logs)
@@ -298,7 +298,7 @@ class TestGuardrails:
     def test_obsidian_caps_runtime(self, writer):
         """Obsidian + 20 min -> clamped to 10 min."""
         logs = _run_preflight(writer,
-                              target_minutes=20,
+                              target_words=2800,
                               optimization_profile="Obsidian (UNSTABLE/4GB)")
         assert any("Obsidian token cap" in l for l in logs) or \
                any("Obsidian" in l and "10" in l for l in logs), \
@@ -322,7 +322,7 @@ class TestGuardrails:
     def test_act_breaks_disabled_short_episode(self, writer):
         """Act breaks disabled for <=3 min episodes."""
         logs = _run_preflight(writer,
-                              target_minutes=3,
+                              target_words=420,
                               include_act_breaks=True)
         assert any("Act breaks disabled" in l for l in logs)
 
@@ -331,23 +331,26 @@ class TestGuardrails:
 # TEST SUITE 4: Dynamic dialogue line scaling
 # ===========================================================================
 class TestDialogueLineScaling:
-    """length_instruction must scale proportionally with target_minutes."""
+    """length_instruction must scale proportionally with derived target_minutes."""
 
-    @pytest.mark.parametrize("minutes,expected_min_lines", [
-        (3, 24),    # 3 * 8 = 24
-        (5, 40),    # 5 * 8 = 40
-        (8, 64),    # 8 * 8 = 64
-        (15, 120),  # 15 * 8 = 120
-        (20, 160),  # 20 * 8 = 160
+    @pytest.mark.parametrize("words,expected_minutes,expected_min_lines", [
+        (350, 3, 24),     # 350/140=2.5 -> round=3, 3*8=24
+        (700, 5, 40),     # 700/140=5, 5*8=40
+        (1120, 8, 64),    # 1120/140=8, 8*8=64
+        (2100, 15, 120),  # 2100/140=15, 15*8=120
+        (2800, 20, 160),  # 2800/140=20, 20*8=160
     ])
-    def test_min_lines_formula(self, minutes, expected_min_lines):
-        """Dialogue floor = max(18, target_minutes * 8)."""
-        result = max(18, int(minutes * 8))
+    def test_min_lines_formula(self, words, expected_minutes, expected_min_lines):
+        """Dialogue floor = max(18, derived_target_minutes * 8)."""
+        derived_minutes = max(3, round(words / 140))
+        assert derived_minutes == expected_minutes
+        result = max(18, int(derived_minutes * 8))
         assert result == expected_min_lines
 
     def test_floor_never_below_18(self):
-        """Even at minimum runtime, floor is 18 lines."""
-        result = max(18, int(3 * 8))
+        """Even at minimum word count, floor is 18 lines."""
+        derived_minutes = max(3, round(350 / 140))
+        result = max(18, int(derived_minutes * 8))
         assert result >= 18
 
 
@@ -376,7 +379,7 @@ class TestNoDeadOptions:
 
     def test_runtime_preset_removed(self):
         assert "runtime_preset" not in _REQUIRED and "runtime_preset" not in _OPTIONAL, \
-            "runtime_preset should be removed from INPUT_TYPES (replaced by target_minutes)"
+            "runtime_preset should be removed from INPUT_TYPES (replaced by target_words)"
 
     def test_news_headlines_removed(self):
         assert "news_headlines" not in _OPTIONAL, \
@@ -394,7 +397,7 @@ class TestNoDeadOptions:
         tooltip = _OPTIONAL["target_length"][1].get("tooltip", "")
         assert "DEPRECATED" not in tooltip, "target_length should NOT be deprecated"
 
-    def test_minimum_target_minutes_is_3(self):
-        """target_minutes min must be 3, not 1."""
-        meta = _REQUIRED["target_minutes"][1]
-        assert meta["min"] == 3, f"target_minutes min should be 3, got {meta['min']}"
+    def test_minimum_target_words_is_350(self):
+        """target_words min must be 350."""
+        meta = _REQUIRED["target_words"][1]
+        assert meta["min"] == 350, f"target_words min should be 350, got {meta['min']}"

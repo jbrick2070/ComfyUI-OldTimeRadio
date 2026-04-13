@@ -2140,9 +2140,9 @@ class LLMScriptWriter:
                     "default": "hard_sci_fi",
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
-                "target_minutes": ("INT", {
-                    "default": 8, "min": 3, "max": 45, "step": 1,
-                    "tooltip": "Target episode duration in minutes. Bark TTS pacing typically adds 50-100% (e.g. 3 -> 5-6 min, 8 -> 12-15 min)"
+                "target_words": ("INT", {
+                    "default": 700, "min": 350, "max": 10000, "step": 50,
+                    "tooltip": "Target spoken dialogue words at ~140 wpm: 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min"
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
@@ -2353,7 +2353,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         return profiles if len(profiles) >= num_names else None
 
     def write_script(self, episode_title, genre_flavor,
-                     target_minutes, num_characters, model_id="google/gemma-4-E4B-it",
+                     target_words, num_characters, model_id="google/gemma-4-E4B-it",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,
@@ -2364,6 +2364,11 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      project_state=None,
                      optimization_profile="Standard"):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
+
+        # Derive target_minutes from target_words for internal use (~140 wpm radio pacing)
+        target_words = int(target_words)
+        target_minutes = max(3, round(target_words / 140))
+        _runtime_log(f"ScriptWriter: target_words={target_words} -> target_minutes={target_minutes}")
 
         # -- OPTIMIZATION PROFILE OVERRIDES --
         # Obsidian mode is "One-Shot": no critique, no open-close, no arc-enhancer.
@@ -2447,12 +2452,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # These get injected into the user prompt to force dialogue VOLUME
         # rather than [PAUSE/BEAT] padding. Targets the "Zoom call pacing" bug.
         # ======================================================================
-        # HARD MINIMUMS - word-count based enforcement (BUG-012/019 fix).
-        # Bark TTS paces at ~67 wpm. We target words, not minutes, because
-        # words are countable post-generation and enforceable via extension pass.
-        # The LLM understands "write 500 words" better than "target 8 minutes".
-        _BARK_WPM = 67  # measured: 247 words -> 3.7 min = 66.8 wpm
-        _target_words = int(target_minutes * _BARK_WPM)
+        # HARD MINIMUMS - word-count based enforcement (BUG-012/020 fix).
+        # Widget is now target_words directly. No conversion needed.
+        _target_words = target_words
         _min_lines = max(18, int(target_minutes * 8))  # line floor still useful as structural hint
         _act_label = {
             "short (3 acts)": "3 acts",
@@ -2479,13 +2481,11 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         length_instruction = (
             f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
             f"(minimum {_min_lines} dialogue lines, NOT counting ANNOUNCER).{_subplot_hint} "
-            f"This script will be read aloud by voice actors at ~67 words per minute, "
+            f"This script will be read aloud by voice actors at ~140 words per minute, "
             f"so {_target_words} words = ~{target_minutes} minutes of audio. "
             f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
             f"{_extend_hint}{_format_hint}"
         )
-        # Store target for post-generation enforcement
-        self._target_dialogue_words = _target_words
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
         # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
@@ -3085,7 +3085,7 @@ Begin the full script now. Follow this structure exactly:
         # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020 fix) ---------
         # Count dialogue words in raw text using regex (no parse needed).
         # If under 70% of target, run LLM extension on raw text.
-        _target_words = getattr(self, "_target_dialogue_words", int(target_minutes * 67))
+        _target_words = target_words  # Direct from widget — no conversion needed
         _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
                                  "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
                                  "ANNOUNCER"}
@@ -3100,7 +3100,7 @@ Begin the full script now. Follow this structure exactly:
         _word_ratio = _raw_dialogue_words / max(1, _target_words)
         _runtime_log(
             f"WORD_ENFORCEMENT: {_raw_dialogue_words} words vs {_target_words} target "
-            f"({_word_ratio:.0%}) | Bark@67wpm -> ~{_raw_dialogue_words / 67:.1f} min"
+            f"({_word_ratio:.0%}) | @140wpm -> ~{_raw_dialogue_words / 140:.1f} min"
         )
 
         if _word_ratio < 0.70 and _target_words > 150:
@@ -3125,7 +3125,7 @@ Begin the full script now. Follow this structure exactly:
             _word_ratio = _raw_dialogue_words / max(1, _target_words)
             _runtime_log(
                 f"WORD_ENFORCEMENT: Post-extension: {_raw_dialogue_words} words "
-                f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 67:.1f} min"
+                f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 140:.1f} min"
             )
 
         # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
@@ -3201,10 +3201,10 @@ Begin the full script now. Follow this structure exactly:
                 _runtime_log(f"GUARDRAIL_UI: {w}")
         script_json = json.dumps(script_lines, indent=2)
 
-        # Estimate actual minutes (Bark TTS paces at ~67 wpm, not 130)
+        # Estimate actual minutes (radio drama pacing ~140 wpm)
         word_count = sum(len(line.get("line", "").split()) for line in script_lines
                          if line.get("type") == "dialogue")
-        est_minutes = max(1, round(word_count / 67, 1))
+        est_minutes = max(1, round(word_count / 140, 1))
 
         # -- Phase 1g: Cast map verification --
         # Extract unique character names from parsed script for downstream matching

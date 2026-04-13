@@ -5,7 +5,7 @@
       "episode_title": "The Last Frequency",
       "genre_flavor": "hard_sci_fi",
       "runtime_preset": "[EMOJI] standard (12 min)",
-      "target_minutes": 8,
+      "target_words": 1120,
       "num_characters": 4,
       "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
       "custom_premise": "",

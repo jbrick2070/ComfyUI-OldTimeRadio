@@ -25,7 +25,7 @@ def test_obsidian_profile_overrides_flags():
                                 writer.write_script(
                                     episode_title="Test",
                                     genre_flavor="scifi",
-                                    target_minutes=3,
+                                    target_words=420,
                                     num_characters=2,
                                     self_critique=True,
                                     open_close=True,
@@ -51,7 +51,7 @@ def test_pro_profile_respects_flags():
                         writer.write_script(
                             episode_title="Test",
                             genre_flavor="scifi",
-                            target_minutes=3,
+                            target_words=420,
                             target_length="short (3 acts)",
                             num_characters=2,
                             self_critique=True,
