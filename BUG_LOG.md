@@ -44,6 +44,22 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** Regenerate debug_prompt.json and check node #1 runtime_preset matches schema.
 - **Tags:** encoding, widget-drift, api, baseline-capture
 
+### BUG-LOCAL-007: PARSE_FATAL when target_length=short (3 acts) + runtime_preset=[FAST] quick (5 min) [FIXED]
+- **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** ScriptWriter generates 4 scenes, 48 lines, but 0 parseable dialogue lines. PARSE_FATAL fires, execution aborts. Episode never reaches TTS stage.
+- **Cause:** `short (3 acts)` compresses the arc so aggressively that Mistral-Nemo produces narration/outline-style content instead of `CHARACTER: dialogue` format. The parser finds no dialogue tags and hard-aborts.
+- **Fix:** Keep `[FAST] quick (5 min)` runtime target but use `medium (5 acts)` for `target_length`. Five acts requires 45 minimum dialogue lines, forcing proper dialogue structure. workflow updated: `target_length` = `medium (5 acts)`.
+- **Verify:** Run `test_audio_byte_identical.py --capture-baseline` and confirm ScriptWriter log shows `dialogue lines > 0`.
+- **Tags:** script-writer, parse-fatal, episode-length
+
+### BUG-LOCAL-008: Node 15 (OTR_BatchAudioGenGenerator) widget drift recurrence [FIXED-WORKAROUND]
+- **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** API prompt has `episode_seed: 3.0, model_id: 3.0` (both float) instead of `episode_seed: "", model_id: "facebook/audiogen-medium"`. Positional mapping shifted by 2.
+- **Cause:** ComfyUI `/object_info` schema returns `optional` params in a different order than `INPUT_TYPES` defines them. The `_workflow_to_api_prompt` positional mapper uses schema order for `params_with_wv_slot`, but `widgets_values` are stored in `INPUT_TYPES` order. When the schema omits or reorders optional params, the wv indices are wrong. Root cause: schema ordering vs INPUT_TYPES ordering mismatch for this node specifically. `debug_audiogen_schema.json` is dumped on each baseline run for diagnosis.
+- **Fix (workaround):** `_fix_known_widget_drift()` in `_run_baseline.py` hardcodes correct values for `OTR_BatchAudioGenGenerator` after prompt conversion. Real fix requires aligning schema ordering — see `debug_audiogen_schema.json` output.
+- **Verify:** Check `debug_prompt.json` after run — node #15 should show `episode_seed: "", model_id: "facebook/audiogen-medium"`.
+- **Tags:** widget-drift, api, baseline-capture, schema-ordering
+
 ### BUG-LOCAL-006: Converted widget alignment in widgets_values mapping [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Node #2 (Gemma4Director) gets `tts_engine: 0.4` (should be dropdown string). Widget values shifted by 1.

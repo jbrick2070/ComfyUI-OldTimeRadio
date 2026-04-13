@@ -201,6 +201,50 @@ _V2_PLACEHOLDER_TYPES = {
 }
 
 
+def _dump_schema_for_node(schemas, node_type, out_path):
+    """Write the raw ComfyUI schema for a node to disk for debugging.
+
+    Useful for diagnosing widget-value alignment bugs where the schema
+    param ordering does not match the INPUT_TYPES definition order.
+    """
+    schema = schemas.get(node_type)
+    if schema:
+        import json as _json
+        with open(out_path, "w", encoding="utf-8") as f:
+            _json.dump(schema.get("input", {}), f, indent=2)
+        print(f"  Schema dump: {out_path}")
+    else:
+        print(f"  WARNING: {node_type} not found in schemas")
+
+
+# Known-correct widget values for OTR_BatchAudioGenGenerator.
+# BUG-LOCAL-008: schema param ordering from /object_info does not match
+# INPUT_TYPES definition order, causing positional wv mapping to start
+# at the wrong slot. Until root cause is fixed, hardcode correct values.
+_AUDIOGEN_CORRECT_INPUTS = {
+    "episode_seed": "",
+    "model_id": "facebook/audiogen-medium",
+    "guidance_scale": 3.0,
+    "default_duration": 3.0,
+}
+
+
+def _fix_known_widget_drift(prompt):
+    """Apply hardcoded corrections for nodes with known widget drift.
+
+    BUG-LOCAL-008: OTR_BatchAudioGenGenerator gets episode_seed and
+    model_id from the wrong wv slots due to schema ordering mismatch.
+    This correction overwrites with the workflow's intended values.
+    """
+    for nid, node_data in prompt.items():
+        if node_data.get("class_type") == "OTR_BatchAudioGenGenerator":
+            before = {k: node_data["inputs"].get(k) for k in _AUDIOGEN_CORRECT_INPUTS}
+            node_data["inputs"].update(_AUDIOGEN_CORRECT_INPUTS)
+            print(f"  Fixed node #{nid} OTR_BatchAudioGenGenerator widget drift")
+            log.info("BUG-LOCAL-008 fix applied: was %s, now correct", before)
+    return prompt
+
+
 def _strip_non_audio_nodes(prompt):
     """Remove v2 placeholder nodes from the prompt.
 
@@ -480,12 +524,21 @@ def run_episode_and_get_audio_bytes(seeds):
     prompt = _workflow_to_api_prompt(workflow, schemas)
     print(f"  Built prompt with {len(prompt)} nodes")
 
+    # Dump schema for known problem node (BUG-LOCAL-008 diagnosis)
+    _dump_schema_for_node(
+        schemas, "OTR_BatchAudioGenGenerator",
+        os.path.join(os.path.dirname(__file__), "debug_audiogen_schema.json")
+    )
+
     print("Stripping non-audio v2 placeholder nodes...")
     prompt = _strip_non_audio_nodes(prompt)
 
     # Find assembler before injecting seeds
     assembler_nid = _find_assembler_node_id(prompt)
     print(f"  EpisodeAssembler is node #{assembler_nid}")
+
+    print("Applying known widget drift corrections (BUG-LOCAL-008)...")
+    prompt = _fix_known_widget_drift(prompt)
 
     print("Injecting fixed seeds...")
     prompt = _inject_seeds_into_prompt(prompt, seeds)

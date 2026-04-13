@@ -32,6 +32,9 @@ Thumbs.db
 *.mp3
 *.flac
 !samples/*.wav
+# Phase 0 regression baseline fixtures are versioned
+!tests/v2/fixtures/baseline_v1.5.wav
+!tests/v2/fixtures/baseline_v1.5.sha256
 
 # Runtime + scratch
 otr_runtime.log
