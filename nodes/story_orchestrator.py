@@ -2146,14 +2146,10 @@ class LLMScriptWriter:
                     "multiline": True, "default": "",
                     "tooltip": "Optional custom story premise (overrides news-based generation)"
                 }),
-                "news_headlines": ("INT", {
-                    "default": 3, "min": 1, "max": 5, "step": 1,
-                    "tooltip": "DEPRECATED - has no effect. RSS always picks 1 headline. Use Creativity dial instead."
-                }),
-                "temperature": ("FLOAT", {
-                    "default": 0.8, "min": 0.1, "max": 1.5, "step": 0.05,
-                    "tooltip": "DEPRECATED - overridden by Creativity dial. Use the Creativity widget instead."
-                }),
+                # news_headlines and temperature removed in v2.0 - both were dead
+                # params (news_headlines was never wired to RSS, temperature was
+                # overridden by creativity dial). Kept in write_script() signature
+                # for backward compat but no longer exposed as widgets.
                 "include_act_breaks": ("BOOLEAN", {
                     "default": True,
                     "tooltip": "Include act breaks with sponsor messages (authentic style)"

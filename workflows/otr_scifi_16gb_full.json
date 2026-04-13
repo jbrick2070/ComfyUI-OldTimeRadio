@@ -27,8 +27,6 @@
                 4,
                 "mistralai/Mistral-Nemo-Instruct-2407",
                 "",
-                3,
-                0.8,
                 true,
                 true,
                 true,
@@ -669,7 +667,7 @@
                 380,
                 200
             ],
-            "title": "\ud83c\udfad 8. Character Forge [v2.0]",
+            "title": "🎭 8. Character Forge [v2.0]",
             "properties": {
                 "Node name for S&R": "OTR_CharacterForge"
             },
@@ -720,7 +718,7 @@
                 380,
                 200
             ],
-            "title": "\ud83c\udfa8 9. Scene Painter [v2.0]",
+            "title": "🎨 9. Scene Painter [v2.0]",
             "properties": {
                 "Node name for S&R": "OTR_ScenePainter"
             },
@@ -763,7 +761,7 @@
                 380,
                 200
             ],
-            "title": "\ud83d\uddbc\ufe0f 10. Visual Compositor [v2.0]",
+            "title": "🖼️ 10. Visual Compositor [v2.0]",
             "properties": {
                 "Node name for S&R": "OTR_VisualCompositor"
             },
@@ -806,7 +804,7 @@
                 380,
                 200
             ],
-            "title": "\ud83c\udfac 11. Production Bus [v2.0]",
+            "title": "🎬 11. Production Bus [v2.0]",
             "properties": {
                 "Node name for S&R": "OTR_ProductionBus"
             },
@@ -848,34 +846,202 @@
         }
     ],
     "links": [
-        [1,  1, 0,  2,  0, "STRING"],
-        [2,  1, 1,  3,  0, "STRING"],
-        [4,  2, 0,  3,  1, "STRING"],
-        [5,  3, 0,  4,  0, "AUDIO"],
-        [6,  4, 0,  7,  0, "AUDIO"],
-        [12, 1, 1, 11,  0, "STRING"],
-        [13, 2, 0, 11,  1, "STRING"],
-        [14,11, 0,  3,  2, "AUDIO"],
-        [15, 7, 0, 12,  0, "AUDIO"],
-        [16, 1, 1, 12,  1, "STRING"],
-        [17, 2, 0, 12,  2, "STRING"],
-        [18, 1, 2, 12,  3, "STRING"],
-        [19, 1, 1, 13,  0, "STRING"],
-        [20,13, 0,  3,  3, "AUDIO"],
-        [21, 2, 0, 14,  0, "STRING"],
-        [22,14, 0,  7,  1, "AUDIO"],
-        [23,14, 1,  7,  2, "AUDIO"],
-        [24, 1, 1, 15,  0, "STRING"],
-        [25,15, 0,  3,  4, "AUDIO"],
-        [26, 2, 0, 15,  1, "STRING"],
-        [27, 1, 1, 16,  0, "STRING"],
-        [28, 2, 0, 16,  1, "STRING"],
-        [29, 2, 0, 17,  0, "STRING"],
-        [30, 1, 1, 19,  0, "STRING"]
+        [
+            1,
+            1,
+            0,
+            2,
+            0,
+            "STRING"
+        ],
+        [
+            2,
+            1,
+            1,
+            3,
+            0,
+            "STRING"
+        ],
+        [
+            4,
+            2,
+            0,
+            3,
+            1,
+            "STRING"
+        ],
+        [
+            5,
+            3,
+            0,
+            4,
+            0,
+            "AUDIO"
+        ],
+        [
+            6,
+            4,
+            0,
+            7,
+            0,
+            "AUDIO"
+        ],
+        [
+            12,
+            1,
+            1,
+            11,
+            0,
+            "STRING"
+        ],
+        [
+            13,
+            2,
+            0,
+            11,
+            1,
+            "STRING"
+        ],
+        [
+            14,
+            11,
+            0,
+            3,
+            2,
+            "AUDIO"
+        ],
+        [
+            15,
+            7,
+            0,
+            12,
+            0,
+            "AUDIO"
+        ],
+        [
+            16,
+            1,
+            1,
+            12,
+            1,
+            "STRING"
+        ],
+        [
+            17,
+            2,
+            0,
+            12,
+            2,
+            "STRING"
+        ],
+        [
+            18,
+            1,
+            2,
+            12,
+            3,
+            "STRING"
+        ],
+        [
+            19,
+            1,
+            1,
+            13,
+            0,
+            "STRING"
+        ],
+        [
+            20,
+            13,
+            0,
+            3,
+            3,
+            "AUDIO"
+        ],
+        [
+            21,
+            2,
+            0,
+            14,
+            0,
+            "STRING"
+        ],
+        [
+            22,
+            14,
+            0,
+            7,
+            1,
+            "AUDIO"
+        ],
+        [
+            23,
+            14,
+            1,
+            7,
+            2,
+            "AUDIO"
+        ],
+        [
+            24,
+            1,
+            1,
+            15,
+            0,
+            "STRING"
+        ],
+        [
+            25,
+            15,
+            0,
+            3,
+            4,
+            "AUDIO"
+        ],
+        [
+            26,
+            2,
+            0,
+            15,
+            1,
+            "STRING"
+        ],
+        [
+            27,
+            1,
+            1,
+            16,
+            0,
+            "STRING"
+        ],
+        [
+            28,
+            2,
+            0,
+            16,
+            1,
+            "STRING"
+        ],
+        [
+            29,
+            2,
+            0,
+            17,
+            0,
+            "STRING"
+        ],
+        [
+            30,
+            1,
+            1,
+            19,
+            0,
+            "STRING"
+        ]
     ],
     "groups": [
         {
-            "title": "1. WRITE THE STORY \ud83d\udcdd",
+            "title": "1. WRITE THE STORY 📝",
             "bounding": [
                 20,
                 80,
@@ -887,7 +1053,7 @@
             "font_size": 24
         },
         {
-            "title": "2. MAKE THE VOICES & SOUNDS \ud83c\udf99\ufe0f",
+            "title": "2. MAKE THE VOICES & SOUNDS 🎙️",
             "bounding": [
                 970,
                 80,
@@ -899,7 +1065,7 @@
             "font_size": 24
         },
         {
-            "title": "3. PUT IT ALL TOGETHER \ud83c\udfac",
+            "title": "3. PUT IT ALL TOGETHER 🎬",
             "bounding": [
                 1920,
                 80,
@@ -911,7 +1077,7 @@
             "font_size": 24
         },
         {
-            "title": "4. VISUAL DRAMA ENGINE \ud83c\udfa5 [v2.0 \u2014 RESEARCH PHASE]",
+            "title": "4. VISUAL DRAMA ENGINE 🎥 [v2.0 — RESEARCH PHASE]",
             "bounding": [
                 20,
                 1130,
