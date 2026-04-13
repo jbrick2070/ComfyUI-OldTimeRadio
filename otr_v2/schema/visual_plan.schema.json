@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OTR v2 Visual Plan",
+  "type": "object",
+  "properties": {
+    "visual_plan": {
+      "type": "object",
+      "properties": {
+        "scenes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scene_id", "shot_type", "duration_s", "audio_offset_s"],
+            "properties": {
+              "scene_id":        { "type": "string" },
+              "shot_type":       { "enum": ["establishing", "character", "insert"] },
+              "character_ids":   { "type": "array", "items": { "type": "string" } },
+              "environment":     { "type": "string" },
+              "camera":          { "type": "string" },
+              "duration_s":      { "type": "number", "minimum": 0.5, "maximum": 60.0 },
+              "audio_offset_s":  { "type": "number", "minimum": 0.0 },
+              "seed":            { "type": "integer" }
+            }
+          }
+        }
+      },
+      "required": ["scenes"]
+    }
+  }
+}

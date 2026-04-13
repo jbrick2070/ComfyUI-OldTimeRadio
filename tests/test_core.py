@@ -536,65 +536,9 @@ class TestWorkflowJSONFull:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 9. WORKFLOW JSON — Lite Workflow + Parity with Full
+# 9. (Removed) Lite workflow tests - otr_scifi_16gb_lite.json was removed
+#    in commit 44cbdec. Tests referencing it are no longer valid.
 # ─────────────────────────────────────────────────────────────────────────────
-
-class TestWorkflowJSONLite:
-
-    @pytest.fixture(scope="class")
-    def wf(self):
-        return _load_workflow("otr_scifi_16gb_lite.json")
-
-    def test_required_keys(self, wf):
-        for k in ["nodes", "links", "last_node_id", "last_link_id"]:
-            assert k in wf
-
-    def test_node_ids_unique(self, wf):
-        ids = [n["id"] for n in wf["nodes"]]
-        assert len(ids) == len(set(ids))
-
-    def test_link_ids_unique(self, wf):
-        ids = [l[0] for l in wf["links"]]
-        assert len(ids) == len(set(ids))
-
-    def test_last_node_id_valid(self, wf):
-        assert wf["last_node_id"] >= max(n["id"] for n in wf["nodes"])
-
-    def test_links_reference_existing_nodes(self, wf):
-        ids = {n["id"] for n in wf["nodes"]}
-        for lid, src, ss, dst, ds, dtype in wf["links"]:
-            assert src in ids and dst in ids
-
-    def test_no_input_slot_collisions(self, wf):
-        seen = {}
-        for lid, src, ss, dst, ds, dtype in wf["links"]:
-            k = (dst, ds)
-            assert k not in seen, f"Lite slot collision: links {seen[k]} and {lid}"
-            seen[k] = lid
-
-    def test_node_types_otr_or_known(self, wf):
-        known = {"PreviewAudio", "PreviewImage", "Note"}
-        for n in wf["nodes"]:
-            assert n["type"].startswith("OTR_") or n["type"] in known
-
-    def test_required_pipeline_nodes(self, wf):
-        types = {n["type"] for n in wf["nodes"]}
-        required = {
-            "OTR_Gemma4ScriptWriter", "OTR_Gemma4Director",
-            "OTR_BatchBarkGenerator", "OTR_SceneSequencer",
-            "OTR_EpisodeAssembler",
-        }
-        assert not (required - types), f"Missing in lite: {required - types}"
-
-    def test_lite_otr_nodes_match_full(self):
-        lite = _load_workflow("otr_scifi_16gb_lite.json")
-        full = _load_workflow("otr_scifi_16gb_full.json")
-        lite_otr = {n["type"] for n in lite["nodes"] if n["type"].startswith("OTR_")}
-        full_otr = {n["type"] for n in full["nodes"] if n["type"].startswith("OTR_")}
-        assert lite_otr == full_otr, (
-            f"Workflow node parity failure — "
-            f"lite-only: {lite_otr - full_otr}, full-only: {full_otr - lite_otr}"
-        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
