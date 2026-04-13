@@ -846,7 +846,19 @@ def run_iteration(run_num):
         # 5. Count treatments before submission
         treatments_before = count_treatments()
 
-        # 6. Submit
+        # 6. Wait for clear queue before submitting
+        for _qwait in range(60):  # up to 10 min (60 x 10s)
+            try:
+                q = requests.get(f"{COMFYUI}/queue", timeout=10).json()
+                running = len(q.get("queue_running", []))
+                pending = len(q.get("queue_pending", []))
+                if running == 0 and pending == 0:
+                    break
+                print_f(f"Queue busy (running={running}, pending={pending}) -- waiting 10s...")
+                time.sleep(POLL_S)
+            except Exception:
+                break  # if queue endpoint fails, just submit anyway
+
         client_id = str(uuid.uuid4())
         print_f("Submitting prompt...")
         resp = requests.post(
