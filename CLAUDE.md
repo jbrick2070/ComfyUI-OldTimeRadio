@@ -85,4 +85,6 @@ Safe for work. No profanity. Good narrative arc (beginning, middle, end). Non-vi
 
 **Hardware:** RTX 5080, 16 GB VRAM, Blackwell, single GPU, no cloud.
 
+**Python path (Windows):** `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` — system `python` is not on PATH. All commands must use this full path or activate the venv first with `& C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\Activate.ps1`.
+
 **Previous attempt failed** (`v2.0-visual-engine`, deleted) by modifying node inputs (widget drift) and loading diffusion in-process (OOM). This sidecar architecture prevents both.

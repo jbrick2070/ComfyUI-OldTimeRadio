@@ -42,7 +42,6 @@ class CharacterForge:
     FUNCTION = "forge"
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("character_portraits", "status")
-    OUTPUT_NODE = True
     EXPERIMENTAL = True
     DESCRIPTION = (
         "[v2.0 PREVIEW] Character Forge - Image to 3D mesh. "
@@ -111,7 +110,6 @@ class ScenePainter:
     FUNCTION = "paint"
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("scene_backgrounds", "status")
-    OUTPUT_NODE = True
     EXPERIMENTAL = True
     DESCRIPTION = (
         "[v2.0 PREVIEW] Scene Painter - Text to cinematic video. "
@@ -180,7 +178,6 @@ class VisualCompositor:
     FUNCTION = "preview"
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("status",)
-    OUTPUT_NODE = True
     EXPERIMENTAL = True
     DESCRIPTION = (
         "[v2.0 PREVIEW] Visual Compositor - 3D + Diffusion + CRT layers. "
@@ -235,7 +232,6 @@ class ProductionBus:
     FUNCTION = "preview"
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("status",)
-    OUTPUT_NODE = True
     EXPERIMENTAL = True
     DESCRIPTION = (
         "[v2.0 PREVIEW] Production Bus - Unified audio + visual assembly. "

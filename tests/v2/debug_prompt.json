@@ -1,0 +1,182 @@
+{
+  "1": {
+    "class_type": "OTR_Gemma4ScriptWriter",
+    "inputs": {
+      "episode_title": "The Last Frequency",
+      "genre_flavor": "hard_sci_fi",
+      "runtime_preset": "[EMOJI] standard (12 min)",
+      "target_minutes": 8,
+      "num_characters": 4,
+      "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+      "custom_premise": "",
+      "news_headlines": 3,
+      "temperature": 0.8,
+      "include_act_breaks": true,
+      "self_critique": true,
+      "open_close": true,
+      "target_length": "medium (5 acts)",
+      "style_variant": "tense claustrophobic",
+      "creativity": "balanced",
+      "arc_enhancer": true,
+      "project_state": "Pro (Ultra Quality)"
+    }
+  },
+  "2": {
+    "class_type": "OTR_Gemma4Director",
+    "inputs": {
+      "script_text": [
+        "1",
+        0
+      ],
+      "temperature": 0.4,
+      "tts_engine": "bark (standard 8GB)",
+      "vintage_intensity": "subtle",
+      "project_state": "Pro (Ultra Quality)"
+    }
+  },
+  "3": {
+    "class_type": "OTR_SceneSequencer",
+    "inputs": {
+      "script_json": [
+        "1",
+        1
+      ],
+      "production_plan_json": [
+        "2",
+        0
+      ],
+      "tts_audio_clips": [
+        "11",
+        0
+      ],
+      "announcer_audio_clips": [
+        "13",
+        0
+      ],
+      "sfx_audio_clips": [
+        "15",
+        0
+      ],
+      "start_line": 0,
+      "end_line": 999
+    }
+  },
+  "4": {
+    "class_type": "OTR_AudioEnhance",
+    "inputs": {
+      "audio": [
+        "3",
+        0
+      ],
+      "target_sample_rate": 48000,
+      "spatial_width": 0.3,
+      "haas_delay_ms": 0.8,
+      "bass_warmth": 0.15,
+      "lpf_cutoff_hz": 16000.0,
+      "tape_emulation": "subtle",
+      "normalize_dbfs": -1.0
+    }
+  },
+  "7": {
+    "class_type": "OTR_EpisodeAssembler",
+    "inputs": {
+      "scene_audio": [
+        "4",
+        0
+      ],
+      "episode_title": "The Last Frequency",
+      "opening_theme_audio": [
+        "14",
+        0
+      ],
+      "closing_theme_audio": [
+        "14",
+        1
+      ],
+      "opening_duration_sec": 10.0,
+      "closing_duration_sec": 8.0,
+      "crossfade_ms": 500
+    }
+  },
+  "11": {
+    "class_type": "OTR_BatchBarkGenerator",
+    "inputs": {
+      "script_json": [
+        "1",
+        1
+      ],
+      "production_plan_json": [
+        "2",
+        0
+      ]
+    }
+  },
+  "12": {
+    "class_type": "OTR_SignalLostVideo",
+    "inputs": {
+      "audio": [
+        "7",
+        0
+      ],
+      "script_json": [
+        "1",
+        1
+      ],
+      "production_plan_json": [
+        "2",
+        0
+      ],
+      "news_used": [
+        "1",
+        2
+      ]
+    }
+  },
+  "13": {
+    "class_type": "OTR_KokoroAnnouncer",
+    "inputs": {
+      "script_json": [
+        "1",
+        1
+      ],
+      "episode_seed": "",
+      "voice_override": "random"
+    }
+  },
+  "14": {
+    "class_type": "OTR_MusicGenTheme",
+    "inputs": {
+      "production_plan_json": [
+        "2",
+        0
+      ],
+      "episode_seed": "",
+      "model_id": "facebook/musicgen-medium",
+      "guidance_scale": 3.0
+    }
+  },
+  "15": {
+    "class_type": "OTR_BatchAudioGenGenerator",
+    "inputs": {
+      "script_json": [
+        "1",
+        1
+      ],
+      "production_plan_json": [
+        "2",
+        0
+      ],
+      "episode_seed": 3.0,
+      "model_id": 3.0
+    }
+  },
+  "9999": {
+    "class_type": "PreviewAudio",
+    "inputs": {
+      "audio": [
+        "7",
+        0
+      ]
+    }
+  }
+}
