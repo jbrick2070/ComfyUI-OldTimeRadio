@@ -9,7 +9,7 @@ Usage:
 AntiGravity: just run this script. Do NOT modify it.
 """
 
-import json, requests, time, random, uuid, os, subprocess, re, sys
+import json, requests, time, random, uuid, os, subprocess, re, sys, textwrap
 
 # ---------------------------------------------------------------------------
 # PATHS (Windows, Jeffrey's machine)
@@ -154,6 +154,210 @@ def count_treatments():
 
 
 # ---------------------------------------------------------------------------
+# STATLER & WALDORF -- Balcony Preview (before each run)
+# ---------------------------------------------------------------------------
+HECKLES = {
+    "hard_sci_fi": [
+        "Statler: Hard sci-fi? The only hard part is staying awake!",
+        "Waldorf: I once read hard sci-fi. Took me three naps to finish!",
+        "Statler: They say hard sci-fi is scientifically accurate. Accurately boring!",
+    ],
+    "space_opera": [
+        "Waldorf: Space opera? I prefer the regular opera -- at least I can sleep in a nice chair!",
+        "Statler: The last space opera I saw, the best performance was the vacuum of space!",
+        "Waldorf: Space opera -- where no one can hear you yawn!",
+    ],
+    "dystopian": [
+        "Statler: A dystopian story? Just describe this theater!",
+        "Waldorf: Dystopian? I have been living one since they put us in this balcony!",
+        "Statler: Another dystopia. As if watching this show was not punishment enough!",
+    ],
+    "time_travel": [
+        "Waldorf: Time travel? I wish I could travel to before I agreed to watch this!",
+        "Statler: If I had a time machine, I would skip to the end credits!",
+        "Waldorf: Time travel -- the only way to get those 30 minutes back!",
+    ],
+    "first_contact": [
+        "Statler: First contact? The aliens took one look and left!",
+        "Waldorf: First contact with this show? More like last contact!",
+        "Statler: Even the aliens have better things to watch!",
+    ],
+    "cosmic_horror": [
+        "Waldorf: Cosmic horror? The real horror is we are still up here watching!",
+        "Statler: They say cosmic horror is unknowable. Just like why we keep coming back!",
+        "Waldorf: Lovecraft never imagined anything as terrifying as this balcony seat!",
+    ],
+    "cyberpunk": [
+        "Statler: Cyberpunk? I can barely work the remote!",
+        "Waldorf: High tech, low life -- just like this theater!",
+        "Statler: In cyberpunk, everyone has implants. I just need new knees!",
+    ],
+    "post_apocalyptic": [
+        "Waldorf: Post-apocalyptic? Looks like the budget already survived one!",
+        "Statler: After the apocalypse, only two things survive -- cockroaches and us!",
+        "Waldorf: Post-apocalyptic -- finally a setting that matches this theater!",
+    ],
+}
+
+WORD_HECKLES = {
+    350: "Statler: 350 words? That is shorter than my grocery list!",
+    700: "Waldorf: 700 words? Just enough rope to hang itself!",
+    1050: "Statler: 1050 words? Getting ambitious, are we?",
+    1400: "Waldorf: 1400 words? I will need a second nap for that!",
+    2100: "Statler: 2100 words? They are writing a novel up there! Waldorf: A novel way to bore us!",
+}
+
+LENGTH_HECKLES = {
+    "short (3 acts)": "Waldorf: Three acts? Even Shakespeare needed five! Statler: Shakespeare also had talent!",
+    "medium (5 acts)": "Statler: Five acts. The perfect number -- of chances to walk out!",
+    "long (7-8 acts)": "Waldorf: Seven acts? Statler: Wake me for the curtain call!",
+}
+
+
+def balcony_preview(config):
+    """Statler and Waldorf heckle the upcoming episode from the balcony."""
+    genre = config["genre"]
+    words = config["words"]
+    length = config["length"]
+
+    lines = []
+    lines.append("")
+    lines.append("*" * 50)
+    lines.append("  FROM THE BALCONY  --  Statler & Waldorf")
+    lines.append("*" * 50)
+    lines.append("")
+
+    # Genre heckle
+    genre_lines = HECKLES.get(genre, ["Statler: What is this? Waldorf: I have no idea!"])
+    lines.append(random.choice(genre_lines))
+
+    # Word count heckle
+    wh = WORD_HECKLES.get(words, f"Waldorf: {words} words? That is a number, all right!")
+    lines.append(wh)
+
+    # Length heckle
+    lh = LENGTH_HECKLES.get(length, "Statler: However many acts, it is too many!")
+    lines.append(lh)
+
+    # Closing zinger
+    closers = [
+        "Both: Dohohoho!",
+        "Waldorf: Why do we keep coming back? Statler: Beats me!",
+        "Statler: Well, here we go again! Waldorf: Same time, same suffering!",
+        "Both: Bravo! ...Just kidding!",
+        "Waldorf: Ready? Statler: I was born ready. Ready to leave!",
+    ]
+    lines.append(random.choice(closers))
+    lines.append("")
+
+    text = "\n".join(lines)
+    print_f(text)
+    return text
+
+
+# ---------------------------------------------------------------------------
+# CRITIC REVIEW -- Haiku + Rotten Tomatoes score (after success)
+# ---------------------------------------------------------------------------
+POSITIVE_HAIKU = [
+    ("Voices fill the dark", "static hums then fades to song", "signal found at last"),
+    ("Echoes in the void", "characters breathe and stumble", "a world comes alive"),
+    ("Dials turn slowly", "the frequency locks on tight", "pure storytelling"),
+    ("Old radio glows", "words crackle through dust and time", "the arc lands just right"),
+    ("Wavering signal", "then the narrative locks in", "a clean transmission"),
+]
+
+MIXED_HAIKU = [
+    ("The premise was bold", "but the middle lost its way", "still worth a listen"),
+    ("Ambitious in scope", "some static in the middle", "but the end came through"),
+    ("A slow-burning start", "then the signal flickered twice", "decent reception"),
+    ("Not their finest hour", "but the voices carried weight", "above average"),
+]
+
+NEGATIVE_HAIKU = [
+    ("The signal was weak", "static drowned the dialogue", "tune in next time please"),
+    ("Too short for its reach", "ambition outran the words", "needs more frequency"),
+    ("Lost in transmission", "the arc never quite resolved", "adjust the antenna"),
+]
+
+TOMATO_LABELS = [
+    (90, 100, "Certified Fresh"),
+    (75, 89, "Fresh"),
+    (60, 74, "Fresh (barely)"),
+    (40, 59, "Rotten"),
+    (0, 39, "Splat"),
+]
+
+
+def critic_review(config, title, dialogue, vram, has_treatment, duration):
+    """Post-episode critic review: haiku + Rotten Tomatoes score."""
+    lines = []
+    lines.append("")
+    lines.append("-" * 50)
+    lines.append("  CRITIC REVIEW")
+    lines.append("-" * 50)
+    lines.append(f'  "{title}"')
+    lines.append("")
+
+    # Score based on signals: treatment present, dialogue count, duration
+    score = 50  # base
+    if has_treatment:
+        score += 15
+    try:
+        dl = int(dialogue)
+        if dl >= 20:
+            score += 10
+        elif dl >= 10:
+            score += 5
+    except (ValueError, TypeError):
+        pass
+    try:
+        v = float(vram)
+        if v <= 14.5:
+            score += 10  # stayed under VRAM ceiling
+    except (ValueError, TypeError):
+        pass
+    if duration < 600:
+        score += 5  # fast run
+    elif duration > 1500:
+        score -= 10  # suspiciously slow
+
+    # Add genre/length flavor variance
+    score += random.randint(-8, 8)
+    score = max(0, min(100, score))
+
+    # Pick haiku pool
+    if score >= 75:
+        haiku = random.choice(POSITIVE_HAIKU)
+    elif score >= 50:
+        haiku = random.choice(MIXED_HAIKU)
+    else:
+        haiku = random.choice(NEGATIVE_HAIKU)
+
+    lines.append(f"  {haiku[0]}")
+    lines.append(f"  {haiku[1]}")
+    lines.append(f"  {haiku[2]}")
+    lines.append("")
+
+    # Tomato label
+    label = "Unknown"
+    for lo, hi, lbl in TOMATO_LABELS:
+        if lo <= score <= hi:
+            label = lbl
+            break
+
+    tomato = "🍅" if score >= 60 else "🤢"
+    lines.append(f"  Rotten Tomatoes: {score}% -- {label} {tomato}")
+    lines.append(f"  Config: {config.get('genre', '?')} / {config.get('words', '?')}w / {config.get('length', '?')}")
+    lines.append(f"  Dialogue: {dialogue} lines | VRAM: {vram} GB | Duration: {duration}s")
+    lines.append("-" * 50)
+    lines.append("")
+
+    text = "\n".join(lines)
+    print_f(text)
+    return text
+
+
+# ---------------------------------------------------------------------------
 # WEB-FORMAT TO API-FORMAT CONVERTER
 # Uses /object_info schema to correctly map widgets_values to named inputs.
 # ---------------------------------------------------------------------------
@@ -260,6 +464,10 @@ def run_iteration(run_num):
                       f"creativity={config['creativity']} | profile={config['profile']}")
         print_f(f"CONFIG: {config_str}")
 
+        # 3b. Balcony preview (Statler & Waldorf heckle)
+        heckle_text = balcony_preview(config)
+        append_to_log(heckle_text)
+
         # 4. Convert web format to API format
         print_f("Fetching node schemas...")
         schemas = requests.get(f"{COMFYUI}/object_info", timeout=30).json()
@@ -340,6 +548,12 @@ def run_iteration(run_num):
     )
     append_to_log(log_entry)
     print_f(log_entry)
+
+    # 10b. Critic review (haiku + Rotten Tomatoes) on success
+    if result == "SUCCESS":
+        review_text = critic_review(
+            config, title, dialogue, vram, has_treatment, duration)
+        append_to_log(review_text)
 
     # 11. Cooldown
     print_f(f"Cooldown: {COOLDOWN_S}s")
