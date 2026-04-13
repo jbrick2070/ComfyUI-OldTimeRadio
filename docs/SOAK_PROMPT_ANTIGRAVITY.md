@@ -39,13 +39,62 @@ import json, requests, time, random, uuid
 COMFYUI = "http://127.0.0.1:8000"
 WORKFLOW = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_scifi_16gb_full.json"
 
+# IMPORTANT: Always reload from disk each run (never reuse a modified copy)
 with open(WORKFLOW, encoding="utf-8") as f:
     workflow = json.load(f)
 
-# CRITICAL: Submit the workflow EXACTLY as loaded from disk.
-# DO NOT modify any widget values, node settings, inputs, or parameters.
-# The workflow already has random seeds enabled via ComfyUI's built-in
-# randomization — every run produces a unique episode automatically.
+# --- CONTROLLED RANDOMIZATION ---
+# ONLY modify the values listed below. Do NOT touch any other field.
+# Node 1 (OTR_Gemma4ScriptWriter) widgets_values index map:
+#   [0] episode_title    [1] genre_flavor     [2] target_words
+#   [3] num_characters   [4] model_id         [5] custom_premise
+#   [6] include_act_breaks  [7] self_critique  [8] open_close
+#   [9] target_length    [10] style_variant    [11] creativity
+#   [12] arc_enhancer    [13] optimization_profile
+
+# Find Node 1 (ScriptWriter) in the web-format nodes list
+for node in workflow.get("nodes", []):
+    if node.get("id") == 1 and node.get("type") == "OTR_Gemma4ScriptWriter":
+        wv = node["widgets_values"]
+
+        # Randomize genre
+        wv[1] = random.choice([
+            "hard_sci_fi", "space_opera", "dystopian", "time_travel",
+            "first_contact", "cosmic_horror", "cyberpunk", "post_apocalyptic"
+        ])
+
+        # Randomize target_words (controls episode length)
+        wv[2] = random.choice([350, 700, 1050, 1400, 2100])
+
+        # Randomize target_length (act count)
+        wv[9] = random.choice([
+            "short (3 acts)", "medium (5 acts)", "long (7-8 acts)"
+        ])
+
+        # Randomize style
+        wv[10] = random.choice([
+            "tense claustrophobic", "space opera epic",
+            "psychological slow-burn", "hard-sci-fi procedural",
+            "noir mystery", "chaotic black-mirror"
+        ])
+
+        # Randomize creativity
+        wv[11] = random.choice([
+            "safe & tight", "balanced", "wild & rough"
+        ])
+
+        # --- LOCKED VALUES (do NOT change these) ---
+        # wv[4]  model_id          = keep as-is (Mistral Nemo 12B)
+        # wv[5]  custom_premise    = keep empty
+        # wv[6]  include_act_breaks = True
+        # wv[7]  self_critique     = True
+        # wv[8]  open_close        = True
+        # wv[12] arc_enhancer      = True
+        # wv[13] optimization_profile = keep as-is
+
+        print(f"SOAK CONFIG: genre={wv[1]} words={wv[2]} "
+              f"length={wv[9]} style={wv[10]} creativity={wv[11]}")
+        break
 
 # Submit via /prompt endpoint
 resp = requests.post(f"{COMFYUI}/prompt", json={"prompt": workflow})
@@ -133,9 +182,11 @@ Append every run to: `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldT
 
 ```markdown
 ### RUN NNN — YYYY-MM-DD HH:MM:SS
+- **Config:** genre=X | words=N | length=X | style=X | creativity=X
 - **Result:** SUCCESS | FAIL | TIMEOUT | REBOOT
 - **Duration:** Xs
 - **Episode:** (title from treatment file if available)
+- **File size:** X MB (from output MP4)
 - **Dialogue lines:** N (from BatchBark log if visible)
 - **VRAM peak:** X.X GB (from system_stats if available)
 - **Error:** (if FAIL — paste the error message, max 3 lines)
@@ -172,7 +223,7 @@ P2/P3 go in the soak log notes only — don't clutter BUG_LOG.md with cosmetic i
 
 1. **NEVER edit source code.** You are an observer. Log everything, fix nothing.
 2. **NEVER push to git.** Not your job.
-3. **NEVER modify the workflow JSON.** Load it from disk and submit it byte-for-byte. Do not change widget values, node settings, seeds, parameters, or any other field. The workflow is pre-configured and self-randomizing. Modifying it invalidates the soak test.
+3. **ONLY modify the EXACT widget values listed in the API PATTERN section.** Reload the workflow from disk each run, randomize ONLY the 5 listed fields (genre, target_words, target_length, style, creativity) using ONLY the exact values shown. Do not modify any other node, field, or value. Do not add or remove nodes. Do not invent new parameter values.
 4. **ALWAYS reboot if stalled.** Don't wait for Jeffrey — restart ComfyUI and keep going.
 5. **ALWAYS log every run.** Even successful ones. The soak log is the deliverable.
 6. **ALWAYS use the API.** Never use the ComfyUI Desktop UI manually.
