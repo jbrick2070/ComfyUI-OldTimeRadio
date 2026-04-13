@@ -404,13 +404,13 @@ class TestObsidianStringMatch:
 class TestNoDeadOptions:
     """Verify deprecated parameters are marked and active ones are not."""
 
-    def test_news_headlines_marked_deprecated(self):
-        tooltip = _OPTIONAL["news_headlines"][1].get("tooltip", "")
-        assert "DEPRECATED" in tooltip, "news_headlines should be marked DEPRECATED"
+    def test_news_headlines_removed(self):
+        assert "news_headlines" not in _OPTIONAL, \
+            "news_headlines should be removed from INPUT_TYPES (dead param)"
 
-    def test_temperature_marked_deprecated(self):
-        tooltip = _OPTIONAL["temperature"][1].get("tooltip", "")
-        assert "DEPRECATED" in tooltip, "temperature should be marked DEPRECATED"
+    def test_temperature_removed(self):
+        assert "temperature" not in _OPTIONAL, \
+            "temperature should be removed from INPUT_TYPES (dead param)"
 
     def test_creativity_not_deprecated(self):
         tooltip = _OPTIONAL["creativity"][1].get("tooltip", "")
