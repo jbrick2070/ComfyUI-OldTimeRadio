@@ -1039,7 +1039,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_("CAST & VOICES")
         W_(BAR)
         if voices:
-            pad_w = max(len(str(k)) for k in voices)
+            pad_w = max((len(str(k)) for k in voices), default=10)
             for char in sorted(voices.keys()):
                 preset = voices[char]
                 desc   = _PRESET_DESC.get(preset, preset)
@@ -1157,6 +1157,11 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
 
     except Exception as exc:
         log.warning("[Video] Story treatment write failed: %s", exc)
+        try:
+            from .story_orchestrator import _runtime_log
+            _runtime_log(f"Video: TREATMENT WRITE FAILED -- {exc}")
+        except Exception:
+            pass
         return None
 
 class SignalLostVideoRenderer:
