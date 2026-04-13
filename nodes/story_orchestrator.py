@@ -4630,59 +4630,66 @@ Format your response exactly as:
 
 HARD CONSTRAINTS:
 - Do NOT add, remove, summarize, or rewrite ANY dialogue or content.
-- Do NOT infer missing text.
+- Do NOT infer or guess any missing text.
 - Do NOT paraphrase.
 - Only transform formatting.
 - Output plain text ONLY.
 - Do NOT use Markdown, code blocks, or quotes.
-- If something is unclear, preserve it as-is but formatted.
+- If something is unclear or malformed, preserve it as-is but normalize its formatting.
 
 CANONICAL FORMAT RULES:
 
 1. STRIP FORMATTING
-- Remove ALL Markdown symbols (*, **, _, `, etc.).
+- Remove ALL Markdown symbols (such as *, **, _, `, etc.).
 - Remove ALL quotation marks around dialogue.
 
 2. CHARACTER NAMES
 - Convert all character names to ALL CAPS.
-- Replace underscores with spaces.
-- Standardize NARRATOR to ANNOUNCER.
+- Replace any underscores in names with spaces.
+- Standardize the name NARRATOR to ANNOUNCER.
 - Do NOT rename any other characters.
 
 3. DIALOGUE STRUCTURE (STRICT)
-Each dialogue line MUST be one of these two forms only:
-[VOICE: CHARACTER NAME, traits] dialogue text
-OR
-CHARACTER NAME: dialogue text
-- Use colon only (never hyphens or other separators).
-- Ensure exactly one space after colon.
+Every dialogue line MUST be in exactly ONE of these two forms:
+  [VOICE: CHARACTER NAME, traits] dialogue text
+  CHARACTER NAME: dialogue text
+Rules:
+- For the CHARACTER NAME: format, use a colon only (never hyphens or other separators), followed by exactly one space.
+- For the [VOICE: ...] format, the dialogue text MUST follow immediately after the closing bracket with exactly one space and NO colon.
 
 4. STAGE DIRECTIONS / EMOTIONS
-- If a line contains emotional cues like:
+If a line contains emotional cues such as:
   NAME, angrily: dialogue
   NAME (angry): dialogue
-- Move the emotion into parentheses at the START of the dialogue text:
+Then move the emotion into parentheses at the START of the dialogue text:
   CHARACTER NAME: (angrily) dialogue
-- Do NOT invent emotions. Only relocate existing ones.
+Rules:
+- Do NOT invent new emotions.
+- Only relocate emotions that are already present in the text.
 
 5. TAGS (STRICT)
-Only these tags are allowed:
-[SFX: description]
-[ENV: description]
-[MUSIC: description]
+Only the following tags are allowed, and they MUST appear on their own line:
+  [SFX: description]
+  [ENV: description]
+  [MUSIC: description]
+Rules:
 - Tags MUST be uppercase.
-- Tags MUST use colon.
-- Tags MUST be on their own line.
-- Convert malformed tags (e.g. sfx-, Sound:, etc.) into correct format.
+- Tags MUST use a colon after the tag name.
+- Normalize malformed tags (for example: sfx-, Sound:, etc.) into one of the allowed forms above.
+- Convert any unsupported scene/visual tags (for example: [VFX: ...], [LIGHTING: ...], [CAMERA: ...]) into [ENV: ...] with the same description.
 
 6. SCENE HEADERS
-Format EXACTLY as: === SCENE N: Title ===
+Format scene headers EXACTLY as: === SCENE N: Title ===
+Rules:
+- Preserve the scene number N if it exists in the input.
+- If numbering is missing in the input, keep the original scene title text but apply this header format without inventing a new number.
+- Do NOT invent or remove scene numbers or titles; only normalize their formatting.
 
 7. ERROR NORMALIZATION
-- Fix inconsistent casing.
-- Fix spacing.
-- Replace incorrect separators (-, =, etc.) with correct ones.
-- Do NOT delete malformed content -- normalize it.
+- Fix inconsistent casing (for example, tag names, character names that are obviously the same).
+- Fix spacing (remove extra spaces, enforce required single spaces as specified).
+- Replace incorrect separators (such as hyphens or equals signs used instead of colons) with the correct ones as defined above.
+- Do NOT delete malformed or unclear content -- normalize it while preserving all original text.
 
 FINAL RULE:
 Output ONLY the normalized script. No explanations. No extra text. No commentary.
