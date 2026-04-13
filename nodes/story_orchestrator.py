@@ -2124,13 +2124,13 @@ class LLMScriptWriter:
                     "default": "hard_sci_fi",
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
-                "runtime_preset": (["[EMOJI] test (1 min)", "[FAST] quick (5 min)", "[EMOJI] standard (12 min)", "[EMOJI] long (15 min)", "[EMOJI] epic (20 min)", "[EMOJI] custom"], {
+                "runtime_preset": (["[FAST] quick (5 min)", "[EMOJI] standard (12 min)", "[EMOJI] long (15 min)", "[EMOJI] epic (20 min)", "[EMOJI] custom"], {
                     "default": "[EMOJI] standard (12 min)",
                     "tooltip": "Friendly runtime selector - overrides target_minutes unless set to [EMOJI] custom"
                 }),
                 "target_minutes": ("INT", {
-                    "default": 8, "min": 1, "max": 45, "step": 1,
-                    "tooltip": "Target minutes - only used when runtime_preset is set to [EMOJI] custom"
+                    "default": 8, "min": 3, "max": 45, "step": 1,
+                    "tooltip": "Target minutes - only used when runtime_preset is set to [EMOJI] custom (minimum 3)"
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
@@ -2148,11 +2148,11 @@ class LLMScriptWriter:
                 }),
                 "news_headlines": ("INT", {
                     "default": 3, "min": 1, "max": 5, "step": 1,
-                    "tooltip": "Number of real science headlines to fetch for story inspiration"
+                    "tooltip": "DEPRECATED - has no effect. RSS always picks 1 headline. Use Creativity dial instead."
                 }),
                 "temperature": ("FLOAT", {
                     "default": 0.8, "min": 0.1, "max": 1.5, "step": 0.05,
-                    "tooltip": "Generation temperature (higher = more creative)"
+                    "tooltip": "DEPRECATED - overridden by Creativity dial. Use the Creativity widget instead."
                 }),
                 "include_act_breaks": ("BOOLEAN", {
                     "default": True,
@@ -2407,14 +2407,31 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         # -- RUNTIME PRESET - override target_minutes unless custom --
         _preset_map = {
-            "[EMOJI] test (1 min)":    1,
-            "[FAST] quick (5 min)":   5,
+            "[FAST] quick (5 min)":      5,
             "[EMOJI] standard (12 min)": 8,
-            "[EMOJI] long (15 min)":   15,
-            "[EMOJI] epic (20 min)":   20,
+            "[EMOJI] long (15 min)":    15,
+            "[EMOJI] epic (20 min)":    20,
         }
         if runtime_preset in _preset_map:
             target_minutes = _preset_map[runtime_preset]
+
+        # -- SAFE PRESET AUTO-CLAMP (BUG-LOCAL-007 prevention) --
+        # Each runtime_preset implies a safe target_length. Override whatever
+        # the user/workflow set so that dangerous combos (e.g. short+5min)
+        # never reach the LLM. "custom" preset = user is on their own.
+        _safe_length_for_preset = {
+            "[FAST] quick (5 min)":       "medium (5 acts)",   # proven safe - Phase 0 baseline
+            "[EMOJI] standard (12 min)":  "medium (5 acts)",   # battle-tested default
+            "[EMOJI] long (15 min)":      "long (7-8 acts)",   # enough runtime for 75+ lines
+            "[EMOJI] epic (20 min)":      "epic (10+ acts)",   # full arc, sub-plots
+        }
+        if runtime_preset in _safe_length_for_preset:
+            safe_length = _safe_length_for_preset[runtime_preset]
+            if target_length != safe_length:
+                _runtime_log(f"PREFLIGHT: Auto-clamped target_length from '{target_length}' to '{safe_length}' (safe for {runtime_preset})")
+                log.info("[PreFlight] Auto-clamped target_length '%s' -> '%s' for preset '%s'",
+                         target_length, safe_length, runtime_preset)
+                target_length = safe_length
 
         # -- DIAGNOSTIC: log feature flags so we can confirm they're received --
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
@@ -2452,12 +2469,24 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # ======================================================================
         # HARD MINIMUMS - Gemma chronically undershoots, so set the floor high.
         # These are MANDATORY counts, not soft targets. Failure = revise pass.
-        length_instruction = {
-            "short (3 acts)":  "MANDATORY: 3 acts, MINIMUM 22 dialogue lines (NOT counting ANNOUNCER). Target 4-minute runtime. Do NOT stop until you have written at least 22 character dialogue lines.",
-            "medium (5 acts)": "MANDATORY: 5 acts, MINIMUM 45 dialogue lines (NOT counting ANNOUNCER). Target 8-minute runtime. Do NOT stop until you have written at least 45 character dialogue lines. If your first draft is shorter, EXTEND the middle acts with more conflict, more interruptions, and more reaction beats.",
-            "long (7-8 acts)": "MANDATORY: 7-8 acts, MINIMUM 75 dialogue lines (NOT counting ANNOUNCER). Target 14-minute runtime. Do NOT stop until you have written at least 75 character dialogue lines.",
-            "epic (10+ acts)": "MANDATORY: 10+ acts, MINIMUM 110 dialogue lines (NOT counting ANNOUNCER). Target 20+ minute runtime. Allow sub-plots. Do NOT stop under 110 dialogue lines.",
-        }.get(target_length, "MANDATORY: 5 acts, MINIMUM 45 dialogue lines.")
+        # Dialogue line floor scales with target_minutes (~8 lines/min with 40%
+        # inflation because Gemma undershoots). Act count comes from target_length.
+        _act_label = {
+            "short (3 acts)": "3 acts",
+            "medium (5 acts)": "5 acts",
+            "long (7-8 acts)": "7-8 acts",
+            "epic (10+ acts)": "10+ acts",
+        }.get(target_length, "5 acts")
+        _min_lines = max(18, int(target_minutes * 8))  # ~8 inflated lines/min, floor 18
+        _extend_hint = (" If your first draft is shorter, EXTEND the middle acts "
+                        "with more conflict, more interruptions, and more reaction beats."
+                        if target_minutes >= 8 else "")
+        _subplot_hint = " Allow sub-plots." if target_minutes >= 18 else ""
+        length_instruction = (
+            f"MANDATORY: {_act_label}, MINIMUM {_min_lines} dialogue lines "
+            f"(NOT counting ANNOUNCER). Target {target_minutes}-minute runtime.{_subplot_hint} "
+            f"Do NOT stop until you have written at least {_min_lines} character dialogue lines.{_extend_hint}"
+        )
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
         # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
@@ -2470,16 +2499,38 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # ======================================================================
 
         # -- 1a. Parameter sanity checks --
-        if target_minutes == 1 and num_characters > 4:
-            log.warning("[PreFlight] target_minutes=1 with %d characters is too many - "
-                        "clamping to 3 characters for 1-min test", num_characters)
-            _runtime_log("PREFLIGHT: Clamped num_characters to 3 (1-min episode)")
+        # Short episodes: too many characters starves dialogue per character
+        if target_minutes <= 5 and num_characters > 4:
+            log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
+                        "clamping to 4 characters for short episode", target_minutes, num_characters)
+            _runtime_log(f"PREFLIGHT: Clamped num_characters to 4 ({target_minutes}-min episode)")
+            num_characters = 4
+        if target_minutes <= 3 and num_characters > 3:
+            log.warning("[PreFlight] target_minutes=%d with %d characters is too many - "
+                        "clamping to 3 characters for very short episode", target_minutes, num_characters)
+            _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 ({target_minutes}-min episode)")
             num_characters = 3
 
-        if target_minutes <= 2 and include_act_breaks:
+        # Long episodes: too few characters can't sustain narrative tension
+        _act_count_for_clamp = {"short (3 acts)": 3, "medium (5 acts)": 5,
+                                "long (7-8 acts)": 8, "epic (10+ acts)": 12}.get(target_length, 5)
+        if _act_count_for_clamp >= 7 and num_characters < 3:
+            log.warning("[PreFlight] %d characters too few for %s - clamping to 3",
+                        num_characters, target_length)
+            _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 (too few for {target_length})")
+            num_characters = 3
+
+        if target_minutes <= 3 and include_act_breaks:
             log.warning("[PreFlight] Act breaks disabled for %d-min episode (too short)", target_minutes)
             _runtime_log("PREFLIGHT: Act breaks disabled (episode too short)")
             include_act_breaks = False
+
+        # Obsidian profile + long episode = severe truncation (2500 token cap)
+        if optimization_profile == "Obsidian (Low VRAM/Fast)" and target_minutes > 10:
+            log.warning("[PreFlight] Obsidian profile with %d-min episode will truncate badly - "
+                        "clamping to 10 minutes", target_minutes)
+            _runtime_log(f"PREFLIGHT: Clamped target_minutes from {target_minutes} to 10 (Obsidian token cap)")
+            target_minutes = 10
 
         # -- 1b. Custom premise enforcement --
         # When user provides a premise, skip RSS entirely - zero context contamination
@@ -3272,7 +3323,7 @@ Write your 7-line spine now:"""
                         op,
                         model_id=model_id,
                         max_new_tokens=outline_max_tokens,
-                        temperature=min(1.0, temperature + 0.1),
+                        temperature=min(1.0, temperature + 0.1) if temperature < 1.0 else temperature,
                         optimization_profile=optimization_profile
                     ),
                     timeout_sec=480,   # was 300 - raised to 8min for SDPA @ ~2 tok/s
