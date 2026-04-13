@@ -3170,6 +3170,20 @@ Begin the full script now. Follow this structure exactly:
             f"({_word_ratio:.0%}) | @140wpm -> ~{_raw_dialogue_words / 140:.1f} min"
         )
 
+        # BUG-024: Zero-dialogue detection — creative generation produced
+        # only SFX/atmosphere with no character dialogue at all.
+        if _raw_dialogue_words == 0:
+            _runtime_log(
+                "WORD_ENFORCEMENT: [!] ZERO CHARACTER DIALOGUE DETECTED - "
+                "script contains only SFX/ANNOUNCER/atmosphere. "
+                "WORD_EXTEND will attempt full dialogue generation from cast roster."
+            )
+            log.warning(
+                "[BUG-024] Zero character dialogue in raw script. "
+                "Cast roster fallback will be used for extension. "
+                "Pre-rolled cast: %s", ", ".join(pre_rolled_cast)
+            )
+
         if _word_ratio < 0.70 and _target_words > 150:
             _deficit = _target_words - _raw_dialogue_words
             _runtime_log(
@@ -3178,7 +3192,8 @@ Begin the full script now. Follow this structure exactly:
             )
             script_text = self._extend_script_dialogue(
                 script_text, _deficit, _target_words,
-                model_id, genre_flavor, optimization_profile
+                model_id, genre_flavor, optimization_profile,
+                fallback_cast=pre_rolled_cast
             )
             # Recount after extension
             _raw_dialogue_matches = re.findall(
@@ -4748,7 +4763,8 @@ SCRIPT TO REFORMAT:
 
     def _extend_script_dialogue(self, script_text, deficit_words,
                                  target_words, model_id, genre_flavor,
-                                 optimization_profile="Standard"):
+                                 optimization_profile="Standard",
+                                 fallback_cast=None):
         """LLM extension pass: add more dialogue to raw script text.
 
         Called when raw text dialogue word count is <70% of target.
@@ -4771,6 +4787,17 @@ SCRIPT TO REFORMAT:
             name.strip() for name, _ in _matches
             if name.strip() not in _false_positives
         })
+
+        # BUG-024 fix: When script has zero character dialogue (only SFX/ANNOUNCER),
+        # the regex extraction returns an empty character list. Fall back to the
+        # pre-rolled cast names so the extension LLM knows WHO to write dialogue for.
+        if not characters and fallback_cast:
+            characters = sorted(fallback_cast)
+            _runtime_log(
+                f"WORD_EXTEND: Zero characters found in script text - "
+                f"falling back to pre-rolled cast: {', '.join(characters)}"
+            )
+
         existing_dialogue = [
             f"{name.strip()}: {dialogue[:80]}"
             for name, dialogue in _matches
@@ -4782,6 +4809,21 @@ SCRIPT TO REFORMAT:
         # Calculate how many new lines we need (avg ~10 words per dialogue line)
         new_lines_needed = max(10, deficit_words // 10)
 
+        # BUG-024: When script has zero dialogue, show the full raw script
+        # (SFX cues, scene headers, atmosphere) so the LLM has story context
+        # to write dialogue that fits the existing narrative skeleton.
+        if existing_preview:
+            script_context_block = f"EXISTING SCRIPT PREVIEW:\n{existing_preview}"
+        else:
+            # Trim raw script to ~2000 chars to fit token budget
+            _raw_trimmed = script_text[:2000]
+            script_context_block = (
+                "WARNING: The script currently has ZERO character dialogue.\n"
+                "It contains only SFX cues, scene headers, and atmosphere.\n"
+                "You must CREATE all the dialogue from scratch using the characters listed.\n\n"
+                f"RAW SCRIPT SKELETON:\n{_raw_trimmed}"
+            )
+
         extend_prompt = f"""You are extending a {genre_flavor.replace("_", " ")} radio drama script.
 The current script has {len(existing_dialogue)} dialogue lines but needs approximately {new_lines_needed} MORE lines
 to reach the target of {target_words} words of spoken dialogue.
@@ -4789,8 +4831,7 @@ to reach the target of {target_words} words of spoken dialogue.
 CHARACTERS IN THE STORY: {", ".join(characters)}
 NUMBER OF SCENES: {num_scenes}
 
-EXISTING SCRIPT PREVIEW:
-{existing_preview}
+{script_context_block}
 
 TASK: Write {new_lines_needed} NEW dialogue lines that continue and deepen the story.
 - Use ONLY the existing characters listed above
