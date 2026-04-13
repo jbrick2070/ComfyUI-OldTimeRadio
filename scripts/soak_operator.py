@@ -281,6 +281,114 @@ def scan_treatment(path):
             if sc not in cast_upper and compressed not in cast_upper:
                 flags.append(f"NAME_DRIFT: '{sc}' in script but not in cast list")
 
+    # 10. All-same-gender cast (known bug pattern)
+    if cast:
+        genders = set()
+        for name, info in cast.items():
+            if name.upper() == "ANNOUNCER":
+                continue
+            traits = info["traits"].lower()
+            if "female" in traits:
+                genders.add("female")
+            elif "male" in traits:
+                genders.add("male")
+        if len(genders) == 1 and len(cast) > 2:
+            flags.append(f"ALL_SAME_GENDER: All non-announcer cast is {genders.pop()}")
+
+    # 11. Title stuck on default
+    m_title = re.search(r'Title\s*:\s*"([^"]+)"', text)
+    if m_title:
+        title_text = m_title.group(1)
+        if title_text.lower() in ("the last frequency", "untitled", "episode"):
+            flags.append(f"TITLE_STUCK: Title is '{title_text}' -- may be default/stuck")
+
+    # 12. Dialogue count mismatch (arc total vs actual script lines)
+    if script_body and total_dialogue > 0:
+        actual_lines = 0
+        for line in script_body.split("\n"):
+            stripped = line.strip()
+            m_char = re.match(r"^([A-Z][A-Z\s]+?)(?:\s+\[.*\])?\s*$", stripped)
+            if m_char and m_char.group(1).strip() not in ("SFX", "PAUSE", "BEAT", "SCENE"):
+                actual_lines += 1
+        # Each character name line precedes dialogue, so count those
+        if abs(actual_lines - total_dialogue) > 2:
+            flags.append(f"DIALOGUE_MISMATCH: Arc says {total_dialogue} lines but script has ~{actual_lines}")
+
+    # 13. Name squish (compressed names without spaces, like NIRANACKELS)
+    if cast:
+        for name in cast:
+            if name.upper() == "ANNOUNCER":
+                continue
+            # Flag names longer than 10 chars with no spaces (likely squished)
+            if len(name) > 10 and " " not in name and name.upper() == name:
+                flags.append(f"NAME_SQUISH: '{name}' looks like a compressed name (missing spaces)")
+
+    # 14. Single-line character (wasted voice load)
+    if script_body and cast:
+        char_line_counts = {}
+        for line in script_body.split("\n"):
+            stripped = line.strip()
+            m_char = re.match(r"^([A-Z][A-Z\s]+?)(?:\s+\[.*\])?\s*$", stripped)
+            if m_char:
+                cname = m_char.group(1).strip()
+                if cname not in ("SFX", "PAUSE", "BEAT", "SCENE", "ANNOUNCER"):
+                    char_line_counts[cname] = char_line_counts.get(cname, 0) + 1
+        for cname, count in char_line_counts.items():
+            if count == 1 and len(char_line_counts) > 1:
+                flags.append(f"SINGLE_LINE_CHAR: {cname} only speaks once (wasted voice load)")
+
+    # 15. Announcer dominates (more lines than any character)
+    if script_body:
+        ann_count = 0
+        max_char_count = 0
+        for line in script_body.split("\n"):
+            stripped = line.strip()
+            if re.match(r"^ANNOUNCER\b", stripped):
+                ann_count += 1
+        if char_line_counts:
+            max_char_count = max(char_line_counts.values()) if char_line_counts else 0
+        if ann_count > max_char_count and ann_count > 2:
+            flags.append(f"ANNOUNCER_DOMINATES: Announcer has {ann_count} lines vs max character {max_char_count}")
+
+    # 16. News seed missing or blank
+    news_m = re.search(r"NEWS SEED\n[-]+\n(.*?)(?:\n\n|\nCAST)", text, re.DOTALL)
+    if not news_m or not news_m.group(1).strip():
+        flags.append("NEWS_SEED_MISSING: No news seed found -- RSS feed may not be injecting")
+
+    # 17. Duplicate dialogue (same line appears twice -- LLM hallucination loop)
+    if script_body:
+        dialogue_lines = []
+        capture_next = False
+        for line in script_body.split("\n"):
+            stripped = line.strip()
+            if capture_next and stripped and not stripped.startswith("["):
+                dialogue_lines.append(stripped)
+                capture_next = False
+            m_char = re.match(r"^([A-Z][A-Z\s]+?)(?:\s+\[.*\])?\s*$", stripped)
+            if m_char and m_char.group(1).strip() not in ("SFX", "PAUSE", "BEAT", "SCENE"):
+                capture_next = True
+        seen_lines = set()
+        for dl in dialogue_lines:
+            if dl in seen_lines and len(dl) > 20:
+                flags.append(f"DUPLICATE_DIALOGUE: Line repeated: '{dl[:60]}...'")
+                break
+            seen_lines.add(dl)
+
+    # 18. Non-ASCII / encoding corruption (mojibake)
+    mojibake_patterns = ["a]]]", "A(c)", "a]!", "a]\"", "A<<", "A>>"]
+    for pattern in mojibake_patterns:
+        if pattern in text:
+            flags.append(f"MOJIBAKE: Encoding corruption detected ('{pattern}' found)")
+            break
+
+    # 19. Scene count mismatch (arc vs script body)
+    if scene_arc:
+        arc_scene_count = len(re.findall(r"Scene\s+\d+", scene_arc.group(1)))
+        script_scene_count = len(re.findall(r"SCENE\s+\d+", script_body, re.IGNORECASE))
+        if arc_scene_count > 0 and script_scene_count > 0:
+            if abs(arc_scene_count - script_scene_count) > 1:
+                flags.append(f"SCENE_MISMATCH: Arc has {arc_scene_count} scenes but script has {script_scene_count}")
+
     return flags
 
 
@@ -489,6 +597,136 @@ def critic_review(config, title, dialogue, vram, has_treatment, duration):
 
 
 # ---------------------------------------------------------------------------
+# PERFORMANCE REVIEW -- Lead Developer suggestions (no code, just ideas)
+# ---------------------------------------------------------------------------
+ENTERTAINMENT_IDEAS = [
+    "Add recurring characters across episodes -- a grizzled captain who keeps showing up in different genres would build listener loyalty.",
+    "Introduce cold opens before the announcer -- 10 seconds of raw scene audio to hook the listener before the title card.",
+    "Add episode-to-episode continuity Easter eggs -- subtle references to previous episodes that reward repeat listeners.",
+    "Create signature SFX for each genre -- a distinct radio static pattern for cyberpunk vs cosmic horror vs space opera.",
+    "Add a post-credits stinger scene -- a short 5-second teaser that hints at a larger universe.",
+    "Experiment with unreliable narrators -- have the announcer occasionally contradict what the characters say.",
+    "Try a two-part cliffhanger format -- end one episode mid-crisis, resolve in the next.",
+    "Add ambient soundscapes between dialogue -- breathing room makes the drama land harder.",
+    "Introduce a mystery box format -- drop a cryptic audio artifact that only makes sense 3 episodes later.",
+    "Use silence as a dramatic tool -- 2 seconds of dead air before a revelation hits different on radio.",
+    "Create genre mashup episodes -- what if first_contact meets noir_mystery?",
+    "Add a listener mail segment voiced by the announcer -- fake letters that deepen the world.",
+]
+
+ROBUSTNESS_IDEAS = [
+    "Track dialogue-to-SFX ratio per genre -- some genres might systematically underuse sound design.",
+    "Add a voice diversity score -- measure how many unique presets get used vs total available.",
+    "Build a character name dictionary to catch LLM name-squishing bugs automatically.",
+    "Log token counts per scene to detect when the LLM is running out of context budget.",
+    "Add a prompt replay mode -- re-run a specific config that produced a flagged treatment to see if it reproduces.",
+    "Track VRAM over time to detect slow memory leaks across 100+ episodes.",
+    "Add a regression baseline -- save 5 known-good treatments and diff new ones against structure.",
+    "Monitor MusicGen cue durations -- flag if opening theme is shorter than 8s or longer than 15s.",
+    "Track Bark generation time per line -- sudden spikes indicate hallucination retries.",
+    "Add a word-count audit -- compare target_words in config vs actual word count in script body.",
+    "Log the news seed used and check if it actually influenced the premise.",
+    "Build a cast diversity tracker -- how often does the same voice preset appear across episodes?",
+]
+
+VIDEO_IDEAS = [
+    "Start with static scene cards -- genre-appropriate still images with Ken Burns zoom during dialogue.",
+    "Use LTX-2.3 for environment establishing shots only -- 5-second clips at scene transitions, not character shots.",
+    "Generate character portrait cards with IP-Adapter -- show once at first dialogue, then cut to environment.",
+    "Add a retro TV static transition between scenes -- fits the old-time radio aesthetic perfectly.",
+    "Create a visual radio dial animation as a recurring motif -- the frequency tuning ties into Signal Lost.",
+    "Try split-screen during two-character dialogue -- left portrait, right portrait, environment behind.",
+    "Generate genre-specific title cards -- cyberpunk neon, cosmic horror fog, space opera starfield.",
+    "Add waveform visualization during pure audio moments -- visual representation of the signal.",
+    "Use crossfade transitions timed to music cues -- sync visual cuts to the MusicGen interstitials.",
+    "Start with audio-only for first 30 seconds, then fade in visuals -- the radio-to-TV transition IS the concept.",
+    "Generate one hero shot per scene in subprocess, composite with FFmpeg -- keeps VRAM under control.",
+    "Build a visual template system -- 3-4 shot types per genre that get randomized per scene.",
+]
+
+
+def performance_review(config, title, dialogue, vram, has_treatment, duration,
+                        scan_flags):
+    """Post-run lead developer review. Picks contextual suggestions based on
+    what happened this run. No code changes -- just ideas logged to soak_log."""
+    lines = []
+    lines.append("")
+    lines.append("=" * 50)
+    lines.append("  PERFORMANCE REVIEW -- Lead Developer Notes")
+    lines.append("=" * 50)
+    lines.append(f'  Episode: "{title}"')
+    lines.append(f"  Config: {config.get('genre', '?')} / {config.get('words', '?')}w / {config.get('length', '?')}")
+    lines.append("")
+
+    # Pick 1 entertainment idea
+    lines.append("  ENTERTAINMENT:")
+    lines.append(f"    {random.choice(ENTERTAINMENT_IDEAS)}")
+    lines.append("")
+
+    # Pick 1 robustness idea, weighted toward relevant ones if flags exist
+    lines.append("  ROBUSTNESS:")
+    if scan_flags:
+        # If there were flags, mention them and pick a relevant idea
+        lines.append(f"    (This run had {len(scan_flags)} flag(s) -- worth investigating)")
+    lines.append(f"    {random.choice(ROBUSTNESS_IDEAS)}")
+    lines.append("")
+
+    # Pick 1 video idea
+    lines.append("  VIDEO INTEGRATION:")
+    lines.append(f"    {random.choice(VIDEO_IDEAS)}")
+    lines.append("")
+
+    # Contextual observation based on this specific run
+    lines.append("  RUN-SPECIFIC OBSERVATION:")
+    obs = []
+    try:
+        dl = int(dialogue)
+        if dl <= 3:
+            obs.append(f"    Only {dl} dialogue lines -- this is barely a vignette. Could we set a minimum floor per act?")
+        elif dl >= 20:
+            obs.append(f"    {dl} dialogue lines is substantial. Does the pacing hold or does it drag in the middle?")
+    except (ValueError, TypeError):
+        obs.append("    Dialogue count unknown -- runtime log parsing might need attention.")
+
+    try:
+        v = float(vram)
+        if v > 12:
+            obs.append(f"    VRAM at {v}GB -- getting warm. Long episodes with more voices could push past ceiling.")
+        elif v < 6:
+            obs.append(f"    VRAM only {v}GB -- lots of headroom. Could we use it for higher quality TTS settings?")
+    except (ValueError, TypeError):
+        pass
+
+    if not has_treatment:
+        obs.append("    No treatment file -- the audience never sees the script. This is a blind listen.")
+
+    words = config.get("words", 0)
+    length = config.get("length", "")
+    if words == 2100 and "short" in length:
+        obs.append("    2100 words in 3 acts -- that is dense. Does the script feel rushed?")
+    elif words == 350 and "long" in length:
+        obs.append("    350 words across 7-8 acts -- each act is ~50 words. Is there enough meat per scene?")
+
+    if config.get("creativity") == "wild & rough":
+        obs.append("    Wild and rough creativity -- check if the LLM went off the rails or produced something genuinely fresh.")
+
+    if not obs:
+        obs.append("    Solid run. No unusual patterns detected.")
+
+    for o in obs:
+        lines.append(o)
+
+    lines.append("")
+    lines.append("  (Ideas only -- no code changes. Log reviewed by Jeffrey.)")
+    lines.append("=" * 50)
+    lines.append("")
+
+    text = "\n".join(lines)
+    print_f(text)
+    return text
+
+
+# ---------------------------------------------------------------------------
 # WEB-FORMAT TO API-FORMAT CONVERTER
 # Uses /object_info schema to correctly map widgets_values to named inputs.
 # ---------------------------------------------------------------------------
@@ -687,6 +925,7 @@ def run_iteration(run_num):
         append_to_log(review_text)
 
     # 10c. Treatment scan (read-only, flags only, never fixes)
+    scan_flags = []
     if result == "SUCCESS":
         newest = find_newest_treatment()
         if newest:
@@ -707,6 +946,12 @@ def run_iteration(run_num):
                 clean_msg = "  TREATMENT SCAN: Clean -- no flags.\n"
                 print_f(clean_msg)
                 append_to_log(clean_msg)
+
+    # 10d. Performance review (lead developer suggestions, logged to soak_log)
+    if result == "SUCCESS":
+        review = performance_review(config, title, dialogue, vram,
+                                    has_treatment, duration, scan_flags)
+        append_to_log(review)
 
     # 11. Cooldown
     print_f(f"Cooldown: {COOLDOWN_S}s")
