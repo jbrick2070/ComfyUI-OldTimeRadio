@@ -19,6 +19,11 @@ WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeR
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
+# Watcher-owned overrides file. Read at the top of every iteration. The
+# otr-alert-watcher scheduled task may write this to pin parameters,
+# pause the soak, or leave notes. NEVER edit the soak source from the
+# watcher -- only this JSON is allowed to drive behavior from outside.
+WATCHER_OVERRIDES_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\scripts\watcher_overrides.json"
 # Archive is on a SEPARATE DRIVE (E:) -- this keeps the main playback
 # folder single-source (no double-play) and keeps storage off the C:
 # drive so overnight soaks cannot fill the system disk. Protects
@@ -98,6 +103,70 @@ def send_ntfy_alert(title, message, priority="default", tags=None):
             print(f"ntfy alert failed: {exc}", flush=True)
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# WATCHER OVERRIDES
+# ---------------------------------------------------------------------------
+# Allowed keys (anything else is silently ignored -- safe by construction):
+#   force_genre        (str) -- one of GENRES
+#   force_words        (int) -- one of TARGET_WORDS
+#   force_length       (str) -- one of TARGET_LENGTHS
+#   force_style        (str) -- one of STYLES
+#   force_creativity   (str) -- one of CREATIVITIES
+#   force_profile      (str) -- one of OPT_PROFILES
+#   pause_soak         (bool) -- when true, iteration waits and re-checks
+#   note_from_watcher  (str) -- free-text, echoed to soak_log (<=500 chars)
+#
+# Unknown keys are IGNORED. Invalid values (not in the closed set) are
+# IGNORED. Corrupt JSON is IGNORED. The soak cannot be broken by this file.
+
+
+def read_watcher_overrides():
+    """Load watcher overrides JSON. Always returns a dict -- never raises."""
+    try:
+        if not os.path.exists(WATCHER_OVERRIDES_PATH):
+            return {}
+        with open(WATCHER_OVERRIDES_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except Exception as exc:
+        try:
+            print(f"watcher_overrides load failed (ignoring): {exc}",
+                  flush=True)
+        except Exception:
+            pass
+        return {}
+
+
+def apply_watcher_overrides(config, overrides):
+    """Replace randomized fields in config with pinned values from overrides.
+
+    Only whitelisted keys with values in the closed set are honored.
+    Returns a list of human-readable strings describing what was pinned,
+    for logging purposes.
+    """
+    pinned = []
+    mapping = [
+        ("force_genre",      "genre",      GENRES),
+        ("force_words",      "words",      TARGET_WORDS),
+        ("force_length",     "length",     TARGET_LENGTHS),
+        ("force_style",      "style",      STYLES),
+        ("force_creativity", "creativity", CREATIVITIES),
+        ("force_profile",    "profile",    OPT_PROFILES),
+    ]
+    for key, cfg_key, allowed in mapping:
+        val = overrides.get(key)
+        if val is None:
+            continue
+        if val in allowed:
+            config[cfg_key] = val
+            pinned.append(f"{cfg_key}={val}")
+        else:
+            pinned.append(f"[IGNORED {key}={val!r} not in allowed set]")
+    return pinned
 
 
 def print_f(msg):
@@ -963,7 +1032,7 @@ def run_iteration(run_num):
         with open(WORKFLOW_PATH, encoding="utf-8") as f:
             workflow = json.load(f)
 
-        # 3. Controlled randomization (ONLY these 5 fields)
+        # 3. Controlled randomization (ONLY these 6 fields)
         config = {
             "genre": random.choice(GENRES),
             "words": random.choice(TARGET_WORDS),
@@ -972,6 +1041,26 @@ def run_iteration(run_num):
             "creativity": random.choice(CREATIVITIES),
             "profile": random.choice(OPT_PROFILES),
         }
+
+        # 3a. Watcher overrides (safe-by-construction: only closed-set values honored)
+        overrides = read_watcher_overrides()
+        if overrides.get("pause_soak") is True:
+            print_f("WATCHER: pause_soak=true - sleeping 60s before re-checking")
+            append_to_log(
+                f"\n--- WATCHER PAUSED soak at run {run_num:03d} "
+                f"{time.strftime('%Y-%m-%d %H:%M:%S')} ---\n"
+            )
+            time.sleep(60)
+            return True  # Keep loop alive; re-read overrides next iteration
+        pinned = apply_watcher_overrides(config, overrides)
+        if pinned:
+            print_f(f"WATCHER: pinned {', '.join(pinned)}")
+        note = overrides.get("note_from_watcher")
+        if isinstance(note, str) and note.strip():
+            note_clean = note.strip()[:500]
+            print_f(f"WATCHER_NOTE: {note_clean}")
+            append_to_log(f"\n> WATCHER_NOTE (run {run_num:03d}): {note_clean}\n")
+
         for node in workflow.get("nodes", []):
             if node.get("id") == 1 and node.get("type") == "OTR_Gemma4ScriptWriter":
                 wv = node["widgets_values"]
