@@ -19,7 +19,9 @@ WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeR
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
-COMFYUI_EXE = r"C:\Users\jeffr\AppData\Local\Programs\comfyui-electron\ComfyUI.exe"
+COMFYUI_EXE = r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
+COMFYUI_MAIN = r"C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py"
+PROMPT_OUTPUT_PATH = r"C:\Users\jeffr\Documents\ComfyUI\otr_prompt_built.json"
 
 TIMEOUT_S = 1800   # 30 min max per episode
 POLL_S = 10         # seconds between completion checks
@@ -61,8 +63,12 @@ WV_OPT_PROFILE = 13
 # HELPERS
 # ---------------------------------------------------------------------------
 def print_f(msg):
-    """Print with immediate flush so AntiGravity sees output in real time."""
-    print(msg)
+    """Print with immediate flush, handling Unicode encoding on Windows."""
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        # Fallback for Windows consoles that don't support UTF-8
+        print(msg.encode('ascii', 'replace').decode('ascii'))
     sys.stdout.flush()
 
 
@@ -74,19 +80,88 @@ def comfyui_alive():
         return False
 
 
+def _find_comfyui_pid():
+    """Find the PID of the ComfyUI server by checking port 8000."""
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True, text=True, timeout=10
+        )
+        for line in result.stdout.splitlines():
+            if ":8000" in line and "LISTENING" in line:
+                parts = line.strip().split()
+                if parts:
+                    return parts[-1]
+    except Exception:
+        pass
+    return None
+
+
 def reboot_comfyui():
-    """Kill and restart ComfyUI Desktop. Wait for startup."""
+    """Kill and restart ComfyUI Desktop. Wait for startup.
+
+    Uses targeted PID kill (port 8000 only) instead of blanket
+    taskkill /IM python.exe, which would kill the soak operator too.
+    Launches ComfyUI in a NEW_CONSOLE so its lifecycle is fully
+    decoupled from the operator process.
+    """
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     print_f(f"REBOOT: ComfyUI unresponsive -- initiating restart at {ts}")
     append_to_log(f"REBOOT: ComfyUI unresponsive -- initiating restart at {ts}")
-    subprocess.run(["taskkill", "/F", "/IM", "ComfyUI.exe"], capture_output=True)
-    time.sleep(15)
-    subprocess.run(
-        ["powershell", "-Command", f'Start-Process "{COMFYUI_EXE}"'],
-        capture_output=True,
-    )
-    print_f("Waiting 90s for full startup...")
-    time.sleep(90)
+
+    # --- Kill only the ComfyUI process (port 8000) ----------------------
+    comfy_pid = _find_comfyui_pid()
+    if comfy_pid:
+        print_f(f"REBOOT: Killing ComfyUI PID {comfy_pid}")
+        subprocess.run(
+            ["taskkill", "/F", "/PID", comfy_pid],
+            capture_output=True
+        )
+    else:
+        print_f("REBOOT: No ComfyUI PID found on port 8000 -- may already be dead")
+
+    time.sleep(10)
+
+    # --- Restart ComfyUI in a decoupled console -------------------------
+    comfy_args = [
+        COMFYUI_EXE, COMFYUI_MAIN,
+        "--port", "8000",
+        "--highvram", "--force-fp16", "--cuda-malloc",
+        "--user-directory", r"C:\Users\jeffr\Documents\ComfyUI",
+    ]
+    comfy_env = os.environ.copy()
+    comfy_env["PYTHONIOENCODING"] = "utf-8"
+
+    print_f("REBOOT: Launching ComfyUI in new console window...")
+    # Fire-and-forget: CREATE_NEW_CONSOLE decouples ComfyUI from this operator
+    # so it survives when the soak loop exits. We still wrap the spawn in
+    # try/except + proc.kill() so a half-launched process never zombies if
+    # Popen itself raises after forking. (Bug Bible BUG-09.02 compliance.)
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            comfy_args,
+            env=comfy_env,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+    except Exception:
+        if proc is not None:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        raise
+
+    # --- Wait for ComfyUI to become responsive --------------------------
+    print_f("REBOOT: Waiting up to 120s for ComfyUI startup...")
+    for attempt in range(24):  # 24 x 5s = 120s max
+        time.sleep(5)
+        if comfyui_alive():
+            print_f(f"REBOOT: ComfyUI responding after {(attempt + 1) * 5}s")
+            return
+        if attempt % 4 == 3:
+            print_f(f"REBOOT: Still waiting... ({(attempt + 1) * 5}s)")
+    print_f("REBOOT: ComfyUI did not respond within 120s")
 
 
 def append_to_log(text):
@@ -584,7 +659,7 @@ def critic_review(config, title, dialogue, vram, has_treatment, duration):
             label = lbl
             break
 
-    tomato = "🍅" if score >= 60 else "🤢"
+    tomato = "[FRESH]" if score >= 60 else "[ROTTEN]"
     lines.append(f"  Rotten Tomatoes: {score}% -- {label} {tomato}")
     lines.append(f"  Config: {config.get('genre', '?')} / {config.get('words', '?')}w / {config.get('length', '?')}")
     lines.append(f"  Dialogue: {dialogue} lines | VRAM: {vram} GB | Duration: {duration}s")
@@ -842,6 +917,14 @@ def run_iteration(run_num):
         schemas = requests.get(f"{COMFYUI}/object_info", timeout=30).json()
         print_f("Converting workflow to API format...")
         api_prompt = _workflow_to_api_prompt(workflow, schemas)
+        
+        # [THE PUSH] Save the API JSON to disk for the user/inspection
+        try:
+            with open(PROMPT_OUTPUT_PATH, "w", encoding="utf-8") as f:
+                json.dump({"prompt": api_prompt}, f, indent=2)
+            print_f(f"API JSON pushed to: {PROMPT_OUTPUT_PATH}")
+        except Exception as e:
+            print_f(f"WARNING: Failed to push API JSON: {e}")
 
         # 5. Count treatments before submission
         treatments_before = count_treatments()
@@ -861,11 +944,31 @@ def run_iteration(run_num):
 
         client_id = str(uuid.uuid4())
         print_f("Submitting prompt...")
-        resp = requests.post(
-            f"{COMFYUI}/prompt",
-            json={"prompt": api_prompt, "client_id": client_id},
-            timeout=30,
-        )
+
+        # Try to serialize before sending to catch malformed JSON early
+        try:
+            payload = json.dumps({"prompt": api_prompt, "client_id": client_id})
+            payload_size_mb = len(payload.encode('utf-8')) / (1024*1024)
+            print_f(f"Payload size: {payload_size_mb:.2f} MB")
+        except Exception as e:
+            error_msg = f"JSON serialization failed: {e}"
+            print_f(f"SUBMIT FAILED: {error_msg}")
+            raise RuntimeError(error_msg)
+
+        try:
+            resp = requests.post(
+                f"{COMFYUI}/prompt",
+                json={"prompt": api_prompt, "client_id": client_id},
+                timeout=30,
+            )
+        except requests.exceptions.Timeout:
+            error_msg = "POST /prompt timed out after 30s -- ComfyUI may be hung"
+            print_f(f"SUBMIT FAILED: {error_msg}")
+            raise RuntimeError(error_msg)
+        except Exception as e:
+            error_msg = f"POST /prompt failed: {e}"
+            print_f(f"SUBMIT FAILED: {error_msg}")
+            raise RuntimeError(error_msg)
 
         if resp.status_code != 200:
             error_msg = f"HTTP {resp.status_code}: {resp.text[:300]}"
@@ -976,31 +1079,4 @@ def run_iteration(run_num):
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(SOAK_LOG), exist_ok=True)
-
     append_to_log(f"\n--- NEW SOAK SESSION {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-
-    # Resume run numbering from existing log
-    run_num = 1
-    if os.path.exists(SOAK_LOG):
-        with open(SOAK_LOG, "r", encoding="utf-8") as f:
-            runs = re.findall(r"### RUN (\d+)", f.read())
-            if runs:
-                run_num = int(runs[-1]) + 1
-
-    print_f(f"SIGNAL LOST Soak Operator starting at run {run_num}")
-    print_f(f"Workflow: {WORKFLOW_PATH}")
-    print_f(f"Soak log: {SOAK_LOG}")
-    print_f(f"Randomizing: genre, target_words, target_length, style, creativity")
-    print_f("")
-
-    while True:
-        try:
-            if not run_iteration(run_num):
-                print_f("CRITICAL: Stopping soak after unrecoverable failure.")
-                break
-            run_num += 1
-        except KeyboardInterrupt:
-            print_f(f"\nSoak stopped by user at run {run_num}.")
-            append_to_log(f"\n--- SOAK STOPPED BY USER at run {run_num} "
-                          f"{time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
-            break
