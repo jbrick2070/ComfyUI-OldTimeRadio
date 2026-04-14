@@ -19,6 +19,10 @@ WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeR
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
+# Archive lives INSIDE old_time_radio so the episode folder is unchanged.
+# Uses a ".archive.txt" suffix so cleanup agents scanning for
+# "*_treatment.txt" won't match these copies.
+ARCHIVE_DIR = os.path.join(OUTPUT_DIR, "_archive")
 COMFYUI_EXE = r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
 COMFYUI_MAIN = r"C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py"
 PROMPT_OUTPUT_PATH = r"C:\Users\jeffr\Documents\ComfyUI\otr_prompt_built.json"
@@ -280,6 +284,35 @@ def find_newest_treatment():
             return None
         return max(treatments, key=os.path.getmtime)
     except Exception:
+        return None
+
+
+def archive_treatment(run_num, treatment_path):
+    """Copy a treatment file to the archive dir so it cannot be
+    deleted by cleanup agents (Gemini/AntiGravity/etc.).
+
+    Archive name: RUN_NNN__<original_basename>
+    Returns the archive path on success, None on failure.
+    """
+    if not treatment_path or not os.path.exists(treatment_path):
+        return None
+    try:
+        os.makedirs(ARCHIVE_DIR, exist_ok=True)
+        import shutil
+        base = os.path.basename(treatment_path)
+        # Strip "_treatment.txt" and append ".archive.txt" so no cleanup
+        # pattern matching "*_treatment.txt" catches the archive copy.
+        if base.endswith("_treatment.txt"):
+            stem = base[: -len("_treatment.txt")]
+        else:
+            stem = os.path.splitext(base)[0]
+        archive_name = f"RUN_{run_num:03d}__{stem}.archive.txt"
+        dest = os.path.join(ARCHIVE_DIR, archive_name)
+        if not os.path.exists(dest):
+            shutil.copy2(treatment_path, dest)
+        return dest
+    except Exception as exc:
+        print_f(f"ARCHIVE: Failed to archive {treatment_path}: {exc}")
         return None
 
 
@@ -1100,6 +1133,20 @@ def run_iteration(run_num):
         review_text = critic_review(
             config, title, dialogue, vram, has_treatment, duration)
         append_to_log(review_text)
+
+    # 10bb. Archive every successful treatment BEFORE anything else can
+    # touch it -- Gemini/AntiGravity cleanup passes have nuked episodes
+    # in the past. The archive dir is a separate tree with a distinct
+    # naming scheme (RUN_NNN__*) so nothing else should treat it as fair
+    # game for cleanup.
+    if result == "SUCCESS":
+        _newest_for_archive = find_newest_treatment()
+        if _newest_for_archive:
+            _archive_path = archive_treatment(run_num, _newest_for_archive)
+            if _archive_path:
+                _msg = f"  ARCHIVED: {os.path.basename(_archive_path)}\n"
+                print_f(_msg)
+                append_to_log(_msg)
 
     # 10c. Treatment scan (read-only, flags only, never fixes)
     scan_flags = []
