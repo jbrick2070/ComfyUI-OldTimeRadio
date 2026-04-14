@@ -329,6 +329,137 @@ class TestLinkedConvertedWidgetSlots:
         assert inputs.get("production_plan_json") == ["11", 0]
 
 
+class TestPreservedSlotMode:
+    """BUG-LOCAL-029: Some nodes save widgets_values with the linked
+    converted widget's slot PRESERVED as a placeholder, rather than
+    stripped. Node 2 (OTR_Gemma4Director) in otr_scifi_16gb_full.json
+    is an example: script_text is linked AND carries widget metadata
+    AND has an empty-string placeholder at slot 0. All downstream
+    widgets (temperature, tts_engine, vintage_intensity,
+    optimization_profile) are offset by one.
+
+    The mapper must auto-detect which mode the node uses by comparing
+    widgets_values length against the widget-backed param count.
+    """
+
+    def _director_schema(self):
+        return {
+            "OTR_Gemma4Director": {
+                "input": {
+                    "required": {
+                        "script_text": ("STRING", {"multiline": True, "default": ""}),
+                    },
+                    "optional": {
+                        "temperature": ("FLOAT", {"default": 0.4}),
+                        "tts_engine": (
+                            ["bark (standard 8GB)", "kokoro (obsidian 4GB)"],
+                            {"default": "bark (standard 8GB)"},
+                        ),
+                        "vintage_intensity": (
+                            ["subtle", "moderate", "heavy", "extreme"],
+                            {"default": "subtle"},
+                        ),
+                        "optimization_profile": (
+                            ["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"],
+                            {"default": "Standard"},
+                        ),
+                        # Socket-only at the tail.
+                        "project_state": ("PROJECT_STATE", {}),
+                    },
+                }
+            }
+        }
+
+    def _director_workflow_preserved(self):
+        """Shape of Node 2 in otr_scifi_16gb_full.json.
+
+        widgets_values length = 5 (one slot per widget-backed param,
+        including a placeholder for the linked script_text). The link
+        table supplies script_text's real value, and the mapper must
+        skip slot 0 when walking widgets to land temperature on 0.4."""
+        return {
+            "links": [[1, 99, 0, 2, 0, "STRING"]],
+            "nodes": [
+                {
+                    "id": 2,
+                    "type": "OTR_Gemma4Director",
+                    "widgets_values": [
+                        "",                      # placeholder for script_text
+                        0.4,                     # temperature
+                        "bark (standard 8GB)",   # tts_engine
+                        "subtle",                # vintage_intensity
+                        "Pro (Ultra Quality)",   # optimization_profile
+                    ],
+                    "inputs": [
+                        {
+                            "name": "script_text",
+                            "type": "STRING",
+                            "link": 1,
+                            "widget": {"name": "script_text"},
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def test_temperature_is_float_not_empty_string(self):
+        mod = _import_mapper()
+        wf = self._director_workflow_preserved()
+        schema = self._director_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["2"]["inputs"]
+
+        assert inputs.get("temperature") == 0.4, (
+            f"temperature must land in its own slot, got {inputs.get('temperature')!r}"
+        )
+
+    def test_optimization_profile_survives_in_preserved_mode(self):
+        mod = _import_mapper()
+        wf = self._director_workflow_preserved()
+        schema = self._director_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["2"]["inputs"]
+
+        assert inputs.get("optimization_profile") == "Pro (Ultra Quality)", (
+            f"optimization_profile must survive, got "
+            f"{inputs.get('optimization_profile')!r}"
+        )
+
+    def test_all_downstream_widgets_land_correctly(self):
+        mod = _import_mapper()
+        wf = self._director_workflow_preserved()
+        schema = self._director_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["2"]["inputs"]
+
+        assert inputs.get("temperature") == 0.4
+        assert inputs.get("tts_engine") == "bark (standard 8GB)"
+        assert inputs.get("vintage_intensity") == "subtle"
+        assert inputs.get("optimization_profile") == "Pro (Ultra Quality)"
+
+    def test_script_text_link_preserved(self):
+        mod = _import_mapper()
+        wf = self._director_workflow_preserved()
+        schema = self._director_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["2"]["inputs"]
+
+        assert inputs.get("script_text") == ["99", 0]
+
+    def test_project_state_socket_stays_absent(self):
+        mod = _import_mapper()
+        wf = self._director_workflow_preserved()
+        schema = self._director_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["2"]["inputs"]
+
+        # PROJECT_STATE with no link: must NOT appear, and must never
+        # be a placeholder string.
+        assert "project_state" not in inputs or isinstance(
+            inputs["project_state"], list
+        )
+
+
 class TestIsWidgetBacked:
     def test_string_is_widget_backed(self):
         mod = _import_mapper()

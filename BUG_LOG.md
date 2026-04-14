@@ -205,6 +205,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** pending
 - **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
 
+### BUG-LOCAL-029: ComfyUI workflow JSON uses two shapes for linked converted widgets; mapper must auto-sense [FIXED]
+- **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** After b6c610e fixed Node 15, Node 2 (OTR_Gemma4Director) started failing with bad dropdown values: `temperature` received `""` instead of `0.4`, `tts_engine` got the wrong slot, and `optimization_profile` shifted down by one. Validation rejected the run. The fix for Node 15 had regressed Node 2.
+- **Cause:** ComfyUI's web UI saves `widgets_values` in two inconsistent shapes depending on when and how a widget was converted to a socket. Inspecting `workflows/otr_scifi_16gb_full.json` directly: Node 15 has 6 widget-backed params, 2 linked, and `len(wv) == 4` ("stripped" mode — linked converted widgets have NO slot). Node 2 has 5 widget-backed params, 1 linked (`script_text`), and `len(wv) == 5` with an empty-string placeholder at slot 0 ("preserved" mode — linked converted widgets keep a placeholder slot). Both shapes are valid; neither is universal.
+- **Fix:** `_workflow_to_api_prompt` now auto-senses per-node mode from slot-count arithmetic: if `len(wv) == total widget-backed param count` and there is at least one linked widget-backed input, the node is in preserved mode and linked params consume a placeholder slot. If `len(wv) == unlinked widget-backed param count`, stripped mode — linked params consume zero slots. Ambiguous cases (trailing unset optionals, manual JSON edits) default to stripped mode, which errs on the side of omitting bad placeholder values rather than letting them land in real widget keys.
+- **Verify:** `pytest tests/test_widget_drift_guard.py` — 27 tests pass. New class `TestPreservedSlotMode` covers Node 2's shape end-to-end: `temperature == 0.4`, `optimization_profile == "Pro (Ultra Quality)"`, `script_text` retains its link, socket-only `project_state` absent from inputs. `TestLinkedConvertedWidgetSlots` continues to cover Node 15's stripped mode. On live soak, `API_PAYLOAD node=1` and `node=2` lines should show correct optimization_profile values and no DRIFT_DETECTED output.
+- **Tags:** widget-drift, socket-only, linked-converted-widget, api, auto-sensing, mode-detection, bug-bible
+
 ### BUG-LOCAL-028: BUG-LOCAL-027 shipfix regressed Node 15: linked converted widgets eat widgets_values slots [FIXED]
 - **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** yes
 - **Symptom:** HTTP 400 value_not_in_list on Node 15 (OTR_BatchAudioGenGenerator) immediately after deploying 2b52ebe. ComfyUI rejected the API submission because `model_id` received `3.0` instead of `"facebook/audiogen-medium"`. Same positional-shift class of bug that BUG-LOCAL-003 and BUG-LOCAL-027 addressed, surfaced on a different param by the new mapper.

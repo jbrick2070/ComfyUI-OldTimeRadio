@@ -1015,19 +1015,52 @@ def _workflow_to_api_prompt(workflow, schemas):
             ordered_params = list(required.items()) + list(optional.items())
 
             wv = node.get("widgets_values", [])
+
+            # BUG-LOCAL-029: ComfyUI's web UI saves widgets_values in TWO
+            # different shapes depending on when / how a widget was
+            # converted to a socket:
+            #   - "stripped" mode: linked converted widgets have no slot.
+            #     len(wv) == count of unlinked widget-backed params.
+            #     Example in otr_scifi_16gb_full.json: Node 15 has 6
+            #     widget-backed params, 2 linked, wv_len = 4.
+            #   - "preserved" mode: linked converted widgets keep their
+            #     slot as a placeholder (usually empty string or the
+            #     last pre-link value). len(wv) == total widget-backed
+            #     count. Example: Node 2 has 5 widget-backed params, 1
+            #     linked, wv_len = 5 with an empty '' at slot 0.
+            # Auto-sense which mode this node is in by comparing lengths;
+            # on ambiguous input, default to stripped (safer: it avoids
+            # feeding a placeholder like "" into a dropdown slot).
+            widget_backed_params = [
+                (p, spec) for p, spec in ordered_params
+                if _is_widget_backed(spec)
+            ]
+            linked_widget_count = sum(
+                1 for p, _ in widget_backed_params if p in linked_names
+            )
+            unlinked_widget_count = len(widget_backed_params) - linked_widget_count
+
+            if len(wv) == len(widget_backed_params) and linked_widget_count > 0:
+                linked_keeps_slot = True
+            elif len(wv) == unlinked_widget_count:
+                linked_keeps_slot = False
+            else:
+                # Ambiguous (trailing unset optionals, manual edits, etc.).
+                # Default to stripped mode: do not let placeholder slots
+                # leak into real widget keys.
+                linked_keeps_slot = False
+
             wv_idx = 0
             for param, spec in ordered_params:
                 widget_backed = _is_widget_backed(spec)
 
                 if param in linked_names:
-                    # Linked at the socket. ComfyUI's workflow JSON does NOT
-                    # keep a widgets_values slot for inputs that have been
-                    # converted from widget to socket (the web UI strips them
-                    # from the widget panel, and saves widgets_values only for
-                    # the inputs still shown as widgets). So a linked param,
-                    # whether it was originally a converted widget or always a
-                    # socket, consumes NO slot here. This is the BUG-LOCAL-003
-                    # correction we just re-regressed in BUG-LOCAL-027.
+                    # Linked socket: never override the link, but consume a
+                    # slot if this node preserves placeholders for linked
+                    # converted widgets.
+                    if linked_keeps_slot and widget_backed:
+                        if wv_idx < len(wv):
+                            wv_idx += 1
                     continue
 
                 if not widget_backed:
