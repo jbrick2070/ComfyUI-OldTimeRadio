@@ -58,10 +58,43 @@ WV_STYLE = 10
 WV_CREATIVITY = 11
 WV_OPT_PROFILE = 13
 
+# ---------------------------------------------------------------------------
+# NTFY PUSH ALERTS
+# ---------------------------------------------------------------------------
+# Public ntfy.sh server, topic "otr_alert". Subscribe on phone via
+# the ntfy app (search the topic) or at https://ntfy.sh/otr_alert .
+NTFY_URL = "https://ntfy.sh/otr_alert"
+NTFY_TIMEOUT_S = 5
+
 
 # ---------------------------------------------------------------------------
 # HELPERS
 # ---------------------------------------------------------------------------
+def send_ntfy_alert(title, message, priority="default", tags=None):
+    """Fire-and-forget push alert to ntfy.sh/otr_alert.
+
+    Never raises -- a failed alert must not take down the soak loop.
+    priority: "min" | "low" | "default" | "high" | "urgent"
+    tags: list of emoji shortcodes, e.g. ["warning", "skull"]
+    """
+    try:
+        headers = {
+            "Title": str(title)[:120],
+            "Priority": priority,
+        }
+        if tags:
+            headers["Tags"] = ",".join(tags)
+        body = str(message)[:1500].encode("utf-8", errors="replace")
+        requests.post(NTFY_URL, data=body, headers=headers,
+                      timeout=NTFY_TIMEOUT_S)
+    except Exception as exc:
+        # Intentionally swallow -- alerting is best-effort
+        try:
+            print(f"ntfy alert failed: {exc}", flush=True)
+        except Exception:
+            pass
+
+
 def print_f(msg):
     """Print with immediate flush, handling Unicode encoding on Windows."""
     try:
@@ -162,6 +195,13 @@ def reboot_comfyui():
         if attempt % 4 == 3:
             print_f(f"REBOOT: Still waiting... ({(attempt + 1) * 5}s)")
     print_f("REBOOT: ComfyUI did not respond within 120s")
+    send_ntfy_alert(
+        "OTR Soak: ComfyUI reboot stalled",
+        "ComfyUI did not respond within 120s after restart. "
+        "Next run will retry, but the soak loop may be degraded.",
+        priority="high",
+        tags=["warning"],
+    )
 
 
 def append_to_log(text):
@@ -876,6 +916,14 @@ def run_iteration(run_num):
             print_f("CRITICAL: ComfyUI unresponsive after 2 reboots.")
             append_to_log(f"### RUN {run_num:03d} -- {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
                           f"- **Result:** CRITICAL\n- **Error:** ComfyUI dead after 2 reboots\n")
+            send_ntfy_alert(
+                f"OTR Soak STOPPED (run {run_num:03d})",
+                "ComfyUI is unresponsive after 2 reboot attempts. "
+                "The soak loop has halted and will not continue until "
+                "ComfyUI is restarted manually.",
+                priority="urgent",
+                tags=["skull", "rotating_light"],
+            )
             return False
 
         # 2. Load workflow fresh from disk
@@ -1033,6 +1081,20 @@ def run_iteration(run_num):
     append_to_log(log_entry)
     print_f(log_entry)
 
+    # 10a. Alert on non-SUCCESS outcomes so Jeffrey hears about it
+    if result in ("FAIL", "TIMEOUT"):
+        send_ntfy_alert(
+            f"OTR Soak run {run_num:03d} {result}",
+            (f"Episode: {title}\n"
+             f"Duration: {duration}s\n"
+             f"Dialogue lines: {dialogue}\n"
+             f"VRAM peak: {vram} GB\n"
+             f"Error: {error_msg or '(none logged)'}\n"
+             f"Config: {config_str if config else 'N/A'}"),
+            priority="high" if result == "FAIL" else "default",
+            tags=["x" if result == "FAIL" else "hourglass_flowing_sand"],
+        )
+
     # 10b. Critic review (haiku + Rotten Tomatoes) on success
     if result == "SUCCESS":
         review_text = critic_review(
@@ -1057,6 +1119,15 @@ def run_iteration(run_num):
                 scan_text += "!" * 50 + "\n"
                 print_f(scan_text)
                 append_to_log(scan_text)
+                send_ntfy_alert(
+                    f"OTR Soak run {run_num:03d}: treatment scan flags",
+                    (f"Episode: {title}\n"
+                     f"File: {os.path.basename(newest)}\n"
+                     f"Flags ({len(scan_flags)}): "
+                     + "; ".join(str(f)[:120] for f in scan_flags[:6])),
+                    priority="default",
+                    tags=["warning"],
+                )
             else:
                 clean_msg = "  TREATMENT SCAN: Clean -- no flags.\n"
                 print_f(clean_msg)
@@ -1080,3 +1151,66 @@ def run_iteration(run_num):
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(SOAK_LOG), exist_ok=True)
     append_to_log(f"\n--- NEW SOAK SESSION {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+
+    # Resume run numbering from existing log so alerts line up with soak_log
+    run_num = 1
+    if os.path.exists(SOAK_LOG):
+        try:
+            with open(SOAK_LOG, "r", encoding="utf-8") as f:
+                runs = re.findall(r"### RUN (\d+)", f.read())
+                if runs:
+                    run_num = int(runs[-1]) + 1
+        except Exception as exc:
+            print_f(f"Could not parse soak_log for run numbering: {exc}")
+
+    print_f(f"SIGNAL LOST Soak Operator starting at run {run_num}")
+    print_f(f"Workflow: {WORKFLOW_PATH}")
+    print_f(f"Soak log:  {SOAK_LOG}")
+    print_f(f"ntfy:      {NTFY_URL}")
+    print_f("Randomizing: genre, target_words, target_length, style, "
+            "creativity, profile")
+    print_f("")
+
+    send_ntfy_alert(
+        "OTR Soak started",
+        f"Resuming at run {run_num:03d}. Alerts land here on FAIL, "
+        f"TIMEOUT, reboot stalls, treatment-scan flags, and hard stops.",
+        priority="low",
+        tags=["loudspeaker"],
+    )
+
+    while True:
+        try:
+            if not run_iteration(run_num):
+                print_f("CRITICAL: Stopping soak after unrecoverable failure.")
+                send_ntfy_alert(
+                    "OTR Soak loop halted",
+                    f"run_iteration returned False at run {run_num:03d}. "
+                    f"The soak loop has stopped and needs a manual restart.",
+                    priority="urgent",
+                    tags=["skull", "rotating_light"],
+                )
+                break
+            run_num += 1
+        except KeyboardInterrupt:
+            print_f(f"\nSoak stopped by user at run {run_num}.")
+            append_to_log(
+                f"\n--- SOAK STOPPED BY USER at run {run_num} "
+                f"{time.strftime('%Y-%m-%d %H:%M:%S')} ---\n"
+            )
+            break
+        except Exception as exc:
+            # Last-line-of-defense catch so an unexpected crash still alerts
+            print_f(f"FATAL: unhandled exception in main loop: {exc}")
+            append_to_log(
+                f"\n--- SOAK CRASH at run {run_num} "
+                f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {exc} ---\n"
+            )
+            send_ntfy_alert(
+                f"OTR Soak CRASH (run {run_num:03d})",
+                f"Unhandled exception in the main loop: {exc}. "
+                f"The soak loop has stopped.",
+                priority="urgent",
+                tags=["skull", "rotating_light"],
+            )
+            break
