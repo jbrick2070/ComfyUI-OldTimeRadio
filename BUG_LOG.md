@@ -205,6 +205,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** pending
 - **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
 
+### BUG-LOCAL-031: Node 13 (OTR_KokoroAnnouncer) widgets_values truncated to 3 slots, `speed` FLOAT received 'random' [FIXED]
+- **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** no (data bug, not code)
+- **Symptom:** RUN 127 of the soak operator failed with ComfyUI HTTP 400: `node_errors: {"13": {"errors": [{"type": "invalid_input_type", "message": "Failed to convert an input value to a FLOAT value", "details": "speed, random, could no..."}]}}`. The `speed` FLOAT param on Node 13 was receiving the string `'random'` (which is the default value for `voice_override`, not `speed`).
+- **Cause:** Node 13's `widgets_values` in the committed workflow JSON was `['[]', '', 'random']` — only 3 slots. `OTR_KokoroAnnouncer` declares 4 widget-backed params: `script_json` (STRING, linked), `episode_seed` (STRING), `voice_override` (dropdown, default `'random'`), `speed` (FLOAT, default 0.95). The shape was ambiguous between preserved-truncated (linked placeholder + 2 of 3 unlinked values) and pure-stripped (no link slot + 3 unlinked values). The auto-sensing heuristic picked pure-stripped because `wv_len(3) == unlinked_count(3)`, which pushed `voice_override='random'` into the `speed` slot. Pre-existing data corruption, not a mapper bug.
+- **Fix:** Set Node 13 `widgets_values` to `['[]', '', 'random', 0.95]` — the canonical preserved-mode shape: linked placeholder for `script_json`, then all three unlinked defaults. Auto-sensing now cleanly reads preserved mode (`wv_len(4) == widget_backed_count(4)`).
+- **Verify:** Direct mapper trace confirms Node 13 resolves to `script_json='[]'` (overridden by link at runtime), `episode_seed=''`, `voice_override='random'`, `speed=0.95`. Full regression green. Next soak run should clear Node 13 validation.
+- **Tags:** widget-drift, data-corruption, workflow-json, kokoro, preserved-truncated, ambiguity
+
 ### BUG-LOCAL-030: Node 11 (OTR_BatchBarkGenerator) widgets_values corrupted to ['[]'] in workflow JSON [FIXED]
 - **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** no (data bug, not code)
 - **Symptom:** After BUG-LOCAL-029 shipped and auto-sensing mapper was verified against Nodes 2, 13, 15, a direct mapper trace against `workflows/otr_scifi_16gb_full.json` revealed Node 11 resolves to `temperature='[]'` — a literal string where a FLOAT is expected. ComfyUI would reject with a type validation error. AntiGravity incorrectly blamed this on the mapper being "blind to dropdowns"; in reality the mapper is correct and the workflow JSON itself is malformed.

@@ -519,7 +519,8 @@
             "widgets_values": [
                 "[]",
                 "",
-                "random"
+                "random",
+                0.95
             ],
             "color": "#234035",
             "bgcolor": "#162821"
