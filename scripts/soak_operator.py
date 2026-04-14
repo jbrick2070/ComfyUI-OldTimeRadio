@@ -1020,14 +1020,14 @@ def _workflow_to_api_prompt(workflow, schemas):
                 widget_backed = _is_widget_backed(spec)
 
                 if param in linked_names:
-                    # Linked at the socket. If the input was also a converted
-                    # widget, it still consumes a slot in widgets_values.
-                    if widget_backed:
-                        for inp in node.get("inputs", []):
-                            if inp["name"] == param and inp.get("widget"):
-                                if wv_idx < len(wv):
-                                    wv_idx += 1  # consume but don't override link
-                                break
+                    # Linked at the socket. ComfyUI's workflow JSON does NOT
+                    # keep a widgets_values slot for inputs that have been
+                    # converted from widget to socket (the web UI strips them
+                    # from the widget panel, and saves widgets_values only for
+                    # the inputs still shown as widgets). So a linked param,
+                    # whether it was originally a converted widget or always a
+                    # socket, consumes NO slot here. This is the BUG-LOCAL-003
+                    # correction we just re-regressed in BUG-LOCAL-027.
                     continue
 
                 if not widget_backed:

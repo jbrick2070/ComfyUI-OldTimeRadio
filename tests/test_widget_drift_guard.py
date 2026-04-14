@@ -217,6 +217,118 @@ class TestMapperSocketOnlyFilter:
         assert inputs["arc_enhancer"] is True
 
 
+class TestLinkedConvertedWidgetSlots:
+    """BUG-LOCAL-028: linked converted widgets must NOT consume widgets_values
+    slots. ComfyUI's workflow JSON stores widgets_values only for inputs still
+    shown as widgets in the UI. When a widget is converted to a socket and then
+    linked, its slot is stripped from widgets_values entirely. The mapper must
+    not "consume and skip" a slot for these, or every downstream param shifts.
+
+    Canonical failure: Node 15 (OTR_BatchAudioGenGenerator) crashes with
+    HTTP 400 value_not_in_list because model_id receives 3.0 instead of
+    'facebook/audiogen-medium'.
+    """
+
+    def _node15_schema(self):
+        return {
+            "OTR_BatchAudioGenGenerator": {
+                "input": {
+                    "required": {
+                        "script_json": ("STRING", {"multiline": True, "default": "[]"}),
+                        "production_plan_json": ("STRING", {"multiline": True, "default": "{}"}),
+                    },
+                    "optional": {
+                        "episode_seed": ("STRING", {"default": ""}),
+                        "model_id": (
+                            ["facebook/audiogen-medium", "facebook/audiogen-small"],
+                            {"default": "facebook/audiogen-medium"},
+                        ),
+                        "guidance_scale": ("FLOAT", {"default": 3.0}),
+                        "default_duration": ("FLOAT", {"default": 3.0}),
+                    },
+                }
+            }
+        }
+
+    def _node15_workflow(self):
+        """Mirrors the on-disk shape in otr_scifi_16gb_full.json where
+        script_json and production_plan_json are linked AND carry a
+        'widget' metadata block from a prior widget-to-socket conversion."""
+        return {
+            "links": [
+                [24, 10, 0, 15, 0, "STRING"],
+                [26, 11, 0, 15, 1, "STRING"],
+            ],
+            "nodes": [
+                {
+                    "id": 15,
+                    "type": "OTR_BatchAudioGenGenerator",
+                    # Only 4 slots: one per widget-backed param still shown
+                    # as a widget (episode_seed, model_id, guidance_scale,
+                    # default_duration). NOT 6. The linked script_json /
+                    # production_plan_json have no slot here.
+                    "widgets_values": ["", "facebook/audiogen-medium", 3.0, 3.0],
+                    "inputs": [
+                        {
+                            "name": "script_json",
+                            "type": "STRING",
+                            "link": 24,
+                            "widget": {"name": "script_json"},
+                        },
+                        {
+                            "name": "production_plan_json",
+                            "type": "STRING",
+                            "link": 26,
+                            "widget": {"name": "production_plan_json"},
+                        },
+                    ],
+                }
+            ],
+        }
+
+    def test_model_id_is_not_float_after_mapping(self):
+        mod = _import_mapper()
+        wf = self._node15_workflow()
+        schema = self._node15_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["15"]["inputs"]
+
+        assert inputs.get("model_id") == "facebook/audiogen-medium", (
+            f"model_id must land in its own slot, got {inputs.get('model_id')!r}"
+        )
+
+    def test_episode_seed_is_empty_string(self):
+        mod = _import_mapper()
+        wf = self._node15_workflow()
+        schema = self._node15_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["15"]["inputs"]
+
+        assert inputs.get("episode_seed") == "", (
+            f"episode_seed must be empty string, got {inputs.get('episode_seed')!r}"
+        )
+
+    def test_guidance_and_duration_land_correctly(self):
+        mod = _import_mapper()
+        wf = self._node15_workflow()
+        schema = self._node15_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["15"]["inputs"]
+
+        assert inputs.get("guidance_scale") == 3.0
+        assert inputs.get("default_duration") == 3.0
+
+    def test_links_preserved(self):
+        mod = _import_mapper()
+        wf = self._node15_workflow()
+        schema = self._node15_schema()
+        prompt = mod._workflow_to_api_prompt(wf, schema)
+        inputs = prompt["15"]["inputs"]
+
+        assert inputs.get("script_json") == ["10", 0]
+        assert inputs.get("production_plan_json") == ["11", 0]
+
+
 class TestIsWidgetBacked:
     def test_string_is_widget_backed(self):
         mod = _import_mapper()
