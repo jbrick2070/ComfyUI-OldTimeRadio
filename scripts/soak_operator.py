@@ -951,8 +951,42 @@ def performance_review(config, title, dialogue, vram, has_treatment, duration,
 # WEB-FORMAT TO API-FORMAT CONVERTER
 # Uses /object_info schema to correctly map widgets_values to named inputs.
 # ---------------------------------------------------------------------------
+
+# Primitive types that ComfyUI renders as widgets in the web UI.
+# Anything else (PROJECT_STATE, MODEL, CLIP, AUDIO, IMAGE, LATENT, CONDITIONING,
+# VAE, etc.) is socket-only and MUST NOT consume a widgets_values slot.
+_WIDGET_PRIMITIVE_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "BOOL"}
+
+
+def _is_widget_backed(spec):
+    """Return True if a schema spec represents a widget-capable input.
+
+    A spec is widget-backed when its type is either a primitive
+    (STRING/INT/FLOAT/BOOLEAN) or a dropdown (a list of choices). Custom
+    socket types like PROJECT_STATE are NOT widget-backed.
+    """
+    type_def = spec[0] if isinstance(spec, (list, tuple)) and len(spec) > 0 else spec
+    if isinstance(type_def, list):       # dropdown (e.g. ["Standard", "Pro"])
+        return True
+    if isinstance(type_def, str) and type_def in _WIDGET_PRIMITIVE_TYPES:
+        return True
+    return False
+
+
 def _workflow_to_api_prompt(workflow, schemas):
-    """Convert ComfyUI web-format workflow JSON to API prompt format."""
+    """Convert ComfyUI web-format workflow JSON to API prompt format.
+
+    BUG-LOCAL-027 fix: previous versions walked every declared input
+    positionally against widgets_values. Socket-only params (e.g.
+    project_state: PROJECT_STATE) have no widget slot, so this walk
+    shifted every subsequent widget up by one. The canonical symptom
+    was a literal string landing in project_state while optimization_profile
+    disappeared from the payload entirely.
+
+    Fix: only widget-backed params (primitives + dropdowns) consume
+    widgets_values slots. Socket-only params are either filled via the
+    link map or omitted from `inputs`.
+    """
     # Build link map: link_id -> [source_node_id, source_slot]
     link_map = {}
     for lnk in workflow.get("links", []):
@@ -975,21 +1009,34 @@ def _workflow_to_api_prompt(workflow, schemas):
         # Map widgets_values to named params via schema
         if ntype in schemas:
             schema = schemas[ntype].get("input", {})
-            required = list(schema.get("required", {}).keys())
-            optional = list(schema.get("optional", {}).keys())
-            all_params = required + optional
+            required = schema.get("required", {}) or {}
+            optional = schema.get("optional", {}) or {}
+            # Preserve required-then-optional declaration order.
+            ordered_params = list(required.items()) + list(optional.items())
 
             wv = node.get("widgets_values", [])
             wv_idx = 0
-            for param in all_params:
+            for param, spec in ordered_params:
+                widget_backed = _is_widget_backed(spec)
+
                 if param in linked_names:
-                    # This param is wired as a link -- check if it also has
-                    # a widget value to consume (converted widget)
-                    for inp in node.get("inputs", []):
-                        if inp["name"] == param and inp.get("widget"):
-                            if wv_idx < len(wv):
-                                wv_idx += 1  # consume but don't override link
+                    # Linked at the socket. If the input was also a converted
+                    # widget, it still consumes a slot in widgets_values.
+                    if widget_backed:
+                        for inp in node.get("inputs", []):
+                            if inp["name"] == param and inp.get("widget"):
+                                if wv_idx < len(wv):
+                                    wv_idx += 1  # consume but don't override link
+                                break
                     continue
+
+                if not widget_backed:
+                    # Socket-only param with no link -- omit from inputs.
+                    # ComfyUI will either use the node's default or error,
+                    # which is the correct behavior (loud failure beats
+                    # silent string-in-socket drift).
+                    continue
+
                 if wv_idx < len(wv):
                     inputs[param] = wv[wv_idx]
                     wv_idx += 1
@@ -1099,6 +1146,41 @@ def run_iteration(run_num):
             print_f(f"API JSON pushed to: {PROMPT_OUTPUT_PATH}")
         except Exception as e:
             print_f(f"WARNING: Failed to push API JSON: {e}")
+
+        # Widget-drift guard: sanity-check nodes #1 and #2. project_state must
+        # be absent or a link [id, slot]; optimization_profile must be present
+        # with a string value. Emit a DRIFT_DETECTED line that the watcher
+        # scraper can alert on.
+        for _drift_nid in ("1", "2"):
+            _drift_node = api_prompt.get(_drift_nid)
+            if not _drift_node:
+                continue
+            _drift_inputs = _drift_node.get("inputs", {})
+            _ps = _drift_inputs.get("project_state", None)
+            _op = _drift_inputs.get("optimization_profile", None)
+            if isinstance(_ps, str):
+                print_f(
+                    f"DRIFT_DETECTED node={_drift_nid} project_state=STRING({_ps!r}) "
+                    f"optimization_profile={_op!r} -- widget-drift bug is live"
+                )
+            if _op is None:
+                print_f(
+                    f"DRIFT_DETECTED node={_drift_nid} optimization_profile=MISSING "
+                    f"project_state={_ps!r}"
+                )
+        # Always log node #1 / #2 key inputs for the runtime diff
+        for _log_nid in ("1", "2"):
+            _log_node = api_prompt.get(_log_nid)
+            if _log_node:
+                _li = _log_node.get("inputs", {})
+                print_f(
+                    f"API_PAYLOAD node={_log_nid} type={_log_node.get('class_type')} "
+                    f"optimization_profile={_li.get('optimization_profile')!r} "
+                    f"project_state={_li.get('project_state')!r} "
+                    f"creativity={_li.get('creativity')!r} "
+                    f"style_variant={_li.get('style_variant')!r} "
+                    f"target_length={_li.get('target_length')!r}"
+                )
 
         # 5. Count treatments before submission
         treatments_before = count_treatments()

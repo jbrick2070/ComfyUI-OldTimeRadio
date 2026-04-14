@@ -1306,8 +1306,18 @@ def _normalize_dialogue_names(text):
 # can log scene counts at every pipeline checkpoint. A scene leak in
 # any pass (WORD_EXTEND, ANNOUNCER, FORMAT_NORM, GRAMMARIAN, PARSE)
 # shows up as a count drop in the soak log, localizing the bug.
+#
+# BUG-LOCAL-026 fix: restrict the scene-number capture to digits only.
+# The previous pattern (\S+?) matched literals like "FINAL" that the
+# creative LLM emits as a closing-scene marker ('=== SCENE FINAL ==='),
+# inflating scene counts and fooling the FORMAT_NORM skip heuristic.
+# Any '=== SCENE FINAL ===' is promoted to 'END' (terminator) below.
 _RE_SCENE_MARKER = re.compile(
-    r'===\s*SCENE\s+(\S+?)(?:\s+[^=]*)?\s*===',
+    r'===\s*SCENE\s+(\d+)(?:\s*:\s*[^=]*?)?\s*===',
+    re.IGNORECASE
+)
+_RE_SCENE_TERMINATOR = re.compile(
+    r'===\s*SCENE\s+FINAL\b[^=]*===',
     re.IGNORECASE
 )
 
@@ -1315,14 +1325,17 @@ _RE_SCENE_MARKER = re.compile(
 def _scene_inventory(text):
     """Return the ordered list of scene tokens found in the script.
 
-    Recognizes the canonical marker format '=== SCENE N ===' (and any
-    trailing title after the number). Returns tokens like ['1', '2', '3']
-    or ['1', 'FINAL'] — whatever the script uses. Empty list means no
-    scene markers present (valid for short scripts pre-FORMAT_NORM).
+    Recognizes canonical '=== SCENE N ===' markers (numeric only) and a
+    trailing '=== SCENE FINAL ===' terminator. Returns tokens like
+    ['1', '2', '3'] or ['1', '2', 'END']. Empty list means no scene
+    markers present (valid for short scripts pre-FORMAT_NORM).
     """
     if not text:
         return []
-    return [m.group(1).upper() for m in _RE_SCENE_MARKER.finditer(text)]
+    tokens = [m.group(1) for m in _RE_SCENE_MARKER.finditer(text)]
+    if _RE_SCENE_TERMINATOR.search(text):
+        tokens.append("END")
+    return tokens
 
 
 def _log_scene_checkpoint(stage, text):
@@ -2522,14 +2535,17 @@ class LLMScriptWriter:
                     "default": True,
                     "tooltip": "Structural coherence pass: rewrites the opening & closing dialogue to ensure a 'seed' in the intro pays off in the finale."
                 }),
-                # v1.4 Theme C - optional series bible. Socket input only, no widget,
-                # so widgets_values length is unchanged and v1.3 workflows load clean.
-                "project_state": ("PROJECT_STATE", {
-                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
-                }),
                 "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
                     "default": "Standard",
                     "tooltip": "Master switch for multi-pass generation. Obsidian is for 4GB hardware only; it is unstable and disables all iterative passes."
+                }),
+                # v1.4 Theme C - optional series bible. Socket input only, no widget.
+                # BUG-LOCAL-027: project_state MUST remain the last entry in optional.
+                # Socket-only inputs at the tail cannot shift widget slots even if the
+                # widgets_values mapper regresses. Do not add widget-backed params
+                # after this line.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
                 }),
             },
         }
@@ -6656,13 +6672,17 @@ class LLMDirector:
                     "default": "subtle",
                     "tooltip": "How vintage/degraded should the final audio sound"
                 }),
-                # v1.4 Theme C - optional series bible, socket input only.
-                "project_state": ("PROJECT_STATE", {
-                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
-                }),
                 "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
                     "default": "Standard",
                     "tooltip": "Consistency widget. Obsidian is unstable; on 4GB cards, ensure 'kokoro' is used for TTS below."
+                }),
+                # v1.4 Theme C - optional series bible, socket input only.
+                # BUG-LOCAL-027: project_state MUST remain the last entry in optional.
+                # Socket-only inputs at the tail cannot shift widget slots even if the
+                # widgets_values mapper regresses. Do not add widget-backed params
+                # after this line.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
                 }),
             },
         }
