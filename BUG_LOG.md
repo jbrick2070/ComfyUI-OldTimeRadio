@@ -205,6 +205,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** pending
 - **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
 
+### BUG-LOCAL-030: Node 11 (OTR_BatchBarkGenerator) widgets_values corrupted to ['[]'] in workflow JSON [FIXED]
+- **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** no (data bug, not code)
+- **Symptom:** After BUG-LOCAL-029 shipped and auto-sensing mapper was verified against Nodes 2, 13, 15, a direct mapper trace against `workflows/otr_scifi_16gb_full.json` revealed Node 11 resolves to `temperature='[]'` — a literal string where a FLOAT is expected. ComfyUI would reject with a type validation error. AntiGravity incorrectly blamed this on the mapper being "blind to dropdowns"; in reality the mapper is correct and the workflow JSON itself is malformed.
+- **Cause:** Node 11's widgets_values was literally `['[]']` — a single-element list containing the string `'[]'`. The schema for `OTR_BatchBarkGenerator` declares three widget-backed params: `script_json` (STRING, default "[]", linked), `production_plan_json` (STRING, default "{}", linked), `temperature` (FLOAT, default 0.7, unlinked). Auto-sensing correctly treated the shape as stripped mode (len(wv)=1 == unlinked_count=1) and assigned `wv[0]` to the only unlinked widget-backed param, which is `temperature`. The resulting value `'[]'` is the wrong type. Root origin: hand-editing or stale web UI state left a placeholder string in the temperature slot. Predates all recent commits (was present in HEAD before BUG-LOCAL-027).
+- **Fix:** Set Node 11 `widgets_values` to `[0.7]` — the schema default for temperature. Auto-sensing now produces `temperature=0.7` (correct FLOAT). Also reverted AntiGravity's unauthorized placeholder-strip edits to Nodes 2 and 13 (both shapes the auto-sensing mapper handles, but the committed source of truth should reflect the canonical web-UI-emitted shape).
+- **Verify:** `python scripts/_verify_mapper.py` (one-off trace helper) shows Node 11 `temperature=0.7` and all of Nodes 2/13/15 mapping cleanly. Full regression green: widget_drift 27, dropdown_guardrails 50, core 103, bug_bible 22 passed + 2 xfailed, v2/audio_byte_identical 7 passed + 1 skipped.
+- **Tags:** widget-drift, data-corruption, workflow-json, hand-edit, bark-generator
+
 ### BUG-LOCAL-029: ComfyUI workflow JSON uses two shapes for linked converted widgets; mapper must auto-sense [FIXED]
 - **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** yes
 - **Symptom:** After b6c610e fixed Node 15, Node 2 (OTR_Gemma4Director) started failing with bad dropdown values: `temperature` received `""` instead of `0.4`, `tts_engine` got the wrong slot, and `optimization_profile` shifted down by one. Validation rejected the run. The fix for Node 15 had regressed Node 2.

@@ -360,7 +360,7 @@
                 "Node name for S&R": "OTR_BatchBarkGenerator"
             },
             "widgets_values": [
-                "[]"
+                0.7
             ],
             "inputs": [
                 {
