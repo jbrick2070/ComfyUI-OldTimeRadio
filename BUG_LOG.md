@@ -205,6 +205,22 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** pending
 - **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
 
+### BUG-LOCAL-024: FORMAT_NORM ghost-run bypass and silent bailout on long scripts [FIXED]
+- **Date:** 2026-04-13 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** Runs 011 and 012 under maximum chaos produced scripts with no CAST section, no `=== SCENE N ===` markers, and TITLE_STUCK downstream. Runtime log showed FORMAT_NORM was skipped entirely, despite the script clearly being malformed. On longer scripts FORMAT_NORM also logged `Output too short - keeping original` and silently bailed out.
+- **Cause:** Two independent blindspots in `_normalize_script_format`: (1) pre-flight skip heuristic only checked dialogue line count (`voice_tag_count >= 3 OR canonical_count >= 5`), so a ghost run with voice tags but no CAST or scene markers bypassed normalization entirely; (2) token budget was capped at 1024 regardless of script length, so a reformatted output of a 10k-char script could not fit in the budget and triggered the `< 0.3 * input` bailout.
+- **Fix:** (1) Tightened skip heuristic to require ALL THREE signals present: `has_dialogue AND has_scenes AND has_cast` (scene marker count >= 1 AND unique character count >= 2). Missing any signal forces FORMAT_NORM to run. (2) Added `_normalize_chunked` following the `_grammarian_chunked` pattern: split by `=== SCENE N ===` markers, reformat each scene independently with a full per-chunk 1024-token budget, 75s per-chunk timeout, reassemble with 80% dialogue-count floor. Single-pass retained for scripts with <=50 dialogue lines or <2 scenes. Also hoisted class constant `_FORMAT_NORM_NON_CHARS` so canonical-name regex excludes SCENE/ACT/SFX/ENV/NARRATOR etc. from the skip count.
+- **Verify:** Run soak with a creative-pass script that lacks CAST + scene markers. Runtime log should show `FORMAT_NORM: Running (dialogue=X+YV, scenes=0, cast=0) - missing: scenes cast`, followed by single-pass or chunked flow. For 50+ line scripts, log should show `FORMAT_NORM: Chunked mode` with per-chunk progress.
+- **Tags:** format-norm, ghost-run, skip-heuristic, chunked-generation, token-budget, maximum-chaos, soak
+
+### BUG-LOCAL-023: Grammarian timeout on long scripts (60+ dialogue lines) [FIXED]
+- **Date:** 2026-04-13 | **Phase:** 0.5 | **Bible candidate:** yes
+- **Symptom:** `GRAMMARIAN: Failed (Grammarian exceeded 75s) - keeping original` on a 67-line space opera script. Token budget of 2048 at ~15 tok/s needs ~136s, but timeout was 75s. Grammarian silently falls back to original script, losing all grammar polish.
+- **Cause:** Single-pass grammarian with fixed 75s timeout cannot handle scripts with 50+ dialogue lines. The prompt + full script exceeds what the LLM can process within the timeout window.
+- **Fix:** Implemented chunked grammarian in `_grammarian_pass()`. Scripts with >50 dialogue lines are split by `=== SCENE N ===` markers, each scene polished independently (90s timeout per chunk, 1024 token budget), then reassembled. Falls back to 40-line raw chunking if no scene markers exist. Single-pass timeout increased from 75s to 150s as safety net. Each chunk has its own dialogue-line safety check; failed chunks keep original text without blocking the rest.
+- **Verify:** Run soak with 60+ line episode config. Runtime log should show `GRAMMARIAN: Chunked mode` followed by per-chunk progress, ending with `GRAMMARIAN: Chunked complete`.
+- **Tags:** grammarian, timeout, chunked-generation, long-scripts, soak
+
 ### BUG-LOCAL-018: test_dropdown_guardrails.py references removed runtime_preset [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0.5 | **Bible candidate:** no
 - **Symptom:** `pytest tests/test_dropdown_guardrails.py` fails with `KeyError: 'runtime_preset'` during collection. 1 additional NameError at runtime for `RUNTIME_PRESETS` variable.

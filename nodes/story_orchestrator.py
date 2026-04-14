@@ -5078,6 +5078,13 @@ Format your response exactly as:
 
         return None
 
+    # False-positive tag names that look like CHARACTER: but aren't speakers.
+    # Shared between skip heuristic and chunk dialogue counting.
+    _FORMAT_NORM_NON_CHARS = {
+        "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+        "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+    }
+
     def _normalize_script_format(self, script_text, model_id, optimization_profile="Standard"):
         """Creative-to-Strict pass: reformat any dialogue style into Canonical 1.0.
 
@@ -5085,33 +5092,87 @@ Format your response exactly as:
         rewrite the script into strict format. This prevents PARSE_FATAL when
         the creative pass produces non-standard dialogue formatting.
 
+        Routing:
+          - Tightened skip heuristic: only skip when dialogue AND scenes AND
+            cast are ALL present. This catches "ghost runs" where max chaos
+            produces parseable-looking dialogue but no CAST or scene markers.
+          - Single-pass for short scripts (<=50 dialogue lines OR <2 scenes).
+          - Chunked by scene marker for long scripts, like the Grammarian.
+
         Returns the normalized script text, or the original if normalization fails.
         """
-        # Quick check: if the script already has [VOICE:] tags, skip normalization
+        # ----- Count every structural signal ------------------------------
         voice_tag_count = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
-        if voice_tag_count >= 3:
-            _runtime_log(f"FORMAT_NORM: Skipped - script already has {voice_tag_count} [VOICE:] tags")
-            return script_text
-
-        # Quick check: if script has enough CHARACTER_NAME: lines, skip.
-        # Exclude false positives like SCENE:, ACT:, NOTE:, TARGET:, STYLE:
-        _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
-                                 "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC"}
         _all_canonical = re.findall(
             r'^([A-Z][A-Z0-9_ ]{1,25}):\s+.+$', script_text, re.MULTILINE
         )
-        canonical_count = sum(1 for name in _all_canonical
-                              if name.strip() not in _false_positive_names)
-        # Threshold: at least 5 real dialogue lines, or 10% of total lines
-        total_lines = max(1, script_text.count('\n'))
-        min_threshold = max(5, int(total_lines * 0.10))
-        if canonical_count >= min_threshold:
-            _runtime_log(f"FORMAT_NORM: Skipped - script already has {canonical_count} canonical dialogue lines (threshold: {min_threshold})")
+        canonical_count = sum(
+            1 for name in _all_canonical
+            if name.strip() not in self._FORMAT_NORM_NON_CHARS
+        )
+        unique_chars = {
+            name.strip() for name in _all_canonical
+            if name.strip() not in self._FORMAT_NORM_NON_CHARS
+        }
+        scene_count = len(re.findall(
+            r'===\s*SCENE\s+\S+.*?===', script_text, re.IGNORECASE
+        ))
+        total_dialogue = canonical_count + voice_tag_count
+
+        # ----- Tightened skip heuristic -----------------------------------
+        # Previously: skipped if dialogue count was "enough" regardless of
+        # whether CAST or scene markers existed. That silently let ghost
+        # runs (Run 011/012) bypass FORMAT_NORM entirely. Now ALL three
+        # structural elements must be present before we skip.
+        has_dialogue  = (voice_tag_count >= 3 or canonical_count >= 5)
+        has_scenes    = scene_count >= 1
+        has_cast      = len(unique_chars) >= 2
+
+        if has_dialogue and has_scenes and has_cast:
+            _runtime_log(
+                f"FORMAT_NORM: Skipped - dialogue={canonical_count}+"
+                f"{voice_tag_count}V, scenes={scene_count}, "
+                f"cast={len(unique_chars)} (all present)"
+            )
             return script_text
 
-        _runtime_log("FORMAT_NORM: Script needs normalization - running strict reformat pass")
+        _runtime_log(
+            f"FORMAT_NORM: Running (dialogue={canonical_count}+"
+            f"{voice_tag_count}V, scenes={scene_count}, "
+            f"cast={len(unique_chars)}) - "
+            f"missing: "
+            f"{'dialogue ' if not has_dialogue else ''}"
+            f"{'scenes ' if not has_scenes else ''}"
+            f"{'cast' if not has_cast else ''}"
+        )
 
-        normalize_prompt = f"""You are a strict script normalizer. Your ONLY task is to reformat input text into the exact canonical format defined below.
+        # ----- Route: chunked for long scripts, single for short ----------
+        _CHUNK_THRESHOLD = 50  # dialogue lines before chunking
+        if total_dialogue > _CHUNK_THRESHOLD and scene_count >= 2:
+            return self._normalize_chunked(
+                script_text, model_id, optimization_profile,
+                canonical_count, voice_tag_count,
+            )
+        return self._normalize_single_pass(
+            script_text, model_id, optimization_profile,
+            canonical_count, voice_tag_count,
+        )
+
+    # -------------------------------------------------------------------------
+    # FORMAT_NORM: single-pass and chunked implementations
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _build_normalize_prompt(script_text, *, is_segment=False):
+        """Shared strict-normalizer prompt. Same rules for full script and
+        per-scene chunk; chunked variant adds a segment-awareness preamble."""
+        preamble = (
+            "The text below is ONE SEGMENT of a longer script. Preserve "
+            "every scene marker verbatim and do not merge or split scenes.\n"
+            if is_segment else ""
+        )
+        return f"""You are a strict script normalizer. Your ONLY task is to reformat input text into the exact canonical format defined below.
+{preamble}
 
 HARD CONSTRAINTS:
 - Do NOT add, remove, summarize, or rewrite ANY dialogue or content.
@@ -5187,14 +5248,25 @@ Output ONLY the normalized script. No explanations. No extra text. No commentary
 SCRIPT TO REFORMAT:
 {script_text}"""
 
-        # BUG-019 FIX: Tighter token budget + timeout for FORMAT_NORM.
-        # The LLM is reformatting, not creating content. Output should be
-        # roughly the same length as the dialogue portion of the input.
-        # Old budget: min(2048, len//3 + 500) gave 2048 for a 10k-char script.
-        # New budget: min(1024, len//4) gives ~1024, preventing runaway filler.
-        # Timeout reduced from 120s to 75s - if it can't finish in 75s, bail.
+    def _normalize_single_pass(self, script_text, model_id,
+                               optimization_profile,
+                               canonical_count, voice_tag_count):
+        """Single-pass FORMAT_NORM for short scripts (under the chunk threshold).
+
+        BUG-019 token budget preserved: min(1024, max(256, len//4)) keeps the
+        LLM from runaway filler while giving enough room for the reformatted
+        output. Timeout 75s - if reformatting can't finish in that window,
+        the script is too long and should have been chunked instead.
+        """
+        normalize_prompt = self._build_normalize_prompt(
+            script_text, is_segment=False
+        )
+
         _norm_max_tokens = min(1024, max(256, len(script_text) // 4))
-        _runtime_log(f"FORMAT_NORM: Token budget = {_norm_max_tokens} (input chars = {len(script_text)})")
+        _runtime_log(
+            f"FORMAT_NORM: Single-pass | token budget={_norm_max_tokens} | "
+            f"input chars={len(script_text)}"
+        )
 
         try:
             normalized = _run_with_timeout(
@@ -5210,7 +5282,11 @@ SCRIPT TO REFORMAT:
             )
 
             if not normalized or len(normalized.strip()) < len(script_text) * 0.3:
-                _runtime_log(f"FORMAT_NORM: Output too short ({len(normalized or '')} chars vs {len(script_text)} input) - keeping original")
+                _runtime_log(
+                    f"FORMAT_NORM: Output too short "
+                    f"({len(normalized or '')} chars vs {len(script_text)} "
+                    f"input) - keeping original"
+                )
                 return script_text
 
             # Verify normalization improved dialogue detection
@@ -5220,16 +5296,183 @@ SCRIPT TO REFORMAT:
             new_voice = len(re.findall(r'\[VOICE:', normalized, re.IGNORECASE))
 
             if new_canonical + new_voice > canonical_count + voice_tag_count:
-                _runtime_log(f"FORMAT_NORM: Success - {new_canonical} canonical + {new_voice} VOICE tags (was {canonical_count} + {voice_tag_count})")
+                _runtime_log(
+                    f"FORMAT_NORM: Success - {new_canonical} canonical + "
+                    f"{new_voice} VOICE tags (was {canonical_count} + "
+                    f"{voice_tag_count})"
+                )
                 return normalized.strip()
             else:
-                _runtime_log(f"FORMAT_NORM: No improvement ({new_canonical} canonical vs {canonical_count}) - keeping original")
+                _runtime_log(
+                    f"FORMAT_NORM: No improvement ({new_canonical} canonical "
+                    f"vs {canonical_count}) - keeping original"
+                )
                 return script_text
 
         except Exception as e:
             log.warning("[FormatNorm] Normalization pass failed: %s", e)
             _runtime_log(f"FORMAT_NORM: Failed ({e}) - keeping original")
             return script_text
+
+    def _normalize_chunked(self, script_text, model_id,
+                           optimization_profile,
+                           canonical_count, voice_tag_count):
+        """Chunked FORMAT_NORM for long scripts (50+ dialogue lines, 2+ scenes).
+
+        Mirrors _grammarian_chunked: split by === SCENE N === markers,
+        normalize each scene independently with a full per-chunk token budget,
+        then reassemble. This fixes the ghost-run class of bug where a long
+        script silently bailed out via "Output too short" because the 1024
+        token cap could not cover the entire reformatted script.
+
+        Each chunk has its own timeout and safety checks; failed chunks keep
+        their original text rather than blocking the rest.
+        """
+        _runtime_log(
+            f"FORMAT_NORM: Chunked mode | canonical={canonical_count}, "
+            f"voice={voice_tag_count} dialogue lines"
+        )
+
+        # ----- Split by scene markers ---------------------------------
+        scene_re = re.compile(
+            r'(===\s*SCENE\s+\S+.*?===)', re.IGNORECASE
+        )
+        parts = scene_re.split(script_text)
+
+        # Reassemble: each chunk = marker + body until next marker.
+        chunks = []
+        current_chunk = ""
+        for part in parts:
+            if scene_re.match(part):
+                if current_chunk.strip():
+                    chunks.append(current_chunk)
+                current_chunk = part
+            else:
+                current_chunk += part
+        if current_chunk.strip():
+            chunks.append(current_chunk)
+
+        # Fall back to line-based chunking if scene split produced only 1.
+        if len(chunks) <= 1:
+            _runtime_log(
+                "FORMAT_NORM: No scene markers found - using line-based chunking"
+            )
+            all_lines = script_text.split('\n')
+            chunk_size = 40
+            chunks = [
+                '\n'.join(all_lines[i:i + chunk_size])
+                for i in range(0, len(all_lines), chunk_size)
+            ]
+
+        _runtime_log(f"FORMAT_NORM: Split into {len(chunks)} chunks")
+
+        # ----- Normalize each chunk independently ---------------------
+        normalized_chunks = []
+        total_fixed = 0
+        total_kept = 0
+
+        for idx, chunk in enumerate(chunks):
+            chunk_num = idx + 1
+
+            # Pre-count for per-chunk safety check.
+            _chunk_canon_pre = sum(
+                1 for name in re.findall(
+                    r'^([A-Z][A-Z0-9_ ]{1,25}):\s+.+$', chunk, re.MULTILINE
+                ) if name.strip() not in self._FORMAT_NORM_NON_CHARS
+            )
+            _chunk_voice_pre = len(re.findall(
+                r'\[VOICE:', chunk, re.IGNORECASE
+            ))
+
+            chunk_prompt = self._build_normalize_prompt(
+                chunk, is_segment=True
+            )
+
+            _chunk_tokens = min(1024, max(256, len(chunk) // 4))
+            _runtime_log(
+                f"FORMAT_NORM: Chunk {chunk_num}/{len(chunks)} | "
+                f"pre={_chunk_canon_pre}+{_chunk_voice_pre}V | "
+                f"budget={_chunk_tokens}"
+            )
+
+            try:
+                normalized = _run_with_timeout(
+                    lambda: _generate_with_llm(
+                        chunk_prompt,
+                        model_id=model_id,
+                        max_new_tokens=_chunk_tokens,
+                        temperature=0.3,
+                        optimization_profile=optimization_profile,
+                    ),
+                    timeout_sec=75,
+                    phase_label=f"FormatNorm-Chunk-{chunk_num}",
+                )
+
+                if not normalized or len(normalized.strip()) < len(chunk) * 0.3:
+                    _runtime_log(
+                        f"FORMAT_NORM: Chunk {chunk_num} output too short "
+                        f"- keeping original"
+                    )
+                    normalized_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                # Per-chunk improvement check: did normalization add structure?
+                _chunk_canon_post = len(re.findall(
+                    r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$',
+                    normalized, re.MULTILINE
+                ))
+                _chunk_voice_post = len(re.findall(
+                    r'\[VOICE:', normalized, re.IGNORECASE
+                ))
+
+                if (_chunk_canon_post + _chunk_voice_post <
+                        (_chunk_canon_pre + _chunk_voice_pre) * 0.8):
+                    _runtime_log(
+                        f"FORMAT_NORM: Chunk {chunk_num} lost dialogue "
+                        f"({_chunk_canon_post}+{_chunk_voice_post}V vs "
+                        f"{_chunk_canon_pre}+{_chunk_voice_pre}V) - "
+                        f"keeping original"
+                    )
+                    normalized_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                normalized_chunks.append(normalized.strip())
+                total_fixed += 1
+
+            except Exception as e:
+                log.warning("[FormatNorm] Chunk %d failed: %s", chunk_num, e)
+                _runtime_log(
+                    f"FORMAT_NORM: Chunk {chunk_num} failed ({e}) "
+                    f"- keeping original"
+                )
+                normalized_chunks.append(chunk)
+                total_kept += 1
+
+        # ----- Reassemble ---------------------------------------------
+        reassembled = '\n\n'.join(normalized_chunks)
+
+        # Final safety: total dialogue count must hold (80% floor).
+        _post_canon = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', reassembled, re.MULTILINE
+        ))
+        _post_voice = len(re.findall(r'\[VOICE:', reassembled, re.IGNORECASE))
+        _pre_total = canonical_count + voice_tag_count
+        _post_total = _post_canon + _post_voice
+
+        if _pre_total > 0 and _post_total < _pre_total * 0.8:
+            _runtime_log(
+                f"FORMAT_NORM: Chunked pass lost too many lines overall "
+                f"({_post_total} vs {_pre_total}) - keeping original"
+            )
+            return script_text
+
+        _runtime_log(
+            f"FORMAT_NORM: Chunked success | {total_fixed} fixed, "
+            f"{total_kept} kept | lines {_pre_total}->{_post_total}"
+        )
+        return reassembled
 
     def _grammarian_pass(self, script_text, model_id,
                          optimization_profile="Standard"):
