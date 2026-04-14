@@ -5207,28 +5207,73 @@ SCRIPT TO REFORMAT:
         _pre_voice = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
         _pre_total = _pre_lines + _pre_voice
 
-        grammarian_prompt = f"""You are a radio drama copy editor. Your ONLY job is to polish
-the script below for grammar, punctuation, and natural spoken flow.
+        # -----------------------------------------------------------
+        # CHUNKED GRAMMARIAN for long scripts (60+ dialogue lines)
+        # Split by scene markers, polish each scene independently,
+        # then reassemble. Prevents timeout on dense episodes.
+        # -----------------------------------------------------------
+        _CHUNK_THRESHOLD = 50  # dialogue lines before chunking kicks in
 
-RULES:
-1. Fix grammar, spelling, and punctuation errors in dialogue lines.
-2. Smooth awkward phrasing so every line sounds natural when read aloud.
-3. Fix logic errors (character referenced before introduction, contradictions).
-4. Break run-on sentences into punchy radio-paced delivery.
-5. Keep all character names EXACTLY as they are. Do not rename anyone.
-6. Keep ALL [SFX:], [ENV:], [VOICE:], and scene markers EXACTLY as they are.
-7. Do NOT add new dialogue lines, scenes, or content.
-8. Do NOT remove any dialogue lines - every character line must survive.
-9. Do NOT add commentary, notes, or explanations.
-10. Output ONLY the polished script. Nothing else.
+        if _pre_total > _CHUNK_THRESHOLD:
+            return self._grammarian_chunked(
+                script_text, model_id, optimization_profile,
+                _pre_total
+            )
 
-SCRIPT TO POLISH:
+        # --- Single-pass grammarian for short scripts ---------------
+        return self._grammarian_single(
+            script_text, model_id, optimization_profile,
+            _pre_total
+        )
+
+    def _grammarian_single(self, script_text, model_id,
+                           optimization_profile, pre_total):
+        """Single-pass grammarian for scripts under the chunk threshold."""
+
+        # Version C (grammarian-v2c-ship): mechanical validator framing.
+        # Replaces the old "copy editor" prompt which was inviting Gemma to
+        # "smooth" and "polish" slang into English-professor prose.
+        grammarian_prompt = f"""You are a mechanical TTS & Parser Validator for a radio drama pipeline.
+You have ZERO creative authority. Your only job is minimal, targeted fixes
+so the script parses cleanly and reads correctly through text-to-speech.
+
+You MUST PRESERVE EXACTLY:
+- Every character's slang, contractions, dialect, fragments, and quirks.
+- All original wording, rhythm, and word choice.
+- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+
+FIX ONLY THESE FIVE THINGS:
+1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
+   "natrual" -> "natural").
+2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
+   prefix. Fix missing colons, capitalization, or spacing only.
+3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
+   period only where its absence would slur TTS output.
+4. LOGIC CONTRADICTIONS that break continuity within the visible script
+   (character in two places, references to events that haven't happened).
+5. EXTREME RUN-ONS (80+ words with no stop): insert a period or ellipsis
+   to allow a TTS breath. Keep every original word in original order.
+
+STRICTLY FORBIDDEN:
+- Do NOT rewrite casual dialogue into formal English.
+  Example: "Ain't no way that thing's natural" stays exactly as-is.
+  NEVER change it to "There is no way that entity is natural."
+- Do NOT remove or replace slang, contractions, or fragments.
+- Do NOT add vocabulary, metaphors, or literary flourishes.
+- Do NOT restructure sentences for "elegance" or "flow."
+- Do NOT add, delete, or reorder any dialogue lines or scenes.
+- Do NOT touch anything that already parses and sounds fine spoken aloud.
+- Do NOT add commentary, notes, markdown, or explanations.
+
+OUTPUT: The corrected script only. Same format as input. Nothing else.
+
+SCRIPT TO VALIDATE:
 {script_text}"""
 
         # Token budget: same as input (we're polishing, not expanding)
         _gram_max_tokens = min(2048, max(256, len(script_text) // 3))
         _runtime_log(
-            f"GRAMMARIAN: Starting polish pass | {_pre_total} dialogue lines | "
+            f"GRAMMARIAN: Starting polish pass | {pre_total} dialogue lines | "
             f"token budget={_gram_max_tokens}"
         )
 
@@ -5241,7 +5286,7 @@ SCRIPT TO POLISH:
                     temperature=0.3,
                     optimization_profile=optimization_profile,
                 ),
-                timeout_sec=75,
+                timeout_sec=150,
                 phase_label="Grammarian",
             )
 
@@ -5259,15 +5304,15 @@ SCRIPT TO POLISH:
             _post_voice = len(re.findall(r'\[VOICE:', polished, re.IGNORECASE))
             _post_total = _post_lines + _post_voice
 
-            if _post_total < _pre_total * 0.8:
+            if _post_total < pre_total * 0.8:
                 _runtime_log(
                     f"GRAMMARIAN: Rejected - lost too many lines "
-                    f"({_post_total} vs {_pre_total}) - keeping original"
+                    f"({_post_total} vs {pre_total}) - keeping original"
                 )
                 return script_text
 
             _runtime_log(
-                f"GRAMMARIAN: Success | lines {_pre_total}->{_post_total} | "
+                f"GRAMMARIAN: Success | lines {pre_total}->{_post_total} | "
                 f"chars {len(script_text)}->{len(polished.strip())}"
             )
             return polished.strip()
@@ -5276,6 +5321,199 @@ SCRIPT TO POLISH:
             log.warning("[Grammarian] Polish pass failed: %s", e)
             _runtime_log(f"GRAMMARIAN: Failed ({e}) - keeping original")
             return script_text
+
+    def _grammarian_chunked(self, script_text, model_id,
+                            optimization_profile, pre_total):
+        """Chunked grammarian for long scripts (50+ dialogue lines).
+
+        Splits the script by === SCENE N === markers, polishes each scene
+        independently, then reassembles. If the script has no scene markers,
+        falls back to line-based chunking (20 dialogue lines per chunk).
+
+        Each chunk gets its own timeout and safety checks, so one failed
+        chunk does not block the rest. Failed chunks keep their original text.
+        """
+        _runtime_log(
+            f"GRAMMARIAN: Chunked mode | {pre_total} dialogue lines "
+            f"(threshold 50)"
+        )
+
+        # ----- Split by scene markers ---------------------------------
+        scene_re = re.compile(
+            r'(===\s*SCENE\s+\S+.*?===)', re.IGNORECASE
+        )
+        parts = scene_re.split(script_text)
+
+        # parts alternates: [pre-scene-text, marker, scene-body, marker, ...]
+        # Reassemble into chunks: each chunk = marker + body until next marker
+        chunks = []
+        current_chunk = ""
+        for part in parts:
+            if scene_re.match(part):
+                # This is a scene marker - save previous chunk, start new one
+                if current_chunk.strip():
+                    chunks.append(current_chunk)
+                current_chunk = part
+            else:
+                current_chunk += part
+        if current_chunk.strip():
+            chunks.append(current_chunk)
+
+        # If splitting produced only 1 chunk, fall back to line-based split
+        if len(chunks) <= 1:
+            _runtime_log("GRAMMARIAN: No scene markers found - using line-based chunking")
+            all_lines = script_text.split('\n')
+            chunk_size = 40  # lines per chunk (not dialogue lines, raw lines)
+            chunks = [
+                '\n'.join(all_lines[i:i + chunk_size])
+                for i in range(0, len(all_lines), chunk_size)
+            ]
+
+        _runtime_log(f"GRAMMARIAN: Split into {len(chunks)} chunks")
+
+        # ----- Polish each chunk independently -------------------------
+        polished_chunks = []
+        total_fixed = 0
+        total_kept = 0
+
+        for idx, chunk in enumerate(chunks):
+            chunk_num = idx + 1
+
+            # Count dialogue lines in this chunk
+            _chunk_dl = len(re.findall(
+                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', chunk, re.MULTILINE
+            ))
+            _chunk_dl += len(re.findall(r'\[VOICE:', chunk, re.IGNORECASE))
+
+            # Skip chunks with no dialogue (pure SFX/ENV blocks)
+            if _chunk_dl == 0:
+                _runtime_log(
+                    f"GRAMMARIAN: Chunk {chunk_num}/{len(chunks)} "
+                    f"skipped (no dialogue)"
+                )
+                polished_chunks.append(chunk)
+                continue
+
+            _chunk_tokens = min(1024, max(128, len(chunk) // 3))
+            _runtime_log(
+                f"GRAMMARIAN: Chunk {chunk_num}/{len(chunks)} | "
+                f"{_chunk_dl} lines | budget={_chunk_tokens}"
+            )
+
+            # Version C chunked variant (grammarian-v2c-ship): same rules as
+            # single-pass, with the segment-awareness clause so chunks do not
+            # flag references to scenes they cannot see as contradictions.
+            chunk_prompt = f"""You are a mechanical TTS & Parser Validator for a radio drama pipeline. The text below is ONE SEGMENT of a longer script. Ignore references to scenes you cannot see -- do not flag them as contradictions.
+You have ZERO creative authority. Your only job is minimal, targeted fixes
+so the script parses cleanly and reads correctly through text-to-speech.
+
+You MUST PRESERVE EXACTLY:
+- Every character's slang, contractions, dialect, fragments, and quirks.
+- All original wording, rhythm, and word choice.
+- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+
+FIX ONLY THESE FIVE THINGS:
+1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
+   "natrual" -> "natural").
+2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
+   prefix. Fix missing colons, capitalization, or spacing only.
+3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
+   period only where its absence would slur TTS output.
+4. LOGIC CONTRADICTIONS that break continuity within the visible script
+   (character in two places, references to events that haven't happened).
+5. EXTREME RUN-ONS (80+ words with no stop): insert a period or ellipsis
+   to allow a TTS breath. Keep every original word in original order.
+
+STRICTLY FORBIDDEN:
+- Do NOT rewrite casual dialogue into formal English.
+  Example: "Ain't no way that thing's natural" stays exactly as-is.
+  NEVER change it to "There is no way that entity is natural."
+- Do NOT remove or replace slang, contractions, or fragments.
+- Do NOT add vocabulary, metaphors, or literary flourishes.
+- Do NOT restructure sentences for "elegance" or "flow."
+- Do NOT add, delete, or reorder any dialogue lines or scenes.
+- Do NOT touch anything that already parses and sounds fine spoken aloud.
+- Do NOT add commentary, notes, markdown, or explanations.
+
+OUTPUT: The corrected script only. Same format as input. Nothing else.
+
+SCRIPT SEGMENT TO VALIDATE:
+{chunk}"""
+
+            try:
+                polished = _run_with_timeout(
+                    lambda: _generate_with_llm(
+                        chunk_prompt,
+                        model_id=model_id,
+                        max_new_tokens=_chunk_tokens,
+                        temperature=0.3,
+                        optimization_profile=optimization_profile,
+                    ),
+                    timeout_sec=90,
+                    phase_label=f"Grammarian-Chunk-{chunk_num}",
+                )
+
+                if not polished or len(polished.strip()) < len(chunk) * 0.5:
+                    _runtime_log(
+                        f"GRAMMARIAN: Chunk {chunk_num} output too short "
+                        f"- keeping original"
+                    )
+                    polished_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                # Safety: did we lose dialogue lines in this chunk?
+                _post_dl = len(re.findall(
+                    r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', polished, re.MULTILINE
+                ))
+                _post_dl += len(re.findall(
+                    r'\[VOICE:', polished, re.IGNORECASE
+                ))
+
+                if _post_dl < _chunk_dl * 0.8:
+                    _runtime_log(
+                        f"GRAMMARIAN: Chunk {chunk_num} lost lines "
+                        f"({_post_dl} vs {_chunk_dl}) - keeping original"
+                    )
+                    polished_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                polished_chunks.append(polished.strip())
+                total_fixed += 1
+
+            except Exception as e:
+                log.warning("[Grammarian] Chunk %d failed: %s", chunk_num, e)
+                _runtime_log(
+                    f"GRAMMARIAN: Chunk {chunk_num} failed ({e}) "
+                    f"- keeping original"
+                )
+                polished_chunks.append(chunk)
+                total_kept += 1
+
+        # ----- Reassemble ---------------------------------------------
+        reassembled = '\n\n'.join(polished_chunks)
+
+        # Final safety: total dialogue count must hold
+        _post_lines = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', reassembled, re.MULTILINE
+        ))
+        _post_voice = len(re.findall(r'\[VOICE:', reassembled, re.IGNORECASE))
+        _post_total = _post_lines + _post_voice
+
+        if _post_total < pre_total * 0.8:
+            _runtime_log(
+                f"GRAMMARIAN: Reassembly lost too many lines "
+                f"({_post_total} vs {pre_total}) - reverting to original"
+            )
+            return script_text
+
+        _runtime_log(
+            f"GRAMMARIAN: Chunked complete | {total_fixed} polished, "
+            f"{total_kept} kept original | lines {pre_total}->{_post_total} | "
+            f"chars {len(script_text)}->{len(reassembled)}"
+        )
+        return reassembled
 
     def _extend_script_dialogue(self, script_text, deficit_words,
                                  target_words, model_id, genre_flavor,
