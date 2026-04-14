@@ -48,7 +48,7 @@ def parse_treatment(path):
 
     # Cast
     cast_section = re.search(
-        r"CAST & VOICES\n[-]+\n(.*?)(?:\n\n|\nSCENE ARC)", text, re.DOTALL
+        r"CAST & VOICES\n[-\u2500]+\n(.*?)(?:\n\n|\nSCENE ARC)", text, re.DOTALL
     )
     data["cast"] = {}
     data["cast_genders"] = {}
@@ -59,7 +59,7 @@ def parse_treatment(path):
                 continue
             # Pattern: NAME  ->  voice_preset  gender * trait * trait
             m = re.match(
-                r"(\S+(?:\s+\S+)*?)\s+(?:->|-->)\s+(\S+)\s+(.*)", line
+                r"(\S+(?:\s+\S+)*?)\s+(?:->|-->|\u2192)\s+(\S+)\s+(.*)", line
             )
             if m:
                 name = m.group(1).strip()
@@ -73,7 +73,7 @@ def parse_treatment(path):
 
     # Scene arc
     scene_arc = re.search(
-        r"SCENE ARC\n[-]+\n(.*?)(?:\n\nFULL SCRIPT)", text, re.DOTALL
+        r"SCENE ARC\n[-\u2500]+\n(.*?)(?:\nFULL SCRIPT\b)", text, re.DOTALL
     )
     data["scenes"] = []
     if scene_arc:
@@ -85,7 +85,7 @@ def parse_treatment(path):
 
     # Full script section
     script_section = re.search(
-        r"FULL SCRIPT.*?\n[-]+\n(.*?)(?:\nPRODUCTION)", text, re.DOTALL
+        r"FULL SCRIPT.*?\n[-\u2500]+\n(.*?)(?:\nPRODUCTION)", text, re.DOTALL
     )
     data["script_body"] = script_section.group(1).strip() if script_section else ""
 

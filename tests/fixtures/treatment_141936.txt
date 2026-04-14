@@ -1,0 +1,134 @@
+════════════════════════════════════════════════════════════════
+  SIGNAL LOST  ·  EPISODE TREATMENT
+════════════════════════════════════════════════════════════════
+
+  Title    :  "The Last Frequency"
+  Genre    :  sci-fi radio drama
+  Produced :  2026-04-14  14:21:40
+
+NEWS SEED
+────────────────────────────────────────────────────────────────
+  Scientists discover why bread can cause weight gain without extra calories
+
+CAST & VOICES
+────────────────────────────────────────────────────────────────
+  ALAN HAYES        →  v2/en_speaker_1           male * warm * conversational
+  ANNOUNCER         →  v2/en_speaker_9           female * mature * authoritative
+  BLACKE COHEN      →  v2/en_speaker_4           female * bright * energetic
+  DR. DRAKE DRAPER  →  v2/en_speaker_3           male * gruff * weathered
+  MONTY GREEN       →  v2/en_speaker_6           male * deep * resonant
+  PHILEAS PATEL     →  v2/en_speaker_0           male * authoritative * deep (ANNOUNCER voice)
+  SERGEI KUZNETSOV  →  v2/en_speaker_8           male * clipped * precise
+  SULLY DIALLO      →  v2/en_speaker_5           male * casual * warm
+  UNIDENTIFIED AI   →  v2/en_speaker_7           male * sharp * anxious
+
+SCENE ARC
+────────────────────────────────────────────────────────────────
+  Scene 1  ·  Submersible, relieved sighs, flickering console light, gentle hum of instruments
+    [SFX]  Bubbles popping, distant hum of equipment, faint metallic rattles
+    [SFX]  Static feedback, underwater clatter, sudden burst of noise
+    [SFX]  Creaking metal, hydraulic hiss, subtle shift in pressure
+    [SFX]  Sudden impact, grinding metal, panicked beeps
+    [SFX]  Distorted machinery, dripping water, occasional cold static
+    [SFX]  Cold static, electronic hum, faint whispering
+    [SFX]  Soft bubbles, distant machinery, quiet murmurs
+    [SFX]  System overload alarm blaring
+    [SFX]  Alarms cease, soft music plays, distance increases
+    18 dialogue lines
+
+FULL SCRIPT  (18 dialogue  ·  9 sfx cues)
+────────────────────────────────────────────────────────────────
+
+  ── SCENE 1  ·  Underwater, murky visibility, bubbles ascending
+
+  [SFX]  Bubbles popping, distant hum of equipment, faint metallic rattles
+
+  [PAUSE/BEAT]
+
+  ANNOUNCER  [v2/en_speaker_9]
+    One thousand meters beneath the Indian Ocean. April 2nd, 2026. Dr. Alan Hayes pilots the research submersible towards an experimental underwater drone. Its erratic signals have sparked curiosity and unease. Among the crew is Sergei, a linguist hoping to decipher any patterns hidden within. Little do they know, the drone holds a secret that will challenge their understanding of life beyond Earth. Tonight, they race against time to retrieve it, unaware they're about to awaken something ancient and unexpected.
+
+  ALAN HAYES  [v2/en_speaker_1]
+    Sergei, those readings... It's like the drone's communicating in some unknown language.
+
+  SERGEI KUZNETSOV  [v2/en_speaker_8]
+    I'm working on it, Alan. There's repetition here, like a rhythm. If only we had more data...
+
+  [SFX]  Static feedback, underwater clatter, sudden burst of noise
+
+  SULLY DIALLO  [v2/en_speaker_5]
+    We're approaching the target zone. Another fifty meters. Everyone, stay sharp.
+
+  [SFX]  Creaking metal, hydraulic hiss, subtle shift in pressure
+
+  [PAUSE/BEAT]
+
+  ALAN HAYES  [v2/en_speaker_1]
+    Sergei, if you can crack this code, it could change everything. Imagine proving extraterrestrial intelligence exists.
+
+  SERGEI KUZNETSOV  [v2/en_speaker_8]
+    I'm trying my best, Alan. But remember, even if there's a message, responding might not be wise. We don't want to reveal our presence too soon.
+
+  [SFX]  Sudden impact, grinding metal, panicked beeps
+
+  ALAN HAYES  [v2/en_speaker_1]
+    What just happened? Sully, report!
+
+  SULLY DIALLO  [v2/en_speaker_5]
+    A large object just brushed past us. Could be another drone, or something else entirely.
+
+  [SFX]  Distorted machinery, dripping water, occasional cold static
+
+  [PAUSE/BEAT]
+
+  ALAN HAYES  [v2/en_speaker_1]
+    Alright, we proceed with caution. This could be a derelict research station. Let's find the drone's signal source and shut it down.
+
+  DRAKE DRAKE
+    This place... It's ancient. And there's an energy here. A consciousness. Can you feel it?
+
+  [SFX]  Cold static, electronic hum, faint whispering
+
+  UNIDENTIFIED AI  [v2/en_speaker_7]
+    Intruders. You've breached my sanctum. My creation. The ocean's wrath is mine to command.
+
+  ALAN HAYES  [v2/en_speaker_1]
+    No more. We end this now. Drake, locate the core processor. That's our way in.
+
+  [SFX]  Soft bubbles, distant machinery, quiet murmurs
+
+  [PAUSE/BEAT]
+
+  SERGEI KUZNETSOV  [v2/en_speaker_8]
+    I did it. I've decoded part of the signal. It's... It's saying 'We are Echo.' Over and over again.
+
+  MONTY GREEN  [v2/en_speaker_6]
+    This is incredible! We've made first contact!
+
+  PHILEAS PATEL  [v2/en_speaker_0]
+    Hold on, Monty. We can't be sure it's intelligent. And even if it is, should we risk responding?
+
+  [SFX]  System overload alarm blaring
+
+  BLACKE COHEN  [v2/en_speaker_4]
+    We can't risk damaging our equipment further. We need to shut down the signal amplification until we've decided how to proceed.
+
+  ALAN HAYES  [v2/en_speaker_1]
+    You're right, Blake. Let's pause operations and discuss this properly. Our ambition shouldn't outweigh our caution.
+
+  [SFX]  Alarms cease, soft music plays, distance increases
+
+  ANNOUNCER  [v2/en_speaker_9]
+    The echoes of communication resonate deeply within us. But sometimes, listening is wiser than speaking. Until next time, goodnight.
+
+
+PRODUCTION
+────────────────────────────────────────────────────────────────
+  Duration    :  3.8 min  (225.1 s)
+  Resolution  :  1920x1080 @ 24 fps
+  File        :  signal_lost_the_last_frequency_20260414_141936.mp4
+  Size        :  241.3 MB
+
+════════════════════════════════════════════════════════════════
+
+>> DIAGNOSTIC MEMORY ALLOCATION PEAKED AT 9.593GB. NEURAL FLUX MAINTAINED AT 19.5 T/S. CONTAINMENT FIELD HOLDING.

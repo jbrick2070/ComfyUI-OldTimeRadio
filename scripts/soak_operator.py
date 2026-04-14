@@ -408,10 +408,10 @@ def scan_treatment(path):
     # 2. Parse cast
     cast = {}
     cast_section = re.search(
-        r"CAST & VOICES\n[-]+\n(.*?)(?:\n\n|\nSCENE ARC)", text, re.DOTALL)
+        r"CAST & VOICES\n[-\u2500]+\n(.*?)(?:\n\n|\nSCENE ARC)", text, re.DOTALL)
     if cast_section:
         for line in cast_section.group(1).strip().split("\n"):
-            m = re.match(r"\s*(\S+(?:\s+\S+)*?)\s+(?:->|-->)\s+(\S+)\s+(.*)", line)
+            m = re.match(r"\s*(\S+(?:\s+\S+)*?)\s+(?:->|-->|\u2192)\s+(\S+)\s+(.*)", line)
             if m:
                 cast[m.group(1).strip()] = {
                     "preset": m.group(2).strip(),
@@ -440,7 +440,7 @@ def scan_treatment(path):
 
     # 5. Scene arc dialogue counts
     scene_arc = re.search(
-        r"SCENE ARC\n[-]+\n(.*?)(?:\n\nFULL SCRIPT)", text, re.DOTALL)
+        r"SCENE ARC\n[-\u2500]+\n(.*?)(?:\nFULL SCRIPT\b)", text, re.DOTALL)
     total_dialogue = 0
     if scene_arc:
         for m in re.finditer(r"Scene\s+(\d+).*?(\d+)\s+dialogue lines", scene_arc.group(1)):
@@ -453,7 +453,7 @@ def scan_treatment(path):
 
     # 6. Full script checks
     script_section = re.search(
-        r"FULL SCRIPT.*?\n[-]+\n(.*?)(?:\nPRODUCTION)", text, re.DOTALL)
+        r"FULL SCRIPT.*?\n[-\u2500]+\n(.*?)(?:\nPRODUCTION)", text, re.DOTALL)
     script_body = script_section.group(1).strip() if script_section else ""
 
     if not script_body:
@@ -572,7 +572,7 @@ def scan_treatment(path):
             flags.append(f"ANNOUNCER_DOMINATES: Announcer has {ann_count} lines vs max character {max_char_count}")
 
     # 16. News seed missing or blank
-    news_m = re.search(r"NEWS SEED\n[-]+\n(.*?)(?:\n\n|\nCAST)", text, re.DOTALL)
+    news_m = re.search(r"NEWS SEED\n[-\u2500]+\n(.*?)(?:\n\n|\nCAST)", text, re.DOTALL)
     if not news_m or not news_m.group(1).strip():
         flags.append("NEWS_SEED_MISSING: No news seed found -- RSS feed may not be injecting")
 
