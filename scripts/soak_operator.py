@@ -19,6 +19,11 @@ WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeR
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
+# Archive is on a SEPARATE DRIVE (E:) -- this keeps the main playback
+# folder single-source (no double-play) and keeps storage off the C:
+# drive so overnight soaks cannot fill the system disk. Protects
+# episodes from cleanup agents that target the live output folder.
+ARCHIVE_DIR = r"E:\Old Random Project Folders\Old_time_radio_Los_SIgna-\antigrav_otr_archive"
 COMFYUI_EXE = r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
 COMFYUI_MAIN = r"C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py"
 PROMPT_OUTPUT_PATH = r"C:\Users\jeffr\Documents\ComfyUI\otr_prompt_built.json"
@@ -280,6 +285,33 @@ def find_newest_treatment():
             return None
         return max(treatments, key=os.path.getmtime)
     except Exception:
+        return None
+
+
+def archive_treatment(run_num, treatment_path):
+    """Copy a successful treatment to ARCHIVE_DIR on the E: drive.
+
+    Runs on a SEPARATE DRIVE so:
+      - C: drive storage cannot fill during overnight soaks
+      - Downstream playback/TTS only sees OUTPUT_DIR (no double-play)
+      - Cleanup agents that target the live output folder cannot nuke
+        older episodes
+
+    Returns the archive path on success, None on failure (never raises).
+    """
+    if not treatment_path or not os.path.exists(treatment_path):
+        return None
+    try:
+        os.makedirs(ARCHIVE_DIR, exist_ok=True)
+        import shutil
+        base = os.path.basename(treatment_path)
+        archive_name = f"RUN_{run_num:03d}__{base}"
+        dest = os.path.join(ARCHIVE_DIR, archive_name)
+        if not os.path.exists(dest):
+            shutil.copy2(treatment_path, dest)
+        return dest
+    except Exception as exc:
+        print_f(f"ARCHIVE: Failed to archive {treatment_path}: {exc}")
         return None
 
 
@@ -1100,6 +1132,17 @@ def run_iteration(run_num):
         review_text = critic_review(
             config, title, dialogue, vram, has_treatment, duration)
         append_to_log(review_text)
+
+    # 10bb. Archive every successful treatment to E: drive BEFORE any
+    # other agent (Gemini / AntiGravity cleanup) can touch it.
+    if result == "SUCCESS":
+        _newest_for_archive = find_newest_treatment()
+        if _newest_for_archive:
+            _archive_path = archive_treatment(run_num, _newest_for_archive)
+            if _archive_path:
+                _msg = f"  ARCHIVED: {_archive_path}\n"
+                print_f(_msg)
+                append_to_log(_msg)
 
     # 10c. Treatment scan (read-only, flags only, never fixes)
     scan_flags = []
