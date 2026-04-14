@@ -167,7 +167,11 @@
                 "[]",
                 "{}",
                 0,
-                999
+                999,
+                "",
+                "bark",
+                0.0,
+                0.0
             ],
             "inputs": [
                 {
@@ -360,6 +364,8 @@
                 "Node name for S&R": "OTR_BatchBarkGenerator"
             },
             "widgets_values": [
+                "[]",
+                "{}",
                 0.7
             ],
             "inputs": [
@@ -418,6 +424,9 @@
                 "Node name for S&R": "OTR_SignalLostVideo"
             },
             "widgets_values": [
+                "[]",
+                "{}",
+                "[]",
                 24,
                 "1920x1080",
                 "The Last Frequency"
@@ -607,6 +616,8 @@
                 "Node name for S&R": "OTR_BatchAudioGenGenerator"
             },
             "widgets_values": [
+                "[]",
+                "{}",
                 "",
                 "facebook/audiogen-medium",
                 3.0,

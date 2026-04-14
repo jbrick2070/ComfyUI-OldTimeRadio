@@ -205,6 +205,18 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Verify:** pending
 - **Tags:** act-count, target-length, maximum-chaos, chunked-generation, soak
 
+### BUG-LOCAL-032: Four workflow nodes had preserved-truncated widgets_values shapes; canonicalized to full preserved mode [FIXED]
+- **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** no (data, not code)
+- **Symptom:** RUN 227 of the soak operator failed on Node 3 (OTR_SceneSequencer) with ComfyUI HTTP 400: `end_line, {}, invalid literal for int()`. A post-fix schema sweep against live `/object_info` revealed four nodes whose committed `widgets_values` arrays were shorter than the declared widget-backed input count, producing the same preserved-vs-stripped auto-sense ambiguity class as BUG-LOCAL-029 / 031.
+- **Cause:** Web-UI workflow JSON can omit trailing unlinked widget slots when they hold defaults. The mapper's auto-sensing heuristic (b3d33bf) handles unambiguous cases (wv_len matches either widget_backed_count for preserved or unlinked_count for stripped) but any wv_len strictly less than widget_backed_count is a preserved-truncated shape the heuristic cannot always reconstruct correctly.
+- **Fix:** Use live `/object_info` schema to compute the canonical preserved-mode shape (linked placeholders + all unlinked defaults, in declared input order) for every node and write back the canonical array. Fixed nodes:
+  - Node 3 (OTR_SceneSequencer): `['[]', '{}', 0, 999]` (4) -> `['[]', '{}', 0, 999, '', 'bark', 0.0, 0.0]` (8)
+  - Node 11 (OTR_BatchBarkGenerator): `[0.7]` (1) -> `['[]', '{}', 0.7]` (3) [canonicalized from stripped to preserved]
+  - Node 12 (OTR_SignalLostVideo): `[24, '1920x1080', 'The Last Frequency']` (3) -> `['[]', '{}', '[]', 24, '1920x1080', 'The Last Frequency']` (6)
+  - Node 15 (OTR_BatchAudioGenGenerator): `['', 'facebook/audiogen-medium', 3.0, 3.0]` (4) -> `['[]', '{}', '', 'facebook/audiogen-medium', 3.0, 3.0]` (6)
+- **Verify:** `scripts/_schema_sweep.py` confirms every node's widgets_values matches its canonical preserved shape (user-tuned Nodes 1/2/4 intentionally diverge in values but match in length). Full sandbox regression: widget_drift 27, dropdown_guardrails 50, core 89, v2/audio 7 = 166 passed. Next soak run expected to clear Node 3 and reach the LLM phase.
+- **Tags:** widget-drift, data-corruption, workflow-json, preserved-truncated, scene-sequencer, video-engine, audiogen, batch-bark
+
 ### BUG-LOCAL-031: Node 13 (OTR_KokoroAnnouncer) widgets_values truncated to 3 slots, `speed` FLOAT received 'random' [FIXED]
 - **Date:** 2026-04-14 | **Phase:** 0.5 | **Bible candidate:** no (data bug, not code)
 - **Symptom:** RUN 127 of the soak operator failed with ComfyUI HTTP 400: `node_errors: {"13": {"errors": [{"type": "invalid_input_type", "message": "Failed to convert an input value to a FLOAT value", "details": "speed, random, could no..."}]}}`. The `speed` FLOAT param on Node 13 was receiving the string `'random'` (which is the default value for `voice_override`, not `speed`).
