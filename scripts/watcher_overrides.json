@@ -9,5 +9,6 @@
     "force_profile": "one of: 'Pro (Ultra Quality)', 'Standard'",
     "pause_soak": "true to pause the iteration loop (re-checks every 60s)",
     "note_from_watcher": "free-text string, echoed to soak_log.md, truncated to 500 chars"
-  }
+  },
+  "note_from_watcher": "Cleared creativity pin 2026-04-13: 'maximum chaos' removed from soak pool entirely (see soak_operator.py CREATIVITIES comment). Override no longer needed."
 }

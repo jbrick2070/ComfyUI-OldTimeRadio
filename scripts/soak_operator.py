@@ -51,7 +51,12 @@ STYLES = [
     "psychological slow-burn", "hard-sci-fi procedural",
     "noir mystery", "chaotic black-mirror",
 ]
-CREATIVITIES = ["safe & tight", "balanced", "wild & rough", "maximum chaos"]
+CREATIVITIES = ["safe & tight", "balanced", "wild & rough"]
+# NOTE: "maximum chaos" REMOVED from soak pool 2026-04-13 after the
+# watcher flagged back-to-back ghost runs (EMPTY_CAST, NO_SCENE_ARC,
+# EMPTY_SCRIPT, TITLE_STUCK) on runs 011 and 012. The creativity
+# preset breaks the prompt too often to be useful for overnight soaks.
+# The widget still accepts it for manual experimentation.
 OPT_PROFILES = ["Pro (Ultra Quality)", "Standard"]
 # NOTE: "Obsidian (UNSTABLE/4GB)" excluded -- not valid on 16 GB hardware
 
