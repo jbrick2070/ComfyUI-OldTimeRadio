@@ -19,10 +19,11 @@ WORKFLOW_PATH = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeR
 SOAK_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\logs\soak_log.md"
 RUNTIME_LOG = r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\otr_runtime.log"
 OUTPUT_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"
-# Archive lives INSIDE old_time_radio so the episode folder is unchanged.
-# Uses a ".archive.txt" suffix so cleanup agents scanning for
-# "*_treatment.txt" won't match these copies.
-ARCHIVE_DIR = os.path.join(OUTPUT_DIR, "_archive")
+# Archive is a SIBLING folder -- keeping copies inside OUTPUT_DIR would
+# cause downstream playback/TTS to play every episode twice. The archive
+# exists purely as a safety net against cleanup agents; nothing else
+# should scan it.
+ARCHIVE_DIR = r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio_archive"
 COMFYUI_EXE = r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
 COMFYUI_MAIN = r"C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI\main.py"
 PROMPT_OUTPUT_PATH = r"C:\Users\jeffr\Documents\ComfyUI\otr_prompt_built.json"
