@@ -1301,6 +1301,39 @@ def _normalize_dialogue_names(text):
     return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
 
 
+# ── Scene inventory (diagnostic instrumentation) ────────────────
+# Extracts the list of scene tokens from a script so the orchestrator
+# can log scene counts at every pipeline checkpoint. A scene leak in
+# any pass (WORD_EXTEND, ANNOUNCER, FORMAT_NORM, GRAMMARIAN, PARSE)
+# shows up as a count drop in the soak log, localizing the bug.
+_RE_SCENE_MARKER = re.compile(
+    r'===\s*SCENE\s+(\S+?)(?:\s+[^=]*)?\s*===',
+    re.IGNORECASE
+)
+
+
+def _scene_inventory(text):
+    """Return the ordered list of scene tokens found in the script.
+
+    Recognizes the canonical marker format '=== SCENE N ===' (and any
+    trailing title after the number). Returns tokens like ['1', '2', '3']
+    or ['1', 'FINAL'] — whatever the script uses. Empty list means no
+    scene markers present (valid for short scripts pre-FORMAT_NORM).
+    """
+    if not text:
+        return []
+    return [m.group(1).upper() for m in _RE_SCENE_MARKER.finditer(text)]
+
+
+def _log_scene_checkpoint(stage, text):
+    """Emit a SCENE_TRACK log line for the given pipeline stage."""
+    tokens = _scene_inventory(text)
+    _runtime_log(
+        f"SCENE_TRACK: {stage} | count={len(tokens)} | tokens={tokens}"
+    )
+    return tokens
+
+
 # ── Name cleanup (fuzzy match against canonical cast) ────────────
 # BUG-020 fix: Under maximum chaos, LLMs hallucinate variant spellings
 # (NEMEO_SIRIKIT instead of NEMO SIRIKIT). This pure-Python pass reads
@@ -3532,6 +3565,9 @@ Begin the full script now. Follow this structure exactly:
         #   4. PARSE        — parse clean text into structured JSON
         # ══════════════════════════════════════════════════════════════
 
+        # -- SCENE CHECKPOINT: raw LLM output (pre-pipeline baseline) --
+        _log_scene_checkpoint("00_RAW_LLM_OUTPUT", script_text)
+
         # -- STEP 0: NORMALIZE BOLD DIALOGUE NAMES (BUG-023 fix) --------
         # LLMs at high temperature produce **NAME**, emotion: format.
         # Strip to canonical NAME: before any word-count regex runs.
@@ -3539,6 +3575,7 @@ Begin the full script now. Follow this structure exactly:
         script_text = _normalize_dialogue_names(script_text)
         if len(script_text) != _pre_norm_len:
             _runtime_log("BOLD_NORM: Stripped Markdown bold from dialogue names")
+        _log_scene_checkpoint("01_AFTER_BOLD_NORM", script_text)
 
         # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020/025 fix) -----
         # Count dialogue words in raw text using dual-format extraction.
@@ -3591,6 +3628,7 @@ Begin the full script now. Follow this structure exactly:
                 f"WORD_ENFORCEMENT: Post-extension: {_raw_dialogue_words} words "
                 f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 140:.1f} min"
             )
+        _log_scene_checkpoint("02_AFTER_WORD_EXTEND", script_text)
 
         # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
         # Check if ANNOUNCER lines exist. If not, generate and inject.
@@ -3626,6 +3664,7 @@ Begin the full script now. Follow this structure exactly:
             if not _has_announcer_close and closing_text:
                 script_text = f"{script_text}\n\nANNOUNCER: {closing_text}"
                 _runtime_log(f"ANNOUNCER_RAW: Appended closing ({len(closing_text)} chars)")
+        _log_scene_checkpoint("03_AFTER_ANNOUNCER", script_text)
 
         # -- STEP 3: FORMAT NORMALIZER (Creative → Strict) ------------
         # Now the script has extensions + announcer. One pass cleans
@@ -3633,12 +3672,14 @@ Begin the full script now. Follow this structure exactly:
         script_text = self._normalize_script_format(
             script_text, model_id, optimization_profile
         )
+        _log_scene_checkpoint("04_AFTER_FORMAT_NORM", script_text)
 
         # -- STEP 3b: NAME CLEANUP (Python fuzzy match) ---------------
         # Read canonical cast from config/episode_cast.txt and fix any
         # hallucinated name variants the LLM produced under high creativity.
         # Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
         script_text = _cleanup_character_names(script_text, _cast_config_path, pre_rolled_cast)
+        _log_scene_checkpoint("05_AFTER_NAME_CLEANUP", script_text)
 
         # -- STEP 3c: GRAMMARIAN (final logic + grammar polish) -------
         # Light LLM pass at temp 0.3. Fixes grammar, catches logic gaps,
@@ -3647,6 +3688,7 @@ Begin the full script now. Follow this structure exactly:
         script_text = self._grammarian_pass(
             script_text, model_id, optimization_profile
         )
+        _log_scene_checkpoint("06_AFTER_GRAMMARIAN", script_text)
 
         # -- STEP 4: PARSE into structured JSON -----------------------
         # Single parse on the fully prepared text.
@@ -3668,6 +3710,19 @@ Begin the full script now. Follow this structure exactly:
                     raise
             else:
                 raise
+
+        # -- SCENE CHECKPOINT: post-parse (structured view) -----------
+        # Count scene_break entries in script_lines. If this drops
+        # below the 06_AFTER_GRAMMARIAN count, the parser lost scenes.
+        _parsed_scene_tokens = [
+            str(ln.get("scene", "")).strip().upper()
+            for ln in script_lines
+            if ln.get("type") == "scene_break"
+        ]
+        _runtime_log(
+            f"SCENE_TRACK: 07_AFTER_PARSE | count={len(_parsed_scene_tokens)} "
+            f"| tokens={_parsed_scene_tokens}"
+        )
 
         # Log guardrail warnings (visible in otr_runtime.log) but keep script_json as pure JSON
         # BUG-016: Never prepend comments to script_json - downstream nodes call json.loads() on it
