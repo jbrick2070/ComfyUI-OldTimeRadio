@@ -20,7 +20,7 @@
                 "Node name for S&R": "OTR_Gemma4ScriptWriter"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "",
                 "hard_sci_fi",
                 700,
                 4,
@@ -298,7 +298,7 @@
                 "Node name for S&R": "OTR_EpisodeAssembler"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "",
                 10.0,
                 8.0,
                 500
@@ -429,7 +429,7 @@
                 "[]",
                 24,
                 "1920x1080",
-                "The Last Frequency"
+                ""
             ],
             "inputs": [
                 {

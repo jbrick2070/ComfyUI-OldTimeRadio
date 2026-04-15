@@ -1201,8 +1201,8 @@ class SignalLostVideoRenderer:
                     "tooltip": "Output video resolution"
                 }),
                 "episode_title": ("STRING", {
-                    "default": "The Last Frequency",
-                    "tooltip": "Episode title for the title bar"
+                    "default": "",
+                    "tooltip": "Episode title for the title bar. Normally resolved from the script_json title token; widget acts as a last-resort override."
                 }),
                 "closing_audio": ("AUDIO", {
                     "tooltip": "Unique closing music from MusicGen for the credits post-roll. If not connected, a gentle decay from the episode audio is used instead of looping."
@@ -1216,23 +1216,69 @@ class SignalLostVideoRenderer:
 
     def render_video(self, audio, script_json, production_plan_json,
                      news_used, fps=24, resolution="1920x1080",
-                     episode_title="The Last Frequency", closing_audio=None):
+                     episode_title="", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
 
         # -- 1. Parse inputs & Extract Smart Title -------------------
+        # BUG-LOCAL-035: Title resolution is now primary-source script_json,
+        # fallback widget. Previously the list-format branch did nothing and
+        # every run silently fell through to the widget default
+        # "The Last Frequency", yielding 100% TITLE_STUCK filenames.
+        # Resolution order:
+        #   1. title token in list-format script_json  (canonical path)
+        #   2. top-level 'title' key in dict-format script_json (legacy)
+        #   3. widget episode_title (manual override / last resort)
+        # Any value matching _STUCK_TITLE_DEFAULTS triggers TITLE_RESOLVE_FAIL
+        # so the run fails loud instead of writing a stuck-default filename.
+        _STUCK_TITLE_DEFAULTS = {
+            "", "the last frequency", "untitled", "episode",
+            "signal lost", "custom episode",
+        }
+
         import json as _json
+        _title_source = "widget"
+        _widget_title = (episode_title or "").strip()
+        _script_title = ""
         try:
-            # Check if script_json contains a specific title override from Gemma
             _script_data = _json.loads(script_json) if isinstance(script_json, str) else (script_json or [])
-            # Search for title in list of dicts (Canonical 1.0) or dict-wrapped script
-            if isinstance(_script_data, dict) and "title" in _script_data:
-                episode_title = _script_data["title"]
-            elif isinstance(_script_data, list):
-                # Check for a specific 'title' or 'metadata' block if we ever add one
-                pass
-        except Exception:
-            pass # Fall back to widget title
+            if isinstance(_script_data, list):
+                # Canonical 1.0: look for a {"type": "title", "value": "..."} token.
+                # LLMScriptWriter.write_script prepends this in v2.0-alpha.
+                for _tok in _script_data:
+                    if isinstance(_tok, dict) and _tok.get("type") == "title":
+                        _cand = (_tok.get("value") or "").strip()
+                        if _cand:
+                            _script_title = _cand
+                            break
+            elif isinstance(_script_data, dict) and "title" in _script_data:
+                _script_title = (_script_data.get("title") or "").strip()
+        except Exception as _te:
+            log.warning("[Video] Title extraction from script_json failed: %s", _te)
+
+        if _script_title and _script_title.lower() not in _STUCK_TITLE_DEFAULTS:
+            episode_title = _script_title
+            _title_source = "script_json"
+        elif _widget_title and _widget_title.lower() not in _STUCK_TITLE_DEFAULTS:
+            episode_title = _widget_title
+            _title_source = "widget_override"
+        else:
+            # Fail loud: we'd write a stuck-default filename again. Surface it.
+            _runtime_log(
+                f"TITLE_TRACE | source=NONE | script_json_title='{_script_title}' "
+                f"| widget_title='{_widget_title}' -> TITLE_RESOLVE_FAIL"
+            )
+            raise RuntimeError(
+                f"TITLE_RESOLVE_FAIL: no usable episode title. "
+                f"script_json_title='{_script_title}', widget='{_widget_title}'. "
+                f"Writer must emit a {{\"type\":\"title\"}} token or the "
+                f"widget must be set to a non-stuck value."
+            )
+
+        _runtime_log(
+            f"TITLE_TRACE | source={_title_source} | resolved='{episode_title}' "
+            f"| widget='{_widget_title}' | script_json='{_script_title}'"
+        )
 
         waveform = audio["waveform"]
         sr = audio["sample_rate"]

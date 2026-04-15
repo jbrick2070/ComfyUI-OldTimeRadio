@@ -5,6 +5,35 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-036: WordExtend NameError `_false_positives is not defined` — 100% fail on every run [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** `[WordExtend] Extension pass failed: name '_false_positives' is not defined` on every single overnight soak run (40/40 failures, SHORT_DURATION scan flag). Extension pass was silently short-circuiting; every episode shipped at the un-extended word count.
+- **Cause:** Literal one-character typo inside the WordExtend node body. The module-level constant is `_DIALOGUE_FALSE_POSITIVES` (defined near line 1545 of `nodes/story_orchestrator.py`), but the extension-pass code path referenced an abbreviated local name `_false_positives` that was never bound. Python raised NameError, the surrounding try/except logged it and returned the script unchanged.
+- **Fix:** Changed the reference to the correct module-level constant `_DIALOGUE_FALSE_POSITIVES` (`nodes/story_orchestrator.py` around line 6065). Added a short comment noting the old name for future grep-archaeology.
+- **Verify:** `grep -rn "_false_positives" nodes/` shows only the comment line — no live code reference. Next real-workflow run should emit target word counts; SHORT_DURATION scan flag should clear.
+- **Tags:** typo, word-extend, short-duration, scan-flag, name-error
+
+### BUG-LOCAL-035: TITLE_STUCK — every episode filename locked to "The Last Frequency" regardless of LLM output [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Overnight soak produced 40 consecutive `The_Last_Frequency_*.mp4` files. Treatment scanner raised TITLE_STUCK on every run. Writer was asked for a title, but the filename path ignored it.
+- **Cause:** Two independent gaps.
+  1. `workflows/otr_scifi_16gb_full.json` hardcoded the widget default `"The Last Frequency"` on three nodes: Node 1 `OTR_Gemma4ScriptWriter` widget #0, Node 7 `OTR_EpisodeAssembler` widget #0, Node 12 `OTR_SignalLostVideo` widget #5.
+  2. The writer's prompt asked for `EPISODE TITLE: ...` but the output was never parsed back. `OTR_SignalLostVideo`'s title-extraction code handled only the dict-format `script_json`; the actual Canonical 1.0 list-format fell through to the widget default on every run. No catch, no error — silent lock-in.
+- **Fix:** Four-part fix across three files.
+  * `workflows/otr_scifi_16gb_full.json`: cleared all three hardcoded widget defaults to `""` so the writer/video nodes fall through to real resolution.
+  * `nodes/story_orchestrator.py`: added module-level `_STUCK_TITLE_DEFAULTS` frozenset + `_RE_TITLE_LINE` + `_extract_title_from_script_text()` + `_derive_title_from_script_lines()`. Updated the Gemma user_prompt (both OC-mode and non-OC branches) to require `TITLE: <...>` as the **very first** line of output, with an anti-stuck-default instruction. In `write_script`, added four-tier title resolution (user override → LLM-parsed → derived-from-first-environment → timestamp), prepended a `{"type": "title", "value": _resolved_title}` token to `script_lines`, and log one `TITLE_TRACE` line per run with raw/parsed/final values.
+  * `nodes/video_engine.py`: rewrote the title-extraction block in `render_video` to (a) scan list-format `script_json` for the new `title` token, (b) fall back to dict-format top-level `title`, (c) fall back to the widget, (d) hard-fail with `RuntimeError("TITLE_RESOLVE_FAIL: ...")` if all paths yield a stuck default. Cleared the default widget value in `INPUT_TYPES` and the `render_video` signature.
+- **Verify:** Next run should emit a `TITLE_TRACE | raw="..." | parsed="..." | final="..."` line. Filename stem should vary across 5 consecutive runs. `TITLE_RESOLVE_FAIL` firing is the desired loud behavior if resolution ever breaks again.
+- **Tags:** title-stuck, widget-default, workflow-json, writer-prompt, video-render, scan-flag, fail-loud
+
+### BUG-LOCAL-034: Fatal-streak auto-halt + user-controlled STOP_FILE pause for soak operator [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** no
+- **Symptom:** Overnight soak churned through 40 identical TITLE_STUCK + WordExtend failures because there was no auto-halt on repeated fatals. Jeffrey had no clean pause-and-ask contract.
+- **Cause:** Soak loop in `scripts/soak_operator.py` flagged failures reactively but never counted streaks or respected a user stop signal between runs.
+- **Fix:** Added module-level constants (`STOP_FILE`, `STOP_POLL_S`, `FATAL_STREAK_LIMIT=3`), a sliding window `_recent_fatal_tags`, and four helpers: `classify_fatal(result, error_msg, scan_flags)`, `check_fatal_streak(tag)`, `trigger_fatal_halt(run_num, tag)`, `wait_for_stop_clear(run_num)`. Wired `classify_fatal` + `check_fatal_streak` into `run_iteration` right after the treatment-scan block so both the run outcome and scan flags feed tagging. Wired `wait_for_stop_clear` at the top of the main `while True:` loop so each iteration honors a live stop before spinning up the next run. Clean SUCCESS with no streakable scan flags resets the window. Three identical fatal tags in a row writes STOP_FILE, sends an urgent ntfy, and blocks the next iteration until Jeffrey removes the file.
+- **Verify:** Touch `scripts/.soak_stop` between runs — next iteration should pause and poll every 30s until removed. Trigger three identical fatals (e.g. three TITLE_RESOLVE_FAIL raises) and confirm STOP_FILE is created automatically.
+- **Tags:** soak, operator, streak, stop-file, user-control
+
 ### BUG-LOCAL-001: v2_preview.py placeholder nodes flagged as output nodes [FIXED]
 - **Date:** 2026-04-12 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Bug Bible regression BUG-01.02 fails: "Output nodes without folder_paths usage: v2_preview.py"

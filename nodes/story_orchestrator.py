@@ -1548,6 +1548,81 @@ _DIALOGUE_FALSE_POSITIVES = frozenset({
     "ANNOUNCER"
 })
 
+# BUG-LOCAL-035: Titles that indicate a stuck default or an unresolved title.
+# When a title resolution path yields one of these, we treat it as a failure
+# and either re-derive or fail loud. Keep lowercase, no punctuation.
+_STUCK_TITLE_DEFAULTS = frozenset({
+    "",
+    "the last frequency",
+    "untitled",
+    "episode",
+    "signal lost",
+    "custom episode",
+})
+
+# Matches a leading "TITLE:" line (case-insensitive) the LLM may emit when
+# asked to generate a title. We accept up to the end of the first line.
+_RE_TITLE_LINE = re.compile(
+    r'^\s*(?:\*\*)?\s*TITLE\s*:\s*["\u201C]?\s*(.+?)\s*["\u201D]?\s*(?:\*\*)?\s*$',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _extract_title_from_script_text(text):
+    """Pull a 'TITLE: ...' line out of raw LLM script text.
+
+    Gemma is instructed to emit such a line when episode_title is blank.
+    Returns the extracted title string (stripped, quotes removed) or "".
+    """
+    if not text:
+        return ""
+    m = _RE_TITLE_LINE.search(text[:2000])  # only look near the top
+    if not m:
+        return ""
+    cand = m.group(1).strip().strip('"\u201C\u201D\u2018\u2019')
+    # Reject obviously broken captures (too long, template residue).
+    if len(cand) > 120:
+        return ""
+    if cand.lower() in _STUCK_TITLE_DEFAULTS:
+        return ""
+    return cand
+
+
+def _derive_title_from_script_lines(lines, genre_flavor=""):
+    """Deterministic fallback title when the LLM didn't emit one.
+
+    Strategy: take the first 'environment' token's description, pick the
+    most-specific noun phrase from its first 6 words, title-case it.
+    This is last-resort; it keeps the filename layer unblocked when the
+    LLM path silently failed, without silently reusing a stuck default.
+    """
+    try:
+        for ln in lines or []:
+            if not isinstance(ln, dict):
+                continue
+            if ln.get("type") == "environment":
+                desc = (ln.get("description") or "").strip()
+                if not desc:
+                    continue
+                # Take first 6 tokens, drop stopwords/punctuation.
+                tokens = re.findall(r"[A-Za-z][A-Za-z0-9'\-]+", desc)[:6]
+                stop = {"a", "an", "the", "of", "on", "in", "at", "and",
+                        "or", "is", "with", "for", "to", "from", "by"}
+                kept = [t for t in tokens if t.lower() not in stop]
+                if not kept:
+                    continue
+                phrase = " ".join(kept[:4]).title()
+                # Filter if phrase collapses to a stuck default.
+                if phrase.lower() in _STUCK_TITLE_DEFAULTS:
+                    continue
+                return phrase
+    except Exception:
+        pass
+    # Final fallback: timestamped derivative so each run is unique and
+    # the filename layer never regresses to a stuck default.
+    genre = (genre_flavor or "transmission").replace("_", " ").title()
+    return f"{genre} Transmission {int(time.time()) % 100000}"
+
 
 def _extract_all_dialogue(text):
     """Extract (name, dialogue) pairs from both bare and VOICE-tag formats.
@@ -2476,8 +2551,8 @@ class LLMScriptWriter:
         return {
             "required": {
                 "episode_title": ("STRING", {
-                    "default": "The Last Frequency",
-                    "tooltip": "Episode title (or leave blank for Gemma to generate one)"
+                    "default": "",
+                    "tooltip": "Episode title (leave blank for Gemma to generate one; see BUG-LOCAL-035)"
                 }),
                 "genre_flavor": (["hard_sci_fi", "space_opera", "dystopian",
                                   "time_travel", "first_contact", "cosmic_horror",
@@ -3205,7 +3280,7 @@ STYLE DIRECTIVE: {style_instruction}
 WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 {winning_outline}
 
-EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
+EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
@@ -3215,7 +3290,12 @@ TARGET LENGTH: ~{target_words} words
 
 REMEMBER: The {oc_mode_label.lower()} above is your premise and story spine. {"Invent the full scene structure, acts, and SFX based on it." if oc_mode_label == "PITCH" else "Follow its structure, characters, and arc."} Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
 
+REQUIRED FIRST LINE: The VERY FIRST line of your output MUST be exactly:
+TITLE: <your chosen title here>
+The title must be unique to this episode - do NOT use "The Last Frequency", "Untitled", "Signal Lost", or "Episode". Draw it from the premise, characters, or a striking image in the story.
+
 Begin the full script now. Follow this structure exactly:
+TITLE: <your chosen title>
 === SCENE 1 ===
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
@@ -3234,7 +3314,7 @@ Begin the full script now. Follow this structure exactly:
 LENGTH DIRECTIVE: {length_instruction}
 STYLE DIRECTIVE: {style_instruction}
 
-EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
+EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
@@ -3247,7 +3327,12 @@ STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGHIJKL")} from the Story Arc 
 
 REMEMBER: Story first. Make the listener CARE about these people before you scare them with science. Write dialogue that sounds like real humans under pressure - not scientists reading papers.
 
+REQUIRED FIRST LINE: The VERY FIRST line of your output MUST be exactly:
+TITLE: <your chosen title here>
+The title must be unique to this episode - do NOT use "The Last Frequency", "Untitled", "Signal Lost", or "Episode". Draw it from the premise, characters, or a striking image in the story.
+
 Begin the full script now. Follow this structure exactly:
+TITLE: <your chosen title>
 === SCENE 1 ===
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
@@ -3745,6 +3830,44 @@ Begin the full script now. Follow this structure exactly:
         if guardrail_warnings:
             for w in guardrail_warnings:
                 _runtime_log(f"GUARDRAIL_UI: {w}")
+
+        # ------------------------------------------------------------------
+        # BUG-LOCAL-035 TITLE_STUCK FIX: resolve a real episode title and
+        # prepend a title token to script_lines so downstream nodes (video,
+        # assembler) can read it without falling back to a widget default.
+        # Resolution order:
+        #   1. user-supplied episode_title (widget)
+        #   2. "TITLE: ..." line emitted by the LLM in script_text
+        #   3. derived from the first environment token (deterministic)
+        #   4. timestamped genre fallback (last resort, still unique)
+        # Any result matching _STUCK_TITLE_DEFAULTS is rejected at each step.
+        # ------------------------------------------------------------------
+        _resolved_title = (episode_title or "").strip()
+        _title_source = "user"
+        if not _resolved_title or _resolved_title.lower() in _STUCK_TITLE_DEFAULTS:
+            _llm_title = _extract_title_from_script_text(script_text)
+            if _llm_title and _llm_title.lower() not in _STUCK_TITLE_DEFAULTS:
+                _resolved_title = _llm_title
+                _title_source = "llm"
+            else:
+                _derived_title = _derive_title_from_script_lines(
+                    script_lines, genre_flavor
+                )
+                if _derived_title and _derived_title.lower() not in _STUCK_TITLE_DEFAULTS:
+                    _resolved_title = _derived_title
+                    _title_source = "derived"
+                else:
+                    _resolved_title = f"Signal Lost Transmission {int(time.time()) % 100000}"
+                    _title_source = "timestamp_fallback"
+        _runtime_log(
+            f"TITLE_TRACE | source={_title_source} | resolved='{_resolved_title}' "
+            f"| user_widget='{episode_title}'"
+        )
+        # Prepend as first script_lines token so downstream nodes can read it.
+        # Token type 'title' is silently skipped by all existing iterators
+        # (they filter on dialogue/sfx/scene_break/etc) - safe addition.
+        script_lines = [{"type": "title", "value": _resolved_title}] + script_lines
+
         script_json = json.dumps(script_lines, indent=2)
 
         # Estimate actual minutes (radio drama pacing ~140 wpm)
@@ -5939,7 +6062,9 @@ OUTPUT ONLY THE NEW DIALOGUE LINES, one per line:"""
                 m = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', raw_line)
                 if m:
                     name = m.group(1).strip()
-                    if name not in _false_positives and name in characters:
+                    # BUG-LOCAL-036: was `_false_positives` (undefined).
+                    # Module-level constant is `_DIALOGUE_FALSE_POSITIVES`.
+                    if name not in _DIALOGUE_FALSE_POSITIVES and name in characters:
                         valid_lines.append(raw_line)
 
             if len(valid_lines) < 3:

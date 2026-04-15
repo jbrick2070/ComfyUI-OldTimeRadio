@@ -38,6 +38,23 @@ POLL_S = 10         # seconds between completion checks
 COOLDOWN_S = 30     # seconds between episodes
 
 # ---------------------------------------------------------------------------
+# USER-CONTROLLED STOP / AUTOMATED RUN PROTOCOL (v2.0-alpha)
+# ---------------------------------------------------------------------------
+# Jeffrey's control contract:
+#   * automated mode: soak runs continuously
+#   * user-initiated stop: create STOP_FILE -> soak pauses at top of next
+#     iteration and polls until the file is removed
+#   * automated fatal-streak halt: if FATAL_STREAK_LIMIT consecutive runs
+#     share the same fatal classification, soak creates STOP_FILE itself
+#     with a reason line and alerts via ntfy; user investigates and
+#     removes the file to resume.
+STOP_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), ".soak_stop"
+)
+STOP_POLL_S = 30
+FATAL_STREAK_LIMIT = 3
+
+# ---------------------------------------------------------------------------
 # ALLOWED PARAMETER VALUES (closed sets -- no invention allowed)
 # ---------------------------------------------------------------------------
 GENRES = [
@@ -1391,10 +1408,142 @@ def run_iteration(run_num):
                                     has_treatment, duration, scan_flags)
         append_to_log(review)
 
+    # 10e. Fatal-streak auto-halt (BUG-LOCAL-035/036 era). Tag this run's
+    # outcome. If 3 identical fatal tags land in a row, create STOP_FILE so
+    # the next iteration pauses until Jeffrey removes it. Clean SUCCESS with
+    # no streakable scan flags resets the window.
+    _fatal_tag = classify_fatal(result, error_msg, scan_flags)
+    if check_fatal_streak(_fatal_tag):
+        trigger_fatal_halt(run_num, _fatal_tag)
+
     # 11. Cooldown
     print_f(f"Cooldown: {COOLDOWN_S}s")
     time.sleep(COOLDOWN_S)
     return True
+
+
+# ---------------------------------------------------------------------------
+# FATAL-STREAK TRACKING + STOP-FILE HANDLING
+# ---------------------------------------------------------------------------
+# Sliding window of recent fatal classifications. A run that is SUCCESS with
+# no streakable scan_flag clears the window. A run with a fatal tag appends.
+# When the window contains FATAL_STREAK_LIMIT identical tags, we halt.
+_recent_fatal_tags = []
+
+# Known streakable scan-flag tags. Update this list if treatment_scanner
+# adds new flag categories. Must match the flag prefix emitted by
+# scan_treatment() so classification picks them up.
+_STREAKABLE_SCAN_TAGS = (
+    "TITLE_STUCK", "EMPTY_SCRIPT", "NEEDS_LLM_CLOSING",
+    "ALL_SAME_GENDER", "SINGLE_LINE_CHAR", "SHORT_DURATION",
+    "DUPLICATE_DIALOGUE", "NAME_DRIFT", "WORD_EXTEND_FAIL",
+)
+
+# Known streakable error-message substrings for FAIL results.
+_STREAKABLE_ERROR_TOKENS = (
+    "TITLE_RESOLVE_FAIL", "NameError", "KeyError", "CUDA out of memory",
+    "AttributeError", "ImportError",
+)
+
+
+def classify_fatal(result, error_msg, scan_flags):
+    """Classify a finished run into a fatal-streak tag or None.
+
+    Returns a short string tag used to detect 3-in-a-row repeats. Returns
+    None for clean SUCCESS runs (which RESET the streak window).
+    """
+    # Clean SUCCESS with no streakable scan flag -> reset streak.
+    flags_str = " ".join(str(f) for f in (scan_flags or []))
+    if result == "SUCCESS":
+        for tag in _STREAKABLE_SCAN_TAGS:
+            if tag in flags_str:
+                return tag
+        return None
+
+    # Non-SUCCESS: prefer scan-flag tag, fall back to error token.
+    for tag in _STREAKABLE_SCAN_TAGS:
+        if tag in flags_str:
+            return tag
+    if result == "TIMEOUT":
+        return "TIMEOUT"
+    if error_msg:
+        for tok in _STREAKABLE_ERROR_TOKENS:
+            if tok in error_msg:
+                return tok
+    return "FAIL_OTHER"
+
+
+def check_fatal_streak(tag):
+    """Update sliding window with the latest tag. Return True if the last
+    FATAL_STREAK_LIMIT entries are identical (and non-None)."""
+    global _recent_fatal_tags
+    if tag is None:
+        _recent_fatal_tags = []
+        return False
+    _recent_fatal_tags.append(tag)
+    if len(_recent_fatal_tags) > FATAL_STREAK_LIMIT:
+        _recent_fatal_tags = _recent_fatal_tags[-FATAL_STREAK_LIMIT:]
+    return (
+        len(_recent_fatal_tags) >= FATAL_STREAK_LIMIT
+        and len(set(_recent_fatal_tags)) == 1
+    )
+
+
+def trigger_fatal_halt(run_num, tag):
+    """Create STOP_FILE, alert, and leave the loop to pause on next iter."""
+    reason = (
+        f"FATAL_STREAK: {FATAL_STREAK_LIMIT} consecutive runs failed with "
+        f"tag={tag}. Paused after run {run_num:03d}. Remove "
+        f"{STOP_FILE} to resume."
+    )
+    try:
+        with open(STOP_FILE, "w", encoding="utf-8") as _sf:
+            _sf.write(reason + "\n")
+    except Exception as _se:
+        print_f(f"WARN: could not write STOP_FILE ({_se}). Halting in-memory.")
+    print_f(reason)
+    append_to_log(f"\n--- {reason} ---\n")
+    send_ntfy_alert(
+        "OTR Soak HALTED (fatal streak)",
+        reason,
+        priority="urgent",
+        tags=["skull", "rotating_light"],
+    )
+
+
+def wait_for_stop_clear(run_num):
+    """Block until STOP_FILE is removed. No-op if file absent.
+
+    Polls every STOP_POLL_S seconds. Ctrl+C during the wait exits cleanly.
+    """
+    if not os.path.exists(STOP_FILE):
+        return
+    reason_hint = ""
+    try:
+        with open(STOP_FILE, "r", encoding="utf-8") as _sf:
+            reason_hint = _sf.read().strip()[:200]
+    except Exception:
+        pass
+    msg = (
+        f"SOAK PAUSED: {STOP_FILE} exists. Waiting before starting run "
+        f"{run_num:03d}. Reason hint: {reason_hint or '(empty file)'}"
+    )
+    print_f(msg)
+    append_to_log(f"\n--- {msg} ---\n")
+    send_ntfy_alert(
+        "OTR Soak paused (stop file present)",
+        msg,
+        priority="default",
+        tags=["pause_button"],
+    )
+    while os.path.exists(STOP_FILE):
+        time.sleep(STOP_POLL_S)
+    resumed = f"SOAK RESUMED at run {run_num:03d}."
+    print_f(resumed)
+    append_to_log(f"\n--- {resumed} ---\n")
+    # Clear the streak window on resume so the next 3 runs get a fresh chance.
+    global _recent_fatal_tags
+    _recent_fatal_tags = []
 
 
 # ---------------------------------------------------------------------------
@@ -1433,6 +1582,9 @@ if __name__ == "__main__":
 
     while True:
         try:
+            # Pause here if a prior fatal streak created STOP_FILE, or if
+            # Jeffrey dropped one manually. Blocks until the file is gone.
+            wait_for_stop_clear(run_num)
             if not run_iteration(run_num):
                 print_f("CRITICAL: Stopping soak after unrecoverable failure.")
                 send_ntfy_alert(
