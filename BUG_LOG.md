@@ -5,6 +5,28 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-038: BatchBark sees 0 dialogue lines despite Grammarian reporting 21 -- Bark bus renders only ANNOUNCER [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Out-of-box QA run (Mistral, defaults, seed=Bacterial Echo at 13:23-13:36) shipped `signal_lost_bacterial_echo_20260415_133600.mp4` with the correct title (BUG-LOCAL-037 fix verified) but the audio bus had no character dialogue. Heartbeat trail:
+  * `ScriptWriter DONE: 1749 tokens ... | 4 scenes | 21 dialogue lines | Characters: ANNOUNCER, DRACULA MALONE, JOHN VANCE, KELLY ECKELS, SOM HALLOWAY` (streaming detector post-grammarian)
+  * `SCENE_TRACK: 06_AFTER_GRAMMARIAN | count=4`
+  * `TITLE_STRIP | extracted='Bacterial Echo'`
+  * `SCENE_TRACK: 07_AFTER_PARSE | count=4` (no dialogue-count checkpoint)
+  * `[BatchBark] Found 0 dialogue lines in Canonical 1.0 format (skipped 1 ANNOUNCER lines - routed to Kokoro bus)`
+  Upstream word-extend path also failed on this run (WORD_ENFORCEMENT 0 words / 700 target on the primary pass, recovered to 33% only via pre-rolled cast fallback), confirming the final `script_json` had dialogue strings somewhere in the text but `_parse_script` did not emit canonical `{"type":"dialogue"}` tokens for them.
+- **Cause:** Chain-of-custody break between FORMAT_NORM / GRAMMARIAN and `_parse_script` for Mistral's bare `NAME: text` dialogue style. Three compounding gaps:
+  1. `_normalize_script_format` skip heuristic (line 5289) treated `canonical_count >= 5` raw `NAME:` matches as "already canonical" and skipped the LLM rewrite to `[VOICE: NAME, traits]`. Mistral's native output is bare `NAME: text` -- that format made the skip-counter happy but was NOT a format `_parse_script`'s four VOICE-tag patterns accepted.
+  2. `_parse_script` had no first-class pattern for bare `NAME: dialogue`. v1-v4 all required `[VOICE: ...]` or `[NAME, traits]` bracket tags. Anything bare hit the "treat as structural direction" fallback (line ~6488) and was lost as a `{"type": "direction"}` token.
+  3. The permissive 2B-fallback inside `_parse_script` (line 6506) only fired when the strict pass produced `dialogue_count == 0 AND len(lines) > 0`. If GRAMMARIAN or any upstream pass injected even one malformed VOICE tag that registered as a dialogue token, the guard short-circuited and the bare `NAME:` recovery pass never ran -- leaving 20+ legitimate dialogue lines stranded as direction tokens.
+  No dialogue-count checkpoint existed between 06_AFTER_GRAMMARIAN and BatchBark input, so the exact loss point was invisible.
+- **Fix:** Four-part defense in `nodes/story_orchestrator.py`:
+  * **Diagnostic** (around line 3848): added `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N | characters=[...]` runtime log line right after the existing SCENE_TRACK checkpoint. Makes the silent drop visible in one grep on any future run.
+  * **FORMAT_NORM skip tightened** (line 5289): changed `has_dialogue = (voice_tag_count >= 3 or canonical_count >= 5)` to `has_dialogue = (voice_tag_count >= 3)`. Bare `NAME:` scripts must now always go through the LLM rewrite pass; they no longer look canonical to the skip heuristic.
+  * **2B-fallback guard loosened** (line ~6506): replaced single `dialogue_count == 0 AND len(lines) > 0` trigger with an OR of that original trigger and a new `dialogue_count < 3 AND raw-text has 5+ NAME: shape matches`. Now any handful of stray malformed VOICE tags at the top cannot short-circuit recovery of a genuinely bare-NAME script. A raw-text pre-check prevents false firings on narration-only treatments.
+  * **v5 VOICE pattern added** (before the direction fallback around line 6487): first-class regex for bare `NAME: dialogue` (accepts 0-2 asterisks, optional `(emotion)` parenthetical after the name, structural-token blacklist covering `TITLE`/`ENV`/`SFX`/etc but explicitly allowing `ANNOUNCER`). Registers the token as `{"type":"dialogue", "character_name": ..., "voice_traits": ..., "line": ...}` directly from the strict parse, so FORMAT_NORM becomes nice-to-have (adds voice traits) rather than load-bearing.
+- **Verify:** Next run's `otr_runtime.log` should show `DIALOGUE_TRACK: 07_AFTER_PARSE | count=N | characters=[...]` with N matching or beating the streaming heartbeat's dialogue count. `[BatchBark] Found N dialogue lines` in `comfyui_8000.log` should be N >= 15 for a normal 12-minute Mistral episode (was 0 before). Full MP4 audio should contain character dialogue audible in VLC, not announcer-only. Scripts emitted natively in `[VOICE: ...]` format (Gemma) or bracket-shorthand `[NAME, traits]` (Nemo) must still parse through their existing paths unchanged.
+- **Tags:** format-norm, parser, canonical-1.0, batch-bark, mistral, skip-heuristic, permissive-fallback, silent-drop
+
 ### BUG-LOCAL-037: BUG-LOCAL-035 fix made the parser see "TITLE" as a speaking character [FIXED]
 - **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Out-of-box-settings test (Mistral, defaults) showed `Characters: ANNOUNCER, LEMMY, QUINN MARTIN, TITLE, VICTOR WELLS, WATSON BERNARD` in the ScriptWriter heartbeat. Dialogue collapsed across the self-critique pass (28 dialogue lines -> 2). Final WORD_ENFORCEMENT logged 2 words / 700 target (0%) and WORD_EXTEND could only recover 1 valid line. The MP4 still rendered with the correct title (`signal_lost_magnetic_echo_*.mp4`) but had almost no dialogue.

@@ -3845,6 +3845,23 @@ TITLE: <your chosen title>
             f"| tokens={_parsed_scene_tokens}"
         )
 
+        # BUG-LOCAL-038: dialogue-token checkpoint. If this lands at 0 while
+        # the streaming heartbeat saw dialogue, the loss is in FORMAT_NORM /
+        # GRAMMARIAN / _parse_script -- not in BatchBark. Makes the silent
+        # drop visible in one grep.
+        _parsed_dialogue_tokens = [
+            ln for ln in script_lines if ln.get("type") == "dialogue"
+        ]
+        _parsed_dialogue_chars = sorted({
+            str(ln.get("character_name", "")).strip()
+            for ln in _parsed_dialogue_tokens
+            if ln.get("character_name")
+        })
+        _runtime_log(
+            f"DIALOGUE_TRACK: 07_AFTER_PARSE | count={len(_parsed_dialogue_tokens)} "
+            f"| characters={_parsed_dialogue_chars}"
+        )
+
         # Log guardrail warnings (visible in otr_runtime.log) but keep script_json as pure JSON
         # BUG-016: Never prepend comments to script_json - downstream nodes call json.loads() on it
         if guardrail_warnings:
@@ -5286,7 +5303,14 @@ Format your response exactly as:
         # whether CAST or scene markers existed. That silently let ghost
         # runs (Run 011/012) bypass FORMAT_NORM entirely. Now ALL three
         # structural elements must be present before we skip.
-        has_dialogue  = (voice_tag_count >= 3 or canonical_count >= 5)
+        #
+        # BUG-LOCAL-038 refinement: require real [VOICE:] tags, not bare
+        # canonical_count. Mistral's native output is `NAME: dialogue` with
+        # no bracket tag -- that format matches _FORMAT_NORM_NON_CHARS less
+        # and looks canonical to this counter, but _parse_script's four VOICE
+        # patterns do NOT accept it. Skipping FORMAT_NORM on bare NAME: runs
+        # is how the dialogue tokens vanish before BatchBark.
+        has_dialogue  = (voice_tag_count >= 3)
         has_scenes    = scene_count >= 1
         has_cast      = len(unique_chars) >= 2
 
@@ -6460,6 +6484,46 @@ OPENING:
                         i = j + 1
                         continue
 
+            # v5: bare `NAME: dialogue` (e.g. `DRACULA MALONE: We're gonna get out of here.`)
+            # BUG-LOCAL-038: Mistral Nemo emits this form natively and FORMAT_NORM
+            # used to be the only thing rewriting it into `[VOICE: NAME, traits]`.
+            # Register it as a first-class pattern so FORMAT_NORM becomes a
+            # nice-to-have (adds traits + voice cues) rather than load-bearing
+            # (prevents silent dialogue-token drop into BatchBark).
+            #
+            # Pattern accepts 0-2 leading asterisks, an optional (parenthetical)
+            # emotion tag after the name, and ignores any trailing asterisks.
+            # Structural tokens are blacklisted so `SCENE: ...`, `ACT 1: ...`,
+            # `TITLE: ...` (BUG-LOCAL-037), `ENV: ...`, etc never register as
+            # dialogue. ANNOUNCER is intentionally allowed -- BatchBark counts
+            # + skips it and routes to the Kokoro bus.
+            _m_v5 = re.match(
+                r'^(?:\*{0,2})([A-Z][A-Z0-9 ]{0,24})(?:\*{0,2})'
+                r'(?:\s*\(([^)]*)\))?\s*:\s+(.+)$',
+                s,
+            )
+            if _m_v5:
+                _v5_raw_name = _m_v5.group(1).strip()
+                _v5_first_word = _v5_raw_name.split()[0] if _v5_raw_name else ""
+                _v5_structural = {
+                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                    "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
+                    "INT", "EXT", "OPENING", "CLOSING", "INTERSTITIAL",
+                    "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR",
+                }
+                if _v5_first_word and _v5_first_word not in _v5_structural:
+                    _v5_emotion = (_m_v5.group(2) or "").strip()
+                    _v5_dialogue = _m_v5.group(3).strip().strip('"*_\u201c\u201d')
+                    if _v5_dialogue:
+                        lines.append({
+                            "type": "dialogue",
+                            "character_name": _v5_raw_name.upper(),
+                            "voice_traits": _v5_emotion or "unspecified",
+                            "line": _v5_dialogue,
+                        })
+                        i += 1
+                        continue
+
             # Fallback: treat as structural direction
             if s and not s.startswith("#") and not s.startswith("---"):
                 lines.append({"type": "direction", "text": s})
@@ -6479,8 +6543,28 @@ OPENING:
         
         # v1.4 Theme B - Failsafe for 2B models that strip [VOICE:] tags
         # If no dialogue was found but we see `NAME: dialogue` structure, attempt recovery
-        if dialogue_count == 0 and len(lines) > 0:
-            log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
+        #
+        # BUG-LOCAL-038: loosened from `dialogue_count == 0` to `< 3` AND raw
+        # text has 5+ `NAME:` shape matches. The previous guard short-circuited
+        # whenever any malformed VOICE tag registered as one dialogue token,
+        # leaving 20+ bare `NAME:` dialogue lines uncovered. The raw-text
+        # sanity check prevents the fallback from firing on scripts that are
+        # genuinely dialogue-light (e.g. narration-only treatments).
+        _raw_name_hits = len(re.findall(
+            r'^(?:\*{0,2})[A-Z][A-Z0-9 ]{1,25}(?:\*{0,2})\s*:\s+\S',
+            text, re.MULTILINE,
+        ))
+        _orig_fallback_trigger = (dialogue_count == 0 and len(lines) > 0)
+        _loose_fallback_trigger = (dialogue_count < 3 and _raw_name_hits >= 5)
+        if _orig_fallback_trigger or _loose_fallback_trigger:
+            if _loose_fallback_trigger and not _orig_fallback_trigger:
+                log.warning(
+                    "[ScriptParser] Only %d dialogue tokens but %d NAME: shape matches in raw text. "
+                    "Attempting permissive 2B-fallback parse (BUG-LOCAL-038)...",
+                    dialogue_count, _raw_name_hits,
+                )
+            else:
+                log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
             _recovered = 0
 
             # Pass 1: Match 'NAME: dialogue' or '*NAME*: dialogue' or '**NAME:** dialogue'
