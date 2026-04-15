@@ -568,6 +568,17 @@ class BatchBarkGenerator:
                  len(preset_groups),
                  ", ".join(f"{k}({len(v)} lines)" for k, v in preset_groups.items()))
 
+        # P1 #5: Length-sort within each preset group.
+        # Bark pads to the longest sequence in the batch. Sorting by text
+        # length groups similar-length lines together, reducing wasted padding.
+        # Script order is restored at assembly time via results[script_idx].
+        for preset in preset_groups:
+            preset_groups[preset].sort(key=lambda item: len(item["line"]))
+
+        log.info("[BatchBark] Length-sorted %d preset groups for reduced padding waste",
+                 len(preset_groups))
+        _runtime_log(f"BatchBark: Length-sorted {len(preset_groups)} preset groups")
+
         # -- Step 4: Load Bark once, generate all lines per preset ---------
         from .bark_tts import _load_bark
         model, processor = _load_bark("suno/bark")
