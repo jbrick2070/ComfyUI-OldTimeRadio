@@ -1301,6 +1301,232 @@ def _normalize_dialogue_names(text):
     return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
 
 
+# ── Scene inventory (diagnostic instrumentation) ────────────────
+# Extracts the list of scene tokens from a script so the orchestrator
+# can log scene counts at every pipeline checkpoint. A scene leak in
+# any pass (WORD_EXTEND, ANNOUNCER, FORMAT_NORM, GRAMMARIAN, PARSE)
+# shows up as a count drop in the soak log, localizing the bug.
+#
+# BUG-LOCAL-026 fix: restrict the scene-number capture to digits only.
+# The previous pattern (\S+?) matched literals like "FINAL" that the
+# creative LLM emits as a closing-scene marker ('=== SCENE FINAL ==='),
+# inflating scene counts and fooling the FORMAT_NORM skip heuristic.
+# Any '=== SCENE FINAL ===' is promoted to 'END' (terminator) below.
+_RE_SCENE_MARKER = re.compile(
+    r'===\s*SCENE\s+(\d+)(?:\s*:\s*[^=]*?)?\s*===',
+    re.IGNORECASE
+)
+_RE_SCENE_TERMINATOR = re.compile(
+    r'===\s*SCENE\s+FINAL\b[^=]*===',
+    re.IGNORECASE
+)
+
+
+def _scene_inventory(text):
+    """Return the ordered list of scene tokens found in the script.
+
+    Recognizes canonical '=== SCENE N ===' markers (numeric only) and a
+    trailing '=== SCENE FINAL ===' terminator. Returns tokens like
+    ['1', '2', '3'] or ['1', '2', 'END']. Empty list means no scene
+    markers present (valid for short scripts pre-FORMAT_NORM).
+    """
+    if not text:
+        return []
+    tokens = [m.group(1) for m in _RE_SCENE_MARKER.finditer(text)]
+    if _RE_SCENE_TERMINATOR.search(text):
+        tokens.append("END")
+    return tokens
+
+
+def _log_scene_checkpoint(stage, text):
+    """Emit a SCENE_TRACK log line for the given pipeline stage."""
+    tokens = _scene_inventory(text)
+    _runtime_log(
+        f"SCENE_TRACK: {stage} | count={len(tokens)} | tokens={tokens}"
+    )
+    return tokens
+
+
+# ── Name cleanup (fuzzy match against canonical cast) ────────────
+# BUG-020 fix: Under maximum chaos, LLMs hallucinate variant spellings
+# (NEMEO_SIRIKIT instead of NEMO SIRIKIT). This pure-Python pass reads
+# the canonical cast from config/episode_cast.txt and fuzzy-matches
+# every CHARACTER: line against the roster. No LLM call, no VRAM cost.
+
+def _name_similarity(a: str, b: str) -> float:
+    """Simple character-level similarity ratio (0.0 to 1.0).
+    Uses longest common subsequence length / max length.
+    Good enough for catching NEMEO->NEMO without pulling in difflib."""
+    a, b = a.upper(), b.upper()
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    # Levenshtein-style: count matching chars in order
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    matches = 0
+    last_idx = -1
+    for ch in shorter:
+        for j in range(last_idx + 1, len(longer)):
+            if longer[j] == ch:
+                matches += 1
+                last_idx = j
+                break
+    return matches / max(len(a), len(b))
+
+
+def _cleanup_character_names(script_text: str, cast_config_path: str,
+                             pre_rolled_cast: list) -> str:
+    """Consistency-focused name cleanup for LLM-generated scripts.
+
+    Two jobs:
+      1. CONSISTENCY: If the same character appears as both "NEMO" (50 lines)
+         and "NEMEO" (2 lines), collapse the rare variant into the dominant one.
+      2. GARBLE DETECTION: If a name is very close to a canonical cast name
+         (similarity > 0.75) but misspelled, fix it. This catches maximum-chaos
+         hallucinations like NEMEO_SIRIKIT -> NEMO SIRIKIT.
+
+    Does NOT force names to match the roster rigidly. "DR NEMO" or "CAPTAIN NEMO"
+    are fine as long as the LLM uses them consistently.
+
+    Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
+
+    Args:
+        script_text: The full script after FORMAT_NORM
+        cast_config_path: Path to config/episode_cast.txt
+        pre_rolled_cast: Fallback list of canonical names
+
+    Returns:
+        Script text with corrected character names
+    """
+    # Build canonical name set from config file or fallback
+    canonical_names = set()
+    try:
+        with open(cast_config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                name_part = line.split("|")[0].strip().upper()
+                if name_part:
+                    canonical_names.add(name_part)
+    except (FileNotFoundError, OSError):
+        pass
+
+    if not canonical_names and pre_rolled_cast:
+        canonical_names = {n.upper() for n in pre_rolled_cast}
+
+    # Always include fixed names that should never be "corrected"
+    canonical_names.update({"LEMMY", "ANNOUNCER"})
+
+    # Names that should never be touched (structural, not characters)
+    _skip_names = frozenset({
+        "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+        "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+        "VOICE", "SOUND", "FADE", "CUT", "TRANSITION",
+    })
+
+    # Extract all unique names from the script WITH occurrence counts
+    bare_names = re.findall(r'^([A-Z][A-Z0-9_ ]{1,30}):', script_text, re.MULTILINE)
+    voice_names = re.findall(r'\[VOICE:\s*([A-Z][A-Z0-9_ ]+)[,\]]', script_text)
+    all_occurrences = [n.strip().upper() for n in bare_names + voice_names]
+
+    # Count occurrences per name
+    name_counts = {}
+    for n in all_occurrences:
+        if n not in _skip_names:
+            name_counts[n] = name_counts.get(n, 0) + 1
+
+    if not name_counts:
+        _runtime_log("NAME_CLEANUP: No character names found in script - skipping")
+        return script_text
+
+    # --- PASS 1: CONSISTENCY ---
+    # Group similar names together. If one variant has 2 uses and another
+    # has 40, the rare one is a typo. Collapse into the dominant variant.
+    replacements = {}
+    processed = set()
+
+    # Sort by frequency (most common first) so dominant names anchor groups
+    sorted_names = sorted(name_counts.items(), key=lambda x: -x[1])
+
+    for dominant_name, dominant_count in sorted_names:
+        if dominant_name in processed or dominant_name in _skip_names:
+            continue
+        processed.add(dominant_name)
+
+        for rare_name, rare_count in sorted_names:
+            if rare_name in processed or rare_name in _skip_names:
+                continue
+            if rare_name == dominant_name:
+                continue
+
+            sim = _name_similarity(rare_name, dominant_name)
+            # High similarity + dominant name is much more frequent = typo
+            if sim >= 0.75 and dominant_count >= rare_count * 3:
+                replacements[rare_name] = dominant_name
+                processed.add(rare_name)
+                _runtime_log(
+                    f"NAME_CLEANUP: CONSISTENCY '{rare_name}' ({rare_count}x) -> "
+                    f"'{dominant_name}' ({dominant_count}x) [sim={sim:.2f}]"
+                )
+
+    # --- PASS 2: GARBLE DETECTION (against canonical roster) ---
+    # Only for names not already handled in pass 1 and not in canonical set.
+    for script_name, count in name_counts.items():
+        if script_name in processed or script_name in canonical_names:
+            continue
+        if script_name in _skip_names:
+            continue
+
+        best_match = None
+        best_score = 0.0
+        for canon in canonical_names:
+            if canon in _skip_names:
+                continue
+            score = _name_similarity(script_name, canon)
+            if score > best_score:
+                best_score = score
+                best_match = canon
+
+        # Only fix if very high similarity (0.75+) - this catches
+        # NEMEO->NEMO but leaves DR NEMO alone (low similarity to NEMO)
+        if best_match and best_score >= 0.75 and count <= 3:
+            replacements[script_name] = best_match
+            _runtime_log(
+                f"NAME_CLEANUP: GARBLE '{script_name}' ({count}x) -> "
+                f"'{best_match}' [sim={best_score:.2f}]"
+            )
+
+    if not replacements:
+        _runtime_log(
+            f"NAME_CLEANUP: {len(name_counts)} unique names, all consistent - "
+            f"no fixes needed"
+        )
+        return script_text
+
+    # Apply replacements (longest first to avoid partial matches)
+    for bad_name, good_name in sorted(replacements.items(), key=lambda x: -len(x[0])):
+        # Replace in bare format: BADNAME: -> GOODNAME:
+        script_text = re.sub(
+            rf'^{re.escape(bad_name)}:', f'{good_name}:',
+            script_text, flags=re.MULTILINE
+        )
+        # Replace in VOICE tags: [VOICE: BADNAME, -> [VOICE: GOODNAME,
+        script_text = script_text.replace(
+            f'[VOICE: {bad_name},', f'[VOICE: {good_name},'
+        )
+        script_text = script_text.replace(
+            f'[VOICE: {bad_name}]', f'[VOICE: {good_name}]'
+        )
+
+    _runtime_log(
+        f"NAME_CLEANUP: Fixed {len(replacements)} name variant(s): "
+        f"{', '.join(f'{k}->{v}' for k, v in replacements.items())}"
+    )
+    return script_text
+
+
 # ── Dual-format dialogue extraction ─────────────────────────────
 # Scripts may contain dialogue in EITHER format:
 #   Bare:  NAME: dialogue text
@@ -1319,8 +1545,94 @@ _RE_VOICE_TAG_DIALOGUE = re.compile(
 _DIALOGUE_FALSE_POSITIVES = frozenset({
     "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
     "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
-    "ANNOUNCER"
+    "ANNOUNCER",
+    # BUG-LOCAL-037: BUG-LOCAL-035's TITLE: <name> first-line convention
+    # was being parsed as a "TITLE" character speaking the title text.
+    # Block it everywhere a NAME: <text> shape gets read as dialogue.
+    "TITLE",
 })
+
+# BUG-LOCAL-035: Titles that indicate a stuck default or an unresolved title.
+# When a title resolution path yields one of these, we treat it as a failure
+# and either re-derive or fail loud. Keep lowercase, no punctuation.
+_STUCK_TITLE_DEFAULTS = frozenset({
+    "",
+    "the last frequency",
+    "untitled",
+    "episode",
+    "signal lost",
+    "custom episode",
+})
+
+# Matches a leading "TITLE:" line (case-insensitive) the LLM may emit when
+# asked to generate a title. We accept up to the end of the first line.
+_RE_TITLE_LINE = re.compile(
+    r'^\s*(?:\*\*)?\s*TITLE\s*:\s*["\u201C]?\s*(.+?)\s*["\u201D]?\s*(?:\*\*)?\s*$',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _extract_title_from_script_text(text):
+    """Pull a 'TITLE: ...' line out of raw LLM script text.
+
+    Gemma is instructed to emit such a line when episode_title is blank.
+    Returns the extracted title string (stripped, quotes removed) or "".
+    """
+    if not text:
+        return ""
+    m = _RE_TITLE_LINE.search(text[:2000])  # only look near the top
+    if not m:
+        return ""
+    cand = m.group(1).strip().strip('"\u201C\u201D\u2018\u2019')
+    # BUG-LOCAL-039: strip markdown bold/italic wrappers on the value itself
+    # (e.g. "TITLE: **Bioluminal Tide**" leaks leading "**" into the capture).
+    cand = re.sub(r'^(?:\*{1,3}|_{1,3})\s*', '', cand)
+    cand = re.sub(r'\s*(?:\*{1,3}|_{1,3})$', '', cand)
+    cand = cand.strip().strip('"\u201C\u201D\u2018\u2019')
+    # Reject obviously broken captures (too long, template residue).
+    if not cand:
+        return ""
+    if len(cand) > 120:
+        return ""
+    if cand.lower() in _STUCK_TITLE_DEFAULTS:
+        return ""
+    return cand
+
+
+def _derive_title_from_script_lines(lines, genre_flavor=""):
+    """Deterministic fallback title when the LLM didn't emit one.
+
+    Strategy: take the first 'environment' token's description, pick the
+    most-specific noun phrase from its first 6 words, title-case it.
+    This is last-resort; it keeps the filename layer unblocked when the
+    LLM path silently failed, without silently reusing a stuck default.
+    """
+    try:
+        for ln in lines or []:
+            if not isinstance(ln, dict):
+                continue
+            if ln.get("type") == "environment":
+                desc = (ln.get("description") or "").strip()
+                if not desc:
+                    continue
+                # Take first 6 tokens, drop stopwords/punctuation.
+                tokens = re.findall(r"[A-Za-z][A-Za-z0-9'\-]+", desc)[:6]
+                stop = {"a", "an", "the", "of", "on", "in", "at", "and",
+                        "or", "is", "with", "for", "to", "from", "by"}
+                kept = [t for t in tokens if t.lower() not in stop]
+                if not kept:
+                    continue
+                phrase = " ".join(kept[:4]).title()
+                # Filter if phrase collapses to a stuck default.
+                if phrase.lower() in _STUCK_TITLE_DEFAULTS:
+                    continue
+                return phrase
+    except Exception:
+        pass
+    # Final fallback: timestamped derivative so each run is unique and
+    # the filename layer never regresses to a stuck default.
+    genre = (genre_flavor or "transmission").replace("_", " ").title()
+    return f"{genre} Transmission {int(time.time()) % 100000}"
 
 
 def _extract_all_dialogue(text):
@@ -1585,8 +1897,12 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         if bare_match:
             name = bare_match.group(1).strip()
             # Skip false positives like "SCENE:", "SFX:", "ENV:", "NOTE:"
+            # BUG-LOCAL-037: TITLE added so the streaming heartbeat does not
+            # mistake the writer-prompt's "TITLE: <...>" first line for a
+            # character speaking the title text.
             if name not in ("SCENE", "SFX", "ENV", "NOTE", "NARRATOR",
-                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE"):
+                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE",
+                            "TITLE"):
                 self.dialogue_count += 1
                 self.characters_seen.add(name)
                 clean_dialogue = bare_match.group(2).strip()[:60]
@@ -2250,8 +2566,8 @@ class LLMScriptWriter:
         return {
             "required": {
                 "episode_title": ("STRING", {
-                    "default": "The Last Frequency",
-                    "tooltip": "Episode title (or leave blank for Gemma to generate one)"
+                    "default": "",
+                    "tooltip": "Episode title (leave blank for Gemma to generate one; see BUG-LOCAL-035)"
                 }),
                 "genre_flavor": (["hard_sci_fi", "space_opera", "dystopian",
                                   "time_travel", "first_contact", "cosmic_horror",
@@ -2309,14 +2625,17 @@ class LLMScriptWriter:
                     "default": True,
                     "tooltip": "Structural coherence pass: rewrites the opening & closing dialogue to ensure a 'seed' in the intro pays off in the finale."
                 }),
-                # v1.4 Theme C - optional series bible. Socket input only, no widget,
-                # so widgets_values length is unchanged and v1.3 workflows load clean.
-                "project_state": ("PROJECT_STATE", {
-                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
-                }),
                 "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
                     "default": "Standard",
                     "tooltip": "Master switch for multi-pass generation. Obsidian is for 4GB hardware only; it is unstable and disables all iterative passes."
+                }),
+                # v1.4 Theme C - optional series bible. Socket input only, no widget.
+                # BUG-LOCAL-027: project_state MUST remain the last entry in optional.
+                # Socket-only inputs at the tail cannot shift widget slots even if the
+                # widgets_values mapper regresses. Do not add widget-backed params
+                # after this line.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the script prompt."
                 }),
             },
         }
@@ -2934,6 +3253,22 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             "If ANNOUNCER is present, it does not count as a cast invention."
         )
 
+        # -- Write canonical cast to config/episode_cast.txt --
+        # Single source of truth for the name cleanup pass downstream.
+        _cast_config_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "config", "episode_cast.txt"
+        )
+        try:
+            os.makedirs(os.path.dirname(_cast_config_path), exist_ok=True)
+            with open(_cast_config_path, "w", encoding="utf-8") as _cf:
+                _cf.write("# Episode Cast - auto-generated per episode\n")
+                for _cname in pre_rolled_cast:
+                    # Gender not known yet at pre-roll; will be resolved by Director
+                    _cf.write(f"{_cname} | unknown\n")
+            _runtime_log(f"ScriptWriter: CAST_CONFIG written: {len(pre_rolled_cast)} characters -> {_cast_config_path}")
+        except Exception as _cast_err:
+            log.warning("[ScriptWriter] Failed to write cast config: %s", _cast_err)
+
         # -- Open-Close Expansion --
         winning_outline = ""
         _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
@@ -2960,7 +3295,7 @@ STYLE DIRECTIVE: {style_instruction}
 WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 {winning_outline}
 
-EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
+EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
@@ -2970,7 +3305,12 @@ TARGET LENGTH: ~{target_words} words
 
 REMEMBER: The {oc_mode_label.lower()} above is your premise and story spine. {"Invent the full scene structure, acts, and SFX based on it." if oc_mode_label == "PITCH" else "Follow its structure, characters, and arc."} Flesh it out with sharp dialogue, atmospheric [SFX:] and [ENV:] tags, and real emotional stakes.
 
+REQUIRED FIRST LINE: The VERY FIRST line of your output MUST be exactly:
+TITLE: <your chosen title here>
+The title must be unique to this episode - do NOT use "The Last Frequency", "Untitled", "Signal Lost", or "Episode". Draw it from the premise, characters, or a striking image in the story.
+
 Begin the full script now. Follow this structure exactly:
+TITLE: <your chosen title>
 === SCENE 1 ===
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
@@ -2989,7 +3329,7 @@ Begin the full script now. Follow this structure exactly:
 LENGTH DIRECTIVE: {length_instruction}
 STYLE DIRECTIVE: {style_instruction}
 
-EPISODE TITLE: {episode_title if episode_title else "(generate a compelling, evocative title)"}
+EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
 GENRE: {genre_flavor.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
@@ -3002,7 +3342,12 @@ STORY ARC SEED: Use Arc Type {random.choice("ABCDEFGHIJKL")} from the Story Arc 
 
 REMEMBER: Story first. Make the listener CARE about these people before you scare them with science. Write dialogue that sounds like real humans under pressure - not scientists reading papers.
 
+REQUIRED FIRST LINE: The VERY FIRST line of your output MUST be exactly:
+TITLE: <your chosen title here>
+The title must be unique to this episode - do NOT use "The Last Frequency", "Untitled", "Signal Lost", or "Episode". Draw it from the premise, characters, or a striking image in the story.
+
 Begin the full script now. Follow this structure exactly:
+TITLE: <your chosen title>
 === SCENE 1 ===
 [ENV: location description, ambient noise, vibe]
 [SFX: establishing sound]
@@ -3336,6 +3681,9 @@ Begin the full script now. Follow this structure exactly:
         #   4. PARSE        — parse clean text into structured JSON
         # ══════════════════════════════════════════════════════════════
 
+        # -- SCENE CHECKPOINT: raw LLM output (pre-pipeline baseline) --
+        _log_scene_checkpoint("00_RAW_LLM_OUTPUT", script_text)
+
         # -- STEP 0: NORMALIZE BOLD DIALOGUE NAMES (BUG-023 fix) --------
         # LLMs at high temperature produce **NAME**, emotion: format.
         # Strip to canonical NAME: before any word-count regex runs.
@@ -3343,6 +3691,7 @@ Begin the full script now. Follow this structure exactly:
         script_text = _normalize_dialogue_names(script_text)
         if len(script_text) != _pre_norm_len:
             _runtime_log("BOLD_NORM: Stripped Markdown bold from dialogue names")
+        _log_scene_checkpoint("01_AFTER_BOLD_NORM", script_text)
 
         # -- STEP 1: WORD-COUNT ENFORCEMENT (BUG-012/020/025 fix) -----
         # Count dialogue words in raw text using dual-format extraction.
@@ -3395,6 +3744,7 @@ Begin the full script now. Follow this structure exactly:
                 f"WORD_ENFORCEMENT: Post-extension: {_raw_dialogue_words} words "
                 f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 140:.1f} min"
             )
+        _log_scene_checkpoint("02_AFTER_WORD_EXTEND", script_text)
 
         # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
         # Check if ANNOUNCER lines exist. If not, generate and inject.
@@ -3430,6 +3780,7 @@ Begin the full script now. Follow this structure exactly:
             if not _has_announcer_close and closing_text:
                 script_text = f"{script_text}\n\nANNOUNCER: {closing_text}"
                 _runtime_log(f"ANNOUNCER_RAW: Appended closing ({len(closing_text)} chars)")
+        _log_scene_checkpoint("03_AFTER_ANNOUNCER", script_text)
 
         # -- STEP 3: FORMAT NORMALIZER (Creative → Strict) ------------
         # Now the script has extensions + announcer. One pass cleans
@@ -3437,8 +3788,37 @@ Begin the full script now. Follow this structure exactly:
         script_text = self._normalize_script_format(
             script_text, model_id, optimization_profile
         )
+        _log_scene_checkpoint("04_AFTER_FORMAT_NORM", script_text)
+
+        # -- STEP 3b: NAME CLEANUP (Python fuzzy match) ---------------
+        # Read canonical cast from config/episode_cast.txt and fix any
+        # hallucinated name variants the LLM produced under high creativity.
+        # Pure Python - no LLM call, no VRAM cost, runs in milliseconds.
+        script_text = _cleanup_character_names(script_text, _cast_config_path, pre_rolled_cast)
+        _log_scene_checkpoint("05_AFTER_NAME_CLEANUP", script_text)
+
+        # -- STEP 3c: GRAMMARIAN (final logic + grammar polish) -------
+        # Light LLM pass at temp 0.3. Fixes grammar, catches logic gaps,
+        # ensures dialogue reads naturally. Does NOT add content, rename
+        # characters, or change the story. Pure copy-edit.
+        script_text = self._grammarian_pass(
+            script_text, model_id, optimization_profile
+        )
+        _log_scene_checkpoint("06_AFTER_GRAMMARIAN", script_text)
 
         # -- STEP 4: PARSE into structured JSON -----------------------
+        # BUG-LOCAL-037: capture the LLM-emitted "TITLE: <...>" line BEFORE
+        # we feed script_text to the parser, then strip it. Otherwise the
+        # parser reads it as a "TITLE" character speaking the title text,
+        # polluting the cast roster and confusing the self-critique pass.
+        _early_llm_title = _extract_title_from_script_text(script_text)
+        script_text = _RE_TITLE_LINE.sub("", script_text).lstrip()
+        if _early_llm_title:
+            _runtime_log(
+                f"TITLE_STRIP | extracted='{_early_llm_title}' | "
+                f"removed leading TITLE: line(s) before parse"
+            )
+
         # Single parse on the fully prepared text.
         # LLM_RESCUE fires only if parser gets 0 dialogue lines.
         try:
@@ -3459,11 +3839,82 @@ Begin the full script now. Follow this structure exactly:
             else:
                 raise
 
+        # -- SCENE CHECKPOINT: post-parse (structured view) -----------
+        # Count scene_break entries in script_lines. If this drops
+        # below the 06_AFTER_GRAMMARIAN count, the parser lost scenes.
+        _parsed_scene_tokens = [
+            str(ln.get("scene", "")).strip().upper()
+            for ln in script_lines
+            if ln.get("type") == "scene_break"
+        ]
+        _runtime_log(
+            f"SCENE_TRACK: 07_AFTER_PARSE | count={len(_parsed_scene_tokens)} "
+            f"| tokens={_parsed_scene_tokens}"
+        )
+
+        # BUG-LOCAL-038: dialogue-token checkpoint. If this lands at 0 while
+        # the streaming heartbeat saw dialogue, the loss is in FORMAT_NORM /
+        # GRAMMARIAN / _parse_script -- not in BatchBark. Makes the silent
+        # drop visible in one grep.
+        _parsed_dialogue_tokens = [
+            ln for ln in script_lines if ln.get("type") == "dialogue"
+        ]
+        _parsed_dialogue_chars = sorted({
+            str(ln.get("character_name", "")).strip()
+            for ln in _parsed_dialogue_tokens
+            if ln.get("character_name")
+        })
+        _runtime_log(
+            f"DIALOGUE_TRACK: 07_AFTER_PARSE | count={len(_parsed_dialogue_tokens)} "
+            f"| characters={_parsed_dialogue_chars}"
+        )
+
         # Log guardrail warnings (visible in otr_runtime.log) but keep script_json as pure JSON
         # BUG-016: Never prepend comments to script_json - downstream nodes call json.loads() on it
         if guardrail_warnings:
             for w in guardrail_warnings:
                 _runtime_log(f"GUARDRAIL_UI: {w}")
+
+        # ------------------------------------------------------------------
+        # BUG-LOCAL-035 TITLE_STUCK FIX: resolve a real episode title and
+        # prepend a title token to script_lines so downstream nodes (video,
+        # assembler) can read it without falling back to a widget default.
+        # Resolution order:
+        #   1. user-supplied episode_title (widget)
+        #   2. "TITLE: ..." line emitted by the LLM in script_text
+        #   3. derived from the first environment token (deterministic)
+        #   4. timestamped genre fallback (last resort, still unique)
+        # Any result matching _STUCK_TITLE_DEFAULTS is rejected at each step.
+        # ------------------------------------------------------------------
+        _resolved_title = (episode_title or "").strip()
+        _title_source = "user"
+        if not _resolved_title or _resolved_title.lower() in _STUCK_TITLE_DEFAULTS:
+            # BUG-LOCAL-037: prefer the title we captured BEFORE strip.
+            # Falls back to a fresh extract for safety if the early capture
+            # was empty for any reason (e.g. self-critique re-emitted one).
+            _llm_title = _early_llm_title or _extract_title_from_script_text(script_text)
+            if _llm_title and _llm_title.lower() not in _STUCK_TITLE_DEFAULTS:
+                _resolved_title = _llm_title
+                _title_source = "llm"
+            else:
+                _derived_title = _derive_title_from_script_lines(
+                    script_lines, genre_flavor
+                )
+                if _derived_title and _derived_title.lower() not in _STUCK_TITLE_DEFAULTS:
+                    _resolved_title = _derived_title
+                    _title_source = "derived"
+                else:
+                    _resolved_title = f"Signal Lost Transmission {int(time.time()) % 100000}"
+                    _title_source = "timestamp_fallback"
+        _runtime_log(
+            f"TITLE_TRACE | source={_title_source} | resolved='{_resolved_title}' "
+            f"| user_widget='{episode_title}'"
+        )
+        # Prepend as first script_lines token so downstream nodes can read it.
+        # Token type 'title' is silently skipped by all existing iterators
+        # (they filter on dialogue/sfx/scene_break/etc) - safe addition.
+        script_lines = [{"type": "title", "value": _resolved_title}] + script_lines
+
         script_json = json.dumps(script_lines, indent=2)
 
         # Estimate actual minutes (radio drama pacing ~140 wpm)
@@ -4813,6 +5264,13 @@ Format your response exactly as:
 
         return None
 
+    # False-positive tag names that look like CHARACTER: but aren't speakers.
+    # Shared between skip heuristic and chunk dialogue counting.
+    _FORMAT_NORM_NON_CHARS = {
+        "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
+        "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
+    }
+
     def _normalize_script_format(self, script_text, model_id, optimization_profile="Standard"):
         """Creative-to-Strict pass: reformat any dialogue style into Canonical 1.0.
 
@@ -4820,33 +5278,94 @@ Format your response exactly as:
         rewrite the script into strict format. This prevents PARSE_FATAL when
         the creative pass produces non-standard dialogue formatting.
 
+        Routing:
+          - Tightened skip heuristic: only skip when dialogue AND scenes AND
+            cast are ALL present. This catches "ghost runs" where max chaos
+            produces parseable-looking dialogue but no CAST or scene markers.
+          - Single-pass for short scripts (<=50 dialogue lines OR <2 scenes).
+          - Chunked by scene marker for long scripts, like the Grammarian.
+
         Returns the normalized script text, or the original if normalization fails.
         """
-        # Quick check: if the script already has [VOICE:] tags, skip normalization
+        # ----- Count every structural signal ------------------------------
         voice_tag_count = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
-        if voice_tag_count >= 3:
-            _runtime_log(f"FORMAT_NORM: Skipped - script already has {voice_tag_count} [VOICE:] tags")
-            return script_text
-
-        # Quick check: if script has enough CHARACTER_NAME: lines, skip.
-        # Exclude false positives like SCENE:, ACT:, NOTE:, TARGET:, STYLE:
-        _false_positive_names = {"SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
-                                 "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC"}
         _all_canonical = re.findall(
             r'^([A-Z][A-Z0-9_ ]{1,25}):\s+.+$', script_text, re.MULTILINE
         )
-        canonical_count = sum(1 for name in _all_canonical
-                              if name.strip() not in _false_positive_names)
-        # Threshold: at least 5 real dialogue lines, or 10% of total lines
-        total_lines = max(1, script_text.count('\n'))
-        min_threshold = max(5, int(total_lines * 0.10))
-        if canonical_count >= min_threshold:
-            _runtime_log(f"FORMAT_NORM: Skipped - script already has {canonical_count} canonical dialogue lines (threshold: {min_threshold})")
+        canonical_count = sum(
+            1 for name in _all_canonical
+            if name.strip() not in self._FORMAT_NORM_NON_CHARS
+        )
+        unique_chars = {
+            name.strip() for name in _all_canonical
+            if name.strip() not in self._FORMAT_NORM_NON_CHARS
+        }
+        scene_count = len(re.findall(
+            r'===\s*SCENE\s+\S+.*?===', script_text, re.IGNORECASE
+        ))
+        total_dialogue = canonical_count + voice_tag_count
+
+        # ----- Tightened skip heuristic -----------------------------------
+        # Previously: skipped if dialogue count was "enough" regardless of
+        # whether CAST or scene markers existed. That silently let ghost
+        # runs (Run 011/012) bypass FORMAT_NORM entirely. Now ALL three
+        # structural elements must be present before we skip.
+        #
+        # BUG-LOCAL-038 refinement: require real [VOICE:] tags, not bare
+        # canonical_count. Mistral's native output is `NAME: dialogue` with
+        # no bracket tag -- that format matches _FORMAT_NORM_NON_CHARS less
+        # and looks canonical to this counter, but _parse_script's four VOICE
+        # patterns do NOT accept it. Skipping FORMAT_NORM on bare NAME: runs
+        # is how the dialogue tokens vanish before BatchBark.
+        has_dialogue  = (voice_tag_count >= 3)
+        has_scenes    = scene_count >= 1
+        has_cast      = len(unique_chars) >= 2
+
+        if has_dialogue and has_scenes and has_cast:
+            _runtime_log(
+                f"FORMAT_NORM: Skipped - dialogue={canonical_count}+"
+                f"{voice_tag_count}V, scenes={scene_count}, "
+                f"cast={len(unique_chars)} (all present)"
+            )
             return script_text
 
-        _runtime_log("FORMAT_NORM: Script needs normalization - running strict reformat pass")
+        _runtime_log(
+            f"FORMAT_NORM: Running (dialogue={canonical_count}+"
+            f"{voice_tag_count}V, scenes={scene_count}, "
+            f"cast={len(unique_chars)}) - "
+            f"missing: "
+            f"{'dialogue ' if not has_dialogue else ''}"
+            f"{'scenes ' if not has_scenes else ''}"
+            f"{'cast' if not has_cast else ''}"
+        )
 
-        normalize_prompt = f"""You are a strict script normalizer. Your ONLY task is to reformat input text into the exact canonical format defined below.
+        # ----- Route: chunked for long scripts, single for short ----------
+        _CHUNK_THRESHOLD = 50  # dialogue lines before chunking
+        if total_dialogue > _CHUNK_THRESHOLD and scene_count >= 2:
+            return self._normalize_chunked(
+                script_text, model_id, optimization_profile,
+                canonical_count, voice_tag_count,
+            )
+        return self._normalize_single_pass(
+            script_text, model_id, optimization_profile,
+            canonical_count, voice_tag_count,
+        )
+
+    # -------------------------------------------------------------------------
+    # FORMAT_NORM: single-pass and chunked implementations
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _build_normalize_prompt(script_text, *, is_segment=False):
+        """Shared strict-normalizer prompt. Same rules for full script and
+        per-scene chunk; chunked variant adds a segment-awareness preamble."""
+        preamble = (
+            "The text below is ONE SEGMENT of a longer script. Preserve "
+            "every scene marker verbatim and do not merge or split scenes.\n"
+            if is_segment else ""
+        )
+        return f"""You are a strict script normalizer. Your ONLY task is to reformat input text into the exact canonical format defined below.
+{preamble}
 
 HARD CONSTRAINTS:
 - Do NOT add, remove, summarize, or rewrite ANY dialogue or content.
@@ -4922,14 +5441,25 @@ Output ONLY the normalized script. No explanations. No extra text. No commentary
 SCRIPT TO REFORMAT:
 {script_text}"""
 
-        # BUG-019 FIX: Tighter token budget + timeout for FORMAT_NORM.
-        # The LLM is reformatting, not creating content. Output should be
-        # roughly the same length as the dialogue portion of the input.
-        # Old budget: min(2048, len//3 + 500) gave 2048 for a 10k-char script.
-        # New budget: min(1024, len//4) gives ~1024, preventing runaway filler.
-        # Timeout reduced from 120s to 75s - if it can't finish in 75s, bail.
+    def _normalize_single_pass(self, script_text, model_id,
+                               optimization_profile,
+                               canonical_count, voice_tag_count):
+        """Single-pass FORMAT_NORM for short scripts (under the chunk threshold).
+
+        BUG-019 token budget preserved: min(1024, max(256, len//4)) keeps the
+        LLM from runaway filler while giving enough room for the reformatted
+        output. Timeout 75s - if reformatting can't finish in that window,
+        the script is too long and should have been chunked instead.
+        """
+        normalize_prompt = self._build_normalize_prompt(
+            script_text, is_segment=False
+        )
+
         _norm_max_tokens = min(1024, max(256, len(script_text) // 4))
-        _runtime_log(f"FORMAT_NORM: Token budget = {_norm_max_tokens} (input chars = {len(script_text)})")
+        _runtime_log(
+            f"FORMAT_NORM: Single-pass | token budget={_norm_max_tokens} | "
+            f"input chars={len(script_text)}"
+        )
 
         try:
             normalized = _run_with_timeout(
@@ -4945,7 +5475,11 @@ SCRIPT TO REFORMAT:
             )
 
             if not normalized or len(normalized.strip()) < len(script_text) * 0.3:
-                _runtime_log(f"FORMAT_NORM: Output too short ({len(normalized or '')} chars vs {len(script_text)} input) - keeping original")
+                _runtime_log(
+                    f"FORMAT_NORM: Output too short "
+                    f"({len(normalized or '')} chars vs {len(script_text)} "
+                    f"input) - keeping original"
+                )
                 return script_text
 
             # Verify normalization improved dialogue detection
@@ -4955,16 +5489,522 @@ SCRIPT TO REFORMAT:
             new_voice = len(re.findall(r'\[VOICE:', normalized, re.IGNORECASE))
 
             if new_canonical + new_voice > canonical_count + voice_tag_count:
-                _runtime_log(f"FORMAT_NORM: Success - {new_canonical} canonical + {new_voice} VOICE tags (was {canonical_count} + {voice_tag_count})")
+                _runtime_log(
+                    f"FORMAT_NORM: Success - {new_canonical} canonical + "
+                    f"{new_voice} VOICE tags (was {canonical_count} + "
+                    f"{voice_tag_count})"
+                )
                 return normalized.strip()
             else:
-                _runtime_log(f"FORMAT_NORM: No improvement ({new_canonical} canonical vs {canonical_count}) - keeping original")
+                _runtime_log(
+                    f"FORMAT_NORM: No improvement ({new_canonical} canonical "
+                    f"vs {canonical_count}) - keeping original"
+                )
                 return script_text
 
         except Exception as e:
             log.warning("[FormatNorm] Normalization pass failed: %s", e)
             _runtime_log(f"FORMAT_NORM: Failed ({e}) - keeping original")
             return script_text
+
+    def _normalize_chunked(self, script_text, model_id,
+                           optimization_profile,
+                           canonical_count, voice_tag_count):
+        """Chunked FORMAT_NORM for long scripts (50+ dialogue lines, 2+ scenes).
+
+        Mirrors _grammarian_chunked: split by === SCENE N === markers,
+        normalize each scene independently with a full per-chunk token budget,
+        then reassemble. This fixes the ghost-run class of bug where a long
+        script silently bailed out via "Output too short" because the 1024
+        token cap could not cover the entire reformatted script.
+
+        Each chunk has its own timeout and safety checks; failed chunks keep
+        their original text rather than blocking the rest.
+        """
+        _runtime_log(
+            f"FORMAT_NORM: Chunked mode | canonical={canonical_count}, "
+            f"voice={voice_tag_count} dialogue lines"
+        )
+
+        # ----- Split by scene markers ---------------------------------
+        scene_re = re.compile(
+            r'(===\s*SCENE\s+\S+.*?===)', re.IGNORECASE
+        )
+        parts = scene_re.split(script_text)
+
+        # Reassemble: each chunk = marker + body until next marker.
+        chunks = []
+        current_chunk = ""
+        for part in parts:
+            if scene_re.match(part):
+                if current_chunk.strip():
+                    chunks.append(current_chunk)
+                current_chunk = part
+            else:
+                current_chunk += part
+        if current_chunk.strip():
+            chunks.append(current_chunk)
+
+        # Fall back to line-based chunking if scene split produced only 1.
+        if len(chunks) <= 1:
+            _runtime_log(
+                "FORMAT_NORM: No scene markers found - using line-based chunking"
+            )
+            all_lines = script_text.split('\n')
+            chunk_size = 40
+            chunks = [
+                '\n'.join(all_lines[i:i + chunk_size])
+                for i in range(0, len(all_lines), chunk_size)
+            ]
+
+        _runtime_log(f"FORMAT_NORM: Split into {len(chunks)} chunks")
+
+        # ----- Normalize each chunk independently ---------------------
+        normalized_chunks = []
+        total_fixed = 0
+        total_kept = 0
+
+        for idx, chunk in enumerate(chunks):
+            chunk_num = idx + 1
+
+            # Pre-count for per-chunk safety check.
+            _chunk_canon_pre = sum(
+                1 for name in re.findall(
+                    r'^([A-Z][A-Z0-9_ ]{1,25}):\s+.+$', chunk, re.MULTILINE
+                ) if name.strip() not in self._FORMAT_NORM_NON_CHARS
+            )
+            _chunk_voice_pre = len(re.findall(
+                r'\[VOICE:', chunk, re.IGNORECASE
+            ))
+
+            chunk_prompt = self._build_normalize_prompt(
+                chunk, is_segment=True
+            )
+
+            _chunk_tokens = min(1024, max(256, len(chunk) // 4))
+            _runtime_log(
+                f"FORMAT_NORM: Chunk {chunk_num}/{len(chunks)} | "
+                f"pre={_chunk_canon_pre}+{_chunk_voice_pre}V | "
+                f"budget={_chunk_tokens}"
+            )
+
+            try:
+                normalized = _run_with_timeout(
+                    lambda: _generate_with_llm(
+                        chunk_prompt,
+                        model_id=model_id,
+                        max_new_tokens=_chunk_tokens,
+                        temperature=0.3,
+                        optimization_profile=optimization_profile,
+                    ),
+                    timeout_sec=75,
+                    phase_label=f"FormatNorm-Chunk-{chunk_num}",
+                )
+
+                if not normalized or len(normalized.strip()) < len(chunk) * 0.3:
+                    _runtime_log(
+                        f"FORMAT_NORM: Chunk {chunk_num} output too short "
+                        f"- keeping original"
+                    )
+                    normalized_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                # Per-chunk improvement check: did normalization add structure?
+                _chunk_canon_post = len(re.findall(
+                    r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$',
+                    normalized, re.MULTILINE
+                ))
+                _chunk_voice_post = len(re.findall(
+                    r'\[VOICE:', normalized, re.IGNORECASE
+                ))
+
+                if (_chunk_canon_post + _chunk_voice_post <
+                        (_chunk_canon_pre + _chunk_voice_pre) * 0.8):
+                    _runtime_log(
+                        f"FORMAT_NORM: Chunk {chunk_num} lost dialogue "
+                        f"({_chunk_canon_post}+{_chunk_voice_post}V vs "
+                        f"{_chunk_canon_pre}+{_chunk_voice_pre}V) - "
+                        f"keeping original"
+                    )
+                    normalized_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                normalized_chunks.append(normalized.strip())
+                total_fixed += 1
+
+            except Exception as e:
+                log.warning("[FormatNorm] Chunk %d failed: %s", chunk_num, e)
+                _runtime_log(
+                    f"FORMAT_NORM: Chunk {chunk_num} failed ({e}) "
+                    f"- keeping original"
+                )
+                normalized_chunks.append(chunk)
+                total_kept += 1
+
+        # ----- Reassemble ---------------------------------------------
+        reassembled = '\n\n'.join(normalized_chunks)
+
+        # Final safety: total dialogue count must hold (80% floor).
+        _post_canon = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', reassembled, re.MULTILINE
+        ))
+        _post_voice = len(re.findall(r'\[VOICE:', reassembled, re.IGNORECASE))
+        _pre_total = canonical_count + voice_tag_count
+        _post_total = _post_canon + _post_voice
+
+        if _pre_total > 0 and _post_total < _pre_total * 0.8:
+            _runtime_log(
+                f"FORMAT_NORM: Chunked pass lost too many lines overall "
+                f"({_post_total} vs {_pre_total}) - keeping original"
+            )
+            return script_text
+
+        _runtime_log(
+            f"FORMAT_NORM: Chunked success | {total_fixed} fixed, "
+            f"{total_kept} kept | lines {_pre_total}->{_post_total}"
+        )
+        return reassembled
+
+    def _grammarian_pass(self, script_text, model_id,
+                         optimization_profile="Standard"):
+        """Final copy-edit pass: grammar, logic, and readability polish.
+
+        Runs at temp 0.3 (structural). The grammarian does NOT:
+          - Add new content, scenes, or dialogue lines
+          - Rename characters or change the cast
+          - Alter SFX/ENV tags or scene structure
+          - Change the story arc or plot
+
+        The grammarian DOES:
+          - Fix grammar, punctuation, and spelling in dialogue
+          - Smooth awkward phrasing so lines read naturally aloud
+          - Flag and fix logic gaps (character in two places at once, etc.)
+          - Ensure dialogue attributions are consistent
+          - Clean up run-on sentences for radio pacing
+
+        Returns the polished script, or the original if the pass fails.
+        """
+        # Skip for very short scripts (not worth the VRAM cost)
+        if len(script_text) < 500:
+            _runtime_log("GRAMMARIAN: Skipped - script too short")
+            return script_text
+
+        # Count dialogue lines before - we must not lose any
+        _pre_lines = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', script_text, re.MULTILINE
+        ))
+        _pre_voice = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
+        _pre_total = _pre_lines + _pre_voice
+
+        # -----------------------------------------------------------
+        # CHUNKED GRAMMARIAN for long scripts (60+ dialogue lines)
+        # Split by scene markers, polish each scene independently,
+        # then reassemble. Prevents timeout on dense episodes.
+        # -----------------------------------------------------------
+        _CHUNK_THRESHOLD = 50  # dialogue lines before chunking kicks in
+
+        if _pre_total > _CHUNK_THRESHOLD:
+            return self._grammarian_chunked(
+                script_text, model_id, optimization_profile,
+                _pre_total
+            )
+
+        # --- Single-pass grammarian for short scripts ---------------
+        return self._grammarian_single(
+            script_text, model_id, optimization_profile,
+            _pre_total
+        )
+
+    def _grammarian_single(self, script_text, model_id,
+                           optimization_profile, pre_total):
+        """Single-pass grammarian for scripts under the chunk threshold."""
+
+        # Version C (grammarian-v2c-ship): mechanical validator framing.
+        # Replaces the old "copy editor" prompt which was inviting Gemma to
+        # "smooth" and "polish" slang into English-professor prose.
+        grammarian_prompt = f"""You are a mechanical TTS & Parser Validator for a radio drama pipeline.
+You have ZERO creative authority. Your only job is minimal, targeted fixes
+so the script parses cleanly and reads correctly through text-to-speech.
+
+You MUST PRESERVE EXACTLY:
+- Every character's slang, contractions, dialect, fragments, and quirks.
+- All original wording, rhythm, and word choice.
+- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+
+FIX ONLY THESE FIVE THINGS:
+1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
+   "natrual" -> "natural").
+2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
+   prefix. Fix missing colons, capitalization, or spacing only.
+3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
+   period only where its absence would slur TTS output.
+4. LOGIC CONTRADICTIONS that break continuity within the visible script
+   (character in two places, references to events that haven't happened).
+5. EXTREME RUN-ONS (80+ words with no stop): insert a period or ellipsis
+   to allow a TTS breath. Keep every original word in original order.
+
+STRICTLY FORBIDDEN:
+- Do NOT rewrite casual dialogue into formal English.
+  Example: "Ain't no way that thing's natural" stays exactly as-is.
+  NEVER change it to "There is no way that entity is natural."
+- Do NOT remove or replace slang, contractions, or fragments.
+- Do NOT add vocabulary, metaphors, or literary flourishes.
+- Do NOT restructure sentences for "elegance" or "flow."
+- Do NOT add, delete, or reorder any dialogue lines or scenes.
+- Do NOT touch anything that already parses and sounds fine spoken aloud.
+- Do NOT add commentary, notes, markdown, or explanations.
+
+OUTPUT: The corrected script only. Same format as input. Nothing else.
+
+SCRIPT TO VALIDATE:
+{script_text}"""
+
+        # Token budget: same as input (we're polishing, not expanding)
+        _gram_max_tokens = min(2048, max(256, len(script_text) // 3))
+        _runtime_log(
+            f"GRAMMARIAN: Starting polish pass | {pre_total} dialogue lines | "
+            f"token budget={_gram_max_tokens}"
+        )
+
+        try:
+            polished = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    grammarian_prompt,
+                    model_id=model_id,
+                    max_new_tokens=_gram_max_tokens,
+                    temperature=0.3,
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=150,
+                phase_label="Grammarian",
+            )
+
+            if not polished or len(polished.strip()) < len(script_text) * 0.5:
+                _runtime_log(
+                    f"GRAMMARIAN: Output too short ({len(polished or '')} chars "
+                    f"vs {len(script_text)} input) - keeping original"
+                )
+                return script_text
+
+            # Safety check: did we lose dialogue lines?
+            _post_lines = len(re.findall(
+                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', polished, re.MULTILINE
+            ))
+            _post_voice = len(re.findall(r'\[VOICE:', polished, re.IGNORECASE))
+            _post_total = _post_lines + _post_voice
+
+            if _post_total < pre_total * 0.8:
+                _runtime_log(
+                    f"GRAMMARIAN: Rejected - lost too many lines "
+                    f"({_post_total} vs {pre_total}) - keeping original"
+                )
+                return script_text
+
+            _runtime_log(
+                f"GRAMMARIAN: Success | lines {pre_total}->{_post_total} | "
+                f"chars {len(script_text)}->{len(polished.strip())}"
+            )
+            return polished.strip()
+
+        except Exception as e:
+            log.warning("[Grammarian] Polish pass failed: %s", e)
+            _runtime_log(f"GRAMMARIAN: Failed ({e}) - keeping original")
+            return script_text
+
+    def _grammarian_chunked(self, script_text, model_id,
+                            optimization_profile, pre_total):
+        """Chunked grammarian for long scripts (50+ dialogue lines).
+
+        Splits the script by === SCENE N === markers, polishes each scene
+        independently, then reassembles. If the script has no scene markers,
+        falls back to line-based chunking (20 dialogue lines per chunk).
+
+        Each chunk gets its own timeout and safety checks, so one failed
+        chunk does not block the rest. Failed chunks keep their original text.
+        """
+        _runtime_log(
+            f"GRAMMARIAN: Chunked mode | {pre_total} dialogue lines "
+            f"(threshold 50)"
+        )
+
+        # ----- Split by scene markers ---------------------------------
+        scene_re = re.compile(
+            r'(===\s*SCENE\s+\S+.*?===)', re.IGNORECASE
+        )
+        parts = scene_re.split(script_text)
+
+        # parts alternates: [pre-scene-text, marker, scene-body, marker, ...]
+        # Reassemble into chunks: each chunk = marker + body until next marker
+        chunks = []
+        current_chunk = ""
+        for part in parts:
+            if scene_re.match(part):
+                # This is a scene marker - save previous chunk, start new one
+                if current_chunk.strip():
+                    chunks.append(current_chunk)
+                current_chunk = part
+            else:
+                current_chunk += part
+        if current_chunk.strip():
+            chunks.append(current_chunk)
+
+        # If splitting produced only 1 chunk, fall back to line-based split
+        if len(chunks) <= 1:
+            _runtime_log("GRAMMARIAN: No scene markers found - using line-based chunking")
+            all_lines = script_text.split('\n')
+            chunk_size = 40  # lines per chunk (not dialogue lines, raw lines)
+            chunks = [
+                '\n'.join(all_lines[i:i + chunk_size])
+                for i in range(0, len(all_lines), chunk_size)
+            ]
+
+        _runtime_log(f"GRAMMARIAN: Split into {len(chunks)} chunks")
+
+        # ----- Polish each chunk independently -------------------------
+        polished_chunks = []
+        total_fixed = 0
+        total_kept = 0
+
+        for idx, chunk in enumerate(chunks):
+            chunk_num = idx + 1
+
+            # Count dialogue lines in this chunk
+            _chunk_dl = len(re.findall(
+                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', chunk, re.MULTILINE
+            ))
+            _chunk_dl += len(re.findall(r'\[VOICE:', chunk, re.IGNORECASE))
+
+            # Skip chunks with no dialogue (pure SFX/ENV blocks)
+            if _chunk_dl == 0:
+                _runtime_log(
+                    f"GRAMMARIAN: Chunk {chunk_num}/{len(chunks)} "
+                    f"skipped (no dialogue)"
+                )
+                polished_chunks.append(chunk)
+                continue
+
+            _chunk_tokens = min(1024, max(128, len(chunk) // 3))
+            _runtime_log(
+                f"GRAMMARIAN: Chunk {chunk_num}/{len(chunks)} | "
+                f"{_chunk_dl} lines | budget={_chunk_tokens}"
+            )
+
+            # Version C chunked variant (grammarian-v2c-ship): same rules as
+            # single-pass, with the segment-awareness clause so chunks do not
+            # flag references to scenes they cannot see as contradictions.
+            chunk_prompt = f"""You are a mechanical TTS & Parser Validator for a radio drama pipeline. The text below is ONE SEGMENT of a longer script. Ignore references to scenes you cannot see -- do not flag them as contradictions.
+You have ZERO creative authority. Your only job is minimal, targeted fixes
+so the script parses cleanly and reads correctly through text-to-speech.
+
+You MUST PRESERVE EXACTLY:
+- Every character's slang, contractions, dialect, fragments, and quirks.
+- All original wording, rhythm, and word choice.
+- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+
+FIX ONLY THESE FIVE THINGS:
+1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
+   "natrual" -> "natural").
+2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
+   prefix. Fix missing colons, capitalization, or spacing only.
+3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
+   period only where its absence would slur TTS output.
+4. LOGIC CONTRADICTIONS that break continuity within the visible script
+   (character in two places, references to events that haven't happened).
+5. EXTREME RUN-ONS (80+ words with no stop): insert a period or ellipsis
+   to allow a TTS breath. Keep every original word in original order.
+
+STRICTLY FORBIDDEN:
+- Do NOT rewrite casual dialogue into formal English.
+  Example: "Ain't no way that thing's natural" stays exactly as-is.
+  NEVER change it to "There is no way that entity is natural."
+- Do NOT remove or replace slang, contractions, or fragments.
+- Do NOT add vocabulary, metaphors, or literary flourishes.
+- Do NOT restructure sentences for "elegance" or "flow."
+- Do NOT add, delete, or reorder any dialogue lines or scenes.
+- Do NOT touch anything that already parses and sounds fine spoken aloud.
+- Do NOT add commentary, notes, markdown, or explanations.
+
+OUTPUT: The corrected script only. Same format as input. Nothing else.
+
+SCRIPT SEGMENT TO VALIDATE:
+{chunk}"""
+
+            try:
+                polished = _run_with_timeout(
+                    lambda: _generate_with_llm(
+                        chunk_prompt,
+                        model_id=model_id,
+                        max_new_tokens=_chunk_tokens,
+                        temperature=0.3,
+                        optimization_profile=optimization_profile,
+                    ),
+                    timeout_sec=90,
+                    phase_label=f"Grammarian-Chunk-{chunk_num}",
+                )
+
+                if not polished or len(polished.strip()) < len(chunk) * 0.5:
+                    _runtime_log(
+                        f"GRAMMARIAN: Chunk {chunk_num} output too short "
+                        f"- keeping original"
+                    )
+                    polished_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                # Safety: did we lose dialogue lines in this chunk?
+                _post_dl = len(re.findall(
+                    r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', polished, re.MULTILINE
+                ))
+                _post_dl += len(re.findall(
+                    r'\[VOICE:', polished, re.IGNORECASE
+                ))
+
+                if _post_dl < _chunk_dl * 0.8:
+                    _runtime_log(
+                        f"GRAMMARIAN: Chunk {chunk_num} lost lines "
+                        f"({_post_dl} vs {_chunk_dl}) - keeping original"
+                    )
+                    polished_chunks.append(chunk)
+                    total_kept += 1
+                    continue
+
+                polished_chunks.append(polished.strip())
+                total_fixed += 1
+
+            except Exception as e:
+                log.warning("[Grammarian] Chunk %d failed: %s", chunk_num, e)
+                _runtime_log(
+                    f"GRAMMARIAN: Chunk {chunk_num} failed ({e}) "
+                    f"- keeping original"
+                )
+                polished_chunks.append(chunk)
+                total_kept += 1
+
+        # ----- Reassemble ---------------------------------------------
+        reassembled = '\n\n'.join(polished_chunks)
+
+        # Final safety: total dialogue count must hold
+        _post_lines = len(re.findall(
+            r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', reassembled, re.MULTILINE
+        ))
+        _post_voice = len(re.findall(r'\[VOICE:', reassembled, re.IGNORECASE))
+        _post_total = _post_lines + _post_voice
+
+        if _post_total < pre_total * 0.8:
+            _runtime_log(
+                f"GRAMMARIAN: Reassembly lost too many lines "
+                f"({_post_total} vs {pre_total}) - reverting to original"
+            )
+            return script_text
+
+        _runtime_log(
+            f"GRAMMARIAN: Chunked complete | {total_fixed} polished, "
+            f"{total_kept} kept original | lines {pre_total}->{_post_total} | "
+            f"chars {len(script_text)}->{len(reassembled)}"
+        )
+        return reassembled
 
     def _extend_script_dialogue(self, script_text, deficit_words,
                                  target_words, model_id, genre_flavor,
@@ -5076,7 +6116,9 @@ OUTPUT ONLY THE NEW DIALOGUE LINES, one per line:"""
                 m = re.match(r'^([A-Z][A-Z0-9_ ]{1,25}):\s+(.+)', raw_line)
                 if m:
                     name = m.group(1).strip()
-                    if name not in _false_positives and name in characters:
+                    # BUG-LOCAL-036: was `_false_positives` (undefined).
+                    # Module-level constant is `_DIALOGUE_FALSE_POSITIVES`.
+                    if name not in _DIALOGUE_FALSE_POSITIVES and name in characters:
                         valid_lines.append(raw_line)
 
             if len(valid_lines) < 3:
@@ -5449,6 +6491,46 @@ OPENING:
                         i = j + 1
                         continue
 
+            # v5: bare `NAME: dialogue` (e.g. `DRACULA MALONE: We're gonna get out of here.`)
+            # BUG-LOCAL-038: Mistral Nemo emits this form natively and FORMAT_NORM
+            # used to be the only thing rewriting it into `[VOICE: NAME, traits]`.
+            # Register it as a first-class pattern so FORMAT_NORM becomes a
+            # nice-to-have (adds traits + voice cues) rather than load-bearing
+            # (prevents silent dialogue-token drop into BatchBark).
+            #
+            # Pattern accepts 0-2 leading asterisks, an optional (parenthetical)
+            # emotion tag after the name, and ignores any trailing asterisks.
+            # Structural tokens are blacklisted so `SCENE: ...`, `ACT 1: ...`,
+            # `TITLE: ...` (BUG-LOCAL-037), `ENV: ...`, etc never register as
+            # dialogue. ANNOUNCER is intentionally allowed -- BatchBark counts
+            # + skips it and routes to the Kokoro bus.
+            _m_v5 = re.match(
+                r'^(?:\*{0,2})([A-Z][A-Z0-9 ]{0,24})(?:\*{0,2})'
+                r'(?:\s*\(([^)]*)\))?\s*:\s+(.+)$',
+                s,
+            )
+            if _m_v5:
+                _v5_raw_name = _m_v5.group(1).strip()
+                _v5_first_word = _v5_raw_name.split()[0] if _v5_raw_name else ""
+                _v5_structural = {
+                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                    "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
+                    "INT", "EXT", "OPENING", "CLOSING", "INTERSTITIAL",
+                    "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR",
+                }
+                if _v5_first_word and _v5_first_word not in _v5_structural:
+                    _v5_emotion = (_m_v5.group(2) or "").strip()
+                    _v5_dialogue = _m_v5.group(3).strip().strip('"*_\u201c\u201d')
+                    if _v5_dialogue:
+                        lines.append({
+                            "type": "dialogue",
+                            "character_name": _v5_raw_name.upper(),
+                            "voice_traits": _v5_emotion or "unspecified",
+                            "line": _v5_dialogue,
+                        })
+                        i += 1
+                        continue
+
             # Fallback: treat as structural direction
             if s and not s.startswith("#") and not s.startswith("---"):
                 lines.append({"type": "direction", "text": s})
@@ -5468,8 +6550,28 @@ OPENING:
         
         # v1.4 Theme B - Failsafe for 2B models that strip [VOICE:] tags
         # If no dialogue was found but we see `NAME: dialogue` structure, attempt recovery
-        if dialogue_count == 0 and len(lines) > 0:
-            log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
+        #
+        # BUG-LOCAL-038: loosened from `dialogue_count == 0` to `< 3` AND raw
+        # text has 5+ `NAME:` shape matches. The previous guard short-circuited
+        # whenever any malformed VOICE tag registered as one dialogue token,
+        # leaving 20+ bare `NAME:` dialogue lines uncovered. The raw-text
+        # sanity check prevents the fallback from firing on scripts that are
+        # genuinely dialogue-light (e.g. narration-only treatments).
+        _raw_name_hits = len(re.findall(
+            r'^(?:\*{0,2})[A-Z][A-Z0-9 ]{1,25}(?:\*{0,2})\s*:\s+\S',
+            text, re.MULTILINE,
+        ))
+        _orig_fallback_trigger = (dialogue_count == 0 and len(lines) > 0)
+        _loose_fallback_trigger = (dialogue_count < 3 and _raw_name_hits >= 5)
+        if _orig_fallback_trigger or _loose_fallback_trigger:
+            if _loose_fallback_trigger and not _orig_fallback_trigger:
+                log.warning(
+                    "[ScriptParser] Only %d dialogue tokens but %d NAME: shape matches in raw text. "
+                    "Attempting permissive 2B-fallback parse (BUG-LOCAL-038)...",
+                    dialogue_count, _raw_name_hits,
+                )
+            else:
+                log.warning("[ScriptParser] Zero standard tags found. Attempting permissive 2B-fallback parse...")
             _recovered = 0
 
             # Pass 1: Match 'NAME: dialogue' or '*NAME*: dialogue' or '**NAME:** dialogue'
@@ -5809,13 +6911,17 @@ class LLMDirector:
                     "default": "subtle",
                     "tooltip": "How vintage/degraded should the final audio sound"
                 }),
-                # v1.4 Theme C - optional series bible, socket input only.
-                "project_state": ("PROJECT_STATE", {
-                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
-                }),
                 "optimization_profile": (["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"], {
                     "default": "Standard",
                     "tooltip": "Consistency widget. Obsidian is unstable; on 4GB cards, ensure 'kokoro' is used for TTS below."
+                }),
+                # v1.4 Theme C - optional series bible, socket input only.
+                # BUG-LOCAL-027: project_state MUST remain the last entry in optional.
+                # Socket-only inputs at the tail cannot shift widget slots even if the
+                # widgets_values mapper regresses. Do not add widget-backed params
+                # after this line.
+                "project_state": ("PROJECT_STATE", {
+                    "tooltip": "Optional: Project State Loader output. When wired, series bible preamble is injected into the director prompt."
                 }),
             },
         }
@@ -5938,6 +7044,41 @@ class LLMDirector:
 
         return (plan_json, voice_json, sfx_json, music_json)
 
+    @staticmethod
+    def _strip_json_comments(text):
+        """Remove JS-style // line comments from JSON text.
+
+        LLMs (especially Mistral) sprinkle '// explanation' inside JSON
+        values. json.loads() rejects these. We strip them only outside of
+        quoted strings to avoid mangling URLs like 'v2/en_speaker_8'.
+        """
+        result = []
+        i = 0
+        in_string = False
+        while i < len(text):
+            c = text[i]
+            if in_string:
+                result.append(c)
+                if c == '\\' and i + 1 < len(text):
+                    result.append(text[i + 1])
+                    i += 2
+                    continue
+                if c == '"':
+                    in_string = False
+            else:
+                if c == '"':
+                    in_string = True
+                    result.append(c)
+                elif c == '/' and i + 1 < len(text) and text[i + 1] == '/':
+                    # skip to end of line
+                    while i < len(text) and text[i] != '\n':
+                        i += 1
+                    continue
+                else:
+                    result.append(c)
+            i += 1
+        return ''.join(result)
+
     def _extract_json(self, text):
         """Extract JSON object from LLM output (handles markdown fences, truncation)."""
         log.info(f"[LLMDirector] Raw output length: {len(text)} chars")
@@ -5952,28 +7093,37 @@ class LLMDirector:
         for pat in patterns:
             m = pat.search(text)
             if m:
+                raw_match = m.group(1)
                 try:
-                    return json.loads(m.group(1))
+                    return json.loads(raw_match)
                 except json.JSONDecodeError:
-                    # Try to repair: strip trailing commas, close unclosed braces
-                    candidate = m.group(1)
-                    candidate = re.sub(r',\s*([}\]])', r'\1', candidate)  # trailing commas
-                    # If JSON was truncated, try closing it
-                    open_braces = candidate.count('{') - candidate.count('}')
-                    open_brackets = candidate.count('[') - candidate.count(']')
-                    if open_braces > 0 or open_brackets > 0:
-                        log.info(f"[LLMDirector] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
-                        candidate += ']' * open_brackets + '}' * open_braces
-                        try:
-                            return json.loads(candidate)
-                        except json.JSONDecodeError as e:
-                            log.warning(f"[LLMDirector] JSON repair failed: {e}")
-                    continue
+                    pass
+                # BUG-LOCAL-040: strip JS-style // comments LLMs inject,
+                # then strip trailing commas before close-brackets.
+                candidate = self._strip_json_comments(raw_match)
+                candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    pass
+                # If JSON was truncated, try closing it
+                open_braces = candidate.count('{') - candidate.count('}')
+                open_brackets = candidate.count('[') - candidate.count(']')
+                if open_braces > 0 or open_brackets > 0:
+                    log.info(f"[LLMDirector] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
+                    repaired = candidate + ']' * open_brackets + '}' * open_braces
+                    try:
+                        return json.loads(repaired)
+                    except json.JSONDecodeError as e:
+                        log.warning(f"[LLMDirector] JSON repair failed: {e}")
+                continue
 
         # Last resort: find the first { and try to build valid JSON from there
         brace_start = text.find('{')
         if brace_start >= 0:
-            candidate = text[brace_start:]
+            # BUG-LOCAL-040: strip comments before brace scan too
+            candidate = self._strip_json_comments(text[brace_start:])
+            candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
             # Try progressively shorter substrings
             for end_offset in range(len(candidate), max(0, len(candidate) - 200), -1):
                 try:

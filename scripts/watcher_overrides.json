@@ -1,0 +1,14 @@
+{
+  "_schema": "OTR soak watcher overrides. Only keys below are honored; unknown keys are silently ignored. Values must match the closed sets in soak_operator.py (GENRES, TARGET_WORDS, TARGET_LENGTHS, STYLES, CREATIVITIES, OPT_PROFILES). Corrupt JSON is ignored. See soak_operator.py:apply_watcher_overrides for the full allowlist.",
+  "_allowed_keys": {
+    "force_genre": "one of: hard_sci_fi, space_opera, dystopian, time_travel, first_contact, cosmic_horror, cyberpunk, post_apocalyptic",
+    "force_words": "one of: 350, 700, 1050, 1400, 2100",
+    "force_length": "one of: 'short (3 acts)', 'medium (5 acts)', 'long (7-8 acts)'",
+    "force_style": "one of: 'tense claustrophobic', 'space opera epic', 'psychological slow-burn', 'hard-sci-fi procedural', 'noir mystery', 'chaotic black-mirror'",
+    "force_creativity": "one of: 'safe & tight', 'balanced', 'wild & rough', 'maximum chaos'",
+    "force_profile": "one of: 'Pro (Ultra Quality)', 'Standard'",
+    "pause_soak": "true to pause the iteration loop (re-checks every 60s)",
+    "note_from_watcher": "free-text string, echoed to soak_log.md, truncated to 500 chars"
+  },
+  "note_from_watcher": "Cleared creativity pin 2026-04-13: 'maximum chaos' removed from soak pool entirely (see soak_operator.py CREATIVITIES comment). Override no longer needed."
+}

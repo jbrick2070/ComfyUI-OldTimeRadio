@@ -20,7 +20,7 @@
                 "Node name for S&R": "OTR_Gemma4ScriptWriter"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "",
                 "hard_sci_fi",
                 700,
                 4,
@@ -167,7 +167,11 @@
                 "[]",
                 "{}",
                 0,
-                999
+                999,
+                "",
+                "bark",
+                0.0,
+                0.0
             ],
             "inputs": [
                 {
@@ -294,7 +298,7 @@
                 "Node name for S&R": "OTR_EpisodeAssembler"
             },
             "widgets_values": [
-                "The Last Frequency",
+                "",
                 10.0,
                 8.0,
                 500
@@ -360,7 +364,9 @@
                 "Node name for S&R": "OTR_BatchBarkGenerator"
             },
             "widgets_values": [
-                "[]"
+                "[]",
+                "{}",
+                0.7
             ],
             "inputs": [
                 {
@@ -418,9 +424,12 @@
                 "Node name for S&R": "OTR_SignalLostVideo"
             },
             "widgets_values": [
+                "[]",
+                "{}",
+                "[]",
                 24,
                 "1920x1080",
-                "The Last Frequency"
+                ""
             ],
             "inputs": [
                 {
@@ -519,7 +528,8 @@
             "widgets_values": [
                 "[]",
                 "",
-                "random"
+                "random",
+                0.95
             ],
             "color": "#234035",
             "bgcolor": "#162821"
@@ -606,6 +616,8 @@
                 "Node name for S&R": "OTR_BatchAudioGenGenerator"
             },
             "widgets_values": [
+                "[]",
+                "{}",
                 "",
                 "facebook/audiogen-medium",
                 3.0,

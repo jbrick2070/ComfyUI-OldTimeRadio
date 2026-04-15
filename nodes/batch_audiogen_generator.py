@@ -99,7 +99,12 @@ class BatchAudioGenGenerator:
             },
             "optional": {
                 "episode_seed": ("STRING", {"default": ""}),
-                "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small", "3", "3.0", 3, 3.0], {"default": "facebook/audiogen-medium"}),
+                # BUG-LOCAL-027: the "3"/"3.0"/3/3.0 entries were scar tissue
+                # from widget-drift hitting this node. With the mapper fix in
+                # _workflow_to_api_prompt, socket-only inputs no longer leak
+                # into widget slots, so the hack is no longer needed. Fail
+                # loudly on bad input instead of silently accepting garbage.
+                "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small"], {"default": "facebook/audiogen-medium"}),
                 "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5}),
                 "default_duration": ("FLOAT", {"default": 3.0, "min": 0.5, "max": 10.0, "step": 0.5}),
             }
