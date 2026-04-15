@@ -7044,6 +7044,41 @@ class LLMDirector:
 
         return (plan_json, voice_json, sfx_json, music_json)
 
+    @staticmethod
+    def _strip_json_comments(text):
+        """Remove JS-style // line comments from JSON text.
+
+        LLMs (especially Mistral) sprinkle '// explanation' inside JSON
+        values. json.loads() rejects these. We strip them only outside of
+        quoted strings to avoid mangling URLs like 'v2/en_speaker_8'.
+        """
+        result = []
+        i = 0
+        in_string = False
+        while i < len(text):
+            c = text[i]
+            if in_string:
+                result.append(c)
+                if c == '\\' and i + 1 < len(text):
+                    result.append(text[i + 1])
+                    i += 2
+                    continue
+                if c == '"':
+                    in_string = False
+            else:
+                if c == '"':
+                    in_string = True
+                    result.append(c)
+                elif c == '/' and i + 1 < len(text) and text[i + 1] == '/':
+                    # skip to end of line
+                    while i < len(text) and text[i] != '\n':
+                        i += 1
+                    continue
+                else:
+                    result.append(c)
+            i += 1
+        return ''.join(result)
+
     def _extract_json(self, text):
         """Extract JSON object from LLM output (handles markdown fences, truncation)."""
         log.info(f"[LLMDirector] Raw output length: {len(text)} chars")
@@ -7058,28 +7093,37 @@ class LLMDirector:
         for pat in patterns:
             m = pat.search(text)
             if m:
+                raw_match = m.group(1)
                 try:
-                    return json.loads(m.group(1))
+                    return json.loads(raw_match)
                 except json.JSONDecodeError:
-                    # Try to repair: strip trailing commas, close unclosed braces
-                    candidate = m.group(1)
-                    candidate = re.sub(r',\s*([}\]])', r'\1', candidate)  # trailing commas
-                    # If JSON was truncated, try closing it
-                    open_braces = candidate.count('{') - candidate.count('}')
-                    open_brackets = candidate.count('[') - candidate.count(']')
-                    if open_braces > 0 or open_brackets > 0:
-                        log.info(f"[LLMDirector] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
-                        candidate += ']' * open_brackets + '}' * open_braces
-                        try:
-                            return json.loads(candidate)
-                        except json.JSONDecodeError as e:
-                            log.warning(f"[LLMDirector] JSON repair failed: {e}")
-                    continue
+                    pass
+                # BUG-LOCAL-040: strip JS-style // comments LLMs inject,
+                # then strip trailing commas before close-brackets.
+                candidate = self._strip_json_comments(raw_match)
+                candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    pass
+                # If JSON was truncated, try closing it
+                open_braces = candidate.count('{') - candidate.count('}')
+                open_brackets = candidate.count('[') - candidate.count(']')
+                if open_braces > 0 or open_brackets > 0:
+                    log.info(f"[LLMDirector] Attempting JSON repair: +{open_braces} braces, +{open_brackets} brackets")
+                    repaired = candidate + ']' * open_brackets + '}' * open_braces
+                    try:
+                        return json.loads(repaired)
+                    except json.JSONDecodeError as e:
+                        log.warning(f"[LLMDirector] JSON repair failed: {e}")
+                continue
 
         # Last resort: find the first { and try to build valid JSON from there
         brace_start = text.find('{')
         if brace_start >= 0:
-            candidate = text[brace_start:]
+            # BUG-LOCAL-040: strip comments before brace scan too
+            candidate = self._strip_json_comments(text[brace_start:])
+            candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
             # Try progressively shorter substrings
             for end_offset in range(len(candidate), max(0, len(candidate) - 200), -1):
                 try:

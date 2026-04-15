@@ -5,6 +5,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-040: Director JSON parse fails on JS-style comments in LLM output [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** `ValueError: Failed to parse production plan JSON. Aborting run to prevent silent audio failure.` Director produced 3491-char output starting with valid-looking JSON but `json.loads()` rejected it. Repair pass logged `Expecting property name enclosed in double quotes: line 13 column 42`.
+- **Cause:** Mistral emitted JavaScript-style `//` line comments inside JSON values, e.g. `"v2/en_speaker_8", // Reserved for LEMMY`. Python `json.loads()` does not accept comments. The existing repair pass stripped trailing commas and tried brace-closure but never stripped comments, so the parse always failed at the first `//`. The truncation (open braces) was a secondary issue masked by the comment failure.
+- **Fix:** Added `_strip_json_comments()` static method to `LLMDirector` — a state-machine parser that removes `// ...` to end-of-line only outside of quoted strings (preserving URL-like values such as `v2/en_speaker_8`). Wired into `_extract_json` at three points: (1) after the first raw `json.loads()` fails, strip comments + trailing commas and retry, (2) before the truncation-repair brace closure, (3) in the last-resort brace-scan path. Comment stripping runs before trailing-comma stripping so `value, // comment\n}` collapses cleanly.
+- **Verify:** Next run should show `[LLMDirector] Plan: N voices, N SFX cues, N music cues` instead of the FATAL. Runs where the LLM emits clean JSON (no comments) hit the first `json.loads()` and skip the stripper entirely — zero perf cost on the clean path.
+- **Tags:** director, json-parse, llm-output, comments, mistral, truncation
+
 ### BUG-LOCAL-039: Leading markdown bold wrapper leaks into extracted title [FIXED]
 - **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** BUG-LOCAL-038 verification tail showed `TITLE_TRACE | source=script_json | resolved='** Bioluminal Tide' | widget='' | script_json='** Bioluminal Tide'`. Title leaked leading `** ` into the resolved value -- every downstream consumer (filename, video overlay, log lines) carried the cosmetic garbage.
