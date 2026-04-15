@@ -5,6 +5,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-039: Leading markdown bold wrapper leaks into extracted title [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** BUG-LOCAL-038 verification tail showed `TITLE_TRACE | source=script_json | resolved='** Bioluminal Tide' | widget='' | script_json='** Bioluminal Tide'`. Title leaked leading `** ` into the resolved value -- every downstream consumer (filename, video overlay, log lines) carried the cosmetic garbage.
+- **Cause:** Mistral emitted `TITLE: **Bioluminal Tide**` (markdown bold wrapping the value, not the whole line). `_RE_TITLE_LINE` only strips `**` as an optional prefix BEFORE the word `TITLE` and as an optional suffix AFTER a trailing quote. The lazy capture group `(.+?)` grabbed the leading `**` of the value and retained it. `_extract_title_from_script_text` only post-processed the capture with `strip()` and quote-strip, no markdown-wrapper strip.
+- **Fix:** In `_extract_title_from_script_text` (around line 1586 in `nodes/story_orchestrator.py`), add two regex substitutions right after the quote-strip to peel leading/trailing `*`/`_` runs (1-3 chars) plus surrounding whitespace, then re-run the quote-strip so nested cases like `**"Title"**` still land clean. Empty-result guard added so a `TITLE: ****` residue returns `""` instead of an empty string that later stages might treat as valid.
+- **Verify:** Next run's `otr_runtime.log` should show `TITLE_TRACE ... resolved='Bioluminal Tide'` (no leading `**`) when Mistral emits markdown-bold titles. Existing Gemma/Nemo runs with unwrapped titles must remain unchanged. Filename must still vary per episode (BUG-LOCAL-035 regression guard).
+- **Tags:** title-extraction, regex, markdown, mistral, cosmetic, post-processing
+
 ### BUG-LOCAL-038: BatchBark sees 0 dialogue lines despite Grammarian reporting 21 -- Bark bus renders only ANNOUNCER [FIXED]
 - **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Out-of-box QA run (Mistral, defaults, seed=Bacterial Echo at 13:23-13:36) shipped `signal_lost_bacterial_echo_20260415_133600.mp4` with the correct title (BUG-LOCAL-037 fix verified) but the audio bus had no character dialogue. Heartbeat trail:

@@ -1584,7 +1584,14 @@ def _extract_title_from_script_text(text):
     if not m:
         return ""
     cand = m.group(1).strip().strip('"\u201C\u201D\u2018\u2019')
+    # BUG-LOCAL-039: strip markdown bold/italic wrappers on the value itself
+    # (e.g. "TITLE: **Bioluminal Tide**" leaks leading "**" into the capture).
+    cand = re.sub(r'^(?:\*{1,3}|_{1,3})\s*', '', cand)
+    cand = re.sub(r'\s*(?:\*{1,3}|_{1,3})$', '', cand)
+    cand = cand.strip().strip('"\u201C\u201D\u2018\u2019')
     # Reject obviously broken captures (too long, template residue).
+    if not cand:
+        return ""
     if len(cand) > 120:
         return ""
     if cand.lower() in _STUCK_TITLE_DEFAULTS:
