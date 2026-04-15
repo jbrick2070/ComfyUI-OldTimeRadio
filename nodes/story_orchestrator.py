@@ -1545,7 +1545,11 @@ _RE_VOICE_TAG_DIALOGUE = re.compile(
 _DIALOGUE_FALSE_POSITIVES = frozenset({
     "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
     "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
-    "ANNOUNCER"
+    "ANNOUNCER",
+    # BUG-LOCAL-037: BUG-LOCAL-035's TITLE: <name> first-line convention
+    # was being parsed as a "TITLE" character speaking the title text.
+    # Block it everywhere a NAME: <text> shape gets read as dialogue.
+    "TITLE",
 })
 
 # BUG-LOCAL-035: Titles that indicate a stuck default or an unresolved title.
@@ -1886,8 +1890,12 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         if bare_match:
             name = bare_match.group(1).strip()
             # Skip false positives like "SCENE:", "SFX:", "ENV:", "NOTE:"
+            # BUG-LOCAL-037: TITLE added so the streaming heartbeat does not
+            # mistake the writer-prompt's "TITLE: <...>" first line for a
+            # character speaking the title text.
             if name not in ("SCENE", "SFX", "ENV", "NOTE", "NARRATOR",
-                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE"):
+                            "ACT", "OPENING", "CLOSING", "TARGET", "STYLE",
+                            "TITLE"):
                 self.dialogue_count += 1
                 self.characters_seen.add(name)
                 clean_dialogue = bare_match.group(2).strip()[:60]
@@ -3792,6 +3800,18 @@ TITLE: <your chosen title>
         _log_scene_checkpoint("06_AFTER_GRAMMARIAN", script_text)
 
         # -- STEP 4: PARSE into structured JSON -----------------------
+        # BUG-LOCAL-037: capture the LLM-emitted "TITLE: <...>" line BEFORE
+        # we feed script_text to the parser, then strip it. Otherwise the
+        # parser reads it as a "TITLE" character speaking the title text,
+        # polluting the cast roster and confusing the self-critique pass.
+        _early_llm_title = _extract_title_from_script_text(script_text)
+        script_text = _RE_TITLE_LINE.sub("", script_text).lstrip()
+        if _early_llm_title:
+            _runtime_log(
+                f"TITLE_STRIP | extracted='{_early_llm_title}' | "
+                f"removed leading TITLE: line(s) before parse"
+            )
+
         # Single parse on the fully prepared text.
         # LLM_RESCUE fires only if parser gets 0 dialogue lines.
         try:
@@ -3845,7 +3865,10 @@ TITLE: <your chosen title>
         _resolved_title = (episode_title or "").strip()
         _title_source = "user"
         if not _resolved_title or _resolved_title.lower() in _STUCK_TITLE_DEFAULTS:
-            _llm_title = _extract_title_from_script_text(script_text)
+            # BUG-LOCAL-037: prefer the title we captured BEFORE strip.
+            # Falls back to a fresh extract for safety if the early capture
+            # was empty for any reason (e.g. self-critique re-emitted one).
+            _llm_title = _early_llm_title or _extract_title_from_script_text(script_text)
             if _llm_title and _llm_title.lower() not in _STUCK_TITLE_DEFAULTS:
                 _resolved_title = _llm_title
                 _title_source = "llm"

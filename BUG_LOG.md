@@ -5,6 +5,17 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-037: BUG-LOCAL-035 fix made the parser see "TITLE" as a speaking character [FIXED]
+- **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Out-of-box-settings test (Mistral, defaults) showed `Characters: ANNOUNCER, LEMMY, QUINN MARTIN, TITLE, VICTOR WELLS, WATSON BERNARD` in the ScriptWriter heartbeat. Dialogue collapsed across the self-critique pass (28 dialogue lines -> 2). Final WORD_ENFORCEMENT logged 2 words / 700 target (0%) and WORD_EXTEND could only recover 1 valid line. The MP4 still rendered with the correct title (`signal_lost_magnetic_echo_*.mp4`) but had almost no dialogue.
+- **Cause:** BUG-LOCAL-035's writer-prompt addition required Mistral/Gemma to emit `TITLE: <name>` as the very first line of output. Both the streaming token detector (line ~1885 inline tuple) and the post-stream parser (`_DIALOGUE_FALSE_POSITIVES` frozenset, line 1545) match a `NAME: text` shape as a dialogue line, and neither blacklist contained `TITLE`. Result: every `TITLE: Magnetic Echo` line got booked as character `TITLE` speaking the title text, polluting the cast roster, eating the word budget, and almost certainly nudging the self-critique into deleting "redundant" dialogue.
+- **Fix:** Three-part defense in `nodes/story_orchestrator.py`:
+  * Added `"TITLE"` to `_DIALOGUE_FALSE_POSITIVES` frozenset (line 1545) -- catches it in the canonical post-stream parser, the dialogue-extension cast filter, and any other consumer of the shared blacklist.
+  * Added `"TITLE"` to the streaming heartbeat's inline false-positive tuple (line ~1885) -- removes the noisy `Characters: ..., TITLE` log lines and stops the running cast count from inflating mid-stream.
+  * Belt-and-suspenders: just before `_parse_script` (line ~3798), capture the LLM's `TITLE:` line via `_extract_title_from_script_text` into `_early_llm_title`, then strip all `TITLE:` lines from `script_text` with `_RE_TITLE_LINE.sub("", text)`. Wired the captured value into the title-resolution block so `source=llm` resolution still works after the strip. Logs `TITLE_STRIP | extracted=...` so future runs can confirm the strip happened.
+- **Verify:** Next run's `otr_runtime.log` should show `TITLE_STRIP | extracted='...'` AND a `ScriptWriter DONE` line whose `Characters: ...` list does NOT contain `TITLE`. Filename should still vary (BUG-LOCAL-035 must remain fixed). `TITLE_TRACE source=llm` should still resolve to the correct title.
+- **Tags:** title-stuck, regression, dialogue-parser, false-positive, cast-roster, self-critique
+
 ### BUG-LOCAL-036: WordExtend NameError `_false_positives is not defined` — 100% fail on every run [FIXED]
 - **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** `[WordExtend] Extension pass failed: name '_false_positives' is not defined` on every single overnight soak run (40/40 failures, SHORT_DURATION scan flag). Extension pass was silently short-circuiting; every episode shipped at the un-extended word count.
