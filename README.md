@@ -16,9 +16,9 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
-[![Download ComfyUI-OldTimeRadio v1.5](https://img.shields.io/badge/Download-OldTimeRadio_v1.5-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
+[![Download ComfyUI-OldTimeRadio v1.7](https://img.shields.io/badge/Download-OldTimeRadio_v1.7-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.5)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
+**[Click here to download the full package (v1.7)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
 
 ---
 
@@ -59,7 +59,7 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 | Model | Size | Notes |
 |-------|------|-------|
-| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.5 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
+| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.7 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
 | **Gemma 4 E4B** | ~5 GB | Balanced performer for 12GB+ cards. |
 | **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
 | **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run. |
@@ -219,7 +219,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 | **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
 | **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
 | | |
-| **v2.0 — Visual Drama Engine** | **[ALPHA — Functional on `v2.0-visual-engine` branch]** |
+| **v2.0 — Visual Drama Engine** | **[ALPHA — on `v2.0-alpha` branch]** |
 | **8. Character Forge** `[v2.0]` | Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes. |
 | **9. Scene Painter** `[v2.0]` | Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation. |
 | **10. Visual Compositor** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
@@ -336,6 +336,26 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 ---
 
 ## Change Log
+
+### What's New in v1.7 — Parser Resilience & Ship Stability
+
+#### Multi-Format Dialogue Parser (v5)
+The canonical parser now handles bare `NAME: dialogue` lines natively (Mistral's preferred output style) alongside the existing `[VOICE: NAME, traits]` bracket format. Previously, bare-NAME scripts silently dropped all dialogue tokens into the direction bucket, producing episodes with zero character speech. The v5 pattern registers dialogue directly from the strict parse, with a structural-token blacklist that prevents stage directions (`ACT`, `SCENE`, `TITLE`, etc.) from being misidentified as speaking characters.
+
+#### FORMAT_NORM Skip Heuristic Tightened
+The LLM-based canonical rewrite pass (`_normalize_script_format`) previously counted bare `NAME:` lines as "already canonical" and skipped the rewrite. This meant Mistral scripts bypassed the voice-trait enrichment pass entirely, then hit a parser that couldn't read them. The skip now requires actual `[VOICE:]` bracket tags, forcing bare-NAME scripts through the rewrite every time.
+
+#### Director JSON Resilience
+LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A new state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the Director now survives malformed output that previously crashed the entire pipeline.
+
+#### Title Extraction Hardening
+Two fixes that eliminate title-related regressions. First, `TITLE` is now blacklisted as a dialogue character name across both the streaming detector and the canonical parser, preventing the LLM's `TITLE: Episode Name` line from polluting the cast roster. Second, markdown bold wrappers (`**Title**`) are stripped from captured title values so filenames and log traces stay clean.
+
+#### Permissive 2B-Fallback Guard
+The recovery path inside `_parse_script` now fires when the strict parse finds fewer than 3 dialogue tokens AND the raw text contains 5+ bare `NAME:` patterns. Previously, even one stray malformed VOICE tag could short-circuit recovery of an entire bare-NAME script.
+
+#### Soak-Hardened
+Seven bugs found and fixed in a single session (BUG-LOCAL-034 through 040), all verified on live end-to-end episode runs. Streak auto-halt, TITLE_STUCK filename resolution, WordExtend NameError, TITLE-as-character regression, bare-NAME dialogue parser, markdown-bold title leak, and Director JSON comment parsing.
 
 ### What's New in v1.5 — CLEAN (Story Editor & Pipeline Hardening)
 
