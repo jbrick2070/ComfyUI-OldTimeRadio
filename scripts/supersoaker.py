@@ -63,6 +63,8 @@ from soak_operator import (  # noqa: E402
     _workflow_to_api_prompt,
     count_treatments,
     check_treatment,
+    comfyui_alive,
+    reboot_comfyui,
 )
 
 # Additional widget index not exported from soak_operator
@@ -561,15 +563,25 @@ def phase_decision(report: dict, phase: dict) -> tuple[bool, str]:
 # Sequencer
 # ---------------------------------------------------------------------------
 def preflight_comfyui() -> bool:
-    try:
-        resp = requests.get(f"{COMFYUI}/system_stats", timeout=5)
-        resp.raise_for_status()
+    """Ensure ComfyUI is up. If not, use soak_operator.reboot_comfyui() to
+    launch it as a decoupled background process (CREATE_NEW_CONSOLE) and
+    wait up to 120s for /system_stats to respond."""
+    if comfyui_alive():
+        print(f"  ComfyUI OK at {COMFYUI}", flush=True)
         return True
+    print(f"  ComfyUI not responding at {COMFYUI} -- launching "
+          f"via soak_operator.reboot_comfyui()...", flush=True)
+    try:
+        reboot_comfyui()  # kills + restarts + waits up to 120s
     except Exception as e:
-        print(f"  ERROR: ComfyUI not reachable at {COMFYUI} -- {e}", flush=True)
-        print(f"  Start ComfyUI Desktop first (http://localhost:8000).",
-              flush=True)
+        print(f"  ERROR: reboot_comfyui() raised: {e}", flush=True)
         return False
+    if comfyui_alive():
+        print(f"  ComfyUI now responding at {COMFYUI}", flush=True)
+        return True
+    print(f"  ERROR: ComfyUI still unresponsive after reboot attempt.",
+          flush=True)
+    return False
 
 
 def sequence(phases: list[dict], workflow_path: str, auto_advance: bool) -> int:
