@@ -97,10 +97,13 @@ _NODE_MODULES = {
     "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            "🛡️ VRAM Guardian"),
-    # ── v2.0 Visual Drama Engine ────────────────────────────────────
-    # Placeholder nodes removed. The sidecar architecture (subprocess-based
-    # visual generation) will be implemented when v2.0 development begins.
-    # See docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md
+    # ── v2.0 HyWorld Integration ────────────────────────────────────
+    # Sidecar-isolated 3D world generation from OTR Director output.
+    # Audio path NEVER touched. Falls back to OTR_SignalLostVideo on failure.
+    # See docs/superpowers/specs/2026-04-15-hyworld-poc-design.md
+    "OTR_HyworldBridge":   (".otr_v2.hyworld.bridge",   "HyworldBridge",   "🌐 HyWorld Bridge"),
+    "OTR_HyworldPoll":     (".otr_v2.hyworld.poll",     "HyworldPoll",     "⏳ HyWorld Poll"),
+    "OTR_HyworldRenderer": (".otr_v2.hyworld.renderer", "HyworldRenderer", "🎬 HyWorld Renderer"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
