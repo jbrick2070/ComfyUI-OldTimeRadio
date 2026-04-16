@@ -5,6 +5,14 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-041: ffmpeg zoompan multiplies frames, producing 1880-second clips for 8.7-second shots [FIXED]
+- **Date:** 2026-04-16 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** First cut of `_make_motion_clip()` in `otr_v2/hyworld/worker.py` produced a `render.mp4` with `duration=1898.416667s` for a shot whose `duration_sec=8.7`. Every motion-stub clip ballooned to 30+ minutes long. Renderer then concatenated them and produced a 90-minute "8-minute episode" video. ffprobe confirmed: `nb_frames=45136 r_frame_rate=24/1`.
+- **Cause:** `zoompan` is a per-input-frame filter — it emits `d` output frames for EACH input frame. The first implementation fed the still through `-loop 1 -t 8.7` at the default 25 fps, producing 217 input frames; each one was multiplied by `d=208` (8.7s * 24fps), giving 45,136 output frames at 24 fps = ~1880 seconds. The `-t` flag on the input side did not cap the output as I had assumed.
+- **Fix:** Switched `_make_motion_clip()` in `otr_v2/hyworld/worker.py` to the canonical Ken Burns ffmpeg pattern: feed exactly one input frame using `-loop 1 -framerate 1 -t 1 -i still.png`, then cap the zoompan output explicitly with `-frames:v N` where `N = int(round(duration_sec * 24))`. This guarantees `nb_frames == N` regardless of zoompan's internal `d` value.
+- **Verify:** Run `scripts/hyworld_smoketest.py` — Test 7 (renderer with stub assets) PASS. ffprobe each shot's `render.mp4`: `duration` must equal `duration_sec` from `shotlist.json` to within ±0.05s. Verified post-fix: 8.7s expected -> 8.709s actual; 3.5s expected -> 3.500s actual.
+- **Tags:** ffmpeg, zoompan, ken-burns, hyworld, worker, motion-stub, frame-multiplication
+
 ### BUG-LOCAL-040: Director JSON parse fails on JS-style comments in LLM output [FIXED]
 - **Date:** 2026-04-15 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** `ValueError: Failed to parse production plan JSON. Aborting run to prevent silent audio failure.` Director produced 3491-char output starting with valid-looking JSON but `json.loads()` rejected it. Repair pass logged `Expecting property name enclosed in double quotes: line 13 column 42`.

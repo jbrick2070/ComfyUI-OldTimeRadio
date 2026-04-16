@@ -1,13 +1,15 @@
 """
-worker.py  --  HyWorld sidecar worker (runs in hyworld2 conda env)
-===================================================================
+worker.py  --  HyWorld sidecar worker (runs in hyworld2 conda env, or main venv fallback)
+=========================================================================================
 This script is spawned by OTR_HyworldBridge as a subprocess.
 It reads the contract files from io/hyworld_in/<job_id>/,
 runs HyWorld inference, and writes results to io/hyworld_out/<job_id>/.
 
-IMPORTANT: This runs in a SEPARATE Python environment (torch 2.4, CUDA 12.4)
+IMPORTANT: This may run in a SEPARATE Python environment (torch 2.4, CUDA 12.4)
 from the main ComfyUI process (torch 2.10, CUDA 13.0).  Do NOT import
-any OTR node code or ComfyUI modules.
+any OTR node code or ComfyUI modules.  The worker also runs under the
+main ComfyUI .venv as a fallback (stub modes only) when the hyworld2
+conda env is unavailable.
 
 Usage (called by bridge.py, not by humans):
     python otr_v2/hyworld/worker.py <path_to_job_dir>
@@ -17,17 +19,27 @@ Status protocol:
         {"status": "RUNNING"|"READY"|"ERROR"|"OOM", "detail": "...", ...}
     The poll node reads this file to determine completion.
 
-Stub implementation:  Until WorldMirror 2.0 is installed in the hyworld2
-conda env, this worker reads the shotlist and creates placeholder assets
-(solid-color PNG stills per shot) so the full pipeline can be tested
-end-to-end without GPU inference.
+Tiered execution path (selected at runtime, no model contention with audio):
+    1. WorldMirror 2.0 inference  - if hyworld2 env + weights present
+    2. Motion stub (real MP4)     - if ffmpeg on PATH (Ken Burns clips
+                                    driven by shotlist camera adjective).
+                                    Uses CPU only, safe to run while Bark
+                                    TTS holds the GPU.
+    3. Still stub (solid PNG)     - last-resort, no external deps.
+
+The motion stub is the current default for testing the full Bridge ->
+Poll -> Renderer path with an MP4 output.  Real generative video
+(SVD / LTX-Video) is the next phase and requires GPU coordination
+with the audio pipeline (must wait until BatchBark releases VRAM).
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import struct
+import subprocess
 import sys
 import time
 import traceback
@@ -73,6 +85,164 @@ def _create_placeholder_png(path: Path, width: int = 1280, height: int = 720,
     path.write_bytes(png)
 
 
+# ---------------------------------------------------------------------------
+# ffmpeg discovery + Ken Burns motion clip generation
+# ---------------------------------------------------------------------------
+
+# Output dimensions for stub clips.  Matches renderer default; the renderer
+# will rescale at concat time anyway, but rendering at the target size keeps
+# zoompan math honest.
+_CLIP_WIDTH = 1280
+_CLIP_HEIGHT = 720
+_CLIP_FPS = 24
+
+# Camera adjective (from shotlist.py voice-traits map) -> ffmpeg zoompan recipe.
+# Each entry is a function (duration_sec, width, height) -> filter_chain str.
+# Formulas use `on` (current input frame) and `d` (total animation frames)
+# because -loop 1 feeds zoompan one new frame per output frame.
+
+def _motion_static(d: int, w: int, h: int) -> str:
+    return f"zoompan=z=1.0:d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+
+def _motion_slow_push_in(d: int, w: int, h: int) -> str:
+    # 1.00 -> ~1.30 over the duration, centered crop.
+    return (
+        f"zoompan=z='min(1.0+0.30*on/{d},1.30)':"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_fast_dolly(d: int, w: int, h: int) -> str:
+    # Faster zoom, slight off-center for canted feel.
+    return (
+        f"zoompan=z='min(1.0+0.55*on/{d},1.55)':"
+        f"x='iw*0.45-(iw/zoom/2)':y='ih*0.55-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_clean_push(d: int, w: int, h: int) -> str:
+    return (
+        f"zoompan=z='min(1.0+0.40*on/{d},1.40)':"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_whip_pan(d: int, w: int, h: int) -> str:
+    # Constant zoom 1.3, sweep horizontally across the available range.
+    return (
+        f"zoompan=z=1.30:"
+        f"x='(iw-iw/zoom)*on/{d}':y='ih/2-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_low_angle(d: int, w: int, h: int) -> str:
+    # Constant zoom 1.25, drift y from bottom to top (looking up).
+    return (
+        f"zoompan=z=1.25:"
+        f"x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/{d})':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_macro(d: int, w: int, h: int) -> str:
+    # Very slow zoom 1.0 -> 1.15, centered.
+    return (
+        f"zoompan=z='min(1.0+0.15*on/{d},1.15)':"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+def _motion_slow_drift(d: int, w: int, h: int) -> str:
+    # Default: gentle zoom 1.0 -> 1.20 with a small horizontal drift.
+    return (
+        f"zoompan=z='min(1.0+0.20*on/{d},1.20)':"
+        f"x='(iw-iw/zoom)*(0.40+0.20*on/{d})':y='ih/2-(ih/zoom/2)':"
+        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
+    )
+
+# First-substring-match wins (case-insensitive).  Matches the camera
+# adjectives produced by shotlist._camera_from_traits().
+_CAMERA_MOTION_MAP: list[tuple[str, callable]] = [
+    ("locked off",      _motion_static),
+    ("clean push",      _motion_clean_push),
+    ("slow handheld",   _motion_slow_push_in),
+    ("fast dolly",      _motion_fast_dolly),
+    ("whip-pan",        _motion_whip_pan),
+    ("low angle",       _motion_low_angle),
+    ("macro detail",    _motion_macro),
+    ("slow drift",      _motion_slow_drift),
+]
+
+
+def _camera_to_motion(camera: str, duration_sec: float, w: int, h: int) -> tuple[str, str]:
+    """Resolve a shotlist camera adjective to an ffmpeg filter chain.
+
+    Returns (motion_label, filter_chain_string).
+    """
+    # Total animation frames at our fixed output FPS.
+    d = max(1, int(round(duration_sec * _CLIP_FPS)))
+    cam_lower = (camera or "").lower()
+    for needle, fn in _CAMERA_MOTION_MAP:
+        if needle in cam_lower:
+            return (needle, fn(d, w, h))
+    return ("default_drift", _motion_slow_drift(d, w, h))
+
+
+def _find_ffmpeg() -> str | None:
+    """Locate ffmpeg.  Mirrors renderer._find_ffmpeg search order."""
+    candidates = [
+        "ffmpeg",
+        r"C:\Users\jeffr\Documents\ComfyUI\ffmpeg\bin\ffmpeg.exe",
+        r"C:\ffmpeg\bin\ffmpeg.exe",
+    ]
+    for c in candidates:
+        resolved = shutil.which(c)
+        if resolved:
+            return resolved
+    return None
+
+
+def _make_motion_clip(
+    ffmpeg: str,
+    still_path: Path,
+    out_path: Path,
+    duration_sec: float,
+    camera: str,
+) -> tuple[bool, str]:
+    """Render a Ken Burns MP4 from a still using the camera-derived motion.
+
+    Returns (ok, motion_label).  On failure, motion_label is the ffmpeg
+    stderr tail so the caller can record it.
+    """
+    motion_label, vfilter = _camera_to_motion(camera, duration_sec, _CLIP_WIDTH, _CLIP_HEIGHT)
+    # Compute exact target frame count.  zoompan multiplies frames (d output
+    # frames per input frame), so we must:
+    #   - feed exactly 1 input frame  (-framerate 1 -loop 1 -t 1)
+    #   - cap output at N frames      (-frames:v N)
+    # Otherwise the duration explodes by ~d^2.  See BUG-LOCAL-014.
+    target_frames = max(1, int(round(duration_sec * _CLIP_FPS)))
+    cmd = [
+        ffmpeg, "-y",
+        "-loop", "1",
+        "-framerate", "1",
+        "-t", "1",
+        "-i", str(still_path),
+        "-vf", vfilter,
+        "-frames:v", str(target_frames),
+        "-c:v", "libx264", "-preset", "veryfast",
+        "-pix_fmt", "yuv420p",
+        "-r", str(_CLIP_FPS),
+        "-an",  # no audio track in the clip; renderer muxes episode WAV separately
+        str(out_path),
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=120, text=True)
+    except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+        return (False, f"ffmpeg-spawn-error:{exc.__class__.__name__}")
+    if result.returncode != 0 or not out_path.exists():
+        return (False, f"ffmpeg-rc{result.returncode}:{(result.stderr or '')[-200:]}")
+    return (True, motion_label)
+
+
 def run_stub(job_dir: Path) -> None:
     """
     Stub worker: read shotlist, create placeholder stills per shot.
@@ -99,7 +269,17 @@ def run_stub(job_dir: Path) -> None:
         _write_status(out_dir, "ERROR", "shotlist has zero shots")
         return
 
-    # Create per-shot placeholder stills
+    # ffmpeg is the gate between still-stub and motion-stub modes.  When
+    # present we upgrade each shot from a static PNG to a Ken Burns MP4
+    # driven by the shotlist camera adjective.  CPU-only -> safe to run
+    # alongside Bark TTS on the GPU.
+    ffmpeg = _find_ffmpeg()
+
+    motion_ok = 0
+    motion_failed = 0
+    backend_label = "stub_motion_clip" if ffmpeg else "stub_placeholder_still"
+
+    # Create per-shot assets (still always written; mp4 written when ffmpeg is up).
     for i, shot in enumerate(shots):
         shot_id = shot.get("shot_id", f"shot_{i:03d}")
         shot_dir = out_dir / shot_id
@@ -110,18 +290,46 @@ def run_stub(job_dir: Path) -> None:
         g = 30 + (i * 23) % 60
         b = 40 + (i * 31) % 60
 
-        _create_placeholder_png(shot_dir / "render.png", r=r, g=g, b=b)
+        still_path = shot_dir / "render.png"
+        _create_placeholder_png(still_path, r=r, g=g, b=b)
 
-        # Write shot metadata
-        (shot_dir / "meta.json").write_text(json.dumps({
+        camera = shot.get("camera", "")
+        duration = float(shot.get("duration_sec", 9))
+        motion_label = "still_only"
+        ffmpeg_detail = ""
+
+        if ffmpeg is not None:
+            mp4_path = shot_dir / "render.mp4"
+            ok, label = _make_motion_clip(ffmpeg, still_path, mp4_path, duration, camera)
+            if ok:
+                motion_ok += 1
+                motion_label = label
+            else:
+                motion_failed += 1
+                ffmpeg_detail = label  # holds the error tail
+
+        # Write shot metadata (now includes resolved motion + backend)
+        meta = {
             "shot_id": shot_id,
             "env_prompt": shot.get("env_prompt", ""),
-            "camera": shot.get("camera", ""),
-            "duration_sec": shot.get("duration_sec", 9),
-            "backend": "stub_placeholder",
-        }, indent=2), encoding="utf-8")
+            "camera": camera,
+            "duration_sec": duration,
+            "backend": backend_label,
+            "motion": motion_label,
+        }
+        if ffmpeg_detail:
+            meta["ffmpeg_detail"] = ffmpeg_detail
+        (shot_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    _write_status(out_dir, "READY", f"Stub: {len(shots)} placeholder stills generated")
+    if ffmpeg is None:
+        detail = f"Still-only stub: {len(shots)} placeholder PNGs (ffmpeg not found)"
+    elif motion_failed == 0:
+        detail = f"Motion stub: {motion_ok} Ken Burns MP4 clips generated"
+    else:
+        detail = (
+            f"Motion stub: {motion_ok} MP4 clips, {motion_failed} fell back to still"
+        )
+    _write_status(out_dir, "READY", detail)
 
 
 def run_worldmirror(job_dir: Path) -> None:
