@@ -68,12 +68,11 @@ STYLES = [
     "psychological slow-burn", "hard-sci-fi procedural",
     "noir mystery", "chaotic black-mirror",
 ]
-CREATIVITIES = ["safe & tight", "balanced", "wild & rough"]
-# NOTE: "maximum chaos" REMOVED from soak pool 2026-04-13 after the
-# watcher flagged back-to-back ghost runs (EMPTY_CAST, NO_SCENE_ARC,
-# EMPTY_SCRIPT, TITLE_STUCK) on runs 011 and 012. The creativity
-# preset breaks the prompt too often to be useful for overnight soaks.
-# The widget still accepts it for manual experimentation.
+CREATIVITIES = ["safe & tight", "balanced", "wild & rough", "maximum chaos"]
+# NOTE: "maximum chaos" was removed 2026-04-13 after ghost runs on runs 011-012.
+# Re-added 2026-04-15 (P1 #9) with weight-biased selection so it runs ~10% of
+# iterations instead of 25%. Catches temperature-sensitive TITLE/WORD_ENFORCEMENT
+# regressions that only manifest at high creativity.
 OPT_PROFILES = ["Pro (Ultra Quality)", "Standard"]
 # NOTE: "Obsidian (UNSTABLE/4GB)" excluded -- not valid on 16 GB hardware
 
@@ -1140,7 +1139,11 @@ def run_iteration(run_num):
             "words": random.choice(TARGET_WORDS),
             "length": random.choice(TARGET_LENGTHS),
             "style": random.choice(STYLES),
-            "creativity": random.choice(CREATIVITIES),
+            "creativity": random.choices(
+                CREATIVITIES,
+                weights=[30, 35, 25, 10],  # max chaos ~10% of runs
+                k=1
+            )[0],
             "profile": random.choice(OPT_PROFILES),
         }
 

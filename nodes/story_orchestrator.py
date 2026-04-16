@@ -1980,6 +1980,8 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
     raw_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
     streamer = GemmaHeartbeatStreamer(raw_tokenizer, skip_prompt=True, skip_special_tokens=True)
 
+    vram_snapshot("llm_generate_entry")
+
     try:
         with torch.no_grad():
             # v1.4: Tune penalty for 2B models to prevent SFX loops
@@ -2005,6 +2007,12 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
         # Decode only the new tokens (skip the prompt).
         new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
         decoded = tokenizer.decode(new_tokens_cpu, skip_special_tokens=True)
+
+        # Log output token count and snapshot VRAM state after generation
+        output_token_count = new_tokens_cpu.shape[0]
+        _runtime_log(f"llm_generate_exit: generated {output_token_count} tokens in {inference_time:.1f}s")
+        vram_snapshot("llm_generate_exit")
+
         return decoded
     finally:
         # v1.4 Theme B/C: GUARANTEED VRAM RECOVERY
@@ -4375,8 +4383,48 @@ YOUR CRITIQUE (numbered list only):"""
             _runtime_log(f"CRITIQUE_ONLY: Failed - {e}")
             return ""
 
+    @staticmethod
+    def _count_character_lines(text):
+        """Count dialogue lines per character in script text.
+
+        Returns a dict {CHARACTER_NAME: line_count}. Matches the pattern
+        'NAME: dialogue' where NAME is uppercase letters/digits/underscores/spaces.
+        Excludes structural tokens: TITLE, SCENE, ACT, SFX, ENV, MUSIC, BEAT,
+        PAUSE, NARRATOR, SYSTEM_SENTINEL. ANNOUNCER is counted as a character.
+
+        Args:
+            text: Script text to analyze.
+
+        Returns:
+            Dict mapping character names to dialogue line counts.
+        """
+        if not text:
+            return {}
+
+        # Structural tokens to exclude (but not ANNOUNCER - it's a real character)
+        _struct_exclude = frozenset([
+            "TITLE", "SCENE", "ACT", "SFX", "ENV", "MUSIC", "BEAT",
+            "PAUSE", "NARRATOR", "SYSTEM_SENTINEL"
+        ])
+
+        # Pattern: NAME: dialogue (uppercase name, optional parenthetical emotion,
+        # colon, then content). Allow optional asterisks (character emphasis).
+        pattern = r'^\s*\*{0,2}([A-Z][A-Z0-9_ ]+?)\*{0,2}\s*(?:\([^)]*\))?\s*:'
+
+        character_counts = {}
+        for line in text.split('\n'):
+            match = re.match(pattern, line)
+            if match:
+                char_name = match.group(1).strip()
+                # Skip structural tokens
+                if char_name not in _struct_exclude:
+                    character_counts[char_name] = character_counts.get(char_name, 0) + 1
+
+        return character_counts
+
     def _critique_and_revise(self, draft_text, genre_flavor, target_words,
-                             model_id, temperature, optimization_profile="Standard"):
+                             model_id, temperature, optimization_profile="Standard",
+                             min_line_count_per_character=2):
         """Three-pass refinement: the LLM critiques its own draft, then revises.
 
         Pass 1 (already done): Draft generation (the script_text we received).
@@ -4384,6 +4432,11 @@ YOUR CRITIQUE (numbered list only):"""
                                numbered improvement plan - NO rewriting.
         Pass 3 (Revision):     LLM receives draft + critique, rewrites the
                                script implementing the specific fixes.
+
+        Args:
+            min_line_count_per_character: Minimum dialogue lines required per character
+                in the revised script. Revisions that drop any character below this
+                threshold are rejected. Default 2.
 
         Returns the revised script text, or the original draft if critique
         fails or produces nothing useful.
@@ -4486,6 +4539,7 @@ RULES:
 - Keep the same approximate length (~{target_words} words).
 - Make dialogue sharper, more natural, more emotionally grounded.
 - Strengthen the story arc wherever the critique identifies weakness.
+- CRITICAL: Do NOT reduce any character below {min_line_count_per_character} dialogue lines. Every character present in the draft must still appear with at least {min_line_count_per_character} lines in the revision.
 
 EDITOR'S CRITIQUE:
 {critique_text}
@@ -4587,6 +4641,25 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                         similarity * 100)
             _runtime_log("CRITIQUE: CRITIQUE_SKIPPED - revision is a hallucination (%.1f%%)" % (similarity * 100))
             return draft_text
+
+        # Check 4: Character line count preservation - ensure no character drops below minimum
+        draft_char_counts = self._count_character_lines(draft_text)
+        revised_char_counts = self._count_character_lines(revised_text)
+
+        _runtime_log(f"CRITIQUE: Character line counts - draft={draft_char_counts} revised={revised_char_counts}")
+
+        # For each character in draft with >= min_lines, verify it still meets the floor in revision
+        for char_name, draft_count in draft_char_counts.items():
+            if draft_count >= min_line_count_per_character:
+                revised_count = revised_char_counts.get(char_name, 0)
+                if revised_count < min_line_count_per_character:
+                    log.warning(
+                        "[Critique] Character '%s' dropped from %d to %d lines (floor=%d) - "
+                        "revision violates character preservation constraint. Keeping original draft.",
+                        char_name, draft_count, revised_count, min_line_count_per_character
+                    )
+                    _runtime_log(f"CRITIQUE: CRITIQUE_REJECTED - character '{char_name}' dropped from {draft_count} to {revised_count} lines (floor={min_line_count_per_character})")
+                    return draft_text
 
         log.info("[Critique] Checks & Critiques complete - revised script accepted "
                  "(similarity=%.1f%%, length ratio=%.0f%%).",
@@ -6738,6 +6811,32 @@ OPENING:
 # NODE 2: DIRECTOR
 # -----------------------------------------------------------------------------
 
+_DIRECTOR_SCHEMA = {
+    "required_keys": {
+        "voice_assignments": dict,
+        "sfx_plan": list,
+        "music_plan": list,
+    },
+    "optional_keys": {
+        "episode_title": str,
+        "pacing": dict,
+        "visual_plan": dict,
+    },
+    "voice_assignment_required": {
+        "voice_preset": str,
+    },
+    "sfx_entry_required": {
+        "cue_id": str,
+        "generation_prompt": str,
+    },
+    "music_entry_required": {
+        "cue_id": str,
+        "duration_sec": (int, float),
+        "generation_prompt": str,
+    },
+    "music_cue_ids": {"opening", "closing", "interstitial"},
+}
+
 DIRECTOR_PROMPT = """You are the PRODUCTION DIRECTOR for the Canonical Audio Engine 1.0.
 Your task is to take a raw script and compile it into a deterministic JSON production plan.
 
@@ -6996,6 +7095,7 @@ class LLMDirector:
 
         # Extract JSON from response
         plan = self._extract_json(raw)
+        plan = self._validate_director_plan(plan)
 
         # Procedural character names (except LEMMY stays LEMMY)
         # Use a deterministic seed based on script content hash
@@ -7255,5 +7355,150 @@ class LLMDirector:
 
         log.info("[LLMDirector] Procedural cast complete: %d characters "
                  "(%d unique presets)", len(new_voice_assignments), len(used_presets))
+
+        return plan
+
+    def _validate_director_plan(self, plan):
+        """Validate and repair the Director's JSON production plan.
+
+        Checks all required keys exist and have correct types. Repairs missing
+        or invalid entries for voice assignments, SFX cues, and music cues.
+        Adds fallback defaults for missing critical fields.
+
+        Args:
+            plan: The parsed production plan dict from _extract_json()
+
+        Returns:
+            The repaired plan dict, guaranteed to have valid structure downstream.
+        """
+        if not isinstance(plan, dict):
+            log.warning("[LLMDirector] DIRECTOR_SCHEMA: plan is not a dict, initializing empty")
+            _runtime_log("DIRECTOR_SCHEMA: plan is not a dict, initializing empty")
+            plan = {}
+
+        # --- Part 1: Check and add required keys with defaults ---
+        for key, expected_type in _DIRECTOR_SCHEMA["required_keys"].items():
+            if key not in plan:
+                log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: missing required key '{key}', adding default")
+                _runtime_log(f"DIRECTOR_SCHEMA: repaired missing required key '{key}'")
+                if expected_type == dict:
+                    plan[key] = {}
+                elif expected_type == list:
+                    plan[key] = []
+            elif not isinstance(plan[key], expected_type):
+                log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: '{key}' has type {type(plan[key]).__name__}, expected {expected_type.__name__}, resetting to default")
+                _runtime_log(f"DIRECTOR_SCHEMA: repaired type mismatch on '{key}'")
+                if expected_type == dict:
+                    plan[key] = {}
+                elif expected_type == list:
+                    plan[key] = []
+
+        # --- Part 2: Validate voice_assignments ---
+        voice_assignments = plan.get("voice_assignments", {})
+        if isinstance(voice_assignments, dict):
+            for char_name, char_data in list(voice_assignments.items()):
+                if not isinstance(char_data, dict):
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: voice_assignments[{char_name}] is not a dict, replacing")
+                    _runtime_log(f"DIRECTOR_SCHEMA: repaired voice_assignments[{char_name}] type")
+                    voice_assignments[char_name] = {}
+                    char_data = voice_assignments[char_name]
+
+                # Check voice_preset exists and is a string
+                if "voice_preset" not in char_data:
+                    fallback = "v2/en_speaker_0"
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: voice_assignments[{char_name}] missing 'voice_preset', using fallback '{fallback}'")
+                    _runtime_log(f"DIRECTOR_SCHEMA: repaired voice_preset for {char_name}")
+                    char_data["voice_preset"] = fallback
+                elif not isinstance(char_data["voice_preset"], str):
+                    fallback = "v2/en_speaker_0"
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: voice_assignments[{char_name}]['voice_preset'] is not a string, using fallback '{fallback}'")
+                    _runtime_log(f"DIRECTOR_SCHEMA: repaired voice_preset type for {char_name}")
+                    char_data["voice_preset"] = fallback
+
+        # --- Part 3: Validate SFX plan ---
+        sfx_plan = plan.get("sfx_plan", [])
+        if not isinstance(sfx_plan, list):
+            log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: sfx_plan is not a list, resetting")
+            _runtime_log("DIRECTOR_SCHEMA: repaired sfx_plan type")
+            plan["sfx_plan"] = []
+            sfx_plan = []
+        else:
+            # Remove SFX entries missing generation_prompt (they're useless)
+            valid_sfx = []
+            for i, sfx_entry in enumerate(sfx_plan):
+                if not isinstance(sfx_entry, dict):
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: sfx_plan[{i}] is not a dict, skipping")
+                    _runtime_log(f"DIRECTOR_SCHEMA: removed invalid sfx_plan[{i}]")
+                    continue
+
+                # Check required fields
+                if "cue_id" not in sfx_entry or "generation_prompt" not in sfx_entry:
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: sfx_plan[{i}] missing required fields, skipping")
+                    _runtime_log(f"DIRECTOR_SCHEMA: removed incomplete sfx_plan[{i}]")
+                    continue
+
+                valid_sfx.append(sfx_entry)
+
+            plan["sfx_plan"] = valid_sfx
+
+        # --- Part 4: Validate and synthesize music_plan ---
+        music_plan = plan.get("music_plan", [])
+        if not isinstance(music_plan, list):
+            log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: music_plan is not a list, resetting")
+            _runtime_log("DIRECTOR_SCHEMA: repaired music_plan type")
+            plan["music_plan"] = []
+            music_plan = []
+
+        # Check that all required cue_ids exist
+        music_dict = {entry.get("cue_id"): entry for entry in music_plan
+                      if isinstance(entry, dict) and "cue_id" in entry}
+
+        # Default music cue configs
+        music_defaults = {
+            "opening": {
+                "cue_id": "opening",
+                "duration_sec": 12,
+                "generation_prompt": "1940s old time radio opening theme, warm brass fanfare, upright bass, snare brushes, mono AM radio character, tube saturation, confident and mysterious, ends on a held chord"
+            },
+            "closing": {
+                "cue_id": "closing",
+                "duration_sec": 8,
+                "generation_prompt": "1940s old time radio closing sting, brass and strings, resolving cadence, warm tube saturation, fades to silence"
+            },
+            "interstitial": {
+                "cue_id": "interstitial",
+                "duration_sec": 4,
+                "generation_prompt": "short old time radio act-break stinger, single brass hit with cymbal swell, mono, tube warmth"
+            }
+        }
+
+        # Ensure all three required cues exist
+        for cue_id in _DIRECTOR_SCHEMA["music_cue_ids"]:
+            if cue_id not in music_dict:
+                log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: music_plan missing cue_id '{cue_id}', synthesizing default")
+                _runtime_log(f"DIRECTOR_SCHEMA: repaired missing music cue '{cue_id}'")
+                plan["music_plan"].append(music_defaults[cue_id].copy())
+            else:
+                # Validate existing cue
+                cue_entry = music_dict[cue_id]
+                # Check duration_sec is a valid positive number
+                duration = cue_entry.get("duration_sec")
+                if not isinstance(duration, (int, float)) or duration <= 0:
+                    default_duration = music_defaults[cue_id]["duration_sec"]
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: music cue '{cue_id}' has invalid duration_sec={duration}, using default {default_duration}")
+                    _runtime_log(f"DIRECTOR_SCHEMA: repaired invalid duration for music cue '{cue_id}'")
+                    cue_entry["duration_sec"] = default_duration
+
+                # Check generation_prompt exists and is a string
+                if "generation_prompt" not in cue_entry or not isinstance(cue_entry.get("generation_prompt"), str):
+                    default_prompt = music_defaults[cue_id]["generation_prompt"]
+                    log.warning(f"[LLMDirector] DIRECTOR_SCHEMA: music cue '{cue_id}' has invalid generation_prompt, using default")
+                    _runtime_log(f"DIRECTOR_SCHEMA: repaired invalid prompt for music cue '{cue_id}'")
+                    cue_entry["generation_prompt"] = default_prompt
+
+        log.info(f"[LLMDirector] DIRECTOR_SCHEMA validation complete: "
+                 f"voice_assignments={len(plan.get('voice_assignments', {}))}, "
+                 f"sfx_plan={len(plan.get('sfx_plan', []))}, "
+                 f"music_plan={len(plan.get('music_plan', []))}")
 
         return plan

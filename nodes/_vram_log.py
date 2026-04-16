@@ -137,7 +137,7 @@ def force_vram_offload():
         comfy.model_management.soft_empty_cache()
     except Exception:
         pass
-    
+
     # Step 3: Explicit Python and PyTorch garbage collection
     import gc
     import torch
@@ -145,3 +145,56 @@ def force_vram_offload():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
+
+
+def vram_sentinel(phase_label, max_entry_gb=6.0):
+    """Decorator that asserts VRAM is below a threshold before the function runs.
+
+    Use on TTS/audio functions that expect the LLM to be unloaded first.
+    If VRAM exceeds max_entry_gb at entry, logs a warning and calls
+    force_vram_offload() to recover. The function still runs either way —
+    this is defensive depth, not a hard gate.
+
+    Args:
+        phase_label: Label for VRAM snapshot logging (e.g. "bark_entry")
+        max_entry_gb: Maximum acceptable VRAM at function entry (default 6.0 GB)
+    """
+    import functools
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            # Check VRAM at entry
+            snap = vram_snapshot(f"{phase_label}_entry")
+            current_gb = snap.get("current_gb", 0.0)
+
+            if current_gb > max_entry_gb:
+                log.warning(
+                    "[VRAM_SENTINEL] %s: VRAM %.1f GB exceeds %.1f GB entry ceiling — "
+                    "LLM weights may still be loaded. Forcing offload.",
+                    phase_label, current_gb, max_entry_gb
+                )
+                _write_runtime_log(
+                    f"VRAM_SENTINEL_TRIGGERED phase={phase_label} "
+                    f"current_gb={current_gb:.3f} ceiling_gb={max_entry_gb:.1f}"
+                )
+                force_vram_offload()
+                # Re-check after offload
+                snap2 = vram_snapshot(f"{phase_label}_after_offload")
+                if snap2.get("current_gb", 0.0) > max_entry_gb:
+                    log.warning(
+                        "[VRAM_SENTINEL] %s: VRAM still %.1f GB after offload — "
+                        "proceeding anyway, may OOM.",
+                        phase_label, snap2["current_gb"]
+                    )
+
+            # Run the actual function
+            vram_reset_peak(phase_label)
+            try:
+                result = fn(*args, **kwargs)
+            finally:
+                vram_snapshot(f"{phase_label}_exit")
+
+            return result
+        return wrapper
+    return decorator

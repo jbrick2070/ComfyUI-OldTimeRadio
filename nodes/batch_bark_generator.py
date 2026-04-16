@@ -29,7 +29,7 @@ import numpy as np
 import torch
 
 from .story_orchestrator import _runtime_log
-from ._vram_log import force_vram_offload
+from ._vram_log import force_vram_offload, vram_sentinel
 
 log = logging.getLogger("OTR")
 
@@ -505,6 +505,7 @@ class BatchBarkGenerator:
             },
         }
 
+    @vram_sentinel("bark_batch", max_entry_gb=6.0)
     def generate_batch(self, script_json, production_plan_json, temperature=0.7):
 
         # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)

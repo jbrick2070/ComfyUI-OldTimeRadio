@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-15
+**Last updated:** 2026-04-15 (session 2)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -21,28 +21,13 @@ Lock these. Any work item that contradicts this list is wrong.
 
 ---
 
-## v1.7 Ship Gate
+## P0 — Shipped or blocked
 
-Confirm BUG-LOCAL-040 (Director JSON comment stripping) on one clean end-to-end run. If the episode renders with dialogue intact and no Director crash, tag v1.7 on `v2.0-alpha` and merge to `main`. All BUG-LOCAL-034 through 040 ship with this release.
+### 1. `min_line_count_per_character` structural constraint — SHIPPED (awaiting live test)
+Injected `min_line_count_per_character=2` into `_critique_and_revise()`. Constraint added to the revision prompt. Post-critique validator counts dialogue lines per character in draft vs revision; rejects revision if any character drops below floor. Helper method `_count_character_lines()` added. Falls back to pre-critique draft on rejection.
 
----
-
-## P0 — Ship before v1.7 or immediately after
-
-### 1. `min_line_count_per_character` structural constraint
-The real self-critique dialogue-collapse fix. Neither external reviewer flagged it. The 28-to-2 line collapse from BUG-LOCAL-037 is a symptom; the cause is the critique pass deleting characters with impunity.
-
-Wire-up:
-- Add `min_line_count_per_character: 2` (default) to Director production plan.
-- Inject the constraint into the self-critique system prompt: "Do not reduce any character below N lines."
-- Post-critique validator rejects output where a previously-present character drops below the floor; falls back to pre-critique script.
-
-Source: review triage K3.
-
-### 2. Director JSON schema + validator
-Validate Director output against a strict schema before downstream nodes consume it. Fail-fast at the boundary. Prevents the null-latent and matrix-shape-mismatch crash classes. Schema draft in `2026-04-15-hyworld-integration-plan-review.md` (Rework §A).
-
-Source: review triage Keep #3.
+### 2. Director JSON schema + validator — SHIPPED (awaiting live test)
+`_DIRECTOR_SCHEMA` constant + `_validate_director_plan()` method in LLMDirector. Validates required keys (voice_assignments, sfx_plan, music_plan), repairs missing entries, validates voice_preset strings, filters broken sfx entries, synthesizes missing music cues, clamps duration_sec. Wired into `direct()` between `_extract_json()` and `_randomize_character_names()`.
 
 ### 3. Scene-Geometry-Vault *(v2.0 — blocked on Gate 0)*
 Series-scale visual continuity bet. Without a persistent geometry vault, Act 3's bridge will not match Act 1's bridge across episodes. Design only after Gate 0 empirical measurements exist.
@@ -56,32 +41,26 @@ Source: review triage Keep #2.
 
 ---
 
-## P1 — Ship once P0 is stable
+## P1 — Shipped or blocked
 
-### 5. Length-sorted Bark batching
-Bark pads to the longest sequence in the batch. Sort by token length within each voice-preset group, generate, re-sort by scene position afterward. Pure throughput win, no quality risk. `BatchBark` already groups by preset — add one sort step.
-
-Source: Bark optimization triage B1.
+### 5. Length-sorted Bark batching — SHIPPED (awaiting live test)
+Added `.sort(key=lambda item: len(item["line"]))` within each preset group in `batch_bark_generator.py`. Script order restored at assembly via `results[script_idx]`. Pure throughput win, zero quality risk.
 
 ### 6. Head-Start async pre-bake (Phase B.5) *(v2.0 — blocked on Gate 0)*
 While ScriptWriter and Director run, kick off HyworldBridge on `outline_json` so geometry generation overlaps the LLM passes. Wall-clock win. Blocked on Gate 0 and vault stability.
 
 Source: review triage Keep #1.
 
-### 7. VRAM-Sentinel decorator on bark utils
-Formalize `_flush_vram_keep_llm()` as a decorator that asserts "Director weights cleared before I run" on every Bark call. Cheap defensive depth. Codifies existing handoff discipline.
-
-Source: review triage Keep #5.
+### 7. VRAM-Sentinel decorator on bark utils — SHIPPED (awaiting live test)
+Added `vram_sentinel(phase_label, max_entry_gb)` decorator to `_vram_log.py`. Checks VRAM at entry, logs warning and force-offloads if above threshold. Applied to `BatchBarkGenerator.generate_batch()` at 6.0 GB ceiling. CUDA-absent safe.
 
 ### 8. ASCII sanitizer in prompt_compiler *(v2.0 — blocked on Gate 0)*
 Strip non-ASCII (smart quotes, em-dashes) before Tencent text encoders. Preserve case. Collapse whitespace. Reference implementation in `2026-04-15-hyworld-integration-plan-review.md` (Rework §B).
 
 Source: review triage Keep #4.
 
-### 9. High-creativity soak profile
-Add one soak variant at `creativity="maximum"` to verify TITLE resolution and WORD_ENFORCEMENT hold under high LLM temperature. Low effort; catches temperature-sensitive regressions.
-
-Source: review triage K1.
+### 9. High-creativity soak profile — SHIPPED (awaiting live test)
+Re-added `"maximum chaos"` to CREATIVITIES pool in `soak_operator.py` with weighted selection (~10% of runs). Catches temperature-sensitive TITLE/WORD_ENFORCEMENT regressions.
 
 ---
 
@@ -97,10 +76,8 @@ The fine pass adds high-frequency detail that AudioEnhance then destroys via tap
 
 Source: Bark optimization triage B3.
 
-### 12. Per-LLM-call VRAM snapshots in soak_operator
-Extend `VRAM_SNAPSHOT phase=director_exit` to every LLM call. Reuses `_vram_log`. Cheap defensive observability.
-
-Source: review triage K2.
+### 12. Per-LLM-call VRAM snapshots — SHIPPED (awaiting live test)
+Added `vram_snapshot("llm_generate_entry")` and `vram_snapshot("llm_generate_exit")` inside `_generate_with_llm()` in `story_orchestrator.py`. Logs token count and inference time. Every LLM call now emits VRAM telemetry.
 
 ### 13. `episode_title` socket input on OTR_SignalLostVideo
 Replace implicit `script_json` title-token read with explicit socket input wired from ScriptWriter. v2.1 cleanup, not alpha-blocking.
@@ -131,15 +108,16 @@ Gate decision:
 
 ## Recently shipped (for context, not action)
 
-| Bug | Summary | Commit |
+| Item | Summary | Status |
 |---|---|---|
-| BUG-LOCAL-034 | Streak auto-halt 5→3 | `ee67d9c` |
-| BUG-LOCAL-035 | TITLE_STUCK fix | `ee67d9c` |
-| BUG-LOCAL-036 | WordExtend NameError | `ee67d9c` |
-| BUG-LOCAL-037 | TITLE-as-character regression | `36d13aa` |
-| BUG-LOCAL-038 | Bare NAME: dialogue parser (4-part) | `27e41a4` |
-| BUG-LOCAL-039 | Markdown bold leak in title | `7ff8fa7` |
-| BUG-LOCAL-040 | JS-style comments in Director JSON | `2828338` |
+| v1.7 | Tagged and merged to `main` (`0aa6d6e`) | Shipped |
+| BUG-LOCAL-034–040 | Parser resilience, title fixes, JSON repair | Shipped with v1.7 |
+| P0 #1 | `min_line_count_per_character` self-critique guard | Code complete, needs live test |
+| P0 #2 | Director JSON schema validator | Code complete, needs live test |
+| P1 #5 | Length-sorted Bark batching | Code complete, needs live test |
+| P1 #7 | VRAM-Sentinel decorator | Code complete, needs live test |
+| P1 #9 | High-creativity soak profile | Code complete, needs live test |
+| P2 #12 | Per-LLM-call VRAM snapshots | Code complete, needs live test |
 
 ---
 
