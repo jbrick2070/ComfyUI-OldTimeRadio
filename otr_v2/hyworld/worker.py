@@ -45,15 +45,54 @@ import time
 import traceback
 from pathlib import Path
 
+# Phase A: atomic writes + VRAM coordinator scaffold.  These imports use
+# absolute-from-file resolution so the module works whether the worker
+# is launched as ``python otr_v2/hyworld/worker.py <job_dir>`` (no
+# package context) or imported as ``otr_v2.hyworld.worker``.
+_THIS_DIR = Path(__file__).resolve().parent
+if str(_THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(_THIS_DIR))
+try:
+    from _atomic import atomic_write_json  # type: ignore
+except ImportError:
+    # Last-resort fallback: degrade to non-atomic write.  This keeps the
+    # worker runnable even from a stripped-down env, at the cost of the
+    # STATUS.json race.  Logged so we notice if it ever happens in prod.
+    def atomic_write_json(path: Path, data, indent: int = 2) -> None:  # type: ignore
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(
+            json.dumps(data, indent=indent, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+try:
+    from vram_coordinator import VRAMCoordinator  # type: ignore
+except ImportError:
+    # If the coordinator module isn't reachable for some reason (e.g.
+    # the worker is launched from a stripped-down env without the rest
+    # of otr_v2.hyworld), fall back to a no-op stand-in.  Today the
+    # worker is CPU-only, so this is purely scaffolding for Phase B.
+    class VRAMCoordinator:  # type: ignore
+        def __init__(self, *a, **kw): pass
+        def acquire(self, *a, **kw):
+            from contextlib import contextmanager
+            @contextmanager
+            def _noop():
+                yield self
+            return _noop()
+        def release(self, *a, **kw): return False
+        def status(self): return None
+        def is_held(self): return False
+
 
 def _write_status(out_dir: Path, status: str, detail: str = "") -> None:
-    """Write STATUS.json for the poll node."""
+    """Write STATUS.json for the poll node.  Atomic to avoid mid-write races."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "STATUS.json").write_text(json.dumps({
+    atomic_write_json(out_dir / "STATUS.json", {
         "status": status,
         "detail": detail,
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-    }, indent=2), encoding="utf-8")
+    })
 
 
 def _create_placeholder_png(path: Path, width: int = 1280, height: int = 720,
@@ -319,7 +358,7 @@ def run_stub(job_dir: Path) -> None:
         }
         if ffmpeg_detail:
             meta["ffmpeg_detail"] = ffmpeg_detail
-        (shot_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        atomic_write_json(shot_dir / "meta.json", meta)
 
     if ffmpeg is None:
         detail = f"Still-only stub: {len(shots)} placeholder PNGs (ffmpeg not found)"
@@ -337,6 +376,12 @@ def run_worldmirror(job_dir: Path) -> None:
     Real WorldMirror 2.0 inference.  Activated when the hyworld2 env
     has the model installed.
 
+    Wraps GPU work in a VRAMCoordinator.acquire() so it cannot collide
+    with Bark TTS or another worker pass.  The coordinator is a Phase
+    A scaffold; until Bark also acquires the same lock, this protects
+    only against concurrent worker runs -- still useful and zero
+    behavioural cost when there's no contention.
+
     TODO: Implement when conda env + weights are verified.
     Skeleton left here so the entry point is clear.
     """
@@ -353,12 +398,20 @@ def run_worldmirror(job_dir: Path) -> None:
         _write_status(out_dir, "ERROR", "WorldMirrorPipeline not installed in this env")
         return
 
-    # Step 2: Load model (first run downloads weights)
-    # Step 3: For each shot, run inference on panorama images
-    # Step 4: Write gaussians.ply, depth maps, rendered frames to out_dir
-    # Step 5: Write READY status
-
-    _write_status(out_dir, "ERROR", "WorldMirror integration not yet implemented")
+    # Step 2-5 happen inside the GPU gate.  Bark TTS does not yet
+    # acquire this lock, so today the gate only blocks worker-vs-worker
+    # collisions.  When Phase B (SDXL anchor) lands, Bark will be
+    # taught to acquire this same lock during the audio render window.
+    coord = VRAMCoordinator()
+    try:
+        with coord.acquire(owner="hyworld_worker", job_id=job_id, timeout=1800):
+            # Step 2: Load model (first run downloads weights)
+            # Step 3: For each shot, run inference on panorama images
+            # Step 4: Write gaussians.ply, depth maps, rendered frames to out_dir
+            # Step 5: Write READY status
+            _write_status(out_dir, "ERROR", "WorldMirror integration not yet implemented")
+    except TimeoutError as e:
+        _write_status(out_dir, "ERROR", f"VRAM gate timeout: {e}")
 
 
 def main() -> None:

@@ -25,12 +25,31 @@ from pathlib import Path
 
 log = logging.getLogger("OTR.hyworld.bridge")
 
+# Phase A: atomic writes for the contract files so the worker (which
+# reads them at startup) never lands on a half-written JSON.
+try:
+    from ._atomic import atomic_write_json, atomic_write_text
+except ImportError:
+    # Fallback when bridge.py is imported outside its package context
+    # (e.g. during certain test setups).
+    from _atomic import atomic_write_json, atomic_write_text  # type: ignore
+
+
 # ---------------------------------------------------------------------------
 # Paths relative to OTR repo root
 # ---------------------------------------------------------------------------
 _OTR_ROOT = Path(__file__).resolve().parent.parent.parent
 _IO_IN = _OTR_ROOT / "io" / "hyworld_in"
 _IO_OUT = _OTR_ROOT / "io" / "hyworld_out"
+
+# Canonical Audio Token types accepted in script_json.  Extra types are
+# allowed (forward-compat) but at least one of these MUST appear or we
+# refuse the run -- a script with zero recognized tokens is almost
+# always a malformed upstream payload.
+_CANONICAL_TOKEN_TYPES = {
+    "title", "scene_break", "environment", "sfx",
+    "pause", "dialogue", "direction", "music",
+}
 
 # Sidecar worker script (lives alongside this file)
 _WORKER_SCRIPT = Path(__file__).resolve().parent / "worker.py"
@@ -46,6 +65,41 @@ def _ensure_io_dirs() -> None:
     """Create io/ exchange directories if they don't exist."""
     _IO_IN.mkdir(parents=True, exist_ok=True)
     _IO_OUT.mkdir(parents=True, exist_ok=True)
+
+
+def _validate_script_lines(script_lines: list) -> tuple[bool, str]:
+    """Light schema check on the parsed script_json payload.
+
+    The full Canonical Audio Token spec is enforced upstream by the
+    audio pipeline; here we only catch obvious malformations that
+    would crash the worker after spawn:
+
+    - top level must be a non-empty list
+    - every entry must be a dict
+    - every entry must have a string ``type`` field
+    - at least one entry's ``type`` must be in the canonical set
+
+    Returns (ok, reason).  reason is empty when ok=True.
+    """
+    if not isinstance(script_lines, list):
+        return False, "top-level must be a JSON array"
+    if not script_lines:
+        return False, "script_lines is empty"
+    canonical_seen = False
+    for i, item in enumerate(script_lines):
+        if not isinstance(item, dict):
+            return False, f"line {i} is not an object"
+        ttype = item.get("type")
+        if not isinstance(ttype, str):
+            return False, f"line {i} missing string 'type' field"
+        if ttype in _CANONICAL_TOKEN_TYPES:
+            canonical_seen = True
+    if not canonical_seen:
+        return False, (
+            f"no canonical token types found "
+            f"(expected at least one of {sorted(_CANONICAL_TOKEN_TYPES)})"
+        )
+    return True, ""
 
 
 class HyworldBridge:
@@ -136,13 +190,16 @@ class HyworldBridge:
         job_id = f"hw_{uuid.uuid4().hex[:12]}"
         log.info("[HyworldBridge] Job %s starting (lane=%s)", job_id, lane)
 
-        # ---- 1. Parse script_lines ----
+        # ---- 1. Parse + validate script_lines ----
         try:
             script_lines = json.loads(script_json)
-            if not isinstance(script_lines, list):
-                raise ValueError("script_json must be a JSON array")
-        except (json.JSONDecodeError, ValueError) as e:
+        except json.JSONDecodeError as e:
             log.error("[HyworldBridge] script_json parse failed: %s", e)
+            return (f"PARSE_ERROR_{job_id}", "[]")
+
+        ok, reason = _validate_script_lines(script_lines)
+        if not ok:
+            log.error("[HyworldBridge] script_json schema check failed: %s", reason)
             return (f"PARSE_ERROR_{job_id}", "[]")
 
         # ---- 2. Generate shotlist (Lane 1 floor, always runs) ----
@@ -160,10 +217,12 @@ class HyworldBridge:
         job_dir = _IO_IN / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
 
-        (job_dir / "script_lines.json").write_text(script_json, encoding="utf-8")
-        (job_dir / "shotlist.json").write_text(shotlist_json, encoding="utf-8")
-        (job_dir / "production_plan.json").write_text(production_plan_json, encoding="utf-8")
-        (job_dir / "scene_manifest.json").write_text(scene_manifest_json, encoding="utf-8")
+        # Atomic writes prevent the worker (which reads these immediately
+        # after spawn) from landing on a half-written contract file.
+        atomic_write_text(job_dir / "script_lines.json", script_json)
+        atomic_write_text(job_dir / "shotlist.json", shotlist_json)
+        atomic_write_text(job_dir / "production_plan.json", production_plan_json)
+        atomic_write_text(job_dir / "scene_manifest.json", scene_manifest_json)
 
         # Metadata for the sidecar
         meta = {
@@ -177,7 +236,7 @@ class HyworldBridge:
             "total_shots": shotlist_result["total_shots"],
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         }
-        (job_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        atomic_write_json(job_dir / "meta.json", meta)
 
         log.info("[HyworldBridge] Contract written to %s", job_dir)
 
@@ -242,8 +301,9 @@ class HyworldBridge:
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             log.info("[HyworldBridge] Sidecar spawned PID=%d for job %s", proc.pid, job_id)
-            # Write PID for poll node to monitor / cleanup
-            (job_dir / "sidecar_pid.txt").write_text(str(proc.pid), encoding="utf-8")
+            # Write PID for poll node to monitor / cleanup.
+            # Atomic so poll never reads a partial PID string.
+            atomic_write_text(job_dir / "sidecar_pid.txt", str(proc.pid))
             return "SPAWNED"
         except Exception as e:
             log.error("[HyworldBridge] Sidecar spawn failed: %s", e)
@@ -255,12 +315,16 @@ class HyworldBridge:
                 proc.terminate()
 
     def _write_status(self, job_id: str, status: str) -> None:
-        """Write a STATUS.json to io/hyworld_out/<job_id>/ for the poll node."""
+        """Write a STATUS.json to io/hyworld_out/<job_id>/ for the poll node.
+
+        Atomic so the poll node never reads a half-written status when
+        the bridge is the one writing it (the worker also uses atomic
+        writes via _atomic.py).
+        """
         out_dir = _IO_OUT / job_id
         out_dir.mkdir(parents=True, exist_ok=True)
-        status_file = out_dir / "STATUS.json"
-        status_file.write_text(json.dumps({
+        atomic_write_json(out_dir / "STATUS.json", {
             "job_id": job_id,
             "status": status,
             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        }, indent=2), encoding="utf-8")
+        })
