@@ -24,7 +24,14 @@ log = logging.getLogger("OTR.hyworld.renderer")
 
 _OTR_ROOT = Path(__file__).resolve().parent.parent.parent
 _IO_OUT = _OTR_ROOT / "io" / "hyworld_out"
-_RENDER_OUT = _OTR_ROOT / "output" / "hyworld_renders"
+
+# Use folder_paths for ComfyUI-compatible output directory (BUG-01.02)
+try:
+    import folder_paths
+    _RENDER_OUT = Path(folder_paths.get_output_directory()) / "hyworld_renders"
+except ImportError:
+    # Fallback for standalone testing
+    _RENDER_OUT = _OTR_ROOT / "output" / "hyworld_renders"
 
 # Crossfade duration between scene clips (seconds)
 _CROSSFADE_SEC = 0.75

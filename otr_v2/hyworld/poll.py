@@ -27,7 +27,7 @@ _TERMINAL_STATUSES = {
     "TIMEOUT",         # worker exceeded its own wall-clock limit
     "ENV_NOT_FOUND",   # bridge couldn't find conda env
     "WORKER_MISSING",  # worker.py not present
-    "SPAWN_FAILED",    # subprocess.Popen failed
+    "SPAWN_FAILED",    # sidecar process launch failed
     "DRY_RUN",         # sidecar_enabled was False
     "SIDECAR_UNAVAILABLE",
 }

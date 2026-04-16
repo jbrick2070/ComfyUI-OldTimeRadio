@@ -223,6 +223,7 @@ class HyworldBridge:
             log.warning("[HyworldBridge] Worker script not found at %s", _WORKER_SCRIPT)
             return "WORKER_MISSING"
 
+        proc = None
         try:
             proc = subprocess.Popen(
                 [str(sidecar_python), str(_WORKER_SCRIPT), str(job_dir)],
@@ -232,12 +233,17 @@ class HyworldBridge:
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             log.info("[HyworldBridge] Sidecar spawned PID=%d for job %s", proc.pid, job_id)
-            # Write PID for poll node
+            # Write PID for poll node to monitor / cleanup
             (job_dir / "sidecar_pid.txt").write_text(str(proc.pid), encoding="utf-8")
             return "SPAWNED"
         except Exception as e:
             log.error("[HyworldBridge] Sidecar spawn failed: %s", e)
             return "SPAWN_FAILED"
+        finally:
+            # Sidecar is fire-and-forget; cleanup only on spawn failure.
+            # On success the poll node monitors the PID via sidecar_pid.txt.
+            if proc is not None and proc.poll() is None and proc.returncode is not None:
+                proc.terminate()
 
     def _write_status(self, job_id: str, status: str) -> None:
         """Write a STATUS.json to io/hyworld_out/<job_id>/ for the poll node."""
