@@ -197,11 +197,11 @@ class HyworldBridge:
     def _spawn_sidecar(self, job_id: str, job_dir: Path) -> str:
         """
         Attempt to spawn the HyWorld worker in the hyworld2 conda env.
-        Returns: "SPAWNED", "ENV_NOT_FOUND", or "SPAWN_FAILED".
+        Falls back to the main ComfyUI Python for stub mode if conda
+        env is unavailable.
+        Returns: "SPAWNED", "SPAWN_FAILED".
         """
-        # Check if conda env exists by probing for its python
-        # On Windows, conda envs live in %USERPROFILE%\miniconda3\envs\<name>
-        # or %USERPROFILE%\anaconda3\envs\<name>
+        # Priority 1: hyworld2 conda env (for real WorldMirror inference)
         home = Path.home()
         candidates = [
             home / "miniconda3" / "envs" / _SIDECAR_ENV / "python.exe",
@@ -209,6 +209,13 @@ class HyworldBridge:
             home / "miniconda3" / "envs" / _SIDECAR_ENV / "bin" / "python",
             home / "anaconda3" / "envs" / _SIDECAR_ENV / "bin" / "python",
         ]
+        # Priority 2: main ComfyUI venv Python (runs worker in stub mode)
+        comfyui_venv = _OTR_ROOT.parent.parent / ".venv" / "Scripts" / "python.exe"
+        if comfyui_venv.exists():
+            candidates.append(comfyui_venv)
+        # Priority 3: system python
+        candidates.append(Path(sys.executable))
+
         sidecar_python = None
         for p in candidates:
             if p.exists():
@@ -216,8 +223,10 @@ class HyworldBridge:
                 break
 
         if sidecar_python is None:
-            log.warning("[HyworldBridge] Conda env '%s' not found. Tried: %s", _SIDECAR_ENV, [str(c) for c in candidates])
-            return "ENV_NOT_FOUND"
+            log.warning("[HyworldBridge] No usable Python found for sidecar. Tried: %s", [str(c) for c in candidates])
+            return "SPAWN_FAILED"
+
+        log.info("[HyworldBridge] Sidecar Python: %s", sidecar_python)
 
         if not _WORKER_SCRIPT.exists():
             log.warning("[HyworldBridge] Worker script not found at %s", _WORKER_SCRIPT)

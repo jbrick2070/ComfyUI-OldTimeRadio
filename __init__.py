@@ -130,7 +130,7 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
 _loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
 _total = len(_NODE_MODULES)
 if _loaded == _total:
-    print(f"[OldTimeRadio] ✓ All {_total} nodes loaded successfully")
+    print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
 else:
     print(f"[OldTimeRadio] ⚠️  Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
 

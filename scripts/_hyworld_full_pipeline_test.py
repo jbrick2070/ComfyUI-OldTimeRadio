@@ -13,9 +13,10 @@ so the sidecar can render video while the audio pipeline is still running.
 SignalLostVideo is kept as fallback only — HyWorld Renderer is the primary
 video output node.
 
-HyWorld runs in dry-run mode (sidecar_enabled=False) so no hyworld2 conda
-env is needed. The test proves the nodes wire correctly into the live
-pipeline without breaking audio (C7).
+HyWorld sidecar is ENABLED. The worker runs in stub mode (placeholder
+stills per shot) since WorldMirror 2.0 is not yet installed. The renderer
+composites these stills into video and muxes with the real episode audio.
+This proves the full end-to-end path: Bridge -> Worker -> Poll -> Renderer -> MP4.
 
 Usage:
     python scripts/_hyworld_full_pipeline_test.py
@@ -153,15 +154,15 @@ WORKFLOW = {
             "lane": "faithful",
             "chaos_ops": "",
             "chaos_seed": 42,
-            "sidecar_enabled": False
+            "sidecar_enabled": True
         }
     },
     "21": {
         "class_type": "OTR_HyworldPoll",
         "inputs": {
             "hyworld_job_id": ["20", 0],
-            "timeout_sec": 10,
-            "poll_interval_sec": 1.0
+            "timeout_sec": 120,
+            "poll_interval_sec": 2.0
         }
     },
     "22": {
