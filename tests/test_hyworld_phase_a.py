@@ -103,8 +103,12 @@ class TestAtomicWrites:
                     successful_reads += 1
                 except json.JSONDecodeError:
                     decode_failures += 1
-                except FileNotFoundError:
-                    # Acceptable transient on Windows during rename.
+                except (FileNotFoundError, PermissionError):
+                    # Acceptable Windows-only transients during rename:
+                    #   FileNotFoundError -> opened between unlink+create
+                    #   PermissionError   -> opened mid-replace, OS lock
+                    # Production readers in poll.py catch OSError, which
+                    # is the parent class of both -- this matches.
                     pass
 
         t_w = threading.Thread(target=writer)
@@ -120,6 +124,51 @@ class TestAtomicWrites:
             f"({successful_reads} successful reads)"
         )
         assert successful_reads > 0, "reader never managed to read the file"
+
+    def test_concurrent_writers_never_crash(self, tmp_path: Path):
+        """Two+ writers racing to the same file must not raise.
+
+        Regression for a Windows-only bug surfaced 2026-04-16: ``os.replace``
+        could hit ``PermissionError [WinError 5]`` when threads/processes
+        raced to rename onto the same target because the OS briefly held
+        an exclusive lock on the destination.  Fixed by retrying
+        ``os.replace`` with backoff in ``_atomic.py``.
+        """
+        target = tmp_path / "status.json"
+        atomic_write_json(target, {"status": "RUNNING"})
+
+        errors: list[BaseException] = []
+        stop = threading.Event()
+
+        def writer(tag: str):
+            for i in range(100):
+                if stop.is_set():
+                    return
+                try:
+                    atomic_write_json(target, {"status": "RUNNING", "tag": tag, "n": i})
+                except BaseException as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+
+        threads = [
+            threading.Thread(target=writer, args=("alpha",)),
+            threading.Thread(target=writer, args=("bravo",)),
+            threading.Thread(target=writer, args=("charlie",)),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=15)
+        stop.set()
+
+        assert not errors, (
+            "concurrent writers crashed: "
+            f"{[type(e).__name__ + ': ' + str(e) for e in errors]}"
+        )
+        # Final file must still be valid JSON written by one of the writers.
+        final = json.loads(target.read_text(encoding="utf-8"))
+        assert final.get("status") == "RUNNING"
+        assert final.get("tag") in {"alpha", "bravo", "charlie"}
 
 
 # ---------------------------------------------------------------------------

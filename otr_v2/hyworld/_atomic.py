@@ -23,8 +23,37 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
+
+# Windows-specific: when two processes/threads race to os.replace onto the
+# same destination, the OS can briefly hold an exclusive lock on the target
+# (antivirus, indexing service, the other rename in flight) and we get
+# WinError 5 / PermissionError.  POSIX renames are race-free, so this only
+# matters on nt.  Retry a handful of times with a short backoff before
+# giving up -- the lock window is microseconds in practice.
+_REPLACE_MAX_RETRIES = 8
+_REPLACE_BACKOFF_SEC = 0.01  # 10 ms; total worst-case wait ~80 ms
+
+
+def _replace_with_retry(src: str, dst: str) -> None:
+    """``os.replace`` with Windows-aware retry on transient PermissionError."""
+    if os.name != "nt":
+        os.replace(src, dst)
+        return
+    last_err: BaseException | None = None
+    for attempt in range(_REPLACE_MAX_RETRIES):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError as e:
+            last_err = e
+            time.sleep(_REPLACE_BACKOFF_SEC * (attempt + 1))
+    # Exhausted retries -- raise the last PermissionError so callers see
+    # the real cause rather than a generic "rename failed".
+    assert last_err is not None
+    raise last_err
 
 
 def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
@@ -61,7 +90,7 @@ def atomic_write_text(path: Path, text: str, encoding: str = "utf-8") -> None:
                 # (e.g. some network mounts).  The os.replace below is
                 # still atomic; we just lose the durability guarantee.
                 pass
-        os.replace(str(tmp_path), str(path))
+        _replace_with_retry(str(tmp_path), str(path))
     except Exception:
         # Best-effort cleanup of the temp file if the rename failed.
         try:
