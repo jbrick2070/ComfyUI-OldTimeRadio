@@ -85,6 +85,25 @@ except ImportError:
         def is_held(self): return False
 
 
+# Phase B v0: SD 1.5 anchor frame generation, gated behind an env var so
+# the default behavior (solid-color placeholder PNG + Ken Burns) is
+# unchanged until Jeffrey explicitly opts in.
+#
+#   set OTR_HYWORLD_ANCHOR=sd15   (PowerShell: $env:OTR_HYWORLD_ANCHOR="sd15")
+#
+# When unset / set to anything else, ``_anchor_gen_module`` is None and the
+# worker falls through to the existing solid-color placeholder path.
+_ANCHOR_BACKEND = os.environ.get("OTR_HYWORLD_ANCHOR", "").strip().lower()
+_USE_ANCHOR_GEN = _ANCHOR_BACKEND in {"sd15", "sd1.5", "anchor"}
+_anchor_gen_module = None  # type: ignore[assignment]
+if _USE_ANCHOR_GEN:
+    try:
+        import anchor_gen as _anchor_gen_module  # type: ignore
+    except ImportError:
+        _anchor_gen_module = None
+        _USE_ANCHOR_GEN = False
+
+
 def _write_status(out_dir: Path, status: str, detail: str = "") -> None:
     """Write STATUS.json for the poll node.  Atomic to avoid mid-write races."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -316,7 +335,37 @@ def run_stub(job_dir: Path) -> None:
 
     motion_ok = 0
     motion_failed = 0
-    backend_label = "stub_motion_clip" if ffmpeg else "stub_placeholder_still"
+
+    # Phase B v0: if SD 1.5 anchor backend is enabled, render real anchor
+    # PNGs into each shot dir BEFORE the per-shot loop runs.  The per-shot
+    # loop will then detect a non-placeholder PNG already on disk and skip
+    # the solid-color fallback, but otherwise the loop is unchanged --
+    # ffmpeg still consumes ``render.png`` from the shot dir as input.
+    anchor_results: dict = {}
+    anchor_ok = 0
+    anchor_failed = 0
+    if _USE_ANCHOR_GEN and _anchor_gen_module is not None:
+        _write_status(out_dir, "RUNNING", "Generating SD 1.5 anchors")
+        try:
+            anchor_results = _anchor_gen_module.generate_for_shotlist(
+                shots, out_dir,
+            )
+            for ar in anchor_results.values():
+                if ar.error:
+                    anchor_failed += 1
+                else:
+                    anchor_ok += 1
+        except Exception as exc:  # noqa: BLE001 -- log, fall back per-shot
+            _write_status(
+                out_dir, "RUNNING",
+                f"Anchor backend crashed ({type(exc).__name__}); falling back to placeholders",
+            )
+            anchor_results = {}
+
+    if anchor_ok > 0:
+        backend_label = "sd15_anchor_motion_clip" if ffmpeg else "sd15_anchor_still"
+    else:
+        backend_label = "stub_motion_clip" if ffmpeg else "stub_placeholder_still"
 
     # Create per-shot assets (still always written; mp4 written when ffmpeg is up).
     for i, shot in enumerate(shots):
@@ -330,7 +379,16 @@ def run_stub(job_dir: Path) -> None:
         b = 40 + (i * 31) % 60
 
         still_path = shot_dir / "render.png"
-        _create_placeholder_png(still_path, r=r, g=g, b=b)
+
+        # If anchor_gen wrote a usable PNG into the shot dir, keep it.
+        # Otherwise (anchor disabled, anchor failed, or anchor missing),
+        # fall back to the solid-color placeholder.
+        anchor_used = False
+        ar = anchor_results.get(shot_id)
+        if ar is not None and not ar.error and still_path.exists() and still_path.stat().st_size > 0:
+            anchor_used = True
+        else:
+            _create_placeholder_png(still_path, r=r, g=g, b=b)
 
         camera = shot.get("camera", "")
         duration = float(shot.get("duration_sec", 9))
@@ -347,7 +405,8 @@ def run_stub(job_dir: Path) -> None:
                 motion_failed += 1
                 ffmpeg_detail = label  # holds the error tail
 
-        # Write shot metadata (now includes resolved motion + backend)
+        # Write shot metadata (now includes resolved motion + backend
+        # and the anchor cache key when SD 1.5 actually rendered the still).
         meta = {
             "shot_id": shot_id,
             "env_prompt": shot.get("env_prompt", ""),
@@ -355,18 +414,32 @@ def run_stub(job_dir: Path) -> None:
             "duration_sec": duration,
             "backend": backend_label,
             "motion": motion_label,
+            "anchor_used": anchor_used,
         }
+        if anchor_used and ar is not None:
+            meta["anchor_cache_key"] = ar.cache_key
+            meta["anchor_cache_hit"] = ar.cache_hit
+            meta["anchor_seed"] = ar.seed
         if ffmpeg_detail:
             meta["ffmpeg_detail"] = ffmpeg_detail
         atomic_write_json(shot_dir / "meta.json", meta)
 
+    # Compose the final READY detail string.  Surface anchor stats only
+    # when the anchor backend was actually requested -- keeps the existing
+    # placeholder-mode message identical to today.
+    anchor_segment = ""
+    if _USE_ANCHOR_GEN:
+        anchor_segment = (
+            f"; SD15 anchors: {anchor_ok} ok, {anchor_failed} failed"
+        )
     if ffmpeg is None:
-        detail = f"Still-only stub: {len(shots)} placeholder PNGs (ffmpeg not found)"
+        detail = f"Still-only stub: {len(shots)} placeholder PNGs (ffmpeg not found){anchor_segment}"
     elif motion_failed == 0:
-        detail = f"Motion stub: {motion_ok} Ken Burns MP4 clips generated"
+        detail = f"Motion stub: {motion_ok} Ken Burns MP4 clips generated{anchor_segment}"
     else:
         detail = (
             f"Motion stub: {motion_ok} MP4 clips, {motion_failed} fell back to still"
+            f"{anchor_segment}"
         )
     _write_status(out_dir, "READY", detail)
 
