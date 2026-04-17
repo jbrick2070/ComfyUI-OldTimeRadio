@@ -3,9 +3,12 @@ renderer.py  --  OTR_HyworldRenderer ComfyUI node
 ===================================================
 Reads geometry + images from io/hyworld_out/<job_id>/,
 composites per-scene MP4 clips, crossfades to match audio length,
-and muxes with the untouched v1.7 WAV.
+and muxes with the untouched episode audio.
 
 Audio path is NEVER modified.  C7: audio output byte-identical.
+ffmpeg uses `-c:a copy` on the final mux so the muxed track is
+bit-for-bit identical to the temp WAV the node writes from the
+incoming AUDIO tensor.
 
 Design doc: docs/2026-04-15-hyworld-poc-design.md  Section 6
 """
@@ -17,8 +20,12 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 import time
+import wave
 from pathlib import Path
+
+import numpy as np
 
 log = logging.getLogger("OTR.hyworld.renderer")
 
@@ -79,8 +86,8 @@ class HyworldRenderer:
                 "hyworld_assets_path": ("STRING", {
                     "tooltip": "Path to io/hyworld_out/<job_id>/ from OTR_HyworldPoll, or 'FALLBACK'.",
                 }),
-                "final_audio_path": ("STRING", {
-                    "tooltip": "Path to the final episode WAV from v1.7 pipeline. NEVER modified.",
+                "episode_audio": ("AUDIO", {
+                    "tooltip": "Final episode audio tensor from OTR_EpisodeAssembler. Written to a temp WAV and muxed with -c:a copy (byte-identical passthrough, C7).",
                 }),
             },
             "optional": {
@@ -107,7 +114,7 @@ class HyworldRenderer:
     def execute(
         self,
         hyworld_assets_path: str,
-        final_audio_path: str,
+        episode_audio,
         shotlist_json: str = "{}",
         episode_title: str = "Untitled",
         crt_postfx: bool = True,
@@ -172,10 +179,12 @@ class HyworldRenderer:
             _log("No shot assets found. Falling back to procedural video.")
             return ("", "\n".join(render_log_lines))
 
-        # ---- VERIFY AUDIO EXISTS (never modify it) ----
-        audio_path = Path(final_audio_path)
-        if not audio_path.exists():
-            _log(f"Audio file not found: {audio_path}. Cannot mux without audio.")
+        # ---- WRITE AUDIO TO TEMP WAV (never modify the tensor) ----
+        # HyworldRenderer owns the temp file; ffmpeg muxes with -c:a copy
+        # so the track is byte-identical to the bytes we write here (C7).
+        audio_path = _write_audio_tensor_to_wav(episode_audio, _log)
+        if audio_path is None:
+            _log("Audio tensor unreadable. Cannot mux without audio.")
             return ("", "\n".join(render_log_lines))
 
         # ---- FIND FFMPEG ----
@@ -247,13 +256,58 @@ class HyworldRenderer:
             return ("", "\n".join(render_log_lines))
 
         # ---- CLEANUP TEMP FILES ----
-        for f in [concat_list, concat_out]:
+        for f in [concat_list, concat_out, audio_path]:
             try:
                 f.unlink(missing_ok=True)
             except OSError:
                 pass
 
         return (str(out_path), "\n".join(render_log_lines))
+
+
+def _write_audio_tensor_to_wav(audio, log_fn) -> Path | None:
+    """Write a ComfyUI AUDIO dict to a unique temp WAV and return its Path.
+
+    ComfyUI AUDIO format: {"waveform": torch.Tensor, "sample_rate": int}
+    Tensor shape is typically (batch, channels, samples) or (channels, samples).
+    We mix to mono to match the rest of the pipeline and write 16-bit PCM.
+    The renderer then passes this path to ffmpeg with `-c:a copy`, so the
+    PCM bytes flow through unchanged (C7 byte-identical).
+    """
+    try:
+        if not isinstance(audio, dict):
+            log_fn(f"Audio input is not an AUDIO dict (got {type(audio).__name__}).")
+            return None
+        waveform = audio.get("waveform")
+        sr = audio.get("sample_rate")
+        if waveform is None or sr is None:
+            log_fn("AUDIO dict missing 'waveform' or 'sample_rate'.")
+            return None
+
+        if waveform.dim() == 3:
+            audio_np = waveform[0].mean(dim=0).cpu().numpy()
+        elif waveform.dim() == 2:
+            audio_np = waveform.mean(dim=0).cpu().numpy()
+        else:
+            audio_np = waveform.cpu().numpy()
+
+        pcm = np.clip(audio_np * 32767.0, -32767, 32767).astype(np.int16)
+
+        fd, path_str = tempfile.mkstemp(prefix="hyworld_audio_", suffix=".wav")
+        os.close(fd)
+        path = Path(path_str)
+
+        with wave.open(str(path), "w") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(int(sr))
+            wf.writeframes(pcm.tobytes())
+
+        log_fn(f"Audio: wrote {len(pcm)} samples @ {sr} Hz to {path.name}")
+        return path
+    except Exception as exc:  # pragma: no cover - defensive
+        log_fn(f"Audio tensor -> WAV failed: {exc}")
+        return None
 
 
 def _still_to_clip(
