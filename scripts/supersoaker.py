@@ -219,7 +219,7 @@ def write_handoff(reason: str, phase: dict, detail: str) -> None:
         f"- Decide whether to:\n"
         f"  1. Fix the feature and re-run `python scripts/supersoaker.py "
         f"--only {phase['id']}`\n"
-        f"  2. Log a bug in `BUG_LOG.md` and promote to Bug Bible if "
+        f"  2. Log a bug in `docs/internal/BUG_LOG.md` and promote to Bug Bible if "
         f"applicable.\n"
         f"  3. Revise the probe itself if the feature is working but the "
         f"regex is wrong.\n\n"
