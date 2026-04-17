@@ -236,15 +236,59 @@ class HyworldRenderer:
             return ("", "\n".join(render_log_lines))
 
         # Step 2: mux concat video + original audio (audio is never re-encoded)
-        cmd_mux = [
+        # C7 safety: audio is king. The old `-shortest` could trim the audio
+        # if the video was shorter. We now probe durations and:
+        #   - if video >= audio: `-t audio_duration` caps output to audio length
+        #     with `-c:v copy` + `-c:a copy` (byte-identical audio passthrough).
+        #   - if video <  audio: pad video with a frozen last frame (tpad
+        #     filter), video gets re-encoded, audio stays `-c:a copy`.
+        # Probe failure falls back to the old `-shortest` behavior (logged).
+        audio_dur = _probe_duration_sec(ffmpeg, audio_path)
+        video_dur = _probe_duration_sec(ffmpeg, concat_out)
+
+        cmd_mux: list[str] = [
             ffmpeg, "-y",
             "-i", str(concat_out),
             "-i", str(audio_path),
-            "-c:v", "copy",
-            "-c:a", "copy",        # byte-identical audio passthrough (C7)
-            "-shortest",
-            str(out_path),
         ]
+
+        if audio_dur is not None and video_dur is not None:
+            _log(f"Durations: video={video_dur:.2f}s, audio={audio_dur:.2f}s")
+            if video_dur + 0.05 < audio_dur:
+                # Video shorter than audio -> pad last frame to close the gap.
+                pad_sec = audio_dur - video_dur + 0.1
+                cmd_mux += [
+                    "-filter_complex",
+                    f"[0:v]tpad=stop_mode=clone:stop_duration={pad_sec:.3f}[vpad]",
+                    "-map", "[vpad]",
+                    "-map", "1:a",
+                    "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p",
+                    "-c:a", "copy",
+                    "-t", f"{audio_dur:.3f}",
+                ]
+                _log(
+                    f"Video < audio by {audio_dur - video_dur:.2f}s; "
+                    f"padding last frame to preserve full audio (C7)."
+                )
+            else:
+                cmd_mux += [
+                    "-c:v", "copy",
+                    "-c:a", "copy",  # byte-identical audio passthrough (C7)
+                    "-t", f"{audio_dur:.3f}",
+                ]
+                _log("Video >= audio; capping output to exact audio length.")
+        else:
+            cmd_mux += [
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-shortest",
+            ]
+            _log(
+                "Duration probe failed; falling back to -shortest "
+                "(C7 risk if video < audio)."
+            )
+
+        cmd_mux.append(str(out_path))
         _log("Muxing video + audio (audio passthrough, C7 guaranteed)...")
         _run_ffmpeg(cmd_mux, _log)
 
@@ -328,13 +372,73 @@ def _still_to_clip(
     subprocess.run(cmd, capture_output=True, timeout=120)
 
 
-def _run_ffmpeg(cmd: list[str], log_fn) -> None:
-    """Run an ffmpeg command, logging stderr on failure."""
+def _probe_duration_sec(ffmpeg_path: str, media_path: Path) -> float | None:
+    """Probe a media file's duration in seconds via the sibling ffprobe
+    binary (ffprobe lives next to ffmpeg on Windows installs). Returns
+    ``None`` on any failure -- callers fall back to -shortest behavior.
+    """
+    if ffmpeg_path == "ffmpeg":
+        ffprobe = "ffprobe"
+    else:
+        parts = Path(ffmpeg_path)
+        sibling = parts.name.replace("ffmpeg", "ffprobe", 1)
+        ffprobe = str(parts.with_name(sibling)) if sibling != parts.name else "ffprobe"
+
+    cmd = [
+        ffprobe, "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(media_path),
+    ]
     try:
-        result = subprocess.run(cmd, capture_output=True, timeout=300, text=True)
+        result = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=30,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return float(result.stdout.strip())
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        pass
+    return None
+
+
+def _run_ffmpeg(cmd: list[str], log_fn, timeout: int = 300) -> int:
+    """Run an ffmpeg command and log stderr tail on failure.
+
+    Redirects stdout->DEVNULL and stderr->a temp file (NOT PIPE) to avoid
+    the Windows pipe-backpressure deadlock class that was the leading
+    suspect in the RUN 245 soak hang (gemini-3-flash consult 2026-04-17).
+    Returns ffmpeg's exit code, or -1 on binary-missing, -2 on timeout.
+    """
+    err_path: Path | None = None
+    try:
+        fd, err_name = tempfile.mkstemp(prefix="ffmpeg_err_", suffix=".log")
+        os.close(fd)
+        err_path = Path(err_name)
+        with open(err_path, "wb") as err_fh:
+            result = subprocess.run(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=err_fh,
+                timeout=timeout,
+            )
         if result.returncode != 0:
-            log_fn(f"ffmpeg error (rc={result.returncode}): {result.stderr[:500]}")
+            tail = err_path.read_bytes()[-1000:].decode("utf-8", errors="replace")
+            log_fn(f"ffmpeg error (rc={result.returncode}): {tail}")
+        return result.returncode
     except subprocess.TimeoutExpired:
-        log_fn("ffmpeg timed out after 300s")
+        log_fn(f"ffmpeg timed out after {timeout}s")
+        return -2
     except FileNotFoundError:
         log_fn("ffmpeg binary not found at runtime")
+        return -1
+    finally:
+        if err_path is not None:
+            try:
+                err_path.unlink(missing_ok=True)
+            except OSError:
+                pass
