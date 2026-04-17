@@ -4,7 +4,7 @@ poll.py  --  OTR_HyworldPoll ComfyUI node
 Polls io/hyworld_out/<job_id>/STATUS.json for sidecar completion.
 Blocks (with ComfyUI spinner) until ready, error, or timeout.
 
-Design doc: docs/superpowers/specs/2026-04-15-hyworld-poc-design.md  Section 6
+Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
 
 Phase A: also tracks the sidecar PID via io/hyworld_in/<job_id>/sidecar_pid.txt
 (written by bridge._spawn_sidecar).  If the PID is no longer alive AND no

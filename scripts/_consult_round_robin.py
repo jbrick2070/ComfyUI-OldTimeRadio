@@ -33,7 +33,7 @@ Usage
 
 Outputs
 -------
-    docs/superpowers/consultations/<DATE>-<TOPIC>/
+    docs/internal/consultations/<DATE>-<TOPIC>/
         00_question.md
         01_chatgpt.md           (round A response + model used)
         02_gemini.md            (round B response + model used)

@@ -165,9 +165,9 @@ If 2.0 does not fit - stay on 1.5, log the OOM signature, and wait for the upstr
 
 ## References
 
-- OTR v2 Design Spec: `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
-- OTR v2.1 Spec: `docs/superpowers/specs/2026-04-14-otr-v2.1-spec.md`
-- Green Zone Guardrail Decision: `docs/superpowers/specs/2026-04-14-green-zone-guardrail-decision.md`
+- OTR v2 Design Spec: `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+- OTR v2.1 Spec: `docs/internal/specs/2026-04-14-otr-v2.1-spec.md`
+- Green Zone Guardrail Decision: `docs/internal/specs/2026-04-14-green-zone-guardrail-decision.md`
 - Platform pins: `../../CLAUDE.md` (`Platform Reality` section)
 
 ---
@@ -278,4 +278,4 @@ OTR is already on it. Logs show `BarkModel on cuda` — that is the `transformer
 ## Reference
 
 - HyWorld Integration Plan v2.5: `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md`
-- OTR v2 Design Spec: `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+- OTR v2 Design Spec: `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md`

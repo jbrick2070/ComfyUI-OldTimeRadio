@@ -5,8 +5,8 @@
 **Status:** Ideas doc for visualization + review. Not an implementation spec.
 **Owner:** Jeffrey A. Brick
 **Companions:**
-- `docs/superpowers/specs/2026-04-15-hyworld-poc-design.md` (architecture / install / nodes)
-- `docs/superpowers/specs/2026-04-15-hyworld-integration-plan-review.md` (keep/discard triage)
+- `docs/internal/specs/2026-04-15-hyworld-poc-design.md` (architecture / install / nodes)
+- `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` (keep/discard triage)
 - `docs/OTR_PIPELINE_EXPLAINER.md` (layman's pipeline)
 
 ---

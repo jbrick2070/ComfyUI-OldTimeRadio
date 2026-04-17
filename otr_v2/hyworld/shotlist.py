@@ -5,7 +5,7 @@ Reads the Canonical Audio Tokens produced by _parse_script() and
 produces a shots[] array suitable for driving the HyWorld sidecar
 (or any interim stand-in: Diffusion360, SPAG4D, ComfyUI-Sharp).
 
-Design doc: docs/superpowers/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
+Design doc: docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
     Sections 4 (per-token mapping), 5 (deterministic vs LLM), 12.2 (Lane 1)
 
 Rules:

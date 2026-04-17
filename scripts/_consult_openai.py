@@ -14,7 +14,7 @@ Safety
 - Reads OPENAI_API_KEY from HKCU:\\Environment fresh on every run.
   Never written to disk.  Never logged.  Never put in argv / env of any
   child process.  Held in memory only for the duration of the HTTP call.
-- All output written under docs/superpowers/consultations/<DATE>/.
+- All output written under docs/internal/consultations/<DATE>/.
 - No telemetry, no third-party libraries, stdlib only.
 
 Usage
@@ -122,8 +122,8 @@ def _build_context_bundle() -> str:
         "## otr_v2/hyworld/renderer.py\n```python\n" + _read_text("otr_v2/hyworld/renderer.py") + "\n```\n",
         "## otr_v2/hyworld/worker.py\n```python\n" + _read_text("otr_v2/hyworld/worker.py") + "\n```\n",
         "## otr_v2/hyworld/shotlist.py\n```python\n" + _read_text("otr_v2/hyworld/shotlist.py") + "\n```\n",
-        "## docs/superpowers/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md (creative mapping doc -- excerpt)\n```\n"
-            + _read_text("docs/superpowers/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md")[:18000] + "\n```\n",
+        "## docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md (creative mapping doc -- excerpt)\n```\n"
+            + _read_text("docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md")[:18000] + "\n```\n",
     ]
     return "\n\n".join(parts)
 

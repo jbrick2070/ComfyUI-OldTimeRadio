@@ -5,8 +5,8 @@ Writes Director plan + scene manifest to io/hyworld_in/,
 generates shotlist via deterministic rules, and spawns the
 sidecar worker process.
 
-Design doc: docs/superpowers/specs/2026-04-15-hyworld-poc-design.md  Section 6
-Mapping doc: docs/superpowers/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
+Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
+Mapping doc: docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
 
 Audio path is NEVER touched.  If this node fails, downstream falls back
 to OTR_SignalLostVideo (procedural).

@@ -19,7 +19,7 @@ Why SD 1.5 (decision recorded 2026-04-16):
     - Upgrade path to SDXL is preserved (this module accepts an injectable
       model loader; swapping in SDXL is one config change).
 
-See ``docs/superpowers/consultations/2026-04-16-2026-04-16-phase-b-anchor-pick/``
+See ``docs/internal/consultations/2026-04-16-2026-04-16-phase-b-anchor-pick/``
 for the full round-robin transcript.
 
 Design constraints (binding):

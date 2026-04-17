@@ -100,7 +100,7 @@ _NODE_MODULES = {
     # ── v2.0 HyWorld Integration ────────────────────────────────────
     # Sidecar-isolated 3D world generation from OTR Director output.
     # Audio path NEVER touched. Falls back to OTR_SignalLostVideo on failure.
-    # See docs/superpowers/specs/2026-04-15-hyworld-poc-design.md
+    # See docs/internal/specs/2026-04-15-hyworld-poc-design.md
     "OTR_HyworldBridge":   (".otr_v2.hyworld.bridge",   "HyworldBridge",   "🌐 HyWorld Bridge"),
     "OTR_HyworldPoll":     (".otr_v2.hyworld.poll",     "HyworldPoll",     "⏳ HyWorld Poll"),
     "OTR_HyworldRenderer": (".otr_v2.hyworld.renderer", "HyworldRenderer", "🎬 HyWorld Renderer"),

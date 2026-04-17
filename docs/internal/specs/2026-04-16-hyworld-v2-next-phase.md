@@ -3,7 +3,7 @@
 **Branch:** `v2.0-alpha`
 **Status:** Active spec. Phase A in progress.
 **Owner:** Jeffrey Brick
-**Source:** Synthesis of three-round ChatGPT consultation (`docs/superpowers/consultations/2026-04-16-chatgpt/`) plus current state of `otr_v2/hyworld/*.py` and the prior creative-mapping doc (`2026-04-15-otr-to-hyworld-narrative-mapping.md`).
+**Source:** Synthesis of three-round ChatGPT consultation (`docs/internal/consultations/2026-04-16-chatgpt/`) plus current state of `otr_v2/hyworld/*.py` and the prior creative-mapping doc (`2026-04-15-otr-to-hyworld-narrative-mapping.md`).
 
 ---
 
@@ -133,7 +133,7 @@ ChatGPT recommends Diffusion360 first for the visual payoff. I'm going to verify
 
 ## Appendix -- ChatGPT consultation transcript
 
-Saved under `docs/superpowers/consultations/2026-04-16-chatgpt/`:
+Saved under `docs/internal/consultations/2026-04-16-chatgpt/`:
 - `00_context_bundle.md` -- full source bundle that was sent to gpt-4.1
 - `01_round1_robustness.md` -- 15-issue critique + scorecard
 - `02_round2_fidelity.md` -- 5-section graphical fidelity / replacement modules / VRAM coordinator design

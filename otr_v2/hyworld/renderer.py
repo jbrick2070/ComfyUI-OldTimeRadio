@@ -7,7 +7,7 @@ and muxes with the untouched v1.7 WAV.
 
 Audio path is NEVER modified.  C7: audio output byte-identical.
 
-Design doc: docs/superpowers/specs/2026-04-15-hyworld-poc-design.md  Section 6
+Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
 """
 
 from __future__ import annotations

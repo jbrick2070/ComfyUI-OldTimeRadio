@@ -137,9 +137,9 @@ Full discard reasoning in `2026-04-15-hyworld-integration-plan-review.md`.
 ## References
 
 - docs/internal/BUG_LOG.md — live bug tracking
-- `docs/superpowers/specs/2026-04-15-hyworld-integration-plan-review.md` — full external review triage
+- `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` — full external review triage
 - `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md` — HyWorld integration master plan
-- `docs/superpowers/specs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
-- `docs/superpowers/specs/2026-04-14-otr-v2.1-spec.md` — v2.1 spec
-- `docs/superpowers/specs/2026-04-14-green-zone-guardrail-decision.md` — guardrail decision
+- `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
+- `docs/internal/specs/2026-04-14-otr-v2.1-spec.md` — v2.1 spec
+- `docs/internal/specs/2026-04-14-green-zone-guardrail-decision.md` — guardrail decision
 - CLAUDE.md — platform pins, standing rules
