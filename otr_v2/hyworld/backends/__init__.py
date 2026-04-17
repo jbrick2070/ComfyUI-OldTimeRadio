@@ -53,16 +53,22 @@ def list_backends() -> list[str]:
     return sorted(_REGISTRY)
 
 
-# -- Day 1 registration: placeholder_test only.  Days 2-7 will add
-# FLUX anchor, FLUX+ControlNet keyframes, PuLID portraits, LTX short
-# motion, Wan2.1 long motion, Florence-2 masks.  Each lands in its
-# own file with its own lazy factory.
+# -- Day 1-7 registration.  Each factory defers its module import so
+# ``backends`` stays torch-free at import time.  Day 2 added FLUX anchor;
+# Days 3-7 will add PuLID portraits, FLUX+ControlNet keyframes, LTX short
+# motion, Wan2.1 long motion, Florence-2 masks.
 
 def _make_placeholder_test():
     from . import placeholder_test
     return placeholder_test.PlaceholderTestBackend()
 
 
+def _make_flux_anchor():
+    from . import flux_anchor
+    return flux_anchor.FluxAnchorBackend()
+
+
 register("placeholder_test", _make_placeholder_test)
+register("flux_anchor", _make_flux_anchor)
 
 __all__ = ["register", "resolve", "list_backends"]

@@ -279,8 +279,11 @@ class HyworldBridge:
         if sidecar_enabled:
             status = self._spawn_sidecar(job_id, job_dir, backend=backend)
             if status != "SPAWNED":
-                log.warning("[HyworldBridge] Sidecar not available: %s. Shotlist still usable for fallback.", status)
-                # Write status so poll node knows
+                log.warning(
+                    "[HyworldBridge] Sidecar not available: %s. "
+                    "Shotlist still usable for fallback.",
+                    status,
+                )
                 self._write_status(job_id, status)
         else:
             log.info("[HyworldBridge] Sidecar disabled (dry run). Shotlist written.")
@@ -335,7 +338,7 @@ class HyworldBridge:
 
         Returns: ``"SPAWNED"``, ``"SPAWN_FAILED"``, or ``"WORKER_MISSING"``.
         """
-        # Pre-spawn cooldown gate — LHM poll.  Never blocks forever; the
+        # Pre-spawn cooldown gate -- LHM poll.  Never blocks forever; the
         # audio rails are protected by VRAMCoordinator in the worker, not
         # by this gate.
         self._cooldown_gate(job_id)
@@ -356,13 +359,16 @@ class HyworldBridge:
         candidates.append(Path(sys.executable))
 
         sidecar_python = None
-        for p in candidates:
-            if p.exists():
-                sidecar_python = p
+        for p_candidate in candidates:
+            if p_candidate.exists():
+                sidecar_python = p_candidate
                 break
 
         if sidecar_python is None:
-            log.warning("[HyworldBridge] No usable Python found for sidecar. Tried: %s", [str(c) for c in candidates])
+            log.warning(
+                "[HyworldBridge] No usable Python found for sidecar. Tried: %s",
+                [str(c) for c in candidates],
+            )
             return "SPAWN_FAILED"
 
         log.info("[HyworldBridge] Sidecar Python: %s", sidecar_python)
@@ -408,13 +414,10 @@ class HyworldBridge:
                 "[HyworldBridge] Sidecar spawned PID=%d for job %s (backend=%s)",
                 proc.pid, job_id, backend,
             )
-            # Write PID for poll node to monitor / cleanup.
-            # Atomic so poll never reads a partial PID string.
             atomic_write_text(job_dir / "sidecar_pid.txt", str(proc.pid))
             return "SPAWNED"
         except Exception as e:
             log.error("[HyworldBridge] Sidecar spawn failed: %s", e)
-            # Close handles if we opened them before the Popen failed.
             for fp in (stdout_fp, stderr_fp):
                 if fp is not None:
                     try:
@@ -423,27 +426,17 @@ class HyworldBridge:
                         pass
             return "SPAWN_FAILED"
         finally:
-            # File handles are owned by the OS once Popen inherits them;
-            # closing our local references is safe and releases the
-            # descriptor in the parent.  Worker keeps writing normally.
             for fp in (stdout_fp, stderr_fp):
                 if fp is not None:
                     try:
                         fp.close()
                     except Exception:
                         pass
-            # Sidecar is fire-and-forget; cleanup only on spawn failure.
-            # On success the poll node monitors the PID via sidecar_pid.txt.
             if proc is not None and proc.poll() is None and proc.returncode is not None:
                 proc.terminate()
 
     def _write_status(self, job_id: str, status: str) -> None:
-        """Write a STATUS.json to io/hyworld_out/<job_id>/ for the poll node.
-
-        Atomic so the poll node never reads a half-written status when
-        the bridge is the one writing it (the worker also uses atomic
-        writes via _atomic.py).
-        """
+        """Write a STATUS.json to io/hyworld_out/<job_id>/ for the poll node."""
         out_dir = _IO_OUT / job_id
         out_dir.mkdir(parents=True, exist_ok=True)
         atomic_write_json(out_dir / "STATUS.json", {
