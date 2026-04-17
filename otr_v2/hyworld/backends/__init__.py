@@ -1,0 +1,68 @@
+"""
+otr_v2.hyworld.backends  --  video stack backend registry
+=========================================================
+
+Day 1 harness for the 14-day video stack sprint.  Each backend is a
+small class with a ``run(job_dir: Path) -> None`` method.  The worker
+resolves a backend by name (from the ``OTR_HYWORLD_BACKEND`` env var,
+plumbed through by ``bridge.py``) and hands the job directory over.
+
+Contract is intentionally minimal so the existing HyworldBridge +
+HyworldPoll + HyworldRenderer trio stays untouched: the backend writes
+``STATUS.json`` and per-shot assets into ``io/hyworld_out/<job_id>/``
+exactly like ``worker.run_stub`` does today.
+
+Registry entries load lazily — importing this package must never pull
+torch, diffusers, or any GPU-heavy dependency.  Real backends (FLUX,
+PuLID, LTX, Wan2.1, Florence-2) land on Days 2-7 of the sprint and
+each will live in its own file, imported on demand.
+
+No module-level side effects.  Safe to import from torch-free unit tests.
+"""
+
+from __future__ import annotations
+
+from typing import Callable, Dict
+
+# Registry: name -> zero-arg factory returning a backend instance.
+# Factories import their module lazily so ``backends`` can be imported
+# without dragging in the whole dependency graph.
+_REGISTRY: Dict[str, Callable] = {}
+
+
+def register(name: str, factory: Callable) -> None:
+    """Register a backend factory under ``name`` (lower-case, dash-free)."""
+    key = name.strip().lower()
+    if not key:
+        raise ValueError("backend name cannot be empty")
+    _REGISTRY[key] = factory
+
+
+def resolve(name: str):
+    """Look up and instantiate a backend by name.  Raises KeyError if unknown."""
+    key = (name or "").strip().lower()
+    if key not in _REGISTRY:
+        raise KeyError(
+            f"unknown backend {name!r}; known: {sorted(_REGISTRY)}"
+        )
+    return _REGISTRY[key]()
+
+
+def list_backends() -> list[str]:
+    """Return the registered backend names in sorted order."""
+    return sorted(_REGISTRY)
+
+
+# -- Day 1 registration: placeholder_test only.  Days 2-7 will add
+# FLUX anchor, FLUX+ControlNet keyframes, PuLID portraits, LTX short
+# motion, Wan2.1 long motion, Florence-2 masks.  Each lands in its
+# own file with its own lazy factory.
+
+def _make_placeholder_test():
+    from . import placeholder_test
+    return placeholder_test.PlaceholderTestBackend()
+
+
+register("placeholder_test", _make_placeholder_test)
+
+__all__ = ["register", "resolve", "list_backends"]

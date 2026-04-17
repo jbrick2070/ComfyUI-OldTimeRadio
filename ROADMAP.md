@@ -55,7 +55,7 @@ Every day ends with: `pytest tests/bug_bible_regression.py`, `pytest tests/test_
 
 | Day | Task | Gate |
 |---|---|---|
-| 1 | `backends/` harness, `_base.py`, STATUS.json schema, `placeholder_test.py`. Wire Bridge `backend=` arg + LHM cooldown gate. | Placeholder spawns, writes `state=done`, exits. VRAM baseline within 3s. C7 green. |
+| 1 | **[DONE 2026-04-17]** `backends/` harness, `_base.py`, STATUS.json schema, `placeholder_test.py`. Wire Bridge `backend=` arg + LHM cooldown gate. Fixed bridge.py:296-299 PIPE deadlock (stdout/stderr → per-job log files). | ✅ 14/14 new dispatch tests green; 26/26 Bug Bible; 56/56 dropdown guardrails; 22/22 anchor_gen. C7 unchanged. Pre-existing BUG-LOCAL-042 vram_sentinel errors surviving (not caused by Day 1). |
 | 2 | `flux_anchor.py` — diffusers FP8 FLUX baseline. Pin diffusers version in `requirements.video.txt`. | 1024² renders ≤ 12.5 GB. No `flash_attn` imports in venv trace. |
 | 3 | `WebFetch` verify PuLID canonical upstream. `pulid_portrait.py` — 3 refs → portrait. | Identity locked across 5 renders, same refs, different prompts. ≤ 14 GB. |
 | 4 | `flux_keyframe.py` — FLUX + Depth/Canny ControlNet. | Same layout preserved across 3 prompt variations. ≤ 13.5 GB. |

@@ -60,6 +60,31 @@ _SIDECAR_ENV = "hyworld2"
 # Timeout before declaring sidecar spawn failure
 _SPAWN_TIMEOUT_S = 30
 
+# Explicit backend choices surfaced in the node UI.  "auto" preserves
+# the legacy worldmirror-or-stub path; named entries dispatch into
+# ``otr_v2/hyworld/backends/`` via the OTR_HYWORLD_BACKEND env var on
+# the spawned sidecar.  Day 1 sprint exposes only placeholder_test; the
+# rest register as Days 2-7 of the 14-day video stack sprint land.
+_BACKEND_CHOICES = [
+    "auto",
+    "placeholder_test",
+    "flux_anchor",
+    "flux_controlnet_keyframe",
+    "pulid_portrait",
+    "ltx_motion",
+    "wan_i2v",
+    "florence2_mask",
+    "sdxl_inpaint",
+]
+
+# Pre-spawn GPU cooldown parameters.  Overridable via env var so the
+# audio-focused test harness can force a tight gate.  Defaults chosen
+# to avoid blocking normal generation: 82C threshold matches the RTX
+# 5080 Laptop's documented thermal headroom, 20s ceiling guarantees we
+# never stall a queue if the card is genuinely saturated.
+_COOLDOWN_TEMP_C = float(os.environ.get("OTR_HYWORLD_COOLDOWN_C", "82.0"))
+_COOLDOWN_MAX_WAIT_S = float(os.environ.get("OTR_HYWORLD_COOLDOWN_MAX_S", "20.0"))
+
 
 def _ensure_io_dirs() -> None:
     """Create io/ exchange directories if they don't exist."""
@@ -163,6 +188,15 @@ class HyworldBridge:
                     "default": True,
                     "tooltip": "If False, generate shotlist only (no sidecar spawn). Useful for dry runs.",
                 }),
+                "backend": (_BACKEND_CHOICES, {
+                    "default": "auto",
+                    "tooltip": (
+                        "Explicit video-stack backend to run in the sidecar. "
+                        "'auto' preserves legacy worldmirror-or-stub behaviour. "
+                        "Other choices dispatch into otr_v2/hyworld/backends/ "
+                        "via the OTR_HYWORLD_BACKEND env var."
+                    ),
+                }),
             },
         }
 
@@ -176,6 +210,7 @@ class HyworldBridge:
         chaos_ops: str = "",
         chaos_seed: int = 42,
         sidecar_enabled: bool = True,
+        backend: str = "auto",
     ) -> tuple[str, str]:
         """
         1. Parse script_json into script_lines.
@@ -242,7 +277,7 @@ class HyworldBridge:
 
         # ---- 4. Spawn sidecar (optional) ----
         if sidecar_enabled:
-            status = self._spawn_sidecar(job_id, job_dir)
+            status = self._spawn_sidecar(job_id, job_dir, backend=backend)
             if status != "SPAWNED":
                 log.warning("[HyworldBridge] Sidecar not available: %s. Shotlist still usable for fallback.", status)
                 # Write status so poll node knows
@@ -253,13 +288,58 @@ class HyworldBridge:
 
         return (job_id, shotlist_json)
 
-    def _spawn_sidecar(self, job_id: str, job_dir: Path) -> str:
+    def _cooldown_gate(self, job_id: str) -> None:
+        """Pre-spawn LHM poll; never blocks the queue indefinitely.
+
+        If LibreHardwareMonitor is unreachable or the card is already
+        cool, returns immediately.  If the GPU is hot, waits up to
+        ``_COOLDOWN_MAX_WAIT_S`` then proceeds regardless -- the
+        sidecar's own VRAM coordinator and OOM guard is the real
+        safety net; this gate just smooths the Bark-to-video handoff.
+        """
+        try:
+            from .backends._base import cooldown_gate
+        except ImportError:
+            try:
+                from backends._base import cooldown_gate  # type: ignore
+            except ImportError:
+                log.debug("[HyworldBridge] cooldown_gate unavailable; skipping")
+                return
+        try:
+            ok, reason = cooldown_gate(
+                max_wait_s=_COOLDOWN_MAX_WAIT_S,
+                temp_threshold_c=_COOLDOWN_TEMP_C,
+            )
+        except Exception as exc:  # noqa: BLE001 -- never let telemetry kill a run
+            log.debug("[HyworldBridge] cooldown_gate errored (%s); proceeding", exc)
+            return
+        if ok:
+            log.info("[HyworldBridge] cooldown gate passed for %s (%s)", job_id, reason)
+        else:
+            log.warning(
+                "[HyworldBridge] cooldown gate timed out for %s (%s); proceeding anyway",
+                job_id, reason,
+            )
+
+    def _spawn_sidecar(self, job_id: str, job_dir: Path, backend: str = "auto") -> str:
         """
         Attempt to spawn the HyWorld worker in the hyworld2 conda env.
         Falls back to the main ComfyUI Python for stub mode if conda
         env is unavailable.
-        Returns: "SPAWNED", "SPAWN_FAILED".
+
+        ``backend`` is plumbed through as the ``OTR_HYWORLD_BACKEND``
+        env var on the sidecar process.  ``"auto"`` leaves it unset so
+        the worker falls through to the legacy worldmirror-or-stub
+        branch; any other value dispatches via backends.resolve() in
+        worker.main().
+
+        Returns: ``"SPAWNED"``, ``"SPAWN_FAILED"``, or ``"WORKER_MISSING"``.
         """
+        # Pre-spawn cooldown gate — LHM poll.  Never blocks forever; the
+        # audio rails are protected by VRAMCoordinator in the worker, not
+        # by this gate.
+        self._cooldown_gate(job_id)
+
         # Priority 1: hyworld2 conda env (for real WorldMirror inference)
         home = Path.home()
         candidates = [
@@ -291,24 +371,67 @@ class HyworldBridge:
             log.warning("[HyworldBridge] Worker script not found at %s", _WORKER_SCRIPT)
             return "WORKER_MISSING"
 
+        # Build sidecar env.  Only set OTR_HYWORLD_BACKEND when a named
+        # backend was chosen; "auto" must leave the env var unset so the
+        # worker's legacy path runs unchanged.
+        sidecar_env = os.environ.copy()
+        if backend and backend.strip().lower() != "auto":
+            sidecar_env["OTR_HYWORLD_BACKEND"] = backend.strip().lower()
+        else:
+            sidecar_env.pop("OTR_HYWORLD_BACKEND", None)
+
+        # Redirect stdout/stderr to per-job log files.  Critical fix for
+        # Windows: ``subprocess.PIPE`` without a drainer deadlocks once
+        # the OS pipe buffer (~64 KB) fills, because the bridge is
+        # fire-and-forget and never reads from the pipe.  Log files
+        # preserve the output for post-mortem without any deadlock risk.
+        log_dir = _IO_OUT / job_id
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stdout_log = log_dir / "sidecar_stdout.log"
+        stderr_log = log_dir / "sidecar_stderr.log"
+
         proc = None
+        stdout_fp = None
+        stderr_fp = None
         try:
+            stdout_fp = open(stdout_log, "wb")
+            stderr_fp = open(stderr_log, "wb")
             proc = subprocess.Popen(
                 [str(sidecar_python), str(_WORKER_SCRIPT), str(job_dir)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=stdout_fp,
+                stderr=stderr_fp,
                 cwd=str(_OTR_ROOT),
+                env=sidecar_env,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
-            log.info("[HyworldBridge] Sidecar spawned PID=%d for job %s", proc.pid, job_id)
+            log.info(
+                "[HyworldBridge] Sidecar spawned PID=%d for job %s (backend=%s)",
+                proc.pid, job_id, backend,
+            )
             # Write PID for poll node to monitor / cleanup.
             # Atomic so poll never reads a partial PID string.
             atomic_write_text(job_dir / "sidecar_pid.txt", str(proc.pid))
             return "SPAWNED"
         except Exception as e:
             log.error("[HyworldBridge] Sidecar spawn failed: %s", e)
+            # Close handles if we opened them before the Popen failed.
+            for fp in (stdout_fp, stderr_fp):
+                if fp is not None:
+                    try:
+                        fp.close()
+                    except Exception:
+                        pass
             return "SPAWN_FAILED"
         finally:
+            # File handles are owned by the OS once Popen inherits them;
+            # closing our local references is safe and releases the
+            # descriptor in the parent.  Worker keeps writing normally.
+            for fp in (stdout_fp, stderr_fp):
+                if fp is not None:
+                    try:
+                        fp.close()
+                    except Exception:
+                        pass
             # Sidecar is fire-and-forget; cleanup only on spawn failure.
             # On success the poll node monitors the PID via sidecar_pid.txt.
             if proc is not None and proc.poll() is None and proc.returncode is not None:

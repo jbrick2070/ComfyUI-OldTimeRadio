@@ -442,6 +442,42 @@ def run_worldmirror(job_dir: Path) -> None:
         _write_status(out_dir, "ERROR", f"VRAM gate timeout: {e}")
 
 
+def _run_named_backend(name: str, job_dir: Path, out_dir: Path) -> bool:
+    """Dispatch to an explicit backend via the backends registry.
+
+    Returns True on success/handled failure (backend wrote STATUS.json
+    itself), False if the name was unknown or the backends package
+    couldn't be imported -- caller should then fall through to the
+    legacy stub / worldmirror path.  See ``backends/__init__.py``.
+    """
+    # Prefer package-relative import (when launched as a module).  Fall
+    # back to path-based so this still works when invoked as a raw
+    # script from the hyworld2 conda env.
+    try:
+        try:
+            from otr_v2.hyworld import backends as _backends  # type: ignore
+        except ImportError:
+            sys.path.insert(0, str(_THIS_DIR.parent))  # add otr_v2/
+            from hyworld import backends as _backends  # type: ignore
+    except ImportError as exc:
+        _write_status(
+            out_dir, "ERROR",
+            f"backends package unimportable for {name!r}: {exc}",
+        )
+        return True  # don't silently fall through -- surface the error
+
+    try:
+        backend = _backends.resolve(name)
+    except KeyError:
+        return False  # unknown name -> let caller fall through
+
+    try:
+        backend.run(job_dir)
+    except Exception:
+        _write_status(out_dir, "ERROR", traceback.format_exc()[-500:])
+    return True
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python worker.py <job_dir>", file=sys.stderr)
@@ -455,6 +491,20 @@ def main() -> None:
     job_id = job_dir.name
     otr_root = job_dir.parent.parent.parent
     out_dir = otr_root / "io" / "hyworld_out" / job_id
+
+    # Explicit backend dispatch (14-day video stack sprint entry point).
+    # When OTR_HYWORLD_BACKEND is set to a registered backend name, we
+    # skip the legacy worldmirror-or-stub branch entirely.  Unknown
+    # names fall through to the existing behaviour so nothing breaks.
+    backend_name = os.environ.get("OTR_HYWORLD_BACKEND", "").strip().lower()
+    if backend_name:
+        try:
+            handled = _run_named_backend(backend_name, job_dir, out_dir)
+        except Exception:
+            _write_status(out_dir, "ERROR", traceback.format_exc()[-500:])
+            sys.exit(1)
+        if handled:
+            return
 
     try:
         # Try real inference first; fall back to stub
