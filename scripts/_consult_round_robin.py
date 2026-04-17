@@ -53,11 +53,17 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import re
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# Matches a leading ISO date (YYYY-MM-DD), optionally followed by '-...'.
+# Used to detect when --topic already carries a date prefix so we don't
+# double-prepend today's date to the output directory.
+_LEADING_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}(-|$)")
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -326,7 +332,13 @@ def main() -> int:
 
     today = datetime.date.today().isoformat()
     topic = args.topic or _slugify(question)
-    out_dir = CONSULT_BASE / f"{today}-{topic}"
+    # If the caller already prefixed the topic with an ISO date (e.g.
+    # "2026-04-17-anchor-image-pick"), don't double-prepend today's date.
+    if _LEADING_ISO_DATE.match(topic):
+        dir_name = topic
+    else:
+        dir_name = f"{today}-{topic}"
+    out_dir = CONSULT_BASE / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     (out_dir / "00_question.md").write_text(
