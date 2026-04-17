@@ -3,7 +3,7 @@
 **Date:** 2026-04-14
 **Author:** Jeffrey Brick (with AI pair)
 **Status:** Draft — pre-scaffolding
-**Parent spec:** `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+**Parent spec:** `docs/2026-04-12-otr-v2-visual-sidecar-design.md`
 **Target branch:** `v2.1-hyworld-prep` (not yet created; off `v2.0-alpha`)
 
 ---

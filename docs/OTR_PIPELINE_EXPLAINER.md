@@ -6,7 +6,7 @@
 
 **Date:** 2026-04-15
 **Branch:** v2.0-alpha
-**Companion doc:** `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` (the technical triage).
+**Companion doc:** `docs/2026-04-15-hyworld-integration-plan-review.md` (the technical triage).
 
 ---
 
@@ -269,8 +269,8 @@ OTR is an audio-first pipeline where the first two stages write and plan the sho
 
 ## References
 
-- `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` — technical triage
-- `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` — sidecar architecture
+- `docs/2026-04-15-hyworld-integration-plan-review.md` — technical triage
+- `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — sidecar architecture
 - `ROADMAP.md` — live priority matrix (P0/P1/P2 + Gate 0)
 - `CLAUDE.md` — platform pins, C1–C7 constraints
 - `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md` — integration master plan

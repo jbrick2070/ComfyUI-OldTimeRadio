@@ -57,7 +57,7 @@ PHASE A -- Atomic STATUS.json + VRAM Coordinator (File Lock)
 
 PHASE B -- Deterministic Anchor Image Generation via SDXL/ComfyUI Node
   Goal:        Replace solid-color PNGs with deterministic, locally-generated anchor images per scene using SDXL (e.g., DreamShaper XL + CRT LoRA).
-  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/shotlist.py, (possibly) new comfyui_anchor_image.py, docs/internal/specs/2026-04-15-hyworld-poc-design.md
+  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/shotlist.py, (possibly) new comfyui_anchor_image.py, docs/2026-04-15-hyworld-poc-design.md
   Risk gate:   End-to-end MP4 is produced with correct scene count; Bug Bible green; anchor images are visually scene-specific and deterministic.
   Rollback:    Switch worker back to placeholder PNG mode.
   Estimated:   3-4 hours.
@@ -73,7 +73,7 @@ PHASE C -- CRT/Analog Post-FX Pass in Renderer
 
 PHASE D -- Splat Generation and Rendering (ComfyUI-Sharp + SplatFusion)
   Goal:        Generate 3D Gaussian splats from anchor images and render fly-through MP4s for each scene.
-  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/renderer.py, (new) splat_render.py, docs/internal/specs/2026-04-15-hyworld-poc-design.md
+  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/renderer.py, (new) splat_render.py, docs/2026-04-15-hyworld-poc-design.md
   Risk gate:   End-to-end MP4 with splat-based visuals, no OOM, Bug Bible green, and audio byte-identical; fallback to anchor images if splat fails.
   Rollback:    Disable splat path, revert to anchor image video.
   Estimated:   4-6 hours (integration + Windows testing).
@@ -89,7 +89,7 @@ PHASE E -- Caching & Disk Hygiene
 
 PHASE F -- Aspirational: Semantic Camera Path Planning (SplaTraj) & HY-Pano 2.0 Integration
   Goal:        Add semantic camera trajectories and support for HY-Pano 2.0 when available.
-  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/shotlist.py, docs/internal/specs/2026-04-15-hyworld-poc-design.md
+  Files:       otr_v2/hyworld/worker.py, otr_v2/hyworld/shotlist.py, docs/2026-04-15-hyworld-poc-design.md
   Risk gate:   Only merge when HY-Pano 2.0 is locally testable and SplaTraj integration is proven not to break audio or VRAM ceiling.
   Rollback:    Keep as feature branch until models are stable.
   Estimated:   N/A (future-facing).

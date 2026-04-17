@@ -4,7 +4,7 @@
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
-Consolidated going-forward plan. Two horizons: **v1.7** (audio pipeline, ship now) and **v2.0** (visual drama engine, gated on HyWorld). Sources: docs/internal/BUG_LOG.md, external review triage (2026-04-15), HyWorld Integration Plan v2.5, soak lessons. Everything shipped or discarded stays in the source docs — this file is open items only.
+Consolidated going-forward plan. Two horizons: **v1.7** (audio pipeline, ship now) and **v2.0** (visual drama engine, gated on HyWorld). Sources: docs/BUG_LOG.md, external review triage (2026-04-15), HyWorld Integration Plan v2.5, soak lessons. Everything shipped or discarded stays in the source docs — this file is open items only.
 
 ---
 
@@ -136,10 +136,10 @@ Full discard reasoning in `2026-04-15-hyworld-integration-plan-review.md`.
 
 ## References
 
-- docs/internal/BUG_LOG.md — live bug tracking
-- `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` — full external review triage
+- docs/BUG_LOG.md — live bug tracking
+- `docs/2026-04-15-hyworld-integration-plan-review.md` — full external review triage
 - `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md` — HyWorld integration master plan
-- `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
-- `docs/internal/specs/2026-04-14-otr-v2.1-spec.md` — v2.1 spec
-- `docs/internal/specs/2026-04-14-green-zone-guardrail-decision.md` — guardrail decision
+- `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
+- `docs/2026-04-14-otr-v2.1-spec.md` — v2.1 spec
+- `docs/2026-04-14-green-zone-guardrail-decision.md` — guardrail decision
 - CLAUDE.md — platform pins, standing rules

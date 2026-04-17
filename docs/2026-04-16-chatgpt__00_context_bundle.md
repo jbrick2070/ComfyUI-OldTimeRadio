@@ -132,7 +132,7 @@ Never use the word "dummy" in code, comments, variable names, or test fixtures. 
 |----------|----------|
 | OTR Repo | https://github.com/jbrick2070/ComfyUI-OldTimeRadio |
 | Bug Bible | https://github.com/jbrick2070/comfyui-custom-node-survival-guide |
-| v2 Design Spec | `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` |
+| v2 Design Spec | `docs/2026-04-12-otr-v2-visual-sidecar-design.md` |
 
 ---
 
@@ -167,8 +167,8 @@ Writes Director plan + scene manifest to io/hyworld_in/,
 generates shotlist via deterministic rules, and spawns the
 sidecar worker process.
 
-Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
-Mapping doc: docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
+Design doc: docs/2026-04-15-hyworld-poc-design.md  Section 6
+Mapping doc: docs/2026-04-15-otr-to-hyworld-narrative-mapping.md
 
 Audio path is NEVER touched.  If this node fails, downstream falls back
 to OTR_SignalLostVideo (procedural).
@@ -438,7 +438,7 @@ poll.py  --  OTR_HyworldPoll ComfyUI node
 Polls io/hyworld_out/<job_id>/STATUS.json for sidecar completion.
 Blocks (with ComfyUI spinner) until ready, error, or timeout.
 
-Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
+Design doc: docs/2026-04-15-hyworld-poc-design.md  Section 6
 """
 
 from __future__ import annotations
@@ -582,7 +582,7 @@ and muxes with the untouched v1.7 WAV.
 
 Audio path is NEVER modified.  C7: audio output byte-identical.
 
-Design doc: docs/internal/specs/2026-04-15-hyworld-poc-design.md  Section 6
+Design doc: docs/2026-04-15-hyworld-poc-design.md  Section 6
 """
 
 from __future__ import annotations
@@ -1269,7 +1269,7 @@ Reads the Canonical Audio Tokens produced by _parse_script() and
 produces a shots[] array suitable for driving the HyWorld sidecar
 (or any interim stand-in: Diffusion360, SPAG4D, ComfyUI-Sharp).
 
-Design doc: docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md
+Design doc: docs/2026-04-15-otr-to-hyworld-narrative-mapping.md
     Sections 4 (per-token mapping), 5 (deterministic vs LLM), 12.2 (Lane 1)
 
 Rules:
@@ -1554,7 +1554,7 @@ def generate_shotlist_json(
 ```
 
 
-## docs/internal/specs/2026-04-15-otr-to-hyworld-narrative-mapping.md (creative mapping doc -- excerpt)
+## docs/2026-04-15-otr-to-hyworld-narrative-mapping.md (creative mapping doc -- excerpt)
 ```
 # OTR -> HyWorld Narrative Mapping (Design Ideas, Pre-Build)
 
@@ -1563,8 +1563,8 @@ def generate_shotlist_json(
 **Status:** Ideas doc for visualization + review. Not an implementation spec.
 **Owner:** Jeffrey A. Brick
 **Companions:**
-- `docs/internal/specs/2026-04-15-hyworld-poc-design.md` (architecture / install / nodes)
-- `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md` (keep/discard triage)
+- `docs/2026-04-15-hyworld-poc-design.md` (architecture / install / nodes)
+- `docs/2026-04-15-hyworld-integration-plan-review.md` (keep/discard triage)
 - `docs/OTR_PIPELINE_EXPLAINER.md` (layman's pipeline)
 
 ---

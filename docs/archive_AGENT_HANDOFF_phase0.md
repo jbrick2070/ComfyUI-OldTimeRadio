@@ -40,7 +40,7 @@
 
 ## Next: Phase 1
 
-Read `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` for full spec.
+Read `docs/2026-04-12-otr-v2-visual-sidecar-design.md` for full spec.
 
 **Phase 1 Summary**: Teach `OTR_Gemma4Director` to emit a `visual_plan` block inside its existing `production_plan_json` output. No IO changes to the node — only the system prompt and post-processing change. On schema validation failure, emit empty `visual_plan` (graceful degradation — audio still ships).
 
@@ -66,7 +66,7 @@ System `python` is NOT on PATH. Always use full path or activate venv first.
 | `BUG_LOG.md` | Live bug log — 10 entries, all fixed |
 | `nodes/v2_preview.py` | 4 placeholder nodes (CharacterForge, ScenePainter, VisualCompositor, ProductionBus) |
 | `otr_v2/schema/visual_plan.schema.json` | JSON Schema for Phase 1 visual plan |
-| `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md` | Full 6-phase design spec |
+| `docs/2026-04-12-otr-v2-visual-sidecar-design.md` | Full 6-phase design spec |
 
 ### ComfyUI Desktop
 - Port: `8000` (not the default 8188)

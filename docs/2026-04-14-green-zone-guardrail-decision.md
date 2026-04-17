@@ -51,7 +51,7 @@ File: `scripts/soak_operator.py`
 Edit the PRESET_OPTIONS / GENRE_OPTIONS / STYLE_OPTIONS / etc. lists to only include green-zone values. Comment out (not delete) the red-zone values with a reference to this doc, e.g.:
 
 ```python
-# RED ZONE — blocked until v2.1 per docs/internal/specs/2026-04-14-green-zone-guardrail-decision.md
+# RED ZONE — blocked until v2.1 per docs/2026-04-14-green-zone-guardrail-decision.md
 # "words": [2100],
 # "length": ["long (7-8 acts)"],
 # "style": ["psychological slow-burn"],

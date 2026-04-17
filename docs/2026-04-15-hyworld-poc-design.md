@@ -4,7 +4,7 @@
 **Branch:** `v2.0-alpha`
 **Status:** Design spec, implementation not started
 **Owner:** Jeffrey A. Brick
-**Companion:** `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md`, `docs/OTR_PIPELINE_EXPLAINER.md`
+**Companion:** `docs/2026-04-15-hyworld-integration-plan-review.md`, `docs/OTR_PIPELINE_EXPLAINER.md`
 
 ---
 
@@ -314,8 +314,8 @@ Stop there. Scene-vault, style-anchor, async pre-bake are all post-PoC.
 ## 15. References
 
 - HuggingFace model card: https://huggingface.co/tencent/HY-World-2.0
-- Review triage: `docs/internal/specs/2026-04-15-hyworld-integration-plan-review.md`
+- Review triage: `docs/2026-04-15-hyworld-integration-plan-review.md`
 - Pipeline explainer: `docs/OTR_PIPELINE_EXPLAINER.md`
-- v2 sidecar design (pre-HyWorld-2.0): `docs/internal/specs/2026-04-12-otr-v2-visual-sidecar-design.md`
+- v2 sidecar design (pre-HyWorld-2.0): `docs/2026-04-12-otr-v2-visual-sidecar-design.md`
 - Platform pins: `CLAUDE.md`
 - Active roadmap: `ROADMAP.md`
