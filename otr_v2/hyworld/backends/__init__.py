@@ -12,7 +12,7 @@ HyworldPoll + HyworldRenderer trio stays untouched: the backend writes
 ``STATUS.json`` and per-shot assets into ``io/hyworld_out/<job_id>/``
 exactly like ``worker.run_stub`` does today.
 
-Registry entries load lazily — importing this package must never pull
+Registry entries load lazily -- importing this package must never pull
 torch, diffusers, or any GPU-heavy dependency.  Real backends (FLUX,
 PuLID, LTX, Wan2.1, Florence-2) land on Days 2-7 of the sprint and
 each will live in its own file, imported on demand.
@@ -68,7 +68,13 @@ def _make_flux_anchor():
     return flux_anchor.FluxAnchorBackend()
 
 
+def _make_pulid_portrait():
+    from . import pulid_portrait
+    return pulid_portrait.PulidPortraitBackend()
+
+
 register("placeholder_test", _make_placeholder_test)
 register("flux_anchor", _make_flux_anchor)
+register("pulid_portrait", _make_pulid_portrait)
 
 __all__ = ["register", "resolve", "list_backends"]
