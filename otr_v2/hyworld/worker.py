@@ -146,6 +146,13 @@ def _create_placeholder_png(path: Path, width: int = 1280, height: int = 720,
 # ---------------------------------------------------------------------------
 # ffmpeg discovery + Ken Burns motion clip generation
 # ---------------------------------------------------------------------------
+#
+# As of Phase C, the camera-adjective -> filter-chain math lives in
+# ``otr_v2/hyworld/camera_path.py`` as a deterministic trajectory
+# engine.  This module only handles ffmpeg subprocess plumbing.  See
+# ``tests/test_camera_path_determinism.py`` for the determinism
+# contract (same adjective + duration + fps => same filter chain =>
+# same SHA-256 over sampled poses).
 
 # Output dimensions for stub clips.  Matches renderer default; the renderer
 # will rescale at concat time anyway, but rendering at the target size keeps
@@ -154,95 +161,29 @@ _CLIP_WIDTH = 1280
 _CLIP_HEIGHT = 720
 _CLIP_FPS = 24
 
-# Camera adjective (from shotlist.py voice-traits map) -> ffmpeg zoompan recipe.
-# Each entry is a function (duration_sec, width, height) -> filter_chain str.
-# Formulas use `on` (current input frame) and `d` (total animation frames)
-# because -loop 1 feeds zoompan one new frame per output frame.
-
-def _motion_static(d: int, w: int, h: int) -> str:
-    return f"zoompan=z=1.0:d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-
-def _motion_slow_push_in(d: int, w: int, h: int) -> str:
-    # 1.00 -> ~1.30 over the duration, centered crop.
-    return (
-        f"zoompan=z='min(1.0+0.30*on/{d},1.30)':"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_fast_dolly(d: int, w: int, h: int) -> str:
-    # Faster zoom, slight off-center for canted feel.
-    return (
-        f"zoompan=z='min(1.0+0.55*on/{d},1.55)':"
-        f"x='iw*0.45-(iw/zoom/2)':y='ih*0.55-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_clean_push(d: int, w: int, h: int) -> str:
-    return (
-        f"zoompan=z='min(1.0+0.40*on/{d},1.40)':"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_whip_pan(d: int, w: int, h: int) -> str:
-    # Constant zoom 1.3, sweep horizontally across the available range.
-    return (
-        f"zoompan=z=1.30:"
-        f"x='(iw-iw/zoom)*on/{d}':y='ih/2-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_low_angle(d: int, w: int, h: int) -> str:
-    # Constant zoom 1.25, drift y from bottom to top (looking up).
-    return (
-        f"zoompan=z=1.25:"
-        f"x='iw/2-(iw/zoom/2)':y='(ih-ih/zoom)*(1-on/{d})':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_macro(d: int, w: int, h: int) -> str:
-    # Very slow zoom 1.0 -> 1.15, centered.
-    return (
-        f"zoompan=z='min(1.0+0.15*on/{d},1.15)':"
-        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-def _motion_slow_drift(d: int, w: int, h: int) -> str:
-    # Default: gentle zoom 1.0 -> 1.20 with a small horizontal drift.
-    return (
-        f"zoompan=z='min(1.0+0.20*on/{d},1.20)':"
-        f"x='(iw-iw/zoom)*(0.40+0.20*on/{d})':y='ih/2-(ih/zoom/2)':"
-        f"d={d}:s={w}x{h}:fps={_CLIP_FPS}"
-    )
-
-# First-substring-match wins (case-insensitive).  Matches the camera
-# adjectives produced by shotlist._camera_from_traits().
-_CAMERA_MOTION_MAP: list[tuple[str, callable]] = [
-    ("locked off",      _motion_static),
-    ("clean push",      _motion_clean_push),
-    ("slow handheld",   _motion_slow_push_in),
-    ("fast dolly",      _motion_fast_dolly),
-    ("whip-pan",        _motion_whip_pan),
-    ("low angle",       _motion_low_angle),
-    ("macro detail",    _motion_macro),
-    ("slow drift",      _motion_slow_drift),
-]
+try:
+    from camera_path import zoompan_for_shot  # type: ignore
+except ImportError:
+    # Last-resort fallback if the worker is launched from a stripped-down
+    # env missing the rest of otr_v2.hyworld.  Matches the _atomic and
+    # vram_coordinator shims above.
+    def zoompan_for_shot(
+        camera: str, duration_sec: float, width: int, height: int,
+        fps: int = 24, seed: int = 0,
+    ) -> tuple[str, str]:
+        d = max(1, int(round(duration_sec * fps)))
+        vfilter = f"zoompan=z=1.0:d={d}:s={width}x{height}:fps={fps}"
+        return ("fallback_static", vfilter)
 
 
 def _camera_to_motion(camera: str, duration_sec: float, w: int, h: int) -> tuple[str, str]:
     """Resolve a shotlist camera adjective to an ffmpeg filter chain.
 
-    Returns (motion_label, filter_chain_string).
+    Thin wrapper around ``camera_path.zoompan_for_shot`` preserved for
+    backward compatibility with any callers that were pinned to this
+    name.  Returns (motion_label, filter_chain_string).
     """
-    # Total animation frames at our fixed output FPS.
-    d = max(1, int(round(duration_sec * _CLIP_FPS)))
-    cam_lower = (camera or "").lower()
-    for needle, fn in _CAMERA_MOTION_MAP:
-        if needle in cam_lower:
-            return (needle, fn(d, w, h))
-    return ("default_drift", _motion_slow_drift(d, w, h))
+    return zoompan_for_shot(camera, duration_sec, w, h, fps=_CLIP_FPS)
 
 
 def _find_ffmpeg() -> str | None:
