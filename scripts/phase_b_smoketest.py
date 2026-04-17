@@ -70,7 +70,7 @@ def build_api_prompt() -> dict:
     Bridge spawns the sidecar worker; Poll blocks until STATUS.json
     writes a terminal status. We include Renderer with an empty shotlist
     and a non-existent audio path SOLELY to satisfy ComfyUI's
-    prompt_no_outputs gate (OUTPUT_NODE=True lives only on Renderer).
+    prompt_no_outputs gate (the OUTPUT_NODE flag lives only on Renderer).
     With shotlist_json="{}" the Renderer short-circuits at the
     "no shot assets found" branch and never invokes ffmpeg, so this
     is a safe no-op terminator for the smoketest.
