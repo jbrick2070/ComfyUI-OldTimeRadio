@@ -356,9 +356,23 @@ def run_stub(job_dir: Path) -> None:
                 else:
                     anchor_ok += 1
         except Exception as exc:  # noqa: BLE001 -- log, fall back per-shot
+            # Capture full traceback to sidecar log file so smoketest/ops
+            # can diagnose the failure without losing the stack. STATUS.json
+            # still gets the short form; full detail goes to io/hyworld_in/<job>/anchor_error.log
+            import traceback
+            try:
+                # out_dir is io/hyworld_out/<job_id>; in_dir is io/hyworld_in/<job_id>
+                err_log = out_dir.parent.parent / "hyworld_in" / out_dir.name / "anchor_error.log"
+                err_log.parent.mkdir(parents=True, exist_ok=True)
+                err_log.write_text(
+                    f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}",
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
             _write_status(
                 out_dir, "RUNNING",
-                f"Anchor backend crashed ({type(exc).__name__}); falling back to placeholders",
+                f"Anchor backend crashed ({type(exc).__name__}: {str(exc)[:200]}); falling back to placeholders",
             )
             anchor_results = {}
 

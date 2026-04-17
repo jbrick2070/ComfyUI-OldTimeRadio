@@ -254,6 +254,7 @@ def _default_sd15_loader(
     try:
         import torch  # type: ignore
         from diffusers import StableDiffusionPipeline  # type: ignore
+        from diffusers.utils import logging as _diffusers_logging  # type: ignore
         from io import BytesIO
     except ImportError as e:
         raise ImportError(
@@ -262,13 +263,104 @@ def _default_sd15_loader(
             f"Underlying error: {e}"
         ) from e
 
-    pipe = StableDiffusionPipeline.from_single_file(
-        model_path,
-        torch_dtype=torch.float16,
-        safety_checker=None,        # SFW prompts only -- no need for the checker
-        requires_safety_checker=False,
-    )
+    # Disable tqdm progress bars. The sidecar's stdout is a subprocess.PIPE
+    # that ComfyUI never drains, so progress writes fail with WinError 22
+    # (Invalid argument) once the pipe buffer backs up. Silencing tqdm in
+    # diffusers + huggingface_hub sidesteps the whole category.
+    try:
+        _diffusers_logging.disable_progress_bar()
+    except Exception:
+        pass
+    import os as _os
+    _os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    _os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    _os.environ["DIFFUSERS_VERBOSITY"] = "error"
+
+    # Two Windows-specific gotchas for the stock v1-5-pruned-emaonly.ckpt:
+    #
+    # (1) PyTorch 2.6 changed torch.load default to weights_only=True. The
+    #     .ckpt is legacy pickle and contains objects not on the default
+    #     safe-globals allowlist. We force weights_only=False for just this
+    #     one load. The file came from Jeffrey's own ComfyUI install, so
+    #     the unrestricted unpickle is trusted.
+    #
+    # (2) The pickle references ``pytorch_lightning.callbacks.model_checkpoint.ModelCheckpoint``
+    #     which is NOT installed in the ComfyUI venv and we don't want to
+    #     add it (extra 60 MB + transitive deps we don't use). We inject a
+    #     minimal shim module tree so the unpickler can find a class to
+    #     instantiate. The resulting fake ModelCheckpoint is harmless --
+    #     diffusers extracts only the state_dict weights from the checkpoint
+    #     dict and ignores everything else.
+    import sys as _sys
+    import types as _types
+    _injected_modules: list[str] = []
+    for mod_name in (
+        "pytorch_lightning",
+        "pytorch_lightning.callbacks",
+        "pytorch_lightning.callbacks.model_checkpoint",
+    ):
+        if mod_name not in _sys.modules:
+            _sys.modules[mod_name] = _types.ModuleType(mod_name)
+            _injected_modules.append(mod_name)
+
+    class _ShimModelCheckpoint:
+        """Placeholder for pytorch_lightning.callbacks.model_checkpoint.ModelCheckpoint.
+
+        Only exists to satisfy the unpickler's ``find_class`` lookup; its
+        state is never read by diffusers.
+        """
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __setstate__(self, state):
+            pass
+
+    _sys.modules["pytorch_lightning.callbacks.model_checkpoint"].ModelCheckpoint = _ShimModelCheckpoint  # type: ignore[attr-defined]
+    _sys.modules["pytorch_lightning.callbacks"].model_checkpoint = _sys.modules["pytorch_lightning.callbacks.model_checkpoint"]  # type: ignore[attr-defined]
+    _sys.modules["pytorch_lightning"].callbacks = _sys.modules["pytorch_lightning.callbacks"]  # type: ignore[attr-defined]
+
+    _orig_torch_load = torch.load
+
+    def _trusted_torch_load(*args, **kwargs):
+        # Override, not setdefault: diffusers passes weights_only=True
+        # explicitly via **weights_only_kwarg in model_loading_utils.py,
+        # so setdefault is a no-op. Force False for this one load.
+        kwargs["weights_only"] = False
+        return _orig_torch_load(*args, **kwargs)
+
+    # Vendored SD 1.5 inference YAML so diffusers does NOT call
+    # huggingface_hub.snapshot_download() to fetch the config, which
+    # violates the "100% local, offline-first" rule and fails with
+    # WinError 22 on Windows with restricted HF_HOME. See
+    # otr_v2/hyworld/configs/v1-inference.yaml for provenance.
+    _local_config = _THIS_DIR / "configs" / "v1-inference.yaml"
+
+    torch.load = _trusted_torch_load  # type: ignore[assignment]
+    try:
+        pipe = StableDiffusionPipeline.from_single_file(
+            model_path,
+            original_config=str(_local_config) if _local_config.exists() else None,
+            local_files_only=True,
+            torch_dtype=torch.float16,
+            safety_checker=None,        # SFW prompts only -- no need for the checker
+            requires_safety_checker=False,
+        )
+    finally:
+        torch.load = _orig_torch_load  # type: ignore[assignment]
+        # Remove only the shim modules we injected -- leave any real
+        # pytorch_lightning install alone if it was present.
+        for mod_name in _injected_modules:
+            _sys.modules.pop(mod_name, None)
     pipe = pipe.to(device)
+
+    # Pipeline-level progress bar is separate from the diffusers logging
+    # tqdm. It fires on every inference() call (~N=steps updates), writing
+    # to stdout which the sidecar has as PIPE -> WinError 22 once the pipe
+    # backs up. Silence it too.
+    try:
+        pipe.set_progress_bar_config(disable=True)
+    except Exception:
+        pass
     # SD 1.5 + diffusers default scheduler is fine for euler_a-like behavior;
     # if a caller wants something else they should pass their own loader.
 
