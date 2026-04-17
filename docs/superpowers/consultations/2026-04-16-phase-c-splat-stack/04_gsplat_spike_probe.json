@@ -1,0 +1,36 @@
+{
+  "phase": "probe",
+  "ts": "2026-04-16T22:41:55",
+  "python": {
+    "executable": "C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Scripts\\python.exe",
+    "version": "3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "architecture": "AMD64"
+  },
+  "torch": {
+    "version": "2.10.0+cu130",
+    "cuda_available": true,
+    "cuda_version": "13.0",
+    "cudnn_version": 91200,
+    "device_count": 1,
+    "devices": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 5080 Laptop GPU",
+        "capability": "sm_120",
+        "total_memory_gb": 15.92
+      }
+    ],
+    "TORCH_CUDA_ARCH_LIST": ""
+  },
+  "gsplat": {
+    "already_installed": false
+  },
+  "nvcc": {
+    "error": "FileNotFoundError: [WinError 2] The system cannot find the file specified"
+  },
+  "pip": {
+    "rc": 0,
+    "stdout": "pip 26.0.1 from C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Lib\\site-packages\\pip (python 3.12)"
+  }
+}
