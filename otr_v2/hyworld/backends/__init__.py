@@ -56,7 +56,8 @@ def list_backends() -> list[str]:
 # -- Day 1-7 registration.  Each factory defers its module import so
 # ``backends`` stays torch-free at import time.  Day 2 added FLUX anchor;
 # Day 3 added PuLID portraits; Day 4 added FLUX + ControlNet keyframes;
-# Days 5-7 will add LTX short motion, Wan2.1 long motion, Florence-2 masks.
+# Day 5 added LTX-2.3 motion (FLUX still -> LTX handoff);
+# Days 6-7 will add Wan2.1 long motion, Florence-2 masks.
 
 def _make_placeholder_test():
     from . import placeholder_test
@@ -78,9 +79,15 @@ def _make_flux_keyframe():
     return flux_keyframe.FluxKeyframeBackend()
 
 
+def _make_ltx_motion():
+    from . import ltx_motion
+    return ltx_motion.LtxMotionBackend()
+
+
 register("placeholder_test", _make_placeholder_test)
 register("flux_anchor", _make_flux_anchor)
 register("pulid_portrait", _make_pulid_portrait)
 register("flux_keyframe", _make_flux_keyframe)
+register("ltx_motion", _make_ltx_motion)
 
 __all__ = ["register", "resolve", "list_backends"]
