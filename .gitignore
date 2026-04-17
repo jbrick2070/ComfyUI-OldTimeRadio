@@ -41,6 +41,7 @@ CLAUDE.md
 
 # Runtime + scratch
 otr_runtime.log
+*.log
 scratch/
 .pytest_cache/
 pytest-cache-files-*/
@@ -49,6 +50,21 @@ QA_*.txt
 patch_*.py
 OTR_TECH_BRIEF.md
 SIGNAL_LOST_v*.md
+
+# Shell scratchpads (test output capture files)
+_*_out.txt
+_*_status.txt
+_*_done.txt
+_*_handoff.txt
+bugbible_out.txt
+smoketest_out.txt
+smoketest_done.txt
+
+# Runtime IO + phase scratch dirs
+io/
+logs/
+P2
+P2/
 
 # Virtual environments
 .venv/
