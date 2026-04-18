@@ -37,8 +37,8 @@ def test_wall_clock_module_imports_torch_free(monkeypatch):
     bridge, and the bridge must stay torch-free.
     """
     # Fresh import to guarantee we're exercising the real module path.
-    sys.modules.pop("otr_v2.hyworld.wall_clock", None)
-    mod = importlib.import_module("otr_v2.hyworld.wall_clock")
+    sys.modules.pop("otr_v2.visual.wall_clock", None)
+    mod = importlib.import_module("otr_v2.visual.wall_clock")
     assert hasattr(mod, "estimate")
     assert hasattr(mod, "WallClockEstimate")
     assert "torch" not in sys.modules or "torch" in sys.modules  # tautology
@@ -49,7 +49,7 @@ def test_wall_clock_module_imports_torch_free(monkeypatch):
 
 
 def test_all_day_1_7_backends_in_both_tables():
-    from otr_v2.hyworld.wall_clock import (
+    from otr_v2.visual.wall_clock import (
         REAL_WALL_CLOCK_S, STUB_WALL_CLOCK_S,
     )
     roster = {
@@ -70,7 +70,7 @@ def test_all_day_1_7_backends_in_both_tables():
 
 
 def test_cold_load_table_covers_all_real_backends():
-    from otr_v2.hyworld.wall_clock import (
+    from otr_v2.visual.wall_clock import (
         COLD_LOAD_PENALTY_S, REAL_WALL_CLOCK_S,
     )
     missing = set(REAL_WALL_CLOCK_S) - set(COLD_LOAD_PENALTY_S)
@@ -80,7 +80,7 @@ def test_cold_load_table_covers_all_real_backends():
 
 
 def test_day_11_ceiling_constant_is_45_minutes():
-    from otr_v2.hyworld.wall_clock import DAY_11_WALL_CLOCK_CEILING_S
+    from otr_v2.visual.wall_clock import DAY_11_WALL_CLOCK_CEILING_S
     assert DAY_11_WALL_CLOCK_CEILING_S == 45 * 60.0
 
 
@@ -90,8 +90,8 @@ def test_day_11_ceiling_constant_is_45_minutes():
 
 
 def test_estimate_accepts_plannerjob_dataclass():
-    from otr_v2.hyworld.planner import PlannerJob
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.planner import PlannerJob
+    from otr_v2.visual.wall_clock import estimate
 
     jobs = [
         PlannerJob(
@@ -110,7 +110,7 @@ def test_estimate_accepts_plannerjob_dataclass():
 
 
 def test_estimate_accepts_dicts():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [
         {"backend": "flux_keyframe"},
         {"backend": "wan21_loop"},
@@ -125,8 +125,8 @@ def test_estimate_accepts_dicts():
 
 
 def test_estimate_accepts_mixed_iterable():
-    from otr_v2.hyworld.planner import PlannerJob
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.planner import PlannerJob
+    from otr_v2.visual.wall_clock import estimate
     jobs = [
         PlannerJob(
             shot_id="s1", backend="flux_anchor", scene_id="a",
@@ -140,7 +140,7 @@ def test_estimate_accepts_mixed_iterable():
 
 
 def test_estimate_skips_entries_without_backend():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [{"backend": "flux_anchor"}, {}, {"backend": ""}]
     est = estimate(jobs, mode="real")
     assert est.per_backend_shots == {"flux_anchor": 1}
@@ -152,7 +152,7 @@ def test_estimate_skips_entries_without_backend():
 
 
 def test_stub_mode_is_much_cheaper_than_real():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [
         {"backend": b} for b in (
             "flux_anchor", "pulid_portrait", "flux_keyframe",
@@ -166,7 +166,7 @@ def test_stub_mode_is_much_cheaper_than_real():
 
 
 def test_render_s_matches_sum_of_per_backend():
-    from otr_v2.hyworld.wall_clock import REAL_WALL_CLOCK_S, estimate
+    from otr_v2.visual.wall_clock import REAL_WALL_CLOCK_S, estimate
     jobs = [
         {"backend": "flux_anchor"},
         {"backend": "flux_anchor"},
@@ -183,7 +183,7 @@ def test_render_s_matches_sum_of_per_backend():
 
 
 def test_cold_load_charged_once_per_backend_not_per_shot():
-    from otr_v2.hyworld.wall_clock import COLD_LOAD_PENALTY_S, estimate
+    from otr_v2.visual.wall_clock import COLD_LOAD_PENALTY_S, estimate
     # Five flux_anchor shots: pipeline warmup hits ONCE.
     jobs = [{"backend": "flux_anchor"} for _ in range(5)]
     est = estimate(jobs, mode="real", include_vhs=False)
@@ -191,7 +191,7 @@ def test_cold_load_charged_once_per_backend_not_per_shot():
 
 
 def test_cold_load_scales_with_distinct_backends():
-    from otr_v2.hyworld.wall_clock import COLD_LOAD_PENALTY_S, estimate
+    from otr_v2.visual.wall_clock import COLD_LOAD_PENALTY_S, estimate
     jobs = [
         {"backend": "flux_anchor"},
         {"backend": "ltx_motion"},
@@ -207,14 +207,14 @@ def test_cold_load_scales_with_distinct_backends():
 
 
 def test_cold_load_skipped_in_stub_mode():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [{"backend": "flux_anchor"}, {"backend": "ltx_motion"}]
     est = estimate(jobs, mode="stub")
     assert est.cold_load_s == 0.0
 
 
 def test_vhs_charged_only_for_motion_and_loop_clips():
-    from otr_v2.hyworld.wall_clock import REAL_VHS_PER_CLIP_S, estimate
+    from otr_v2.visual.wall_clock import REAL_VHS_PER_CLIP_S, estimate
     jobs = [
         {"backend": "flux_anchor"},         # still, no VHS
         {"backend": "flux_keyframe"},       # still, no VHS
@@ -227,14 +227,14 @@ def test_vhs_charged_only_for_motion_and_loop_clips():
 
 
 def test_vhs_can_be_disabled():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [{"backend": "ltx_motion"}, {"backend": "wan21_loop"}]
     est = estimate(jobs, mode="real", include_vhs=False)
     assert est.vhs_s == 0.0
 
 
 def test_unknown_backend_recorded_and_costs_zero():
-    from otr_v2.hyworld.wall_clock import REAL_WALL_CLOCK_S, estimate
+    from otr_v2.visual.wall_clock import REAL_WALL_CLOCK_S, estimate
     jobs = [
         {"backend": "flux_anchor"},
         {"backend": "not_a_real_backend"},
@@ -246,7 +246,7 @@ def test_unknown_backend_recorded_and_costs_zero():
 
 
 def test_empty_jobs_returns_zero_total():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     est = estimate([], mode="real")
     assert est.total_s == 0.0
     assert est.render_s == 0.0
@@ -255,7 +255,7 @@ def test_empty_jobs_returns_zero_total():
 
 
 def test_invalid_mode_raises():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     with pytest.raises(ValueError):
         estimate([{"backend": "flux_anchor"}], mode="hybrid")
 
@@ -266,7 +266,7 @@ def test_invalid_mode_raises():
 
 
 def test_estimate_to_dict_schema():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [{"backend": "flux_anchor"}, {"backend": "ltx_motion"}]
     payload = estimate(jobs, mode="real").to_dict()
     for key in (
@@ -281,12 +281,12 @@ def test_estimate_to_dict_schema():
 
 
 def test_per_backend_s_breakdown_accumulates():
-    from otr_v2.hyworld.wall_clock import estimate
+    from otr_v2.visual.wall_clock import estimate
     jobs = [{"backend": "flux_anchor"}] * 3
     est = estimate(jobs, mode="real", include_cold_load=False,
                    include_vhs=False)
     # Three identical shots: per-backend total is 3x the single-shot cost.
-    from otr_v2.hyworld.wall_clock import REAL_WALL_CLOCK_S
+    from otr_v2.visual.wall_clock import REAL_WALL_CLOCK_S
     assert est.per_backend_s["flux_anchor"] == pytest.approx(
         3 * REAL_WALL_CLOCK_S["flux_anchor"]
     )
@@ -304,7 +304,7 @@ def test_representative_3min_scene_fits_under_45min_ceiling():
     tweak the per-backend numbers so aggressively that a 3-min scene no
     longer fits, we need to re-pick the stack, not ship the regression.
     """
-    from otr_v2.hyworld.wall_clock import (
+    from otr_v2.visual.wall_clock import (
         DAY_11_WALL_CLOCK_CEILING_S, estimate,
     )
     # A realistic mix for 3 min of final content at ~6 s average beat:
@@ -333,7 +333,7 @@ def test_representative_3min_scene_fits_under_45min_ceiling():
 def test_stub_of_3min_scene_fits_well_under_1min():
     """Stub mode for a 3-min scene should finish in well under a minute;
     it's pure disk I/O with no real diffusion."""
-    from otr_v2.hyworld.wall_clock import (
+    from otr_v2.visual.wall_clock import (
         DAY_11_STUB_CEILING_S, estimate,
     )
     mix = (

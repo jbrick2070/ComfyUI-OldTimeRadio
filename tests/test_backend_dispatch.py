@@ -29,23 +29,23 @@ if str(_REPO_ROOT) not in sys.path:
 
 class BackendRegistryTests(unittest.TestCase):
     def test_resolve_placeholder_test(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("placeholder_test")
         self.assertEqual(backend.name, "placeholder_test")
         self.assertTrue(hasattr(backend, "run"))
 
     def test_resolve_case_insensitive(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("  PlaceHolder_Test  ")
         self.assertEqual(backend.name, "placeholder_test")
 
     def test_resolve_unknown_raises(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         with self.assertRaises(KeyError):
             _backends.resolve("flux_anchor_not_registered_yet")
 
     def test_list_backends_sorted(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         names = _backends.list_backends()
         self.assertEqual(names, sorted(names))
         self.assertIn("placeholder_test", names)
@@ -55,13 +55,13 @@ class PlaceholderBackendTests(unittest.TestCase):
     def setUp(self):
         import tempfile
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_placeholder_"))
-        # Emulate repo layout: <root>/io/hyworld_in/<job>/shotlist.json
+        # Emulate repo layout: <root>/io/visual_in/<job>/shotlist.json
         # out_dir_for walks parent.parent.parent, so job_dir must be
         # 3 levels deep under a fake root.
         self.job_id = "hw_testjob_001"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
 
     def tearDown(self):
@@ -74,7 +74,7 @@ class PlaceholderBackendTests(unittest.TestCase):
         )
 
     def test_run_writes_ready_status_and_pngs(self):
-        from otr_v2.hyworld.backends.placeholder_test import PlaceholderTestBackend
+        from otr_v2.visual.backends.placeholder_test import PlaceholderTestBackend
         self._write_shotlist([
             {"shot_id": "shot_000", "env_prompt": "a", "camera": "push in",
              "duration_sec": 5.0},
@@ -102,7 +102,7 @@ class PlaceholderBackendTests(unittest.TestCase):
             self.assertEqual(meta_data["shot_id"], shot_id)
 
     def test_run_empty_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.placeholder_test import PlaceholderTestBackend
+        from otr_v2.visual.backends.placeholder_test import PlaceholderTestBackend
         self._write_shotlist([])
         PlaceholderTestBackend().run(self.in_dir)
         status = json.loads(
@@ -112,7 +112,7 @@ class PlaceholderBackendTests(unittest.TestCase):
         self.assertIn("zero shots", status["detail"])
 
     def test_run_missing_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.placeholder_test import PlaceholderTestBackend
+        from otr_v2.visual.backends.placeholder_test import PlaceholderTestBackend
         # no shotlist.json written
         PlaceholderTestBackend().run(self.in_dir)
         status = json.loads(
@@ -125,14 +125,14 @@ class PlaceholderBackendTests(unittest.TestCase):
 class CooldownGateTests(unittest.TestCase):
     def test_unreachable_lhm_proceeds(self):
         """LHM down -> ship-and-warn, not block."""
-        from otr_v2.hyworld.backends import _base
+        from otr_v2.visual.backends import _base
         with mock.patch.object(_base, "_read_lhm_gpu_temp", return_value=None):
             ok, reason = _base.cooldown_gate(max_wait_s=0.1)
         self.assertTrue(ok)
         self.assertEqual(reason, "lhm_unreachable")
 
     def test_cool_gpu_proceeds_immediately(self):
-        from otr_v2.hyworld.backends import _base
+        from otr_v2.visual.backends import _base
         with mock.patch.object(_base, "_read_lhm_gpu_temp", return_value=55.0):
             ok, reason = _base.cooldown_gate(max_wait_s=0.1, temp_threshold_c=82.0)
         self.assertTrue(ok)
@@ -140,7 +140,7 @@ class CooldownGateTests(unittest.TestCase):
 
     def test_hot_gpu_times_out_and_proceeds(self):
         """Hot card -> returns False after max_wait, never blocks forever."""
-        from otr_v2.hyworld.backends import _base
+        from otr_v2.visual.backends import _base
         with mock.patch.object(_base, "_read_lhm_gpu_temp", return_value=95.0):
             ok, reason = _base.cooldown_gate(
                 max_wait_s=0.2, temp_threshold_c=82.0, poll_interval_s=0.05,
@@ -150,7 +150,7 @@ class CooldownGateTests(unittest.TestCase):
 
 
 class BridgeBackendEnvTests(unittest.TestCase):
-    """Verify bridge._spawn_sidecar plumbs OTR_HYWORLD_BACKEND correctly."""
+    """Verify bridge._spawn_sidecar plumbs OTR_VISUAL_BACKEND correctly."""
 
     def _fake_python(self, tmp: Path) -> Path:
         """Create a placeholder python.exe file so the candidates loop picks it up."""
@@ -159,25 +159,25 @@ class BridgeBackendEnvTests(unittest.TestCase):
         return p
 
     def test_auto_does_not_set_env_var(self):
-        from otr_v2.hyworld import bridge
+        from otr_v2.visual import bridge
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="otr_bridge_env_"))
         try:
             # Pre-set the env var so we can verify the auto-path clears it.
-            with mock.patch.dict(os.environ, {"OTR_HYWORLD_BACKEND": "leaked"}):
+            with mock.patch.dict(os.environ, {"OTR_VISUAL_BACKEND": "leaked"}):
                 with mock.patch("subprocess.Popen") as mock_popen:
                     mock_popen.return_value = mock.Mock(pid=4242)
                     with mock.patch.object(
                         bridge.Path, "home", return_value=tmp,
                     ):
-                        job_dir = tmp / "io" / "hyworld_in" / "hw_testjob"
+                        job_dir = tmp / "io" / "visual_in" / "hw_testjob"
                         job_dir.mkdir(parents=True)
                         # Stub out cooldown so the test is fast
                         with mock.patch.object(
-                            bridge.HyworldBridge, "_cooldown_gate",
+                            bridge.VisualBridge, "_cooldown_gate",
                             lambda self, job_id: None,
                         ):
-                            b = bridge.HyworldBridge()
+                            b = bridge.VisualBridge()
                             status = b._spawn_sidecar(
                                 "hw_testjob", job_dir, backend="auto",
                             )
@@ -185,13 +185,13 @@ class BridgeBackendEnvTests(unittest.TestCase):
             self.assertTrue(mock_popen.called)
             kwargs = mock_popen.call_args.kwargs
             env = kwargs["env"]
-            self.assertNotIn("OTR_HYWORLD_BACKEND", env)
+            self.assertNotIn("OTR_VISUAL_BACKEND", env)
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_named_backend_sets_env_var(self):
-        from otr_v2.hyworld import bridge
+        from otr_v2.visual import bridge
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="otr_bridge_env_"))
         try:
@@ -200,27 +200,27 @@ class BridgeBackendEnvTests(unittest.TestCase):
                 with mock.patch.object(
                     bridge.Path, "home", return_value=tmp,
                 ):
-                    job_dir = tmp / "io" / "hyworld_in" / "hw_testjob2"
+                    job_dir = tmp / "io" / "visual_in" / "hw_testjob2"
                     job_dir.mkdir(parents=True)
                     with mock.patch.object(
-                        bridge.HyworldBridge, "_cooldown_gate",
+                        bridge.VisualBridge, "_cooldown_gate",
                         lambda self, job_id: None,
                     ):
-                        b = bridge.HyworldBridge()
+                        b = bridge.VisualBridge()
                         status = b._spawn_sidecar(
                             "hw_testjob2", job_dir, backend="placeholder_test",
                         )
             self.assertEqual(status, "SPAWNED")
             kwargs = mock_popen.call_args.kwargs
             env = kwargs["env"]
-            self.assertEqual(env.get("OTR_HYWORLD_BACKEND"), "placeholder_test")
+            self.assertEqual(env.get("OTR_VISUAL_BACKEND"), "placeholder_test")
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_spawn_uses_file_not_pipe_for_stdout(self):
         """Regression guard: stdout/stderr MUST be file handles, not PIPE."""
-        from otr_v2.hyworld import bridge
+        from otr_v2.visual import bridge
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="otr_bridge_pipes_"))
         try:
@@ -229,13 +229,13 @@ class BridgeBackendEnvTests(unittest.TestCase):
                 with mock.patch.object(
                     bridge.Path, "home", return_value=tmp,
                 ):
-                    job_dir = tmp / "io" / "hyworld_in" / "hw_pipeguard"
+                    job_dir = tmp / "io" / "visual_in" / "hw_pipeguard"
                     job_dir.mkdir(parents=True)
                     with mock.patch.object(
-                        bridge.HyworldBridge, "_cooldown_gate",
+                        bridge.VisualBridge, "_cooldown_gate",
                         lambda self, job_id: None,
                     ):
-                        bridge.HyworldBridge()._spawn_sidecar(
+                        bridge.VisualBridge()._spawn_sidecar(
                             "hw_pipeguard", job_dir, backend="auto",
                         )
             kwargs = mock_popen.call_args.kwargs
@@ -253,8 +253,8 @@ class BridgeInputTypesTests(unittest.TestCase):
     """Guardrail: backend arg must be a closed choice list with 'auto' default."""
 
     def test_backend_arg_in_input_types(self):
-        from otr_v2.hyworld.bridge import HyworldBridge
-        it = HyworldBridge.INPUT_TYPES()
+        from otr_v2.visual.bridge import VisualBridge
+        it = VisualBridge.INPUT_TYPES()
         self.assertIn("backend", it["optional"])
         choices, meta = it["optional"]["backend"]
         self.assertIsInstance(choices, list)

@@ -1,12 +1,12 @@
 # OTR Pipeline — Plain-English Explainer
 
-**Purpose:** a bird's-eye tour of what happens inside OldTimeRadio when you click "Queue Prompt" in ComfyUI. Written for planning, not for engineers. Use it to reason about where HyWorld nodes could slot in, and whether long-form video means we need to parse or batch the script differently.
+**Purpose:** a bird's-eye tour of what happens inside OldTimeRadio when you click "Queue Prompt" in ComfyUI. Written for planning, not for engineers. Use it to reason about where Visual nodes could slot in, and whether long-form video means we need to parse or batch the script differently.
 
 **Audience:** Jeffrey, when thinking about pipeline design without wanting to read code.
 
 **Date:** 2026-04-15
 **Branch:** v2.0-alpha
-**Companion doc:** `docs/2026-04-15-hyworld-integration-plan-review.md` (the technical triage).
+**Companion doc:** `docs/2026-04-15-visual-integration-plan-review.md` (the technical triage).
 
 ---
 
@@ -82,7 +82,7 @@ Durations above are **observed soak ranges** on the RTX 5080 Laptop. Short-forma
 
 **Typical time:** **2 to 5 minutes.** Gemma3-27B streaming generation with heartbeat pulses every 25 tokens. The self-critique pass (P0 #1) runs a second look over the draft and can add 30–90 seconds.
 
-**Why it matters for planning:** this is where the narrative truth of the episode is fixed. Everything downstream — voices, music, sound effects, and eventually video — is derived from `script_json`. If HyWorld is going to produce faithful visuals, the script must contain enough scene-level cues (setting, mood, time of day) for the Director to extract them cleanly.
+**Why it matters for planning:** this is where the narrative truth of the episode is fixed. Everything downstream — voices, music, sound effects, and eventually video — is derived from `script_json`. If Visual is going to produce faithful visuals, the script must contain enough scene-level cues (setting, mood, time of day) for the Director to extract them cleanly.
 
 ### Stage 2. 🎬 LLM Director (`OTR_Gemma4Director`)
 
@@ -99,7 +99,7 @@ Durations above are **observed soak ranges** on the RTX 5080 Laptop. Short-forma
 
 **Typical time:** **1 to 2 minutes.** One LLM pass, no streaming.
 
-**Why it matters for planning:** this is the natural place to attach visual planning too. The Director already produces structured JSON; extending it to emit a per-scene geometry cue (setting, mood, time_of_day, style_anchor_hash) is the Keep #6 idea from the HyWorld review. The validator we just shipped (P0 #2) gives us the fail-fast boundary needed to add visual fields without cascading crashes.
+**Why it matters for planning:** this is the natural place to attach visual planning too. The Director already produces structured JSON; extending it to emit a per-scene geometry cue (setting, mood, time_of_day, style_anchor_hash) is the Keep #6 idea from the Visual review. The validator we just shipped (P0 #2) gives us the fail-fast boundary needed to add visual fields without cascading crashes.
 
 ---
 
@@ -117,7 +117,7 @@ This is the GPU-heavy phase. Multiple generators run sequentially, each loading 
 
 **Typical time:** **5 to 20 minutes.** Scales with total dialogue line count. A short episode might be 40–60 lines; a long one 150+. With P1 #5 shipped (length-sorted batching within voice-preset groups), short lines stop wasting pad cycles behind long lines.
 
-**Why it matters for planning:** Bark is the single biggest wall-clock cost in the whole pipeline. If Jeffrey wants to keep total pipeline time under 30 minutes while adding visuals, any visual work that can overlap with Bark generation is "free wall-clock time." This is the entire thesis of Keep #1 (Head-Start async pre-bake): kick off HyWorld on the outline **while** Bark is still grinding through dialogue.
+**Why it matters for planning:** Bark is the single biggest wall-clock cost in the whole pipeline. If Jeffrey wants to keep total pipeline time under 30 minutes while adding visuals, any visual work that can overlap with Bark generation is "free wall-clock time." This is the entire thesis of Keep #1 (Head-Start async pre-bake): kick off Visual on the outline **while** Bark is still grinding through dialogue.
 
 ### Stage 4. 🎙️ Kokoro Announcer (`OTR_KokoroAnnouncer`)
 
@@ -167,7 +167,7 @@ All four audio generators above produce clips in isolation. Wave 3 arranges them
 
 **Typical time:** **1 to 3 minutes** depending on episode length.
 
-**Why it matters for planning:** this is the placeholder visual engine. It delivers a complete MP4 today, no GPU required. The v2.0 vision replaces (or augments) this node with real HyWorld-generated visuals. **Critical rule from CLAUDE.md C7:** audio output must remain byte-identical to v1.5 baseline at every gate. Whatever visual engine replaces this node must not touch the audio path.
+**Why it matters for planning:** this is the placeholder visual engine. It delivers a complete MP4 today, no GPU required. The v2.0 vision replaces (or augments) this node with real Visual-generated visuals. **Critical rule from CLAUDE.md C7:** audio output must remain byte-identical to v1.5 baseline at every gate. Whatever visual engine replaces this node must not touch the audio path.
 
 ---
 
@@ -188,15 +188,15 @@ All four audio generators above produce clips in isolation. Wave 3 arranges them
 - Intermediate music and SFX cue files (same)
 - The raw `script_json` or `director_plan` (these are passed node-to-node in ComfyUI, not persisted by default)
 
-This last point matters for HyWorld: the geometry vault will want **persisted** Director output per episode, keyed by `episode_fingerprint`, to enable cross-episode continuity.
+This last point matters for Visual: the geometry vault will want **persisted** Director output per episode, keyed by `episode_fingerprint`, to enable cross-episode continuity.
 
 ---
 
-## How HyWorld nodes would slot in
+## How Visual nodes would slot in
 
-Using the plain view above, here is where each HyWorld component naturally lives:
+Using the plain view above, here is where each Visual component naturally lives:
 
-### Parallel to Wave 1 — `HyworldBridge` (async pre-bake)
+### Parallel to Wave 1 — `VisualBridge` (async pre-bake)
 
 - **Where:** fires the moment the Director emits a scene plan; runs in parallel with Wave 2.
 - **Reads:** `director_plan.scene_plan` (needs to exist; not in today's schema yet).
@@ -208,7 +208,7 @@ Using the plain view above, here is where each HyWorld component naturally lives
 - **Where:** the `OTR_SignalLostVideo` position.
 - **Reads:** the vault's baked geometry for each scene + the final assembled audio.
 - **Writes:** MP4 with real camera motion, character blocking, lighting.
-- **Constraint C4:** HyWorld clips are max 10–12 s each (257 frames @ 24fps). A 20-minute episode is ~100–120 clips that must be chunked and crossfaded in ffmpeg. **This is the long-form-video parsing question.** The script does not naturally break into 10-second beats; the Director's `scene_plan` will need sub-scene "shot" entries of 8–12 s each for the video engine to consume cleanly.
+- **Constraint C4:** Visual clips are max 10–12 s each (257 frames @ 24fps). A 20-minute episode is ~100–120 clips that must be chunked and crossfaded in ffmpeg. **This is the long-form-video parsing question.** The script does not naturally break into 10-second beats; the Director's `scene_plan` will need sub-scene "shot" entries of 8–12 s each for the video engine to consume cleanly.
 
 ### New layer — Style-Anchor cache (between vault and renderer)
 
@@ -235,11 +235,11 @@ Today's script format emits character dialogue and inline `SFX:` / `MUSIC:` / `E
 }
 ```
 
-That `shots` array is the hinge. It does not exist today. It is also the natural way to satisfy C4 (≤12 s per HyWorld clip) without inventing chunk boundaries after the fact.
+That `shots` array is the hinge. It does not exist today. It is also the natural way to satisfy C4 (≤12 s per Visual clip) without inventing chunk boundaries after the fact.
 
 ### Batch-differently question
 
-Today Bark batches dialogue by voice preset. With visuals, we could also batch HyWorld clips by **style anchor** — all scenes sharing the same World Seed relit N ways in one pass. That is why the Style-Anchor cache design (Keep #2) matters structurally, not just as a disk-saving optimization.
+Today Bark batches dialogue by voice preset. With visuals, we could also batch Visual clips by **style anchor** — all scenes sharing the same World Seed relit N ways in one pass. That is why the Style-Anchor cache design (Keep #2) matters structurally, not just as a disk-saving optimization.
 
 ---
 
@@ -247,30 +247,30 @@ Today Bark batches dialogue by voice preset. With visuals, we could also batch H
 
 Three real forks to think about, not code:
 
-**Fork A — Do we extend the Director schema now, or wait for HyWorld Gate 0?**
+**Fork A — Do we extend the Director schema now, or wait for Visual Gate 0?**
 
-Pro-now: the `shots` and `style_anchor_hash` fields cost nothing to add behind a validator and are useful even without HyWorld (they document scene intent). Pro-wait: if Gate 0 fails and we stay on 1.5, the schema extensions might need to look different.
+Pro-now: the `shots` and `style_anchor_hash` fields cost nothing to add behind a validator and are useful even without Visual (they document scene intent). Pro-wait: if Gate 0 fails and we stay on 1.5, the schema extensions might need to look different.
 
-**Fork B — Does Wave 2 stay sequential, or do we parallelize Bark + HyWorld?**
+**Fork B — Does Wave 2 stay sequential, or do we parallelize Bark + Visual?**
 
-Sequential is simpler and keeps the VRAM story clean (one big model loaded at a time). Parallel is a wall-clock win of ~10–15 minutes on a long episode but needs a second device budget or very careful offload discipline. Gate 0 will tell us whether HyWorld 2.0 is light enough to coexist with Bark.
+Sequential is simpler and keeps the VRAM story clean (one big model loaded at a time). Parallel is a wall-clock win of ~10–15 minutes on a long episode but needs a second device budget or very careful offload discipline. Gate 0 will tell us whether Visual 2.0 is light enough to coexist with Bark.
 
 **Fork C — Does the final video node stay procedural as a fallback?**
 
-Option 1: delete `OTR_SignalLostVideo` once HyWorld lands. Option 2: keep it as the "audio-only safe mode" fallback when HyWorld fails or is disabled. Option 2 respects the C7 rule (audio is king, visual must never break audio) more cleanly.
+Option 1: delete `OTR_SignalLostVideo` once Visual lands. Option 2: keep it as the "audio-only safe mode" fallback when Visual fails or is disabled. Option 2 respects the C7 rule (audio is king, visual must never break audio) more cleanly.
 
 ---
 
 ## One-paragraph mental model
 
-OTR is an audio-first pipeline where the first two stages write and plan the show (LLM), the next four stages speak and score it (GPU generators), and the last four stages stitch and polish it (fast DSP + ffmpeg). Bark TTS dominates wall-clock time. HyWorld nodes naturally live **in parallel with Bark**, not serially after it, and they **replace** the placeholder video engine rather than adding a new step. The integration hinge is the Director's output schema — every visual decision downstream reads from it, so that schema is the right place to invest before writing any HyWorld glue code.
+OTR is an audio-first pipeline where the first two stages write and plan the show (LLM), the next four stages speak and score it (GPU generators), and the last four stages stitch and polish it (fast DSP + ffmpeg). Bark TTS dominates wall-clock time. Visual nodes naturally live **in parallel with Bark**, not serially after it, and they **replace** the placeholder video engine rather than adding a new step. The integration hinge is the Director's output schema — every visual decision downstream reads from it, so that schema is the right place to invest before writing any Visual glue code.
 
 ---
 
 ## References
 
-- `docs/2026-04-15-hyworld-integration-plan-review.md` — technical triage
+- `docs/2026-04-15-visual-integration-plan-review.md` — technical triage
 - `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — sidecar architecture
 - `ROADMAP.md` — live priority matrix (P0/P1/P2 + Gate 0)
 - `CLAUDE.md` — platform pins, C1–C7 constraints
-- `ComfyUI_Hyworld_Narrative_Integration_Plan_v2_5.md` — integration master plan
+- `ComfyUI_Visual_Narrative_Integration_Plan_v2_5.md` — integration master plan

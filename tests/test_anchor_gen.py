@@ -1,5 +1,5 @@
 """
-test_anchor_gen.py  --  Unit tests for otr_v2.hyworld.anchor_gen.
+test_anchor_gen.py  --  Unit tests for otr_v2.visual.anchor_gen.
 ================================================================
 
 Covers the pure-python surface (prompt building, seed derivation, cache
@@ -30,7 +30,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from otr_v2.hyworld import anchor_gen as ag  # noqa: E402
+from otr_v2.visual import anchor_gen as ag  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

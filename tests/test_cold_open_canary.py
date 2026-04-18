@@ -31,9 +31,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from otr_v2.hyworld import planner as planner_mod
-from otr_v2.hyworld.backends import list_backends, resolve
-from otr_v2.hyworld.postproc import vhs as vhs_mod
+from otr_v2.visual import planner as planner_mod
+from otr_v2.visual.backends import list_backends, resolve
+from otr_v2.visual.postproc import vhs as vhs_mod
 
 
 # ------------------------------------------------------------------
@@ -178,11 +178,11 @@ def _write_shotlist(job_dir: Path, shots: list[dict]) -> None:
 
 def _out_dir_for(otr_root: Path, job_id: str) -> Path:
     """Mirror Backend.out_dir_for for ad-hoc canary runs."""
-    return otr_root / "io" / "hyworld_out" / job_id
+    return otr_root / "io" / "visual_out" / job_id
 
 
 def _job_dir_for(otr_root: Path, job_id: str) -> Path:
-    return otr_root / "io" / "hyworld_in" / job_id
+    return otr_root / "io" / "visual_in" / job_id
 
 
 def _all_stub_env() -> dict:
@@ -205,9 +205,9 @@ def stub_env(monkeypatch):
 
 @pytest.fixture
 def canary_root(tmp_path):
-    """otr_root/ with io/hyworld_in and io/hyworld_out ready to use."""
-    (tmp_path / "io" / "hyworld_in").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "io" / "hyworld_out").mkdir(parents=True, exist_ok=True)
+    """otr_root/ with io/visual_in and io/visual_out ready to use."""
+    (tmp_path / "io" / "visual_in").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "io" / "visual_out").mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
@@ -219,7 +219,7 @@ def canary_root(tmp_path):
 def test_planner_module_importable_torch_free():
     # Planner must stay pure stdlib so the canary can import it without
     # pulling diffusers/torch on a GPU-less CI host.
-    import otr_v2.hyworld.planner  # noqa: F401
+    import otr_v2.visual.planner  # noqa: F401
     assert "torch" not in sys.modules or os.environ.get("OTR_ALLOW_TORCH") == "1"
 
 
@@ -418,7 +418,7 @@ def test_vhs_postproc_over_full_canary_run(stub_env, canary_root):
             continue
         # Per-backend subdir so each backend's load_shotlist finds its
         # own shotlist; outputs all land under the shared out_dir via
-        # out_dir_for's otr_root/io/hyworld_out/<job_id> convention.
+        # out_dir_for's otr_root/io/visual_out/<job_id> convention.
         per_backend_job_id = f"{job_id}"
         # Each backend writes into the SAME shared out_dir using its
         # own shotlist.  To avoid each backend overwriting STATUS.json,
@@ -476,7 +476,7 @@ def test_vhs_postproc_over_full_canary_run(stub_env, canary_root):
 
 def test_no_zero_byte_outputs_after_full_canary(stub_env, canary_root):
     """Day 10 gate: after a full canary pass, no output anywhere in
-    io/hyworld_out/ is zero bytes.  Stand-in for the 'no black frames'
+    io/visual_out/ is zero bytes.  Stand-in for the 'no black frames'
     check since we can't decode pixels in a torch-free test."""
     outline = _scene_01_outline()
     grouped = _planner_jobs_by_backend(outline)
@@ -523,8 +523,8 @@ def test_canary_is_deterministic_across_two_runs(stub_env, tmp_path):
     )
 
     root = tmp_path / "canary_det_shared"
-    (root / "io" / "hyworld_in").mkdir(parents=True, exist_ok=True)
-    (root / "io" / "hyworld_out").mkdir(parents=True, exist_ok=True)
+    (root / "io" / "visual_in").mkdir(parents=True, exist_ok=True)
+    (root / "io" / "visual_out").mkdir(parents=True, exist_ok=True)
 
     def _run_once() -> dict[str, bytes]:
         job_id = "canary_det"

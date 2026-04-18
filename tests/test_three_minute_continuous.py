@@ -7,7 +7,7 @@ ROADMAP bar:
 This is a torch-free stub-mode test.  It drives the planner with a
 3-minute outline, asserts the planned job list itself obeys the
 "no stagnation / no duplicate stills" invariant, then projects wall
-clock via ``otr_v2.hyworld.wall_clock.estimate`` and enforces the 45
+clock via ``otr_v2.visual.wall_clock.estimate`` and enforces the 45
 minute ceiling.  Real-mode render-time validation is deferred to
 Day 14 once every backend's weights are on disk.
 
@@ -26,14 +26,14 @@ from typing import Any
 
 import pytest
 
-from otr_v2.hyworld.backends import resolve
-from otr_v2.hyworld.planner import (
+from otr_v2.visual.backends import resolve
+from otr_v2.visual.planner import (
     DEFAULT_NONREPEAT_WINDOW,
     PlannerResult,
     plan_episode,
 )
-from otr_v2.hyworld.postproc import vhs as vhs_mod
-from otr_v2.hyworld.wall_clock import (
+from otr_v2.visual.postproc import vhs as vhs_mod
+from otr_v2.visual.wall_clock import (
     DAY_11_STUB_CEILING_S,
     DAY_11_WALL_CLOCK_CEILING_S,
     estimate,
@@ -170,19 +170,19 @@ def stub_env(monkeypatch):
 
 @pytest.fixture
 def scene_root(tmp_path):
-    (tmp_path / "io" / "hyworld_in").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "io" / "hyworld_out").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "io" / "visual_in").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "io" / "visual_out").mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
 def _job_dir(root: Path, job_id: str) -> Path:
-    d = root / "io" / "hyworld_in" / job_id
+    d = root / "io" / "visual_in" / job_id
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _out_dir(root: Path, job_id: str) -> Path:
-    d = root / "io" / "hyworld_out" / job_id
+    d = root / "io" / "visual_out" / job_id
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -295,7 +295,7 @@ def test_3min_scene_projected_real_wall_clock_under_45_min():
     under 45 minutes for a 3-min continuous scene.
 
     This is a projection, not a measurement -- it uses per-backend
-    point estimates from ``otr_v2.hyworld.wall_clock``.  The Day 14
+    point estimates from ``otr_v2.visual.wall_clock``.  The Day 14
     overnight dry run will close this loop with actual wall-clock data.
     """
     outline = _three_minute_cockpit_outline()

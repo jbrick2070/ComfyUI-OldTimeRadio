@@ -4,7 +4,7 @@ _consult_openai.py  --  Three-round design consultation with ChatGPT.
 
 Purpose
 -------
-Send the current state of the OTR HyWorld stack to OpenAI's API and ask
+Send the current state of the OTR Visual stack to OpenAI's API and ask
 for a robustness critique, graphical-fidelity / replacement-module ideas,
 and a prioritized v2.0 next-phase plan.  Three sequential rounds; later
 rounds get the full transcript so the model can build on its own answers.
@@ -117,13 +117,13 @@ def _build_context_bundle() -> str:
     """Concatenate the relevant source files into one readable bundle."""
     parts = [
         "## CLAUDE.md (project rules)\n```\n" + _read_text("CLAUDE.md") + "\n```\n",
-        "## otr_v2/hyworld/bridge.py\n```python\n" + _read_text("otr_v2/hyworld/bridge.py") + "\n```\n",
-        "## otr_v2/hyworld/poll.py\n```python\n" + _read_text("otr_v2/hyworld/poll.py") + "\n```\n",
-        "## otr_v2/hyworld/renderer.py\n```python\n" + _read_text("otr_v2/hyworld/renderer.py") + "\n```\n",
-        "## otr_v2/hyworld/worker.py\n```python\n" + _read_text("otr_v2/hyworld/worker.py") + "\n```\n",
-        "## otr_v2/hyworld/shotlist.py\n```python\n" + _read_text("otr_v2/hyworld/shotlist.py") + "\n```\n",
-        "## docs/2026-04-15-otr-to-hyworld-narrative-mapping.md (creative mapping doc -- excerpt)\n```\n"
-            + _read_text("docs/2026-04-15-otr-to-hyworld-narrative-mapping.md")[:18000] + "\n```\n",
+        "## otr_v2/visual/bridge.py\n```python\n" + _read_text("otr_v2/visual/bridge.py") + "\n```\n",
+        "## otr_v2/visual/poll.py\n```python\n" + _read_text("otr_v2/visual/poll.py") + "\n```\n",
+        "## otr_v2/visual/renderer.py\n```python\n" + _read_text("otr_v2/visual/renderer.py") + "\n```\n",
+        "## otr_v2/visual/worker.py\n```python\n" + _read_text("otr_v2/visual/worker.py") + "\n```\n",
+        "## otr_v2/visual/shotlist.py\n```python\n" + _read_text("otr_v2/visual/shotlist.py") + "\n```\n",
+        "## docs/2026-04-15-otr-to-visual-narrative-mapping.md (creative mapping doc -- excerpt)\n```\n"
+            + _read_text("docs/2026-04-15-otr-to-visual-narrative-mapping.md")[:18000] + "\n```\n",
     ]
     return "\n\n".join(parts)
 
@@ -137,28 +137,28 @@ SYSTEM_PROMPT = """You are a senior systems architect helping review and harden 
 ROUND_1_PROMPT = """ROUND 1 of 3 -- Robustness critique.
 
 CONTEXT BUNDLE:
-The following is the entire current state of the HyWorld integration in OTR (a ComfyUI radio-drama generator). Five Python files plus the creative mapping doc plus the project rules file.
+The following is the entire current state of the Visual integration in OTR (a ComfyUI radio-drama generator). Five Python files plus the creative mapping doc plus the project rules file.
 
 {context}
 
 YOUR TASK:
-Read the bundle. Critique the HyWorld pipeline (Bridge -> Poll -> Renderer + Worker sidecar) for robustness on a real Windows workstation. Specifically:
+Read the bundle. Critique the Visual pipeline (Bridge -> Poll -> Renderer + Worker sidecar) for robustness on a real Windows workstation. Specifically:
 
 1. **Failure modes I'm not handling.** What can break that the current code does not catch? Be concrete: name the function and the case.
 2. **Race conditions.** STATUS.json is written by the worker subprocess and read by the poll node. Where can they collide? Are the write/read patterns safe?
 3. **Contract violations.** What can a malformed `script_lines` or `production_plan_json` do to the bridge / shotlist / renderer? Where do invariants leak?
 4. **Process lifecycle.** The bridge spawns the worker fire-and-forget. What happens when the user cancels the ComfyUI workflow mid-run? When ComfyUI itself crashes? When the worker hangs? Are PIDs tracked correctly? Are zombies possible?
 5. **Audio-byte-identical guarantee (C7).** Are there any code paths in renderer.py that could re-encode or modify the audio? Any subprocess invocations missing `-c:a copy`?
-6. **Disk hygiene.** `io/hyworld_in/<job_id>/` and `io/hyworld_out/<job_id>/` accumulate forever. Is there a sweep? When should there be?
+6. **Disk hygiene.** `io/visual_in/<job_id>/` and `io/visual_out/<job_id>/` accumulate forever. Is there a sweep? When should there be?
 7. **Logging consistency.** Are log messages structured well enough to debug from a 12-minute episode log without re-running?
 
 Be brutal but actionable. For each finding, propose the fix in one sentence. Output as a numbered list grouped by severity (Critical / Major / Minor). At the end, give a SCORECARD of overall robustness (1-10) with a one-line justification."""
 
 ROUND_2_PROMPT = """ROUND 2 of 3 -- Graphical fidelity & replacement modules.
 
-You've now seen the full HyWorld stack. Reality check:
+You've now seen the full Visual stack. Reality check:
 
-- WorldMirror 2.0 is the ONLY shipped HY-World 2.0 model. Pano / Stereo / Nav are all "Coming Soon" with no ETA.
+- WorldMirror 2.0 is the ONLY shipped Visual 2.0 model. Pano / Stereo / Nav are all "Coming Soon" with no ETA.
 - The current worker.py is in stub mode: it writes solid-color PNGs and uses ffmpeg's `zoompan` filter to make Ken Burns motion clips driven by camera adjectives from the shotlist. That's the visual today.
 - The design doc Section 11 lists candidate replacement modules: `Diffusion360_ComfyUI` (text -> 360 pano, SDXL-based), `SPAG4D` (pano -> 3DGS, ~6-8 GB VRAM), `ComfyUI-Sharp` (image -> 3DGS, sub-1s, very low VRAM), `SplaTraj` (semantic camera path planning), with `ComfyUI-3D-Pack` as an umbrella.
 - Hardware: RTX 5080 Laptop, 16 GB VRAM, Blackwell sm_120, Windows. Python 3.12, torch 2.10, CUDA 13.0 in main env. Worker runs CPU-only today; GPU work must wait for Bark TTS to finish or coordinate via a VRAM gate.

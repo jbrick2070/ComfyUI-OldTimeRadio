@@ -12,7 +12,7 @@ telemetry tree, and asserts the four Day 13 acceptance gates:
 
   1. Planner covers the full 1200-s runtime.
   2. Every shot produces a non-zero-byte artifact in
-     ``io/hyworld_out/<job_id>/``.
+     ``io/visual_out/<job_id>/``.
   3. Every STATUS.json written by a backend ends in ``READY``
      (no ``ERROR``, no ``OOM``, no ``RUNNING`` left behind).
   4. The LHM poller captures >= 18 samples across the projected run
@@ -35,11 +35,11 @@ from typing import Any
 
 import pytest
 
-from otr_v2.hyworld.backends import resolve
-from otr_v2.hyworld.planner import PlannerResult, plan_episode
-from otr_v2.hyworld.postproc import vhs as vhs_mod
-from otr_v2.hyworld.wall_clock import estimate
-from otr_v2.hyworld import lhm_monitor as lm
+from otr_v2.visual.backends import resolve
+from otr_v2.visual.planner import PlannerResult, plan_episode
+from otr_v2.visual.postproc import vhs as vhs_mod
+from otr_v2.visual.wall_clock import estimate
+from otr_v2.visual import lhm_monitor as lm
 
 
 # ------------------------------------------------------------------
@@ -367,19 +367,19 @@ def stub_env(monkeypatch):
 
 @pytest.fixture
 def scene_root(tmp_path):
-    (tmp_path / "io" / "hyworld_in").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "io" / "hyworld_out").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "io" / "visual_in").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "io" / "visual_out").mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
 def _job_dir(root: Path, job_id: str) -> Path:
-    d = root / "io" / "hyworld_in" / job_id
+    d = root / "io" / "visual_in" / job_id
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def _out_dir(root: Path, job_id: str) -> Path:
-    d = root / "io" / "hyworld_out" / job_id
+    d = root / "io" / "visual_out" / job_id
     d.mkdir(parents=True, exist_ok=True)
     return d
 

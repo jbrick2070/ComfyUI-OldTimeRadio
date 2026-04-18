@@ -2,7 +2,7 @@
 tests/test_character_regression.py  --  Day 12 character identity gate
 =======================================================================
 
-Regression suite for ``otr_v2.hyworld.character_regression``.  Exercises
+Regression suite for ``otr_v2.visual.character_regression``.  Exercises
 the ROADMAP Day 12 bar:
 
     SSIM > 0.85 on cropped faces between Scene 1 and Scene 3
@@ -28,8 +28,8 @@ from pathlib import Path
 
 import pytest
 
-from otr_v2.hyworld import character_regression as cr
-from otr_v2.hyworld.backends import pulid_portrait as pp
+from otr_v2.visual import character_regression as cr
+from otr_v2.visual.backends import pulid_portrait as pp
 
 
 # ---------------------------------------------------------------------
@@ -45,18 +45,18 @@ def _write_shotlist(job_dir: Path, shots: list[dict]) -> None:
 
 
 def _canary_root(base: Path) -> Path:
-    """Create an otr_root/ with io/hyworld_{in,out} ready to use."""
-    (base / "io" / "hyworld_in").mkdir(parents=True, exist_ok=True)
-    (base / "io" / "hyworld_out").mkdir(parents=True, exist_ok=True)
+    """Create an otr_root/ with io/visual_{in,out} ready to use."""
+    (base / "io" / "visual_in").mkdir(parents=True, exist_ok=True)
+    (base / "io" / "visual_out").mkdir(parents=True, exist_ok=True)
     return base
 
 
 def _job_dir_for(otr_root: Path, job_id: str) -> Path:
-    return otr_root / "io" / "hyworld_in" / job_id
+    return otr_root / "io" / "visual_in" / job_id
 
 
 def _out_dir_for(otr_root: Path, job_id: str) -> Path:
-    return otr_root / "io" / "hyworld_out" / job_id
+    return otr_root / "io" / "visual_out" / job_id
 
 
 def _populate_scene(
@@ -65,7 +65,7 @@ def _populate_scene(
     shots: list[dict],
     monkeypatch: pytest.MonkeyPatch,
 ) -> Path:
-    """Render one scene's pulid_portrait shots into otr_root/io/hyworld_out/<scene_id>/.
+    """Render one scene's pulid_portrait shots into otr_root/io/visual_out/<scene_id>/.
 
     Each meta.json is patched post-render to record the ``scene_id`` so
     :func:`character_regression.find_portraits` can walk it.  Returns
@@ -111,7 +111,7 @@ def test_module_imports_torch_free(tmp_path: Path) -> None:
             def load_module(self, name): raise ImportError("torch blocked")
         sys.meta_path.insert(0, _Blocker())
 
-        from otr_v2.hyworld import character_regression as cr  # noqa: F401
+        from otr_v2.visual import character_regression as cr  # noqa: F401
 
         # Core API surface must exist.
         assert hasattr(cr, "SSIM_GATE")
@@ -244,7 +244,7 @@ def test_compute_ssim_invalid_mode_raises(tmp_path: Path) -> None:
 
 def test_find_portraits_walks_scene_layout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
 
     _populate_scene(
         "scene_01",
@@ -281,7 +281,7 @@ def test_find_portraits_walks_scene_layout(tmp_path: Path, monkeypatch: pytest.M
 
 def test_find_portraits_ignores_other_characters(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
 
     _populate_scene(
         "scene_01",
@@ -317,7 +317,7 @@ def test_same_refs_across_scenes_locks_identity(
 ) -> None:
     """BABA with SAME refs in scene 1 and scene 3 must pass the gate."""
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
     refs = ["refs/baba_01.png", "refs/baba_02.png"]
 
     _populate_scene(
@@ -354,7 +354,7 @@ def test_different_refs_break_identity_lock(
     fed the wrong ref pack to scene 3, SSIM drops and the gate trips.
     """
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
 
     _populate_scene(
         "scene_01", otr_root,
@@ -385,7 +385,7 @@ def test_character_regression_across_scene_1_and_scene_3(
 ) -> None:
     """Full ROADMAP Day 12 bar: BABA + BOOEY likeness across scenes 1 & 3."""
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
     baba_refs = ["refs/baba_01.png", "refs/baba_02.png"]
     booey_refs = ["refs/booey_01.png", "refs/booey_02.png"]
 
@@ -421,7 +421,7 @@ def test_regress_character_within_scene_pairs_skipped(
 ) -> None:
     """Within-scene shot-to-shot SSIMs must NOT factor into the gate."""
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
 
     _populate_scene(
         "scene_01", otr_root,
@@ -468,7 +468,7 @@ def test_regress_character_single_scene_is_not_testable(
     """A character with only one scene represented cannot fail the gate
     -- the regression requires ≥ 2 scenes."""
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
     _populate_scene(
         "scene_01", otr_root,
         shots=[{
@@ -487,7 +487,7 @@ def test_regress_cast_aggregates_per_character(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
 
     _populate_scene(
         "scene_01", otr_root,
@@ -515,7 +515,7 @@ def test_result_to_dict_schema(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     otr_root = tmp_path
-    out_root = otr_root / "io" / "hyworld_out"
+    out_root = otr_root / "io" / "visual_out"
     refs = ["refs/baba.png"]
     _populate_scene(
         "scene_01", otr_root,

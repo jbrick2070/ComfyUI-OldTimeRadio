@@ -2,7 +2,7 @@
 tests/test_wan21_loop.py  --  Day 6 Wan2.1 1.3B I2V loop backend (stub mode)
 ============================================================================
 
-Torch-free unit tests for ``otr_v2.hyworld.backends.wan21_loop``:
+Torch-free unit tests for ``otr_v2.visual.backends.wan21_loop``:
 
 * Registry wiring + cross-day backend roster (Days 1-6).
 * Stub-mode run via ``OTR_WAN_STUB=1`` -- verifies loop.mp4 is emitted
@@ -45,17 +45,17 @@ if str(_REPO_ROOT) not in sys.path:
 
 class Wan21LoopRegistryTests(unittest.TestCase):
     def test_wan21_loop_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         self.assertIn("wan21_loop", _backends.list_backends())
 
     def test_resolve_wan21_loop(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("wan21_loop")
         self.assertEqual(backend.name, "wan21_loop")
         self.assertTrue(hasattr(backend, "run"))
 
     def test_all_day_1_through_6_backends_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         names = set(_backends.list_backends())
         self.assertTrue({
             "placeholder_test", "flux_anchor", "pulid_portrait",
@@ -68,8 +68,8 @@ class Wan21LoopStubModeTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_"))
         self.job_id = "hw_wan_001"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_WAN_STUB": "1"}, clear=False,
@@ -87,7 +87,7 @@ class Wan21LoopStubModeTests(unittest.TestCase):
         )
 
     def test_stub_renders_ready_with_valid_mp4(self):
-        from otr_v2.hyworld.backends.wan21_loop import (
+        from otr_v2.visual.backends.wan21_loop import (
             Wan21LoopBackend, _is_mp4,
         )
         self._write_shotlist([
@@ -129,7 +129,7 @@ class Wan21LoopStubModeTests(unittest.TestCase):
     def test_stub_output_filename_is_loop_mp4(self):
         """Gate G6: output filename MUST be loop.mp4, not motion.mp4,
         so the planner can distinguish Wan2.1 loops from LTX motions."""
-        from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+        from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
         self._write_shotlist([
             {"shot_id": "shot_000", "env_prompt": "x",
              "duration_sec": 5.0},
@@ -144,7 +144,7 @@ class Wan21LoopStubModeTests(unittest.TestCase):
                          "wan21_loop must not write it")
 
     def test_empty_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+        from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
         self._write_shotlist([])
         Wan21LoopBackend().run(self.in_dir)
         status = json.loads(
@@ -154,7 +154,7 @@ class Wan21LoopStubModeTests(unittest.TestCase):
         self.assertIn("zero shots", status["detail"])
 
     def test_missing_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+        from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
         Wan21LoopBackend().run(self.in_dir)
         status = json.loads(
             (self.out_dir / "STATUS.json").read_text(encoding="utf-8"),
@@ -171,8 +171,8 @@ class Wan21LoopHandoffTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_hand_"))
         self.job_id = "hw_wan_hand"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_WAN_STUB": "1"}, clear=False,
@@ -195,7 +195,7 @@ class Wan21LoopHandoffTests(unittest.TestCase):
         return path
 
     def _run(self, shots):
-        from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+        from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
         (self.in_dir / "shotlist.json").write_text(
             json.dumps({"shots": shots}), encoding="utf-8",
         )
@@ -275,8 +275,8 @@ class Wan21LoopVsLtxBackendIsolationTests(unittest.TestCase):
     and Day 6 stubs would collide and hide planner bugs."""
 
     def test_wan_and_ltx_stubs_differ_for_same_still_hash(self):
-        from otr_v2.hyworld.backends import wan21_loop as wanmod
-        from otr_v2.hyworld.backends import ltx_motion as ltxmod
+        from otr_v2.visual.backends import wan21_loop as wanmod
+        from otr_v2.visual.backends import ltx_motion as ltxmod
 
         tmp = Path(tempfile.mkdtemp(prefix="otr_backend_iso_"))
         try:
@@ -300,8 +300,8 @@ class Wan21LoopStubEnvvarTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_env_"))
         self.job_id = "hw_wan_env"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         (self.in_dir / "shotlist.json").write_text(
             json.dumps({"shots": [
@@ -317,7 +317,7 @@ class Wan21LoopStubEnvvarTests(unittest.TestCase):
 
     def test_otr_wan_stub_triggers_stub(self):
         with mock.patch.dict(os.environ, {"OTR_WAN_STUB": "1"}, clear=False):
-            from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+            from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
             Wan21LoopBackend().run(self.in_dir)
         status = json.loads(
             (self.out_dir / "STATUS.json").read_text(encoding="utf-8"),
@@ -327,7 +327,7 @@ class Wan21LoopStubEnvvarTests(unittest.TestCase):
 
     def test_stub_reason_names_trigger(self):
         with mock.patch.dict(os.environ, {"OTR_WAN_STUB": "1"}, clear=False):
-            from otr_v2.hyworld.backends.wan21_loop import Wan21LoopBackend
+            from otr_v2.visual.backends.wan21_loop import Wan21LoopBackend
             Wan21LoopBackend().run(self.in_dir)
         meta = json.loads(
             (self.out_dir / "shot_000" / "meta.json").read_text(encoding="utf-8"),
@@ -337,47 +337,47 @@ class Wan21LoopStubEnvvarTests(unittest.TestCase):
 
 class Wan21LoopHelperTests(unittest.TestCase):
     def test_still_hash_stable(self):
-        from otr_v2.hyworld.backends.wan21_loop import _still_hash
-        a = _still_hash("/io/hyworld_out/job/shot_000/keyframe.png")
-        b = _still_hash("/io/hyworld_out/job/shot_000/keyframe.png")
+        from otr_v2.visual.backends.wan21_loop import _still_hash
+        a = _still_hash("/io/visual_out/job/shot_000/keyframe.png")
+        b = _still_hash("/io/visual_out/job/shot_000/keyframe.png")
         self.assertEqual(a, b)
 
     def test_still_hash_distinct(self):
-        from otr_v2.hyworld.backends.wan21_loop import _still_hash
-        a = _still_hash("/io/hyworld_out/job/shot_000/keyframe.png")
-        b = _still_hash("/io/hyworld_out/job/shot_001/keyframe.png")
+        from otr_v2.visual.backends.wan21_loop import _still_hash
+        a = _still_hash("/io/visual_out/job/shot_000/keyframe.png")
+        b = _still_hash("/io/visual_out/job/shot_001/keyframe.png")
         self.assertNotEqual(a, b)
 
     def test_still_hash_empty(self):
-        from otr_v2.hyworld.backends.wan21_loop import _still_hash
+        from otr_v2.visual.backends.wan21_loop import _still_hash
         self.assertEqual(_still_hash(""), "no_still")
 
     def test_derive_seed_deterministic(self):
-        from otr_v2.hyworld.backends.wan21_loop import _derive_seed
+        from otr_v2.visual.backends.wan21_loop import _derive_seed
         shot = {"shot_id": "shot_042"}
         self.assertEqual(_derive_seed(shot, 0), _derive_seed(shot, 0))
 
     def test_derive_seed_distinct_from_flux_anchor(self):
-        from otr_v2.hyworld.backends.wan21_loop import _derive_seed as wan_seed
-        from otr_v2.hyworld.backends.flux_anchor import _derive_seed as fa_seed
+        from otr_v2.visual.backends.wan21_loop import _derive_seed as wan_seed
+        from otr_v2.visual.backends.flux_anchor import _derive_seed as fa_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(wan_seed(shot, 0), fa_seed(shot, 0))
 
     def test_derive_seed_distinct_from_pulid(self):
-        from otr_v2.hyworld.backends.wan21_loop import _derive_seed as wan_seed
-        from otr_v2.hyworld.backends.pulid_portrait import _derive_seed as pulid_seed
+        from otr_v2.visual.backends.wan21_loop import _derive_seed as wan_seed
+        from otr_v2.visual.backends.pulid_portrait import _derive_seed as pulid_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(wan_seed(shot, 0), pulid_seed(shot, 0))
 
     def test_derive_seed_distinct_from_flux_keyframe(self):
-        from otr_v2.hyworld.backends.wan21_loop import _derive_seed as wan_seed
-        from otr_v2.hyworld.backends.flux_keyframe import _derive_seed as kf_seed
+        from otr_v2.visual.backends.wan21_loop import _derive_seed as wan_seed
+        from otr_v2.visual.backends.flux_keyframe import _derive_seed as kf_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(wan_seed(shot, 0), kf_seed(shot, 0))
 
     def test_derive_seed_distinct_from_ltx_motion(self):
-        from otr_v2.hyworld.backends.wan21_loop import _derive_seed as wan_seed
-        from otr_v2.hyworld.backends.ltx_motion import _derive_seed as ltx_seed
+        from otr_v2.visual.backends.wan21_loop import _derive_seed as wan_seed
+        from otr_v2.visual.backends.ltx_motion import _derive_seed as ltx_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(
             wan_seed(shot, 0), ltx_seed(shot, 0),
@@ -385,7 +385,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
         )
 
     def test_build_prompt_uses_loop_prompt_when_set(self):
-        from otr_v2.hyworld.backends.wan21_loop import _build_prompt
+        from otr_v2.visual.backends.wan21_loop import _build_prompt
         p = _build_prompt({
             "loop_prompt": "slow drifting stars",
             "motion_prompt": "ignored push-in",
@@ -400,7 +400,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
         self.assertIn("seamless loop", p)
 
     def test_build_prompt_falls_back_to_motion_prompt(self):
-        from otr_v2.hyworld.backends.wan21_loop import _build_prompt
+        from otr_v2.visual.backends.wan21_loop import _build_prompt
         p = _build_prompt({
             "motion_prompt": "slow push-in toward the console",
             "env_prompt": "cockpit",
@@ -409,14 +409,14 @@ class Wan21LoopHelperTests(unittest.TestCase):
         self.assertIn("24fps", p)
 
     def test_build_prompt_falls_back_to_env_when_no_motion(self):
-        from otr_v2.hyworld.backends.wan21_loop import _build_prompt
+        from otr_v2.visual.backends.wan21_loop import _build_prompt
         p = _build_prompt({"env_prompt": "warehouse at night",
                            "camera": "wide"})
         self.assertIn("warehouse at night", p)
         self.assertIn("24fps", p)
 
     def test_is_mp4_recognises_ftyp(self):
-        from otr_v2.hyworld.backends.wan21_loop import _is_mp4, _stub_mp4
+        from otr_v2.visual.backends.wan21_loop import _is_mp4, _stub_mp4
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_mp4_"))
         try:
             p = tmp / "m.mp4"
@@ -427,7 +427,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_is_mp4_rejects_non_mp4(self):
-        from otr_v2.hyworld.backends.wan21_loop import _is_mp4
+        from otr_v2.visual.backends.wan21_loop import _is_mp4
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_notmp4_"))
         try:
             p = tmp / "x.png"
@@ -438,7 +438,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_stub_mp4_same_hash_yields_same_bytes(self):
-        from otr_v2.hyworld.backends.wan21_loop import _stub_mp4
+        from otr_v2.visual.backends.wan21_loop import _stub_mp4
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_det_"))
         try:
             a = tmp / "a.mp4"
@@ -451,7 +451,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_input_still_prefers_keyframe(self):
-        from otr_v2.hyworld.backends.wan21_loop import _resolve_input_still
+        from otr_v2.visual.backends.wan21_loop import _resolve_input_still
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_res_"))
         try:
             job_dir = tmp / "in"
@@ -471,7 +471,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_input_still_falls_back_to_anchor(self):
-        from otr_v2.hyworld.backends.wan21_loop import _resolve_input_still
+        from otr_v2.visual.backends.wan21_loop import _resolve_input_still
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_res2_"))
         try:
             job_dir = tmp / "in"
@@ -490,7 +490,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_input_still_missing(self):
-        from otr_v2.hyworld.backends.wan21_loop import _resolve_input_still
+        from otr_v2.visual.backends.wan21_loop import _resolve_input_still
         tmp = Path(tempfile.mkdtemp(prefix="otr_wan_res3_"))
         try:
             job_dir = tmp / "in"
@@ -506,7 +506,7 @@ class Wan21LoopHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_should_stub_honours_env_flag(self):
-        from otr_v2.hyworld.backends.wan21_loop import _should_stub
+        from otr_v2.visual.backends.wan21_loop import _should_stub
         with mock.patch.dict(os.environ, {"OTR_WAN_STUB": "1"}, clear=False):
             stub, reason = _should_stub()
             self.assertTrue(stub)

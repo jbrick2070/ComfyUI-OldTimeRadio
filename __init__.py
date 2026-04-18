@@ -97,24 +97,24 @@ _NODE_MODULES = {
     "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            "🛡️ VRAM Guardian"),
-    # ── v2.0 HyWorld Integration ────────────────────────────────────
-    # Sidecar-isolated 3D world generation from OTR Director output.
-    # Audio path NEVER touched. Falls back to OTR_SignalLostVideo on failure.
-    # See docs/2026-04-15-hyworld-poc-design.md
-    "OTR_HyworldBridge":   (".otr_v2.hyworld.bridge",   "HyworldBridge",   "🌐 HyWorld Bridge"),
-    "OTR_HyworldPoll":     (".otr_v2.hyworld.poll",     "HyworldPoll",     "⏳ HyWorld Poll"),
-    "OTR_HyworldRenderer": (".otr_v2.hyworld.renderer", "HyworldRenderer", "🎬 HyWorld Renderer"),
+    # ── v2.0 Visual Generation Trio ─────────────────────────────────
+    # Sidecar-isolated visual (stills/portraits/motion) generation from
+    # OTR Director output. Audio path NEVER touched. Falls back to
+    # OTR_SignalLostVideo on failure.  See docs/OTR_PIPELINE_EXPLAINER.md
+    "OTR_VisualBridge":   (".otr_v2.visual.bridge",   "VisualBridge",   "🌐 Visual Bridge"),
+    "OTR_VisualPoll":     (".otr_v2.visual.poll",     "VisualPoll",     "⏳ Visual Poll"),
+    "OTR_VisualRenderer": (".otr_v2.visual.renderer", "VisualRenderer", "🎬 Visual Renderer"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
     try:
         mod = importlib.import_module(module_path, package=__name__)
         cls = getattr(mod, class_name)
-        
+
         # Primary registration (OTR_ prefix)
         NODE_CLASS_MAPPINGS[node_name] = cls
         NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
-        
+
         # Legacy alias registration
         # If the primary ID is "OTR_NodeName", also map "NodeName" to it.
         # This restores styled widgets in older production workflows.
@@ -122,7 +122,7 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
             legacy_name = node_name[4:]
             if legacy_name not in NODE_CLASS_MAPPINGS:
                 NODE_CLASS_MAPPINGS[legacy_name] = cls
-                
+
     except Exception as e:
         log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
         print(f"[OldTimeRadio] ⚠️  Skipped '{node_name}': {e}")

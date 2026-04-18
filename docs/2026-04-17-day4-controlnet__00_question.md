@@ -42,7 +42,7 @@ Specifically concerned about:
 
 Where should the control image come from?
 
-A) **Chain off Day 2 anchor output.** `flux_keyframe` reads `io/hyworld_out/<job>/shot_XXX/render.png` (the Day 2 anchor), extracts Depth or Canny on the fly (e.g. `transformers` depth pipeline or OpenCV Canny), re-renders variations.
+A) **Chain off Day 2 anchor output.** `flux_keyframe` reads `io/visual_out/<job>/shot_XXX/render.png` (the Day 2 anchor), extracts Depth or Canny on the fly (e.g. `transformers` depth pipeline or OpenCV Canny), re-renders variations.
 
 B) **Accept `control_image` path from the shotlist.** The LLM script pipeline emits a per-shot `control_image` entry — could be a storyboard sketch, a separate anchor, whatever the script wants.
 

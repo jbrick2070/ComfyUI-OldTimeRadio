@@ -2,7 +2,7 @@
 test_planner.py  --  Day 9 orchestration timeline planner regression
 ===================================================================
 
-Validates ``otr_v2.hyworld.planner.plan_episode`` across:
+Validates ``otr_v2.visual.planner.plan_episode`` across:
 
     * Backend assignment (explicit override, kind-based inference,
       graceful degradation when identity/composite inputs are missing)
@@ -102,7 +102,7 @@ def _mini_outline(runtime_s: float = 30.0) -> dict:
 
 
 def test_module_imports_cleanly():
-    from otr_v2.hyworld import planner
+    from otr_v2.visual import planner
 
     assert hasattr(planner, "plan_episode")
     assert hasattr(planner, "PlannerJob")
@@ -112,7 +112,7 @@ def test_module_imports_cleanly():
 
 
 def test_public_constants_sane():
-    from otr_v2.hyworld.planner import (
+    from otr_v2.visual.planner import (
         MAX_MOTION_DURATION_S,
         DEFAULT_NONREPEAT_WINDOW,
         HANDOFF_BACKENDS,
@@ -134,7 +134,7 @@ def test_public_constants_sane():
 
 
 def test_establishing_kind_picks_flux_anchor():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 6.0,
@@ -151,7 +151,7 @@ def test_establishing_kind_picks_flux_anchor():
 
 
 def test_close_up_with_character_picks_pulid():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 4.0,
@@ -173,7 +173,7 @@ def test_close_up_with_character_picks_pulid():
 
 
 def test_close_up_without_refs_degrades_to_keyframe():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 4.0,
@@ -192,7 +192,7 @@ def test_close_up_without_refs_degrades_to_keyframe():
 
 
 def test_motion_kind_picks_ltx():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 6.0,
@@ -210,7 +210,7 @@ def test_motion_kind_picks_ltx():
 
 
 def test_loop_kind_picks_wan21():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 8.0,
@@ -228,7 +228,7 @@ def test_loop_kind_picks_wan21():
 
 
 def test_insert_with_mask_and_insert_picks_florence():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 3.0,
@@ -250,7 +250,7 @@ def test_insert_with_mask_and_insert_picks_florence():
 
 
 def test_insert_without_mask_degrades_to_keyframe():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 3.0,
@@ -269,7 +269,7 @@ def test_insert_without_mask_degrades_to_keyframe():
 
 
 def test_explicit_backend_overrides_kind():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 5.0,
@@ -288,7 +288,7 @@ def test_explicit_backend_overrides_kind():
 
 
 def test_explicit_unknown_backend_raises():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 5.0,
@@ -311,7 +311,7 @@ def test_explicit_unknown_backend_raises():
 
 
 def test_motion_duration_clamped_to_C4_cap():
-    from otr_v2.hyworld.planner import plan_episode, MAX_MOTION_DURATION_S
+    from otr_v2.visual.planner import plan_episode, MAX_MOTION_DURATION_S
 
     outline = {
         "runtime_s": 20.0,
@@ -330,7 +330,7 @@ def test_motion_duration_clamped_to_C4_cap():
 
 
 def test_loop_duration_clamped_to_C4_cap():
-    from otr_v2.hyworld.planner import plan_episode, MAX_MOTION_DURATION_S
+    from otr_v2.visual.planner import plan_episode, MAX_MOTION_DURATION_S
 
     outline = {
         "runtime_s": 15.0,
@@ -348,7 +348,7 @@ def test_loop_duration_clamped_to_C4_cap():
 
 
 def test_still_backend_duration_not_clamped_above_10s():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     # Still frames (flux_anchor) can hold for 20s without C4 tripping.
     outline = {
@@ -367,7 +367,7 @@ def test_still_backend_duration_not_clamped_above_10s():
 
 
 def test_negative_duration_replaced_with_default():
-    from otr_v2.hyworld.planner import plan_episode, DEFAULT_BEAT_DURATION_S
+    from otr_v2.visual.planner import plan_episode, DEFAULT_BEAT_DURATION_S
 
     outline = {
         "runtime_s": 10.0,
@@ -392,7 +392,7 @@ def test_negative_duration_replaced_with_default():
 def test_no_duplicate_backend_prompt_in_window():
     """Three identical beats in a row must be nudged to unique hashes
     inside the default window."""
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 15.0,
@@ -412,7 +412,7 @@ def test_no_duplicate_backend_prompt_in_window():
 
 def test_nonrepeat_window_configurable():
     """Window=1 allows repeats two-apart; window=5 does not."""
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 30.0,
@@ -438,7 +438,7 @@ def test_nonrepeat_window_configurable():
 
 def test_nudged_prompt_is_deterministic():
     """Same outline planned twice -> same nudges -> same hashes."""
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = _mini_outline(30)
     r1 = plan_episode(outline)
@@ -453,7 +453,7 @@ def test_nudged_prompt_is_deterministic():
 
 
 def test_motion_beat_picks_prior_still_as_handoff():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 12.0,
@@ -474,7 +474,7 @@ def test_motion_beat_picks_prior_still_as_handoff():
 
 
 def test_motion_beat_without_upstream_still_warns():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 6.0,
@@ -492,7 +492,7 @@ def test_motion_beat_without_upstream_still_warns():
 
 
 def test_motion_handoff_crosses_scene_boundary_only_within_scene():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 14.0,
@@ -519,7 +519,7 @@ def test_motion_handoff_crosses_scene_boundary_only_within_scene():
 
 
 def test_runtime_target_respected_when_beats_exceed():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = _mini_outline(runtime_s=12.0)  # well under the 30s of beats
     r = plan_episode(outline)
@@ -530,7 +530,7 @@ def test_runtime_target_respected_when_beats_exceed():
 
 
 def test_runtime_target_repeats_scenes_when_beats_are_short():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "runtime_s": 60.0,
@@ -550,7 +550,7 @@ def test_runtime_target_repeats_scenes_when_beats_are_short():
 
 
 def test_override_target_runtime():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = _mini_outline(runtime_s=30.0)
     r = plan_episode(outline, target_runtime_s=10.0)
@@ -559,7 +559,7 @@ def test_override_target_runtime():
 
 
 def test_empty_outline_returns_empty_timeline():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     r = plan_episode({"runtime_s": 10.0, "scenes": []})
     assert r.jobs == []
@@ -572,7 +572,7 @@ def test_empty_outline_returns_empty_timeline():
 
 
 def test_emit_shotlist_json_schema():
-    from otr_v2.hyworld.planner import plan_episode, emit_shotlist_json
+    from otr_v2.visual.planner import plan_episode, emit_shotlist_json
 
     r = plan_episode(_mini_outline(runtime_s=15.0))
     shotlist = emit_shotlist_json(r)
@@ -593,7 +593,7 @@ def test_emit_shotlist_json_schema():
 
 
 def test_write_shotlist_to_disk(tmp_path):
-    from otr_v2.hyworld.planner import plan_episode, write_shotlist
+    from otr_v2.visual.planner import plan_episode, write_shotlist
 
     r = plan_episode(_mini_outline(runtime_s=10.0))
     out = tmp_path / "shotlist.json"
@@ -605,7 +605,7 @@ def test_write_shotlist_to_disk(tmp_path):
 
 
 def test_coerce_outline_accepts_string_json():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline_str = json.dumps(_mini_outline(runtime_s=10.0))
     r = plan_episode(outline_str)
@@ -613,7 +613,7 @@ def test_coerce_outline_accepts_string_json():
 
 
 def test_coerce_outline_accepts_path(tmp_path):
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     p = tmp_path / "o.json"
     p.write_text(json.dumps(_mini_outline(runtime_s=10.0)), encoding="utf-8")
@@ -629,7 +629,7 @@ def test_coerce_outline_accepts_path(tmp_path):
 def test_3min_dry_run_clean():
     """The Day 9 gate: given a 180s outline, the planner must emit a
     clean, non-repeating job list that covers the full runtime."""
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     outline = {
         "title": "SIGNAL LOST 3-MIN DRY RUN",
@@ -681,8 +681,8 @@ def test_3min_dry_run_clean():
 
 def test_all_emitted_backends_are_registered():
     """The planner may never emit a name outside the Day 1-7 registry."""
-    from otr_v2.hyworld.planner import plan_episode
-    from otr_v2.hyworld.backends import list_backends
+    from otr_v2.visual.planner import plan_episode
+    from otr_v2.visual.backends import list_backends
 
     registered = set(list_backends())
     outline = _mini_outline(runtime_s=30.0)
@@ -700,7 +700,7 @@ def test_all_emitted_backends_are_registered():
 
 
 def test_planner_job_to_dict_round_trip():
-    from otr_v2.hyworld.planner import PlannerJob
+    from otr_v2.visual.planner import PlannerJob
 
     j = PlannerJob(
         shot_id="s", backend="flux_anchor", scene_id="sc1",
@@ -716,7 +716,7 @@ def test_planner_job_to_dict_round_trip():
 
 
 def test_planner_result_to_dict_includes_diagnostics():
-    from otr_v2.hyworld.planner import plan_episode
+    from otr_v2.visual.planner import plan_episode
 
     r = plan_episode(_mini_outline(runtime_s=10.0))
     d = r.to_dict()

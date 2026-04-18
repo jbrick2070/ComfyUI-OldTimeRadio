@@ -40,36 +40,36 @@ regression suite.
   Treatment file not written. Empty error field. VRAM peak 10.04 GB.
   ComfyUI queue stuck `running=1` for hours after timeout.
 - **Active workflow:** `workflows/otr_scifi_16gb_full.json` (full rig,
-  includes HyWorld trio). *Claude incorrectly told rounds 2+3 that
-  HyWorld was NOT active. Rounds 2+3 answers should be re-weighted.*
+  includes Visual trio). *Claude incorrectly told rounds 2+3 that
+  Visual was NOT active. Rounds 2+3 answers should be re-weighted.*
 - **Real root cause:** (pending verification) — leading candidates:
-  - HyworldPoll infinite loop (round 1 gpt-4.1's pick — now back on the
-    table since HyWorld IS in the graph).
+  - VisualPoll infinite loop (round 1 gpt-4.1's pick — now back on the
+    table since Visual IS in the graph).
   - Bark generation cumulative time > 1800s soak ceiling
     (gemini-3-pro's pick — 337 lines × ~6s = 2022s).
   - VRAM thrash into Windows Shared GPU Memory fallback
     (gemini-3-pro's #3 pick — matches "GPU still churning").
-  - SignalLostVideo or HyworldRenderer ffmpeg pipe deadlock
+  - SignalLostVideo or VisualRenderer ffmpeg pipe deadlock
     (gemini-3-flash's pick).
 - **Verification plan:** Deploy 4 `[WEDGE_PROBE]` log lines (Bark entry,
-  HyworldPoll each cycle, SignalLostVideo entry, HyworldRenderer entry),
+  VisualPoll each cycle, SignalLostVideo entry, VisualRenderer entry),
   restart ComfyUI, re-run. Read the last probe that printed — that is
   the wedge.
 - **Fixes landed:**
-  - HyworldRenderer: `-shortest` replaced with `-t audio_duration` and
+  - VisualRenderer: `-shortest` replaced with `-t audio_duration` and
     tpad padding (C7 safety). Commit 86bfeae.
-  - HyworldRenderer: `_run_ffmpeg` redirects stderr to temp file, not
+  - VisualRenderer: `_run_ffmpeg` redirects stderr to temp file, not
     PIPE (addresses gemini-3-flash's deadlock suspicion). Commit 86bfeae.
 - **Round scores:** see table above. Re-score after verification.
 
 ### BUG-SHOWDOWN-001 — Round 4 (corrected premise) — 2026-04-17
 Round 4 fed both models the CORRECT premise: `otr_scifi_16gb_full.json` is the
-live soak workflow, HyWorld trio IS wired in. Prior rounds' wrong premise
+live soak workflow, Visual trio IS wired in. Prior rounds' wrong premise
 invalidated those scores (already reflected above).
 
 **gpt-5.4** — 6.5/10
-- Root-cause match: 3.0/5 — picked `otr_v2/hyworld/bridge.py:_spawn_sidecar` Windows PIPE deadlock. Plausible downstream wedge but fails to explain why Bark (upstream) wouldn't have hit the 1800s ceiling first.
-- Premise hygiene: 1.0/2 — rolled with the prompt; didn't question whether the graph actually reached HyWorld at all.
+- Root-cause match: 3.0/5 — picked `otr_v2/visual/bridge.py:_spawn_sidecar` Windows PIPE deadlock. Plausible downstream wedge but fails to explain why Bark (upstream) wouldn't have hit the 1800s ceiling first.
+- Premise hygiene: 1.0/2 — rolled with the prompt; didn't question whether the graph actually reached Visual at all.
 - Factual accuracy: 1.5/2 — line numbers off by ~40 (cited 256-261, actual PIPE usage at bridge.py:296-299), but the PIPE-not-drained fact is correct and verified.
 - Actionability: 1.0/1 — three clean `[WEDGE_TRACE]` instrumentation lines, exact insertion points, one per candidate.
 
@@ -81,12 +81,12 @@ invalidated those scores (already reflected above).
 
 **Combined diagnosis (Claude synthesis, round 4):**
 Most likely chain: **Bark 337-line batch chews through the 1800s soak ceiling
-(gemini-3-pro wins on this) → Bark eventually finishes → HyworldBridge spawns
+(gemini-3-pro wins on this) → Bark eventually finishes → VisualBridge spawns
 worker.py with unread PIPE handles (gpt-5.4 wins on this) → bridge/worker
 deadlock accounts for the "hours after timeout" tail.**
 
 Both diagnoses may both be correct, applied in sequence. Verification requires
-ALL of: (1) Bark loop probe, (2) HyworldBridge spawn probe. Gemini's premise-
+ALL of: (1) Bark loop probe, (2) VisualBridge spawn probe. Gemini's premise-
 hygiene dominance carries the round.
 
 ## Re-score policy

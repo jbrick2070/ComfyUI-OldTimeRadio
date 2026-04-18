@@ -2,17 +2,17 @@
 phase_b_smoketest.py -- Minimal end-to-end test of Phase B anchor_gen wiring
 
 Fires a tiny Bridge+Poll workflow against a running ComfyUI on port 8000,
-then watches io/hyworld_out/<job_id>/ for:
+then watches io/visual_out/<job_id>/ for:
   - STATUS.json evolution (SPAWNED -> PROCESSING -> READY / ERROR / WORKER_DEAD)
   - per-shot meta.json showing anchor_used/cache_hit/seed
   - render.png files actually landing on disk
 
-Assumes the invoking shell has OTR_HYWORLD_ANCHOR=sd15 set, which ComfyUI
+Assumes the invoking shell has OTR_VISUAL_ANCHOR=sd15 set, which ComfyUI
 inherited when launched. The sidecar worker reads the env var at module
 import time (inside worker.py), so no per-job toggle is needed.
 
 Usage (PowerShell):
-    $env:OTR_HYWORLD_ANCHOR = "sd15"
+    $env:OTR_VISUAL_ANCHOR = "sd15"
     & C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Scripts\\python.exe `
         C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\scripts\\phase_b_smoketest.py
 """
@@ -29,8 +29,8 @@ from pathlib import Path
 
 COMFYUI = "http://127.0.0.1:8000"
 OTR_ROOT = Path(__file__).resolve().parent.parent
-IO_OUT = OTR_ROOT / "io" / "hyworld_out"
-IO_IN = OTR_ROOT / "io" / "hyworld_in"
+IO_OUT = OTR_ROOT / "io" / "visual_out"
+IO_IN = OTR_ROOT / "io" / "visual_in"
 CLIENT_ID = f"phase_b_smoketest_{int(time.time())}"
 
 
@@ -77,7 +77,7 @@ def build_api_prompt() -> dict:
     """
     return {
         "1": {
-            "class_type": "OTR_HyworldBridge",
+            "class_type": "OTR_VisualBridge",
             "inputs": {
                 "script_json": json.dumps(SCRIPT_LINES),
                 # Suffix a timestamp so ComfyUI's execution_cached gate
@@ -94,15 +94,15 @@ def build_api_prompt() -> dict:
             },
         },
         "2": {
-            "class_type": "OTR_HyworldPoll",
+            "class_type": "OTR_VisualPoll",
             "inputs": {
-                "hyworld_job_id": ["1", 0],
+                "visual_job_id": ["1", 0],
             },
         },
         "3": {
-            "class_type": "OTR_HyworldRenderer",
+            "class_type": "OTR_VisualRenderer",
             "inputs": {
-                "hyworld_assets_path": ["2", 0],
+                "visual_assets_path": ["2", 0],
                 "final_audio_path": "C:/nonexistent_smoketest_audio.wav",
                 "shotlist_json": "{}",
                 "episode_title": "Phase B Smoketest",
@@ -114,7 +114,7 @@ def build_api_prompt() -> dict:
 
 
 def recent_jobs(since: float) -> list[Path]:
-    """Return io/hyworld_out subdirs modified after `since`."""
+    """Return io/visual_out subdirs modified after `since`."""
     if not IO_OUT.exists():
         return []
     return sorted(
@@ -165,7 +165,7 @@ def main() -> int:
     # NOTE: this prints the DRIVER's env, not ComfyUI's. The flag lives on
     # the ComfyUI process that spawned the sidecar worker; we cannot inspect
     # it over HTTP. Check ComfyUI's own launch shell if you need to confirm.
-    print(f"  driver OTR_HYWORLD_ANCHOR={os.environ.get('OTR_HYWORLD_ANCHOR', '(unset in driver — must be set in ComfyUI shell)')}")
+    print(f"  driver OTR_VISUAL_ANCHOR={os.environ.get('OTR_VISUAL_ANCHOR', '(unset in driver — must be set in ComfyUI shell)')}")
     print(f"  ComfyUI: {COMFYUI}")
     print(f"  Client:  {CLIENT_ID}")
     print(f"  Shots:   {len(SCRIPT_LINES)} script_lines")

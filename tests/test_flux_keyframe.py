@@ -2,7 +2,7 @@
 tests/test_flux_keyframe.py  --  Day 4 FLUX + ControlNet keyframe backend
 ===========================================================================
 
-Torch-free unit tests for ``otr_v2.hyworld.backends.flux_keyframe``:
+Torch-free unit tests for ``otr_v2.visual.backends.flux_keyframe``:
 
 * Registry wiring.
 * Stub-mode run via ``OTR_FLUX_KEYFRAME_STUB=1`` -- verifies PNG dimensions,
@@ -42,17 +42,17 @@ if str(_REPO_ROOT) not in sys.path:
 
 class FluxKeyframeRegistryTests(unittest.TestCase):
     def test_flux_keyframe_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         self.assertIn("flux_keyframe", _backends.list_backends())
 
     def test_resolve_flux_keyframe(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("flux_keyframe")
         self.assertEqual(backend.name, "flux_keyframe")
         self.assertTrue(hasattr(backend, "run"))
 
     def test_all_day_1_through_4_backends_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         names = set(_backends.list_backends())
         self.assertTrue({
             "placeholder_test", "flux_anchor",
@@ -65,8 +65,8 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_"))
         self.job_id = "hw_kf_001"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_FLUX_KEYFRAME_STUB": "1"}, clear=False,
@@ -90,7 +90,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
         return width, height
 
     def test_stub_renders_ready_with_1024_pngs(self):
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         # Characters and shot_ids whatever the LLM produced for this
         # episode -- no fixed roster.
         self._write_shotlist([
@@ -133,7 +133,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
     def test_stub_mode_depth_and_keyframe_have_distinct_colors(self):
         """Salt separation: depth.png and keyframe.png must differ even
         though both derive from the same control_image_hash."""
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         self._write_shotlist([
             {"shot_id": "shot_000", "env_prompt": "cockpit",
              "camera": "medium", "character": "actor_a",
@@ -151,7 +151,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
     def test_stub_meta_records_anchor_absence(self):
         """In stub with no pre-created anchor, meta.json must record
         ``anchor_present: false`` so run analysis can flag it."""
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         self._write_shotlist([
             {"shot_id": "shot_000", "env_prompt": "cockpit",
              "character": "actor_a", "duration_sec": 9.0},
@@ -164,7 +164,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
 
     def test_stub_meta_records_anchor_present_when_day2_output_exists(self):
         """When a Day 2 anchor exists on disk, meta must record it."""
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         shot_dir = self.out_dir / "shot_000"
         shot_dir.mkdir(parents=True)
         # Simulate a Day 2 anchor on disk.
@@ -182,7 +182,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
         self.assertTrue(meta["control_image"].endswith("render.png"))
 
     def test_empty_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         self._write_shotlist([])
         FluxKeyframeBackend().run(self.in_dir)
         status = json.loads(
@@ -192,7 +192,7 @@ class FluxKeyframeStubModeTests(unittest.TestCase):
         self.assertIn("zero shots", status["detail"])
 
     def test_missing_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         FluxKeyframeBackend().run(self.in_dir)
         status = json.loads(
             (self.out_dir / "STATUS.json").read_text(encoding="utf-8"),
@@ -216,8 +216,8 @@ class FluxKeyframeLayoutLockTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_lock_"))
         self.job_id = "hw_kf_lock"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_FLUX_KEYFRAME_STUB": "1"}, clear=False,
@@ -230,7 +230,7 @@ class FluxKeyframeLayoutLockTests(unittest.TestCase):
         shutil.rmtree(self._tmp, ignore_errors=True)
 
     def _run_with(self, shots):
-        from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+        from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
         (self.in_dir / "shotlist.json").write_text(
             json.dumps({"shots": shots}), encoding="utf-8",
         )
@@ -321,8 +321,8 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_env_"))
         self.job_id = "hw_kf_env"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         (self.in_dir / "shotlist.json").write_text(
             json.dumps({"shots": [
@@ -340,7 +340,7 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "OTR_FLUX_KEYFRAME_STUB": "1",
         }, clear=False):
-            from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+            from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
             FluxKeyframeBackend().run(self.in_dir)
         status = json.loads(
             (self.out_dir / "STATUS.json").read_text(encoding="utf-8"),
@@ -357,7 +357,7 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
         # Explicitly drop the per-backend flag if present.
         env.pop("OTR_FLUX_KEYFRAME_STUB", None)
         with mock.patch.dict(os.environ, env, clear=True):
-            from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+            from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
             FluxKeyframeBackend().run(self.in_dir)
         status = json.loads(
             (self.out_dir / "STATUS.json").read_text(encoding="utf-8"),
@@ -369,7 +369,7 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {
             "OTR_FLUX_KEYFRAME_STUB": "1",
         }, clear=False):
-            from otr_v2.hyworld.backends.flux_keyframe import FluxKeyframeBackend
+            from otr_v2.visual.backends.flux_keyframe import FluxKeyframeBackend
             FluxKeyframeBackend().run(self.in_dir)
         meta = json.loads(
             (self.out_dir / "shot_000" / "meta.json").read_text(encoding="utf-8"),
@@ -379,23 +379,23 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
 
 class FluxKeyframeHelperTests(unittest.TestCase):
     def test_control_image_hash_stable(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _control_image_hash
-        a = _control_image_hash("/io/hyworld_out/job_x/shot_000/render.png")
-        b = _control_image_hash("/io/hyworld_out/job_x/shot_000/render.png")
+        from otr_v2.visual.backends.flux_keyframe import _control_image_hash
+        a = _control_image_hash("/io/visual_out/job_x/shot_000/render.png")
+        b = _control_image_hash("/io/visual_out/job_x/shot_000/render.png")
         self.assertEqual(a, b)
 
     def test_control_image_hash_distinct_paths(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _control_image_hash
-        a = _control_image_hash("/io/hyworld_out/job_x/shot_000/render.png")
-        b = _control_image_hash("/io/hyworld_out/job_x/shot_001/render.png")
+        from otr_v2.visual.backends.flux_keyframe import _control_image_hash
+        a = _control_image_hash("/io/visual_out/job_x/shot_000/render.png")
+        b = _control_image_hash("/io/visual_out/job_x/shot_001/render.png")
         self.assertNotEqual(a, b)
 
     def test_control_image_hash_empty(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _control_image_hash
+        from otr_v2.visual.backends.flux_keyframe import _control_image_hash
         self.assertEqual(_control_image_hash(""), "no_control")
 
     def test_color_from_hash_salt_separation(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _color_from_hash
+        from otr_v2.visual.backends.flux_keyframe import _color_from_hash
         h = "abcdef123456"
         kf = _color_from_hash(h, salt="keyframe")
         dp = _color_from_hash(h, salt="depth")
@@ -406,19 +406,19 @@ class FluxKeyframeHelperTests(unittest.TestCase):
         )
 
     def test_color_from_hash_floor(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _color_from_hash
+        from otr_v2.visual.backends.flux_keyframe import _color_from_hash
         # Force a near-zero hash to confirm the floor lifts it to >= 40.
         rgb = _color_from_hash("000000000000", salt="keyframe")
         self.assertGreaterEqual(min(rgb), 40)
 
     def test_derive_seed_deterministic(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _derive_seed
+        from otr_v2.visual.backends.flux_keyframe import _derive_seed
         shot = {"shot_id": "shot_042"}
         self.assertEqual(_derive_seed(shot, 0), _derive_seed(shot, 0))
 
     def test_derive_seed_distinct_from_flux_anchor(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _derive_seed as kf_seed
-        from otr_v2.hyworld.backends.flux_anchor import _derive_seed as fa_seed
+        from otr_v2.visual.backends.flux_keyframe import _derive_seed as kf_seed
+        from otr_v2.visual.backends.flux_anchor import _derive_seed as fa_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(
             kf_seed(shot, 0), fa_seed(shot, 0),
@@ -427,8 +427,8 @@ class FluxKeyframeHelperTests(unittest.TestCase):
         )
 
     def test_derive_seed_distinct_from_pulid(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _derive_seed as kf_seed
-        from otr_v2.hyworld.backends.pulid_portrait import _derive_seed as pulid_seed
+        from otr_v2.visual.backends.flux_keyframe import _derive_seed as kf_seed
+        from otr_v2.visual.backends.pulid_portrait import _derive_seed as pulid_seed
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(
             kf_seed(shot, 0), pulid_seed(shot, 0),
@@ -436,7 +436,7 @@ class FluxKeyframeHelperTests(unittest.TestCase):
         )
 
     def test_build_prompt_includes_character_when_set(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _build_prompt
+        from otr_v2.visual.backends.flux_keyframe import _build_prompt
         p = _build_prompt({
             "env_prompt": "cockpit at dusk",
             "camera": "medium close-up",
@@ -447,7 +447,7 @@ class FluxKeyframeHelperTests(unittest.TestCase):
         self.assertIn("medium close-up", p)
 
     def test_build_prompt_omits_character_when_missing(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _build_prompt
+        from otr_v2.visual.backends.flux_keyframe import _build_prompt
         p = _build_prompt({"env_prompt": "warehouse", "camera": "wide"})
         self.assertIn("warehouse", p)
         self.assertIn("wide", p)
@@ -456,11 +456,11 @@ class FluxKeyframeHelperTests(unittest.TestCase):
     def test_resolve_control_image_only_reads_anchor_path(self):
         """Row 3: _resolve_control_image must NOT look at
         shot['control_image']."""
-        from otr_v2.hyworld.backends.flux_keyframe import _resolve_control_image
+        from otr_v2.visual.backends.flux_keyframe import _resolve_control_image
         tmp = Path(tempfile.mkdtemp(prefix="otr_kf_resolve_"))
         try:
-            job_dir = tmp / "io" / "hyworld_in" / "job_x"
-            out_dir = tmp / "io" / "hyworld_out" / "job_x"
+            job_dir = tmp / "io" / "visual_in" / "job_x"
+            out_dir = tmp / "io" / "visual_out" / "job_x"
             job_dir.mkdir(parents=True)
             (out_dir / "shot_000").mkdir(parents=True)
             (out_dir / "shot_000" / "render.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
@@ -478,11 +478,11 @@ class FluxKeyframeHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_control_image_returns_none_when_anchor_missing(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _resolve_control_image
+        from otr_v2.visual.backends.flux_keyframe import _resolve_control_image
         tmp = Path(tempfile.mkdtemp(prefix="otr_kf_resolve2_"))
         try:
-            job_dir = tmp / "io" / "hyworld_in" / "job_y"
-            out_dir = tmp / "io" / "hyworld_out" / "job_y"
+            job_dir = tmp / "io" / "visual_in" / "job_y"
+            out_dir = tmp / "io" / "visual_out" / "job_y"
             job_dir.mkdir(parents=True)
             # No anchor on disk.
             shot = {"shot_id": "shot_000"}
@@ -493,7 +493,7 @@ class FluxKeyframeHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_should_stub_honours_env_flags(self):
-        from otr_v2.hyworld.backends.flux_keyframe import _should_stub
+        from otr_v2.visual.backends.flux_keyframe import _should_stub
         with mock.patch.dict(os.environ, {
             "OTR_FLUX_KEYFRAME_STUB": "1",
         }, clear=False):

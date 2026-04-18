@@ -111,6 +111,6 @@ visuals, so the smoke test is safe to run against a live workflow.
 
 ## References
 
-- Backend source: `otr_v2/hyworld/backends/{flux_anchor,flux_keyframe,pulid_portrait,ltx_motion,wan21_loop,florence2_sdxl_comp}.py`
-- WEDGE_PROBE: `otr_v2/hyworld/wedge_probe.py` (committed `a690450`)
+- Backend source: `otr_v2/visual/backends/{flux_anchor,flux_keyframe,pulid_portrait,ltx_motion,wan21_loop,florence2_sdxl_comp}.py`
+- WEDGE_PROBE: `otr_v2/visual/wedge_probe.py` (committed `a690450`)
 - CLAUDE.md C5 (fp8 native), C7 (audio byte-identical), 14.5 GB VRAM ceiling

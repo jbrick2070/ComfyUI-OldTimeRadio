@@ -51,7 +51,7 @@ Why:
 - **B-only** is flexible, but it forces the shotlist/LLM layer to solve a problem you already can solve locally.
 - **C** keeps the pipeline clean:
   - If `shot["control_image"]` exists, use it.
-  - Else use `io/hyworld_out/<job>/shot_XXX/render.png`.
+  - Else use `io/visual_out/<job>/shot_XXX/render.png`.
   - Then derive depth/canny locally and deterministically.
 
 That preserves your current pipeline while opening the door for storyboard/sketch control later with **zero API break**.

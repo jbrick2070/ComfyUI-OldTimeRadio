@@ -1,7 +1,7 @@
 # audit_video_stack_weights.ps1
 # -----------------------------------------------------------------------------
 # Reports presence of each video stack weight target, matching the defaults
-# in otr_v2/hyworld/backends/*.py. Read-only — never downloads, never edits.
+# in otr_v2/visual/backends/*.py. Read-only — never downloads, never edits.
 # -----------------------------------------------------------------------------
 
 $ModelsRoot = "C:\Users\jeffr\Documents\ComfyUI\models"

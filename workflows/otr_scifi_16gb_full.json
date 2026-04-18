@@ -670,7 +670,7 @@
         },
         {
             "id": 16,
-            "type": "OTR_HyworldBridge",
+            "type": "OTR_VisualBridge",
             "pos": [
                 2400,
                 200
@@ -679,9 +679,9 @@
                 420,
                 280
             ],
-            "title": "16. HyWorld Bridge",
+            "title": "16. Visual Bridge",
             "properties": {
-                "Node name for S&R": "OTR_HyworldBridge"
+                "Node name for S&R": "OTR_VisualBridge"
             },
             "widgets_values": [
                 "[]",
@@ -691,7 +691,8 @@
                 "faithful",
                 "",
                 42,
-                true
+                true,
+                "video_stack"
             ],
             "inputs": [
                 {
@@ -721,7 +722,7 @@
             ],
             "outputs": [
                 {
-                    "name": "hyworld_job_id",
+                    "name": "visual_job_id",
                     "type": "STRING",
                     "links": [
                         34
@@ -745,7 +746,7 @@
         },
         {
             "id": 17,
-            "type": "OTR_HyworldPoll",
+            "type": "OTR_VisualPoll",
             "pos": [
                 2860,
                 200
@@ -754,26 +755,26 @@
                 300,
                 120
             ],
-            "title": "17. HyWorld Poll",
+            "title": "17. Visual Poll",
             "properties": {
-                "Node name for S&R": "OTR_HyworldPoll"
+                "Node name for S&R": "OTR_VisualPoll"
             },
             "widgets_values": [
                 ""
             ],
             "inputs": [
                 {
-                    "name": "hyworld_job_id",
+                    "name": "visual_job_id",
                     "type": "STRING",
                     "link": 34,
                     "widget": {
-                        "name": "hyworld_job_id"
+                        "name": "visual_job_id"
                     }
                 }
             ],
             "outputs": [
                 {
-                    "name": "hyworld_assets_path",
+                    "name": "visual_assets_path",
                     "type": "STRING",
                     "links": [
                         35
@@ -801,7 +802,7 @@
         },
         {
             "id": 18,
-            "type": "OTR_HyworldRenderer",
+            "type": "OTR_VisualRenderer",
             "pos": [
                 3200,
                 200
@@ -810,9 +811,9 @@
                 420,
                 240
             ],
-            "title": "18. HyWorld Renderer",
+            "title": "18. Visual Renderer",
             "properties": {
-                "Node name for S&R": "OTR_HyworldRenderer"
+                "Node name for S&R": "OTR_VisualRenderer"
             },
             "widgets_values": [
                 "",
@@ -823,11 +824,11 @@
             ],
             "inputs": [
                 {
-                    "name": "hyworld_assets_path",
+                    "name": "visual_assets_path",
                     "type": "STRING",
                     "link": 35,
                     "widget": {
-                        "name": "hyworld_assets_path"
+                        "name": "visual_assets_path"
                     }
                 },
                 {

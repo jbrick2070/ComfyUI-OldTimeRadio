@@ -2,7 +2,7 @@
 tests/test_flux_anchor.py  --  Day 2 FLUX anchor backend (stub-mode)
 ====================================================================
 
-Torch-free unit tests for ``otr_v2.hyworld.backends.flux_anchor``:
+Torch-free unit tests for ``otr_v2.visual.backends.flux_anchor``:
 
 * Registry wiring (resolve + list).
 * Stub-mode run via ``OTR_FLUX_STUB=1`` -- verifies PNG dimensions,
@@ -34,12 +34,12 @@ if str(_REPO_ROOT) not in sys.path:
 
 class FluxAnchorRegistryTests(unittest.TestCase):
     def test_flux_anchor_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         names = _backends.list_backends()
         self.assertIn("flux_anchor", names)
 
     def test_resolve_flux_anchor(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("flux_anchor")
         self.assertEqual(backend.name, "flux_anchor")
         self.assertTrue(hasattr(backend, "run"))
@@ -50,8 +50,8 @@ class FluxAnchorStubModeTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_anchor_"))
         self.job_id = "hw_flux_001"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         # Force stub mode regardless of whether real weights exist.
         self._env_patch = mock.patch.dict(
@@ -78,7 +78,7 @@ class FluxAnchorStubModeTests(unittest.TestCase):
         return width, height
 
     def test_stub_renders_ready_with_1024_pngs(self):
-        from otr_v2.hyworld.backends.flux_anchor import FluxAnchorBackend
+        from otr_v2.visual.backends.flux_anchor import FluxAnchorBackend
         self._write_shotlist([
             {"shot_id": "shot_000", "env_prompt": "a neon-lit Tokyo alley",
              "camera": "push in", "duration_sec": 9.0},
@@ -114,7 +114,7 @@ class FluxAnchorStubModeTests(unittest.TestCase):
             self.assertIsInstance(meta_data["seed"], int)
 
     def test_empty_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.flux_anchor import FluxAnchorBackend
+        from otr_v2.visual.backends.flux_anchor import FluxAnchorBackend
         self._write_shotlist([])
         FluxAnchorBackend().run(self.in_dir)
         status = json.loads(
@@ -124,7 +124,7 @@ class FluxAnchorStubModeTests(unittest.TestCase):
         self.assertIn("zero shots", status["detail"])
 
     def test_missing_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.flux_anchor import FluxAnchorBackend
+        from otr_v2.visual.backends.flux_anchor import FluxAnchorBackend
         # no shotlist.json written
         FluxAnchorBackend().run(self.in_dir)
         status = json.loads(
@@ -136,7 +136,7 @@ class FluxAnchorStubModeTests(unittest.TestCase):
 
 class FluxAnchorHelperTests(unittest.TestCase):
     def test_build_prompt_joins_env_camera_style(self):
-        from otr_v2.hyworld.backends.flux_anchor import _build_prompt
+        from otr_v2.visual.backends.flux_anchor import _build_prompt
         prompt = _build_prompt({
             "env_prompt": "a smoky jazz club",
             "camera": "slow dolly",
@@ -146,13 +146,13 @@ class FluxAnchorHelperTests(unittest.TestCase):
         self.assertIn("cinematic", prompt.lower())
 
     def test_build_prompt_no_env_no_camera(self):
-        from otr_v2.hyworld.backends.flux_anchor import _build_prompt
+        from otr_v2.visual.backends.flux_anchor import _build_prompt
         prompt = _build_prompt({})
         # Style suffix alone is always present.
         self.assertIn("cinematic", prompt.lower())
 
     def test_derive_seed_is_deterministic(self):
-        from otr_v2.hyworld.backends.flux_anchor import _derive_seed
+        from otr_v2.visual.backends.flux_anchor import _derive_seed
         shot = {"shot_id": "shot_042"}
         a = _derive_seed(shot, 0)
         b = _derive_seed(shot, 0)
@@ -162,13 +162,13 @@ class FluxAnchorHelperTests(unittest.TestCase):
         self.assertLess(a, 2**31)
 
     def test_derive_seed_varies_by_shot(self):
-        from otr_v2.hyworld.backends.flux_anchor import _derive_seed
+        from otr_v2.visual.backends.flux_anchor import _derive_seed
         a = _derive_seed({"shot_id": "shot_000"}, 0)
         b = _derive_seed({"shot_id": "shot_001"}, 1)
         self.assertNotEqual(a, b)
 
     def test_should_stub_respects_env(self):
-        from otr_v2.hyworld.backends import flux_anchor as _fa
+        from otr_v2.visual.backends import flux_anchor as _fa
         with mock.patch.dict(os.environ, {"OTR_FLUX_STUB": "1"}, clear=False):
             stub, reason = _fa._should_stub()
         self.assertTrue(stub)

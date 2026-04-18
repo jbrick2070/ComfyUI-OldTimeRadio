@@ -2,7 +2,7 @@
 tests/test_wedge_probe.py
 =========================
 
-Unit tests for otr_v2.hyworld.wedge_probe.
+Unit tests for otr_v2.visual.wedge_probe.
 
 Coverage
 --------
@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 # Import the module under test
-from otr_v2.hyworld import wedge_probe as wp
+from otr_v2.visual import wedge_probe as wp
 
 
 # ---- Fixtures --------------------------------------------------------------
@@ -190,7 +190,7 @@ def test_module_imports_no_audio_or_gpu_libs() -> None:
     """Audio is king (C7).  The probe module must not drag in torch,
     numpy, ffmpeg wrappers, or any audio library even transitively from
     its own module body."""
-    mod = importlib.import_module("otr_v2.hyworld.wedge_probe")
+    mod = importlib.import_module("otr_v2.visual.wedge_probe")
     src = Path(mod.__file__).read_text(encoding="utf-8")
     forbidden = ("import torch", "import numpy", "from torch", "from numpy")
     for needle in forbidden:

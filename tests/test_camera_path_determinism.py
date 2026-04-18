@@ -3,7 +3,7 @@ test_camera_path_determinism.py  --  Phase C camera trajectory regression
 =========================================================================
 
 Locks in the determinism and frame-count contracts for
-``otr_v2/hyworld/camera_path.py``.  Pure Python, no ffmpeg required:
+``otr_v2/visual/camera_path.py``.  Pure Python, no ffmpeg required:
 all tests run in well under a second.
 
 Contracts verified here:
@@ -34,7 +34,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from otr_v2.hyworld.camera_path import (
+from otr_v2.visual.camera_path import (
     Trajectory,
     from_adjective,
     hash_trajectory,

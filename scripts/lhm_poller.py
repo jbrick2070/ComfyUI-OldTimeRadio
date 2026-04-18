@@ -2,7 +2,7 @@
 scripts/lhm_poller.py  --  Day 13 LHM telemetry sampler (CLI wrapper)
 ======================================================================
 
-Thin CLI around :mod:`otr_v2.hyworld.lhm_monitor` for use with Windows
+Thin CLI around :mod:`otr_v2.visual.lhm_monitor` for use with Windows
 Task Scheduler or a manual overnight run:
 
     python scripts/lhm_poller.py --interval 60 --duration 1200 \\
@@ -30,7 +30,7 @@ _REPO_ROOT = _HERE.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from otr_v2.hyworld.lhm_monitor import (  # noqa: E402  -- path bootstrap
+from otr_v2.visual.lhm_monitor import (  # noqa: E402  -- path bootstrap
     poll_loop,
     summarize,
     summarize_ndjson,

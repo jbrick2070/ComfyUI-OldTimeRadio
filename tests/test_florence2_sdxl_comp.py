@@ -2,7 +2,7 @@
 tests/test_florence2_sdxl_comp.py  --  Day 7 Florence-2 + SDXL inpaint (stub)
 ==============================================================================
 
-Torch-free unit tests for ``otr_v2.hyworld.backends.florence2_sdxl_comp``:
+Torch-free unit tests for ``otr_v2.visual.backends.florence2_sdxl_comp``:
 
 * Registry wiring + cross-day backend roster (Days 1-7).
 * Stub-mode run via ``OTR_FLORENCE_STUB=1`` -- verifies composite.png
@@ -57,17 +57,17 @@ def _read_png_header(path: Path) -> tuple[bytes, int]:
 
 class Florence2SdxlRegistryTests(unittest.TestCase):
     def test_florence2_sdxl_comp_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         self.assertIn("florence2_sdxl_comp", _backends.list_backends())
 
     def test_resolve_florence2_sdxl_comp(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         backend = _backends.resolve("florence2_sdxl_comp")
         self.assertEqual(backend.name, "florence2_sdxl_comp")
         self.assertTrue(hasattr(backend, "run"))
 
     def test_all_day_1_through_7_backends_registered(self):
-        from otr_v2.hyworld import backends as _backends
+        from otr_v2.visual import backends as _backends
         names = set(_backends.list_backends())
         self.assertTrue({
             "placeholder_test", "flux_anchor", "pulid_portrait",
@@ -81,8 +81,8 @@ class Florence2SdxlStubModeTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_"))
         self.job_id = "hw_f2sd_001"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_FLORENCE_STUB": "1"}, clear=False,
@@ -100,7 +100,7 @@ class Florence2SdxlStubModeTests(unittest.TestCase):
         )
 
     def test_stub_renders_ready_with_valid_pngs(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         self._write_shotlist([
@@ -154,7 +154,7 @@ class Florence2SdxlStubModeTests(unittest.TestCase):
     def test_stub_output_filename_is_composite_png(self):
         """Gate G7: output filename MUST be composite.png so planner
         can distinguish Day 7 composites from Day 4 keyframes."""
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         self._write_shotlist([
@@ -173,7 +173,7 @@ class Florence2SdxlStubModeTests(unittest.TestCase):
                          "Day 7 must not write it")
 
     def test_empty_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         self._write_shotlist([])
@@ -185,7 +185,7 @@ class Florence2SdxlStubModeTests(unittest.TestCase):
         self.assertIn("zero shots", status["detail"])
 
     def test_missing_shotlist_writes_error(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         Florence2SdxlCompBackend().run(self.in_dir)
@@ -206,8 +206,8 @@ class Florence2SdxlThreeWayInvariantTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_inv_"))
         self.job_id = "hw_f2sd_inv"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_FLORENCE_STUB": "1"}, clear=False,
@@ -227,7 +227,7 @@ class Florence2SdxlThreeWayInvariantTests(unittest.TestCase):
         return path
 
     def _run(self, shots):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         (self.in_dir / "shotlist.json").write_text(
@@ -324,8 +324,8 @@ class Florence2SdxlHandoffTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_hand_"))
         self.job_id = "hw_f2sd_hand"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         self._env_patch = mock.patch.dict(
             os.environ, {"OTR_FLORENCE_STUB": "1"}, clear=False,
@@ -346,7 +346,7 @@ class Florence2SdxlHandoffTests(unittest.TestCase):
         return path
 
     def _run(self, shots):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             Florence2SdxlCompBackend,
         )
         (self.in_dir / "shotlist.json").write_text(
@@ -392,8 +392,8 @@ class Florence2SdxlStubEnvvarTests(unittest.TestCase):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_env_"))
         self.job_id = "hw_f2sd_env"
         self.fake_root = self._tmp / "repo"
-        self.in_dir = self.fake_root / "io" / "hyworld_in" / self.job_id
-        self.out_dir = self.fake_root / "io" / "hyworld_out" / self.job_id
+        self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
+        self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
         self.in_dir.mkdir(parents=True)
         (self.in_dir / "shotlist.json").write_text(
             json.dumps({"shots": [
@@ -410,7 +410,7 @@ class Florence2SdxlStubEnvvarTests(unittest.TestCase):
     def test_otr_florence_stub_triggers_stub(self):
         with mock.patch.dict(os.environ, {"OTR_FLORENCE_STUB": "1"},
                              clear=False):
-            from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+            from otr_v2.visual.backends.florence2_sdxl_comp import (
                 Florence2SdxlCompBackend,
             )
             Florence2SdxlCompBackend().run(self.in_dir)
@@ -423,7 +423,7 @@ class Florence2SdxlStubEnvvarTests(unittest.TestCase):
     def test_stub_reason_names_trigger(self):
         with mock.patch.dict(os.environ, {"OTR_FLORENCE_STUB": "1"},
                              clear=False):
-            from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+            from otr_v2.visual.backends.florence2_sdxl_comp import (
                 Florence2SdxlCompBackend,
             )
             Florence2SdxlCompBackend().run(self.in_dir)
@@ -435,7 +435,7 @@ class Florence2SdxlStubEnvvarTests(unittest.TestCase):
 
 class Florence2SdxlHelperTests(unittest.TestCase):
     def test_composite_hash_stable(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _composite_hash,
         )
         a = _composite_hash("/kf.png", "cockpit window", "CRT overlay")
@@ -443,7 +443,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertEqual(a, b)
 
     def test_composite_hash_shifts_with_still(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _composite_hash,
         )
         a = _composite_hash("/kf_a.png", "x", "y")
@@ -451,7 +451,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertNotEqual(a, b)
 
     def test_composite_hash_shifts_with_mask(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _composite_hash,
         )
         a = _composite_hash("/kf.png", "window", "y")
@@ -459,7 +459,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertNotEqual(a, b)
 
     def test_composite_hash_shifts_with_insert(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _composite_hash,
         )
         a = _composite_hash("/kf.png", "x", "poster")
@@ -467,67 +467,67 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertNotEqual(a, b)
 
     def test_mask_hash_stable(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import _mask_hash
+        from otr_v2.visual.backends.florence2_sdxl_comp import _mask_hash
         self.assertEqual(_mask_hash("window"), _mask_hash("window"))
 
     def test_mask_hash_distinct(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import _mask_hash
+        from otr_v2.visual.backends.florence2_sdxl_comp import _mask_hash
         self.assertNotEqual(_mask_hash("window"), _mask_hash("door"))
 
     def test_mask_hash_empty(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import _mask_hash
+        from otr_v2.visual.backends.florence2_sdxl_comp import _mask_hash
         self.assertEqual(_mask_hash(""), "no_mask")
 
     def test_derive_seed_deterministic(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import _derive_seed
+        from otr_v2.visual.backends.florence2_sdxl_comp import _derive_seed
         shot = {"shot_id": "shot_042"}
         self.assertEqual(_derive_seed(shot, 0), _derive_seed(shot, 0))
 
     def test_derive_seed_distinct_from_flux_anchor(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _derive_seed as f2_seed,
         )
-        from otr_v2.hyworld.backends.flux_anchor import (
+        from otr_v2.visual.backends.flux_anchor import (
             _derive_seed as fa_seed,
         )
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(f2_seed(shot, 0), fa_seed(shot, 0))
 
     def test_derive_seed_distinct_from_pulid(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _derive_seed as f2_seed,
         )
-        from otr_v2.hyworld.backends.pulid_portrait import (
+        from otr_v2.visual.backends.pulid_portrait import (
             _derive_seed as pulid_seed,
         )
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(f2_seed(shot, 0), pulid_seed(shot, 0))
 
     def test_derive_seed_distinct_from_flux_keyframe(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _derive_seed as f2_seed,
         )
-        from otr_v2.hyworld.backends.flux_keyframe import (
+        from otr_v2.visual.backends.flux_keyframe import (
             _derive_seed as kf_seed,
         )
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(f2_seed(shot, 0), kf_seed(shot, 0))
 
     def test_derive_seed_distinct_from_ltx_motion(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _derive_seed as f2_seed,
         )
-        from otr_v2.hyworld.backends.ltx_motion import (
+        from otr_v2.visual.backends.ltx_motion import (
             _derive_seed as ltx_seed,
         )
         shot = {"shot_id": "shot_042"}
         self.assertNotEqual(f2_seed(shot, 0), ltx_seed(shot, 0))
 
     def test_derive_seed_distinct_from_wan21_loop(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _derive_seed as f2_seed,
         )
-        from otr_v2.hyworld.backends.wan21_loop import (
+        from otr_v2.visual.backends.wan21_loop import (
             _derive_seed as wan_seed,
         )
         shot = {"shot_id": "shot_042"}
@@ -537,7 +537,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         )
 
     def test_build_mask_prompt_passthrough(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _build_mask_prompt,
         )
         self.assertEqual(
@@ -546,13 +546,13 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         )
 
     def test_build_mask_prompt_empty(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _build_mask_prompt,
         )
         self.assertEqual(_build_mask_prompt({}), "")
 
     def test_build_insert_prompt_uses_insert(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _build_insert_prompt,
         )
         p = _build_insert_prompt({"insert_prompt": "CRT overlay",
@@ -561,7 +561,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertIn("photorealistic", p)
 
     def test_build_insert_prompt_falls_back_to_env(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _build_insert_prompt,
         )
         p = _build_insert_prompt({"env_prompt": "warehouse at night"})
@@ -569,14 +569,14 @@ class Florence2SdxlHelperTests(unittest.TestCase):
         self.assertIn("photorealistic", p)
 
     def test_build_insert_prompt_defaults_when_all_empty(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _build_insert_prompt,
         )
         p = _build_insert_prompt({})
         self.assertIn("cinematic interior", p)
 
     def test_resolve_input_still_prefers_keyframe(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _resolve_input_still,
         )
         tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_res_"))
@@ -598,7 +598,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_input_still_falls_back_to_anchor(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _resolve_input_still,
         )
         tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_res2_"))
@@ -619,7 +619,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_resolve_input_still_missing(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _resolve_input_still,
         )
         tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_res3_"))
@@ -637,7 +637,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_should_stub_honours_env_flag(self):
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import _should_stub
+        from otr_v2.visual.backends.florence2_sdxl_comp import _should_stub
         with mock.patch.dict(os.environ, {"OTR_FLORENCE_STUB": "1"},
                              clear=False):
             stub, reason = _should_stub()
@@ -647,7 +647,7 @@ class Florence2SdxlHelperTests(unittest.TestCase):
     def test_mask_value_bounds(self):
         """Stub mask grayscale value must be in (0, 255) exclusive so
         no test will ever see a degenerate all-black or all-white mask."""
-        from otr_v2.hyworld.backends.florence2_sdxl_comp import (
+        from otr_v2.visual.backends.florence2_sdxl_comp import (
             _mask_value_from_hash,
         )
         self.assertEqual(_mask_value_from_hash("00abcdef123456"), 1)

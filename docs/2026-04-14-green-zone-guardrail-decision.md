@@ -109,7 +109,7 @@ If those four conditions hold tomorrow morning, cut the v2.0-alpha tag and merge
 ## Out of scope for this decision
 
 - Fixing any red-zone value (deferred to v2.1 scope)
-- Adding HyWorld visual pipeline (v2.1 per separate spec)
+- Adding Visual visual pipeline (v2.1 per separate spec)
 - Changing the writer LLM, TTS voices, or audio pipeline
 - VRAM Guardian test isolation bug (BUG-LOCAL-034 candidate — separate fix)
 

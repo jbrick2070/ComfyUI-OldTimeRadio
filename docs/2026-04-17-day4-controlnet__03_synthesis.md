@@ -42,7 +42,7 @@ Specifically concerned about:
 
 Where should the control image come from?
 
-A) **Chain off Day 2 anchor output.** `flux_keyframe` reads `io/hyworld_out/<job>/shot_XXX/render.png` (the Day 2 anchor), extracts Depth or Canny on the fly (e.g. `transformers` depth pipeline or OpenCV Canny), re-renders variations.
+A) **Chain off Day 2 anchor output.** `flux_keyframe` reads `io/visual_out/<job>/shot_XXX/render.png` (the Day 2 anchor), extracts Depth or Canny on the fly (e.g. `transformers` depth pipeline or OpenCV Canny), re-renders variations.
 
 B) **Accept `control_image` path from the shotlist.** The LLM script pipeline emits a per-shot `control_image` entry — could be a storyboard sketch, a separate anchor, whatever the script wants.
 
@@ -109,7 +109,7 @@ Why:
 - **B-only** is flexible, but it forces the shotlist/LLM layer to solve a problem you already can solve locally.
 - **C** keeps the pipeline clean:
   - If `shot["control_image"]` exists, use it.
-  - Else use `io/hyworld_out/<job>/shot_XXX/render.png`.
+  - Else use `io/visual_out/<job>/shot_XXX/render.png`.
   - Then derive depth/canny locally and deterministically.
 
 That preserves your current pipeline while opening the door for storyboard/sketch control later with **zero API break**.

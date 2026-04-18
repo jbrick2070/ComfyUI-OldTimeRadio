@@ -6,7 +6,7 @@
 # kill criterion trips and the fallback table in ROADMAP.md P0 demands it.
 #
 # NOT a full ComfyUI requirements file — only the deltas needed for the
-# otr_v2.hyworld.backends video stack (FLUX, PuLID, LTX, Wan2.1,
+# otr_v2.visual.backends video stack (FLUX, PuLID, LTX, Wan2.1,
 # Florence-2, SDXL Inpainting).
 #
 # Explicitly excluded: flash_attn (NOT BUILDABLE on sm_120 — do not chase).

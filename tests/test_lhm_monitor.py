@@ -2,7 +2,7 @@
 tests/test_lhm_monitor.py  --  Day 13 LHM poller unit tests
 ============================================================
 
-Drives ``otr_v2.hyworld.lhm_monitor`` via injected ``fetcher`` /
+Drives ``otr_v2.visual.lhm_monitor`` via injected ``fetcher`` /
 ``sleep_fn`` / ``monotonic_fn`` / ``unix_fn`` hooks so the tests run
 deterministically without touching the real LHM endpoint or wall
 clock.
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from otr_v2.hyworld import lhm_monitor as lm
+from otr_v2.visual import lhm_monitor as lm
 
 
 # ---------------------------------------------------------------------
@@ -120,7 +120,7 @@ def test_module_imports_torch_free(tmp_path: Path) -> None:
             def find_module(self, name, path=None): return self if name == "torch" else None
             def load_module(self, name): raise ImportError("torch blocked")
         sys.meta_path.insert(0, _Blocker())
-        from otr_v2.hyworld import lhm_monitor as lm  # noqa: F401
+        from otr_v2.visual import lhm_monitor as lm  # noqa: F401
         assert hasattr(lm, "poll_once")
         assert hasattr(lm, "poll_loop")
         assert hasattr(lm, "summarize")

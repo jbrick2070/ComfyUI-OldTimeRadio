@@ -102,7 +102,12 @@ $Manifest = @(
        kind   = "snapshot_to_cache"
        approx_gb = 1.2 }
 
-    @{ repo   = "Wan-AI/Wan2.1-I2V-1.3B"
+    # Wan-AI never published a 1.3B I2V variant - only the T2V-1.3B
+    # (Diffusers-formatted) repo exists at that weight class.  The
+    # wan21_loop backend gracefully falls back to T2V when the I2V
+    # pipeline class is unavailable, so we pull the T2V weights into
+    # the historical I2V target path and the backend finds them.
+    @{ repo   = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
        target = (Join-Path $ModelsRoot "diffusers\Wan2.1-I2V-1.3B")
        kind   = "snapshot"
        approx_gb = 5.5 }
