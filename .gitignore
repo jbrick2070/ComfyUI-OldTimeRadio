@@ -56,9 +56,24 @@ _*_out.txt
 _*_status.txt
 _*_done.txt
 _*_handoff.txt
+_*.txt
+_*.cmd
+_*.bat
+_*.log
 bugbible_out.txt
 smoketest_out.txt
 smoketest_done.txt
+outputs_*.txt
+day*_*.txt
+
+# Per-task dev scripts (machine-local, not versioned)
+scripts/_*.ps1
+scripts/_*.py
+scripts/yoga_watchdog.py
+# Keep versioned dev scripts by exception (none currently)
+
+# Retired v1.x soak operator artifacts
+workflows/soak_target_api.json
 
 # Runtime IO + phase scratch dirs
 io/
