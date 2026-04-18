@@ -1122,18 +1122,6 @@
       "color": "#F5A623",
       "flags": {},
       "font_size": 24
-    },
-    {
-      "title": "STAGE 4   VISUAL SIDECAR",
-      "bounding": [
-        20,
-        1130,
-        1740,
-        380
-      ],
-      "color": "#2DD4BF",
-      "flags": {},
-      "font_size": 24
     }
   ],
   "config": {},
