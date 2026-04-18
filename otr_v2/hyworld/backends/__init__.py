@@ -58,7 +58,8 @@ def list_backends() -> list[str]:
 # Day 3 added PuLID portraits; Day 4 added FLUX + ControlNet keyframes;
 # Day 5 added LTX-2.3 motion (FLUX still -> LTX handoff);
 # Day 6 added Wan2.1 1.3B I2V loops (FLUX still -> Wan2.1 handoff);
-# Day 7 will add Florence-2 masks for SDXL inpaint compositing.
+# Day 7 added Florence-2 + SDXL inpaint composite (text-prompt mask).
+# Days 8-14 are orchestration, canary, and freeze (no new backends).
 
 def _make_placeholder_test():
     from . import placeholder_test
@@ -90,11 +91,17 @@ def _make_wan21_loop():
     return wan21_loop.Wan21LoopBackend()
 
 
+def _make_florence2_sdxl_comp():
+    from . import florence2_sdxl_comp
+    return florence2_sdxl_comp.Florence2SdxlCompBackend()
+
+
 register("placeholder_test", _make_placeholder_test)
 register("flux_anchor", _make_flux_anchor)
 register("pulid_portrait", _make_pulid_portrait)
 register("flux_keyframe", _make_flux_keyframe)
 register("ltx_motion", _make_ltx_motion)
 register("wan21_loop", _make_wan21_loop)
+register("florence2_sdxl_comp", _make_florence2_sdxl_comp)
 
 __all__ = ["register", "resolve", "list_backends"]
