@@ -55,7 +55,7 @@ class PulidRegistryTests(unittest.TestCase):
 class PulidStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_pulid_"))
-        self.job_id = "hw_pulid_001"
+        self.job_id = "vs_pulid_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -153,7 +153,7 @@ class PulidIdentityLockTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_pulid_id_"))
-        self.job_id = "hw_pulid_idlock"
+        self.job_id = "vs_pulid_idlock"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

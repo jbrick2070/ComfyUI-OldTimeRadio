@@ -63,7 +63,7 @@ class FluxKeyframeRegistryTests(unittest.TestCase):
 class FluxKeyframeStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_"))
-        self.job_id = "hw_kf_001"
+        self.job_id = "vs_kf_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -214,7 +214,7 @@ class FluxKeyframeLayoutLockTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_lock_"))
-        self.job_id = "hw_kf_lock"
+        self.job_id = "vs_kf_lock"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -319,7 +319,7 @@ class FluxKeyframeStubEnvvarTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_kf_env_"))
-        self.job_id = "hw_kf_env"
+        self.job_id = "vs_kf_env"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

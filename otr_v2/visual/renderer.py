@@ -358,18 +358,93 @@ def _still_to_clip(
     ffmpeg: str, still_path: str, out_path: str,
     duration: float, width: str, height: str,
 ) -> None:
-    """Convert a still image to a video clip of given duration."""
+    """Convert a still image to an animated clip of given duration.
+
+    When the motion sidecar couldn't produce a real per-shot MP4, the
+    renderer falls through to the still for that shot.  A frozen PNG
+    for 30-60 seconds reads as a slideshow, so we composite a procgen
+    overlay on top of a slow Ken Burns zoom/pan so the fallback still
+    feels alive on screen:
+
+        1. Ken Burns: scale up to 110% then crop with a slow easing
+           zoompan, giving ~10% parallax across the shot duration.
+        2. Scan-line overlay: horizontal 2-px lines every 4 px at
+           12% opacity (CRT-style scan pattern).
+        3. Signal-lost noise: low-amplitude filmgrain + vignette so
+           the image has natural motion.
+        4. Slight gamma wobble via eq filter sine-driven over time
+           so the highlights breathe.
+
+    If the complex filter graph fails (older ffmpeg builds, unusual
+    still aspect ratios), we fall back to a plain 1-frame loop so the
+    clip still lands and the episode doesn't stall.
+    """
+    # C7 safety note: this function only touches VIDEO.  Audio is
+    # never piped through this path.
+    dur = max(float(duration), 0.1)
+    total_frames = max(int(dur * _FPS), 2)
+
+    # Ken Burns: zoompan that scales from 1.00 -> 1.10 and drifts
+    # toward centre-right over the clip duration.  'd' is frame count,
+    # 'z' grows linearly, 'x'/'y' ease toward the zoom focus.
+    zoompan = (
+        f"zoompan="
+        f"z='min(1.0+0.10*on/{total_frames},1.10)':"
+        f"x='iw/2-(iw/zoom/2)+((iw*0.04)*on/{total_frames})':"
+        f"y='ih/2-(ih/zoom/2)':"
+        f"d={total_frames}:s={width}x{height}:fps={_FPS}"
+    )
+    # Scan-line overlay built from geq so we don't need an external
+    # asset.  lte(mod(Y,4),1) draws a 1-px line every 4 px; mix 12%.
+    scanlines = (
+        f"geq=lum='lum(X,Y)*(1-0.12*lte(mod(Y\\,4)\\,1))':cb='cb(X,Y)':cr='cr(X,Y)'"
+    )
+    # Filmgrain via noise filter (temporal).  alls=8 is subtle.
+    noise = "noise=alls=8:allf=t"
+    # Vignette + subtle breathing gamma (sine-wave).
+    vignette = "vignette=PI/5"
+    breath = "eq=gamma='1.0+0.04*sin(2*PI*t/4)'"
+
+    filter_graph = f"{zoompan},{scanlines},{noise},{vignette},{breath},format=yuv420p"
+
     cmd = [
         ffmpeg, "-y", "-loop", "1",
         "-i", still_path,
-        "-t", str(duration),
+        "-t", str(dur),
+        "-vf", filter_graph,
+        "-c:v", "libx264", "-preset", "fast",
+        "-pix_fmt", "yuv420p",
+        "-r", str(_FPS),
+        out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=180)
+    if result.returncode == 0 and Path(out_path).exists():
+        return
+
+    # Fallback: plain loop if the filter graph errored (older ffmpeg
+    # without geq, unusual still format, etc).  Log the stderr tail
+    # into a sidecar debug file so post-mortem analysis has context.
+    stderr_tail = b""
+    try:
+        stderr_tail = (result.stderr or b"")[-2048:]
+    except Exception:
+        stderr_tail = b""
+    try:
+        Path(out_path).with_suffix(".filter_err.log").write_bytes(stderr_tail)
+    except OSError:
+        pass
+    fallback_cmd = [
+        ffmpeg, "-y", "-loop", "1",
+        "-i", still_path,
+        "-t", str(dur),
         "-c:v", "libx264", "-preset", "fast",
         "-pix_fmt", "yuv420p",
         "-s", f"{width}x{height}",
         "-r", str(_FPS),
         out_path,
     ]
-    subprocess.run(cmd, capture_output=True, timeout=120)
+    subprocess.run(fallback_cmd, capture_output=True, timeout=120)
+    return
 
 
 def _probe_duration_sec(ffmpeg_path: str, media_path: Path) -> float | None:

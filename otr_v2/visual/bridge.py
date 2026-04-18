@@ -223,7 +223,7 @@ class VisualBridge:
         # Late import to avoid circular deps at ComfyUI scan time
         from .shotlist import generate_shotlist
 
-        job_id = f"hw_{uuid.uuid4().hex[:12]}"
+        job_id = f"vs_{uuid.uuid4().hex[:12]}"
         log.info("[VisualBridge] Job %s starting (lane=%s)", job_id, lane)
 
         # ---- 1. Parse + validate script_lines ----

@@ -66,7 +66,7 @@ class Wan21LoopRegistryTests(unittest.TestCase):
 class Wan21LoopStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_"))
-        self.job_id = "hw_wan_001"
+        self.job_id = "vs_wan_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -169,7 +169,7 @@ class Wan21LoopHandoffTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_hand_"))
-        self.job_id = "hw_wan_hand"
+        self.job_id = "vs_wan_hand"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -298,7 +298,7 @@ class Wan21LoopVsLtxBackendIsolationTests(unittest.TestCase):
 class Wan21LoopStubEnvvarTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_wan_env_"))
-        self.job_id = "hw_wan_env"
+        self.job_id = "vs_wan_env"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

@@ -58,7 +58,7 @@ class PlaceholderBackendTests(unittest.TestCase):
         # Emulate repo layout: <root>/io/visual_in/<job>/shotlist.json
         # out_dir_for walks parent.parent.parent, so job_dir must be
         # 3 levels deep under a fake root.
-        self.job_id = "hw_testjob_001"
+        self.job_id = "vs_testjob_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -170,7 +170,7 @@ class BridgeBackendEnvTests(unittest.TestCase):
                     with mock.patch.object(
                         bridge.Path, "home", return_value=tmp,
                     ):
-                        job_dir = tmp / "io" / "visual_in" / "hw_testjob"
+                        job_dir = tmp / "io" / "visual_in" / "vs_testjob"
                         job_dir.mkdir(parents=True)
                         # Stub out cooldown so the test is fast
                         with mock.patch.object(
@@ -179,7 +179,7 @@ class BridgeBackendEnvTests(unittest.TestCase):
                         ):
                             b = bridge.VisualBridge()
                             status = b._spawn_sidecar(
-                                "hw_testjob", job_dir, backend="auto",
+                                "vs_testjob", job_dir, backend="auto",
                             )
             self.assertEqual(status, "SPAWNED")
             self.assertTrue(mock_popen.called)
@@ -200,7 +200,7 @@ class BridgeBackendEnvTests(unittest.TestCase):
                 with mock.patch.object(
                     bridge.Path, "home", return_value=tmp,
                 ):
-                    job_dir = tmp / "io" / "visual_in" / "hw_testjob2"
+                    job_dir = tmp / "io" / "visual_in" / "vs_testjob2"
                     job_dir.mkdir(parents=True)
                     with mock.patch.object(
                         bridge.VisualBridge, "_cooldown_gate",
@@ -208,7 +208,7 @@ class BridgeBackendEnvTests(unittest.TestCase):
                     ):
                         b = bridge.VisualBridge()
                         status = b._spawn_sidecar(
-                            "hw_testjob2", job_dir, backend="placeholder_test",
+                            "vs_testjob2", job_dir, backend="placeholder_test",
                         )
             self.assertEqual(status, "SPAWNED")
             kwargs = mock_popen.call_args.kwargs
@@ -229,14 +229,14 @@ class BridgeBackendEnvTests(unittest.TestCase):
                 with mock.patch.object(
                     bridge.Path, "home", return_value=tmp,
                 ):
-                    job_dir = tmp / "io" / "visual_in" / "hw_pipeguard"
+                    job_dir = tmp / "io" / "visual_in" / "vs_pipeguard"
                     job_dir.mkdir(parents=True)
                     with mock.patch.object(
                         bridge.VisualBridge, "_cooldown_gate",
                         lambda self, job_id: None,
                     ):
                         bridge.VisualBridge()._spawn_sidecar(
-                            "hw_pipeguard", job_dir, backend="auto",
+                            "vs_pipeguard", job_dir, backend="auto",
                         )
             kwargs = mock_popen.call_args.kwargs
             self.assertNotEqual(kwargs.get("stdout"), subprocess.PIPE)

@@ -61,7 +61,7 @@ class LtxMotionRegistryTests(unittest.TestCase):
 class LtxMotionStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_ltx_"))
-        self.job_id = "hw_ltx_001"
+        self.job_id = "vs_ltx_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -145,7 +145,7 @@ class LtxMotionHandoffTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_ltx_hand_"))
-        self.job_id = "hw_ltx_hand"
+        self.job_id = "vs_ltx_hand"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -255,7 +255,7 @@ class LtxMotionHandoffTests(unittest.TestCase):
 class LtxMotionStubEnvvarTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_ltx_env_"))
-        self.job_id = "hw_ltx_env"
+        self.job_id = "vs_ltx_env"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

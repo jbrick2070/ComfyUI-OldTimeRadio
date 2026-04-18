@@ -48,7 +48,7 @@ class FluxAnchorRegistryTests(unittest.TestCase):
 class FluxAnchorStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_flux_anchor_"))
-        self.job_id = "hw_flux_001"
+        self.job_id = "vs_flux_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

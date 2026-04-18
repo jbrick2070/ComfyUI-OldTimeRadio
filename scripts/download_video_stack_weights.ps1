@@ -102,11 +102,21 @@ $Manifest = @(
        kind   = "snapshot_to_cache"
        approx_gb = 1.2 }
 
+    # LTX-Video 2.3 (primary motion backend in video_stack chain).
+    # Image-to-video, 24fps, 10-12s clips, fp8_e4m3fn Blackwell-native
+    # per constraint C5.  The ltx_motion backend loads from
+    # $ModelsRoot\diffusers\LTX-Video (OTR_LTX_MODEL env var overrides).
+    @{ repo   = "Lightricks/LTX-Video"
+       target = (Join-Path $ModelsRoot "diffusers\LTX-Video")
+       kind   = "snapshot"
+       approx_gb = 18.0 }
+
     # Wan-AI never published a 1.3B I2V variant - only the T2V-1.3B
     # (Diffusers-formatted) repo exists at that weight class.  The
     # wan21_loop backend gracefully falls back to T2V when the I2V
     # pipeline class is unavailable, so we pull the T2V weights into
     # the historical I2V target path and the backend finds them.
+    # Kept as Wan2.1 fallback when LTX errors or leaves gaps.
     @{ repo   = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
        target = (Join-Path $ModelsRoot "diffusers\Wan2.1-I2V-1.3B")
        kind   = "snapshot"

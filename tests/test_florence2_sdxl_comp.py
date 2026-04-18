@@ -79,7 +79,7 @@ class Florence2SdxlRegistryTests(unittest.TestCase):
 class Florence2SdxlStubModeTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_"))
-        self.job_id = "hw_f2sd_001"
+        self.job_id = "vs_f2sd_001"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -204,7 +204,7 @@ class Florence2SdxlThreeWayInvariantTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_inv_"))
-        self.job_id = "hw_f2sd_inv"
+        self.job_id = "vs_f2sd_inv"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -322,7 +322,7 @@ class Florence2SdxlHandoffTests(unittest.TestCase):
 
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_hand_"))
-        self.job_id = "hw_f2sd_hand"
+        self.job_id = "vs_f2sd_hand"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id
@@ -390,7 +390,7 @@ class Florence2SdxlHandoffTests(unittest.TestCase):
 class Florence2SdxlStubEnvvarTests(unittest.TestCase):
     def setUp(self):
         self._tmp = Path(tempfile.mkdtemp(prefix="otr_f2sd_env_"))
-        self.job_id = "hw_f2sd_env"
+        self.job_id = "vs_f2sd_env"
         self.fake_root = self._tmp / "repo"
         self.in_dir = self.fake_root / "io" / "visual_in" / self.job_id
         self.out_dir = self.fake_root / "io" / "visual_out" / self.job_id

@@ -36,7 +36,7 @@ a hard kill of either Bark or the worker from wedging the next run.
 Usage
 -----
     coord = VRAMCoordinator()
-    with coord.acquire(owner="visual_worker", job_id="hw_xxx", timeout=1800):
+    with coord.acquire(owner="visual_worker", job_id="vs_xxx", timeout=1800):
         # ... do GPU work safely ...
         pass
 """
@@ -244,7 +244,7 @@ class VRAMCoordinator:
         Args:
             owner: short label like "visual_worker" or "bark".  Visible
                 in the lock payload for debugging.
-            job_id: optional job id (e.g. ``hw_xxx``) to embed in the payload.
+            job_id: optional job id (e.g. ``vs_xxx``) to embed in the payload.
             timeout: max wall-clock seconds to wait.  TimeoutError raised
                 if we never get the lock.
 
