@@ -63,6 +63,17 @@ def main(argv: list[str]) -> int:
         print(f"FAIL hf_download_driver: huggingface_hub missing: {exc}")
         return 2
 
+    # Optional spec keys (PowerShell-side override for repos that need
+    # a narrower filter — e.g. PuLID where we only want pulid_flux*.safetensors
+    # and not the whole eva_clip / facexlib dir).
+    allow_patterns = spec.get("allow_patterns")  # list[str] or None
+    ignore_patterns = spec.get("ignore_patterns") or [
+        "*.gguf",
+        "*.onnx",
+        "*_fp4.safetensors",
+        "*.msgpack",
+    ]
+
     try:
         if kind == "snapshot":
             os.makedirs(target, exist_ok=True)
@@ -71,13 +82,8 @@ def main(argv: list[str]) -> int:
                 local_dir=target,
                 local_dir_use_symlinks=False,
                 token=token,
-                allow_patterns=None,
-                ignore_patterns=[
-                    "*.gguf",
-                    "*.onnx",
-                    "*_fp4.safetensors",
-                    "*.msgpack",
-                ],
+                allow_patterns=allow_patterns,
+                ignore_patterns=ignore_patterns,
             )
             print(f"OK snapshot {repo} -> {out}")
             return 0

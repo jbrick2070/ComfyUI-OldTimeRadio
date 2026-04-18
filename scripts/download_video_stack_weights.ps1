@@ -50,6 +50,24 @@ if (-not (Test-Path $Driver)) {
 }
 
 # -----------------------------------------------------------------------------
+# HF_TOKEN: pull from User-scope env var if not already in the in-process
+# environment.  Older terminal sessions opened before setx won't have the
+# in-process copy, so read HKCU\Environment directly and populate $env:.
+# Never logs the token value - only presence + length.
+# -----------------------------------------------------------------------------
+if (-not $env:HF_TOKEN) {
+    $userTok = [Environment]::GetEnvironmentVariable("HF_TOKEN", "User")
+    if ($userTok) {
+        $env:HF_TOKEN = $userTok
+        Log ("HF_TOKEN pulled from User-scope env (length=" + $userTok.Length + ")")
+    } else {
+        Log "HF_TOKEN not set at User or Process scope - gated repos will be skipped"
+    }
+} else {
+    Log ("HF_TOKEN already in process env (length=" + $env:HF_TOKEN.Length + ")")
+}
+
+# -----------------------------------------------------------------------------
 # Manifest: HF repo -> local target dir (or file).  Kept as ordered list so
 # the big gated FLUX repo goes first (fail fast on missing HF_TOKEN).
 # -----------------------------------------------------------------------------
@@ -62,8 +80,11 @@ $Manifest = @(
 
     @{ repo   = "guozinan/PuLID"
        target = (Join-Path $ModelsRoot "pulid")
-       kind   = "file"
-       file   = "pulid_flux.safetensors"
+       kind   = "snapshot"
+       # Upstream has re-versioned the weights file (pulid_flux_v0.9.1.safetensors,
+       # pulid_flux_v0.9.0.safetensors, etc.).  A glob keeps us forward-compatible
+       # without pinning a specific filename.  Backends already discover by prefix.
+       allow_patterns = @("pulid_flux*.safetensors", "pulid_flux*.bin")
        approx_gb = 1.2 }
 
     @{ repo   = "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0"
@@ -133,6 +154,31 @@ foreach ($entry in $Manifest) {
     if ($rc -eq 0) {
         Log ("OK   " + $repo)
         $Ok += $repo
+
+        # PuLID canonicalization: upstream re-versioned the weights file
+        # (pulid_flux_v0.9.1.safetensors, pulid_flux_v0.9.0.safetensors, ...),
+        # but the backend default expects pulid_flux.safetensors.  If the
+        # canonical name is missing, hard-link it to the newest versioned
+        # match so no production code changes are required.  Hard link is
+        # instant on NTFS same-volume, uses zero disk.
+        if ($repo -eq "guozinan/PuLID") {
+            $canonical = Join-Path $target "pulid_flux.safetensors"
+            if (-not (Test-Path $canonical)) {
+                $found = @(Get-ChildItem -Path $target -Filter "pulid_flux*.safetensors" -ErrorAction SilentlyContinue | Sort-Object Name)
+                if ($found.Count -gt 0) {
+                    $src = $found[-1].FullName
+                    try {
+                        New-Item -ItemType HardLink -Path $canonical -Target $src -ErrorAction Stop | Out-Null
+                        Log ("     hardlink pulid_flux.safetensors -> " + $found[-1].Name)
+                    } catch {
+                        Copy-Item -Path $src -Destination $canonical -Force
+                        Log ("     copy pulid_flux.safetensors <- " + $found[-1].Name + " (hardlink failed)")
+                    }
+                } else {
+                    Log ("     WARN: no pulid_flux*.safetensors found in " + $target)
+                }
+            }
+        }
     } else {
         Log ("FAIL " + $repo + " exit=" + $rc)
         $Failed += $repo
