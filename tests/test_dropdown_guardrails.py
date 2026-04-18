@@ -39,8 +39,11 @@ def _mock_runtime_log(msg):
     _RUNTIME_LOG_LINES.append(msg)
 
 
-def _fake_vram_snapshot(*a, **kw):
-    pass
+def _fake_vram_snapshot(label="stub", **kw):
+    # Return a real-shape dict so callers like VRAMGuardian.flush() that
+    # do ``before["current_gb"] - after["current_gb"]`` don't blow up
+    # when the stubbed module leaks into another test's sys.modules.
+    return {"phase": label, "current_gb": 0.0, "peak_gb": 0.0}
 
 def _fake_vram_reset_peak(*a, **kw):
     pass
@@ -55,6 +58,13 @@ _vram_mod.vram_snapshot = _fake_vram_snapshot
 _vram_mod.vram_reset_peak = _fake_vram_reset_peak
 _vram_mod.force_vram_offload = _fake_force_vram_offload
 _vram_mod.register_vram_cleanup = lambda *a, **kw: None
+# BUG-LOCAL-042: include vram_sentinel in stub so subsequent tests that
+# import nodes.batch_bark_generator (which does
+# ``from ._vram_log import force_vram_offload, vram_sentinel``) don't
+# crash on the polluted sys.modules entry left behind by this file.
+# Real vram_sentinel is a decorator factory: vram_sentinel(label, max_gb)
+# returns a decorator. Stub returns a pass-through decorator.
+_vram_mod.vram_sentinel = lambda *a, **kw: (lambda fn: fn)
 sys.modules["nodes._vram_log"] = _vram_mod
 
 # Patch project_state
