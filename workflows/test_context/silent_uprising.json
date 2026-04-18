@@ -1,0 +1,146 @@
+{
+  "_comment": "Reverse-engineered parsed variables from signal_lost_the_silent_uprising_20260418_033838_treatment.txt. Drives the TEST workflow (otr_scifi_16gb_TEST.json) as ground-truth hardcoded inputs so LTX / Wan2.1 / FLUX can iterate without running the LLM/TTS pipeline. Source treatment path retained for audit.",
+  "source_treatment": "output/old_time_radio/signal_lost_the_silent_uprising_20260418_033838_treatment.txt",
+  "source_mp4": "output/old_time_radio/signal_lost_the_silent_uprising_20260418_033838.mp4",
+
+  "episode": {
+    "title": "The Silent Uprising",
+    "slug": "silent_uprising",
+    "genre": "sci-fi radio drama",
+    "produced_at": "2026-04-18T03:41:24",
+    "news_seed": "Rocket Report: Starship V3 test-fired; ESA's tentative step toward crew launch",
+    "audio_file": "silent_uprising_test_hq48k.wav",
+    "audio_dir": "ComfyUI/input/",
+    "audio_format": "48000 Hz mono PCM 24-bit",
+    "duration_sec_treatment": 302.2,
+    "duration_sec_actual": 347.45,
+    "resolution": "1920x1080",
+    "fps": 24
+  },
+
+  "characters": [
+    {
+      "slot": "CHAR_1",
+      "name": "RAINN DRAKE",
+      "voice_tag": "v2/en_speaker_6",
+      "voice_traits": "male * deep * resonant",
+      "role": "lead decoder, science officer",
+      "flux_portrait_prompt": "cinematic medium shot portrait of a composed man in his late 30s, short-cropped dark hair, focused brown eyes, wearing a sleek charcoal crew jumpsuit with silver shoulder insignia on a Mars mission starship bridge, soft cool blue rim lighting, shallow depth of field, 85mm lens, photoreal",
+      "pulid_anchor_seed": 10601
+    },
+    {
+      "slot": "CHAR_2",
+      "name": "LLOYD SMITHERS",
+      "voice_tag": "v2/en_speaker_1",
+      "voice_traits": "male * warm * conversational",
+      "role": "mission captain",
+      "flux_portrait_prompt": "cinematic medium shot portrait of a mid-50s captain with steel-grey hair and lined weathered features, firm jaw, wearing a navy-blue command uniform with gold captain braid on the shoulder, tense expression, low ambient red-alert lighting on spaceship bridge, 85mm lens, photoreal",
+      "pulid_anchor_seed": 10602
+    },
+    {
+      "slot": "CHAR_3",
+      "name": "CREED STEINER",
+      "voice_tag": "v2/en_speaker_3",
+      "voice_traits": "male * gruff * weathered",
+      "role": "veteran engineer, xenolinguist",
+      "flux_portrait_prompt": "cinematic medium shot portrait of a rugged mid-40s engineer with a greying full beard, dark workwear crew jumpsuit smudged with grease, leaning forward with intent, warm key light and cold fill, starship engineering bay background, 85mm lens, photoreal",
+      "pulid_anchor_seed": 10603
+    },
+    {
+      "slot": "CHAR_4",
+      "name": "KRIT CORBEN",
+      "voice_tag": "v2/en_speaker_4",
+      "voice_traits": "female * bright * energetic",
+      "role": "comms officer",
+      "flux_portrait_prompt": "cinematic medium shot portrait of a bright-eyed young woman in her late 20s, shoulder-length auburn hair tied back, wearing a slim crew jumpsuit with comms officer insignia, alert supportive expression, headset over one ear, softly glowing console panels behind her, 85mm lens, photoreal",
+      "pulid_anchor_seed": 10604
+    },
+    {
+      "slot": "CHAR_5",
+      "name": "ANNOUNCER",
+      "voice_tag": "v2/en_speaker_0",
+      "voice_traits": "male * authoritative * deep",
+      "role": "narrator (non-visual)",
+      "flux_portrait_prompt": "",
+      "pulid_anchor_seed": 0,
+      "visual": false
+    }
+  ],
+
+  "environment": {
+    "primary_location": "Mars-bound spaceship bridge",
+    "ambient": "humming machinery, tension, low alarm blips",
+    "palette": "cool steel-blue dominant, muted cyan console glow, accent amber warning lights, deep shadow pockets",
+    "era": "near-future hard sci-fi, 2040s",
+    "lighting": "low key, under-lit consoles, red emergency pulse in climax beats",
+    "style_anchor_prompt": "interior of a near-future Mars-bound deep-space starship bridge, rows of backlit consoles, holographic panels, angled ceiling truss framework, weathered industrial surfaces, cinematic chiaroscuro, hard sci-fi aesthetic, realistic Blade Runner-adjacent color grade, 35mm anamorphic"
+  },
+
+  "visual_beats": [
+    {
+      "beat_id": "beat_01",
+      "label": "OPENING_TENSION",
+      "start_sec": 0.0,
+      "end_sec": 86.0,
+      "flux_prompt": "Mars-bound starship bridge, crew at command stations under low red alert lighting, alarms blaring, holographic displays flickering with unknown signal patterns, wide establishing shot, cinematic, photoreal, 35mm anamorphic, hard sci-fi",
+      "camera": "Static Focus",
+      "motion_hint": "slow ambient console flicker, distant machinery tremor, no camera move"
+    },
+    {
+      "beat_id": "beat_02",
+      "label": "DECODING_SEQUENCE",
+      "start_sec": 86.0,
+      "end_sec": 172.0,
+      "flux_prompt": "close over-shoulder view of Rainn Drake decoding alien signal at a holographic console, prime-number glyphs glowing cyan and amber across translucent panels, focused brow, other crew members out of focus in background, cinematic, photoreal, 85mm lens, hard sci-fi",
+      "camera": "Slow Zoom In",
+      "motion_hint": "slow push-in on the console, fingers tracing glowing sequences"
+    },
+    {
+      "beat_id": "beat_03",
+      "label": "DECISION_MOMENT",
+      "start_sec": 172.0,
+      "end_sec": 258.0,
+      "flux_prompt": "wide shot of a starship bridge with the captain Lloyd Smithers gripping the railing above, crew at stations below him, red alert bars strobing against blue console glow, tension on every face, cinematic, photoreal, 35mm anamorphic, hard sci-fi",
+      "camera": "Tilt Up",
+      "motion_hint": "slow tilt from crew stations up to the captain's command position"
+    },
+    {
+      "beat_id": "beat_04",
+      "label": "CLIMAX_REVEAL",
+      "start_sec": 258.0,
+      "end_sec": 347.45,
+      "flux_prompt": "climactic reveal on a Mars-bound starship bridge, shimmering alien message glyphs materializing as translucent holograms above the central console, crew reflected in the console glass with shocked wide-eyed expressions, high contrast cool blue and warm amber, cinematic, photoreal, 35mm anamorphic, hard sci-fi",
+      "camera": "Pan Left",
+      "motion_hint": "slow left pan across the hologram to catch reflected faces"
+    }
+  ],
+
+  "camera_presets_rotation": [
+    "Static Focus",
+    "Slow Zoom In",
+    "Tilt Up",
+    "Pan Left"
+  ],
+
+  "scene_manifest": {
+    "scenes": [
+      {"index": 0, "start_sec": 0.0,   "end_sec": 86.0,   "label": "opening_tension",    "beat_id": "beat_01"},
+      {"index": 1, "start_sec": 86.0,  "end_sec": 172.0,  "label": "decoding_sequence",  "beat_id": "beat_02"},
+      {"index": 2, "start_sec": 172.0, "end_sec": 258.0,  "label": "decision_moment",    "beat_id": "beat_03"},
+      {"index": 3, "start_sec": 258.0, "end_sec": 347.45, "label": "climax_reveal",      "beat_id": "beat_04"}
+    ],
+    "total_duration_sec": 347.45
+  },
+
+  "production_plan": {
+    "episode_title": "The Silent Uprising",
+    "lane": "faithful",
+    "era": "near-future hard sci-fi, 2040s",
+    "visual_palette": "cool steel-blue dominant with amber alarm accents; console-glow chiaroscuro; Blade-Runner-adjacent grade",
+    "backend_preference": "video_stack",
+    "target_fps": 24,
+    "target_resolution": "1920x1080",
+    "ltx_clip_max_sec": 10.0,
+    "fallback_policy": "procgen_overlay_still"
+  }
+}

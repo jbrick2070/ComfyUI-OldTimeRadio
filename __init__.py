@@ -101,9 +101,10 @@ _NODE_MODULES = {
     # Sidecar-isolated visual (stills/portraits/motion) generation from
     # OTR Director output. Audio path NEVER touched. Falls back to
     # OTR_SignalLostVideo on failure.  See docs/OTR_PIPELINE_EXPLAINER.md
-    "OTR_VisualBridge":   (".otr_v2.visual.bridge",   "VisualBridge",   "🌐 Visual Bridge"),
-    "OTR_VisualPoll":     (".otr_v2.visual.poll",     "VisualPoll",     "⏳ Visual Poll"),
-    "OTR_VisualRenderer": (".otr_v2.visual.renderer", "VisualRenderer", "🎬 Visual Renderer"),
+    "OTR_VisualBridge":         (".otr_v2.visual.bridge",            "VisualBridge",         "🌐 Visual Bridge"),
+    "OTR_VisualPoll":           (".otr_v2.visual.poll",              "VisualPoll",           "⏳ Visual Poll"),
+    "OTR_VisualRenderer":       (".otr_v2.visual.renderer",          "VisualRenderer",       "🎬 Visual Renderer"),
+    "OTR_VisualPromptCoercion": (".otr_v2.visual.prompt_coercion",   "VisualPromptCoercion", "🧹 Visual Prompt Coercion"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
