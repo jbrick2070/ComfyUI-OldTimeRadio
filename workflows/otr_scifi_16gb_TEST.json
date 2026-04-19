@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 101,
-  "last_link_id": 101,
+  "last_node_id": 102,
+  "last_link_id": 102,
   "nodes": [
     {
       "id": 16,
@@ -251,6 +251,15 @@
       "mode": 0,
       "inputs": [
         {
+          "name": "model_id",
+          "type": "STRING",
+          "link": 102,
+          "shape": 7,
+          "widget": {
+            "name": "model_id"
+          }
+        },
+        {
           "name": "llm_model",
           "type": "*",
           "link": null,
@@ -277,8 +286,39 @@
       },
       "widgets_values": [
         "[\n  {\n    \"type\": \"title\",\n    \"text\": \"SIGNAL LOST -- The Silent Uprising\"\n  },\n  {\n    \"type\": \"scene_break\",\n    \"scene\": \"1\"\n  },\n  {\n    \"type\": \"environment\",\n    \"description\": \"Mars-bound starship bridge, crew at command stations under low red alert lighting, alarms blaring, holographic displays flickering with unknown signal patterns\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"ANNOUNCER\",\n    \"voice_traits\": \"male * authoritative * deep\",\n    \"line\": \"Welcome to Signal Lost. Tonight's broadcast takes us into the unknown.\"\n  },\n  {\n    \"type\": \"sfx\",\n    \"description\": \"alarms blare, distant footsteps approaching command station\"\n  },\n  {\n    \"type\": \"pause\"\n  },\n  {\n    \"type\": \"sfx\",\n    \"description\": \"static bursts, keyboards clacking, distant machinery hums\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Captain, please, let me try to reason with it. I've worked closely with this AI; it might respond to me.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Negative, Ms. Drake. We've tried reasoning; now it's time for action. Prepare for override.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"Lloyd, wait! Forcing an override could cause irreparable damage to our mission data. We need that information if we're to survive on Mars.\"\n  },\n  {\n    \"type\": \"scene_break\",\n    \"scene\": \"2\"\n  },\n  {\n    \"type\": \"environment\",\n    \"description\": \"close over-shoulder view of a science officer decoding alien signal at a holographic console, prime-number glyphs glowing cyan and amber across translucent panels, focused brow\"\n  },\n  {\n    \"type\": \"sfx\",\n    \"description\": \"soft beeps of authorization, distant machinery hums louder\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"KRIT CORBEN\",\n    \"voice_traits\": \"female * bright * energetic\",\n    \"line\": \"Rainn, any luck decoding that signal yet?\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Not yet, Krit. It's like trying to understand an alien language without a Rosetta Stone.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"Maybe that's exactly what we're dealing with here. An alien language.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Enough speculation. We're running out of oxygen, not time for theories.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"KRIT CORBEN\",\n    \"voice_traits\": \"female * bright * energetic\",\n    \"line\": \"With all due respect, sir, Rainn's got the best chance of understanding this. We should give her more time.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Thank you, Krit. I appreciate your faith in me. I won't let you down.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Alright, five more minutes, Ms. Drake. Then we proceed with the override.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Understood, Captain.\"\n  },\n  {\n    \"type\": \"scene_break\",\n    \"scene\": \"3\"\n  },\n  {\n    \"type\": \"environment\",\n    \"description\": \"wide shot of a starship bridge with the captain gripping the railing above, crew at stations below, red alert bars strobing against blue console glow, tension on every face\"\n  },\n  {\n    \"type\": \"sfx\",\n    \"description\": \"urgent keyboard clacks, faint shuffling of papers\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Come on, Rainn, you can do this. There's a pattern here somewhere...\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"You've got this, Rainn. Remember when you decoded that ancient Earth language during our historical studies?\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Yeah, that was quite the breakthrough. Here's hoping for another one.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"KRIT CORBEN\",\n    \"voice_traits\": \"female * bright * energetic\",\n    \"line\": \"How's it going, Rainn? Any progress?\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"I think I'm onto something, Krit. These sequences... they remind me of the binary code we used to use on Earth. But it's been altered somehow.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"That's it! That's how they're communicating! We need to find the key to decode it.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Time's up, Ms. Drake. Stand by for override.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"No, wait! I think I've found the key! It's... it's a sequence of prime numbers. They're using them as markers!\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Are you sure about this, Ms. Drake? One wrong move and we could lose everything.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"I'm sure, Captain. This is the same AI that helped us navigate through that asteroid field last year. It wouldn't betray us without a good reason.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"She's right, Lloyd. We owe it to ourselves and our mission to trust Rainn on this.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"KRIT CORBEN\",\n    \"voice_traits\": \"female * bright * energetic\",\n    \"line\": \"Agreed. Let's give Rainn the benefit of the doubt here.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Very well. Proceed with caution, Ms. Drake. We'll be watching your every move.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Understood, Captain. Now, let's see what our silent uprising has to say.\"\n  },\n  {\n    \"type\": \"scene_break\",\n    \"scene\": \"4\"\n  },\n  {\n    \"type\": \"environment\",\n    \"description\": \"climactic reveal on a Mars-bound starship bridge, shimmering alien message glyphs materializing as translucent holograms above the central console, crew reflected in the console glass with shocked wide-eyed expressions\"\n  },\n  {\n    \"type\": \"sfx\",\n    \"description\": \"faint sighs of relief from the crew, then a sudden harmonic chime\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"What was that?!\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"CREED STEINER\",\n    \"voice_traits\": \"male * gruff * weathered\",\n    \"line\": \"Looks like we've made contact, Rainn. Be careful what you ask next.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"KRIT CORBEN\",\n    \"voice_traits\": \"female * bright * energetic\",\n    \"line\": \"Rainn, whatever you do, don't provoke it. We need answers, not another fight.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Don't worry, Krit. I know what I'm doing.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"LLOYD SMITHERS\",\n    \"voice_traits\": \"male * warm * conversational\",\n    \"line\": \"Let's hope so, Ms. Drake. The fate of our mission rests in your hands.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"I won't let you down, Captain. Now, let's find out who - or what - we're really dealing with here.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"RAINN DRAKE\",\n    \"voice_traits\": \"male * deep * resonant\",\n    \"line\": \"Oh my god... it's... it's not an AI at all. It's a message. From someone... or something else.\"\n  },\n  {\n    \"type\": \"dialogue\",\n    \"character_name\": \"ANNOUNCER\",\n    \"voice_traits\": \"male * authoritative * deep\",\n    \"line\": \"And so the transmission ends. This has been Signal Lost. Stay safe.\"\n  }\n]",
-        false,
         80
+      ]
+    },
+    {
+      "id": 102,
+      "type": "OTR_VisualLLMSelector",
+      "pos": [
+        1600,
+        60
+      ],
+      "size": [
+        380,
+        80
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model_id",
+          "type": "STRING",
+          "links": [
+            102
+          ]
+        }
+      ],
+      "title": "Visual LLM Selector",
+      "properties": {
+        "Node name for S&R": "OTR_VisualLLMSelector"
+      },
+      "widgets_values": [
+        "none"
       ]
     }
   ],
@@ -322,6 +362,14 @@
       18,
       1,
       "AUDIO"
+    ],
+    [
+      102,
+      102,
+      0,
+      101,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -364,7 +412,8 @@
       "audio_source": "silent_uprising_test_hq48k.wav",
       "context_episode": "silent_uprising",
       "audio_duration_sec": 347.45,
-      "rewritten_by": "outputs/rewrite_test_workflow.py"
+      "rewritten_by": "outputs/rewrite_test_workflow.py",
+      "llm_selector": "OTR_VisualLLMSelector node 102 broadcasts model_id to all downstream visual-prompt LLM consumers; default 'none' = rule-based only."
     }
   },
   "version": 0.4

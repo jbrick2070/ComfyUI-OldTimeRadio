@@ -225,20 +225,23 @@ class VisualPromptCoercion:
     Clean raw script_json before it reaches OTR_VisualBridge.
 
     Wire:
+        OTR_VisualLLMSelector.model_id ──┐
         raw_script_json ─► OTR_VisualPromptCoercion ─► OTR_VisualBridge
 
     Required input:
         script_json: STRING (Canonical Audio Token array as JSON)
 
     Optional inputs:
-        llm_model:      any  (disconnected = rule-based fallback)
-        enable_llm:     BOOL (default False; must be True AND model
-                              connected for LLM pass to run)
-        max_env_words:  INT  (override environment word cap)
+        model_id:       STRING ("none" or a HF id from the central
+                                OTR_VisualLLMSelector switcher).  When
+                                != "none", the LLM polish pass slot is
+                                activated; v1 is a no-op stub.
+        llm_model:      any    (pre-loaded LLM handle; v2 seam)
+        max_env_words:  INT    (override environment word cap)
 
     Outputs:
         cleaned_script_json: STRING (drop-in replacement for VisualBridge)
-        coercion_stats_json: STRING (diagnostic counts per field)
+        coercion_stats_json: STRING (diagnostic counts + model_id audit)
     """
 
     CATEGORY = "OTR/v2/Visual"
@@ -260,16 +263,24 @@ class VisualPromptCoercion:
                 }),
             },
             "optional": {
-                # Optional LLM input socket -- matches Phase 2 of the
-                # visual test guide.  Wiring it does NOT force an LLM
-                # pass unless enable_llm is also True.  Accepts any type
-                # so a Gemma/Ollama model handle can plug in without us
-                # needing to import transformers at node-scan time.
-                "llm_model": ("*", {"tooltip": "Optional LLM handle (leave unconnected for rule-based only)."}),
-                "enable_llm": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "If True AND llm_model connected, run an LLM polish pass after the rule pass.",
+                # Feed this from OTR_VisualLLMSelector.model_id so the
+                # whole visual path shares one LLM choice.  Default
+                # "none" keeps the node in rule-based-only mode, which
+                # is the safe behaviour when the selector is not wired.
+                "model_id": ("STRING", {
+                    "default": "none",
+                    "forceInput": True,
+                    "tooltip": (
+                        "Wire from OTR_VisualLLMSelector.model_id. "
+                        "'none' (default) = rule-based cleanup only, "
+                        "no LLM pass."
+                    ),
                 }),
+                # Optional loaded-model handle -- reserved for v2 when
+                # a shared loader feeds the whole visual path.  Accepts
+                # any type so a Gemma/Ollama handle can plug in without
+                # forcing transformers at node-scan time.
+                "llm_model": ("*", {"tooltip": "Optional pre-loaded LLM handle (v2 seam; leave unconnected)."}),
                 "max_env_words": ("INT", {
                     "default": _ENV_WORD_CAP,
                     "min": 10,
@@ -282,8 +293,8 @@ class VisualPromptCoercion:
     def coerce(
         self,
         script_json: str,
+        model_id: str = "none",
         llm_model: Any = None,
-        enable_llm: bool = False,
         max_env_words: int = _ENV_WORD_CAP,
     ) -> tuple[str, str]:
         # Temporarily override the module cap for this call
@@ -304,25 +315,35 @@ class VisualPromptCoercion:
 
             cleaned, stats = coerce_script_lines(tokens)
 
+            # Record the LLM decision in stats regardless of whether the
+            # pass ran.  Downstream diagnostic tooling can audit which
+            # model was selected for which episode.
+            resolved_model = (model_id or "none").strip() or "none"
+            stats["llm_model_id"] = resolved_model
             stats["llm_pass_ran"] = False
-            if enable_llm and llm_model is not None:
+
+            if resolved_model != "none":
                 # LLM polish pass is intentionally a no-op in v1.  The
-                # socket is reserved so we can wire in a local Ollama
-                # handle in v2 without touching the workflow JSON.
-                # Keeping this as a documented seam also means the
-                # round-robin consult tooling (ChatGPT+Gemini) can be
-                # swapped in for offline polish if needed.
-                log.info("[PromptCoercion] LLM polish pass reserved (v1 stub). Rule-based output returned.")
-                stats["llm_pass_ran"] = False
+                # model_id is wired through so v2 can flip this branch
+                # on without touching the workflow graph.  When a
+                # pre-loaded llm_model handle is also supplied, the
+                # sidecar planner can short-circuit loading.
+                log.info(
+                    "[PromptCoercion] LLM polish reserved (v1 stub). model_id=%s handle=%s",
+                    resolved_model,
+                    "provided" if llm_model is not None else "none",
+                )
                 stats["llm_pass_note"] = "v1_stub_reserved_seam"
+                stats["llm_handle_provided"] = llm_model is not None
 
             cleaned_json = json.dumps(cleaned, indent=2)
             stats_json = json.dumps(stats, indent=2)
-            log.info("[PromptCoercion] cleaned %d tokens (env=%d dlg=%d sfx=%d)",
+            log.info("[PromptCoercion] cleaned %d tokens (env=%d dlg=%d sfx=%d) llm=%s",
                      stats["total_tokens"],
                      stats["environments_cleaned"],
                      stats["dialogues_cleaned"],
-                     stats["sfx_cleaned"])
+                     stats["sfx_cleaned"],
+                     resolved_model)
             return (cleaned_json, stats_json)
         finally:
             _ENV_WORD_CAP = previous_cap

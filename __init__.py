@@ -105,6 +105,7 @@ _NODE_MODULES = {
     "OTR_VisualPoll":           (".otr_v2.visual.poll",              "VisualPoll",           "⏳ Visual Poll"),
     "OTR_VisualRenderer":       (".otr_v2.visual.renderer",          "VisualRenderer",       "🎬 Visual Renderer"),
     "OTR_VisualPromptCoercion": (".otr_v2.visual.prompt_coercion",   "VisualPromptCoercion", "🧹 Visual Prompt Coercion"),
+    "OTR_VisualLLMSelector":    (".otr_v2.visual.llm_selector",      "VisualLLMSelector",    "🔀 Visual LLM Selector"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
