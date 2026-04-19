@@ -69,6 +69,16 @@ except Exception:
 warnings.filterwarnings("ignore", category=FutureWarning, module=r"transformers\..*")
 warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\..*")
 
+# 4. HF_TOKEN bake-in — ComfyUI's desktop process does NOT inherit user-scope
+#    env vars from HKCU\Environment, so gated models (Gemma, Mistral, FLUX-dev)
+#    401 on first download.  Pull the token from the user registry now and
+#    export it into os.environ so every downstream loader picks it up.
+try:
+    from .otr_v2.visual._hf_token import ensure_hf_token
+    ensure_hf_token()
+except Exception as _hf_err:
+    log.debug("[OldTimeRadio] HF_TOKEN bake-in skipped: %s", _hf_err)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ISOLATED PER-NODE LOADING
 # If one node fails to import (e.g. missing transformers, parler_tts lib),

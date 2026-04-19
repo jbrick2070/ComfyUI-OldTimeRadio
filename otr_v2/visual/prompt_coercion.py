@@ -323,18 +323,32 @@ class VisualPromptCoercion:
             stats["llm_pass_ran"] = False
 
             if resolved_model != "none":
-                # LLM polish pass is intentionally a no-op in v1.  The
-                # model_id is wired through so v2 can flip this branch
-                # on without touching the workflow graph.  When a
-                # pre-loaded llm_model handle is also supplied, the
-                # sidecar planner can short-circuit loading.
-                log.info(
-                    "[PromptCoercion] LLM polish reserved (v1 stub). model_id=%s handle=%s",
-                    resolved_model,
-                    "provided" if llm_model is not None else "none",
-                )
-                stats["llm_pass_note"] = "v1_stub_reserved_seam"
-                stats["llm_handle_provided"] = llm_model is not None
+                # Live LLM polish pass.  HF_TOKEN is resolved inside
+                # llm_polish via _hf_token.ensure_hf_token() (winreg
+                # HKCU\Environment fallback) so gated models load
+                # without manual env setup.  Failures in the polish
+                # path always degrade gracefully to rule-only output.
+                try:
+                    from .llm_polish import polish_environment_prompts
+                    polished, polish_stats = polish_environment_prompts(
+                        cleaned,
+                        resolved_model,
+                        max_env_words=int(max_env_words),
+                    )
+                    cleaned = polished
+                    stats["llm_pass_ran"] = polish_stats.get(
+                        "polish_succeeded", 0
+                    ) > 0
+                    stats["llm_polish"] = polish_stats
+                    stats["llm_handle_provided"] = llm_model is not None
+                except Exception as exc:
+                    log.warning(
+                        "[PromptCoercion] LLM polish failed (%s); "
+                        "falling back to rule-only cleaned output.",
+                        exc,
+                    )
+                    stats["llm_pass_note"] = f"polish_exception:{type(exc).__name__}"
+                    stats["llm_handle_provided"] = llm_model is not None
 
             cleaned_json = json.dumps(cleaned, indent=2)
             stats_json = json.dumps(stats, indent=2)
