@@ -88,3 +88,20 @@ venv/
 # v2 generated artifacts
 *.mp4
 !assets/*.mp4
+
+# --- 2026-04-18 scratch hygiene ---
+# Regression + QC scratch
+bb_out.txt
+bb_result.txt
+dd_result.txt
+full_out.txt
+test_out.txt
+otr_runtime.log
+qc_*.txt
+qc_*.log
+qc_*.cmd
+qc_*.done
+_*.txt
+GEMINI.md
+# Cowork outputs scratchpad
+outputs/
