@@ -62,7 +62,7 @@ _SPAWN_TIMEOUT_S = 30
 
 # Explicit backend choices surfaced in the node UI.  "auto" preserves
 # the legacy worldmirror-or-stub path; named entries dispatch into
-# ``otr_v2/visual/backends/`` via the OTR_VISUAL_BACKEND env var on
+# ``visual/backends/`` via the OTR_VISUAL_BACKEND env var on
 # the spawned sidecar.  Day 1 sprint exposes only placeholder_test; the
 # rest register as Days 2-7 of the 14-day video stack sprint land.
 _BACKEND_CHOICES = [
@@ -153,7 +153,7 @@ class VisualBridge:
             "required": {
                 "script_json": ("STRING", {
                     "multiline": True,
-                    "tooltip": "Canonical Audio Token array from OTR_Gemma4ScriptWriter (JSON string).",
+                    "tooltip": "Canonical Audio Token array from OTR_LLMScriptWriter (JSON string).",
                 }),
                 "episode_title": ("STRING", {
                     "default": "Untitled Episode",
@@ -194,7 +194,7 @@ class VisualBridge:
                     "tooltip": (
                         "Explicit video-stack backend to run in the sidecar. "
                         "'auto' preserves legacy worldmirror-or-stub behaviour. "
-                        "Other choices dispatch into otr_v2/visual/backends/ "
+                        "Other choices dispatch into visual/backends/ "
                         "via the OTR_VISUAL_BACKEND env var."
                     ),
                 }),
@@ -325,6 +325,70 @@ class VisualBridge:
                 job_id, reason,
             )
 
+    def _pre_spawn_vram_flush(self, job_id: str) -> None:
+        """Evict VRAM residues from the parent ComfyUI process before spawn.
+
+        Addresses BUG-LOCAL-048: the sidecar subprocess inherits none of the
+        parent's CUDA context (multiprocessing spawn start method), but the
+        physical 16 GB VRAM is shared -- so LLM / Bark / Kokoro / anchor_gen
+        residues held by ComfyUI leave the sidecar with almost no room to
+        land real FLUX/LTX/Wan2.1 weights.  Observed 2026-04-19 on live
+        run vs_3412f49920ef: 16,129 MB used / 173 MB free at spawn time,
+        GPU pinned at 100% / 55W (PCIe thrashing, no compute progress).
+
+        Called from _spawn_sidecar BEFORE the cooldown gate so the LHM
+        readings the gate sees reflect the clean state, not the leftover.
+
+        Safe no-op when CUDA is unavailable or when no callbacks are
+        registered.  Errors are logged and swallowed -- never let a
+        pre-spawn hygiene routine abort a real generation run.
+        """
+        # Snapshot current VRAM so the ceiling log has a before/after pair.
+        try:
+            from nodes._vram_log import (
+                force_vram_offload,
+                vram_snapshot,
+                vram_reset_peak,
+            )
+        except ImportError:
+            try:
+                from _vram_log import (  # type: ignore
+                    force_vram_offload,
+                    vram_snapshot,
+                    vram_reset_peak,
+                )
+            except ImportError:
+                log.debug(
+                    "[VisualBridge] _vram_log unavailable; skipping pre-spawn flush"
+                )
+                return
+
+        try:
+            before = vram_snapshot(f"pre_spawn_{job_id}_before")
+            before_gb = before.get("current_gb", 0.0)
+            log.info(
+                "[VisualBridge] pre-spawn VRAM flush starting for %s (before=%.2f GB)",
+                job_id, before_gb,
+            )
+            force_vram_offload()
+            after = vram_snapshot(f"pre_spawn_{job_id}_after")
+            after_gb = after.get("current_gb", 0.0)
+            freed_gb = max(0.0, before_gb - after_gb)
+            log.info(
+                "[VisualBridge] pre-spawn VRAM flush complete for %s "
+                "(after=%.2f GB, freed=%.2f GB)",
+                job_id, after_gb, freed_gb,
+            )
+            # Fresh peak counter for the sidecar window so the episode
+            # report attributes VRAM to the sidecar, not the main graph.
+            vram_reset_peak(f"sidecar_{job_id}")
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[VisualBridge] pre-spawn VRAM flush errored for %s (%s); "
+                "proceeding anyway -- subprocess still has its own OOM guard",
+                job_id, exc,
+            )
+
     def _spawn_sidecar(self, job_id: str, job_dir: Path, backend: str = "auto") -> str:
         """
         Attempt to spawn the Visual worker in the visual2 conda env.
@@ -339,6 +403,12 @@ class VisualBridge:
 
         Returns: ``"SPAWNED"``, ``"SPAWN_FAILED"``, or ``"WORKER_MISSING"``.
         """
+        # Pre-spawn VRAM flush (BUG-LOCAL-048).  The subprocess inherits
+        # none of our CUDA context but still shares physical 16 GB VRAM,
+        # so LLM / Bark / Kokoro residues in the parent process starve
+        # FLUX/LTX/Wan2.1 of load headroom.  Flush first, then cooldown.
+        self._pre_spawn_vram_flush(job_id)
+
         # Pre-spawn cooldown gate -- LHM poll.  Never blocks forever; the
         # audio rails are protected by VRAMCoordinator in the worker, not
         # by this gate.
