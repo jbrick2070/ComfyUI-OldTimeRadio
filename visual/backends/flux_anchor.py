@@ -1,5 +1,5 @@
 """
-otr_v2.visual.backends.flux_anchor  --  Day 2, Stage 1 anchors
+visual.backends.flux_anchor  --  Day 2, Stage 1 anchors
 ===============================================================
 
 FLUX.1-dev FP8 (e4m3fn) text-to-image anchor renderer.  Runs inside the
@@ -134,11 +134,32 @@ def _should_stub() -> tuple[bool, str]:
     return (False, "")
 
 
-def _try_load_pipeline():
-    """Load FluxPipeline with FP8 + CPU offload.  Returns (pipe, reason).
+def _log_stderr(msg: str) -> None:
+    """Loud log to sidecar stderr. No-op if stderr is unavailable.
 
-    ``pipe`` is None when the import/load failed -- caller falls back to
-    stub mode and records the reason in meta.json.
+    Added for BUG-LOCAL-047 / BUG-046 family so dtype fallback decisions
+    leave a paper trail in ``sidecar_stderr.log`` instead of being silent.
+    """
+    try:
+        sys.stderr.write(msg if msg.endswith("\n") else msg + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def _try_load_pipeline():
+    """Load FluxPipeline with CPU offload.  Returns (pipe, reason).
+
+    Dtype attempt order: FP8 e4m3fn (Blackwell-native, Day 2 canonical)
+    then BF16 fallback.  Some torch/diffusers builds can load FP8 weights
+    into the kernel but can't round-trip Float8_e4m3fnStorage through the
+    safetensors loader (BUG-LOCAL-047).  When that happens the first
+    attempt raises TypeError during ``from_pretrained`` and we retry with
+    BF16 so the run can still produce real FLUX stills instead of silently
+    dropping to the solid-color stub path.
+
+    ``pipe`` is None when every dtype attempt failed -- caller falls back
+    to stub mode and records the reason in meta.json.
     """
     try:
         import torch  # type: ignore
@@ -149,35 +170,69 @@ def _try_load_pipeline():
     if not torch.cuda.is_available():
         return (None, "cuda_unavailable")
 
+    # Dtype attempt order matters:
+    #   1. FP8 e4m3fn -- Blackwell sm_120 native, ~half the VRAM of BF16.
+    #   2. BF16 -- broader diffusers/safetensors compatibility, fits in
+    #      the 14.5 GB budget with CPU offload on but not without.
+    # Explicit env override lets Jeffrey pin dtype if needed.
+    override = os.environ.get("OTR_FLUX_DTYPE", "").strip().lower()
+    if override == "bf16":
+        dtype_order = [("bf16", torch.bfloat16)]
+    elif override in ("fp8", "fp8_e4m3fn"):
+        dtype_order = [("fp8_e4m3fn", torch.float8_e4m3fn)]
+    else:
+        dtype_order = [
+            ("fp8_e4m3fn", torch.float8_e4m3fn),
+            ("bf16", torch.bfloat16),
+        ]
+
+    last_reason = "no_dtype_tried"
+    pipe = None
+    loaded_label = None
+    for label, dtype in dtype_order:
+        _log_stderr(f"[flux_anchor] attempting FluxPipeline.from_pretrained dtype={label}")
+        try:
+            pipe = FluxPipeline.from_pretrained(
+                str(_MODEL_PATH),
+                torch_dtype=dtype,
+                local_files_only=True,
+            )
+            loaded_label = label
+            _log_stderr(f"[flux_anchor] loaded pipeline dtype={label}")
+            break
+        except Exception as exc:  # noqa: BLE001
+            err_text = str(exc)[:200]
+            last_reason = f"load_error[{label}]:{type(exc).__name__}:{err_text}"
+            _log_stderr(
+                f"[flux_anchor] {label} load failed: "
+                f"{type(exc).__name__}: {err_text}"
+            )
+            pipe = None
+            continue
+
+    if pipe is None:
+        return (None, last_reason)
+
+    # Stay under the 12.5 GB Day 2 gate on the RTX 5080 Laptop.
+    # enable_model_cpu_offload trades ~1-2s per render for ~6 GB of
+    # peak-VRAM headroom -- matches the headroom needed for LTX
+    # handoffs on Day 5.
     try:
-        # FP8 e4m3fn is the Day 2 canonical dtype (Blackwell sm_120 native).
-        pipe = FluxPipeline.from_pretrained(
-            str(_MODEL_PATH),
-            torch_dtype=torch.float8_e4m3fn,
-            local_files_only=True,
-        )
-        # Stay under the 12.5 GB Day 2 gate on the RTX 5080 Laptop.
-        # enable_model_cpu_offload trades ~1-2s per render for ~6 GB of
-        # peak-VRAM headroom -- matches the headroom needed for LTX
-        # handoffs on Day 5.
+        pipe.enable_model_cpu_offload()
+    except Exception:
+        # Older diffusers may expose a different name; ignore.
         try:
-            pipe.enable_model_cpu_offload()
-        except Exception:
-            # Older diffusers may expose a different name; ignore.
-            try:
-                pipe.enable_sequential_cpu_offload()
-            except Exception:
-                pass
-        # Silence diffusers progress bars so the sidecar stdout log
-        # doesn't blow up with tqdm carriage-returns.  Mirrors the
-        # anchor_gen fix for BUG-LOCAL-043.
-        try:
-            pipe.set_progress_bar_config(disable=True)
+            pipe.enable_sequential_cpu_offload()
         except Exception:
             pass
-        return (pipe, "loaded")
-    except Exception as exc:  # noqa: BLE001
-        return (None, f"load_error:{type(exc).__name__}:{str(exc)[:200]}")
+    # Silence diffusers progress bars so the sidecar stdout log
+    # doesn't blow up with tqdm carriage-returns.  Mirrors the
+    # anchor_gen fix for BUG-LOCAL-043.
+    try:
+        pipe.set_progress_bar_config(disable=True)
+    except Exception:
+        pass
+    return (pipe, f"loaded[{loaded_label}]")
 
 
 class FluxAnchorBackend(Backend):
@@ -268,7 +323,7 @@ class FluxAnchorBackend(Backend):
         # audio-side passes (Bark/MusicGen) so peak-VRAM spikes don't
         # collide.  Same import dance as worker.py.
         try:
-            from otr_v2.visual.vram_coordinator import VRAMCoordinator  # type: ignore
+            from visual.vram_coordinator import VRAMCoordinator  # type: ignore
         except ImportError:
             try:
                 hw = Path(__file__).resolve().parent.parent
