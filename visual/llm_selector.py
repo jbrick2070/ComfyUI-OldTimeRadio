@@ -11,10 +11,13 @@ Design intent:
     - One widget, one source of truth.
     - Output is plain STRING ``model_id`` so it composes cleanly
       with any downstream node that accepts a string input socket.
-    - Default is ``"none"`` -- downstream nodes treat this as
-      "rule-based fallback only", so flipping the switcher to a real
-      model turns on LLM polish everywhere without further rewiring.
-    - Choices match OTR_Gemma4ScriptWriter exactly, so the same
+    - Default is Mistral-Nemo-Instruct-2407 -- the canonical OTR
+      story-writing LLM (22.84 GB cache on disk, already warm for the
+      audio path).  Downstream nodes still accept ``"none"`` for a
+      rule-based fallback, but a fresh node placed on the graph or
+      a freshly-loaded workflow with an empty widget now defaults to
+      real LLM polish instead of silently falling back.
+    - Choices match OTR_LLMScriptWriter exactly, so the same
       canonical list drives both the audio-story and visual paths.
 
 Wiring pattern (typical):
@@ -45,7 +48,7 @@ _LLM_MODEL_CHOICES: list[str] = [
     "mistralai/Mistral-Nemo-Instruct-2407",
     "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
 ]
-_LLM_DEFAULT: str = "none"
+_LLM_DEFAULT: str = "mistralai/Mistral-Nemo-Instruct-2407"
 
 
 class VisualLLMSelector:
@@ -77,8 +80,10 @@ class VisualLLMSelector:
                     "default": _LLM_DEFAULT,
                     "tooltip": (
                         "LLM chosen for every downstream visual-prompt "
-                        "cleanup.  'none' = rule-based only, no LLM pass. "
-                        "Matches OTR_Gemma4ScriptWriter's model list."
+                        "cleanup.  Default = Mistral-Nemo-Instruct-2407 "
+                        "(canonical OTR writer).  Pick 'none' to disable "
+                        "the LLM pass and run rule-based fallback only. "
+                        "Matches OTR_LLMScriptWriter's model list."
                     ),
                 }),
             },

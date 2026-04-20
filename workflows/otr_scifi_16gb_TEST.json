@@ -318,7 +318,7 @@
         "Node name for S&R": "OTR_VisualLLMSelector"
       },
       "widgets_values": [
-        "none"
+        "mistralai/Mistral-Nemo-Instruct-2407"
       ]
     }
   ],
@@ -413,7 +413,7 @@
       "context_episode": "silent_uprising",
       "audio_duration_sec": 347.45,
       "rewritten_by": "outputs/rewrite_test_workflow.py",
-      "llm_selector": "OTR_VisualLLMSelector node 102 broadcasts model_id to all downstream visual-prompt LLM consumers; default 'none' = rule-based only."
+      "llm_selector": "OTR_VisualLLMSelector node 102 broadcasts model_id to all downstream visual-prompt LLM consumers; class default is Mistral-Nemo-Instruct-2407 (canonical OTR writer), and this workflow also pins that value explicitly. Set to 'none' for rule-based fallback only."
     }
   },
   "version": 0.4
