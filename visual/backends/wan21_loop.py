@@ -1,5 +1,5 @@
 """
-otr_v2.visual.backends.wan21_loop  --  Day 6 Wan2.1 1.3B I2V loop
+visual.backends.wan21_loop  --  Day 6 Wan2.1 1.3B I2V loop
 ==================================================================
 
 Wan2.1 1.3B image-to-video loop backend.  Takes a still (Day 4
@@ -66,6 +66,7 @@ shot_id doesn't collide across pipelines.
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import os
 import struct
@@ -83,6 +84,73 @@ from ._base import (
     atomic_write_json,
     write_status,
 )
+
+
+def _log_stderr(msg: str) -> None:
+    """Loud log to sidecar stderr. No-op if stderr is unavailable."""
+    try:
+        sys.stderr.write(msg if msg.endswith("\n") else msg + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def _release_pipe(pipe) -> None:
+    """Tear down a loaded Wan2.1 pipeline and its CPU-offload hooks.
+
+    BUG-LOCAL-050: video_stack chains flux_anchor -> ltx_motion ->
+    wan21_loop inside a single sidecar process.  Without explicit
+    teardown, diffusers' accelerate-hooked modules stayed resident
+    after ``run()`` returned -- the next pipeline loaded on top and the
+    combined working set PCIe-thrashed at 100% GPU / ~1 W / ~200 MB
+    free VRAM.  Calling this at the end of the render loop forces the
+    hooks loose, drops component storages from CUDA, and runs a
+    conservative ``empty_cache()`` so any subsequent stage (or the
+    sidecar exit itself) starts clean.
+
+    Safe to call with ``pipe=None`` (no-op).
+    """
+    if pipe is None:
+        return
+    try:
+        remove = getattr(pipe, "remove_all_hooks", None)
+        if callable(remove):
+            remove()
+    except Exception:
+        pass
+    try:
+        for attr in ("transformer", "text_encoder", "text_encoder_2", "vae",
+                     "image_encoder", "scheduler", "tokenizer", "tokenizer_2"):
+            mod = getattr(pipe, attr, None)
+            if mod is None:
+                continue
+            to = getattr(mod, "to", None)
+            if callable(to):
+                try:
+                    mod.to("cpu")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        del pipe
+    except Exception:
+        pass
+    try:
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    _log_stderr("[wan21_loop] pipe released (del + gc + empty_cache)")
 
 
 # ---- Model discovery ------------------------------------------------------
@@ -393,7 +461,7 @@ class Wan21LoopBackend(Backend):
         import torch  # type: ignore
 
         try:
-            from otr_v2.visual.vram_coordinator import VRAMCoordinator  # type: ignore
+            from visual.vram_coordinator import VRAMCoordinator  # type: ignore
         except ImportError:
             try:
                 hw = Path(__file__).resolve().parent.parent
@@ -445,124 +513,131 @@ class Wan21LoopBackend(Backend):
         duration_s = _DURATION_S
         num_frames = min(int(duration_s * _FPS), _MAX_FRAMES)
 
-        with coord.acquire(owner="wan21_loop", job_id=out_dir.name, timeout=1800):
-            for i, shot in enumerate(shots):
-                shot_id = shot.get("shot_id", f"shot_{i:03d}")
-                shot_dir = out_dir / shot_id
-                shot_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with coord.acquire(owner="wan21_loop", job_id=out_dir.name, timeout=1800):
+                for i, shot in enumerate(shots):
+                    shot_id = shot.get("shot_id", f"shot_{i:03d}")
+                    shot_dir = out_dir / shot_id
+                    shot_dir.mkdir(parents=True, exist_ok=True)
 
-                still_path, source_tag = _resolve_input_still(shot, job_dir, out_dir)
-                if still_path is None:
-                    no_still += 1
-                    atomic_write_json(shot_dir / "meta.json", {
-                        "shot_id": shot_id,
-                        "backend": self.name,
-                        "mode": "real",
-                        "error": "still_missing",
-                        "detail": (
-                            "No Day 2 render.png or Day 4 keyframe.png "
-                            "on disk for this shot_id; Wan2.1 loop handoff "
-                            "needs an upstream still."
-                        ),
-                    })
-                    continue
+                    still_path, source_tag = _resolve_input_still(shot, job_dir, out_dir)
+                    if still_path is None:
+                        no_still += 1
+                        atomic_write_json(shot_dir / "meta.json", {
+                            "shot_id": shot_id,
+                            "backend": self.name,
+                            "mode": "real",
+                            "error": "still_missing",
+                            "detail": (
+                                "No Day 2 render.png or Day 4 keyframe.png "
+                                "on disk for this shot_id; Wan2.1 loop handoff "
+                                "needs an upstream still."
+                            ),
+                        })
+                        continue
 
-                prompt = _build_prompt(shot)
-                seed = _derive_seed(shot, i)
-                generator = torch.Generator(device="cuda").manual_seed(seed)
+                    prompt = _build_prompt(shot)
+                    seed = _derive_seed(shot, i)
+                    generator = torch.Generator(device="cuda").manual_seed(seed)
 
-                t0 = time.perf_counter()
-                try:
-                    call_kwargs = dict(
-                        prompt=prompt,
-                        num_inference_steps=_NUM_INFERENCE_STEPS,
-                        num_frames=num_frames,
-                        generator=generator,
-                    )
-                    if Image is not None and variant == "i2v":
-                        call_kwargs["image"] = Image.open(still_path).convert("RGB")
-                    elif variant == "t2v":
-                        # Fallback: no image conditioning available,
-                        # record that handoff degraded to T2V.
-                        pass
-
-                    out = pipe(**call_kwargs)
-                    frames = out.frames[0] if hasattr(out, "frames") else out
-                except torch.cuda.OutOfMemoryError:
-                    oom += 1
-                    atomic_write_json(shot_dir / "meta.json", {
-                        "shot_id": shot_id,
-                        "backend": self.name,
-                        "mode": "real",
-                        "error": "CUDA_OOM",
-                        "prompt": prompt,
-                        "seed": seed,
-                        "input_still": str(still_path),
-                        "input_still_source": source_tag,
-                        "dtype": dtype_str,
-                    })
+                    t0 = time.perf_counter()
                     try:
-                        torch.cuda.empty_cache()
-                    except Exception:
-                        pass
-                    continue
-                except Exception as exc:  # noqa: BLE001
-                    errored += 1
+                        call_kwargs = dict(
+                            prompt=prompt,
+                            num_inference_steps=_NUM_INFERENCE_STEPS,
+                            num_frames=num_frames,
+                            generator=generator,
+                        )
+                        if Image is not None and variant == "i2v":
+                            call_kwargs["image"] = Image.open(still_path).convert("RGB")
+                        elif variant == "t2v":
+                            # Fallback: no image conditioning available,
+                            # record that handoff degraded to T2V.
+                            pass
+
+                        out = pipe(**call_kwargs)
+                        frames = out.frames[0] if hasattr(out, "frames") else out
+                    except torch.cuda.OutOfMemoryError:
+                        oom += 1
+                        atomic_write_json(shot_dir / "meta.json", {
+                            "shot_id": shot_id,
+                            "backend": self.name,
+                            "mode": "real",
+                            "error": "CUDA_OOM",
+                            "prompt": prompt,
+                            "seed": seed,
+                            "input_still": str(still_path),
+                            "input_still_source": source_tag,
+                            "dtype": dtype_str,
+                        })
+                        try:
+                            torch.cuda.empty_cache()
+                        except Exception:
+                            pass
+                        continue
+                    except Exception as exc:  # noqa: BLE001
+                        errored += 1
+                        atomic_write_json(shot_dir / "meta.json", {
+                            "shot_id": shot_id,
+                            "backend": self.name,
+                            "mode": "real",
+                            "error": f"{type(exc).__name__}: {str(exc)[:300]}",
+                            "traceback_tail": traceback.format_exc()[-800:],
+                            "prompt": prompt,
+                            "seed": seed,
+                            "input_still": str(still_path),
+                            "input_still_source": source_tag,
+                            "dtype": dtype_str,
+                        })
+                        continue
+
+                    elapsed = time.perf_counter() - t0
+                    mp4_path = shot_dir / "loop.mp4"
+                    try:
+                        export_to_video(frames, str(mp4_path), fps=_FPS)
+                    except Exception as exc:  # noqa: BLE001
+                        errored += 1
+                        atomic_write_json(shot_dir / "meta.json", {
+                            "shot_id": shot_id,
+                            "backend": self.name,
+                            "mode": "real",
+                            "error": f"export_error:{type(exc).__name__}:{exc}",
+                            "prompt": prompt,
+                            "seed": seed,
+                            "input_still": str(still_path),
+                            "input_still_source": source_tag,
+                            "dtype": dtype_str,
+                        })
+                        continue
+
                     atomic_write_json(shot_dir / "meta.json", {
                         "shot_id": shot_id,
                         "backend": self.name,
                         "mode": "real",
-                        "error": f"{type(exc).__name__}: {str(exc)[:300]}",
-                        "traceback_tail": traceback.format_exc()[-800:],
+                        "variant": variant,
+                        "dtype": dtype_str,
                         "prompt": prompt,
                         "seed": seed,
+                        "duration_s": duration_s,
+                        "fps": _FPS,
+                        "num_frames": num_frames,
+                        "render_time_s": round(elapsed, 2),
                         "input_still": str(still_path),
                         "input_still_source": source_tag,
-                        "dtype": dtype_str,
+                        "input_still_hash": _still_hash(str(still_path)),
+                        "pipeline_reason": pipe_reason,
+                        "env_prompt": shot.get("env_prompt", ""),
+                        "camera": shot.get("camera", ""),
+                        "motion_prompt": shot.get("motion_prompt", ""),
+                        "loop_prompt": shot.get("loop_prompt", ""),
                     })
-                    continue
-
-                elapsed = time.perf_counter() - t0
-                mp4_path = shot_dir / "loop.mp4"
-                try:
-                    export_to_video(frames, str(mp4_path), fps=_FPS)
-                except Exception as exc:  # noqa: BLE001
-                    errored += 1
-                    atomic_write_json(shot_dir / "meta.json", {
-                        "shot_id": shot_id,
-                        "backend": self.name,
-                        "mode": "real",
-                        "error": f"export_error:{type(exc).__name__}:{exc}",
-                        "prompt": prompt,
-                        "seed": seed,
-                        "input_still": str(still_path),
-                        "input_still_source": source_tag,
-                        "dtype": dtype_str,
-                    })
-                    continue
-
-                atomic_write_json(shot_dir / "meta.json", {
-                    "shot_id": shot_id,
-                    "backend": self.name,
-                    "mode": "real",
-                    "variant": variant,
-                    "dtype": dtype_str,
-                    "prompt": prompt,
-                    "seed": seed,
-                    "duration_s": duration_s,
-                    "fps": _FPS,
-                    "num_frames": num_frames,
-                    "render_time_s": round(elapsed, 2),
-                    "input_still": str(still_path),
-                    "input_still_source": source_tag,
-                    "input_still_hash": _still_hash(str(still_path)),
-                    "pipeline_reason": pipe_reason,
-                    "env_prompt": shot.get("env_prompt", ""),
-                    "camera": shot.get("camera", ""),
-                    "motion_prompt": shot.get("motion_prompt", ""),
-                    "loop_prompt": shot.get("loop_prompt", ""),
-                })
-                rendered += 1
+                    rendered += 1
+        finally:
+            # BUG-LOCAL-050: always release the pipe before returning so
+            # any subsequent stage (or the sidecar exit itself) starts
+            # with a clean VRAM slate.  Runs even on exception so a
+            # mid-render failure doesn't leave accelerate hooks resident.
+            _release_pipe(pipe)
 
         if oom > 0:
             write_status(

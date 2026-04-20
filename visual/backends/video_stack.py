@@ -1,5 +1,5 @@
 """
-otr_v2.visual.backends.video_stack  --  composite still+motion pipeline
+visual.backends.video_stack  --  composite still+motion pipeline
 ========================================================================
 
 Chains motion backends in sequence within a single sidecar spawn so
@@ -48,7 +48,9 @@ metadata doesn't collide with any individual backend's meta.json.
 
 from __future__ import annotations
 
+import gc
 import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -59,6 +61,58 @@ from ._base import (
     STATUS_RUNNING,
     write_status,
 )
+
+
+def _log_stderr(msg: str) -> None:
+    """Loud log to sidecar stderr. No-op if stderr is unavailable."""
+    try:
+        sys.stderr.write(msg if msg.endswith("\n") else msg + "\n")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def _between_stage_barrier(stage_just_finished: str) -> None:
+    """Belt-and-suspenders VRAM barrier between chained backends.
+
+    BUG-LOCAL-050: even with per-backend ``_release_pipe()`` teardown,
+    we want a hard process-level barrier between stages so any residual
+    allocation (caches in transformers, accelerate's ``OffloadHook``
+    device copies, short-lived tensors held by frame-exporters) is
+    zeroed before the next pipeline's ``from_pretrained`` begins.  This
+    is cheap (tens of milliseconds) and directly prevents the PCIe
+    thrashing pattern that surfaced on 2026-04-19.
+    """
+    try:
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.synchronize()
+            except Exception:
+                pass
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception:
+                pass
+            # Snapshot free VRAM so post-mortem logs can see whether the
+            # barrier actually reclaimed anything between stages.
+            try:
+                free, total = torch.cuda.mem_get_info()
+                free_mb = free / (1024 * 1024)
+                total_mb = total / (1024 * 1024)
+                _log_stderr(
+                    f"[video_stack] barrier after {stage_just_finished}: "
+                    f"vram_free={free_mb:.0f}MB / {total_mb:.0f}MB"
+                )
+            except Exception:
+                _log_stderr(f"[video_stack] barrier after {stage_just_finished}")
+    except Exception:
+        _log_stderr(f"[video_stack] barrier after {stage_just_finished} (no-cuda)")
 
 
 # A real (playable) Wan2.1 MP4 will be much larger than the stub's
@@ -145,6 +199,12 @@ class VideoStackBackend(Backend):
             )
             return
 
+        # BUG-LOCAL-050: hard barrier before loading the next pipeline.
+        # flux_anchor's _release_pipe() already tore its pipe down; this
+        # is belt-and-suspenders to catch any residual caches accelerate
+        # or diffusers kept on-device.
+        _between_stage_barrier("flux_anchor")
+
         # Stage 2a: LTX-2.3 motion (preferred).  Consumes
         # <shot>/render.png and writes <shot>/motion.mp4.
         write_status(
@@ -166,6 +226,12 @@ class VideoStackBackend(Backend):
                 f"falling through to wan21_loop",
                 backend=self.name, stage="ltx_motion",
             )
+
+        # BUG-LOCAL-050: barrier between LTX and Wan2.1.  This is the
+        # exact point where tonight's 2026-04-19 thrash originated --
+        # Wan2.1 loaded on top of LTX's lingering hooks and combined
+        # working set blew past the 14.5 GB ceiling.
+        _between_stage_barrier("ltx_motion")
 
         # Decide whether Wan2.1 fallback is worth running.  If LTX
         # produced at least one real (non-stub) motion.mp4 for every
@@ -206,6 +272,10 @@ class VideoStackBackend(Backend):
                     f"{exc}; continuing with whatever LTX produced + stills",
                     backend=self.name, stage="wan21_loop",
                 )
+            # BUG-LOCAL-050: barrier after Wan2.1 before promote/exit so
+            # the sidecar exit itself doesn't get blamed for any CUDA
+            # context tail that would otherwise PCIe-thrash on shutdown.
+            _between_stage_barrier("wan21_loop")
         else:
             write_status(
                 out_dir, STATUS_RUNNING,

@@ -2,7 +2,7 @@
 visual.backends.flux_anchor  --  Day 2, Stage 1 anchors
 ===============================================================
 
-FLUX.1-dev FP8 (e4m3fn) text-to-image anchor renderer.  Runs inside the
+FLUX.1-dev torchao FP8 text-to-image anchor renderer.  Runs inside the
 subprocess spawned by ``VisualBridge._spawn_sidecar`` when the user
 picks ``backend="flux_anchor"`` in the node UI (or sets
 ``OTR_VISUAL_BACKEND=flux_anchor`` directly).
@@ -12,35 +12,44 @@ Dependencies (pinned in ``requirements.video.txt``):
     accelerate==1.13.0, sentencepiece, torchao==0.16.0
 
 Model weights (NOT checked in):
-    ``C:/Users/jeffr/Documents/ComfyUI/models/diffusers/FLUX.1-dev``
-    (or override via ``OTR_FLUX_MODEL`` env var -- absolute path only).
-    Pre-quantized FP8 weights expected at
     ``C:/Users/jeffr/Documents/ComfyUI/models/diffusers/FLUX.1-dev-torchao-fp8``
-    (or override via ``OTR_FLUX_FP8_MODEL``).
+    (or override via ``OTR_FLUX_MODEL`` env var -- absolute path only).
+    Pre-quantized via torchao ``float8_weight_only``, pickled ``.bin``
+    files.  This is the only supported FLUX checkpoint on a 16 GB
+    Blackwell card -- the stock BF16 path was removed 2026-04-19 because
+    it PCIe-thrashed even under ``enable_sequential_cpu_offload()``
+    when chained with a second pipeline (Wan2.1 / LTX).  See
+    BUG-LOCAL-049 (FP8 swap) and BUG-LOCAL-050 (chained-stage
+    pipe leak) for the full history.
 
-Two execution modes:
+Execution modes:
 
 1. **Real mode** (default when weights exist and CUDA is available):
-   loads ``FluxPipeline`` via one of two paths (BUG-LOCAL-049):
-     a. pre-quantized ``diffusers/FLUX.1-dev-torchao-fp8`` folder with
-        ``use_safetensors=False`` and NO ``torch_dtype`` override, then
-        ``enable_model_cpu_offload()`` (~10-11 GB peak).
-     b. stock BF16 ``FLUX.1-dev`` folder with ``torch_dtype=bf16`` and
-        ``enable_sequential_cpu_offload()`` (tighter VRAM ceiling, slower).
-   Renders 1024x1024 per shot.  Each shot's ``env_prompt`` is concatenated
-   with ``camera`` and a small cinematic suffix before being fed to the
+   builds a ``FluxPipeline`` from ``diffusers/FLUX.1-dev-torchao-fp8``
+   via the diffusers folder loader (``use_safetensors=False``) with NO
+   ``torch_dtype`` override (weights are already quantized), then
+   ``enable_model_cpu_offload()``.  Peak VRAM ~10-11 GB.  Renders
+   1024x1024 per shot.  Each shot's ``env_prompt`` is concatenated with
+   ``camera`` and a small cinematic suffix before being fed to the
    pipeline.
 
-2. **Stub mode** (``OTR_FLUX_STUB=1`` OR weights missing OR no CUDA):
-   emits a 1024x1024 solid PNG per shot tagged ``backend=flux_anchor``
-   with ``mode=stub``.  Lets the Day 2 dispatch path be smoke-tested
-   without dragging down 23 GB of weights in CI.
+2. **Stub mode** (``OTR_FLUX_STUB=1`` OR weights missing OR no CUDA OR
+   pipeline load fails): emits a 1024x1024 solid PNG per shot tagged
+   ``backend=flux_anchor`` with ``mode=stub``.  Lets the Day 2 dispatch
+   path be smoke-tested without dragging down 17 GB of weights in CI.
 
 Zero audio imports.  C7 audio byte-identical gate is unaffected.
+
+BUG-LOCAL-050: ``_release_pipe()`` is called at the end of
+``_render_real`` so the next chained backend (ltx_motion / wan21_loop)
+starts with a clean VRAM slate.  Without this, CPU-offload hooks
+from this pipeline stayed resident and collided with the next load,
+producing PCIe thrashing at 100% GPU / 1 W / ~200 MB free.
 """
 
 from __future__ import annotations
 
+import gc
 import os
 import struct
 import sys
@@ -62,23 +71,13 @@ from ._base import (
 
 
 # Model discovery.  User-overridable via env so conda env installs can
-# point elsewhere without a code change.
+# point elsewhere without a code change.  Only the torchao FP8 folder
+# is supported -- the BF16 path was removed 2026-04-19 (BUG-LOCAL-049
+# /050).  If the folder is absent, ``_should_stub`` returns True.
 _DEFAULT_MODEL_PATH = Path(
-    r"C:\Users\jeffr\Documents\ComfyUI\models\diffusers\FLUX.1-dev"
-)
-_MODEL_PATH = Path(os.environ.get("OTR_FLUX_MODEL", str(_DEFAULT_MODEL_PATH)))
-
-# BUG-LOCAL-049: pre-quantized FP8 checkpoint (torchao float8_weight_only),
-# Diffusers-folder layout.  Loading this bypasses the torch 2.10
-# Float8_e4m3fnStorage safetensors deserialization bug that forced the
-# BUG-LOCAL-047 ladder to fall through to BF16, which in turn produced
-# the thrashing documented in BUG-LOCAL-048.  Weights are already
-# quantized -- no ``torch_dtype`` override is passed.  Folder is optional:
-# if absent, we fall through to the BF16 ladder against ``_MODEL_PATH``.
-_DEFAULT_FP8_MODEL_PATH = Path(
     r"C:\Users\jeffr\Documents\ComfyUI\models\diffusers\FLUX.1-dev-torchao-fp8"
 )
-_FP8_MODEL_PATH = Path(os.environ.get("OTR_FLUX_FP8_MODEL", str(_DEFAULT_FP8_MODEL_PATH)))
+_MODEL_PATH = Path(os.environ.get("OTR_FLUX_MODEL", str(_DEFAULT_MODEL_PATH)))
 
 # Day 2 gate: 1024x1024 square.  Must not change without amending the
 # kill criteria table in ROADMAP.md.
@@ -145,13 +144,13 @@ def _derive_seed(shot: dict, shot_idx: int, base: int = 0x0F1401) -> int:
 def _should_stub() -> tuple[bool, str]:
     """Return (stub_requested, reason).  Reason is logged into meta.json.
 
-    Stubs only when BOTH model paths are missing -- the FP8-torchao folder
-    is preferred, but the BF16 folder is a valid fallback.
+    Stubs only when the torchao FP8 folder is missing (the only supported
+    FLUX path since BUG-LOCAL-049 / 050 stripped the BF16 ladder).
     """
     if os.environ.get("OTR_FLUX_STUB", "").strip() == "1":
         return (True, "OTR_FLUX_STUB=1")
-    if not _FP8_MODEL_PATH.exists() and not _MODEL_PATH.exists():
-        return (True, f"model_missing:fp8={_FP8_MODEL_PATH} bf16={_MODEL_PATH}")
+    if not _MODEL_PATH.exists():
+        return (True, f"model_missing:{_MODEL_PATH}")
     # CUDA check is lazy -- deferred to real-mode entry so the import
     # stays torch-free here.  ``run()`` handles the fallback.
     return (False, "")
@@ -160,7 +159,7 @@ def _should_stub() -> tuple[bool, str]:
 def _log_stderr(msg: str) -> None:
     """Loud log to sidecar stderr. No-op if stderr is unavailable.
 
-    Added for BUG-LOCAL-047 / BUG-046 family so dtype fallback decisions
+    Added for BUG-LOCAL-047 / BUG-046 family so load-failure decisions
     leave a paper trail in ``sidecar_stderr.log`` instead of being silent.
     """
     try:
@@ -170,31 +169,88 @@ def _log_stderr(msg: str) -> None:
         pass
 
 
+def _release_pipe(pipe) -> None:
+    """Tear down a loaded FluxPipeline and its CPU-offload hooks.
+
+    BUG-LOCAL-050: video_stack chains flux_anchor -> ltx_motion ->
+    wan21_loop inside a single sidecar process.  Without explicit
+    teardown, diffusers' accelerate-hooked modules stayed resident
+    after ``run()`` returned -- the next pipeline loaded on top and the
+    combined working set PCIe-thrashed at 100% GPU / ~1 W / ~200 MB
+    free VRAM.  Calling this at the end of the render loop forces the
+    hooks loose, drops the CUDA context for this pipe, and runs a
+    conservative ``empty_cache()`` so the next stage starts from a
+    clean baseline.
+
+    Safe to call with ``pipe=None`` (no-op).
+    """
+    if pipe is None:
+        return
+    try:
+        # ``remove_all_hooks`` is the accelerate-supported way to drop
+        # offload hooks.  Not every diffusers version exposes it on the
+        # pipeline object; fall through on AttributeError.
+        remove = getattr(pipe, "remove_all_hooks", None)
+        if callable(remove):
+            remove()
+    except Exception:
+        pass
+    try:
+        # Best-effort component teardown.  del-ing the pipeline is
+        # insufficient when accelerate has hooks on individual
+        # submodules; we move them to CPU first so the CUDA allocator
+        # drops their storage on the next empty_cache().
+        for attr in ("transformer", "text_encoder", "text_encoder_2", "vae",
+                     "scheduler", "tokenizer", "tokenizer_2"):
+            mod = getattr(pipe, attr, None)
+            if mod is None:
+                continue
+            to = getattr(mod, "to", None)
+            if callable(to):
+                try:
+                    mod.to("cpu")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        del pipe
+    except Exception:
+        pass
+    try:
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import torch  # type: ignore
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    _log_stderr("[flux_anchor] pipe released (del + gc + empty_cache)")
+
+
 def _try_load_pipeline():
     """Load FluxPipeline with CPU offload.  Returns (pipe, reason, load_mode).
 
-    Load order (BUG-LOCAL-049):
+    Single supported path (BUG-LOCAL-049 / 050):
 
-    1. **fp8_torchao** -- pre-quantized checkpoint at ``_FP8_MODEL_PATH``.
-       Weights are already torchao ``float8_weight_only`` on disk, so we
-       pass *no* ``torch_dtype`` override and ``use_safetensors=False``
-       (the repo ships pickled .bin files).  This bypasses the torch 2.10
-       ``Float8_e4m3fnStorage`` safetensors deserialization bug entirely.
-       Peak VRAM ~10-11 GB with ``enable_model_cpu_offload()``.
+    **fp8_torchao** -- pre-quantized checkpoint at ``_MODEL_PATH``.
+    Weights are already torchao ``float8_weight_only`` on disk, so we
+    pass *no* ``torch_dtype`` override and ``use_safetensors=False``
+    (the repo ships pickled .bin files).  This bypasses the torch 2.10
+    ``Float8_e4m3fnStorage`` safetensors deserialization bug entirely.
+    Peak VRAM ~10-11 GB with ``enable_model_cpu_offload()``.
 
-    2. **bf16_sequential** -- fallback to the stock BF16 diffusers folder
-       at ``_MODEL_PATH`` using ``enable_sequential_cpu_offload()``.  The
-       sequential offload variant pages per-module, trading throughput
-       for a much tighter peak-VRAM footprint -- this is the
-       belt-and-suspenders fix for BUG-LOCAL-048 thrashing when the FP8
-       folder is unavailable.
-
-    ``OTR_FLUX_DTYPE=bf16`` or ``=fp8`` env overrides are retained for
-    diagnostics; the default behavior prefers FP8 folder when present.
-
-    Returns ``(pipe, reason, load_mode)``.  ``pipe`` is None when every
-    attempt failed -- caller falls back to stub mode and records the
-    reason in meta.json.
+    Returns ``(pipe, reason, load_mode)``.  ``pipe`` is None when the
+    load failed -- caller falls back to stub mode and records the
+    reason in meta.json.  No dtype override env var is honoured:
+    the BF16 ladder was removed with BUG-LOCAL-050 because a second
+    pipeline (Wan2.1 / LTX) in the same sidecar thrashed the bus.
     """
     try:
         import torch  # type: ignore
@@ -205,70 +261,37 @@ def _try_load_pipeline():
     if not torch.cuda.is_available():
         return (None, "cuda_unavailable", "none")
 
-    override = os.environ.get("OTR_FLUX_DTYPE", "").strip().lower()
-    prefer_fp8 = override not in ("bf16",)
-    try_bf16 = override != "fp8" and override != "fp8_e4m3fn"
+    if not _MODEL_PATH.exists():
+        return (None, f"model_missing:{_MODEL_PATH}", "none")
 
-    attempts: list[tuple[str, Path, dict]] = []
-    if prefer_fp8 and _FP8_MODEL_PATH.exists():
-        # torchao folder: no torch_dtype, use_safetensors=False
-        attempts.append((
-            "fp8_torchao",
-            _FP8_MODEL_PATH,
-            {"use_safetensors": False, "local_files_only": True},
-        ))
-    if try_bf16 and _MODEL_PATH.exists():
-        attempts.append((
-            "bf16_sequential",
-            _MODEL_PATH,
-            {"torch_dtype": torch.bfloat16, "local_files_only": True},
-        ))
-
-    if not attempts:
-        return (None, "no_model_path_resolved", "none")
-
-    pipe = None
-    load_mode = "none"
-    last_reason = "no_attempt"
-    for label, path, kwargs in attempts:
-        _log_stderr(f"[flux_anchor] attempting FluxPipeline.from_pretrained load_mode={label} path={path}")
-        try:
-            pipe = FluxPipeline.from_pretrained(str(path), **kwargs)
-            load_mode = label
-            _log_stderr(f"[flux_anchor] loaded pipeline load_mode={label}")
-            break
-        except Exception as exc:  # noqa: BLE001
-            err_text = str(exc)[:200]
-            last_reason = f"load_error[{label}]:{type(exc).__name__}:{err_text}"
-            _log_stderr(
-                f"[flux_anchor] {label} load failed: "
-                f"{type(exc).__name__}: {err_text}"
-            )
-            pipe = None
-            continue
-
-    if pipe is None:
-        return (None, last_reason, "none")
-
-    # Offload strategy depends on load_mode:
-    #   fp8_torchao      -> model_cpu_offload (fast, ~10-11 GB peak)
-    #   bf16_sequential  -> sequential_cpu_offload (belt-and-suspenders
-    #       for BUG-LOCAL-048 thrashing; slower per-step but stays under
-    #       14.5 GB ceiling on 16 GB cards).
+    _log_stderr(
+        f"[flux_anchor] attempting FluxPipeline.from_pretrained "
+        f"load_mode=fp8_torchao path={_MODEL_PATH}"
+    )
     try:
-        if load_mode == "bf16_sequential":
-            pipe.enable_sequential_cpu_offload()
-        else:
-            pipe.enable_model_cpu_offload()
-    except Exception:
-        # Older diffusers may expose different names; fall through.
-        try:
-            pipe.enable_sequential_cpu_offload()
-        except Exception:
-            try:
-                pipe.enable_model_cpu_offload()
-            except Exception:
-                pass
+        pipe = FluxPipeline.from_pretrained(
+            str(_MODEL_PATH),
+            use_safetensors=False,
+            local_files_only=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        err_text = str(exc)[:200]
+        reason = f"load_error[fp8_torchao]:{type(exc).__name__}:{err_text}"
+        _log_stderr(
+            f"[flux_anchor] fp8_torchao load failed: "
+            f"{type(exc).__name__}: {err_text}"
+        )
+        return (None, reason, "none")
+
+    _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_torchao")
+
+    try:
+        pipe.enable_model_cpu_offload()
+    except Exception as exc:  # noqa: BLE001
+        _log_stderr(
+            f"[flux_anchor] enable_model_cpu_offload failed "
+            f"({type(exc).__name__}: {str(exc)[:120]}); continuing without offload"
+        )
     # Silence diffusers progress bars so the sidecar stdout log
     # doesn't blow up with tqdm carriage-returns.  Mirrors the
     # anchor_gen fix for BUG-LOCAL-043.
@@ -276,11 +299,11 @@ def _try_load_pipeline():
         pipe.set_progress_bar_config(disable=True)
     except Exception:
         pass
-    return (pipe, f"loaded[{load_mode}]", load_mode)
+    return (pipe, "loaded[fp8_torchao]", "fp8_torchao")
 
 
 class FluxAnchorBackend(Backend):
-    """Day 2 -- FLUX.1-dev FP8 text-to-image anchor renderer."""
+    """Day 2 -- FLUX.1-dev torchao FP8 text-to-image anchor renderer."""
 
     name = "flux_anchor"
 
@@ -308,12 +331,11 @@ class FluxAnchorBackend(Backend):
         # Real mode -- attempt pipeline load.  Any failure falls back to
         # stub rather than surfacing ERROR, so downstream nodes always
         # have PNGs to work with even when weights are mid-download.
-        # Path selection: prefer pre-quantized FP8 folder (BUG-LOCAL-049),
-        # fall back to BF16 folder via sequential CPU offload.
-        source_desc = str(_FP8_MODEL_PATH) if _FP8_MODEL_PATH.exists() else str(_MODEL_PATH)
+        # Single supported source: pre-quantized FP8 folder (BUG-LOCAL-049).
         write_status(
             out_dir, STATUS_RUNNING,
-            f"flux_anchor real mode: loading FLUX.1-dev from {source_desc}",
+            f"flux_anchor real mode: loading FLUX.1-dev (fp8_torchao) "
+            f"from {_MODEL_PATH}",
         )
         pipe, reason, load_mode = _try_load_pipeline()
         if pipe is None:
@@ -325,7 +347,14 @@ class FluxAnchorBackend(Backend):
             return
 
         _log_stderr(f"[flux_anchor] load_mode={load_mode}")
-        self._render_real(pipe, shots, out_dir, load_mode)
+        try:
+            self._render_real(pipe, shots, out_dir, load_mode)
+        finally:
+            # BUG-LOCAL-050: always release the pipe before returning so
+            # the next chained backend (ltx_motion / wan21_loop) starts
+            # with a clean VRAM slate.  Runs even on exception so a
+            # mid-render failure doesn't leave hooks resident.
+            _release_pipe(pipe)
 
     # ------------------------------------------------------------------
     # stub path -- CI-safe, no torch, no GPU
