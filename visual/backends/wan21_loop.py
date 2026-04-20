@@ -332,11 +332,22 @@ def _try_load_wan_pipeline():
                     torch_dtype=dtype,
                     local_files_only=True,
                 )
+                # BUG-LOCAL-052: on the 16 GB RTX 5080 Laptop,
+                # enable_model_cpu_offload() returns without error but the
+                # diffusion working set still exceeds VRAM once the
+                # transformer + VAE + scheduler state land on-device,
+                # causing the PCIe-thrash signature (100% core, 0% memory
+                # controller, D3D Shared spilled to system RAM).
+                # enable_sequential_cpu_offload() is slower per step but
+                # actually fits inside the 14.5 GB working ceiling, so it
+                # becomes the primary path on Blackwell-laptop hardware.
+                # The non-sequential call is retained as an explicit
+                # escape for future hardware with more VRAM headroom.
                 try:
-                    pipe.enable_model_cpu_offload()
+                    pipe.enable_sequential_cpu_offload()
                 except Exception:
                     try:
-                        pipe.enable_sequential_cpu_offload()
+                        pipe.enable_model_cpu_offload()
                     except Exception:
                         pass
                 try:
@@ -361,10 +372,16 @@ def _try_load_wan_pipeline():
             torch_dtype=__import__("torch").float16,
             local_files_only=True,
         )
+        # BUG-LOCAL-052: same offload priority flip as the I2V path --
+        # sequential first for the 16 GB working ceiling, model-offload
+        # retained only as an explicit escape.
         try:
-            pipe.enable_model_cpu_offload()
+            pipe.enable_sequential_cpu_offload()
         except Exception:
-            pass
+            try:
+                pipe.enable_model_cpu_offload()
+            except Exception:
+                pass
         return (pipe, "t2v", "float16",
                 f"wan_t2v_loaded_fallback:{_WAN_PATH}")
     except Exception as exc:  # noqa: BLE001

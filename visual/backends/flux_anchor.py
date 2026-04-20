@@ -169,6 +169,52 @@ def _log_stderr(msg: str) -> None:
         pass
 
 
+def _install_torchao_compat_shim() -> str:
+    """Install back-compat aliases for torchao symbols renamed in 0.16.
+
+    BUG-LOCAL-051: the pre-quantized FLUX.1-dev-torchao-fp8 checkpoint
+    was saved against an older torchao that exported the lowercase
+    helper ``torchao.quantization.float8_dynamic_activation_float8_weight``
+    (a function returning a ``Float8DynamicActivationFloat8WeightConfig``
+    instance).  torchao 0.16 removed the helper; only the Config class
+    remains.  Deserialising the checkpoint triggers
+
+        ImportError: cannot import name
+        'float8_dynamic_activation_float8_weight' from 'torchao.quantization'
+
+    Re-quantising would require re-downloading 53 GB of BF16 weights we
+    deleted in BUG-LOCAL-049, so instead we install the missing name as
+    an alias of the Config class.  The class's ``__call__`` (via
+    ``__init__``) accepts the same kwargs the old helper took, so any
+    call site that does ``float8_dynamic_activation_float8_weight(...)``
+    gets the equivalent Config instance back.
+
+    Idempotent: if torchao already exports the name (older torchao or a
+    future re-introduction), the shim is a no-op.  Returns a short tag
+    describing what was done so ``_try_load_pipeline`` can log it.
+    """
+    try:
+        import torchao.quantization as _q  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        return f"torchao_import_failed:{type(exc).__name__}"
+
+    if hasattr(_q, "float8_dynamic_activation_float8_weight"):
+        return "native"
+
+    cfg_cls = getattr(_q, "Float8DynamicActivationFloat8WeightConfig", None)
+    if cfg_cls is None:
+        return "shim_skipped:no_config_class"
+
+    # Pickle resolves callables by fully-qualified module.name.  Aliasing
+    # the class at the expected attribute name is enough for unpickling
+    # the checkpoint; call sites that did
+    # ``float8_dynamic_activation_float8_weight(activation_dtype=...,
+    # weight_dtype=...)`` now hit ``Config(activation_dtype=...,
+    # weight_dtype=...)`` instead, which is the replacement API anyway.
+    setattr(_q, "float8_dynamic_activation_float8_weight", cfg_cls)
+    return "shim_installed:aliased_to_Float8DynamicActivationFloat8WeightConfig"
+
+
 def _release_pipe(pipe) -> None:
     """Tear down a loaded FluxPipeline and its CPU-offload hooks.
 
@@ -263,6 +309,16 @@ def _try_load_pipeline():
 
     if not _MODEL_PATH.exists():
         return (None, f"model_missing:{_MODEL_PATH}", "none")
+
+    # BUG-LOCAL-051: install the torchao back-compat shim BEFORE the
+    # diffusers load, since from_pretrained unpickles weight metadata
+    # that references the helper removed in torchao 0.16.  Without this
+    # the load raises ImportError and the backend silently falls through
+    # to stub mode (fake colored PNGs), which is what produced the
+    # 2026-04-19 overnight run of stub stills chained into a real Wan2.1
+    # that then PCIe-thrashed on top of them.
+    shim_state = _install_torchao_compat_shim()
+    _log_stderr(f"[flux_anchor] torchao compat shim: {shim_state}")
 
     _log_stderr(
         f"[flux_anchor] attempting FluxPipeline.from_pretrained "
