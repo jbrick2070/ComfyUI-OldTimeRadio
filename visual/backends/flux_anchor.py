@@ -172,47 +172,82 @@ def _log_stderr(msg: str) -> None:
 def _install_torchao_compat_shim() -> str:
     """Install back-compat aliases for torchao symbols renamed in 0.16.
 
-    BUG-LOCAL-051: the pre-quantized FLUX.1-dev-torchao-fp8 checkpoint
-    was saved against an older torchao that exported the lowercase
-    helper ``torchao.quantization.float8_dynamic_activation_float8_weight``
-    (a function returning a ``Float8DynamicActivationFloat8WeightConfig``
-    instance).  torchao 0.16 removed the helper; only the Config class
-    remains.  Deserialising the checkpoint triggers
+    BUG-LOCAL-051 (initial) + BUG-LOCAL-053 (extension): the pre-quantized
+    FLUX.1-dev-torchao-fp8 checkpoint was saved against an older torchao
+    that exported lowercase helper *functions* such as
 
-        ImportError: cannot import name
-        'float8_dynamic_activation_float8_weight' from 'torchao.quantization'
+        torchao.quantization.float8_dynamic_activation_float8_weight
+        torchao.quantization.float8_static_activation_float8_weight
+        torchao.quantization.float8_weight_only
+
+    Each helper returned an instance of the corresponding ``*Config`` class.
+    torchao 0.16 removed the helpers; only the Config classes remain.
+    Deserialising the checkpoint triggers, in sequence, one ImportError per
+    missing helper -- the initial 051 shim only covered the *dynamic*
+    variant, so the loader still tripped on the *static* variant and fell
+    back to stub mode (sidecar_stderr.log 2026-04-20T21:31:27Z).
 
     Re-quantising would require re-downloading 53 GB of BF16 weights we
-    deleted in BUG-LOCAL-049, so instead we install the missing name as
-    an alias of the Config class.  The class's ``__call__`` (via
-    ``__init__``) accepts the same kwargs the old helper took, so any
-    call site that does ``float8_dynamic_activation_float8_weight(...)``
-    gets the equivalent Config instance back.
+    deleted in BUG-LOCAL-049, so instead we install every known legacy
+    helper name as an alias of its replacement Config class.  Pickle
+    resolves callables by fully-qualified ``module.name``, so binding the
+    class at the expected attribute name is enough for unpickling; call
+    sites that did ``helper(activation_dtype=..., weight_dtype=...)`` now
+    hit ``Config(activation_dtype=..., weight_dtype=...)`` instead, which
+    is the replacement API anyway.
 
-    Idempotent: if torchao already exports the name (older torchao or a
-    future re-introduction), the shim is a no-op.  Returns a short tag
-    describing what was done so ``_try_load_pipeline`` can log it.
+    Idempotent: if torchao already exports a name (older torchao or a
+    future re-introduction), that alias is skipped.  Returns a short tag
+    describing which aliases were installed so ``_try_load_pipeline`` can
+    log it.
     """
     try:
         import torchao.quantization as _q  # type: ignore
     except Exception as exc:  # noqa: BLE001
         return f"torchao_import_failed:{type(exc).__name__}"
 
-    if hasattr(_q, "float8_dynamic_activation_float8_weight"):
+    # Legacy-helper -> replacement-Config pairs.  Order is deterministic so
+    # the logged tag is stable across runs.
+    pairs = (
+        (
+            "float8_dynamic_activation_float8_weight",
+            "Float8DynamicActivationFloat8WeightConfig",
+        ),
+        (
+            "float8_static_activation_float8_weight",
+            "Float8StaticActivationFloat8WeightConfig",
+        ),
+        (
+            "float8_weight_only",
+            "Float8WeightOnlyConfig",
+        ),
+    )
+
+    installed: list[str] = []
+    skipped_native: list[str] = []
+    missing_cls: list[str] = []
+
+    for helper_name, cls_name in pairs:
+        if hasattr(_q, helper_name):
+            skipped_native.append(helper_name)
+            continue
+        cfg_cls = getattr(_q, cls_name, None)
+        if cfg_cls is None:
+            missing_cls.append(helper_name)
+            continue
+        setattr(_q, helper_name, cfg_cls)
+        installed.append(helper_name)
+
+    if not installed and not missing_cls and skipped_native:
         return "native"
-
-    cfg_cls = getattr(_q, "Float8DynamicActivationFloat8WeightConfig", None)
-    if cfg_cls is None:
-        return "shim_skipped:no_config_class"
-
-    # Pickle resolves callables by fully-qualified module.name.  Aliasing
-    # the class at the expected attribute name is enough for unpickling
-    # the checkpoint; call sites that did
-    # ``float8_dynamic_activation_float8_weight(activation_dtype=...,
-    # weight_dtype=...)`` now hit ``Config(activation_dtype=...,
-    # weight_dtype=...)`` instead, which is the replacement API anyway.
-    setattr(_q, "float8_dynamic_activation_float8_weight", cfg_cls)
-    return "shim_installed:aliased_to_Float8DynamicActivationFloat8WeightConfig"
+    parts: list[str] = []
+    if installed:
+        parts.append("installed=" + ",".join(installed))
+    if skipped_native:
+        parts.append("native=" + ",".join(skipped_native))
+    if missing_cls:
+        parts.append("missing_cls=" + ",".join(missing_cls))
+    return "shim:" + ";".join(parts) if parts else "shim:noop"
 
 
 def _release_pipe(pipe) -> None:
