@@ -172,82 +172,98 @@ def _log_stderr(msg: str) -> None:
 def _install_torchao_compat_shim() -> str:
     """Install back-compat aliases for torchao symbols renamed in 0.16.
 
-    BUG-LOCAL-051 (initial) + BUG-LOCAL-053 (extension): the pre-quantized
-    FLUX.1-dev-torchao-fp8 checkpoint was saved against an older torchao
-    that exported lowercase helper *functions* such as
+    BUG-LOCAL-051 (initial) -> 053 (hand-list expansion) -> 054
+    (auto-discovery): the pre-quantized FLUX.1-dev-torchao-fp8 checkpoint
+    was saved against an older torchao that exported every quantization
+    Config as a matching lowercase helper function -- e.g.
 
         torchao.quantization.float8_dynamic_activation_float8_weight
         torchao.quantization.float8_static_activation_float8_weight
         torchao.quantization.float8_weight_only
+        torchao.quantization.int4_weight_only
 
-    Each helper returned an instance of the corresponding ``*Config`` class.
     torchao 0.16 removed the helpers; only the Config classes remain.
-    Deserialising the checkpoint triggers, in sequence, one ImportError per
-    missing helper -- the initial 051 shim only covered the *dynamic*
-    variant, so the loader still tripped on the *static* variant and fell
-    back to stub mode (sidecar_stderr.log 2026-04-20T21:31:27Z).
+    Deserialising the checkpoint trips one ImportError per missing helper
+    and walks the config tree one symbol at a time, so fixing one reveals
+    the next.  053 tried to hand-maintain the list; the live 21:50:19 run
+    tripped on *int4_weight_only* (BUG-LOCAL-054), proving whack-a-mole.
 
-    Re-quantising would require re-downloading 53 GB of BF16 weights we
-    deleted in BUG-LOCAL-049, so instead we install every known legacy
-    helper name as an alias of its replacement Config class.  Pickle
-    resolves callables by fully-qualified ``module.name``, so binding the
-    class at the expected attribute name is enough for unpickling; call
-    sites that did ``helper(activation_dtype=..., weight_dtype=...)`` now
-    hit ``Config(activation_dtype=..., weight_dtype=...)`` instead, which
-    is the replacement API anyway.
+    054 switches to auto-discovery: walk every ``*Config`` class exported
+    by ``torchao.quantization``, derive the expected snake_case helper
+    name via CamelCase->snake_case with the trailing ``_config`` stripped,
+    and alias each one whose helper is missing.  Pickle resolves callables
+    by fully-qualified ``module.name``, so binding the class at the
+    expected attribute is enough for unpickling; call sites that did
+    ``helper(kwargs)`` now hit ``Config(kwargs)`` instead, which is the
+    replacement API anyway.
 
-    Idempotent: if torchao already exports a name (older torchao or a
-    future re-introduction), that alias is skipped.  Returns a short tag
-    describing which aliases were installed so ``_try_load_pipeline`` can
-    log it.
+    Idempotent: helpers that already exist (older torchao or a future
+    re-introduction) are skipped.  Spurious aliases for non-checkpoint
+    classes (e.g. ``Float8MMConfig``) are harmless because pickle only
+    resolves what the checkpoint actually references.  Returns a
+    structured tag tracking the canonical helper set so the stderr log
+    tells future archaeologists exactly what was repaired.
     """
+    import re
     try:
         import torchao.quantization as _q  # type: ignore
     except Exception as exc:  # noqa: BLE001
         return f"torchao_import_failed:{type(exc).__name__}"
 
-    # Legacy-helper -> replacement-Config pairs.  Order is deterministic so
-    # the logged tag is stable across runs.
-    pairs = (
-        (
-            "float8_dynamic_activation_float8_weight",
-            "Float8DynamicActivationFloat8WeightConfig",
-        ),
-        (
-            "float8_static_activation_float8_weight",
-            "Float8StaticActivationFloat8WeightConfig",
-        ),
-        (
-            "float8_weight_only",
-            "Float8WeightOnlyConfig",
-        ),
-    )
+    _CAMEL_SPLIT = re.compile(r"([a-z0-9])([A-Z])")
+
+    def _camel_to_snake(cls_name: str) -> str:
+        # Strip trailing "Config" first, then insert underscore before every
+        # uppercase letter that follows a lowercase letter or digit, then
+        # lowercase.  Acronym runs ("AO", "MM", "UIntX") collapse to their
+        # natural lowercase form -- good enough because pickle only asks
+        # for the exact names the checkpoint needs.
+        base = cls_name[: -len("Config")] if cls_name.endswith("Config") else cls_name
+        return _CAMEL_SPLIT.sub(r"\1_\2", base).lower()
 
     installed: list[str] = []
-    skipped_native: list[str] = []
-    missing_cls: list[str] = []
+    native: list[str] = []
 
-    for helper_name, cls_name in pairs:
-        if hasattr(_q, helper_name):
-            skipped_native.append(helper_name)
+    for attr in dir(_q):
+        if not attr.endswith("Config"):
             continue
-        cfg_cls = getattr(_q, cls_name, None)
-        if cfg_cls is None:
-            missing_cls.append(helper_name)
+        if not attr[:1].isupper():
             continue
-        setattr(_q, helper_name, cfg_cls)
-        installed.append(helper_name)
+        cls = getattr(_q, attr, None)
+        if not isinstance(cls, type):
+            continue
+        helper = _camel_to_snake(attr)
+        if not helper:
+            continue
+        if hasattr(_q, helper):
+            native.append(helper)
+            continue
+        setattr(_q, helper, cls)
+        installed.append(helper)
 
-    if not installed and not missing_cls and skipped_native:
-        return "native"
-    parts: list[str] = []
-    if installed:
-        parts.append("installed=" + ",".join(installed))
-    if skipped_native:
-        parts.append("native=" + ",".join(skipped_native))
-    if missing_cls:
-        parts.append("missing_cls=" + ",".join(missing_cls))
-    return "shim:" + ";".join(parts) if parts else "shim:noop"
+    # Structured return tag: summary counts + explicit status for the
+    # canonical helpers we know the FLUX checkpoint may reference.  The
+    # "canonical" list is documentation, not enforcement -- auto-discovery
+    # handles the rest.
+    canonical = (
+        "float8_dynamic_activation_float8_weight",
+        "float8_static_activation_float8_weight",
+        "float8_weight_only",
+        "int4_weight_only",
+        "int8_weight_only",
+    )
+    state: dict[str, str] = {}
+    for h in canonical:
+        if h in installed:
+            state[h] = "I"
+        elif h in native:
+            state[h] = "N"
+        else:
+            state[h] = "-"  # neither installed nor native; likely class missing
+
+    parts = [f"installed={len(installed)}", f"native={len(native)}"]
+    parts.extend(f"{h}={state[h]}" for h in canonical)
+    return "shim:" + ";".join(parts)
 
 
 def _release_pipe(pipe) -> None:
