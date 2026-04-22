@@ -6,8 +6,8 @@ ComfyUI or any OTR node module (no torch, no transformers). Safe to run
 in CI and as part of the standard regression suite.
 
 Scope:
-    workflows/*.json  (top-level only — subdirs like test_context/ hold
-    script fixtures, not ComfyUI workflows, and are excluded on purpose)
+    workflows/*.json  (top-level only — any subdirectories are excluded
+    on purpose, in case they ever hold non-workflow fixtures)
 
 Checks, per JSON file:
     1.  Valid UTF-8, no BOM, parses as a JSON object.

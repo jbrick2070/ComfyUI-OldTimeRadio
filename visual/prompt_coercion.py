@@ -50,7 +50,6 @@ Cleanup rules (v1, deterministic):
 
 Design doc:
     uploads/ltx_visual_test_guide.md (Phase 2)
-    workflows/test_context/silent_uprising.json (reference payload)
 """
 
 from __future__ import annotations

@@ -40,8 +40,8 @@ def _write_smoke_log(job_id: str, assets_path: str, status: str, detail: str) ->
     """Write a one-line poll summary to <ComfyUI output>/otr_smoke/<job_id>.log.
 
     Makes OTR_VisualPoll a proper OUTPUT_NODE (observable side-effect in the
-    output directory) so smoke-test workflows like flux_smoke.json have
-    something to inspect without chaining to OTR_VisualRenderer.
+    output directory) so isolation / smoke-test workflows have something to
+    inspect without chaining to OTR_VisualRenderer.
     """
     if folder_paths is None:
         return
@@ -153,11 +153,11 @@ class VisualPoll:
     FUNCTION = "execute"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("visual_assets_path", "status", "status_detail")
-    # OUTPUT_NODE=True lets VisualPoll terminate the graph on its own
-    # for dev / smoke-test workflows (e.g. flux_smoke.json). The full
-    # pipeline still chains Poll -> Renderer -> SaveImage; OUTPUT_NODE=True
-    # is additive -- ComfyUI treats the node as an execution anchor
-    # without preventing downstream consumers from reading its strings.
+    # OUTPUT_NODE=True lets VisualPoll terminate the graph on its own for
+    # dev / smoke-test / isolation workflows. The full pipeline still chains
+    # Poll -> Renderer -> SaveImage; OUTPUT_NODE=True is additive -- ComfyUI
+    # treats the node as an execution anchor without preventing downstream
+    # consumers from reading its strings.
     OUTPUT_NODE = True
 
     @classmethod
