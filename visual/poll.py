@@ -21,11 +21,44 @@ import os
 import time
 from pathlib import Path
 
+# folder_paths is ComfyUI's canonical API for the user-configurable output dir.
+# Required by Bug Bible BUG-01.02 for any node with OUTPUT_NODE = True so smoke
+# logs land in the expected location and don't hard-code a writable path.
+try:
+    import folder_paths  # type: ignore
+except ImportError:
+    folder_paths = None  # unit-test / CI context — output log just gets skipped
+
 log = logging.getLogger("OTR.visual.poll")
 
 _OTR_ROOT = Path(__file__).resolve().parent.parent.parent
 _IO_OUT = _OTR_ROOT / "io" / "visual_out"
 _IO_IN = _OTR_ROOT / "io" / "visual_in"
+
+
+def _write_smoke_log(job_id: str, assets_path: str, status: str, detail: str) -> None:
+    """Write a one-line poll summary to <ComfyUI output>/otr_smoke/<job_id>.log.
+
+    Makes OTR_VisualPoll a proper OUTPUT_NODE (observable side-effect in the
+    output directory) so smoke-test workflows like flux_smoke.json have
+    something to inspect without chaining to OTR_VisualRenderer.
+    """
+    if folder_paths is None:
+        return
+    try:
+        output_dir = Path(folder_paths.get_output_directory()) / "otr_smoke"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        log_path = output_dir / f"{job_id}.log"
+        log_path.write_text(
+            f"job_id={job_id}\n"
+            f"status={status}\n"
+            f"assets_path={assets_path}\n"
+            f"detail={detail}\n"
+            f"timestamp={time.strftime('%Y-%m-%dT%H:%M:%S')}\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.debug("[VisualPoll] smoke log write skipped: %s", exc)
 
 # Terminal statuses that stop polling
 _TERMINAL_STATUSES = {
@@ -120,7 +153,12 @@ class VisualPoll:
     FUNCTION = "execute"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("visual_assets_path", "status", "status_detail")
-    OUTPUT_NODE = False
+    # OUTPUT_NODE=True lets VisualPoll terminate the graph on its own
+    # for dev / smoke-test workflows (e.g. flux_smoke.json). The full
+    # pipeline still chains Poll -> Renderer -> SaveImage; OUTPUT_NODE=True
+    # is additive -- ComfyUI treats the node as an execution anchor
+    # without preventing downstream consumers from reading its strings.
+    OUTPUT_NODE = True
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -138,7 +176,9 @@ class VisualPoll:
         # Bridge returns "PARSE_ERROR_<job_id>" when script_json is malformed.
         # Short-circuit so we don't poll a job dir that will never exist.
         if visual_job_id.startswith("PARSE_ERROR_"):
-            return ("FALLBACK", "PARSE_ERROR", "Bridge received unparseable script_json")
+            result = ("FALLBACK", "PARSE_ERROR", "Bridge received unparseable script_json")
+            _write_smoke_log(visual_job_id, *result)
+            return result
 
         job_dir_out = _IO_OUT / visual_job_id
         job_dir_in = _IO_IN / visual_job_id
@@ -165,27 +205,33 @@ class VisualPoll:
                     pass
             
             if status_data and status_data.get("status") in _TERMINAL_STATUSES:
-                return (
+                result = (
                     str(job_dir_out),
                     status_data.get("status", "UNKNOWN"),
                     status_data.get("detail", ""),
                 )
-            
+                _write_smoke_log(visual_job_id, *result)
+                return result
+
             # Check grace period after PID death
             if grace_started is not None:
                 if time.time() - grace_started > _PID_DEATH_GRACE_SEC:
-                    return (
+                    result = (
                         str(job_dir_out),
                         "WORKER_DEAD",
                         f"Sidecar PID {sidecar_pid} died without terminal status",
                     )
-            
+                    _write_smoke_log(visual_job_id, *result)
+                    return result
+
             # Timeout fallback (10 minute hard limit)
             if poll_count > 1200:  # 0.5s * 1200 = 600s = 10 min
-                return (
+                result = (
                     str(job_dir_out),
                     "TIMEOUT",
                     "Poll timeout exceeded",
                 )
+                _write_smoke_log(visual_job_id, *result)
+                return result
             
             time.sleep(0.5)
