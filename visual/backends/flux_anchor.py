@@ -241,6 +241,32 @@ def _install_torchao_compat_shim() -> str:
         setattr(_q, helper, cls)
         installed.append(helper)
 
+    # BUG-LOCAL-055: acronym-to-word boundary edge cases that the
+    # generic ``([a-z0-9])([A-Z])`` split can't tokenize.  torchao
+    # exposes ``UIntXWeightOnlyConfig`` (the UIntX quantization format)
+    # but the regex has no way to know that ``UIntX`` is a single token
+    # -- it produces ``u_int_x_weight_only`` instead of the pickled
+    # legacy name ``uintx_weight_only``.  Hand-alias the known edge
+    # cases here.  Extend this table when new acronym-boundary symbols
+    # surface in future checkpoints; the auto-discovery loop above
+    # handles every case that CamelCase split can resolve unambiguously.
+    _EXPLICIT_ACRONYM_ALIASES: dict[str, str] = {
+        "uintx_weight_only": "UIntXWeightOnlyConfig",
+    }
+    explicit_state: dict[str, str] = {}
+    for helper_name, cls_name in _EXPLICIT_ACRONYM_ALIASES.items():
+        if hasattr(_q, helper_name):
+            explicit_state[helper_name] = "N"
+            native.append(helper_name)
+            continue
+        cls = getattr(_q, cls_name, None)
+        if not isinstance(cls, type):
+            explicit_state[helper_name] = "x"  # target class missing
+            continue
+        setattr(_q, helper_name, cls)
+        installed.append(helper_name)
+        explicit_state[helper_name] = "I"
+
     # Structured return tag: summary counts + explicit status for the
     # canonical helpers we know the FLUX checkpoint may reference.  The
     # "canonical" list is documentation, not enforcement -- auto-discovery
@@ -251,6 +277,7 @@ def _install_torchao_compat_shim() -> str:
         "float8_weight_only",
         "int4_weight_only",
         "int8_weight_only",
+        "uintx_weight_only",
     )
     state: dict[str, str] = {}
     for h in canonical:
