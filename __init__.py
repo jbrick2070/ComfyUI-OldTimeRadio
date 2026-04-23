@@ -118,6 +118,8 @@ _NODE_MODULES = {
     "OTR_VisualLLMSelector":    (".visual.llm_selector",      "VisualLLMSelector",    " Visual LLM Selector"),
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
     "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
+    "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
+    "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
