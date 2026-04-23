@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 1,
-  "last_node_id": 103,
-  "last_link_id": 1162,
+  "last_node_id": 104,
+  "last_link_id": 1163,
   "nodes": [
     {
       "id": 100,
@@ -374,13 +374,13 @@
         "1": 1060.3828125
       },
       "flags": {},
-      "order": 8,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 1111
+          "link": 1163
         }
       ],
       "properties": {},
@@ -544,6 +544,47 @@
       "mode": 0,
       "color": "#2B5A3A",
       "bgcolor": "#1D3A26"
+    },
+    {
+      "id": 104,
+      "type": "OTR_UnloadAll",
+      "pos": [
+        2860,
+        195
+      ],
+      "size": {
+        "0": 260,
+        "1": 110
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1111
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            1163
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_UnloadAll"
+      },
+      "widgets_values": [
+        true,
+        true,
+        true
+      ]
     }
   ],
   "links": [
@@ -559,7 +600,7 @@
       1111,
       8,
       0,
-      9,
+      104,
       0,
       "IMAGE"
     ],
@@ -658,6 +699,14 @@
       30,
       0,
       "STRING"
+    ],
+    [
+      1163,
+      104,
+      0,
+      9,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [
