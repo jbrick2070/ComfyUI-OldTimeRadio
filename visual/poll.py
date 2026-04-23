@@ -31,7 +31,7 @@ except ImportError:
 
 log = logging.getLogger("OTR.visual.poll")
 
-_OTR_ROOT = Path(__file__).resolve().parent.parent.parent
+_OTR_ROOT = Path(__file__).resolve().parent.parent  # repo root (ComfyUI-OldTimeRadio/)
 _IO_OUT = _OTR_ROOT / "io" / "visual_out"
 _IO_IN = _OTR_ROOT / "io" / "visual_in"
 

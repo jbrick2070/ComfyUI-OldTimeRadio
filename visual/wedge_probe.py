@@ -1,5 +1,5 @@
 """
-otr_v2.visual.wedge_probe  --  diagnostic event probe for live graph runs
+visual.wedge_probe  --  diagnostic event probe for live graph runs
 ===========================================================================
 
 Purpose
@@ -32,7 +32,7 @@ Public API
 ----------
 ::
 
-    from otr_v2.visual import wedge_probe
+    from visual import wedge_probe
 
     probe = wedge_probe.get_probe()          # singleton, enable via env
 
@@ -336,11 +336,11 @@ _singleton: WedgeProbe | None = None
 
 def _resolve_log_path() -> Path:
     """Resolve the NDJSON log path.  Env override wins; otherwise relative
-    to this module's package (``otr_v2/../logs/wedge_probe.ndjson``)."""
+    to this module's package (``<repo>/logs/wedge_probe.ndjson``)."""
     override = os.environ.get(_ENV_LOG_PATH, "").strip()
     if override:
         return Path(override).expanduser().resolve()
-    pkg_root = Path(__file__).resolve().parent.parent.parent  # repo root
+    pkg_root = Path(__file__).resolve().parent.parent  # repo root (ComfyUI-OldTimeRadio/)
     return pkg_root / _DEFAULT_LOG_RELPATH
 
 

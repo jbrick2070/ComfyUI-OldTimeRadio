@@ -38,7 +38,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Paths relative to OTR repo root
 # ---------------------------------------------------------------------------
-_OTR_ROOT = Path(__file__).resolve().parent.parent.parent
+_OTR_ROOT = Path(__file__).resolve().parent.parent  # repo root (ComfyUI-OldTimeRadio/)
 _IO_IN = _OTR_ROOT / "io" / "visual_in"
 _IO_OUT = _OTR_ROOT / "io" / "visual_out"
 

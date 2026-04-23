@@ -57,7 +57,7 @@ log = logging.getLogger("OTR.visual.vram_coordinator")
 # Repo-root-relative location for the lock file.  Lives in io/ alongside
 # the rest of the Visual exchange dirs so it gets picked up by the
 # Phase E disk-hygiene sweep automatically.
-_OTR_ROOT = Path(__file__).resolve().parent.parent.parent
+_OTR_ROOT = Path(__file__).resolve().parent.parent  # repo root (ComfyUI-OldTimeRadio/)
 _DEFAULT_LOCK_PATH = _OTR_ROOT / "io" / "vram.lock"
 
 # How long a held lock can stay before we consider it suspicious and

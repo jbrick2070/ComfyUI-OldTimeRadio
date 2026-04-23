@@ -29,7 +29,7 @@ import numpy as np
 
 log = logging.getLogger("OTR.visual.renderer")
 
-_OTR_ROOT = Path(__file__).resolve().parent.parent.parent
+_OTR_ROOT = Path(__file__).resolve().parent.parent  # repo root (ComfyUI-OldTimeRadio/)
 _IO_OUT = _OTR_ROOT / "io" / "visual_out"
 
 # Use folder_paths for ComfyUI-compatible output directory (BUG-01.02)
