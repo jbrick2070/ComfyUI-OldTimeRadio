@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 1,
   "last_node_id": 103,
-  "last_link_id": 1161,
+  "last_link_id": 1162,
   "nodes": [
     {
       "id": 100,
@@ -306,7 +306,7 @@
     },
     {
       "id": 30,
-      "type": "CheckpointLoaderSimple",
+      "type": "OTR_CheckpointLoaderGated",
       "pos": [
         1648,
         192
@@ -349,10 +349,17 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CheckpointLoaderSimple"
+        "Node name for S&R": "OTR_CheckpointLoaderGated"
       },
       "widgets_values": [
         "flux1-dev-fp8.safetensors"
+      ],
+      "inputs": [
+        {
+          "name": "trigger",
+          "type": "STRING",
+          "link": 1162
+        }
       ]
     },
     {
@@ -526,7 +533,8 @@
           "name": "prompt",
           "type": "STRING",
           "links": [
-            1160
+            1160,
+            1162
           ],
           "slot_index": 0
         }
@@ -640,6 +648,14 @@
       101,
       0,
       103,
+      0,
+      "STRING"
+    ],
+    [
+      1162,
+      103,
+      0,
+      30,
       0,
       "STRING"
     ]

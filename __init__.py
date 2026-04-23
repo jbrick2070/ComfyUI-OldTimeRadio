@@ -117,6 +117,7 @@ _NODE_MODULES = {
     "OTR_VisualPromptCoercion": (".visual.prompt_coercion",   "VisualPromptCoercion", " Visual Prompt Coercion"),
     "OTR_VisualLLMSelector":    (".visual.llm_selector",      "VisualLLMSelector",    " Visual LLM Selector"),
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
+    "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
