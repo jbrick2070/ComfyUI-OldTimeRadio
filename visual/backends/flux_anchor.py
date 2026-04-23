@@ -675,6 +675,23 @@ class FluxAnchorBackend(Backend):
                 backend=self.name, mode="real", load_mode=load_mode,
                 rendered=rendered, oom=oom, errored=errored,
             )
+        elif rendered == 0 and errored > 0:
+            # BUG-LOCAL-058: every shot raised an exception. Don't
+            # write STATUS_READY here -- this stage IS a failure. Use
+            # STATUS_RUNNING so video_stack's downstream stages still
+            # run (they stub-fallback gracefully when render.png is
+            # missing) and the FINAL STATUS is video_stack's own
+            # "missing=N" composite READY, not a misleading intermediate
+            # "flux_anchor READY: 0 rendered". Prevents VisualPoll from
+            # unblocking on flux_anchor's premature terminal marker.
+            write_status(
+                out_dir, STATUS_RUNNING,
+                f"flux_anchor failed all shots: 0/{len(shots)} rendered, "
+                f"{errored} errored (load_mode={load_mode}); "
+                f"chain continues with stub anchors",
+                backend=self.name, mode="real", load_mode=load_mode,
+                rendered=rendered, errored=errored,
+            )
         else:
             write_status(
                 out_dir, STATUS_READY,

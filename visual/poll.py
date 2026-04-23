@@ -89,6 +89,15 @@ _PID_CHECK_EVERY_N_CYCLES = 5
 # for any final STATUS.json write to land before declaring WORKER_DEAD.
 _PID_DEATH_GRACE_SEC = 3.0
 
+# BUG-LOCAL-058 rescue valve: if STATUS is terminal but the sidecar PID
+# hasn't exited yet, keep polling and waiting up to this many seconds
+# for it to exit. Prevents the poll-race where an early stage
+# (flux_anchor) writes STATUS_READY while ltx_motion + wan21_loop are
+# still loading pipelines. If the sidecar genuinely hangs after writing
+# READY, we still unblock eventually instead of ComfyUI-freezing for
+# 10 full minutes on the poll-timeout.
+_READY_PID_WAIT_MAX = 300.0  # 5 minutes
+
 
 def _read_sidecar_pid(job_id: str) -> int:
     """Read the sidecar's PID file written by bridge._spawn_sidecar.
@@ -187,15 +196,31 @@ class VisualPoll:
         sidecar_pid = _read_sidecar_pid(visual_job_id)
         poll_count = 0
         grace_started = None
-        
+        # BUG-LOCAL-058: When the sidecar runs a chained backend
+        # (video_stack -> flux_anchor, ltx_motion, wan21_loop), early
+        # stages write STATUS_READY on their own stage completion.
+        # Returning on the FIRST STATUS_READY lets VisualRenderer run
+        # against a half-finished output directory (missing render.png
+        # files because ltx_motion and wan21_loop haven't touched them
+        # yet) and fall back to procedural video even though the sidecar
+        # is still alive and doing real work. The correct unblock gate
+        # is (terminal status written) AND (sidecar PID has exited).
+        # READY-seen time is tracked here so we can still unblock if
+        # the sidecar wrote READY but hung without exiting (detached
+        # thread, orphaned CUDA context, etc.).
+        ready_seen_at = None
+
         while True:
             poll_count += 1
-            
+
             # Check PID liveness every N cycles
+            pid_is_dead = False
             if sidecar_pid > 0 and poll_count % _PID_CHECK_EVERY_N_CYCLES == 0:
                 if not _pid_alive(sidecar_pid):
-                    grace_started = time.time()
-            
+                    pid_is_dead = True
+                    if grace_started is None:
+                        grace_started = time.time()
+
             # Read STATUS if it exists
             status_data = None
             if status_file.exists():
@@ -203,26 +228,70 @@ class VisualPoll:
                     status_data = json.loads(status_file.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
                     pass
-            
+
             if status_data and status_data.get("status") in _TERMINAL_STATUSES:
-                result = (
-                    str(job_dir_out),
-                    status_data.get("status", "UNKNOWN"),
-                    status_data.get("detail", ""),
+                now = time.time()
+                if ready_seen_at is None:
+                    ready_seen_at = now
+                    log.info(
+                        "[VisualPoll] terminal STATUS=%s seen for job %s; "
+                        "waiting for sidecar PID %s to exit before unblocking",
+                        status_data.get("status"),
+                        visual_job_id,
+                        sidecar_pid if sidecar_pid > 0 else "?",
+                    )
+
+                # Unblock conditions (either is sufficient):
+                #   (a) sidecar PID has exited (clean completion, the
+                #       intended success path) -- ensures all chained
+                #       backends have released pipelines and the
+                #       subprocess has actually finished.
+                #   (b) we never tracked a PID (bridge didn't write
+                #       sidecar_pid.txt; probably stub / DRY_RUN mode)
+                #       -- PID gate degenerates to a no-op and we return
+                #       immediately like before.
+                #   (c) PID was tracked but STATUS has been terminal for
+                #       >= _READY_PID_WAIT_MAX seconds -- rescue valve
+                #       for a sidecar that wrote STATUS_READY then hung.
+                pid_exited = sidecar_pid <= 0 or pid_is_dead
+                waited_too_long = (
+                    sidecar_pid > 0
+                    and (now - ready_seen_at) >= _READY_PID_WAIT_MAX
                 )
-                _write_smoke_log(visual_job_id, *result)
-                return result
+                if pid_exited or waited_too_long:
+                    if waited_too_long and not pid_exited:
+                        log.warning(
+                            "[VisualPoll] unblocking for job %s despite PID "
+                            "%d still alive -- STATUS=%s held for >=%.0fs",
+                            visual_job_id, sidecar_pid,
+                            status_data.get("status"),
+                            _READY_PID_WAIT_MAX,
+                        )
+                    result = (
+                        str(job_dir_out),
+                        status_data.get("status", "UNKNOWN"),
+                        status_data.get("detail", ""),
+                    )
+                    _write_smoke_log(visual_job_id, *result)
+                    return result
 
             # Check grace period after PID death
             if grace_started is not None:
                 if time.time() - grace_started > _PID_DEATH_GRACE_SEC:
-                    result = (
-                        str(job_dir_out),
-                        "WORKER_DEAD",
-                        f"Sidecar PID {sidecar_pid} died without terminal status",
-                    )
-                    _write_smoke_log(visual_job_id, *result)
-                    return result
+                    # PID dead without a terminal STATUS is the
+                    # WORKER_DEAD case (crash, hard kill, spawn error).
+                    # But if we already saw a terminal STATUS and were
+                    # just waiting for PID exit, the loop above handles
+                    # it -- this block only fires when STATUS never went
+                    # terminal.
+                    if ready_seen_at is None:
+                        result = (
+                            str(job_dir_out),
+                            "WORKER_DEAD",
+                            f"Sidecar PID {sidecar_pid} died without terminal status",
+                        )
+                        _write_smoke_log(visual_job_id, *result)
+                        return result
 
             # Timeout fallback (10 minute hard limit)
             if poll_count > 1200:  # 0.5s * 1200 = 600s = 10 min
