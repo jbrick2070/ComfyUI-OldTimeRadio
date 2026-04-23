@@ -429,18 +429,15 @@ def _try_load_pipeline():
             f"load_mode=fp8_single_file path={_SINGLE_FILE_PATH}"
         )
         try:
-            # low_cpu_mem_usage=False: Diffusers' default (True) creates
-            # meta-tensor placeholders during load, which then fail
-            # .to("cuda") with "Cannot copy out of meta tensor". False
-            # forces direct CPU materialization -- the 24 GB bf16 peak
-            # fits in 64 GB system RAM, and pipe.to("cuda") then
-            # transfers real data normally. Cost: higher RAM spike at
-            # load. Benefit: actually works on PyTorch 2.10 + cu130.
+            # low_cpu_mem_usage=False was tried in commit 312d1cd and
+            # did NOT fix the meta-tensor issue -- Diffusers left params
+            # in meta state regardless. Reverted per Jeffrey's request;
+            # the 24 GB CPU RAM spike it caused wasn't buying us
+            # anything. Back to Diffusers' default behavior.
             pipe = FluxPipeline.from_single_file(
                 str(_SINGLE_FILE_PATH),
                 # No torch_dtype -- let diffusers pick from safetensors.
                 local_files_only=True,
-                low_cpu_mem_usage=False,
             )
             _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_single_file")
             # Materialize the full pipeline on GPU. FP8 transformer +
