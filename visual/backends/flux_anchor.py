@@ -665,9 +665,23 @@ class FluxAnchorBackend(Backend):
         # transition to stderr so the truth persists regardless of downstream
         # overwrites. Also write flux_anchor.meta.json alongside meta.json so
         # the per-stage history survives the chained-backend overwrite.
+        # Single-shot isolation mode. Set OTR_FLUX_SINGLE_SHOT=1 to render
+        # only the first shot and skip shots 2..N. Useful for isolating
+        # load-path bugs (meta-tensor, dtype, OOM) from any loop or
+        # chain-state issues. The batching loop code below is fully
+        # preserved -- this just adds an early break when the flag is set.
+        # Unset the env var to restore the full 9-shot run.
+        _single_shot_mode = os.environ.get("OTR_FLUX_SINGLE_SHOT", "").strip() == "1"
+        if _single_shot_mode:
+            _log_stderr(
+                "[flux_anchor] SINGLE-SHOT MODE active (OTR_FLUX_SINGLE_SHOT=1) "
+                "-- rendering shot 1 only, skipping shots 2..N"
+            )
+
         _log_stderr(
             f"[flux_anchor] _render_real entered: shots={len(shots)} "
             f"load_mode={load_mode} out_dir={out_dir}"
+            + (" [single-shot]" if _single_shot_mode else "")
         )
         with coord.acquire(owner="flux_anchor", job_id=out_dir.name, timeout=1800):
             _log_stderr("[flux_anchor] VRAMCoordinator acquired")
@@ -717,6 +731,12 @@ class FluxAnchorBackend(Backend):
                         torch.cuda.empty_cache()
                     except Exception:
                         pass
+                    if _single_shot_mode:
+                        _log_stderr(
+                            "[flux_anchor] single-shot mode: stopping "
+                            "after shot 1 (OOM'd)"
+                        )
+                        break
                     continue
                 except Exception as exc:  # noqa: BLE001
                     errored += 1
@@ -737,6 +757,12 @@ class FluxAnchorBackend(Backend):
                         f"ERRORED after {time.perf_counter() - t0:.1f}s: "
                         f"{type(exc).__name__}: {str(exc)[:200]}"
                     )
+                    if _single_shot_mode:
+                        _log_stderr(
+                            "[flux_anchor] single-shot mode: stopping "
+                            "after shot 1 (errored)"
+                        )
+                        break
                     continue
 
                 elapsed = time.perf_counter() - t0
@@ -763,9 +789,22 @@ class FluxAnchorBackend(Backend):
                 )
                 rendered += 1
 
+                # Single-shot mode: stop after the first iteration
+                # regardless of whether it succeeded, OOM'd, or raised.
+                # The OOM and exception branches `continue` above, which
+                # bypasses this check -- the same single-shot break
+                # logic therefore lives inside both except blocks too.
+                if _single_shot_mode:
+                    _log_stderr(
+                        "[flux_anchor] single-shot mode: stopping after "
+                        "shot 1 (remaining shots skipped)"
+                    )
+                    break
+
         _log_stderr(
             f"[flux_anchor] _render_real done: rendered={rendered} "
             f"oom={oom} errored={errored}"
+            + (" [single-shot]" if _single_shot_mode else "")
         )
 
         if oom > 0:
