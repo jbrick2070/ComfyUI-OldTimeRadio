@@ -557,7 +557,19 @@ class FluxAnchorBackend(Backend):
         oom = 0
         errored = 0
 
+        # BUG-LOCAL-057: previously this loop had zero stderr logging, so when
+        # pipe() raised per-shot exceptions the errors were written ONLY to
+        # meta.json -- which wan21_loop later overwrites with its own
+        # "still_missing" meta, erasing the forensic trail. Log each stage
+        # transition to stderr so the truth persists regardless of downstream
+        # overwrites. Also write flux_anchor.meta.json alongside meta.json so
+        # the per-stage history survives the chained-backend overwrite.
+        _log_stderr(
+            f"[flux_anchor] _render_real entered: shots={len(shots)} "
+            f"load_mode={load_mode} out_dir={out_dir}"
+        )
         with coord.acquire(owner="flux_anchor", job_id=out_dir.name, timeout=1800):
+            _log_stderr("[flux_anchor] VRAMCoordinator acquired")
             for i, shot in enumerate(shots):
                 shot_id = shot.get("shot_id", f"shot_{i:03d}")
                 shot_dir = out_dir / shot_id
@@ -566,6 +578,11 @@ class FluxAnchorBackend(Backend):
                 prompt = _build_prompt(shot)
                 seed = _derive_seed(shot, i)
                 generator = torch.Generator(device="cuda").manual_seed(seed)
+
+                _log_stderr(
+                    f"[flux_anchor] shot {i+1}/{len(shots)} {shot_id} "
+                    f"prompt_len={len(prompt)} seed={seed} start"
+                )
 
                 t0 = time.perf_counter()
                 try:
@@ -580,7 +597,7 @@ class FluxAnchorBackend(Backend):
                     img = out.images[0]
                 except torch.cuda.OutOfMemoryError:
                     oom += 1
-                    atomic_write_json(shot_dir / "meta.json", {
+                    oom_meta = {
                         "shot_id": shot_id,
                         "backend": self.name,
                         "mode": "real",
@@ -588,7 +605,13 @@ class FluxAnchorBackend(Backend):
                         "error": "CUDA_OOM",
                         "prompt": prompt,
                         "seed": seed,
-                    })
+                    }
+                    atomic_write_json(shot_dir / "meta.json", oom_meta)
+                    atomic_write_json(shot_dir / "flux_anchor.meta.json", oom_meta)
+                    _log_stderr(
+                        f"[flux_anchor] shot {i+1}/{len(shots)} {shot_id} "
+                        f"OOM after {time.perf_counter() - t0:.1f}s"
+                    )
                     try:
                         torch.cuda.empty_cache()
                     except Exception:
@@ -596,7 +619,7 @@ class FluxAnchorBackend(Backend):
                     continue
                 except Exception as exc:  # noqa: BLE001
                     errored += 1
-                    atomic_write_json(shot_dir / "meta.json", {
+                    err_meta = {
                         "shot_id": shot_id,
                         "backend": self.name,
                         "mode": "real",
@@ -605,12 +628,19 @@ class FluxAnchorBackend(Backend):
                         "traceback_tail": traceback.format_exc()[-800:],
                         "prompt": prompt,
                         "seed": seed,
-                    })
+                    }
+                    atomic_write_json(shot_dir / "meta.json", err_meta)
+                    atomic_write_json(shot_dir / "flux_anchor.meta.json", err_meta)
+                    _log_stderr(
+                        f"[flux_anchor] shot {i+1}/{len(shots)} {shot_id} "
+                        f"ERRORED after {time.perf_counter() - t0:.1f}s: "
+                        f"{type(exc).__name__}: {str(exc)[:200]}"
+                    )
                     continue
 
                 elapsed = time.perf_counter() - t0
                 img.save(shot_dir / "render.png", format="PNG")
-                atomic_write_json(shot_dir / "meta.json", {
+                ok_meta = {
                     "shot_id": shot_id,
                     "backend": self.name,
                     "mode": "real",
@@ -623,8 +653,19 @@ class FluxAnchorBackend(Backend):
                     "env_prompt": shot.get("env_prompt", ""),
                     "camera": shot.get("camera", ""),
                     "duration_sec": float(shot.get("duration_sec", 9)),
-                })
+                }
+                atomic_write_json(shot_dir / "meta.json", ok_meta)
+                atomic_write_json(shot_dir / "flux_anchor.meta.json", ok_meta)
+                _log_stderr(
+                    f"[flux_anchor] shot {i+1}/{len(shots)} {shot_id} "
+                    f"rendered in {elapsed:.1f}s"
+                )
                 rendered += 1
+
+        _log_stderr(
+            f"[flux_anchor] _render_real done: rendered={rendered} "
+            f"oom={oom} errored={errored}"
+        )
 
         if oom > 0:
             write_status(
