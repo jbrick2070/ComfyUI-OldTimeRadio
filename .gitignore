@@ -33,8 +33,8 @@ Thumbs.db
 *.flac
 !samples/*.wav
 # Phase 0 regression baseline fixtures are versioned
-!tests/v2/fixtures/baseline_v1.5.wav
-!tests/v2/fixtures/baseline_v1.5.sha256
+!tests/fixtures/baseline_v1.5.wav
+!tests/fixtures/baseline_v1.5.sha256
 
 # AI project rules (local only, not for public repo)
 CLAUDE.md
@@ -105,3 +105,11 @@ _*.txt
 GEMINI.md
 # Cowork outputs scratchpad
 outputs/
+
+# --- 2026-04-23 vendor hygiene ---
+# Failed clone fragments (OneDrive blocked sandbox cleanup); we don't
+# vendor external packs anyway (MIT reimplementation policy).  Belt +
+# suspenders: anything under nodes/vendor/ is non-versioned.
+nodes/vendor/
+# Reference clones staged in /tmp during license-audit sessions
+/tmp/otr_vendor_stage/

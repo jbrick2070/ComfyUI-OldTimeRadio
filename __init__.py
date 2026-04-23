@@ -120,6 +120,8 @@ _NODE_MODULES = {
     "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
     "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
+    # v2.0 MIT-original video-chain nodes (replace VideoHelperSuite-GPL deps)
+    "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

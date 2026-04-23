@@ -237,6 +237,44 @@ Reference: `uploads/OTR_v2-alpha_VIDEO_CONSISTENCY_BUILD_DECISION.md` (full v3 b
 > - 16 GB VRAM hard ceiling. LHM @ `http://localhost:8085/data.json` is always on.
 
 
+## Session handoff &mdash; 2026-04-23b (MIT video-consistency pivot)
+
+Branch: `v2.0-alpha-video-stack`. Do NOT touch `main`.
+
+### Decisions locked this session
+
+1. **OTR stays MIT licensed.** Considered and rejected a shift to GPL-3.0 (one-way door; preserves future optionality). Never vendor GPL-3 packs (`Kosinkadink/ComfyUI-VideoHelperSuite`, `Well-Made/ComfyUI-Wan-SVI2Pro-FLF`) into the OTR tree &mdash; reimplement under MIT or use native ComfyUI templates (Apache via core) instead.
+2. **Don't vendor community packs as `OTR_*` wrappers.** Past OTR custom video nodes have bottlenecked. Where a pack is MIT/Apache-compatible and the license permits, write OTR-native MIT code instead; prefer native ComfyUI core nodes for anything they can do. Community-pack vendoring only when (a) license is MIT/Apache, (b) no native equivalent, (c) OTR doesn't need pipeline-specific coordination.
+3. **Character consistency without faces.** Jeffrey rejected face-identity anchors (PuLID). Path forward is style/environment anchoring via IP-Adapter (per C6 &mdash; environments only, never characters) using XLabs FLUX IP-Adapter weights (Apache 2.0, MIT-compatible reimplementation path).
+4. **First-Last-Frame chained video** is the consistency mechanism for audio-length coverage. N+1 FLUX stills produce N video clips where each clip's last frame equals the next clip's first frame by construction &mdash; concat is seamless without crossfades.
+
+### Shipped this session
+
+- **`nodes/otr_video_concat.py`** (new, ~280 lines, MIT) &mdash; ffmpeg-based seamless clip concatenation. Pure subprocess wrapper (no Python pixel processing); `-c copy` fast path with auto-fallback to re-encode on codec mismatch; stub mode (`OTR_VIDEO_CONCAT_STUB=1` / ffmpeg-missing / `force_stub=True`); C7 audio passthrough via `-c:a copy -map 0:a?`. Replaces the need to vendor `VideoHelperSuite`.
+- **`tests/test_otr_video_concat.py`** (new, ~320 lines) &mdash; 24 unit tests covering path parsing, filelist writer, argv builder, stub mode, node surface area. Torch-free, ffmpeg-free.
+- **`__init__.py`** &mdash; OTR_VideoConcat registered. Loaded node count: 25 &rarr; 26.
+- **`.gitignore`** &mdash; `nodes/vendor/` and `/tmp/otr_vendor_stage/` blacklisted so failed clone fragments can never enter git (OneDrive held sandbox locks during the MIT-pivot cleanup).
+- **`docs/2026-04-23-MIT-video-consistency-plan.md`** (new) &mdash; full implementation spec for OTR_FluxIpAdapter (phase 2) and OTR_WanFlfVideo (phase 3). Architecture notes, kill criteria, test lists, path A vs B analysis for the FLF engine.
+- **Memory**: `feedback_otr_stays_mit.md` saved (never vendor GPL into MIT); `feedback_use_community_nodes_not_custom.md` saved (community over OTR wrappers).
+
+### Pending handoff (Jeffrey, on return)
+
+Full verification + commit script queued at `scripts/_claude_handoff_2026-04-23b.ps1`. Runs: OneDrive cleanup of `nodes/vendor/` fragments, AST parse of both new files, regression suites, test run on new tests, local commit. Jeffrey reviews + pushes.
+
+### Phase 2 &mdash; OTR_FluxIpAdapter (next session)
+
+See `docs/2026-04-23-MIT-video-consistency-plan.md` for the full spec. Estimate 2-3 sessions. Read `XLabs-AI/x-flux-comfyui` (Apache 2.0) staged at `/tmp/otr_vendor_stage/x-flux-comfyui/` during this session; MIT reimplementation via ComfyUI `ModelPatcher.set_model_attn2_patch()`; stub mode first; Blackwell fp8 kernel check before claiming done.
+
+### Phase 3 &mdash; OTR_WanFlfVideo (next-next session)
+
+Two candidate paths. Path A: native ComfyUI Wan 2.2 FLF2V template (Apache) wired in via a thin `OTR_WanFlfShotList` helper, ~60 lines. Path B: OTR-native Wan 2.2 I2V sidecar, adapted from existing `visual/backends/wan21_loop.py` with `last_image` conditioning added. 30-min Blackwell fp8 smoke test decides A vs B.
+
+### Environmental issues to watch
+
+- **BUG-LOCAL-058 (OneDrive sync race)** hit hard this session. Sandbox `rm` on fresh git clones failed with "Operation not permitted" on `.git/` internals; sandbox-mount view of `__init__.py` stayed stale for minutes after the Write tool updated the Windows file. Mitigation used: file tool Writes for deliverables, bash heredoc for any sandbox-verified writes, all verification deferred to Windows-side script. Consider moving the repo off OneDrive-synced `Documents\` to clear this class of bug permanently.
+
+---
+
 ## P1 — Audio pipeline (shipped, live-test cycle)
 
 All items code-complete and on `v2.0-alpha`; awaiting real-soak verification as episodes run.
