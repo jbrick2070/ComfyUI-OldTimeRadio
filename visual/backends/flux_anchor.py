@@ -423,14 +423,34 @@ def _try_load_pipeline():
                 local_files_only=True,
             )
             _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_single_file")
+            # from_single_file returns the pipeline with weights in
+            # "meta" state (placeholder tensors, no data). Model offload
+            # (fast path, bulk tensor move) fails because accelerate
+            # can't .to("cpu") a meta tensor. Sequential offload
+            # materializes each submodule on the fly inside the forward
+            # pass, which works correctly with meta-loaded checkpoints
+            # and also happens to fit the 16 GB VRAM ceiling. Same
+            # pattern wan21_loop uses per BUG-LOCAL-052.
             try:
-                pipe.enable_model_cpu_offload()
+                pipe.enable_sequential_cpu_offload()
+                _log_stderr(
+                    "[flux_anchor] enable_sequential_cpu_offload active "
+                    "(meta tensor materialized per-submodule during forward)"
+                )
             except Exception as off_exc:  # noqa: BLE001
                 _log_stderr(
-                    f"[flux_anchor] enable_model_cpu_offload failed "
+                    f"[flux_anchor] enable_sequential_cpu_offload failed "
                     f"({type(off_exc).__name__}: {str(off_exc)[:120]}); "
-                    f"continuing without offload"
+                    f"falling back to enable_model_cpu_offload"
                 )
+                try:
+                    pipe.enable_model_cpu_offload()
+                except Exception as off_exc2:  # noqa: BLE001
+                    _log_stderr(
+                        f"[flux_anchor] enable_model_cpu_offload also failed "
+                        f"({type(off_exc2).__name__}: "
+                        f"{str(off_exc2)[:120]}); continuing without offload"
+                    )
             try:
                 pipe.set_progress_bar_config(disable=True)
             except Exception:
