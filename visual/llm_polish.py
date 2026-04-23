@@ -308,6 +308,20 @@ def polish_environment_prompts(
 
     model, tokenizer, device = loaded
 
+    # Mirror flux_anchor's single-shot default: when OTR_FLUX_ALL_SHOTS
+    # is not set, polish only the FIRST environment token and pass the
+    # rest through untouched. Keeps the isolation-debug cycle fast --
+    # no point polishing 4 prompts when flux_anchor will only render
+    # shot 1 anyway.
+    _all_shots_mode = os.environ.get("OTR_FLUX_ALL_SHOTS", "").strip() == "1"
+    _single_shot_mode = not _all_shots_mode
+    if _single_shot_mode:
+        log.info(
+            "[llm_polish] SINGLE-SHOT MODE (default) -- polishing only "
+            "prompt #1; prompts 2..N pass through unchanged. Set "
+            "OTR_FLUX_ALL_SHOTS=1 to polish all environment tokens."
+        )
+
     polished: list[dict] = []
     for tok in tokens:
         if not isinstance(tok, dict) or tok.get("type") != "environment":
@@ -316,6 +330,12 @@ def polish_environment_prompts(
 
         original = tok.get("description", "")
         if not original:
+            polished.append(tok)
+            continue
+
+        # Single-shot: after the first polish, pass remaining env tokens
+        # through untouched.
+        if _single_shot_mode and stats["polish_attempted"] >= 1:
             polished.append(tok)
             continue
 
