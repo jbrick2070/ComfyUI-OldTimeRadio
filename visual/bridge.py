@@ -19,11 +19,117 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
 
 log = logging.getLogger("OTR.visual.bridge")
+
+
+# ---------------------------------------------------------------------------
+# Sidecar stderr tee -- mirrors the subprocess's per-job sidecar_stderr.log
+# to the parent ComfyUI console so users see flux_anchor / ltx_motion /
+# wan21_loop progress in real time instead of having to tail a hidden
+# file after the fact. Runs as a daemon thread so it dies with ComfyUI.
+# ---------------------------------------------------------------------------
+def _start_sidecar_stderr_tee(
+    proc: subprocess.Popen,
+    stderr_log_path: Path,
+    job_id: str,
+) -> threading.Thread:
+    """Spin up a daemon thread that tails the sidecar's stderr log file
+    and mirrors each new line to the parent process's stderr, prefixed
+    with ``[sidecar:<job_id>] ``.
+
+    The thread polls for new content every second. When the sidecar
+    process has exited AND three consecutive polls yield no new bytes,
+    the thread returns. All lines are decoded lenient-UTF-8 so tqdm
+    progress-bar escape sequences pass through unharmed.
+    """
+
+    def _worker() -> None:
+        t_start = time.time()
+        # Wait up to 5s for the log file to appear -- bridge opens it
+        # right before Popen, so normally it exists immediately.
+        while not stderr_log_path.exists() and (time.time() - t_start) < 5.0:
+            time.sleep(0.1)
+        if not stderr_log_path.exists():
+            log.debug(
+                "[VisualBridge] sidecar stderr tee: log never appeared at %s",
+                stderr_log_path,
+            )
+            return
+        try:
+            f = open(stderr_log_path, "rb")
+        except OSError as exc:
+            log.debug(
+                "[VisualBridge] sidecar stderr tee: open failed (%s)", exc
+            )
+            return
+        prefix = f"[sidecar:{job_id}] "
+        idle_polls = 0
+        pending = b""
+        try:
+            while True:
+                chunk = f.read(65536)
+                if chunk:
+                    idle_polls = 0
+                    buffer = pending + chunk
+                    # Split on LF -- CR is treated as an in-line char so
+                    # tqdm's carriage-return overwrite still renders.
+                    lines = buffer.split(b"\n")
+                    pending = lines.pop()  # partial last line held back
+                    for line_bytes in lines:
+                        try:
+                            line = line_bytes.decode("utf-8", errors="replace")
+                        except Exception:
+                            line = repr(line_bytes)[:500]
+                        # Strip any CR at end so terminal doesn't get double blanks.
+                        line = line.rstrip("\r")
+                        if not line:
+                            continue
+                        print(prefix + line, file=sys.stderr, flush=True)
+                else:
+                    # No new data. Check if sidecar has exited.
+                    exited = proc.poll() is not None
+                    if exited:
+                        idle_polls += 1
+                        if idle_polls >= 3:
+                            # Flush any trailing partial line.
+                            if pending:
+                                try:
+                                    print(
+                                        prefix
+                                        + pending.decode(
+                                            "utf-8", errors="replace"
+                                        ).rstrip("\r"),
+                                        file=sys.stderr,
+                                        flush=True,
+                                    )
+                                except Exception:
+                                    pass
+                            rc = proc.returncode
+                            print(
+                                f"{prefix}<sidecar exited rc={rc}>",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                            break
+                    time.sleep(1.0)
+        finally:
+            try:
+                f.close()
+            except Exception:
+                pass
+
+    t = threading.Thread(
+        target=_worker,
+        name=f"sidecar-stderr-tee-{job_id}",
+        daemon=True,
+    )
+    t.start()
+    return t
 
 # Phase A: atomic writes for the contract files so the worker (which
 # reads them at startup) never lands on a half-written JSON.
@@ -370,6 +476,38 @@ class VisualBridge:
                 "[VisualBridge] pre-spawn VRAM flush starting for %s (before=%.2f GB)",
                 job_id, before_gb,
             )
+            # Explicitly unload the prompt-polish LLM (Mistral-Nemo etc.)
+            # before force_vram_offload runs. force_vram_offload moves
+            # weights GPU->CPU but does NOT release the allocation; the
+            # model stays resident in RAM and leaks across runs. Calling
+            # llm_polish.unload() does del model + gc.collect + empty_cache
+            # so both VRAM and RAM are actually reclaimed between jobs.
+            try:
+                from visual import llm_polish  # type: ignore
+                llm_polish.unload()
+                log.info(
+                    "[VisualBridge] pre-spawn: llm_polish.unload() called "
+                    "(prompt-polish LLM released from RAM + VRAM)"
+                )
+            except ImportError:
+                try:
+                    import llm_polish  # type: ignore
+                    llm_polish.unload()
+                    log.info(
+                        "[VisualBridge] pre-spawn: llm_polish.unload() called "
+                        "(fallback import, LLM released)"
+                    )
+                except ImportError:
+                    log.debug(
+                        "[VisualBridge] pre-spawn: llm_polish module "
+                        "unavailable; skipping LLM unload"
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[VisualBridge] pre-spawn: llm_polish.unload() errored "
+                    "(%s); proceeding with force_vram_offload anyway",
+                    exc,
+                )
             force_vram_offload()
             after = vram_snapshot(f"pre_spawn_{job_id}_after")
             after_gb = after.get("current_gb", 0.0)
@@ -486,6 +624,12 @@ class VisualBridge:
                 proc.pid, job_id, backend,
             )
             atomic_write_text(job_dir / "sidecar_pid.txt", str(proc.pid))
+            # Start the stderr tee so every line written by flux_anchor /
+            # ltx_motion / wan21_loop inside the subprocess appears on the
+            # main ComfyUI console, prefixed with [sidecar:<job_id>].
+            # Without this the sidecar logs to a hidden file and the user
+            # sees a 2-3 minute silent gap in the console.
+            _start_sidecar_stderr_tee(proc, stderr_log, job_id)
             return "SPAWNED"
         except Exception as e:
             log.error("[VisualBridge] Sidecar spawn failed: %s", e)

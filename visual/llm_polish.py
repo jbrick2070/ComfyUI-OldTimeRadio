@@ -288,8 +288,23 @@ def polish_environment_prompts(
             continue
 
         stats["polish_attempted"] += 1
+        idx = stats["polish_attempted"]
+        # Log the INPUT prompt so the main ComfyUI console shows exactly
+        # what the LLM is being asked to rewrite.  Truncated to 200 chars
+        # for readability; full text always lives in the polished token's
+        # description_original field.
+        log.info(
+            "[llm_polish] #%d IN  (len=%d): %s",
+            idx, len(original), original[:200] + ("..." if len(original) > 200 else ""),
+        )
+        t0 = time.time()
         new_text = _generate_single(original, model, tokenizer, device)
+        elapsed = time.time() - t0
         if not new_text:
+            log.warning(
+                "[llm_polish] #%d OUT (failed in %.1fs, keeping original)",
+                idx, elapsed,
+            )
             # Leave original intact on failure.
             polished.append(tok)
             continue
@@ -298,6 +313,12 @@ def polish_environment_prompts(
         words = new_text.split()
         if len(words) > max_env_words:
             new_text = " ".join(words[:max_env_words])
+
+        log.info(
+            "[llm_polish] #%d OUT (len=%d, %.1fs): %s",
+            idx, len(new_text), elapsed,
+            new_text[:200] + ("..." if len(new_text) > 200 else ""),
+        )
 
         new_tok = dict(tok)
         new_tok["description"] = new_text
