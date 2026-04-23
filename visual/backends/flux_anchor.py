@@ -411,6 +411,18 @@ def _try_load_pipeline():
     # Tier 1: Comfy-Org single-file safetensors via from_single_file.
     # This is the same checkpoint that rendered ComfyUI-native in 44s
     # with peak 11350 MB VRAM on the RTX 5080 tonight.
+    #
+    # Key decisions (per external diagnostic on meta-tensor failure):
+    #   - Pass NO torch_dtype. Passing bfloat16 caused diffusers to
+    #     create meta placeholders that never materialized from the
+    #     FP8 safetensors, leading to the "Tensor on device meta is
+    #     not on the expected device cpu!" error at pipe() call time.
+    #     Letting diffusers use the safetensors' native dtype (FP8 for
+    #     transformer, bf16 for text encoders) materializes cleanly.
+    #   - Skip accelerate offload entirely and use pipe.to("cuda").
+    #     The checkpoint's FP8 transformer is ~11 GB; text encoders
+    #     + VAE bring peak to ~12-13 GB -- fits in 16 GB without the
+    #     offload hooks that were failing on meta tensors.
     if _SINGLE_FILE_PATH.exists():
         _log_stderr(
             f"[flux_anchor] attempting FluxPipeline.from_single_file "
@@ -419,37 +431,36 @@ def _try_load_pipeline():
         try:
             pipe = FluxPipeline.from_single_file(
                 str(_SINGLE_FILE_PATH),
-                torch_dtype=torch.bfloat16,
+                # No torch_dtype -- let diffusers pick from safetensors.
                 local_files_only=True,
             )
             _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_single_file")
-            # from_single_file returns the pipeline with weights in
-            # "meta" state (placeholder tensors, no data). Model offload
-            # (fast path, bulk tensor move) fails because accelerate
-            # can't .to("cpu") a meta tensor. Sequential offload
-            # materializes each submodule on the fly inside the forward
-            # pass, which works correctly with meta-loaded checkpoints
-            # and also happens to fit the 16 GB VRAM ceiling. Same
-            # pattern wan21_loop uses per BUG-LOCAL-052.
+            # Materialize the full pipeline on GPU. FP8 transformer +
+            # bf16 encoders fit ~12-13 GB on a 16 GB card, matching the
+            # ComfyUI-native baseline (peak 11350 MB).
             try:
-                pipe.enable_sequential_cpu_offload()
+                pipe.to("cuda")
                 _log_stderr(
-                    "[flux_anchor] enable_sequential_cpu_offload active "
-                    "(meta tensor materialized per-submodule during forward)"
+                    "[flux_anchor] pipeline materialized on cuda "
+                    "(no offload -- single_file FP8 fits 16 GB directly)"
                 )
-            except Exception as off_exc:  # noqa: BLE001
+            except Exception as place_exc:  # noqa: BLE001
+                # If .to("cuda") OOMs, fall back to sequential offload.
                 _log_stderr(
-                    f"[flux_anchor] enable_sequential_cpu_offload failed "
-                    f"({type(off_exc).__name__}: {str(off_exc)[:120]}); "
-                    f"falling back to enable_model_cpu_offload"
+                    f"[flux_anchor] pipe.to('cuda') failed "
+                    f"({type(place_exc).__name__}: {str(place_exc)[:120]}); "
+                    f"falling back to enable_sequential_cpu_offload"
                 )
                 try:
-                    pipe.enable_model_cpu_offload()
-                except Exception as off_exc2:  # noqa: BLE001
+                    pipe.enable_sequential_cpu_offload()
                     _log_stderr(
-                        f"[flux_anchor] enable_model_cpu_offload also failed "
-                        f"({type(off_exc2).__name__}: "
-                        f"{str(off_exc2)[:120]}); continuing without offload"
+                        "[flux_anchor] enable_sequential_cpu_offload active"
+                    )
+                except Exception as off_exc:  # noqa: BLE001
+                    _log_stderr(
+                        f"[flux_anchor] enable_sequential_cpu_offload also "
+                        f"failed ({type(off_exc).__name__}: "
+                        f"{str(off_exc)[:120]}); continuing without offload"
                     )
             try:
                 pipe.set_progress_bar_config(disable=True)
