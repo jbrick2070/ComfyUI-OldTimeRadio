@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 1,
-  "last_node_id": 104,
-  "last_link_id": 1163,
+  "last_node_id": 105,
+  "last_link_id": 1168,
   "nodes": [
     {
       "id": 100,
@@ -72,7 +72,8 @@
           "name": "cleaned_script_json",
           "type": "STRING",
           "links": [
-            1161
+            1161,
+            1164
           ]
         },
         {
@@ -123,165 +124,6 @@
       ]
     },
     {
-      "id": 33,
-      "type": "CLIPTextEncode",
-      "pos": [
-        1990,
-        400
-      ],
-      "size": {
-        "0": 422.84503173828125,
-        "1": 164.31304931640625
-      },
-      "flags": {
-        "collapsed": true
-      },
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 1156,
-          "slot_index": 0
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            1157
-          ],
-          "slot_index": 0
-        }
-      ],
-      "title": "CLIP Text Encode (Negative Prompt)",
-      "properties": {
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        ""
-      ],
-      "color": "#322",
-      "bgcolor": "#533"
-    },
-    {
-      "id": 27,
-      "type": "EmptySD3LatentImage",
-      "pos": [
-        2071,
-        455
-      ],
-      "size": {
-        "0": 315,
-        "1": 106
-      },
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "LATENT",
-          "type": "LATENT",
-          "links": [
-            1153
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "EmptySD3LatentImage"
-      },
-      "widgets_values": [
-        1024,
-        1024,
-        1
-      ],
-      "color": "#323",
-      "bgcolor": "#535"
-    },
-    {
-      "id": 35,
-      "type": "FluxGuidance",
-      "pos": [
-        2176,
-        96
-      ],
-      "size": {
-        "0": 211.60000610351562,
-        "1": 58
-      },
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "conditioning",
-          "type": "CONDITIONING",
-          "link": 1158
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            1159
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "FluxGuidance"
-      },
-      "widgets_values": [
-        3.5
-      ]
-    },
-    {
-      "id": 8,
-      "type": "VAEDecode",
-      "pos": [
-        2751,
-        195
-      ],
-      "size": {
-        "0": 210,
-        "1": 46
-      },
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "samples",
-          "type": "LATENT",
-          "link": 1154
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": 1148
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            1111
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VAEDecode"
-      }
-    },
-    {
       "id": 34,
       "type": "Note",
       "pos": [
@@ -323,7 +165,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            1149
+            1165
           ],
           "shape": 3,
           "slot_index": 0
@@ -332,8 +174,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            1147,
-            1156
+            1166
           ],
           "shape": 3,
           "slot_index": 1
@@ -342,7 +183,7 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            1148
+            1167
           ],
           "shape": 3,
           "slot_index": 2
@@ -389,115 +230,6 @@
       ]
     },
     {
-      "id": 6,
-      "type": "CLIPTextEncode",
-      "pos": [
-        1984,
-        192
-      ],
-      "size": {
-        "0": 422.84503173828125,
-        "1": 164.31304931640625
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 1147
-        },
-        {
-          "name": "text",
-          "type": "STRING",
-          "link": 1160,
-          "widget": {
-            "name": "text"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            1158
-          ],
-          "slot_index": 0
-        }
-      ],
-      "title": "CLIP Text Encode (Positive Prompt)",
-      "properties": {
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        ""
-      ],
-      "color": "#232",
-      "bgcolor": "#353"
-    },
-    {
-      "id": 31,
-      "type": "KSampler",
-      "pos": [
-        2416,
-        192
-      ],
-      "size": {
-        "0": 315,
-        "1": 262
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "MODEL",
-          "link": 1149
-        },
-        {
-          "name": "positive",
-          "type": "CONDITIONING",
-          "link": 1159
-        },
-        {
-          "name": "negative",
-          "type": "CONDITIONING",
-          "link": 1157
-        },
-        {
-          "name": "latent_image",
-          "type": "LATENT",
-          "link": 1153
-        }
-      ],
-      "outputs": [
-        {
-          "name": "LATENT",
-          "type": "LATENT",
-          "links": [
-            1154
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "KSampler"
-      },
-      "widgets_values": [
-        972054013131368,
-        "randomize",
-        20,
-        1,
-        "euler",
-        "simple",
-        1
-      ]
-    },
-    {
       "id": 103,
       "type": "OTR_VisualExtractFluxPrompt",
       "pos": [
@@ -533,7 +265,6 @@
           "name": "prompt",
           "type": "STRING",
           "links": [
-            1160,
             1162
           ],
           "slot_index": 0
@@ -563,7 +294,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 1111
+          "link": 1168
         }
       ],
       "outputs": [
@@ -585,6 +316,85 @@
         true,
         true
       ]
+    },
+    {
+      "id": 105,
+      "type": "OTR_BatchFluxRender",
+      "pos": [
+        2100,
+        195
+      ],
+      "size": {
+        "0": 420,
+        "1": 340
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "title": "Batch FLUX Render (4 shots)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1165
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1166
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 1167
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 1164,
+          "widget": {
+            "name": "script_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            1168
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchFluxRender"
+      },
+      "widgets_values": [
+        "",
+        4,
+        1,
+        20,
+        1.0,
+        "euler",
+        "simple",
+        1024,
+        1024,
+        3.5,
+        "cinematic 35mm film still, dimly lit starship bridge, red alert lighting, holographic console glow, tense crew silhouettes, volumetric haze, shallow depth of field",
+        "cinematic, 35mm film, anamorphic lens, volumetric lighting, heavy vignette, muted color grade, sharp focus",
+        false
+      ],
+      "color": "#5A2B5A",
+      "bgcolor": "#3A1D3A"
     }
   ],
   "links": [
@@ -594,94 +404,6 @@
       0,
       101,
       0,
-      "STRING"
-    ],
-    [
-      1111,
-      8,
-      0,
-      104,
-      0,
-      "IMAGE"
-    ],
-    [
-      1147,
-      30,
-      1,
-      6,
-      0,
-      "CLIP"
-    ],
-    [
-      1148,
-      30,
-      2,
-      8,
-      1,
-      "VAE"
-    ],
-    [
-      1149,
-      30,
-      0,
-      31,
-      0,
-      "MODEL"
-    ],
-    [
-      1153,
-      27,
-      0,
-      31,
-      3,
-      "LATENT"
-    ],
-    [
-      1154,
-      31,
-      0,
-      8,
-      0,
-      "LATENT"
-    ],
-    [
-      1156,
-      30,
-      1,
-      33,
-      0,
-      "CLIP"
-    ],
-    [
-      1157,
-      33,
-      0,
-      31,
-      2,
-      "CONDITIONING"
-    ],
-    [
-      1158,
-      6,
-      0,
-      35,
-      0,
-      "CONDITIONING"
-    ],
-    [
-      1159,
-      35,
-      0,
-      31,
-      1,
-      "CONDITIONING"
-    ],
-    [
-      1160,
-      103,
-      0,
-      6,
-      1,
       "STRING"
     ],
     [
@@ -705,6 +427,46 @@
       104,
       0,
       9,
+      0,
+      "IMAGE"
+    ],
+    [
+      1164,
+      101,
+      0,
+      105,
+      3,
+      "STRING"
+    ],
+    [
+      1165,
+      30,
+      0,
+      105,
+      0,
+      "MODEL"
+    ],
+    [
+      1166,
+      30,
+      1,
+      105,
+      1,
+      "CLIP"
+    ],
+    [
+      1167,
+      30,
+      2,
+      105,
+      2,
+      "VAE"
+    ],
+    [
+      1168,
+      105,
+      0,
+      104,
       0,
       "IMAGE"
     ]
