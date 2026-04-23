@@ -74,7 +74,7 @@ warnings.filterwarnings("ignore", category=UserWarning,   module=r"transformers\
 #    401 on first download.  Pull the token from the user registry now and
 #    export it into os.environ so every downstream loader picks it up.
 try:
-    from .otr_v2.visual._hf_token import ensure_hf_token
+    from .visual._hf_token import ensure_hf_token
     ensure_hf_token()
 except Exception as _hf_err:
     log.debug("[OldTimeRadio] HF_TOKEN bake-in skipped: %s", _hf_err)
@@ -91,31 +91,32 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
-    "OTR_Gemma4ScriptWriter": (".nodes.story_orchestrator", "LLMScriptWriter", "📻 LLM Story Writer"),
-    "OTR_Gemma4Director":     (".nodes.story_orchestrator", "LLMDirector",      "🎬 LLM Director"),
-    "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          "🎙️ Bark TTS (Suno)"),
-    "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         "💥 SFX Generator"),
-    "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       "🎞️ Scene Sequencer"),
-    "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     "📼 Episode Assembler"),
-    "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         "🔊 Spatial Audio Enhance"),
-    "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   "⚡ Batch Bark Generator"),
-    "OTR_BatchKokoroGenerator":(".nodes.batch_kokoro_generator", "BatchKokoroGenerator","⚡ Batch Kokoro (4GB)"),
-    "OTR_BatchAudioGenGenerator":(".nodes.batch_audiogen_generator", "BatchAudioGenGenerator","⚡ Batch AudioGen (Foley)"),
-    "OTR_BatchProceduralSFX": (".nodes.batch_procedural_sfx", "BatchProceduralSFX",   "⚡ Batch Procedural SFX (Obsidian)"),
-    "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", "📺 Signal Lost Video"),
-    "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      "📖 Project State Loader"),
-    "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         "🎙️ Kokoro Announcer"),
-    "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           "🎺 MusicGen Theme"),
-    "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            "🛡️ VRAM Guardian"),
-    # ── v2.0 Visual Generation Trio ─────────────────────────────────
+    "OTR_LLMScriptWriter":    (".nodes.story_orchestrator", "LLMScriptWriter", " LLM Story Writer"),
+    "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
+    "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
+    "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),
+    "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       " Scene Sequencer"),
+    "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
+    "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
+    "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   " Batch Bark Generator"),
+    "OTR_BatchKokoroGenerator":(".nodes.batch_kokoro_generator", "BatchKokoroGenerator"," Batch Kokoro (4GB)"),
+    "OTR_BatchAudioGenGenerator":(".nodes.batch_audiogen_generator", "BatchAudioGenGenerator"," Batch AudioGen (Foley)"),
+    "OTR_BatchProceduralSFX": (".nodes.batch_procedural_sfx", "BatchProceduralSFX",   " Batch Procedural SFX (Obsidian)"),
+    "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
+    "OTR_ProjectStateLoader": (".nodes.project_state",         "ProjectStateLoader",      " Project State Loader"),
+    "OTR_KokoroAnnouncer":    (".nodes.kokoro_announcer",      "KokoroAnnouncer",         " Kokoro Announcer"),
+    "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           " MusicGen Theme"),
+    "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            " VRAM Guardian"),
+    # v2.0 Visual Generation Trio
     # Sidecar-isolated visual (stills/portraits/motion) generation from
     # OTR Director output. Audio path NEVER touched. Falls back to
     # OTR_SignalLostVideo on failure.  See docs/OTR_PIPELINE_EXPLAINER.md
-    "OTR_VisualBridge":         (".otr_v2.visual.bridge",            "VisualBridge",         "🌐 Visual Bridge"),
-    "OTR_VisualPoll":           (".otr_v2.visual.poll",              "VisualPoll",           "⏳ Visual Poll"),
-    "OTR_VisualRenderer":       (".otr_v2.visual.renderer",          "VisualRenderer",       "🎬 Visual Renderer"),
-    "OTR_VisualPromptCoercion": (".otr_v2.visual.prompt_coercion",   "VisualPromptCoercion", "🧹 Visual Prompt Coercion"),
-    "OTR_VisualLLMSelector":    (".otr_v2.visual.llm_selector",      "VisualLLMSelector",    "🔀 Visual LLM Selector"),
+    "OTR_VisualBridge":         (".visual.bridge",            "VisualBridge",         " Visual Bridge"),
+    "OTR_VisualPoll":           (".visual.poll",              "VisualPoll",           " Visual Poll"),
+    "OTR_VisualRenderer":       (".visual.renderer",          "VisualRenderer",       " Visual Renderer"),
+    "OTR_VisualPromptCoercion": (".visual.prompt_coercion",   "VisualPromptCoercion", " Visual Prompt Coercion"),
+    "OTR_VisualLLMSelector":    (".visual.llm_selector",      "VisualLLMSelector",    " Visual LLM Selector"),
+    "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
@@ -137,13 +138,33 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
 
     except Exception as e:
         log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
-        print(f"[OldTimeRadio] ⚠️  Skipped '{node_name}': {e}")
+        print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
 
-_loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
+# ─────────────────────────────────────────────────────────────────────────────
+# RENAME ALIASES — keep older workflow JSONs loading after we generalize node IDs
+#
+# The story-writing + directing nodes were originally named after the Gemma
+# model family ("OTR_Gemma4ScriptWriter" / "OTR_Gemma4Director"), but Gemma is
+# only ONE of several LLM choices the dropdown exposes (Mistral-Nemo, Qwen2.5,
+# etc.). The canonical IDs are now OTR_LLMScriptWriter / OTR_LLMDirector.
+#
+# Old workflow JSONs that reference the Gemma4 IDs continue to load via these
+# aliases. Safe to remove these entries once all production workflows have been
+# re-saved against the new IDs.
+# ─────────────────────────────────────────────────────────────────────────────
+_RENAME_ALIASES = {
+    "OTR_Gemma4ScriptWriter": "OTR_LLMScriptWriter",
+    "OTR_Gemma4Director":     "OTR_LLMDirector",
+}
+for _old_id, _new_id in _RENAME_ALIASES.items():
+    if _new_id in NODE_CLASS_MAPPINGS and _old_id not in NODE_CLASS_MAPPINGS:
+        NODE_CLASS_MAPPINGS[_old_id] = NODE_CLASS_MAPPINGS[_new_id]
+
+_loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_") and k not in _RENAME_ALIASES)
 _total = len(_NODE_MODULES)
 if _loaded == _total:
     print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
 else:
-    print(f"[OldTimeRadio] ⚠️  Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
+    print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
