@@ -392,7 +392,8 @@
         3.5,
         "cinematic 35mm film still, dimly lit starship bridge, red alert lighting, holographic console glow, tense crew silhouettes, volumetric haze, shallow depth of field",
         "cinematic, 35mm film, anamorphic lens, volumetric lighting, heavy vignette, muted color grade, sharp focus",
-        false
+        false,
+        true
       ],
       "color": "#5A2B5A",
       "bgcolor": "#3A1D3A"
