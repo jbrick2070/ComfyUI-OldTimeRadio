@@ -662,17 +662,24 @@ class FluxAnchorBackend(Backend):
         # transition to stderr so the truth persists regardless of downstream
         # overwrites. Also write flux_anchor.meta.json alongside meta.json so
         # the per-stage history survives the chained-backend overwrite.
-        # Single-shot isolation mode. Set OTR_FLUX_SINGLE_SHOT=1 to render
-        # only the first shot and skip shots 2..N. Useful for isolating
-        # load-path bugs (meta-tensor, dtype, OOM) from any loop or
-        # chain-state issues. The batching loop code below is fully
-        # preserved -- this just adds an early break when the flag is set.
-        # Unset the env var to restore the full 9-shot run.
-        _single_shot_mode = os.environ.get("OTR_FLUX_SINGLE_SHOT", "").strip() == "1"
+        # BUG-LOCAL-057 debugging: single-shot is the DEFAULT while the
+        # meta-tensor issue is being isolated. To restore the full
+        # batched run, set env var OTR_FLUX_ALL_SHOTS=1 in the sidecar
+        # environment. Flipped from opt-in to opt-out so Jeffrey doesn't
+        # need to deal with Windows setx + process-tree refresh just to
+        # test a single prompt.
+        _all_shots_mode = os.environ.get("OTR_FLUX_ALL_SHOTS", "").strip() == "1"
+        _single_shot_mode = not _all_shots_mode
         if _single_shot_mode:
             _log_stderr(
-                "[flux_anchor] SINGLE-SHOT MODE active (OTR_FLUX_SINGLE_SHOT=1) "
-                "-- rendering shot 1 only, skipping shots 2..N"
+                "[flux_anchor] SINGLE-SHOT MODE (default) -- rendering "
+                "shot 1 only, skipping shots 2..N. Set OTR_FLUX_ALL_SHOTS=1 "
+                "to restore batched 9-shot run."
+            )
+        else:
+            _log_stderr(
+                "[flux_anchor] ALL-SHOTS MODE (OTR_FLUX_ALL_SHOTS=1) -- "
+                "rendering the full shotlist"
             )
 
         _log_stderr(
