@@ -117,6 +117,43 @@ def _load_model(model_id: str) -> tuple[Any, Any, str] | None:
         log.warning("[llm_polish] tokenizer load failed for %s: %s", model_id, exc)
         return None
 
+    # v1.7 parity: 4-bit NF4 quantization via bitsandbytes.  Mirrors
+    # story_orchestrator's fast-path so Mistral-Nemo 12B drops from
+    # ~24 GB bf16 to ~6 GB NF4 and generation speeds up 2-3x from memory
+    # bandwidth savings.  Visual polish produces short outputs (<= 80
+    # words) so NF4 quality loss is irrelevant in practice.
+    quant_config = None
+    if device == "cuda":
+        try:
+            from transformers import BitsAndBytesConfig  # type: ignore
+            quant_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            )
+            log.info("[llm_polish] 4-bit NF4 enabled (bitsandbytes)")
+        except ImportError:
+            log.warning(
+                "[llm_polish] bitsandbytes not installed -- Mistral-Nemo 12B "
+                "will load at bfloat16 (~24 GB). Install with: pip install bitsandbytes"
+            )
+
+    load_kwargs: dict[str, Any] = dict(
+        trust_remote_code=False,
+        attn_implementation="sdpa",
+        low_cpu_mem_usage=True,
+        cache_dir=cache_dir,
+        token=token,
+    )
+    if quant_config is not None:
+        load_kwargs["quantization_config"] = quant_config
+        # Pin on GPU 0 -- matches story_orchestrator's flagship override
+        # so bitsandbytes doesn't sneakily dispatch layers to CPU.
+        load_kwargs["device_map"] = {"": 0}
+    else:
+        load_kwargs["torch_dtype"] = load_dtype
+
     # Now the model weights.  Visual polish generates short outputs
     # (<= 80 words), so no KV-cache hardening is required here.
     try:
@@ -124,12 +161,7 @@ def _load_model(model_id: str) -> tuple[Any, Any, str] | None:
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 local_files_only=True,
-                trust_remote_code=False,
-                torch_dtype=load_dtype,
-                attn_implementation="sdpa",
-                low_cpu_mem_usage=True,
-                cache_dir=cache_dir,
-                token=token,
+                **load_kwargs,
             )
         except Exception as cache_err:
             log.info(
@@ -139,19 +171,19 @@ def _load_model(model_id: str) -> tuple[Any, Any, str] | None:
             )
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                trust_remote_code=False,
-                torch_dtype=load_dtype,
-                attn_implementation="sdpa",
-                low_cpu_mem_usage=True,
-                cache_dir=cache_dir,
-                token=token,
+                **load_kwargs,
             )
     except Exception as exc:
         log.warning("[llm_polish] model load failed for %s: %s", model_id, exc)
         return None
 
     try:
-        model = model.to(device)
+        # When quant_config is set, bitsandbytes + device_map already placed
+        # the model on GPU.  Calling .to("cuda") on a 4-bit quantized model
+        # raises; skip it.  For the bfloat16 fallback path, .to(device) is
+        # the legacy behavior.
+        if quant_config is None:
+            model = model.to(device)
         model = model.eval()
     except Exception as exc:
         log.warning("[llm_polish] model.to(%s) failed: %s", device, exc)
@@ -208,7 +240,7 @@ def _generate_single(
     model: Any,
     tokenizer: Any,
     device: str,
-    max_new_tokens: int = 160,
+    max_new_tokens: int = 100,
 ) -> str | None:
     """Run one polish call.  Returns the cleaned string or None on error."""
     try:
