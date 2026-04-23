@@ -406,6 +406,23 @@ def _try_load_pipeline():
     if not torch.cuda.is_available():
         return (None, "cuda_unavailable", "none")
 
+    # Explicit cuda:0 binding. Confirms we're pinning to the correct
+    # GPU and surfaces the device name in the sidecar log so there's
+    # no ambiguity about where the pipeline lands.
+    try:
+        torch.cuda.set_device(0)
+        _dev_name = torch.cuda.get_device_name(0)
+        _free, _total = torch.cuda.mem_get_info(0)
+        _log_stderr(
+            f"[flux_anchor] cuda:0 bound -- device={_dev_name} "
+            f"free={_free/(1024**3):.2f}GB total={_total/(1024**3):.2f}GB"
+        )
+    except Exception as exc:  # noqa: BLE001
+        _log_stderr(
+            f"[flux_anchor] torch.cuda.set_device(0) failed: "
+            f"{type(exc).__name__}: {str(exc)[:120]}"
+        )
+
     failures: list[str] = []
 
     # Tier 1: Comfy-Org single-file safetensors via from_single_file.
@@ -429,15 +446,18 @@ def _try_load_pipeline():
             f"load_mode=fp8_single_file path={_SINGLE_FILE_PATH}"
         )
         try:
-            # low_cpu_mem_usage=False was tried in commit 312d1cd and
-            # did NOT fix the meta-tensor issue -- Diffusers left params
-            # in meta state regardless. Reverted per Jeffrey's request;
-            # the 24 GB CPU RAM spike it caused wasn't buying us
-            # anything. Back to Diffusers' default behavior.
+            # device_map="cuda": forces Diffusers to materialize each
+            # component DIRECTLY on cuda:0 instead of the CPU hop the
+            # default load path was doing (the 100% CPU/RAM spike
+            # Jeffrey observed during the 01:41 pipeline-load phase).
+            # If Diffusers honors this, we skip the meta-tensor
+            # detour entirely: weights stream from safetensors straight
+            # to GPU, no CPU materialization, no .to("cuda") needed.
             pipe = FluxPipeline.from_single_file(
                 str(_SINGLE_FILE_PATH),
                 # No torch_dtype -- let diffusers pick from safetensors.
                 local_files_only=True,
+                device_map="cuda",
             )
             _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_single_file")
             # Materialize the full pipeline on GPU. FP8 transformer +
