@@ -79,6 +79,21 @@ _DEFAULT_MODEL_PATH = Path(
 )
 _MODEL_PATH = Path(os.environ.get("OTR_FLUX_MODEL", str(_DEFAULT_MODEL_PATH)))
 
+# BUG-LOCAL-057 Step 2: Comfy-Org single-file safetensors (primary path).
+# This is the same file ComfyUI-native loaded in 44.62s with peak 11350 MB
+# VRAM tonight -- raw FP8 tensors, no torchao pickle, no v1/v2 config
+# version drift. Preferred over the torchao folder because the pre-quantized
+# diffusers/FLUX.1-dev-torchao-fp8 checkpoint was saved with
+# Float8DynamicActivationFloat8WeightConfig v1 layout while torchao 0.16
+# expects v2 -- triggers "size of tensor a (4096) must match tensor b (10240)"
+# at pipe() call time. Single-file safetensors has neither layout concept.
+_DEFAULT_SINGLE_FILE_PATH = Path(
+    r"C:\Users\jeffr\Documents\ComfyUI\models\checkpoints\flux1-dev-fp8.safetensors"
+)
+_SINGLE_FILE_PATH = Path(
+    os.environ.get("OTR_FLUX_SINGLE_FILE", str(_DEFAULT_SINGLE_FILE_PATH))
+)
+
 # Day 2 gate: 1024x1024 square.  Must not change without amending the
 # kill criteria table in ROADMAP.md.
 _RENDER_WIDTH = 1024
@@ -361,20 +376,26 @@ def _release_pipe(pipe) -> None:
 def _try_load_pipeline():
     """Load FluxPipeline with CPU offload.  Returns (pipe, reason, load_mode).
 
-    Single supported path (BUG-LOCAL-049 / 050):
+    Two-tier load (BUG-LOCAL-057 Step 2):
 
-    **fp8_torchao** -- pre-quantized checkpoint at ``_MODEL_PATH``.
-    Weights are already torchao ``float8_weight_only`` on disk, so we
-    pass *no* ``torch_dtype`` override and ``use_safetensors=False``
-    (the repo ships pickled .bin files).  This bypasses the torch 2.10
-    ``Float8_e4m3fnStorage`` safetensors deserialization bug entirely.
-    Peak VRAM ~10-11 GB with ``enable_model_cpu_offload()``.
+    **fp8_single_file** (PREFERRED) -- Comfy-Org's
+    ``flux1-dev-fp8.safetensors`` (single 17.25 GB file, raw FP8 tensors,
+    no pickle, no torchao dependency). Loaded via
+    ``FluxPipeline.from_single_file(path, torch_dtype=torch.bfloat16)``.
+    Matches the checkpoint ComfyUI-native renders in ~44s. Avoids the
+    torchao v1/v2 tensor layout mismatch that the folder path hits.
 
-    Returns ``(pipe, reason, load_mode)``.  ``pipe`` is None when the
-    load failed -- caller falls back to stub mode and records the
-    reason in meta.json.  No dtype override env var is honoured:
-    the BF16 ladder was removed with BUG-LOCAL-050 because a second
-    pipeline (Wan2.1 / LTX) in the same sidecar thrashed the bus.
+    **fp8_torchao** (FALLBACK) -- legacy pre-quantized Diffusers folder
+    at ``_MODEL_PATH``. Still attempted when the single-file path is
+    missing OR ``from_single_file`` rejects the format. Weights are
+    torchao ``float8_weight_only`` pickle .bin; we pass no ``torch_dtype``
+    override and ``use_safetensors=False``. Known to raise RuntimeError
+    on pipe() call with torchao 0.16 due to v1/v2 Float8 config layout
+    drift (symptom: ``size of tensor a (4096) must match tensor b (10240)``).
+
+    Returns ``(pipe, reason, load_mode)``. ``pipe`` is None when ALL paths
+    failed -- caller falls back to stub mode and records the reason in
+    meta.json.
     """
     try:
         import torch  # type: ignore
@@ -385,16 +406,60 @@ def _try_load_pipeline():
     if not torch.cuda.is_available():
         return (None, "cuda_unavailable", "none")
 
+    failures: list[str] = []
+
+    # Tier 1: Comfy-Org single-file safetensors via from_single_file.
+    # This is the same checkpoint that rendered ComfyUI-native in 44s
+    # with peak 11350 MB VRAM on the RTX 5080 tonight.
+    if _SINGLE_FILE_PATH.exists():
+        _log_stderr(
+            f"[flux_anchor] attempting FluxPipeline.from_single_file "
+            f"load_mode=fp8_single_file path={_SINGLE_FILE_PATH}"
+        )
+        try:
+            pipe = FluxPipeline.from_single_file(
+                str(_SINGLE_FILE_PATH),
+                torch_dtype=torch.bfloat16,
+                local_files_only=True,
+            )
+            _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_single_file")
+            try:
+                pipe.enable_model_cpu_offload()
+            except Exception as off_exc:  # noqa: BLE001
+                _log_stderr(
+                    f"[flux_anchor] enable_model_cpu_offload failed "
+                    f"({type(off_exc).__name__}: {str(off_exc)[:120]}); "
+                    f"continuing without offload"
+                )
+            try:
+                pipe.set_progress_bar_config(disable=True)
+            except Exception:
+                pass
+            return (pipe, "loaded[fp8_single_file]", "fp8_single_file")
+        except Exception as exc:  # noqa: BLE001
+            err_text = str(exc)[:200]
+            failures.append(
+                f"fp8_single_file:{type(exc).__name__}:{err_text}"
+            )
+            _log_stderr(
+                f"[flux_anchor] fp8_single_file load failed: "
+                f"{type(exc).__name__}: {err_text}; falling back to fp8_torchao"
+            )
+    else:
+        failures.append(f"fp8_single_file:missing:{_SINGLE_FILE_PATH}")
+        _log_stderr(
+            f"[flux_anchor] single-file safetensors not found at "
+            f"{_SINGLE_FILE_PATH}; skipping to fp8_torchao fallback"
+        )
+
+    # Tier 2: legacy torchao FP8 Diffusers folder (BUG-LOCAL-049/050).
     if not _MODEL_PATH.exists():
-        return (None, f"model_missing:{_MODEL_PATH}", "none")
+        failures.append(f"fp8_torchao:missing:{_MODEL_PATH}")
+        return (None, "|".join(failures), "none")
 
     # BUG-LOCAL-051: install the torchao back-compat shim BEFORE the
     # diffusers load, since from_pretrained unpickles weight metadata
-    # that references the helper removed in torchao 0.16.  Without this
-    # the load raises ImportError and the backend silently falls through
-    # to stub mode (fake colored PNGs), which is what produced the
-    # 2026-04-19 overnight run of stub stills chained into a real Wan2.1
-    # that then PCIe-thrashed on top of them.
+    # that references helpers removed in torchao 0.16.
     shim_state = _install_torchao_compat_shim()
     _log_stderr(f"[flux_anchor] torchao compat shim: {shim_state}")
 
@@ -410,12 +475,12 @@ def _try_load_pipeline():
         )
     except Exception as exc:  # noqa: BLE001
         err_text = str(exc)[:200]
-        reason = f"load_error[fp8_torchao]:{type(exc).__name__}:{err_text}"
+        failures.append(f"fp8_torchao:{type(exc).__name__}:{err_text}")
         _log_stderr(
             f"[flux_anchor] fp8_torchao load failed: "
             f"{type(exc).__name__}: {err_text}"
         )
-        return (None, reason, "none")
+        return (None, "|".join(failures), "none")
 
     _log_stderr("[flux_anchor] loaded pipeline load_mode=fp8_torchao")
 
@@ -426,9 +491,6 @@ def _try_load_pipeline():
             f"[flux_anchor] enable_model_cpu_offload failed "
             f"({type(exc).__name__}: {str(exc)[:120]}); continuing without offload"
         )
-    # Silence diffusers progress bars so the sidecar stdout log
-    # doesn't blow up with tqdm carriage-returns.  Mirrors the
-    # anchor_gen fix for BUG-LOCAL-043.
     try:
         pipe.set_progress_bar_config(disable=True)
     except Exception:
