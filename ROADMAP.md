@@ -375,6 +375,84 @@ Deferred. Captured here so it doesn't drop on the floor.
 
 ---
 
+## Session handoff &mdash; 2026-04-23d (FULL workflow cleanup + reference fixture)
+
+Branch: `v2.0-alpha-video-stack`. Three small commits to end the night: `c2067ed`, `7c5415f`, `2dea4b1`. All ready for tomorrow.
+
+### What shipped after the 23:04:18 full run
+
+- **`c2067ed` &mdash; ROADMAP TTS upgrade section.** Parallel consideration for Bark &rarr; Fish Speech / CosyVoice / Qwen3-TTS. Deferred until FLUX.2+HuMo Stage 4 green. License-first filter keeps OTR MIT. Bark stays shipping for now.
+- **`7c5415f` &mdash; FULL workflow cleanup.** Removed the dead sidecar trio (`OTR_VisualBridge`, `OTR_VisualPoll`, `OTR_VisualRenderer`) from `otr_scifi_16gb_full.json` &mdash; they were hitting `BUG-046` meta-tensor every run and burning ~4 min on procedural-video fallback. Rewired `OTR_VideoPlan.audio_gate` &rarr; `OTR_SignalLostVideo.video_path` for sequencing. Also bumped `LLMDirector` token budget from `min(1700, 550+len//10)` to `min(2500, 700+len//6)` &mdash; tonight's 6180-char script got 1168 tokens and truncated mid-`visual_plan.characters`, losing `visual_plan.scenes` entirely (PASS2=0 PASS3=0 downstream). Workflow went 19&rarr;16 nodes, 36&rarr;29 links.
+- **`2dea4b1` &mdash; Satellites Collide reference fixture.** Hand-built from the run's `_treatment.txt` + Director log output. Five real characters (DUANE VOSS, PARRY MARTIN, ALAN SIRIKIT, REGINALD HAYES, ANNOUNCER), phantom cast stripped (CAPTAIN JOHNSON / ENSIGN PARKER / CONTROL were a critique-revise bleed-through), full `visual_plan.characters` + `visual_plan.scenes` for all 3 scenes, 7 SFX, 3 music cues. Saves ~37 min per TEST iteration.
+
+### Bugs this closes
+
+- Sidecar FLUX meta-tensor error (BUG-046 family) no longer in the FULL graph.
+- `[VisualRenderer] No shot assets found. Falling back to procedural video.` no longer happens.
+- `OTR_VideoPlan READY: PASS1=N PASS2=0 PASS3=0` should flip to nonzero PASS2/PASS3 with the new token budget.
+- `OTR_ShotDurationCalculator READY: shots=0` should flip to real shot counts.
+
+### What's NOT yet fixed (known + deferred)
+
+- **Phantom cast bleed-through** &mdash; critique/revise still pastes in unrelated scenes (the SPACE STATION / CAPTAIN JOHNSON scene in tonight's run). Needs a guard in `_critique_and_revise()` or a post-revise scrubbing pass. Separate task.
+- **Reference POC video is pointer-only** &mdash; 483 MB `.mp4` stays in `output/old_time_radio/`, not in git. Fixture README documents the path. If it ever gets deleted, regenerate from the fixture's `director.json` + script text.
+- **Per-line Bark WAVs** &mdash; not yet extracted to the fixture. When Stage 2 (HuMo insertion) lands, write `scripts/extract_reference_bark_wavs.py` that reads the baked audio from the POC `.mp4` and splits it into per-line WAVs keyed off the canonical 1.0 script timing.
+
+### Confirmed architecture for video compositing (Stage 3)
+
+The "creative ffmpeg" proof-of-life deliverable uses a base+overlay model:
+
+- **Base layer:** POC proc-gen `.mp4` (already has the full episode audio baked in with crossfades, waveform visualizer, treatment/title splash). Acts as the scaffold.
+- **Foreground overlays:** HuMo clips (97 frames @ 25fps = 3.88s each, one per dialogue line or per shot).
+- **Composite pass:** `ffmpeg` overlays HuMo clips onto the scaffold at timecodes that match the character's dialogue in the audio timeline. Moments where no character is on-screen (ANNOUNCER, SFX beats, music bridges) keep showing the POC base.
+
+The math works because both layers derive from the same audio timeline.
+
+### Quick-start for tomorrow (2026-04-24)
+
+1. Pull `v2.0-alpha-video-stack`, confirm HEAD is `2dea4b1`.
+2. Open ComfyUI Desktop &rarr; reload workflows &rarr; load `workflows/otr_scifi_16gb_full.json`. Confirm only **16 nodes** render, with VideoPlan fed from `OTR_SignalLostVideo.video_path` on its audio_gate.
+3. Queue one FULL run. Paste the console log into chat when it finishes (or errors). **Expected green signals:**
+  - No `[VisualBridge]` / `[sidecar:]` / `[flux_anchor]` noise.
+  - No `Falling back to procedural video.`
+  - `[LLMDirector] max_new_tokens=...` is ~1700 for a 6k script and there's no `+3 braces` JSON-repair warning, OR the warning is smaller than tonight's.
+  - `OTR_VideoPlan READY: PASS1=N PASS2=M PASS3=K` with **nonzero** M and K.
+  - `OTR_ShotDurationCalculator READY: shots=X` where X equals the Director's scene count &times; shots_per_scene.
+  - `BatchFluxRender` renders **all** shots, not just 1.
+4. If green: diff the fresh `production_plan_json` against `tests/fixtures/reference_episode/director_satellites_collide.json`. If structurally similar, call the fixture canonical; if the fresh one is better, promote it and update the fixture.
+5. If green: start Stage 1 of `memory/project_flux2_humo_rollout_2026-04-23.md` &mdash; download FLUX.2-klein Q5_K_M GGUF, swap into TEST, compare against tonight's `otr_videoplan_pass3_00003..12.png` baselines.
+
+### Ready-to-paste pickup prompt (copy this into tomorrow's first message)
+
+```
+Continuing OTR v2.0-alpha on branch v2.0-alpha-video-stack. Read in order:
+
+1. ROADMAP.md "Session handoff - 2026-04-23d" (latest section, post-TTS table).
+2. memory/project_flux2_humo_rollout_2026-04-23.md.
+3. tests/fixtures/reference_episode/README.md.
+
+Last three commits (verify `git log --oneline -3` == c2067ed, 7c5415f, 2dea4b1):
+- c2067ed: roadmap TTS upgrade section (Bark -> Fish Speech / CosyVoice / Qwen3-TTS, deferred until Stage 4 green)
+- 7c5415f: FULL workflow - removed dead sidecar trio (VisualBridge/Poll/Renderer), bumped Director tokens 1700->2500, rewired VideoPlan.audio_gate to OTR_SignalLostVideo.video_path
+- 2dea4b1: Satellites Collide reference fixture (clean director.json with 5 chars + 3 scenes, no phantom cast)
+
+Tonight's goal: run the patched FULL workflow and verify the four green signals
+in the ROADMAP handoff. Specifically confirm:
+- no sidecar errors
+- PASS2/PASS3 nonzero in OTR_VideoPlan
+- Calculator sees real shot durations
+- BatchFluxRender processes all shots not just 1
+
+If green, diff fresh Director output against the fixture, promote if better.
+If green, begin Stage 1 of FLUX.2+HuMo rollout: download FLUX.2-klein
+Q5_K_M GGUF, swap into otr_videoplan_TEST.json, re-queue.
+
+Do NOT touch main. Do NOT start Stage 2 (HuMo) before Stage 1 is green.
+Do NOT re-run the full pipeline just to get a script - use the fixture.
+```
+
+---
+
 ## P1 — Audio pipeline (shipped, live-test cycle)
 
 All items code-complete and on `v2.0-alpha`; awaiting real-soak verification as episodes run.
