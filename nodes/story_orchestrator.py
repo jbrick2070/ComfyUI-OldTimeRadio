@@ -6434,6 +6434,16 @@ OPENING:
         voice_tagonly_pat = re.compile(r'^\[VOICE:\s*(.+?)(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
         # v4 (shorthand): [ANNOUNCER, traits] or [ANNOUNCER] as a standalone tag (Mistral Nemo style)
         voice_shorthand_pat = re.compile(r'^\[([A-Z][A-Z0-9_ ]{1,20})(?:,\s*(.+?))?\]\s*$', re.IGNORECASE)
+        # v4-inline: [CHARACTER, traits] dialogue on the SAME line (Mistral Nemo's most common form)
+        # BUG-LOCAL-061 fix (2026-04-24): previous regex set only accepted the
+        # bracketed tag alone (v4 standalone) or the VOICE:-prefixed inline form
+        # (v1/v2). Mistral Nemo emits `[EDNA, Female, 40s, urgent] Dammit!`
+        # inline without the VOICE: prefix; every such line fell through the
+        # parser and produced `[BatchBark] Found 0 dialogue lines`.
+        voice_shorthand_inline_pat = re.compile(
+            r'^\[([A-Z][A-Z0-9_ ]{1,20})(?:,\s*(.+?))?\]\s*(.+)$',
+            re.IGNORECASE,
+        )
 
         raw_lines = text.strip().splitlines()
         i = 0
@@ -6539,6 +6549,41 @@ OPENING:
                         i = j + 1  # consume both tag line and dialogue line
                         continue
                     # else: fall through as direction
+
+            # v4-inline: [CHARACTER, traits] dialogue on the SAME line (BUG-LOCAL-061)
+            # Mistral Nemo's most common dialogue form. Must run before v4
+            # standalone because v4 standalone requires `]\s*$` and so never
+            # matches an inline-dialogue line.
+            m = voice_shorthand_inline_pat.match(s)
+            if m:
+                raw_name     = m.group(1).strip()
+                voice_traits = (m.group(2) or "").strip()
+                dialogue     = m.group(3).strip().strip('"\u201c\u201d*_')
+                upper_name   = raw_name.upper()
+                _first_word_v4i = upper_name.split()[0] if upper_name.strip() else ""
+                # Reject structural bracketed tags (`[VOICE: ...]` handled by
+                # v1/v2/v3, `[ENV:...]` / `[SFX:...]` already matched above,
+                # but `[SCENE ONE] description` or `[ACT TWO]` etc must not
+                # register as character dialogue).
+                if _first_word_v4i not in (
+                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                    "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
+                    "INT", "EXT", "VOICE",
+                ):
+                    if raw_name.lower() in self._GENDER_WORDS:
+                        _fallback_counter += 1
+                        character_name = f"CHAR_{chr(64 + _fallback_counter)}"
+                        voice_traits = f"{raw_name}, {voice_traits}".strip(", ")
+                    else:
+                        character_name = upper_name
+                    lines.append({
+                        "type": "dialogue",
+                        "character_name": character_name,
+                        "voice_traits": voice_traits,
+                        "line": dialogue,
+                    })
+                    i += 1
+                    continue
 
             # v4: [CHARACTER, traits] shorthand (e.g. [ANNOUNCER, female, 50s, calm])
             # Used by Mistral Nemo when it omits the VOICE: prefix
@@ -7109,6 +7154,17 @@ class LLMDirector:
             # BUG-004 fix: extract gender from each [VOICE: NAME, gender, ...] tag
             # so the procedural cast generator never assigns a male voice to a
             # female character or vice versa. First gender hint per name wins.
+            #
+            # BUG-LOCAL-060 (2026-04-24): previous implementation only scanned
+            # for the `[VOICE: NAME, gender, ...]` form. Mistral Nemo emits the
+            # shorthand `[NAME, gender, age, mood]` inline with dialogue (e.g.
+            # `[EDNA, Female, 40s, urgent] Dammit!`), which produced 0 hits and
+            # let the procedural fallback assign wrong-gender voices (EDNA=male,
+            # BOB=female). Now we scan THREE sources in priority order:
+            #   1. `[VOICE: NAME, gender, ...]` canonical tags
+            #   2. `[NAME, gender, ...]` shorthand tags (Mistral Nemo form)
+            #   3. Director's own voice_assignments[NAME].notes field
+            # First hit per character name wins.
             gender_map = {}
             voice_tag_re = re.compile(
                 r"\[VOICE:\s*([A-Z][A-Z0-9_ ]*?)\s*,\s*(male|female)\b",
@@ -7118,8 +7174,62 @@ class LLMDirector:
                 name_key = m.group(1).strip().upper()
                 gender_val = m.group(2).strip().lower()
                 gender_map.setdefault(name_key, gender_val)
-            log.info("[LLMDirector] Parsed %d gender hints from script: %s",
-                     len(gender_map), gender_map)
+            hits_from_voice_tags = len(gender_map)
+
+            # Source 2: shorthand `[NAME, gender, ...]` tags. Skip structural
+            # tokens that look like character names in bracket position.
+            _SHORTHAND_STRUCTURAL = {
+                "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
+                "INT", "EXT", "OPENING", "CLOSING", "INTERSTITIAL",
+                "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR",
+                "SYSTEM_SENTINEL", "VOICE",
+            }
+            shorthand_gender_re = re.compile(
+                r"\[([A-Z][A-Z0-9_ ]{1,20})\s*,\s*(male|female)\b",
+                re.IGNORECASE,
+            )
+            for m in shorthand_gender_re.finditer(script_text):
+                name_key = m.group(1).strip().upper()
+                first_word = name_key.split()[0] if name_key else ""
+                if first_word in _SHORTHAND_STRUCTURAL:
+                    continue
+                gender_val = m.group(2).strip().lower()
+                gender_map.setdefault(name_key, gender_val)
+            hits_from_shorthand = len(gender_map) - hits_from_voice_tags
+
+            # Source 3: Director's voice_assignments.notes field. The Director
+            # already writes "Female, 40s, urgent" in the notes for each
+            # character; reuse that as a backstop so a correctly-structured
+            # Director plan always wins over procedural rotation.
+            va = plan.get("voice_assignments") if plan else None
+            if isinstance(va, dict):
+                for char_name, entry in va.items():
+                    key = (char_name or "").strip().upper()
+                    if not key or key in gender_map:
+                        continue
+                    notes = ""
+                    if isinstance(entry, dict):
+                        notes = str(entry.get("notes") or "")
+                    lo = notes.lower()
+                    # Match whole words only to avoid "female" matching inside
+                    # "remale" or similar. The notes field is free-form but
+                    # Mistral Nemo always emits one of these two tokens first.
+                    if re.search(r"\bfemale\b", lo):
+                        gender_map[key] = "female"
+                    elif re.search(r"\bmale\b", lo):
+                        gender_map[key] = "male"
+            hits_from_director_notes = len(gender_map) - hits_from_voice_tags - hits_from_shorthand
+
+            log.info(
+                "[LLMDirector] Parsed %d gender hints (voice_tags=%d, shorthand=%d, "
+                "director_notes=%d): %s",
+                len(gender_map),
+                hits_from_voice_tags,
+                hits_from_shorthand,
+                hits_from_director_notes,
+                gender_map,
+            )
 
             plan = self._randomize_character_names(plan, script_hash, gender_map=gender_map)
 

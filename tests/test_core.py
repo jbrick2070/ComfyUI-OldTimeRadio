@@ -524,14 +524,20 @@ class TestWorkflowJSONFull:
             seen[k] = lid
 
     def test_node_types_otr_or_known(self, wf):
-        known = {"PreviewAudio", "PreviewImage", "Note"}
+        # Stock ComfyUI nodes allowed in the FULL workflow. The image-rendering
+        # slice (PASS1/2/3 composites + PNG saves) needs CheckpointLoaderSimple
+        # for the FLUX checkpoint and SaveImage for the PASS3 PNG outputs.
+        known = {
+            "PreviewAudio", "PreviewImage", "Note",
+            "CheckpointLoaderSimple", "SaveImage",
+        }
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known
 
     def test_required_pipeline_nodes(self, wf):
         types = {n["type"] for n in wf["nodes"]}
         required = {
-            "OTR_Gemma4ScriptWriter", "OTR_Gemma4Director",
+            "OTR_LLMScriptWriter", "OTR_LLMDirector",
             "OTR_BatchBarkGenerator", "OTR_SceneSequencer",
             "OTR_EpisodeAssembler",
         }
