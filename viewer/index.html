@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OTR Production Ledger</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px 16px 36px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    color: #1a1a1a; background: #f5f7fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0f172a; color: #e2e8f0; }
+    h1, h2 { color: #f1f5f9; }
+    h2 { border-bottom-color: #334155; }
+    .sub { color: #94a3b8; }
+    .loader, .header-card, table { background: #1e293b; border-color: #334155; }
+    .loader input[type="text"], .loader textarea { background: #0f172a;
+      color: #e2e8f0; border-color: #334155; }
+    th { background: #0f172a; color: #cbd5e1; }
+    th, td { border-bottom-color: #334155; }
+    td.mono { color: #94a3b8; }
+    td.path { color: #64748b; }
+    td.empty { color: #475569; }
+    td.prompt { color: #94a3b8; }
+    .empty-panel { background: #1e293b; border-color: #334155; color: #94a3b8; }
+    .kpi .k { color: #94a3b8; }
+    .kpi .v { color: #e2e8f0; }
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 16px 0 6px; color: #334155;
+       border-bottom: 1px solid #cbd5e1; padding-bottom: 3px; }
+  .sub { color: #6b7280; font-size: 12px; margin-bottom: 10px; }
+
+  .loader {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 12px;
+  }
+  .loader label { font-weight: 600; font-size: 12px; display: block; margin-bottom: 3px; }
+  .loader input[type="text"] {
+    width: 100%; padding: 5px 8px; border: 1px solid #d1d5db;
+    border-radius: 3px; font-family: Consolas, Menlo, monospace; font-size: 12px;
+  }
+  .loader textarea {
+    width: 100%; min-height: 50px; padding: 5px 8px;
+    border: 1px solid #d1d5db; border-radius: 3px;
+    font-family: Consolas, Menlo, monospace; font-size: 11px;
+  }
+  .row { display: flex; gap: 6px; margin-top: 6px; align-items: center; flex-wrap: wrap; }
+  button {
+    background: #2563eb; color: #fff; border: none; padding: 5px 12px;
+    border-radius: 3px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  button.alt { background: #6b7280; }
+  button:hover { filter: brightness(1.1); }
+  label.chk { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+
+  #status { font-size: 12px; color: #6b7280; margin-left: 8px; }
+  #status.err { color: #dc2626; font-weight: 600; }
+  #status.ok  { color: #16a34a; }
+
+  .header-card {
+    background: #fff; border: 1px solid #d1d5db; border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 12px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px 16px;
+  }
+  .kpi .k { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi .v { font-size: 14px; font-weight: 600; color: #0f172a;
+            font-family: Consolas, Menlo, monospace; }
+
+  table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    border: 1px solid #d1d5db; border-radius: 4px; overflow: hidden; font-size: 12px;
+  }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #e5e7eb;
+           vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; color: #334155;
+       font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: Consolas, Menlo, monospace; font-size: 11px; color: #475569; }
+  td.num  { font-family: Consolas, Menlo, monospace; text-align: right; color: #1f2937; }
+  td.path {
+    font-family: Consolas, Menlo, monospace; font-size: 10px;
+    color: #6b7280; word-break: break-all; max-width: 280px;
+  }
+  td.empty { color: #cbd5e1; font-style: italic; }
+  td.desc { max-width: 340px; }
+  td.prompt { font-family: Consolas, Menlo, monospace; font-size: 10.5px;
+              max-width: 420px; color: #475569; }
+
+  .gender-female { color: #be185d; font-weight: 600; }
+  .gender-male   { color: #1d4ed8; font-weight: 600; }
+
+  .empty-panel {
+    background: #fff; border: 2px dashed #cbd5e1; border-radius: 6px;
+    padding: 20px; text-align: center; color: #6b7280; margin: 8px 0; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>OTR Production Ledger</h1>
+<div class="sub">Standalone view of <code>signal_lost_*_ledger.json</code> served by <code>scripts/serve_ledger.py</code>. Pin this browser window beside your editor.</div>
+
+<div class="loader">
+  <div class="row">
+    <button onclick="loadLatest()">Load latest</button>
+    <button class="alt" onclick="listLedgers()">List ledgers</button>
+    <label class="chk"><input type="checkbox" id="auto" checked
+                              onchange="toggleAuto(this.checked)"> Auto-refresh (5s)</label>
+    <span id="status">starting...</span>
+  </div>
+  <details style="margin-top: 8px;">
+    <summary style="cursor: pointer; font-size: 12px; color: #2563eb;">
+      Or paste ledger JSON / pick file
+    </summary>
+    <input type="file" id="filePicker" accept=".json"
+           onchange="loadFromPicker(this.files[0])">
+    <textarea id="pasted" placeholder='Paste ledger JSON here...'></textarea>
+    <div class="row">
+      <button class="alt" onclick="parsePasted()">Parse pasted</button>
+    </div>
+  </details>
+</div>
+
+<div id="viewer"></div>
+
+<script>
+let autoTimer = null;
+let lastLoadedPath = null;
+
+function setStatus(msg, klass) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = klass || '';
+}
+
+function fmtDur(s) {
+  if (s == null || isNaN(s)) return '—';
+  s = Number(s);
+  const m = Math.floor(s / 60);
+  const sec = (s - m * 60);
+  if (m === 0) return sec.toFixed(1) + 's';
+  return m + ':' + sec.toFixed(1).padStart(4, '0');
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function truncate(s, n) {
+  s = String(s == null ? '' : s);
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+function basename(p) {
+  if (!p) return '';
+  return String(p).split(/[\\/]/).pop();
+}
+
+async function loadLatest() {
+  try {
+    setStatus('loading...');
+    const r = await fetch('/ledger?latest=1', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()));
+    const data = await r.json();
+    lastLoadedPath = data._meta && data._meta.path;
+    applyLedger(data, lastLoadedPath);
+  } catch (e) {
+    setStatus('load failed: ' + e.message, 'err');
+  }
+}
+
+async function listLedgers() {
+  try {
+    setStatus('listing...');
+    const r = await fetch('/list', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const list = await r.json();
+    if (!list.length) { setStatus('no ledgers found', 'err'); return; }
+    setStatus(`found ${list.length} ledger(s) — newest: ${list[0].name}`, 'ok');
+  } catch (e) {
+    setStatus('list failed: ' + e.message, 'err');
+  }
+}
+
+function loadFromPicker(file) {
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const data = JSON.parse(fr.result);
+      applyLedger(data, file.name);
+    } catch (e) {
+      setStatus('parse failed: ' + e.message, 'err');
+    }
+  };
+  fr.readAsText(file);
+}
+
+function parsePasted() {
+  const raw = document.getElementById('pasted').value;
+  if (!raw.trim()) { setStatus('paste JSON first', 'err'); return; }
+  try {
+    const led = JSON.parse(raw);
+    applyLedger(led, '(pasted)');
+  } catch (e) {
+    setStatus('JSON parse failed: ' + e.message, 'err');
+  }
+}
+
+function toggleAuto(on) {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  if (on) {
+    autoTimer = setInterval(loadLatest, 5000);
+    setStatus('auto-refresh ON (5s)', 'ok');
+  } else {
+    setStatus('auto-refresh OFF');
+  }
+}
+
+function applyLedger(led, source) {
+  const when = new Date().toLocaleTimeString();
+  setStatus('loaded ' + (basename(source) || '(unknown)') + ' at ' + when, 'ok');
+  const v = document.getElementById('viewer');
+  v.innerHTML = renderHeader(led) + renderSections(led);
+}
+
+function renderHeader(led) {
+  const kpis = [
+    ['Episode',     led.episode_id || '—'],
+    ['Commit',      led.commit || '—'],
+    ['Schema',      led.schema_version || '—'],
+    ['Cast',        (led.cast || []).length],
+    ['Scenes',      (led.scenes || []).length],
+    ['Shots',       (led.shots || []).length],
+    ['Lines',       led.total_dialogue_lines || 0],
+    ['Words',       led.total_word_count || 0],
+    ['Chars',       led.total_char_count || 0],
+    ['SFX',         (led.sfx || []).length],
+    ['Music',       (led.music || []).length],
+    ['Clips',       (led.clips || []).length],
+    ['Episode dur', fmtDur(led.total_episode_dur_s)],
+  ];
+  const video = led.final_video_path
+    ? '<div style="grid-column:1/-1; font-family:Consolas,Menlo,monospace; font-size:11px;">'
+      + '<span style="opacity:0.6;">final_video:</span> ' + esc(led.final_video_path) + '</div>'
+    : '';
+  return '<div class="header-card">' +
+    kpis.map(([k, v]) =>
+      '<div class="kpi"><div class="k">' + esc(k) + '</div>' +
+      '<div class="v">' + esc(v) + '</div></div>'
+    ).join('') + video + '</div>';
+}
+
+function renderSections(led) {
+  let out = '';
+  out += section('Cast',   led.cast,   ['char_id', 'name', 'description', 'gender',
+                                          'voice_preset', 'line_count', 'word_count']);
+  out += section('Scenes', led.scenes, ['scene_id', 'description', 'env',
+                                          'line_count', 'word_count']);
+  out += section('Shots',  led.shots,  ['shot_id', 'scene_id', 'description',
+                                          'visual_prompt', 'png_path',
+                                          'start_s', 'dur_s']);
+  out += section('Lines',  led.lines,  ['line_id', 'shot_id', 'char_id',
+                                          'text', 'traits', 'char_count', 'word_count',
+                                          'bark_wav_path', 'start_s', 'dur_s']);
+  out += section('SFX',    led.sfx,    ['cue_id', 'shot_id', 'description',
+                                          'generation_prompt', 'wav_path',
+                                          'start_s', 'dur_s']);
+  out += section('Music',  led.music,  ['cue_id', 'description', 'generation_prompt',
+                                          'wav_path', 'start_s', 'dur_s']);
+  out += section('Clips',  led.clips,  ['clip_id', 'shot_id', 'line_id',
+                                          'humo_clip_path',
+                                          'audio_slice_start_s', 'audio_slice_dur_s']);
+  return out;
+}
+
+function section(title, rows, cols) {
+  rows = rows || [];
+  if (rows.length === 0) {
+    return '<h2>' + esc(title) + ' <span style="opacity:0.5; font-weight:400;">(0)</span></h2>'
+      + '<div class="empty-panel">no rows yet</div>';
+  }
+  const headerCells = cols.map(c => '<th>' + esc(c) + '</th>').join('');
+  const bodyRows = rows.map(r => renderRow(r, cols)).join('');
+  return '<h2>' + esc(title) + ' <span style="opacity:0.5; font-weight:400;">('
+    + rows.length + ')</span></h2>' +
+    '<table><thead><tr>' + headerCells + '</tr></thead><tbody>'
+    + bodyRows + '</tbody></table>';
+}
+
+function renderRow(row, cols) {
+  return '<tr>' + cols.map(col => renderCell(row, col)).join('') + '</tr>';
+}
+
+function renderCell(row, col) {
+  const v = row[col];
+  if (v == null || v === '') return '<td class="empty">—</td>';
+  if (col === 'start_s' || col === 'dur_s'
+      || col === 'audio_slice_start_s' || col === 'audio_slice_dur_s') {
+    return '<td class="num">' + esc(fmtDur(v)) + '</td>';
+  }
+  if (col === 'char_count' || col === 'word_count' || col === 'line_count') {
+    return '<td class="num">' + esc(v) + '</td>';
+  }
+  if (col === 'gender') {
+    const g = String(v).toLowerCase();
+    return '<td><span class="gender-' + esc(g) + '">' + esc(v) + '</span></td>';
+  }
+  if (col === 'png_path' || col === 'bark_wav_path'
+      || col === 'wav_path' || col === 'humo_clip_path') {
+    return '<td class="path" title="' + esc(v) + '">' + esc(basename(v)) + '</td>';
+  }
+  if (col === 'visual_prompt' || col === 'generation_prompt') {
+    return '<td class="prompt" title="' + esc(v) + '">' + esc(truncate(v, 140)) + '</td>';
+  }
+  if (col === 'text' || col === 'description' || col === 'traits' || col === 'env') {
+    return '<td class="desc" title="' + esc(v) + '">' + esc(truncate(v, 180)) + '</td>';
+  }
+  if (col === 'char_id' || col === 'scene_id' || col === 'shot_id'
+      || col === 'line_id' || col === 'cue_id' || col === 'clip_id'
+      || col === 'voice_preset') {
+    return '<td class="mono">' + esc(v) + '</td>';
+  }
+  return '<td>' + esc(v) + '</td>';
+}
+
+document.getElementById('viewer').innerHTML =
+  '<div class="empty-panel">Click <b>Load latest</b> or wait for auto-refresh.</div>';
+
+// Kick off immediately
+loadLatest();
+toggleAuto(true);
+</script>
+</body>
+</html>
