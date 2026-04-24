@@ -213,6 +213,7 @@ class Ledger:
             rows.append({
                 "char_id":       _safe_str(r.get("char_id")),
                 "name":          _safe_str(r.get("name")),
+                "description":   _safe_str(r.get("description")) or None,
                 "gender":        _safe_str(r.get("gender")) or None,
                 "voice_preset":  _safe_str(r.get("voice_preset")) or None,
                 "line_count":    _safe_int(r.get("line_count")),
@@ -226,7 +227,8 @@ class Ledger:
         for r in scene_rows or []:
             rows.append({
                 "scene_id":    _safe_str(r.get("scene_id")),
-                "env":         _safe_str(r.get("env")),
+                "description": _safe_str(r.get("description")) or None,
+                "env":         _safe_str(r.get("env")) or None,
                 "line_count":  _safe_int(r.get("line_count")),
                 "word_count":  _safe_int(r.get("word_count")),
             })
@@ -239,6 +241,7 @@ class Ledger:
             rows.append({
                 "shot_id":        _safe_str(r.get("shot_id")),
                 "scene_id":       _safe_str(r.get("scene_id")) or None,
+                "description":    _safe_str(r.get("description")) or None,
                 "visual_prompt":  _safe_str(r.get("visual_prompt")),
                 "png_path":       _safe_str(r.get("png_path")) or None,
                 "start_s":        _safe_float(r.get("start_s")),
@@ -271,12 +274,13 @@ class Ledger:
         rows: List[Dict[str, Any]] = []
         for r in sfx_rows or []:
             rows.append({
-                "cue_id":       _safe_str(r.get("cue_id")),
-                "shot_id":      _safe_str(r.get("shot_id")) or None,
-                "description":  _safe_str(r.get("description")),
-                "wav_path":     _safe_str(r.get("wav_path")) or None,
-                "start_s":      _safe_float(r.get("start_s")),
-                "dur_s":        _safe_float(r.get("dur_s")),
+                "cue_id":            _safe_str(r.get("cue_id")),
+                "shot_id":           _safe_str(r.get("shot_id")) or None,
+                "description":       _safe_str(r.get("description")),
+                "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
+                "wav_path":          _safe_str(r.get("wav_path")) or None,
+                "start_s":           _safe_float(r.get("start_s")),
+                "dur_s":             _safe_float(r.get("dur_s")),
             })
         self.data["sfx"] = rows
         return self
@@ -285,10 +289,12 @@ class Ledger:
         rows: List[Dict[str, Any]] = []
         for r in music_rows or []:
             rows.append({
-                "cue_id":    _safe_str(r.get("cue_id")),
-                "wav_path":  _safe_str(r.get("wav_path")) or None,
-                "start_s":   _safe_float(r.get("start_s")),
-                "dur_s":     _safe_float(r.get("dur_s")),
+                "cue_id":            _safe_str(r.get("cue_id")),
+                "description":       _safe_str(r.get("description")) or None,
+                "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
+                "wav_path":          _safe_str(r.get("wav_path")) or None,
+                "start_s":           _safe_float(r.get("start_s")),
+                "dur_s":             _safe_float(r.get("dur_s")),
             })
         self.data["music"] = rows
         return self

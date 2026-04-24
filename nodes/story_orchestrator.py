@@ -7433,11 +7433,12 @@ class LLMDirector:
                 if not isinstance(entry, dict):
                     continue
                 key = (char_name or "").strip().upper()
-                notes = str(entry.get("notes") or "").lower()
+                raw_notes = str(entry.get("notes") or "")
+                notes_lo = raw_notes.lower()
                 gender = None
-                if re.search(r"\bfemale\b", notes):
+                if re.search(r"\bfemale\b", notes_lo):
                     gender = "female"
-                elif re.search(r"\bmale\b", notes):
+                elif re.search(r"\bmale\b", notes_lo):
                     gender = "male"
                 row = name_to_row.get(key)
                 if row is None:
@@ -7448,6 +7449,12 @@ class LLMDirector:
                 row["voice_preset"] = entry.get("voice_preset") or row.get("voice_preset")
                 if gender:
                     row["gender"] = gender
+                # Director's voice_assignments.notes carries the free-form
+                # character description (e.g. "NEMO BOUVIER - male, 40s,
+                # stoic" after procedural rename, or "Female, 40s, urgent"
+                # directly from Mistral). Use as the canonical description.
+                if raw_notes:
+                    row["description"] = raw_notes
             led.set_cast(existing_cast)
 
             # Scenes + shots: visual_plan.scenes carries per-scene
@@ -7460,14 +7467,20 @@ class LLMDirector:
                 if not isinstance(sc, dict):
                     continue
                 sid = str(sc.get("scene_id") or f"scene_{idx+1}").strip()
+                # shot_description is the short human-readable title,
+                # visual_prompt is the detailed FLUX prompt. Keep them
+                # separated so the viewer can show both.
+                short_desc = str(sc.get("shot_description") or "")
+                detailed_prompt = str(sc.get("visual_prompt") or "")
                 scene_rows.append({
-                    "scene_id": sid,
-                    "env":      str(sc.get("shot_description") or ""),
+                    "scene_id":    sid,
+                    "description": short_desc,
                 })
                 shot_rows.append({
                     "shot_id":       f"sh{idx+1:02d}",
                     "scene_id":      sid,
-                    "visual_prompt": str(sc.get("visual_prompt") or ""),
+                    "description":   short_desc,
+                    "visual_prompt": detailed_prompt,
                 })
             if scene_rows:
                 led.set_scenes(scene_rows)
@@ -7482,15 +7495,23 @@ class LLMDirector:
                 if not isinstance(entry, dict):
                     continue
                 sfx_rows.append({
-                    "cue_id":      str(entry.get("cue_id") or ""),
-                    "description": str(entry.get("description") or ""),
+                    "cue_id":            str(entry.get("cue_id") or ""),
+                    "description":       str(entry.get("description") or ""),
+                    "generation_prompt": str(entry.get("generation_prompt") or ""),
                 })
             music_rows = []
             for entry in plan.get("music_plan", []) or []:
                 if not isinstance(entry, dict):
                     continue
+                gen_prompt = str(entry.get("generation_prompt") or "")
+                # Music entries often have only generation_prompt, no separate
+                # description. Derive a short description from the first
+                # comma-delimited phrase so the viewer has something readable.
+                short_desc = gen_prompt.split(",", 1)[0].strip() if gen_prompt else ""
                 music_rows.append({
-                    "cue_id": str(entry.get("cue_id") or ""),
+                    "cue_id":            str(entry.get("cue_id") or ""),
+                    "description":       short_desc,
+                    "generation_prompt": gen_prompt,
                 })
             if sfx_rows:
                 led.set_sfx(sfx_rows)
