@@ -2216,6 +2216,28 @@ names. The drama's resolution must land on a concrete finding from the seed.
 SCRIPT_SYSTEM_PROMPT = """# CANONICAL AUDIO ENGINE v1.0 - DETERMINISTIC TOKENS ONLY.
 # Every line must be an "Audio Token": [ENV:], [SFX:], [VOICE:], or (beat).
 
+=== HARD REQUIREMENTS (VALIDATED AUTOMATICALLY) ===
+The parser counts character dialogue lines. A script failing these checks is REJECTED:
+
+REQ-1 CHARACTER DIALOGUE IS MANDATORY. The episode MUST contain real characters
+      speaking to each other - not just an ANNOUNCER/narrator bookending a montage
+      of [ENV:] and [SFX:] cues. A "narration-only" script with no character
+      conversation is INVALID. You will see a line-count minimum stated in the
+      user prompt; hit it before stopping.
+
+REQ-2 DIALOGUE FORMAT TOLERANCE. The parser accepts BOTH of these forms
+      identically, so use whichever feels natural - just be consistent within
+      one script:
+          [VOICE: NAME, gender, age, tone, energy] Short spoken line.
+          [NAME, gender, age, mood] Short spoken line.
+      In BOTH forms the NAME is ALWAYS FIRST and ALL-CAPS. NAME must be a real
+      character name, not a descriptor word like MAN / WOMAN / MALE / FEMALE.
+
+REQ-3 NEVER OMIT THE NAME. Lines like "[male, 40s, calm] text" or
+      "[Female, urgent] text" (where the first field is a gender word, not a
+      name) are REJECTED. Invent a character name first, then put traits after
+      the comma.
+
 === [EMOJI] 1. CANONICAL FORMATTING (STRICT) ===
 Every scene MUST follow this layout:
 
@@ -2913,14 +2935,28 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # BUG-007 root cause fix: short acts + short runtime made the LLM
         # produce narration instead of tagged dialogue. Force the format
         # explicitly when act count is low.
+        #
+        # BUG-LOCAL-062 fix (2026-04-24): previous wording insisted on
+        # 'CHARACTER_NAME: dialogue' bare-colon format, which Mistral Nemo
+        # IGNORED roughly half the time (it emits [NAME, mood] dialogue
+        # shorthand instead) AND occasionally collapsed to narration-only output
+        # (run #2 produced 0 dialogue lines, the parser had nothing to work
+        # with, final MP4 was 48.5s instead of ~7 min). Now tolerant of both
+        # bracketed shorthand AND bare-colon forms (post-BUG-LOCAL-061 the
+        # parser accepts both) AND explicitly forbids narration-only output.
         _format_hint = ""
         if _act_label == "3 acts":
             _format_hint = (
-                " CRITICAL FORMAT RULE: Every spoken line MUST use the format "
-                "'CHARACTER_NAME: dialogue text'. Do NOT write prose narration, "
-                "do NOT write untagged dialogue, do NOT write stage directions "
-                "without a CHARACTER: tag. The parser REJECTS lines without "
-                "this format. Even with only 3 acts, every line must be tagged."
+                " CRITICAL FORMAT RULE: Every spoken line MUST be TAGGED with the "
+                "speaking character's name. Two tag forms are accepted - pick one "
+                "and use it consistently: "
+                "(A) '[NAME, gender, age, mood] dialogue text' or "
+                "(B) 'NAME: dialogue text' (all-caps name, colon, dialogue). "
+                "NEVER write untagged prose, NEVER write stage directions without "
+                "a speaker tag, NEVER let the episode collapse to ANNOUNCER-only "
+                "narration. An episode without real character conversations is "
+                "REJECTED. Even with only 3 acts, every line must be tagged and "
+                "the conversation between characters must carry the story."
             )
         length_instruction = (
             f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
@@ -4243,6 +4279,7 @@ Evaluate each on:
 4. SCIENTIFIC PLAUSIBILITY: Is the science grounded or handwavy?
 5. AUDIO POTENTIAL: Will this sound amazing as a radio drama? Strong SFX moments?
 6. EAR FLOW: Does the premise lend itself to short, punchy, spoken-aloud dialogue (X Minus One / Suspense style)? Will lines be 5-15 words, rhythmic, easy to say in one breath? Reject outlines that imply long expository monologues or tongue-twister jargon.
+7. DIALOGUE DENSITY (HARD FLOOR): The winner MUST support character-to-character conversation across the whole runtime. Reject any outline that reads like pure atmosphere, montage, or narrator-monologue - the downstream script must be a real dialogue drama, not a soundscape piece. If a candidate puts all the action into [SFX:] cues and leaves characters silent, penalize it heavily.
 
 {outlines_block}
 
@@ -5462,12 +5499,17 @@ CANONICAL FORMAT RULES:
 - Do NOT rename any other characters.
 
 3. DIALOGUE STRUCTURE (STRICT)
-Every dialogue line MUST be in exactly ONE of these two forms:
+Every dialogue line MUST be in exactly ONE of these two output forms:
   [VOICE: CHARACTER NAME, traits] dialogue text
   CHARACTER NAME: dialogue text
+Accepted INPUT forms that you may need to convert:
+  [CHARACTER NAME, traits] dialogue text  ->  rewrite to [VOICE: CHARACTER NAME, traits] dialogue text
+  **CHARACTER NAME:** dialogue text        ->  rewrite to CHARACTER NAME: dialogue text
+  CHARACTER NAME (emotion): dialogue text  ->  rewrite to CHARACTER NAME: (emotion) dialogue text
 Rules:
 - For the CHARACTER NAME: format, use a colon only (never hyphens or other separators), followed by exactly one space.
 - For the [VOICE: ...] format, the dialogue text MUST follow immediately after the closing bracket with exactly one space and NO colon.
+- Never drop or invent dialogue during conversion - only rewrite the tag shape.
 
 4. STAGE DIRECTIONS / EMOTIONS
 If a line contains emotional cues such as:
@@ -5764,12 +5806,20 @@ SCRIPT TO REFORMAT:
             _runtime_log("GRAMMARIAN: Skipped - script too short")
             return script_text
 
-        # Count dialogue lines before - we must not lose any
+        # Count dialogue lines before - we must not lose any.
+        # Three equivalent forms are counted (LLM-agnostic: Gemma leans toward
+        # `NAME:` and `[VOICE:...]`, Mistral Nemo toward `[NAME, mood] text`).
+        # Missing the shorthand count previously caused the loss-check to
+        # silently pass when Mistral's entire dialogue payload was shorthand.
         _pre_lines = len(re.findall(
             r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', script_text, re.MULTILINE
         ))
         _pre_voice = len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
-        _pre_total = _pre_lines + _pre_voice
+        _pre_shorthand = len(re.findall(
+            r'^\[[A-Z][A-Z0-9_ ]{1,20}(?:,\s*.+?)?\]\s*\S',
+            script_text, re.MULTILINE,
+        ))
+        _pre_total = _pre_lines + _pre_voice + _pre_shorthand
 
         # -----------------------------------------------------------
         # CHUNKED GRAMMARIAN for long scripts (60+ dialogue lines)
@@ -5804,13 +5854,20 @@ so the script parses cleanly and reads correctly through text-to-speech.
 You MUST PRESERVE EXACTLY:
 - Every character's slang, contractions, dialect, fragments, and quirks.
 - All original wording, rhythm, and word choice.
-- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+- All [SFX:], [ENV:], [VOICE:], [NAME,...], and === SCENE N === markers (verbatim).
+- Whichever dialogue tag style the upstream writer used; do NOT convert between
+  forms. The parser accepts all three equivalents listed below.
 
 FIX ONLY THESE FIVE THINGS:
 1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
    "natrual" -> "natural").
-2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
-   prefix. Fix missing colons, capitalization, or spacing only.
+2. PARSER SYNTAX: Every spoken line must be TAGGED in ONE of these three
+   equivalent forms - keep whichever the upstream used:
+       (A) CHARACTER: dialogue
+       (B) [VOICE: CHARACTER, traits] dialogue
+       (C) [CHARACTER, traits] dialogue
+   Fix missing colons, capitalization, or spacing only. Do NOT rewrite form
+   A -> B or B -> C; that conversion belongs to the normalizer, not here.
 3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
    period only where its absence would slur TTS output.
 4. LOGIC CONTRADICTIONS that break continuity within the visible script
@@ -5974,13 +6031,20 @@ so the script parses cleanly and reads correctly through text-to-speech.
 You MUST PRESERVE EXACTLY:
 - Every character's slang, contractions, dialect, fragments, and quirks.
 - All original wording, rhythm, and word choice.
-- All [SFX:], [ENV:], [VOICE:], and === SCENE N === markers (verbatim).
+- All [SFX:], [ENV:], [VOICE:], [NAME,...], and === SCENE N === markers (verbatim).
+- Whichever dialogue tag style the upstream writer used; do NOT convert between
+  forms. The parser accepts all three equivalents listed below.
 
 FIX ONLY THESE FIVE THINGS:
 1. SPELLING TYPOS that would mispronounce in TTS (e.g., "teh" -> "the",
    "natrual" -> "natural").
-2. PARSER SYNTAX: Every spoken line must start with a valid "CHARACTER:"
-   prefix. Fix missing colons, capitalization, or spacing only.
+2. PARSER SYNTAX: Every spoken line must be TAGGED in ONE of these three
+   equivalent forms - keep whichever the upstream used:
+       (A) CHARACTER: dialogue
+       (B) [VOICE: CHARACTER, traits] dialogue
+       (C) [CHARACTER, traits] dialogue
+   Fix missing colons, capitalization, or spacing only. Do NOT rewrite form
+   A -> B or B -> C; that conversion belongs to the normalizer, not here.
 3. PUNCTUATION: Close orphaned quotes, brackets, parentheses. Add a missing
    period only where its absence would slur TTS output.
 4. LOGIC CONTRADICTIONS that break continuity within the visible script
