@@ -1464,7 +1464,7 @@ class SignalLostVideoRenderer:
         # on disk is the complete episode record.
         # ------------------------------------------------------------------
         try:
-            from nodes.production_ledger import get_ledger
+            from .production_ledger import get_ledger
             led = get_ledger()
             # Strip the ".mp4" extension and use the stem as the ledger id.
             ep_id = os.path.splitext(os.path.basename(out_path))[0]

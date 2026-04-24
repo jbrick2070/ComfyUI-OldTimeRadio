@@ -2,33 +2,78 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Cache-Control" content="no-store">
 <title>OTR Production Ledger</title>
 <style>
-  :root { color-scheme: light dark; }
+  /* FORCED high-contrast dark theme with !important to override Chrome's
+     "force dark mode" feature (which inverts page colors and washed out
+     the table cells in earlier passes). Tested 2026-04-24 against Chrome
+     auto-dark + manual dark with high-contrast results. */
+  :root { color-scheme: dark only; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 12px 16px 36px;
+    margin: 0 !important; padding: 12px 16px 36px !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     font-size: 13px; line-height: 1.4;
-    color: #1a1a1a; background: #f5f7fa;
+    color: #f8fafc !important; background: #0b1220 !important;
   }
-  @media (prefers-color-scheme: dark) {
-    body { background: #0f172a; color: #e2e8f0; }
-    h1, h2 { color: #f1f5f9; }
-    h2 { border-bottom-color: #334155; }
-    .sub { color: #94a3b8; }
-    .loader, .header-card, table { background: #1e293b; border-color: #334155; }
-    .loader input[type="text"], .loader textarea { background: #0f172a;
-      color: #e2e8f0; border-color: #334155; }
-    th { background: #0f172a; color: #cbd5e1; }
-    th, td { border-bottom-color: #334155; }
-    td.mono { color: #94a3b8; }
-    td.path { color: #64748b; }
-    td.empty { color: #475569; }
-    td.prompt { color: #94a3b8; }
-    .empty-panel { background: #1e293b; border-color: #334155; color: #94a3b8; }
-    .kpi .k { color: #94a3b8; }
-    .kpi .v { color: #e2e8f0; }
+  h1, h2 { color: #ffffff !important; }
+  h2 {
+    border-bottom: 1px solid #64748b;
+    padding-bottom: 3px;
+  }
+  p, div, span, label, summary { color: #f8fafc !important; }
+  .sub { color: #e2e8f0 !important; }
+  .loader, .header-card, table {
+    background: #1e293b !important; border: 1px solid #64748b !important;
+  }
+  .loader input[type="text"], .loader textarea {
+    background: #0f172a !important; color: #ffffff !important;
+    border: 1px solid #64748b !important;
+  }
+  .loader label { color: #ffffff !important; }
+  label.chk { color: #e2e8f0 !important; }
+  th {
+    background: #0f172a !important; color: #ffffff !important;
+    border-bottom: 2px solid #64748b !important;
+  }
+  th, td {
+    border-bottom: 1px solid #475569 !important;
+    color: #f8fafc !important;
+  }
+  td { color: #ffffff !important; }
+  /* Zebra striping for wide-table scanning */
+  tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.06) !important; }
+  tbody tr:hover { background: rgba(96, 165, 250, 0.18) !important; }
+  td.mono   { color: #cbd5e1 !important; }
+  td.num    { color: #fde68a !important; }
+  td.path   { color: #cbd5e1 !important; }
+  td.empty  { color: #94a3b8 !important; font-style: italic; }
+  td.desc   { color: #ffffff !important; }
+  td.prompt { color: #e2e8f0 !important; }
+  .empty-panel {
+    background: #1e293b !important; border: 2px dashed #64748b !important;
+    color: #cbd5e1 !important;
+  }
+  .kpi .k { color: #cbd5e1 !important; font-weight: 500; }
+  .kpi .v { color: #ffffff !important; }
+  .gender-female { color: #f9a8d4 !important; font-weight: 700; }
+  .gender-male   { color: #93c5fd !important; font-weight: 700; }
+  button {
+    background: #3b82f6 !important; color: #ffffff !important;
+    border: none !important;
+  }
+  button.alt {
+    background: #475569 !important; color: #ffffff !important;
+  }
+  #status     { color: #e2e8f0 !important; }
+  #status.ok  { color: #86efac !important; }
+  #status.err { color: #fca5a5 !important; }
+  code {
+    background: rgba(255,255,255,0.12) !important;
+    padding: 1px 5px; border-radius: 3px;
+    color: #ffffff !important;
   }
   h1 { font-size: 18px; margin: 0 0 4px; }
   h2 { font-size: 14px; margin: 16px 0 6px; color: #334155;
@@ -182,10 +227,43 @@ async function listLedgers() {
     const r = await fetch('/list', { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const list = await r.json();
-    if (!list.length) { setStatus('no ledgers found', 'err'); return; }
-    setStatus(`found ${list.length} ledger(s) — newest: ${list[0].name}`, 'ok');
+    if (!list.length) {
+      setStatus('no ledgers found in output dir', 'err');
+      document.getElementById('viewer').innerHTML =
+        '<div class="empty-panel">No <code>*_ledger.json</code> files found in ' +
+        'C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\old_time_radio\\</div>';
+      return;
+    }
+    setStatus(`${list.length} ledger(s) on disk — click one to load`, 'ok');
+    const rows = list.map(it => {
+      const ts = new Date(it.mtime * 1000).toLocaleString();
+      const sizeKb = (it.size / 1024).toFixed(1);
+      return '<tr style="cursor:pointer;" onclick="loadByPath(\'' +
+        String(it.path).replace(/\\/g, '\\\\').replace(/\'/g, '\\\'') + '\')">' +
+        '<td class="mono">' + esc(it.name) + '</td>' +
+        '<td>' + esc(ts) + '</td>' +
+        '<td class="num">' + sizeKb + ' KB</td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('viewer').innerHTML =
+      '<h2>Available ledgers <span style="opacity:0.6; font-weight:400;">(' +
+      list.length + ', click to load)</span></h2>' +
+      '<table><thead><tr><th>File</th><th>Modified</th><th>Size</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>';
   } catch (e) {
     setStatus('list failed: ' + e.message, 'err');
+  }
+}
+
+async function loadByPath(p) {
+  try {
+    setStatus('loading ' + (p.split(/[\\/]/).pop()) + '...');
+    const r = await fetch('/ledger?path=' + encodeURIComponent(p), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    applyLedger(data, p);
+  } catch (e) {
+    setStatus('load failed: ' + e.message, 'err');
   }
 }
 

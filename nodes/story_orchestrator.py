@@ -1817,7 +1817,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self._LEDGER_THROTTLE_LINES = 3
         if self.live_ledger:
             try:
-                from nodes.production_ledger import new_ledger
+                from .production_ledger import new_ledger
                 new_ledger()
             except Exception:
                 pass
@@ -1928,7 +1928,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
     def _emit_partial_ledger(self):
         """Save the running cast + lines accumulated during streaming."""
         try:
-            from nodes.production_ledger import get_ledger
+            from .production_ledger import get_ledger
             led = get_ledger()
             cast_rows = [
                 {"char_id": cid, "name": name}
@@ -4171,7 +4171,7 @@ TITLE: <your chosen title>
             # to an orphan file with an older timestamp and start a new
             # one. Use get_ledger() to overwrite the same file with the
             # final parsed canonical cast + lines.
-            from nodes.production_ledger import get_ledger
+            from .production_ledger import get_ledger
             led = get_ledger()
             cast_rows = [{"char_id": f"c{idx+1:02d}", "name": n}
                          for idx, n in enumerate(_parsed_dialogue_chars)]
@@ -7515,7 +7515,7 @@ class LLMDirector:
         #   - music cue list (same)
         # ------------------------------------------------------------------
         try:
-            from nodes.production_ledger import get_ledger
+            from .production_ledger import get_ledger
             led = get_ledger()
             # Preserve the ScriptWriter-stage cast order but enrich with
             # voice_preset + gender from the Director's voice_assignments.
