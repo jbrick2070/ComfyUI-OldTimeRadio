@@ -1779,16 +1779,16 @@ class GemmaHeartbeatStreamer(BaseStreamer):
     written in real time without touching ComfyUI.
     """
 
-    def __init__(self, tokenizer, skip_prompt=False, **decode_kwargs):
+    def __init__(self, tokenizer, skip_prompt=False, live_ledger=False, **decode_kwargs):
         self.tokenizer = tokenizer
         self.skip_prompt = skip_prompt
         self.decode_kwargs = decode_kwargs
-        
+
         # v1.5: Incremental decoding state (Resolves O(N^2) complexity)
         self.token_cache = []
         self.print_len = 0
         self.line_buffer = ""
-        
+
         self.on_prompt_end = True
         self.print_streamer = TextStreamer(tokenizer, skip_prompt=skip_prompt, **decode_kwargs)
 
@@ -1802,6 +1802,25 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self.total_tokens = 0
         self._start_time = time.time()
         self._last_speed_report = 0
+
+        # L1.5 live-ledger streaming hook. Only the script-body call site
+        # passes live_ledger=True; spine/critique/revision/grammarian
+        # streamers leave the singleton untouched. The body streamer resets
+        # the singleton at __init__ so a fresh episode starts clean, then
+        # writes partial ledger snapshots every _LEDGER_THROTTLE_LINES new
+        # dialogue lines. The post-parse end-hook overwrites with the
+        # canonical parsed cast + lines on the SAME file.
+        self.live_ledger = bool(live_ledger)
+        self._streamed_lines = []   # list of (name, full_text)
+        self._streamed_chars = {}   # name -> char_id
+        self._last_ledger_save_at = 0
+        self._LEDGER_THROTTLE_LINES = 3
+        if self.live_ledger:
+            try:
+                from nodes.production_ledger import new_ledger
+                new_ledger()
+            except Exception:
+                pass
 
     def put(self, value):
         """Processes a new batch of tokens incrementally."""
@@ -1878,6 +1897,55 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             f"{self.dialogue_count} dialogue lines | "
             f"Characters: {', '.join(sorted(self.characters_seen)) or 'none'}"
         )
+        # L1.5: flush any tail lines that hadn't crossed the throttle
+        # threshold so the viewer sees the final draft before critique
+        # runs and overwrites.
+        if self.live_ledger and self._streamed_lines:
+            self._emit_partial_ledger()
+
+    # -- L1.5 live-ledger helpers --------------------------------------
+    def _record_streamed_line(self, name, full_text):
+        """Track a fresh dialogue line and write a partial ledger snapshot.
+
+        Only fires when self.live_ledger=True (script-body call site).
+        Throttled to one save per _LEDGER_THROTTLE_LINES new lines so the
+        on-disk file isn't rewritten on every token. Failures are
+        swallowed -- the ledger never blocks streaming.
+        """
+        if not self.live_ledger:
+            return
+        try:
+            self._streamed_lines.append((name, full_text or ""))
+            if name not in self._streamed_chars:
+                self._streamed_chars[name] = f"c{len(self._streamed_chars)+1:02d}"
+            if (self.dialogue_count - self._last_ledger_save_at
+                    >= self._LEDGER_THROTTLE_LINES):
+                self._emit_partial_ledger()
+                self._last_ledger_save_at = self.dialogue_count
+        except Exception:
+            pass
+
+    def _emit_partial_ledger(self):
+        """Save the running cast + lines accumulated during streaming."""
+        try:
+            from nodes.production_ledger import get_ledger
+            led = get_ledger()
+            cast_rows = [
+                {"char_id": cid, "name": name}
+                for name, cid in self._streamed_chars.items()
+            ]
+            line_rows = []
+            for i, (name, text) in enumerate(self._streamed_lines):
+                line_rows.append({
+                    "line_id":  f"l{i+1:03d}",
+                    "char_id":  self._streamed_chars.get(name),
+                    "text":     text,
+                })
+            led.set_cast(cast_rows)
+            led.set_lines(line_rows)
+            led.save()
+        except Exception:
+            pass
 
     def _process_line(self, line):
         """Detect Canonical Tokens, update counters, pulse the heartbeat."""
@@ -1899,13 +1967,16 @@ class GemmaHeartbeatStreamer(BaseStreamer):
                 start_idx = line_up.find("[VOICE:") + 7
                 end_idx = line.find("]", start_idx)
                 tag_content = line[start_idx:end_idx]
-                
+
                 name = tag_content.split(",", 1)[0].strip().upper()
                 self.characters_seen.add(name)
-                
-                # Dynamic log update
-                clean_dialogue = line[end_idx+1:].strip()[:60]
+
+                # Full dialogue (untruncated) for the ledger; trim only
+                # the trailing punctuation/markdown decorations.
+                full_dialogue = line[end_idx+1:].strip().strip('"*_“”')
+                clean_dialogue = full_dialogue[:60]
                 _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
+                self._record_streamed_line(name, full_dialogue)
             except (IndexError, ValueError):
                 _runtime_log(f"ScriptWriter: Voice line #{self.dialogue_count}")
             return
@@ -1947,8 +2018,10 @@ class GemmaHeartbeatStreamer(BaseStreamer):
                             "TITLE"):
                 self.dialogue_count += 1
                 self.characters_seen.add(name)
-                clean_dialogue = bare_match.group(2).strip()[:60]
+                full_dialogue = bare_match.group(2).strip().strip('"*_“”')
+                clean_dialogue = full_dialogue[:60]
                 _runtime_log(f"ScriptWriter: [{self.dialogue_count}] {name}: {clean_dialogue}")
+                self._record_streamed_line(name, full_dialogue)
                 return
 
         # -- Beat pause -----------------------------------------------
@@ -1958,8 +2031,17 @@ class GemmaHeartbeatStreamer(BaseStreamer):
 
 def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92,
-                          optimization_profile="Standard"):
-    """Generate text with LLM."""
+                          optimization_profile="Standard",
+                          live_ledger=False):
+    """Generate text with LLM.
+
+    live_ledger=True turns on the L1.5 streaming-ledger hook on the
+    underlying GemmaHeartbeatStreamer. Pass it ONLY at the body call site
+    (and any other site whose dialogue you want surfaced live). Spine /
+    critique / revision / grammarian calls leave it False so they don't
+    repeatedly overwrite the singleton ledger with their own intermediate
+    drafts.
+    """
     import torch
 
     model, tokenizer = _load_llm(model_id, optimization_profile=optimization_profile)
@@ -2020,7 +2102,10 @@ def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
     # Initialize streamer for live feedback in the terminal + heartbeat logs.
     # Safely access tokenizer if we're using a multimodal processor.
     raw_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
-    streamer = GemmaHeartbeatStreamer(raw_tokenizer, skip_prompt=True, skip_special_tokens=True)
+    streamer = GemmaHeartbeatStreamer(
+        raw_tokenizer, skip_prompt=True, skip_special_tokens=True,
+        live_ledger=live_ledger,
+    )
 
     vram_snapshot("llm_generate_entry")
 
@@ -3488,7 +3573,8 @@ TITLE: <your chosen title>
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
                 top_p=active_top_p,
-                optimization_profile=optimization_profile
+                optimization_profile=optimization_profile,
+                live_ledger=True,  # L1.5: stream cast + lines to ledger
             )
         else:
             # Long episodes: chunked act-by-act generation
@@ -4078,8 +4164,15 @@ TITLE: <your chosen title>
         # SignalLostVideo back-fill timings + final paths.
         # ------------------------------------------------------------------
         try:
-            from nodes.production_ledger import new_ledger
-            led = new_ledger()
+            # L1.5: do NOT reset the ledger here. The body streamer
+            # already created a fresh ledger via new_ledger() in its
+            # __init__ and incrementally populated it with cast + lines
+            # during generation. Calling new_ledger() now would dump that
+            # to an orphan file with an older timestamp and start a new
+            # one. Use get_ledger() to overwrite the same file with the
+            # final parsed canonical cast + lines.
+            from nodes.production_ledger import get_ledger
+            led = get_ledger()
             cast_rows = [{"char_id": f"c{idx+1:02d}", "name": n}
                          for idx, n in enumerate(_parsed_dialogue_chars)]
             name_to_cid = {row["name"]: row["char_id"] for row in cast_rows}
