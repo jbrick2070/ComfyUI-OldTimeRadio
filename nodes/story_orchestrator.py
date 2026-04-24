@@ -4071,6 +4071,56 @@ TITLE: <your chosen title>
         # path left memory on the table and needs investigation.
         vram_snapshot("script_writer_exit_after_unload")
 
+        # ------------------------------------------------------------------
+        # Production Ledger (L1) -- initial snapshot of cast + lines.
+        # Writes are best-effort; ledger failures never block the pipeline.
+        # Director fills in scenes + shots + voice_presets; SceneSequencer +
+        # SignalLostVideo back-fill timings + final paths.
+        # ------------------------------------------------------------------
+        try:
+            from nodes.production_ledger import new_ledger
+            led = new_ledger()
+            cast_rows = [{"char_id": f"c{idx+1:02d}", "name": n}
+                         for idx, n in enumerate(_parsed_dialogue_chars)]
+            name_to_cid = {row["name"]: row["char_id"] for row in cast_rows}
+            # Derive a running scene_id so downstream shot assignment can
+            # key against it. Scenes appear as explicit 'scene_break' items
+            # in script_lines; we number them 1..N in the order seen. A
+            # script with no scene_break items still gets a single
+            # implicit s01 so shots/lines have somewhere to attach.
+            scene_rows = []
+            line_to_scene = {}
+            current_scene = "s01"
+            scene_count = 0
+            for i, ln in enumerate(script_lines):
+                if ln.get("type") == "scene_break":
+                    scene_count += 1
+                    current_scene = f"s{scene_count:02d}"
+                    scene_rows.append({"scene_id": current_scene,
+                                       "env": ""})
+                line_to_scene[i] = current_scene
+            if not scene_rows:
+                scene_rows = [{"scene_id": "s01", "env": ""}]
+            line_rows = []
+            ln_idx = 0
+            for i, ln in enumerate(script_lines):
+                if ln.get("type") != "dialogue":
+                    continue
+                ln_idx += 1
+                line_rows.append({
+                    "line_id":  f"l{ln_idx:03d}",
+                    "shot_id":  None,  # Director assigns shots -> L2
+                    "char_id":  name_to_cid.get(ln.get("character_name"), None),
+                    "text":     str(ln.get("line") or ""),
+                    "traits":   str(ln.get("voice_traits") or ""),
+                })
+            led.set_cast(cast_rows)
+            led.set_scenes(scene_rows)
+            led.set_lines(line_rows)
+            led.save()
+        except Exception as _e:  # noqa: BLE001
+            log.warning("[Ledger] ScriptWriter-stage snapshot failed: %s", _e)
+
         return (script_text, script_json, news_json, est_minutes)
 
     # -------------------------------------------------------------------------
@@ -7360,6 +7410,96 @@ class LLMDirector:
 
         # v1.4 Theme C - director exit snapshot.
         vram_snapshot("director_exit")
+
+        # ------------------------------------------------------------------
+        # Production Ledger (L1) -- Director stage populates:
+        #   - cast voice_preset + gender (overwrites ScriptWriter's bare
+        #     cast rows with voice_assignments data)
+        #   - scenes env (from visual_plan.scenes description)
+        #   - shots (one per visual_plan.scenes entry, PNG path filled later)
+        #   - sfx cue list (metadata only, wav_path + timing come from
+        #     BatchAudioGen + SceneSequencer)
+        #   - music cue list (same)
+        # ------------------------------------------------------------------
+        try:
+            from nodes.production_ledger import get_ledger
+            led = get_ledger()
+            # Preserve the ScriptWriter-stage cast order but enrich with
+            # voice_preset + gender from the Director's voice_assignments.
+            existing_cast = list(led.data.get("cast") or [])
+            name_to_row = {r.get("name"): r for r in existing_cast}
+            va = plan.get("voice_assignments", {}) or {}
+            for char_name, entry in va.items():
+                if not isinstance(entry, dict):
+                    continue
+                key = (char_name or "").strip().upper()
+                notes = str(entry.get("notes") or "").lower()
+                gender = None
+                if re.search(r"\bfemale\b", notes):
+                    gender = "female"
+                elif re.search(r"\bmale\b", notes):
+                    gender = "male"
+                row = name_to_row.get(key)
+                if row is None:
+                    row = {"char_id": f"c{len(existing_cast)+1:02d}",
+                           "name": key}
+                    existing_cast.append(row)
+                    name_to_row[key] = row
+                row["voice_preset"] = entry.get("voice_preset") or row.get("voice_preset")
+                if gender:
+                    row["gender"] = gender
+            led.set_cast(existing_cast)
+
+            # Scenes + shots: visual_plan.scenes carries per-scene
+            # environment + one visual prompt per scene. Each scene maps to
+            # one shot row in L1; PASS3's multi-shot expansion lives in L2.
+            vp_scenes = (plan.get("visual_plan", {}) or {}).get("scenes", []) or []
+            scene_rows = []
+            shot_rows = []
+            for idx, sc in enumerate(vp_scenes):
+                if not isinstance(sc, dict):
+                    continue
+                sid = str(sc.get("scene_id") or f"scene_{idx+1}").strip()
+                scene_rows.append({
+                    "scene_id": sid,
+                    "env":      str(sc.get("shot_description") or ""),
+                })
+                shot_rows.append({
+                    "shot_id":       f"sh{idx+1:02d}",
+                    "scene_id":      sid,
+                    "visual_prompt": str(sc.get("visual_prompt") or ""),
+                })
+            if scene_rows:
+                led.set_scenes(scene_rows)
+            if shot_rows:
+                led.set_shots(shot_rows)
+
+            # SFX + music: copy metadata rows (description + generation_prompt
+            # for reference). wav_path + start_s + dur_s get filled by the
+            # audio generators + SceneSequencer later.
+            sfx_rows = []
+            for entry in plan.get("sfx_plan", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                sfx_rows.append({
+                    "cue_id":      str(entry.get("cue_id") or ""),
+                    "description": str(entry.get("description") or ""),
+                })
+            music_rows = []
+            for entry in plan.get("music_plan", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                music_rows.append({
+                    "cue_id": str(entry.get("cue_id") or ""),
+                })
+            if sfx_rows:
+                led.set_sfx(sfx_rows)
+            if music_rows:
+                led.set_music(music_rows)
+
+            led.save()
+        except Exception as _e:  # noqa: BLE001
+            log.warning("[Ledger] Director-stage snapshot failed: %s", _e)
 
         return (plan_json, voice_json, sfx_json, music_json)
 

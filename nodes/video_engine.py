@@ -1456,6 +1456,28 @@ class SignalLostVideoRenderer:
             duration, W, H, fps, size_mb
         )
 
+        # ------------------------------------------------------------------
+        # Production Ledger (L1) -- finalize the episode. Rename the ledger
+        # from its placeholder "pending_<ts>" to match the MP4 basename,
+        # attach final audio + video paths, and record total episode
+        # duration. This is the last write-only stage of L1; the file now
+        # on disk is the complete episode record.
+        # ------------------------------------------------------------------
+        try:
+            from nodes.production_ledger import get_ledger
+            led = get_ledger()
+            # Strip the ".mp4" extension and use the stem as the ledger id.
+            ep_id = os.path.splitext(os.path.basename(out_path))[0]
+            led.rename_episode(ep_id)
+            led.set_final_paths(
+                audio_path=None,           # standalone WAV not saved yet (L2)
+                video_path=out_path,
+                total_episode_dur_s=float(duration),
+            )
+            led.save()
+        except Exception as _e:  # noqa: BLE001
+            log.warning("[Ledger] SignalLostVideo finalize failed: %s", _e)
+
         # Return using the standard ComfyUI 'gifs' key so the canvas
         # spawns an HTML5 video player widget automatically.
         return {
