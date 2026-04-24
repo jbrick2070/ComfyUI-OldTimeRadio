@@ -397,8 +397,15 @@ def test_build_shot_plan_final_end_frame_toggle():
         include_final_end_frame=False,
     )
     assert with_end["total_prompts"] == without["total_prompts"] + 1
+    # First frame is a pure "start" (no ends_shot)
+    assert with_end["tokens"][0]["kind"] == "start"
+    # Last frame with include_final_end_frame is a pure "end"
     assert with_end["tokens"][-1]["kind"] == "end"
-    assert all(t["kind"] == "start" for t in without["tokens"])
+    # Middle frames are "bridge" (start of next shot AND end of previous)
+    # Without the final end frame, the last frame is still a bridge/start
+    assert without["tokens"][0]["kind"] == "start"
+    # Without end toggle, no "end"-only frame exists
+    assert not any(t["kind"] == "end" for t in without["tokens"])
 
 
 def test_build_shot_plan_empty_director():
@@ -444,14 +451,59 @@ def test_build_shot_plan_shot_ids_unique():
         "shot_ids must be unique across the episode"
 
 
-def test_build_shot_plan_shot_ids_include_character_slug():
+def test_build_shot_plan_frame_ids_are_global_4digit():
+    """Schema: frame IDs are global 4-digit, no character suffix."""
     from nodes.otr_video_plan import build_shot_plan
     director_json = json.dumps(_sample_director())
     plan = build_shot_plan(
         director_json, "KENJI CROSS", shots_per_scene=1,
     )
     for tok in plan["tokens"]:
-        assert "kenji_cross" in tok["shot_id"]
+        # frame_0000, frame_0001, ...
+        assert tok["frame_id"].startswith("frame_")
+        assert len(tok["frame_id"]) == len("frame_0000")
+
+
+def test_build_shot_plan_shot_ids_are_global_3digit():
+    """Schema: shot IDs are global 'shot_NNN' across the whole episode."""
+    from nodes.otr_video_plan import build_shot_plan
+    director_json = json.dumps(_sample_director())
+    plan = build_shot_plan(
+        director_json, "BABA", shots_per_scene=3,
+    )
+    shot_ids = [s["shot_id"] for s in plan["shots"]]
+    # 2 scenes x 3 shots = 6 shots
+    assert shot_ids == [
+        "shot_001", "shot_002", "shot_003",
+        "shot_004", "shot_005", "shot_006",
+    ]
+
+
+def test_build_shot_plan_clip_ids_indexed_from_one():
+    """Schema: clip IDs are 'shot_NNN_c1', 'shot_NNN_c2', ..."""
+    from nodes.otr_video_plan import build_shot_plan
+    director_json = json.dumps(_sample_director())
+    plan = build_shot_plan(
+        director_json, "BABA", shots_per_scene=1,
+    )
+    for shot in plan["shots"]:
+        assert len(shot["segments"]) >= 1
+        # Default: 1 clip per shot
+        assert shot["segments"][0]["clip_id"] == f"{shot['shot_id']}_c1"
+
+
+def test_build_shot_plan_shared_boundary_frames():
+    """Schema: adjacent shots share boundary frames (FLF chain)."""
+    from nodes.otr_video_plan import build_shot_plan
+    director_json = json.dumps(_sample_director())
+    plan = build_shot_plan(
+        director_json, "BABA", shots_per_scene=2,
+    )
+    shots = plan["shots"]
+    # shot_001's end_frame == shot_002's start_frame (shared)
+    for i in range(len(shots) - 1):
+        assert shots[i]["end_frame_id"] == shots[i + 1]["start_frame_id"], \
+            f"shots {shots[i]['shot_id']} and {shots[i+1]['shot_id']} don't share boundary frame"
 
 
 def test_build_shot_plan_scene_without_visual_prompt_uses_shot_description():
@@ -493,9 +545,15 @@ def test_director_json_multiline():
 
 def test_return_types():
     from nodes.otr_video_plan import OTRVideoPlan
-    assert OTRVideoPlan.RETURN_TYPES == ("STRING", "INT", "STRING")
-    assert OTRVideoPlan.RETURN_NAMES[0] == "prompt_list_json"
-    assert OTRVideoPlan.RETURN_NAMES[1] == "prompt_count"
+    # 5-tuple: pass1_chars, pass2_scenes, pass3_composites, count, summary
+    assert OTRVideoPlan.RETURN_TYPES == (
+        "STRING", "STRING", "STRING", "INT", "STRING"
+    )
+    assert OTRVideoPlan.RETURN_NAMES[0] == "pass1_char_prompts_json"
+    assert OTRVideoPlan.RETURN_NAMES[1] == "pass2_scene_prompts_json"
+    assert OTRVideoPlan.RETURN_NAMES[2] == "pass3_compose_prompts_json"
+    assert OTRVideoPlan.RETURN_NAMES[3] == "pass3_prompt_count"
+    assert OTRVideoPlan.RETURN_NAMES[4] == "debug_summary"
 
 
 def test_function_and_category():
@@ -508,34 +566,44 @@ def test_plan_method_end_to_end():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
     director_json = json.dumps(_sample_director())
-    prompt_list_json, prompt_count, summary = node.plan(
+    pass1_json, pass2_json, pass3_json, pass3_count, summary = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
         genre_flavor="hard_sci_fi",
     )
-    payload = json.loads(prompt_list_json)
-    assert payload["total_prompts"] == prompt_count
-    assert payload["focus_character"] == "BABA"
-    # Envelope BatchFluxRender reads
-    assert "tokens" in payload
-    assert payload["tokens"][0]["type"] == "environment"
-    # Summary should be a string with multiple lines
-    assert "focus character" in summary.lower()
-    assert "total prompts" in summary.lower()
+    pass3 = json.loads(pass3_json)
+    assert pass3["total_prompts"] == pass3_count
+    assert pass3["focus_character"] == "BABA"
+    assert "tokens" in pass3
+    assert pass3["tokens"][0]["type"] == "environment"
+    # Summary covers all 3 passes
+    assert "pass 1" in summary.lower()
+    assert "pass 2" in summary.lower()
+    assert "pass 3" in summary.lower()
+
+    # PASS 1 = one character portrait
+    pass1 = json.loads(pass1_json)
+    assert pass1["total_prompts"] == 1
+    assert pass1["tokens"][0]["role"] == "char_portrait"
+
+    # PASS 2 = one token per scene (2 scenes in sample)
+    pass2 = json.loads(pass2_json)
+    assert pass2["total_prompts"] == 2
+    assert pass2["tokens"][0]["role"] == "scene_env"
 
 
 def test_plan_method_handles_none_genre():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
     director_json = json.dumps(_sample_director())
-    prompt_list_json, count, _summary = node.plan(
+    _p1, _p2, pass3_json, _count, _summary = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
         genre_flavor="(none)",
     )
-    payload = json.loads(prompt_list_json)
+    payload = json.loads(pass3_json)
     assert payload["genre_flavor"] == ""
 
 
@@ -546,36 +614,40 @@ def test_plan_method_empty_scenes_still_returns_envelope():
         "voice_assignments": {"BABA": {"voice_preset": "x", "notes": "old"}},
         "visual_plan": {"characters": {"BABA": {"portrait_prompt": "p"}}, "scenes": []},
     })
-    prompt_list_json, count, summary = node.plan(
+    _p1, _p2, pass3_json, count, _summary = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
         genre_flavor="hard_sci_fi",
     )
     assert count == 0
-    payload = json.loads(prompt_list_json)
+    payload = json.loads(pass3_json)
     assert payload["tokens"] == []
     assert payload["scenes_covered"] == 0
 
 
 def test_plan_output_consumable_by_batch_flux_render_parser():
-    """Smoke: our output must match the schema BatchFluxRender's
+    """Smoke: all 3 pass outputs match the schema BatchFluxRender's
     _parse_env_prompts expects so wiring is zero-effort."""
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
     director_json = json.dumps(_sample_director())
-    prompt_list_json, _count, _summary = node.plan(
+    pass1_json, pass2_json, pass3_json, _count, _summary = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=2,
         genre_flavor="hard_sci_fi",
     )
-    payload = json.loads(prompt_list_json)
-    # BatchFluxRender contract: dict with "tokens", each having
-    # type="environment" and a "description" string.
-    assert isinstance(payload, dict)
-    assert isinstance(payload.get("tokens"), list)
-    for tok in payload["tokens"]:
-        assert tok.get("type") == "environment"
-        assert isinstance(tok.get("description"), str)
-        assert tok["description"]  # non-empty
+    # Every pass output must match BatchFluxRender contract:
+    # dict with "tokens" list where each token has type="environment"
+    # and a non-empty description string.
+    for name, js in (
+        ("pass1", pass1_json), ("pass2", pass2_json), ("pass3", pass3_json)
+    ):
+        payload = json.loads(js)
+        assert isinstance(payload, dict), f"{name} not dict"
+        assert isinstance(payload.get("tokens"), list), f"{name} tokens not list"
+        for tok in payload["tokens"]:
+            assert tok.get("type") == "environment", f"{name} non-env token"
+            assert isinstance(tok.get("description"), str)
+            assert tok["description"], f"{name} empty description"

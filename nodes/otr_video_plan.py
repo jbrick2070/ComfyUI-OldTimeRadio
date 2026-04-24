@@ -99,6 +99,28 @@ _ERA_TAIL_BY_GENRE: dict[str, str] = {
 # when the caller explicitly passes an override.
 _DEFAULT_ERA_TAIL = "timeless cinematic aesthetic"
 
+# Vocabulary
+# ----------
+# SCENE    - story setting (e.g. "comms bay"). One per scene_id.
+# SHOT     - narrative unit belonging to one scene. Duration is TBD
+#            (computed by a downstream calculator from Bark audio
+#            durations once audio is rendered; not available at plan
+#            time). Can be longer than one Wan call.
+# SEGMENT  - Wan-call-sized sub-unit of a shot. Target <= 9 seconds
+#            (under the 10s C4 hard cap with buffer). One Wan render
+#            per segment, bounded by two FLUX frames.
+# FRAME    - one PASS 3 FLUX render. N segments need N+1 frames
+#            (adjacent segments share boundary frames, FLF style).
+#
+# Default behavior when the duration calculator is unavailable:
+# ONE segment per shot (we assume the shot fits in one Wan call).
+# Multi-segment splitting happens later when real durations are known.
+
+SEGMENT_TARGET_DURATION_S = 9.0
+SEGMENT_HARD_CAP_S = 10.0   # C4 constraint
+SEGMENT_TARGET_FPS = 16
+SEGMENT_MAX_FRAMES = 161    # 10.0s at 16fps, proven on 5080 Blackwell
+
 
 # ---------------------------------------------------------------------------
 # Pure helpers (unit-testable without ComfyUI)
@@ -211,6 +233,112 @@ def compose_shot_prompt(
     return ", ".join(parts)
 
 
+def build_pass1_char_prompts(
+    director_json: str,
+    focus_character: str,
+    *,
+    style_tail: str = "",
+) -> dict:
+    """PASS 1 envelope: one token for each character's portrait.
+
+    For the thin-slice single-character mode, this emits exactly one
+    token — the focus_character's portrait. Later this can expand to
+    render every cast member's portrait up front.
+
+    Output envelope matches BatchFluxRender's env-token schema so it
+    consumes the list as-is.
+    """
+    try:
+        director = json.loads(director_json) if director_json else {}
+    except json.JSONDecodeError:
+        director = {}
+    if not isinstance(director, dict):
+        director = {}
+
+    resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
+    portrait = resolve_character_portrait(
+        director, focus_character, resolved_style_tail
+    )
+    char_slug = slugify(focus_character)
+
+    tokens = [{
+        "type": "environment",
+        "description": portrait,
+        "role": "char_portrait",
+        "shot_id": f"char_{char_slug}_portrait",
+        "focus_character": focus_character,
+        "kind": "pass1_char",
+    }]
+
+    return {
+        "tokens": tokens,
+        "source": "OTR_VideoPlan.pass1",
+        "focus_character": focus_character,
+        "total_prompts": len(tokens),
+        "style_tail": resolved_style_tail,
+    }
+
+
+def build_pass2_scene_prompts(
+    director_json: str,
+    *,
+    style_tail: str = "",
+) -> dict:
+    """PASS 2 envelope: one token per scene environment.
+
+    Each scene's visual_prompt is wrapped with the style tail. No
+    character, no era, no action — just the empty scene.
+
+    Output envelope matches BatchFluxRender's env-token schema.
+    """
+    try:
+        director = json.loads(director_json) if director_json else {}
+    except json.JSONDecodeError:
+        director = {}
+    if not isinstance(director, dict):
+        director = {}
+
+    resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
+    scenes = extract_scenes(director)
+
+    tokens: list[dict[str, Any]] = []
+    for scene in scenes:
+        scene_id = (scene.get("scene_id") or "").strip()
+        if not scene_id:
+            scene_id = f"scene_{len(tokens)+1:02d}"
+        scene_visual = (scene.get("visual_prompt") or "").strip()
+        if not scene_visual:
+            scene_visual = (
+                scene.get("shot_description") or f"{scene_id} environment"
+            ).strip()
+
+        # Compose without character, without era, without action —
+        # just the scene visual + style tail.
+        composed = compose_shot_prompt(
+            portrait="",
+            scene_visual=scene_visual,
+            era_tail="",
+            style_tail=resolved_style_tail,
+            shot_hint="empty environment establishing shot",
+        )
+        tokens.append({
+            "type": "environment",
+            "description": composed,
+            "role": "scene_env",
+            "shot_id": f"{slugify(scene_id)}_env",
+            "scene_id": scene_id,
+            "kind": "pass2_scene",
+        })
+
+    return {
+        "tokens": tokens,
+        "source": "OTR_VideoPlan.pass2",
+        "scenes_covered": len(scenes),
+        "total_prompts": len(tokens),
+        "style_tail": resolved_style_tail,
+    }
+
+
 def build_shot_plan(
     director_json: str,
     focus_character: str,
@@ -282,11 +410,15 @@ def build_shot_plan(
 
     char_slug = slugify(focus_character)
 
+    # Flat list of all shots across all scenes, with their scene context.
+    # Globally-numbered shot_ids ("shot_001", "shot_002", ...) for at-a-glance
+    # cross-referencing. Parent scene pointer is carried separately.
+    shots: list[dict[str, Any]] = []
+    shot_global_idx = 0
     for scene in scenes:
         scene_id = (scene.get("scene_id") or "").strip()
         if not scene_id:
-            # Synthesize an id so downstream filenames don't collide
-            scene_id = f"scene_{len(tokens)+1:02d}"
+            scene_id = f"scene_{len(shots)+1:02d}"
         scene_visual = (scene.get("visual_prompt") or "").strip()
         if not scene_visual:
             log.warning(
@@ -298,69 +430,135 @@ def build_shot_plan(
             ).strip()
 
         for shot_idx in range(shots_per_scene):
-            # Simple shot-progression hint: "early", "mid", "late"
-            if shots_per_scene == 1:
-                shot_hint = ""
-            elif shot_idx == 0:
-                shot_hint = "establishing framing"
-            elif shot_idx == shots_per_scene - 1:
-                shot_hint = "closing framing of the beat"
-            else:
-                shot_hint = "medium framing, action in progress"
-
-            composed = compose_shot_prompt(
-                portrait=portrait,
-                scene_visual=scene_visual,
-                era_tail=era_tail,
-                style_tail=resolved_style_tail,
-                shot_hint=shot_hint,
-            )
-
-            shot_id = (
-                f"{slugify(scene_id)}_s{shot_idx:02d}_start_{char_slug}"
-            )
-            tokens.append({
-                "type": "environment",
-                "description": composed,
-                "role": "char_scene_composite",
-                "shot_id": shot_id,
+            shot_global_idx += 1
+            shots.append({
+                "shot_id": f"shot_{shot_global_idx:03d}",
                 "scene_id": scene_id,
-                "focus_character": focus_character,
+                "scene_visual": scene_visual,
                 "shot_index_in_scene": shot_idx,
-                "kind": "start",
             })
 
-    if include_final_end_frame and tokens:
-        # One extra frame at the very end so the FLF chain closes.
-        last_scene = scenes[-1] if scenes else {}
-        last_scene_id = (last_scene.get("scene_id") or "scene_final").strip()
-        last_visual = (last_scene.get("visual_prompt") or "").strip() or (
-            last_scene.get("shot_description") or "final environment"
-        )
+    # Render N+1 frames. Frame k bounds shot k (as its start) and shot k-1
+    # (as its end). Edge cases: frame 0 is only a start; frame N is only an
+    # end. If there are zero shots, emit zero frames (empty director case).
+    #
+    # For N shots, we emit len(shots)+1 frames when include_final_end_frame
+    # is True, else len(shots) frames (dropping the final cap).
+    frame_count = (
+        len(shots) + (1 if include_final_end_frame and shots else 0)
+    )
+    for frame_idx in range(frame_count):
+        # Which shot does this frame BOUND?
+        # Frame k is the START of shot k (if k < N) and the END of shot k-1 (if k > 0).
+        starts_shot = shots[frame_idx] if frame_idx < len(shots) else None
+        ends_shot   = shots[frame_idx - 1] if frame_idx > 0 else None
+
+        # Pick the scene context: prefer the START shot's scene; fall back to the
+        # ending shot's scene for the final frame. Defensive skip if neither is
+        # set (only possible with shots=[] which we already guard above).
+        bound_shot = starts_shot or ends_shot
+        if bound_shot is None:
+            continue
+        scene_id = bound_shot["scene_id"]
+        scene_visual = bound_shot["scene_visual"]
+
+        # Shot-progression hint — "opening", "mid", "closing":
+        # first frame of the episode = opening establishing shot
+        # last frame of the episode = final closing
+        # bridge frames = "transition frame" (end of one, start of next)
+        if starts_shot and not ends_shot:
+            shot_hint = "establishing framing, opening of the scene"
+        elif ends_shot and not starts_shot:
+            shot_hint = "final closing framing, end of episode"
+        elif starts_shot and ends_shot:
+            # Bridge: same scene means transition within; different scene means cut.
+            if starts_shot["scene_id"] == ends_shot["scene_id"]:
+                shot_hint = "transition within scene, action continues"
+            else:
+                shot_hint = "scene transition, new setting establishing"
+        else:
+            shot_hint = ""
+
         composed = compose_shot_prompt(
             portrait=portrait,
-            scene_visual=last_visual,
+            scene_visual=scene_visual,
             era_tail=era_tail,
             style_tail=resolved_style_tail,
-            shot_hint="final closing framing, end of episode",
+            shot_hint=shot_hint,
         )
+
+        frame_id = f"frame_{frame_idx:04d}"
+
         tokens.append({
             "type": "environment",
             "description": composed,
             "role": "char_scene_composite",
-            "shot_id": f"{slugify(last_scene_id)}_final_end_{char_slug}",
-            "scene_id": last_scene_id,
+            "frame_id": frame_id,
+            "shot_id": frame_id,  # back-compat: some callers still key on shot_id
+            "scene_id": scene_id,
             "focus_character": focus_character,
-            "shot_index_in_scene": -1,
-            "kind": "end",
+            "frame_index": frame_idx,
+            "starts_shot": starts_shot["shot_id"] if starts_shot else None,
+            "ends_shot":   ends_shot["shot_id"]   if ends_shot   else None,
+            "kind": (
+                "start" if starts_shot and not ends_shot
+                else "end" if ends_shot and not starts_shot
+                else "bridge"
+            ),
         })
+
+    # Emit a shots[] index with a segments[] sub-structure per shot.
+    #
+    # A SHOT is a narrative unit (6-10s of audio-aligned story).
+    # A CLIP is a single Wan call, bounded by 2 FLUX frames.
+    #
+    # When shot_duration_s <= wan_single_call_budget_s (~10s at 16fps
+    # on 5080): one clip per shot, bounded by 2 frames.
+    #
+    # When shot_duration_s > budget: the "magical duration calculator"
+    # (TBA - depends on Bark audio timing, not available at plan time)
+    # splits the shot into M segments, needing M+1 frames. That expansion
+    # is DEFERRED - for now we emit 1 clip per shot, and the structure
+    # is ready to receive more segments later.
+    shots_index: list[dict[str, Any]] = []
+    for i, shot in enumerate(shots):
+        start_frame_id = f"frame_{i:04d}"
+        end_frame_idx = i + 1
+        if end_frame_idx < len(shots) or include_final_end_frame:
+            end_frame_id = f"frame_{end_frame_idx:04d}"
+        else:
+            end_frame_id = None  # no end frame available
+
+        # Default: ONE clip per shot. Duration calculator (TBA) expands
+        # to N segments when shot_duration_s > SEGMENT_HARD_CAP_S.
+        # Clip IDs are 1-indexed: shot_003_c1, shot_003_c2, etc.
+        segments = [{
+            "clip_id": f"{shot['shot_id']}_c1",
+            "start_frame_id": start_frame_id,
+            "end_frame_id":   end_frame_id,
+        }]
+
+        shots_index.append({
+            "shot_id": shot["shot_id"],
+            "scene_id": shot["scene_id"],
+            "shot_duration_s": None,  # TBA: filled by duration calculator
+            "segments": segments,
+            # convenience top-level pointers (valid for 1-clip-per-shot case)
+            "start_frame_id": start_frame_id,
+            "end_frame_id":   end_frame_id,
+        })
+
+    total_segments = sum(len(s["segments"]) for s in shots_index)
 
     return {
         "tokens": tokens,
+        "shots": shots_index,
         "source": "OTR_VideoPlan",
         "focus_character": focus_character,
         "shots_per_scene": shots_per_scene,
         "scenes_covered": len(scenes),
+        "total_shots": len(shots),
+        "total_segments": total_segments,
         "total_prompts": len(tokens),
         "genre_flavor": genre_flavor,
         "era_tail": era_tail,
@@ -424,11 +622,13 @@ class OTRVideoPlan:
             },
         }
 
-    RETURN_TYPES = ("STRING", "INT", "STRING")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING")
     RETURN_NAMES = (
-        "prompt_list_json",   # consumed by OTR_BatchFluxRender as env tokens
-        "prompt_count",       # count int for UI display
-        "debug_summary",      # human-readable summary
+        "pass1_char_prompts_json",    # PASS 1: character portraits (one per cast member)
+        "pass2_scene_prompts_json",   # PASS 2: empty scene envs (one per scene)
+        "pass3_compose_prompts_json", # PASS 3: per-shot char-in-scene composites
+        "pass3_prompt_count",         # count of PASS 3 shots (feeds Wan N+1 chain)
+        "debug_summary",              # human-readable summary of all 3 passes
     )
     FUNCTION = "plan"
     CATEGORY = "OldTimeRadio/video"
@@ -445,7 +645,21 @@ class OTRVideoPlan:
         if genre_flavor == "(none)":
             genre_flavor = ""
 
-        plan = build_shot_plan(
+        # PASS 1: char portraits (one per character in single-char mode)
+        pass1 = build_pass1_char_prompts(
+            director_json=director_json,
+            focus_character=focus_character,
+            style_tail=style_tail,
+        )
+
+        # PASS 2: scene envs (one per scene)
+        pass2 = build_pass2_scene_prompts(
+            director_json=director_json,
+            style_tail=style_tail,
+        )
+
+        # PASS 3: composite shot frames (S scenes x K shots + 1 end)
+        pass3 = build_shot_plan(
             director_json=director_json,
             focus_character=focus_character,
             shots_per_scene=shots_per_scene,
@@ -455,35 +669,39 @@ class OTRVideoPlan:
         )
 
         summary_lines = [
-            f"focus character: {plan['focus_character']}",
-            f"genre flavor:    {plan['genre_flavor'] or '(none)'}",
-            f"scenes covered:  {plan['scenes_covered']}",
-            f"shots per scene: {plan['shots_per_scene']}",
-            f"total prompts:   {plan['total_prompts']}",
-            f"era tail:        {plan['era_tail']}",
+            f"focus character: {pass3['focus_character']}",
+            f"genre flavor:    {pass3['genre_flavor'] or '(none)'}",
+            f"scenes covered:  {pass3['scenes_covered']}",
             "",
-            "first 3 prompts:",
+            f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)",
+            f"PASS 2 (scene envs):       {pass2['total_prompts']} prompt(s)",
+            f"PASS 3 (composite shots):  {pass3['total_prompts']} prompt(s) "
+            f"({pass3['shots_per_scene']} per scene + "
+            f"{1 if include_final_end_frame and pass3['tokens'] else 0} end)",
+            "",
+            "first PASS 3 composite:",
         ]
-        for tok in plan["tokens"][:3]:
+        for tok in pass3["tokens"][:1]:
             summary_lines.append(
                 f"  [{tok['shot_id']}] "
-                f"{tok['description'][:120]}"
-                f"{'...' if len(tok['description']) > 120 else ''}"
+                f"{tok['description'][:160]}"
+                f"{'...' if len(tok['description']) > 160 else ''}"
             )
         summary = "\n".join(summary_lines)
 
         log.info(
-            "OTR_VideoPlan READY: focus=%r shots=%d (%d scenes x %d + %d end)",
+            "OTR_VideoPlan READY: PASS1=%d PASS2=%d PASS3=%d focus=%r",
+            pass1["total_prompts"],
+            pass2["total_prompts"],
+            pass3["total_prompts"],
             focus_character,
-            plan["total_prompts"],
-            plan["scenes_covered"],
-            shots_per_scene,
-            1 if include_final_end_frame and plan["tokens"] else 0,
         )
 
         return (
-            json.dumps(plan, indent=2),
-            plan["total_prompts"],
+            json.dumps(pass1, indent=2),
+            json.dumps(pass2, indent=2),
+            json.dumps(pass3, indent=2),
+            pass3["total_prompts"],
             summary,
         )
 
@@ -503,6 +721,8 @@ __all__ = [
     "OTRVideoPlan",
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
+    "build_pass1_char_prompts",
+    "build_pass2_scene_prompts",
     "build_shot_plan",
     "compose_shot_prompt",
     "extract_scenes",
