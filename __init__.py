@@ -122,6 +122,8 @@ _NODE_MODULES = {
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
     # v2.0 MIT-original video-chain nodes (replace VideoHelperSuite-GPL deps)
     "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
+    # v2.0 read-only Director/script adapter for multi-pass FLUX rendering
+    "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
