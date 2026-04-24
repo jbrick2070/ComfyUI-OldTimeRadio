@@ -1,5 +1,5 @@
 {
-  "last_node_id": 5,
+  "last_node_id": 6,
   "last_link_id": 15,
   "nodes": [
     {
@@ -37,7 +37,7 @@
           "name": "pass3_compose_prompts_json",
           "type": "STRING",
           "links": [
-            10
+            9
           ],
           "shape": 3,
           "slot_index": 2
@@ -70,6 +70,75 @@
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
+    },
+    {
+      "id": 6,
+      "type": "OTR_ShotDurationCalculator",
+      "pos": [
+        600,
+        650
+      ],
+      "size": [
+        380,
+        260
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "Shot Duration Calculator",
+      "inputs": [
+        {
+          "name": "pass3_compose_prompts_json",
+          "type": "STRING",
+          "link": 9,
+          "widget": {
+            "name": "pass3_compose_prompts_json"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "expanded_pass3_json",
+          "type": "STRING",
+          "links": [
+            10
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "total_clips",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "total_frames",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 2
+        },
+        {
+          "name": "debug_summary",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_ShotDurationCalculator"
+      },
+      "widgets_values": [
+        "",
+        "[7.0, 15.0, 8.0, 27.0, 6.0, 9.0]",
+        9.0,
+        10.0
+      ],
+      "color": "#3B6E3B",
+      "bgcolor": "#244524"
     },
     {
       "id": 2,
@@ -186,7 +255,7 @@
       },
       "widgets_values": [
         "",
-        2,
+        100,
         1,
         "randomize",
         20,
@@ -279,9 +348,17 @@
   ],
   "links": [
     [
-      10,
+      9,
       1,
       2,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      10,
+      6,
+      0,
       3,
       3,
       "STRING"

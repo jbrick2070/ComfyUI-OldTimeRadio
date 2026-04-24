@@ -124,6 +124,8 @@ _NODE_MODULES = {
     "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
     # v2.0 read-only Director/script adapter for multi-pass FLUX rendering
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
+    # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
+    "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
