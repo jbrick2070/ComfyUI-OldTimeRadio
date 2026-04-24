@@ -673,6 +673,23 @@ class OTRVideoPlan:
                     "BOOLEAN",
                     {"default": True},
                 ),
+                "audio_gate": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "forceInput": True,
+                        "tooltip": (
+                            "Optional sequencing gate. Wire a downstream audio "
+                            "node's output here (e.g. OTR_VisualRenderer."
+                            "final_mp4_path) to force ComfyUI's topsort to run "
+                            "audio + POC video + ffmpeg chain to completion "
+                            "BEFORE starting the FLUX video branch. "
+                            "The value itself is ignored — presence of the link "
+                            "is what creates the dependency. Prevents VRAM "
+                            "contention when Bark / MusicGen / FLUX compete."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -695,7 +712,13 @@ class OTRVideoPlan:
         genre_flavor: str,
         style_tail: str = "",
         include_final_end_frame: bool = True,
+        audio_gate: str = "",
     ):
+        # audio_gate is deliberately ignored — its only purpose is to create
+        # a topsort dependency so this node fires AFTER the upstream audio
+        # pipeline completes. Never read or log the value.
+        _ = audio_gate
+
         if genre_flavor == "(none)":
             genre_flavor = ""
 

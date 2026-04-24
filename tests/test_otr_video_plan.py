@@ -730,6 +730,45 @@ def test_plan_method_multi_char_default():
     assert "all cast" in summary.lower() or "2" in summary
 
 
+def test_plan_method_accepts_audio_gate_and_ignores_value():
+    """audio_gate is a topsort-dependency input only; value must not affect output."""
+    from nodes.otr_video_plan import OTRVideoPlan
+    node = OTRVideoPlan()
+    director_json = json.dumps(_sample_director())
+
+    # Without audio_gate
+    out_a = node.plan(
+        director_json=director_json,
+        focus_character="BABA",
+        shots_per_scene=1,
+        genre_flavor="hard_sci_fi",
+    )
+    # With audio_gate wired (arbitrary string value)
+    out_b = node.plan(
+        director_json=director_json,
+        focus_character="BABA",
+        shots_per_scene=1,
+        genre_flavor="hard_sci_fi",
+        audio_gate="C:/path/to/final_episode.mp4",
+    )
+    # Parse the JSON envelopes and compare — audio_gate should not affect output
+    # (we compare the parsed dicts to avoid JSON whitespace differences)
+    assert json.loads(out_a[0]) == json.loads(out_b[0])
+    assert json.loads(out_a[1]) == json.loads(out_b[1])
+    assert json.loads(out_a[2]) == json.loads(out_b[2])
+    assert out_a[3] == out_b[3]
+
+
+def test_input_types_has_audio_gate_optional():
+    from nodes.otr_video_plan import OTRVideoPlan
+    schema = OTRVideoPlan.INPUT_TYPES()
+    assert "optional" in schema
+    assert "audio_gate" in schema["optional"]
+    assert schema["optional"]["audio_gate"][0] == "STRING"
+    # forceInput ensures the widget is replaced with an input socket
+    assert schema["optional"]["audio_gate"][1].get("forceInput") is True
+
+
 def test_plan_method_single_char_when_focus_set():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
