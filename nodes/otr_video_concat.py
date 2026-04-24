@@ -324,6 +324,10 @@ class OTRVideoConcat:
     RETURN_NAMES = ("video_path",)
     FUNCTION = "concat"
     CATEGORY = "OldTimeRadio/video"
+    # OUTPUT_NODE tells ComfyUI this is a terminal effect (writes a file).
+    # Without it, ComfyUI will not execute the node unless another node
+    # consumes its STRING output, which is inconvenient for test graphs.
+    OUTPUT_NODE = True
 
     def concat(
         self,

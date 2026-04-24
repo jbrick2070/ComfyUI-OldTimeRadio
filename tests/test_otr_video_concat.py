@@ -380,6 +380,14 @@ def test_function_and_category_set():
     assert OTRVideoConcat.CATEGORY.startswith("OldTimeRadio")
 
 
+def test_is_output_node():
+    """ComfyUI needs OUTPUT_NODE=True to execute a terminal file-writing
+    node when its STRING output is not consumed by anything downstream."""
+    from nodes.otr_video_concat import OTRVideoConcat
+
+    assert getattr(OTRVideoConcat, "OUTPUT_NODE", False) is True
+
+
 def test_concat_method_stub_end_to_end(tmp_path, monkeypatch):
     """Smoke test of the node's concat() entry point in stub mode."""
     from nodes.otr_video_concat import OTRVideoConcat
