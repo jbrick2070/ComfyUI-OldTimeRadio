@@ -1272,6 +1272,8 @@ _TOKEN_RATIO_ACT_OBSIDIAN = 2.5  # Obsidian 4GB: wider slack for constrained KV 
 #   __FIRST LAST__: text               → FIRST LAST: text
 #   FIRST_LAST: text                   → FIRST LAST: text
 #   *FIRST_LAST*, whispering: text     → FIRST LAST: text
+#   [FIRST LAST, traits] text          → FIRST LAST: text  (BUG-LOCAL-063)
+#   [FIRST, mood] text                 → FIRST: text       (BUG-LOCAL-063)
 #
 # Standard NAME: lines pass through unchanged (regex only fires on decorated
 # names — plain uppercase + colon is a no-op match that rewrites identically).
@@ -1285,6 +1287,33 @@ _RE_LLM_DIALOGUE_NAME = re.compile(
     re.MULTILINE
 )
 
+# BUG-LOCAL-063 (2026-04-24): The normalizer's promise --
+# "All downstream consumers (word-count regex, FORMAT_NORM, PARSE) see clean
+# text" -- broke when Mistral Nemo's preferred [NAME, mood] text shorthand
+# landed here unrecognized. Run #4 produced a clean script with ~18 lines of
+# `[MINDSY, Female, 30s, Urgent, Determined] Kane, I've crunched the numbers!`
+# style dialogue, but WORD_ENFORCEMENT's dialogue-counting regex (which looks
+# for `NAME:` form) saw zero and triggered the rescue pipeline, which then
+# discarded itself, producing a near-empty final MP4. Pattern below rewrites
+# bracket-shorthand to canonical `NAME:` form so every downstream counter
+# sees the same clean text. Structural tokens (ENV/SFX/MUSIC/VOICE/ACT/SCENE/
+# BEAT/PAUSE/TRANSITION/FADE/CUT/INT/EXT) pass through untouched.
+_BRACKET_STRUCTURAL_TOKENS = frozenset({
+    "ENV", "SFX", "MUSIC", "VOICE", "ACT", "SCENE", "BEAT", "PAUSE",
+    "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT", "INT", "EXT",
+    "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR", "SYSTEM_SENTINEL",
+    "OPENING", "CLOSING", "INTERSTITIAL",
+})
+_RE_LLM_BRACKET_NAME_DIALOGUE = re.compile(
+    r'^'
+    r'\['                                   # opening bracket
+    r'([A-Z][A-Z0-9_ ]{1,25})'             # character name (may have underscores/spaces)
+    r'(?:,\s*[^\]]*?)?'                    # optional traits list (non-greedy)
+    r'\]'                                   # closing bracket
+    r'\s+(?=\S)',                           # at least one space, dialogue follows
+    re.MULTILINE,
+)
+
 
 def _normalize_dialogue_names(text):
     """Intelligent LLM output normalizer — strips all creative formatting
@@ -1293,12 +1322,25 @@ def _normalize_dialogue_names(text):
     Called once before WORD_EXTEND (Step 0) and once on extension LLM output.
     All downstream consumers (word-count regex, FORMAT_NORM, PARSE) see clean text.
     """
-    def _clean(m):
+    def _clean_colon(m):
         name = m.group(1).strip().replace('_', ' ')
         # Collapse multiple spaces (from stripped underscores or padding)
         name = ' '.join(name.split())
         return f'{name}:'
-    return _RE_LLM_DIALOGUE_NAME.sub(_clean, text)
+    # Pass 1: bracket-shorthand '[NAME, mood] dialogue' -> 'NAME: dialogue'.
+    # Skip structural bracketed tokens ([ENV:...], [SFX:...], [VOICE: NAME...],
+    # [ACT TWO], [SCENE 3]). The [VOICE: NAME, ...] form is handled by Pass 2
+    # after the bracket is stripped and the NAME: colon form remains.
+    def _clean_bracket(m):
+        raw_name = m.group(1).strip().replace('_', ' ')
+        first_word = raw_name.split()[0] if raw_name else ''
+        if first_word.upper() in _BRACKET_STRUCTURAL_TOKENS:
+            return m.group(0)  # leave structural tags untouched
+        name = ' '.join(raw_name.split())
+        return f'{name}: '
+    text = _RE_LLM_BRACKET_NAME_DIALOGUE.sub(_clean_bracket, text)
+    # Pass 2: classic colon + bold/underscore decorated forms.
+    return _RE_LLM_DIALOGUE_NAME.sub(_clean_colon, text)
 
 
 # ── Scene inventory (diagnostic instrumentation) ────────────────
