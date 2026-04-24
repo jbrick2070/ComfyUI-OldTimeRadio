@@ -1,0 +1,81 @@
+{
+  "episode_title": "The Saturn Broadcast",
+  "voice_assignments": {
+    "LEMMY": {
+      "voice_preset": "v2/en_speaker_8",
+      "notes": "Male, 50s, gravelly, weathered, confident"
+    },
+    "KENJI CROSS": {
+      "voice_preset": "v2/en_speaker_3",
+      "notes": "Male, 30s, urgent, clipped military cadence"
+    },
+    "ANNOUNCER": {
+      "voice_preset": "v2/en_speaker_4",
+      "notes": "Female, 40s, warm authoritative broadcast voice"
+    }
+  },
+  "sfx_plan": [
+    {
+      "cue_id": "sfx_001",
+      "type": "sfx",
+      "description": "low frequency console hum",
+      "generation_prompt": "deep industrial drone of old analog electronics, subtle electromagnetic hum, distant air handler, mono"
+    },
+    {
+      "cue_id": "sfx_002",
+      "type": "sfx",
+      "description": "red alert klaxon, distant",
+      "generation_prompt": "muffled alarm klaxon pulsing through thick bulkhead doors, distant urgent warning, rhythmic low-frequency whoop"
+    }
+  ],
+  "music_plan": [
+    {
+      "cue_id": "opening",
+      "duration_sec": 12,
+      "generation_prompt": "1940s old time radio sci-fi opening, brass fanfare with theremin lead, upright bass, AM radio character, confident and mysterious"
+    },
+    {
+      "cue_id": "closing",
+      "duration_sec": 8,
+      "generation_prompt": "1940s old time radio sci-fi closing sting, brass and strings resolving, tube warmth, fades to silence"
+    },
+    {
+      "cue_id": "interstitial",
+      "duration_sec": 4,
+      "generation_prompt": "short act-break stinger, single brass hit with cymbal swell, tube warmth, mono"
+    }
+  ],
+  "pacing": {
+    "beat_pause_ms": 100
+  },
+  "visual_plan": {
+    "characters": {
+      "LEMMY": {
+        "portrait_prompt": "Cinematic portrait of a weathered male spacer in his 50s, long dark hair streaked with grey, deep facial scars along the jawline, prominent muttonchop sideburns, worn leather flight jacket over a patched grey jumpsuit, dangling silver pendant, piercing eyes, ambient red alert lighting on his face, high fidelity 35mm film grain"
+      },
+      "KENJI CROSS": {
+        "portrait_prompt": "Cinematic portrait of a disciplined male officer in his 30s, close-cropped black hair, sharp cheekbones, clean-shaven, pressed charcoal military uniform with silver rank insignia on the collar, alert posture, cold blue console light on his face, high fidelity 35mm film grain"
+      },
+      "ANNOUNCER": {
+        "portrait_prompt": "Cinematic portrait of a poised broadcast announcer in her 40s, hair pulled back, vintage headset with boom microphone, warm amber studio lamp lighting, soft focus 1940s radio studio aesthetic, 35mm film grain"
+      }
+    },
+    "scenes": [
+      {
+        "scene_id": "scene_1",
+        "shot_description": "LEMMY at the comms console, a signal is coming in from Saturn",
+        "visual_prompt": "Cinematic wide shot of dim cramped starship comms bay, red alert pulse slowly pulsing overhead, blue holographic console glow, banks of 1980s-style analog readouts, industrial grey riveted panels, atmospheric volumetric haze"
+      },
+      {
+        "scene_id": "scene_2",
+        "shot_description": "LEMMY and KENJI CROSS argue in the corridor about whether to respond",
+        "visual_prompt": "Cinematic medium shot of narrow starship corridor lit by flickering emergency strip lighting, long perspective lines of bulkhead ribs, condensation streaks on metal walls, amber warning stripes on the floor, volumetric haze, cold steel atmosphere"
+      },
+      {
+        "scene_id": "scene_3",
+        "shot_description": "LEMMY alone in the captain's ready room, making the call",
+        "visual_prompt": "Cinematic close shot of captain's ready room, dim desk lamp casting a warm pool of light on a cluttered metal desk covered in maps and data tablets, large porthole window showing distant Saturn and its rings, warm amber lamp light contrasted against cold blue starlight, cinematic 35mm film aesthetic"
+      }
+    ]
+  }
+}

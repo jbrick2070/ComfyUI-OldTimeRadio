@@ -626,6 +626,125 @@ def test_plan_method_empty_scenes_still_returns_envelope():
     assert payload["scenes_covered"] == 0
 
 
+# ------------------------------------------------------------------
+# Multi-character mode
+# ------------------------------------------------------------------
+
+
+def _multi_char_director() -> dict:
+    return {
+        "episode_title": "The Saturn Broadcast",
+        "voice_assignments": {
+            "LEMMY": {"voice_preset": "v2/en_speaker_8",
+                      "notes": "Male, 50s, gravelly"},
+            "KENJI CROSS": {"voice_preset": "v2/en_speaker_3",
+                            "notes": "Male, 30s, clipped"},
+        },
+        "sfx_plan": [],
+        "music_plan": [],
+        "pacing": {"beat_pause_ms": 100},
+        "visual_plan": {
+            "characters": {
+                "LEMMY": {"portrait_prompt": "weathered male spacer, 50s, muttonchops, flight jacket"},
+                "KENJI CROSS": {"portrait_prompt": "disciplined officer, 30s, black hair, charcoal uniform"},
+            },
+            "scenes": [
+                {"scene_id": "scene_1", "visual_prompt": "dim comms bay"},
+                {"scene_id": "scene_2", "visual_prompt": "narrow corridor"},
+            ],
+        },
+    }
+
+
+def test_pass1_multi_char_emits_one_token_per_character():
+    from nodes.otr_video_plan import build_pass1_char_prompts
+    director_json = json.dumps(_multi_char_director())
+    # Empty focus_character => multi-char mode
+    pass1 = build_pass1_char_prompts(director_json, "", style_tail="style")
+    assert pass1["character_count"] == 2
+    assert set(pass1["characters"]) == {"LEMMY", "KENJI CROSS"}
+    # Each token has the right portrait
+    desc_by_name = {t["character"]: t["description"] for t in pass1["tokens"]}
+    assert "muttonchops" in desc_by_name["LEMMY"]
+    assert "charcoal uniform" in desc_by_name["KENJI CROSS"]
+
+
+def test_pass1_all_sentinel_equals_multi_char():
+    from nodes.otr_video_plan import build_pass1_char_prompts
+    director_json = json.dumps(_multi_char_director())
+    # "(all)" sentinel => multi-char mode
+    pass1 = build_pass1_char_prompts(director_json, "(all)", style_tail="style")
+    assert pass1["character_count"] == 2
+
+
+def test_pass1_single_char_mode_respects_focus():
+    """When focus_character is a specific name, only that one portrait."""
+    from nodes.otr_video_plan import build_pass1_char_prompts
+    director_json = json.dumps(_multi_char_director())
+    pass1 = build_pass1_char_prompts(director_json, "LEMMY", style_tail="style")
+    assert pass1["character_count"] == 1
+    assert pass1["characters"] == ["LEMMY"]
+
+
+def test_pass3_multi_char_includes_all_portraits():
+    from nodes.otr_video_plan import build_shot_plan
+    director_json = json.dumps(_multi_char_director())
+    # Empty focus_character => include all chars
+    plan = build_shot_plan(
+        director_json, focus_character="",
+        shots_per_scene=1, genre_flavor="hard_sci_fi",
+    )
+    first_desc = plan["tokens"][0]["description"]
+    # Both character portraits should appear
+    assert "muttonchops" in first_desc
+    assert "charcoal uniform" in first_desc
+
+
+def test_pass3_single_char_mode_only_focus_character():
+    from nodes.otr_video_plan import build_shot_plan
+    director_json = json.dumps(_multi_char_director())
+    plan = build_shot_plan(
+        director_json, focus_character="LEMMY",
+        shots_per_scene=1, genre_flavor="hard_sci_fi",
+    )
+    first_desc = plan["tokens"][0]["description"]
+    # Only LEMMY's portrait in compose, not KENJI's
+    assert "muttonchops" in first_desc
+    assert "charcoal uniform" not in first_desc
+
+
+def test_plan_method_multi_char_default():
+    """Default "(all)" widget value => multi-char mode, both PASS 1 chars."""
+    from nodes.otr_video_plan import OTRVideoPlan
+    node = OTRVideoPlan()
+    director_json = json.dumps(_multi_char_director())
+    pass1_json, _p2, _p3, _count, summary = node.plan(
+        director_json=director_json,
+        focus_character="(all)",
+        shots_per_scene=1,
+        genre_flavor="hard_sci_fi",
+    )
+    pass1 = json.loads(pass1_json)
+    assert pass1["character_count"] == 2
+    # Summary should say "all cast"
+    assert "all cast" in summary.lower() or "2" in summary
+
+
+def test_plan_method_single_char_when_focus_set():
+    from nodes.otr_video_plan import OTRVideoPlan
+    node = OTRVideoPlan()
+    director_json = json.dumps(_multi_char_director())
+    pass1_json, _p2, pass3_json, _count, _summary = node.plan(
+        director_json=director_json,
+        focus_character="LEMMY",
+        shots_per_scene=1,
+        genre_flavor="hard_sci_fi",
+    )
+    pass1 = json.loads(pass1_json)
+    assert pass1["character_count"] == 1
+    assert pass1["characters"] == ["LEMMY"]
+
+
 def test_plan_output_consumable_by_batch_flux_render_parser():
     """Smoke: all 3 pass outputs match the schema BatchFluxRender's
     _parse_env_prompts expects so wiring is zero-effort."""

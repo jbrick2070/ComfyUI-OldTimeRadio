@@ -235,15 +235,19 @@ def compose_shot_prompt(
 
 def build_pass1_char_prompts(
     director_json: str,
-    focus_character: str,
+    focus_character: str = "",
     *,
     style_tail: str = "",
 ) -> dict:
     """PASS 1 envelope: one token for each character's portrait.
 
-    For the thin-slice single-character mode, this emits exactly one
-    token — the focus_character's portrait. Later this can expand to
-    render every cast member's portrait up front.
+    Multi-character mode (default): emits one token per character found
+    in ``director.visual_plan.characters``. Use this to render the whole
+    cast's portraits up front as FLUX images that can be reused across
+    every shot they appear in.
+
+    Single-character mode: set ``focus_character`` to a specific name to
+    limit output to just that one portrait. Useful for thin-slice tests.
 
     Output envelope matches BatchFluxRender's env-token schema so it
     consumes the list as-is.
@@ -256,24 +260,49 @@ def build_pass1_char_prompts(
         director = {}
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
-    portrait = resolve_character_portrait(
-        director, focus_character, resolved_style_tail
-    )
-    char_slug = slugify(focus_character)
 
-    tokens = [{
-        "type": "environment",
-        "description": portrait,
-        "role": "char_portrait",
-        "shot_id": f"char_{char_slug}_portrait",
-        "focus_character": focus_character,
-        "kind": "pass1_char",
-    }]
+    # Collect all character names that have portrait data
+    visual_plan = director.get("visual_plan") or {}
+    chars_dict = visual_plan.get("characters") or {}
+    all_char_names = [
+        n for n in chars_dict.keys() if isinstance(n, str) and n.strip()
+    ]
+
+    # If focus_character is set (non-empty, not the sentinel "(all)"),
+    # limit to just that one. Otherwise emit tokens for every character.
+    focus_is_limit = bool(focus_character) and focus_character != "(all)"
+    if focus_is_limit:
+        target_names = [focus_character]
+    else:
+        target_names = all_char_names if all_char_names else [focus_character]
+        # If neither the cast nor a focus char is usable, fall back to
+        # a single un-named portrait so the envelope is still valid.
+        target_names = [n for n in target_names if n]
+        if not target_names:
+            target_names = [""]
+
+    tokens: list[dict[str, Any]] = []
+    for name in target_names:
+        portrait = resolve_character_portrait(
+            director, name, resolved_style_tail
+        )
+        char_slug = slugify(name) if name else "unnamed"
+        tokens.append({
+            "type": "environment",
+            "description": portrait,
+            "role": "char_portrait",
+            "shot_id": f"char_{char_slug}_portrait",
+            "character": name,
+            "focus_character": focus_character,
+            "kind": "pass1_char",
+        })
 
     return {
         "tokens": tokens,
         "source": "OTR_VideoPlan.pass1",
         "focus_character": focus_character,
+        "character_count": len(tokens),
+        "characters": [t["character"] for t in tokens],
         "total_prompts": len(tokens),
         "style_tail": resolved_style_tail,
     }
@@ -401,9 +430,32 @@ def build_shot_plan(
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
     era_tail = resolve_era_tail(genre_flavor)
-    portrait = resolve_character_portrait(
-        director, focus_character, resolved_style_tail
-    )
+
+    # Multi-character compose: concatenate portraits for every character
+    # in visual_plan.characters (the whole cast). Single-character mode
+    # activates when ``focus_character`` is set to a specific non-empty
+    # name (not "(all)"), emitting only that character's portrait.
+    visual_plan = director.get("visual_plan") or {}
+    chars_dict = visual_plan.get("characters") or {}
+    all_char_names = [
+        n for n in chars_dict.keys() if isinstance(n, str) and n.strip()
+    ]
+    focus_is_limit = bool(focus_character) and focus_character != "(all)"
+    if focus_is_limit:
+        target_char_names = [focus_character]
+    else:
+        target_char_names = all_char_names if all_char_names else [focus_character]
+        target_char_names = [n for n in target_char_names if n]
+
+    # Collect portrait strings for the target characters and join.
+    portrait_parts = [
+        resolve_character_portrait(director, n, resolved_style_tail)
+        for n in target_char_names
+    ]
+    portrait = ", ".join(p.strip().rstrip(",").strip() for p in portrait_parts if p) \
+        if portrait_parts else resolve_character_portrait(
+            director, focus_character, resolved_style_tail
+        )
 
     scenes = extract_scenes(director)
     tokens: list[dict[str, Any]] = []
@@ -594,10 +646,12 @@ class OTRVideoPlan:
                 "focus_character": (
                     "STRING",
                     {
-                        "default": "BABA",
+                        "default": "(all)",
                         "tooltip": (
-                            "Name of the one character to anchor "
-                            "across every shot in this render pass"
+                            "'(all)' or empty = multi-character mode: "
+                            "render every character in visual_plan.characters. "
+                            "Set to a specific name (e.g. 'LEMMY') to limit to "
+                            "one character for a thin-slice test."
                         ),
                     },
                 ),
@@ -645,10 +699,17 @@ class OTRVideoPlan:
         if genre_flavor == "(none)":
             genre_flavor = ""
 
-        # PASS 1: char portraits (one per character in single-char mode)
+        # Treat the "(all)" sentinel as unset so downstream helpers
+        # switch into multi-character mode.
+        resolved_focus = focus_character
+        if focus_character == "(all)":
+            resolved_focus = ""
+
+        # PASS 1: char portraits (one per character, or just the
+        # focus character if focus_character is a specific name)
         pass1 = build_pass1_char_prompts(
             director_json=director_json,
-            focus_character=focus_character,
+            focus_character=resolved_focus,
             style_tail=style_tail,
         )
 
@@ -661,19 +722,30 @@ class OTRVideoPlan:
         # PASS 3: composite shot frames (S scenes x K shots + 1 end)
         pass3 = build_shot_plan(
             director_json=director_json,
-            focus_character=focus_character,
+            focus_character=resolved_focus,
             shots_per_scene=shots_per_scene,
             genre_flavor=genre_flavor,
             style_tail=style_tail,
             include_final_end_frame=include_final_end_frame,
         )
 
+        # Describe cast (for multi-char mode) or focus
+        pass1_chars = pass1.get("characters", [])
+        if resolved_focus:
+            cast_line = f"focus character: {resolved_focus}"
+        else:
+            cast_line = (
+                f"cast ({pass1['character_count']}): "
+                f"{', '.join(pass1_chars) if pass1_chars else '(none)'}"
+            )
+
         summary_lines = [
-            f"focus character: {pass3['focus_character']}",
+            cast_line,
             f"genre flavor:    {pass3['genre_flavor'] or '(none)'}",
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
-            f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)",
+            f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"
+            f"{' — all cast' if not resolved_focus else ' — focus only'}",
             f"PASS 2 (scene envs):       {pass2['total_prompts']} prompt(s)",
             f"PASS 3 (composite shots):  {pass3['total_prompts']} prompt(s) "
             f"({pass3['shots_per_scene']} per scene + "
