@@ -340,6 +340,32 @@ Math is unchanged. Only the constants move.
 - **Scene-geometry consistency across episodes** (Scene-Geometry-Vault from P2). Still deferred, same as before.
 - **Still no IP-Adapter / Kontext for character identity lock.** Text-composite remains the floor; upgrading to image-reference PASS 3 compose (FLUX.2-Kontext klein) is a Stage 5 item.
 
+### Parallel consideration &mdash; TTS upgrade path (Bark &rarr; Fish Speech / CosyVoice)
+
+Independent of the FLUX.2 + HuMo rollout. Bark is shipping and stable, but both Fish Speech and CosyVoice are legitimate 2026-era upgrades worth evaluating once the video stack is green. Do NOT start this before Stage 4 is done &mdash; audio is king, and replacing the TTS backbone while video is still in flux would break our baseline reference.
+
+**Candidates (all fit on 5080 16 GB):**
+
+| Engine | Est. VRAM | License | Strengths | Weaknesses |
+|---|---|---|---|---|
+| **Bark** (current) | 8-12 GB | MIT | Natural laughter / sighs / non-verbal; great character colour; proven in OTR pipeline | Slower per-token; no per-speaker cloning without retraining; English-centric |
+| **Fish Speech S2-Pro** | 16 GB (BNB NF4 4-bit); 24 GB+ full | Non-commercial research license &mdash; verify before use | Best-in-class audio quality among 2026 open TTS; clean zero-shot voice cloning; has ComfyUI node (`Saganaki22/ComfyUI-FishAudioS2`) | License profile is the blocker &mdash; OTR is MIT and we do not vendor restrictive code. Worth evaluating for personal use only unless upstream relaxes. |
+| **CosyVoice 2.0** | ~6-8 GB | Apache-2.0 | Ultra-low latency (~150 ms first-chunk); pronunciation error rate 30-50% lower than v1; multilingual; streaming; Apache-2.0 is safe to vendor | No built-in non-verbal sounds as expressive as Bark; would lose some of the 1940s-radio character colour we rely on |
+| **CosyVoice 3.0** | ~8-10 GB | Apache-2.0 | Quality improvements over 2.0; same license profile | Still maturing; double-check upstream stability before committing |
+| **Qwen3-TTS** | ~6 GB | Apache-2.0 | Apache-2.0; Alibaba quality; strong multilingual | Newer &mdash; less community tooling than CosyVoice; ComfyUI node coverage thin as of 2026-04-23 |
+
+**Criteria to evaluate when we pick this up:**
+
+1. **License compatibility first.** OTR stays MIT. Fish Speech's non-commercial research license means we can listen and evaluate on Jeffrey's machine, but cannot ship it vendored in the repo. CosyVoice 2/3 and Qwen3-TTS are Apache-2.0 &mdash; safe to use and recommend.
+2. **Does it keep the "1940s radio voice" character?** Bark's strength is non-verbal expressivity (sighs, laughter, uh-huhs). A pure-quality win on neutral speech is a net loss if the period-drama colour drains out of the announcer / character reads.
+3. **Does it fit into `batch_bark_generator.py` without rewriting the orchestrator?** The sequencer (length-sorted batching, VRAM-Sentinel decorator, per-call snapshots) is proven; an ideal swap is a drop-in TTS backend behind the same interface.
+4. **Per-character voice consistency across episodes.** Currently Bark uses preset matching. CosyVoice's zero-shot cloning from a 3-10s reference could actually improve cross-episode consistency (feed the same reference WAV every time).
+5. **Streaming vs batch.** CosyVoice 2's streaming 150 ms could let us interleave TTS with FLUX &mdash; probably overkill for OTR's batch pipeline, but worth noting.
+
+**Recommended first look (when we get here):** CosyVoice 2.0 Apache-2.0, sideload a ComfyUI node, A/B against Bark on the LEMMY + KENJI CROSS + ANNOUNCER test fixture. No commitment, no rip-and-replace until we hear it in context.
+
+Deferred. Captured here so it doesn't drop on the floor.
+
 ### Quick-start for next session
 
 1. Read `memory/project_flux2_humo_rollout_2026-04-23.md`
