@@ -1,0 +1,134 @@
+Title: Satellites Collide
+Genre: hard sci-fi radio drama
+Cast: DUANE VOSS, PARRY MARTIN, ALAN SIRIKIT, REGINALD HAYES, ANNOUNCER
+Duration: 7.7 min (461.2s assembled audio)
+News seed: Johnson Leaders Honored by National Space Club & Foundation
+
+Source: extracted from the 2026-04-23 23:04:18 run treatment.
+The phantom SPACE STATION / CAPTAIN JOHNSON / ENSIGN PARKER / CONTROL scene
+that the critique/revise pass pasted in has been removed. Five real
+characters only.
+
+
+=== SCENE 1 ===
+[ENV: Observatory control room, humming computers, occasional beeps, tense atmosphere]
+[SFX: Fingernails tapping nervously on a keyboard]
+(beat)
+
+ANNOUNCER: Welcome to Signal Lost. Tonight, in the vast expanse of outer space, a rogue satellite hurtles towards our most advanced telescope. Caused by an uncharted asteroid fragment, it threatens to plunge humanity into darkness. Time is running out for our heroes to change its course. Tonight, we listen to their race against time. But first, an urgent call...
+
+[SFX: Ringing phone, static]
+
+DUANE VOSS: (Urgent) Voss here. Give me the details.
+
+PARRY MARTIN: (Calmly authoritative) Duane, it's bad. The object's trajectory suggests impact in less than twenty-four hours. We're looking at catastrophic damage to the telescope.
+
+ALAN SIRIKIT: (Agitated, distant) And there's something else. Something I should've disclosed earlier.
+
+REGINALD HAYES: (Soothing, echoed) Son, you've always had good instincts. Trust them now.
+
+DUANE VOSS: (Determined) Thanks, Dad. We'll find a way to stop this.
+
+[SFX: Chair rolling in, keys clattering]
+
+
+=== SCENE 2 ===
+[ENV: Observatory office, shuffling papers, distant murmur of machinery]
+
+ANNOUNCER: Parry Martin, Director of the Observatory, clashes with Duane Voss, the tenacious astronomer leading their desperate strategy.
+
+PARRY MARTIN: (Firm, concerned) We can't afford mistakes, Duane. Not with this much at stake.
+
+DUANE VOSS: (Impassioned, frustrated) We can't sit idle either! If we don't act soon, it'll be too late!
+
+ALAN SIRIKIT: (Sheepish, hesitant) Guys, I need to confess. Last year, when I was rushing that project... I cut corners. I might've left a vulnerability in the software.
+
+[SFX: Sharp inhale, stressed breathing]
+
+PARRY MARTIN: (Alarmed, serious) Alan, if this is true, we could've prevented this. Why didn't you say anything?
+
+ALAN SIRIKIT: (Remorseful) I was scared. I thought I could fix it later. I'm sorry.
+
+
+=== SCENE 3 ===
+[ENV: Observatory control room, intense, frantic energy]
+
+ANNOUNCER: A daring plan takes shape. Our heroes' resolve is tested.
+
+DUANE VOSS: (Resolute, grim) We need someone to pilot a manual intercept. It's risky, but it's our best chance.
+
+PARRY MARTIN: (Reluctant, determined) I'll lead the mission. As director, it's my responsibility to protect our investments.
+
+ALAN SIRIKIT: (Anxious, eager) I'll handle ground support. We'll monitor your progress, keep you safe.
+
+REGINALD HAYES: (Proud, steady) That's my boy. Take care of each other, alright?
+
+[SFX: Launch sequence initiated, countdown beeps]
+
+ANNOUNCER: Parry Martin closes in on the rogue satellite. A tense ballet ensues.
+
+PARRY MARTIN: (Focused, calm) Alright, Duane. Talk me through this.
+
+DUANE VOSS: (Concerned, precise) Stay sharp, Parry. We're approaching from port side. One wrong move could spell disaster.
+
+ALAN SIRIKIT: (Nervous, distant) Maintain 4,500 feet. Watch for debris fields. They're unpredictable.
+
+[SFX: Proximity alarm, warning buzz intensifies]
+
+PARRY MARTIN: (Tense) Roger that. Here goes nothing.
+
+[SFX: Controlled explosion, jarring thump]
+
+ANNOUNCER: Crisis contained, but not without sacrifice. Our heroes grapple with their victory and losses.
+
+DUANE VOSS: (Gravity-stricken, reflective) Well, that's done. Dad?
+
+REGINALD HAYES: (Grateful, weary) You did all you could, son. I couldn't ask for more.
+
+PARRY MARTIN: (Reflective, determined) We'll learn from this, Duane. Together, we'll ensure nothing like this happens again.
+
+ALAN SIRIKIT: (Humiliated, determined) I let everyone down. But I swear, I'll make it up to you all.
+
+ANNOUNCER: According to NASA, reported May 2nd, 2026, undetected celestial objects pose constant threats to our technological advancements. This near-miss serves as a reminder of humanity's relentless pursuit of knowledge amidst cosmic uncertainty.
+
+ALAN SIRIKIT: (Defensive) You think I wanted this to happen? I never meant for anyone to get hurt!
+
+PARRY MARTIN: (Accusatory) Then why didn't you speak up sooner, Alan? This could have been avoided!
+
+ALAN SIRIKIT: (Angry) Easy for you to say, Parry! You weren't the one living under threat of blackmail!
+
+DUANE VOSS: (Surprised) Blackmail? What are you talking about, Alan?
+
+ALAN SIRIKIT: (Pause) I... I can't discuss it now. We have bigger problems at hand.
+
+REGINALD HAYES: (Suspicious) There's more to this than meets the eye, isn't there, Alan?
+
+PARRY MARTIN: (Serious) We need full disclosure, Alan. Now. Our lives depend on it.
+
+ALAN SIRIKIT: (Reluctant) Fine. After this crisis, I'll tell you everything.
+
+DUANE VOSS: (Frustrated) We're running out of time, people! Let's focus on stopping this thing!
+
+PARRY MARTIN: (Apologetic) You're right, Duane. Alan, what do we know about its composition? Can we blast it apart?
+
+ALAN SIRIKIT: (Shaking his head) No, it's not like anything we've encountered before. It's too dense.
+
+REGINALD HAYES: (Thoughtful) Perhaps we shouldn't destroy it. Maybe we can redirect it instead.
+
+DUANE VOSS: (Intrigued) How so, Dad?
+
+REGINALD HAYES: (Explaining) If we can alter its trajectory just enough, it might miss Earth entirely.
+
+PARRY MARTIN: (Impressed) That's brilliant, Reginald. But it'll take precision and finesse.
+
+ALAN SIRIKIT: (Cautious) We'd also need to avoid any populated areas during the maneuver.
+
+DUANE VOSS: (Determined) Leave that to me. I'll plot the course. Parry, you'll need to fly close to match its speed.
+
+PARRY MARTIN: (Nodding) Understood. Alan, ready the ground teams. We'll need their support once we've altered its course.
+
+ALAN SIRIKIT: (Affirmative) On it. Good luck, both of you.
+
+[MUSIC: Resigned, thoughtful theme]
+
+=== END OF TRANSMISSION ===

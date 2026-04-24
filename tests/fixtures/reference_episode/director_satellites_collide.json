@@ -1,0 +1,125 @@
+{
+  "episode_title": "Satellites Collide",
+  "voice_assignments": {
+    "ANNOUNCER": {
+      "voice_preset": "v2/en_speaker_1",
+      "notes": "Male, measured, calm, 1940s radio broadcast delivery"
+    },
+    "DUANE VOSS": {
+      "voice_preset": "v2/en_speaker_0",
+      "notes": "Male, 60s, authoritative, deep, astronomer leading the observatory"
+    },
+    "PARRY MARTIN": {
+      "voice_preset": "v2/en_speaker_4",
+      "notes": "Female, 40s, warm, measured, observatory director"
+    },
+    "ALAN SIRIKIT": {
+      "voice_preset": "v2/en_speaker_6",
+      "notes": "Male, 50s, stoic, resonant, observatory engineer carrying guilt"
+    },
+    "REGINALD HAYES": {
+      "voice_preset": "v2/en_speaker_7",
+      "notes": "Male, older, sharp and anxious, Duane's ailing father and observatory medic"
+    }
+  },
+  "sfx_plan": [
+    {
+      "cue_id": "sfx_001",
+      "type": "sfx",
+      "description": "fingernails tapping nervously on a keyboard",
+      "generation_prompt": "soft rhythmic tapping of fingernails on computer keyboard, close-up, intimate, slightly stressed cadence"
+    },
+    {
+      "cue_id": "sfx_002",
+      "type": "sfx",
+      "description": "ringing phone with static",
+      "generation_prompt": "persistent ringing of vintage desk phone with faint static background, tense office atmosphere"
+    },
+    {
+      "cue_id": "sfx_003",
+      "type": "sfx",
+      "description": "chair rolling in, keys clattering",
+      "generation_prompt": "sound of office chair rolling across hard floor followed by clatter of loose keys on a desk"
+    },
+    {
+      "cue_id": "sfx_004",
+      "type": "sfx",
+      "description": "sharp inhale, stressed breathing",
+      "generation_prompt": "abrupt intake of breath followed by rapid, stressed breathing, human foley, close perspective"
+    },
+    {
+      "cue_id": "sfx_005",
+      "type": "sfx",
+      "description": "launch sequence initiated, countdown beeps",
+      "generation_prompt": "mechanical beeps signaling launch sequence, steady cadence building in frequency, mission control timbre"
+    },
+    {
+      "cue_id": "sfx_006",
+      "type": "sfx",
+      "description": "proximity alarm, warning buzz intensifies",
+      "generation_prompt": "electronic proximity alarm buzzing, growing louder and more insistent, spacecraft cockpit perspective"
+    },
+    {
+      "cue_id": "sfx_007",
+      "type": "sfx",
+      "description": "controlled explosion, jarring thump",
+      "generation_prompt": "distant controlled explosion followed by a solid impact thump through bulkhead metal, muffled and heavy"
+    }
+  ],
+  "music_plan": [
+    {
+      "cue_id": "opening",
+      "duration_sec": 12,
+      "generation_prompt": "1940s old time radio sci-fi opening theme, tense strings, ominous brass, upright bass, snare brushes, mono AM radio character, tube saturation, suspenseful, ends on a held chord"
+    },
+    {
+      "cue_id": "closing",
+      "duration_sec": 8,
+      "generation_prompt": "1940s old time radio sci-fi closing sting, relieved strings, soft brass, resolving cadence, warm tube saturation, fades to silence"
+    },
+    {
+      "cue_id": "interstitial",
+      "duration_sec": 4,
+      "generation_prompt": "short old time radio act-break stinger, single brass hit with cymbal swell, mono, tube warmth, tense undertones"
+    }
+  ],
+  "pacing": {
+    "beat_pause_ms": 100
+  },
+  "visual_plan": {
+    "characters": {
+      "DUANE VOSS": {
+        "portrait_prompt": "Cinematic portrait of a weathered male astronomer in his 60s, thinning silver hair and receding hairline, wire-rim glasses, lined determined face, rumpled white observatory lab coat over a dark sweater, soft blue console glow on his face, high fidelity 35mm film grain"
+      },
+      "PARRY MARTIN": {
+        "portrait_prompt": "Cinematic portrait of a composed female observatory director in her 40s, shoulder-length dark hair pulled back, sharp intelligent eyes, tailored charcoal blazer over a cream blouse, small silver director's pin, warm amber office light on her face, high fidelity 35mm film grain"
+      },
+      "ALAN SIRIKIT": {
+        "portrait_prompt": "Cinematic portrait of a nervous male observatory engineer in his 50s, disheveled dark hair, round wire-framed glasses, worried eyes, wrinkled button-down shirt with rolled sleeves, pocket protector of pens, anxious posture, fluorescent workshop light on his face, high fidelity 35mm film grain"
+      },
+      "REGINALD HAYES": {
+        "portrait_prompt": "Cinematic portrait of a distinguished elderly male medic, short-trimmed silver beard, wise weary eyes, navy cardigan over a collared shirt, stethoscope draped around his neck, warm desk-lamp light on his face in a dim clinic, high fidelity 35mm film grain"
+      },
+      "ANNOUNCER": {
+        "portrait_prompt": "Cinematic portrait of a male 1940s radio announcer at the microphone, slicked hair, crisp dark suit and tie, vintage condenser microphone close to his mouth, warm amber studio lamp lighting, soft focus 1940s radio studio aesthetic, 35mm film grain"
+      }
+    },
+    "scenes": [
+      {
+        "scene_id": "scene_1",
+        "shot_description": "Observatory control room, humming computers, tense atmosphere as the rogue satellite is discovered",
+        "visual_prompt": "Cinematic wide shot of a dim 1980s-era observatory control room, banks of CRT monitors showing telescope feeds and orbital trajectory plots, rows of humming analog equipment, red alert indicator pulsing slowly on the far wall, soft blue console glow on operator faces, atmospheric volumetric haze, 35mm film grain"
+      },
+      {
+        "scene_id": "scene_2",
+        "shot_description": "Observatory office where Parry confronts Duane and Alan confesses his backdoor mistake",
+        "visual_prompt": "Cinematic medium shot of a cluttered observatory director's office lit by a single amber desk lamp, walls lined with framed astronomical prints and shelves of reference books, shuffling papers on a heavy wooden desk, warm amber key light against cold blue window light from outside, atmospheric 35mm film grain"
+      },
+      {
+        "scene_id": "scene_3",
+        "shot_description": "Observatory control room during intercept, somber mood, crisis contained but not without sacrifice",
+        "visual_prompt": "Cinematic wide shot of the observatory control room during the intercept climax, all consoles active with orbital trajectory displays and proximity alarms, operators leaning in under flickering emergency lighting, cold blue console glow mixed with amber warning lights, tension thick in volumetric haze, 35mm film grain"
+      }
+    ]
+  }
+}
