@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 25,
-  "last_link_id": 46,
+  "last_link_id": 47,
   "nodes": [
     {
       "id": 1,
@@ -53,8 +53,7 @@
             12,
             16,
             19,
-            24,
-            31
+            24
           ],
           "slot_index": 1
         },
@@ -69,7 +68,7 @@
         {
           "name": "estimated_minutes",
           "type": "INT",
-          "links": [],
+          "links": null,
           "slot_index": 3
         }
       ],
@@ -121,7 +120,6 @@
             17,
             21,
             26,
-            32,
             38
           ],
           "slot_index": 0
@@ -129,19 +127,19 @@
         {
           "name": "voice_map_json",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 1
         },
         {
           "name": "sfx_plan_json",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 2
         },
         {
           "name": "music_plan_json",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 3
         }
       ],
@@ -222,15 +220,13 @@
         {
           "name": "render_log",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 1
         },
         {
           "name": "scene_manifest_json",
           "type": "STRING",
-          "links": [
-            33
-          ],
+          "links": null,
           "slot_index": 2
         }
       ],
@@ -330,21 +326,20 @@
           "name": "episode_audio",
           "type": "AUDIO",
           "links": [
-            15,
-            36
+            15
           ],
           "slot_index": 0
         },
         {
           "name": "output_path",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 1
         },
         {
           "name": "episode_info",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 2
         }
       ],
@@ -404,7 +399,7 @@
         {
           "name": "batch_log",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 1
         }
       ],
@@ -472,7 +467,9 @@
         {
           "name": "video_path",
           "type": "STRING",
-          "links": [],
+          "links": [
+            47
+          ],
           "slot_index": 0
         }
       ],
@@ -661,7 +658,7 @@
         {
           "name": "batch_log",
           "type": "STRING",
-          "links": [],
+          "links": null,
           "slot_index": 1
         }
       ],
@@ -670,205 +667,6 @@
       "mode": 0,
       "color": "#234035",
       "bgcolor": "#162821"
-    },
-    {
-      "id": 16,
-      "type": "OTR_VisualBridge",
-      "pos": [
-        2400,
-        200
-      ],
-      "size": [
-        420,
-        280
-      ],
-      "title": "7a. Visual Bridge (sidecar spawn)",
-      "properties": {
-        "Node name for S&R": "OTR_VisualBridge"
-      },
-      "widgets_values": [
-        "[]",
-        "SIGNAL LOST Episode",
-        "{}",
-        "{}",
-        "faithful",
-        "",
-        42,
-        true,
-        "video_stack"
-      ],
-      "inputs": [
-        {
-          "name": "script_json",
-          "type": "STRING",
-          "link": 31,
-          "widget": {
-            "name": "script_json"
-          }
-        },
-        {
-          "name": "production_plan_json",
-          "type": "STRING",
-          "link": 32,
-          "widget": {
-            "name": "production_plan_json"
-          }
-        },
-        {
-          "name": "scene_manifest_json",
-          "type": "STRING",
-          "link": 33,
-          "widget": {
-            "name": "scene_manifest_json"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "visual_job_id",
-          "type": "STRING",
-          "links": [
-            34
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "shotlist_json",
-          "type": "STRING",
-          "links": [
-            37
-          ],
-          "slot_index": 1
-        }
-      ],
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "color": "#3A2B5A",
-      "bgcolor": "#241C3C"
-    },
-    {
-      "id": 17,
-      "type": "OTR_VisualPoll",
-      "pos": [
-        2860,
-        200
-      ],
-      "size": [
-        300,
-        120
-      ],
-      "title": "7b. Visual Poll (await sidecar)",
-      "properties": {
-        "Node name for S&R": "OTR_VisualPoll"
-      },
-      "widgets_values": [
-        ""
-      ],
-      "inputs": [
-        {
-          "name": "visual_job_id",
-          "type": "STRING",
-          "link": 34,
-          "widget": {
-            "name": "visual_job_id"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "visual_assets_path",
-          "type": "STRING",
-          "links": [
-            35
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "status",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 1
-        },
-        {
-          "name": "status_detail",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 2
-        }
-      ],
-      "flags": {},
-      "order": 17,
-      "mode": 0,
-      "color": "#3A2B5A",
-      "bgcolor": "#241C3C"
-    },
-    {
-      "id": 18,
-      "type": "OTR_VisualRenderer",
-      "pos": [
-        3200,
-        200
-      ],
-      "size": [
-        420,
-        240
-      ],
-      "title": "7c. Visual Renderer (final mp4)",
-      "properties": {
-        "Node name for S&R": "OTR_VisualRenderer"
-      },
-      "widgets_values": [
-        "",
-        "{}",
-        "SIGNAL LOST Episode",
-        true,
-        "1280x720"
-      ],
-      "inputs": [
-        {
-          "name": "visual_assets_path",
-          "type": "STRING",
-          "link": 35,
-          "widget": {
-            "name": "visual_assets_path"
-          }
-        },
-        {
-          "name": "episode_audio",
-          "type": "AUDIO",
-          "link": 36
-        },
-        {
-          "name": "shotlist_json",
-          "type": "STRING",
-          "link": 37,
-          "widget": {
-            "name": "shotlist_json"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "final_mp4_path",
-          "type": "STRING",
-          "links": [
-            39
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "render_log",
-          "type": "STRING",
-          "links": [],
-          "slot_index": 1
-        }
-      ],
-      "flags": {},
-      "order": 18,
-      "mode": 0,
-      "color": "#3A2B5A",
-      "bgcolor": "#241C3C"
     },
     {
       "id": 20,
@@ -897,7 +695,7 @@
         {
           "name": "audio_gate",
           "type": "STRING",
-          "link": 39,
+          "link": 47,
           "widget": {
             "name": "audio_gate"
           }
@@ -1393,75 +1191,11 @@
       "STRING"
     ],
     [
-      31,
-      1,
-      1,
-      16,
-      0,
-      "STRING"
-    ],
-    [
-      32,
-      2,
-      0,
-      16,
-      1,
-      "STRING"
-    ],
-    [
-      33,
-      3,
-      2,
-      16,
-      2,
-      "STRING"
-    ],
-    [
-      34,
-      16,
-      0,
-      17,
-      0,
-      "STRING"
-    ],
-    [
-      35,
-      17,
-      0,
-      18,
-      0,
-      "STRING"
-    ],
-    [
-      36,
-      7,
-      0,
-      18,
-      1,
-      "AUDIO"
-    ],
-    [
-      37,
-      16,
-      1,
-      18,
-      2,
-      "STRING"
-    ],
-    [
       38,
       2,
       0,
       20,
       0,
-      "STRING"
-    ],
-    [
-      39,
-      18,
-      0,
-      20,
-      1,
       "STRING"
     ],
     [
@@ -1519,6 +1253,14 @@
       25,
       0,
       "IMAGE"
+    ],
+    [
+      47,
+      12,
+      0,
+      20,
+      1,
+      "STRING"
     ]
   ],
   "groups": [

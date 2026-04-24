@@ -3,13 +3,13 @@ OTR Orchestrator - Script Writer + Director for "SIGNAL LOST"
 ===================================================================
 
 Two nodes:
-  1. Gemma4ScriptWriter - Fetches real daily science news via RSS, feeds it to
+  1. LLMScriptWriter - Fetches real daily science news via RSS, feeds it to
      LLM to generate a full audio drama script. Contemporary sci-fi anthology
      format (Black Mirror / NPR Invisibilia / Arrival). News-as-spine: real
      headlines become the inciting incident, extrapolated to dramatic extremes.
      Includes a hard-science epilogue citing real sources (ArXiv, Nature, etc.).
 
-  2. Gemma4Director - Takes a finished script and generates a production plan:
+  2. LLMDirector - Takes a finished script and generates a production plan:
      TTS voice assignments, SFX cue list, music cues, timing, and spatial audio
      settings. Outputs structured JSON that drives all downstream nodes.
 
@@ -75,7 +75,7 @@ log = logging.getLogger("OTR")
 # BaseStreamer for custom heartbeat logic.
 # Graceful stub allows importing this module in test environments without
 # a GPU or transformers installed - ScriptParser and pure-logic tests work fine;
-# actual Gemma4 generation will raise ImportError at call time as expected.
+# actual LLM generation will raise ImportError at call time as expected.
 try:
     from transformers.generation.streamers import BaseStreamer, TextStreamer
 except ImportError:
@@ -2932,7 +2932,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         )
         style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
-        # Bark health check moved to Gemma4Director to prevent VRAM OOM during script generation.
+        # Bark health check moved to LLMDirector to prevent VRAM OOM during script generation.
         log.info(f"[LLMScriptWriter] Feature flags: open_close={open_close}, "
                  f"self_critique={self_critique}, custom_premise={'set' if custom_premise else 'empty'}")
 
@@ -7078,11 +7078,14 @@ class LLMDirector:
 
         # Scale max_new_tokens to script length.
         # Director output: voice_assignments (placeholder presets, procedurally
-        # overridden), sfx_plan, music_plan (3 fixed cues), pacing. No dialogue
-        # duplication. A 5-character cast + 10 SFX cues + 3 music cues = ~600-800 tokens.
-        # Budget: ~1 token per 10 chars of script (for SFX scanning) + 550 base.
+        # overridden), sfx_plan, music_plan (3 fixed cues), pacing, AND a full
+        # visual_plan with characters + scenes. On 2026-04-23 a 6180-char script
+        # emitted 3911 chars of JSON before truncation at max_new_tokens=1168,
+        # losing visual_plan.scenes entirely (PASS2=0 PASS3=0 downstream). Bumped
+        # budget: base 700, ~1 token per 6 chars of script, ceiling 2500. A 6k
+        # script now gets ~1730 tokens, a 12k script hits the 2500 cap cleanly.
         script_len = len(script_text)
-        max_tokens = min(1700, max(650, 550 + script_len // 10))
+        max_tokens = min(2500, max(800, 700 + script_len // 6))
         log.info(f"[LLMDirector] max_new_tokens={max_tokens} (script={script_len} chars)")
 
         raw = _generate_with_llm(
