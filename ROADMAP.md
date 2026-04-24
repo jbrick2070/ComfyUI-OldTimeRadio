@@ -275,6 +275,80 @@ Two candidate paths. Path A: native ComfyUI Wan 2.2 FLF2V template (Apache) wire
 
 ---
 
+## Session handoff &mdash; 2026-04-23c (video branch shipped; FLUX.2 + HuMo rollout planned)
+
+Branch: `v2.0-alpha-video-stack`. 14 commits tonight. Full audio+video pipeline runs end-to-end on 5080 16GB.
+
+### Shipped this session (cumulative, commits `3cee09d`..`ce15063`)
+
+- `OTR_VideoConcat` &mdash; MIT ffmpeg concat node, 28 unit tests + real smoke passed. Replaces need for VideoHelperSuite (GPL-3).
+- `OTR_VideoPlan` &mdash; read-only Director/script adapter, 3-pass outputs (pass1 char portraits, pass2 scene envs, pass3 composite shots). Multi-character mode default. `audio_gate` optional STRING input for execution-order sequencing. 52 unit tests.
+- `OTR_ShotDurationCalculator` &mdash; expands 1-clip-per-shot to N-clips-per-shot from shot durations. FLF shared-boundary invariant preserved. `clips_per_shot(dur) = 1 if dur<=10 else ceil(dur/9)`. 25 unit tests.
+- `workflows/otr_scifi_16gb_full.json` &mdash; full audio pipeline + bolt-on video branch wired via `audio_gate`. Execution order guaranteed: Director → audio → POC video → ffmpeg mux → VideoPlan → Calculator → FLUX → UnloadAll → SaveImage. **No separate `_with_video` variant** (consolidated per minimum-JSON discipline).
+- `workflows/otr_videoplan_TEST.json` &mdash; standalone 10-frame video-branch test. Validated end-to-end on 5080, 10 PNGs on disk at `output/otr_videoplan_pass3_000{03..12}.png`.
+- `tests/fixtures/sample_director_lemmy.json` &mdash; realistic 3-scene Director JSON with LEMMY + KENJI CROSS for manual testing without running the full ScriptWriter+Director chain.
+- **258 tests green** (cumulative: 52 plan + 28 concat + 25 calculator + 50 dropdown + 103 core).
+
+### Architectural direction &mdash; SUPERSEDED and new (FLUX.2 + HuMo)
+
+**Previously:** FLUX.1-dev + Wan 2.2 + VACE (First-Last-Frame) + Lightning LoRA &mdash; locked earlier on 2026-04-23.
+
+**Now (as of 2026-04-23c):** FLUX.2-klein + HuMo 17B for audio-driven character animation. Research confirmed both fit on 5080 16GB Blackwell via GGUF quantization. HuMo is a direct replacement for Wan 2.2 in the video position, with the critical difference that HuMo is **audio-driven** &mdash; characters visibly speak their Bark-rendered dialogue with real lip-sync. Aligns perfectly with OTR's "audio is king" principle.
+
+Wan 2.2 + VACE plan retained as fallback if HuMo fails to fit (unlikely given the quantized variants available).
+
+### FLUX.2-klein + HuMo 4-stage rollout plan (next sessions)
+
+| Stage | Scope | Est. time | Success signal |
+|---|---|---|---|
+| **1. FLUX.2-klein in TEST** | Download FLUX.2-klein Q5_K_M GGUF (~10-13 GB). Swap `CheckpointLoaderSimple` widget in `otr_videoplan_TEST.json`. Re-queue. Compare new 10 PASS 3 PNGs against the FLUX.1 baseline (on disk from tonight). | 30-60 min | Better multi-character composites (LEMMY + KENJI + ANNOUNCER in one frame). Rollback = one widget change. |
+| **2. Add HuMo to TEST with pre-baked audio** | Grab 3-4 per-line Bark WAVs from tonight's full-run output. Add `LoadAudio` node to TEST. Download HuMo 17B GGUF Q6 from `calcuis/humo-gguf`. Wire: FLUX.2-klein portrait + WAV + prompt → HuMo node. | 2-3 hr first time | One ~3.9s clip where character's mouth moves with the audio. |
+| **3. "Creative ffmpeg" proof-of-life .mp4** | HuMo emits IMAGE batch. Mux with audio via either VHS_VideoCombine (install as runtime-only, GPL-3 not vendored) or extend OTR_VideoConcat to take IMAGE batch + audio. | 30 min | One `.mp4` where a character speaks a real OTR line. Concrete deliverable from TEST. |
+| **4. Full integration** | Swap FLUX.2-klein into `otr_scifi_16gb_full.json` CheckpointLoaderSimple. Insert HuMo nodes between Calculator and VideoConcat. Wire real per-shot Bark WAVs into HuMo's audio input (this is the audio-timeline wiring we've been deferring). Flip `SEGMENT_TARGET_DURATION_S` 9.0 → 3.5 and `SEGMENT_HARD_CAP_S` 10.0 → 4.0 in `otr_shot_duration_calculator.py` (matches HuMo's 97-frames-at-25fps = ~3.9s cap). | 3-5 hr | Full episode rendered with characters lip-synced to their Bark dialogue. |
+
+Full plan details preserved in memory `project_flux2_humo_rollout_2026-04-23.md`. Do NOT start Stage 2 until Stage 1 is green.
+
+### VRAM stack &mdash; projected production pipeline (fits on 5080 16 GB)
+
+| Stage | Model | Est. peak | Native Blackwell? |
+|---|---|---|---|
+| LLM Script + Director | Mistral-Nemo NF4 | ~6 GB | yes |
+| Dialogue TTS | Bark bf16 | ~4 GB | yes |
+| Music | MusicGen medium | ~5 GB | yes |
+| Announcer TTS | Kokoro (local) | ~1 GB | yes |
+| PASS 1/2/3 image | FLUX.2-klein Q5_K_M GGUF | ~10-13 GB | yes (FP8 tensor cores) |
+| Video (audio-driven) | HuMo 17B GGUF Q6 | ~10-15 GB | yes (FP8 tensor cores) |
+| Mux | ffmpeg | 0 GB (CPU) | n/a |
+
+All 100% local, no cloud, no API keys. Full 2026-era audio-drama-with-video pipeline on consumer hardware.
+
+### Constants that flip in Stage 4 (the whole diff)
+
+```python
+# nodes/otr_shot_duration_calculator.py
+SEGMENT_TARGET_DURATION_S = 9.0   # -> 3.5 for HuMo
+SEGMENT_HARD_CAP_S        = 10.0  # -> 4.0 for HuMo
+SEGMENT_TARGET_FPS        = 16    # -> 25 for HuMo
+SEGMENT_MAX_FRAMES        = 161   # -> 97 for HuMo (97 @ 25fps = 3.88s)
+```
+
+Math is unchanged. Only the constants move.
+
+### Honest gaps still open after Stage 4
+
+- **Multi-character in one shot when both speak.** HuMo is designed for one speaking character at a time. For two-shot dialogue, need either (a) composite non-speaker into background + animate speaker, or (b) run HuMo twice per shot and composite. Deferred until after single-character quality is proven.
+- **Scene-geometry consistency across episodes** (Scene-Geometry-Vault from P2). Still deferred, same as before.
+- **Still no IP-Adapter / Kontext for character identity lock.** Text-composite remains the floor; upgrading to image-reference PASS 3 compose (FLUX.2-Kontext klein) is a Stage 5 item.
+
+### Quick-start for next session
+
+1. Read `memory/project_flux2_humo_rollout_2026-04-23.md`
+2. Download FLUX.2-klein Q5_K_M GGUF to `C:\Users\jeffr\Documents\ComfyUI\models\checkpoints\`
+3. Load `workflows/otr_videoplan_TEST.json`, swap checkpoint widget, queue
+4. Compare outputs against `C:\Users\jeffr\Documents\ComfyUI\output\otr_videoplan_pass3_00003..12.png` (FLUX.1 baseline from this session)
+
+---
+
 ## P1 — Audio pipeline (shipped, live-test cycle)
 
 All items code-complete and on `v2.0-alpha`; awaiting real-soak verification as episodes run.
