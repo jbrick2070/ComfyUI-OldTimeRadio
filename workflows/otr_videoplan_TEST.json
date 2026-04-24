@@ -221,14 +221,14 @@
       "title": "Unload All",
       "inputs": [
         {
-          "name": "images",
+          "name": "image",
           "type": "IMAGE",
           "link": 14
         }
       ],
       "outputs": [
         {
-          "name": "images",
+          "name": "image",
           "type": "IMAGE",
           "links": [
             15
