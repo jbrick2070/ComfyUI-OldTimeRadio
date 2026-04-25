@@ -5,8 +5,8 @@ REM Per CLAUDE.md: "Only Jeffrey merges to main and tags releases."
 REM ============================================================================
 REM
 REM What this does:
-REM   1. Verify working tree clean on v2.0-alpha-video-stack.
-REM   2. Verify local HEAD == origin/v2.0-alpha-video-stack (lockstep).
+REM   1. Verify working tree clean on v2.0-alpha.
+REM   2. Verify local HEAD == origin/v2.0-alpha (lockstep).
 REM   3. Annotated-tag the current HEAD as v2.0-alpha-video-full.
 REM   4. Push the tag to origin.
 REM
@@ -22,12 +22,12 @@ if errorlevel 1 (
 echo.
 echo === 1/4: Checking current branch ===
 for /f "tokens=*" %%b in ('git rev-parse --abbrev-ref HEAD') do set CUR_BRANCH=%%b
-if not "%CUR_BRANCH%"=="v2.0-alpha-video-stack" (
-    echo [FAIL] Expected branch v2.0-alpha-video-stack, got %CUR_BRANCH%.
-    echo        Run: git checkout v2.0-alpha-video-stack
+if not "%CUR_BRANCH%"=="v2.0-alpha" (
+    echo [FAIL] Expected branch v2.0-alpha, got %CUR_BRANCH%.
+    echo        Run: git checkout v2.0-alpha
     exit /b 1
 )
-echo [OK] On v2.0-alpha-video-stack.
+echo [OK] On v2.0-alpha.
 
 echo.
 echo === 2/4: Checking working tree is clean ===
@@ -45,9 +45,9 @@ echo [OK] Working tree clean.
 
 echo.
 echo === 3/4: Verifying lockstep with origin ===
-git fetch origin v2.0-alpha-video-stack
+git fetch origin v2.0-alpha
 for /f "tokens=*" %%h in ('git rev-parse HEAD') do set LOCAL_HEAD=%%h
-for /f "tokens=*" %%h in ('git rev-parse origin/v2.0-alpha-video-stack') do set ORIGIN_HEAD=%%h
+for /f "tokens=*" %%h in ('git rev-parse origin/v2.0-alpha') do set ORIGIN_HEAD=%%h
 if not "%LOCAL_HEAD%"=="%ORIGIN_HEAD%" (
     echo [FAIL] Local HEAD %LOCAL_HEAD% != origin HEAD %ORIGIN_HEAD%.
     echo        Push local commits or pull origin before tagging.

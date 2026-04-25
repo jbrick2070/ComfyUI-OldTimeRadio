@@ -1,7 +1,7 @@
 # OTR MIT Video-Consistency Implementation Plan
 
 **Date:** 2026-04-23
-**Branch:** `v2.0-alpha-video-stack` (off `v2.0-alpha`; do NOT touch `main`)
+**Branch:** `v2.0-alpha` (do NOT touch `main`)
 **Author:** Claude + Jeffrey Brick
 **Status:** Plan; phase 1 shipped (OTR_VideoConcat), phase 2-3 pending
 

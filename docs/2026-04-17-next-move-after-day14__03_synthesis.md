@@ -4,7 +4,7 @@
 
 ## Current state (as of 2026-04-17)
 - **Repo:** ComfyUI-OldTimeRadio
-- **Branch:** v2.0-alpha-video-stack @ 15fe48e (pushed, lockstep clean)
+- **Branch:** v2.0-alpha @ 15fe48e (pushed, lockstep clean)
 - **Just shipped:** 14-day autonomous sprint. All Day 1-14 rows in ROADMAP marked DONE. v2.0 video stack is feature-complete in **stub mode** (CI-safe, no GPU weights). Backends: flux_anchor, pulid_portrait, flux_keyframe (FLUX+ControlNet Union Pro 2.0), ltx_motion (LTX-2.3 I2V), wan21_loop (Wan2.1 1.3B I2V), florence2_sdxl_comp, placeholder_test. Plus: VHS postproc, planner.py, wall_clock estimator, character_regression SSIM gate, LHM telemetry poller, 20-min episode dry-run gate.
 - **Also just shipped today:** BUG-LOCAL-042 marked [FIXED] — stale Windows __pycache__ self-resolved; tests/test_core.py now 103/103 green. Bug Bible regression 24 passed + 2 xfailed.
 - **ComfyUI Desktop:** Just restarted on :8000. Alive. Jeffrey is available.
