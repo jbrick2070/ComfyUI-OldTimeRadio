@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-17 (video stack consult folded in, supporting files retired)
+**Last updated:** 2026-04-25 (HuMo full-episode coverage promoted to top P0; video stack sprint shipped on 2026-04-17 retained below as completed history)
 **Branch:** `v2.0-alpha` (+ sprint fork `v2.0-alpha-video-stack`)
 **Owner:** Jeffrey A. Brick
 
@@ -21,7 +21,105 @@ Lock these. Any work item that contradicts this list is wrong.
 
 ---
 
-## P0 — Video Stack Sprint (14-day build)
+## P0 — HuMo Full-Episode Coverage (current focus)
+
+**Branch:** `v2.0-alpha-video-stack`
+**State:** Goal 1 scaffolded (orchestrator + concat scripts shipped 2026-04-25), not yet run end-to-end. Goal 2 not started.
+
+This section supersedes the original 14-day video stack sprint as the active P0. The video stack sprint shipped on 2026-04-17 and is retained below as completed history (see "P0 [SHIPPED 2026-04-17] — Video Stack Sprint").
+
+### Hardware floor (measured 2026-04-25)
+
+After ~5 hours of HuMo configuration testing on the RTX 5080 Laptop 16 GB + 64 GB RAM, these numbers are locked. Do not relitigate without new hardware or a major upstream change (FA3 on Blackwell, ComfyUI memory manager rewrite, etc.).
+
+- **Production weight set:** HuMo 17B Q5_K_M GGUF (11.86 GB on disk, from `VeryAladeen/Wan2_1-HuMo_17B-GGUF`). Loaded via city96's `ComfyUI-GGUF` `UnetLoaderGGUF`. Stock fp8 (15.89 GB) caused PCIe spillover and is now redundant — deletable once Q5_K_M output quality is signed off.
+- **Stable shape:** `length=97` (3.88 s @ 25 fps), `width=480`, `height=832`, `batch_size=1`. `length=65` triggers a torch.compile RAM spike that pages the Python worker to disk swap (reproduced twice — normalvram + lowvram modes both hung). Do not retry length=65 without a fresh OS process and pinned-RAM config audit.
+- **Per-step:** 42 s at length=97. Confirmed identical across fp8 / Q5_K_M GGUF / smart-memory-off / lowvram. ComfyUI is already evicting maximally — the partial-load split (~6.7 GB GPU + ~5.5 GB pinned RAM) is HuMo's own weights, not encoder squeeze.
+- **Per-clip:** ~4:30 native (HuMo only), ~6:15 in TEST_humo (FLUX preroll + UnloadAll handoff + HuMo).
+- **Cold load:** ~50 s for the first prompt; amortizes across N prompts via Pattern B sequential POSTs because ComfyUI's model cache stays warm.
+- **NVIDIA Sysmem Fallback Policy:** "Prefer No Sysmem Fallback" set on `python.exe` for diagnostic clarity. Doesn't change `cudaMallocAsync` behavior.
+- **Decisions documented:** `docs/2026-04-25-humo-batch-pipeline.md`.
+
+### Goal 1 — TEST workflow renders every shot with HuMo
+
+**Definition of done:** Queue a TEST-style HuMo workflow and end up with one HuMo MP4 per shot the OTR_VideoPlan would have rendered as a FLUX-only PASS3 composite. Audio is sliced from the master WAV per ledger timing (or `--auto-slice` when timing is missing).
+
+**Pieces shipped 2026-04-25 (`c387e525`):**
+
+- `scripts/render_humo_batch.py` — Pattern B orchestrator. Reads ledger, slices audio, copies portraits to ComfyUI `input/`, POSTs HuMo prompts to `:8000/prompt` sequentially. Scope flags: `all` / `first-per-scene` / `cold-open` / `custom:l001,l005,...`. `--auto-slice` fallback for ledgers without per-line timing. Pure Python stdlib + ffmpeg subprocess.
+- `scripts/concat_humo_episode.py` — ffmpeg stitcher. Two modes: `concat` (back-to-back clips, master WAV replaces audio) and `overlay` (clips composite onto base track at line.start_s/dur_s positions).
+- `workflows/otr_videoplan_TEST_humo.json` — TEST workflow wired with `UnetLoaderGGUF` → `Wan2_1-HuMo-17B_Q5_K_M.gguf`. Reverted to length=97 stable shape.
+- Recipe + decision log: `docs/2026-04-25-humo-batch-pipeline.md`, `docs/2026-04-24-humo-poc-recipe.md` (corrected fp8 size + Q5_K_M / Q4_K_S guidance committed `2093a14`).
+
+**Remaining for Goal 1:**
+
+- [ ] **Smoke run** — orchestrator on the astrotech ledger with `--max-clips 3 --auto-slice 3.88` and confirm 3 valid MP4s land in the out-dir. Validates the full HTTP flow + warm-cache assumption end-to-end.
+- [ ] **Scale up** — drop `--max-clips`, run full per-shot coverage. For a 7-min episode at ~4:30/clip with warm cache, expect ~6 hours wall clock for ~80 clips. Acceptable as overnight.
+- [ ] **Concat run** — `concat_humo_episode.py --mode concat` against the clip directory + master WAV. Verify the final MP4 plays end-to-end and audio aligns with the visible clips.
+
+**Gates:**
+
+| Gate | Threshold |
+|---|---|
+| Smoke run wall clock | First clip ≤ 6:00 (cold load), clip 2 ≤ 5:00 (warm) |
+| Per-clip steady-state | ≤ 4:45 after warm |
+| MP4 validity | ffprobe-parseable, > 100 KB, contains audio + video streams, duration ≈ 3.88 s |
+| VRAM peak across run | ≤ 14 GB sustained (no pagefile thrash, no swap-out symptoms) |
+| Failure recovery | If a single clip fails, orchestrator continues to next clip and reports failure count at end |
+
+### Goal 2 — FULL pipeline covers every shot with HuMo (not yet started)
+
+**Definition of done:** Run `otr_scifi_16gb_full.json` end-to-end, walk away, return to a finished episode MP4 where every line of dialogue is HuMo-animated. The Director's script is consumed as-is — no human-in-the-loop curation of which lines deserve HuMo treatment. The pipeline is fire-and-forget.
+
+**Required upstream pieces:**
+
+- [ ] **Ledger L2 (Task #20)** — SceneSequencer populates `ledger.lines[].start_s` and `dur_s`. Without per-line timing, the orchestrator falls back to `--auto-slice` which doesn't respect line boundaries (lip-sync drift accumulates across the episode). Goal 2 quality depends on Ledger L2 landing first.
+- [ ] **FULL→HuMo handoff** — after the FULL pipeline writes the master WAV, the orchestrator must auto-trigger. Two options:
+  - A new ComfyUI node (e.g. `OTR_HuMoBatch`) at the end of the FULL graph that shells out to `render_humo_batch.py` then `concat_humo_episode.py`. Per existing memory, prefer external script over OTR_* custom node — so:
+  - A post-FULL script (`scripts/run_full_then_humo.py`) that watches for ledger completion, then chains the orchestrator + concat. Invokable as a single command.
+- [ ] **Resumability** — if the long render dies at clip 50 of 80, restart should skip the first 50. Add `--resume` flag to `render_humo_batch.py` that skips `line_id`s whose MP4 already exists in `--out-dir`.
+- [ ] **Episode meta.json** — total HuMo clips rendered, total wall clock, per-clip durations, lip-sync drift warnings, ffmpeg concat command logged for reproducibility.
+
+**Gates:**
+
+| Gate | Threshold |
+|---|---|
+| End-to-end unattended | A 7-min episode completes FULL + HuMo coverage in one overnight run, ≤ 10 hours total |
+| Zero human edits | No prompts, no clicks, no manual file moves between FULL queue and final MP4 |
+| Output validity | Final MP4 plays end-to-end, audio matches master WAV duration, every line is on-screen |
+| Lip-sync drift | Visible only at HuMo's 3.88 s window boundaries (acceptable; not a regression vs Goal 1 single-clip lip-sync) |
+| Resumability | Killing the orchestrator mid-render and restarting completes without re-rendering existing clips |
+
+**Out of scope for Goal 2 (defer):**
+
+- Mixing HuMo with Wan 2.2 + SVI Pro for atmospheric (non-talking) clips
+- FLUX-still-with-pan-zoom as a non-HuMo fallback for narration / sound-design beats
+- Director scoring of "headline" lines for higher-fidelity treatment
+- FA3 / Blackwell flash-attention 3 (not yet available on this driver / torch combo)
+
+### Why these two goals in this order
+
+Goal 1 proves the orchestrator runs end-to-end on real hardware with real ledgers. It validates Pattern B's warm-cache hypothesis at scale, exposes any bugs in the audio slicing or portrait selection, and gives a known-good output to compare against. Goal 2 wraps it in unattended automation. Reversing the order — wiring auto-trigger before proving the orchestrator works — risks a 10-hour overnight run that fails at clip 5 because of a 1-line bug we'd catch in 20 minutes by running Goal 1 first.
+
+### Open prerequisites
+
+- **Task #20** (Ledger L2 — per-line `start_s` / `dur_s` populated by SceneSequencer): blocks Goal 2 quality. Goal 1 can proceed with `--auto-slice` while Task #20 ships.
+- **Task #25** (OTR_LoadLedger node): non-blocking. Lets TEST workflow replay an existing ledger for HuMo iteration without paying the LLM cost — useful if Goal 1 needs many iterations on prompt wording or portrait selection.
+- **Task #34** (tail-end OTR_UnloadAll on TEST_humo): non-blocking but reduces zombie residual between runs. Apply opportunistically.
+
+### Kill criteria (fail-fast)
+
+| Trigger | Response |
+|---|---|
+| Per-step time > 60 s sustained on a known-good config | Stop. Re-validate hardware (LHM telemetry), driver, and that no other process is competing for VRAM. Do not chase per-step optimization. |
+| Process paged to disk swap (negative `WorkingSet`) | Kill, restart ComfyUI, do not retry the same shape change. The 2026-04-25 length=65 hangs are the precedent — the system RAM ceiling is real. |
+| Clip output is silent video / black frames | Whisper audio format mismatch. Verify mono 16 kHz WAV. |
+| Lip-sync visibly drifts mid-clip | Audio slice longer than HuMo's 3.88 s native window. Cap at 3.88 s in orchestrator. |
+| FULL pipeline regression on Goal 2 wiring | Revert immediately. Audio is king (C7) — never let HuMo break the audio path. |
+
+---
+
+## P0 [SHIPPED 2026-04-17] — Video Stack Sprint (14-day build)
 
 Sprint fork: `v2.0-alpha-video-stack` off `v2.0-alpha`. Tag target: `v2.0-alpha-video-full`.
 Supersedes the retired Visual 2.0 Gate 0 probe. The VisualBridge → VisualPoll → VisualRenderer trio (shipped) stays as the harness; the backends swap.
