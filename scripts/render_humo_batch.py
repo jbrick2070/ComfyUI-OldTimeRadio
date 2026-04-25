@@ -351,6 +351,36 @@ class ComfyClient:
 # HuMo prompt builder
 # ---------------------------------------------------------------------------
 
+# Wan 2.1 VAE compresses 4 frames into 1 latent, so HuMo's `length` widget
+# must satisfy (length - 1) % 4 == 0. Common valid values:
+#   length=97  -> 3.88s @ 25fps  (yesterday's "stable floor" baseline)
+#   length=113 -> 4.52s
+#   length=125 -> 5.00s
+#   length=153 -> 6.12s
+#   length=177 -> 7.08s          (verified working at 640x640 fp8 2026-04-25)
+HUMO_FPS = 25
+HUMO_MIN_FRAMES = 33   # smaller frame counts have hung this hardware; treat as floor
+HUMO_MAX_FRAMES = 177  # last empirically verified value on RTX 5080 Laptop 16GB
+
+
+def humo_length_for_dur(dur_s: float, *, fps: int = HUMO_FPS) -> int:
+    """Pick the smallest valid HuMo `length` >= round(dur_s * fps).
+
+    Wan 2.1 VAE temporal compression requires length = 4n + 1.
+    Floored at HUMO_MIN_FRAMES (33) -- below that has hung this hardware.
+    Capped at HUMO_MAX_FRAMES (177) -- last empirically verified ceiling.
+    """
+    target = max(1, round(float(dur_s) * fps))
+    # ceil((target - 1) / 4) gives the smallest n such that 4n + 1 >= target
+    n = (target - 1 + 3) // 4
+    frames = 4 * n + 1
+    if frames < HUMO_MIN_FRAMES:
+        frames = HUMO_MIN_FRAMES
+    if frames > HUMO_MAX_FRAMES:
+        frames = HUMO_MAX_FRAMES
+    return frames
+
+
 # API-format prompt for the HuMo subgraph (no FLUX). Built fresh per clip
 # with the per-clip widget overrides.
 def build_humo_prompt(
@@ -732,14 +762,27 @@ def main() -> int:
             f"({clip['start_s']:.2f}s + {clip['dur_s']:.2f}s)"
         )
 
-        # 4c. Build + submit prompt
+        # 4c. Build + submit prompt.
+        # Per-line HuMo length: snap line.dur_s up to nearest 4n+1 frame count.
+        # Lets a single ledger mix [7s, 4.5s, 5s, ...] logical clips in one run
+        # without forcing a global clip_length. CLI --clip-length is still
+        # honoured as a default when a line lacks dur_s.
+        humo_length = (
+            humo_length_for_dur(clip["dur_s"])
+            if clip.get("dur_s")
+            else int(args.clip_length * 25)
+        )
         api_prompt = build_humo_prompt(
             image_filename=clip["portrait_filename_in_input"],
             audio_filename=clip["audio_filename_in_input"],
             positive_prompt=clip["positive_prompt"],
             save_prefix=clip["save_prefix"],
             seed=clip["seed"],
-            length=int(args.clip_length * 25),  # 3.88s @ 25fps = 97
+            length=humo_length,
+        )
+        print(
+            f"    humo     -> length={humo_length} "
+            f"({humo_length / HUMO_FPS:.2f}s, target dur_s={clip['dur_s']:.2f}s)"
         )
         try:
             prompt_id = client.submit_prompt(api_prompt)
