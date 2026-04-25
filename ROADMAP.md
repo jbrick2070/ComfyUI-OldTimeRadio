@@ -40,6 +40,13 @@ After ~5 hours of HuMo configuration testing on the RTX 5080 Laptop 16 GB + 64 G
 - **NVIDIA Sysmem Fallback Policy:** "Prefer No Sysmem Fallback" set on `python.exe` for diagnostic clarity. Doesn't change `cudaMallocAsync` behavior.
 - **Decisions documented:** `docs/2026-04-25-humo-batch-pipeline.md`.
 
+**Update 2026-04-25 (afternoon, expert continuity brief):**
+
+- **Single-call 7 s viable** at 640×640 fp8_e4m3fn / `length=177` / lightx2v 4-step / uni_pc 6 steps. Heavy PCIe spillover (peak ~12.9 GB VRAM + 17 GB D3D Shared) but stable. Wall-clock ~6 min cold. Verified by single live render against `humo_test_7s.wav`. The earlier "length=97 only" floor was specific to the Q5_K_M GGUF + 480×832 config above; it does not generalise to other config combinations.
+- **Frame count must be 4n+1.** Wan 2.1 VAE temporal compression is 4-frames-into-1-latent, so HuMo's `length` widget only accepts `length = 4n + 1` (97, 113, 125, 153, 177 are valid; 175 errors). The `humo_length_for_dur(dur_s)` helper in `scripts/render_humo_batch.py` snaps any duration up to the nearest valid frame count.
+- **Architecture finding (`docs/2026-04-25-humo-continuity-brief.md`):** HuMo's `ref_image` is VAE-encoded and **appended at the end** of the temporal latent sequence with `mask=1` on the anchor and `mask=0` on generated frames. Frame 0 is denoised from noise with attention to the anchor — it is **not** a first-frame seed. Naive daisy-chain (`next_ref = prev_last_frame`) will accumulate drift. The practical fix is hybrid blending (Goal 3 below).
+- **Out-of-distribution risk:** HuMo was trained on 97-frame clips. 177-frame runs are already OOD before any chaining. Visual quality at 177 is empirically passable but may carry subtle artefacts inherent to the OOD shape, separate from any chaining issues. Fallback path if Stage 0/1 metrics fail unacceptably: drop the clip-fill rule's base from 7.0 s (177 frames) to 3.88 s (97 frames). Every render becomes in-distribution at the cost of more clips per shot.
+
 ### Goal 1 — TEST workflow renders every shot with HuMo
 
 **Definition of done:** Queue a TEST-style HuMo workflow and end up with one HuMo MP4 per shot the OTR_VideoPlan would have rendered as a FLUX-only PASS3 composite. Audio is sliced from the master WAV per ledger timing (or `--auto-slice` when timing is missing).
@@ -132,9 +139,50 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
 - Director scoring of "headline" lines for higher-fidelity treatment
 - FA3 / Blackwell flash-attention 3 (not yet available on this driver / torch combo)
 
-### Why these two goals in this order
+### Goal 3 — Shot continuity via hybrid anchor (research-validated path)
 
-Goal 1 proves the orchestrator runs end-to-end on real hardware with real ledgers. It validates Pattern B's warm-cache hypothesis at scale, exposes any bugs in the audio slicing or portrait selection, and gives a known-good output to compare against. Goal 2 wraps it in unattended automation. Reversing the order — wiring auto-trigger before proving the orchestrator works — risks a 10-hour overnight run that fails at clip 5 because of a 1-line bug we'd catch in 20 minutes by running Goal 1 first.
+**Definition of done:** Within a single shot (one speaker, one setting), N chained HuMo clips concatenate into a seamless ~28-second sequence with no visible cut every 7 seconds and no character-identity drift across hops. At shot boundaries (new speaker OR scene-background change — the only two cut conditions), a fresh FLUX portrait re-anchors the chain. Per-hop metrics (seam SSIM, ArcFace identity cosine) are written to a CSV alongside the clip set so the orchestrator can flag drift and propose anchor resets without manual review.
+
+**Source of plan:** `docs/2026-04-25-humo-continuity-brief.md` — expert brief, model-source-verified, includes architecture finding (ref image appended at end of temporal latent sequence, attention anchor not first-frame seed) and the staged validation gates below.
+
+**Architecture context (already in Hardware floor section above):**
+
+The naive chain `next_ref = prev_last_frame` will drift because the ref image is an attention anchor, not a frame 0 seed. The practical fix is hybrid blending: `ref_image = α × clean_portrait + (1−α) × prev_last_frame` with α swept on a 2-clip seam test. Stage 2 below picks α; Stages 0 / 1 / 3 gate whether we even need it.
+
+**Staged validation (sequential, gated — do not skip ahead):**
+
+| Stage | Goal | Gate to advance |
+|---|---|---|
+| **0. Disambiguation** | One clip from a clean FLUX portrait. Compute SSIM(input_portrait, F1_0). | `> 0.97` → first-frame seeding (naive chain works, redesign Stage 2). `0.80–0.93` → end-of-sequence anchor (proceed). `< 0.80` → weak conditioning (raise scale_t, re-check VAE). |
+| **1. Two-clip seam** | Render C1 with clean portrait, save F1_176. Render C2 with `ref = F1_176`, save F2_0. Measure `seam_ssim(F1_176, F2_0)` and `id_cosine(F1_0, F2_0)` via ArcFace. | `seam_ssim ≥ 0.95 AND id_cosine ≥ 0.85` → skip to Stage 4 (naive chain holds). Else → Stage 2. |
+| **2. Hybrid anchor α sweep** | ComfyUI-native: insert `Image Blend` before VAE Encode. Sweep α ∈ {0.5, 0.7, 0.9} on a 2-clip seam test. Pick highest seam_ssim where id_cosine ≥ 0.85. | One α value selected with metrics that beat Stage 1 numbers. |
+| **3. 5-hop validation** | Chain 5 clips with the chosen α. Per hop: `seam_ssim`, `id_vs_clean`, `id_vs_F1_0`. Drift trigger: `id_vs_clean < 0.80` → force clean re-anchor on next clip (α=1). Hard reset: `id_vs_clean < 0.70` → declare a cut, require motivated camera move from the writer. | All 5 hops complete without hitting the hard-reset threshold; drift trigger fires at most once. |
+| **4. Cowork orchestration** | Pipe ComfyUI logs to the orchestrator. Per-hop metrics auto-emitted as JSON. Auto-generated stitch list with continuity flags for Resolve/Filmora. Error parser maps ComfyUI tracebacks to actionable fixes. Audio slice manager aligns 7 s windows to phoneme boundaries (avoid mid-syllable cuts). | Orchestrator reads a run log, computes metrics, proposes the next-clip anchor strategy without Jeffrey opening the ComfyUI UI between hops. |
+
+**Skip list (locked — do not relitigate without new findings):**
+
+| Tempting | Why not |
+|---|---|
+| Fork DiT for true frame-0 latent injection | 2-week detour, hybrid anchor gets ~80% of the gain |
+| Switch to Wan 2.1 i2v | Loses audio-driven motion, the reason for HuMo |
+| 30-second continuous-shot target | Architecture won't support it; plan cuts every 2 clips |
+| Increase frames beyond 177 | Already OOD vs 97-frame training |
+
+**Deliverable checklist:**
+
+- [ ] Stage 0 SSIM result (one number, decides everything downstream)
+- [ ] Stage 1 seam metrics (two numbers, pass/fail gate)
+- [ ] Stage 2 α sweep table (three rows)
+- [ ] Stage 3 5-hop metrics CSV
+- [ ] Stage 4 log-reader → metrics → drift flag → reset proposal wired into the orchestrator
+
+**Why Goal 3 sits between Goal 1 and Goal 2 (the critical-path argument):**
+
+Goal 1 proves the orchestrator submits N HuMo prompts, gets N MP4s back, and stays alive. That's an *orchestration* test — the visual quality of those MP4s is not the gate. Goal 3 is the *quality* gate: without continuity, every shot >7 seconds has visible 7-second cuts inside it, and a 30-second narrative beat looks like four hard jump-cuts. Goal 2 (FULL pipeline unattended) cannot ship a deliverable-quality episode without Goal 3 already in place. So the dependency chain is **Goal 1 (mechanics) → Goal 3 (quality) → Goal 2 (production)**, and any attempt to do Goal 2 first would produce visibly broken episodes that need Goal 3 retrofitted anyway.
+
+### Why these three goals in this order
+
+Goal 1 proves the orchestrator runs end-to-end on real hardware with real ledgers. It validates Pattern B's warm-cache hypothesis at scale, exposes any bugs in the audio slicing or portrait selection, and gives a known-good output to compare against. Goal 3 then lifts the output from "55 disjoint clips with visible cuts every 7 s" to "a seamless episode with cuts only at intentional boundaries" — without it, the orchestrator's output is mechanically correct but visually unwatchable. Goal 2 wraps the result in unattended automation. Reversing any of these orderings — wiring auto-trigger before proving the orchestrator works, or shipping unattended runs before continuity is solved — risks 10-hour overnight runs that produce broken episodes we'd then have to throw away.
 
 ### Open prerequisites
 
