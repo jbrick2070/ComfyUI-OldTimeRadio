@@ -47,7 +47,39 @@ That's an overnight render. Slow but feasible for full per-shot
 coverage. For sparse cutaways (5-10 clips per episode at scene
 boundaries), the same pipeline runs in 30-60 minutes.
 
-## End-to-end usage
+## TEST-mode usage (Goal 1 smoke, no audio episode required)
+
+For the Goal 1 smoke run we don't have a full audio episode yet — there
+is no SceneSequencer-populated ledger to feed the orchestrator. The
+adapter `scripts/build_test_ledger_from_director.py` synthesises a
+ledger directly from a TEST workflow's baked-in `director_json`. One
+ledger line per pass3 shot, speakers cycled across cast, every line
+slices the same first 3.88 s of the master WAV (so a short test WAV
+like `humo_test.wav` is enough).
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+
+# 1. Build synthetic ledger from baked-in director_json.
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
+  scripts\build_test_ledger_from_director.py `
+  --workflow workflows\otr_videoplan_TEST_humo.json `
+  --out output\old_time_radio\test_humo_ledger.json
+
+# 2. Render N HuMo clips. For LEMMY/Saturn (3 scenes × 2 shots): N = 6.
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
+  scripts\render_humo_batch.py `
+  --ledger output\old_time_radio\test_humo_ledger.json `
+  --master-wav C:\Users\jeffr\Documents\ComfyUI\input\humo_test.wav `
+  --out-dir output\old_time_radio\humo_test `
+  --scope all
+```
+
+The adapter expects portraits to already exist on disk at
+`C:\Users\jeffr\Documents\ComfyUI\output\otr_humo_pass1_portrait_*.png`
+— the existing TEST_humo.json produces them on Queue Prompt.
+
+## Production usage
 
 Step 1 — render the audio episode the existing way (writes ledger):
 

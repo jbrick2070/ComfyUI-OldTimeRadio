@@ -51,11 +51,46 @@ After ~5 hours of HuMo configuration testing on the RTX 5080 Laptop 16 GB + 64 G
 - `workflows/otr_videoplan_TEST_humo.json` — TEST workflow wired with `UnetLoaderGGUF` → `Wan2_1-HuMo-17B_Q5_K_M.gguf`. Reverted to length=97 stable shape.
 - Recipe + decision log: `docs/2026-04-25-humo-batch-pipeline.md`, `docs/2026-04-24-humo-poc-recipe.md` (corrected fp8 size + Q5_K_M / Q4_K_S guidance committed `2093a14`).
 
+**Pieces shipped 2026-04-25 (Goal 1 prep, this session):**
+
+- `scripts/build_test_ledger_from_director.py` — adapter that reads a TEST-style workflow's baked-in `director_json`, expands the pass3 shot plan via `nodes.otr_video_plan.build_shot_plan`, and emits a synthetic ledger with `cast[]` + `lines[]` (one line per shot, speaker rotated across cast). Bridges the gap between `OTR_VideoPlan.execute()` (which writes `shots[]` only) and `render_humo_batch.py` (which iterates `lines[]`). No workflow edit, no new OTR_* nodes, pure stdlib. 16 unit tests + dry-run verified against `workflows/otr_videoplan_TEST_humo.json` — produces 6 ledger lines (3 scenes × 2 shots/scene) with cycled portraits.
+- `tests/test_build_test_ledger_from_director.py` — 16 tests covering workflow parsing, director expansion, speaker strategies, schema versioning, and round-trip with `render_humo_batch.filter_lines`. All green.
+
+**Architecture decision (2026-04-25):** Picked path B (orchestrator + small adapter) over path A (mega-workflow with N HuMo subgraphs). Reasoning: the orchestrator already exists, scales to any N via `--scope all`, and keeps the workflow JSON small. The adapter is the smallest possible bridge — it does not modify the workflow, does not add new ComfyUI nodes, and reuses `build_shot_plan` for shot expansion so the TEST run lines up with the same plan a FULL run would produce. See `docs/2026-04-25-humo-batch-pipeline.md`.
+
 **Remaining for Goal 1:**
 
-- [ ] **Smoke run** — orchestrator on the astrotech ledger with `--max-clips 3 --auto-slice 3.88` and confirm 3 valid MP4s land in the out-dir. Validates the full HTTP flow + warm-cache assumption end-to-end.
-- [ ] **Scale up** — drop `--max-clips`, run full per-shot coverage. For a 7-min episode at ~4:30/clip with warm cache, expect ~6 hours wall clock for ~80 clips. Acceptable as overnight.
+- [x] **Adapter + dry-run** — `build_test_ledger_from_director.py` against `otr_videoplan_TEST_humo.json` writes a 6-line ledger; `render_humo_batch.py --scope all --dry-run` plans 6 prompts cleanly with portraits resolved per speaker. Verified 2026-04-25 in this session.
+- [ ] **Smoke run (live ComfyUI)** — Jeffrey runs the two-step block below against a live ComfyUI server at :8000. Confirms warm-cache assumption + HTTP flow on real hardware. Expect ~6:15 for clip 1 (cold load), ~4:30 each for clips 2-6 → ~30 min total.
+- [ ] **Scale up** — same flow on the FULL ledger once it lands; drop scope cap. For a 7-min episode at ~4:30/clip, ~6 h overnight.
 - [ ] **Concat run** — `concat_humo_episode.py --mode concat` against the clip directory + master WAV. Verify the final MP4 plays end-to-end and audio aligns with the visible clips.
+
+**Smoke-run command block (Jeffrey to execute when ComfyUI is up):**
+
+```powershell
+cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+
+# 1. Render the 3 character portraits via the existing TEST_humo workflow.
+#    Open the workflow in ComfyUI Desktop (localhost:8000) and Queue Prompt
+#    once. Confirms portraits land at:
+#      C:\Users\jeffr\Documents\ComfyUI\output\otr_humo_pass1_portrait_*.png
+#    The in-graph HuMo step also produces 1 smoke clip — that's expected.
+
+# 2. Build the synthetic test ledger from the baked-in director_json.
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
+  scripts\build_test_ledger_from_director.py `
+  --workflow workflows\otr_videoplan_TEST_humo.json `
+  --out output\old_time_radio\test_humo_ledger.json
+
+# 3. Render N HuMo clips against the ledger. With LEMMY/Saturn this gives
+#    6 MP4s landing in output\old_time_radio\humo_test\.
+C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
+  scripts\render_humo_batch.py `
+  --ledger output\old_time_radio\test_humo_ledger.json `
+  --master-wav C:\Users\jeffr\Documents\ComfyUI\input\humo_test.wav `
+  --out-dir output\old_time_radio\humo_test `
+  --scope all
+```
 
 **Gates:**
 
