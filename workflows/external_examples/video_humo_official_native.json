@@ -716,7 +716,7 @@
         "Node name for S&R": "SaveVideo"
       },
       "widgets_values": [
-        "video/ComfyUI",
+        "old_time_radio/humo_test/clip",
         "auto",
         "auto"
       ]
