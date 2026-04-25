@@ -792,6 +792,37 @@ class OTRVideoPlan:
             focus_character,
         )
 
+        # ------------------------------------------------------------------
+        # Production Ledger (L2 prep). VideoPlan emits the canonical PASS3
+        # shot list. Write it to the ledger so:
+        #   - FULL run: shots[] gets the detailed visual_prompt + per-shot
+        #     scene_id (richer than the Director-stage one-shot-per-scene
+        #     placeholder).
+        #   - TEST run: VideoPlan is typically the FIRST OTR node. If no
+        #     ledger exists yet, get_ledger() auto-creates a placeholder
+        #     so subsequent FLUX renders can attach png_paths.
+        # ------------------------------------------------------------------
+        try:
+            from .production_ledger import get_ledger
+            led = get_ledger()
+            shot_rows = []
+            for idx, tok in enumerate(pass3.get("tokens") or []):
+                if not isinstance(tok, dict):
+                    continue
+                shot_rows.append({
+                    "shot_id":       str(tok.get("shot_id") or f"sh{idx+1:02d}"),
+                    "scene_id":      str(tok.get("scene_id") or "") or None,
+                    "description":   str(tok.get("description") or "")[:200],
+                    "visual_prompt": str(tok.get("visual_prompt")
+                                          or tok.get("compose_prompt")
+                                          or tok.get("description") or ""),
+                })
+            if shot_rows:
+                led.set_shots(shot_rows)
+                led.save()
+        except Exception as _e:  # noqa: BLE001
+            log.warning("[Ledger] OTR_VideoPlan snapshot failed: %s", _e)
+
         return (
             json.dumps(pass1, indent=2),
             json.dumps(pass2, indent=2),
