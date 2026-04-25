@@ -320,19 +320,19 @@
     },
     {
       "id": 7,
-      "type": "UNETLoader",
+      "type": "UnetLoaderGGUF",
       "pos": [
         80,
         700
       ],
       "size": [
         390,
-        82
+        58
       ],
       "flags": {},
       "order": 6,
       "mode": 0,
-      "title": "Load HuMo 17B fp8",
+      "title": "Load HuMo 17B Q5_K_M GGUF (city96)",
       "inputs": [],
       "outputs": [
         {
@@ -346,11 +346,10 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "UNETLoader"
+        "Node name for S&R": "UnetLoaderGGUF"
       },
       "widgets_values": [
-        "humo_17B_fp8_e4m3fn.safetensors",
-        "default"
+        "Wan2_1-HuMo-17B_Q5_K_M.gguf"
       ]
     },
     {
