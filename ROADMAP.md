@@ -159,6 +159,24 @@ The naive chain `next_ref = prev_last_frame` will drift because the ref image is
 | **3. 5-hop validation** | Chain 5 clips with the chosen α. Per hop: `seam_ssim`, `id_vs_clean`, `id_vs_F1_0`. Drift trigger: `id_vs_clean < 0.80` → force clean re-anchor on next clip (α=1). Hard reset: `id_vs_clean < 0.70` → declare a cut, require motivated camera move from the writer. | All 5 hops complete without hitting the hard-reset threshold; drift trigger fires at most once. |
 | **4. Cowork orchestration** | Pipe ComfyUI logs to the orchestrator. Per-hop metrics auto-emitted as JSON. Auto-generated stitch list with continuity flags for Resolve/Filmora. Error parser maps ComfyUI tracebacks to actionable fixes. Audio slice manager aligns 7 s windows to phoneme boundaries (avoid mid-syllable cuts). | Orchestrator reads a run log, computes metrics, proposes the next-clip anchor strategy without Jeffrey opening the ComfyUI UI between hops. |
 
+**Orchestrator integration — within-shot chain mechanic (gated on Stage 3 passing):**
+
+The chain happens inside `scripts/render_humo_batch.py`. Within one shot (logical clips that share the same `shot_id` in the ledger — e.g. `shot_001_c1`, `shot_001_c2`, `shot_001_c3` all carry `shot_id == "shot_001"`), the orchestrator threads each clip's last frame into the next clip's reference image. At shot boundaries (next ledger line carries a new `shot_id`), the chain resets to a fresh FLUX portrait. Concretely, per clip:
+
+1. **Identify chain state.** Read `clip.shot_id`. If equal to the previous clip's `shot_id` → "chain mode". Else (or first clip in run) → "fresh anchor mode".
+2. **Choose the reference image:**
+    - Fresh anchor mode: `ref = portrait_for_speaker(clip.speaker)` (existing behaviour — clean FLUX portrait via `find_portrait_for_speaker`).
+    - Chain mode: `ref = α × clean_portrait + (1 − α) × prev_last_frame` where α is the value Stage 2 picks (likely 0.7 or 0.9 based on the brief's expected sweep).
+3. **Extract last frame.** After clip N's MP4 lands in `--out-dir`, run `ffmpeg -sseof -0.04 -i <clip_N>.mp4 -frames:v 1 -update 1 <out>.png` to grab the last frame as a PNG. Store at `<comfyui-input-dir>/humo_chain_<shot_id>_c<N>_last.png`.
+4. **Blend with portrait.** PIL + numpy: load both images, resize to HuMo's input resolution (640×640 in current config), linear blend at α, save the blended PNG.
+5. **Stage as next clip's `ref_image`.** Overwrite the per-clip `portrait_filename_in_input` slot with the blended PNG so the next prompt builder picks it up automatically — no API changes to `build_humo_prompt`.
+6. **Reset on shot boundary.** When `clip.shot_id` changes, drop the chain state and go back to fresh anchor mode for the new shot's first clip.
+7. **Emit per-hop metrics.** Compute `seam_ssim(prev_last, clip_first_frame)` and `id_cosine(clip_first_frame, clean_portrait)` via ArcFace; append to a `metrics.csv` next to the clip set. Drift triggers (per Stage 3 thresholds — `id_vs_clean < 0.80` forces a clean re-anchor; `< 0.70` forces a hard cut) get logged as warnings in the run summary.
+
+The data needed for steps 1 and 6 is already present in the ledgers we generate — `silent_test_astrotech/ledger.json` carries `shot_id` on every clip line, so the orchestrator just needs to track "previous shot_id" across iterations of its existing main loop.
+
+Net code change in `render_humo_batch.py`: roughly 80-100 lines (extract/blend helper + chain-state tracking + metrics writer + the dependency on Pillow + numpy for blending and SSIM, both already in the venv). Gated on Stage 3 metrics passing — until those metrics land, the orchestrator stays in fresh-anchor mode and accepts visible 7-second cuts inside long shots as the known cost.
+
 **Skip list (locked — do not relitigate without new findings):**
 
 | Tempting | Why not |
