@@ -23,7 +23,7 @@ ComfyUI subdirectories:
 
 | File | Goes to | URL | Size | Likely have? |
 |---|---|---|---|---|
-| `humo_17B_fp8_e4m3fn.safetensors` | `models/diffusion_models/` | [Comfy-Org/HuMo_ComfyUI](https://huggingface.co/Comfy-Org/HuMo_ComfyUI/resolve/main/split_files/diffusion_models/humo_17B_fp8_e4m3fn.safetensors) | ~10 GB | NO — main download |
+| `humo_17B_fp8_e4m3fn.safetensors` | `models/diffusion_models/` | [Comfy-Org/HuMo_ComfyUI](https://huggingface.co/Comfy-Org/HuMo_ComfyUI/resolve/main/split_files/diffusion_models/humo_17B_fp8_e4m3fn.safetensors) | **15.89 GB** | NO — main download (over 16 GB ceiling, see VRAM note below) |
 | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `models/text_encoders/` | [Comfy-Org/Wan_2.1_ComfyUI_repackaged](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors) | ~5 GB | maybe — Wan 2.1 share |
 | `wan_2.1_vae.safetensors` | `models/vae/` | [Comfy-Org/Wan_2.2_ComfyUI_Repackaged](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors) | ~500 MB | maybe |
 | `whisper_large_v3_fp16.safetensors` | `models/audio_encoders/` | [Comfy-Org/HuMo_ComfyUI](https://huggingface.co/Comfy-Org/HuMo_ComfyUI/resolve/main/split_files/audio_encoders/whisper_large_v3_fp16.safetensors) | ~3 GB | NO |
@@ -31,21 +31,68 @@ ComfyUI subdirectories:
 
 ## VRAM math
 
+**CORRECTED 2026-04-25:** the 17B fp8 model is **15.89 GB on disk**, not
+~10 GB as the original recipe stated. ComfyUI stages it at **16266 MB**
+on GPU — **over** the 5080 Laptop's 16 GB ceiling. This triggers
+NVIDIA's Sysmem Fallback Policy: the driver silently spills overflow
+weights into pinned system RAM, then pages them over PCIe per layer.
+Result: each KSampler step takes ~42 seconds instead of the ~12s it
+would take if the weights actually fit on the GPU.
+
+Measured wall clock with stock fp8: **6 steps × ~42s = 4:14 sampling**,
+total run **~4:30**. Functional but slow.
+
 The `lightx2v_I2V_14B_480p_cfg_step_distill_rank64` LoRA reduces sampling
-from typical 50 steps down to 6, with negligible quality loss. That's
-the key to fitting on 16 GB:
+from typical 50 steps down to 6 — keep it loaded, don't strip it. The
+"lora key not loaded" warnings during runs are noise (they're the I2V
+cross-attention layers that HuMo's audio-conditioning architecture
+doesn't have); the LoRA still applies to all the layers that DO match.
 
 ```
-Loaded sequentially via ComfyUI's smart offloading:
-  Phase 1: CLIPLoader + CLIPTextEncode  →  ~5 GB   (umt5_xxl loads, encodes prompt, can offload)
-  Phase 2: AudioEncoderEncode (Whisper) →  ~3 GB   (Whisper extracts speech features, can offload)
-  Phase 3: KSampler with HuMo + LoRA    →  ~12 GB  (humo_17B_fp8 + lightx2v LoRA + LATENT working)
-  Phase 4: VAEDecode                    →  ~500 MB (small VAE, fast)
-  Phase 5: CreateVideo + SaveVideo      →  CPU-side ffmpeg
-
-Peak measured against your 14.5 GB ceiling: should fit at ~12 GB peak in Phase 3.
-If it OOMs, drop length=97 -> 65 (2.6s instead of 3.88s) to halve activation cost.
+Phase load chart (with stock fp8):
+  Phase 1: umt5_xxl  ─────────  6.4 GB  (encoded twice — pos + neg)
+  Phase 2: Whisper   ─────────  1.2 GB  (audio encoder)
+  Phase 3: WanVAE    ─────────  0.2 GB
+  Phase 4: HuMo 17B fp8 ──────  16.3 GB ← OVER CEILING, fallback engaged
+                                          ALL prior models stay resident
+                                          ("0 models unloaded")
+  Phase 5: VAEDecode + Save ──  CPU mostly
 ```
+
+**Two paths to fix the spillover:**
+
+1. **Diagnostic — disable Sysmem Fallback for ComfyUI's python.exe.**
+   NVIDIA Control Panel → Manage 3D Settings → Program Settings → add
+   `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe` →
+   "CUDA - Sysmem Fallback Policy" → **Prefer No Sysmem Fallback**.
+   Re-queue. Should OOM cleanly at the WAN21_HuMo load phase, which
+   confirms the spillover diagnosis.
+
+2. **Fix — switch to a GGUF quant that fits.** Install city96's
+   `ComfyUI-GGUF` custom node, download a smaller weight set, replace
+   `UNETLoader` with `UnetLoaderGGUF` in the workflow. Best 17B HuMo
+   quants (from VeryAladeen/Wan2_1-HuMo_17B-GGUF on Hugging Face):
+
+   | Variant | Size on disk | Notes |
+   |---|---|---|
+   | Q5_K_M | **11.86 GB** | recommended — near-lossless, fits with ~4 GB headroom |
+   | Q5_K_S | 11.22 GB | similar to Q5_K_M, slightly more compressed |
+   | Q4_K_S | 9.60 GB | fallback if Q5_K_M still tight |
+   | Q3_K_M | 7.83 GB | aggressive — risks lip-sync detail loss |
+   | Q2_K   | 5.81 GB | too aggressive for face-centric model |
+
+   **Q4_K_M does NOT exist for HuMo 17B** in either VeryAladeen or
+   calcuis repos — don't go looking for it. Q4_K_S is the equivalent
+   next-tier-down.
+
+   **Don't drop below Q4_K_S for keeper takes.** HuMo's whole job is
+   lip sync; quantization damage hits mouth-shape precision and
+   phoneme timing first.
+
+If still tight after Q5_K_M: drop length 97 → 65 (2.6s instead of
+3.88s) to roughly halve activation memory. Frame count cuts only as
+last resort — at 25 fps, 33 frames is 1.32 seconds, fine for batch
+prompt validation but too short for keeper takes.
 
 ## The graph topology (simplified)
 
@@ -86,18 +133,24 @@ fast-inference values. Don't change without understanding the trade.
 
 ## What success looks like
 
-- VRAM peak ≤ 14 GB (LHM live monitor)
-- One MP4 written to `output/video/ComfyUI_<NNNN>.mp4` (97 frames, 25 fps, 3.88s)
-- Character's mouth moves with the audio (lip-sync)
+- One MP4 written to `output/old_time_radio/humo_test/clip_<NNNN>.mp4` (97 frames, 25 fps, 3.88s)
+- Character's mouth moves with the audio (lip-sync readable)
 - Background looks reasonable (text prompt influences scene)
-- Wall clock per clip: 2-5 minutes
+- Wall clock per clip:
+  - **stock fp8**: 4-7 min (sysmem fallback PCIe-thrash, validated 2026-04-25)
+  - **Q5_K_M GGUF**: ~1:30-2:00 (target after VRAM fits cleanly)
+- VRAM peak (LHM live monitor):
+  - stock fp8: 16+ GB with sysmem fallback engaged
+  - Q5_K_M GGUF: ~13 GB clean, no spillover
 
 ## What failure looks like
 
-- OOM during diffusion: **fallback** = drop length to 65 frames (2.6s)
+- OOM at WAN21_HuMo load (with Sysmem Fallback disabled): expected for stock fp8 on a 16 GB card; switch to Q5_K_M GGUF
+- OOM at WAN21_HuMo load (with Sysmem Fallback enabled): something else is wrong — encoders might not be releasing, or another model is resident from a prior run
 - Black/garbled output: probably Whisper audio format mismatch — re-encode to mono 16 kHz WAV
 - Character looks wrong (different person every time): expected — HuMo TIA matches the reference image; if quality is poor, the FLUX portrait may need higher detail
-- Wall-clock > 10 min/clip: lightx2v LoRA isn't loading; verify the LoraLoaderModelOnly weight is at 1.0
+- Mushy mouths / bad phoneme timing: quant too aggressive (Q3 or below); step back up to Q4_K_S or Q5_K_M
+- Wall-clock > 10 min/clip on a fitting quant: lightx2v LoRA isn't loading; verify the LoraLoaderModelOnly weight is at 1.0. (The "lora key not loaded: ..._img.lora_*" lines are normal — those are I2V layers HuMo doesn't have. The LoRA still applies to layers it can match.)
 
 ## Better variant for OTR — `video_humo_native_unlimited_workflow.json`
 
