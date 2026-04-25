@@ -99,6 +99,62 @@ fast-inference values. Don't change without understanding the trade.
 - Character looks wrong (different person every time): expected — HuMo TIA matches the reference image; if quality is poor, the FLUX portrait may need higher detail
 - Wall-clock > 10 min/clip: lightx2v LoRA isn't loading; verify the LoraLoaderModelOnly weight is at 1.0
 
+## Better variant for OTR — `video_humo_native_unlimited_workflow.json`
+
+**This is probably the workflow we actually want for OTR.** Same model
+files as the official template, but adds three things:
+
+1. **832×480 LANDSCAPE** instead of 480×832 portrait — matches OTR's
+   cinematic radio drama aesthetic without needing Option C composite tricks
+2. **Variable length** via `ContextWindowsManual` (sliding-window inference)
+   — beyond HuMo's native 97-frame ceiling. Default in template is 249
+   frames = 9.96s.
+3. **Auto-derives frame count from audio duration** via a `MathExpression`
+   node: `ceil(a*25/4)*4+1`. Feed it any WAV, it computes the frame count.
+
+**Source:** [amao2001/ganloss-latent-space](https://github.com/amao2001/ganloss-latent-space/blob/main/workflow/2025-09-27%20video_humo_native_unlimited_workflow.json)
+
+**Local copy:** `workflows/external_examples/video_humo_native_unlimited_workflow.json`
+
+**Custom nodes required:**
+
+| Node | Status on your machine | If missing |
+|---|---|---|
+| `ContextWindowsManual` | INSTALLED | core sliding-window machinery |
+| `VHS_LoadAudioUpload` | INSTALLED | from VideoHelperSuite |
+| `VHS_VideoCombine` | INSTALLED | from VideoHelperSuite |
+| `MathExpression\|pysssss` | MISSING | install `pysssss/ComfyUI-Custom-Scripts` OR hard-code frame count |
+| `easy showAnything` | MISSING | install `easyuse/ComfyUI-Easy-Use` OR delete the node — debug-only |
+
+The two missing nodes are quality-of-life only. Path of least resistance:
+delete both nodes from the workflow and hard-code length on
+`WanHuMoImageToVideo` widgets (e.g. set length=249 manually instead of
+having MathExpression compute it).
+
+**Honest concerns about this variant:**
+
+- **VRAM at long lengths.** ContextWindowsManual keeps multiple windows
+  in memory during blending. Going from 97 frames to 249 frames may
+  push above 14.5 GB peak. Measure first; drop length if needed.
+- **Boundary artifacts.** Window-blending sometimes shows subtle motion
+  glitches at 81-frame boundaries (every ~65 frames after first window).
+  Usually fine for casual viewing, visible if you look for it.
+- **Off-axis from native training.** HuMo trained portrait; running
+  landscape works but quality may differ slightly. Fall back to portrait
+  if results look wrong.
+- **Not author-endorsed.** ContextWindowsManual is community technique
+  for HuMo. Treat as "experimental but tested" not "guaranteed."
+
+**Recommended POC sequence:**
+
+1. Try the **official native template first** — proves the 5 models load
+   and HuMo runs at all on the hardware. 97 frames, portrait, no surprises.
+2. If green, switch to **video_humo_native_unlimited** with length=97 first
+   (so it's apples-to-apples with the official template, just landscape).
+3. Then bump length to 161, then 249, watching VRAM each step.
+4. Stop at the highest length that fits 14 GB peak with no boundary
+   artifacts you can't tolerate.
+
 ## After POC succeeds
 
 We have the option of HuMo for "talking close-up" shots in the OTR
