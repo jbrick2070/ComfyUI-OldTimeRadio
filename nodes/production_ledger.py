@@ -1,12 +1,28 @@
 """
-nodes/production_ledger.py -- OTR Production Ledger (L1, write-only)
+nodes/production_ledger.py -- OTR Production Ledger (L2, write-only)
 
 Single-source-of-truth JSON record of everything an episode produced:
-cast, scenes, shots, lines, sfx, music, and their positions on the final
-audio timeline.
+cast, scenes, shots, beats, lines, sfx, music, and their positions on
+the final audio timeline.
 
-L1 scope:
-  * Write-only. No downstream consumer reads from this file in L1.
+Hierarchy:
+    Scene > Shot > Beat > Clip
+        - Scene: high-level narrative location.
+        - Shot: continuous visual unit (same framing/lighting).
+        - Beat: single-speaker continuous turn within a shot. NEW in L2.
+        - Clip: one HuMo render call (length 4n+1 frames @ 25 fps).
+
+The beat layer was added 2026-04-25 PM (schema bump l1 -> l2) so the
+HuMo clip-fill rule applies per-beat (not per-shot). This guarantees
+no clip's audio window crosses a speaker boundary, which preserves
+identity in Goal 3 daisy-chain mode (see ROADMAP Goal 3 +
+docs/2026-04-25-humo-continuity-brief.md).
+
+L2 scope:
+  * Write-only on the producing side (FULL pipeline + script-side
+    builders such as build_silent_test_episode.py).
+  * Read by the HuMo orchestrator (render_humo_batch.py) and downstream
+    visualisation (artifacts).
   * Incremental saves after every stage -- a crash leaves a partial JSON
     showing exactly where the pipeline died.
   * Writes NEVER raise. A ledger failure is logged and the pipeline continues.
@@ -14,16 +30,22 @@ L1 scope:
 Stages that populate the ledger (in pipeline order):
   ScriptWriter DONE    -> cast + lines (text + word/char counts)
   LLMDirector DONE     -> cast (voice_presets) + scenes (env) + shots (visual prompts)
-  SceneSequencer DONE  -> lines/sfx/music start_s + dur_s
+  SceneSequencer DONE  -> lines/sfx/music start_s + dur_s + beats (speaker turns)
   SignalLostVideo DONE -> episode_id (real title), final_audio_path,
                           final_video_path, total_episode_dur_s
+
+Backward compatibility:
+  Older callers that pre-date the beat hierarchy can omit beat_id and
+  boundary on lines; the orchestrator must treat missing values as
+  equivalent to "shot_start" for safety.
 
 Usage inside any OTR node:
 
     from nodes.production_ledger import get_ledger
     led = get_ledger()                 # re-use current episode
     led.set_cast([{"char_id":"c01", "name":"EDNA", ...}])
-    led.add_lines([{"line_id":"l001", "char_id":"c01", "text":"..."}])
+    led.set_beats([{"beat_id":"shot_001_b1", "speaker":"EDNA", ...}])
+    led.set_lines([{"line_id":"l001", "beat_id":"shot_001_b1", "boundary":"shot_start", ...}])
     led.save()
 """
 from __future__ import annotations
@@ -159,7 +181,14 @@ class Ledger:
     """One episode's production ledger. Thread-safe for single-graph
     ComfyUI runs (sequential node execution)."""
 
-    SCHEMA_VERSION = "l1-2026-04-24"
+    # Schema version bumped 2026-04-25 PM:
+    #   l1-2026-04-24  -> baseline (cast, scenes, shots, lines, sfx, music, clips)
+    #   l2-2026-04-25  -> adds beats[] hierarchy
+    #
+    # Beat = single-speaker continuous turn within a shot. Hierarchy:
+    #     Scene > Shot > Beat > Clip
+    # See ROADMAP Goal 3 + docs/2026-04-25-humo-continuity-brief.md.
+    SCHEMA_VERSION = "l2-2026-04-25"
 
     def __init__(self, episode_id: str, out_dir: str):
         self.episode_id = episode_id
@@ -176,9 +205,11 @@ class Ledger:
             "total_char_count": 0,
             "total_word_count": 0,
             "total_dialogue_lines": 0,
+            "total_beats": 0,
             "cast": [],
             "scenes": [],
             "shots": [],
+            "beats": [],
             "lines": [],
             "sfx": [],
             "music": [],
@@ -250,16 +281,61 @@ class Ledger:
         self.data["shots"] = rows
         return self
 
+    def set_beats(self, beat_rows: Iterable[Dict[str, Any]]) -> "Ledger":
+        """Set the beats[] section.
+
+        A beat is a single-speaker continuous turn within a shot. It is
+        the unit at which the HuMo clip-fill rule applies (beats never
+        cross speakers, so HuMo audio windows align cleanly).
+
+        Hierarchy: Scene > Shot > Beat > Clip.
+
+        Each input row is normalised to:
+            beat_id, shot_id, scene_id, speaker, char_id,
+            line_ids[], start_s, dur_s
+        """
+        rows: List[Dict[str, Any]] = []
+        for r in beat_rows or []:
+            line_ids_in = r.get("line_ids") or []
+            line_ids = [_safe_str(x) for x in line_ids_in if _safe_str(x)]
+            rows.append({
+                "beat_id":   _safe_str(r.get("beat_id")),
+                "shot_id":   _safe_str(r.get("shot_id")) or None,
+                "scene_id":  _safe_str(r.get("scene_id")) or None,
+                "speaker":   _safe_str(r.get("speaker")) or None,
+                "char_id":   _safe_str(r.get("char_id")) or None,
+                "line_ids":  line_ids,
+                "start_s":   _safe_float(r.get("start_s")),
+                "dur_s":     _safe_float(r.get("dur_s")),
+            })
+        self.data["beats"] = rows
+        self.data["total_beats"] = len(rows)
+        return self
+
     def set_lines(self, line_rows: Iterable[Dict[str, Any]]) -> "Ledger":
+        """Set the lines[] section.
+
+        ``beat_id`` and ``boundary`` are optional but recommended once
+        the upstream pipeline (SceneSequencer or build_silent_test_episode)
+        has populated the beat hierarchy. ``boundary`` is one of:
+            - "shot_start"  first clip of a new shot (visual reset)
+            - "beat_start"  first clip of a new speaker turn within a shot
+            - "continue"    same shot, same speaker (Goal 3 daisy chain)
+        Older callers that pre-date the beat hierarchy can omit both
+        fields; downstream consumers must treat missing values as
+        equivalent to "shot_start" for safety.
+        """
         rows: List[Dict[str, Any]] = []
         for r in line_rows or []:
             text = _safe_str(r.get("text"))
             rows.append({
                 "line_id":        _safe_str(r.get("line_id")),
                 "shot_id":        _safe_str(r.get("shot_id")) or None,
+                "beat_id":        _safe_str(r.get("beat_id")) or None,
                 "char_id":        _safe_str(r.get("char_id")) or None,
                 "text":           text,
                 "traits":         _safe_str(r.get("traits")) or None,
+                "boundary":       _safe_str(r.get("boundary")) or None,
                 "char_count":     _char_count(text),
                 "word_count":     _word_count(text),
                 "bark_wav_path":  _safe_str(r.get("bark_wav_path")) or None,

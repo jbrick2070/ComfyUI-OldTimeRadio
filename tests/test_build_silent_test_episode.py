@@ -182,53 +182,114 @@ def test_clip_durations_custom_base():
 
 
 # ---------------------------------------------------------------------------
-# group_lines_into_shots
+# group_lines_into_shots — shot/beat hierarchy
 # ---------------------------------------------------------------------------
 
 
-def test_group_respects_target_dur():
+def _flat_line_ids(shot: dict) -> list[str]:
+    """Helper: collect all line_ids across all beats in a shot."""
+    return [lid for b in shot["beats"] for lid in b["line_ids"]]
+
+
+def test_group_single_speaker_monologue_stays_in_one_beat():
+    """A long single-speaker monologue should be one shot with one beat,
+    even when it exceeds target_shot_dur. Shot only closes at speaker
+    boundaries (and scene boundaries)."""
     from build_silent_test_episode import group_lines_into_shots
     lines = [
-        {"line_id": "l1", "scene_id": "s1", "dur_s": 3.0},
-        {"line_id": "l2", "scene_id": "s1", "dur_s": 3.0},
-        {"line_id": "l3", "scene_id": "s1", "dur_s": 3.0},  # closes shot at 9s
-        {"line_id": "l4", "scene_id": "s1", "dur_s": 4.0},
-        {"line_id": "l5", "scene_id": "s1", "dur_s": 6.0},  # closes shot at 10s
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+        {"line_id": "l2", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+        {"line_id": "l3", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+    ]
+    shots = group_lines_into_shots(lines, target_shot_dur=9.0)
+    assert len(shots) == 1
+    assert shots[0]["dur_s"] == pytest.approx(15.0)
+    assert len(shots[0]["beats"]) == 1
+    assert shots[0]["beats"][0]["speaker"] == "ALICE"
+    assert _flat_line_ids(shots[0]) == ["l1", "l2", "l3"]
+    assert shots[0]["speakers"] == ["ALICE"]
+
+
+def test_group_speaker_change_creates_new_beat_within_shot():
+    """When accumulated dur is below target, a speaker change opens a
+    new beat inside the same shot rather than closing the shot."""
+    from build_silent_test_episode import group_lines_into_shots
+    lines = [
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 3.0},
+        {"line_id": "l2", "scene_id": "s1", "speaker": "BOB", "dur_s": 3.0},
+        {"line_id": "l3", "scene_id": "s1", "speaker": "ALICE", "dur_s": 2.0},
+    ]
+    shots = group_lines_into_shots(lines, target_shot_dur=9.0)
+    assert len(shots) == 1
+    s = shots[0]
+    assert s["dur_s"] == pytest.approx(8.0)
+    assert len(s["beats"]) == 3
+    assert [b["speaker"] for b in s["beats"]] == ["ALICE", "BOB", "ALICE"]
+    assert s["speakers"] == ["ALICE", "BOB"]  # ordered, deduped
+
+
+def test_group_speaker_change_after_target_closes_shot():
+    """When accumulated shot dur reaches target, the next speaker change
+    closes the shot at that boundary."""
+    from build_silent_test_episode import group_lines_into_shots
+    lines = [
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+        {"line_id": "l2", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},  # 10 >= 9
+        {"line_id": "l3", "scene_id": "s1", "speaker": "BOB", "dur_s": 4.0},   # speaker change closes shot
     ]
     shots = group_lines_into_shots(lines, target_shot_dur=9.0)
     assert len(shots) == 2
-    assert shots[0]["dur_s"] == pytest.approx(9.0)
-    assert shots[0]["line_ids"] == ["l1", "l2", "l3"]
-    assert shots[1]["dur_s"] == pytest.approx(10.0)
-    assert shots[1]["line_ids"] == ["l4", "l5"]
+    assert shots[0]["beats"][0]["speaker"] == "ALICE"
+    assert shots[0]["dur_s"] == pytest.approx(10.0)
+    assert shots[1]["beats"][0]["speaker"] == "BOB"
+    assert shots[1]["dur_s"] == pytest.approx(4.0)
 
 
 def test_group_never_crosses_scene_boundary():
     from build_silent_test_episode import group_lines_into_shots
     lines = [
-        {"line_id": "l1", "scene_id": "s1", "dur_s": 4.0},
-        {"line_id": "l2", "scene_id": "s2", "dur_s": 4.0},  # forces shot close
-        {"line_id": "l3", "scene_id": "s2", "dur_s": 6.0},
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 4.0},
+        {"line_id": "l2", "scene_id": "s2", "speaker": "ALICE", "dur_s": 4.0},
+        {"line_id": "l3", "scene_id": "s2", "speaker": "ALICE", "dur_s": 6.0},
     ]
     shots = group_lines_into_shots(lines, target_shot_dur=9.0)
     assert len(shots) == 2
     assert shots[0]["scene_id"] == "s1"
-    assert shots[0]["line_ids"] == ["l1"]
+    assert _flat_line_ids(shots[0]) == ["l1"]
     assert shots[1]["scene_id"] == "s2"
-    assert shots[1]["line_ids"] == ["l2", "l3"]
+    assert _flat_line_ids(shots[1]) == ["l2", "l3"]
 
 
-def test_group_start_s_is_cumulative():
+def test_group_beat_start_s_is_cumulative():
+    """beat.start_s tracks the cumulative master timeline, not in-shot offset."""
     from build_silent_test_episode import group_lines_into_shots
     lines = [
-        {"line_id": "l1", "scene_id": "s1", "dur_s": 5.0},
-        {"line_id": "l2", "scene_id": "s1", "dur_s": 5.0},  # closes at 10
-        {"line_id": "l3", "scene_id": "s1", "dur_s": 5.0},
-        {"line_id": "l4", "scene_id": "s1", "dur_s": 5.0},  # closes at 10
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 3.0},
+        {"line_id": "l2", "scene_id": "s1", "speaker": "BOB", "dur_s": 4.0},
+        {"line_id": "l3", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+    ]
+    shots = group_lines_into_shots(lines, target_shot_dur=20.0)
+    assert len(shots) == 1
+    beats = shots[0]["beats"]
+    assert beats[0]["start_s"] == 0.0
+    assert beats[1]["start_s"] == pytest.approx(3.0)
+    assert beats[2]["start_s"] == pytest.approx(7.0)
+
+
+def test_group_shot_id_and_beat_id_format():
+    from build_silent_test_episode import group_lines_into_shots
+    lines = [
+        {"line_id": "l1", "scene_id": "s1", "speaker": "ALICE", "dur_s": 5.0},
+        {"line_id": "l2", "scene_id": "s1", "speaker": "BOB", "dur_s": 5.0},
+        {"line_id": "l3", "scene_id": "s2", "speaker": "ALICE", "dur_s": 5.0},
     ]
     shots = group_lines_into_shots(lines, target_shot_dur=9.0)
-    assert shots[0]["start_s"] == 0.0
-    assert shots[1]["start_s"] == pytest.approx(10.0)
+    # 2 shots: scene change forces close. shot1 spans ALICE+BOB (under target)
+    assert shots[0]["shot_id"] == "shot_001"
+    assert shots[0]["beats"][0]["beat_id"] == "shot_001_b1"
+    assert shots[0]["beats"][1]["beat_id"] == "shot_001_b2"
+    assert shots[1]["shot_id"] == "shot_002"
+    assert shots[1]["beats"][0]["beat_id"] == "shot_002_b1"
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +345,8 @@ def test_build_silent_episode_writes_ledger_and_meta(tmp_path: Path):
     assert ledger["schema_version"] == "silent-test-2026-04-25"
     assert ledger["total_dialogue_lines"] == 4
     assert ledger["total_shots"] >= 1
-    assert ledger["total_clips"] >= ledger["total_shots"]
+    assert ledger["total_beats"] >= ledger["total_shots"]
+    assert ledger["total_clips"] >= ledger["total_beats"]
 
 
 def test_build_silent_episode_lines_have_humo_length(tmp_path: Path):
@@ -304,13 +366,118 @@ def test_build_silent_episode_lines_have_humo_length(tmp_path: Path):
         assert ln["start_s"] >= 0
 
 
-def test_build_silent_episode_clip_durations_sum_to_shot_dur(tmp_path: Path):
+def test_build_silent_episode_clip_durations_sum_to_beat_dur(tmp_path: Path):
+    """Clip-fill rule applied per BEAT (not per shot), so each beat's
+    clip_durations sum to the beat's dur. Sum across all beats in a shot
+    sums to the shot's dur."""
     from build_silent_test_episode import build_silent_test_episode
     src_path = tmp_path / "src_ledger.json"
     src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
     ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
     for shot in ledger["shots"]:
-        assert sum(shot["clip_durations_s"]) == pytest.approx(shot["dur_s"])
+        for beat in shot["beats"]:
+            assert sum(beat["clip_durations_s"]) == pytest.approx(beat["dur_s"]), (
+                f"beat {beat['beat_id']} clips don't sum to dur: "
+                f"{beat['clip_durations_s']} vs {beat['dur_s']}"
+            )
+        # Shot dur = sum of beat durs
+        beat_total = sum(b["dur_s"] for b in shot["beats"])
+        assert beat_total == pytest.approx(shot["dur_s"])
+
+
+def test_build_silent_episode_lines_carry_beat_id_and_boundary(tmp_path: Path):
+    """Every emitted clip line must carry beat_id + boundary so the
+    orchestrator's anchor-mode lookup table works."""
+    from build_silent_test_episode import build_silent_test_episode
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
+    ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
+    valid_boundaries = {"shot_start", "beat_start", "continue"}
+    for ln in ledger["lines"]:
+        assert "beat_id" in ln
+        assert ln["beat_id"]  # non-empty
+        assert "boundary" in ln
+        assert ln["boundary"] in valid_boundaries
+
+
+def test_build_silent_episode_first_clip_of_shot_is_shot_start(tmp_path: Path):
+    """First clip of each shot must carry boundary=shot_start. First clip
+    of each subsequent beat in that shot is beat_start. All other clips
+    are continue."""
+    from build_silent_test_episode import build_silent_test_episode
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
+    ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
+
+    seen_shots: set[str] = set()
+    seen_beats_in_shot: dict[str, set[str]] = {}
+    for ln in ledger["lines"]:
+        sid = ln["shot_id"]
+        bid = ln["boundary"]
+        bb = ln["beat_id"]
+
+        if sid not in seen_shots:
+            assert bid == "shot_start", (
+                f"first clip of new shot {sid} should be shot_start, got {bid}"
+            )
+            seen_shots.add(sid)
+            seen_beats_in_shot[sid] = {bb}
+        elif bb not in seen_beats_in_shot[sid]:
+            assert bid == "beat_start", (
+                f"first clip of new beat {bb} (shot {sid}) should be beat_start, got {bid}"
+            )
+            seen_beats_in_shot[sid].add(bb)
+        else:
+            assert bid == "continue", (
+                f"continuing clip in beat {bb} (shot {sid}) should be continue, got {bid}"
+            )
+
+
+def test_build_silent_episode_shots_carry_beats_inline(tmp_path: Path):
+    """ledger.shots[i].beats[] must be present, populated, and consistent
+    with the lines[] emit."""
+    from build_silent_test_episode import build_silent_test_episode
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
+    ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
+    for shot in ledger["shots"]:
+        assert "beats" in shot
+        assert shot["beats"], f"shot {shot['shot_id']} has no beats"
+        assert "speakers" in shot
+        # Total clip count from beats matches shot's clip_count
+        assert sum(b["clip_count"] for b in shot["beats"]) == shot["clip_count"]
+    # Sum across shots matches total_clips
+    total = sum(s["clip_count"] for s in ledger["shots"])
+    assert total == ledger["total_clips"]
+
+
+def test_build_silent_episode_no_clip_spans_two_speakers(tmp_path: Path):
+    """The whole point of beats: a clip's audio window must come from
+    one speaker only. Verify by checking each clip's [start_s, start_s+dur_s]
+    falls entirely within one source line's window (or contiguous lines
+    of the SAME speaker)."""
+    from build_silent_test_episode import build_silent_test_episode
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
+    ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
+    # Build (start_s, end_s, speaker) triples from source_lines
+    src_windows = []
+    cursor = 0.0
+    for ln in ledger["source_lines"]:
+        src_windows.append((cursor, cursor + ln["dur_s"], ln["speaker"]))
+        cursor += ln["dur_s"]
+    for clip in ledger["lines"]:
+        c_start = clip["start_s"]
+        c_end = c_start + clip["dur_s"]
+        # Find which source-line window(s) overlap this clip
+        overlap_speakers = set()
+        for s_start, s_end, s_speaker in src_windows:
+            # Strictly-inside overlap (more than rounding tolerance)
+            if s_end > c_start + 1e-6 and s_start < c_end - 1e-6:
+                overlap_speakers.add(s_speaker)
+        assert len(overlap_speakers) <= 1, (
+            f"clip {clip['line_id']} ({c_start}-{c_end}) spans speakers {overlap_speakers}"
+        )
 
 
 def test_build_silent_episode_speaker_resolved_from_cast(tmp_path: Path):

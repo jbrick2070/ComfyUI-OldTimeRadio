@@ -1,7 +1,9 @@
 # HuMo Continuity Pipeline — Cowork Brief
 
-**Stack:** RTX 5080 16GB, ComfyUI v0.16.4, HuMo-17B fp8_e4m3fn, lightx2v 4-step + uni_pc 6-step, 177 frames, 640×640
+**Stack:** RTX 5080 16GB, ComfyUI v0.16.4, HuMo 14B fp8_e4m3fn scaled (Kijai) — promoted to production 2026-04-25 PM, see ROADMAP Hardware Floor; lightx2v 4-step + uni_pc 6-step, 177 frames, 640×640
 **Goal:** Multi-clip narrative continuity with stable identity across 4–5 hops
+
+**Ledger schema:** L2 (`l2-2026-04-25`) — adds the beat layer to the hierarchy (Scene > Shot > **Beat** > Clip). A beat is a single-speaker continuous turn within a shot. The orchestrator's daisy-chain only fires within a beat (`boundary == "continue"`); speaker changes inside a shot trigger a `beat_start` clean reset; new shots trigger a `shot_start` full reset.
 
 ---
 

@@ -73,12 +73,67 @@ class TestLedgerBasics:
     def test_new_ledger_creates_structure(self, tmp_out):
         led = Ledger("signal_lost_test_20260424_000000", str(tmp_out))
         assert led.episode_id == "signal_lost_test_20260424_000000"
-        assert led.data["schema_version"].startswith("l1-")
-        for key in ("cast", "scenes", "shots", "lines", "sfx", "music", "clips"):
+        # Schema bumped 2026-04-25 PM (l1 -> l2) for the beats[] hierarchy.
+        assert led.data["schema_version"].startswith("l2-")
+        for key in ("cast", "scenes", "shots", "beats", "lines",
+                    "sfx", "music", "clips"):
             assert led.data[key] == []
         assert led.data["final_audio_path"] is None
         assert led.data["final_video_path"] is None
         assert led.data["total_episode_dur_s"] is None
+        assert led.data["total_beats"] == 0
+
+
+class TestLedgerBeats:
+    def test_set_beats_round_trips(self, tmp_out):
+        led = Ledger("test_beats", str(tmp_out))
+        led.set_beats([
+            {"beat_id": "shot_001_b1", "shot_id": "shot_001",
+             "scene_id": "scene_lab", "speaker": "ALICE", "char_id": "c01",
+             "line_ids": ["l001", "l002"], "start_s": 0.0, "dur_s": 5.5},
+            {"beat_id": "shot_001_b2", "shot_id": "shot_001",
+             "scene_id": "scene_lab", "speaker": "BOB", "char_id": "c02",
+             "line_ids": ["l003"], "start_s": 5.5, "dur_s": 3.2},
+        ])
+        assert len(led.data["beats"]) == 2
+        assert led.data["total_beats"] == 2
+        b1 = led.data["beats"][0]
+        assert b1["beat_id"] == "shot_001_b1"
+        assert b1["speaker"] == "ALICE"
+        assert b1["line_ids"] == ["l001", "l002"]
+        assert b1["start_s"] == 0.0
+        assert b1["dur_s"] == 5.5
+
+    def test_set_lines_carries_beat_id_and_boundary(self, tmp_out):
+        led = Ledger("test_beat_lines", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "shot_id": "shot_001",
+             "beat_id": "shot_001_b1", "boundary": "shot_start",
+             "char_id": "c01", "text": "Hello", "start_s": 0.0, "dur_s": 1.0},
+            {"line_id": "l002", "shot_id": "shot_001",
+             "beat_id": "shot_001_b2", "boundary": "beat_start",
+             "char_id": "c02", "text": "Hi", "start_s": 1.0, "dur_s": 1.0},
+            {"line_id": "l003", "shot_id": "shot_001",
+             "beat_id": "shot_001_b2", "boundary": "continue",
+             "char_id": "c02", "text": "There", "start_s": 2.0, "dur_s": 1.0},
+        ])
+        rows = led.data["lines"]
+        assert rows[0]["beat_id"] == "shot_001_b1"
+        assert rows[0]["boundary"] == "shot_start"
+        assert rows[1]["boundary"] == "beat_start"
+        assert rows[2]["boundary"] == "continue"
+
+    def test_set_lines_omitting_beat_fields_back_compat(self, tmp_out):
+        """Older callers pre-dating beats can omit beat_id + boundary;
+        ledger stores None and downstream treats as shot_start."""
+        led = Ledger("test_back_compat", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "shot_id": "shot_001", "char_id": "c01",
+             "text": "Hello", "start_s": 0.0, "dur_s": 1.0},
+        ])
+        row = led.data["lines"][0]
+        assert row["beat_id"] is None
+        assert row["boundary"] is None
 
     def test_path_follows_episode_id(self, tmp_out):
         led = Ledger("signal_lost_BLACK SPHERE_20260424", str(tmp_out))

@@ -3,6 +3,13 @@
 **Date:** 2026-04-25
 **Status:** scaffolded, not yet run end-to-end on a full episode
 
+**Schema:** L2 ledger (production_ledger.py `l2-2026-04-25`). Hierarchy:
+**Scene > Shot > Beat > Clip.** A beat is a single-speaker turn within a
+shot — the orchestrator's clip-fill rule applies per beat, never across
+beat boundaries, so no HuMo render window crosses two speakers' audio.
+Every clip line carries `beat_id` and `boundary` ∈ {`shot_start`,
+`beat_start`, `continue`}. See ROADMAP Goal 3 + the continuity brief.
+
 ## What this is
 
 Two scripts that together turn a finished OTR audio episode + ledger into

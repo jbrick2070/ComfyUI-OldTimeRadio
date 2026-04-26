@@ -6,6 +6,19 @@
 
 **This file is the single source of truth.** Canonical going-forward plan. Three horizons: **v1.7 audio pipeline** (shipped, live-test cycle ongoing), **v2.0 video stack sprint** (14-day build, drives the next two weeks), and **v2.0 continuity layer** (Scene-Geometry-Vault + Style-Anchor cache, post-sprint). Everything shipped or discarded stays in source docs — this file is open items only.
 
+**Canonical narrative hierarchy** (every script, ledger, workflow, and doc in this repo follows this):
+
+```
+Scene  >  Shot  >  Beat  >  Clip
+```
+
+- **Scene** — high-level narrative location (`AstroTech Research Facility`, `Control Room`, ...). One per scene_id.
+- **Shot** — continuous visual unit. Same framing, same lighting. May contain multiple speakers.
+- **Beat** — single-speaker continuous turn within a shot. The unit at which the 7 s clip-fill rule applies — beats never cross speakers, so HuMo audio windows align cleanly to one voice. Added 2026-04-25 PM (production_ledger schema bump l1 → l2).
+- **Clip** — one HuMo render call. Length must be 4n + 1 frames (Wan VAE temporal compression of 4) and ≤ 177 (verified ceiling on 16 GB).
+
+Every consumer of `ledger.json` must understand all four levels. The orchestrator's Goal 3 anchor mode reads `lines[].boundary` ∈ {`shot_start`, `beat_start`, `continue`} to decide between fresh anchor, clean speaker reset, or daisy-chain α-blend.
+
 ---
 
 ## Platform Pins

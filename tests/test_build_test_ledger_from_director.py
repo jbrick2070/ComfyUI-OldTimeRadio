@@ -262,6 +262,41 @@ def test_each_line_has_required_orchestrator_keys():
         assert not missing, f"line missing keys: {missing}"
 
 
+def test_beats_present_and_match_shots():
+    """Schema l2: beats[] must be populated, one per shot in this
+    synthetic test (each shot is single-speaker by construction)."""
+    from build_test_ledger_from_director import director_json_to_test_ledger
+
+    led = director_json_to_test_ledger(
+        json.dumps(LEMMY_SATURN_DIRECTOR),
+        episode_id="test",
+        shots_per_scene=2,
+    )
+    assert "beats" in led
+    assert led["total_beats"] == len(led["shots"])
+    # Each beat id follows shot_id_b1 convention (one beat per shot)
+    for shot, beat in zip(led["shots"], led["beats"]):
+        assert beat["shot_id"] == shot["shot_id"]
+        assert beat["beat_id"] == f"{shot['shot_id']}_b1"
+        assert beat["speaker"]  # non-empty
+
+
+def test_lines_carry_beat_id_and_shot_start_boundary():
+    """Schema l2: every line must reference its beat and carry a
+    boundary value; for this synthetic test (one beat per shot) all
+    lines are shot_start."""
+    from build_test_ledger_from_director import director_json_to_test_ledger
+
+    led = director_json_to_test_ledger(
+        json.dumps(LEMMY_SATURN_DIRECTOR),
+        episode_id="test",
+        shots_per_scene=2,
+    )
+    for ln in led["lines"]:
+        assert "beat_id" in ln and ln["beat_id"]
+        assert ln["boundary"] == "shot_start"
+
+
 def test_schema_version_marks_synthetic_test_ledger():
     from build_test_ledger_from_director import (
         director_json_to_test_ledger,

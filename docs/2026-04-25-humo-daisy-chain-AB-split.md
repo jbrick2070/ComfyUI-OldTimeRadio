@@ -2,6 +2,8 @@
 
 **TL;DR:** HuMo doesn't have native long-video support yet. The flashy `WanVideo Long I2V Multi/InfiniteTalk` mechanism is built for InfiniteTalk + Wan 2.1/2.2 base, not for HuMo's TIA conditioning. Two paths below.
 
+**Ledger schema in play:** L2 (`l2-2026-04-25`). Hierarchy: Scene > Shot > **Beat** > Clip. Daisy-chain fires only within a beat; speaker changes inside a shot are clean resets, scene changes are full resets. Orchestrator reads `lines[].boundary`.
+
 ---
 
 ## What's actually true about HuMo today

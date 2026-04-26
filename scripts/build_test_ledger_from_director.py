@@ -215,10 +215,14 @@ def director_json_to_test_ledger(
         if fid:
             frame_to_prompt[fid] = tok.get("description") or ""
 
-    # Convert each pass3 shot into one ledger shot AND one ledger line.
-    # ledger.shots[] is forward-compat with the production schema; the
-    # orchestrator only iterates ledger.lines[].
+    # Convert each pass3 shot into one ledger shot, one ledger beat
+    # (each shot is single-speaker in this synthetic test), and one
+    # ledger line. The beat[] hierarchy was added 2026-04-25 PM (l2
+    # schema) so the HuMo orchestrator's Goal 3 daisy-chain mode can
+    # see boundary cues even on TEST runs that don't go through the
+    # real script-writer / scene-sequencer.
     shots_out: list[dict[str, Any]] = []
+    beats_out: list[dict[str, Any]] = []
     lines_out: list[dict[str, Any]] = []
     for idx, shot in enumerate(shots_index):
         shot_id = shot.get("shot_id") or f"shot_{idx + 1:03d}"
@@ -244,6 +248,7 @@ def director_json_to_test_ledger(
         # start_s / dur_s upstream and don't go through this script.
         start_s = 0.0
         dur_s = float(clip_length_s)
+        beat_id = f"{shot_id}_b1"
 
         shots_out.append({
             "shot_id": shot_id,
@@ -251,15 +256,29 @@ def director_json_to_test_ledger(
             "description": (visual_prompt or "")[:200] or None,
             "visual_prompt": visual_prompt,
             "png_path": None,
+            "speakers": [speaker] if speaker else [],
+            "beat_count": 1,
+            "start_s": start_s,
+            "dur_s": dur_s,
+        })
+        beats_out.append({
+            "beat_id": beat_id,
+            "shot_id": shot_id,
+            "scene_id": scene_id,
+            "speaker": speaker,
+            "char_id": char_id,
+            "line_ids": [shot_id],  # one line per shot in this synthetic test
             "start_s": start_s,
             "dur_s": dur_s,
         })
         lines_out.append({
             "line_id": shot_id,
             "shot_id": shot_id,
+            "beat_id": beat_id,
             "scene_id": scene_id,
             "char_id": char_id,
             "speaker": speaker,
+            "boundary": "shot_start",  # one beat per shot, so always a fresh shot anchor
             "text": "",
             "traits": None,
             "char_count": 0,
@@ -286,9 +305,11 @@ def director_json_to_test_ledger(
         "total_char_count": 0,
         "total_word_count": 0,
         "total_dialogue_lines": len(lines_out),
+        "total_beats": len(beats_out),
         "cast": cast,
         "scenes": scenes,
         "shots": shots_out,
+        "beats": beats_out,
         "lines": lines_out,
         "sfx": [],
         "music": [],
