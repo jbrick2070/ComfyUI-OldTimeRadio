@@ -239,7 +239,8 @@ def find_portrait_for_speaker(
     if speaker_norm in cast_names:
         idx = cast_names.index(speaker_norm)
         candidates = sorted(
-            list(portraits_dir.glob("otr_stills/pass1_portrait_*.png"))
+            list(portraits_dir.glob("otr/stills/pass1_portrait_*.png"))
+            + list(portraits_dir.glob("otr_stills/pass1_portrait_*.png"))
             + list(portraits_dir.glob("otr_humo_pass1_portrait_*.png"))
         )
         # Use modulo so even if we have fewer portraits than cast, we
@@ -288,13 +289,16 @@ def find_composite_for_shot_speaker(
         return None
     shot_slug = _composite_slug(shot_id, limit=24)
     speaker_slug = _composite_slug(speaker, limit=40)
-    # 2026-04-26: pass3 outputs reorganised into output/otr_stills/. Look
-    # there first, fall back to legacy root-output location for backwards
-    # compatibility with renders made before the foldering change.
-    new_pat = f"otr_stills/pass3_{shot_slug}_{speaker_slug}_*.png"
+    # 2026-04-26: pass3 outputs nested under output/otr/stills/. Look
+    # there first, then mid-day's flat output/otr_stills/, then the
+    # original root-output location for backwards compatibility with
+    # all generations of renders.
+    new_pat = f"otr/stills/pass3_{shot_slug}_{speaker_slug}_*.png"
+    mid_pat = f"otr_stills/pass3_{shot_slug}_{speaker_slug}_*.png"
     legacy_pat = f"otr_humo_pass3_{shot_slug}_{speaker_slug}_*.png"
     candidates = sorted(
         list(portraits_dir.glob(new_pat))
+        + list(portraits_dir.glob(mid_pat))
         + list(portraits_dir.glob(legacy_pat)),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
@@ -769,11 +773,12 @@ def build_clip_plan(
         portrait_filename = f"humo_clip_{line_id}_portrait.png"
         audio_filename = f"humo_clip_{line_id}_speech.wav"
 
-        # 2026-04-26: outputs reorganised under output/otr_videos/. Each
-        # episode gets its own subdirectory keyed by the silent_test
-        # ledger's episode_id so multi-episode runs don't collide.
+        # 2026-04-26: outputs nested under output/otr/videos/<episode_id>/.
+        # Single OTR parent dir keeps ComfyUI's output/ root tidy.
+        # Per-episode subdir keyed by the silent_test ledger's
+        # episode_id so multi-episode runs don't collide.
         _ep_id = ledger.get("episode_id", "episode")
-        save_prefix = f"otr_videos/{_ep_id}/humo_{line_id}"
+        save_prefix = f"otr/videos/{_ep_id}/humo_{line_id}"
         seed = (idx * 1009 + 7) & 0x7FFFFFFFFFFFFFFF  # deterministic per-line
 
         plan.append({

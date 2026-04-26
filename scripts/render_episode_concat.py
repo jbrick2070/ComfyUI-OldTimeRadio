@@ -62,7 +62,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--comfy-output-dir", type=Path,
                    default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output"),
                    help="ComfyUI output directory (HuMo clips live in "
-                        "<this>/otr_videos/<episode_id>/)")
+                        "<this>/otr/videos/<episode_id>/, with mid-day "
+                        "legacy fallback to <this>/otr_videos/<episode_id>/)")
     audio = p.add_mutually_exclusive_group(required=True)
     audio.add_argument("--audio-mp4", type=Path,
                        help="Path to the audio episode mp4 (audio extracted)")
@@ -108,14 +109,19 @@ def load_ledger(p: Path) -> dict:
 
 
 def find_humo_clip(comfy_out: Path, episode_id: str, line_id: str) -> Path | None:
-    """Locate the HuMo mp4 for a given line. Picks the newest match if
-    multiple runs left siblings (ComfyUI appends _NNNNN before the ext)."""
-    folder = comfy_out / "otr_videos" / episode_id
-    candidates = sorted(
-        folder.glob(f"humo_{line_id}_*.mp4"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
+    """Locate the HuMo mp4 for a given line. Searches both the new
+    output/otr/videos/<id>/ tree and the mid-day output/otr_videos/<id>/
+    tree. Picks the newest match if multiple runs left siblings
+    (ComfyUI appends _NNNNN before the ext)."""
+    folders = [
+        comfy_out / "otr" / "videos" / episode_id,
+        comfy_out / "otr_videos" / episode_id,   # mid-day legacy
+    ]
+    candidates = []
+    for folder in folders:
+        candidates.extend(folder.glob(f"humo_{line_id}_*.mp4"))
+    candidates = sorted(candidates,
+                        key=lambda p: p.stat().st_mtime, reverse=True)
     return candidates[0] if candidates else None
 
 

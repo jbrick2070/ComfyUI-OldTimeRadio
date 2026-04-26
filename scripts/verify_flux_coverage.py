@@ -85,21 +85,18 @@ def expected_targets(ledger: dict) -> tuple[list[dict], list[dict]]:
 def find_files_for(out_dir: Path, pass_label: str, slug_pattern: str) -> list[Path]:
     """Find any PNGs matching the pass + slug pattern. ComfyUI appends NNNNN_.
 
-    2026-04-26: outputs reorganised into output/otr_stills/. Search the new
-    location first, fall back to the legacy root-output location for
-    backwards compatibility with pre-foldering renders.
-
-    Filenames are now:
-        otr_stills/pass1_portrait_<slug>_NNNNN_.png
-        otr_stills/pass3_<shot>_<slug>_NNNNN_.png
-    Legacy:
-        otr_humo_pass1_portrait_<slug>_NNNNN_.png
-        otr_humo_pass3_<shot>_<slug>_NNNNN_.png
+    Searches three generations of paths for backwards compatibility:
+      - NEW (final):   output/otr/stills/<pass>_<slug>_NNNNN_.png
+      - MID (today):   output/otr_stills/<pass>_<slug>_NNNNN_.png
+      - LEGACY:        output/otr_humo_<pass>_<slug>_NNNNN_.png  (root)
     """
-    new_pat = f"otr_stills/{pass_label}_{slug_pattern}_*.png"
+    new_pat = f"otr/stills/{pass_label}_{slug_pattern}_*.png"
+    mid_pat = f"otr_stills/{pass_label}_{slug_pattern}_*.png"
     legacy_pat = f"otr_humo_{pass_label}_{slug_pattern}_*.png"
     return sorted(
-        list(out_dir.glob(new_pat)) + list(out_dir.glob(legacy_pat))
+        list(out_dir.glob(new_pat))
+        + list(out_dir.glob(mid_pat))
+        + list(out_dir.glob(legacy_pat))
     )
 
 

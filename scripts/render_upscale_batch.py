@@ -112,6 +112,21 @@ def parse_args() -> argparse.Namespace:
                    help="Max wall-clock per /prompt completion (default 1h).")
     p.add_argument("--poll-interval", type=float, default=5.0,
                    help="Seconds between /history polls.")
+    p.add_argument("--comfy-output-dir", type=Path,
+                   default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output"),
+                   help="ComfyUI output directory (used for promotion).")
+    p.add_argument("--episodes-dir", type=Path,
+                   default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes"),
+                   help="Flat directory for final-good deliverables. After "
+                        "SeedVR2 finishes, the 1080p mp4 (and any sibling "
+                        ".vtt) is copied here with a clean filename so "
+                        "media servers (Plex/Jellyfin/Emby) can loop on "
+                        "one folder. Pass --no-promote to skip.")
+    p.add_argument("--no-promote", action="store_true",
+                   help="Skip the copy-to-episodes-dir step.")
+    p.add_argument("--episode-name", default=None,
+                   help="Filename stem in --episodes-dir. Defaults to "
+                        "<input_basename> with '_framed' stripped.")
     p.add_argument("--dry-run", action="store_true",
                    help="Print the API graph and exit; do not submit.")
     return p.parse_args()
@@ -316,10 +331,11 @@ def main() -> int:
     # absolute path string in the file widget.
     input_filename = str(args.input_mp4)
 
-    # 2026-04-26: outputs reorganised into output/otr_videos/.
+    # 2026-04-26: outputs nested under output/otr/videos/. Single OTR
+    # parent keeps the ComfyUI output/ root tidy.
     output_prefix = (
         args.output_prefix
-        or f"otr_videos/{args.input_mp4.stem}_{args.resolution}p"
+        or f"otr/videos/{args.input_mp4.stem}_{args.resolution}p"
     )
 
     if (args.batch_size - 1) % 4 != 0:
@@ -393,6 +409,54 @@ def main() -> int:
           f"({wall / 60.0:.1f} min)")
     print(f"[hint] check ComfyUI output dir for "
           f"{output_prefix}_NNNNN.mp4")
+
+    # ---- promote: copy final mp4 (and sibling .vtt) to flat episodes dir ----
+    if args.no_promote:
+        return 0
+    import shutil  # local import keeps stdlib-only top-level
+    # Locate the actual upscaled mp4 (ComfyUI appends _NNNNN_ before .mp4)
+    expected_dir = (
+        args.comfy_output_dir / Path(output_prefix).parent
+    )
+    expected_stem = Path(output_prefix).name
+    candidates = sorted(
+        expected_dir.glob(f"{expected_stem}_*.mp4"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        print(f"WARN: no upscaled mp4 found under {expected_dir} matching "
+              f"{expected_stem}_*.mp4 -- promotion skipped", file=sys.stderr)
+        return 0
+    src_mp4 = candidates[0]
+
+    # Clean filename: strip "_framed" + "_<resolution>p" + ComfyUI's "_NNNNN_"
+    clean_stem = (
+        args.episode_name
+        or args.input_mp4.stem.replace("_framed", "").replace("_FRAMED", "")
+    )
+    args.episodes_dir.mkdir(parents=True, exist_ok=True)
+    dst_mp4 = args.episodes_dir / f"{clean_stem}.mp4"
+    shutil.copy2(src_mp4, dst_mp4)
+    print(f"[promote] {dst_mp4}")
+
+    # Look for the .vtt sidecar that render_episode_concat.py wrote next
+    # to the un-framed source. Path pattern:
+    #   <comfy-out>/otr_videos/<episode_id>/<episode_id>.vtt
+    # The input mp4 is most likely <episode_id>_framed.mp4 in the same dir.
+    src_vtt_candidates = [
+        args.input_mp4.with_suffix(".vtt"),
+        args.input_mp4.parent / f"{args.input_mp4.stem.replace('_framed', '')}.vtt",
+    ]
+    for src_vtt in src_vtt_candidates:
+        if src_vtt.exists():
+            dst_vtt = args.episodes_dir / f"{clean_stem}.vtt"
+            shutil.copy2(src_vtt, dst_vtt)
+            print(f"[promote] {dst_vtt}")
+            break
+    else:
+        print(f"[promote] note: no sibling .vtt found; mov_text track in "
+              f"the mp4 itself still carries embedded subs")
     return 0
 
 
