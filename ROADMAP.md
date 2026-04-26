@@ -177,14 +177,25 @@ The data needed for steps 1 and 6 is already present in the ledgers we generate 
 
 Net code change in `render_humo_batch.py`: roughly 80-100 lines (extract/blend helper + chain-state tracking + metrics writer + the dependency on Pillow + numpy for blending and SSIM, both already in the venv). Gated on Stage 3 metrics passing — until those metrics land, the orchestrator stays in fresh-anchor mode and accepts visible 7-second cuts inside long shots as the known cost.
 
+**Alternative paths within Goal 3 (A-tier, current HuMo, fact-checked 2026-04-25 — `docs/2026-04-25-humo-daisy-chain-AB-split.md`):**
+
+The hybrid-anchor mechanic above (Stages 0-3 + orchestrator integration) is one of three paths that deliver continuity on the *current* HuMo model. Pick after Stage 0/1 metrics land — the right choice depends on whether the seam test passes naively, marginally, or not at all.
+
+| Path | What it does | When it's the right pick | Caveats |
+|---|---|---|---|
+| **A1. Single-window** | Stay inside HuMo's native 97-frame (3.88 s) training distribution. No chain, no continuity. Every shot is one HuMo call max. | Stage 0 SSIM is well below 0.97 AND we want zero artefacts. Smallest, safest baseline. | Hard cap on shot length at 3.88 s; multi-clip shots become hard cuts. |
+| **A2. Hybrid-anchor RGB chain** (default plan above) | Extract clip N's last frame, ADAIN/mkl colour-match **back to the original FLUX portrait** (never to clip N's last frame), optional IP-Adapter Identity Wash anchored to the clean portrait, blend at α with the portrait, feed as clip N+1's `ref_image`. | Stage 1 seam_ssim ≥ 0.95 AND id_cosine ≥ 0.85 with α-blending. | Practical limit ~3-4 hops before drift becomes visible. Refresh portrait every 4 clips. |
+| **A3. HuMo + InfiniteTalk stack** (verified [RunningHub workflow 1968348721056501761](https://www.runninghub.ai/post/1968348721056501761)) | Run HuMo for character/identity, hand off to InfiniteTalk for long-video lip-sync via its `motion_frame` mechanism. ~15 s seamless output per RunningHub's MV reference. | A2 fails or the seam is unacceptable AND we can spare disk for an extra ~18 GB of weights. | **Requires `Wan2_1-HuMo-14B` (Kijai fp8 scaled, NOT our current 17B GGUF) + InfiniteTalk weights from [MeiGen-AI/InfiniteTalk](https://github.com/MeiGen-AI/InfiniteTalk) + `whisper_large_v3_encoder_fp16.safetensors`.** Pipeline diverges from current single-call HuMo orchestrator — InfiniteTalk becomes the long-video driver, HuMo becomes the identity provider. |
+
 **Skip list (locked — do not relitigate without new findings):**
 
 | Tempting | Why not |
 |---|---|
 | Fork DiT for true frame-0 latent injection | 2-week detour, hybrid anchor gets ~80% of the gain |
-| Switch to Wan 2.1 i2v | Loses audio-driven motion, the reason for HuMo |
-| 30-second continuous-shot target | Architecture won't support it; plan cuts every 2 clips |
-| Increase frames beyond 177 | Already OOD vs 97-frame training |
+| Switch to Wan 2.1 i2v (alone, without HuMo) | Loses audio-driven motion, the reason for HuMo |
+| 30-second continuous-shot target on current HuMo | Architecture won't support it; plan cuts every 2 clips. A3 stack lifts the ceiling to ~15 s. |
+| Increase frames beyond 177 on current HuMo | Already OOD vs 97-frame training |
+| Feed HuMo into `WanVideo Long I2V Multi/InfiniteTalk` directly | Per kijai issue [#1941](https://github.com/kijai/ComfyUI-WanVideoWrapper/issues/1941), that node is built for InfiniteTalk-as-primary, not HuMo-as-primary. The verified workflow is the **stacked** A3 path above. |
 
 **Deliverable checklist:**
 
@@ -197,6 +208,19 @@ Net code change in `render_humo_batch.py`: roughly 80-100 lines (extract/blend h
 **Why Goal 3 sits between Goal 1 and Goal 2 (the critical-path argument):**
 
 Goal 1 proves the orchestrator submits N HuMo prompts, gets N MP4s back, and stays alive. That's an *orchestration* test — the visual quality of those MP4s is not the gate. Goal 3 is the *quality* gate: without continuity, every shot >7 seconds has visible 7-second cuts inside it, and a 30-second narrative beat looks like four hard jump-cuts. Goal 2 (FULL pipeline unattended) cannot ship a deliverable-quality episode without Goal 3 already in place. So the dependency chain is **Goal 1 (mechanics) → Goal 3 (quality) → Goal 2 (production)**, and any attempt to do Goal 2 first would produce visibly broken episodes that need Goal 3 retrofitted anyway.
+
+### Parking lot — long-video continuity options for the post-HuMo era (B-tier)
+
+When HuMo's window-bounded architecture stops being the right tool — either because we hit a quality ceiling on Stages 0-3 we can't blend our way out of, or because a model with native long-video support lands and changes the trade-off — these are the candidates already fact-checked. Each requires a separate model swap and pipeline rebuild. Do NOT pull weights or rewrite the orchestrator for any of these until A-tier hits a wall on real metrics.
+
+| Option | What it is | Why parked |
+|---|---|---|
+| **B1. InfiniteTalk + Wan 2.1 / 2.2 (alone, no HuMo)** — [MeiGen-AI/InfiniteTalk](https://github.com/MeiGen-AI/InfiniteTalk) | Audio-driven talking-head with native long-video via `WanVideo Long I2V Multi/InfiniteTalk` node. `motion_frame` mechanism with built-in colour correction. GGUF variants fit 16 GB. | Promote when HuMo's character preservation isn't the bottleneck and continuity is. Trade: weaker identity hold, much stronger seam quality. |
+| **B2. Stable Video Infinity 2.0 (Wan 2.2 I2V A14B base, LoRA)** — [vita-epfl/Stable-Video-Infinity](https://github.com/vita-epfl/Stable-Video-Infinity) (ICLR 26 Oral) | LoRA on Wan 2.2 I2V. 5-pass chained sampling with motion-latent forwarding + tail-frame blending. "Error Recycling Fine Tuning" approach removes drift. **No audio conditioning** — text/image only. | Promote for long non-talking shots: cutaways, environment beats, sound-design holds. Not a HuMo replacement; a sibling for clips where lip-sync isn't needed. Fits 16 GB with GGUF Wan 2.2 base. |
+| **B3. LTX 2.3 (22B, native audio-video sync)** | Native audio-video sync at the model level. 4K / 50 fps capable. | **Does not fit 16 GB** — minimum 24 GB VRAM. Park until next hardware refresh or a quantised variant ships. Already aligned with existing memory `reference_ltx_keep_only_2b.md` (only 2B v0.9 retained on this rig). |
+| **B4. HuMo "Longer Generation" official checkpoint** ([Phantom-video/HuMo](https://github.com/Phantom-video/HuMo)) | TODO in HuMo README, promised October 2025, vapor as of Apr 2026. If/when it ships it would supersede A1/A2/A3 entirely — native long-video on the same model. | Set GitHub watch on the repo. Revisit Goal 3 entirely if released. |
+
+**Why these are parking-lot, not active P0:** the smoke run of the current HuMo orchestrator hasn't even produced its first end-to-end episode yet (Goal 1). Promoting any B-tier option now would mean rebuilding the orchestrator + downloading 18-50 GB of new weights before we have a deliverable to compare against. Goal 1 ships first, Stage 0/1 metrics tell us whether A2 (hybrid anchor) holds, A3 (HuMo+InfiniteTalk stack) is the in-family upgrade if it doesn't, and only THEN do B-tier alternatives become live decisions.
 
 ### Why these three goals in this order
 
