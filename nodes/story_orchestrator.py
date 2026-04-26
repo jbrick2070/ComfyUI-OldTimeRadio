@@ -4587,27 +4587,42 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
         if not winning_outline or not winning_outline.strip():
             return ""
 
-        # Trim the news block - we only need the headline for tonal cue.
+        # Trim the news block - we only need the first headline (max 200
+        # chars) as a tonal cue. Bare string, no prefix; the prompt template
+        # below frames it as "Tone hint (optional): ...".
         _news_hint = ""
         if news_block:
             _first_news = news_block.strip().split("\n")[0][:200]
             if _first_news:
-                _news_hint = f"News tone hint: {_first_news}\n\n"
+                _news_hint = _first_news
 
+        # Prompt v2 (2026-04-26 PM): genre-agnostic, craft-focused. Lets the
+        # LLM pick up genre from the spine itself rather than spelling it out,
+        # which keeps the title from sliding into on-the-nose genre tropes.
         title_prompt = (
-            f"You are titling a single episode of a SIGNAL LOST "
-            f"{genre_flavor.replace('_', ' ')} radio drama in a "
-            f"{style_variant} style.\n\n"
-            f"{_news_hint}"
-            f"Episode spine:\n{winning_outline[:1200]}\n\n"
-            "Write ONE evocative episode title in 2-5 words. The title should:\n"
-            " - draw from a striking image, character, or concept in the spine above\n"
-            " - feel period-appropriate to the genre and style\n"
-            " - avoid generic phrases (\"The Last Frequency\", \"Untitled\", "
-            "\"Episode\", \"Signal Lost\", \"The Long Goodbye\", \"Custom Episode\")\n"
-            " - have NO surrounding quotes, NO explanation, NO 'Title:' prefix\n\n"
+            "You are creating a title for a single episode of a radio drama.\n\n"
+            f"Tone hint (optional): {_news_hint.strip() or '(none)'}\n\n"
+            f"Episode spine: {winning_outline[:1200]}\n\n"
+            "Write ONE evocative episode title in 2-5 words.\n\n"
+            "The title must:\n"
+            " - draw from a vivid image, key object, character, or thematic "
+            "tension in the spine\n"
+            " - match the implied genre and tone (do not name the genre "
+            "explicitly)\n"
+            " - feel specific and memorable, not generic or placeholder\n"
+            " - avoid cliches like \"The Beginning\", \"Final Chapter\", "
+            "\"Untitled\", or \"Episode X\"\n"
+            " - avoid repeating obvious words from the spine unless used in "
+            "a fresh or symbolic way\n\n"
+            "Style guidance:\n"
+            " - prefer concrete nouns + subtle intrigue\n"
+            " - light ambiguity is good; confusion is not\n"
+            " - aim for something that could sit on a vintage radio listing "
+            "or modern podcast feed\n\n"
             "Output ONLY the title text on a single line. Nothing else."
         )
+        # genre_flavor / style_variant are still accepted as parameters for
+        # logging + future style-pinning, but no longer baked into the prompt.
 
         try:
             raw = _run_with_timeout(
