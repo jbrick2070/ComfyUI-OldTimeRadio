@@ -114,7 +114,7 @@ def _run_preflight(writer, **overrides):
         "genre_flavor": "hard_sci_fi",
         "target_words": 1120,
         "num_characters": 4,
-        "model_id": "inflatebot/MN-12B-Mag-Mell-R1",
+        "model_id": "Nitral-AI/Captain_Eris_Violet-V0.420-12B",
         "custom_premise": "",
         "include_act_breaks": True,
         "self_critique": True,

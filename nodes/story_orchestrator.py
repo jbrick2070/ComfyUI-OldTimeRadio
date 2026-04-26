@@ -923,7 +923,7 @@ def _fetch_science_news(max_feeds=10):
 # LLM INFERENCE WRAPPER
 # -----------------------------------------------------------------------------
 
-def _load_llm(model_id_full="inflatebot/MN-12B-Mag-Mell-R1", device="cuda", optimization_profile="Standard"):
+def _load_llm(model_id_full="Nitral-AI/Captain_Eris_Violet-V0.420-12B", device="cuda", optimization_profile="Standard"):
     # Strip [BETA] or [8-bit] labels used in the UI dropdown
     model_id = model_id_full.split(" ")[0]
 
@@ -2074,7 +2074,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
-def _generate_with_llm(prompt, model_id="inflatebot/MN-12B-Mag-Mell-R1",
+def _generate_with_llm(prompt, model_id="Nitral-AI/Captain_Eris_Violet-V0.420-12B",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92,
                           optimization_profile="Standard",
                           live_ledger=False):
@@ -2241,7 +2241,7 @@ def _truncate_at_sentence_boundary(text, max_chars):
 # This lets the Director automatically inherit the exact same model memory
 # space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
 # -----------------------------------------------------------------------------
-_CURRENT_LLM_MODEL = "inflatebot/MN-12B-Mag-Mell-R1"
+_CURRENT_LLM_MODEL = "Nitral-AI/Captain_Eris_Violet-V0.420-12B"
 
 
 # ============================================================================
@@ -2787,27 +2787,34 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                # 2026-04-26: MN-12B-Mag-Mell-R1 promoted to default —
-                # creative-writing fine-tune of Mistral-Nemo with stronger
-                # narrative prose + dialogue voice (same architecture, same
-                # tokenizer, same VRAM footprint as base Nemo). Mistral-Nemo
-                # base kept as the validated fallback that cleared the
-                # BUG-061/062/063 format hardening cycle. Gemma 2/4 variants
-                # are smaller alternates. Qwen-2.5-14B retained as alpha.
-                "model_id": (["inflatebot/MN-12B-Mag-Mell-R1",
+                # 2026-04-26 PM: MN-12B-Mag-Mell-R1 retired as default.
+                # Live FULL run on time_travel/noir_mystery produced a
+                # narration-only collapse: 0 character dialogue lines,
+                # invented atmospheric "speakers" (AETHERPHASE HARMONIZE,
+                # BFUSKY VECTORS, OCCULTNUCLEUS) instead of using the
+                # canonical [CHARACTER, mood] dialogue shape. Mag-Mell
+                # is a creative-writing fine-tune that fights the OTR
+                # format gates. Captain-Eris-Violet is now the default —
+                # also a Mistral-Nemo derivative but RP-tuned, dialogue-
+                # first, holds character voice across long scenes.
+                # Mistral-Nemo base kept as validated fallback. Gemma
+                # variants are smaller alternates. Qwen-2.5-14B is alpha.
+                "model_id": (["Nitral-AI/Captain_Eris_Violet-V0.420-12B",
                               "mistralai/Mistral-Nemo-Instruct-2407",
                               "google/gemma-2-2b-it",
                               "google/gemma-2-9b-it",
                               "google/gemma-4-E4B-it",
                               "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
-                    "default": "inflatebot/MN-12B-Mag-Mell-R1",
+                    "default": "Nitral-AI/Captain_Eris_Violet-V0.420-12B",
                     "tooltip": "Hugging Face model ID for LLM. "
-                               "MN-12B-Mag-Mell-R1 is the default "
-                               "creative-writing fine-tune (12B, 4-bit NF4, "
-                               "_cap=6144) — stronger narrative prose, "
-                               "R1 reasoning flavor. Mistral-Nemo base is "
-                               "the validated fallback. Gemma 2/4 variants "
-                               "are smaller alternates. Qwen-2.5-14B is "
+                               "Captain-Eris-Violet is the default "
+                               "dialogue-first fine-tune of Mistral-Nemo "
+                               "(12B, 4-bit NF4, _cap=6144) — character "
+                               "voice + period speech, holds persona "
+                               "across long scenes. Mistral-Nemo base is "
+                               "the validated fallback that cleared "
+                               "BUG-061/062/063. Gemma variants are "
+                               "smaller alternates. Qwen-2.5-14B is "
                                "alpha — less validated against the OTR "
                                "format gates."
                 }),
@@ -3013,7 +3020,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         return profiles if len(profiles) >= num_names else None
 
     def write_script(self, episode_title, genre_flavor,
-                     target_words, num_characters, model_id="inflatebot/MN-12B-Mag-Mell-R1",
+                     target_words, num_characters, model_id="Nitral-AI/Captain_Eris_Violet-V0.420-12B",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,
