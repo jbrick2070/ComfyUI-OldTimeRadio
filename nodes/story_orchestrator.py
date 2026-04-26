@@ -7809,10 +7809,16 @@ class LLMDirector:
                 used_presets.add(profile["voice_preset"])
                 # FIX (v1.1): Use the ORIGINAL script name as the dict key so
                 # BatchBark can match [VOICE: NAME ...] to the right preset.
-                # The procedural name is stored in notes for the treatment file.
+                # FIX (v2.0-alpha 2026-04-26): Do NOT prefix notes with
+                # profile['name']. The procedural name (e.g. "PRIAM SMITHERS")
+                # disagrees with the script name (e.g. "MEREDITH") and
+                # downstream cast.description ends up showing the wrong name.
+                # The procedural name remains available on profile['name']
+                # if a treatment-file consumer needs it. Match the LEMMY /
+                # ANNOUNCER branches which pass bare notes.
                 new_voice_assignments[upper_name] = {
                     "voice_preset": profile["voice_preset"],
-                    "notes": f"{profile['name']} - {profile['notes']}",
+                    "notes": profile["notes"],
                 }
                 log.info("[LLMDirector] %s - voice: %s (profile: %s, %s, %s, %s)",
                          upper_name, profile["voice_preset"],
