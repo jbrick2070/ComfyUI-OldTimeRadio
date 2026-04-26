@@ -184,6 +184,31 @@ def write_concat_list(clips: list[Path], list_path: Path) -> None:
     list_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def is_clip_readable(src: Path, ffmpeg_bin: str = "ffmpeg") -> bool:
+    """Return True if ffprobe can read the mp4's format duration.
+
+    Guards against partially-written / corrupt HuMo clips that would
+    silently break the concat. Edge case: if render_humo_batch.py is
+    racing with concat (rare but possible), one of its in-flight mp4s
+    may not yet have a valid moov atom. ffprobe rejects those cleanly.
+    """
+    # Derive ffprobe path from the ffmpeg path (they ship together).
+    ffprobe = ffmpeg_bin.replace("ffmpeg", "ffprobe")
+    try:
+        rc = subprocess.call(
+            [ffprobe, "-v", "error",
+             "-show_entries", "format=duration",
+             "-of", "csv=p=0",
+             str(src)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return rc == 0
+    except FileNotFoundError:
+        # ffprobe missing -- skip the check rather than blocking concat.
+        return True
+
+
 def trim_clip_to_dur(*, src: Path, dst: Path, dur_s: float,
                      ffmpeg_bin: str, dry_run: bool) -> int:
     """Trim a HuMo clip to exactly dur_s seconds via ffmpeg stream copy.
@@ -252,6 +277,12 @@ def run_concat_with_audio(*, clips: list[Path], audio_src: Path,
     mux_cmd.extend([
         "-c:v", "copy",
         "-c:a", "aac", "-b:a", "192k",
+        # ITU BS.1770 broadcast loudness target (per peer review
+        # 2026-04-26). Bark + Kokoro + MusicGen + AudioGen levels
+        # currently drift across the mix; -loudnorm two-pass would be
+        # cleaner but the single-pass form is fine for delivery and
+        # adds zero round-trips to the existing mux call.
+        "-af", "loudnorm=I=-16:TP=-1.5:LRA=11",
     ])
     if embed_subs_vtt is not None:
         mux_cmd.extend(["-c:s", "mov_text"])
@@ -321,31 +352,43 @@ def main() -> int:
     out_vtt = out_dir / f"{episode_id}.vtt"
 
     # ---- collect HuMo clips in beat order, paired with their ledger
-    #      line's dur_s so the trim pass knows the target length ----
+    #      line's dur_s so the trim pass knows the target length.
+    #      ffprobe-validate each clip to drop any that are partially
+    #      written or corrupt (per peer review 2026-04-26 — guards
+    #      against silent broken-episode failures). ----
     lines = led.get("lines", []) or []
     paired: list[tuple[Path, float | None, str]] = []   # (clip, dur_s, line_id)
     clips: list[Path] = []
     missing: list[str] = []
+    corrupt: list[str] = []
     for ln in lines:
         line_id = ln.get("line_id")
         if not line_id:
             continue
         clip = find_humo_clip(args.comfy_output_dir, episode_id, line_id)
-        if clip:
-            dur_s = ln.get("dur_s")
-            paired.append((clip, dur_s, line_id))
-            clips.append(clip)
-        else:
+        if not clip:
             missing.append(line_id)
+            continue
+        if not is_clip_readable(clip, args.ffmpeg):
+            corrupt.append(f"{line_id} ({clip.name})")
+            continue
+        dur_s = ln.get("dur_s")
+        paired.append((clip, dur_s, line_id))
+        clips.append(clip)
 
     print(f"[ledger] episode_id={episode_id}")
     print(f"[ledger] lines={len(lines)} (cast={len(led.get('cast') or [])}, "
           f"shots={len(led.get('shots') or [])}, "
           f"beats={len(led.get('beats') or [])})")
-    print(f"[clips]  found {len(clips)} HuMo mp4(s)  missing={len(missing)}")
+    print(f"[clips]  found {len(clips)} HuMo mp4(s)  "
+          f"missing={len(missing)}  corrupt={len(corrupt)}")
     if missing:
         print(f"  missing line_ids: {missing[:10]}"
               f"{' ...' if len(missing) > 10 else ''}")
+    if corrupt:
+        print(f"  corrupt clips dropped (ffprobe failed): "
+              f"{corrupt[:10]}"
+              f"{' ...' if len(corrupt) > 10 else ''}")
 
     # ---- write subtitles regardless (cheap) ----
     n_cues = write_vtt(led, out_vtt,

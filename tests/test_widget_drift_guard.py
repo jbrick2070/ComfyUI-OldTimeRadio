@@ -33,12 +33,12 @@ if PACK_ROOT not in sys.path:
 
 
 # ---------------------------------------------------------------------------
-# Shared schema fixture: mirrors the real Gemma4ScriptWriter input layout
+# Shared schema fixture: mirrors the real LLMScriptWriter input layout
 # with a socket-only PROJECT_STATE interleaved between widget-backed params.
 # ---------------------------------------------------------------------------
 def _script_writer_schema():
     return {
-        "OTR_Gemma4ScriptWriter": {
+        "OTR_LLMScriptWriter": {
             "input": {
                 "required": {
                     "episode_title": ("STRING", {"default": ""}),
@@ -51,7 +51,8 @@ def _script_writer_schema():
                 },
                 "optional": {
                     "model_id": (
-                        ["google/gemma-2-2b-it", "mistralai/Mistral-Nemo-Instruct-2407"],
+                        ["mistralai/Mistral-Nemo-Instruct-2407",
+                         "Qwen/Qwen2.5-14B-Instruct [ALPHA]"],
                         {"default": "mistralai/Mistral-Nemo-Instruct-2407"},
                     ),
                     "custom_premise": ("STRING", {"multiline": True, "default": ""}),
@@ -91,7 +92,7 @@ def _legacy_drift_schema():
     inputs because socket-only params cannot consume widget slots.
     """
     schema = _script_writer_schema()
-    opt = schema["OTR_Gemma4ScriptWriter"]["input"]["optional"]
+    opt = schema["OTR_LLMScriptWriter"]["input"]["optional"]
     reordered = {}
     for k, v in opt.items():
         if k == "optimization_profile":
@@ -102,7 +103,7 @@ def _legacy_drift_schema():
             continue  # will be placed above
         else:
             reordered[k] = v
-    schema["OTR_Gemma4ScriptWriter"]["input"]["optional"] = reordered
+    schema["OTR_LLMScriptWriter"]["input"]["optional"] = reordered
     return schema
 
 
@@ -132,7 +133,7 @@ def _workflow(schema):
         "nodes": [
             {
                 "id": 1,
-                "type": "OTR_Gemma4ScriptWriter",
+                "type": "OTR_LLMScriptWriter",
                 "widgets_values": _widgets_values(),
                 "inputs": [
                     # project_state declared as a socket input, not linked here.
@@ -332,7 +333,7 @@ class TestLinkedConvertedWidgetSlots:
 class TestPreservedSlotMode:
     """BUG-LOCAL-029: Some nodes save widgets_values with the linked
     converted widget's slot PRESERVED as a placeholder, rather than
-    stripped. Node 2 (OTR_Gemma4Director) in otr_scifi_16gb_full.json
+    stripped. Node 2 (OTR_LLMDirector) in otr_scifi_16gb_full.json
     is an example: script_text is linked AND carries widget metadata
     AND has an empty-string placeholder at slot 0. All downstream
     widgets (temperature, tts_engine, vintage_intensity,
@@ -344,7 +345,7 @@ class TestPreservedSlotMode:
 
     def _director_schema(self):
         return {
-            "OTR_Gemma4Director": {
+            "OTR_LLMDirector": {
                 "input": {
                     "required": {
                         "script_text": ("STRING", {"multiline": True, "default": ""}),
@@ -382,7 +383,7 @@ class TestPreservedSlotMode:
             "nodes": [
                 {
                     "id": 2,
-                    "type": "OTR_Gemma4Director",
+                    "type": "OTR_LLMDirector",
                     "widgets_values": [
                         "",                      # placeholder for script_text
                         0.4,                     # temperature

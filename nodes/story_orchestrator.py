@@ -923,7 +923,7 @@ def _fetch_science_news(max_feeds=10):
 # LLM INFERENCE WRAPPER
 # -----------------------------------------------------------------------------
 
-def _load_llm(model_id_full="google/gemma-4-E4B-it", device="cuda", optimization_profile="Standard"):
+def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda", optimization_profile="Standard"):
     # Strip [BETA] or [8-bit] labels used in the UI dropdown
     model_id = model_id_full.split(" ")[0]
 
@@ -2029,7 +2029,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
-def _generate_with_llm(prompt, model_id="google/gemma-4-E4B-it",
+def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92,
                           optimization_profile="Standard",
                           live_ledger=False):
@@ -2196,7 +2196,7 @@ def _truncate_at_sentence_boundary(text, max_chars):
 # This lets the Director automatically inherit the exact same model memory
 # space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
 # -----------------------------------------------------------------------------
-_CURRENT_LLM_MODEL = "google/gemma-4-E4B-it"
+_CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"
 
 
 # ============================================================================
@@ -2742,9 +2742,18 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                "model_id": (["google/gemma-2-2b-it", "google/gemma-2-9b-it", "google/gemma-4-E4B-it", "mistralai/Mistral-Nemo-Instruct-2407", "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": "Hugging Face model ID for LLM (Gemma series, Nemo, Qwen, etc.)"
+                # 2026-04-26: Gemma options retired. Mistral-Nemo is the
+                # production model — it cleared the BUG-061/062/063 format
+                # hardening cycle and produced the Long Goodbye trial run
+                # cleanly. Qwen-2.5-14B retained as alpha alternative;
+                # tooltip notes that.
+                "model_id": (["mistralai/Mistral-Nemo-Instruct-2407",
+                              "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
+                    "default": "mistralai/Mistral-Nemo-Instruct-2407",
+                    "tooltip": "Hugging Face model ID for LLM. Mistral-Nemo "
+                               "is the locked production default (12B, 4-bit "
+                               "NF4, _cap=6144). Qwen-2.5-14B is alpha — "
+                               "less validated against the OTR format gates."
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -2948,7 +2957,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         return profiles if len(profiles) >= num_names else None
 
     def write_script(self, episode_title, genre_flavor,
-                     target_words, num_characters, model_id="google/gemma-4-E4B-it",
+                     target_words, num_characters, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,

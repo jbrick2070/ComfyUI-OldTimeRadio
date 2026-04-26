@@ -1,5 +1,5 @@
 """
-Regression test: every dropdown / narrative option in OTR_Gemma4ScriptWriter.
+Regression test: every dropdown / narrative option in OTR_LLMScriptWriter.
 
 Tests the pre-flight guardrail logic WITHOUT running the LLM.  We patch the
 heavy methods (RSS fetch, model load, generation) and only exercise the code
@@ -114,7 +114,7 @@ def _run_preflight(writer, **overrides):
         "genre_flavor": "hard_sci_fi",
         "target_words": 1120,
         "num_characters": 4,
-        "model_id": "google/gemma-4-E4B-it",
+        "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
         "custom_premise": "",
         "include_act_breaks": True,
         "self_critique": True,
