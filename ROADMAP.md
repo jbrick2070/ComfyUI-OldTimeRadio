@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-26 (FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
+**Last updated:** 2026-04-26 PM (peer-review fixes landed: ITU loudness normalization + ffprobe corrupt-clip guard in concat orchestrator; LLM dropdown now defaults to MN-12B-Mag-Mell-R1 creative-writing fine-tune with Mistral-Nemo, Gemma 2/4, and Qwen alpha kept as alternates; FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -43,6 +43,24 @@ Lock these. Any work item that contradicts this list is wrong.
 - **Auto-title from spine** (commits `594556e` + `06483ad`) — between the OpenClose evaluator and the ScriptWriter draft, a small LLM call generates a 2-5 word evocative title from the winning spine. Prompt v2 is genre-agnostic (the LLM picks up genre from the spine itself, no on-the-nose tropes). Activates only when user widget is empty / `auto` / a stuck-default. 9 regression tests covering wrappers, stuck-default rejection, overlong-leak rejection, LLM-failure swallowing.
 - **`scripts/render_upscale_batch.py`** (commit `eb9152e`) — post-HuMo SeedVR2 1080p upscale orchestrator. Mirrors `external_examples/SeedVR2_HD_video_upscale.json` widget defaults (3B fp16 DiT + ema_vae_fp16, blocks_to_swap=32, batch_size=33, temporal_overlap=3, color_correction=lab). Pattern matches our other `render_*_batch.py` scripts: build one API graph, POST one /prompt, poll /history, confirm output. Estimated 30-50 min wall-clock for a 5-min episode. Decoupled from HuMo render so re-upscaling at different resolutions doesn't need a HuMo redo.
 - **Output foldering** — outputs reorganised into `output/otr_stills/` (FLUX pass1 portraits + pass3 composites) and `output/otr_videos/<episode_id>/` (HuMo per-clip mp4s + concat episode mp4 + 1080p upscale). Lookup paths in `render_humo_batch.py` and `verify_flux_coverage.py` search both new and legacy locations for backwards compatibility. Legacy `output/old_time_radio/` retained for v1.5 audio episodes.
+
+## What shipped 2026-04-26 PM (peer-review fixes + Mag-Mell promotion)
+
+- **Peer-review fixes from `cowork_full_workflow_audit.md`** (commit `733f0db`):
+    - **ITU BS.1770 loudness normalization** in `render_episode_concat.py` mux step (`-af loudnorm=I=-16:TP=-1.5:LRA=11`). Prevents quiet/loud mismatch when mixing HuMo audio with proc-gen Bark/Kokoro/MusicGen layers — broadcast-grade target across the final master.
+    - **`is_clip_readable()` ffprobe corrupt-clip guard** — every HuMo mp4 gets `ffprobe -show_entries format=duration` checked before joining the concat list. Corrupt clips drop into a `corrupt[]` list and are excluded from concat (surfaced alongside `missing[]` in the status print). Stops one busted HuMo clip from poisoning the whole episode master.
+- **MN-12B-Mag-Mell-R1 promoted to default LLM** (commit `86ac4e0`) — `inflatebot/MN-12B-Mag-Mell-R1` is now the dropdown default in both `OTR_LLMScriptWriter` and `OTR_VisualLLMSelector`. Creative-writing fine-tune of Mistral-Nemo: same architecture, same tokenizer, same VRAM footprint, but stronger narrative prose and dialogue voice with R1 reasoning flavor. Mistral-Nemo base kept as the validated fallback that cleared BUG-061/062/063. Gemma 2/4 variants restored as smaller alternates; Qwen-2.5-14B kept as alpha. Both shipped workflow JSONs (`otr_scifi_16gb_full.json` + `otr_scifi_16gb_TEST.json`) updated to match. Four function defaults aligned: `_load_llm`, `_generate_with_llm`, `_CURRENT_LLM_MODEL`, `write_script`. Test fixtures updated; full regression green (80 + 23 passed, AST OK, lockstep verified).
+
+### LLM dropdown order (v2.0-alpha @ 86ac4e0)
+
+1. `inflatebot/MN-12B-Mag-Mell-R1` ← default (creative-writing fine-tune)
+2. `mistralai/Mistral-Nemo-Instruct-2407` ← validated fallback
+3. `google/gemma-2-2b-it`
+4. `google/gemma-2-9b-it`
+5. `google/gemma-4-E4B-it`
+6. `Qwen/Qwen2.5-14B-Instruct [ALPHA]`
+
+If Mag-Mell produces format-gate failures (BUG-061/062/063 family), rollback is to flip the default back to `mistralai/Mistral-Nemo-Instruct-2407` in the four function defaults + dropdown + the two workflow JSONs.
 
 ### FULL workflow trial outcome (Long Goodbye, 2026-04-26 12:25 PM)
 

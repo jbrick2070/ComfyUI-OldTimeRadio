@@ -16,15 +16,16 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 ---
 
 ## Download
+
 [![Download ComfyUI-OldTimeRadio v1.7](https://img.shields.io/badge/Download-OldTimeRadio_v1.7-blue?style=for-the-badge)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)
 
-**[Click here to download the full package (v1.7)](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases)** — includes workflow JSONs + this guide.
+[**Click here to download the full package (v1.7)**](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/releases) — includes workflow JSONs + this guide.
 
 ---
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Gemma 4 E4B**, **Mistral Nemo 12B** (v1.4 flagship default), and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **MN-12B-Mag-Mell-R1** (v2.0-alpha default — creative-writing fine-tune of Mistral-Nemo with stronger narrative prose), **Mistral Nemo 12B** (validated fallback), **Gemma 2/4** variants, and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
@@ -32,7 +33,7 @@ The pipeline handles the entire production: **Kokoro v1.0** provides high-fideli
 
 ## Current Realities & Beta Quirks
 
-While SIGNAL LOST aims for a fully automated pipeline, **we are bound by the realities of local hardware.** Generating a complete 5-act to 10-act radio drama entirely from scratch is a massive computational lift. 
+While SIGNAL LOST aims for a fully automated pipeline, **we are bound by the realities of local hardware.** Generating a complete 5-act to 10-act radio drama entirely from scratch is a massive computational lift.
 
 Please be aware: **Full epic episodes can take over an hour to render on local hardware.** Because of the sequential generation of tokens, voices, Foley effects, and CRT filters, the pipeline runs deep.
 
@@ -47,9 +48,10 @@ ComfyUI is a free, node-based interface for running AI models locally on your GP
 > **Already have ComfyUI installed?** Skip to Step 2.
 
 ### Step 1 — Install ComfyUI
+
 Use the official desktop installer — it handles Python, Git, and dependencies automatically:
 
-**https://www.comfy.org/download**
+[**https://www.comfy.org/download**](https://www.comfy.org/download)
 
 Advanced users can install manually from [GitHub](https://github.com/comfyanonymous/ComfyUI).
 
@@ -57,25 +59,20 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 > **☕ Grab a coffee — models download automatically on first run.**
 
-| Model | Size | Notes |
-|-------|------|-------|
-| **Mistral Nemo 12B** | ~24 GB (4-bit: ~7 GB) | **v1.7 Flagship Default.** 18 tok/s on RTX 5080. Rich, cinematic narrative output. |
-| **Gemma 4 E4B** | ~5 GB | Balanced performer for 12GB+ cards. |
-| **Gemma 4 26B-A4B [BETA]** | ~14 GB (4-bit) | Higher-quality MoE LLM. Activates ~4B per token. **Optional.** |
-| **Bark TTS** | ~5 GB | Voice engine. Auto-downloads on first run. |
-| **MusicGen Medium** | ~6 GB | Instrumental theme generator. Auto-downloads on first run. |
-| **Kokoro 82M** | ~0.3 GB | British narrator voice engine. Auto-downloads on first run. |
+ModelSizeNotes**MN-12B-Mag-Mell-R1**\~24 GB (4-bit: \~7 GB)**v2.0-alpha Default.** Creative-writing fine-tune of Mistral-Nemo. Same architecture / tokenizer / VRAM footprint as base Nemo, stronger narrative prose and dialogue voice.**Mistral Nemo 12B**\~24 GB (4-bit: \~7 GB)Validated fallback (cleared BUG-061/062/063 format hardening).**Gemma 4 E4B**\~5 GBBalanced performer for 12GB+ cards.**Gemma 4 26B-A4B \[BETA\]**\~14 GB (4-bit)Higher-quality MoE LLM. Activates \~4B per token. **Optional.Bark TTS**\~5 GBVoice engine. Auto-downloads on first run.**MusicGen Medium**\~6 GBInstrumental theme generator. Auto-downloads on first run.**Kokoro 82M**\~0.3 GBBritish narrator voice engine. Auto-downloads on first run.
 
 > VRAM management is automatic. The pipeline unloads the LLM before loading audio models so you never run out of memory.
 
 ### Step 3 — Install ComfyUI-OldTimeRadio
 
 **Option A — ComfyUI Manager (recommended):**
+
 1. Open ComfyUI Manager → **Install via Git URL**
-2. Paste: `https://github.com/jbrick2070/ComfyUI-OldTimeRadio` 
+2. Paste: `https://github.com/jbrick2070/ComfyUI-OldTimeRadio`
 3. Click **Install** → Restart ComfyUI
 
 **Option B — Manual:**
+
 ```bash
 cd ComfyUI/custom_nodes
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
@@ -86,10 +83,7 @@ pip install transformers soundfile numpy feedparser tokenizers sentencepiece
 
 Two workflows ship in the `workflows/` folder:
 
-| Workflow | Runtime Preset | Best For | File |
-|----------|---------------|----------|------|
-| **Test** | 🧪 1 min | Smoke testing after code changes | `otr_scifi_16gb_test.json` |
-| **Full** | 📻 12 min | Production episodes, all features ON, Pro profile | `otr_scifi_16gb_full.json` |
+WorkflowRuntime PresetBest ForFile**Test**🧪 1 minSmoke testing after code changes`otr_scifi_16gb_test.json`**Full**📻 12 minProduction episodes, all features ON, Pro profile`otr_scifi_16gb_full.json`
 
 1. Open ComfyUI at `http://127.0.0.1:8000`
 2. Click **Load** → select a workflow
@@ -97,31 +91,29 @@ Two workflows ship in the `workflows/` folder:
 
 **GPU requirements:**
 
-| Setup | GPU | VRAM |
-|-------|-----|------|
-| Recommended | RTX 5080 / 4090 | 16 GB+ |
-| Minimum | RTX 4070 / 3060 | 12 GB |
+SetupGPUVRAMRecommendedRTX 5080 / 409016 GB+MinimumRTX 4070 / 306012 GB
 
-> [!IMPORTANT]
-> **SIGNAL LOST is a 16GB VRAM Project.** While we offer lower-parameter models in the node options, real-world profiling confirms that the total pipeline footprint (Weights + KV Cache + Activation Buffers + TTS + Video Encoding) requires a minimum of 12-16GB VRAM to run at full speed without swapping to system RAM.
+> \[!IMPORTANT\] **SIGNAL LOST is a 16GB VRAM Project.** While we offer lower-parameter models in the node options, real-world profiling confirms that the total pipeline footprint (Weights + KV Cache + Activation Buffers + TTS + Video Encoding) requires a minimum of 12-16GB VRAM to run at full speed without swapping to system RAM.
 
 ### Step 5 — Continuous 24/7 Broadcast (OBS Automation)
 
 Run SIGNAL LOST as a live generative broadcast — each output episode auto-loads into OBS as it finishes.
 
 **Prerequisites:**
+
 - [OBS Studio](https://obsproject.com/download)
 - [Media Playlist Source (OBS Plugin)](https://obsproject.com/forum/resources/media-playlist-source.1765/)
 - [Directory Sorter for OBS](https://github.com/CodeYan01/directory_sorter_for_obs)
 
 **Setup:**
+
 1. Install OBS and the Media Playlist Source plugin.
 2. In OBS: **Tools → Scripts → Python Settings** → point to your Python path.
 3. Load the `directory_sorter_for_obs` script → point to `ComfyUI/output/old_time_radio/`.
 4. Add a **Media Playlist Source** scene item pointed to the same folder.
 5. OBS picks up each new MP4 automatically as Signal Lost Video finishes.
 
-> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Gemma 4 and Bark.
+> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Mag-Mell and Bark.
 
 ---
 
@@ -133,8 +125,8 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 │                                                                                                    │
 │ ┌──────────────────────────────┐                  ┌──────────────────────────────────────┐        │
 │ │ 1. LLM Story Writer        │─────────────────►│ 2. LLM Director              │        │
-│ │ (OTR_Gemma4ScriptWriter)     │                  │ (OTR_Gemma4Director)                 │        │
-│ │ RSS → Gemma 4 → Script       │                  │ Procedural cast • voices • SFX • music │        │
+│ │ (OTR_LLMScriptWriter)        │                  │ (OTR_LLMDirector)                    │        │
+│ │ RSS → LLM → Script           │                  │ Procedural cast • voices • SFX • music │        │
 │ │ Open-Close expansion         │                  │ LEMMY stays LEMMY (en_speaker_8)     │        │
 │ │ Self-critique loop           │                  └──────────────────────────────────────┘        │
 │ └──────────────────────────────┘                                                                    │
@@ -205,25 +197,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 ## Node Reference
 
-| Node | What It Does |
-|------|-------------|
-| **1. LLM Story Writer** | Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. **v1.5 Story Editor** critiques the outline before writing and generates per-act briefs that guide each act's dialogue. Open-Close expansion generates 3 competing 7-line micro-spines and picks the best. Arc Enhancer polishes opening/closing using act summaries + critique findings for start-to-end coherence. 12 dramatic story arc templates. |
-| **2. LLM Director** | Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. |
-| **3. Voice Maker Machine** | Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. |
-| **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends. |
-| **🎺 MusicGen Theme** | Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations. |
-| **🔊 SFX Maker Machine (AudioGen)** | Generates high-fidelity Foley sound effects from Director prompts using `facebook/audiogen-medium`, natively cached to save VRAM. |
-| **🔊 SFX Maker Machine (Procedural)** | Zero-VRAM fallback generator for 4GB Obsidian users, synthesizing clean procedural effects without loading heavy audio models. |
-| **4. Scene Builder** | Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in script order. |
-| **5. Make It Sound Awesome** | Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization. |
-| **6. Glue Everything Together** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
-| **7. Make the Final Video** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
-| | |
-| **v2.0 — Visual Drama Engine** | **[ALPHA — on `v2.0-alpha` branch]** |
-| **8. Character Forge** `[v2.0]` | Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes. |
-| **9. Scene Painter** `[v2.0]` | Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation. |
-| **10. Visual Compositor** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
-| **11. Production Bus** `[v2.0]` | FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track. |
+NodeWhat It Does**1. LLM Story Writer**Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. **v1.5 Story Editor** critiques the outline before writing and generates per-act briefs that guide each act's dialogue. Open-Close expansion generates 3 competing 7-line micro-spines and picks the best. Arc Enhancer polishes opening/closing using act summaries + critique findings for start-to-end coherence. 12 dramatic story arc templates.**2. LLM Director**Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails.**3. Voice Maker Machine**Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated.**🎙️ Kokoro Announcer**Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends.**🎺 MusicGen Theme**Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations.**🔊 SFX Maker Machine (AudioGen**)Generates high-fidelity Foley sound effects from Director prompts using `facebook/audiogen-medium`, natively cached to save VRAM.**🔊 SFX Maker Machine (Procedural**)Zero-VRAM fallback generator for 4GB Obsidian users, synthesizing clean procedural effects without loading heavy audio models.**4. Scene Builder**Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in script order.**5. Make It Sound Awesome**Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization.**6. Glue Everything Together**Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration.**7. Make the Final Video**Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats.**v2.0 — Visual Drama Engine\[ALPHA — on** `v2.0-alpha` **branch\]8. Character Forge** `[v2.0]`Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes.**9. Scene Painter** `[v2.0]`Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation.**10. Visual Compositor** `[v2.0]`Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required.**11. Production Bus** `[v2.0]`FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track.
 
 ---
 
@@ -232,8 +206,9 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 There's an 11% chance per run that a character named **LEMMY** — a grizzled, wrench-wielding engineer — crashes the episode. He always gets `v2/en_speaker_8` (gravelly, English, 50s), always has a signature wrench-clank SFX on his first line, and always speaks in blunt, colorful mechanic metaphors.
 
 Watch for this in the ComfyUI console:
+
 ```
-[Gemma4ScriptWriter] 🎲 Lemmy rolled in on his own (lucky 11%)  [force=False, rng_hit=True]
+[LLMScriptWriter] 🎲 Lemmy rolled in on his own (lucky 11%)  [force=False, rng_hit=True]
 ```
 
 For testing, flip the `summon_lemmy` toggle on Node 1 to guarantee his appearance.
@@ -267,51 +242,42 @@ python otr_monitor.py
 
 ## Troubleshooting
 
-<details>
-<summary><strong>CUDA out of memory during Voice Maker Machine</strong></summary>
+**CUDA out of memory during Voice Maker Machine**
 
 **Cause:** Gemma 4 occasionally didn't fully un-pin its VRAM.
 
-**Fix:** Restart ComfyUI and re-queue. The pipeline uses automatic VRAM management between model lifetimes. If it persists, switch to the Lite workflow (`gemma-4-E4B-it`, ~3 GB VRAM).
-</details>
+**Fix:** Restart ComfyUI and re-queue. The pipeline uses automatic VRAM management between model lifetimes. If it persists, switch to the Lite workflow (`gemma-4-E4B-it`, \~3 GB VRAM).
 
-<details>
-<summary><strong>Signal Lost Video node fails with "ffmpeg not found"</strong></summary>
+**Signal Lost Video node fails with "ffmpeg not found"**
 
 **Cause:** ffmpeg is not installed or not on your system PATH.
 
 **Fix:** Windows: `winget install ffmpeg`
-</details>
 
-<details>
-<summary><strong>"No news articles found" / RSS feed errors</strong></summary>
+**"No news articles found" / RSS feed errors**
 
 **Cause:** Firewall issues or the RSS fetch timed out.
 
 **What happens:** The pipeline falls back to built-in sci-fi premises. Generation succeeds — it just won't reference today's news cycle.
-</details>
 
-<details>
-<summary><strong>Lemmy appears on every single run</strong></summary>
+**Lemmy appears on every single run**
 
 **Cause:** The `summon_lemmy` toggle was set to ON in your browser session and got cached.
 
 **Fix:** Hard-refresh the ComfyUI browser tab (Ctrl+Shift+R), reload the workflow JSON via File → Open. Confirm `summon_lemmy` is OFF on Node 1. The 11% RNG uses OS entropy and is not affected by the per-episode seed.
-</details>
 
-<details>
-<summary><strong>Script is too short / under-running the target runtime</strong></summary>
+**Script is too short / under-running the target runtime**
 
 **Cause:** Gemma occasionally undershoots even with MANDATORY line count directives.
 
 **Fix:** v1.5 addresses this with the Story Editor (per-act briefs that prevent lazy generation), 1.5x dialogue inflation, and prompt hardening. Try `creativity = wild & rough` for even more output. The `self_critique` toggle enables structural analysis that guides writing quality.
-</details>
 
 ---
 
 ## Technical Appendix
 
 ### Requirements
+
 ```
 transformers>=4.40,<6.0
 soundfile>=0.12
@@ -330,6 +296,7 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 **Isolated Module Loading** — A failing dependency in one node will not crash the rest of the pack. Each of the 19 nodes loads independently with per-node exception handling.
 
 **RNG Architecture** — Two separate RNG systems prevent determinism leaking into places it shouldn't:
+
 - `random` (seeded per-episode from fingerprint) — used for reproducible story arc selection, Open-Close arc choices, character voice pool draws
 - `SystemRandom` (`_LEMMY_RNG`) — OS entropy, used only for the Lemmy 11% coin flip so it stays genuinely random across repeated runs of the same config
 
@@ -340,108 +307,137 @@ Built adhering to the [ComfyUI Custom Node Survival Guide](https://github.com/jb
 ### What's New in v1.7 — Parser Resilience & Ship Stability
 
 #### Multi-Format Dialogue Parser (v5)
+
 The canonical parser now handles bare `NAME: dialogue` lines natively (Mistral's preferred output style) alongside the existing `[VOICE: NAME, traits]` bracket format. Previously, bare-NAME scripts silently dropped all dialogue tokens into the direction bucket, producing episodes with zero character speech. The v5 pattern registers dialogue directly from the strict parse, with a structural-token blacklist that prevents stage directions (`ACT`, `SCENE`, `TITLE`, etc.) from being misidentified as speaking characters.
 
 #### FORMAT_NORM Skip Heuristic Tightened
+
 The LLM-based canonical rewrite pass (`_normalize_script_format`) previously counted bare `NAME:` lines as "already canonical" and skipped the rewrite. This meant Mistral scripts bypassed the voice-trait enrichment pass entirely, then hit a parser that couldn't read them. The skip now requires actual `[VOICE:]` bracket tags, forcing bare-NAME scripts through the rewrite every time.
 
 #### Director JSON Resilience
+
 LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A new state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the Director now survives malformed output that previously crashed the entire pipeline.
 
 #### Title Extraction Hardening
+
 Two fixes that eliminate title-related regressions. First, `TITLE` is now blacklisted as a dialogue character name across both the streaming detector and the canonical parser, preventing the LLM's `TITLE: Episode Name` line from polluting the cast roster. Second, markdown bold wrappers (`**Title**`) are stripped from captured title values so filenames and log traces stay clean.
 
 #### Permissive 2B-Fallback Guard
+
 The recovery path inside `_parse_script` now fires when the strict parse finds fewer than 3 dialogue tokens AND the raw text contains 5+ bare `NAME:` patterns. Previously, even one stray malformed VOICE tag could short-circuit recovery of an entire bare-NAME script.
 
 #### Soak-Hardened
+
 Seven bugs found and fixed in a single session (BUG-LOCAL-034 through 040), all verified on live end-to-end episode runs. Streak auto-halt, TITLE_STUCK filename resolution, WordExtend NameError, TITLE-as-character regression, bare-NAME dialogue parser, markdown-bold title leak, and Director JSON comment parsing.
 
 ### What's New in v1.5 — CLEAN (Story Editor & Pipeline Hardening)
 
 #### Story Editor (Critique-Guided Writing)
+
 The pipeline now **critiques the outline before writing dialogue**. After generating the structural outline, a veteran "Story Editor" pass analyzes weaknesses and generates per-act briefs describing what each act must accomplish dramatically. Every act prompt receives its brief + the overall critique, producing stronger, more purposeful dialogue from the first draft.
 
 #### 7-Line Micro-Spine Protocol
-Open-Close expansion now generates ultra-condensed 7-line structural spines (~100 tokens) instead of full outlines (~450 tokens). Cuts the Open-Close phase from ~12 minutes to ~2 minutes while producing tighter narrative structures.
+
+Open-Close expansion now generates ultra-condensed 7-line structural spines (\~100 tokens) instead of full outlines (\~450 tokens). Cuts the Open-Close phase from \~12 minutes to \~2 minutes while producing tighter narrative structures.
 
 #### Arc Enhancer v2 — Critique + Act Summaries
+
 The Arc Enhancer now receives both the Story Editor's critique findings AND the act-by-act narrative summaries from chunked generation. This gives the bookend rewriter a complete picture of the story when polishing the opening and closing for start-to-end coherence.
 
 #### Dynamic Token Budgets
+
 Act token budgets now scale dynamically with `words_per_act × 2.5` instead of being hardcoded to 1536, clamped between 1024-2048. Longer episodes get proportionally more generation headroom.
 
 #### VRAM Stability
+
 `force_vram_offload()` replaces raw `gc.collect()`/`torch.cuda.empty_cache()` between acts. The 3-step teardown (registered callbacks → ComfyUI model unload → PyTorch cache purge) ensures clean memory between every generation step.
 
 ### What's New in v1.4
 
 #### Mistral Nemo 12B — Flagship Narrative Engine
+
 The default LLM is now **Mistral Nemo 12B** (`mistralai/Mistral-Nemo-Instruct-2407`), delivering richer, more cinematic script output at 18 tok/s on RTX 5080. 4-bit NF4 quantization fits the full 12.4B parameter model inside a 7 GB VRAM envelope with a 2 GB sovereignty buffer. Gemma 4 E4B remains available as an alternative.
 
 #### Zero-Prime Cache Hardening
+
 All model loaders (LLM, Bark, MusicGen, Kokoro) now explicitly bind `cache_dir` to the local `ComfyUI/models/huggingface/hub` directory via the `HF_HOME` environment variable. This eliminates redundant Hub fetches, `.incomplete` file deadlocks, and Windows symlink resolution failures that plagued earlier versions. Models load instantly from NVMe with zero internet dependency after first download.
 
 #### Pro-Tier Model Support & 1-Click Master Switch
+
 You are no longer locked to a single model. The **True Single Switch Architecture** lets you set your desired model solely on the `LLMScriptWriter` node and the global pipeline seamlessly inherits the exact memory pointer without ever doubling VRAM.
 
 #### VRAM Leak Hardening
+
 Massive rebuild of the underlying ThreadPool and memory GC. VRAM allocations now securely decouple and flush (explicit `model.cpu()`, `del`, `gc.collect()`, and ComfyUI `soft_empty_cache`) even when an episode hits a 600-second timeout abort. 2 GB Sovereignty Buffer enforced on 16 GB cards.
 
 #### Kokoro & MusicGen Audio Engine
+
 New modular nodes for `KokoroAnnouncer` (British narrator) and `MusicGenTheme` (orchestral cues), seamlessly snapping into the pipeline to execute specialized audio workloads while the LLM is safely unloaded.
 
 #### Obsidian "One-Shot" Optimization
+
 Added an **Optimization Profile** master switch. Selecting "Obsidian (Low VRAM/Fast)" disables all iterative LLM passes for 4GB GPUs.
 
 #### Subtle Pacing & Clean Load Protocol
+
 Implemented a **50% Pacing Overhaul** across the audio engine for a tighter, more modern radio sound.
 
 ### What's New in v1.3
 
 #### Arc Enhancer — Full Phase A/B/C Pipeline
+
 The Arc Enhancer is now fully instrumented and on by default in all three workflows.
 
 **Phase A — Structural Coherence Scoring:** Before any rewrite, the system scores the draft arc across 5 checks: truncation guard, strong scene (≥4 distinct voices), payoff (keyword overlap between opening and closing), echo (shared thematic words), and epilogue (ANNOUNCER present in final 500 characters). Score and all 5 check values are logged per-episode so you can see exactly what the arc looks like before Phase B touches it.
 
-**Phase B — Plot Spine Injection:** The middle acts are summarized into a ~50-word "plot spine" and injected directly into the Phase B bookend rewrite prompt. Phase B can no longer hallucinate an ending that contradicts what actually happened in the middle of the episode.
+**Phase B — Plot Spine Injection:** The middle acts are summarized into a \~50-word "plot spine" and injected directly into the Phase B bookend rewrite prompt. Phase B can no longer hallucinate an ending that contradicts what actually happened in the middle of the episode.
 
 **Phase C — Echo Phrase Logging:** After the bookend rewrite, the system extracts the shared noun that bridges the new opening and closing lines and logs it — the concrete thematic echo that ties the episode together.
 
 #### OpenClose Stability Fix
-Reduced outline token budget from 600 to 450 tokens and raised the generation wall from 300s to 480s. Eliminates the timeout failure that was hitting when SDPA inference ran at ~2 tok/sec on long outline passes.
+
+Reduced outline token budget from 600 to 450 tokens and raised the generation wall from 300s to 480s. Eliminates the timeout failure that was hitting when SDPA inference ran at \~2 tok/sec on long outline passes.
 
 #### Test Workflow Speed Pass
+
 Test workflow now runs `short (3 acts)` instead of `medium (5 acts)` — cuts smoke-test time by roughly half while retaining 100% feature coverage including Arc Enhancer, Plot Spine, and echo logging.
 
 #### Attention Backend Clarity
+
 The Flash Attention 2 probe now logs a precise platform message instead of a generic "not installed" warning:
+
 ```
-[Gemma4] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention + SDPA active. Performance unaffected. Do not attempt install.
+[OTR] Flash Attention 2: NOT AVAILABLE — no prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention + SDPA active. Performance unaffected. Do not attempt install.
 ```
 
 #### Stability (from v1.3-beta)
-`prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `Gemma4Director` stage so Gemma has full VRAM during Arc Enhancer operations.
+
+`prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `LLMDirector` stage so the LLM has full VRAM during Arc Enhancer operations.
 
 #### Gemma 4 VRAM Release Fix (v1.3 final)
+
 `_unload_gemma4` now calls `model.cpu()` before dropping references, and `_generate_with_gemma4` detaches output tensors to CPU and explicitly frees GPU tensors plus the streamer before returning. Root cause was abandoned `_run_with_timeout` ThreadPoolExecutor threads holding live Gemma model references, preventing garbage collection and causing a 31.70 GiB allocation on a 16 GB card. Verified end to end: telemetry reads `VRAM allocated=0.03 GiB` after unload, and the full sci-fi workflow completes in approximately 1h 14m producing a 457 MB MP4.
 
 #### Known issues carried into v1.4 (RESOLVED IN BETA)
-The Critique Revision pass (600s wall) and Arc-Enhancer-Echo pass (300s wall) previously hit timeouts on long runs and interleaved fallback text with the script body. **(Fixed in v1.4-beta: We now use a strict `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]` tag that cleanly bypasses downstream assembly logic, protecting script structural flow).**
+
+The Critique Revision pass (600s wall) and Arc-Enhancer-Echo pass (300s wall) previously hit timeouts on long runs and interleaved fallback text with the script body. **(Fixed in v1.4-beta: We now use a strict** `[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]` **tag that cleanly bypasses downstream assembly logic, protecting script structural flow).**
 
 ### What's New in v1.2
 
 #### Narrative Patterns 1–6
-Six new story-craft patterns embedded in the Gemma prompt chain:
-**AISM Filter**, **Scaffolding Preamble**, **Verbalized Sampling Epilogue**, **Yes-But / No-And conflict rule**, **Vocal Blueprints**, and **Locked Decisions**. The result: tighter arcs, sharper character differentiation, and fewer "AI voice" tells in the dialogue.
+
+Six new story-craft patterns embedded in the Gemma prompt chain: **AISM Filter**, **Scaffolding Preamble**, **Verbalized Sampling Epilogue**, **Yes-But / No-And conflict rule**, **Vocal Blueprints**, and **Locked Decisions**. The result: tighter arcs, sharper character differentiation, and fewer "AI voice" tells in the dialogue.
 
 #### 8,316 Procedural Cast Combos
+
 First/last name pools expanded to **154 × 54** — Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, pulp adventure, classic Simpsons/Office generics, and 24 pre-1931 public domain literary characters. Zero trademark-specific franchise names. Every episode draws a unique cast.
 
 #### Lemmy Statistical Audit
+
 New `tests/lemmy_rng_check.py` harness runs 10,000 trials against the 11% `SystemRandom` roll with ±1.5% tolerance. Confirms the easter egg stays statistically honest across builds.
 
 #### v1.2 Bug Fixes (v1.2.0.5)
+
 - **Revision token budget** scales from draft length (`draft_chars / 3.5 × 1.25`) instead of `target_words`, ending Scene 4 decapitation that caused "weak ending" reviews
 - **Minced oaths pool** — ContentFilter rotates through period-authentic 1940s radio euphemisms (*Stars above*, *Jiminy*, *Great Scott*, *Thunderation*) instead of `[BLEEP]`
 - **Female preset pool expansion** — `en_speaker_7` promoted to female, giving 3 distinct female voices (4 / 7 / 9) so VEX and ZARA no longer collide on the same preset
@@ -450,6 +446,7 @@ New `tests/lemmy_rng_check.py` harness runs 10,000 trials against the 11% `Syste
 ### What's New in v1.1
 
 #### Friendlier UI — 5th-Grader Approved
+
 All three workflows now use numbered nodes with emojis and color-coded groups so anyone can follow the pipeline at a glance:
 
 - **Blue zone** → `1. WRITE THE STORY 📝`
@@ -459,14 +456,11 @@ All three workflows now use numbered nodes with emojis and color-coded groups so
 Node names: `1. Gemma Writes the Story` → `2. Gemma Directs the Show` → `3. Voice Maker Machine` → `4. Scene Builder` → `5. Make It Sound Awesome` → `6. Glue Everything Together` → `7. Make the Final Video`
 
 #### Three New Control Dials on Node 1
-| Widget | Options | What It Does |
-|--------|---------|-------------|
-| `runtime_preset` | 🧪 test / ⚡ quick / 📻 standard / 🎬 long / 🎭 epic / 🔧 custom | Pick your episode length without typing numbers |
-| `target_length` | short (3 acts) / medium (5 acts) / long (7-8 acts) / epic (10+) | Controls act count and mandatory dialogue volume |
-| `style_variant` | tense claustrophobic / space opera epic / psychological slow-burn / hard-sci-fi procedural / noir mystery / chaotic black-mirror | Injects a tonal directive into the script prompt |
-| `creativity` | safe & tight / balanced / wild & rough / maximum chaos | Maps to temperature/top_p (0.6 → 0.85 → 1.1 → 1.35) |
+
+WidgetOptionsWhat It Does`runtime_preset`🧪 test / ⚡ quick / 📻 standard / 🎬 long / 🎭 epic / 🔧 customPick your episode length without typing numbers`target_length`short (3 acts) / medium (5 acts) / long (7-8 acts) / epic (10+)Controls act count and mandatory dialogue volume`style_variant`tense claustrophobic / space opera epic / psychological slow-burn / hard-sci-fi procedural / noir mystery / chaotic black-mirrorInjects a tonal directive into the script prompt`creativity`safe & tight / balanced / wild & rough / maximum chaosMaps to temperature/top_p (0.6 → 0.85 → 1.1 → 1.35)
 
 #### The Lemmy Fix
+
 LEMMY — the 11% easter-egg engineer named after Lemmy Kilmister — had two bugs in v1.0:
 
 1. **Voice collision**: Drake could steal his `v2/en_speaker_8` preset before Lemmy's locked branch ran. Fixed with two-pass cast iteration (LEMMY and ANNOUNCER processed first).
@@ -475,17 +469,20 @@ LEMMY — the 11% easter-egg engineer named after Lemmy Kilmister — had two bu
 New `summon_lemmy` toggle on Node 1 guarantees Lemmy for testing. Defaults to OFF in production — he stays a genuine 11% surprise.
 
 #### Pacing Overhaul
+
 - Banned consecutive `[PAUSE/BEAT]` tags at the system-prompt level
 - Hardened length directives to MANDATORY minimum line counts (not soft targets)
 - Default `target_minutes` lowered 25 → 8 for punchy, dense dialogue out of the box
 - `active_top_p` (creativity dial) now correctly reaches the chunked generation path for long episodes
 
 #### Strict Node Count Discipline
+
 Continually monitoring the footprint and removing unused nodes. Boot log confirms: `[OldTimeRadio] All 19 nodes loaded successfully` (expanded from 15 in v1.4 to include the v2.0 Visual Drama Engine nodes: CharacterForge, ScenePainter, VisualCompositor, ProductionBus).
 
 ---
 
 ## 🛠️ Developer Note: Architecture Gotchas
+
 *For the next AI assistant or contributor:*
 
 1. **Offline First:** This project is designed for air-gapped performance. Never add code that relies on real-time `transformers` Hub pings or `requests.get` to remote servers without the safety mocks in `prestartup_script.py`.
