@@ -2787,18 +2787,14 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                # 2026-04-26 PM: MN-12B-Mag-Mell-R1 retired as default.
-                # Live FULL run on time_travel/noir_mystery produced a
-                # narration-only collapse: 0 character dialogue lines,
-                # invented atmospheric "speakers" (AETHERPHASE HARMONIZE,
-                # BFUSKY VECTORS, OCCULTNUCLEUS) instead of using the
-                # canonical [CHARACTER, mood] dialogue shape. Mag-Mell
-                # is a creative-writing fine-tune that fights the OTR
-                # format gates. Captain-Eris-Violet is now the default —
-                # also a Mistral-Nemo derivative but RP-tuned, dialogue-
-                # first, holds character voice across long scenes.
-                # Mistral-Nemo base kept as validated fallback. Gemma
-                # variants are smaller alternates. Qwen-2.5-14B is alpha.
+                # 2026-04-26 PM: Captain-Eris-Violet promoted to
+                # default LLM. Mistral-Nemo derivative, RP-tuned,
+                # dialogue-first; holds character voice across long
+                # scenes — a good fit for the canonical [CHARACTER,
+                # mood] dialogue shape. Mistral-Nemo base kept as the
+                # validated fallback that cleared BUG-061/062/063.
+                # Gemma variants are smaller alternates. Qwen-2.5-14B
+                # is alpha — less validated against the OTR format gates.
                 "model_id": (["Nitral-AI/Captain_Eris_Violet-V0.420-12B",
                               "mistralai/Mistral-Nemo-Instruct-2407",
                               "google/gemma-2-2b-it",

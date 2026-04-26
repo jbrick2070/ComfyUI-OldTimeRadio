@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-26 PM (peer-review fixes landed: ITU loudness normalization + ffprobe corrupt-clip guard in concat orchestrator; LLM dropdown now defaults to MN-12B-Mag-Mell-R1 creative-writing fine-tune with Mistral-Nemo, Gemma 2/4, and Qwen alpha kept as alternates; FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
+**Last updated:** 2026-04-26 PM (peer-review fixes landed: ITU loudness normalization + ffprobe corrupt-clip guard in concat orchestrator; LLM dropdown now defaults to Captain-Eris-Violet — a dialogue-first Mistral-Nemo RP fine-tune — with Mistral-Nemo base kept as the validated fallback, Gemma 2/4 and Qwen alpha as alternates; cache-mismatch reload thrash fixed at the LLM cache layer (BUG-LOCAL-065); FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -44,23 +44,24 @@ Lock these. Any work item that contradicts this list is wrong.
 - **`scripts/render_upscale_batch.py`** (commit `eb9152e`) — post-HuMo SeedVR2 1080p upscale orchestrator. Mirrors `external_examples/SeedVR2_HD_video_upscale.json` widget defaults (3B fp16 DiT + ema_vae_fp16, blocks_to_swap=32, batch_size=33, temporal_overlap=3, color_correction=lab). Pattern matches our other `render_*_batch.py` scripts: build one API graph, POST one /prompt, poll /history, confirm output. Estimated 30-50 min wall-clock for a 5-min episode. Decoupled from HuMo render so re-upscaling at different resolutions doesn't need a HuMo redo.
 - **Output foldering** — outputs reorganised into `output/otr_stills/` (FLUX pass1 portraits + pass3 composites) and `output/otr_videos/<episode_id>/` (HuMo per-clip mp4s + concat episode mp4 + 1080p upscale). Lookup paths in `render_humo_batch.py` and `verify_flux_coverage.py` search both new and legacy locations for backwards compatibility. Legacy `output/old_time_radio/` retained for v1.5 audio episodes.
 
-## What shipped 2026-04-26 PM (peer-review fixes + Mag-Mell promotion)
+## What shipped 2026-04-26 PM (peer-review fixes + Captain-Eris-Violet promotion + cache-thrash fix)
 
 - **Peer-review fixes from `cowork_full_workflow_audit.md`** (commit `733f0db`):
     - **ITU BS.1770 loudness normalization** in `render_episode_concat.py` mux step (`-af loudnorm=I=-16:TP=-1.5:LRA=11`). Prevents quiet/loud mismatch when mixing HuMo audio with proc-gen Bark/Kokoro/MusicGen layers — broadcast-grade target across the final master.
     - **`is_clip_readable()` ffprobe corrupt-clip guard** — every HuMo mp4 gets `ffprobe -show_entries format=duration` checked before joining the concat list. Corrupt clips drop into a `corrupt[]` list and are excluded from concat (surfaced alongside `missing[]` in the status print). Stops one busted HuMo clip from poisoning the whole episode master.
-- **MN-12B-Mag-Mell-R1 promoted to default LLM** (commit `86ac4e0`) — `inflatebot/MN-12B-Mag-Mell-R1` is now the dropdown default in both `OTR_LLMScriptWriter` and `OTR_VisualLLMSelector`. Creative-writing fine-tune of Mistral-Nemo: same architecture, same tokenizer, same VRAM footprint, but stronger narrative prose and dialogue voice with R1 reasoning flavor. Mistral-Nemo base kept as the validated fallback that cleared BUG-061/062/063. Gemma 2/4 variants restored as smaller alternates; Qwen-2.5-14B kept as alpha. Both shipped workflow JSONs (`otr_scifi_16gb_full.json` + `otr_scifi_16gb_TEST.json`) updated to match. Four function defaults aligned: `_load_llm`, `_generate_with_llm`, `_CURRENT_LLM_MODEL`, `write_script`. Test fixtures updated; full regression green (80 + 23 passed, AST OK, lockstep verified).
+- **BUG-LOCAL-065 fixed — LLM cache-mismatch reload thrash** (commit `ddfa392`) — between LLM phases (title-gen → Open-Close → draft → critique → revise → arc-enhancer) the cache-mismatch check at `_load_llm` was firing false-positive evictions because the eviction probe used `next(model.parameters()).device` and bnb 4-bit's first parameter is non-deterministically a CPU-resident metadata buffer. Each false-positive triggered a full unload + cold-load (~15-17 s × 4-6 cycles per FULL run). Fix scans up to 8 parameters (any cuda → resident) and replaces the opaque boolean check with explicit per-field delta collection so the runtime log names the drifting field. New regression `tests/test_llm_cache_mismatch_diagnostics.py` — 12 tests covering no-drift across all phase boundaries, quantized-model false-positive guards, and legitimate-mismatch coverage. Bible candidate.
+- **Captain-Eris-Violet promoted to default LLM** (commit `74e4e81`) — `Nitral-AI/Captain_Eris_Violet-V0.420-12B` is now the dropdown default in both `OTR_LLMScriptWriter` and `OTR_VisualLLMSelector`. Dialogue-first RP fine-tune of Mistral-Nemo: same architecture, same tokenizer, same VRAM footprint, but with explicit RP/dialogue training that holds character voice across long scenes — a better fit for the OTR `[CHARACTER, mood] dialogue` format than a pure narrative-prose fine-tune. Mistral-Nemo base kept as the validated fallback that cleared BUG-061/062/063. Gemma 2/4 variants kept as smaller alternates; Qwen-2.5-14B kept as alpha. Both shipped workflow JSONs (`otr_scifi_16gb_full.json` + `otr_scifi_16gb_TEST.json`) updated to match. Four function defaults aligned: `_load_llm`, `_generate_with_llm`, `_CURRENT_LLM_MODEL`, `write_script`. Test fixtures updated; full regression green (92 passed, AST OK, lockstep verified).
 
-### LLM dropdown order (v2.0-alpha @ 86ac4e0)
+### LLM dropdown order (v2.0-alpha)
 
-1. `inflatebot/MN-12B-Mag-Mell-R1` ← default (creative-writing fine-tune)
+1. `Nitral-AI/Captain_Eris_Violet-V0.420-12B` ← default (dialogue-first RP fine-tune)
 2. `mistralai/Mistral-Nemo-Instruct-2407` ← validated fallback
 3. `google/gemma-2-2b-it`
 4. `google/gemma-2-9b-it`
 5. `google/gemma-4-E4B-it`
 6. `Qwen/Qwen2.5-14B-Instruct [ALPHA]`
 
-If Mag-Mell produces format-gate failures (BUG-061/062/063 family), rollback is to flip the default back to `mistralai/Mistral-Nemo-Instruct-2407` in the four function defaults + dropdown + the two workflow JSONs.
+If Captain-Eris-Violet produces format-gate failures (BUG-061/062/063 family), rollback is to flip the default back to `mistralai/Mistral-Nemo-Instruct-2407` in the four function defaults + dropdown + the two workflow JSONs.
 
 ### FULL workflow trial outcome (Long Goodbye, 2026-04-26 12:25 PM)
 

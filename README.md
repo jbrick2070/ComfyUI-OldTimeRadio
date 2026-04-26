@@ -25,7 +25,7 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ## What It Does
 
-"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **MN-12B-Mag-Mell-R1** (v2.0-alpha default — creative-writing fine-tune of Mistral-Nemo with stronger narrative prose), **Mistral Nemo 12B** (validated fallback), **Gemma 2/4** variants, and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
+"SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Captain-Eris-Violet** (v2.0-alpha default — dialogue-first RP fine-tune of Mistral-Nemo with strong character voice), **Mistral Nemo 12B** (validated fallback), **Gemma 2/4** variants, and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.
 
 The pipeline handles the entire production: **Kokoro v1.0** provides high-fidelity British narration for act transitions, **Bark TTS** performs the dialogue with expressive human emotion, and **MusicGen** generates tone-mapped orchestral themes. Everything is mastered into 48kHz stereo with procedural SFX and rendered as a procedural CRT-aesthetic MP4. Every run is a brand new, complete episode generated entirely from scratch on your own hardware.
 
@@ -59,7 +59,7 @@ Advanced users can install manually from [GitHub](https://github.com/comfyanonym
 
 > **☕ Grab a coffee — models download automatically on first run.**
 
-ModelSizeNotes**MN-12B-Mag-Mell-R1**\~24 GB (4-bit: \~7 GB)**v2.0-alpha Default.** Creative-writing fine-tune of Mistral-Nemo. Same architecture / tokenizer / VRAM footprint as base Nemo, stronger narrative prose and dialogue voice.**Mistral Nemo 12B**\~24 GB (4-bit: \~7 GB)Validated fallback (cleared BUG-061/062/063 format hardening).**Gemma 4 E4B**\~5 GBBalanced performer for 12GB+ cards.**Gemma 4 26B-A4B \[BETA\]**\~14 GB (4-bit)Higher-quality MoE LLM. Activates \~4B per token. **Optional.Bark TTS**\~5 GBVoice engine. Auto-downloads on first run.**MusicGen Medium**\~6 GBInstrumental theme generator. Auto-downloads on first run.**Kokoro 82M**\~0.3 GBBritish narrator voice engine. Auto-downloads on first run.
+ModelSizeNotes**Captain-Eris-Violet 12B**\~24 GB (4-bit: \~7 GB)**v2.0-alpha Default.** Dialogue-first RP fine-tune of Mistral-Nemo. Same architecture / tokenizer / VRAM footprint as base Nemo, with explicit dialogue training that holds character voice across long scenes.**Mistral Nemo 12B**\~24 GB (4-bit: \~7 GB)Validated fallback (cleared BUG-061/062/063 format hardening).**Gemma 4 E4B**\~5 GBBalanced performer for 12GB+ cards.**Gemma 4 26B-A4B \[BETA\]**\~14 GB (4-bit)Higher-quality MoE LLM. Activates \~4B per token. **Optional.Bark TTS**\~5 GBVoice engine. Auto-downloads on first run.**MusicGen Medium**\~6 GBInstrumental theme generator. Auto-downloads on first run.**Kokoro 82M**\~0.3 GBBritish narrator voice engine. Auto-downloads on first run.
 
 > VRAM management is automatic. The pipeline unloads the LLM before loading audio models so you never run out of memory.
 
@@ -113,7 +113,7 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 4. Add a **Media Playlist Source** scene item pointed to the same folder.
 5. OBS picks up each new MP4 automatically as Signal Lost Video finishes.
 
-> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Mag-Mell and Bark.
+> **Pro tip:** If your GPU is maxed on inference, set OBS to encode via integrated GPU (QSV AV1 or HEVC). Keeps the stream smooth while RTX handles Captain-Eris-Violet and Bark.
 
 ---
 

@@ -101,7 +101,7 @@ def _compute_cache_deltas(cache, *, device, requested_quantized, model_id,
 
 
 def _warm_cache():
-    """Realistic mid-run cache state for Mag-Mell-R1 + Pro Ultra Quality."""
+    """Realistic mid-run cache state for Captain-Eris-Violet + Pro Ultra Quality."""
     return {
         "model": object(),       # placeholder -- presence == loaded
         "tokenizer": object(),
