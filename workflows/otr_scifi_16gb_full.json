@@ -1718,7 +1718,7 @@
         "Node name for S&R": "SaveVideo"
       },
       "widgets_values": [
-        "old_time_radio/humo_test/clip",
+        "otr_videos/humo_test/clip",
         "auto",
         "auto"
       ]

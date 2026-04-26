@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-25 (HuMo full-episode coverage promoted to top P0; video stack sprint shipped on 2026-04-17 retained below as completed history)
+**Last updated:** 2026-04-26 (FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-beta delivery chain scoped — concat-and-mux + subtitles + cabinet-frame still to scaffold)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -31,6 +31,64 @@ Lock these. Any work item that contradicts this list is wrong.
 - 100% local, offline-first, open source, no API keys.
 - VRAM ceiling: **14.5 GB audio** / **15.5 GB video** (lifted 2026-04-17 for the video stack sprint only — audio stays at 14.5 GB).
 - Audio is king. Full narrative output must never break, shorten, or degrade.
+
+---
+
+## What shipped 2026-04-26 (today's session)
+
+- **`scripts/render_flux_batch.py` --mode bundled** (commit `d5772a3`) — one /prompt POST renders ALL targets in a single ComfyUI queue slot, sharing the FLUX model load and negative CLIP encode. Saved ~8 min on the astrotech 44-composite pass3 (47 → 37 min total). Default mode; `--mode serial` keeps the legacy one-at-a-time loop for granular retry.
+- **BUG-LOCAL-064 fixed** (commit `e80f0fc`) — LLMDirector procedural cast no longer leaks the procedural last-name into `cast.description`. The leak was real on the astrotech 2026-04-24 ledger (MEREDITH → "PRIAM SMITHERS - …"). Caught at FLUX-pass1 setup before any image rendered. New regression `tests/test_director_cast_naming.py` + helper `scripts/fix_cast_descriptions.py` for cleaning already-shipped ledgers in place.
+- **`scripts/verify_flux_coverage.py`** (commit `d5772a3`) — reads the ledger, walks expected portraits + per-(shot, speaker) composites, scans the output dir, prints PRESENT/MISSING per-target. RADIO ambient beats correctly skip the composite check. Exit non-zero if anything missing. Used to prove **7/7 portraits + 44/44 composites = 100% FLUX coverage of astrotech**.
+- **FULL workflow merge — HuMo single-clip demo + trial widget defaults** (commit `d7028fb`) — added 16 HuMo-side nodes from `otr_videoplan_TEST_humo.json` to `otr_scifi_16gb_full.json` (16→32 nodes, 29→50 links). FULL canvas now goes audio → FLUX → ONE HuMo demo clip → mp4 in a single Run. Trial-friendly widget defaults baked in (350 words / 2 chars / no act-breaks / no critique / no open-close / no arc / Standard profile). Multi-clip episode HuMo still goes through `render_humo_batch.py`.
+- **Auto-title from spine** (commits `594556e` + `06483ad`) — between the OpenClose evaluator and the ScriptWriter draft, a small LLM call generates a 2-5 word evocative title from the winning spine. Prompt v2 is genre-agnostic (the LLM picks up genre from the spine itself, no on-the-nose tropes). Activates only when user widget is empty / `auto` / a stuck-default. 9 regression tests covering wrappers, stuck-default rejection, overlong-leak rejection, LLM-failure swallowing.
+- **`scripts/render_upscale_batch.py`** (commit `eb9152e`) — post-HuMo SeedVR2 1080p upscale orchestrator. Mirrors `external_examples/SeedVR2_HD_video_upscale.json` widget defaults (3B fp16 DiT + ema_vae_fp16, blocks_to_swap=32, batch_size=33, temporal_overlap=3, color_correction=lab). Pattern matches our other `render_*_batch.py` scripts: build one API graph, POST one /prompt, poll /history, confirm output. Estimated 30-50 min wall-clock for a 5-min episode. Decoupled from HuMo render so re-upscaling at different resolutions doesn't need a HuMo redo.
+- **Output foldering** — outputs reorganised into `output/otr_stills/` (FLUX pass1 portraits + pass3 composites) and `output/otr_videos/<episode_id>/` (HuMo per-clip mp4s + concat episode mp4 + 1080p upscale). Lookup paths in `render_humo_batch.py` and `verify_flux_coverage.py` search both new and legacy locations for backwards compatibility. Legacy `output/old_time_radio/` retained for v1.5 audio episodes.
+
+### FULL workflow trial outcome (Long Goodbye, 2026-04-26 12:25 PM)
+
+`The Long Goodbye / cyberpunk / 2 chars / maximum chaos creativity / hard-sci-fi procedural style / Pro (Ultra Quality) profile / self_critique on / open_close on`. Edge-case loadout to stress the format-drift safety nets.
+
+What worked:
+- News fetch, OpenClose 3-spine competition + evaluator merge, draft + self-critique + revision pass, PARSE, Director, Bark + Kokoro + MusicGen + AudioGen, SceneSequencer + AudioEnhance + EpisodeAssembler, FLUX (BatchFluxRender → 2 envs), HuMo single-clip demo (16,531 MB Staged + 1053 patches attached on the lightx2v + ModelSamplingSD3 + HuMo 14B fp8 stack)
+- BUG-LOCAL-061/062/063 hardening held: bracket-shorthand normalised, dialogue density preserved, no zero-line WORD_EXTEND rescue triggered
+
+Key finding (real, not a regression):
+- The FULL workflow's HuMo path and `OTR_SignalLostVideo` audio-only path run as **parallel sinks, not a chain**. The final `signal_lost_the_long_goodbye_20260426_125131.mp4` is the SignalLostVideo proc-gen audio episode. The HuMo demo clip landed at `output/video/ComfyUI_00002_.mp4` and was never stitched in. Multi-clip HuMo episodes need a separate concat-and-mux orchestrator (see v2.0-beta delivery chain below).
+
+---
+
+## v2.0-beta — End-to-end delivery chain (next P0 after Goal 1 fully runs)
+
+The v2 delivery chain has three remaining post-process orchestrators between HuMo per-clip rendering and the final 1080p deliverable. Each script does ~one thing, runs independently, can be skipped.
+
+```
+render_humo_batch.py (HuMo per-clip — shipped)
+  → render_episode_concat.py     [TODO]
+       ├─ ffmpeg concat HuMo clips in beat order from ledger
+       ├─ prepend opening title card (episode title + transmission date + logline)
+       ├─ append scrolling closing card (treatment text + cast roster)
+       ├─ mux with audio episode from SceneSequencer
+       └─ write .vtt sidecar from ledger.lines[].text + start_s + dur_s
+  → render_compose_frame.py      [TODO]
+       ├─ vintage 1940s console radio cabinet PNG (transparent speaker-grille cutout)
+       ├─ HuMo content composited inside the grille cutout
+       ├─ filament-glow halo around frame edges (audio-RMS-driven, amber)
+       └─ twin analog VU needles in lower corners (per-channel audio level)
+  → render_upscale_batch.py      [SHIPPED — eb9152e]
+       └─ SeedVR2 1080p, optional --burn-subs flag for hard-burned .vtt
+```
+
+Design notes:
+- **Compose frame BEFORE upscale** so the cabinet PNG and waveform get upscaled cleanly to 1080p in one pass.
+- **Soft subs always**, hard subs optional via `--burn-subs` for social clips.
+- **Filament glow + VU needles** are the chosen audio-reactive elements: slow, low-contrast, peripheral, period-authentic. Spectrum analysers and bouncing peak meters explicitly rejected (compete with HuMo for attention).
+- **Cabinet frame** ties to the lip-syncing RADIO design — atmospheric beats already feature an actual radio portrait, so framing dialogue beats inside the same cabinet creates "radio inside a radio" recursion that's stylistically intentional.
+
+Order of build:
+1. `render_episode_concat.py` (highest priority — without it, no multi-clip episode mp4)
+2. `generate_subtitles.py` (or fold into concat — fast, ledger-only, 30 lines of Python, cheap insurance)
+3. `render_compose_frame.py` (the cabinet/glow/VU layer — biggest visual win once concat works)
+4. `--burn-subs` flag on `render_upscale_batch.py` (one-line addition)
 
 ---
 

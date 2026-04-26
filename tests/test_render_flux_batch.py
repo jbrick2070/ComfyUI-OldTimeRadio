@@ -178,18 +178,21 @@ def test_composite_prompt_combines_speaker_and_scene():
     assert "STYLE_TAG" in p                       # style tail
 
 
-def test_save_prefix_uses_humo_naming_convention():
-    """Output filenames follow the existing on-disk convention:
-       portraits → otr_humo_pass1_portrait_<speaker>
-       composites → otr_humo_pass3_<shot>_<speaker>
-    so the HuMo orchestrator's find_portrait_for_speaker glob still hits."""
+def test_save_prefix_uses_otr_stills_subfolder():
+    """Output filenames land under output/otr_stills/ subfolder
+    (changed 2026-04-26 from flat output/ root):
+       portraits  -> otr_stills/pass1_portrait_<speaker>
+       composites -> otr_stills/pass3_<shot>_<speaker>
+    The HuMo orchestrator's find_portrait_for_speaker glob now searches
+    both the new otr_stills/ location and the legacy otr_humo_* root
+    location for backwards compatibility."""
     from render_flux_batch import build_target_list
     targets = build_target_list(_l2_ledger(), style_tail="x")
     for t in targets:
         if t["kind"] == "portrait":
-            assert t["save_prefix"].startswith("otr_humo_pass1_portrait_")
+            assert t["save_prefix"].startswith("otr_stills/pass1_portrait_")
         elif t["kind"] == "composite":
-            assert t["save_prefix"].startswith("otr_humo_pass3_")
+            assert t["save_prefix"].startswith("otr_stills/pass3_")
             assert t["speaker"].lower().replace(" ", "_") in t["save_prefix"].lower()
 
 
@@ -447,7 +450,7 @@ def test_radio_portrait_filename_follows_pass1_convention():
     radio_portrait = next(t for t in targets
                           if (t.get("speaker") or "").upper() == "RADIO"
                           and t["kind"] == "portrait")
-    assert radio_portrait["save_prefix"] == "otr_humo_pass1_portrait_radio"
+    assert radio_portrait["save_prefix"] == "otr_stills/pass1_portrait_radio"
 
 
 def test_target_count_matches_astrotech_design():

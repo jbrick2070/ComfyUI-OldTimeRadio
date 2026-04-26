@@ -13,7 +13,7 @@ Two target kinds:
   PORTRAITS  -- one per cast member. Clean head/shoulders shot of the
                 speaker, used as HuMo's identity anchor and as the alpha
                 baseline in Goal 3 hybrid-anchor blends.
-                File: otr_humo_pass1_portrait_<speaker_slug>.png
+                File: otr_stills/pass1_portrait_<speaker_slug>.png
 
   COMPOSITES -- one per (shot, speaker) pair. The speaker placed in the
                 shot's scene context. C1 of every shot/beat references
@@ -21,7 +21,7 @@ Two target kinds:
                 reuse the same composite (cinematic continuity), so a
                 beat_resume-tagged clip uses this composite + the
                 speaker's prior last frame, NOT a fresh portrait.
-                File: otr_humo_pass3_<shot_id>_<speaker_slug>.png
+                File: otr_stills/pass3_<shot_id>_<speaker_slug>.png
 
 Usage (production):
   python scripts/render_flux_batch.py \\
@@ -261,7 +261,10 @@ def build_target_list(
                 + "even cinematic lighting, " + style_tail
             )
         slug = slugify(name)
-        prefix = f"otr_humo_pass1_portrait_{slug}"
+        # 2026-04-26: outputs reorganised into output/otr_stills/ subfolder.
+        # ComfyUI's SaveImage treats path separators in filename_prefix as
+        # subdirectories under output_directory, so this just works.
+        prefix = f"otr_stills/pass1_portrait_{slug}"
         targets.append({
             "kind": "portrait",
             "target_id": f"portrait_{slug}",
@@ -306,7 +309,7 @@ def build_target_list(
                 f"{speaker_desc}{scene_part}, "
                 + style_tail
             )
-            prefix = f"otr_humo_pass3_{shot_slug}_{speaker_slug}"
+            prefix = f"otr_stills/pass3_{shot_slug}_{speaker_slug}"
             targets.append({
                 "kind": "composite",
                 "target_id": f"composite_{shot_slug}_{speaker_slug}",

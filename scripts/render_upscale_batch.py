@@ -316,9 +316,10 @@ def main() -> int:
     # absolute path string in the file widget.
     input_filename = str(args.input_mp4)
 
+    # 2026-04-26: outputs reorganised into output/otr_videos/.
     output_prefix = (
         args.output_prefix
-        or f"{args.input_mp4.stem}_{args.resolution}p"
+        or f"otr_videos/{args.input_mp4.stem}_{args.resolution}p"
     )
 
     if (args.batch_size - 1) % 4 != 0:
