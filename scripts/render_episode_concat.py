@@ -76,6 +76,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--include-ambient-subs", action="store_true",
                    help="Include atmospheric (kind=ambient) beats as cues "
                         "marked [ambient] in the .vtt. Off by default.")
+    p.add_argument("--trim", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="Pre-trim each HuMo clip to its ledger line's "
+                        "dur_s before concat so the video timeline matches "
+                        "proc-gen audio mix frame-accurately. Off via "
+                        "--no-trim if you want raw 4n+1 HuMo durations. "
+                        "(default: on)")
     p.add_argument("--dry-run", action="store_true",
                    help="Print plan, do not run ffmpeg.")
     return p.parse_args()
@@ -158,6 +165,33 @@ def write_concat_list(clips: list[Path], list_path: Path) -> None:
         path_str = str(c).replace("\\", "/").replace("'", r"\'")
         lines.append(f"file '{path_str}'")
     list_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def trim_clip_to_dur(*, src: Path, dst: Path, dur_s: float,
+                     ffmpeg_bin: str, dry_run: bool) -> int:
+    """Trim a HuMo clip to exactly dur_s seconds via ffmpeg stream copy.
+
+    HuMo renders at 4n+1 frame counts (Wan VAE temporal compression), so
+    a line whose actual dialogue is 3.4 s gets a 97-frame / 3.88 s clip.
+    Without this trim, concat'd video runs slightly long vs proc-gen
+    audio mix and ffmpeg --shortest clips the tail. This pass keeps the
+    video exactly aligned with the ledger timeline.
+
+    Stream copy avoids re-encoding (fast, lossless). The trim point may
+    snap to the nearest keyframe (~1-frame tolerance at 25 fps), which
+    is visually invisible.
+    """
+    cmd = [
+        ffmpeg_bin, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-t", f"{dur_s:.3f}",
+        "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
+        str(dst),
+    ]
+    if dry_run:
+        return 0
+    return subprocess.call(cmd)
 
 
 def run_concat_with_audio(*, clips: list[Path], audio_src: Path,
@@ -244,8 +278,10 @@ def main() -> int:
     out_mp4 = out_dir / f"{episode_id}.mp4"
     out_vtt = out_dir / f"{episode_id}.vtt"
 
-    # ---- collect HuMo clips in beat order ----
+    # ---- collect HuMo clips in beat order, paired with their ledger
+    #      line's dur_s so the trim pass knows the target length ----
     lines = led.get("lines", []) or []
+    paired: list[tuple[Path, float | None, str]] = []   # (clip, dur_s, line_id)
     clips: list[Path] = []
     missing: list[str] = []
     for ln in lines:
@@ -254,6 +290,8 @@ def main() -> int:
             continue
         clip = find_humo_clip(args.comfy_output_dir, episode_id, line_id)
         if clip:
+            dur_s = ln.get("dur_s")
+            paired.append((clip, dur_s, line_id))
             clips.append(clip)
         else:
             missing.append(line_id)
@@ -279,9 +317,44 @@ def main() -> int:
               file=sys.stderr)
         return 4
 
+    # ---- pre-trim pass (default ON): trim each HuMo clip to the
+    #      ledger line's dur_s so concat'd video matches proc-gen audio
+    #      timeline frame-accurately. Lines without dur_s in the ledger
+    #      pass through untrimmed. ----
+    trimmed_clips: list[Path] = []
+    trim_dir: Path | None = None
+    n_trimmed = 0
+    n_passthrough = 0
+    if args.trim:
+        trim_dir = out_dir / ".trim_temp"
+        trim_dir.mkdir(parents=True, exist_ok=True)
+        for src, dur_s, line_id in paired:
+            if dur_s is None or float(dur_s) <= 0:
+                trimmed_clips.append(src)
+                n_passthrough += 1
+                continue
+            dst = trim_dir / f"trim_{line_id}_{src.name}"
+            rc = trim_clip_to_dur(
+                src=src, dst=dst, dur_s=float(dur_s),
+                ffmpeg_bin=args.ffmpeg, dry_run=args.dry_run,
+            )
+            if rc != 0 and not args.dry_run:
+                print(f"WARN: trim failed for {src.name} (rc={rc}); "
+                      f"using untrimmed source", file=sys.stderr)
+                trimmed_clips.append(src)
+                n_passthrough += 1
+                continue
+            trimmed_clips.append(dst if not args.dry_run else src)
+            n_trimmed += 1
+        print(f"[trim]   {n_trimmed} clip(s) trimmed to dur_s, "
+              f"{n_passthrough} passthrough (no dur_s)")
+    else:
+        trimmed_clips = clips
+        print("[trim]   skipped (--no-trim); using raw 4n+1 HuMo durations")
+
     # ---- concat + mux ----
     rc = run_concat_with_audio(
-        clips=clips, audio_src=audio_src,
+        clips=trimmed_clips, audio_src=audio_src,
         out_mp4=out_mp4, ffmpeg_bin=args.ffmpeg,
         dry_run=args.dry_run,
     )
@@ -290,6 +363,18 @@ def main() -> int:
     if args.dry_run:
         print(f"[dry-run] would write {out_mp4}")
         return 0
+    # Clean up trim temp dir if we created one (ignore errors -- the
+    # individual mp4s are no longer needed after concat).
+    if trim_dir is not None and trim_dir.exists():
+        for f in trim_dir.glob("trim_*"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+        try:
+            trim_dir.rmdir()
+        except OSError:
+            pass
     print(f"[done]   {out_mp4}")
     print(f"[done]   {out_vtt}")
     return 0
