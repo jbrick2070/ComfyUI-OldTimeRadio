@@ -88,7 +88,7 @@
         "Node name for S&R": "OTR_VisualLLMSelector"
       },
       "widgets_values": [
-        "Nitral-AI/Captain-Eris_Violet-V0.420-12B"
+        "mistralai/Mistral-Nemo-Instruct-2407"
       ]
     },
     {

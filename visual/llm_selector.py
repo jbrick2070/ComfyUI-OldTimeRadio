@@ -42,14 +42,15 @@ log = logging.getLogger("OTR.visual.llm_selector")
 # if a new model is added to the project.
 _LLM_MODEL_CHOICES: list[str] = [
     "none",
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
     "mistralai/Mistral-Nemo-Instruct-2407",
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+    "inflatebot/MN-12B-Mag-Mell-R1",
     "google/gemma-2-2b-it",
     "google/gemma-2-9b-it",
     "google/gemma-4-E4B-it",
     "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
 ]
-_LLM_DEFAULT: str = "Nitral-AI/Captain-Eris_Violet-V0.420-12B"
+_LLM_DEFAULT: str = "mistralai/Mistral-Nemo-Instruct-2407"
 
 
 class VisualLLMSelector:

@@ -923,7 +923,7 @@ def _fetch_science_news(max_feeds=10):
 # LLM INFERENCE WRAPPER
 # -----------------------------------------------------------------------------
 
-def _load_llm(model_id_full="Nitral-AI/Captain-Eris_Violet-V0.420-12B", device="cuda", optimization_profile="Standard"):
+def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda", optimization_profile="Standard"):
     # Strip [BETA] or [8-bit] labels used in the UI dropdown
     model_id = model_id_full.split(" ")[0]
 
@@ -2074,7 +2074,7 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
-def _generate_with_llm(prompt, model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92,
                           optimization_profile="Standard",
                           live_ledger=False):
@@ -2241,7 +2241,7 @@ def _truncate_at_sentence_boundary(text, max_chars):
 # This lets the Director automatically inherit the exact same model memory
 # space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
 # -----------------------------------------------------------------------------
-_CURRENT_LLM_MODEL = "Nitral-AI/Captain-Eris_Violet-V0.420-12B"
+_CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"
 
 
 # ============================================================================
@@ -2787,32 +2787,38 @@ class LLMScriptWriter:
                 }),
             },
             "optional": {
-                # 2026-04-26 PM: Captain-Eris-Violet promoted to
-                # default LLM. Mistral-Nemo derivative, RP-tuned,
-                # dialogue-first; holds character voice across long
-                # scenes — a good fit for the canonical [CHARACTER,
-                # mood] dialogue shape. Mistral-Nemo base kept as the
-                # validated fallback that cleared BUG-061/062/063.
-                # Gemma variants are smaller alternates. Qwen-2.5-14B
-                # is alpha — less validated against the OTR format gates.
-                "model_id": (["Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-                              "mistralai/Mistral-Nemo-Instruct-2407",
+                # 2026-04-26 PM: Mistral-Nemo restored as default while
+                # the rest of the pipeline (HuMo orchestrator, concat,
+                # upscale, episodes folder) is being shaken down. Live
+                # trials of two different RP fine-tunes (Captain-Eris-Violet
+                # and Mag-Mell-R1, both Mistral-Nemo-derivative 12B merges)
+                # produced short or empty episodes -- they wrote nice
+                # creative draft prose but did not engage with the
+                # structured rescue prompts (Open-Close spines, WORD_EXTEND,
+                # Announcer bookends). Mistral-Nemo base cleared
+                # BUG-061/062/063 format hardening and is the validated
+                # path. Captain-Eris-Violet and Mag-Mell remain in the
+                # dropdown for users who want creative voice; the planned
+                # follow-up is a two-LLM split (creative model writes the
+                # script, structured model handles cleanup phases).
+                "model_id": (["mistralai/Mistral-Nemo-Instruct-2407",
+                              "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                              "inflatebot/MN-12B-Mag-Mell-R1",
                               "google/gemma-2-2b-it",
                               "google/gemma-2-9b-it",
                               "google/gemma-4-E4B-it",
                               "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
-                    "default": "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                    "default": "mistralai/Mistral-Nemo-Instruct-2407",
                     "tooltip": "Hugging Face model ID for LLM. "
-                               "Captain-Eris-Violet is the default "
-                               "dialogue-first fine-tune of Mistral-Nemo "
-                               "(12B, 4-bit NF4, _cap=6144) — character "
-                               "voice + period speech, holds persona "
-                               "across long scenes. Mistral-Nemo base is "
-                               "the validated fallback that cleared "
-                               "BUG-061/062/063. Gemma variants are "
-                               "smaller alternates. Qwen-2.5-14B is "
-                               "alpha — less validated against the OTR "
-                               "format gates."
+                               "Mistral-Nemo is the production default "
+                               "(12B, 4-bit NF4, _cap=6144). It cleared "
+                               "BUG-061/062/063 format hardening. "
+                               "Captain-Eris-Violet and MN-12B-Mag-Mell-R1 "
+                               "are RP fine-tunes available for creative "
+                               "voice but they fail structured rescue "
+                               "prompts -- pair with the planned two-LLM "
+                               "split. Gemma variants are smaller "
+                               "alternates. Qwen-2.5-14B is alpha."
                 }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
@@ -3016,7 +3022,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         return profiles if len(profiles) >= num_names else None
 
     def write_script(self, episode_title, genre_flavor,
-                     target_words, num_characters, model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                     target_words, num_characters, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,

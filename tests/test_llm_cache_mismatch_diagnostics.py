@@ -101,13 +101,13 @@ def _compute_cache_deltas(cache, *, device, requested_quantized, model_id,
 
 
 def _warm_cache():
-    """Realistic mid-run cache state for Captain-Eris-Violet + Pro Ultra Quality."""
+    """Realistic mid-run cache state for Mistral-Nemo + Pro Ultra Quality."""
     return {
         "model": object(),       # placeholder -- presence == loaded
         "tokenizer": object(),
         "device": "cuda",
         "quantized": True,
-        "model_id": "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+        "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
         "budget_profile": "Pro (Ultra Quality)",
         "VERSION": "v1.5",
         "context_cap": 6144,
@@ -127,7 +127,7 @@ class TestNoMismatchAcrossLLMPhases:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -141,7 +141,7 @@ class TestNoMismatchAcrossLLMPhases:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -156,7 +156,7 @@ class TestNoMismatchAcrossLLMPhases:
                 cache,
                 device="cuda",
                 requested_quantized=True,
-                model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                model_id="mistralai/Mistral-Nemo-Instruct-2407",
                 optimization_profile="Pro (Ultra Quality)",
                 _cap=6144,
                 current_model_device="cuda:0",
@@ -191,7 +191,7 @@ class TestQuantizedFirstParamCpuFalsePositive:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cpu",  # first param reports cpu
@@ -205,7 +205,7 @@ class TestQuantizedFirstParamCpuFalsePositive:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cpu",
@@ -224,7 +224,10 @@ class TestRealMismatchesStillDrift:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="mistralai/Mistral-Nemo-Instruct-2407",  # changed
+            # warm cache holds Mistral-Nemo (the production default);
+            # request a different model to confirm legitimate model-id
+            # mismatches still register as drift after the BUG-066 fix.
+            model_id="google/gemma-2-9b-it",  # changed
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -239,7 +242,7 @@ class TestRealMismatchesStillDrift:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Standard",  # changed
             _cap=6144,
             current_model_device="cuda:0",
@@ -255,7 +258,7 @@ class TestRealMismatchesStillDrift:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -271,7 +274,7 @@ class TestRealMismatchesStillDrift:
             cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -286,7 +289,7 @@ class TestRealMismatchesStillDrift:
             cache,
             device="cuda",
             requested_quantized=False,  # user picked Obsidian + non-quant
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cuda:0",
@@ -306,7 +309,7 @@ class TestEmptyCacheIsNotADrift:
             empty_cache,
             device="cuda",
             requested_quantized=True,
-            model_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+            model_id="mistralai/Mistral-Nemo-Instruct-2407",
             optimization_profile="Pro (Ultra Quality)",
             _cap=6144,
             current_model_device="cpu",
