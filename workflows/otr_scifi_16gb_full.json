@@ -1013,7 +1013,7 @@
       "flags": {},
       "order": 5,
       "mode": 0,
-      "title": "Save PASS 3 composites",
+      "title": "Save FLUX environment stills (otr/stills/full_env_*)",
       "inputs": [
         {
           "name": "images",
@@ -1026,7 +1026,7 @@
         "Node name for S&R": "SaveImage"
       },
       "widgets_values": [
-        "otr_full_pass3"
+        "otr/stills/full_env"
       ]
     },
     {
