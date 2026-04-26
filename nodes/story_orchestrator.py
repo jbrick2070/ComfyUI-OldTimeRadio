@@ -3452,6 +3452,44 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 model_id, temperature, cast_roster_block=cast_roster_block
             )
 
+        # -- Auto-title from spine (added 2026-04-26) --
+        # If the user did not supply a strong title, ask the LLM for one
+        # grounded in the winning outline. The spine knows more about what
+        # this episode IS than a user typing in a placeholder. Override
+        # only when the user value is empty, "auto", or a known stuck-default.
+        _user_title_clean = (episode_title or "").strip().lower()
+        _wants_auto_title = (
+            not _user_title_clean
+            or _user_title_clean == "auto"
+            or _user_title_clean in _STUCK_TITLE_DEFAULTS
+        )
+        if winning_outline and _wants_auto_title:
+            try:
+                _spine_title = self._generate_title_from_spine(
+                    winning_outline=winning_outline,
+                    genre_flavor=genre_flavor,
+                    style_variant=style_variant,
+                    news_block=news_block,
+                    model_id=model_id,
+                    temperature=temperature,
+                    optimization_profile=optimization_profile,
+                )
+                if _spine_title:
+                    log.info(
+                        "[ScriptWriter] AUTO_TITLE_FROM_SPINE: %r (was: %r)",
+                        _spine_title, episode_title
+                    )
+                    _runtime_log(
+                        f"AUTO_TITLE_FROM_SPINE: {_spine_title!r} "
+                        f"(was {episode_title!r})"
+                    )
+                    episode_title = _spine_title
+            except Exception as _t_err:
+                log.warning(
+                    "[ScriptWriter] Auto-title generation failed: %s "
+                    "- falling back to user/LLM/derived chain", _t_err
+                )
+
         # -- Build final script prompt --
         # Mode label must match the logic in _open_close_expansion_inner so the
         # downstream prompt asks the model to expand a PITCH (long episodes) or
@@ -4525,6 +4563,109 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
         # Fallback: return the full evaluator output (it usually contains a merged outline)
         log.info("[OpenClose] No clean marker found - using full evaluator output as outline")
         return eval_text
+
+    # -------------------------------------------------------------------------
+    # AUTO-TITLE FROM SPINE - one small LLM call between OpenClose winner
+    # selection and ScriptWriter draft, so the title is grounded in the
+    # actual spine instead of a user-typed placeholder. Added 2026-04-26.
+    # -------------------------------------------------------------------------
+
+    def _generate_title_from_spine(self, *, winning_outline, genre_flavor,
+                                   style_variant, news_block,
+                                   model_id, temperature,
+                                   optimization_profile="Standard"):
+        """Generate a 2-5 word evocative episode title from the winning spine.
+
+        Runs ONE small LLM call after the OpenClose evaluator picks a winner
+        but before the ScriptWriter draft fires. Result is used as the
+        episode_title for the rest of the pipeline (prompt frame, ledger
+        episode_id, downstream announcer bookends).
+
+        Returns the cleaned title string, or "" on any failure (caller
+        falls back to the existing user / LLM-emitted / derived chain).
+        """
+        if not winning_outline or not winning_outline.strip():
+            return ""
+
+        # Trim the news block - we only need the headline for tonal cue.
+        _news_hint = ""
+        if news_block:
+            _first_news = news_block.strip().split("\n")[0][:200]
+            if _first_news:
+                _news_hint = f"News tone hint: {_first_news}\n\n"
+
+        title_prompt = (
+            f"You are titling a single episode of a SIGNAL LOST "
+            f"{genre_flavor.replace('_', ' ')} radio drama in a "
+            f"{style_variant} style.\n\n"
+            f"{_news_hint}"
+            f"Episode spine:\n{winning_outline[:1200]}\n\n"
+            "Write ONE evocative episode title in 2-5 words. The title should:\n"
+            " - draw from a striking image, character, or concept in the spine above\n"
+            " - feel period-appropriate to the genre and style\n"
+            " - avoid generic phrases (\"The Last Frequency\", \"Untitled\", "
+            "\"Episode\", \"Signal Lost\", \"The Long Goodbye\", \"Custom Episode\")\n"
+            " - have NO surrounding quotes, NO explanation, NO 'Title:' prefix\n\n"
+            "Output ONLY the title text on a single line. Nothing else."
+        )
+
+        try:
+            raw = _run_with_timeout(
+                lambda: _generate_with_llm(
+                    title_prompt,
+                    model_id=model_id,
+                    max_new_tokens=24,
+                    temperature=max(0.4, min(1.0, temperature)),
+                    optimization_profile=optimization_profile,
+                ),
+                timeout_sec=60,
+                phase_label="AutoTitle-Spine",
+            )
+        except Exception as _err:
+            log.warning("[AutoTitle] LLM call failed: %s", _err)
+            return ""
+
+        if not raw:
+            return ""
+
+        # Take first non-empty line, strip junk.
+        candidate = ""
+        for ln in raw.strip().split("\n"):
+            ln = ln.strip()
+            if ln:
+                candidate = ln
+                break
+        if not candidate:
+            return ""
+
+        # Strip "Title:" / "**" / smart-quote / asterisk wrappers.
+        # Handles "**Title:** Pulse", "Title: \"Pulse\"", "**Pulse**", etc.
+        candidate = re.sub(
+            r'^\s*(?:\*\*)?\s*(?:TITLE|Title)\s*:\s*(?:\*\*)?\s*',
+            '', candidate
+        )
+        # Iteratively strip wrapping whitespace, asterisks, ASCII / smart
+        # quotes, single quotes from BOTH ends until the value is stable.
+        _wrap_chars = '"“”‘’*\' \t'
+        prev = None
+        while candidate != prev:
+            prev = candidate
+            candidate = candidate.strip(_wrap_chars)
+        if not candidate:
+            return ""
+
+        # Reject stuck defaults and obviously-too-long output (full sentence
+        # leaking through from the model).
+        if candidate.lower() in _STUCK_TITLE_DEFAULTS:
+            log.info("[AutoTitle] Rejected stuck default: %r", candidate)
+            return ""
+        if len(candidate.split()) > 10:
+            log.info("[AutoTitle] Rejected overlong title (%d words): %r",
+                     len(candidate.split()), candidate)
+            return ""
+
+        log.info("[AutoTitle] Spine-derived title: %r", candidate)
+        return candidate
 
     # -------------------------------------------------------------------------
     # CHECKS & CRITIQUES - Draft -> Critique -> Revise
