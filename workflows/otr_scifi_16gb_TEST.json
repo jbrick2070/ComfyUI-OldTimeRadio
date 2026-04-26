@@ -88,7 +88,7 @@
         "Node name for S&R": "OTR_VisualLLMSelector"
       },
       "widgets_values": [
-        "mistralai/Mistral-Nemo-Instruct-2407"
+        "inflatebot/MN-12B-Mag-Mell-R1"
       ]
     },
     {

@@ -114,7 +114,7 @@ def _run_preflight(writer, **overrides):
         "genre_flavor": "hard_sci_fi",
         "target_words": 1120,
         "num_characters": 4,
-        "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "model_id": "inflatebot/MN-12B-Mag-Mell-R1",
         "custom_premise": "",
         "include_act_breaks": True,
         "self_critique": True,
