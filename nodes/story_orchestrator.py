@@ -4084,6 +4084,25 @@ TITLE: <your chosen title>
         )
         _log_scene_checkpoint("06_AFTER_GRAMMARIAN", script_text)
 
+        # 2026-04-26 BUG-LOCAL-066: capture pre-parse dialogue expectation
+        # so the post-parse floor check can detect silent dialogue loss.
+        # Counts the same three forms FORMAT_NORM/Grammarian count: bare
+        # NAME:, [VOICE: NAME], and [NAME, mood] shorthand. Used purely as
+        # a sanity expectation -- if the parser returns far fewer dialogue
+        # tokens than this number, something dropped lines silently and
+        # the LLM_RESCUE path should attempt recovery.
+        _expected_pre_parse_dialogue = (
+            len(re.findall(
+                r'^[A-Z][A-Z0-9_ ]{1,19}:\s*.+$',
+                script_text, re.MULTILINE,
+            ))
+            + len(re.findall(r'\[VOICE:', script_text, re.IGNORECASE))
+            + len(re.findall(
+                r'^\[[A-Z][A-Z0-9_ ]{1,20}(?:,\s*.+?)?\]\s*\S',
+                script_text, re.MULTILINE,
+            ))
+        )
+
         # -- STEP 4: PARSE into structured JSON -----------------------
         # BUG-LOCAL-037: capture the LLM-emitted "TITLE: <...>" line BEFORE
         # we feed script_text to the parser, then strip it. Otherwise the
@@ -4146,6 +4165,61 @@ TITLE: <your chosen title>
             f"DIALOGUE_TRACK: 07_AFTER_PARSE | count={len(_parsed_dialogue_tokens)} "
             f"| characters={_parsed_dialogue_chars}"
         )
+
+        # 2026-04-26 BUG-LOCAL-066: post-parse dialogue floor.
+        # Until now LLM_RESCUE only fired when the parser raised on 0
+        # dialogue. But Grammarian's polish can rewrite dialogue into a
+        # form the parser doesn't recognize, dropping 15+ lines silently
+        # while still passing Grammarian's own 80% safety check (which
+        # was asymmetric -- pre counted shorthand, post did not). The
+        # floor check below catches that drop: if the parser produced
+        # <50% of the dialogue lines we expected after Grammarian, attempt
+        # an LLM_RESCUE reparse on the un-polished text.
+        _post_parse_count = len(_parsed_dialogue_tokens)
+        if (_expected_pre_parse_dialogue >= 6
+                and _post_parse_count < _expected_pre_parse_dialogue * 0.5):
+            _runtime_log(
+                f"DIALOGUE_FLOOR: parsed {_post_parse_count} dialogue tokens but "
+                f"AFTER_GRAMMARIAN had {_expected_pre_parse_dialogue} -- triggering "
+                f"LLM_RESCUE reparse"
+            )
+            try:
+                rescued_text = self._llm_reparse_rescue(
+                    script_text, model_id, optimization_profile
+                )
+            except Exception as _resc_err:
+                rescued_text = None
+                _runtime_log(f"LLM_RESCUE: floor-trigger failed ({_resc_err})")
+            if rescued_text and rescued_text != script_text:
+                rescued_lines = self._parse_script(rescued_text)
+                rescued_dialogue = [
+                    ln for ln in rescued_lines if ln.get("type") == "dialogue"
+                ]
+                if len(rescued_dialogue) > _post_parse_count:
+                    _runtime_log(
+                        f"LLM_RESCUE: floor-trigger recovered "
+                        f"{len(rescued_dialogue)} dialogue lines "
+                        f"(was {_post_parse_count}, expected ~"
+                        f"{_expected_pre_parse_dialogue})"
+                    )
+                    script_lines = rescued_lines
+                    _parsed_dialogue_tokens = rescued_dialogue
+                    _parsed_dialogue_chars = sorted({
+                        str(ln.get("character_name", "")).strip()
+                        for ln in _parsed_dialogue_tokens
+                        if ln.get("character_name")
+                    })
+                    _runtime_log(
+                        f"DIALOGUE_TRACK: 07_AFTER_PARSE_RESCUED | "
+                        f"count={len(_parsed_dialogue_tokens)} "
+                        f"| characters={_parsed_dialogue_chars}"
+                    )
+                else:
+                    _runtime_log(
+                        f"LLM_RESCUE: floor-trigger rescue returned only "
+                        f"{len(rescued_dialogue)} dialogue lines -- keeping "
+                        f"original parser output"
+                    )
 
         # Log guardrail warnings (visible in otr_runtime.log) but keep script_json as pure JSON
         # BUG-016: Never prepend comments to script_json - downstream nodes call json.loads() on it
@@ -6328,11 +6402,20 @@ SCRIPT TO VALIDATE:
                 return script_text
 
             # Safety check: did we lose dialogue lines?
+            # 2026-04-26 BUG-LOCAL-066: counter MUST be symmetric with the
+            # pre_total computation -- pre_total counts shorthand +
+            # bare-colon + voice, so post must too. Adding underscores to
+            # the bare-colon char class keeps it aligned with the rest of
+            # the pipeline (`OSCAR_KANE: line` form).
             _post_lines = len(re.findall(
-                r'^[A-Z][A-Z0-9 ]{1,19}:\s*.+$', polished, re.MULTILINE
+                r'^[A-Z][A-Z0-9_ ]{1,19}:\s*.+$', polished, re.MULTILINE
             ))
             _post_voice = len(re.findall(r'\[VOICE:', polished, re.IGNORECASE))
-            _post_total = _post_lines + _post_voice
+            _post_shorthand = len(re.findall(
+                r'^\[[A-Z][A-Z0-9_ ]{1,20}(?:,\s*.+?)?\]\s*\S',
+                polished, re.MULTILINE,
+            ))
+            _post_total = _post_lines + _post_voice + _post_shorthand
 
             if _post_total < pre_total * 0.8:
                 _runtime_log(
@@ -7095,8 +7178,14 @@ OPENING:
             # `TITLE: ...` (BUG-LOCAL-037), `ENV: ...`, etc never register as
             # dialogue. ANNOUNCER is intentionally allowed -- BatchBark counts
             # + skips it and routes to the Kokoro bus.
+            # 2026-04-26 BUG-LOCAL-066: added `_` to char class so names
+            # the production_plan emits with underscores (`OSCAR_KANE`,
+            # `RUFUS_HALPERT`, `AUTHORITY_VOICE`) survive the parser. All
+            # the upstream counters (`_RE_BARE_DIALOGUE`, FORMAT_NORM,
+            # Grammarian) accept underscores; without this fix the parser
+            # silently dropped any underscored character's lines.
             _m_v5 = re.match(
-                r'^(?:\*{0,2})([A-Z][A-Z0-9 ]{0,24})(?:\*{0,2})'
+                r'^(?:\*{0,2})([A-Z][A-Z0-9_ ]{0,24})(?:\*{0,2})'
                 r'(?:\s*\(([^)]*)\))?\s*:\s+(.+)$',
                 s,
             )
@@ -7148,8 +7237,11 @@ OPENING:
         # leaving 20+ bare `NAME:` dialogue lines uncovered. The raw-text
         # sanity check prevents the fallback from firing on scripts that are
         # genuinely dialogue-light (e.g. narration-only treatments).
+        # 2026-04-26 BUG-LOCAL-066: added `_` -- aligns with the rest of
+        # the pipeline so the loose-fallback trigger fires when underscored
+        # names are present in the raw text.
         _raw_name_hits = len(re.findall(
-            r'^(?:\*{0,2})[A-Z][A-Z0-9 ]{1,25}(?:\*{0,2})\s*:\s+\S',
+            r'^(?:\*{0,2})[A-Z][A-Z0-9_ ]{1,25}(?:\*{0,2})\s*:\s+\S',
             text, re.MULTILINE,
         ))
         _orig_fallback_trigger = (dialogue_count == 0 and len(lines) > 0)
