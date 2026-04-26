@@ -404,20 +404,7 @@
       "IMAGE"
     ]
   ],
-  "groups": [
-    {
-      "title": "OTR_VideoPlan end-to-end test (LEMMY)",
-      "bounding": [
-        60,
-        140,
-        2120,
-        620
-      ],
-      "color": "#3f789e",
-      "font_size": 18,
-      "flags": {}
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {
     "ds": {

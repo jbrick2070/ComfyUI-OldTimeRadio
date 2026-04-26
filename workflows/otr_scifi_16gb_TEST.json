@@ -5,38 +5,6 @@
   "last_link_id": 1168,
   "nodes": [
     {
-      "id": 100,
-      "type": "LoadAudio",
-      "pos": [
-        1600,
-        480
-      ],
-      "size": [
-        380,
-        100
-      ],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "AUDIO",
-          "type": "AUDIO",
-          "links": null
-        }
-      ],
-      "title": "TEST audio (offline HQ wav)",
-      "properties": {
-        "Node name for S&R": "LoadAudio"
-      },
-      "widgets_values": [
-        "silent_uprising_test_hq48k.wav",
-        null,
-        ""
-      ]
-    },
-    {
       "id": 101,
       "type": "OTR_VisualPromptCoercion",
       "pos": [
@@ -473,32 +441,7 @@
       "IMAGE"
     ]
   ],
-  "groups": [
-    {
-      "title": "TEST INPUTS  (offline assets)",
-      "bounding": [
-        1580,
-        80,
-        820,
-        540
-      ],
-      "color": "#7ED321",
-      "flags": {},
-      "font_size": 22
-    },
-    {
-      "title": "VISUAL SIDECAR  (under test)",
-      "bounding": [
-        2380,
-        80,
-        1260,
-        540
-      ],
-      "color": "#4A90E2",
-      "flags": {},
-      "font_size": 22
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {
     "ds": {

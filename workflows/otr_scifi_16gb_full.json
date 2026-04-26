@@ -1263,56 +1263,7 @@
       "STRING"
     ]
   ],
-  "groups": [
-    {
-      "title": "STAGE 1   STORY",
-      "bounding": [
-        20,
-        80,
-        940,
-        560
-      ],
-      "color": "#4A90E2",
-      "flags": {},
-      "font_size": 24
-    },
-    {
-      "title": "STAGE 2   AUDIO PRODUCTION",
-      "bounding": [
-        970,
-        80,
-        940,
-        560
-      ],
-      "color": "#7ED321",
-      "flags": {},
-      "font_size": 24
-    },
-    {
-      "title": "STAGE 3   AUDIO ASSEMBLY",
-      "bounding": [
-        1920,
-        80,
-        520,
-        560
-      ],
-      "color": "#F5A623",
-      "flags": {},
-      "font_size": 24
-    },
-    {
-      "title": "Video Branch (bolt-on, 2026-04-23)",
-      "bounding": [
-        80,
-        1140,
-        2440,
-        700
-      ],
-      "color": "#3f789e",
-      "font_size": 18,
-      "flags": {}
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {
     "ds": {

@@ -1190,32 +1190,7 @@
       "VIDEO"
     ]
   ],
-  "groups": [
-    {
-      "title": "Stage 1 - FLUX portraits (480x832, batch of 3)",
-      "bounding": [
-        60,
-        140,
-        2440,
-        420
-      ],
-      "color": "#3f789e",
-      "font_size": 18,
-      "flags": {}
-    },
-    {
-      "title": "Stage 2 - HuMo audio-driven animation (clip 0)",
-      "bounding": [
-        60,
-        660,
-        2440,
-        540
-      ],
-      "color": "#5A2B5A",
-      "font_size": 18,
-      "flags": {}
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {
     "ds": {

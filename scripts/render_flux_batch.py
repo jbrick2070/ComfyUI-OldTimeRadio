@@ -86,6 +86,17 @@ def parse_args() -> argparse.Namespace:
         help="all / portraits-only / composites-only / custom:<filter>",
     )
     p.add_argument(
+        "--mode",
+        default="bundled",
+        choices=["bundled", "serial"],
+        help=(
+            "bundled (default): submit one big graph that renders ALL targets "
+            "in a single ComfyUI queue slot, sharing the FLUX model load and "
+            "negative CLIP encode. serial: submit one /prompt per target "
+            "(legacy mode, ~5-10s slower per target)."
+        ),
+    )
+    p.add_argument(
         "--checkpoint",
         default="flux1-dev-fp8.safetensors",
         help="FLUX checkpoint filename.",
@@ -341,6 +352,86 @@ def filter_targets(
 # FLUX prompt builder
 # ---------------------------------------------------------------------------
 
+def build_bundled_prompt(
+    *,
+    checkpoint: str,
+    targets: list[dict[str, Any]],
+    negative: str,
+    seeds: list[int],
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+) -> dict[str, Any]:
+    """ComfyUI API-format graph that renders N FLUX targets in ONE submission.
+
+    Shape:
+        ckpt        ── shared CheckpointLoaderSimple (one model load)
+        neg_shared  ── shared CLIPTextEncode (one negative encode)
+        per target i:
+            pos_i    ── CLIPTextEncode (positive)
+            latent_i ── EmptyLatentImage
+            ksamp_i  ── KSampler (reads ckpt model, pos_i, neg_shared, latent_i)
+            decode_i ── VAEDecode
+            save_i   ── SaveImage with target's own filename_prefix
+
+    Net effect: ComfyUI loads FLUX once, then runs N KSampler steps in series
+    inside a single queue slot. Per-target save_prefix is preserved so the
+    verifier still rounds-trips against the ledger.
+    """
+    graph: dict[str, Any] = {
+        "ckpt": {
+            "class_type": "CheckpointLoaderSimple",
+            "inputs": {"ckpt_name": checkpoint},
+            "_meta": {"title": "Load FLUX checkpoint (shared)"},
+        },
+        "neg_shared": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": negative, "clip": ["ckpt", 1]},
+            "_meta": {"title": "Negative (shared)"},
+        },
+    }
+    for i, t in enumerate(targets):
+        seed = seeds[i]
+        graph[f"pos_{i}"] = {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"text": t["positive_prompt"], "clip": ["ckpt", 1]},
+            "_meta": {"title": f"Positive {t['target_id']}"},
+        }
+        graph[f"latent_{i}"] = {
+            "class_type": "EmptyLatentImage",
+            "inputs": {"width": width, "height": height, "batch_size": 1},
+        }
+        graph[f"ksamp_{i}"] = {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": seed,
+                "steps": steps,
+                "cfg": cfg,
+                "sampler_name": "euler",
+                "scheduler": "simple",
+                "denoise": 1.0,
+                "model": ["ckpt", 0],
+                "positive": [f"pos_{i}", 0],
+                "negative": ["neg_shared", 0],
+                "latent_image": [f"latent_{i}", 0],
+            },
+        }
+        graph[f"decode_{i}"] = {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": [f"ksamp_{i}", 0], "vae": ["ckpt", 2]},
+        }
+        graph[f"save_{i}"] = {
+            "class_type": "SaveImage",
+            "inputs": {
+                "filename_prefix": t["save_prefix"],
+                "images": [f"decode_{i}", 0],
+            },
+            "_meta": {"title": f"Save {t['target_id']}"},
+        }
+    return graph
+
+
 def build_flux_prompt(
     *,
     checkpoint: str,
@@ -528,6 +619,72 @@ def main() -> int:
 
     started = time.time()
     completed = 0
+
+    # ------------------------------------------------------------------
+    # BUNDLED mode: ONE graph, N parallel chains, one queue slot.
+    # FLUX loads once, every KSampler runs in series with the model
+    # resident, no per-prompt /prompt API overhead.
+    # ------------------------------------------------------------------
+    if args.mode == "bundled":
+        seeds = [((idx * 1009 + 7) & 0x7FFFFFFFFFFFFFFF)
+                 for idx in range(1, len(targets) + 1)]
+        api_prompt = build_bundled_prompt(
+            checkpoint=args.checkpoint,
+            targets=targets,
+            negative=args.negative_prompt,
+            seeds=seeds,
+            width=args.width,
+            height=args.height,
+            steps=args.steps,
+            cfg=args.cfg,
+        )
+        print(f"\n[bundled] submitting one graph with {len(targets)} chain(s)")
+        try:
+            prompt_id = client.submit_prompt(api_prompt)
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+            print(f"    SUBMIT FAILED: {e}", file=sys.stderr)
+            if body:
+                print(f"    response_body: {body[:1500]}", file=sys.stderr)
+            return 5
+        except Exception as e:
+            print(f"    SUBMIT FAILED: {e}", file=sys.stderr)
+            return 5
+        print(f"    prompt_id={prompt_id}")
+        # One bundled prompt may take MANY minutes — extend the timeout to
+        # cover N renders at warm rate plus cold load slack.
+        bundled_timeout = max(args.prompt_timeout,
+                              90 * len(targets) + 240)
+        try:
+            client.wait_for_completion(
+                prompt_id,
+                timeout_s=bundled_timeout,
+                poll_interval_s=max(args.poll_interval, 5.0),
+            )
+        except TimeoutError as e:
+            print(f"    TIMEOUT: {e}", file=sys.stderr)
+            return 6
+        # Verify each target landed.
+        for t in targets:
+            landed = _existing_output(args.out_dir, t)
+            if landed:
+                completed += 1
+            else:
+                print(f"    WARN: no PNG for {t['target_id']} matching "
+                      f"{t['out_filename_glob']}", file=sys.stderr)
+        total = time.time() - started
+        avg = total / max(1, completed)
+        print(f"\n[done] {completed}/{len(targets)} renders in {total:.1f}s "
+              f"({avg:.1f}s avg)")
+        return 0 if completed == len(targets) else 7
+
+    # ------------------------------------------------------------------
+    # SERIAL mode: legacy one-prompt-per-target loop.
+    # ------------------------------------------------------------------
     for idx, t in enumerate(targets, 1):
         elapsed_per_clip_started = time.time()
         print(f"\n[{idx}/{len(targets)}] {t['kind']:<10} {t['target_id']}")
@@ -546,6 +703,16 @@ def main() -> int:
         )
         try:
             prompt_id = client.submit_prompt(api_prompt)
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+            print(f"    SUBMIT FAILED: {e}", file=sys.stderr)
+            if body:
+                print(f"    response_body: {body[:1500]}", file=sys.stderr)
+            continue
         except Exception as e:
             print(f"    SUBMIT FAILED: {e}", file=sys.stderr)
             continue
