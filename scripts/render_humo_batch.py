@@ -999,14 +999,17 @@ def main() -> int:
 
         # 4e. Move output MP4 from ComfyUI's output dir to --out-dir
         # SaveVideo writes to ComfyUI's output/ at the prefix path.
-        comfy_output_root = (
-            Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
-            / "old_time_radio" / "humo_episode"
-        )
+        # 2026-04-26 PM BUG-LOCAL-067: search both the new otr/audio
+        # location and the legacy old_time_radio path so previously-
+        # rendered HuMo episodes still resolve.
+        _comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
+        candidates = []
+        for _root in (_comfy_output / "otr" / "audio" / "humo_episode",
+                      _comfy_output / "old_time_radio" / "humo_episode"):
+            if _root.exists():
+                candidates.extend(_root.glob(f"{line_id}_*.mp4"))
         candidates = sorted(
-            comfy_output_root.glob(f"{line_id}_*.mp4"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
+            candidates, key=lambda p: p.stat().st_mtime, reverse=True
         )
         if candidates:
             src_mp4 = candidates[0]

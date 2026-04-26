@@ -1390,9 +1390,11 @@ class SignalLostVideoRenderer:
             wf.writeframes(pcm_out.tobytes())
 
         # -- 4. Determine output path ---------------------------------
+        # 2026-04-26 PM BUG-LOCAL-067: nest under output/otr/audio/ so
+        # every OTR artifact lives under the single output/otr/ root.
         out_dir = os.path.join(
             os.path.expanduser("~"), "Documents", "ComfyUI",
-            "output", "old_time_radio"
+            "output", "otr", "audio"
         )
         os.makedirs(out_dir, exist_ok=True)
 
@@ -1482,7 +1484,7 @@ class SignalLostVideoRenderer:
         # spawns an HTML5 video player widget automatically.
         return {
             "ui": {"gifs": [{"filename": os.path.basename(out_path),
-                             "subfolder": "old_time_radio",
+                             "subfolder": "otr/audio",
                              "type": "output"}]},
             "result": (out_path,),
         }

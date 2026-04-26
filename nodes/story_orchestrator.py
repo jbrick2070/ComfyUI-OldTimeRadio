@@ -4319,8 +4319,10 @@ TITLE: <your chosen title>
                 },
                 "guardrails_triggered": [],  # Populated by downstream phases
             }
+            # 2026-04-26 PM BUG-LOCAL-067: nest QA debug dumps under
+            # output/otr/audio/ alongside the matching ledger.
             qa_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                   "output", "old_time_radio",
+                                   "output", "otr", "audio",
                                    f"qa_debug_{episode_fingerprint}.json")
             os.makedirs(os.path.dirname(qa_path), exist_ok=True)
             with open(qa_path, "w", encoding="utf-8") as f:

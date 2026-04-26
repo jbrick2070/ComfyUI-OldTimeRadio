@@ -71,9 +71,15 @@ _GIT_HEAD_CACHE: Optional[str] = None
 # ---------------------------------------------------------------------------
 
 def _default_out_dir() -> str:
+    # 2026-04-26 PM BUG-LOCAL-067: moved from output/old_time_radio/ to
+    # output/otr/audio/ so every OTR artifact (audio episodes, ledgers,
+    # treatments, FLUX stills, HuMo videos, 1080p deliveries) nests under
+    # the single output/otr/ super-folder. Legacy output/old_time_radio/
+    # is left in place for already-rendered episodes; scripts fall back
+    # to reading both locations.
     return os.path.join(
         os.path.expanduser("~"),
-        "Documents", "ComfyUI", "output", "old_time_radio",
+        "Documents", "ComfyUI", "output", "otr", "audio",
     )
 
 

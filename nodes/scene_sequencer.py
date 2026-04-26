@@ -144,7 +144,7 @@ def _resample_audio(clip_np, src_rate, dst_rate):
             clip_np
         ).astype(np.float32)
 
-DEFAULT_OUT = os.path.join(os.path.expanduser("~"), "Documents", "ComfyUI", "output", "old_time_radio")
+DEFAULT_OUT = os.path.join(os.path.expanduser("~"), "Documents", "ComfyUI", "output", "otr", "audio")
 
 
 # -----------------------------------------------------------------------------
@@ -304,7 +304,7 @@ def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
 
     Priority:
       1. Cached assignment (stable across the episode)
-      2. Director's voice_assignments (from Gemma4Director voice_map_json)
+      2. Director's voice_assignments (from LLMDirector voice_map_json)
       3. Gender-aware hash fallback using voice_traits from script
     """
     if voice_tag in _CHARACTER_VOICE_CACHE:
@@ -576,12 +576,12 @@ class SceneSequencer:
                 "script_json": ("STRING", {
                     "multiline": True,
                     "default": "[]",
-                    "tooltip": "Parsed script JSON from Gemma4ScriptWriter"
+                    "tooltip": "Parsed script JSON from LLMScriptWriter"
                 }),
                 "production_plan_json": ("STRING", {
                     "multiline": True,
                     "default": "{}",
-                    "tooltip": "Production plan JSON from Gemma4Director"
+                    "tooltip": "Production plan JSON from LLMDirector"
                 }),
             },
             "optional": {
@@ -691,14 +691,14 @@ class SceneSequencer:
             output_dir = DEFAULT_OUT
         os.makedirs(output_dir, exist_ok=True)
 
-        # Free Gemma4 VRAM before TTS generation - Bark needs GPU headroom.
-        # Gemma4 is done by this point (script + plan already generated).
+        # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
+        # LLM is done by this point (script + plan already generated).
         try:
             from .story_orchestrator import _unload_llm
             _unload_llm()
-            log.info("[SceneSequencer] Freed Gemma4 VRAM for inline TTS")
+            log.info("[SceneSequencer] Freed LLM VRAM for inline TTS")
         except Exception:
-            pass  # Gemma4 may already be unloaded or not imported
+            pass  # LLM may already be unloaded or not imported
 
         # Extract pre-rendered clips from batched AUDIO inputs
         tts_clips = self._extract_clips_from_audio(tts_audio_clips)
