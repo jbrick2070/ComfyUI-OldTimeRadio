@@ -7843,13 +7843,29 @@ class LLMDirector:
             led = get_ledger()
             # Preserve the ScriptWriter-stage cast order but enrich with
             # voice_preset + gender from the Director's voice_assignments.
+            #
+            # 2026-04-26 PM BUG-LOCAL-068: ScriptWriter cast rows use the
+            # script-side spaced name ("KAEL VAUGHN") while the Director's
+            # voice_assignments dict keys carry the underscored variant
+            # ("KAEL_VAUGHN"). A naive equality lookup miss caused the
+            # loop to APPEND a duplicate underscored row for every Director-
+            # known character, leaving voice_preset on the new row and
+            # dialogue on the original row. Net effect: Bark fell back to
+            # default voices because the speaking characters had voice=None.
+            # Normalize both sides ("KAEL_VAUGHN" -> "KAEL VAUGHN") before
+            # the lookup so the same character merges into a single row,
+            # and persist the script-side spaced name as the canonical form.
+            def _norm_name_key(s):
+                return (s or "").strip().upper().replace("_", " ")
+
             existing_cast = list(led.data.get("cast") or [])
-            name_to_row = {r.get("name"): r for r in existing_cast}
+            name_to_row = {_norm_name_key(r.get("name")): r
+                           for r in existing_cast}
             va = plan.get("voice_assignments", {}) or {}
             for char_name, entry in va.items():
                 if not isinstance(entry, dict):
                     continue
-                key = (char_name or "").strip().upper()
+                key = _norm_name_key(char_name)
                 raw_notes = str(entry.get("notes") or "")
                 notes_lo = raw_notes.lower()
                 gender = None
@@ -7859,6 +7875,10 @@ class LLMDirector:
                     gender = "male"
                 row = name_to_row.get(key)
                 if row is None:
+                    # New row -- use the spaced (canonical) form so the
+                    # ledger doesn't carry mixed underscored / spaced
+                    # entries that would re-trigger this same bug for
+                    # any later consumer.
                     row = {"char_id": f"c{len(existing_cast)+1:02d}",
                            "name": key}
                     existing_cast.append(row)
