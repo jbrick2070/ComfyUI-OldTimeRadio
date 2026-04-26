@@ -83,6 +83,17 @@ def parse_args() -> argparse.Namespace:
                         "proc-gen audio mix frame-accurately. Off via "
                         "--no-trim if you want raw 4n+1 HuMo durations. "
                         "(default: on)")
+    p.add_argument("--embed-subs", action=argparse.BooleanOptionalAction,
+                   default=True,
+                   help="Embed the .vtt as a mov_text subtitle track "
+                        "inside the mp4 container so players (VLC, mpv, "
+                        "modern browsers) get a toggleable CC track "
+                        "without needing the sidecar file. Sidecar .vtt "
+                        "is still written either way. "
+                        "Off via --no-embed-subs. (default: on)")
+    p.add_argument("--subs-lang", default="eng",
+                   help="Language tag for the embedded subtitle stream "
+                        "(ISO 639-2/3-letter, default 'eng').")
     p.add_argument("--dry-run", action="store_true",
                    help="Print plan, do not run ffmpeg.")
     return p.parse_args()
@@ -196,9 +207,18 @@ def trim_clip_to_dur(*, src: Path, dst: Path, dur_s: float,
 
 def run_concat_with_audio(*, clips: list[Path], audio_src: Path,
                           out_mp4: Path, ffmpeg_bin: str,
-                          dry_run: bool) -> int:
+                          dry_run: bool,
+                          embed_subs_vtt: Path | None = None,
+                          subs_lang: str = "eng") -> int:
     """Concat HuMo clips, mux audio_src as the audio track. Audio src may
-    be a WAV or any file ffmpeg can decode an audio stream from."""
+    be a WAV or any file ffmpeg can decode an audio stream from.
+
+    If embed_subs_vtt is provided, also embeds the .vtt as a mov_text
+    subtitle stream inside the output mp4 (language tag = subs_lang).
+    Players that honor mp4 subtitle tracks (VLC, mpv, QuickTime, modern
+    web browsers via <video><track>) will show a toggleable CC option
+    without needing the sidecar file alongside.
+    """
     list_path = out_mp4.with_suffix(".concat.txt")
     write_concat_list(clips, list_path)
 
@@ -213,17 +233,33 @@ def run_concat_with_audio(*, clips: list[Path], audio_src: Path,
         str(intermediate),
     ]
 
-    # Second pass: mux master audio over the concatenated video.
+    # Second pass: mux master audio over the concatenated video. If the
+    # caller passed a .vtt, also fold it in as an mp4 mov_text subtitle
+    # stream.
     mux_cmd = [
         ffmpeg_bin, "-y", "-loglevel", "warning",
         "-i", str(intermediate),
         "-i", str(audio_src),
+    ]
+    if embed_subs_vtt is not None:
+        mux_cmd.extend(["-i", str(embed_subs_vtt)])
+    mux_cmd.extend([
         "-c:v", "copy",
         "-c:a", "aac", "-b:a", "192k",
-        "-map", "0:v:0", "-map", "1:a:0",
+    ])
+    if embed_subs_vtt is not None:
+        mux_cmd.extend(["-c:s", "mov_text"])
+    mux_cmd.extend(["-map", "0:v:0", "-map", "1:a:0"])
+    if embed_subs_vtt is not None:
+        mux_cmd.extend([
+            "-map", "2:s:0",
+            f"-metadata:s:s:0", f"language={subs_lang}",
+            f"-metadata:s:s:0", "title=English",
+        ])
+    mux_cmd.extend([
         "-shortest",
         str(out_mp4),
-    ]
+    ])
 
     print("[ffmpeg] concat:")
     print("  " + " ".join(concat_cmd))
@@ -352,12 +388,18 @@ def main() -> int:
         trimmed_clips = clips
         print("[trim]   skipped (--no-trim); using raw 4n+1 HuMo durations")
 
-    # ---- concat + mux ----
+    # ---- concat + mux (with optional embedded soft subs) ----
+    embed_vtt = out_vtt if (args.embed_subs and n_cues > 0) else None
     rc = run_concat_with_audio(
         clips=trimmed_clips, audio_src=audio_src,
         out_mp4=out_mp4, ffmpeg_bin=args.ffmpeg,
         dry_run=args.dry_run,
+        embed_subs_vtt=embed_vtt,
+        subs_lang=args.subs_lang,
     )
+    if embed_vtt is not None and not args.dry_run:
+        print(f"[subs]   embedded {n_cues} cue(s) as mov_text "
+              f"(language={args.subs_lang}) inside {out_mp4.name}")
     if rc != 0:
         return rc
     if args.dry_run:
