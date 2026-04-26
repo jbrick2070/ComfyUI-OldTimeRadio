@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-26 (FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-beta delivery chain scoped — concat-and-mux + subtitles + cabinet-frame still to scaffold)
+**Last updated:** 2026-04-26 (FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -53,13 +53,13 @@ What worked:
 - BUG-LOCAL-061/062/063 hardening held: bracket-shorthand normalised, dialogue density preserved, no zero-line WORD_EXTEND rescue triggered
 
 Key finding (real, not a regression):
-- The FULL workflow's HuMo path and `OTR_SignalLostVideo` audio-only path run as **parallel sinks, not a chain**. The final `signal_lost_the_long_goodbye_20260426_125131.mp4` is the SignalLostVideo proc-gen audio episode. The HuMo demo clip landed at `output/video/ComfyUI_00002_.mp4` and was never stitched in. Multi-clip HuMo episodes need a separate concat-and-mux orchestrator (see v2.0-beta delivery chain below).
+- The FULL workflow's HuMo path and `OTR_SignalLostVideo` audio-only path run as **parallel sinks, not a chain**. The final `signal_lost_the_long_goodbye_20260426_125131.mp4` is the SignalLostVideo proc-gen audio episode. The HuMo demo clip landed at `output/video/ComfyUI_00002_.mp4` and was never stitched in. Multi-clip HuMo episodes need a separate concat-and-mux orchestrator (see P1 delivery chain below).
 
 ---
 
-## v2.0-beta — End-to-end delivery chain (next P0 after Goal 1 fully runs)
+## v2.0-alpha P1 — End-to-end delivery chain (post-Goal-1 polish, still alpha)
 
-The v2 delivery chain has three remaining post-process orchestrators between HuMo per-clip rendering and the final 1080p deliverable. Each script does ~one thing, runs independently, can be skipped.
+Three post-process orchestrators between HuMo per-clip rendering and the final 1080p deliverable. Each script does ~one thing, runs independently, can be skipped. Version label stays **v2.0-alpha** until Jeffrey explicitly bumps it — these are alpha-tier polish, not a milestone promotion.
 
 ```
 render_humo_batch.py (HuMo per-clip — shipped)
