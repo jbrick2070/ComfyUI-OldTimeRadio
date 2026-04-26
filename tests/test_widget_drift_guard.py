@@ -51,13 +51,13 @@ def _script_writer_schema():
                 },
                 "optional": {
                     "model_id": (
-                        ["Nitral-AI/Captain_Eris_Violet-V0.420-12B",
+                        ["Nitral-AI/Captain-Eris_Violet-V0.420-12B",
                          "mistralai/Mistral-Nemo-Instruct-2407",
                          "google/gemma-2-2b-it",
                          "google/gemma-2-9b-it",
                          "google/gemma-4-E4B-it",
                          "Qwen/Qwen2.5-14B-Instruct [ALPHA]"],
-                        {"default": "Nitral-AI/Captain_Eris_Violet-V0.420-12B"},
+                        {"default": "Nitral-AI/Captain-Eris_Violet-V0.420-12B"},
                     ),
                     "custom_premise": ("STRING", {"multiline": True, "default": ""}),
                     "include_act_breaks": ("BOOLEAN", {"default": True}),
@@ -118,7 +118,7 @@ def _widgets_values():
         "hard_sci_fi",            # 1  genre_flavor
         700,                      # 2  target_words
         4,                        # 3  num_characters
-        "Nitral-AI/Captain_Eris_Violet-V0.420-12B",  # 4  model_id
+        "Nitral-AI/Captain-Eris_Violet-V0.420-12B",  # 4  model_id
         "",                       # 5  custom_premise
         True,                     # 6  include_act_breaks
         True,                     # 7  self_critique
