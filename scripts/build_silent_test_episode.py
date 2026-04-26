@@ -84,6 +84,34 @@ DEFAULT_TARGET_SHOT_DUR = 9.0
 DEFAULT_CLIP_BASE_DUR = 7.0
 SCHEMA_VERSION = "silent-test-2026-04-25"
 
+# ---------------------------------------------------------------------------
+# Lip-synching radio constants
+# ---------------------------------------------------------------------------
+#
+# OTR's visual conceit for non-dialogue beats: the radio IS the storyteller.
+# The console radio's speaker grille becomes the "mouth" that HuMo lip-syncs
+# to whatever audio is playing — klaxons make the grille thump, music makes
+# it pulse, ambient hum makes it shimmer. One radio still, audio-driven
+# variation. See ROADMAP Goal 3 + the daisy-chain brief for the full design.
+#
+# We inject synthetic RADIO atmospheric "phantom shots" before the first
+# dialogue shot (cold open) and after the last (closing) to cover the gap
+# between cumulative dialogue duration and the source ledger's
+# total_episode_dur_s. The cold-open share defaults to 40% of the gap;
+# closing gets the remaining 60% (radio dramas usually have more outro
+# than intro).
+
+RADIO_SPEAKER_NAME = "RADIO"
+RADIO_CHAR_ID = "c_radio"
+RADIO_DESCRIPTION = (
+    "Vintage 1940s console radio, polished walnut cabinet with art-deco "
+    "curves, large fabric-covered speaker grille front-and-center as the "
+    "focal mouth, illuminated amber dial, brass tuning knobs, faint warm "
+    "room lighting, soft dust haze, cinematic 35mm film grain"
+)
+RADIO_GAP_FLOOR_S = 2.0          # skip injection if total gap < this
+RADIO_COLD_OPEN_FRACTION = 0.4   # 40% of gap -> cold open, 60% -> closing
+
 
 # ---------------------------------------------------------------------------
 # Word-count duration estimator
@@ -303,6 +331,106 @@ def generate_silence_wav(out_path: Path, dur_s: float) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Lip-synching radio — atmospheric phantom shot injection
+# ---------------------------------------------------------------------------
+
+def _ensure_radio_in_cast(cast: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Inject the synthetic RADIO cast member if not already present.
+
+    Returns the (possibly modified) cast list. RADIO is treated as a
+    speaker by the orchestrator: it gets a portrait via render_flux_batch
+    and is fed into HuMo's ref_image slot for atmospheric clips.
+    """
+    for c in cast:
+        if (c.get("name") or "").upper().strip() == RADIO_SPEAKER_NAME:
+            return cast
+    cast.append({
+        "char_id": RADIO_CHAR_ID,
+        "name": RADIO_SPEAKER_NAME,
+        "description": RADIO_DESCRIPTION,
+        "gender": None,
+        "voice_preset": None,
+        "line_count": 0,
+        "word_count": 0,
+    })
+    return cast
+
+
+def _inject_radio_phantom_shots(
+    shots: list[dict[str, Any]],
+    *,
+    dialogue_total_dur: float,
+    total_episode_dur: float,
+    gap_floor_s: float = RADIO_GAP_FLOOR_S,
+    cold_open_fraction: float = RADIO_COLD_OPEN_FRACTION,
+) -> tuple[list[dict[str, Any]], float, float]:
+    """Inject cold-open + closing RADIO atmospheric phantom shots.
+
+    Computes the gap = total_episode_dur - dialogue_total_dur. If the gap
+    is below `gap_floor_s` the function is a no-op (just returns shots
+    unchanged) since there's no atmospheric coverage to add.
+
+    When injected:
+      * Cold open: ONE shot with ONE RADIO beat at start_s = 0
+        for `cold_open_fraction * gap` seconds.
+      * Closing: ONE shot with ONE RADIO beat at the tail
+        for the remaining gap.
+      * Existing dialogue shots' start_s is shifted by cold_open_dur so
+        the timeline stays continuous.
+
+    Returns: (new_shots, cold_open_dur, closing_dur). Either dur may be
+    0.0 if no injection happened.
+    """
+    gap = max(0.0, float(total_episode_dur) - float(dialogue_total_dur))
+    if gap < float(gap_floor_s):
+        return shots, 0.0, 0.0
+
+    cold_open_dur = round(gap * float(cold_open_fraction), 6)
+    closing_dur = round(gap - cold_open_dur, 6)
+
+    # Shift dialogue shots forward by the cold-open duration.
+    for shot in shots:
+        shot["start_s"] = round(shot["start_s"] + cold_open_dur, 6)
+        for beat in shot.get("beats", []):
+            beat["start_s"] = round(beat["start_s"] + cold_open_dur, 6)
+
+    cold_open_shot: dict[str, Any] = {
+        "shot_id": "shot_atmos_open",
+        "scene_id": None,
+        "start_s": 0.0,
+        "dur_s": cold_open_dur,
+        "speakers": [RADIO_SPEAKER_NAME],
+        "beats": [{
+            "beat_id": "shot_atmos_open_b1",
+            "speaker": RADIO_SPEAKER_NAME,
+            "kind": "ambient",
+            "line_ids": [],
+            "start_s": 0.0,
+            "dur_s": cold_open_dur,
+        }],
+    }
+
+    closing_start = round(cold_open_dur + dialogue_total_dur, 6)
+    closing_shot: dict[str, Any] = {
+        "shot_id": "shot_atmos_close",
+        "scene_id": None,
+        "start_s": closing_start,
+        "dur_s": closing_dur,
+        "speakers": [RADIO_SPEAKER_NAME],
+        "beats": [{
+            "beat_id": "shot_atmos_close_b1",
+            "speaker": RADIO_SPEAKER_NAME,
+            "kind": "ambient",
+            "line_ids": [],
+            "start_s": closing_start,
+            "dur_s": closing_dur,
+        }],
+    }
+
+    return [cold_open_shot] + shots + [closing_shot], cold_open_dur, closing_dur
+
+
+# ---------------------------------------------------------------------------
 # Main builder
 # ---------------------------------------------------------------------------
 
@@ -351,6 +479,34 @@ def build_silent_test_episode(
     shots = group_lines_into_shots(
         enriched_lines, target_shot_dur=target_shot_dur,
     )
+
+    # All dialogue beats default to kind="dialogue".
+    for shot in shots:
+        for beat in shot.get("beats", []):
+            beat.setdefault("kind", "dialogue")
+
+    # ----- Phase 2.5: inject lip-synching RADIO atmospheric phantom shots -----
+    # Cold open + closing — fills the gap between cumulative dialogue dur
+    # and the source ledger's total_episode_dur_s. Adds the synthetic
+    # RADIO cast member if not already present.
+    src_total_episode_dur = float(src.get("total_episode_dur_s") or 0.0)
+    if src_total_episode_dur > total_episode_dur + RADIO_GAP_FLOOR_S:
+        cast = _ensure_radio_in_cast(cast)
+        shots, cold_open_dur, closing_dur = _inject_radio_phantom_shots(
+            shots,
+            dialogue_total_dur=total_episode_dur,
+            total_episode_dur=src_total_episode_dur,
+        )
+        # Rewrite enriched_lines start_s so the cumulative-timeline test
+        # still passes after the cold-open shift.
+        for ln in enriched_lines:
+            ln["start_s"] = round(ln["start_s"] + cold_open_dur, 6)
+        total_episode_dur = round(
+            cold_open_dur + total_episode_dur + closing_dur, 6
+        )
+        radio_phantom_active = (cold_open_dur + closing_dur) > 0
+    else:
+        radio_phantom_active = False
 
     # ----- Phase 3: clip-fill each beat, build orchestrator-ready lines -----
     # The orchestrator iterates ledger.lines[]. We REPLACE the original
@@ -424,6 +580,7 @@ def build_silent_test_episode(
                     "speaker": speaker,
                     "char_id": char_id,
                     "boundary": boundary,
+                    "kind": beat.get("kind", "dialogue"),
                     "text": "",
                     "start_s": beat_start + offset,
                     "dur_s": clip_dur,
@@ -448,6 +605,7 @@ def build_silent_test_episode(
             beats_out.append({
                 "beat_id": beat["beat_id"],
                 "speaker": beat["speaker"],
+                "kind": beat.get("kind", "dialogue"),
                 "line_ids": list(beat["line_ids"]),
                 "start_s": beat["start_s"],
                 "dur_s": beat["dur_s"],
@@ -609,6 +767,10 @@ def main() -> int:
         f"     shots               = {ledger['total_shots']}\n"
         f"     beats (single-spkr) = {ledger['total_beats']}\n"
         f"     logical clips       = {ledger['total_clips']}\n"
+        f"     dialogue / atmos    = "
+        f"{sum(1 for ln in ledger['lines'] if ln.get('kind') == 'dialogue')}"
+        f" / "
+        f"{sum(1 for ln in ledger['lines'] if ln.get('kind') != 'dialogue')}\n"
         f"     wall-clock @ 6 min/clip cold, ~5 min warm = "
         f"~{(6 + (ledger['total_clips'] - 1) * 5) / 60:.1f} h"
     )

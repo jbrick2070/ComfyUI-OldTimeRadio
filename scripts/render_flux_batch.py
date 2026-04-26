@@ -222,16 +222,33 @@ def build_target_list(
     targets: list[dict[str, Any]] = []
 
     # ----- portraits -----
+    # Special handling for the synthetic RADIO speaker: it gets a portrait
+    # with a fixed vintage-radio prompt, and we DO NOT emit per-(shot,
+    # speaker) composites for RADIO -- the same one radio still is reused
+    # for every atmospheric clip (per ROADMAP Goal 3 lip-synching radio
+    # design: one radio identity, audio-driven motion variation via HuMo).
     for c in cast:
         name = (c.get("name") or "").strip()
         if not name:
             continue
         desc = (c.get("description") or "").strip()
-        positive = (
-            (desc or f"a portrait of {name}")
-            + ", clean head and shoulders portrait, neutral pose, "
-            + "even cinematic lighting, " + style_tail
-        )
+        is_radio = name.upper() == "RADIO"
+        if is_radio:
+            # Front-and-center grille framing -- the grille IS the mouth
+            # HuMo will lip-sync to whatever audio plays during atmospheric
+            # beats (klaxons, music, hum, silence).
+            positive = (
+                (desc or "vintage 1940s console radio")
+                + ", front-on view with the speaker grille filling the "
+                + "center of the frame as the focal element, "
+                + style_tail
+            )
+        else:
+            positive = (
+                (desc or f"a portrait of {name}")
+                + ", clean head and shoulders portrait, neutral pose, "
+                + "even cinematic lighting, " + style_tail
+            )
         slug = slugify(name)
         prefix = f"otr_humo_pass1_portrait_{slug}"
         targets.append({
@@ -247,6 +264,9 @@ def build_target_list(
         })
 
     # ----- (shot, speaker) composites -----
+    # RADIO is intentionally skipped: it reuses the single portrait for
+    # every atmospheric beat in the episode (cinematic continuity --
+    # "the radio" is one recurring object, not a per-shot variant).
     seen_pairs: set[tuple[str, str]] = set()
     for shot in shots:
         shot_id = shot.get("shot_id") or ""
@@ -255,6 +275,9 @@ def build_target_list(
         for beat in shot.get("beats") or []:
             speaker = (beat.get("speaker") or "").strip()
             if not speaker:
+                continue
+            if speaker.upper() == "RADIO":
+                # No composite — atmospheric beats reuse the radio portrait.
                 continue
             key = (shot_id, speaker)
             if key in seen_pairs:

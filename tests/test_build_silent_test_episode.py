@@ -400,6 +400,132 @@ def test_build_silent_episode_lines_carry_beat_id_and_boundary(tmp_path: Path):
         assert ln["boundary"] in valid_boundaries
 
 
+def _source_ledger_with_episode_dur() -> dict:
+    """Source ledger with total_episode_dur_s set well above the
+    cumulative dialogue duration, so the lip-synching RADIO atmospheric
+    phantom shots get injected (cold open + closing)."""
+    led = _mini_source_ledger()
+    # Mini ledger's word-count-derived dialogue ≈ 13-14s. Set total to
+    # 30s so gap = ~17s, comfortably above RADIO_GAP_FLOOR_S=2s.
+    led["total_episode_dur_s"] = 30.0
+    return led
+
+
+def test_radio_phantom_shots_injected_when_gap_exists(tmp_path: Path):
+    """Source ledger with total_episode_dur_s above cumulative dialogue
+    triggers cold-open + closing RADIO phantom shots. Each is a single
+    shot with one beat, kind=ambient, speaker=RADIO."""
+    from build_silent_test_episode import build_silent_test_episode
+
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(
+        json.dumps(_source_ledger_with_episode_dur()),
+        encoding="utf-8",
+    )
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out", write_audio=False,
+    )
+
+    shot_ids = [s["shot_id"] for s in ledger["shots"]]
+    assert "shot_atmos_open" in shot_ids
+    assert "shot_atmos_close" in shot_ids
+    # Cold open is first, closing is last
+    assert shot_ids[0] == "shot_atmos_open"
+    assert shot_ids[-1] == "shot_atmos_close"
+
+    open_shot = next(s for s in ledger["shots"]
+                     if s["shot_id"] == "shot_atmos_open")
+    close_shot = next(s for s in ledger["shots"]
+                      if s["shot_id"] == "shot_atmos_close")
+    for atmos in (open_shot, close_shot):
+        assert len(atmos["beats"]) == 1
+        b = atmos["beats"][0]
+        assert b["speaker"] == "RADIO"
+        assert b["kind"] == "ambient"
+        assert b["clip_count"] >= 1
+
+
+def test_radio_injected_into_cast_when_phantom_shots_active(tmp_path: Path):
+    """The synthetic RADIO cast member is appended to ledger.cast when
+    atmospheric phantom shots get injected (so render_flux_batch can
+    find it and emit the radio portrait)."""
+    from build_silent_test_episode import build_silent_test_episode
+
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(
+        json.dumps(_source_ledger_with_episode_dur()),
+        encoding="utf-8",
+    )
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out", write_audio=False,
+    )
+    names = [c.get("name") for c in ledger["cast"]]
+    assert "RADIO" in names
+    radio = next(c for c in ledger["cast"] if c.get("name") == "RADIO")
+    assert "vintage" in (radio.get("description") or "").lower()
+
+
+def test_radio_clips_carry_kind_ambient(tmp_path: Path):
+    """Every clip line emitted from a RADIO atmospheric beat must carry
+    kind=ambient and speaker=RADIO so the orchestrator can route it
+    correctly."""
+    from build_silent_test_episode import build_silent_test_episode
+
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(
+        json.dumps(_source_ledger_with_episode_dur()),
+        encoding="utf-8",
+    )
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out", write_audio=False,
+    )
+    radio_clips = [ln for ln in ledger["lines"] if ln.get("speaker") == "RADIO"]
+    assert radio_clips, "expected at least one RADIO clip"
+    for ln in radio_clips:
+        assert ln["kind"] == "ambient"
+        assert ln["shot_id"] in ("shot_atmos_open", "shot_atmos_close")
+
+
+def test_radio_phantom_skipped_when_no_episode_dur_gap(tmp_path: Path):
+    """If total_episode_dur_s is missing or close to the cumulative
+    dialogue dur, no phantom shots get injected (no-op behaviour for
+    older ledgers)."""
+    from build_silent_test_episode import build_silent_test_episode
+
+    src_path = tmp_path / "src_ledger.json"
+    # Mini ledger with no total_episode_dur_s -> no gap, no injection.
+    src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out", write_audio=False,
+    )
+    shot_ids = [s["shot_id"] for s in ledger["shots"]]
+    assert "shot_atmos_open" not in shot_ids
+    assert "shot_atmos_close" not in shot_ids
+    # No RADIO injected into cast either
+    names = [c.get("name") for c in ledger["cast"]]
+    assert "RADIO" not in names
+
+
+def test_dialogue_clips_keep_kind_dialogue(tmp_path: Path):
+    """Dialogue clips emitted alongside RADIO atmospheric clips must
+    still carry kind=dialogue, not ambient."""
+    from build_silent_test_episode import build_silent_test_episode
+
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(
+        json.dumps(_source_ledger_with_episode_dur()),
+        encoding="utf-8",
+    )
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out", write_audio=False,
+    )
+    dialogue_clips = [ln for ln in ledger["lines"]
+                      if ln.get("speaker") != "RADIO"]
+    assert dialogue_clips, "expected dialogue clips alongside RADIO"
+    for ln in dialogue_clips:
+        assert ln["kind"] == "dialogue"
+
+
 def _speaker_repeat_source_ledger() -> dict:
     """Source ledger that exercises beat_resume: a single shot where
     speaker A is interrupted by speaker B, then A returns. ALICE speaks

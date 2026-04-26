@@ -371,6 +371,85 @@ def test_composite_finder_ignores_other_speakers(tmp_path: Path):
     assert found is None
 
 
+# ---------------------------------------------------------------------------
+# Lip-synching radio: RADIO gets a portrait but ZERO composites
+# (atmospheric beats reuse one radio still, audio-driven motion via HuMo)
+# ---------------------------------------------------------------------------
+
+
+def _l2_ledger_with_radio() -> dict:
+    """L2 ledger that includes the synthetic RADIO cast member + an
+    atmospheric phantom shot. Mirrors what build_silent_test_episode emits
+    when the source ledger has total_episode_dur_s > cumulative dialogue."""
+    led = _l2_ledger()
+    led["cast"].append({
+        "char_id": "c_radio",
+        "name": "RADIO",
+        "description": "vintage 1940s console radio, walnut cabinet",
+    })
+    # Insert atmospheric phantom shots with RADIO beats.
+    led["shots"].insert(0, {
+        "shot_id": "shot_atmos_open",
+        "scene_id": None,
+        "dur_s": 8.0,
+        "speakers": ["RADIO"],
+        "beats": [{"beat_id": "shot_atmos_open_b1", "speaker": "RADIO",
+                   "kind": "ambient", "line_ids": [],
+                   "start_s": 0.0, "dur_s": 8.0}],
+    })
+    led["shots"].append({
+        "shot_id": "shot_atmos_close",
+        "scene_id": None,
+        "dur_s": 12.0,
+        "speakers": ["RADIO"],
+        "beats": [{"beat_id": "shot_atmos_close_b1", "speaker": "RADIO",
+                   "kind": "ambient", "line_ids": [],
+                   "start_s": 25.0, "dur_s": 12.0}],
+    })
+    return led
+
+
+def test_radio_gets_portrait_but_no_composites():
+    """RADIO must show up exactly once in targets[] as a portrait. No
+    per-(shot, RADIO) composites — the same one radio still reuses
+    across all atmospheric clips."""
+    from render_flux_batch import build_target_list
+    targets = build_target_list(_l2_ledger_with_radio(), style_tail="cinematic")
+    radio_targets = [t for t in targets
+                     if (t.get("speaker") or "").upper() == "RADIO"]
+    assert len(radio_targets) == 1
+    assert radio_targets[0]["kind"] == "portrait"
+    # No RADIO composites
+    radio_composites = [t for t in targets
+                        if t["kind"] == "composite"
+                        and (t.get("speaker") or "").upper() == "RADIO"]
+    assert radio_composites == []
+
+
+def test_radio_portrait_prompt_uses_grille_framing():
+    """The RADIO portrait prompt must steer FLUX to render the speaker
+    grille front-and-center (HuMo's audio-driven 'mouth')."""
+    from render_flux_batch import build_target_list
+    targets = build_target_list(_l2_ledger_with_radio(), style_tail="x")
+    radio_portrait = next(t for t in targets
+                          if (t.get("speaker") or "").upper() == "RADIO"
+                          and t["kind"] == "portrait")
+    p = radio_portrait["positive_prompt"].lower()
+    assert "grille" in p
+    assert "speaker" in p
+
+
+def test_radio_portrait_filename_follows_pass1_convention():
+    """The RADIO portrait must save under the existing pass1 portrait
+    naming convention so HuMo's find_portrait_for_speaker glob hits it."""
+    from render_flux_batch import build_target_list
+    targets = build_target_list(_l2_ledger_with_radio(), style_tail="x")
+    radio_portrait = next(t for t in targets
+                          if (t.get("speaker") or "").upper() == "RADIO"
+                          and t["kind"] == "portrait")
+    assert radio_portrait["save_prefix"] == "otr_humo_pass1_portrait_radio"
+
+
 def test_target_count_matches_astrotech_design():
     """Build a 6-cast / 23-shot / 46-beat / 44-unique-pair ledger shape
     (matches actual astrotech ledger) and confirm the orchestrator emits
