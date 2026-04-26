@@ -952,12 +952,28 @@ def _load_llm(model_id_full="inflatebot/MN-12B-Mag-Mell-R1", device="cuda", opti
     requested_quantized = is_obsidian or "4-bit" in model_id_full.lower() or \
                           any(tag in model_id_full.lower() for tag in vram_safe_tags)
 
-    # v1.4 Audit: Also check if the model object itself has been moved to CPU
+    # v1.4 Audit: Also check if the model object itself has been moved to CPU.
+    # 2026-04-26 BUG-LOCAL-065 hardening: bitsandbytes 4-bit quantized models
+    # have a non-deterministic parameter iteration order; the FIRST parameter
+    # can legitimately report 'cpu' (quantization metadata buffers, embed
+    # tokens with offload) even when the model is correctly placed on cuda
+    # for inference. Scan up to 8 parameters and accept the cache as valid
+    # if ANY of them are on cuda. Only flag eviction when ALL inspected
+    # params are off-cuda.
     current_model_device = "cpu"
+    any_cuda_param = False
     if _LLM_CACHE["model"] is not None:
         try:
-            current_model_device = str(next(_LLM_CACHE["model"].parameters()).device)
-        except StopIteration:
+            for i, p in enumerate(_LLM_CACHE["model"].parameters()):
+                pd = str(getattr(p, "device", "cpu"))
+                if i == 0:
+                    current_model_device = pd
+                if "cuda" in pd:
+                    any_cuda_param = True
+                    break
+                if i >= 7:
+                    break
+        except Exception:
             pass
 
     # v1.5.1: Context cap tuning. History: 2048 (format loss), 4096 (still
@@ -965,15 +981,44 @@ def _load_llm(model_id_full="inflatebot/MN-12B-Mag-Mell-R1", device="cuda", opti
     # keeps format instructions (~6k tokens) while peak VRAM stays ~12-13 GB.
     _cap = 6144 if any(kw in str(model_id_full).lower() for kw in ("nemo", "12b", "14b")) else 8192
 
-    if (_LLM_CACHE["model"] is not None and
-            (str(_LLM_CACHE["device"]) != str(device) or 
-             _LLM_CACHE["quantized"] != requested_quantized or
-             _LLM_CACHE["model_id"] != model_id or
-             _LLM_CACHE.get("budget_profile") != optimization_profile or
-             _LLM_CACHE.get("VERSION") != "v1.5" or
-             _LLM_CACHE.get("context_cap") != _cap or
-             ("cuda" in str(device) and "cpu" in current_model_device))):
-        _runtime_log(f"LLM cache mismatch (Context Cap: {_cap}) - reloading to enforce budget")
+    # 2026-04-26 BUG-LOCAL-065: explicit field-level diagnostics so cache
+    # mismatches are debuggable. Previously the reason a reload fired
+    # was opaque -- by the time anyone looked at the log the LLM had
+    # already cycled. Now every reload prints exactly which fields drifted.
+    cache_deltas = []
+    if _LLM_CACHE["model"] is not None:
+        if str(_LLM_CACHE["device"]) != str(device):
+            cache_deltas.append(("device", _LLM_CACHE["device"], device))
+        if _LLM_CACHE["quantized"] != requested_quantized:
+            cache_deltas.append(("quantized", _LLM_CACHE["quantized"], requested_quantized))
+        if _LLM_CACHE["model_id"] != model_id:
+            cache_deltas.append(("model_id", _LLM_CACHE["model_id"], model_id))
+        if _LLM_CACHE.get("budget_profile") != optimization_profile:
+            cache_deltas.append(("budget_profile",
+                                 _LLM_CACHE.get("budget_profile"),
+                                 optimization_profile))
+        if _LLM_CACHE.get("VERSION") != "v1.5":
+            cache_deltas.append(("VERSION",
+                                 _LLM_CACHE.get("VERSION"), "v1.5"))
+        if _LLM_CACHE.get("context_cap") != _cap:
+            cache_deltas.append(("context_cap",
+                                 _LLM_CACHE.get("context_cap"), _cap))
+        # Eviction check: declare evicted only if NO parameters report cuda.
+        if ("cuda" in str(device)
+                and "cpu" in current_model_device
+                and not any_cuda_param):
+            cache_deltas.append(("model_evicted_to_cpu",
+                                 current_model_device, str(device)))
+
+    if _LLM_CACHE["model"] is not None and cache_deltas:
+        delta_summary = ", ".join(
+            f"{k}: {cached!r}->{req!r}"
+            for k, cached, req in cache_deltas
+        )
+        _runtime_log(
+            f"LLM cache mismatch (Context Cap: {_cap}) "
+            f"[fields drifted: {delta_summary}] - reloading to enforce budget"
+        )
         _unload_llm()
 
     if _LLM_CACHE["model"] is None:
