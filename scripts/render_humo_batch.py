@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -250,6 +251,47 @@ def find_portrait_for_speaker(
 
     # 4. Last resort: any PNG in input dir
     return None
+
+
+# Slug rule must stay in lockstep with render_flux_batch.slugify so the
+# composite filenames written by FLUX get found by HuMo. Both functions
+# lowercase, replace runs of non-[a-z0-9] with `_`, strip leading and
+# trailing underscores.
+_SLUG_RE_CONSUME = re.compile(r"[^a-z0-9]+")
+
+
+def _composite_slug(s: str, limit: int = 40) -> str:
+    s = (s or "").strip().lower()
+    s = _SLUG_RE_CONSUME.sub("_", s).strip("_")
+    return (s[:limit] or "unnamed")
+
+
+def find_composite_for_shot_speaker(
+    shot_id: str | None,
+    speaker: str | None,
+    portraits_dir: Path,
+) -> Path | None:
+    """Find the per-(shot, speaker) FLUX composite written by render_flux_batch.
+
+    Filename convention from render_flux_batch.build_target_list:
+        otr_humo_pass3_<shot_slug>_<speaker_slug>_*.png
+    where shot_slug truncates at 24 chars and speaker_slug at 40 chars.
+
+    Returns the newest matching PNG, or None if no composite is on disk
+    yet -- caller falls back to the pass1 portrait so the run still
+    proceeds against legacy data.
+    """
+    if not shot_id or not speaker:
+        return None
+    shot_slug = _composite_slug(shot_id, limit=24)
+    speaker_slug = _composite_slug(speaker, limit=40)
+    pattern = f"otr_humo_pass3_{shot_slug}_{speaker_slug}_*.png"
+    candidates = sorted(
+        portraits_dir.glob(pattern),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
 
 
 # ---------------------------------------------------------------------------
@@ -690,6 +732,14 @@ def build_clip_plan(
             )
             continue
 
+        # Per-(shot, speaker) composite from render_flux_batch.py — used as
+        # the fresh-anchor reference for shot_start / beat_start clips when
+        # one is on disk. Falls back to the cast portrait if no composite
+        # has been rendered yet (back-compat with pre-FLUX-batch runs).
+        composite_src = find_composite_for_shot_speaker(
+            ln.get("shot_id"), speaker, args.portraits_dir,
+        )
+
         # --- positive prompt ---
         # Try cast.description, fall back to a generic OTR scene line.
         speaker_desc = ""
@@ -723,6 +773,7 @@ def build_clip_plan(
             "audio_src_path": str(master_wav),
             "audio_filename_in_input": audio_filename,
             "portrait_src_path": str(portrait_src),
+            "composite_src_path": str(composite_src) if composite_src else None,
             "portrait_filename_in_input": portrait_filename,
             "positive_prompt": positive_prompt,
             "save_prefix": save_prefix,
@@ -823,9 +874,28 @@ def main() -> int:
             speaker_last_frame_in_shot.clear()
 
         # 4a. Stage reference image into ComfyUI input/
-        # Default to the clean cast portrait. Chain mode overrides this
-        # with the previous clip's last frame (continue) or this
-        # speaker's own previous last-frame-in-this-shot (beat_resume).
+        # Anchor-mode lookup, in priority order per boundary type:
+        #   shot_start / beat_start -> per-(shot, speaker) FLUX composite
+        #     when present; otherwise fall back to clean cast portrait.
+        #     The composite (otr_humo_pass3_<shot>_<speaker>) carries
+        #     scene context so HuMo's first frame opens with the right
+        #     framing/lighting. Falls back to the cast portrait
+        #     (otr_humo_pass1_portrait_<speaker>) if FLUX hasn't rendered
+        #     a composite yet, so legacy runs still work.
+        #   beat_resume -> this speaker's own last frame from earlier in
+        #     the same shot. Falls back to composite, then portrait.
+        #   continue -> previous clip's last frame.
+        composite_src = (
+            Path(clip["composite_src_path"]) if clip.get("composite_src_path")
+            else None
+        )
+        portrait_src = Path(clip["portrait_src_path"])
+
+        def _fresh_anchor() -> tuple[Path, str]:
+            if composite_src and composite_src.exists():
+                return composite_src, f"composite ({composite_src.name})"
+            return portrait_src, "clean portrait"
+
         chain_source: str = "clean portrait"  # for log only
         if args.chain:
             if boundary == "continue" and prev_last_frame_path \
@@ -841,16 +911,16 @@ def main() -> int:
                 else:
                     # Speaker is supposedly returning but we don't have a
                     # prior frame on hand (first run after restart, etc.).
-                    # Fall back to portrait so the run doesn't break.
-                    ref_src = Path(clip["portrait_src_path"])
-                    chain_source = "clean portrait (beat_resume fallback)"
+                    # Fall back to composite-or-portrait so the run keeps
+                    # going.
+                    ref_src, fallback_label = _fresh_anchor()
+                    chain_source = f"{fallback_label} (beat_resume fallback)"
             else:
-                # shot_start, beat_start, or unknown boundary -- clean reset
-                ref_src = Path(clip["portrait_src_path"])
-                chain_source = "clean portrait"
+                # shot_start, beat_start, or unknown boundary -- fresh anchor
+                ref_src, chain_source = _fresh_anchor()
         else:
-            ref_src = Path(clip["portrait_src_path"])
-            chain_source = "clean portrait (--no-chain)"
+            ref_src, chain_source = _fresh_anchor()
+            chain_source += " (--no-chain)"
 
         portrait_dst = args.comfyui_input_dir / clip["portrait_filename_in_input"]
         shutil.copy2(ref_src, portrait_dst)

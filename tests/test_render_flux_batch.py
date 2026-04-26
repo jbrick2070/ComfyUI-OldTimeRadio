@@ -298,6 +298,79 @@ def test_flux_prompt_save_prefix_lands_in_save_node():
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Composite filename round-trip — render_flux_batch writes filenames that
+# render_humo_batch.find_composite_for_shot_speaker can find. This is the
+# integration glue that closes the FLUX→HuMo handoff.
+# ---------------------------------------------------------------------------
+
+
+def test_composite_filename_roundtrip(tmp_path: Path):
+    """A composite saved by render_flux_batch must be locatable by
+    render_humo_batch's find_composite_for_shot_speaker. Both ends use
+    the same slug rule (lowercase, [^a-z0-9]+ -> _, strip)."""
+    from render_flux_batch import slugify as flux_slugify
+    from render_humo_batch import (
+        find_composite_for_shot_speaker,
+        _composite_slug as humo_slugify,
+    )
+
+    # Slug rule lockstep
+    for raw in ["ANN", "Kenji Cross", "MEREDITH", "shot_011", "shot_001"]:
+        assert flux_slugify(raw, limit=24) == humo_slugify(raw, limit=24)
+        assert flux_slugify(raw, limit=40) == humo_slugify(raw, limit=40)
+
+    # Simulate a saved composite landing in the portraits dir (which is
+    # ComfyUI's output root for the silent_test pipeline).
+    shot_id = "shot_011"
+    speaker = "MEREDITH"
+    shot_slug = humo_slugify(shot_id, limit=24)
+    speaker_slug = humo_slugify(speaker, limit=40)
+    composite_name = f"otr_humo_pass3_{shot_slug}_{speaker_slug}_00001_.png"
+    saved = tmp_path / composite_name
+    saved.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)  # tiny PNG-ish
+
+    found = find_composite_for_shot_speaker(shot_id, speaker, tmp_path)
+    assert found is not None
+    assert found.name == composite_name
+
+
+def test_composite_finder_returns_none_when_missing(tmp_path: Path):
+    """No composite on disk -> None, so the orchestrator falls back to
+    the cast portrait (back-compat with pre-FLUX-batch ledgers)."""
+    from render_humo_batch import find_composite_for_shot_speaker
+    found = find_composite_for_shot_speaker(
+        "shot_999", "NOBODY", tmp_path,
+    )
+    assert found is None
+
+
+def test_composite_finder_returns_newest_when_multiple_runs(tmp_path: Path):
+    """If FLUX renders the same (shot, speaker) twice, the newer file wins."""
+    from render_humo_batch import find_composite_for_shot_speaker
+    older = tmp_path / "otr_humo_pass3_shot_001_alice_00001_.png"
+    newer = tmp_path / "otr_humo_pass3_shot_001_alice_00002_.png"
+    older.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00")
+    # Make older actually older on disk
+    import os, time
+    os.utime(older, (time.time() - 600, time.time() - 600))
+    newer.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00")
+    found = find_composite_for_shot_speaker("shot_001", "ALICE", tmp_path)
+    assert found is not None
+    assert found.name == newer.name
+
+
+def test_composite_finder_ignores_other_speakers(tmp_path: Path):
+    """A composite for (shot_001, ALICE) must not match a query for
+    (shot_001, BOB) — slugs are exact match, not prefix."""
+    from render_humo_batch import find_composite_for_shot_speaker
+    (tmp_path / "otr_humo_pass3_shot_001_alice_00001_.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+    )
+    found = find_composite_for_shot_speaker("shot_001", "BOB", tmp_path)
+    assert found is None
+
+
 def test_target_count_matches_astrotech_design():
     """Build a 6-cast / 23-shot / 46-beat / 44-unique-pair ledger shape
     (matches actual astrotech ledger) and confirm the orchestrator emits
