@@ -174,23 +174,44 @@ The naive chain `next_ref = prev_last_frame` will drift because the ref image is
 | **3. 5-hop validation** | Chain 5 clips with the chosen α. Per hop: `seam_ssim`, `id_vs_clean`, `id_vs_F1_0`. Drift trigger: `id_vs_clean < 0.80` → force clean re-anchor on next clip (α=1). Hard reset: `id_vs_clean < 0.70` → declare a cut, require motivated camera move from the writer. | All 5 hops complete without hitting the hard-reset threshold; drift trigger fires at most once. |
 | **4. Cowork orchestration** | Pipe ComfyUI logs to the orchestrator. Per-hop metrics auto-emitted as JSON. Auto-generated stitch list with continuity flags for Resolve/Filmora. Error parser maps ComfyUI tracebacks to actionable fixes. Audio slice manager aligns 7 s windows to phoneme boundaries (avoid mid-syllable cuts). | Orchestrator reads a run log, computes metrics, proposes the next-clip anchor strategy without Jeffrey opening the ComfyUI UI between hops. |
 
-**Orchestrator integration — within-shot chain mechanic (gated on Stage 3 passing):**
+**Orchestrator chain mechanic — schema l2 boundary state machine (MVP shipped 2026-04-25 PM):**
 
-The chain happens inside `scripts/render_humo_batch.py`. Within one shot (logical clips that share the same `shot_id` in the ledger — e.g. `shot_001_c1`, `shot_001_c2`, `shot_001_c3` all carry `shot_id == "shot_001"`), the orchestrator threads each clip's last frame into the next clip's reference image. At shot boundaries (next ledger line carries a new `shot_id`), the chain resets to a fresh FLUX portrait. Concretely, per clip:
+The chain happens inside `scripts/render_humo_batch.py` and reads each ledger line's `boundary` field (added by the L2 schema bump). The 4-state machine drives the per-clip reference image decision:
 
-1. **Identify chain state.** Read `clip.shot_id`. If equal to the previous clip's `shot_id` → "chain mode". Else (or first clip in run) → "fresh anchor mode".
-2. **Choose the reference image:**
-    - Fresh anchor mode: `ref = portrait_for_speaker(clip.speaker)` (existing behaviour — clean FLUX portrait via `find_portrait_for_speaker`).
-    - Chain mode: `ref = α × clean_portrait + (1 − α) × prev_last_frame` where α is the value Stage 2 picks (likely 0.7 or 0.9 based on the brief's expected sweep).
-3. **Extract last frame.** After clip N's MP4 lands in `--out-dir`, run `ffmpeg -sseof -0.04 -i <clip_N>.mp4 -frames:v 1 -update 1 <out>.png` to grab the last frame as a PNG. Store at `<comfyui-input-dir>/humo_chain_<shot_id>_c<N>_last.png`.
-4. **Blend with portrait.** PIL + numpy: load both images, resize to HuMo's input resolution (640×640 in current config), linear blend at α, save the blended PNG.
-5. **Stage as next clip's `ref_image`.** Overwrite the per-clip `portrait_filename_in_input` slot with the blended PNG so the next prompt builder picks it up automatically — no API changes to `build_humo_prompt`.
-6. **Reset on shot boundary.** When `clip.shot_id` changes, drop the chain state and go back to fresh anchor mode for the new shot's first clip.
-7. **Emit per-hop metrics.** Compute `seam_ssim(prev_last, clip_first_frame)` and `id_cosine(clip_first_frame, clean_portrait)` via ArcFace; append to a `metrics.csv` next to the clip set. Drift triggers (per Stage 3 thresholds — `id_vs_clean < 0.80` forces a clean re-anchor; `< 0.70` forces a hard cut) get logged as warnings in the run summary.
+| `boundary` | When it fires | MVP anchor recipe (shipped) | Stage-2-tuned hybrid (deferred until metrics) |
+|---|---|---|---|
+| `shot_start` | First clip of a new shot (or first clip of run) | `ref = clean_portrait[speaker]` (or per-(shot, speaker) FLUX composite when present) | same |
+| `beat_start` | Same shot, NEW speaker (never seen in this shot before) | `ref = clean_portrait[speaker]` — clean reset, no chain | same |
+| `beat_resume` | Same shot, RETURNING speaker (was interrupted by another beat earlier in this shot) | `ref = speaker_last_frame_in_shot[speaker]` — chain back to that speaker's own last frame in this shot, NOT the interrupting speaker's frame | `ref = α × portrait + (1−α) × speaker_last_frame_in_shot[speaker]` |
+| `continue` | Same beat, same speaker, next clip | `ref = prev_last_frame` — naive daisy chain from immediately preceding clip | `ref = α × portrait + (1−α) × prev_last_frame` |
 
-The data needed for steps 1 and 6 is already present in the ledgers we generate — `silent_test_astrotech/ledger.json` carries `shot_id` on every clip line, so the orchestrator just needs to track "previous shot_id" across iterations of its existing main loop.
+State the orchestrator tracks across the run:
 
-Net code change in `render_humo_batch.py`: roughly 80-100 lines (extract/blend helper + chain-state tracking + metrics writer + the dependency on Pillow + numpy for blending and SSIM, both already in the venv). Gated on Stage 3 metrics passing — until those metrics land, the orchestrator stays in fresh-anchor mode and accepts visible 7-second cuts inside long shots as the known cost.
+- `prev_last_frame_path` — single value, the last MP4's terminal frame (drives `continue`)
+- `prev_shot_id` — used to detect shot transitions
+- `speaker_last_frame_in_shot[speaker]` — per-speaker map, **cleared whenever shot_id changes**, so a returning speaker in a new shot doesn't chain from their prior shot's frame
+
+After every successful render the orchestrator:
+
+1. Moves the rendered MP4 to `--out-dir/<line_id>.mp4`
+2. Extracts the last frame as PNG via `ffmpeg -sseof -0.04 -i <mp4> -frames:v 1 -update 1 <line_id>_last.png` (the `extract_last_frame` helper)
+3. Updates `prev_last_frame_path` and `speaker_last_frame_in_shot[speaker]`
+
+**MVP shipped 2026-04-25 (`scripts/render_humo_batch.py`):**
+
+- All four boundary types honoured (naive — no alpha blend yet)
+- `--no-chain` flag falls back to fresh-portrait-every-clip for A/B comparison
+- Chain state cleared on shot transition
+- ffmpeg `extract_last_frame` helper — last-frame PNG saved alongside each clip's MP4
+- Per-clip log line shows the chain source: `clean portrait` / `prev clip last frame` / `speaker last frame in shot (<filename>)`
+
+**Deferred until Stage 0 / 1 / 2 metrics land:**
+
+- Alpha-blend hybrid anchor (`α × portrait + (1−α) × prev_frame`) — needs Stage 2 α sweep to pick the value
+- ArcFace identity cosine + SSIM seam metrics → `metrics.csv` per run
+- Drift triggers (`id_vs_clean < 0.80` → force clean re-anchor; `< 0.70` → declare a hard cut)
+
+The MVP is enough to test whether naive chaining holds within HuMo's training distribution. If Stage 1 seam_ssim ≥ 0.95 with naive chain, we're done. If not, the alpha blend lands as a ~30-line incremental patch on top of the MVP.
 
 **Alternative paths within Goal 3 (A-tier, current HuMo, fact-checked 2026-04-25 — `docs/2026-04-25-humo-daisy-chain-AB-split.md`):**
 

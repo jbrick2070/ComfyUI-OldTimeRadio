@@ -373,6 +373,12 @@ def build_silent_test_episode(
     for shot in shots:
         shot_id = shot["shot_id"]
         scene_id = shot["scene_id"]
+        # Track which speakers have appeared in this shot already so we
+        # can distinguish a fresh speaker (`beat_start`) from a returning
+        # speaker who was interrupted earlier (`beat_resume`). Cleared
+        # per shot since the chain-from-this-speaker's-last-frame
+        # mechanic only makes sense within one shot.
+        speakers_seen_in_shot: set[str] = set()
 
         for beat_idx, beat in enumerate(shot["beats"]):
             beat_id = beat["beat_id"]
@@ -380,6 +386,7 @@ def build_silent_test_episode(
             char_id = cast_name_to_char_id.get(speaker)
             beat_start = beat["start_s"]
             beat_dur = beat["dur_s"]
+            speaker_already_in_shot = speaker in speakers_seen_in_shot
 
             clip_durs = clip_durations_for_shot(beat_dur, base=clip_base_dur)
             beat["clip_count"] = len(clip_durs)
@@ -390,15 +397,23 @@ def build_silent_test_episode(
                 length = humo_length_for_dur(clip_dur)
                 clip_id = f"{beat_id}_c{clip_idx + 1}"
 
-                # Boundary type: drives the orchestrator's anchor mode.
+                # Boundary type drives the orchestrator's anchor mode:
+                #   shot_start  : first clip of new shot, full visual reset
+                #   beat_start  : same shot, NEW speaker (never appeared in
+                #                 this shot before) -- clean portrait, no
+                #                 chain
+                #   beat_resume : same shot, RETURNING speaker (interrupted
+                #                 earlier in this shot by another beat) --
+                #                 chain from this speaker's last frame in
+                #                 this shot
+                #   continue    : same beat, same speaker -- chain from
+                #                 immediately preceding clip's last frame
                 if beat_idx == 0 and clip_idx == 0:
-                    # First clip of first beat in a shot = visual reset.
                     boundary = "shot_start"
                 elif clip_idx == 0:
-                    # First clip of a non-first beat = clean speaker reset.
-                    boundary = "beat_start"
+                    boundary = ("beat_resume" if speaker_already_in_shot
+                                else "beat_start")
                 else:
-                    # Same beat, same speaker, same shot = chain candidate.
                     boundary = "continue"
 
                 clip_lines.append({
@@ -417,6 +432,12 @@ def build_silent_test_episode(
                 })
                 offset += clip_dur
                 total_clips += 1
+
+            # End of beat: this speaker has now appeared in this shot.
+            # Subsequent beats with the same speaker in this shot get
+            # boundary=beat_resume.
+            if speaker:
+                speakers_seen_in_shot.add(speaker)
 
     # ----- Phase 4: per-shot summary (beats inline, with clip plan) -----
     shots_out: list[dict[str, Any]] = []

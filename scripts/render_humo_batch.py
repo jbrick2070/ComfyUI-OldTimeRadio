@@ -149,6 +149,31 @@ def parse_args() -> argparse.Namespace:
         help="Hard cap on a single prompt's wall-clock (seconds). At "
         "6:15/clip baseline we're well under this.",
     )
+    # Goal 3 daisy-chain mechanic. Honours per-clip `boundary` field on
+    # ledger lines (shot_start / beat_start / beat_resume / continue):
+    #   shot_start  : ref_image = clean speaker portrait (full reset)
+    #   beat_start  : ref_image = clean speaker portrait (clean reset, new
+    #                 speaker in this shot, no chain)
+    #   beat_resume : ref_image = this speaker's last frame from earlier in
+    #                 this shot (cinematic continuity on speaker return)
+    #   continue    : ref_image = previous clip's last frame
+    # MVP: naive chain (no alpha blend). Hybrid alpha blend is layered on
+    # later once Stage 0/1/2 metrics from the continuity brief land.
+    # `--no-chain` falls back to fresh-portrait-every-clip (the pre-Goal-3
+    # behaviour) for A/B comparison.
+    p.add_argument(
+        "--chain",
+        dest="chain",
+        action="store_true",
+        default=True,
+        help="(default) Honour ledger boundary field for daisy-chain anchoring.",
+    )
+    p.add_argument(
+        "--no-chain",
+        dest="chain",
+        action="store_false",
+        help="Disable daisy-chain; every clip uses the clean speaker portrait.",
+    )
     return p.parse_args()
 
 
@@ -282,6 +307,29 @@ def get_audio_duration(path: Path) -> float:
     ]
     out = subprocess.run(cmd, check=True, capture_output=True, text=True)
     return float(out.stdout.strip())
+
+
+def extract_last_frame(mp4_path: Path, out_png: Path) -> Path:
+    """Extract the last frame of an MP4 as a PNG.
+
+    Uses ffmpeg with `-sseof -0.04` (seek to 40 ms before EOF) plus
+    `-frames:v 1 -update 1` to grab a single image. Output is a PNG
+    next to the MP4 (or wherever ``out_png`` points). Used by the
+    Goal 3 daisy-chain mechanic to feed clip N's terminal frame as
+    the next clip's reference image.
+    """
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-sseof", "-0.04",
+        "-i", str(mp4_path),
+        "-frames:v", "1",
+        "-update", "1",
+        str(out_png),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    return out_png
 
 
 # ---------------------------------------------------------------------------
@@ -668,6 +716,9 @@ def build_clip_plan(
 
         plan.append({
             "line_id": line_id,
+            "shot_id": ln.get("shot_id"),
+            "beat_id": ln.get("beat_id"),
+            "boundary": ln.get("boundary"),
             "speaker": speaker,
             "audio_src_path": str(master_wav),
             "audio_filename_in_input": audio_filename,
@@ -746,17 +797,64 @@ def main() -> int:
     print(f"[comfy] queue state running={running} pending={pending}")
 
     # 4. Render each clip
+    # Goal 3 daisy-chain state. Reset on shot boundary so per-speaker
+    # last-frame mapping never leaks across shots (a returning speaker
+    # in shot N+1 should NOT see their last frame from shot N).
+    prev_last_frame_path: Path | None = None
+    prev_shot_id: str | None = None
+    speaker_last_frame_in_shot: dict[str, Path] = {}
+
     started_at = time.time()
     completed = 0
     for idx, clip in enumerate(plan, 1):
         line_id = clip["line_id"]
         clip_started = time.time()
-        print(f"\n[{idx}/{len(plan)}] {line_id}  ({clip['speaker']})")
+        speaker = clip["speaker"]
+        boundary = clip.get("boundary") or "shot_start"
+        clip_shot_id = clip.get("shot_id")
+        print(
+            f"\n[{idx}/{len(plan)}] {line_id}  ({speaker})  boundary={boundary}"
+        )
 
-        # 4a. Stage portrait into ComfyUI input/
+        # If we crossed into a new shot, drop the per-speaker map so a
+        # returning speaker in the new shot won't chain from their old
+        # shot's last frame.
+        if prev_shot_id is not None and clip_shot_id != prev_shot_id:
+            speaker_last_frame_in_shot.clear()
+
+        # 4a. Stage reference image into ComfyUI input/
+        # Default to the clean cast portrait. Chain mode overrides this
+        # with the previous clip's last frame (continue) or this
+        # speaker's own previous last-frame-in-this-shot (beat_resume).
+        chain_source: str = "clean portrait"  # for log only
+        if args.chain:
+            if boundary == "continue" and prev_last_frame_path \
+                    and prev_last_frame_path.exists():
+                ref_src = prev_last_frame_path
+                chain_source = "prev clip last frame"
+            elif boundary == "beat_resume":
+                speaker_prev = speaker_last_frame_in_shot.get(speaker)
+                if speaker_prev and speaker_prev.exists():
+                    ref_src = speaker_prev
+                    chain_source = (f"speaker last frame in shot "
+                                    f"({speaker_prev.name})")
+                else:
+                    # Speaker is supposedly returning but we don't have a
+                    # prior frame on hand (first run after restart, etc.).
+                    # Fall back to portrait so the run doesn't break.
+                    ref_src = Path(clip["portrait_src_path"])
+                    chain_source = "clean portrait (beat_resume fallback)"
+            else:
+                # shot_start, beat_start, or unknown boundary -- clean reset
+                ref_src = Path(clip["portrait_src_path"])
+                chain_source = "clean portrait"
+        else:
+            ref_src = Path(clip["portrait_src_path"])
+            chain_source = "clean portrait (--no-chain)"
+
         portrait_dst = args.comfyui_input_dir / clip["portrait_filename_in_input"]
-        shutil.copy2(clip["portrait_src_path"], portrait_dst)
-        print(f"    portrait -> {portrait_dst.name}")
+        shutil.copy2(ref_src, portrait_dst)
+        print(f"    ref      -> {portrait_dst.name}  [{chain_source}]")
 
         # 4b. Slice audio into ComfyUI input/
         audio_dst = args.comfyui_input_dir / clip["audio_filename_in_input"]
@@ -829,11 +927,36 @@ def main() -> int:
             shutil.move(str(src_mp4), str(dst_mp4))
             print(f"    DONE in {clip_dur:.1f}s -> {dst_mp4.name}")
             completed += 1
+
+            # Goal 3 chain state update. Extract this clip's last frame
+            # and stash it for the next clip's anchor decision. Always
+            # update prev_last_frame_path (used by `continue` boundary)
+            # and the per-speaker map for this shot (used by `beat_resume`).
+            if args.chain:
+                try:
+                    last_frame_dst = (args.out_dir
+                                      / f"{line_id}_last.png")
+                    extract_last_frame(dst_mp4, last_frame_dst)
+                    prev_last_frame_path = last_frame_dst
+                    if speaker:
+                        speaker_last_frame_in_shot[speaker] = last_frame_dst
+                    print(f"    last_frame -> {last_frame_dst.name}")
+                except subprocess.CalledProcessError as exc:
+                    # Don't tank the run if ffmpeg blows up extracting the
+                    # last frame -- next clip will fall back to portrait.
+                    print(
+                        f"    WARN: last-frame extract failed: {exc}",
+                        file=sys.stderr,
+                    )
+                    prev_last_frame_path = None
+            prev_shot_id = clip_shot_id
         else:
             print(
                 f"    WARN: completed but no MP4 found in {comfy_output_root}",
                 file=sys.stderr,
             )
+            # Skip chain update so a missing MP4 doesn't poison the next clip.
+            prev_shot_id = clip_shot_id
 
     elapsed = time.time() - started_at
     print(

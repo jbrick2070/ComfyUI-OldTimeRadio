@@ -392,7 +392,7 @@ def test_build_silent_episode_lines_carry_beat_id_and_boundary(tmp_path: Path):
     src_path = tmp_path / "src_ledger.json"
     src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
     ledger = build_silent_test_episode(src_path, tmp_path / "out", write_audio=False)
-    valid_boundaries = {"shot_start", "beat_start", "continue"}
+    valid_boundaries = {"shot_start", "beat_start", "beat_resume", "continue"}
     for ln in ledger["lines"]:
         assert "beat_id" in ln
         assert ln["beat_id"]  # non-empty
@@ -400,10 +400,112 @@ def test_build_silent_episode_lines_carry_beat_id_and_boundary(tmp_path: Path):
         assert ln["boundary"] in valid_boundaries
 
 
-def test_build_silent_episode_first_clip_of_shot_is_shot_start(tmp_path: Path):
-    """First clip of each shot must carry boundary=shot_start. First clip
-    of each subsequent beat in that shot is beat_start. All other clips
-    are continue."""
+def _speaker_repeat_source_ledger() -> dict:
+    """Source ledger that exercises beat_resume: a single shot where
+    speaker A is interrupted by speaker B, then A returns. ALICE speaks
+    short enough lines that the shot stays under the 9 s target until
+    BOB joins, so all three lines stay in one shot."""
+    return {
+        "schema_version": "l1-2026-04-24",
+        "episode_id": "speaker_repeat",
+        "cast": [
+            {"char_id": "c01", "name": "ALICE"},
+            {"char_id": "c02", "name": "BOB"},
+        ],
+        "scenes": [{"scene_id": "scene_lab", "description": "lab"}],
+        "lines": [
+            {"line_id": "l001", "char_id": "c01", "scene_id": "scene_lab",
+             "text": "First.", },                                # ALICE — short
+            {"line_id": "l002", "char_id": "c02", "scene_id": "scene_lab",
+             "text": "Hi.", },                                   # BOB interrupts
+            {"line_id": "l003", "char_id": "c01", "scene_id": "scene_lab",
+             "text": "Resume now.", },                            # ALICE returns
+        ],
+        "sfx": [], "music": [],
+    }
+
+
+def test_beat_resume_fires_when_speaker_returns_within_shot(tmp_path: Path):
+    """ALICE → BOB → ALICE within one shot: ALICE's first clip after BOB
+    must carry boundary=beat_resume (not beat_start), so the orchestrator
+    chains from ALICE's last frame in this shot, not from a clean reset."""
+    from build_silent_test_episode import build_silent_test_episode
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(_speaker_repeat_source_ledger()),
+                        encoding="utf-8")
+    ledger = build_silent_test_episode(
+        src_path, tmp_path / "out",
+        target_shot_dur=20.0,  # large so all 3 lines stay in one shot
+        write_audio=False,
+    )
+    # Should be one shot with 3 beats: ALICE, BOB, ALICE
+    assert ledger["total_shots"] == 1
+    shot = ledger["shots"][0]
+    assert len(shot["beats"]) == 3
+    assert [b["speaker"] for b in shot["beats"]] == ["ALICE", "BOB", "ALICE"]
+
+    # First clip of each beat carries the right boundary
+    by_beat = {}
+    for ln in ledger["lines"]:
+        by_beat.setdefault(ln["beat_id"], []).append(ln)
+    beat_ids = [b["beat_id"] for b in shot["beats"]]
+
+    # b1 ALICE first clip = shot_start
+    assert by_beat[beat_ids[0]][0]["boundary"] == "shot_start"
+    # b2 BOB first clip = beat_start (BOB is new in this shot)
+    assert by_beat[beat_ids[1]][0]["boundary"] == "beat_start"
+    # b3 ALICE first clip = beat_resume (ALICE was already in this shot)
+    assert by_beat[beat_ids[2]][0]["boundary"] == "beat_resume"
+
+
+def test_beat_resume_does_not_leak_across_shots(tmp_path: Path):
+    """If ALICE appears in shot 1 and again in shot 2 (after a scene
+    change), shot 2's first ALICE beat is shot_start, not beat_resume.
+    The speakers_seen tracker resets per shot."""
+    from build_silent_test_episode import build_silent_test_episode
+    src = {
+        "schema_version": "l1-2026-04-24",
+        "episode_id": "cross_shot",
+        "cast": [{"char_id": "c01", "name": "ALICE"}],
+        "scenes": [
+            {"scene_id": "scene_a"},
+            {"scene_id": "scene_b"},
+        ],
+        "lines": [
+            {"line_id": "l001", "char_id": "c01",
+             "scene_id": "scene_a", "text": "Scene one."},
+            {"line_id": "l002", "char_id": "c01",
+             "scene_id": "scene_b", "text": "Scene two."},
+        ],
+        "sfx": [], "music": [],
+    }
+    src_path = tmp_path / "src_ledger.json"
+    src_path.write_text(json.dumps(src), encoding="utf-8")
+    ledger = build_silent_test_episode(src_path, tmp_path / "out",
+                                        write_audio=False)
+    # Two shots (scene change forces close)
+    assert ledger["total_shots"] == 2
+    # Both first-beat clips are shot_start, neither is beat_resume
+    for shot in ledger["shots"]:
+        first_beat_id = shot["beats"][0]["beat_id"]
+        first_clip = next(ln for ln in ledger["lines"]
+                          if ln["beat_id"] == first_beat_id)
+        assert first_clip["boundary"] == "shot_start", (
+            f"shot {shot['shot_id']} first clip should be shot_start, "
+            f"got {first_clip['boundary']}"
+        )
+
+
+def test_build_silent_episode_boundary_state_machine(tmp_path: Path):
+    """The 4-state boundary machine must hold across the whole ledger:
+       - first clip of each shot          -> shot_start
+       - first clip of a beat whose speaker hasn't appeared in this shot
+                                          -> beat_start
+       - first clip of a beat whose speaker DID appear earlier in this shot
+                                          -> beat_resume
+       - any clip after the first in a beat
+                                          -> continue
+    """
     from build_silent_test_episode import build_silent_test_episode
     src_path = tmp_path / "src_ledger.json"
     src_path.write_text(json.dumps(_mini_source_ledger()), encoding="utf-8")
@@ -411,10 +513,12 @@ def test_build_silent_episode_first_clip_of_shot_is_shot_start(tmp_path: Path):
 
     seen_shots: set[str] = set()
     seen_beats_in_shot: dict[str, set[str]] = {}
+    seen_speakers_in_shot: dict[str, set[str]] = {}
     for ln in ledger["lines"]:
         sid = ln["shot_id"]
         bid = ln["boundary"]
         bb = ln["beat_id"]
+        sp = ln["speaker"]
 
         if sid not in seen_shots:
             assert bid == "shot_start", (
@@ -422,14 +526,25 @@ def test_build_silent_episode_first_clip_of_shot_is_shot_start(tmp_path: Path):
             )
             seen_shots.add(sid)
             seen_beats_in_shot[sid] = {bb}
+            seen_speakers_in_shot[sid] = {sp}
         elif bb not in seen_beats_in_shot[sid]:
-            assert bid == "beat_start", (
-                f"first clip of new beat {bb} (shot {sid}) should be beat_start, got {bid}"
-            )
+            # New beat in this shot -- depends on whether speaker is new
+            if sp in seen_speakers_in_shot[sid]:
+                assert bid == "beat_resume", (
+                    f"speaker {sp} returning in shot {sid} (beat {bb}) "
+                    f"should be beat_resume, got {bid}"
+                )
+            else:
+                assert bid == "beat_start", (
+                    f"first clip of new speaker {sp} in shot {sid} "
+                    f"(beat {bb}) should be beat_start, got {bid}"
+                )
             seen_beats_in_shot[sid].add(bb)
+            seen_speakers_in_shot[sid].add(sp)
         else:
             assert bid == "continue", (
-                f"continuing clip in beat {bb} (shot {sid}) should be continue, got {bid}"
+                f"continuing clip in beat {bb} (shot {sid}) should be "
+                f"continue, got {bid}"
             )
 
 
