@@ -400,7 +400,7 @@ def build_humo_prompt(
     Mirrors the HuMo subgraph wiring from
     workflows/otr_videoplan_TEST_humo.json (nodes 7..21):
 
-      UnetLoaderGGUF(humo Q5_K_M)
+      UNETLoader(HuMo 14B fp8 e4m3fn scaled, Kijai)
         -> LoraLoaderModelOnly(lightx2v)
           -> ModelSamplingSD3(shift=8)
             -> KSampler
@@ -437,11 +437,20 @@ def build_humo_prompt(
     )
 
     return {
-        # 7: UnetLoaderGGUF (Q5_K_M)
+        # 7: UNETLoader (HuMo 14B fp8 e4m3fn scaled — Kijai mirror)
+        # Production HuMo per ROADMAP Hardware Floor scoring (37.5/45 vs
+        # 17B fp8's 36/45). Validated in the RunningHub HuMo+InfiniteTalk
+        # A3 stack and tuned by Kijai for 16 GB cards.
+        # Fallbacks (per ROADMAP):
+        #   - "humo_17B_fp8_e4m3fn.safetensors" (UNETLoader) — 36/45, slower
+        #   - "Wan2_1-HuMo-17B_Q5_K_M.gguf" (UnetLoaderGGUF) — 30/45, smoke runs
         "7": {
-            "class_type": "UnetLoaderGGUF",
-            "inputs": {"unet_name": "Wan2_1-HuMo-17B_Q5_K_M.gguf"},
-            "_meta": {"title": "Load HuMo 17B Q5_K_M GGUF"},
+            "class_type": "UNETLoader",
+            "inputs": {
+                "unet_name": "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+                "weight_dtype": "default",
+            },
+            "_meta": {"title": "Load HuMo 14B fp8 e4m3fn scaled (Kijai)"},
         },
         # 8: LoraLoaderModelOnly (lightx2v)
         "8": {
