@@ -240,24 +240,31 @@ def main() -> int:
             {"name": "clip_count", "type": "INT",    "links": None, "shape": 3, "slot_index": 1},
             {"name": "report",     "type": "STRING", "links": None, "shape": 3, "slot_index": 2},
         ],
-        # widgets_values: ComfyUI's runtime DOES NOT include
-        # placeholders for widgets that have been converted to inputs
-        # (widget: key + non-None link in inputs[]). Earlier patcher
-        # versions wrote placeholders here and the values shifted by
-        # the placeholder count, producing "cfg got 'uni_pc'" / "scheduler
-        # got '480'" validation errors. Below: only ledger_json is
-        # link-converted (so its placeholder is omitted); portraits_dir
-        # is a real widget with link=None (placeholder stays as ""),
-        # so the auto-resolve branch fires.
+        # widgets_values: ComfyUI's prompt validator reads widget
+        # values by index from this list. Two non-obvious rules
+        # (BUG-LOCAL-079):
+        #   1. Placeholders for widget-converted-to-link inputs DO
+        #      stay in this list. ComfyUI expects them at their
+        #      slot; the link's runtime value overrides at execute().
+        #   2. ComfyUI auto-inserts a `control_after_generate`
+        #      companion widget after every INT widget named "seed".
+        #      Its value is one of randomize/fixed/increment/decrement.
+        #      That companion eats one slot in widgets_values that
+        #      isn't visible in INPUT_TYPES. Skip it and every widget
+        #      after seed shifts by +1.
         widgets_values=[
-            "",   # portraits_dir (real widget; "" -> node auto-resolve)
-            7.0,  # clip_length
-            0,    # max_clips (0 = unlimited)
-            7,    # seed
-            6,    # steps
-            1.0,  # cfg
-            "uni_pc", "simple",
-            480, 832,
+            "",            # [0] ledger_json placeholder (link wins)
+            "",            # [1] portraits_dir ("" -> node auto-resolve)
+            7.0,           # [2] clip_length
+            0,             # [3] max_clips
+            7,             # [4] seed
+            "randomize",   # [5] control_after_generate (seed companion)
+            6,             # [6] steps
+            1.0,           # [7] cfg
+            "uni_pc",      # [8] sampler_name
+            "simple",      # [9] scheduler
+            480,           # [10] width
+            832,           # [11] height
         ],
     )
     humo["inputs"][0]["link"] = _add_link(wf, sampling["id"],     0, humo["id"], 0, "MODEL")
@@ -296,16 +303,23 @@ def main() -> int:
             {"name": "final_mp4_path", "type": "STRING", "links": None, "shape": 3, "slot_index": 0},
             {"name": "report",         "type": "STRING", "links": None, "shape": 3, "slot_index": 1},
         ],
-        # widgets_values: omit placeholders for inputs that are
-        # widget-converted-to-link. All three (procgen_video_path,
-        # clips_dir, ledger_json) have link references, so their
-        # placeholders are NOT included. Only the 8 real widgets
-        # (blend_mode through ffmpeg) get values.
+        # widgets_values: ComfyUI keeps placeholders for converted
+        # inputs (procgen_video_path, clips_dir, ledger_json). Each
+        # at its INPUT_TYPES slot, link wins at runtime.
+        # No `seed` widget on this node so no control_after_generate
+        # companion to insert. 11 entries.
         widgets_values=[
-            "addition", 0.5,
-            1920, 1080, 25,
-            1080, 7.0,
-            "ffmpeg",
+            "",            # [0] procgen_video_path placeholder
+            "",            # [1] clips_dir placeholder
+            "",            # [2] ledger_json placeholder
+            "addition",    # [3] blend_mode
+            0.5,           # [4] blend_opacity
+            1920,          # [5] canvas_width
+            1080,          # [6] canvas_height
+            25,            # [7] canvas_fps
+            1080,          # [8] humo_target_height
+            7.0,           # [9] fallback_clip_length
+            "ffmpeg",      # [10] ffmpeg
         ],
     )
     composite["inputs"][0]["link"] = _add_link(wf, sig_video["id"], 0, composite["id"], 0, "STRING")

@@ -1,21 +1,26 @@
-"""Fix the widgets_values misalignment on OTR_BatchHumoRender and
-OTR_VideoComposite that the in-graph patcher emitted.
+"""Fix widgets_values on OTR_BatchHumoRender + OTR_VideoComposite.
 
-Symptom: ComfyUI rejects the prompt at validation with errors like
-    cfg, uni_pc, could not convert string to float: 'uni_pc'
-    sampler_name: 'simple' not in (list of length 44)
-    scheduler: '480' not in [...]
-because widgets_values has empty-string PLACEHOLDERS for inputs that
-were also wired via links (ledger_json, portraits_dir, procgen_video_path,
-clips_dir). ComfyUI's frontend treats the link as the source-of-truth
-and IGNORES the placeholder, but our placeholders shifted the rest of
-widgets_values up by 2 slots.
+After three rounds of empirical mismatch-debugging from ComfyUI's
+prompt validator (BUG-LOCAL-079 second pass), the actual rules are:
 
-Fix: remove the placeholders for any widget-as-input that has both a
-``widget: {...}`` key in inputs[] AND a non-None link. Leave widget
-values for unwired widgets in place.
+  1. Placeholders for widget-converted-to-link inputs DO stay in
+     widgets_values. ComfyUI's runtime expects them at their slot;
+     the link's runtime value overrides the placeholder. (Earlier
+     "fix" that dropped them was wrong.)
 
-Idempotent.
+  2. ComfyUI auto-inserts a ``control_after_generate`` companion
+     widget after every INT widget named ``seed``. Its value is one
+     of "randomize" / "fixed" / "increment" / "decrement". This
+     companion eats one slot in widgets_values that the patcher
+     never wrote, shifting every widget after seed by +1.
+
+This patcher:
+  - Restores the placeholders for converted inputs in
+    OTR_VideoComposite (3 placeholders dropped earlier).
+  - Inserts the missing ``control_after_generate`` companion after
+    seed in OTR_BatchHumoRender.
+
+Idempotent: re-running with the right widgets_values is no-op.
 """
 from __future__ import annotations
 
@@ -29,49 +34,54 @@ WF = REPO / "workflows" / "otr_scifi_16gb_full.json"
 
 
 def _fix_node(node: dict) -> tuple[bool, str]:
-    """Drop widgets_values placeholders for inputs that are
-    widget-converted-to-link (input has both `widget` key and a
-    non-None link). Returns (changed, summary)."""
+    """Rebuild widgets_values from the canonical truth for the two
+    OTR nodes we touched. Avoids fragile diff math against whatever
+    earlier fixes produced -- just produce the known-correct shape.
+    """
+    ntype = node.get("type")
     inputs = node.get("inputs") or []
-    widgets_values = node.get("widgets_values") or []
+    current = node.get("widgets_values") or []
 
-    # The widget order in widgets_values is the order of widget-typed
-    # inputs in INPUT_TYPES. Inputs in the inputs[] array that are
-    # links-only (no widget: key) DON'T occupy widget slots. Inputs
-    # that have BOTH widget: AND link DO occupy widget slots BUT
-    # ComfyUI ignores their widget value (the link wins).
-    #
-    # The correct widgets_values ordering is: only entries for inputs
-    # that are pure widgets (no link) AND for inputs that are
-    # widget-converted-to-link. Both kept, in INPUT_TYPES order.
-    # ComfyUI's renderer expects placeholders for converted inputs.
-    #
-    # OUR BUG: we wrote placeholders for converted inputs but
-    # ComfyUI's runtime is reading widgets_values WITHOUT the
-    # placeholders. Different versions of ComfyUI handle this
-    # differently. Pragmatic fix: drop the placeholder entries for
-    # converted-to-link inputs. The link will be honored for the
-    # value at runtime.
+    if ntype == "OTR_BatchHumoRender":
+        # Canonical widgets_values for BatchHumoRender (12 entries):
+        #   [0] ledger_json placeholder ("" — link wins)
+        #   [1] portraits_dir placeholder ("" — auto-resolve)
+        #   [2] clip_length          7.0
+        #   [3] max_clips            0
+        #   [4] seed                 7
+        #   [5] control_after_generate  "randomize"  (auto-companion to seed)
+        #   [6] steps                6
+        #   [7] cfg                  1.0
+        #   [8] sampler_name         "uni_pc"
+        #   [9] scheduler            "simple"
+        #   [10] width                480
+        #   [11] height               832
+        target = ["", "", 7.0, 0, 7, "randomize", 6, 1.0, "uni_pc", "simple", 480, 832]
+        if list(current) == target:
+            return (False, "already canonical")
+        node["widgets_values"] = target
+        return (True, f"rebuilt to canonical 12-slot ({len(current)} -> 12)")
 
-    # Identify how many leading placeholders to drop. We rely on the
-    # convention that the patcher placed converted-input placeholders
-    # at the START of widgets_values.
-    converted_count = 0
-    for inp in inputs:
-        if inp.get("widget") and inp.get("link") is not None:
-            converted_count += 1
+    if ntype == "OTR_VideoComposite":
+        # Canonical widgets_values for VideoComposite (11 entries):
+        #   [0] procgen_video_path placeholder ("" — link wins)
+        #   [1] clips_dir placeholder ("" — link wins)
+        #   [2] ledger_json placeholder ("" — link wins)
+        #   [3] blend_mode    "addition"
+        #   [4] blend_opacity 0.5
+        #   [5] canvas_width  1920
+        #   [6] canvas_height 1080
+        #   [7] canvas_fps    25
+        #   [8] humo_target_height 1080
+        #   [9] fallback_clip_length 7.0
+        #   [10] ffmpeg "ffmpeg"
+        target = ["", "", "", "addition", 0.5, 1920, 1080, 25, 1080, 7.0, "ffmpeg"]
+        if list(current) == target:
+            return (False, "already canonical")
+        node["widgets_values"] = target
+        return (True, f"rebuilt to canonical 11-slot ({len(current)} -> 11)")
 
-    if converted_count == 0:
-        return (False, "no converted-input placeholders to drop")
-    if len(widgets_values) <= converted_count:
-        return (False, f"widgets_values too short ({len(widgets_values)}) for {converted_count} drops")
-
-    # Drop the first `converted_count` placeholders.
-    new_widgets_values = list(widgets_values[converted_count:])
-    node["widgets_values"] = new_widgets_values
-    return (True,
-            f"dropped {converted_count} placeholder(s); "
-            f"widgets_values {len(widgets_values)} -> {len(new_widgets_values)}")
+    return (False, f"untargeted node type {ntype}")
 
 
 def main() -> int:
