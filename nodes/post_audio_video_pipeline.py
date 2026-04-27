@@ -226,12 +226,26 @@ class PostAudioVideoPipeline:
     Wire this into the FULL workflow downstream of
     OTR_SignalLostVideo / OTR_EpisodeAssembler so the HuMo batch +
     concat run automatically after audio is delivered.
+
+    OUTPUT_NODE = True is LOAD-BEARING (BUG-LOCAL-077):
+        ComfyUI's executor traces backward from OUTPUT_NODE-marked
+        nodes to determine which nodes to actually run. A node whose
+        outputs feed nothing downstream AND which is not flagged as
+        OUTPUT_NODE gets pruned silently from the execution graph.
+        This node is a side-effect-only trigger -- its outputs are
+        diagnostic strings the user reads in the ComfyUI console, not
+        wired to consumer nodes -- so it MUST self-declare as an
+        output node or it never fires. Discovered when the FULL
+        workflow ran 30 min (audio + FLUX) at 2026-04-27 09:54 and
+        node 44 was missing from the prompt's outputs dict despite
+        being in the graph.
     """
 
     CATEGORY = "OTR/v2/Pipeline"
     FUNCTION = "execute"
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("status", "log_path")
+    OUTPUT_NODE = True
 
     @classmethod
     def INPUT_TYPES(cls):

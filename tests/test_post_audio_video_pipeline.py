@@ -121,6 +121,19 @@ def test_node_class_attributes(m) -> None:
     assert cls.RETURN_NAMES == ("status", "log_path")
 
 
+def test_output_node_is_true_so_comfy_executor_does_not_prune(m) -> None:
+    """BUG-LOCAL-077: ComfyUI's execution graph pruner traces backward
+    from OUTPUT_NODE-marked nodes. A side-effect-only trigger node
+    whose outputs feed nothing downstream MUST self-declare as
+    OUTPUT_NODE = True or it gets silently dropped from the
+    execution graph. The first FULL workflow run on 2026-04-27 ran
+    audio + FLUX for 30 min and never fired this node because of
+    this missing flag. Pin it."""
+    cls = m.PostAudioVideoPipeline
+    assert getattr(cls, "OUTPUT_NODE", False) is True, \
+        "PostAudioVideoPipeline must have OUTPUT_NODE=True or it gets pruned"
+
+
 def test_input_types_shape(m) -> None:
     inp = m.PostAudioVideoPipeline.INPUT_TYPES()
     assert "required" in inp
