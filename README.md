@@ -23,6 +23,63 @@ Fully automated. Zero API keys. Drop into `custom_nodes/` and queue.
 
 ---
 
+## v2.0-alpha — Lip-synced video pipeline (active development on `v2.0-alpha` branch)
+
+v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** adds in-graph HuMo lip-sync per dialogue line, layered over the v1.7 proc gen base — full-episode mp4 with talking-head video on top of the audio-reactive CRT visualization. Shipping on the `v2.0-alpha` git branch; `main` stays at v1.7.
+
+### What's in the v2.0-alpha FULL workflow (`workflows/otr_scifi_16gb_full.json`)
+
+```
+Audio path (v1.7 unchanged):
+  Story (LLM) → Director (LLM) → SceneSequencer → AudioEnhance → EpisodeAssembler → SignalLostVideo
+  Output: signal_lost_<id>.mp4 — 1920x1080 audio-reactive CRT proc gen with 48 kHz audio embedded
+
+FLUX environment stills (v1.7 unchanged):
+  VideoPlan → ShotDurationCalculator → BatchFluxRender → UnloadAll → SaveImage
+  Output: full_env_*.png stills under output/otr/stills/
+
+NEW: HuMo loader chain
+  UNETLoader (HuMo 14B fp8 e4m3fn scaled) → LoraLoaderModelOnly (lightx2v) → ModelSamplingSD3 (shift=8)
+  CLIPLoader (umt5_xxl)
+  VAELoader (wan_2.1)
+  AudioEncoderLoader (whisper_large_v3_fp16)
+
+NEW: OTR_BatchHumoRender
+  Loads HuMo + Lora + CLIP + VAE + Whisper once per workflow execution. Loops every dialogue
+  line in the production ledger internally, renders per-line lip-sync clips at 480x832 portrait
+  via direct ComfyUI node calls. 7s default clip length, max_clips=0 for full episode.
+  Output: output/otr/videos/<ep_id>/<line_id>.mp4 (one mp4 per dialogue line)
+
+NEW: OTR_VideoComposite
+  Single ffmpeg invocation. Pillarboxes HuMo clips at 624x1080 center in 1920x1080 canvas,
+  additive-blends SignalLostVideo proc gen on top at 50% opacity, mux audio from proc gen.
+  Output: output/otr/episodes/<ep_id>/<ep_id>.mp4 — final 1080p deliverable
+```
+
+### Why in-graph (not subprocess)?
+
+Earlier v2.0-alpha builds (BUG-LOCAL-076) tried a subprocess pattern: a trigger node fired a PowerShell wrapper that called Python orchestrators. It worked but kept HuMo's progress hidden from ComfyUI's UI (the subprocess submitted prompts to `/prompt` API, but the *decision logic* — which line, what timing, what portrait — ran in a separate process the user couldn't see). Pivoted 2026-04-27 to in-graph nodes (BUG-LOCAL-078) so progress is visible in ComfyUI's KSampler progress bars and the workflow JSON is a single self-contained source of truth.
+
+The CLI scripts (`scripts/render_humo_batch.py`, `scripts/render_episode_concat.py`, `scripts/test_humo_batch_concat.ps1`) remain in the repo as ad-hoc smoke tools — useful for testing HuMo on a single episode without queueing the full workflow — but the production path is in-graph.
+
+### v2.0-alpha quick test
+
+1. `git checkout v2.0-alpha` in your `custom_nodes/ComfyUI-OldTimeRadio/` directory
+2. Drag `workflows/otr_scifi_16gb_full.json` into ComfyUI
+3. Queue prompt
+4. Wait ~3-4 hours for a 5-min episode (audio + FLUX stills are minutes; HuMo per-line is ~265s × N lines)
+5. Final mp4 lands at `output/otr/episodes/<episode_id>/<episode_id>.mp4`
+
+### v2.0-alpha known gaps (planned, not blocking)
+
+- **Real PASS1 character portraits not rendered** — HuMo currently uses FLUX environment stills as visual stand-ins because no node renders character portraits. Faces in the composite will be visually wrong per line; pipeline runs end-to-end. Real fix is wiring a second BatchFluxRender invocation to `VideoPlan.pass1_char_prompts_json`.
+- **Per-line audio-aligned timing** — HuMo overlays chain back-to-back from t=0 instead of matching real speech windows. Visual lip-sync is desynced from audio. Fix requires SceneSequencer to populate per-line `start_s` in the ledger.
+- **Optional 4K upscale** — `scripts/render_upscale_batch.py` (SeedVR2 3B fp16) ships but isn't yet wired as a Phase 2.5 / Phase 4 node in the v2.0-alpha workflow. CLI invocation works for ad-hoc per-clip or per-final upscale.
+
+See `ROADMAP.md` for the full v2.0-alpha P1 build sequence and `docs/BUG_LOG.md` BUG-LOCAL-074 through BUG-LOCAL-078 for the architectural history.
+
+---
+
 ## What It Does
 
 "SIGNAL LOST" fetches today's real science headlines via RSS, then triggers a multi-stage **Model-Independent LLM** chain to write a refined sci-fi radio drama. Supports **Captain-Eris-Violet** (v2.0-alpha default — dialogue-first RP fine-tune of Mistral-Nemo with strong character voice), **Mistral Nemo 12B** (validated fallback), **Gemma 2/4** variants, and other Hugging Face models out of the box. Each episode randomly draws from 12 proven story arc templates — Shakespeare tragedies, Twilight Zone twists, and more.

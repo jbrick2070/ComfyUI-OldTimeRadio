@@ -76,81 +76,102 @@ Key finding (real, not a regression):
 
 ---
 
-## v2.0-alpha P1 — End-to-end delivery chain (current focus)
+## v2.0-alpha P1 — End-to-end delivery chain (in-graph batch architecture, current focus)
 
-Post-process orchestrators between the FULL workflow's audio output and the final 1080p HuMo+procgen composite. Version target is **v2.0-alpha** (NOT v2.5 — Jeffrey explicit). Updated 2026-04-27 after BUG-LOCAL-074/075/076 shipped + the additive-blend-on-procgen architecture was locked.
+Production HuMo + composite work runs as **visible nodes inside `otr_scifi_16gb_full.json`** -- no subprocess, no hidden orchestrator. Version target is **v2.0-alpha** (NOT v2.5 -- Jeffrey explicit). Architecture pivoted 2026-04-27 from the BUG-076 subprocess pattern (OTR_PostAudioVideoPipeline + test_humo_batch_concat.ps1 + render_humo_batch.py) to in-graph nodes after Jeffrey called the subprocess design "hidden": "humo batching should happen in node in workflow not some hidden thing".
 
-### Architecture as locked 2026-04-27
+### Architecture as locked 2026-04-27 (in-graph)
 
 ```
-FULL workflow (otr_scifi_16gb_full.json)
-  ├─ Audio path → episode mp4 (1920x1080, audio-reactive CRT proc gen via OTR_SignalLostVideo)
-  ├─ FLUX environment stills (BatchFluxRender → SaveImage)
-  └─ OTR_PostAudioVideoPipeline node fires test_humo_batch_concat.ps1 as fire-and-forget subprocess
-       │
-       └─ Wrapper phases:
-           Phase 1: portraits (skipped via -SkipPass1 since pass1 portraits exist on disk)
-           Phase 2:  render_humo_batch.py             [SHIPPED — BUG-074]
-                       └─ per-line HuMo lip-sync clips at 480x832 portrait, 25 fps
-           Phase 2.5: render_upscale_batch.py × N      [TODO — opt-in via --upscale-clips]
-                       └─ SeedVR2 3B fp16, --resolution 624, per HuMo clip
-                       └─ output: 624x1081 upscaled clips next to native 480x832
-           Phase 3:  render_episode_concat.py REWRITE  [TODO — replaces concat-only logic]
-                       ├─ Read SignalLostVideo proc gen mp4 as full-episode base layer
-                       ├─ Build black 1920x1080x25fps canvas of episode duration
-                       ├─ Overlay HuMo clips (upscaled if Phase 2.5 ran, else lanczos-fit)
-                       │  centered at x=648, y=0, with width=624 at HuMo's 1080 height
-                       │  enable='between(t,start_s,start_s+dur_s)' per ledger line
-                       ├─ Blend proc gen on top: blend=all_mode=addition:all_opacity=0.5
-                       ├─ Map audio from proc gen mp4 (already has 313s episode audio)
-                       └─ Write .vtt sidecar from ledger.lines[].text
-           Phase 4:  optional 4K final                  [TODO — opt-in via --upscale-final]
-                       └─ render_upscale_batch.py on the composite mp4, --resolution 2160
+FULL workflow (otr_scifi_16gb_full.json -- 25 nodes, 41 links post-pivot)
+  │
+  ├─ Audio path (unchanged)
+  │   Story → Director → SceneSequencer → AudioEnhance → EpisodeAssembler → SignalLostVideo
+  │   Output: signal_lost_<id>.mp4 at 1920x1080, audio-reactive CRT proc gen + AAC 48 kHz audio embedded
+  │
+  ├─ FLUX environment stills (unchanged)
+  │   VideoPlan → ShotDurationCalculator → BatchFluxRender → UnloadAll → SaveImage
+  │   Output: full_env_*.png at output/otr/stills/  (used as PASS1 portrait stand-ins per BUG-078)
+  │
+  ├─ NEW HuMo loader chain (cold-loads HuMo model family)
+  │   UNETLoader (Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors)
+  │      → LoraLoaderModelOnly (lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16)
+  │         → ModelSamplingSD3 (shift=8)                              ─┐
+  │   CLIPLoader (umt5_xxl_fp8_e4m3fn_scaled, type=wan)               ─┤
+  │   VAELoader (wan_2.1_vae.safetensors)                             ─┤
+  │   AudioEncoderLoader (whisper_large_v3_fp16.safetensors)          ─┤
+  │                                                                     ↓
+  ├─ NEW OTR_BatchHumoRender                       [SHIPPED — BUG-078]
+  │   Single execute() call. Loads HuMo + Lora + CLIP + VAE + Whisper once,
+  │   loops every ledger line internally, renders per-line lip-sync clips
+  │   via direct ComfyUI node calls (CLIPTextEncode / KSampler / VAEDecode /
+  │   WanHuMoImageToVideo / AudioEncoderEncode / CreateVideo / SaveVideo).
+  │   Per-line clip is renamed from SaveVideo's humo_<line_id>_NNNNN_.mp4
+  │   to canonical <line_id>.mp4 in-place (BUG-074 / BUG-075 convention).
+  │   • clip_length=7.0 (HuMo sweet spot at length=175 -> 177 frames @ 25 fps = 7.08s actual)
+  │   • max_clips=0 (unlimited; smoke test caps with positive int)
+  │   • OUTPUT_NODE=True per BUG-077 lesson (without it, executor prunes silently)
+  │   Output: output/otr/videos/<ep_id>/<line_id>.mp4 (per ledger line)
+  │
+  └─ NEW OTR_VideoComposite                         [SHIPPED — BUG-078]
+      Single ffmpeg invocation. Reads SignalLostVideo's mp4 as audio-reactive CRT base
+      + audio source. Pillarboxes HuMo clips at 624x1080 center in 1920x1080 canvas,
+      additive-blends proc gen on top at 50% opacity, maps audio from proc gen mp4.
+      No separate audio mux step.
+      Output: output/otr/episodes/<ep_id>/<ep_id>.mp4
 ```
 
 ### Composition geometry (locked)
 
 - Final canvas: **1920x1080** at **25 fps**
-- HuMo center pane: **624x1080** (480x832 → 624x1081 via SeedVR2 or lanczos, then crop 1px)
+- HuMo center pane: **624x1080** (HuMo native 480x832 portrait → lanczos-scale to 1080 height)
 - Pillarbox sides: **648 + 648 = 1296px** filled by SignalLostVideo proc gen
 - Blend over HuMo: proc gen at `all_mode=addition`, `all_opacity=0.5`
   - black pixels of proc gen contribute zero (additive identity), HuMo face stays clean
-  - bright CRT waveform/spectrum bars glow over HuMo and continue across pillarbox wings
+  - bright CRT waveform/spectrum bars glow over HuMo face during dialogue
+  - and continue across pillarbox wings during silence (where HuMo isn't present)
 - Audio: from SignalLostVideo proc gen mp4 (48 kHz AAC, full episode), do NOT separately mux
+- blend_mode dropdown supports addition / screen / lighten / overlay / normal for A/B
 
 ### Per-line timing source
 
-Ledger lines do not yet carry `dur_s` reliably (SceneSequencer-populated only). Workaround in Phase 3:
-- For each line, ffprobe its `bark_wav_path` to get actual duration
-- Build cumulative `start_s` by summing prior lines' dur_s
-- Use those as the `between(t,X,Y)` window per HuMo clip overlay
+Ledger lines do not yet carry `dur_s` reliably (SceneSequencer-populated only). Fallback chain in `OTR_VideoComposite._build_clip_timeline`:
+1. `ledger.lines[].dur_s` if positive
+2. ffprobe the actual rendered `<line_id>.mp4` for true duration
+3. fallback `clip_length` (default 7.0s)
 
-When SceneSequencer fully populates per-line timing, the ffprobe step becomes a fallback.
+Cumulative `start_s` is the sum of prior `dur_s` -- HuMo clips chain back-to-back from t=0. Real audio-aligned timing requires SceneSequencer to populate per-line `start_s` (separate work item).
+
+### What's retired
+
+- `OTR_PostAudioVideoPipeline` node (subprocess trigger, BUG-076) -- removed from FULL workflow JSON, class kept registered with title suffix "(retired)" for back-compat with old JSONs.
+- `scripts/test_humo_batch_concat.ps1` (PowerShell wrapper) -- still works for ad-hoc smoke testing via CLI; not invoked from the FULL workflow.
+- `scripts/render_humo_batch.py` (subprocess orchestrator) -- still works for ad-hoc smoke; not invoked from the FULL workflow. The 7s clip-length logic, BUG-074 fixes, daisy-chain mechanic all now live INSIDE `OTR_BatchHumoRender`.
+- `scripts/render_episode_concat.py` (subprocess concat) -- ditto. Composite logic now in `OTR_VideoComposite`.
 
 ### Pending work (in build order)
 
-1. **render_episode_concat.py rewrite** — replace concat-and-mux with the layered overlay+additive-blend recipe above. Inputs: proc gen mp4 + N HuMo clips + ledger. Output: 1920x1080 final mp4 at `output/otr/episodes/<id>/<id>.mp4`. Single ffmpeg invocation. Per-line timing via ffprobe-on-bark-wav fallback.
-2. **`--upscale-clips` switch in `test_humo_batch_concat.ps1`** — Phase 2.5 SeedVR2 loop (45 clips × ~30s ≈ 22 min surcharge). Default off so smoke runs stay fast.
-3. **`upscale_clips: BOOLEAN` widget on OTR_PostAudioVideoPipeline node** — flips the wrapper switch from the workflow JSON. Default false.
-4. **Concat phase prefers `upscaled_l*.mp4` over `l*.mp4`** when both present, falls back when upscale didn't run.
-5. **Optional Phase 4 — final 4K upscale** of the 1920x1080 composite. Single SeedVR2 pass at `--resolution 2160`. Opt-in.
+1. **Real PASS1 portrait render path** -- currently `_find_portrait` falls through to `full_env_*.png` (FLUX env stills) as visual stand-ins because no node renders character portraits to disk. Requires either (a) generalizing BatchFluxRender to accept any token type filter, then wiring a second invocation to `VideoPlan.pass1_char_prompts_json` with a SaveImage prefix targeting `otr/stills/pass1_portrait_*.png`; or (b) a sibling `OTR_BatchFluxPortraitRender` node. Without this, faces in the composite are visually wrong (env stills as character placeholders).
+2. **Real audio-aligned per-line timing** -- requires SceneSequencer to populate `lines[].start_s` and `lines[].dur_s` from the assembled audio timeline. Currently those fields are null in the ledger. With them populated, `OTR_VideoComposite` can position HuMo overlays at real speech windows instead of cumulative-from-zero.
+3. **`upscale_clips: BOOLEAN` toggle on OTR_BatchHumoRender** -- when on, run SeedVR2 3B fp16 (`render_upscale_batch.py` already shipped) on each clip at `--resolution 624` before the move-rename step. ~22 min GPU surcharge for sharper face detail in the pillarbox center pane.
+4. **Optional 4K final pass** -- second OTR_VideoComposite invocation OR a Phase 4 SeedVR2 pass on the 1920x1080 composite at `--resolution 2160`.
 
-### Superseded design (kept for context, do NOT build)
+### Superseded designs (kept for context, do NOT build)
 
-The earlier "render_compose_frame.py" plan with vintage radio cabinet PNG + filament glow + analog VU needles is **SUPERSEDED** by this architecture. The cabinet/glow/VU aesthetic is now delivered by SignalLostVideo's audio-reactive CRT proc gen video (already shipped, runs as part of the FULL workflow). The cabinet PNG layer / per-frame VU needle compositing is no longer needed because the proc gen base layer carries that visual character natively, the additive blend overlay puts it on top of HuMo, and SeedVR2 handles the upscale.
-
-Rationale for the pivot: SignalLostVideo's `_CRTRenderer` + `_TelemetryHUDRenderer` already produces the period-authentic audio-reactive visual layer (waveform mirror + frequency bars + telemetry HUD). Building a separate render_compose_frame.py would duplicate that work in a different code path. Single-source-of-truth wins.
+- The earlier `render_compose_frame.py` plan with vintage radio cabinet PNG + filament glow + analog VU needles is SUPERSEDED. SignalLostVideo's `_CRTRenderer` + `_TelemetryHUDRenderer` already produces the period-authentic audio-reactive layer; the additive blend in OTR_VideoComposite puts it on top of HuMo. Single source of truth.
+- The subprocess pattern (BUG-076 OTR_PostAudioVideoPipeline + wrapper script + render_humo_batch.py orchestrator) is SUPERSEDED by the in-graph nodes (BUG-078). Subprocess script remains as a CLI smoke tool but the production path is in-graph.
 
 ### Cost estimates (Storms-Sentience-sized, 45 lines, 313s episode)
 
-- HuMo render (Phase 2): ~265s × 45 = **~3h20m GPU**
-- AI upscale per clip (Phase 2.5, opt-in): ~30s × 45 = **~22m GPU**
-- ffmpeg composite (Phase 3): **~1-2 min CPU** (single pass, no GPU)
-- Optional 4K upscale (Phase 4): **~10-15 min GPU**
+- Audio path: ~5-10 min CPU+GPU (LLM + Bark + Kokoro + MusicGen + AudioGen + assemble + SignalLostVideo encode)
+- FLUX env stills: ~5-10 min GPU (currently 13 shots @ ~26s/shot batched)
+- HuMo cold load: ~30-60s GPU one-time per workflow run
+- HuMo per-line render: ~265s/clip × 45 = **~3h20m GPU**
+- ffmpeg composite: **~1-2 min CPU** (single pass, no GPU)
+- Optional Phase 4 4K upscale: ~10-15 min GPU
 
-Without Phase 2.5: ~3h22m for 1080p deliverable.
-With Phase 2.5: ~3h44m for sharper 1080p.
-Add Phase 4: ~3h57m for 4K.
+Total without optional upscale: **~4h end-to-end** for a 5-min episode.
+With optional 4K final pass: ~4h15m.
 
 ---
 
