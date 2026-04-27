@@ -370,17 +370,19 @@ _BARK_HEALTH_CHECKED = False
 _BARK_HEALTH_DISABLED = set()
 
 
-def _bark_health_check():
-    """Run a 1-second synthesis test on every active en_speaker_* preset.
+def _bark_test_presets(presets_to_test):
+    """Run a 1-second synthesis test on each given Bark preset.
 
-    Mutates the module-level _VOICE_PROFILES, _ANNOUNCER_PRESETS, and
-    _LEMMY_PROFILE to remove any preset that fails. Idempotent - only
-    runs the first time it's called.
+    Pure helper: no global state mutation, no idempotency flag. Returns
+    (passed: set, disabled: set, reason: str | None). Reason is non-None
+    only on a "skip everything" outcome (Bark unimportable / probe failed).
+
+    Used by both the legacy full-catalog `_bark_health_check()` and the
+    new lazy cast-only `_bark_health_check_for_cast()`.
     """
-    global _BARK_HEALTH_CHECKED, _VOICE_PROFILES, _ANNOUNCER_PRESETS, _LEMMY_PROFILE
-    if _BARK_HEALTH_CHECKED:
-        return
-    _BARK_HEALTH_CHECKED = True
+    if not presets_to_test:
+        return set(), set(), None
+    presets_to_test = sorted(set(presets_to_test))
 
     try:
         import numpy as np
@@ -389,27 +391,20 @@ def _bark_health_check():
     except ImportError as e:
         log.info("[VoiceHealth] Bark not importable (%s) - skipping health check", e)
         _runtime_log(f"VOICE_HEALTH_SKIPPED: bark unavailable ({e})")
-        return
+        return set(), set(), f"bark unavailable ({e})"
 
-    log.info("[VoiceHealth] Running 1-second Bark health check on English presets...")
-    _runtime_log("VOICE_HEALTH: Starting Bark preset health check")
-
-    presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
-                              {p for p, _ in _ANNOUNCER_PRESETS} |
-                              {_LEMMY_PROFILE["voice_preset"]})
-
-    # -- Quick smoke test on a single preset BEFORE the full sweep --
+    # Smoke test on a single preset before the full sweep -- catches
+    # "Bark itself is broken" early so we don't mark every preset failed.
     try:
         model, processor = _load_bark(device="cuda")
         _probe, _ = _generate_single_line("Test.", presets_to_test[0], model, processor, temperature=0.6)
     except Exception as e:
-        log.warning("[VoiceHealth] Bark probe failed (%s) - Bark itself appears broken, "
-                    "skipping per-preset check and leaving all voices enabled", e)
-        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark probe failed ({e}) - all presets left enabled")
-        return
+        log.warning("[VoiceHealth] Bark probe failed (%s) - leaving presets untested", e)
+        _runtime_log(f"VOICE_HEALTH_SKIPPED: bark probe failed ({e})")
+        return set(presets_to_test), set(), f"probe failed ({e})"
 
     test_text = "Testing one two three."
-    disabled = set()
+    passed, disabled = set(), set()
     for preset in presets_to_test:
         t0 = time.time()
         try:
@@ -420,13 +415,41 @@ def _bark_health_check():
                 raise ValueError("NaN/Inf in output")
             if float(np.max(np.abs(arr))) < 1e-4:
                 raise ValueError("silent output")
+            passed.add(preset)
             log.info("[VoiceHealth] %s OK (%.1fs)", preset, time.time() - t0)
             _runtime_log(f"VOICE_HEALTH_OK: {preset} ({time.time()-t0:.1f}s)")
         except Exception as e:
             disabled.add(preset)
-            log.warning("[VoiceHealth] %s FAILED: %s - disabling for session", preset, e)
+            log.warning("[VoiceHealth] %s FAILED: %s", preset, e)
             _runtime_log(f"VOICE_HEALTH_DISABLED: {preset} - {e}")
+    return passed, disabled, None
 
+
+def _bark_health_check():
+    """LEGACY: full-catalog Bark warmup + global pool mutation.
+
+    Tests every active en_speaker_* preset and removes failed presets
+    from `_VOICE_PROFILES`, `_ANNOUNCER_PRESETS`, and `_LEMMY_PROFILE`.
+    Idempotent: runs only on the first call per process.
+
+    NOTE: As of 2026-04-26 PM the orchestrator no longer calls this from
+    `LLMDirector.direct()`; the new lazy `_bark_health_check_for_cast()`
+    runs after cast assignment instead. This function is kept exported
+    for any external caller and as a manual catalog-validation tool.
+    """
+    global _BARK_HEALTH_CHECKED, _VOICE_PROFILES, _ANNOUNCER_PRESETS, _LEMMY_PROFILE
+    if _BARK_HEALTH_CHECKED:
+        return
+    _BARK_HEALTH_CHECKED = True
+
+    log.info("[VoiceHealth] Running 1-second Bark health check on full catalog...")
+    _runtime_log("VOICE_HEALTH: Starting full-catalog Bark preset health check")
+    presets_to_test = sorted({vp[0] for vp in _VOICE_PROFILES} |
+                              {p for p, _ in _ANNOUNCER_PRESETS} |
+                              {_LEMMY_PROFILE["voice_preset"]})
+    _, disabled, reason = _bark_test_presets(presets_to_test)
+    if reason:
+        return
     if disabled:
         _BARK_HEALTH_DISABLED.update(disabled)
         _VOICE_PROFILES[:] = [vp for vp in _VOICE_PROFILES if vp[0] not in disabled]
@@ -441,6 +464,86 @@ def _bark_health_check():
         _runtime_log(f"VOICE_HEALTH: {len(disabled)} preset(s) disabled, {len(_VOICE_PROFILES)} remain")
     else:
         _runtime_log(f"VOICE_HEALTH: All {len(presets_to_test)} presets passed")
+
+
+def _bark_health_check_for_cast(cast_rows):
+    """LAZY: validate only the Bark presets the cast actually uses.
+
+    Trades a one-time ~120s full-catalog warmup at Director start for a
+    ~5-25s targeted check after Director assigns voices. On any preset
+    failure, swaps the cast row's voice_preset for a known-good fallback
+    of the same gender from `_VOICE_PROFILES` and records the swap.
+
+    Mutates cast_rows IN PLACE; returns the list (same object) for
+    chainability. Kokoro voices (`bm_*` / `am_*` / `bf_*` / `af_*`) are
+    skipped because Kokoro has its own loader path.
+    """
+    if not cast_rows:
+        return cast_rows or []
+
+    # Extract distinct Bark presets the cast actually uses
+    bark_voices_in_cast = set()
+    for r in cast_rows:
+        vp = r.get("voice_preset") or ""
+        if isinstance(vp, str) and vp.startswith("v2/"):
+            bark_voices_in_cast.add(vp)
+
+    if not bark_voices_in_cast:
+        _runtime_log("VOICE_HEALTH_LAZY: cast has no Bark presets (Kokoro-only?); skipped")
+        return cast_rows
+
+    log.info("[VoiceHealth] Lazy cast check on %d preset(s): %s",
+             len(bark_voices_in_cast), sorted(bark_voices_in_cast))
+    _runtime_log(f"VOICE_HEALTH_LAZY: testing {len(bark_voices_in_cast)} cast preset(s)")
+    _, disabled, reason = _bark_test_presets(sorted(bark_voices_in_cast))
+    if reason:
+        # Bark not importable or probe failed -- leave cast alone, BatchBark
+        # will surface the issue at generation time as it always has.
+        return cast_rows
+    if not disabled:
+        _runtime_log(f"VOICE_HEALTH_LAZY: all {len(bark_voices_in_cast)} cast preset(s) passed")
+        return cast_rows
+
+    # Re-assign each disabled preset to a fallback voice from the same
+    # gender pool, avoiding duplicates within the cast where possible.
+    in_use = {r.get("voice_preset") for r in cast_rows if r.get("voice_preset")}
+    log.warning("[VoiceHealth] %d cast preset(s) failed; remapping",
+                len(disabled))
+    for row in cast_rows:
+        vp = row.get("voice_preset") or ""
+        if vp not in disabled:
+            continue
+        gender = (row.get("gender") or "").lower()
+        # Prefer same-gender survivors not already used by another cast row
+        candidates = [pp for pp, gg in _VOICE_PROFILES
+                      if pp not in disabled
+                      and pp not in _BARK_HEALTH_DISABLED
+                      and (not gender or gg == gender)
+                      and pp not in in_use]
+        # Fallback 1: same gender, even if already in use
+        if not candidates and gender:
+            candidates = [pp for pp, gg in _VOICE_PROFILES
+                          if pp not in disabled
+                          and pp not in _BARK_HEALTH_DISABLED
+                          and gg == gender]
+        # Fallback 2: any surviving voice
+        if not candidates:
+            candidates = [pp for pp, gg in _VOICE_PROFILES
+                          if pp not in disabled and pp not in _BARK_HEALTH_DISABLED]
+        if not candidates:
+            log.error("[VoiceHealth] no fallback available for cast row %s; voice_preset stays %s",
+                      row.get("name"), vp)
+            _runtime_log(f"VOICE_HEALTH_LAZY: no fallback available for {row.get('name')}; preset {vp} retained (BatchBark will fail)")
+            continue
+        new_vp = candidates[0]
+        log.warning("[VoiceHealth] %s remapped: %s -> %s (gender=%s)",
+                    row.get("name") or "(unnamed)", vp, new_vp, gender or "any")
+        _runtime_log(f"VOICE_HEALTH_LAZY: remap {row.get('name')} {vp} -> {new_vp}")
+        row["voice_preset"] = new_vp
+        in_use.discard(vp)
+        in_use.add(new_vp)
+    _BARK_HEALTH_DISABLED.update(disabled)
+    return cast_rows
 
 # -----------------------------------------------------------------------------
 # LOG CLEANUP - compliant fixes handle most warnings at the source.
@@ -7851,12 +7954,15 @@ class LLMDirector:
         global _CURRENT_LLM_MODEL
         model_id = _CURRENT_LLM_MODEL
 
-        # Defer Bark health check until AFTER the script is written,
-        # preventing Bark from hogging VRAM while Gemma writes the script.
-        try:
-            _bark_health_check()
-        except Exception as e:
-            _runtime_log(f"VOICE_HEALTH_SKIPPED: unexpected error {e}")
+        # 2026-04-26 PM ARCH CHANGE: voice health check is now lazy --
+        # `_bark_health_check_for_cast()` runs AFTER cast assignment with
+        # only the cast's Bark presets, replacing the prior eager full-
+        # catalog warmup that tested all 10 en_speaker_* presets ~120s.
+        # Net effect: ~95s removed from first-run-after-Comfy-boot,
+        # +25s added to every queue (one-time bark load amortised across
+        # the queue's audio render anyway). The new lazy check also
+        # remaps cast rows to known-good fallbacks on individual preset
+        # failure, so a single bad voice no longer corrupts a render.
 
         # v1.4 Theme C - resolve series bible (read-only).
         try:
@@ -8120,6 +8226,15 @@ class LLMDirector:
             # STANLEARY ratio=0.875). We merge with a clear winner-rule
             # so downstream Bark voicing lands on the speaking row.
             existing_cast = _consolidate_similar_cast_rows(existing_cast)
+            # 2026-04-26 PM ARCH: lazy Bark health check on the cast's
+            # actual Bark presets only -- replaces the eager full-catalog
+            # warmup that used to run at the top of direct(). Failed
+            # presets are remapped in-place to known-good fallbacks of
+            # the same gender from `_VOICE_PROFILES`.
+            try:
+                existing_cast = _bark_health_check_for_cast(existing_cast)
+            except Exception as e:
+                _runtime_log(f"VOICE_HEALTH_LAZY_SKIPPED: unexpected error {e}")
             led.set_cast(existing_cast)
 
             # Scenes + shots: visual_plan.scenes carries per-scene
