@@ -1393,7 +1393,6 @@
       },
       "widgets_values": [
         "",
-        "",
         7.0,
         0,
         7,
@@ -1468,9 +1467,6 @@
         "Node name for S&R": "OTR_VideoComposite"
       },
       "widgets_values": [
-        "",
-        "",
-        "",
         "addition",
         0.5,
         1920,

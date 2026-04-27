@@ -240,12 +240,17 @@ def main() -> int:
             {"name": "clip_count", "type": "INT",    "links": None, "shape": 3, "slot_index": 1},
             {"name": "report",     "type": "STRING", "links": None, "shape": 3, "slot_index": 2},
         ],
-        # widget order matches INPUT_TYPES required:
-        # ledger_json, portraits_dir, clip_length, max_clips, seed,
-        # steps, cfg, sampler_name, scheduler, width, height
+        # widgets_values: ComfyUI's runtime DOES NOT include
+        # placeholders for widgets that have been converted to inputs
+        # (widget: key + non-None link in inputs[]). Earlier patcher
+        # versions wrote placeholders here and the values shifted by
+        # the placeholder count, producing "cfg got 'uni_pc'" / "scheduler
+        # got '480'" validation errors. Below: only ledger_json is
+        # link-converted (so its placeholder is omitted); portraits_dir
+        # is a real widget with link=None (placeholder stays as ""),
+        # so the auto-resolve branch fires.
         widgets_values=[
-            "",   # ledger_json (overridden by link below)
-            "",   # portraits_dir (overridden by link OR auto-resolve)
+            "",   # portraits_dir (real widget; "" -> node auto-resolve)
             7.0,  # clip_length
             0,    # max_clips (0 = unlimited)
             7,    # seed
@@ -291,12 +296,12 @@ def main() -> int:
             {"name": "final_mp4_path", "type": "STRING", "links": None, "shape": 3, "slot_index": 0},
             {"name": "report",         "type": "STRING", "links": None, "shape": 3, "slot_index": 1},
         ],
-        # Widget order matches INPUT_TYPES:
-        # procgen_video_path, clips_dir, ledger_json, blend_mode,
-        # blend_opacity, canvas_width, canvas_height, canvas_fps,
-        # humo_target_height, fallback_clip_length, ffmpeg
+        # widgets_values: omit placeholders for inputs that are
+        # widget-converted-to-link. All three (procgen_video_path,
+        # clips_dir, ledger_json) have link references, so their
+        # placeholders are NOT included. Only the 8 real widgets
+        # (blend_mode through ffmpeg) get values.
         widgets_values=[
-            "", "", "",
             "addition", 0.5,
             1920, 1080, 25,
             1080, 7.0,
