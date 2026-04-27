@@ -127,11 +127,24 @@ _NODE_MODULES = {
     # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
     "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),
     # v2.0 post-audio video pipeline trigger -- fires HuMo batch + concat
-    # in a subprocess after the audio path produces a ledger. Wire this
-    # into the FULL workflow downstream of OTR_SignalLostVideo /
-    # OTR_EpisodeAssembler so the per-line lip-sync + concat run
-    # automatically without a manual PowerShell paste.
-    "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline"),
+    # in a subprocess after the audio path produces a ledger. RETIRED
+    # in favour of in-graph batch nodes (OTR_BatchHumoRender +
+    # OTR_VideoComposite) that keep all production work inside the
+    # workflow JSON. Kept registered so any old workflow JSON that
+    # still references it loads without error; new builds should not
+    # use it.
+    "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline (retired)"),
+    # v2.0 in-graph batch HuMo lip-sync renderer. Loads HuMo + Lora +
+    # CLIP + VAE + Whisper once, loops every ledger line internally,
+    # writes per-line clips at output/otr/videos/<ep_id>/<line_id>.mp4.
+    # Replaces scripts/render_humo_batch.py for production use; the
+    # CLI script stays as an ad-hoc smoke tool.
+    "OTR_BatchHumoRender":         (".nodes.batch_humo_render", "BatchHumoRender", " Batch HuMo Render"),
+    # v2.0 in-graph episode compositor. Pillarbox HuMo center 624x1080
+    # in 1920x1080 canvas + additive-blend SignalLostVideo proc gen at
+    # 50% opacity + audio mux from proc gen. Single ffmpeg invocation.
+    # Replaces scripts/render_episode_concat.py for production use.
+    "OTR_VideoComposite":          (".nodes.video_composite", "VideoComposite", " Video Composite (1080p)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
