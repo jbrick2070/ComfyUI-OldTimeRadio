@@ -116,9 +116,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--clip-length",
         type=float,
-        default=3.88,
-        help="HuMo clip duration in seconds (matches WanHuMo length=97 "
-        "@ 25 fps = 3.88s).",
+        default=7.0,
+        help="HuMo clip duration in seconds. Default 7.0 lands at 175 "
+        "frames -> 177 (clamped by Wan 2.1 VAE 4n+1 rule = 7.08s "
+        "actual). HuMo's empirical sweet spot on RTX 5080 16 GB at "
+        "640x640 fp8. Older runs used 3.88s (length=97); 7.0s is "
+        "twice the line density per clip and matches Jeffrey's "
+        "FULL-workflow spec. NOTE: when --auto-slice is set to a "
+        "different value, the audio stride uses --auto-slice but the "
+        "audio window per clip is hardcoded to --clip-length below "
+        "(line ~749), which means --auto-slice and --clip-length "
+        "must match to avoid overlap or gaps. The wrapper "
+        "test_humo_batch_concat.ps1 passes -AutoSlice 7.0 to keep "
+        "them aligned by default.",
     )
     p.add_argument(
         "--max-clips",

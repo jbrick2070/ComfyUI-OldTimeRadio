@@ -25,7 +25,12 @@ param(
                                             # NOTE: first-per-scene needs lines[*].shot_id populated; ledger
                                             # currently nulls those out, so default to 'all' for safety
     [int]$MaxClips = 4,                     # smoke default: 4 clips. set 0 for unlimited (full episode)
-    [double]$AutoSlice = 3.88,              # auto-slice master WAV when lines lack timing
+    [double]$AutoSlice = 7.0,               # auto-slice master WAV when lines lack timing.
+                                            # Default bumped from 3.88 to 7.0 per BUG-LOCAL-076 /
+                                            # FULL-workflow spec: 7.0s clips give twice the line
+                                            # density per clip and match HuMo's 7.08s ceiling.
+                                            # Must match render_humo_batch.py --clip-length to
+                                            # avoid stride/window overlap or gaps.
     [switch]$DryRun
 )
 

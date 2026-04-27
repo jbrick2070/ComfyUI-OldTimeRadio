@@ -126,6 +126,12 @@ _NODE_MODULES = {
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
     # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
     "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),
+    # v2.0 post-audio video pipeline trigger -- fires HuMo batch + concat
+    # in a subprocess after the audio path produces a ledger. Wire this
+    # into the FULL workflow downstream of OTR_SignalLostVideo /
+    # OTR_EpisodeAssembler so the per-line lip-sync + concat run
+    # automatically without a manual PowerShell paste.
+    "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
