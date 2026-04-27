@@ -690,6 +690,20 @@ def build_clip_plan(
     scenes = ledger.get("scenes") or []
     lines = ledger.get("lines") or []
 
+    # BUG-LOCAL-074 (Bug A): ledger lines carry `char_id`, not `speaker`.
+    # production_ledger.set_lines (production_ledger.py:321-353) and
+    # story_orchestrator.py:4719-4725 both write rows with `char_id` and
+    # rely on cast[*].name for the human-readable name. Build a lookup so
+    # plan entries can carry a real speaker name into prompt building,
+    # portrait selection, and the daisy-chain map. Older legacy ledgers
+    # that populated `speaker` directly still resolve via the ln.speaker
+    # branch first (back-compat).
+    cid_to_name: dict[str, str] = {
+        (c.get("char_id") or ""): (c.get("name") or "")
+        for c in cast
+        if c.get("char_id")
+    }
+
     selected = filter_lines(lines, args.scope, scenes)
 
     # If timing is missing AND --auto-slice is set, distribute clips
@@ -708,7 +722,15 @@ def build_clip_plan(
     plan: list[dict] = []
     for idx, ln in enumerate(selected):
         line_id = str(ln.get("line_id") or f"l{idx + 1:03d}")
-        speaker = (ln.get("speaker") or "").strip()
+        # Speaker resolution priority:
+        #   1. ln.speaker (legacy/explicit override)
+        #   2. cast[char_id == ln.char_id].name (current schema)
+        #   3. "" (graceful fallback -- portrait lookup uses first PNG)
+        speaker = (
+            ln.get("speaker")
+            or cid_to_name.get(ln.get("char_id") or "", "")
+            or ""
+        ).strip()
 
         # --- timing ---
         start_s = ln.get("start_s")
@@ -997,16 +1019,31 @@ def main() -> int:
             continue
         clip_dur = time.time() - clip_started
 
-        # 4e. Move output MP4 from ComfyUI's output dir to --out-dir
-        # SaveVideo writes to ComfyUI's output/ at the prefix path.
-        # 2026-04-26 PM BUG-LOCAL-067: search both the new otr/audio
-        # location and the legacy old_time_radio path so previously-
-        # rendered HuMo episodes still resolve.
+        # 4e. Move output MP4 from ComfyUI's output dir to --out-dir.
+        # SaveVideo writes to ComfyUI's output/<save_prefix>_<NNNNN>_.mp4
+        # where save_prefix is built in build_clip_plan as
+        # "otr/videos/<episode_id>/humo_<line_id>" (see line 781). The
+        # earlier search hit otr/audio/humo_episode/ + old_time_radio/
+        # humo_episode/, neither of which match the prefix; candidates
+        # came back empty, the else-branch crashed on undefined
+        # `comfy_output_root`, and the orchestrator died after clip 1.
+        # BUG-LOCAL-074 (Bug B): point the search at the actual save
+        # root and keep the legacy paths as a back-compat fallback.
         _comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
+        _ep_id = ledger.get("episode_id", "episode")
+        save_root = _comfy_output / "otr" / "videos" / _ep_id
+        search_roots = [
+            save_root,
+            _comfy_output / "otr" / "audio" / "humo_episode",
+            _comfy_output / "old_time_radio" / "humo_episode",
+        ]
         candidates = []
-        for _root in (_comfy_output / "otr" / "audio" / "humo_episode",
-                      _comfy_output / "old_time_radio" / "humo_episode"):
+        for _root in search_roots:
             if _root.exists():
+                # SaveVideo appends "_<NNNNN>_" before ".mp4". Match both
+                # the current "humo_<line_id>_*.mp4" prefix and legacy
+                # "<line_id>_*.mp4" so older episodes still resolve.
+                candidates.extend(_root.glob(f"humo_{line_id}_*.mp4"))
                 candidates.extend(_root.glob(f"{line_id}_*.mp4"))
         candidates = sorted(
             candidates, key=lambda p: p.stat().st_mtime, reverse=True
@@ -1042,7 +1079,7 @@ def main() -> int:
             prev_shot_id = clip_shot_id
         else:
             print(
-                f"    WARN: completed but no MP4 found in {comfy_output_root}",
+                f"    WARN: completed but no MP4 found in {save_root}",
                 file=sys.stderr,
             )
             # Skip chain update so a missing MP4 doesn't poison the next clip.
