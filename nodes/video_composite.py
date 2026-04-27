@@ -96,12 +96,43 @@ def _ffprobe_dur(path: Path, ffprobe: str = "ffprobe") -> float | None:
 
 
 def _load_ledger(arg: str) -> dict:
+    """Accept inline JSON, ledger.json path, .mp4 path (suffix-swap
+    to ledger), or empty (auto-pick newest non-pending). Mirrors
+    BatchHumoRender._load_ledger so wiring is consistent."""
     s = (arg or "").strip()
+
     if not s:
-        raise RuntimeError("VideoComposite: ledger_json is empty")
+        audio_dirs = [
+            Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio"),
+            Path(r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"),
+        ]
+        cands = []
+        for d in audio_dirs:
+            if d.exists():
+                cands.extend(
+                    p for p in d.glob("*_ledger.json")
+                    if not p.name.startswith("pending_")
+                )
+        if not cands:
+            raise RuntimeError("VideoComposite: ledger_json empty and auto-pick found no ledger")
+        p = max(cands, key=lambda x: x.stat().st_mtime)
+        with open(p, "r", encoding="utf-8") as f:
+            return json.load(f)
+
     if s.startswith("{"):
         return json.loads(s)
+
     p = Path(s)
+    # .mp4 path -> swap suffix to _ledger.json (SignalLostVideo convention)
+    if p.suffix.lower() == ".mp4":
+        ledger_p = p.with_suffix("").parent / f"{p.stem}_ledger.json"
+        if ledger_p.exists():
+            with open(ledger_p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        raise RuntimeError(
+            f"VideoComposite: derived ledger from .mp4 not found: {ledger_p}"
+        )
+
     if not p.exists():
         raise RuntimeError(f"VideoComposite: ledger path not found: {p}")
     with open(p, "r", encoding="utf-8") as f:

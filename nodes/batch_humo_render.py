@@ -115,13 +115,21 @@ def _find_portrait(
     cast: list[dict],
     portraits_dir: Path,
 ) -> Path | None:
-    """Find the PASS1 portrait for a speaker.
+    """Find a portrait image for a speaker.
 
-    Strategy (mirror of render_humo_batch.find_portrait_for_speaker):
+    Strategy (extends render_humo_batch.find_portrait_for_speaker
+    with a final FLUX env-still fallback so the workflow runs even
+    when no per-cast PASS1 portraits have been pre-rendered):
+
       1. cast[].portrait_path if populated and exists
       2. otr_humo_pass1_portrait_*.png by index in cast list
-      3. any otr_humo_pass1_portrait_*.png as fallback
-      4. None
+      3. any otr_humo_pass1_portrait_*.png
+      4. **NEW**: full_env_*.png by index in cast list (uses FLUX
+         environment stills as face stand-ins — visually wrong per
+         line but the workflow runs end-to-end without a separate
+         portrait-render pass; BUG-LOCAL-078 stopgap)
+      5. any full_env_*.png
+      6. None
     """
     speaker_norm = (speaker or "").upper().strip()
 
@@ -132,8 +140,9 @@ def _find_portrait(
             if p and Path(p).exists():
                 return Path(p)
 
-    # 2. PASS1 humo portraits indexed by cast position
     cast_names = [(c.get("name") or "").upper().strip() for c in cast]
+
+    # 2. PASS1 humo portraits indexed by cast position (canonical naming)
     if speaker_norm in cast_names:
         idx = cast_names.index(speaker_norm)
         candidates = sorted(
@@ -144,8 +153,31 @@ def _find_portrait(
         if candidates:
             return candidates[idx % len(candidates)]
 
-    # 3. Any HuMo portrait
+    # 3. Any HuMo portrait (no cast match)
     candidates = sorted(portraits_dir.glob("otr_humo_pass1_portrait_*.png"))
+    if candidates:
+        return candidates[0]
+
+    # 4. FLUX env-stills indexed by cast position (BUG-078 stopgap).
+    #    These are typically full_env_NNNNN_.png from BatchFluxRender's
+    #    environment-token output. Visually wrong per-line (each cast
+    #    member maps to a random env still) but produces a runnable
+    #    end-to-end pipeline. Replace with proper PASS1 portraits when
+    #    a portrait render path is wired into the workflow.
+    if speaker_norm in cast_names:
+        idx = cast_names.index(speaker_norm)
+        candidates = sorted(
+            list(portraits_dir.glob("otr/stills/full_env_*.png"))
+            + list(portraits_dir.glob("otr_stills/full_env_*.png"))
+        )
+        if candidates:
+            return candidates[idx % len(candidates)]
+
+    # 5. Any FLUX env still (last resort)
+    candidates = sorted(
+        list(portraits_dir.glob("otr/stills/full_env_*.png"))
+        + list(portraits_dir.glob("otr_stills/full_env_*.png"))
+    )
     if candidates:
         return candidates[0]
 
@@ -362,9 +394,13 @@ class BatchHumoRender:
                  episode_id, len(cast), len(lines))
 
         # ---- 2. Resolve portraits dir ----
+        # Default = ComfyUI output root so _find_portrait's globs hit
+        # both `otr/portraits/<ep_id>/otr_humo_pass1_portrait_*.png`
+        # AND `otr/stills/full_env_*.png` AND `otr/stills/pass1_*.png`.
+        # User-supplied input wins if non-empty.
         comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
         if not portraits_dir or not portraits_dir.strip():
-            portraits_dir_path = comfy_output / "otr" / "portraits" / episode_id
+            portraits_dir_path = comfy_output
         else:
             portraits_dir_path = Path(portraits_dir)
         log.info("[BatchHumoRender] portraits_dir=%s", portraits_dir_path)
@@ -520,14 +556,55 @@ class BatchHumoRender:
 
     @staticmethod
     def _load_ledger(ledger_arg: str) -> dict:
-        """Accept either a JSON string or a path to *_ledger.json."""
-        if not ledger_arg or not ledger_arg.strip():
-            raise RuntimeError("BatchHumoRender: ledger_json is empty")
-        s = ledger_arg.strip()
+        """Accept either:
+          - inline JSON string (starts with '{')
+          - path to *_ledger.json
+          - path to *.mp4 (audio episode); ledger inferred via
+            suffix swap (.mp4 -> _ledger.json), since that's the
+            convention OTR_SignalLostVideo / EpisodeAssembler write.
+            Lets us wire BatchHumoRender's ledger_json input directly
+            from SignalLostVideo.video_path -- no separate ledger
+            output node required.
+          - empty -> auto-pick newest non-pending in the canonical
+            audio dirs (BUG-LOCAL-076 fallback chain).
+        """
+        s = (ledger_arg or "").strip()
+
+        # Auto-pick fallback when input empty
+        if not s:
+            audio_dirs = [
+                Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio"),
+                Path(r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"),
+            ]
+            cands = []
+            for d in audio_dirs:
+                if d.exists():
+                    cands.extend(
+                        p for p in d.glob("*_ledger.json")
+                        if not p.name.startswith("pending_")
+                    )
+            if not cands:
+                raise RuntimeError("BatchHumoRender: ledger_json empty and auto-pick found no ledger")
+            p = max(cands, key=lambda x: x.stat().st_mtime)
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+
         if s.startswith("{"):
             return json.loads(s)
-        # Otherwise treat as a path
+
         p = Path(s)
+        # .mp4 path -> swap suffix to _ledger.json (SignalLostVideo
+        # convention)
+        if p.suffix.lower() == ".mp4":
+            ledger_p = p.with_suffix("").parent / f"{p.stem}_ledger.json"
+            if ledger_p.exists():
+                with open(ledger_p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            raise RuntimeError(
+                f"BatchHumoRender: derived ledger from .mp4 not found: {ledger_p}"
+            )
+
+        # Plain ledger.json path
         if not p.exists():
             raise RuntimeError(f"BatchHumoRender: ledger path not found: {p}")
         with open(p, "r", encoding="utf-8") as f:
