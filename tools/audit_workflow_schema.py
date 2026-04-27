@@ -1,0 +1,191 @@
+#!/usr/bin/env python
+"""Audit workflow JSON files for ComfyUI zod-schema compliance.
+
+ComfyUI's frontend uses a zod schema to validate workflow JSON before
+the graph queues. Two requirements bite hand-edited workflows the most:
+
+1. Top-level `id` field must be a UUID4 (8-4-4-4-12 hex), not an empty
+   string and not a kebab-case slug. Documented in BUG-LOCAL-069 family.
+
+2. Every `nodes[]` entry must carry `flags` (object), `order` (int),
+   `mode` (int enum: 0=ALWAYS, 2=MUTE, 4=BYPASS). Documented as
+   BUG-LOCAL-069. New nodes invented from scratch in Python often miss
+   these.
+
+Usage:
+    python tools/audit_workflow_schema.py [--fix] [--workflows DIR]
+
+    --fix       auto-rewrite invalid files in place
+    --workflows DIR override the default workflows/ directory
+
+Exit code is 0 if all files pass, 1 if any have issues (whether fixed
+or reported only). Useful as a pre-commit hook or CI step.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import uuid
+from pathlib import Path
+
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+REQUIRED_NODE_FIELDS = ("flags", "order", "mode")
+
+
+def audit_file(p: Path, fix: bool = False) -> tuple[list[str], bool]:
+    """Returns (issues_list, was_fixed)."""
+    try:
+        text = p.read_text(encoding="utf-8")
+        j = json.loads(text)
+    except Exception as e:
+        return [f"PARSE FAIL: {e}"], False
+
+    issues: list[str] = []
+    fixed = False
+
+    # 1. Top-level id is UUID4
+    wf_id = j.get("id", "")
+    if not UUID_RE.match(str(wf_id)):
+        if fix:
+            new_uuid = str(uuid.uuid4())
+            issues.append(
+                f"id={wf_id!r} not UUID4 -> regenerated: {new_uuid}"
+            )
+            j["id"] = new_uuid
+            fixed = True
+        else:
+            issues.append(f"id={wf_id!r} not UUID4")
+
+    # 2. Every node has flags/order/mode
+    if not isinstance(j.get("nodes"), list):
+        issues.append("'nodes' missing or not a list")
+        return issues, fixed
+
+    max_order = max(
+        (n.get("order") for n in j["nodes"] if isinstance(n.get("order"), int)),
+        default=-1,
+    )
+    next_order = max_order + 1
+    for n in j["nodes"]:
+        for f in REQUIRED_NODE_FIELDS:
+            if f not in n:
+                if fix:
+                    if f == "flags":
+                        n[f] = {}
+                    elif f == "order":
+                        n[f] = next_order
+                        next_order += 1
+                    elif f == "mode":
+                        n[f] = 0
+                    issues.append(
+                        f"node id={n.get('id')} type={n.get('type')} "
+                        f"missing {f} -> filled"
+                    )
+                    fixed = True
+                else:
+                    issues.append(
+                        f"node id={n.get('id')} type={n.get('type')} "
+                        f"missing {f}"
+                    )
+
+    # 3. last_node_id / last_link_id sanity
+    max_node_id = max((n.get("id", 0) for n in j["nodes"]), default=0)
+    if not isinstance(j.get("last_node_id"), int) or j["last_node_id"] < max_node_id:
+        if fix:
+            j["last_node_id"] = max_node_id
+            issues.append(f"last_node_id bumped to {max_node_id}")
+            fixed = True
+        else:
+            issues.append(f"last_node_id missing or < max id {max_node_id}")
+
+    links = j.get("links", []) or []
+    max_link_id = max(
+        (L[0] for L in links if isinstance(L, list) and L),
+        default=0,
+    )
+    if not isinstance(j.get("last_link_id"), int) or j["last_link_id"] < max_link_id:
+        if fix:
+            j["last_link_id"] = max_link_id
+            issues.append(f"last_link_id bumped to {max_link_id}")
+            fixed = True
+        else:
+            issues.append(f"last_link_id missing or < max link id {max_link_id}")
+
+    # 4. 'links' present
+    if "links" not in j:
+        if fix:
+            j["links"] = []
+            issues.append("'links' missing -> set to []")
+            fixed = True
+        else:
+            issues.append("'links' missing")
+
+    # 5. 'version' present
+    if "version" not in j:
+        if fix:
+            j["version"] = 0.4
+            issues.append("'version' missing -> set to 0.4")
+            fixed = True
+        else:
+            issues.append("'version' missing")
+
+    if fixed:
+        p.write_text(json.dumps(j, indent=2), encoding="utf-8")
+
+    return issues, fixed
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("--fix", action="store_true",
+                        help="Auto-rewrite invalid files in place")
+    parser.add_argument("--workflows", type=Path,
+                        default=Path(__file__).resolve().parent.parent / "workflows",
+                        help="Workflows directory (default: workflows/)")
+    args = parser.parse_args()
+
+    print(f"=== Workflow JSON zod-schema audit ===")
+    print(f"scanning: {args.workflows}")
+    print(f"fix mode: {args.fix}")
+    print()
+
+    files = sorted(args.workflows.glob("*.json"))
+    if not files:
+        print("no *.json files found")
+        return 0
+
+    print(f"found {len(files)} workflow JSON files")
+    print()
+
+    any_issues = False
+    summary: list[tuple[str, str, int]] = []
+    for p in files:
+        issues, fixed = audit_file(p, fix=args.fix)
+        if not issues:
+            print(f"  OK    {p.name}")
+            summary.append((p.name, "OK", 0))
+            continue
+        any_issues = True
+        tag = "FIXED" if fixed else "ISSUES"
+        print(f"  {tag:<6} {p.name}")
+        for i in issues:
+            print(f"          - {i}")
+        summary.append((p.name, tag, len(issues)))
+
+    print()
+    print("=== summary ===")
+    for name, tag, n in summary:
+        print(f"  {tag:<6} {name:<45} ({n} issue(s))")
+
+    return 1 if any_issues else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
