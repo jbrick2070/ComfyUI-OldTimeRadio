@@ -2012,18 +2012,42 @@ def _unload_llm():
     import gc
     import torch
     if _LLM_CACHE["model"] is not None:
-        # Step 1: force weights off GPU before dropping the reference.
+        # 2026-04-26 PM BUG-LOCAL-073 GUARD: synchronize BEFORE cpu().
+        # If a prior CUDA kernel left dirty memory (illegal access pending),
+        # cuda.synchronize() will surface it as a clean Python exception
+        # rather than letting model.cpu() walk dirty memory and zombify
+        # the process. On synchronize failure we skip the cpu() walk and
+        # go straight to dropping references + empty_cache(), which is
+        # safe because torch.cuda.empty_cache() resets the allocator
+        # state without touching individual tensors.
+        sync_ok = True
         try:
-            _LLM_CACHE["model"].cpu()
-        except Exception as cpu_err:
-            log.warning("[StoryOrchestrator] model.cpu() during unload failed: %s", cpu_err)
+            torch.cuda.synchronize()
+        except Exception as sync_err:
+            sync_ok = False
+            log.warning("[StoryOrchestrator] cuda.synchronize() before unload failed: %s -- skipping model.cpu() walk", sync_err)
+            _runtime_log(f"VRAM_UNLOAD_GUARD: synchronize failed ({sync_err}); cpu() bypassed")
+        # Step 1: force weights off GPU before dropping the reference.
+        # Only attempt if synchronize succeeded -- otherwise dirty memory
+        # would propagate the fault inside .cpu() and lock the process.
+        if sync_ok:
+            try:
+                _LLM_CACHE["model"].cpu()
+            except Exception as cpu_err:
+                log.warning("[StoryOrchestrator] model.cpu() during unload failed: %s", cpu_err)
+                _runtime_log(f"VRAM_UNLOAD_GUARD: cpu() failed ({cpu_err}); proceeding with empty_cache only")
         # Step 2: drop references from the module-level cache.
         del _LLM_CACHE["model"]
         del _LLM_CACHE["tokenizer"]
         _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None}
-        # Step 3 + 4: gc and return VRAM to the allocator.
+        # Step 3 + 4: gc and return VRAM to the allocator. These ALWAYS
+        # run, even after a sync/cpu failure, so the allocator's tracking
+        # state is reset and the next phase starts with a clean budget.
         gc.collect()
-        torch.cuda.empty_cache()
+        try:
+            torch.cuda.empty_cache()
+        except Exception as ec_err:
+            log.warning("[StoryOrchestrator] empty_cache() failed: %s", ec_err)
         
         # Evict from ComfyUI's internal cache tracking as well
         try:

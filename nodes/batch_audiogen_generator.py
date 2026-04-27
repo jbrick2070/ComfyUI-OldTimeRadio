@@ -7,7 +7,7 @@ effects generated via facebook/audiogen-medium.
 
 Architectural Highlights:
   - Contextual Matching: Parses the script_json for [SFX: ...] tags and matches 
-    them in order to the sfx_plan dictionary from Gemma4Director.
+    them in order to the sfx_plan dictionary from LLMDirector.
   - Per-Prompt Caching: SHA-256 hashed filenames under models/sfx_cache/ ensure
     we never waste VRAM or time generating the same sound twice for the same episode.
   - VRAM Discipline: Loads the model only if uncached cues exist. unloads it
@@ -224,15 +224,37 @@ class BatchAudioGenGenerator:
                         final_clips[idx] = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
                         
                 finally:
-                    # Explicit VRAM cleanup
+                    # 2026-04-26 PM BUG-LOCAL-073 GUARD: synchronize before
+                    # cpu() so a pending CUDA kernel fault surfaces as a
+                    # clean Python exception instead of zombifying the
+                    # process during model walk. Mirror of the guard in
+                    # story_orchestrator._unload_llm.
+                    sync_ok = True
+                    if torch.cuda.is_available():
+                        try:
+                            torch.cuda.synchronize()
+                        except Exception as sync_err:
+                            sync_ok = False
+                            batch_log.append(
+                                f"AudioGen unload: cuda.synchronize() failed ({sync_err}); skipping cpu() walk"
+                            )
                     if 'model' in locals():
-                        model.cpu()
+                        if sync_ok:
+                            try:
+                                model.cpu()
+                            except Exception as cpu_err:
+                                batch_log.append(
+                                    f"AudioGen unload: model.cpu() failed ({cpu_err}); proceeding with empty_cache only"
+                                )
                         del model
                     if 'processor' in locals():
                         del processor
                     gc.collect()
                     if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                        try:
+                            torch.cuda.empty_cache()
+                        except Exception as ec_err:
+                            batch_log.append(f"AudioGen unload: empty_cache failed ({ec_err})")
                     batch_log.append("Model unloaded, VRAM cleared.")
 
         # 5. Build batched AUDIO output
