@@ -5,6 +5,46 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-069: Hand-edited ComfyUI workflow JSON inserted new nodes without the required `flags` / `order` / `mode` metadata fields, so ComfyUI's zod schema validator rejected the entire workflow at load time with `Invalid workflow against zod schema: Required at "nodes[N].flags"; Required at "nodes[N].order"; Required at "nodes[N].mode"` -- the canonical ComfyUI node shape includes three metadata fields beyond the obvious id/type/pos/size/title/properties/widgets_values/inputs/outputs and any new node missing any one of them is rejected by the frontend before the graph ever runs [FIXED]
+- **Date:** 2026-04-26 | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Live FULL workflow load on `v2.0-alpha @ d9c440b` (the SageAttention activation commit that inserted two `PathchSageAttentionKJ` nodes via Python JSON surgery rather than ComfyUI's drag-and-drop UI). On loading the workflow JSON in ComfyUI Desktop, the canvas rendered every node correctly but a yellow Alert popped up reading: `Invalid workflow against zod schema: Validation error: Required at "nodes[32].flags"; Required at "nodes[32].order"; Required at "nodes[32].mode"; Required at "nodes[33].flags"; Required at "nodes[33].order"; Required at "nodes[33].mode"`. Indices [32] and [33] were the array positions of the two newly-inserted patch nodes (id=42 and id=43 respectively). Queue Prompt was effectively blocked while the alert stood -- ComfyUI tolerates the partial graph for display but won't execute a workflow that fails its load-time schema check. Same Alert would have surfaced on any other hand-authored JSON edit that adds nodes without the three required metadata fields.
+- **Cause:** ComfyUI's frontend uses a zod schema (TypeScript-side) to validate workflow JSON shape before letting the graph queue. Every node in the canonical workflow JSON carries three metadata fields beyond the obvious geometry / wiring fields: `flags` (object, typically `{}` -- exists for ad-hoc per-node UI flags like `pinned` or `collapsed`), `order` (int, the topological execution order index assigned by the canvas auto-layout), `mode` (int enum: `0`=ALWAYS, `2`=MUTE, `4`=BYPASS). When ComfyUI's UI saves a workflow it always writes these fields. When humans (or scripts) hand-author a new node from scratch, the natural minimal shape `{id, type, pos, size, title, properties, widgets_values, inputs, outputs}` looks complete on inspection but the zod schema considers it invalid. The validator fails fast on the first missing field but lists all of them in the error -- which is helpful but the error doesn't say WHICH fields are missing, only WHERE in the array the bad nodes live (`nodes[32]`, `nodes[33]`), so a first-time hitter has to grep the existing-node shape to figure out what's missing. The patch_workflow_sage.py edit script in the prior commit invented the two new nodes from scratch with the minimal shape and shipped them without the metadata, even though every other node in the same JSON file demonstrated the correct shape one screen above.
+- **Fix:** Two parts. (1) Hotfix at `nodes/scripts/fix_patch_node_metadata.py`-style surgery: walked the `nodes[]` array, scanned each node for `flags` / `order` / `mode`, defaulted any missing field (`flags={}`, `order=max(existing)+1`, `mode=0`). All 34 nodes now carry the required fields and ComfyUI loads the workflow cleanly. (2) Long-term shape contract: any future hand-authored node-creation Python code (e.g. `patch_workflow_sage.py` and similar future migration scripts) must seed the new node dict with `{"flags": {}, "order": <next>, "mode": 0}` alongside the geometry fields. The canonical node template now lives as a comment block in the BUG-LOCAL-069 entry below for any future hand-edit author to crib from.
+- **Verify:** (a) JSON parse clean. (b) Validation script `python -c "import json; j=json.load(open('workflows/otr_scifi_16gb_full.json')); req={'flags','order','mode'}; missing=[(n['id'],n['type'],f) for n in j['nodes'] for f in req if f not in n]; print('missing:', missing if missing else 'OK')"` returns `OK` (none missing). (c) Live: ComfyUI Desktop loads the workflow without the yellow Alert; Queue Prompt is no longer blocked. (d) Regression coverage to add post-v2.0-ship: a unit test that walks every shipped workflow JSON in `workflows/` and asserts every `nodes[*]` entry has `flags`, `order`, `mode` keys present. Lives well in `tests/test_workflow_schema_contract.py` (does not yet exist) -- worth scaffolding when the workflow JSON count grows past three or when next time someone hand-edits a workflow.
+- **Bible promotion notes:** Bible candidate. Generalisable rule: when emitting a JSON record that targets a frontend that uses runtime schema validation (zod, JSONSchema, msgspec, pydantic, etc.), the canonical record shape is whatever the frontend WRITES, not what the human reads as "minimal viable". Cribbing the shape from a sibling record in the same file is the only safe seed for hand-authored edits. Subsidiary rules: (i) zod errors that name array indices (`nodes[32]`) without naming the missing fields force a grep-against-sibling-records workflow; downstream consumers of the error message should expand it to also dump the exemplar shape; (ii) workflow JSONs are de facto API contracts and should have a per-node-shape lint test that runs in CI alongside the JSON-validity test; (iii) when a script invents a new node, the function that builds the node dict should accept the canonical shape as a constant and `**defaults | overrides` so missing fields can never silently drop. Sister repo: add to `BUG_BIBLE.yaml` under `comfyui-workflow-schema` area; legacy id BUG-LOCAL-069; tags `comfyui-workflow-schema`, `zod-validation`, `hand-edited-json`, `metadata-fields-missing`, `flags-order-mode`, `node-shape-contract`, `cribbing-from-sibling-record`. Suggested bug_bible_regression test: assert that `flags` / `order` / `mode` are present on every node in every shipped workflow JSON.
+
+**Canonical ComfyUI node shape (cheat-sheet for future hand-edits):**
+
+```python
+{
+    "id": int,                    # last_node_id + N
+    "type": "ClassNameAsRegistered",
+    "pos": [int, int],            # canvas coordinates
+    "size": [int, int],           # node body width, height
+    "title": "Display title",
+    "properties": {
+        "Node name for S&R": "ClassNameAsRegistered",
+    },
+    "widgets_values": [...],      # widget defaults in INPUT_TYPES order
+    "inputs": [
+        {"name": "model", "type": "MODEL", "link": int_or_None},
+    ],
+    "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [int, ...], "slot_index": 0},
+    ],
+    "flags": {},                  # REQUIRED -- usually empty dict
+    "order": int,                 # REQUIRED -- topological order, last+1 is safe
+    "mode": 0,                    # REQUIRED -- 0=ALWAYS, 2=MUTE, 4=BYPASS
+    # Optional:
+    "color": "#hexcolor",
+    "bgcolor": "#hexcolor",
+}
+```
+
+When inventing a new node in Python, build the dict from this template and override only what differs. Never start from a "minimal" subset.
+
+- **Tags:** comfyui-workflow-schema, zod-validation, hand-edited-json, metadata-fields-missing, flags-order-mode, node-shape-contract, cribbing-from-sibling-record, bible-candidate
+
 ### BUG-LOCAL-068: Director cast-merge step appended duplicate underscored cast rows for every Director-known character, leaving voice_preset on the new (underscored) row and dialogue on the original (spaced) row -- net effect: speaking characters had `voice_preset=None` and Bark fell back to default voices, while the underscored "ghost" rows had voice_preset but never appeared in dialogue [FIXED]
 - **Date:** 2026-04-26 | **Phase:** 0 | **Bible candidate:** yes
 - **Symptom:** Live FULL trial of Captain-Eris-Violet ("Signal Abyss" episode, ledger `signal_lost_signal_abyss_20260426_161737_ledger.json`) produced a 5-entry `cast` array where the 3 actual speaking characters and the 2 procedural "ghosts" had split data: `c01 ANNOUNCER lines=3 voice=v2/en_speaker_0` (correct), `c02 KAEL VAUGHN lines=1 voice=None` (no voice mapping), `c03 REI HOWARD lines=1 voice=None` (no voice mapping), `c04 REI_HOWARD lines=0 voice=v2/en_speaker_4` (voice but no lines), `c05 KAEL_VAUGHN lines=0 voice=v2/en_speaker_3` (voice but no lines). Bark synthesised the dialogue lines using its default voices because the `voice_preset` lookup at the speaking-character row returned None; the procedural-quality voice presets the Director had selected (gender-matched, age-matched) attached to never-spoken ghost rows. Same family as BUG-LOCAL-064 ("two parallel name-spaces, only one wins downstream") but a different surface: the previous bug leaked the procedural NAME into `description`; this bug splits the entire CAST ROW so neither half is complete.
