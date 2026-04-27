@@ -274,6 +274,33 @@ def _lazy_humo_nodes() -> dict[str, Any]:
     return refs
 
 
+def _call(node_instance, **kwargs):
+    """Call a ComfyUI node by its declared FUNCTION method name with
+    keyword arguments matching INPUT_TYPES.
+
+    BUG-LOCAL-080 fix: ComfyUI node method names are NOT consistent.
+    AudioEncoderEncode does not have ``.encode()`` -- the actual
+    method is named by the class's ``FUNCTION`` attribute. Hardcoding
+    method names (``audio_enc.encode(...)``) blows up at runtime.
+
+    Using ``getattr(instance, instance.FUNCTION)`` resolves whatever
+    name the node author declared. Passing keyword arguments avoids
+    positional-order mismatches (CLIPTextEncode expects ``clip``
+    first in some signatures, ``text`` first in others).
+
+    Returns whatever the underlying method returns (typically a
+    tuple of outputs).
+    """
+    fn_name = getattr(node_instance, "FUNCTION", "execute")
+    fn = getattr(node_instance, fn_name, None)
+    if fn is None:
+        raise AttributeError(
+            f"node {type(node_instance).__name__} has no method "
+            f"{fn_name!r} (declared by FUNCTION attribute)"
+        )
+    return fn(**kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Node class
 # ---------------------------------------------------------------------------
@@ -441,21 +468,19 @@ class BatchHumoRender:
         except Exception as exc:
             log.debug("[BatchHumoRender] pre-pin skipped: %s", exc)
 
-        # ---- 6. Encode negative once (shared across clips) ----
-        try:
-            negative = text_enc.encode(clip, _CHINESE_NEGATIVE)[0]
-        except Exception as exc:
-            raise RuntimeError(f"BatchHumoRender: negative encode failed: {exc}")
+        # ---- 6. Build per-line plan (no GPU work yet) ----
+        if max_clips and max_clips > 0:
+            lines = lines[:max_clips]
 
-        # ---- 7. Loop lines ----
         report_lines: list[str] = [
             f"BatchHumoRender: episode={episode_id} target_lines={len(lines)}",
         ]
         if max_clips and max_clips > 0:
-            lines = lines[:max_clips]
             report_lines.append(f"  capped to {max_clips} clips")
 
-        rendered = 0
+        # Per-line plan: (line_id, speaker, start_s, dur_s, humo_length,
+        #                 pos_text, ref_image_tensor, audio_dict)
+        plan: list[dict] = []
         for idx, ln in enumerate(lines):
             line_id = str(ln.get("line_id") or f"l{idx + 1:03d}")
             speaker = (
@@ -485,59 +510,138 @@ class BatchHumoRender:
             if not ref_png:
                 ref_png = _find_portrait(speaker, cast, portraits_dir_path)
             if not ref_png:
-                report_lines.append(f"  l{idx+1:03d}: SKIP no portrait")
-                log.warning("[BatchHumoRender] line %s speaker=%r: no portrait", line_id, speaker)
+                report_lines.append(f"  {line_id}: SKIP no portrait")
+                log.warning("[BatchHumoRender] line %s speaker=%r: no portrait",
+                            line_id, speaker)
                 continue
 
-            # Build prompts
-            pos_text = _build_pos_prompt(speaker, ln, cast)
-
-            # Slice audio
-            line_audio = _slice_audio_tensor(audio, start_s, dur_s)
-
-            # Load portrait as IMAGE tensor
             try:
                 ref_image = _png_to_tensor(ref_png)
             except Exception as exc:
                 report_lines.append(f"  {line_id}: SKIP portrait load failed: {exc}")
                 continue
 
-            # Run pipeline for this clip
-            shot_t0 = time.time()
-            shot_seed = (seed + idx * 1009) & 0x7FFFFFFFFFFFFFFF
+            line_audio = _slice_audio_tensor(audio, start_s, dur_s)
+            pos_text = _build_pos_prompt(speaker, ln, cast)
+
+            plan.append({
+                "idx": idx, "line_id": line_id, "speaker": speaker,
+                "start_s": start_s, "dur_s": dur_s, "humo_length": humo_length,
+                "pos_text": pos_text, "ref_image": ref_image,
+                "audio": line_audio, "ref_png_name": ref_png.name,
+            })
+
+        if not plan:
+            report_lines.append("FATAL: empty plan -- no lines had portraits")
+            return (str(clips_dir_path), 0, "\n".join(report_lines))
+
+        # ---- 7. Phase A: encode all text prompts up front ----
+        # Encode the negative once, then every positive in sequence.
+        # This avoids reloading WanTEModel between every line during
+        # the HuMo render loop (BUG-LOCAL-080 architectural complaint:
+        # "audio was trying encode at the same time as humo was
+        # running" -- the per-line encode + render mix forced ComfyUI
+        # to swap models in and out of VRAM constantly).
+        log.info("[BatchHumoRender] Phase A: encoding %d positive + 1 negative text prompts",
+                 len(plan))
+        try:
+            negative = _call(text_enc, clip=clip, text=_CHINESE_NEGATIVE)[0]
+        except Exception as exc:
+            raise RuntimeError(f"BatchHumoRender: negative encode failed: {exc}")
+
+        for entry in plan:
             try:
-                positive = text_enc.encode(clip, pos_text)[0]
-                audio_emb = audio_enc_node.encode(audio_encoder, line_audio)[0]
-                humo_pos, humo_neg, humo_latent = humo_node.encode(
-                    width, height, humo_length, 1,
-                    positive, negative, vae,
-                    audio_emb,
-                    ref_image,
-                )[:3]
-                samples = sampler.sample(
-                    model, shot_seed, steps, cfg, sampler_name, scheduler,
-                    humo_pos, humo_neg, humo_latent, 1.0,
+                entry["positive"] = _call(text_enc, clip=clip, text=entry["pos_text"])[0]
+            except Exception as exc:
+                log.warning("[BatchHumoRender] %s: text encode failed: %s",
+                            entry["line_id"], exc)
+                entry["positive"] = None
+
+        # ---- 8. Phase B: encode all per-line audio up front ----
+        log.info("[BatchHumoRender] Phase B: encoding %d audio segments via Whisper",
+                 len(plan))
+        for entry in plan:
+            try:
+                entry["audio_emb"] = _call(
+                    audio_enc_node,
+                    audio_encoder=audio_encoder,
+                    audio=entry["audio"],
                 )[0]
-                images_out = vae_decoder.decode(vae, samples)[0]
-                video_obj = create_video.create_video(images_out, line_audio, 25.0)[0]
-                save_video.save_video(
-                    video_obj,
+            except Exception as exc:
+                log.warning("[BatchHumoRender] %s: audio encode failed: %s",
+                            entry["line_id"], exc)
+                entry["audio_emb"] = None
+
+        # ---- 9. Phase C: HuMo render loop (model stays warm) ----
+        log.info("[BatchHumoRender] Phase C: HuMo render loop, %d lines",
+                 sum(1 for e in plan if e.get("positive") is not None
+                     and e.get("audio_emb") is not None))
+        rendered = 0
+        for entry in plan:
+            line_id = entry["line_id"]
+            if entry.get("positive") is None or entry.get("audio_emb") is None:
+                report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase")
+                continue
+
+            shot_t0 = time.time()
+            shot_seed = (seed + entry["idx"] * 1009) & 0x7FFFFFFFFFFFFFFF
+            try:
+                # WanHuMoImageToVideo returns (positive_with_humo_inputs,
+                # negative_with_humo_inputs, latent). Use kwargs matching
+                # the API-format prompt's input names (BUG-LOCAL-080 fix).
+                humo_out = _call(
+                    humo_node,
+                    width=width,
+                    height=height,
+                    length=entry["humo_length"],
+                    batch_size=1,
+                    positive=entry["positive"],
+                    negative=negative,
+                    vae=vae,
+                    audio_encoder_output=entry["audio_emb"],
+                    ref_image=entry["ref_image"],
+                )
+                humo_pos, humo_neg, humo_latent = humo_out[:3]
+
+                samples = _call(
+                    sampler,
+                    model=model,
+                    seed=shot_seed,
+                    steps=steps,
+                    cfg=cfg,
+                    sampler_name=sampler_name,
+                    scheduler=scheduler,
+                    positive=humo_pos,
+                    negative=humo_neg,
+                    latent_image=humo_latent,
+                    denoise=1.0,
+                )[0]
+
+                images_out = _call(vae_decoder, samples=samples, vae=vae)[0]
+                video_obj = _call(
+                    create_video,
+                    images=images_out,
+                    audio=entry["audio"],
+                    fps=25.0,
+                )[0]
+                _call(
+                    save_video,
+                    video=video_obj,
                     filename_prefix=f"otr/videos/{episode_id}/humo_{line_id}",
                     format="auto",
                     codec="auto",
                 )
 
                 # Rename SaveVideo's "humo_<line_id>_NNNNN_.mp4" to
-                # canonical "<line_id>.mp4" so downstream concat
-                # lookup is straightforward (BUG-074 convention).
+                # canonical "<line_id>.mp4" (BUG-074 convention).
                 self._rename_savevideo_output(
                     clips_dir_path, line_id, report_lines,
                 )
 
                 shot_ms = int((time.time() - shot_t0) * 1000)
                 report_lines.append(
-                    f"  {line_id} ({speaker}): {shot_ms} ms "
-                    f"(length={humo_length} ref={ref_png.name})"
+                    f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
+                    f"(length={entry['humo_length']} ref={entry['ref_png_name']})"
                 )
                 log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
                 rendered += 1
@@ -547,10 +651,10 @@ class BatchHumoRender:
 
         total_ms = int((time.time() - t_start) * 1000)
         report_lines.append(
-            f"Total: {rendered}/{len(lines)} clip(s) in {total_ms} ms"
+            f"Total: {rendered}/{len(plan)} clip(s) in {total_ms} ms"
         )
         log.info("[BatchHumoRender] complete: %d/%d clips in %d ms",
-                 rendered, len(lines), total_ms)
+                 rendered, len(plan), total_ms)
 
         return (str(clips_dir_path), rendered, "\n".join(report_lines))
 
