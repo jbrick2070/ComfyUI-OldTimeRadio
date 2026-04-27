@@ -176,4 +176,72 @@ if _loaded == _total:
 else:
     print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
 
+# =====================================================================
+# HTTP route: GET /otr/latest_ledger
+# Exposes the freshest *_ledger.json from output/otr/audio/ (or the legacy
+# output/old_time_radio/ fallback) as plain JSON over ComfyUI's existing
+# HTTP server. Lets the live-run-tail Cowork artifact poll a single URL
+# without needing Desktop Commander or any MCP transport.
+# Wrapped in try/except so a server import failure cannot break node load.
+# =====================================================================
+try:
+    import json as _otr_json
+    import os as _otr_os
+    from glob import glob as _otr_glob
+    from server import PromptServer as _otr_PromptServer  # type: ignore
+    from aiohttp import web as _otr_web  # type: ignore
+    import folder_paths as _otr_folder_paths  # type: ignore
+
+    _OTR_CORS_HEADERS = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Cache-Control": "no-store",
+    }
+
+    @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")
+    async def _otr_latest_ledger(request):
+        try:
+            output_dir = _otr_folder_paths.get_output_directory()
+            search_dirs = [
+                _otr_os.path.join(output_dir, "otr", "audio"),
+                _otr_os.path.join(output_dir, "old_time_radio"),
+            ]
+            candidates = []
+            for d in search_dirs:
+                if _otr_os.path.isdir(d):
+                    candidates.extend(_otr_glob(_otr_os.path.join(d, "*_ledger.json")))
+            if not candidates:
+                return _otr_web.json_response({
+                    "ok": False,
+                    "reason": "no ledger files found",
+                    "searched": search_dirs,
+                }, headers=_OTR_CORS_HEADERS)
+            candidates.sort(key=lambda p: _otr_os.path.getmtime(p), reverse=True)
+            latest = candidates[0]
+            with open(latest, "r", encoding="utf-8") as f:
+                ledger = _otr_json.load(f)
+            return _otr_web.json_response({
+                "ok": True,
+                "filename": _otr_os.path.basename(latest),
+                "fullpath": latest,
+                "mtime": _otr_os.path.getmtime(latest),
+                "size": _otr_os.path.getsize(latest),
+                "ledger": ledger,
+            }, headers=_OTR_CORS_HEADERS)
+        except Exception as exc:
+            return _otr_web.json_response(
+                {"ok": False, "reason": str(exc)},
+                status=500,
+                headers=_OTR_CORS_HEADERS,
+            )
+
+    @_otr_PromptServer.instance.routes.options("/otr/latest_ledger")
+    async def _otr_latest_ledger_options(request):
+        return _otr_web.Response(status=204, headers=_OTR_CORS_HEADERS)
+
+    print("[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)")
+except Exception as _otr_route_err:
+    print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
+
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

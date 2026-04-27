@@ -1775,12 +1775,12 @@
         380,
         78
       ],
-      "title": "Patch Sage Attention (HuMo)",
+      "title": "Patch Sage Attention (HuMo) -- DISABLED, BUG-LOCAL-070 scope expansion",
       "properties": {
         "Node name for S&R": "PathchSageAttentionKJ"
       },
       "widgets_values": [
-        "sageattn_qk_int8_pv_fp16_cuda",
+        "disabled",
         false
       ],
       "inputs": [

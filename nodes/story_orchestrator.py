@@ -221,6 +221,144 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 
 
 # -----------------------------------------------------------------------------
+# CAST CONSOLIDATION HELPERS
+# Used by LLMDirector cast-merge to collapse near-duplicate cast rows that
+# arise from prefix-overlap (LLOYD vs LLOYD KAPOOR) or LLM typo divergence
+# (STANLEY vs STANLEARY). BUG-LOCAL-068 expansion 2026-04-26 PM.
+# -----------------------------------------------------------------------------
+
+
+def _norm_cast_key(s):
+    """Normalise a character name for lookup: strip, upper, _ -> space."""
+    return (s or "").strip().upper().replace("_", " ")
+
+
+def _cast_names_should_merge(name_a, name_b, fuzzy_ratio=0.85):
+    """Decide whether two normalised cast names refer to the same character.
+
+    Returns (should_merge: bool, winner_name: str | None) where winner_name
+    is the name that should survive the merge.
+
+    Rules (in order of precedence):
+      1. Exact equality after strip/upper/underscore-normalisation -> merge
+      2. Token prefix overlap: shorter is a strict whitespace-aligned prefix
+         of longer (e.g. "LLOYD" prefix of "LLOYD KAPOOR") -> merge,
+         winner = longer (more information).
+      3. SequenceMatcher.ratio >= fuzzy_ratio AND both have the same
+         single-token shape (no spaces) -> merge, winner = longer
+         (typo divergence: "STANLEY" + "STANLEARY" -> keep "STANLEY"
+         only when a clear winner emerges; ties favour the longer string).
+
+    Returns (False, None) when the names are distinct characters.
+    Empty / one-char names are never merged.
+    """
+    if not name_a or not name_b:
+        return (False, None)
+    a = name_a.strip()
+    b = name_b.strip()
+    if len(a) <= 1 or len(b) <= 1:
+        return (False, None)
+    if a == b:
+        return (True, a)
+    # Token prefix overlap: shorter must end on a word boundary inside longer
+    short, long_ = (a, b) if len(a) < len(b) else (b, a)
+    if long_.startswith(short + " "):
+        return (True, long_)
+    # Pure typo divergence: only collapse single-token names. We do NOT
+    # apply fuzzy ratio across multi-token names because "ROBERT FROST"
+    # and "ROBERT FORD" would otherwise merge incorrectly.
+    if " " in a or " " in b:
+        return (False, None)
+    import difflib
+    ratio = difflib.SequenceMatcher(None, a, b).ratio()
+    if ratio >= fuzzy_ratio:
+        # Prefer the longer string. If tied, prefer the alphabetically
+        # earlier so the choice is deterministic.
+        if len(a) > len(b):
+            return (True, a)
+        if len(b) > len(a):
+            return (True, b)
+        return (True, min(a, b))
+    return (False, None)
+
+
+def _consolidate_similar_cast_rows(cast_rows):
+    """Collapse near-duplicate cast rows in place.
+
+    For each pair of rows whose names should merge per
+    `_cast_names_should_merge`, fold the loser's data into the winner:
+      - voice_preset: any non-None value wins (loser's wins if winner has
+        None — common pattern: speaker row has dialogue but no voice;
+        description row has voice but no dialogue).
+      - description / gender: any non-empty value wins.
+      - line_count, word_count: summed (defensive — usually only one row
+        carries them, but if the parser tagged both we don't lose dialogue).
+      - char_id, name: from the winner.
+
+    Loser rows are removed. Order of survivors preserves the order of
+    their first appearance. Returns a NEW list; does not mutate the
+    input list, but row dicts inside the result are the original objects
+    (mutated in place where merging happened).
+
+    Idempotent: running twice yields the same result as running once.
+    """
+    if not cast_rows or len(cast_rows) < 2:
+        return list(cast_rows or [])
+
+    keep = list(cast_rows)
+    i = 0
+    while i < len(keep):
+        row_i = keep[i]
+        name_i = _norm_cast_key(row_i.get("name"))
+        j = i + 1
+        while j < len(keep):
+            row_j = keep[j]
+            name_j = _norm_cast_key(row_j.get("name"))
+            should, winner = _cast_names_should_merge(name_i, name_j)
+            if should:
+                # Identify winner row vs loser row
+                if winner == name_i:
+                    win_row, lose_row = row_i, row_j
+                else:
+                    win_row, lose_row = row_j, row_i
+                # Fold loser into winner
+                if not win_row.get("voice_preset") and lose_row.get("voice_preset"):
+                    win_row["voice_preset"] = lose_row["voice_preset"]
+                if not win_row.get("description") and lose_row.get("description"):
+                    win_row["description"] = lose_row["description"]
+                if not win_row.get("gender") and lose_row.get("gender"):
+                    win_row["gender"] = lose_row["gender"]
+                # Numeric fields summed defensively
+                for fld in ("line_count", "word_count"):
+                    a = win_row.get(fld) or 0
+                    b = lose_row.get(fld) or 0
+                    if a or b:
+                        win_row[fld] = a + b
+                # Make sure winner uses the canonical winner name
+                win_row["name"] = winner
+                # Remove loser, restart inner walk so we re-check the
+                # winner row against everyone else (chained typos like
+                # STANLEY / STANLEARY / STANLERY all collapse safely).
+                if lose_row is row_i:
+                    keep.pop(i)
+                    name_i = _norm_cast_key(row_i.get("name") if i < len(keep) else None)
+                    # i now points at what was row_j; recheck from j=i+1
+                    j = i + 1
+                    if i < len(keep):
+                        row_i = keep[i]
+                        name_i = _norm_cast_key(row_i.get("name"))
+                    else:
+                        break
+                else:
+                    keep.pop(j)
+                    # j stays the same -- now points at the next row
+                continue
+            j += 1
+        i += 1
+    return keep
+
+
+# -----------------------------------------------------------------------------
 # Phase 3d: BARK VOICE HEALTH CHECK
 # Synthesize a 1-second test clip for each active English preset at startup.
 # Any preset that returns silence or NaN gets removed from _VOICE_PROFILES
@@ -7955,6 +8093,33 @@ class LLMDirector:
                 # directly from Mistral). Use as the canonical description.
                 if raw_notes:
                     row["description"] = raw_notes
+            # ----------------------------------------------------------
+            # 2026-04-26 PM BUG-LOCAL-068 EXPANSION: fuzzy-merge pass
+            # ----------------------------------------------------------
+            # The original BUG-068 fix only handled space/underscore
+            # variants ("KAEL VAUGHN" vs "KAEL_VAUGHN"). Two new failure
+            # shapes were discovered the same evening:
+            #
+            #   1. Prefix-overlap (two-LLM split, Captain-Eris -> Mistral):
+            #      Captain-Eris uses first names in dialogue tags
+            #      ("[LLOYD]") while Mistral cleanup adds full names in
+            #      character descriptions ("LLOYD KAPOOR"). Naive equality
+            #      treats them as separate characters; the speaker rows
+            #      get dialogue and no voice; the description rows get
+            #      voice and no dialogue.
+            #
+            #   2. Typo-divergence (single-LLM Mistral, observed live):
+            #      Mistral mid-stream typoed "[STANLEY]" as "[STANLEARY]"
+            #      and alternated between the two for the rest of the
+            #      script. Same cast-fragmentation outcome.
+            #
+            # Both shapes have a shared signature: TWO cast rows, one
+            # with the voice_preset and one with the dialogue line_count.
+            # difflib.SequenceMatcher.ratio() catches both (LLOYD vs
+            # LLOYD KAPOOR ratio=0.78 with prefix-rule; STANLEY vs
+            # STANLEARY ratio=0.875). We merge with a clear winner-rule
+            # so downstream Bark voicing lands on the speaking row.
+            existing_cast = _consolidate_similar_cast_rows(existing_cast)
             led.set_cast(existing_cast)
 
             # Scenes + shots: visual_plan.scenes carries per-scene
