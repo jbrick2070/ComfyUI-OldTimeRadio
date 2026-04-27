@@ -15,9 +15,10 @@ Inputs (from the silent_test ledger):
   - episode_id      -> output naming
   - total_episode_dur_s
 
-Discovery rule for HuMo clip mp4s:
-  output/otr_videos/<episode_id>/humo_<line_id>_*.mp4
-  (matches render_humo_batch.py's save_prefix scheme)
+Discovery rule for HuMo clip mp4s (BUG-LOCAL-075):
+  output/otr/videos/<episode_id>/<line_id>.mp4              (canonical post-move)
+  output/otr/videos/<episode_id>/humo_<line_id>_*.mp4       (raw SaveVideo, partial-run recovery)
+  output/otr_videos/<episode_id>/...                        (mid-day legacy, back-compat only)
 
 Audio source:
   --audio-mp4  the SignalLostVideo / EpisodeAssembler output mp4
@@ -25,9 +26,9 @@ Audio source:
   OR
   --audio-wav  the SceneSequencer master WAV directly
 
-Outputs:
-  output/otr_videos/<episode_id>/<episode_id>.mp4
-  output/otr_videos/<episode_id>/<episode_id>.vtt   (subtitle sidecar)
+Outputs (BUG-LOCAL-075 -- everything under output/otr/):
+  output/otr/episodes/<episode_id>/<episode_id>.mp4
+  output/otr/episodes/<episode_id>/<episode_id>.vtt   (subtitle sidecar)
 
 Usage:
   python scripts/render_episode_concat.py \\
@@ -62,8 +63,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--comfy-output-dir", type=Path,
                    default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output"),
                    help="ComfyUI output directory (HuMo clips live in "
-                        "<this>/otr/videos/<episode_id>/, with mid-day "
-                        "legacy fallback to <this>/otr_videos/<episode_id>/)")
+                        "<this>/otr/videos/<episode_id>/ as <line_id>.mp4 "
+                        "or humo_<line_id>_*.mp4; mid-day legacy fallback "
+                        "to <this>/otr_videos/<episode_id>/)")
     audio = p.add_mutually_exclusive_group(required=True)
     audio.add_argument("--audio-mp4", type=Path,
                        help="Path to the audio episode mp4 (audio extracted)")
@@ -71,7 +73,8 @@ def parse_args() -> argparse.Namespace:
                        help="Path to the master WAV directly")
     p.add_argument("--out-dir", type=Path, default=None,
                    help="Where to write final mp4 + .vtt. Defaults to "
-                        "<comfy-output-dir>/otr_videos/<episode_id>/")
+                        "<comfy-output-dir>/otr/episodes/<episode_id>/ "
+                        "(canonical post BUG-LOCAL-075).")
     p.add_argument("--ffmpeg", default="ffmpeg",
                    help="ffmpeg binary path (default: 'ffmpeg' on PATH)")
     p.add_argument("--include-ambient-subs", action="store_true",
@@ -109,16 +112,38 @@ def load_ledger(p: Path) -> dict:
 
 
 def find_humo_clip(comfy_out: Path, episode_id: str, line_id: str) -> Path | None:
-    """Locate the HuMo mp4 for a given line. Searches both the new
-    output/otr/videos/<id>/ tree and the mid-day output/otr_videos/<id>/
-    tree. Picks the newest match if multiple runs left siblings
-    (ComfyUI appends _NNNNN before the ext)."""
+    """Locate the HuMo mp4 for a given line.
+
+    Two filename forms exist on disk:
+      1. ``<line_id>.mp4`` -- the canonical post-move form written by
+         render_humo_batch.py's move block (line 1053). This is what
+         every successful run produces and the form concat must
+         resolve against.
+      2. ``humo_<line_id>_NNNNN_.mp4`` -- ComfyUI's SaveVideo raw
+         output before render_humo_batch's move-rename. Only seen on
+         disk when render_humo_batch crashed mid-run before the move
+         could happen (see BUG-LOCAL-074 / BUG-LOCAL-075). Kept as a
+         fallback so partial-run recovery still works.
+
+    Two folder roots are searched:
+      - ``output/otr/videos/<id>/`` -- canonical OTR location.
+      - ``output/otr_videos/<id>/`` -- mid-day legacy, retained for
+        back-compat with episodes rendered before the path rename.
+
+    Picks the newest match across all roots and forms.
+    """
     folders = [
         comfy_out / "otr" / "videos" / episode_id,
         comfy_out / "otr_videos" / episode_id,   # mid-day legacy
     ]
-    candidates = []
+    candidates: list[Path] = []
     for folder in folders:
+        if not folder.exists():
+            continue
+        # Canonical post-move form first; raw SaveVideo form second.
+        canonical = folder / f"{line_id}.mp4"
+        if canonical.exists():
+            candidates.append(canonical)
         candidates.extend(folder.glob(f"humo_{line_id}_*.mp4"))
     candidates = sorted(candidates,
                         key=lambda p: p.stat().st_mtime, reverse=True)
@@ -343,8 +368,12 @@ def main() -> int:
 
     led = load_ledger(args.ledger)
     episode_id = led.get("episode_id") or args.ledger.parent.name
+    # BUG-LOCAL-075: all OTR outputs live under output/otr/. The default
+    # used to be otr_videos/<id>/ which violated the "everything under
+    # otr/" rule. New canonical default is otr/episodes/<id>/ alongside
+    # otr/audio/, otr/videos/, otr/portraits/, otr/stills/.
     out_dir = args.out_dir or (
-        args.comfy_output_dir / "otr_videos" / episode_id
+        args.comfy_output_dir / "otr" / "episodes" / episode_id
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -398,7 +427,9 @@ def main() -> int:
     if not clips:
         print("FATAL: no HuMo clips found; cannot concat.", file=sys.stderr)
         print("       Check that render_humo_batch.py finished and that "
-              "save_prefix routes to otr_videos/<episode_id>/humo_<line_id>",
+              "clips landed at otr/videos/<episode_id>/<line_id>.mp4 "
+              "(canonical) or otr/videos/<episode_id>/humo_<line_id>_*.mp4 "
+              "(raw SaveVideo).",
               file=sys.stderr)
         return 4
 

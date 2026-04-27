@@ -441,9 +441,12 @@ def main() -> int:
     print(f"[promote] {dst_mp4}")
 
     # Look for the .vtt sidecar that render_episode_concat.py wrote next
-    # to the un-framed source. Path pattern:
-    #   <comfy-out>/otr_videos/<episode_id>/<episode_id>.vtt
-    # The input mp4 is most likely <episode_id>_framed.mp4 in the same dir.
+    # to the un-framed source. Canonical path pattern (post BUG-LOCAL-075):
+    #   <comfy-out>/otr/episodes/<episode_id>/<episode_id>.vtt
+    # Legacy: <comfy-out>/otr_videos/<episode_id>/<episode_id>.vtt
+    # The input mp4 is most likely <episode_id>_framed.mp4 in the same dir,
+    # so the sibling-derived candidates below resolve either layout without
+    # hardcoding the parent dir name.
     src_vtt_candidates = [
         args.input_mp4.with_suffix(".vtt"),
         args.input_mp4.parent / f"{args.input_mp4.stem.replace('_framed', '')}.vtt",
