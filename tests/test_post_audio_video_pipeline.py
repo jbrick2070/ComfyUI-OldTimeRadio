@@ -4,7 +4,7 @@ Covers:
   - _resolve_ledger_from_input flexibility (mp4 -> ledger swap, .json
     direct, directory scan, empty fallback).
   - dry-run mode returns a valid status string without spawning a
-    subprocess.
+    child process (no Popen call hits in this code path).
   - INPUT_TYPES contract (required/optional shape, types).
   - Error path: bad input returns an error: status, not a crash.
 
@@ -153,7 +153,8 @@ def test_dry_run_mode_returns_valid_status_no_subprocess(
     tmp_path: Path, m
 ) -> None:
     """dry-run validates inputs and returns a status string without
-    launching anything. No subprocess.Popen call is made."""
+    launching anything. No child process gets spawned (the in-process
+    Popen-launch path is bypassed entirely by the mode dispatch)."""
     mp4 = tmp_path / "fake_episode.mp4"
     mp4.write_bytes(b"\x00\x00\x00\x18ftypmp42")
     led = tmp_path / "fake_episode_ledger.json"
