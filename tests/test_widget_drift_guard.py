@@ -60,6 +60,17 @@ def _script_writer_schema():
                          "Qwen/Qwen2.5-14B-Instruct [ALPHA]"],
                         {"default": "mistralai/Mistral-Nemo-Instruct-2407"},
                     ),
+                    "cleanup_model_id": (
+                        ["auto (use story model)",
+                         "mistralai/Mistral-Nemo-Instruct-2407",
+                         "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                         "inflatebot/MN-12B-Mag-Mell-R1",
+                         "google/gemma-2-2b-it",
+                         "google/gemma-2-9b-it",
+                         "google/gemma-4-E4B-it",
+                         "Qwen/Qwen2.5-14B-Instruct [ALPHA]"],
+                        {"default": "auto (use story model)"},
+                    ),
                     "custom_premise": ("STRING", {"multiline": True, "default": ""}),
                     "include_act_breaks": ("BOOLEAN", {"default": True}),
                     "self_critique": ("BOOLEAN", {"default": True}),
@@ -120,15 +131,16 @@ def _widgets_values():
         700,                      # 2  target_words
         4,                        # 3  num_characters
         "mistralai/Mistral-Nemo-Instruct-2407",  # 4  model_id
-        "",                       # 5  custom_premise
-        True,                     # 6  include_act_breaks
-        True,                     # 7  self_critique
-        True,                     # 8  open_close
-        "medium (5 acts)",        # 9  target_length
-        "tense claustrophobic",   # 10 style_variant
-        "balanced",               # 11 creativity
-        True,                     # 12 arc_enhancer
-        "Standard",               # 13 optimization_profile
+        "auto (use story model)", # 5  cleanup_model_id (two-LLM split)
+        "",                       # 6  custom_premise
+        True,                     # 7  include_act_breaks
+        True,                     # 8  self_critique
+        True,                     # 9  open_close
+        "medium (5 acts)",        # 10 target_length
+        "tense claustrophobic",   # 11 style_variant
+        "balanced",               # 12 creativity
+        True,                     # 13 arc_enhancer
+        "Standard",               # 14 optimization_profile
     ]
 
 

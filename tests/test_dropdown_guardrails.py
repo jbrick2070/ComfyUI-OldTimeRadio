@@ -115,6 +115,7 @@ def _run_preflight(writer, **overrides):
         "target_words": 1120,
         "num_characters": 4,
         "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+        "cleanup_model_id": "auto (use story model)",
         "custom_premise": "",
         "include_act_breaks": True,
         "self_critique": True,

@@ -2820,6 +2820,38 @@ class LLMScriptWriter:
                                "split. Gemma variants are smaller "
                                "alternates. Qwen-2.5-14B is alpha."
                 }),
+                # 2026-04-26 PM two-LLM split (task #56): creative LLM
+                # writes the script (draft / revision / arc / spines /
+                # autotitle / per-act gen / cast names) while the
+                # cleanup LLM handles structured rescue + polish phases
+                # (Grammarian, WORD_EXTEND, LLM_RESCUE, ANNOUNCER
+                # bookends, FormatNorm, Director plan). Lets users pair
+                # an RP fine-tune like Captain-Eris-Violet (rich dialogue
+                # voice but fails structured prompts) with Mistral-Nemo
+                # base (validated against every format gate). Default
+                # "auto" uses the same model for both roles --
+                # backward-compatible with every saved workflow.
+                "cleanup_model_id": ([
+                    "auto (use story model)",
+                    "mistralai/Mistral-Nemo-Instruct-2407",
+                    "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
+                    "inflatebot/MN-12B-Mag-Mell-R1",
+                    "google/gemma-2-2b-it",
+                    "google/gemma-2-9b-it",
+                    "google/gemma-4-E4B-it",
+                    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+                ], {
+                    "default": "auto (use story model)",
+                    "tooltip": "Optional second LLM for structured rescue "
+                               "+ polish phases (Grammarian, WORD_EXTEND, "
+                               "LLM_RESCUE, ANNOUNCER bookends, "
+                               "FormatNorm, Director). 'auto' uses the "
+                               "story model -- backward compat. Pair an "
+                               "RP fine-tune as the story model with "
+                               "Mistral-Nemo base here for the best of "
+                               "both worlds: rich character voice + "
+                               "format compliance."
+                }),
                 "custom_premise": ("STRING", {
                     "multiline": True, "default": "",
                     "tooltip": "Optional custom story premise (overrides news-based generation)"
@@ -3023,6 +3055,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
     def write_script(self, episode_title, genre_flavor,
                      target_words, num_characters, model_id="mistralai/Mistral-Nemo-Instruct-2407",
+                     cleanup_model_id="auto (use story model)",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,
@@ -3036,6 +3069,28 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         target_words = int(target_words)
         _runtime_log(f"ScriptWriter: target_words={target_words} (~{max(1, round(target_words / 140))} min at 140 wpm)")
+
+        # 2026-04-26 PM two-LLM split (BUG-LOCAL-068 follow-up).
+        # Resolve effective cleanup model. "auto (use story model)" means
+        # "use the same model for everything" -- backward compatible with
+        # every saved workflow that pre-dates this widget.
+        if (not cleanup_model_id
+                or str(cleanup_model_id).strip().lower().startswith("auto")):
+            _effective_cleanup_id = model_id
+            _two_llm_active = False
+        else:
+            _effective_cleanup_id = str(cleanup_model_id).strip()
+            _two_llm_active = (_effective_cleanup_id != model_id)
+        if _two_llm_active:
+            _runtime_log(
+                f"ScriptWriter: TWO_LLM_SPLIT active "
+                f"creative={model_id!r} cleanup={_effective_cleanup_id!r}"
+            )
+        else:
+            _runtime_log(
+                f"ScriptWriter: SINGLE_LLM mode "
+                f"model={model_id!r}"
+            )
 
         # -- OPTIMIZATION PROFILE OVERRIDES --
         # Obsidian mode is "One-Shot": no critique, no open-close, no arc-enhancer.
@@ -4013,9 +4068,10 @@ TITLE: <your chosen title>
                 f"WORD_ENFORCEMENT: UNDER THRESHOLD ({_word_ratio:.0%} < 70%) - "
                 f"deficit {_deficit} words - running extension pass"
             )
+            # WORD_EXTEND is structured rescue -- use cleanup model.
             script_text = self._extend_script_dialogue(
                 script_text, _deficit, _target_words,
-                model_id, genre_flavor, optimization_profile,
+                _effective_cleanup_id, genre_flavor, optimization_profile,
                 fallback_cast=pre_rolled_cast
             )
             # Recount after extension (dual-format)
@@ -4054,9 +4110,11 @@ TITLE: <your chosen title>
                 if clean and not clean.startswith("CUSTOM") and not clean.startswith("---"):
                     _news_head = clean[:300]
                     break
+            # ANNOUNCER bookend gen is structured -- use cleanup model.
             opening_text, closing_text = self._generate_announcer_bookends(
                 [], episode_title, genre_flavor,
-                _news_head, _char_names, model_id, optimization_profile,
+                _news_head, _char_names, _effective_cleanup_id,
+                optimization_profile,
             )
             if not _has_announcer_open and opening_text:
                 script_text = f"ANNOUNCER: {opening_text}\n\n{script_text}"
@@ -4069,8 +4127,9 @@ TITLE: <your chosen title>
         # -- STEP 3: FORMAT NORMALIZER (Creative → Strict) ------------
         # Now the script has extensions + announcer. One pass cleans
         # everything into canonical format before the parser runs.
+        # FORMAT_NORM is structured polish -- use cleanup model.
         script_text = self._normalize_script_format(
-            script_text, model_id, optimization_profile
+            script_text, _effective_cleanup_id, optimization_profile
         )
         _log_scene_checkpoint("04_AFTER_FORMAT_NORM", script_text)
 
@@ -4085,8 +4144,9 @@ TITLE: <your chosen title>
         # Light LLM pass at temp 0.3. Fixes grammar, catches logic gaps,
         # ensures dialogue reads naturally. Does NOT add content, rename
         # characters, or change the story. Pure copy-edit.
+        # Grammarian is structured polish -- use cleanup model.
         script_text = self._grammarian_pass(
-            script_text, model_id, optimization_profile
+            script_text, _effective_cleanup_id, optimization_profile
         )
         _log_scene_checkpoint("06_AFTER_GRAMMARIAN", script_text)
 
@@ -4129,8 +4189,9 @@ TITLE: <your chosen title>
         except ValueError as parse_err:
             if "0 dialogue lines" in str(parse_err) and len(script_text) > 500:
                 _runtime_log("LLM_RESCUE: Parser found 0 dialogue - attempting LLM reparse")
+                # LLM_RESCUE is structured rescue -- use cleanup model.
                 rescued_text = self._llm_reparse_rescue(
-                    script_text, model_id, optimization_profile
+                    script_text, _effective_cleanup_id, optimization_profile
                 )
                 if rescued_text and rescued_text != script_text:
                     _runtime_log(f"LLM_RESCUE: Got {len(rescued_text)} chars back - retrying parse")
@@ -4190,8 +4251,10 @@ TITLE: <your chosen title>
                 f"LLM_RESCUE reparse"
             )
             try:
+                # BUG-066 floor-trigger LLM_RESCUE -- structured reparse,
+                # use cleanup model.
                 rescued_text = self._llm_reparse_rescue(
-                    script_text, model_id, optimization_profile
+                    script_text, _effective_cleanup_id, optimization_profile
                 )
             except Exception as _resc_err:
                 rescued_text = None
