@@ -572,6 +572,62 @@ class BatchHumoRender:
                             entry["line_id"], exc)
                 entry["audio_emb"] = None
 
+        # ---- 8.5. VRAM cleanup between Phase B and Phase C ----
+        # BUG-LOCAL-081: at 30+ lines, Phase B reloaded Whisper for
+        # every line (each AudioEncoderEncode call triggered a fresh
+        # "WhisperLargeV3 prepared" log). At Phase B end, GPU still
+        # holds: Whisper weights (1.2 GB), umt5_xxl text encoder
+        # (6.4 GB from Phase A), 30 audio embedding tensors (~10 MB
+        # each = 300 MB), 30 positive cond tensors (~50 MB each =
+        # 1.5 GB). Total ~9.4 GB pinned before HuMo even starts to
+        # load.  Phase C asks for HuMo (16.5 GB staged) on a 16 GB
+        # card -- ComfyUI's dynamic VRAM loader thrashes pages
+        # perpetually and never converges to forward progress.
+        # Symptom: KSampler stuck at "0/6 [?it/s]" for 20+ minutes.
+        #
+        # Fix is two-step:
+        #   1. Move every Phase A/B output tensor to CPU. That
+        #      releases GPU pages backing positive/negative cond and
+        #      audio embeddings -- Phase C's WanHuMoImageToVideo
+        #      moves them back to GPU when it actually needs them.
+        #   2. unload_all_models + soft_empty_cache to evict Whisper
+        #      and umt5_xxl from GPU and return pages to the CUDA
+        #      allocator pool.
+        try:
+            import torch  # type: ignore
+            def _to_cpu(obj):
+                """Best-effort move a Comfy CONDITIONING / AUDIO_EMB
+                payload to CPU. Conditioning is a list of [tensor,
+                meta_dict] pairs; meta_dict can carry pooled_output
+                also as a tensor. AUDIO_EMB shape is unknown but
+                likely tensor or dict."""
+                if isinstance(obj, torch.Tensor):
+                    return obj.detach().to("cpu", copy=False) if obj.device.type == "cuda" else obj
+                if isinstance(obj, list):
+                    return [_to_cpu(x) for x in obj]
+                if isinstance(obj, tuple):
+                    return tuple(_to_cpu(x) for x in obj)
+                if isinstance(obj, dict):
+                    return {k: _to_cpu(v) for k, v in obj.items()}
+                return obj
+            negative = _to_cpu(negative)
+            for entry in plan:
+                if entry.get("positive") is not None:
+                    entry["positive"] = _to_cpu(entry["positive"])
+                if entry.get("audio_emb") is not None:
+                    entry["audio_emb"] = _to_cpu(entry["audio_emb"])
+            log.info("[BatchHumoRender] Phase A/B tensors moved to CPU")
+        except Exception as exc:
+            log.warning("[BatchHumoRender] CPU offload failed: %s", exc)
+
+        try:
+            import comfy.model_management as mm  # type: ignore
+            log.info("[BatchHumoRender] Inter-phase VRAM cleanup: unload_all_models + soft_empty_cache")
+            mm.unload_all_models()
+            mm.soft_empty_cache(force=True)
+        except Exception as exc:
+            log.warning("[BatchHumoRender] inter-phase VRAM cleanup failed: %s", exc)
+
         # ---- 9. Phase C: HuMo render loop (model stays warm) ----
         log.info("[BatchHumoRender] Phase C: HuMo render loop, %d lines",
                  sum(1 for e in plan if e.get("positive") is not None
