@@ -329,10 +329,14 @@ class VideoComposite:
         ledger = _load_ledger(ledger_json)
         episode_id = ledger.get("episode_id", "episode")
 
-        # ---- Resolve output_dir (canonical OTR tree) ----
-        # output_dir = ComfyUI/output/otr/episodes/<episode_id>/
+        # ---- Resolve output_dir (broadcast tree, OBS-safe) ----
+        # output_dir = ComfyUI/output/episodes_for_obs/<episode_id>/
+        # Sibling of output/otr/ (NOT a child) so OBS's directory_sorter
+        # can point at output/episodes_for_obs/ and only see finished
+        # episodes -- never the per-line HuMo clip pieces under
+        # output/otr/videos/<ep_id>/.
         comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
-        out_dir = comfy_output / "otr" / "episodes" / episode_id
+        out_dir = comfy_output / "episodes_for_obs" / episode_id
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / f"{episode_id}.mp4"
 

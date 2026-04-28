@@ -5,6 +5,15 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-084: Final episode mp4s lived under `output/otr/episodes/` -- OBS directory_sorter would pick up the per-line clip pieces under `output/otr/videos/` alongside the finished episodes when streaming [FIXED via broadcast tree split]
+
+- **Date:** 2026-04-27 | **Phase:** 0 | **Bible candidate:** no
+- **Symptom:** Jeffrey planned to use the OBS `directory_sorter_for_obs` plugin to auto-rotate finished episodes for streaming. The plugin reads the chosen directory **plus all subfolders**. With the v2.0-alpha layout, pointing it at `output/otr/` (intuitive: "where my OTR work lives") would scoop up the in-flight per-line HuMo clip pieces from `output/otr/videos/<ep_id>/<line_id>.mp4` alongside the finished episode at `output/otr/episodes/<ep_id>/<ep_id>.mp4`. Stream playback would have ~10-30 disjoint 7-second clip fragments interleaved with the real episode.
+- **Cause:** The v2.0-alpha directory layout (BUG-LOCAL-075's "everything under output/otr/" rule) keeps clip pieces and finished episodes in the same parent tree. Conceptually clean (one folder for all OTR output) but defeats the OBS sort plugin's recursive-walk behaviour. The pieces are work-in-progress, the episodes are broadcast-ready -- they need different visibility levels, which means different parent directories.
+- **Fix:** Split the broadcast tree from the work tree. Final episode mp4 + .vtt sidecar now write to `output/episodes_for_obs/<ep_id>/` -- a sibling of `output/otr/`, not a child. Patched `nodes/video_composite.py` (in-graph node default) and `scripts/render_episode_concat.py` (legacy CLI default) so both paths agree. Pieces stay where they are: per-line HuMo clips in `output/otr/videos/<ep_id>/`, FLUX stills in `output/otr/stills/`, audio in `output/otr/audio/`, portraits in `output/otr/portraits/`. Test `test_default_out_dir_is_in_broadcast_tree` (renamed from `test_default_out_dir_is_under_otr_tree`) pins the new path.
+- **Verify:** (a) AST parse clean on `nodes/video_composite.py`, `scripts/render_episode_concat.py`, `tests/test_render_episode_concat_discovery.py`. (b) 161/161 OTR tests pass (`test_video_composite` + `test_render_episode_concat_discovery` + `test_batch_humo_render` + `test_core`). (c) 23/23 bug-bible regression. (d) Behavioural verify on next FULL queue: episode mp4 lands in `output/episodes_for_obs/<ep_id>/<ep_id>.mp4`; pointing OBS directory_sorter at `output/episodes_for_obs/` shows ONLY finished episodes, no clip-piece chatter.
+- **Tags:** obs-streaming, directory-sorter, broadcast-tree-split, otr-tree-layout, episodes-for-obs, video-composite-node-default, render-episode-concat-cli-default
+
 ### BUG-LOCAL-083: SaveVideo + CreateVideo crash with `cls.hidden NoneType` when called from inside another node; 12 successfully-rendered HuMo clips silently discarded [FIXED via direct-ffmpeg mux]
 
 - **Date:** 2026-04-27 | **Phase:** 0 | **Bible candidate:** yes

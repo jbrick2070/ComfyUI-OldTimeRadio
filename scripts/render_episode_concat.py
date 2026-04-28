@@ -26,9 +26,9 @@ Audio source:
   OR
   --audio-wav  the SceneSequencer master WAV directly
 
-Outputs (BUG-LOCAL-075 -- everything under output/otr/):
-  output/otr/episodes/<episode_id>/<episode_id>.mp4
-  output/otr/episodes/<episode_id>/<episode_id>.vtt   (subtitle sidecar)
+Outputs (BUG-LOCAL-084 -- broadcast tree, sibling of output/otr/):
+  output/episodes_for_obs/<episode_id>/<episode_id>.mp4
+  output/episodes_for_obs/<episode_id>/<episode_id>.vtt   (subtitle sidecar)
 
 Usage:
   python scripts/render_episode_concat.py \\
@@ -73,8 +73,9 @@ def parse_args() -> argparse.Namespace:
                        help="Path to the master WAV directly")
     p.add_argument("--out-dir", type=Path, default=None,
                    help="Where to write final mp4 + .vtt. Defaults to "
-                        "<comfy-output-dir>/otr/episodes/<episode_id>/ "
-                        "(canonical post BUG-LOCAL-075).")
+                        "<comfy-output-dir>/episodes_for_obs/<episode_id>/ "
+                        "(canonical post BUG-LOCAL-084 -- sibling of otr/, "
+                        "OBS-streaming-safe).")
     p.add_argument("--ffmpeg", default="ffmpeg",
                    help="ffmpeg binary path (default: 'ffmpeg' on PATH)")
     p.add_argument("--include-ambient-subs", action="store_true",
@@ -368,12 +369,13 @@ def main() -> int:
 
     led = load_ledger(args.ledger)
     episode_id = led.get("episode_id") or args.ledger.parent.name
-    # BUG-LOCAL-075: all OTR outputs live under output/otr/. The default
-    # used to be otr_videos/<id>/ which violated the "everything under
-    # otr/" rule. New canonical default is otr/episodes/<id>/ alongside
-    # otr/audio/, otr/videos/, otr/portraits/, otr/stills/.
+    # BUG-LOCAL-075 (superseded by BUG-LOCAL-084): final episode mp4
+    # now lives in output/episodes_for_obs/<id>/ -- a sibling of
+    # output/otr/, NOT a child. Keeps OBS's directory_sorter from
+    # picking up the per-line clip pieces under output/otr/videos/
+    # alongside the finished episodes when streaming.
     out_dir = args.out_dir or (
-        args.comfy_output_dir / "otr" / "episodes" / episode_id
+        args.comfy_output_dir / "episodes_for_obs" / episode_id
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 

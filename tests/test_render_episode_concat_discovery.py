@@ -116,10 +116,15 @@ def test_find_humo_clip_no_episode_dir_returns_none(tmp_path: Path) -> None:
     assert rec.find_humo_clip(comfy_out, "nonexistent_episode", "l001") is None
 
 
-def test_default_out_dir_is_under_otr_tree(tmp_path: Path) -> None:
-    """BUG-LOCAL-075: the concat default output dir must live under
-    output/otr/, not output/otr_videos/. Pin by source-string check on
-    the active default expression."""
+def test_default_out_dir_is_in_broadcast_tree(tmp_path: Path) -> None:
+    """BUG-LOCAL-084: the concat default output dir must live in
+    output/episodes_for_obs/<id>/ -- a sibling of output/otr/, NOT a
+    child -- so OBS's directory_sorter can stream finished episodes
+    without picking up the per-line clip pieces under output/otr/videos/.
+    Pin by source-string check on the active default expression.
+    Supersedes the old BUG-LOCAL-075 'everything under otr/' rule for
+    final episode outputs only; intermediate work files (audio, stills,
+    portraits, per-line video pieces) still live under output/otr/."""
     src = (SCRIPTS_DIR / "render_episode_concat.py").read_text(encoding="utf-8")
-    assert '"otr" / "episodes" / episode_id' in src, \
-        "default out_dir no longer composes output/otr/episodes/<id>"
+    assert '"episodes_for_obs" / episode_id' in src, \
+        "default out_dir no longer composes output/episodes_for_obs/<id>"
