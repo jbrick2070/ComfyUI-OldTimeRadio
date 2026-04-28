@@ -7947,6 +7947,106 @@ KOKORO_VOICE_RULES = """- Scan all [VOICE:] tags in the script. The FIRST FIELD 
 - LEMMY always gets am_michael."""
 
 
+class DirectorJSONParseError(ValueError):
+    """BUG-LOCAL-090: raised by LLMDirector._extract_json when every
+    parse strategy fails. Carries the raw LLM output so the caller
+    can dump it to a debug file and synthesize a minimal fallback
+    plan from the script's VOICE tags instead of aborting the run.
+    """
+
+    def __init__(self, message: str, raw_output: str = ""):
+        super().__init__(message)
+        self.raw_output = raw_output
+
+
+# BUG-LOCAL-091 fallback filter: cast names extracted from script
+# parsing that are obviously SFX cues, scene markers, or stage
+# directions, not real characters. Names matching these patterns get
+# filtered out of the cast before voice assignment.
+_SFX_CAST_BLOCKLIST_PATTERNS = (
+    r"^SFX\b", r"^MUSIC\b", r"^THEME\b",
+    r"\bBLARING\b", r"\bBLARE\b", r"\bWHOOSH\b", r"\bWHOOSHING\b",
+    r"\bFLICKERS?\b", r"\bFLICKER\b",
+    r"\bCHAMBER\b", r"\bPORTAL\b", r"\bALARM\b",
+    r"\bEQUIPMENT\b", r"\bCUE\b",
+    r"\bAT THE\b",   # "BACK AT THE LAB" etc
+    r"\bSOUND\b", r"\bMUSIC QUEUE\b",
+    r"\bINTENSE\b", r"\bMYSTERIOUS VOICE\b",
+)
+
+
+def _looks_like_non_character_cast_name(name: str) -> bool:
+    """Return True when ``name`` is almost certainly an SFX cue,
+    music stinger, scene-direction fragment, or other parser
+    artefact -- not a real character. Used to filter the cast list
+    before voice assignment so Director does not try to write
+    voice_assignments for ``ALARM BLARING`` and friends, which
+    historically produced unparseable JSON (BUG-LOCAL-090 root cause).
+    """
+    if not name:
+        return True
+    n = name.upper().strip()
+    for pat in _SFX_CAST_BLOCKLIST_PATTERNS:
+        if re.search(pat, n):
+            return True
+    return False
+
+
+def _build_fallback_director_plan(script_text: str, max_chars: int = 8) -> dict:
+    """BUG-LOCAL-090 minimal fallback plan: when LLMDirector._extract_json
+    cannot parse the LLM output, build the smallest possible viable
+    production plan from the script's [VOICE: NAME, ...] tags so the
+    run can ship audio + video at default quality instead of aborting
+    after an hour-plus of upstream work.
+
+    Returns a dict with the contract LLMDirector consumers expect:
+      - voice_assignments: {NAME: {voice_preset, notes}}
+      - sfx_plan: []
+      - music_plan: []
+      - pacing: {beat_pause_ms: 100}
+    """
+    voice_tag_re = re.compile(
+        r"\[VOICE:\s*([A-Z][A-Z0-9_ ]*?)\s*[,\]]",
+        re.IGNORECASE,
+    )
+    seen: list[str] = []
+    for m in voice_tag_re.finditer(script_text or ""):
+        name = (m.group(1) or "").upper().strip()
+        if not name or _looks_like_non_character_cast_name(name):
+            continue
+        if name not in seen:
+            seen.append(name)
+        if len(seen) >= max_chars:
+            break
+
+    # Default speaker pool: balanced m/f spread, LEMMY reserved
+    default_pool = [
+        "v2/en_speaker_0", "v2/en_speaker_4", "v2/en_speaker_3",
+        "v2/en_speaker_9", "v2/en_speaker_1", "v2/en_speaker_2",
+        "v2/en_speaker_5", "v2/en_speaker_7",
+    ]
+    voice_assignments: dict = {}
+    for i, name in enumerate(seen):
+        if name == "LEMMY":
+            voice_assignments[name] = {
+                "voice_preset": "v2/en_speaker_8",
+                "notes": "fallback: LEMMY canonical",
+            }
+        else:
+            voice_assignments[name] = {
+                "voice_preset": default_pool[i % len(default_pool)],
+                "notes": "fallback: BUG-090 minimal plan",
+            }
+
+    return {
+        "voice_assignments": voice_assignments,
+        "sfx_plan": [],
+        "music_plan": [],
+        "pacing": {"beat_pause_ms": 100},
+        "_fallback_source": "BUG-LOCAL-090 minimal-plan-from-script-VOICE-tags",
+    }
+
+
 class LLMDirector:
     """Takes a script and generates a full production plan via LLM."""
 
@@ -8063,8 +8163,32 @@ class LLMDirector:
             optimization_profile=optimization_profile
         )
 
-        # Extract JSON from response
-        plan = self._extract_json(raw)
+        # Extract JSON from response.
+        # BUG-LOCAL-090: when every parse strategy fails, the
+        # extractor raises DirectorJSONParseError carrying the raw
+        # output (already saved to a debug file). Catch it and
+        # synthesize a minimal fallback plan from the script's
+        # VOICE tags so the run continues instead of losing an
+        # hour-plus of upstream LLM/Bark/audio work.
+        try:
+            plan = self._extract_json(raw)
+        except DirectorJSONParseError as parse_exc:
+            log.warning(
+                "[LLMDirector] BUG-090 fallback path: building minimal "
+                "plan from script VOICE tags (raw output %d chars saved to "
+                "output/otr/audio/director_raw_*.txt)",
+                len(parse_exc.raw_output),
+            )
+            _runtime_log(
+                "DIRECTOR: JSON parse failed -- BUG-090 fallback active "
+                "(see director_raw_*.txt for raw LLM output)"
+            )
+            plan = _build_fallback_director_plan(script_text)
+            log.warning(
+                "[LLMDirector] fallback plan: %d voice_assignments, "
+                "0 sfx, 0 music",
+                len(plan.get("voice_assignments", {})),
+            )
         plan = self._validate_director_plan(plan)
 
         # Procedural character names (except LEMMY stays LEMMY)
@@ -8433,9 +8557,38 @@ class LLMDirector:
                 except json.JSONDecodeError:
                     continue
 
-        log.critical("[LLMDirector] FATAL: Could not parse JSON from model output.")
-        log.critical(f"[LLMDirector] Full raw output:\n{text[:1000]}")
-        raise ValueError("Failed to parse production plan JSON. Aborting run to prevent silent audio failure.")
+        # BUG-LOCAL-090: when every parse strategy fails, save the raw
+        # LLM output to a debug file for offline inspection and raise
+        # a structured exception that the caller can catch to build a
+        # minimal fallback plan from the script's VOICE tags. We no
+        # longer abort the run unconditionally -- aborting on a
+        # parser glitch loses an hour-plus of upstream LLM/audio
+        # work; better to ship with a default voice mapping and let
+        # downstream phases use the actual script content.
+        try:
+            import os, time as _time
+            from pathlib import Path as _Path
+            dump_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            dump_dir.mkdir(parents=True, exist_ok=True)
+            dump_path = dump_dir / f"director_raw_{int(_time.time())}.txt"
+            dump_path.write_text(text or "", encoding="utf-8")
+            log.critical(
+                "[LLMDirector] FATAL: Could not parse JSON. "
+                "Raw output saved to %s",
+                dump_path,
+            )
+        except Exception as _dump_exc:
+            log.warning(
+                "[LLMDirector] could not persist raw output: %s",
+                _dump_exc,
+            )
+        log.critical(
+            f"[LLMDirector] Raw output preview:\n{(text or '')[:1000]}"
+        )
+        raise DirectorJSONParseError(
+            "Failed to parse production plan JSON",
+            raw_output=text or "",
+        )
 
     def _randomize_character_names(self, plan: dict, episode_seed: str,
                                    gender_map: dict = None) -> dict:
