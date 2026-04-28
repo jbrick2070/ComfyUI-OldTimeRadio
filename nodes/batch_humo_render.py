@@ -237,6 +237,155 @@ def _slice_audio_tensor(audio_dict: dict, start_s: float, dur_s: float) -> dict:
     return {"waveform": sliced.contiguous(), "sample_rate": sr}
 
 
+def _save_clip_via_ffmpeg(
+    *,
+    images,
+    audio_dict: dict,
+    out_path: Path,
+    fps: int = 25,
+) -> Path:
+    """Write a HuMo clip .mp4 directly via ffmpeg, bypassing
+    CreateVideo + SaveVideo.
+
+    BUG-LOCAL-083 workaround: ComfyUI v0.20.1's CreateVideo +
+    SaveVideo are V3-style nodes that read ``cls.hidden`` (set by
+    the executor with extra_pnginfo + prompt metadata) at execute
+    time. Direct-calling those nodes from inside another node's
+    execute() leaves ``cls.hidden = None`` and they crash at::
+
+        File "comfy_extras/nodes_video.py", line 100, in execute
+            if cls.hidden.extra_pnginfo is not None:
+        AttributeError: 'NoneType' object has no attribute
+        'extra_pnginfo'
+
+    HuMo renders the frames + audio segment fine, but the save step
+    fails -- 12 clips x 9 minutes each = 108 minutes of GPU work
+    discarded. Same family as BUG-LOCAL-074 (executor state assumed
+    by node code).
+
+    Fix: write the decoded image tensor as a PNG sequence + the
+    audio waveform as raw f32 PCM into a temp dir, then mux into
+    the final mp4 with ffmpeg. Same on-disk artifact (mp4 with
+    embedded audio at canonical ``<line_id>.mp4`` filename), no
+    executor coupling.
+
+    Args:
+        images: IMAGE tensor ``[N_frames, H, W, C]`` float in [0, 1]
+            (or 3-D ``[H, W, C]`` for a single frame).
+        audio_dict: ``{"waveform": Tensor[..., samples],
+                       "sample_rate": int}`` (ComfyUI AUDIO type).
+        out_path: final mp4 path, e.g.
+            ``output/otr/videos/<ep_id>/<line_id>.mp4``.
+        fps: frame rate (HuMo = 25).
+
+    Returns:
+        ``out_path`` on success.
+
+    Raises:
+        RuntimeError on ffmpeg failure.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    import numpy as np  # type: ignore
+    import torch  # type: ignore
+    from PIL import Image  # type: ignore
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ---- 1. Image tensor -> uint8 numpy [N, H, W, C] ----
+    img = images
+    if isinstance(img, torch.Tensor):
+        if img.device.type != "cpu":
+            img = img.detach().to("cpu", copy=False)
+        arr = img.numpy()
+    else:
+        arr = np.asarray(img)
+    if arr.ndim == 3:
+        arr = arr[None, ...]
+    if arr.ndim != 4:
+        raise RuntimeError(
+            f"_save_clip_via_ffmpeg: unexpected image shape {arr.shape}"
+        )
+    arr = np.clip(arr, 0.0, 1.0)
+    arr = (arr * 255.0 + 0.5).astype(np.uint8)
+    n_frames = int(arr.shape[0])
+    if n_frames < 1:
+        raise RuntimeError("_save_clip_via_ffmpeg: zero frames decoded")
+
+    # ---- 2. Audio waveform -> raw f32 interleaved ----
+    waveform = audio_dict.get("waveform") if audio_dict else None
+    sr = int(audio_dict.get("sample_rate", 16000)) if audio_dict else 16000
+    have_audio = waveform is not None
+    if have_audio:
+        if isinstance(waveform, torch.Tensor):
+            if waveform.device.type != "cpu":
+                waveform = waveform.detach().to("cpu", copy=False)
+            wf = waveform.numpy()
+        else:
+            wf = np.asarray(waveform)
+        # Strip leading batch dims down to [C, samples]
+        while wf.ndim > 2:
+            wf = wf[0]
+        if wf.ndim == 1:
+            wf = wf[None, :]
+        # ffmpeg f32le wants samples-major interleaved for multi-ch
+        wf_il = np.ascontiguousarray(wf.T.astype(np.float32, copy=False))
+        n_channels = int(wf.shape[0])
+        if wf_il.size == 0:
+            have_audio = False
+
+    tmp = Path(tempfile.mkdtemp(prefix="otr_humo_clip_"))
+    try:
+        # ---- 3. Write PNG frame sequence ----
+        frames_dir = tmp / "frames"
+        frames_dir.mkdir()
+        for i in range(n_frames):
+            Image.fromarray(arr[i]).save(frames_dir / f"f_{i:05d}.png")
+
+        # ---- 4. Write audio as raw f32le ----
+        audio_raw = tmp / "audio.f32"
+        if have_audio:
+            wf_il.tofile(audio_raw)
+
+        # ---- 5. ffmpeg mux ----
+        cmd = [
+            "ffmpeg", "-y",
+            "-loglevel", "error",
+            "-framerate", str(int(fps)),
+            "-i", str(frames_dir / "f_%05d.png"),
+        ]
+        if have_audio:
+            cmd += [
+                "-f", "f32le",
+                "-ar", str(sr),
+                "-ac", str(n_channels),
+                "-i", str(audio_raw),
+            ]
+        cmd += [
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-crf", "18",
+            "-preset", "medium",
+        ]
+        if have_audio:
+            cmd += ["-c:a", "aac", "-b:a", "192k", "-shortest"]
+        cmd += [str(out_path)]
+
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg mux failed (rc={proc.returncode}): "
+                f"{(proc.stderr or '').strip()[:500]}"
+            )
+        return out_path
+    finally:
+        try:
+            shutil.rmtree(tmp, ignore_errors=True)
+        except Exception:
+            pass
+
+
 def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
     """Build a HuMo positive prompt from the ledger line + cast desc."""
     speaker_desc = ""
@@ -438,11 +587,14 @@ class BatchHumoRender:
         clips_dir_path.mkdir(parents=True, exist_ok=True)
 
         # ---- 4. Lazy-load Comfy nodes ----
+        # BUG-LOCAL-083: CreateVideo + SaveVideo dropped from the
+        # required list. Their V3 ``cls.hidden`` coupling crashes
+        # when called outside the executor; we mux clip mp4s with
+        # ``_save_clip_via_ffmpeg`` instead.
         refs = _lazy_humo_nodes()
         missing = [k for k in (
             "CLIPTextEncode", "KSampler", "VAEDecode",
             "WanHuMoImageToVideo", "AudioEncoderEncode",
-            "CreateVideo", "SaveVideo",
         ) if refs.get(k) is None]
         if missing:
             raise RuntimeError(
@@ -454,8 +606,6 @@ class BatchHumoRender:
         vae_decoder = refs["VAEDecode"]()
         humo_node = refs["WanHuMoImageToVideo"]()
         audio_enc_node = refs["AudioEncoderEncode"]()
-        create_video = refs["CreateVideo"]()
-        save_video = refs["SaveVideo"]()
 
         # ---- 5. Pin model on GPU ----
         try:
@@ -674,24 +824,26 @@ class BatchHumoRender:
                 )[0]
 
                 images_out = _call(vae_decoder, samples=samples, vae=vae)[0]
-                video_obj = _call(
-                    create_video,
-                    images=images_out,
-                    audio=entry["audio"],
-                    fps=25.0,
-                )[0]
-                _call(
-                    save_video,
-                    video=video_obj,
-                    filename_prefix=f"otr/videos/{episode_id}/humo_{line_id}",
-                    format="auto",
-                    codec="auto",
-                )
 
-                # Rename SaveVideo's "humo_<line_id>_NNNNN_.mp4" to
-                # canonical "<line_id>.mp4" (BUG-074 convention).
-                self._rename_savevideo_output(
-                    clips_dir_path, line_id, report_lines,
+                # BUG-LOCAL-083: ComfyUI v0.20.1's SaveVideo (and the
+                # paired CreateVideo) is a V3-style node that expects
+                # `cls.hidden` to be populated by the executor with
+                # `extra_pnginfo` + `prompt` metadata. Direct-calling
+                # those nodes from inside another node's execute()
+                # leaves `cls.hidden = None` and crashes at line 100
+                # of comfy_extras/nodes_video.py.
+                #
+                # Workaround: skip CreateVideo + SaveVideo entirely.
+                # Write the clip mp4 directly via ffmpeg from the
+                # decoded image tensor + per-line audio tensor. Same
+                # output (a .mp4 with audio embedded) without the
+                # broken executor-coupling. Output filename is
+                # canonical `<line_id>.mp4` so concat finds it.
+                _save_clip_via_ffmpeg(
+                    images=images_out,
+                    audio_dict=entry["audio"],
+                    out_path=clips_dir_path / f"{line_id}.mp4",
+                    fps=25,
                 )
 
                 shot_ms = int((time.time() - shot_t0) * 1000)

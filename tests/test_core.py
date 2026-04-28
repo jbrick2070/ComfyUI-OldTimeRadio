@@ -527,9 +527,16 @@ class TestWorkflowJSONFull:
         # Stock ComfyUI nodes allowed in the FULL workflow. The image-rendering
         # slice (PASS1/2/3 composites + PNG saves) needs CheckpointLoaderSimple
         # for the FLUX checkpoint and SaveImage for the PASS3 PNG outputs.
+        # The HuMo in-graph loader chain (BUG-078) needs UNETLoader / CLIPLoader
+        # / VAELoader / AudioEncoderLoader / LoraLoaderModelOnly / ModelSamplingSD3
+        # plus the KJNodes SageAttention patcher.
         known = {
             "PreviewAudio", "PreviewImage", "Note",
             "CheckpointLoaderSimple", "SaveImage",
+            # HuMo loader chain
+            "UNETLoader", "CLIPLoader", "VAELoader",
+            "AudioEncoderLoader", "LoraLoaderModelOnly",
+            "ModelSamplingSD3", "PathchSageAttentionKJ",
         }
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known
