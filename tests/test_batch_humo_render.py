@@ -117,17 +117,30 @@ def test_find_portrait_uses_cast_portrait_path_first(tmp_path: Path, m) -> None:
 
 
 def test_find_portrait_falls_through_to_indexed_pass1(tmp_path: Path, m) -> None:
-    """Cast position -> PASS1 portrait by index."""
+    """Cast position -> PASS1 portrait by index. Post BUG-LOCAL-087
+    the candidates sort by mtime DESCENDING (newest first), so
+    cast index 0 maps to the most recently written portrait. Stagger
+    mtimes explicitly here so the test pin is deterministic regardless
+    of filesystem creation order."""
+    import os, time
+    paths = []
     for i in range(1, 4):
-        (tmp_path / f"otr_humo_pass1_portrait_{i:03d}.png").write_bytes(b"\x89PNG")
+        p = tmp_path / f"otr_humo_pass1_portrait_{i:03d}.png"
+        p.write_bytes(b"\x89PNG")
+        paths.append(p)
+    now = time.time()
+    os.utime(paths[0], (now - 30, now - 30))  # 001 oldest
+    os.utime(paths[1], (now - 20, now - 20))  # 002 middle
+    os.utime(paths[2], (now - 10, now - 10))  # 003 newest
     cast = [
         {"char_id": "c01", "name": "ANNOUNCER"},
         {"char_id": "c02", "name": "LEV"},
         {"char_id": "c03", "name": "TODD"},
     ]
-    assert m._find_portrait("ANNOUNCER", cast, tmp_path).name == "otr_humo_pass1_portrait_001.png"
+    # idx 0 -> newest (003), idx 1 -> middle (002), idx 2 -> oldest (001)
+    assert m._find_portrait("ANNOUNCER", cast, tmp_path).name == "otr_humo_pass1_portrait_003.png"
     assert m._find_portrait("LEV",       cast, tmp_path).name == "otr_humo_pass1_portrait_002.png"
-    assert m._find_portrait("TODD",      cast, tmp_path).name == "otr_humo_pass1_portrait_003.png"
+    assert m._find_portrait("TODD",      cast, tmp_path).name == "otr_humo_pass1_portrait_001.png"
 
 
 def test_find_portrait_unknown_speaker_falls_to_first_pass1(tmp_path: Path, m) -> None:

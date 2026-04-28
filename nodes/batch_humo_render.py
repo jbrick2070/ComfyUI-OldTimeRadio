@@ -786,6 +786,74 @@ class BatchHumoRender:
         if max_clips and max_clips > 0:
             report_lines.append(f"  capped to {max_clips} clips")
 
+        # ---- 5.7. BUG-LOCAL-094: distribute clip timings across full episode ----
+        # When upstream nodes (SceneSequencer / Bark / EpisodeAssembler)
+        # don't write `lines[i].start_s` and `lines[i].dur_s` back to
+        # the ledger -- which is the current state -- the legacy
+        # fallback was `start_s = idx * clip_length` (idx * 7s) for
+        # every line. That clumped all HuMo clips into the first
+        # `N * 7s` of the episode, leaving the back half as
+        # procgen-only. Worse: with episodes longer than 7s/line
+        # average, the audio slice for each clip drifted progressively
+        # out of sync with the actual Bark TTS playback in the
+        # composite.
+        #
+        # Fix (heuristic, until proper Bark write-back lands):
+        # estimate per-line timings from the line's `word_count`
+        # share of the total episode duration. This:
+        #   * spreads HuMo clips evenly across the whole timeline
+        #   * scales the slice positions roughly with where each
+        #     line actually plays in the assembled audio
+        #   * still respects the `clip_length` ceiling for HuMo
+        #     render budget (BUG-082 VRAM cap)
+        # The estimate is overridden line-by-line whenever the
+        # ledger DOES carry an explicit `start_s` / `dur_s` (so a
+        # future SceneSequencer write-back upgrade replaces this
+        # automatically with no further code changes here).
+        estimated_timings: dict[int, tuple[float, float]] = {}
+        try:
+            total_episode_dur = ledger.get("total_episode_dur_s")
+            if not total_episode_dur:
+                # Fallback: estimate from the audio tensor itself.
+                wf = audio.get("waveform") if isinstance(audio, dict) else None
+                sr = int(audio.get("sample_rate", 0)) if isinstance(audio, dict) else 0
+                if wf is not None and sr > 0:
+                    try:
+                        total_episode_dur = float(wf.shape[-1]) / float(sr)
+                    except Exception:
+                        total_episode_dur = None
+            if total_episode_dur and total_episode_dur > 0:
+                voiced = [ln for ln in lines if (ln.get("char_id") or "").strip()]
+                # word-share denominator: prefer word_count, fall back
+                # to char_count (so a 0-word ledger does not divide by 0)
+                total_weight = sum(
+                    max(int(ln.get("word_count") or 0), 1)
+                    for ln in voiced
+                ) or len(voiced) or 1
+                cursor = 0.0
+                # Map indices in `lines` (not just voiced) so the
+                # per-line loop's `idx` lookup still works
+                for idx, ln in enumerate(lines):
+                    if not (ln.get("char_id") or "").strip():
+                        # non-voiced line (announcer-only ledger
+                        # entry, or filtered-out parse artefact);
+                        # zero-dur slice that won't render.
+                        estimated_timings[idx] = (cursor, 0.0)
+                        continue
+                    weight = max(int(ln.get("word_count") or 0), 1)
+                    proportional = float(total_episode_dur) * (weight / total_weight)
+                    estimated_timings[idx] = (cursor, proportional)
+                    cursor += proportional
+                log.info(
+                    "[BatchHumoRender] BUG-094 estimated %d line timings "
+                    "across %.1fs episode (avg %.2fs/line)",
+                    len(estimated_timings), total_episode_dur,
+                    total_episode_dur / max(len(voiced), 1),
+                )
+        except Exception as exc:
+            log.warning("[BatchHumoRender] timing estimation failed: %s", exc)
+            estimated_timings = {}
+
         # Per-line plan: (line_id, speaker, start_s, dur_s, humo_length,
         #                 pos_text, ref_image_tensor, audio_dict)
         plan: list[dict] = []
@@ -798,10 +866,23 @@ class BatchHumoRender:
             ).strip()
             char_id = (ln.get("char_id") or "").strip()
 
-            # Per-line timing: prefer ledger.start_s/dur_s, fall back
-            # to auto-slice (idx * clip_length).
+            # Per-line timing priority (BUG-094):
+            #   1. ledger.lines[i].start_s/dur_s (real values from a
+            #      future SceneSequencer write-back -- best)
+            #   2. estimated_timings[idx] (this run's word-share
+            #      heuristic computed in section 5.7 above -- spreads
+            #      clips across the full episode duration)
+            #   3. legacy fallback: idx * clip_length (clumped at
+            #      front of timeline; only triggers when neither the
+            #      ledger nor the heuristic produced timings, e.g.
+            #      total_episode_dur_s missing AND audio tensor
+            #      unreadable)
             start_s = ln.get("start_s")
             dur_s = ln.get("dur_s")
+            if (start_s is None or start_s == "") and idx in estimated_timings:
+                start_s = estimated_timings[idx][0]
+            if (dur_s is None or dur_s == "" or dur_s <= 0) and idx in estimated_timings:
+                dur_s = estimated_timings[idx][1] or clip_length
             if start_s is None or start_s == "":
                 start_s = idx * clip_length
             if dur_s is None or dur_s == "" or dur_s <= 0:
