@@ -7479,7 +7479,15 @@ OPENING:
                     "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
                     "TRANSITION", "CONTINUED", "CONT", "END", "FADE", "CUT",
                     "INT", "EXT", "VOICE",
-                ):
+                ) and not _looks_like_non_character_cast_name(upper_name):
+                    # BUG-LOCAL-091: content-based blocklist catches
+                    # multi-word SFX/stage-direction tags whose FIRST
+                    # word looks innocent (e.g. `[ALARM BLARING] ...`,
+                    # `[CHAMBER FLICKERS BRIGHTLY] ...`,
+                    # `[BACK AT THE LAB] ...`). Without this guard
+                    # those phrases get registered as cast names,
+                    # poison the cast map, and crash Director's
+                    # JSON output (BUG-LOCAL-090 root cause).
                     if raw_name.lower() in self._GENDER_WORDS:
                         _fallback_counter += 1
                         character_name = f"CHAR_{chr(64 + _fallback_counter)}"
@@ -7494,6 +7502,22 @@ OPENING:
                     })
                     i += 1
                     continue
+                elif _looks_like_non_character_cast_name(upper_name):
+                    # Re-route to SFX so the cue isn't lost entirely.
+                    # The dialogue text after the bracket is descriptive
+                    # narration of the cue; record it on the SFX entry's
+                    # description field for downstream AudioGen.
+                    log.info(
+                        "[ScriptParser] BUG-091: rejected '%s' as cast "
+                        "(SFX/stage-direction); routing to sfx",
+                        upper_name,
+                    )
+                    lines.append({
+                        "type": "sfx",
+                        "description": f"{upper_name}: {dialogue}".strip(": "),
+                    })
+                    i += 1
+                    continue
 
             # v4: [CHARACTER, traits] shorthand (e.g. [ANNOUNCER, female, 50s, calm])
             # Used by Mistral Nemo when it omits the VOICE: prefix
@@ -7504,9 +7528,15 @@ OPENING:
                 # Must look like a character name (not a known structural tag)
                 upper_name = raw_name.upper()
                 _first_word_v4 = upper_name.split()[0] if upper_name.strip() else ""
-                if _first_word_v4 not in (
-                    "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
-                    "TRANSITION", "CONTINUED", "CONT", "END",
+                # BUG-LOCAL-091: same content-based filter as v4-inline
+                # to reject multi-word SFX/stage-direction tags whose
+                # first word slipped past the structural blocklist.
+                if (
+                    _first_word_v4 not in (
+                        "ENV", "SFX", "MUSIC", "BEAT", "PAUSE", "ACT", "SCENE",
+                        "TRANSITION", "CONTINUED", "CONT", "END",
+                    )
+                    and not _looks_like_non_character_cast_name(upper_name)
                 ):
                     j = i + 1
                     while j < len(raw_lines) and not raw_lines[j].strip():
@@ -7518,6 +7548,17 @@ OPENING:
                         lines.append({"type": "dialogue", "character_name": upper_name, "voice_traits": voice_traits, "line": dialogue})
                         i = j + 1
                         continue
+                elif _looks_like_non_character_cast_name(upper_name):
+                    # BUG-091: reject as cast; route the bracketed
+                    # cue to SFX so it isn't dropped silently.
+                    log.info(
+                        "[ScriptParser] BUG-091: rejected '%s' as cast "
+                        "(SFX/stage-direction); routing to sfx",
+                        upper_name,
+                    )
+                    lines.append({"type": "sfx", "description": upper_name})
+                    i += 1
+                    continue
 
             # v5: bare `NAME: dialogue` (e.g. `DRACULA MALONE: We're gonna get out of here.`)
             # BUG-LOCAL-038: Mistral Nemo emits this form natively and FORMAT_NORM
@@ -7552,7 +7593,17 @@ OPENING:
                     "INT", "EXT", "OPENING", "CLOSING", "INTERSTITIAL",
                     "TITLE", "NOTE", "TARGET", "STYLE", "NARRATOR",
                 }
-                if _v5_first_word and _v5_first_word not in _v5_structural:
+                # BUG-LOCAL-091: also content-filter v5 bare NAME:
+                # form. Captain-Eris-Violet emits lines like
+                # `ALARM BLARING: warning text` or
+                # `BACK AT THE LAB: descriptive narration` whose
+                # first word ("ALARM", "BACK") slips past the
+                # structural-token blocklist. Reject and route to SFX.
+                if (
+                    _v5_first_word
+                    and _v5_first_word not in _v5_structural
+                    and not _looks_like_non_character_cast_name(_v5_raw_name.upper())
+                ):
                     _v5_emotion = (_m_v5.group(2) or "").strip()
                     _v5_dialogue = _m_v5.group(3).strip().strip('"*_\u201c\u201d')
                     if _v5_dialogue:
@@ -7564,6 +7615,19 @@ OPENING:
                         })
                         i += 1
                         continue
+                elif _v5_first_word and _looks_like_non_character_cast_name(_v5_raw_name.upper()):
+                    log.info(
+                        "[ScriptParser] BUG-091: rejected '%s' as cast "
+                        "(bare NAME: form was SFX/stage-direction); "
+                        "routing to sfx",
+                        _v5_raw_name.upper(),
+                    )
+                    lines.append({
+                        "type": "sfx",
+                        "description": _v5_raw_name.upper(),
+                    })
+                    i += 1
+                    continue
 
             # Fallback: treat as structural direction
             if s and not s.startswith("#") and not s.startswith("---"):
