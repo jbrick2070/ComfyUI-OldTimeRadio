@@ -50,6 +50,41 @@ Jeffrey's stance: *we don't release v2.0 until 8GB-class users get an enhanced v
 
 **Related thought (separate decision):** flip default `optimization_profile` from current default to `Pro (Ultra Quality)` once 16GB FULL has shipped clean — Jeffrey: "I almost feel we should default to Pro Ultra". Holding off until at least one clean Pro Ultra FULL run ships, in case Pro Ultra exposes new edge cases the BUG-085/090/091/094/095/096 safety nets don't yet cover.
 
+**v2.0-beta candidate — LTX-Video animated backgrounds (3-layer composite).** Jeffrey 2026-04-28 PM, while Stellar Shadows ran: *"yes well LTX would be background behind all other layers ... maybe reactive at top in lighten mode ... we don't need that many LTX clips you know maybe 1 or two per scene looping for the whole scene"*. Architecture refinement that promotes the current 2-layer composite (procgen-base + HuMo-overlay, BUG-092) into a 3-layer composite when LTX-Video 0.9 is wired in:
+
+```
+TOP:    Procgen/CRT audio-reactive overlay -- `lighten` blend, ~0.3 opacity
+MID:    HuMo lip-sync portrait -- center pillarbox during dialogue, opaque
+BOTTOM: LTX animated background -- full canvas, opaque
+```
+
+**Why CRT-on-top in `lighten` mode is more truthful:** a failing broadcast's scanlines + audio-peak flicker should cover the WHOLE frame including the speaker's face -- the interference doesn't politely stop at the pillarbox edges. Lighten mode takes max(CRT, underlying) per channel so artifacts ride on top without erasing detail; ~0.3 opacity keeps HuMo lip-sync readable while audio-reactive peaks make the CRT flare across LTX + HuMo together for unified broadcast-medium feel.
+
+**LTX render budget (per Jeffrey's loop + framerate refinements):**
+- **1-2 LTX clips per SCENE** (NOT per shot). Each ~5-10s. Loop across the scene's full duration via ffmpeg `-stream_loop -1` or filter-graph repetition with optional crossfade or ping-pong reverse to mask the loop tell.
+- **Render LTX at 12 fps** (not 24 fps). Atmospheric backgrounds (Mars dust drift, corridor smoke, slow zoom) read fine at 12 fps because the motion is slow. Halves the per-clip render time. Bonus: 12 fps matches old broadcast-TV cadence and reinforces the "Signal Lost" failing-broadcast aesthetic. ffmpeg `fps=25` filter handles upsample to canvas rate via frame doubling -- the eye doesn't notice the 12→25 stutter on slow-moving environmental content.
+- For Stellar-Shadows-sized episodes (1 scene, 3-5 min): 1 LTX render -> looped 30+ times. Budget: ~15-30s of LTX render time per episode (with 12 fps cut).
+- For 4-scene episodes: 4 LTX renders. Budget: ~1-2 min total.
+- Compare with per-shot LTX at 24 fps: would be 5-10 LTX renders per episode at full framerate = ~10-20 min. The per-scene-with-loop-at-12-fps pattern is ~10x cheaper without losing the "animated background" feel.
+
+**Implementation sketch:**
+- `OTR_VideoComposite` gains an optional `bottom_video` STRING input (path to LTX clip OR a list of one-per-scene clip paths). When set -> 3-layer mode, procgen flips to top-overlay-with-lighten. When unset -> current 2-layer architecture stands (BUG-092 unchanged).
+- New `OTR_BatchLTXRender` node parallels `OTR_BatchFluxRender`'s pattern: per-scene loop seeded by the scene's PASS3 FLUX env still as I2V conditioning. Reuses BUG-088 cast-still binding work for visual continuity (the LTX clip's first frame ≈ the FLUX still HuMo characters use as portraits).
+- ffmpeg loop handling in VideoComposite: for each scene's `[scene_start_s, scene_end_s]` window, layer the LTX clip with `setpts=PTS-STARTPTS+SCENE_START_S/TB,loop=loop=-1:size=N_FRAMES`.
+- Sequencing follows BUG-086 dependency-edge pattern: FLUX -> UnloadAll (frees FLUX VRAM) -> LTX (fits in 5-6 GB) -> UnloadAll (frees LTX VRAM) -> HuMo. All three big models share the 16 GB budget by being mutually exclusive in time.
+
+**Bonus for 8GB tier:** LTX 0.9 fp16 fits on 8 GB cards. Same `OTR_BatchLTXRender` node serves both 16 GB tier (as background layer) and 8 GB tier (as primary visual; HuMo bypassed). Single model, two roles via workflow toggle.
+
+**Sub-candidate — Vintage radio bookend still.** Jeffrey 2026-04-28 PM: *"did we ever render the radio still for the talking radio?"* — confirmed grep across the whole repo: NO. Never rendered one. That's an actual identity gap given the project is called "Old Time Radio." Proposed shape:
+
+- **One FLUX render per episode** of a vintage 1940s console radio: glowing amber dials, walnut cabinet, vacuum-tube halo, dimly lit listening room, cinematic 35mm film aesthetic. Saved as `output/otr/stills/radio_bookend_<ep_id>.png` for ledger traceability (and reuse if re-rendering the composite later).
+- **Bookend overlay** in `OTR_VideoComposite`: during the opening music window (0 → opening_music.dur_s, ~10-12s) the radio still is the FULL CANVAS (LTX + HuMo branches muted). When opening music fades out, the radio still crossfades into the regular composite (LTX/procgen base + HuMo dialogue). At episode end, the closing music window (last 8s) crossfades BACK to the radio still + closing music. Procgen-CRT lighten layer rides on top of both bookend and middle phases — keeps the broadcast-failing aesthetic continuous.
+- **Why this works:** every episode opens with the camera lingering on the radio while the brass fanfare plays, then fades INTO the actual scene drama, then returns to the radio for the closing sting. Anchors the "you're listening to an OTR broadcast — but with picture" identity that the project name implies. Currently the opening music plays over procgen-only (visually empty); this fills that with the iconic radio image.
+- **Cost:** 1 extra FLUX render per episode (~30-60s). Cheap. The radio prompt can be canned in the workflow widget so it's deterministic across episodes (or randomized if user wants variety).
+- **Ledger:** `radio_bookend_path` field in the ledger (new minor schema bump or reuse existing `shots[]` with `shot_id="radio_bookend"`). Use the BUG-088 freshness mechanism to ensure the bookend still is regenerated per episode rather than reused stale.
+
+**Decision pending the Stellar Shadows landing at ~6 PM 2026-04-28:** if procgen-base + HuMo-pillarbox alone feels alive enough -> ship v2.0-alpha 2-layer canonical, LTX is v2.0-beta enhancement. If procgen-only background between dialogue feels static -> LTX promotes from "v2.0-beta opt-in" to "v2.0 must-have". Radio bookend is a separate decision -- low cost, high identity value, likely worth doing regardless of the LTX call.
+
 **Related v2.0-beta candidate — LLM character normalize pass.** Jeffrey 2026-04-28: *"should an LLM character normalize pass be run too?"* Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_PATTERNS` (BUG-091 + BUG-097), and (2) fuzzy `_consolidate_similar_cast_rows_with_aliases` (BUG-098 + earlier prefix/typo merges). Both are deterministic but limited to KNOWN patterns. An LLM-based normalize pass after fuzzy dedup could catch semantic aliases neither layer sees: `KEVIN VOICEOVER` → `KEVIN STENDAHL` (same person, narration mode), `(captain)` lowercase narration cue → `CAPTAIN` proper noun, `DR. AMELIA HARTFIELD` → `AMELIA` short form, `THE ANNOUNCER` → `ANNOUNCER`. **Design constraints:** (i) prompt must be conservative ("ONLY merge when names CLEARLY refer to the same character; when in doubt, do NOT merge"); (ii) hard-cap the merge-set size (never collapse >50% of cast in one pass — flags hallucination); (iii) only run when `optimization_profile = "Pro (Ultra Quality)"` (adds 2-5 min wall time per run); (iv) feed the LLM the cast list + first 1500 chars of script_text + first sentence of each character's first line for context. **Defer to v2.0-beta** — by then we'll have a real corpus of run logs showing common emission patterns, so the prompt can be data-informed instead of guesswork-driven.
 
 ---
