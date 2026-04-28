@@ -98,6 +98,81 @@ This is the morning-of plan. Each step is small enough to ship as a focused comm
 
 ---
 
+## v2.0 release blocker — Generic / relative paths (no Windows-hardcoded absolutes)
+
+**Owner:** Jeffrey | **Status:** open | **Added:** 2026-04-28 PM
+
+Jeffrey's stance 2026-04-28: *"can't we make them more relative paths to the output folder before we ship — we need all generic relative paths"*. Every `r"C:\Users\jeffr\Documents\ComfyUI\output"` in the codebase is a release blocker for any non-Jeffrey user (Linux/Mac/RunPod/cloud) AND a portability blocker for the 8GB-tier work. v2.0 cannot ship while paths are user-and-OS-specific.
+
+### Inventory of hardcoded Windows paths to refactor
+
+Quick grep audit (2026-04-28 evening):
+
+- `nodes/batch_humo_render.py` — 3-4 places: `_resolve_cast_stills_from_ledger`, `_load_ledger_with_path` auto-discover, `comfy_output` in `execute()`, `_extract_json` raw output dump
+- `nodes/video_composite.py` — 2 places: output_dir computation, `_load_ledger_with_path` auto-discover
+- `nodes/musicgen_theme.py` — BUG-095 audio_dir hardcoded for ledger write-back
+- `nodes/batch_audiogen_generator.py` — same as MusicGen
+- `nodes/batch_bark_generator.py` — BUG-096 audio_dir hardcoded
+- `nodes/story_orchestrator.py` — Director BUG-090 raw output dump uses Windows path
+- `scripts/render_episode_concat.py` — `--out-dir` default + comfy_output_dir CLI default
+- `scripts/render_humo_batch.py` — episode dir resolver
+- `workflows/otr_scifi_16gb_full.json` — `LoadAudio` widget hard-pins a `C:\...` mp4 path; some other node widgets carry default paths
+- `workflows/otr_humo_smoke.json` — same widget pattern with the Resonance Chamber fixture path
+
+Total: ~12-15 spots in code + 2-4 widget defaults in workflow JSONs. Mechanical refactor, no logic change.
+
+### Refactor strategy
+
+**Single `nodes/_otr_paths.py` helper module** that exposes typed accessors all nodes import:
+
+```python
+def comfy_output_dir() -> Path:
+    """ComfyUI's main output directory. Resolution order:
+       1. OTR_OUTPUT_DIR env var if set
+       2. folder_paths.get_output_directory() (ComfyUI's API) if importable
+       3. Walk up from this module: <repo>/../../../output (typical custom_nodes layout)
+       4. Fallback: Path.cwd() / "output"
+    """
+    ...
+
+def otr_audio_dir() -> Path:    return comfy_output_dir() / "otr" / "audio"
+def otr_stills_dir() -> Path:   return comfy_output_dir() / "otr" / "stills"
+def otr_portraits_dir() -> Path: return comfy_output_dir() / "otr" / "portraits"
+def otr_videos_dir(episode_id: str) -> Path:
+    return comfy_output_dir() / "otr" / "videos" / episode_id
+def episodes_for_obs_dir(episode_id: str) -> Path:
+    return comfy_output_dir() / "episodes_for_obs" / episode_id
+def director_raw_dump_dir() -> Path:
+    return otr_audio_dir()  # BUG-090 dumps live alongside ledgers
+```
+
+Every hardcoded `Path(r"C:\Users\jeffr\Documents\ComfyUI\output")` gets replaced with the appropriate helper. Future cloud-tier work (RunPod, 8GB tier, whatever) just sets `OTR_OUTPUT_DIR=/workspace/output` and the whole pipeline obeys.
+
+### Workflow JSON path scrub
+
+Widget defaults in `otr_scifi_16gb_full.json` and `otr_humo_smoke.json` need the Windows-specific path strings cleared OR replaced with a placeholder that's user-overridable on first load. Two options:
+
+- **A. Empty defaults**: clear the LoadAudio path, force the user to drag a file in. Simple, but breaks the smoke's drag-and-queue UX.
+- **B. Comment-marker defaults**: use a placeholder like `"<set_audio_path_here>"` that the node detects and either (a) auto-discovers the most recent ledger-paired mp4 in the canonical audio dir or (b) prints a clear "set the LoadAudio widget" message in the report. Preserves UX while flagging the missing input.
+
+Lean toward B for the smoke (preserves drag-and-queue), A for the FULL workflow (audio comes from upstream nodes anyway, so no widget needed).
+
+### Validation plan
+
+After refactor:
+- All AST + 200+ regression tests still pass on Windows (no regression of current behavior)
+- `OTR_OUTPUT_DIR=/tmp/otr_test python -m pytest tests/` runs cleanly with the override
+- Documented in `README.md` how to set `OTR_OUTPUT_DIR` for cloud / non-default installs
+- Smoke + FULL workflows load and queue cleanly on a fresh ComfyUI install with no manual path edits
+
+### Tradeoff vs. doing it tomorrow
+
+If we ship v2.0-alpha as a portfolio piece WITHOUT this refactor: only Jeffrey can run it. Anyone else (collaborator, friend, RunPod template) hits immediate `Path("C:\\Users\\jeffr\\...")` failures. Path refactor is a 30-60 min mechanical task — earlier is better than later because future BUG fixes will keep adding new hardcoded paths if we don't lock down the helper module first.
+
+**Recommended placement in tomorrow's morning plan: Step 0 (before Step 1's radio bookend work).** Lock down the path helper, refactor existing code, THEN start adding new Flux stills / LTX / etc with the helper from day one.
+
+---
+
 ## v2.0 release blocker — 8GB-VRAM-class user experience
 
 **Owner:** Jeffrey | **Status:** open | **Added:** 2026-04-28
