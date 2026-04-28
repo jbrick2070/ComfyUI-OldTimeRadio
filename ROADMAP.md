@@ -21,6 +21,29 @@ Every consumer of `ledger.json` must understand all four levels. The orchestrato
 
 ---
 
+## v2.0 release blocker — 8GB-VRAM-class user experience
+
+**Owner:** Jeffrey | **Status:** open | **Added:** 2026-04-28
+
+Jeffrey's stance: *we don't release v2.0 until 8GB-class users get an enhanced visual output too*. Right now the pipeline is hard-locked at 16 GB (HuMo 14B fp8 = 16.5 GB staged, BUG-LOCAL-082 frame cap, Pro Ultra LLM profile). On an 8 GB card the HuMo branch OOMs immediately.
+
+**Decision needed (NOT now -- after 16GB FULL run is green):** workflow strategy for 8GB users. Two options:
+
+- **Option A — Two workflow JSONs.** Ship `otr_scifi_16gb_full.json` (current, HuMo lip-sync) AND `otr_scifi_8gb_full.json` (FLUX env-still slideshow over procgen, no HuMo). Each JSON is purpose-built; users pick the right one for their card. Pro: simple per-JSON, no runtime branching, easy to test. Con: two files to maintain in lockstep when audio/LLM upstream changes.
+- **Option B — Single master JSON with a runtime VRAM switch.** One workflow with a `vram_mode` widget (`auto` / `16gb` / `8gb`) that gates HuMo + composite vs. cheaper fallback paths. Either via an OTR_VRAMSwitch node that produces conditional outputs, or via ComfyUI's `mode=4` (mute) flag toggled by a script-pass at queue time. Pro: one canonical JSON. Con: more complex graph, harder to reason about, runtime conditional execution in ComfyUI is awkward.
+
+**Acceptance criteria for the 8GB path (whichever option):**
+- Full audio pipeline (LLM + Bark + AudioGen + MusicGen + SceneSequencer + EpisodeAssembler) — same as 16GB path.
+- SignalLostVideo procgen base — same.
+- Visual layer: at minimum the FLUX env-stills slideshow timed to ledger lines (cycle stills with crossfades over the procgen base). HuMo lip-sync NOT required.
+- Final mp4 lands in `output/episodes_for_obs/<ep>/<ep>.mp4` same as 16GB path.
+
+**Decision deferred until first clean 16GB FULL run ships.** Add to `docs/2026-04-28-8gb-strategy-decision.md` after the run lands so we have real data on what the 16GB path looks like end-to-end before designing the 8GB fallback.
+
+**Related thought (separate decision):** flip default `optimization_profile` from current default to `Pro (Ultra Quality)` once 16GB FULL has shipped clean — Jeffrey: "I almost feel we should default to Pro Ultra". Holding off until at least one clean Pro Ultra FULL run ships, in case Pro Ultra exposes new edge cases the BUG-085/090/091/094/095/096 safety nets don't yet cover.
+
+---
+
 ## Platform Pins
 
 Lock these. Any work item that contradicts this list is wrong.
