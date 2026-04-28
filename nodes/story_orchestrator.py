@@ -3131,11 +3131,26 @@ class LLMScriptWriter:
                 }),
                 "self_critique": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "Checks & Critiques: Draft -> Critique -> Revise loop for higher story quality (adds ~2 extra LLM passes)"
+                    "tooltip": (
+                        "Checks & Critiques: Draft -> Critique -> Revise loop "
+                        "for higher story quality (adds ~2 extra LLM passes). "
+                        "Defaults ON for stable / high-quality scripts. "
+                        "Edge-case empty-output crashes are caught by the "
+                        "BUG-LOCAL-085 empty-draft guard. Flip OFF for "
+                        "faster cheaper runs at the cost of polish."
+                    ),
                 }),
                 "open_close": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "Open-Close Expansion: generate 3 competing story outlines, evaluator picks the best before full script (adds ~4 small LLM passes)"
+                    "tooltip": (
+                        "Open-Close Expansion: generate 3 competing story "
+                        "outlines, evaluator picks the best before full "
+                        "script (adds ~4 small LLM passes). Defaults ON "
+                        "for stable / high-quality scripts. Cascading "
+                        "1-token / empty-output cases are caught by "
+                        "BUG-LOCAL-090 Director fallback. Flip OFF for "
+                        "faster cheaper runs at the cost of plot variety."
+                    ),
                 }),
                 "target_length": (["short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
                     "default": "medium (5 acts)",
