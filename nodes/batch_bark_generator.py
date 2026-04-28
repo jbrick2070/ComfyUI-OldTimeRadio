@@ -490,11 +490,11 @@ class BatchBarkGenerator:
             "required": {
                 "script_json": ("STRING", {
                     "multiline": True, "default": "[]",
-                    "tooltip": "Parsed script JSON from Gemma4ScriptWriter"
+                    "tooltip": "Parsed script JSON from LLMScriptWriter"
                 }),
                 "production_plan_json": ("STRING", {
                     "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON from Gemma4Director"
+                    "tooltip": "Production plan JSON from LLMDirector"
                 }),
             },
             "optional": {
@@ -547,11 +547,11 @@ class BatchBarkGenerator:
             empty = {"waveform": torch.zeros(1, 1, 2400), "sample_rate": 24000}
             return (empty, "No dialogue lines found")
 
-        # -- Step 2: Free Gemma4 VRAM - Bark needs GPU headroom ------------
+        # -- Step 2: Free LLM VRAM - Bark needs GPU headroom ------------
         try:
             from .story_orchestrator import _unload_llm
             _unload_llm()
-            log.info("[BatchBark] Freed Gemma4 VRAM for batch TTS")
+            log.info("[BatchBark] Freed LLM VRAM for batch TTS")
         except Exception:
             pass
 
@@ -681,9 +681,85 @@ class BatchBarkGenerator:
             max_len = padded.shape[-1]
 
         audio_out = {"waveform": batch_tensor, "sample_rate": target_sr}
-        log_text = "\n".join(batch_log)
 
         log.info("[BatchBark] Output: %d clips, max_len=%d samples (%.1fs), sr=%d",
                  len(ordered_clips), max_len, max_len / target_sr, target_sr)
 
+        # ---- BUG-LOCAL-096: write per-line dur_s + start_s back to ledger ----
+        # Bark doesn't persist per-line WAVs to disk in the current
+        # design (clips live in memory and assemble straight into
+        # SceneSequencer's mix), so we cannot stamp `bark_wav_path`.
+        # But we DO know the actual generated WAV duration per line
+        # via results[script_idx] = (audio_np, sr). Writing dur_s
+        # back to ledger.lines[].dur_s + cumulative start_s gives
+        # BatchHumoRender real per-line timings instead of the
+        # BUG-LOCAL-094 word-share heuristic -- HuMo audio slices
+        # then align with actual Bark playback positions in the
+        # assembled audio.
+        #
+        # Mapping strategy: text-match. For each dialogue_item, find
+        # the ledger line whose `text` equals the item's `line`.
+        # Walk in script order so duplicate-text collisions resolve
+        # to the first unmatched ledger row.
+        try:
+            import json as _json
+            from pathlib import Path as _Path
+            audio_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            if audio_dir.exists():
+                cands = list(audio_dir.glob("*_ledger.json"))
+                if cands:
+                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
+                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                    ledger_lines = led.get("lines") or []
+                    # Build text -> [unused ledger indices] map
+                    text_to_idx: dict[str, list[int]] = {}
+                    for li, ln in enumerate(ledger_lines):
+                        t = (ln.get("text") or "").strip()
+                        if not t:
+                            continue
+                        text_to_idx.setdefault(t, []).append(li)
+                    # Walk dialogue_items in script order; cumulative
+                    # start_s tracks Bark's contribution to the
+                    # assembled timeline (announcer / sfx gaps not
+                    # accounted for here -- this is approximate but
+                    # WAY closer than BUG-094 word-share).
+                    cumulative_start = 0.0
+                    updated = 0
+                    for item in dialogue_items:
+                        idx = item.get("script_idx")
+                        if idx not in results:
+                            continue
+                        audio_np, sr = results[idx]
+                        try:
+                            dur = float(len(audio_np)) / float(sr)
+                        except Exception:
+                            dur = 0.0
+                        item_text = (item.get("line") or "").strip()
+                        candidates = text_to_idx.get(item_text) or []
+                        if not candidates:
+                            continue
+                        ledger_idx = candidates.pop(0)
+                        row = ledger_lines[ledger_idx]
+                        row["dur_s"] = dur
+                        row["start_s"] = cumulative_start
+                        cumulative_start += dur
+                        updated += 1
+                    if updated:
+                        ledger_path.write_text(
+                            _json.dumps(led, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                        log.info(
+                            "[BatchBark] BUG-096 ledger updated: %d line "
+                            "dur_s + start_s timings written to %s",
+                            updated, ledger_path.name,
+                        )
+                        batch_log.append(
+                            f"BUG-096 ledger updated: {updated} line "
+                            f"timings -> {ledger_path.name}"
+                        )
+        except Exception as _exc:
+            log.warning("[BatchBark] BUG-096 ledger write-back failed: %s", _exc)
+
+        log_text = "\n".join(batch_log)
         return (audio_out, log_text)
