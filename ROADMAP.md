@@ -35,8 +35,15 @@ Jeffrey's stance: *we don't release v2.0 until 8GB-class users get an enhanced v
 **Acceptance criteria for the 8GB path (whichever option):**
 - Full audio pipeline (LLM + Bark + AudioGen + MusicGen + SceneSequencer + EpisodeAssembler) — same as 16GB path.
 - SignalLostVideo procgen base — same.
-- Visual layer: at minimum the FLUX env-stills slideshow timed to ledger lines (cycle stills with crossfades over the procgen base). HuMo lip-sync NOT required.
+- **Visual layer must be MOTION VIDEO, not stills.** Jeffrey explicit 2026-04-28: *"i just don't want stills if we can find a 8gb vid model"*. The 8GB tier gets actual lip-sync or B-roll video, just at a smaller scale than HuMo 14B fp8.
 - Final mp4 lands in `output/episodes_for_obs/<ep>/<ep>.mp4` same as 16GB path.
+
+**Model research required (before designing the 8GB workflow):**
+1. **Image model under 8 GB.** Current pipeline uses FLUX-fp8 (~12 GB staged for fast_batch). Replacement candidates worth benchmarking on 8 GB cards: SDXL-Turbo, SD 3 Medium, FLUX-schnell at lower precision, SD 1.5 (last resort if quality acceptable). Must produce 1024x1024 cinematic stills usable as portrait stand-ins for the video model below.
+2. **Video model under 8 GB.** Current pipeline uses HuMo 14B fp8 (16.5 GB staged). Replacement candidates: HuMo's smaller siblings if they exist, Wan 2.1 1.3B if available, LTX-Video 0.9 (~5 GB), CogVideoX-2B fp8, AnimateDiff with a lightweight base. Lip-sync ideal but not required — even animated B-roll over the procgen base is a strict upgrade over stills. Must accept the same per-line audio segment input pattern HuMo uses (or a documented adapter).
+3. **Pairing:** the chosen image + video models should share a tokenizer/conditioning style if possible to avoid double prompt-engineering surface. If they can't share, the BatchFluxRender / BatchHumoRender split is fine; just document the prompt-shape difference per workflow.
+
+**Decision deferred until first clean 16GB FULL run ships.** Add to `docs/2026-04-28-8gb-strategy-decision.md` after the run lands so we have real data on what the 16GB path looks like end-to-end before designing the 8GB fallback.
 
 **Decision deferred until first clean 16GB FULL run ships.** Add to `docs/2026-04-28-8gb-strategy-decision.md` after the run lands so we have real data on what the 16GB path looks like end-to-end before designing the 8GB fallback.
 
