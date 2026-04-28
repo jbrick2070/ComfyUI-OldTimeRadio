@@ -538,6 +538,31 @@ class BatchHumoRender:
                 "width": ("INT", {"default": 480, "min": 256, "max": 1280, "step": 8}),
                 "height": ("INT", {"default": 832, "min": 256, "max": 1280, "step": 8}),
             },
+            "optional": {
+                # BUG-LOCAL-086: dependency-only gate input. Wire any
+                # IMAGE output from the FLUX-render branch (typically
+                # OTR_UnloadAll's IMAGE passthrough, which sits between
+                # OTR_BatchFluxRender and SaveImage) to this socket so
+                # ComfyUI's topological scheduler runs FLUX env stills
+                # FIRST, then UnloadAll frees FLUX VRAM, THEN this
+                # batch-HuMo loop starts with fresh per-episode
+                # `full_env_*.png` stand-ins on disk. Without the wire,
+                # HuMo would run before FLUX (both being independent
+                # graph branches downstream of SignalLostVideo) and
+                # `_find_portrait` would fall back to whatever stale
+                # env stills happened to be on disk from prior runs.
+                # The value is intentionally ignored at runtime; the
+                # wire is purely a graph-edge for ordering.
+                "flux_done_gate": ("IMAGE", {
+                    "tooltip": (
+                        "Optional FLUX->HuMo dependency gate. Wire "
+                        "OTR_UnloadAll's IMAGE output here to force "
+                        "FLUX env stills to render BEFORE this HuMo "
+                        "loop. Value is ignored; only the dependency "
+                        "edge matters."
+                    ),
+                }),
+            },
         }
 
     def execute(
@@ -554,8 +579,14 @@ class BatchHumoRender:
         scheduler: str,
         width: int,
         height: int,
+        flux_done_gate=None,  # BUG-LOCAL-086: dependency gate, value ignored
     ):
         t_start = time.time()
+        # BUG-LOCAL-086: flux_done_gate is intentionally not consumed.
+        # Its sole purpose is to insert a graph edge so ComfyUI's
+        # topological scheduler runs the FLUX -> UnloadAll branch
+        # BEFORE this node starts.
+        del flux_done_gate
 
         # ---- 1. Parse ledger ----
         ledger = self._load_ledger(ledger_json)

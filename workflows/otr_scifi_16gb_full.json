@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 52,
-  "last_link_id": 82,
+  "last_link_id": 83,
   "nodes": [
     {
       "id": 1,
@@ -988,7 +988,8 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            46
+            46,
+            83
           ],
           "shape": 3,
           "slot_index": 0
@@ -1361,6 +1362,12 @@
           "widget": {
             "name": "portraits_dir"
           }
+        },
+        {
+          "name": "flux_done_gate",
+          "type": "IMAGE",
+          "link": 83,
+          "shape": 7
         }
       ],
       "outputs": [
@@ -1813,6 +1820,14 @@
       52,
       2,
       "STRING"
+    ],
+    [
+      83,
+      24,
+      0,
+      51,
+      7,
+      "IMAGE"
     ]
   ],
   "groups": [],
