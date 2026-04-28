@@ -258,6 +258,63 @@ def _slice_audio_tensor(audio_dict: dict, start_s: float, dur_s: float) -> dict:
     return {"waveform": sliced.contiguous(), "sample_rate": sr}
 
 
+def _resolve_cast_stills_from_ledger(
+    cast: list[dict],
+    portraits_dir: Path,
+    ledger_mtime: float | None,
+    *,
+    slack_seconds: float = 60.0,
+) -> tuple[dict[str, Path], list[Path]]:
+    """BUG-LOCAL-088: build a cast_char_id -> still_path map using
+    the ledger's mtime as the freshness floor.
+
+    Strategy:
+      1. Glob `output/otr/stills/full_env_*.png` (both nested layouts).
+      2. Filter to mtime >= (ledger_mtime - slack_seconds). If no
+         ledger mtime is available (inline JSON ledger), fall back
+         to "last 30 minutes" so we still favour fresh stills.
+      3. Sort surviving candidates by mtime descending (newest first).
+      4. Walk the cast list in order; assign candidates[i] to
+         cast[i]['char_id']. If candidates run out, leave that
+         char_id unmapped (caller falls back to the existing
+         _find_portrait/_find_composite tiers).
+
+    Returns ``(char_id_to_path, fresh_candidates_sorted_newest_first)``.
+    The caller logs which assignment came from "fresh" vs "stale" so
+    the runtime log shows the freshness state per line.
+    """
+    import time as _time
+
+    fresh_floor: float
+    if ledger_mtime is not None:
+        fresh_floor = ledger_mtime - slack_seconds
+    else:
+        # No on-disk ledger source; conservatively accept anything
+        # written in the last 30 minutes.
+        fresh_floor = _time.time() - 30 * 60
+
+    candidates_all: list[Path] = []
+    for pattern in ("otr/stills/full_env_*.png", "otr_stills/full_env_*.png"):
+        for p in portraits_dir.glob(pattern):
+            try:
+                if p.stat().st_mtime >= fresh_floor:
+                    candidates_all.append(p)
+            except OSError:
+                continue
+
+    candidates_all.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    char_id_to_path: dict[str, Path] = {}
+    for i, c in enumerate(cast):
+        char_id = (c.get("char_id") or "").strip()
+        if not char_id:
+            continue
+        if i < len(candidates_all):
+            char_id_to_path[char_id] = candidates_all[i]
+
+    return char_id_to_path, candidates_all
+
+
 def _save_clip_via_ffmpeg(
     *,
     images,
@@ -610,7 +667,7 @@ class BatchHumoRender:
         del flux_done_gate
 
         # ---- 1. Parse ledger ----
-        ledger = self._load_ledger(ledger_json)
+        ledger, ledger_path = self._load_ledger_with_path(ledger_json)
         cast = ledger.get("cast") or []
         lines = ledger.get("lines") or []
         episode_id = ledger.get("episode_id", "episode")
@@ -618,8 +675,17 @@ class BatchHumoRender:
             (c.get("char_id") or ""): (c.get("name") or "")
             for c in cast if c.get("char_id")
         }
-        log.info("[BatchHumoRender] episode_id=%s cast=%d lines=%d",
-                 episode_id, len(cast), len(lines))
+        ledger_mtime: float | None = None
+        if ledger_path is not None:
+            try:
+                ledger_mtime = ledger_path.stat().st_mtime
+            except OSError:
+                ledger_mtime = None
+        log.info(
+            "[BatchHumoRender] episode_id=%s cast=%d lines=%d ledger=%s",
+            episode_id, len(cast), len(lines),
+            (ledger_path.name if ledger_path is not None else "<inline>"),
+        )
 
         # ---- 2. Resolve portraits dir ----
         # Default = ComfyUI output root so _find_portrait's globs hit
@@ -670,6 +736,46 @@ class BatchHumoRender:
         except Exception as exc:
             log.debug("[BatchHumoRender] pre-pin skipped: %s", exc)
 
+        # ---- 5.5. BUG-LOCAL-088: ledger-driven cast->still binding ----
+        # Build a per-cast-member still resolver using the LEDGER as
+        # the source of truth for "this episode". After BUG-086 the
+        # FLUX env stills are guaranteed to land before HuMo starts;
+        # after BUG-087 they sort newest-first; this step adds the
+        # explicit freshness floor so STALE stills from prior runs
+        # are never selected even when fresh-count < cast-count.
+        cast_still_map, fresh_candidates = _resolve_cast_stills_from_ledger(
+            cast=cast,
+            portraits_dir=portraits_dir_path,
+            ledger_mtime=ledger_mtime,
+        )
+        log.info(
+            "[BatchHumoRender] cast-still binding: %d/%d cast members "
+            "matched to fresh stills (%d fresh stills available)",
+            len(cast_still_map), len(cast), len(fresh_candidates),
+        )
+        if cast and not fresh_candidates:
+            log.warning(
+                "[BatchHumoRender] no fresh stills found above ledger "
+                "mtime cutoff -- portrait selection will fall back to "
+                "global glob (stale stills possible)"
+            )
+        elif len(cast_still_map) < sum(1 for c in cast if c.get("line_count", 0) > 0):
+            log.warning(
+                "[BatchHumoRender] only %d fresh stills for %d voiced "
+                "cast members; trailing cast positions will fall back "
+                "to legacy _find_portrait tiers",
+                len(fresh_candidates),
+                sum(1 for c in cast if c.get("line_count", 0) > 0),
+            )
+        for c in cast:
+            cid = c.get("char_id") or ""
+            cname = c.get("name") or ""
+            if cid in cast_still_map:
+                log.info(
+                    "[BatchHumoRender]   cast %s (%s) -> %s (FRESH)",
+                    cid, cname, cast_still_map[cid].name,
+                )
+
         # ---- 6. Build per-line plan (no GPU work yet) ----
         if max_clips and max_clips > 0:
             lines = lines[:max_clips]
@@ -690,6 +796,7 @@ class BatchHumoRender:
                 or cid_to_name.get(ln.get("char_id") or "", "")
                 or ""
             ).strip()
+            char_id = (ln.get("char_id") or "").strip()
 
             # Per-line timing: prefer ledger.start_s/dur_s, fall back
             # to auto-slice (idx * clip_length).
@@ -706,11 +813,24 @@ class BatchHumoRender:
             dur_s = min(dur_s, float(clip_length))
             humo_length = humo_length_for_dur(dur_s)
 
-            # Resolve portrait
+            # Resolve portrait. BUG-LOCAL-088 priority:
+            #   1. ledger-driven cast_still_map (this-episode FLUX)
+            #   2. _find_composite (per-shot pass3 composite)
+            #   3. _find_portrait (legacy tiers; mtime-sorted post BUG-087)
             shot_id = ln.get("shot_id")
-            ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
+            ref_png: Path | None = None
+            ref_source = "none"
+            if char_id and char_id in cast_still_map:
+                ref_png = cast_still_map[char_id]
+                ref_source = "ledger-cast-fresh"
+            if not ref_png:
+                ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
+                if ref_png:
+                    ref_source = "find_composite"
             if not ref_png:
                 ref_png = _find_portrait(speaker, cast, portraits_dir_path)
+                if ref_png:
+                    ref_source = "find_portrait"
             if not ref_png:
                 report_lines.append(f"  {line_id}: SKIP no portrait")
                 log.warning("[BatchHumoRender] line %s speaker=%r: no portrait",
@@ -726,11 +846,33 @@ class BatchHumoRender:
             line_audio = _slice_audio_tensor(audio, start_s, dur_s)
             pos_text = _build_pos_prompt(speaker, ln, cast)
 
+            # BUG-LOCAL-088: log which still each line consumed + source
+            # tier + freshness so post-mortem can verify ledger
+            # accuracy without re-globbing the disk.
+            try:
+                ref_mtime = ref_png.stat().st_mtime
+                ref_age = (time.time() - ref_mtime) if ref_mtime else None
+                age_str = (
+                    f"{ref_age:.0f}s ago" if ref_age is not None and ref_age < 3600
+                    else (f"{ref_age/60:.0f}min ago" if ref_age is not None and ref_age < 86400
+                          else (f"{ref_age/3600:.0f}h ago" if ref_age is not None
+                                else "unknown"))
+                )
+            except OSError:
+                age_str = "unknown"
+            log.info(
+                "[BatchHumoRender] line %s speaker=%s char_id=%s "
+                "ref=%s source=%s age=%s",
+                line_id, speaker or "?", char_id or "?",
+                ref_png.name, ref_source, age_str,
+            )
+
             plan.append({
                 "idx": idx, "line_id": line_id, "speaker": speaker,
                 "start_s": start_s, "dur_s": dur_s, "humo_length": humo_length,
                 "pos_text": pos_text, "ref_image": ref_image,
                 "audio": line_audio, "ref_png_name": ref_png.name,
+                "ref_source": ref_source,
             })
 
         if not plan:
@@ -920,9 +1062,20 @@ class BatchHumoRender:
 
     @staticmethod
     def _load_ledger(ledger_arg: str) -> dict:
+        """Compatibility shim around ``_load_ledger_with_path``: returns
+        only the parsed dict for callers that don't need the source
+        path. New code should prefer ``_load_ledger_with_path`` so
+        ledger-mtime-based freshness checks (BUG-LOCAL-088) can use
+        the file's mtime as a cutoff.
+        """
+        ledger, _ = BatchHumoRender._load_ledger_with_path(ledger_arg)
+        return ledger
+
+    @staticmethod
+    def _load_ledger_with_path(ledger_arg: str) -> tuple[dict, Path | None]:
         """Accept either:
-          - inline JSON string (starts with '{')
-          - path to *_ledger.json
+          - inline JSON string (starts with '{') -- returns (dict, None)
+          - path to *_ledger.json -- returns (dict, Path)
           - path to *.mp4 (audio episode); ledger inferred via
             suffix swap (.mp4 -> _ledger.json), since that's the
             convention OTR_SignalLostVideo / EpisodeAssembler write.
@@ -931,6 +1084,11 @@ class BatchHumoRender:
             output node required.
           - empty -> auto-pick newest non-pending in the canonical
             audio dirs (BUG-LOCAL-076 fallback chain).
+
+        Returns (ledger_dict, ledger_path_or_None). When the input is
+        an inline JSON blob the path is None (no on-disk source
+        exists; BUG-088 freshness check falls back to a wall-clock
+        cutoff in that case).
         """
         s = (ledger_arg or "").strip()
 
@@ -951,10 +1109,10 @@ class BatchHumoRender:
                 raise RuntimeError("BatchHumoRender: ledger_json empty and auto-pick found no ledger")
             p = max(cands, key=lambda x: x.stat().st_mtime)
             with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return json.load(f), p
 
         if s.startswith("{"):
-            return json.loads(s)
+            return json.loads(s), None
 
         p = Path(s)
         # .mp4 path -> swap suffix to _ledger.json (SignalLostVideo
@@ -963,7 +1121,7 @@ class BatchHumoRender:
             ledger_p = p.with_suffix("").parent / f"{p.stem}_ledger.json"
             if ledger_p.exists():
                 with open(ledger_p, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    return json.load(f), ledger_p
             raise RuntimeError(
                 f"BatchHumoRender: derived ledger from .mp4 not found: {ledger_p}"
             )
@@ -972,7 +1130,7 @@ class BatchHumoRender:
         if not p.exists():
             raise RuntimeError(f"BatchHumoRender: ledger path not found: {p}")
         with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+            return json.load(f), p
 
     @staticmethod
     def _rename_savevideo_output(
