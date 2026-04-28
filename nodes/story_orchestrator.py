@@ -8128,6 +8128,45 @@ def _looks_like_non_character_cast_name(name: str) -> bool:
     return False
 
 
+def _build_director_json_repair_prompt(raw_output: str, script_text: str = "") -> str:
+    """BUG-LOCAL-099: prompt the LLM to repair its own broken JSON
+    Director output. Used between BUG-090's parse-fail and the
+    minimal-fallback path so we recover the actual content (SFX
+    cues, music prompts, voice notes) instead of throwing them
+    away.
+
+    Strict-JSON instructions; no markdown fences, no commentary.
+    Truncates raw_output to a generous bound so the repair LLM
+    sees enough context but stays under typical context caps.
+    """
+    raw_excerpt = (raw_output or "")[:4000]
+    script_excerpt = (script_text or "")[:1500]
+    return f"""You are a JSON repair specialist. Your previous attempt to produce a Production Plan JSON failed parsing. Re-emit it as VALID JSON ONLY.
+
+REQUIRED SCHEMA (top-level keys exactly):
+{{
+  "voice_assignments": {{ "<CHARACTER_NAME>": {{"voice_preset": "v2/en_speaker_<0-9>", "notes": "<short>"}}, ... }},
+  "sfx_plan": [ {{"cue_id": "<short_slug>", "description": "<short>", "generation_prompt": "<full prompt>"}}, ... ],
+  "music_plan": [ {{"cue_id": "opening|closing|interstitial", "description": "<short>", "generation_prompt": "<full prompt>"}}, ... ],
+  "pacing": {{"beat_pause_ms": 100}}
+}}
+
+HARD RULES:
+- Output strictly valid JSON. NO markdown fences (no ```json, no ```). NO commentary. NO explanations. NO trailing text.
+- Preserve ALL content from the prior attempt -- character names, voice notes, SFX descriptions, music prompts. The goal is structural repair, not creative re-generation.
+- If the prior output is partial / truncated mid-string, complete the structure with reasonable defaults so the JSON is parseable.
+- voice_preset values must be one of: v2/en_speaker_0, v2/en_speaker_1, ..., v2/en_speaker_9.
+- music_plan must always contain all three cue_ids: "opening", "closing", "interstitial". If one is missing, fill with a sensible default prompt.
+
+PRIOR FAILED OUTPUT (repair this):
+{raw_excerpt}
+
+SCRIPT EXCERPT FOR CHARACTER NAME REFERENCE:
+{script_excerpt}
+
+OUTPUT THE VALID JSON NOW (just the JSON object, nothing else):"""
+
+
 def _build_fallback_director_plan(script_text: str, max_chars: int = 8) -> dict:
     """BUG-LOCAL-090 minimal fallback plan: when LLMDirector._extract_json
     cannot parse the LLM output, build the smallest possible viable
@@ -8300,23 +8339,82 @@ class LLMDirector:
         )
 
         # Extract JSON from response.
-        # BUG-LOCAL-090: when every parse strategy fails, the
-        # extractor raises DirectorJSONParseError carrying the raw
-        # output (already saved to a debug file). Catch it and
-        # synthesize a minimal fallback plan from the script's
-        # VOICE tags so the run continues instead of losing an
-        # hour-plus of upstream LLM/Bark/audio work.
+        # Three-tier resilience chain (highest fidelity first):
+        #   Tier 1: parse the LLM's first output directly
+        #   Tier 2 (BUG-LOCAL-099): retry the LLM with a strict
+        #     "output VALID JSON ONLY" repair prompt that includes
+        #     the failed raw output. The LLM extracts/repairs the
+        #     production plan from its own broken JSON, recovering
+        #     the actual content (SFX cues, music prompts, voice
+        #     notes) instead of dropping them on the floor.
+        #   Tier 3 (BUG-LOCAL-090): minimal fallback plan synthesized
+        #     from the script's [VOICE: NAME] tags. Used only if
+        #     BOTH the original parse AND the repair pass fail.
+        plan = None
         try:
             plan = self._extract_json(raw)
         except DirectorJSONParseError as parse_exc:
+            # Tier 2: BUG-LOCAL-099 LLM-repair retry.
             log.warning(
-                "[LLMDirector] BUG-090 fallback path: building minimal "
-                "plan from script VOICE tags (raw output %d chars saved to "
-                "output/otr/audio/director_raw_*.txt)",
+                "[LLMDirector] BUG-099 LLM-repair pass: original parse "
+                "failed (%d chars), retrying with strict-JSON prompt to "
+                "recover content...",
                 len(parse_exc.raw_output),
             )
             _runtime_log(
-                "DIRECTOR: JSON parse failed -- BUG-090 fallback active "
+                "DIRECTOR: BUG-099 JSON-repair retry (preserve content)"
+            )
+            try:
+                repair_prompt = _build_director_json_repair_prompt(
+                    parse_exc.raw_output, script_text
+                )
+                # Use cleanup model when available -- typically faster
+                # / smaller than the story model and well-suited for
+                # structural reformatting tasks.
+                _repair_model = (
+                    _effective_cleanup_id
+                    if _effective_cleanup_id
+                    else model_id
+                )
+                repaired_raw = _generate_with_llm(
+                    repair_prompt,
+                    model_id=_repair_model,
+                    max_new_tokens=2000,
+                    temperature=0.1,  # very low for JSON fidelity
+                    optimization_profile=optimization_profile,
+                )
+                plan = self._extract_json(repaired_raw)
+                log.info(
+                    "[LLMDirector] BUG-099 repair pass succeeded: "
+                    "%d voice_assignments, %d sfx, %d music",
+                    len(plan.get("voice_assignments") or {}),
+                    len(plan.get("sfx_plan") or []),
+                    len(plan.get("music_plan") or []),
+                )
+                _runtime_log(
+                    "DIRECTOR: BUG-099 LLM-repair pass recovered content"
+                )
+            except Exception as repair_exc:
+                log.warning(
+                    "[LLMDirector] BUG-099 repair pass also failed (%s); "
+                    "falling through to BUG-090 minimal fallback",
+                    repair_exc,
+                )
+                _runtime_log(
+                    f"DIRECTOR: BUG-099 repair failed ({type(repair_exc).__name__}) "
+                    "-- BUG-090 minimal fallback active"
+                )
+                plan = None
+
+        if plan is None:
+            # Tier 3: BUG-LOCAL-090 minimal fallback.
+            log.warning(
+                "[LLMDirector] BUG-090 minimal fallback: building plan "
+                "from script VOICE tags only (sfx_plan + music_plan "
+                "will be empty -- AudioGen + MusicGen will use defaults)"
+            )
+            _runtime_log(
+                "DIRECTOR: BUG-090 minimal fallback active "
                 "(see director_raw_*.txt for raw LLM output)"
             )
             plan = _build_fallback_director_plan(script_text)
@@ -8325,6 +8423,7 @@ class LLMDirector:
                 "0 sfx, 0 music",
                 len(plan.get("voice_assignments", {})),
             )
+
         plan = self._validate_director_plan(plan)
 
         # Procedural character names (except LEMMY stays LEMMY)
