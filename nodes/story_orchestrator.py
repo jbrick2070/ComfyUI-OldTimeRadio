@@ -5448,6 +5448,24 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
         # -- Phase 2b: Critique length & format guardrails --
 
+        # BUG-LOCAL-085 guard: if the initial draft pass produced 0
+        # chars (LLM emitted nothing, prompt-truncation edge case,
+        # token-boundary issue, etc.), accept whatever the revision
+        # produced rather than crashing on division-by-zero in the
+        # diagnostic log lines below. Without this guard the whole
+        # script-writer node aborts even though the revision pass
+        # successfully produced a complete script.
+        if len(draft_text) == 0:
+            log.warning(
+                "[Critique] Empty draft (0 chars) -- accepting revision "
+                "of length %d as the script.",
+                len(revised_text),
+            )
+            _runtime_log(
+                f"CRITIQUE: Empty draft, using revision ({len(revised_text)} chars)"
+            )
+            return revised_text
+
         # Check 1: Revision must be at least 60% of draft length (not a summary)
         if len(revised_text) < len(draft_text) * 0.6:
             log.warning(
