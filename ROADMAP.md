@@ -21,6 +21,83 @@ Every consumer of `ledger.json` must understand all four levels. The orchestrato
 
 ---
 
+## v2.0-alpha continuation — Morning of 2026-04-29 order of operations (Jeffrey-locked)
+
+Captured at the end of the 2026-04-28 marathon session. **Execute in this exact order** -- each step's outputs feed the next:
+
+### Step 1 — Extra FLUX stills (radio bookend + per-scene backgrounds)
+
+Extend `OTR_BatchFluxRender` to emit **two new sets of stills** beyond the existing PASS3 cast-shot composites:
+
+- **One vintage radio bookend** per episode. Hard-coded prompt (canned in workflow widget, deterministic across episodes): `"1940s vintage console radio, glowing amber dials, walnut cabinet, vacuum tube halo, dimly lit listening room, cinematic 35mm film aesthetic, 1080p"`. Saved as `output/otr/stills/radio_bookend_<ep_id>.png`. Used during opening + closing music windows.
+- **One per-scene environment still** per `ledger.scenes[]` entry. Prompt comes from Director's `visual_plan.scenes[i].visual_prompt`. Saved as `output/otr/stills/scene_bg_<scene_id>_<ep_id>.png`. Doubles as: (a) HuMo I2V portrait stand-in (per-scene flavor), (b) LTX img2vid seed (Step 3) OR ffmpeg-native zoompan source (Step 3 alternative).
+
+### Step 2 — Ledger write-back so HuMo reads canonical paths
+
+`OTR_BatchFluxRender` writes the rendered paths back to ledger:
+- `ledger.shots[shot_id].png_path` for every PASS3 + scene_bg rendered
+- New top-level field `ledger.radio_bookend_path` for the radio still (or use `ledger.shots["radio_bookend"].png_path`)
+
+This closes the BUG-LOCAL-096-followup gap (Flux→shot_id flow). HuMo's `_resolve_cast_stills_from_ledger` (BUG-088) and `_find_composite` (BUG-087 family) get upgraded to **PREFER `ledger.shots[].png_path` lookup over filesystem-glob-by-mtime**. Glob fallback stays as last resort. HuMo lip-sync gets the right scene-flavored still as a portrait stand-in instead of mtime-guessing.
+
+### Step 3 — Background animation: LTX OR ffmpeg-native, evaluate cost/look
+
+Two paths to "animated background":
+
+- **3a. LTX img2vid** (rich motion). Per-scene FLUX still feeds `OTR_BatchLTXRender`, produces 5-10s clip at 12 fps, looped via ffmpeg `-stream_loop -1` across scene duration. Render budget ~15-90s per episode (per the loop+12fps cuts already roadmap'd above). Layered as the BOTTOM of the 3-layer composite.
+- **3b. ffmpeg-native pseudo-motion** (free, no second model). FLUX still + `zoompan` (slow zoom in/out) + `setpts=PTS*0.5` (slow down) + duplicate-frame loop = a "Ken Burns animated still" without any LTX render. Costs zero extra GPU time. Less rich than LTX but might look good enough for the broadcast-distress aesthetic.
+
+Decision: **render BOTH on the next test episode**, A/B compare visually. If 3b looks acceptable, ship 3b for v2.0-alpha and keep LTX as v2.0-beta upgrade. If 3b feels too static, commit to LTX.
+
+### Step 4 — Sequencing dependency edges
+
+Per the BUG-086 dependency-gate pattern:
+
+```
+LLM/Bark/SceneSequencer/EpisodeAssembler/SignalLostVideo
+        ↓ (existing)
+VideoPlan + ShotDuration
+        ↓
+BatchFluxRender (ALL stills: PASS3 cast + scene_bg + radio_bookend)
+        ↓ ledger write-back (Step 2)
+        ↓
+UnloadAll (frees FLUX VRAM)
+        ↓
+[OPTIONAL] BatchLTXRender (per-scene img2vid loops)
+        ↓ ledger write-back (ledger.scenes[].ltx_path)
+        ↓
+UnloadAll (frees LTX VRAM)
+        ↓
+BatchHumoRender (reads ledger.shots[].png_path → BUG-088 cast-still binding)
+        ↓
+VideoComposite
+   ┌─ assemble layers per timeline:
+   │    bookend window:  radio_bookend full canvas + procgen lighten on top
+   │    scene window:    scene_bg/LTX bottom + HuMo center pillarbox (during dialogue) + procgen lighten on top
+   └─ output → episodes_for_obs/<ep>/<ep>.mp4
+        ↓ (audio: -map 0:a from procgen, ALWAYS preserved)
+        ↓
+[OPTIONAL] SeedVR2 upscale pass
+   ⚠ AUDIO MUST REMAIN INTACT through the upscale -- ffmpeg `-c:a copy` to passthrough,
+     don't re-encode. Verify with ffprobe post-upscale.
+```
+
+### Step 5 — Audio integrity guard through upscale
+
+Sanity check: at every composite/upscale stage, the final mp4 must have **both video AND audio streams**. ffprobe verification step in `OTR_VideoComposite`'s report output. If audio is missing, surface as a warning in the report STRING. Pin in regression test (`test_video_composite.py`): assert ffprobe shows audio stream codec_type=audio after composite.
+
+### Acceptance / done
+
+- Radio bookend visible at opening + closing of every episode
+- Per-scene FLUX backgrounds populated to `ledger.shots[].png_path`
+- HuMo prefers ledger lookup over mtime glob (logs `source=ledger-shot-canonical` for matched, `source=mtime-fallback` only when shot has no png_path)
+- (3a OR 3b) animated backgrounds visible behind HuMo during dialogue
+- Final mp4 has audio. Optional upscaled mp4 has audio.
+
+This is the morning-of plan. Each step is small enough to ship as a focused commit (BUG-100 series).
+
+---
+
 ## v2.0 release blocker — 8GB-VRAM-class user experience
 
 **Owner:** Jeffrey | **Status:** open | **Added:** 2026-04-28
