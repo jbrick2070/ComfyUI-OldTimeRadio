@@ -57,10 +57,17 @@ def main() -> int:
     next_link_id = [1]
 
     def add_link(src_id, src_slot, dst_id, dst_slot, link_type):
+        """Register a link on BOTH the source node's outputs[].links
+        AND the destination node's inputs[].link field. Earlier
+        builder versions only set the source side, which made
+        ComfyUI's frontend yell about "is funky... target.link is
+        NOT correct (is null)" and auto-patch the JSON on load.
+        Setting both ends produces a JSON that loads without warnings.
+        """
         lid = next_link_id[0]
         next_link_id[0] += 1
         links.append([lid, src_id, src_slot, dst_id, dst_slot, link_type])
-        # Register on src node's output
+        # Register on src node's outputs[].links list
         for n in nodes:
             if n["id"] == src_id:
                 outs = n.get("outputs") or []
@@ -68,6 +75,11 @@ def main() -> int:
                     if outs[src_slot].get("links") is None:
                         outs[src_slot]["links"] = []
                     outs[src_slot]["links"].append(lid)
+            # Register on dst node's inputs[].link field
+            if n["id"] == dst_id:
+                ins = n.get("inputs") or []
+                if dst_slot < len(ins):
+                    ins[dst_slot]["link"] = lid
         return lid
 
     # 1. LoadAudio -- reads the Resonance Chamber mp4 from input/.

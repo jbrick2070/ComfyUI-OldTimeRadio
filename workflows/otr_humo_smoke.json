@@ -94,7 +94,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": null
+          "link": 1
         }
       ],
       "outputs": [
@@ -137,7 +137,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": null
+          "link": 2
         }
       ],
       "outputs": [
@@ -289,27 +289,27 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": null
+          "link": 3
         },
         {
           "name": "clip",
           "type": "CLIP",
-          "link": null
+          "link": 4
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": null
+          "link": 5
         },
         {
           "name": "audio_encoder",
           "type": "AUDIO_ENCODER",
-          "link": null
+          "link": 6
         },
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": null
+          "link": 7
         }
       ],
       "outputs": [
