@@ -3,7 +3,7 @@ MusicGen Theme - dedicated instrumental music bus for opening, closing, and
 act-break interstitial cues.
 
 Replaces the previous "no music at all" hole in the OTR pipeline. Reads the
-three fixed music cues out of production_plan_json (written by Gemma4Director,
+three fixed music cues out of production_plan_json (written by LLMDirector,
 one tailored prompt per episode), generates them via transformers' native
 MusicGen-medium (facebook/musicgen-medium), and emits three AUDIO tensors that
 feed straight into EpisodeAssembler's opening_theme_audio and
@@ -20,8 +20,8 @@ Design notes (see ROADMAP v1.4 Theme A):
     uncached. After generation it is explicitly unloaded and cuda cache is
     flushed, so Bark has its full VRAM window when BatchBark runs next.
   - musicgen-medium is ~6 GB VRAM - fits cleanly inside the 14.5 GB ceiling
-    once Gemma4 has been unloaded (which happens automatically at the
-    Gemma4Director exit, before this node runs).
+    once the LLM has been unloaded (which happens automatically at the
+    LLMDirector exit, before this node runs).
   - 32 kHz native sample rate, mono. SceneSequencer output is 48 kHz - the
     EpisodeAssembler downstream already handles rate matching, so we leave
     the 32 kHz rate intact in the returned AUDIO dict.
@@ -148,7 +148,7 @@ class MusicGenTheme:
     """OTR v1.4 - instrumental music generator for opening, closing, and
     act-break interstitial cues.
 
-    Reads the three music cues written by Gemma4Director into
+    Reads the three music cues written by LLMDirector into
     production_plan_json, generates any cue that isn't already in the
     per-episode cache, and returns three AUDIO tensors ready to wire into
     EpisodeAssembler.
@@ -166,7 +166,7 @@ class MusicGenTheme:
                 "production_plan_json": ("STRING", {
                     "multiline": True,
                     "default": "{}",
-                    "tooltip": "Production plan JSON from Gemma4Director. music_plan key is read.",
+                    "tooltip": "Production plan JSON from LLMDirector. music_plan key is read.",
                 }),
             },
             "optional": {
@@ -322,6 +322,64 @@ class MusicGenTheme:
         render_log.append(
             f"--- 3 music cues ready (opening, closing, interstitial) ---"
         )
+
+        # ---- BUG-LOCAL-095: write music wav_paths back to ledger ----
+        # Find the most recent pending or final ledger and stamp each
+        # cue's wav_path + dur_s into ledger.music[]. Silent skip when
+        # no ledger exists yet (rare; usually ScriptWriter has run by
+        # the time MusicGen does). Errors logged but never crash.
+        try:
+            import json as _json
+            import time as _time
+            from pathlib import Path as _Path
+            audio_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            if audio_dir.exists():
+                cands = list(audio_dir.glob("*_ledger.json"))
+                if cands:
+                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
+                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                    music_rows = led.get("music") or []
+                    # Build a lookup by cue_id; if a row is missing for
+                    # one of our cues, skip that one (don't synthesize
+                    # ledger schema -- keep node side-effect bounded).
+                    music_by_id = {(r.get("cue_id") or ""): r for r in music_rows}
+                    updated = 0
+                    for cue_id in CUE_IDS:
+                        cue_dict = cues.get(cue_id) or {}
+                        cache_path = cue_dict.get("cache_path")
+                        result_dict = results.get(cue_id) or {}
+                        wf = result_dict.get("waveform")
+                        sr = int(result_dict.get("sample_rate", 0)) or MUSICGEN_SAMPLE_RATE
+                        dur = None
+                        if wf is not None and sr > 0:
+                            try:
+                                dur = float(wf.shape[-1]) / float(sr)
+                            except Exception:
+                                dur = None
+                        row = music_by_id.get(cue_id)
+                        if row is not None:
+                            if cache_path:
+                                row["wav_path"] = str(cache_path)
+                            if dur is not None:
+                                row["dur_s"] = dur
+                            updated += 1
+                    if updated:
+                        ledger_path.write_text(
+                            _json.dumps(led, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                        log.info(
+                            "[MusicGenTheme] BUG-095 ledger updated: "
+                            "%d music cue path(s) written to %s",
+                            updated, ledger_path.name,
+                        )
+                        render_log.append(
+                            f"ledger updated: {updated} music wav_path(s) -> "
+                            f"{ledger_path.name}"
+                        )
+        except Exception as _exc:
+            log.warning("[MusicGenTheme] BUG-095 ledger write-back failed: %s", _exc)
+
         log_text = "\n".join(render_log)
         return (
             results["opening"],

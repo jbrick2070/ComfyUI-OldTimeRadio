@@ -262,11 +262,56 @@ class BatchAudioGenGenerator:
         # Batching requires padding to max length.
         max_samples = max(clip.shape[2] for clip in final_clips)
         batched_waveform = torch.zeros(len(final_clips), 1, max_samples)
-        
+
         for i, clip in enumerate(final_clips):
             samples = clip.shape[2]
             batched_waveform[i, 0, :samples] = clip[0, 0, :samples]
-            
+
+        # ---- BUG-LOCAL-095: write SFX wav_paths back to ledger ----
+        # Stamp each SFX cue's cache_path + dur_s into ledger.sfx[].
+        # Maps render_queue position -> ledger.sfx[position] (both
+        # iterate the script in order). Silent skip when no ledger
+        # is on disk yet. Errors logged, never crash.
+        try:
+            import json as _json
+            from pathlib import Path as _Path
+            audio_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            if audio_dir.exists():
+                cands = list(audio_dir.glob("*_ledger.json"))
+                if cands:
+                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
+                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                    sfx_rows = led.get("sfx") or []
+                    updated = 0
+                    for i, item in enumerate(render_queue):
+                        if i >= len(sfx_rows):
+                            break
+                        row = sfx_rows[i]
+                        cache_path = item.get("cache_path")
+                        clip_t = final_clips[i] if i < len(final_clips) else None
+                        dur = None
+                        if clip_t is not None:
+                            try:
+                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
+                            except Exception:
+                                dur = None
+                        if cache_path:
+                            row["wav_path"] = str(cache_path)
+                        if dur is not None:
+                            row["dur_s"] = dur
+                        updated += 1
+                    if updated:
+                        ledger_path.write_text(
+                            _json.dumps(led, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                        batch_log.append(
+                            f"BUG-095 ledger updated: {updated} sfx wav_path(s) -> "
+                            f"{ledger_path.name}"
+                        )
+        except Exception as _exc:
+            batch_log.append(f"BUG-095 ledger write-back failed: {_exc}")
+
         return ({"waveform": batched_waveform, "sample_rate": AUDIOGEN_SAMPLE_RATE}, "\n".join(batch_log))
 
 NODE_CLASS_MAPPINGS = {"OTR_BatchAudioGenGenerator": BatchAudioGenGenerator}
