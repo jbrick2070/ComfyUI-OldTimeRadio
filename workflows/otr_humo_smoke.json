@@ -284,7 +284,7 @@
       "flags": {},
       "order": 8,
       "mode": 0,
-      "title": "Batch HuMo Render (smoke -- 4 clips)",
+      "title": "Batch HuMo Render (smoke -- 3 clips)",
       "inputs": [
         {
           "name": "model",
@@ -344,7 +344,7 @@
         "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_resonance_chamber_20260427_164718.mp4",
         "",
         7.0,
-        4,
+        3,
         7,
         "randomize",
         6,

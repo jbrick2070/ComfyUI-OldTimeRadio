@@ -177,7 +177,9 @@ def main() -> int:
     #        is the source of truth.
     #   [1]  portraits_dir placeholder ("" -> auto-resolve)
     #   [2]  clip_length 7.0
-    #   [3]  max_clips 4 (smoke -- 4 clips, not 30)
+    #   [3]  max_clips 3 (smoke -- 3 clips, not 30; tight cycle for
+    #        BUG-083 _save_clip_via_ffmpeg + BUG-084 episodes_for_obs/
+    #        verification)
     #   [4]  seed 7
     #   [5]  control_after_generate "randomize"
     #   [6]  steps 6
@@ -188,7 +190,7 @@ def main() -> int:
     #   [11] height 832
     nodes.append(_node(
         node_id=8, ntype="OTR_BatchHumoRender",
-        title="Batch HuMo Render (smoke -- 4 clips)",
+        title="Batch HuMo Render (smoke -- 3 clips)",
         pos=[600, 240], size=[480, 460],
         inputs=[
             {"name": "model", "type": "MODEL", "link": None},
@@ -212,7 +214,8 @@ def main() -> int:
             FIXTURE_LEDGER_MP4,  # ledger_json (mp4 path -> swap-suffix internally)
             "",                  # portraits_dir (auto-resolve)
             7.0,                 # clip_length
-            4,                   # max_clips (smoke: 4 only)
+            3,                   # max_clips (smoke: 3 only -- tight
+                                 #   cycle for BUG-083/084 verify)
             7,                   # seed
             "randomize",         # control_after_generate
             6,                   # steps
@@ -327,7 +330,7 @@ def main() -> int:
     print(f"OK: wrote {OUT}")
     print(f"  fixture: {FIXTURE_LEDGER_MP4}")
     print(f"  nodes: {len(nodes)}, links: {len(links)}")
-    print(f"  max_clips: 4 (smoke; bump in widget for fuller test)")
+    print(f"  max_clips: 3 (smoke; bump in widget for fuller test)")
     return 0
 
 
