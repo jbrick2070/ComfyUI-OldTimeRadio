@@ -301,11 +301,33 @@ def _consolidate_similar_cast_rows(cast_rows):
     (mutated in place where merging happened).
 
     Idempotent: running twice yields the same result as running once.
+
+    BUG-LOCAL-098: callers that need to rewrite downstream `char_id`
+    references (e.g. `lines[i].char_id`) should use
+    ``_consolidate_similar_cast_rows_with_aliases`` which returns
+    ``(consolidated_cast, alias_map)`` where alias_map is
+    ``{loser_char_id: winner_char_id}``. The plain function here is
+    kept for back-compat with callers that don't track aliases.
+    """
+    consolidated, _ = _consolidate_similar_cast_rows_with_aliases(cast_rows)
+    return consolidated
+
+
+def _consolidate_similar_cast_rows_with_aliases(cast_rows):
+    """BUG-LOCAL-098: like ``_consolidate_similar_cast_rows`` but also
+    returns the ``{loser_char_id: winner_char_id}`` alias map so
+    callers can rewrite line/sfx/music ``char_id`` references to the
+    surviving cast entry. Without this, dedup leaves the cast clean
+    but ``lines[i].char_id`` still points at the dropped char_id,
+    causing Bark to fail voice resolution for those lines (observed
+    on the Arcadia run: l001 + l033 referenced ``c02`` after the
+    ANNOUCNER/ANNOUNCER typo merge dropped c02 from cast).
     """
     if not cast_rows or len(cast_rows) < 2:
-        return list(cast_rows or [])
+        return list(cast_rows or []), {}
 
     keep = list(cast_rows)
+    aliases: dict[str, str] = {}  # loser_char_id -> winner_char_id
     i = 0
     while i < len(keep):
         row_i = keep[i]
@@ -336,6 +358,16 @@ def _consolidate_similar_cast_rows(cast_rows):
                         win_row[fld] = a + b
                 # Make sure winner uses the canonical winner name
                 win_row["name"] = winner
+                # BUG-LOCAL-098: record loser->winner char_id alias so
+                # the caller can rewrite lines[i].char_id and other
+                # references that pointed at the loser. Chains of
+                # aliases (e.g. STANLEY -> STANLEARY -> STANLERY are
+                # all aliases of the final survivor) get flattened by
+                # walking the alias map transitively below.
+                lose_cid = (lose_row.get("char_id") or "").strip()
+                win_cid = (win_row.get("char_id") or "").strip()
+                if lose_cid and win_cid and lose_cid != win_cid:
+                    aliases[lose_cid] = win_cid
                 # Remove loser, restart inner walk so we re-check the
                 # winner row against everyone else (chained typos like
                 # STANLEY / STANLEARY / STANLERY all collapse safely).
@@ -355,7 +387,19 @@ def _consolidate_similar_cast_rows(cast_rows):
                 continue
             j += 1
         i += 1
-    return keep
+
+    # Flatten chained aliases: if A -> B and B -> C, rewrite A -> C.
+    # Bounded loop in case of cycles (shouldn't happen but defensive).
+    for _ in range(len(aliases) + 1):
+        changed = False
+        for k, v in list(aliases.items()):
+            if v in aliases and aliases[v] != v:
+                aliases[k] = aliases[v]
+                changed = True
+        if not changed:
+            break
+
+    return keep, aliases
 
 
 # -----------------------------------------------------------------------------
@@ -8042,6 +8086,14 @@ class DirectorJSONParseError(ValueError):
 # parsing that are obviously SFX cues, scene markers, or stage
 # directions, not real characters. Names matching these patterns get
 # filtered out of the cast before voice assignment.
+#
+# BUG-LOCAL-097 (2026-04-28): added VOICEOVER + VOICEOBER (LLM typo
+# of VOICEOVER) + NARRATOR + V.O. + O.S. patterns. Captain-Eris-Violet
+# during the Arcadia run emitted `[KEVIN VOICEOVER]` and
+# `[KEVIN VOICEOBER]` lines that registered as separate cast members
+# alongside the real KEVIN STENDAHL. These are screenplay
+# meta-direction tags ("voice-over", "off-screen") used to mark a
+# character's narration mode, NOT distinct character names.
 _SFX_CAST_BLOCKLIST_PATTERNS = (
     r"^SFX\b", r"^MUSIC\b", r"^THEME\b",
     r"\bBLARING\b", r"\bBLARE\b", r"\bWHOOSH\b", r"\bWHOOSHING\b",
@@ -8051,6 +8103,11 @@ _SFX_CAST_BLOCKLIST_PATTERNS = (
     r"\bAT THE\b",   # "BACK AT THE LAB" etc
     r"\bSOUND\b", r"\bMUSIC QUEUE\b",
     r"\bINTENSE\b", r"\bMYSTERIOUS VOICE\b",
+    # BUG-LOCAL-097 -- screenplay meta-direction (not characters)
+    r"\bVOICEOVER\b", r"\bVOICE\s?OVER\b", r"\bVOICEOBER\b",
+    r"\bNARRATOR\b",
+    r"\bV\.O\.\b", r"\bO\.S\.\b",        # "JOHN V.O." / "JANE O.S."
+    r"\bSCREEN\b", r"\bOFF.SCREEN\b",
 )
 
 
@@ -8470,7 +8527,45 @@ class LLMDirector:
             # LLOYD KAPOOR ratio=0.78 with prefix-rule; STANLEY vs
             # STANLEARY ratio=0.875). We merge with a clear winner-rule
             # so downstream Bark voicing lands on the speaking row.
-            existing_cast = _consolidate_similar_cast_rows(existing_cast)
+            existing_cast, _cast_aliases = _consolidate_similar_cast_rows_with_aliases(existing_cast)
+            # BUG-LOCAL-098: rewrite lines[i].char_id (and any other
+            # downstream char_id refs) to point from a dropped loser
+            # char_id to the surviving winner. Without this, the cast
+            # is clean but lines still reference dangling ids ->
+            # Bark fails voice resolution for those lines. Observed
+            # on the Arcadia run with the ANNOUCNER/ANNOUNCER typo
+            # merge dropping c02 from cast while l001 + l033 still
+            # pointed at c02.
+            if _cast_aliases:
+                _rewritten = 0
+                try:
+                    led_data = led.data
+                    for ln in led_data.get("lines", []) or []:
+                        cid = ln.get("char_id")
+                        if cid and cid in _cast_aliases:
+                            ln["char_id"] = _cast_aliases[cid]
+                            _rewritten += 1
+                    # SFX rows can carry a char_id too in some workflows;
+                    # be defensive.
+                    for sx in led_data.get("sfx", []) or []:
+                        cid = sx.get("char_id")
+                        if cid and cid in _cast_aliases:
+                            sx["char_id"] = _cast_aliases[cid]
+                            _rewritten += 1
+                    log.info(
+                        "[LLMDirector] BUG-098 cast-merge alias rewrite: "
+                        "%d row(s) updated, aliases=%s",
+                        _rewritten, _cast_aliases,
+                    )
+                    _runtime_log(
+                        f"DIRECTOR: BUG-098 cast-alias rewrite "
+                        f"({_rewritten} ledger refs updated; "
+                        f"aliases={_cast_aliases})"
+                    )
+                except Exception as _exc:
+                    log.warning(
+                        "[LLMDirector] BUG-098 alias rewrite failed: %s", _exc
+                    )
             # 2026-04-26 PM ARCH: lazy Bark health check on the cast's
             # actual Bark presets only -- replaces the eager full-catalog
             # warmup that used to run at the top of direct(). Failed
