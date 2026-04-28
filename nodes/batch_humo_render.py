@@ -130,6 +130,14 @@ def _find_portrait(
          portrait-render pass; BUG-LOCAL-078 stopgap)
       5. any full_env_*.png
       6. None
+
+    BUG-LOCAL-087 ordering: every glob result is sorted by mtime
+    descending (newest first). Without this, a freshly-rendered
+    full_env_00059_.png would lose to a days-old full_env_00001_.png
+    under default alphabetic sort -- meaning HuMo would always pick
+    the OLDEST visual reference even when FLUX just rendered fresh
+    per-episode stills (BUG-086). Sorting by mtime ensures the
+    newest stills line up with cast position 0 first.
     """
     speaker_norm = (speaker or "").upper().strip()
 
@@ -148,13 +156,19 @@ def _find_portrait(
         candidates = sorted(
             list(portraits_dir.glob("otr/stills/pass1_portrait_*.png"))
             + list(portraits_dir.glob("otr_stills/pass1_portrait_*.png"))
-            + list(portraits_dir.glob("otr_humo_pass1_portrait_*.png"))
+            + list(portraits_dir.glob("otr_humo_pass1_portrait_*.png")),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
         if candidates:
             return candidates[idx % len(candidates)]
 
-    # 3. Any HuMo portrait (no cast match)
-    candidates = sorted(portraits_dir.glob("otr_humo_pass1_portrait_*.png"))
+    # 3. Any HuMo portrait (no cast match) -- newest first
+    candidates = sorted(
+        portraits_dir.glob("otr_humo_pass1_portrait_*.png"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     if candidates:
         return candidates[0]
 
@@ -164,19 +178,26 @@ def _find_portrait(
     #    member maps to a random env still) but produces a runnable
     #    end-to-end pipeline. Replace with proper PASS1 portraits when
     #    a portrait render path is wired into the workflow.
+    #    BUG-LOCAL-087: sort by mtime descending so the newest stills
+    #    (this episode's FLUX output) come first -- cast index 0 maps
+    #    to the freshest still.
     if speaker_norm in cast_names:
         idx = cast_names.index(speaker_norm)
         candidates = sorted(
             list(portraits_dir.glob("otr/stills/full_env_*.png"))
-            + list(portraits_dir.glob("otr_stills/full_env_*.png"))
+            + list(portraits_dir.glob("otr_stills/full_env_*.png")),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
         )
         if candidates:
             return candidates[idx % len(candidates)]
 
-    # 5. Any FLUX env still (last resort)
+    # 5. Any FLUX env still (last resort) -- newest first
     candidates = sorted(
         list(portraits_dir.glob("otr/stills/full_env_*.png"))
-        + list(portraits_dir.glob("otr_stills/full_env_*.png"))
+        + list(portraits_dir.glob("otr_stills/full_env_*.png")),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
     )
     if candidates:
         return candidates[0]
