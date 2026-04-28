@@ -202,29 +202,36 @@ def _build_filter_graph(
         [0]  procgen video (base layer + audio source)
         [1..N] HuMo clips, one per timeline entry
 
-    Filter graph:
+    Filter graph (BUG-LOCAL-092 architecture):
         [0:v] fps -> scale -> setsar -> [procgen]
-        color=black canvas of episode_dur -> [base]
-        [i:v] scale 624:humo_h -> setsar -> [hi]
-        chain: [base] overlay each [hi] at x=offset_x,y=0 with
+        [i:v] fps -> scale 624:humo_h -> setsar ->
+              setpts (per-clip start_s) -> [hi]
+        chain: [procgen] overlay each [hi] at x=offset_x,y=0 with
                enable='between(t,start,start+dur)'
-        final: [base_with_humo] [procgen] blend=all_mode=BLEND:
-               all_opacity=OPACITY -> [v]
+        (optional) blend pass for `additive procgen-over-humo`
+                    feel -- lower default opacity, screen mode by
+                    default; opacity=0 disables the pass entirely.
+        final: [...] -> [v]
+
+    Why this order: procgen is the BASE (full opacity), HuMo
+    overlays opaquely at the center pillarbox during each line's
+    time window. The pillarbox sides ALWAYS show full procgen
+    (the audio-reactive CRT visualizer Jeffrey wants), and the
+    center swaps to HuMo only while a character is speaking.
+    The previous order (black canvas + HuMo on top + blanket-
+    blend procgen at addition@0.5) drowned everything in the
+    procgen color cast (BUG-LOCAL-092 magenta/pink wash).
     """
     humo_w = round(humo_h * (480 / 832) / 8) * 8  # snap to mult of 8 (h264 chroma safe)
     offset_x = (canvas_w - humo_w) // 2
 
     parts = []
-    # [0] procgen → time-aligned + scaled
+    # [0] procgen → time-aligned + scaled = BASE layer (sides + initial center)
     parts.append(
         f"[0:v]fps={canvas_fps},scale={canvas_w}:{canvas_h},setsar=1[procgen]"
     )
-    # Black base canvas
-    parts.append(
-        f"color=black:s={canvas_w}x{canvas_h}:r={canvas_fps}:d={episode_dur:.3f},setsar=1[base0]"
-    )
-    # Per-clip scale + overlay chain
-    last_label = "base0"
+    # Per-clip scale + overlay chain. HuMo overlays directly on procgen.
+    last_label = "procgen"
     inputs_list: list[Path] = [procgen_video]
     for idx, (clip_path, start_s, dur_s) in enumerate(timeline):
         in_idx = idx + 1
@@ -240,11 +247,19 @@ def _build_filter_graph(
             f"enable='between(t,{start_s:.3f},{end_s:.3f})'[{new_label}]"
         )
         last_label = new_label
-    # Final additive blend with proc gen on top
-    parts.append(
-        f"[{last_label}][procgen]blend=all_mode={blend_mode}:"
-        f"all_opacity={blend_opacity:.3f}[v]"
-    )
+
+    # Optional subtle procgen-over-HuMo "audio-reactive sheen" pass.
+    # opacity=0 disables it entirely. Default is now low (0.0 in
+    # widgets) so the composite is clean by default; users who want
+    # the additive sheen can dial up blend_opacity in the widget.
+    if blend_opacity and blend_opacity > 0:
+        parts.append(
+            f"[{last_label}][procgen]blend=all_mode={blend_mode}:"
+            f"all_opacity={blend_opacity:.3f}[v]"
+        )
+    else:
+        # Just rename the last overlay output to [v]
+        parts.append(f"[{last_label}]copy[v]")
     return ";".join(parts), inputs_list
 
 
@@ -289,12 +304,21 @@ class VideoComposite:
                 }),
             },
             "optional": {
+                # BUG-LOCAL-092: defaults flipped.
+                # Old defaults (addition @ 0.5) blanket-drowned the
+                # composite in procgen color cast (Jeffrey's "horrendously
+                # pink" feedback). New defaults: `lighten` mode, opacity
+                # 0.0 (sheen pass disabled by default). User can dial
+                # opacity up for the audio-reactive sheen flash; lighten
+                # mode preserves HuMo skin tones since it only takes the
+                # max(procgen, humo) per channel rather than additively
+                # tinting.
                 "blend_mode": (
-                    ["addition", "screen", "lighten", "overlay", "normal"],
-                    {"default": "addition"},
+                    ["lighten", "screen", "addition", "overlay", "normal"],
+                    {"default": "lighten"},
                 ),
                 "blend_opacity": ("FLOAT", {
-                    "default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05,
+                    "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05,
                 }),
                 "canvas_width": ("INT", {"default": 1920, "min": 256, "max": 3840, "step": 8}),
                 "canvas_height": ("INT", {"default": 1080, "min": 256, "max": 2160, "step": 8}),
@@ -318,8 +342,8 @@ class VideoComposite:
         procgen_video_path: str,
         clips_dir: str,
         ledger_json: str,
-        blend_mode: str = "addition",
-        blend_opacity: float = 0.5,
+        blend_mode: str = "lighten",
+        blend_opacity: float = 0.0,
         canvas_width: int = 1920,
         canvas_height: int = 1080,
         canvas_fps: int = 25,

@@ -107,6 +107,11 @@ def test_build_clip_timeline_fallback_when_dur_missing(tmp_path: Path, m) -> Non
 # ---------------------------------------------------------------------------
 
 def test_filter_graph_includes_all_required_primitives(tmp_path: Path, m) -> None:
+    """BUG-LOCAL-092: post-architecture, procgen is the BASE layer
+    (no black canvas underneath); HuMo overlays on top of procgen
+    at center; the final blanket-blend is OPTIONAL (only emitted
+    when blend_opacity > 0). With the legacy `addition`/0.5 input
+    we still expect the blend pass to be present."""
     procgen = tmp_path / "procgen.mp4"
     procgen.write_bytes(b"\x00")
     timeline = [
@@ -124,7 +129,9 @@ def test_filter_graph_includes_all_required_primitives(tmp_path: Path, m) -> Non
     # Expected primitives
     assert "fps=25" in graph
     assert "scale=1920:1080" in graph
-    assert "color=black:s=1920x1080" in graph
+    # BUG-092: procgen is the base now -- no separate black canvas.
+    assert "[procgen]" in graph
+    assert "color=black:" not in graph
     assert "overlay=" in graph
     assert "enable='between(t," in graph
     assert "blend=all_mode=addition" in graph
@@ -135,6 +142,26 @@ def test_filter_graph_includes_all_required_primitives(tmp_path: Path, m) -> Non
     assert inputs[0] == procgen
     assert inputs[1].name == "l001.mp4"
     assert inputs[2].name == "l002.mp4"
+
+
+def test_filter_graph_skips_blend_pass_when_opacity_zero(tmp_path: Path, m) -> None:
+    """BUG-LOCAL-092: blend_opacity=0.0 (new default) skips the
+    blanket-blend pass entirely. Procgen-as-base + HuMo overlays
+    is the whole composite; no additive sheen."""
+    procgen = tmp_path / "procgen.mp4"
+    procgen.write_bytes(b"\x00")
+    timeline = [(tmp_path / "l001.mp4", 0.0, 3.88)]
+    graph, _ = m._build_filter_graph(
+        procgen_video=procgen, timeline=timeline,
+        canvas_w=1920, canvas_h=1080, canvas_fps=25,
+        humo_h=1080,
+        blend_mode="lighten", blend_opacity=0.0,
+        episode_dur=10.0,
+    )
+    assert "blend=all_mode=" not in graph, (
+        "opacity=0 should skip the optional blend pass"
+    )
+    assert graph.rstrip(";").endswith("[v]")
 
 
 def test_filter_graph_pillarbox_offset_is_centered(tmp_path: Path, m) -> None:
@@ -173,8 +200,10 @@ def test_filter_graph_supports_alternate_blend_modes(tmp_path: Path, m) -> None:
 
 def test_filter_graph_handles_empty_timeline_gracefully(tmp_path: Path, m) -> None:
     """Empty timeline -- no overlays. Should still produce a valid
-    graph that runs proc gen through fps+scale and blends nothing
-    on top (final blend is procgen on procgen, mostly identity)."""
+    graph that runs procgen through fps+scale. With the BUG-092
+    architecture there is no separate black canvas; procgen IS the
+    base. With the legacy `addition`/0.5 input the optional
+    blanket-blend pass is still emitted."""
     procgen = tmp_path / "procgen.mp4"
     procgen.write_bytes(b"\x00")
     graph, inputs = m._build_filter_graph(
@@ -185,7 +214,9 @@ def test_filter_graph_handles_empty_timeline_gracefully(tmp_path: Path, m) -> No
         episode_dur=10.0,
     )
     assert "fps=25" in graph
-    assert "color=black:s=1920x1080" in graph
+    # BUG-092: procgen is the base; no separate black canvas anymore.
+    assert "[procgen]" in graph
+    assert "color=black:" not in graph
     assert "blend=all_mode=addition" in graph
     assert len(inputs) == 1  # just procgen
 
@@ -227,12 +258,20 @@ def test_input_types_optional_widgets(m) -> None:
         assert k in inp["optional"], f"optional widget {k!r} missing"
 
 
-def test_default_blend_mode_is_addition(m) -> None:
-    """Per Jeffrey's spec: additive blend at 50% opacity."""
+def test_default_blend_mode_is_lighten_with_zero_opacity(m) -> None:
+    """BUG-LOCAL-092: defaults flipped from `addition`/0.5 (which
+    drowned the composite in procgen color cast -- Jeffrey's
+    'horrendously pink' feedback) to `lighten`/0.0 (sheen pass
+    disabled by default; user can dial up for the audio-reactive
+    flash without saturation)."""
     inp = m.VideoComposite.INPUT_TYPES()
     blend_mode_choices = inp["optional"]["blend_mode"][0]
-    assert blend_mode_choices[0] == "addition"  # first = default
-    assert inp["optional"]["blend_opacity"][1]["default"] == 0.5
+    assert blend_mode_choices[0] == "lighten"  # first = default
+    assert inp["optional"]["blend_opacity"][1]["default"] == 0.0
+    # All five blend modes still selectable for advanced users.
+    assert set(blend_mode_choices) == {
+        "lighten", "screen", "addition", "overlay", "normal",
+    }
 
 
 def test_default_canvas_is_1920x1080_at_25fps(m) -> None:
