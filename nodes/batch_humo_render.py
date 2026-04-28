@@ -977,6 +977,11 @@ class BatchHumoRender:
                  sum(1 for e in plan if e.get("positive") is not None
                      and e.get("audio_emb") is not None))
         rendered = 0
+        # BUG-LOCAL-089: track per-line clip records for ledger write-back.
+        # The `clips[]` ledger field lets downstream tools (concat,
+        # post-mortem, OBS scheduler) find every rendered clip by
+        # ledger lookup instead of filesystem glob.
+        clip_records: list[dict] = []
         for entry in plan:
             line_id = entry["line_id"]
             if entry.get("positive") is None or entry.get("audio_emb") is None:
@@ -1033,12 +1038,30 @@ class BatchHumoRender:
                 # output (a .mp4 with audio embedded) without the
                 # broken executor-coupling. Output filename is
                 # canonical `<line_id>.mp4` so concat finds it.
+                clip_mp4_path = clips_dir_path / f"{line_id}.mp4"
                 _save_clip_via_ffmpeg(
                     images=images_out,
                     audio_dict=entry["audio"],
-                    out_path=clips_dir_path / f"{line_id}.mp4",
+                    out_path=clip_mp4_path,
                     fps=25,
                 )
+
+                # BUG-LOCAL-089: record this clip in the per-run
+                # ledger.clips[] array. Includes line_id, char_id,
+                # mp4_path, start_s, dur_s, source-tier, ref_png so
+                # concat (VideoComposite) can resolve every clip via
+                # ledger lookup instead of glob heuristics.
+                clip_records.append({
+                    "line_id": line_id,
+                    "char_id": (lines[entry["idx"]].get("char_id") or "").strip() or None,
+                    "speaker": entry["speaker"] or None,
+                    "mp4_path": str(clip_mp4_path),
+                    "start_s": float(entry["start_s"]),
+                    "dur_s": float(entry["dur_s"]),
+                    "humo_length": int(entry["humo_length"]),
+                    "ref_png_name": entry.get("ref_png_name"),
+                    "ref_source": entry.get("ref_source"),
+                })
 
                 shot_ms = int((time.time() - shot_t0) * 1000)
                 report_lines.append(
@@ -1057,6 +1080,34 @@ class BatchHumoRender:
         )
         log.info("[BatchHumoRender] complete: %d/%d clips in %d ms",
                  rendered, len(plan), total_ms)
+
+        # ---- 10. BUG-LOCAL-089: write clips[] back to the ledger ----
+        # Persist the per-clip records so VideoComposite + post-mortem
+        # can resolve every clip via ledger lookup. Skipped silently
+        # when the ledger came from an inline JSON blob (no source
+        # path to write back to).
+        if ledger_path is not None and clip_records:
+            try:
+                ledger["clips"] = clip_records
+                with open(ledger_path, "w", encoding="utf-8") as f:
+                    json.dump(ledger, f, indent=2, ensure_ascii=False)
+                log.info(
+                    "[BatchHumoRender] ledger updated: %d clip records -> %s",
+                    len(clip_records), ledger_path.name,
+                )
+                report_lines.append(
+                    f"  ledger updated: {len(clip_records)} clip records"
+                )
+            except Exception as exc:
+                log.warning(
+                    "[BatchHumoRender] ledger clips write-back failed: %s", exc
+                )
+                report_lines.append(f"  ledger write-back FAILED: {exc}")
+        elif ledger_path is None:
+            log.info(
+                "[BatchHumoRender] inline ledger (no path) -- "
+                "skipping clips[] write-back"
+            )
 
         return (str(clips_dir_path), rendered, "\n".join(report_lines))
 

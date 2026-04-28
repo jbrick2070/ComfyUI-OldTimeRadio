@@ -96,9 +96,23 @@ def _ffprobe_dur(path: Path, ffprobe: str = "ffprobe") -> float | None:
 
 
 def _load_ledger(arg: str) -> dict:
+    """Backwards-compat shim around _load_ledger_with_path. Returns
+    only the parsed ledger dict for callers that don't need the
+    source path. New code should prefer _load_ledger_with_path so
+    the source path is available for write-back."""
+    ledger, _ = _load_ledger_with_path(arg)
+    return ledger
+
+
+def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
     """Accept inline JSON, ledger.json path, .mp4 path (suffix-swap
     to ledger), or empty (auto-pick newest non-pending). Mirrors
-    BatchHumoRender._load_ledger so wiring is consistent."""
+    BatchHumoRender._load_ledger_with_path so wiring is consistent.
+
+    Returns (ledger_dict, ledger_path_or_None). Path is None for
+    inline JSON; BUG-LOCAL-089 final_video_path write-back skips
+    in that case rather than synthesizing a new file.
+    """
     s = (arg or "").strip()
 
     if not s:
@@ -117,10 +131,10 @@ def _load_ledger(arg: str) -> dict:
             raise RuntimeError("VideoComposite: ledger_json empty and auto-pick found no ledger")
         p = max(cands, key=lambda x: x.stat().st_mtime)
         with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
+            return json.load(f), p
 
     if s.startswith("{"):
-        return json.loads(s)
+        return json.loads(s), None
 
     p = Path(s)
     # .mp4 path -> swap suffix to _ledger.json (SignalLostVideo convention)
@@ -128,7 +142,7 @@ def _load_ledger(arg: str) -> dict:
         ledger_p = p.with_suffix("").parent / f"{p.stem}_ledger.json"
         if ledger_p.exists():
             with open(ledger_p, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return json.load(f), ledger_p
         raise RuntimeError(
             f"VideoComposite: derived ledger from .mp4 not found: {ledger_p}"
         )
@@ -136,7 +150,7 @@ def _load_ledger(arg: str) -> dict:
     if not p.exists():
         raise RuntimeError(f"VideoComposite: ledger path not found: {p}")
     with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
+        return json.load(f), p
 
 
 def _build_clip_timeline(
@@ -326,7 +340,7 @@ class VideoComposite:
         if not (shutil.which(ffmpeg) or Path(ffmpeg).exists()):
             return ("", f"error: ffmpeg not found at {ffmpeg!r}")
 
-        ledger = _load_ledger(ledger_json)
+        ledger, ledger_path = _load_ledger_with_path(ledger_json)
         episode_id = ledger.get("episode_id", "episode")
 
         # ---- Resolve output_dir (broadcast tree, OBS-safe) ----
@@ -408,6 +422,40 @@ class VideoComposite:
         total_ms = int((time.time() - t_start) * 1000)
         report.append(f"  ffmpeg complete in {total_ms} ms")
         report.append(f"  out: {out_mp4}")
+
+        # ---- BUG-LOCAL-089: write final_video_path back to ledger ----
+        # The broadcast-tree mp4 is the canonical "this episode is
+        # done" artifact. Persist its path in the ledger so OBS
+        # schedulers, post-mortem tools, and any downstream re-runs
+        # can resolve it via ledger lookup. Skipped silently when the
+        # ledger came from inline JSON (no on-disk source).
+        if ledger_path is not None:
+            try:
+                ledger["final_video_path"] = str(out_mp4)
+                ledger["total_episode_dur_s"] = (
+                    float(episode_dur) if episode_dur else
+                    ledger.get("total_episode_dur_s")
+                )
+                with open(ledger_path, "w", encoding="utf-8") as f:
+                    json.dump(ledger, f, indent=2, ensure_ascii=False)
+                log.info(
+                    "[VideoComposite] ledger updated: final_video_path -> %s",
+                    out_mp4.name,
+                )
+                report.append(
+                    f"  ledger updated: final_video_path={out_mp4.name}"
+                )
+            except Exception as exc:
+                log.warning(
+                    "[VideoComposite] ledger final_video_path write-back failed: %s",
+                    exc,
+                )
+                report.append(f"  ledger write-back FAILED: {exc}")
+        else:
+            log.info(
+                "[VideoComposite] inline ledger (no path) -- "
+                "skipping final_video_path write-back"
+            )
         return (str(out_mp4), "\n".join(report))
 
 
