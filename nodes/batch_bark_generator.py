@@ -752,9 +752,10 @@ class BatchBarkGenerator:
                         cumulative_start += dur
                         updated += 1
                     if updated:
-                        # Schema l3: stamp phase timing + git commit
-                        # alongside the per-line writes so the ledger
-                        # shows which version of the code produced it.
+                        # Schema l3: stamp phase timing + git commit +
+                        # post_bark audio gate alongside the per-line
+                        # writes so the ledger shows which version of
+                        # the code produced it.
                         try:
                             from . import _otr_ledger as _OTRL  # type: ignore
                             _OTRL.record_phase_ms(led, "bark", int(_total_bark_ms))
@@ -763,6 +764,32 @@ class BatchBarkGenerator:
                             )
                             if _gc_b:
                                 _OTRL.set_meta(led, "git_commit", _gc_b)
+                            # post_bark audio gate. The batch_tensor is
+                            # [B, 1, max_T] with per-line clips zero-
+                            # padded to the longest length. Hash the
+                            # leading 1KB of the raw byte buffer; this
+                            # tripwires any change to bark output, pad
+                            # ordering, or sample-rate drift.
+                            try:
+                                _bt_cpu = (
+                                    batch_tensor.detach().cpu().numpy()
+                                    if hasattr(batch_tensor, "detach")
+                                    else batch_tensor.numpy()
+                                )
+                                _bt_bytes = bytes(_bt_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                                _bark_gate = _OTRL.audio_gate_record(
+                                    gate_name="post_bark",
+                                    waveform_bytes=_bt_bytes,
+                                    dur_s=float(max_len) / float(target_sr),
+                                    sample_count=int(max_len),
+                                    sample_rate=int(target_sr),
+                                )
+                                _OTRL.append_audio_gate(led, _bark_gate)
+                            except Exception as _gexc:
+                                log.warning(
+                                    "[BatchBark] post_bark audio gate failed: %s",
+                                    _gexc,
+                                )
                             _OTRL.save_ledger_safe(ledger_path, led)
                         except Exception as _meta_exc:
                             # Schema-l3 metadata is best-effort; if the

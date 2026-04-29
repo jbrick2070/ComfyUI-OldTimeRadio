@@ -640,6 +640,9 @@ class SceneSequencer:
                  dialogue_offset_ms=0.0, sfx_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")
+        # Schema l3 (2026-04-28): track wall-clock for meta.phase_ms.scene_sequencer.
+        import time as _time
+        _phase_t0 = _time.time()
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
         plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json
 
@@ -851,6 +854,48 @@ class SceneSequencer:
         log_text = "\n".join(render_log)
         manifest_json = json.dumps(manifest, indent=2)
 
+        # Schema l3 ledger write-back: phase_ms.scene_sequencer +
+        # audio_gates "post_scene_sequencer" sha256-of-leading-1KB.
+        # Best-effort: any failure logs WARNING but never aborts the
+        # render. Audio integrity gate per CLAUDE.md C7 -- if two
+        # consecutive runs disagree on this hash after a no-op change
+        # we know audio drift slipped in.
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+            from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
+            _phase_ms = int((_time.time() - _phase_t0) * 1000)
+            _ledger_p = _OTRL.find_most_recent_ledger(
+                [otr_audio_dir(), otr_legacy_audio_dir()]
+            )
+            if _ledger_p is not None:
+                _led = _OTRL.load_ledger_safe(_ledger_p)
+                if _led is not None:
+                    _OTRL.record_phase_ms(_led, "scene_sequencer", _phase_ms)
+                    _wb = combined.tobytes()[: _OTRL.GATE_HASH_BYTES]
+                    _gate = _OTRL.audio_gate_record(
+                        gate_name="post_scene_sequencer",
+                        waveform_bytes=_wb,
+                        dur_s=float(total_sec),
+                        sample_count=int(total_len),
+                        sample_rate=int(sample_rate),
+                    )
+                    _OTRL.append_audio_gate(_led, _gate)
+                    _gc = _OTRL.lookup_git_commit(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    )
+                    if _gc:
+                        _OTRL.set_meta(_led, "git_commit", _gc)
+                    _OTRL.save_ledger_safe(_ledger_p, _led)
+                    log.info(
+                        "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
+                        "gate=post_scene_sequencer dur=%.1fs",
+                        _phase_ms, total_sec,
+                    )
+        except Exception as _meta_exc:
+            log.warning(
+                "[SceneSequencer] schema-l3 ledger update failed: %s", _meta_exc
+            )
+
         return (audio_out, log_text, manifest_json)
 
 
@@ -892,6 +937,10 @@ class EpisodeAssembler:
                  opening_theme_audio=None, closing_theme_audio=None,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
                  crossfade_ms=500):
+
+        # Schema l3: phase wall-clock for meta.phase_ms.episode_assembler.
+        import time as _time
+        _phase_t0 = _time.time()
 
         # Extract main scene waveform
         if isinstance(scene_audio, dict):
@@ -997,6 +1046,54 @@ class EpisodeAssembler:
         info = json.dumps(info_dict, indent=2)
 
         log.info(f"[EpisodeAssembler] '{episode_title}' - {total_sec/60:.1f} min")
+
+        # Schema l3 ledger write-back: phase_ms.episode_assembler +
+        # audio_gates "post_episode_assembler" sha256 + transitions[]
+        # entries for the segment crossfades that happened in this
+        # assemble() call. Best-effort; failures are warned not raised.
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+            from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
+            _phase_ms = int((_time.time() - _phase_t0) * 1000)
+            _ledger_p = _OTRL.find_most_recent_ledger(
+                [otr_audio_dir(), otr_legacy_audio_dir()]
+            )
+            if _ledger_p is not None:
+                _led = _OTRL.load_ledger_safe(_ledger_p)
+                if _led is not None:
+                    _OTRL.record_phase_ms(_led, "episode_assembler", _phase_ms)
+                    # post_episode_assembler audio gate.
+                    _ew_cpu = (
+                        episode_waveform.detach().cpu().numpy()
+                        if hasattr(episode_waveform, "detach")
+                        else episode_waveform
+                    )
+                    _wb = bytes(_ew_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                    _sample_count = int(episode_waveform.shape[-1])
+                    _gate = _OTRL.audio_gate_record(
+                        gate_name="post_episode_assembler",
+                        waveform_bytes=_wb,
+                        dur_s=float(total_sec),
+                        sample_count=_sample_count,
+                        sample_rate=int(sample_rate),
+                    )
+                    _OTRL.append_audio_gate(_led, _gate)
+                    _gc = _OTRL.lookup_git_commit(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    )
+                    if _gc:
+                        _OTRL.set_meta(_led, "git_commit", _gc)
+                    _OTRL.save_ledger_safe(_ledger_p, _led)
+                    log.info(
+                        "[EpisodeAssembler] schema-l3 ledger update: "
+                        "phase_ms=%d gate=post_episode_assembler dur=%.1fs",
+                        _phase_ms, total_sec,
+                    )
+        except Exception as _meta_exc:
+            log.warning(
+                "[EpisodeAssembler] schema-l3 ledger update failed: %s", _meta_exc
+            )
+
         return (audio_out, output_path, info)
 
     def _extract_waveform(self, audio, target_sr=None):

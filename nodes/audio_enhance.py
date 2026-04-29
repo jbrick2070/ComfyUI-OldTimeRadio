@@ -325,6 +325,10 @@ class AudioEnhance:
                 haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
                 normalize_dbfs=-1.0, tape_emulation="off"):
 
+        # Schema l3 (2026-04-28): wall-clock for meta.phase_ms.audio_enhance.
+        import time as _time
+        _phase_t0 = _time.time()
+
         # -- Extract waveform & sample rate --
         if isinstance(audio, tuple):
             audio = audio[0]
@@ -419,5 +423,50 @@ class AudioEnhance:
                  "spatial=%.2f Haas=%.1fms warmth=%.2f",
                  target_sample_rate, waveform.shape[1], final_samples,
                  final_duration, spatial_width, haas_delay_ms, bass_warmth)
+
+        # Schema l3 ledger write-back: phase_ms.audio_enhance +
+        # audio_gates "post_audio_enhance" sha256-of-leading-1KB.
+        # Best-effort -- never aborts the render on a metadata
+        # failure (CLAUDE.md: audio path is "do not break").
+        try:
+            import os as _os
+            from . import _otr_ledger as _OTRL  # type: ignore
+            from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
+            _phase_ms = int((_time.time() - _phase_t0) * 1000)
+            _ledger_p = _OTRL.find_most_recent_ledger(
+                [otr_audio_dir(), otr_legacy_audio_dir()]
+            )
+            if _ledger_p is not None:
+                _led = _OTRL.load_ledger_safe(_ledger_p)
+                if _led is not None:
+                    _OTRL.record_phase_ms(_led, "audio_enhance", _phase_ms)
+                    _wf_cpu = (
+                        waveform.detach().cpu().numpy()
+                        if hasattr(waveform, "detach") else waveform
+                    )
+                    _wb = bytes(_wf_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                    _gate = _OTRL.audio_gate_record(
+                        gate_name="post_audio_enhance",
+                        waveform_bytes=_wb,
+                        dur_s=float(final_duration),
+                        sample_count=int(final_samples),
+                        sample_rate=int(target_sample_rate),
+                    )
+                    _OTRL.append_audio_gate(_led, _gate)
+                    _gc = _OTRL.lookup_git_commit(
+                        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+                    )
+                    if _gc:
+                        _OTRL.set_meta(_led, "git_commit", _gc)
+                    _OTRL.save_ledger_safe(_ledger_p, _led)
+                    log.info(
+                        "[OTR_AudioEnhance] schema-l3 ledger update: "
+                        "phase_ms=%d gate=post_audio_enhance dur=%.1fs",
+                        _phase_ms, final_duration,
+                    )
+        except Exception as _meta_exc:
+            log.warning(
+                "[OTR_AudioEnhance] schema-l3 ledger update failed: %s", _meta_exc
+            )
 
         return (enhanced,)
