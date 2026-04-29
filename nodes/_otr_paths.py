@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Optional
 
 
 # Walk-up math: this file lives at
@@ -200,6 +201,93 @@ def director_raw_dump_dir() -> Path:
     return otr_audio_dir()
 
 
+def comfyui_log_path() -> Optional[str]:
+    """Locate the active ComfyUI core log file.
+
+    ComfyUI writes its stdout / stderr stream to a log file whose
+    location varies by install type. There is NO authoritative API
+    inside ComfyUI to query this -- ``folder_paths.get_user_directory()``
+    returns the user-state directory which historically held the log
+    but recent ComfyUI Desktop builds (Electron-based) write logs to a
+    platform-specific app-data location instead.
+
+    Known layouts:
+
+    - **ComfyUI Desktop (Electron) on Windows**
+      ``%APPDATA%/ComfyUI/logs/comfyui.log``
+      (i.e. ``~/AppData/Roaming/ComfyUI/logs/comfyui.log``)
+
+    - **ComfyUI Desktop (Electron) on macOS**
+      ``~/Library/Logs/ComfyUI/comfyui.log``
+
+    - **ComfyUI Desktop (Electron) on Linux**
+      ``${XDG_CONFIG_HOME:-~/.config}/ComfyUI/logs/comfyui.log``
+
+    - **ComfyUI portable / pip-installed / standalone**
+      ``<user_directory>/comfyui.log`` -- where ``user_directory`` is
+      the value reported by ``folder_paths.get_user_directory()`` (the
+      same directory that holds ``comfyui.db``, workflow autosaves,
+      ``__manager`` cache, etc.). Older builds.
+
+    Strategy: enumerate every candidate path, keep the ones that exist
+    on disk, then pick the one with the **most-recent mtime**. The
+    active log is being written to RIGHT NOW by the running ComfyUI
+    process, so its mtime is the freshest. If multiple log layouts
+    coexist on a machine (e.g. user previously ran the portable build
+    and now runs the Desktop build), this picks the live one
+    automatically.
+
+    Returns the absolute path on success, ``None`` when no candidate
+    exists. Callers should treat ``None`` as "log location unknown,
+    don't stamp it" rather than raising.
+
+    The probe is cheap (a handful of ``os.path.exists`` + ``getmtime``
+    calls) so it's safe to call once per render at workflow phase 0.
+    """
+    candidates: list[str] = []
+    home = os.path.expanduser("~")
+
+    # ComfyUI Desktop Electron build, Windows
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(os.path.join(appdata, "ComfyUI", "logs", "comfyui.log"))
+
+    # ComfyUI Desktop Electron build, macOS
+    candidates.append(os.path.join(home, "Library", "Logs", "ComfyUI", "comfyui.log"))
+
+    # ComfyUI Desktop Electron build, Linux
+    xdg_config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+    candidates.append(os.path.join(xdg_config, "ComfyUI", "logs", "comfyui.log"))
+
+    # ComfyUI portable / pip / standalone (legacy layout). folder_paths
+    # is the ComfyUI runtime module; absent in CLI / test environments.
+    try:
+        import folder_paths as _fp  # noqa: PLC0415 -- ComfyUI runtime import
+        _user_dir = _fp.get_user_directory()
+        candidates.append(os.path.join(_user_dir, "comfyui.log"))
+        # Some builds also write directly into <user_dir>/.. (one level up)
+        candidates.append(os.path.join(_user_dir, "..", "comfyui.log"))
+    except Exception:  # noqa: BLE001 -- folder_paths unavailable outside ComfyUI
+        pass
+
+    # Probe: keep only existing files, pick most-recent mtime.
+    found: list[tuple[float, str]] = []
+    for c in candidates:
+        try:
+            c_norm = os.path.normpath(c)
+            if os.path.isfile(c_norm):
+                mtime = os.path.getmtime(c_norm)
+                found.append((mtime, c_norm))
+        except OSError:
+            continue
+
+    if not found:
+        return None
+
+    found.sort(reverse=True)
+    return found[0][1]
+
+
 def resolve_hf_model_path(repo_id: str) -> str:
     """Resolve a HuggingFace ``repo_id`` to a local cache path.
 
@@ -277,4 +365,5 @@ __all__ = [
     "episodes_for_obs_dir",
     "director_raw_dump_dir",
     "resolve_hf_model_path",
+    "comfyui_log_path",
 ]

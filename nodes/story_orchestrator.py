@@ -3635,11 +3635,18 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                     "otr_runtime.log",
                 )
                 _log_paths["otr_runtime"] = _otr_log
+                # ComfyUI core log discovery: probe candidate paths
+                # by mtime recency and pick the live one. Handles
+                # ComfyUI Desktop (Electron) on Win/macOS/Linux PLUS
+                # legacy portable layouts. Returns None if no log
+                # file exists yet -- the running process may not have
+                # flushed its first line at the moment we stamp the
+                # ledger; downstream tail tools should re-probe via
+                # the helper if comfyui_core is None.
                 try:
-                    import folder_paths as _fp  # noqa: PLC0415 -- ComfyUI runtime import
-                    _user_dir = _fp.get_user_directory()
-                    _log_paths["comfyui_core"] = os.path.join(_user_dir, "comfyui.log")
-                except Exception:  # noqa: BLE001 -- folder_paths may be missing in CLI envs
+                    from ._otr_paths import comfyui_log_path as _comfy_log_lookup
+                    _log_paths["comfyui_core"] = _comfy_log_lookup()
+                except Exception:  # noqa: BLE001 -- helper may fail in CLI/test env
                     _log_paths["comfyui_core"] = None
                 _early_led.data.setdefault("meta", {})["log_paths"] = _log_paths
                 _early_led.save()
