@@ -15,9 +15,10 @@ Dependencies (added to ``requirements.video.txt`` on Day 3):
     PuLID upstream), Pillow.
 
 Model discovery:
-    FLUX weights: see flux_anchor._MODEL_PATH
-    PuLID weights: ``C:/Users/jeffr/Documents/ComfyUI/models/pulid/pulid_flux.safetensors``
-    (env override: OTR_PULID_MODEL)
+    FLUX weights: see flux_anchor._MODEL_PATH (resolves via
+        ``nodes._otr_paths.comfy_models_dir()``)
+    PuLID weights: ``<comfy_models_dir>/pulid/pulid_flux.safetensors``
+        (env override: ``OTR_PULID_MODEL``)
 
 Two execution modes (same pattern as flux_anchor.py):
 
@@ -58,17 +59,43 @@ from ._base import (
 
 
 # ---- Model discovery ------------------------------------------------------
+#
+# Defaults resolve through ``nodes._otr_paths.comfy_models_dir()`` so
+# cloud / 8GB-tier deployments land naturally without code edits.
+# Env vars (OTR_PULID_MODEL / OTR_FLUX_MODEL) still win when set.
 
-_DEFAULT_PULID_PATH = Path(
-    r"C:\Users\jeffr\Documents\ComfyUI\models\pulid\pulid_flux.safetensors"
-)
+def _resolve_default_pulid_path() -> Path:
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _NODES = _P(__file__).resolve().parents[2] / "nodes"
+        if str(_NODES) not in _sys.path:
+            _sys.path.insert(0, str(_NODES))
+        from _otr_paths import comfy_models_dir  # type: ignore
+        return comfy_models_dir() / "pulid" / "pulid_flux.safetensors"
+    except Exception:
+        return Path(__file__).resolve().parents[3] / "models" / "pulid" / "pulid_flux.safetensors"
+
+
+def _resolve_default_flux_path() -> Path:
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _NODES = _P(__file__).resolve().parents[2] / "nodes"
+        if str(_NODES) not in _sys.path:
+            _sys.path.insert(0, str(_NODES))
+        from _otr_paths import comfy_models_dir  # type: ignore
+        return comfy_models_dir() / "diffusers" / "FLUX.1-dev"
+    except Exception:
+        return Path(__file__).resolve().parents[3] / "models" / "diffusers" / "FLUX.1-dev"
+
+
+_DEFAULT_PULID_PATH = _resolve_default_pulid_path()
 _PULID_PATH = Path(os.environ.get("OTR_PULID_MODEL", str(_DEFAULT_PULID_PATH)))
 
 # FLUX base -- pulled from the same default as flux_anchor so a single
 # weight set powers both Day 2 anchors and Day 3 portraits.
-_DEFAULT_FLUX_PATH = Path(
-    r"C:\Users\jeffr\Documents\ComfyUI\models\diffusers\FLUX.1-dev"
-)
+_DEFAULT_FLUX_PATH = _resolve_default_flux_path()
 _FLUX_PATH = Path(os.environ.get("OTR_FLUX_MODEL", str(_DEFAULT_FLUX_PATH)))
 
 # Day 3 gate: 1024x1024 square matches Day 2 so downstream nodes never

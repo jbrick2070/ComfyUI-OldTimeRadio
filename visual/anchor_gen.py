@@ -8,9 +8,10 @@ Ken Burns motion step in ``worker._make_motion_clip`` is unchanged --
 it just gets a richer input image to animate.
 
 Why SD 1.5 (decision recorded 2026-04-16):
-    - Already on disk at
-      ``C:/Users/jeffr/Documents/ComfyUI/models/checkpoints/v1-5-pruned-emaonly.ckpt``
-      (4.3 GB).  No download blocking the first render.
+    - Already on disk at ``<comfy_models_dir>/checkpoints/v1-5-pruned-emaonly.ckpt``
+      (4.3 GB) -- resolved via ``nodes._otr_paths.comfy_models_dir()``
+      so cloud / portfolio installs don't need to know the user's
+      home path. No download blocking the first render.
     - 4-7 GB VRAM peak vs. SDXL's 9-13.5 GB; large headroom under the
       14.5 GB ceiling.
     - Its "muddy / lower-fidelity" failure mode is plausibly a feature for
@@ -237,9 +238,34 @@ def cache_path(req: AnchorRequest, cache_dir: Path) -> Path:
 # Default SD 1.5 loader (lazy: imports torch / diffusers only on first call)
 # ---------------------------------------------------------------------------
 
+def _resolve_default_sd15_path() -> str:
+    """Resolve the SD 1.5 checkpoint path via ``comfy_models_dir()``.
+
+    This loader is dormant since the 2026-04-17 pivot to FLUX anchors
+    (per memory: "SD 1.5 anchors rejected -- pivot to SDXL + period
+    LoRA -- SUPERSEDED 2026-04-17 by FLUX anchors"). Kept as Stage 1
+    fallback only. Path resolves through the same helper as the
+    FLUX / PuLID backends so a portfolio user doesn't need to know
+    Jeffrey's directory layout.
+    """
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _NODES = _P(__file__).resolve().parents[1] / "nodes"
+        if str(_NODES) not in _sys.path:
+            _sys.path.insert(0, str(_NODES))
+        from _otr_paths import comfy_models_dir  # type: ignore
+        return str(comfy_models_dir() / "checkpoints" / "v1-5-pruned-emaonly.ckpt")
+    except Exception:
+        return str(
+            Path(__file__).resolve().parents[2]
+            / "models" / "checkpoints" / "v1-5-pruned-emaonly.ckpt"
+        )
+
+
 def _default_sd15_loader(
     *,
-    model_path: str = "C:/Users/jeffr/Documents/ComfyUI/models/checkpoints/v1-5-pruned-emaonly.ckpt",
+    model_path: str = "",
     device: str = "cuda",
 ) -> Callable[[AnchorRequest], bytes]:  # pragma: no cover -- requires torch.
     """Construct an SD 1.5 inference callable.
@@ -250,7 +276,14 @@ def _default_sd15_loader(
     Returns a callable ``infer(req: AnchorRequest) -> bytes`` that
     produces PNG bytes for the given request.  Raises ImportError if
     diffusers / torch aren't installed in the current env.
+
+    ``model_path`` defaults to the empty string; when empty the loader
+    resolves it via ``comfy_models_dir() / 'checkpoints' /
+    'v1-5-pruned-emaonly.ckpt'`` so cloud / portfolio installs don't
+    need to know Jeffrey's directory layout.
     """
+    if not model_path:
+        model_path = _resolve_default_sd15_path()
     try:
         import torch  # type: ignore
         from diffusers import StableDiffusionPipeline  # type: ignore

@@ -12,8 +12,11 @@ Dependencies (pinned in ``requirements.video.txt``):
     accelerate==1.13.0, sentencepiece, torchao==0.16.0
 
 Model weights (NOT checked in):
-    ``C:/Users/jeffr/Documents/ComfyUI/models/diffusers/FLUX.1-dev-torchao-fp8``
-    (or override via ``OTR_FLUX_MODEL`` env var -- absolute path only).
+    ``<comfy_models_dir>/diffusers/FLUX.1-dev-torchao-fp8`` -- resolved
+    via ``nodes._otr_paths.comfy_models_dir()`` so cloud / 8GB-tier
+    deployments land naturally without code edits. Override via the
+    ``OTR_FLUX_MODEL`` env var (absolute path) when the weights live
+    elsewhere.
     Pre-quantized via torchao ``float8_weight_only``, pickled ``.bin``
     files.  This is the only supported FLUX checkpoint on a 16 GB
     Blackwell card -- the stock BF16 path was removed 2026-04-19 because
@@ -70,13 +73,31 @@ from ._base import (
 )
 
 
-# Model discovery.  User-overridable via env so conda env installs can
-# point elsewhere without a code change.  Only the torchao FP8 folder
-# is supported -- the BF16 path was removed 2026-04-19 (BUG-LOCAL-049
-# /050).  If the folder is absent, ``_should_stub`` returns True.
-_DEFAULT_MODEL_PATH = Path(
-    r"C:\Users\jeffr\Documents\ComfyUI\models\diffusers\FLUX.1-dev-torchao-fp8"
-)
+# Model discovery.  User-overridable via env so conda env installs +
+# cloud / 8GB-tier deployments can point elsewhere without a code
+# change. Only the torchao FP8 folder is supported -- the BF16 path
+# was removed 2026-04-19 (BUG-LOCAL-049 / 050). If the folder is
+# absent, ``_should_stub`` returns True.
+#
+# Default resolves through ``nodes._otr_paths.comfy_models_dir()`` so
+# we land at ComfyUI's standard ``models/`` regardless of where the
+# user installed (Documents, AppData Desktop, RunPod /workspace, etc).
+def _resolve_default_flux_model_path() -> Path:
+    try:
+        import sys as _sys
+        from pathlib import Path as _P
+        _NODES = _P(__file__).resolve().parents[2] / "nodes"
+        if str(_NODES) not in _sys.path:
+            _sys.path.insert(0, str(_NODES))
+        from _otr_paths import comfy_models_dir  # type: ignore
+        return comfy_models_dir() / "diffusers" / "FLUX.1-dev-torchao-fp8"
+    except Exception:
+        # Defensive: if the helper can't load (e.g. running this file
+        # standalone outside the OTR package), fall back to a
+        # walk-up-to-comfy-root guess.
+        return Path(__file__).resolve().parents[3] / "models" / "diffusers" / "FLUX.1-dev-torchao-fp8"
+
+_DEFAULT_MODEL_PATH = _resolve_default_flux_model_path()
 _MODEL_PATH = Path(os.environ.get("OTR_FLUX_MODEL", str(_DEFAULT_MODEL_PATH)))
 
 # BUG-LOCAL-057 Step 2: Comfy-Org single-file safetensors (primary path).
