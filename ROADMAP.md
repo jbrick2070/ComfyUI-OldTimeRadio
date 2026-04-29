@@ -21,6 +21,38 @@ Every consumer of `ledger.json` must understand all four levels. The orchestrato
 
 ---
 
+## v2.0-alpha session log — 2026-04-28 PM (paths + lip-sync alignment)
+
+Three commits shipped today on `v2.0-alpha`:
+
+- **`70f4a5c`** — Step 0 paths refactor. New `nodes/_otr_paths.py` helper module (resolution order: `OTR_OUTPUT_DIR` env → `folder_paths.get_output_directory()` → walk-up to ComfyUI root → cwd fallback). 14 files retouched; ~12-15 hardcoded `r"C:\Users\jeffr\..."` strings in nodes/scripts replaced with helper calls. Workflow JSON `otr_humo_smoke.json` widget defaults scrubbed.
+- **`cce3472`** — BUG-LOCAL-100 + BUG-LOCAL-101. Stellar Shadows render exposed two upstream-of-HuMo bugs producing audible script garbage:
+  - **BUG-100** — script parser captured third-person narration as the dialogue line (Stellar Shadows l002/l003: "Lev bursts onto catwalk deck...", "Stanley follows closely..."). Fix: new heuristic `_is_inline_narration(speaker, text)` + next-line look-ahead in v1/v2 inline match arms of `_parse_script`.
+  - **BUG-101** — `_clean_text_for_bark` translated parentheticals to Bark non-verbal tokens (`(panting)` → `[pants]`); Bark's rendered tokens leaked breath audio before dialogue (Stellar Shadows 0:34 "Let's work I guess..."). Fix: drop ALL parentheticals in both `_clean_text_for_bark` implementations (batch_bark + scene_sequencer).
+- **`84ffe1e`** — BUG-LOCAL-100b + BUG-LOCAL-102.
+  - **BUG-100b** — schema-level dialogue contract added to `SCRIPT_SYSTEM_PROMPT`. Concrete WRONG/RIGHT examples mirroring the Stellar Shadows failure pattern. Belt-and-suspenders with the BUG-100 parser heuristic: prevent emission of the bad pattern, then catch at parse time if the LLM slips.
+  - **BUG-102** — HuMo's intrinsic ~3-6 frame motion-onset freeze produced a constant ~150-200 ms audio-leads-lips perception. Round-robin consult (Gemini + ChatGPT 4.1) converged on Option A: pre-pad each per-line audio with leading silence (~200 ms zeros) so HuMo burns its warm-up freeze on silence rather than the first phoneme; trim symmetrically before save so VideoComposite placement math is unchanged. New optional widget `humo_warmup_pad_ms` (default 200, range 0-500). Fix lives entirely inside `BatchHumoRender` — master audio mix + VideoComposite untouched (CLAUDE.md C7 preserved).
+
+Protective regression layer also shipped:
+- `tests/test_inline_narration_heuristic.py` — 22 cases covering BUG-100 helper.
+- 5 new BUG-101 paren-drop assertions in `tests/test_core.py::TestCleanTextForBark`.
+- `tests/test_humo_warmup_pad.py` — 21 cases covering BUG-102 pad/trim helpers + round-trip.
+
+All four bugs marked Bible candidates; promotion deferred until next render confirms behavioural fix.
+
+### QA gate before Step 1
+
+The Step 1-5 work below is **gated on the next FULL queue's QA pass.** Verify in the new ledger:
+
+1. `lines[].text` contains NO third-person narration (no "Lev bursts onto deck...", no "Stanley follows closely..." style prose).
+2. `lines[].text` contains NO parentheticals (no `(panting)`, no `(grabbing the mic)`, etc.).
+3. `clips[].warmup_pad_ms = 200` stamped on every entry.
+4. User perception of lip-sync: alignment within ~30 ms across whole episode (audio no longer reliably leads lips).
+
+If any of (1)-(4) fail, triage / re-tune the relevant fix BEFORE starting Step 1. Do not stack new visual work on top of a still-broken audio stack.
+
+---
+
 ## v2.0-alpha continuation — Morning of 2026-04-29 order of operations (Jeffrey-locked)
 
 Captured at the end of the 2026-04-28 marathon session. **Execute in this exact order** -- each step's outputs feed the next:

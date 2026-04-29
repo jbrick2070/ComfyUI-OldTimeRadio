@@ -314,6 +314,59 @@ class TestCleanTextForBark:
             f"  SceneSequencer:{ss!r}"
         )
 
+    # -- BUG-LOCAL-101 paren-drop assertions ---------------------------------
+    # Stage-direction parentheticals previously translated to Bark non-verbal
+    # tokens ((panting) -> [pants]) which leaked breath/throat audio before
+    # dialogue and confused listeners. They now drop wholesale.
+
+    def test_paren_panting_dropped_no_pants_token(self, clean_fn):
+        # The exact Stellar Shadows l004 trigger
+        text = "(panting) We've lost too much time already, Stanley!"
+        result = clean_fn(text)
+        assert "[pants]" not in result, (
+            "paren-form (panting) must NOT translate to Bark [pants] token "
+            "(BUG-LOCAL-101)"
+        )
+        assert "(panting)" not in result, "paren content must be stripped"
+        assert "We've lost too much time" in result, "dialogue must survive"
+
+    def test_paren_laughs_dropped_no_laughs_token(self, clean_fn):
+        text = "(laughs) That is impossible."
+        result = clean_fn(text)
+        assert "[laughs]" not in result, (
+            "paren-form (laughs) must NOT translate to Bark [laughs] token"
+        )
+        assert "(laughs)" not in result
+        assert "That is impossible" in result
+
+    def test_paren_unknown_emotion_dropped(self, clean_fn):
+        # Emotions that never had a Bark token mapping (already ""):
+        # confirm they still drop cleanly
+        for emotion in ["(defensive)", "(skeptical)", "(grinning)", "(insistent)"]:
+            text = f"{emotion} The reading is wrong."
+            result = clean_fn(text)
+            assert emotion not in result, f"{emotion} must be stripped"
+            assert "The reading is wrong" in result
+
+    def test_multiple_parens_in_one_line_all_dropped(self, clean_fn):
+        text = "(softly) Lev... (whispering) what aren't you telling me?"
+        result = clean_fn(text)
+        assert "(" not in result and ")" not in result, (
+            "all paren content must be stripped; no leftover open/close"
+        )
+        assert "Lev" in result and "what aren't you telling me" in result
+
+    def test_explicit_bracket_token_still_passes_whitelist(self, clean_fn):
+        # Writers who deliberately want a Bark non-verbal token can still
+        # write [laughs] inline -- the whitelist preserves it. Only the
+        # paren -> token translation went away.
+        text = "Well, [laughs] that's a problem."
+        result = clean_fn(text)
+        assert "[laughs]" in result, (
+            "explicit [laughs] in dialogue must survive the bracket whitelist "
+            "(only paren-to-token translation is gone post-BUG-101)"
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. TOKEN BUDGET — 1024 Floor Logic
