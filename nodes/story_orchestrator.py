@@ -1358,10 +1358,33 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
         except Exception:
             pass
 
-    # v1.5.1: Context cap tuning. History: 2048 (format loss), 4096 (still
-    # truncated), 8192 (19GB VRAM spike, 2.9 tok/s). 6144 is the sweet spot:
-    # keeps format instructions (~6k tokens) while peak VRAM stays ~12-13 GB.
-    _cap = 6144 if any(kw in str(model_id_full).lower() for kw in ("nemo", "12b", "14b")) else 8192
+    # 2026-04-29: per-model context cap. Previously a primitive size
+    # heuristic ("nemo|12b|14b" -> 6144 else 8192) regardless of the
+    # model's actual native context window. That truncated Gemma 4
+    # E2B body-pass prompts from 9838 -> 7168 tokens, losing ~25%
+    # of the prompt (system spec, AISM filter, cast roster) on every
+    # large-target render.
+    #
+    # New approach: explicit per-model dict. Values are conservative
+    # slices of each model's native context, chosen to leave headroom
+    # for KV cache + co-resident Bark/FLUX/HuMo VRAM on a 16 GB
+    # Blackwell. Native context windows are MUCH larger (Mistral-Nemo
+    # 1M, Gemma 4 128K, Qwen 2.5 32K) but burning more is a VRAM
+    # tradeoff that needs scientific measurement before being raised.
+    # See docs/2026-04-29-vram-context-test.md for the measurement
+    # framework that informs future increases.
+    _MODEL_CONTEXT_CAPS = {
+        "mistralai/Mistral-Nemo-Instruct-2407":              16384,
+        "google/gemma-4-E2B-it":                             16384,
+        "google/gemma-4-E4B-it":                             16384,
+        "Qwen/Qwen2.5-14B-Instruct":                         12288,
+        "Nitral-AI/Captain-Eris_Violet-V0.420-12B":          12288,
+        "inflatebot/MN-12B-Mag-Mell-R1":                     12288,
+        "google/gemma-2-2b-it":                               8192,
+        "google/gemma-2-9b-it":                               8192,
+    }
+    _resolved_id = str(model_id_full).split(" ", 1)[0].strip()
+    _cap = _MODEL_CONTEXT_CAPS.get(_resolved_id, 8192)
 
     # 2026-04-26 BUG-LOCAL-065: explicit field-level diagnostics so cache
     # mismatches are debuggable. Previously the reason a reload fired
@@ -3267,8 +3290,8 @@ class LLMScriptWriter:
                     "tooltip": "Target spoken dialogue words at ~140 wpm: 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. For smoke tests below 350, pick target_length='tiny (smoke, 1 act)' which forces target_words=100 + num_characters=2 internally regardless of these widget values."
                 }),
                 "num_characters": ("INT", {
-                    "default": 4, "min": 2, "max": 8, "step": 1,
-                    "tooltip": "Speaking characters (plus announcer). Auto-clamped to 4 when target_words <= 700, or 3 when <= 420."
+                    "default": 4, "min": 1, "max": 8, "step": 1,
+                    "tooltip": "Speaking characters (plus announcer). 1=monologue/diary mode (one voice carries the entire episode, ANNOUNCER bookends still apply). Auto-clamped to 4 when target_words <= 700, or 3 when <= 420 (clamps respect user's explicit 1 or 2 -- only bump UP from default)."
                 }),
             },
             "optional": {
@@ -3858,14 +3881,27 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             num_characters = 3
 
         # Long episodes: too few characters can't sustain narrative tension
-        _act_count_for_clamp = {"short (3 acts)": 3, "medium (5 acts)": 5,
-                                "long (7-8 acts)": 8, "epic (10+ acts)": 12}.get(target_length, 5)
-        if _act_count_for_clamp >= 7 and num_characters < 3:
+        # 2026-04-29: respect user's explicit pick of 1 or 2 (monologue or
+        # duo). Only auto-bump if user picked the default 4 with insufficient
+        # acts handling, OR if user picked a non-1/2 value below 3. The
+        # rationale: 1-char monologue is a legitimate narrative form
+        # (audio diary, war journal, last-broadcaster), and forcing it
+        # back to 3 silently destroys the user's intent.
+        _act_count_for_clamp = {"tiny (smoke, 1 act)": 1, "short (3 acts)": 3,
+                                "medium (5 acts)": 5, "long (7-8 acts)": 8,
+                                "epic (10+ acts)": 12}.get(target_length, 5)
+        if _act_count_for_clamp >= 7 and num_characters < 3 and num_characters not in (1, 2):
             log.warning("[PreFlight] %d characters too few for %s - clamping to 3",
                         num_characters, target_length)
             _runtime_log(f"PREFLIGHT: Clamped num_characters to 3 (too few for {target_length})")
             guardrail_warnings.append(f"[!] Auto-clamped {num_characters} -> 3 characters ({target_length} requires minimum 3)")
             num_characters = 3
+        elif _act_count_for_clamp >= 7 and num_characters in (1, 2):
+            _runtime_log(
+                f"PREFLIGHT: respecting user-explicit num_characters={num_characters} "
+                f"on {target_length} episode (would normally bump to 3; skipped because "
+                f"1=monologue and 2=duo are deliberate narrative choices)"
+            )
 
         if target_words <= 420 and include_act_breaks:
             log.warning("[PreFlight] Act breaks disabled for %d-word episode (too short)", target_words)
@@ -6765,7 +6801,12 @@ Format your response exactly as:
         # is how the dialogue tokens vanish before BatchBark.
         has_dialogue  = (voice_tag_count >= 3)
         has_scenes    = scene_count >= 1
-        has_cast      = len(unique_chars) >= 2
+        # 2026-04-29: relaxed cast assertion to >= 1 to support 1-character
+        # monologue mode. Previously a 1-char (announcer + single voice)
+        # script would be flagged as needing FORMAT_NORM rescue even when
+        # dialogue + scenes were present, triggering an unnecessary cleanup
+        # pass that could mangle the legitimate single-character output.
+        has_cast      = len(unique_chars) >= 1
 
         if has_dialogue and has_scenes and has_cast:
             _runtime_log(
