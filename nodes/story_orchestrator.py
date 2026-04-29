@@ -2311,12 +2311,16 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         self._streamed_chars = {}   # name -> char_id
         self._last_ledger_save_at = 0
         self._LEDGER_THROTTLE_LINES = 3
-        if self.live_ledger:
-            try:
-                from .production_ledger import new_ledger
-                new_ledger()
-            except Exception:
-                pass
+        # NOTE 2026-04-29: removed `new_ledger()` here. write_script() now
+        # owns ledger creation at workflow entry (much earlier than this
+        # streamer construction), so calling new_ledger() here would WIPE
+        # the early ledger that's been accumulating gen_params + git_commit
+        # + meta state during NewsFetcher / model load / OpenClose Spine.
+        # The streamer's _emit_partial_ledger / _record_streamed_line use
+        # get_ledger() (which returns the singleton, creates one if missing)
+        # so this branch is no longer needed for first-write semantics.
+        # If write_script's early init fails for any reason, get_ledger()
+        # still creates a placeholder on first read -- no functional regression.
 
     def put(self, value):
         """Processes a new batch of tokens incrementally."""
@@ -3571,6 +3575,56 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         target_words = int(target_words)
         _runtime_log(f"ScriptWriter: target_words={target_words} (~{max(1, round(target_words / 140))} min at 140 wpm)")
+
+        # 2026-04-29: EARLY LEDGER INIT.
+        # Previously the ledger was created inside GemmaHeartbeatStreamer when
+        # the body-pass started -- which is AFTER NewsFetcher, model load,
+        # OpenClose Spine (3 outlines + evaluator), and auto-title. On a
+        # Gemma-4-E2B run with maximum chaos that's a 5+ minute observability
+        # gap where /otr/latest_ledger returns the previous run's file. The
+        # early init here creates a fresh pending_<ts>_ledger.json on disk
+        # the moment write_script() is entered, stamps schema_version + git
+        # commit + initial gen_params snapshot, and then saves so the watcher
+        # / external tail tools see live state from t=0. Subsequent phases
+        # mutate this same ledger (via the singleton) and overwrite the file
+        # via Ledger.save() at each gate.
+        try:
+            from .production_ledger import new_ledger as _new_ledger
+            from . import _otr_ledger as _OTRL
+            _early_led = _new_ledger()
+            _early_led.save()  # write pending_<ts>_ledger.json immediately
+            try:
+                _OTRL.set_meta(_early_led, "git_commit", _OTRL.lookup_git_commit())
+            except Exception:  # noqa: BLE001 -- meta-stamp never blocks
+                pass
+            # Initial gen_params snapshot. Forward-compatible with the
+            # spine-ledger ticket's full meta.gen_params bundle.
+            try:
+                _early_led.data.setdefault("meta", {})["gen_params_initial"] = {
+                    "model_id":             str(model_id),
+                    "cleanup_model_id":     str(cleanup_model_id),
+                    "target_words":         int(target_words),
+                    "num_characters":       int(num_characters),
+                    "target_length":        str(target_length),
+                    "style_variant":        str(style_variant),
+                    "creativity":           str(creativity),
+                    "genre_flavor":         str(genre_flavor),
+                    "optimization_profile": str(optimization_profile),
+                    "arc_enhancer":         bool(arc_enhancer),
+                    "include_act_breaks":   bool(include_act_breaks),
+                    "self_critique":        bool(self_critique),
+                    "open_close":           bool(open_close),
+                    "custom_premise_set":   bool(custom_premise),
+                }
+                _early_led.save()
+            except Exception:  # noqa: BLE001 -- snapshot is observability, never blocks
+                pass
+            _runtime_log(
+                f"EARLY_LEDGER: pending ledger initialized at write_script entry "
+                f"(model_id={model_id}, target_words={target_words})"
+            )
+        except Exception as _early_err:  # noqa: BLE001 -- early init never blocks
+            log.warning("[ScriptWriter] Early ledger init failed: %s", _early_err)
 
         # 2026-04-26 PM two-LLM split (BUG-LOCAL-068 follow-up).
         # Resolve effective cleanup model. "auto (use story model)" means
