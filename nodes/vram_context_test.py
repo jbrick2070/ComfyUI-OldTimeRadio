@@ -1,0 +1,362 @@
+"""vram_context_test.py -- OTR_VRAMContextTest ComfyUI node.
+
+Production-accurate VRAM measurement at varying prompt context lengths,
+running INSIDE ComfyUI via the same `_load_llm()` + `_generate_with_llm()`
+code path that real renders use. Replaces the earlier headless standalone
+script (`scripts/vram_context_test.py`), which loaded models outside
+ComfyUI and undercounted runtime overhead.
+
+Why an in-workflow node:
+
+  - ComfyUI's model-management framework, custom-node imports, and any
+    other co-resident state add ~500 MB-1 GB of VRAM the headless
+    measurement misses. Cap-tuning decisions need numbers from the
+    real path.
+  - The node calls `_load_llm()` and `_generate_with_llm()` directly,
+    so quantization config, attention backend selection, tokenizer
+    setup, and prompt-truncation logic exactly match what
+    LLMScriptWriter.write_script() does.
+  - Results are stamped into the ledger via the early-init / per-clip
+    pattern used elsewhere in OTR, so they're inspectable post-run
+    via /otr/latest_ledger or any standard ledger tooling.
+
+Workflow placement:
+
+  Drop the OTR_VRAMContextTest node into a small smoke workflow
+  (NO LLMScriptWriter / Bark / FLUX / HuMo) so the test runs without
+  competing for VRAM. The node loads the chosen LLM once, probes
+  every prompt length in sequence, then unloads.
+
+Output:
+
+  - report (STRING): markdown table summarising each probe's VRAM
+    + CPU RAM + generation time. Append to docs/2026-04-29-vram-
+    context-test.md or pipe to a Save Text node.
+  - Side effect: appends entries to ledger.meta.vram_test_results[]
+    via the existing early-ledger init + Ledger.save() merge.
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from pathlib import Path
+
+log = logging.getLogger("OTR.vram_context_test")
+
+
+# Per-prompt-length filler paragraph. Sliced to the target token count so
+# every probe sees a similar prompt structure. Same paragraph the headless
+# script used so cross-comparison is straightforward.
+_FILLER_PARAGRAPH = (
+    "In the static-locked decade after the broadcast collapse, every working "
+    "radio receiver was a sealed container of hope and grief in equal measure, "
+    "transmitting only the sound of weather across thirty-seven dead frequencies, "
+    "although the operators at Listening Post 4 occasionally swore they could hear "
+    "the faint syncopated rhythm of a Morse fragment underneath the carrier wave, "
+    "three short and one long, repeating, never quite resolving into anything they "
+    "could prove had been deliberately sent rather than gathered up out of solar "
+    "interference and pareidolia. "
+)
+
+
+# Same model-id list the LLMScriptWriter dropdown exposes. Kept in sync
+# manually -- if the orchestrator dropdown gains/loses entries, mirror
+# them here so the test surface matches the production surface.
+_LLM_MODEL_CHOICES = [
+    "mistralai/Mistral-Nemo-Instruct-2407",
+    "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B-it",
+    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
+]
+
+# Default prompt-length probe set. Comma-separated for the widget so the
+# user can edit per-run without recompiling. Powers-of-two-ish coverage
+# from "tight" to "stress" with a focus around the production cap range
+# (8K-16K) since that's what we're actually trying to tune.
+_DEFAULT_PROBE_LENGTHS = "2048,4096,6144,8192,12288,16384,20480,24576"
+
+
+def _nvml_used_bytes(device_index: int = 0) -> int:
+    """Total VRAM used on this device by ALL processes (nvidia-smi truth)."""
+    try:
+        import pynvml  # type: ignore
+        pynvml.nvmlInit()
+        h = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+        info = pynvml.nvmlDeviceGetMemoryInfo(h)
+        return int(info.used)
+    except Exception:
+        return 0
+
+
+def _process_cpu_ram_bytes() -> int:
+    """This process's resident-set size on the host (CPU RAM, NOT VRAM)."""
+    try:
+        import psutil  # type: ignore
+        return int(psutil.Process().memory_info().rss)
+    except Exception:
+        return 0
+
+
+def _parse_lengths(s: str) -> list[int]:
+    """Parse a comma-separated string of token-length probe targets."""
+    out: list[int] = []
+    for tok in (s or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            n = int(tok)
+            if n >= 64:
+                out.append(n)
+        except ValueError:
+            continue
+    return out or [int(x) for x in _DEFAULT_PROBE_LENGTHS.split(",")]
+
+
+class VRAMContextTest:
+    """Measure VRAM (PyTorch + NVML) and CPU RAM at each probe prompt length.
+
+    Calls _load_llm() and _generate_with_llm() so measurements reflect the
+    same code path LLMScriptWriter uses in production renders. Results
+    stamp into ledger.meta.vram_test_results[] and a markdown report
+    is returned as the node's STRING output.
+    """
+
+    CATEGORY = "OTR/v2/Diagnostics"
+    FUNCTION = "execute"
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("report",)
+    OUTPUT_NODE = True
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_id": (_LLM_MODEL_CHOICES, {
+                    "default": "mistralai/Mistral-Nemo-Instruct-2407",
+                    "tooltip": (
+                        "Which LLM to probe. Mirrors the LLMScriptWriter "
+                        "dropdown so production-relevant models are first-"
+                        "class. Suffix tags ([ALPHA], (EXPERIMENTAL)) are "
+                        "stripped before the HF lookup -- same behaviour as "
+                        "the writer's _load_llm()."
+                    ),
+                }),
+                "probe_lengths": ("STRING", {
+                    "default": _DEFAULT_PROBE_LENGTHS,
+                    "tooltip": (
+                        "Comma-separated token-length targets. Each probe "
+                        "builds a prompt of approximately this many tokens "
+                        "and runs a single 16-token generation, capturing "
+                        "VRAM nvml + VRAM torch + CPU RAM peaks. Default "
+                        f"probes: {_DEFAULT_PROBE_LENGTHS}"
+                    ),
+                }),
+                "max_new_tokens": ("INT", {
+                    "default": 16, "min": 4, "max": 256, "step": 4,
+                    "tooltip": (
+                        "Generation length per probe. 16 is the smallest "
+                        "useful sample for VRAM measurement (KV cache "
+                        "growth is the relevant scaling factor, not "
+                        "generation length itself). Raise to 64-128 if "
+                        "you want to also bench tokens/sec at this "
+                        "context size."
+                    ),
+                }),
+            },
+            "optional": {
+                "optimization_profile": (
+                    ["Pro (Ultra Quality)", "Standard", "Obsidian (UNSTABLE/4GB)"],
+                    {"default": "Standard",
+                     "tooltip": "Same widget as LLMScriptWriter -- "
+                                "controls 4-bit NF4 vs full precision."},
+                ),
+                "measurement_label": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": (
+                        "Optional tag for this run, stamped into the "
+                        "ledger entry. Useful when running the same node "
+                        "across multiple workflows or after VRAM-affecting "
+                        "config changes."
+                    ),
+                }),
+            },
+        }
+
+    def execute(
+        self,
+        model_id: str,
+        probe_lengths: str,
+        max_new_tokens: int = 16,
+        optimization_profile: str = "Standard",
+        measurement_label: str = "",
+    ):
+        # Late imports so the node loads cleanly even if the orchestrator
+        # module has heavy dependencies missing in some environments.
+        try:
+            from . import story_orchestrator as _SO
+        except ImportError:
+            import sys
+            from pathlib import Path
+            _NODES_DIR = Path(__file__).resolve().parent
+            if str(_NODES_DIR) not in sys.path:
+                sys.path.insert(0, str(_NODES_DIR))
+            import story_orchestrator as _SO  # type: ignore
+
+        try:
+            import torch
+        except ImportError:
+            return ("torch unavailable; cannot run VRAM probe.",)
+
+        lengths = _parse_lengths(probe_lengths)
+        log.info(
+            "[VRAMContextTest] model=%s probes=%s max_new_tokens=%d label=%s",
+            model_id, lengths, max_new_tokens, measurement_label or "<none>",
+        )
+
+        # Pre-load the model once. _load_llm caches; the first call is the
+        # "real" load and subsequent generations reuse the cached instance.
+        log.info("[VRAMContextTest] pre-loading %s ...", model_id)
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        load_t0 = time.time()
+        try:
+            _SO._load_llm(model_id, optimization_profile=optimization_profile)
+        except Exception as exc:
+            msg = (
+                f"## VRAM Context Test\n\n"
+                f"FAILED to load `{model_id}`: `{type(exc).__name__}: {exc}`\n"
+            )
+            log.exception("[VRAMContextTest] load failed: %s", exc)
+            return (msg,)
+        load_s = time.time() - load_t0
+        base_torch_gb = torch.cuda.memory_allocated() / 1e9
+        base_nvml_gb = _nvml_used_bytes() / 1e9
+        base_cpu_gb = _process_cpu_ram_bytes() / 1e9
+        log.info(
+            "[VRAMContextTest] loaded in %.1fs  base_torch=%.2fGB  "
+            "base_nvml=%.2fGB  base_cpu=%.2fGB",
+            load_s, base_torch_gb, base_nvml_gb, base_cpu_gb,
+        )
+
+        # Probe each prompt length via the production _generate_with_llm
+        # path. Captures three orthogonal memory numbers per probe
+        # (see docs/2026-04-29-vram-context-test.md for the column
+        # definitions). VRAM nvml is the cap-tuning truth.
+        results: list[dict] = []
+        for n_target in lengths:
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+
+            n_paras = max(1, n_target // 80)
+            prompt = _FILLER_PARAGRAPH * n_paras
+
+            t0 = time.time()
+            try:
+                _ = _SO._generate_with_llm(
+                    prompt,
+                    model_id=model_id,
+                    max_new_tokens=max_new_tokens,
+                    temperature=0.0,
+                    top_p=1.0,
+                    optimization_profile=optimization_profile,
+                )
+            except Exception as exc:
+                log.exception(
+                    "[VRAMContextTest] probe failed at ctx=%d: %s",
+                    n_target, exc,
+                )
+                results.append({
+                    "ctx_target": n_target,
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
+                # If one length OOMs, larger will too -- stop probing
+                if "OutOfMemoryError" in type(exc).__name__ or "out of memory" in str(exc).lower():
+                    break
+                else:
+                    continue
+            gen_s = time.time() - t0
+
+            peak_torch_gb = torch.cuda.max_memory_allocated() / 1e9
+            nvml_gb = _nvml_used_bytes() / 1e9
+            cpu_gb = _process_cpu_ram_bytes() / 1e9
+            log.info(
+                "[VRAMContextTest] ctx=%d  torch=%.2fGB  nvml=%.2fGB  "
+                "cpu=%.2fGB  gen_s=%.2f",
+                n_target, peak_torch_gb, nvml_gb, cpu_gb, gen_s,
+            )
+            results.append({
+                "ctx_target":    n_target,
+                "peak_torch_gb": round(peak_torch_gb, 3),
+                "nvml_used_gb":  round(nvml_gb, 3),
+                "cpu_ram_gb":    round(cpu_gb, 3),
+                "gen_s":         round(gen_s, 2),
+            })
+
+        # Stamp ledger.meta.vram_test_results[] for post-run inspection
+        # via /otr/latest_ledger or any standard ledger tooling. Best-
+        # effort; never blocks the report return.
+        try:
+            from .production_ledger import get_ledger
+            led = get_ledger()
+            led.data.setdefault("meta", {}).setdefault("vram_test_results", []).append({
+                "label":                measurement_label or None,
+                "model_id":             model_id,
+                "optimization_profile": optimization_profile,
+                "max_new_tokens":       int(max_new_tokens),
+                "load_s":               round(load_s, 2),
+                "base_torch_gb":        round(base_torch_gb, 3),
+                "base_nvml_gb":         round(base_nvml_gb, 3),
+                "base_cpu_gb":          round(base_cpu_gb, 3),
+                "probes":               results,
+            })
+            led.save()
+        except Exception as ledger_exc:  # noqa: BLE001
+            log.warning(
+                "[VRAMContextTest] ledger stamp failed (non-fatal): %s",
+                ledger_exc,
+            )
+
+        # Build markdown report.
+        lines = [
+            f"## VRAM Context Test -- `{model_id}`",
+            "",
+            f"- **label**: {measurement_label or '_<none>_'}",
+            f"- **profile**: {optimization_profile}",
+            f"- **load**: {load_s:.1f}s "
+            f"(base torch {base_torch_gb:.2f} / nvml {base_nvml_gb:.2f} / "
+            f"cpu {base_cpu_gb:.2f} GB)",
+            "",
+            "Three memory columns are reported separately. Use **VRAM nvml** "
+            "for cap-tuning decisions -- it includes CUDA driver overhead "
+            "and any other GPU process. **VRAM torch** is PyTorch allocator "
+            "only (this process). **CPU RAM** is host-side and NEVER mixed "
+            "into VRAM accounting.",
+            "",
+            "| Context (target) | VRAM nvml (GB) | VRAM torch (GB) | "
+            "CPU RAM (GB) | Gen sec | Note |",
+            "|---:|---:|---:|---:|---:|---|",
+        ]
+        for r in results:
+            if "error" in r:
+                lines.append(
+                    f"| {r['ctx_target']} | OOM | OOM | -- | -- | "
+                    f"{r['error'][:50]} |"
+                )
+            else:
+                lines.append(
+                    f"| {r['ctx_target']} | {r['nvml_used_gb']:.2f} | "
+                    f"{r['peak_torch_gb']:.2f} | {r['cpu_ram_gb']:.2f} | "
+                    f"{r['gen_s']:.2f} | |"
+                )
+
+        report = "\n".join(lines) + "\n"
+        log.info("[VRAMContextTest] complete (%d probes)", len(results))
+        return (report,)
+
+
+__all__ = ["VRAMContextTest"]
