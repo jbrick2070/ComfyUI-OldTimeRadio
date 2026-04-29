@@ -252,51 +252,19 @@ def _clean_text_for_bark(text):
     # === SCENE ... === headers
     text = re.sub(r'===.*?===', '', text)
 
-    # -- Step 2: Parenthetical stage directions - Bark tokens ----------------
-    # e.g. (sighs), (nervous laugh), (clears throat), (whispers softly)
-    _PAREN_TO_BARK = [
-        # Exact / strong matches first (ordered by specificity)
-        ("laughter",        "[laughter]"),
-        ("laugh",           "[laughs]"),
-        ("chuckl",          "[laughs]"),
-        ("giggl",           "[laughs]"),
-        ("sigh",            "[sighs]"),
-        ("gasp",            "[gasps]"),
-        ("clears throat",   "[clears throat]"),
-        ("clear",           "[clears throat]"),
-        ("cough",           "[coughs]"),
-        ("pant",            "[pants]"),
-        ("breath",          "[pants]"),
-        ("sob",             "[sobs]"),
-        ("cry",             "[sobs]"),
-        ("weep",            "[sobs]"),
-        ("grunt",           "[grunts]"),
-        ("strain",          "[grunts]"),
-        ("groan",           "[groans]"),
-        ("moan",            "[groans]"),
-        ("whistle",         "[whistles]"),
-        ("sneeze",          "[sneezes]"),
-        # Unsupported but common - convert to nearest Bark equivalent
-        ("whisper",         ""),        # Bark can't whisper; drop the direction, tone stays
-        ("quiet",           ""),
-        ("soft",            ""),
-        ("shout",           ""),        # Bark doesn't shout; caps in text handles emphasis
-        ("yell",            ""),
-        ("scream",          ""),
-        ("nervous",         "[sighs]"),
-        ("anxious",         "[sighs]"),
-        ("excited",         ""),
-        ("angry",           ""),
-    ]
-
-    def _translate_paren(m):
-        inner = m.group(1).lower().strip()
-        for stem, token in _PAREN_TO_BARK:
-            if stem in inner:
-                return (token + " ") if token else ""
-        return ""  # unknown direction - drop it
-
-    text = re.sub(r'\(([^)]{1,80})\)\s*', _translate_paren, text)
+    # -- Step 2: Drop ALL parenthetical stage directions ---------------------
+    # BUG-LOCAL-101 (2026-04-28 PM): the previous behavior translated common
+    # parentheticals to Bark non-verbal tokens ((panting) -> [pants],
+    # (laughs) -> [laughs], etc.). In practice Bark's rendered nonverbal
+    # tokens at the start of a clip add 200-500 ms of breath/throat audio
+    # BEFORE the first dialogue word, which the listener perceives as
+    # garbled words leading into the line (Stellar Shadows 2026-04-28
+    # 0:34 "Let's work I guess..." was the [pants] token rendered for
+    # l004's "(panting)" prefix). Drop ALL parens so Bark gets clean
+    # dialogue text only. If a writer wants laughter or breath in the
+    # output they can write it inline ("Hahaha!", "Mmm...") in the actual
+    # dialogue text rather than as a parenthetical performance note.
+    text = re.sub(r'\([^)]{1,80}\)\s*', '', text)
 
     # -- Step 3: Asterisk actions - Bark tokens -------------------------------
     # e.g. *laughs* *sighs deeply*

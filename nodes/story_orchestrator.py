@@ -1917,6 +1917,51 @@ _RE_VOICE_TAG_DIALOGUE = re.compile(
     re.MULTILINE
 )
 
+def _is_inline_narration(speaker_name, text):
+    """BUG-LOCAL-100: detect inline stage direction in [VOICE:] line.
+
+    Some LLMs (Captain-Eris, Mistral Nemo at higher temperatures)
+    emit a stage direction on the same line as the VOICE tag, with
+    the actual dialogue on the next line::
+
+        [VOICE: LEV SHAW, traits] Lev bursts onto deck, hurrying...
+        Got the newest readings yet?
+
+    Without this check the parser captures "Lev bursts onto deck..."
+    as the dialogue and Bark TTS reads the stage direction aloud
+    (Stellar Shadows ledger 2026-04-28: l002 + l003 are pure
+    narration that got vocalized).
+
+    Heuristic: the captured text starts with the speaker's first
+    word in third-person form (e.g. "Lev " for LEV SHAW, "Stanley "
+    for STANLEY CRANSTON). Returns True when the caller should look
+    ahead to the next line for the actual dialogue.
+
+    False positives are unlikely: real dialogue almost never starts
+    with the speaker's own name in third person (a character does
+    not say "Lev bursts..." about themselves). False negatives fall
+    through to current parser behavior unchanged.
+    """
+    if not text or not speaker_name:
+        return False
+    # Strip leading ASCII straight quote, smart quotes, asterisks,
+    # underscores, and whitespace before checking for the speaker's first
+    # name. Smart quotes assembled via chr() to keep this file ASCII-clean
+    # (CLAUDE.md: UTF-8 no BOM, ASCII source where possible).
+    _LDQ = chr(0x201C)  # left double smart quote
+    _RDQ = chr(0x201D)  # right double smart quote
+    _LEADING_NOISE = "[*_\"" + _LDQ + _RDQ + "\\s]+"
+    _TRAIL_PUNCT = ".,!?;:'\"" + _LDQ + _RDQ
+    cleaned = re.sub("^" + _LEADING_NOISE, "", text).strip()
+    if not cleaned:
+        return False
+    first_word = cleaned.split()[0].rstrip(_TRAIL_PUNCT).lower()
+    speaker_words = speaker_name.strip().split()
+    if not speaker_words:
+        return False
+    return first_word == speaker_words[0].lower()
+
+
 _DIALOGUE_FALSE_POSITIVES = frozenset({
     "SCENE", "ACT", "NOTE", "TARGET", "STYLE", "SFX",
     "ENV", "NARRATOR", "OPENING", "CLOSING", "MUSIC",
@@ -7478,6 +7523,33 @@ OPENING:
                     character_name = fallback_name
                 else:
                     character_name = raw_name.upper()
+                # BUG-LOCAL-100: detect inline-narration pattern. When the
+                # captured "dialogue" is actually third-person stage direction
+                # ("Lev bursts onto deck...") with the real dialogue on the
+                # NEXT line, look ahead and use that instead. Without this,
+                # Bark TTS reads stage directions aloud (Stellar Shadows
+                # 2026-04-28: l002 + l003).
+                if _is_inline_narration(character_name, dialogue):
+                    j = i + 1
+                    while j < len(raw_lines) and not raw_lines[j].strip():
+                        j += 1
+                    next_s = raw_lines[j].strip() if j < len(raw_lines) else ""
+                    next_s_clean = re.sub(r'^[*_]+|[*_]+$', '', next_s).strip()
+                    if next_s_clean and not next_s_clean.startswith('[') and not next_s_clean.startswith('='):
+                        log.info(
+                            "[ScriptParser] BUG-100: rejected inline narration for %s, "
+                            "using next-line dialogue",
+                            character_name,
+                        )
+                        dialogue = next_s_clean.strip('"\u201c\u201d*_')
+                        lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": voice_traits, "line": dialogue})
+                        i = j + 1  # consume both lines
+                        continue
+                    log.warning(
+                        "[ScriptParser] BUG-100: inline narration detected for %s "
+                        "but no usable next-line dialogue found",
+                        character_name,
+                    )
                 lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": voice_traits, "line": dialogue})
                 i += 1
                 continue
@@ -7487,6 +7559,28 @@ OPENING:
             if m:
                 character_name = m.group(1).strip().upper()
                 dialogue = m.group(2).strip().strip('"\u201c\u201d*_')
+                # BUG-LOCAL-100: same inline-narration check as v1.
+                if _is_inline_narration(character_name, dialogue):
+                    j = i + 1
+                    while j < len(raw_lines) and not raw_lines[j].strip():
+                        j += 1
+                    next_s = raw_lines[j].strip() if j < len(raw_lines) else ""
+                    next_s_clean = re.sub(r'^[*_]+|[*_]+$', '', next_s).strip()
+                    if next_s_clean and not next_s_clean.startswith('[') and not next_s_clean.startswith('='):
+                        log.info(
+                            "[ScriptParser] BUG-100: rejected inline narration for %s, "
+                            "using next-line dialogue",
+                            character_name,
+                        )
+                        dialogue = next_s_clean.strip('"\u201c\u201d*_')
+                        lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": "", "line": dialogue})
+                        i = j + 1
+                        continue
+                    log.warning(
+                        "[ScriptParser] BUG-100: inline narration detected for %s "
+                        "but no usable next-line dialogue found",
+                        character_name,
+                    )
                 lines.append({"type": "dialogue", "character_name": character_name, "voice_traits": "", "line": dialogue})
                 i += 1
                 continue

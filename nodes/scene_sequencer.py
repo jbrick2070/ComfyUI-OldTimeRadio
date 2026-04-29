@@ -392,49 +392,15 @@ def _clean_text_for_bark(text):
     text = re.sub(r'\[(?:ENV|SFX|MUSIC):[^\]]*\]', '', text, flags=re.IGNORECASE)
     text = re.sub(r'===.*?===', '', text)
 
-    # -- Step 2: Parenthetical stage directions - Bark tokens -----------------
-    _PAREN_TO_BARK = [
-        ("laughter",        "[laughter]"),
-        ("laugh",           "[laughs]"),
-        ("chuckl",          "[laughs]"),
-        ("giggl",           "[laughs]"),
-        ("sigh",            "[sighs]"),
-        ("gasp",            "[gasps]"),
-        ("clears throat",   "[clears throat]"),
-        ("clear",           "[clears throat]"),
-        ("cough",           "[coughs]"),
-        ("pant",            "[pants]"),
-        ("breath",          "[pants]"),
-        ("sob",             "[sobs]"),
-        ("cry",             "[sobs]"),
-        ("weep",            "[sobs]"),
-        ("grunt",           "[grunts]"),
-        ("strain",          "[grunts]"),
-        ("groan",           "[groans]"),
-        ("moan",            "[groans]"),
-        ("whistle",         "[whistles]"),
-        ("sneeze",          "[sneezes]"),
-        # Unsupported tokens - drop direction, let voice preset carry the tone
-        ("whisper",         ""),
-        ("quiet",           ""),
-        ("soft",            ""),
-        ("shout",           ""),
-        ("yell",            ""),
-        ("scream",          ""),
-        ("nervous",         "[sighs]"),
-        ("anxious",         "[sighs]"),
-        ("excited",         ""),
-        ("angry",           ""),
-    ]
-
-    def _translate_paren(m):
-        inner = m.group(1).lower().strip()
-        for stem, token in _PAREN_TO_BARK:
-            if stem in inner:
-                return (token + " ") if token else ""
-        return ""
-
-    text = re.sub(r'\(([^)]{1,80})\)\s*', _translate_paren, text)
+    # -- Step 2: Drop ALL parenthetical stage directions ----------------------
+    # BUG-LOCAL-101 (2026-04-28 PM): mirrors the change in
+    # batch_bark_generator._clean_text_for_bark. The two functions must stay
+    # behaviorally identical (test_scene_sequencer_clean_matches_batcher).
+    # Parens get dropped wholesale rather than translated to Bark non-verbal
+    # tokens, because rendered tokens add unwanted breath/throat audio
+    # leading into dialogue (Stellar Shadows 2026-04-28: l004 "(panting)"
+    # produced "Let's work I guess..." in Whisper transcription).
+    text = re.sub(r'\([^)]{1,80}\)\s*', '', text)
 
     # -- Step 3: Asterisk actions - Bark tokens -------------------------------
     _ASTERISK_TO_BARK = [
