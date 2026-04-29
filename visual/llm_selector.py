@@ -43,8 +43,8 @@ log = logging.getLogger("OTR.visual.llm_selector")
 _LLM_MODEL_CHOICES: list[str] = [
     "none",
     "mistralai/Mistral-Nemo-Instruct-2407",
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-    "inflatebot/MN-12B-Mag-Mell-R1",
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
     "google/gemma-2-2b-it",
     "google/gemma-2-9b-it",
     "google/gemma-4-E4B-it",
@@ -102,8 +102,19 @@ class VisualLLMSelector:
                 _LLM_DEFAULT,
             )
             resolved = _LLM_DEFAULT
-        log.info("[LLMSelector] visual path LLM = %s", resolved)
-        return (resolved,)
+        # UI tag suffixes ("(EXPERIMENTAL)", "[ALPHA]") flag model status
+        # in the dropdown but are NOT part of the HF ID. HF model IDs
+        # never contain spaces, so strip everything from the first space
+        # onward before broadcasting downstream. Matches _load_llm() in
+        # nodes.story_orchestrator (model_id_full.split(" ")[0]).
+        broadcast = resolved.split(" ", 1)[0].strip() or _LLM_DEFAULT
+        if broadcast != resolved:
+            log.info(
+                "[LLMSelector] stripped UI tag from %r -> %r",
+                resolved, broadcast,
+            )
+        log.info("[LLMSelector] visual path LLM = %s", broadcast)
+        return (broadcast,)
 
 
 __all__ = [

@@ -52,8 +52,8 @@ def _script_writer_schema():
                 "optional": {
                     "model_id": (
                         ["mistralai/Mistral-Nemo-Instruct-2407",
-                         "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-                         "inflatebot/MN-12B-Mag-Mell-R1",
+                         "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+                         "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
                          "google/gemma-2-2b-it",
                          "google/gemma-2-9b-it",
                          "google/gemma-4-E4B-it",
@@ -63,8 +63,8 @@ def _script_writer_schema():
                     "cleanup_model_id": (
                         ["auto (use story model)",
                          "mistralai/Mistral-Nemo-Instruct-2407",
-                         "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-                         "inflatebot/MN-12B-Mag-Mell-R1",
+                         "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+                         "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
                          "google/gemma-2-2b-it",
                          "google/gemma-2-9b-it",
                          "google/gemma-4-E4B-it",
