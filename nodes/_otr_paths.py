@@ -200,6 +200,71 @@ def director_raw_dump_dir() -> Path:
     return otr_audio_dir()
 
 
+def resolve_hf_model_path(repo_id: str) -> str:
+    """Resolve a HuggingFace ``repo_id`` to a local cache path.
+
+    Returns the parent directory of ``models--{org}--{name}`` if a
+    cached copy is found, otherwise returns the original ``repo_id``
+    string. Both forms are accepted by ``transformers.from_pretrained``
+    and ``huggingface_hub.snapshot_download`` -- a directory triggers
+    offline load, the ``repo_id`` triggers a download.
+
+    Resolution order (each candidate must exist AND be non-empty):
+
+    1. ``OTR_MODELS_DIR`` env var -- explicit user override.
+       ``$OTR_MODELS_DIR/huggingface/hub/models--{...}``.
+    2. ``HF_HOME`` env var -- HF standard.
+       ``$HF_HOME/hub/models--{...}``.
+    3. ``comfy_models_dir() / "huggingface" / "hub" / models--{...}`` --
+       ComfyUI project convention. Falls through silently if
+       ``folder_paths`` import fails (i.e. running outside ComfyUI).
+    4. ``~/.cache/huggingface/hub/models--{...}`` -- HF default cache.
+    5. Fall back to the bare ``repo_id`` string -- caller's
+       ``from_pretrained()`` resolves online.
+
+    Designed for shipped node distribution where the user's HF_HOME and
+    ComfyUI install layout are unknown. Local OTR development with
+    HF_HOME set in HKCU\\Environment usually hits candidate #2 first.
+
+    Cache-dir naming convention is HuggingFace's: ``org/name`` becomes
+    ``models--org--name``. A folder must exist AND contain at least one
+    entry (snapshots/, blobs/, refs/, etc.) to be considered valid --
+    skips empty stub directories that some HF tools create to hold a
+    locks file before any actual download.
+    """
+    cache_dirname = "models--" + repo_id.replace("/", "--")
+    candidates = []
+
+    otr_dir = os.environ.get("OTR_MODELS_DIR", "").strip()
+    if otr_dir:
+        candidates.append(Path(otr_dir) / "huggingface" / "hub" / cache_dirname)
+
+    hf_home = os.environ.get("HF_HOME", "").strip()
+    if hf_home:
+        candidates.append(Path(hf_home) / "hub" / cache_dirname)
+
+    try:
+        candidates.append(comfy_models_dir() / "huggingface" / "hub" / cache_dirname)
+    except Exception:  # noqa: BLE001 -- best-effort; folder_paths may be missing in CLI/test envs
+        pass
+
+    candidates.append(Path.home() / ".cache" / "huggingface" / "hub" / cache_dirname)
+
+    for c in candidates:
+        try:
+            if c.exists() and any(c.iterdir()):
+                # Return the cache root (parent of "hub"), not the model dir.
+                # transformers.from_pretrained also accepts the model dir
+                # directly via its snapshots/ subdir, but returning the
+                # cache root keeps the caller's loader code symmetric with
+                # the bare-repo_id fallback case.
+                return str(c.parent.parent)
+        except OSError:  # noqa: PERF203 -- per-candidate isolation
+            continue
+
+    return repo_id
+
+
 __all__ = [
     "comfy_output_dir",
     "comfy_input_dir",
@@ -211,4 +276,5 @@ __all__ = [
     "otr_videos_dir",
     "episodes_for_obs_dir",
     "director_raw_dump_dir",
+    "resolve_hf_model_path",
 ]
