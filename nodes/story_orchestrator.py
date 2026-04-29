@@ -3264,7 +3264,7 @@ class LLMScriptWriter:
                 }),
                 "target_words": ("INT", {
                     "default": 700, "min": 350, "max": 10000, "step": 50,
-                    "tooltip": "Target spoken dialogue words at ~140 wpm: 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min"
+                    "tooltip": "Target spoken dialogue words at ~140 wpm: 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. For smoke tests below 350, pick target_length='tiny (smoke, 1 act)' which forces target_words=100 + num_characters=2 internally regardless of these widget values."
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 2, "max": 8, "step": 1,
@@ -3378,9 +3378,9 @@ class LLMScriptWriter:
                         "faster cheaper runs at the cost of plot variety."
                     ),
                 }),
-                "target_length": (["short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
+                "target_length": (["tiny (smoke, 1 act)", "short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
                     "default": "medium (5 acts)",
-                    "tooltip": "Act structure preset. Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
+                    "tooltip": "Act structure preset. Tiny=1 act smoke test (pair with target_words=100, num_characters=2 for fastest end-to-end pipeline validation, ~45 sec audio + ~6 HuMo clips). Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
                 }),
                 "style_variant": (["tense claustrophobic", "space opera epic", "psychological slow-burn", "hard-sci-fi procedural", "noir mystery", "chaotic black-mirror"], {
                     "default": "tense claustrophobic",
@@ -3574,6 +3574,23 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
 
         target_words = int(target_words)
+
+        # 2026-04-29 SMOKE-TEST PRESET. The "tiny (smoke, 1 act)" target
+        # length forces target_words=100 (below the widget min of 350)
+        # for fastest end-to-end pipeline validation. num_characters is
+        # left as the user-chosen value -- chars and words are
+        # independent dimensions in the matrix and the user may want
+        # 2 chars + 100 words OR 5 chars + 100 words. To get 2 chars,
+        # set the num_characters widget to 2 directly (it accepts
+        # min=2). Override BEFORE the early ledger init so the
+        # gen_params snapshot reflects the effective target_words.
+        if isinstance(target_length, str) and target_length.lower().startswith("tiny"):
+            target_words = 100
+            _runtime_log(
+                "ScriptWriter: SMOKE-TEST preset detected (target_length=tiny) "
+                f"-> target_words=100 forced (num_characters={num_characters} unchanged)"
+            )
+
         _runtime_log(f"ScriptWriter: target_words={target_words} (~{max(1, round(target_words / 140))} min at 140 wpm)")
 
         # 2026-04-29: EARLY LEDGER INIT.
@@ -6037,6 +6054,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
         # v1.5 FIX: Respect the target_length widget for act counts
         # Map: short=3, medium=5, long=8, epic=12
         _act_map = {
+            "tiny (smoke, 1 act)": 1,
             "short (3 acts)":  3,
             "medium (5 acts)": 5,
             "long (7-8 acts)": 8,

@@ -719,6 +719,23 @@ class BatchHumoRender:
                         "disable (reverts to pre-BUG-102 behavior)."
                     ),
                 }),
+                "resume_from_ledger": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "If ON, before rendering each clip, check "
+                        "ledger.clips[] for an entry with matching "
+                        "line_id whose mp4_path file still exists on "
+                        "disk. If found, skip the HuMo render and "
+                        "reuse the existing clip. Pairs with the "
+                        "per-clip incremental ledger save: a crashed "
+                        "or cancelled run can be re-queued and the "
+                        "render picks up where it left off instead "
+                        "of redoing finished clips. Set OFF to force "
+                        "a full re-render (e.g. after changing the "
+                        "warmup_pad_ms widget value -- existing clips "
+                        "would have a stale pad)."
+                    ),
+                }),
             },
         }
 
@@ -738,6 +755,7 @@ class BatchHumoRender:
         height: int,
         flux_done_gate=None,  # BUG-LOCAL-086: dependency gate, value ignored
         humo_warmup_pad_ms: int = 200,  # BUG-LOCAL-102: see INPUT_TYPES tooltip
+        resume_from_ledger: bool = True,  # 2026-04-29: see INPUT_TYPES tooltip
     ):
         t_start = time.time()
         # BUG-LOCAL-086: flux_done_gate is intentionally not consumed.
@@ -1183,8 +1201,56 @@ class BatchHumoRender:
         # post-mortem, OBS scheduler) find every rendered clip by
         # ledger lookup instead of filesystem glob.
         clip_records: list[dict] = []
+
+        # 2026-04-29: build a lookup of already-rendered clips for resume.
+        # If resume_from_ledger is ON and the on-disk ledger already has a
+        # clips[] entry for a given line_id whose mp4_path file still
+        # exists, skip the HuMo render and reuse the existing clip.
+        # Pairs with the per-clip incremental save: a crashed run can be
+        # re-queued and we pick up at the first un-rendered clip instead
+        # of redoing all 33 clips at 9-10 min each.
+        existing_clips_by_line_id: dict = {}
+        if resume_from_ledger and ledger_path is not None:
+            try:
+                _existing = ledger.get("clips") or []
+                for _ec in _existing:
+                    _eid = (_ec or {}).get("line_id")
+                    _emp4 = (_ec or {}).get("mp4_path")
+                    if _eid and _emp4 and Path(_emp4).is_file():
+                        existing_clips_by_line_id[_eid] = _ec
+                if existing_clips_by_line_id:
+                    log.info(
+                        "[BatchHumoRender] resume_from_ledger=ON: %d "
+                        "existing clip(s) found in ledger with mp4 on disk; "
+                        "those line_ids will be skipped",
+                        len(existing_clips_by_line_id),
+                    )
+            except Exception as _resume_exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchHumoRender] resume scan failed (will re-render "
+                    "everything): %s",
+                    _resume_exc,
+                )
+                existing_clips_by_line_id = {}
+
         for entry in plan:
             line_id = entry["line_id"]
+
+            # Resume: reuse existing clip if matching line_id + mp4 on disk.
+            if line_id in existing_clips_by_line_id:
+                _reused = existing_clips_by_line_id[line_id]
+                clip_records.append(_reused)
+                rendered += 1
+                report_lines.append(
+                    f"  {line_id} ({entry.get('speaker')}): RESUMED "
+                    f"(reused {_reused.get('mp4_path')})"
+                )
+                log.info(
+                    "[BatchHumoRender] %s RESUMED: reused existing clip %s",
+                    line_id, _reused.get("mp4_path"),
+                )
+                continue
+
             if entry.get("positive") is None or entry.get("audio_emb") is None:
                 report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase")
                 continue

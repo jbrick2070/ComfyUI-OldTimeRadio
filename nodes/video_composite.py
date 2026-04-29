@@ -348,6 +348,23 @@ class VideoComposite:
                     "multiline": False,
                     "tooltip": "ffmpeg binary path or name on PATH.",
                 }),
+                "cleanup_clips_after_assembly": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "[DEFAULT OFF -- experimental] If ON, after the "
+                        "final mp4 is written and verified, delete every "
+                        "per-line HuMo clip mp4 listed in ledger.clips[]. "
+                        "Saves disk space (33 clips x 25 MB = ~800 MB per "
+                        "episode) once the per-clip files are no longer "
+                        "needed for re-encoding or VideoComposite re-runs. "
+                        "Each deleted clip's ledger entry gets "
+                        "'cleaned_up: true' stamped so a postmortem can "
+                        "tell deleted-on-purpose from missing-due-to-bug. "
+                        "Recommended OFF until BUG-101/102/106 are fully "
+                        "stable -- you may want to re-encode a single "
+                        "clip without re-running the 5-hour HuMo render."
+                    ),
+                }),
             },
         }
 
