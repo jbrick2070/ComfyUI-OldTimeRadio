@@ -775,6 +775,100 @@ _ACCENTS = [
     ("neutral",  "en", 1.00),   # English-only - no foreign presets
 ]
 
+# Per-character voice traits pool. Drawn at cast-roll time so each character
+# carries a fixed (gender, age_band, tone, energy, vocab_register, signature)
+# tuple across every scene. Without this, the LLM improvises traits inside
+# each [VOICE:] tag and the same character drifts in voice/age/gender between
+# scenes. Signature is a one-line speech tic the LLM keeps consistent.
+# Keep this list balanced: ~50/50 gender split, varied age bands, varied
+# energy levels, no two entries with identical (gender, age, tone) triples.
+_VOICE_TRAITS = [
+    ("male",   "30s", "wry",          "low",    "blue-collar",  "trims sentences mid-thought"),
+    ("female", "40s", "clipped",      "high",   "technical",    "answers questions with questions"),
+    ("male",   "50s", "weathered",    "low",    "plainspoken",  "drops articles when stressed"),
+    ("female", "20s", "curious",      "medium", "academic",     "names tools by their model number"),
+    ("male",   "60s", "gravelly",     "low",    "rural",        "ends sentences with 'son' or 'kid'"),
+    ("female", "30s", "sardonic",     "medium", "urban",        "speaks in fragments under stress"),
+    ("male",   "40s", "anxious",      "high",   "bureaucratic", "qualifies every statement"),
+    ("female", "50s", "authoritative","medium", "command",      "issues orders, never asks"),
+    ("male",   "20s", "earnest",      "high",   "vernacular",   "uses contractions even when formal"),
+    ("female", "60s", "quiet",        "low",    "lyrical",      "speaks in metaphor when scared"),
+]
+
+
+def _check_voice_consistency(script_text, pre_rolled_cast_traits):
+    """Walk every [VOICE: NAME, gender, age, tone, energy] tag in the final
+    script and compare the LLM-chosen traits against the pre-rolled cast
+    traits. Returns a list of soft-warning dicts (no schema bump, written
+    to ledger.voice_warnings[] for forward analysis). ANNOUNCER tags are
+    skipped because the announcer alternates per episode and is not in the
+    pre-rolled cast traits dict.
+
+    Each warning dict shape:
+        {
+          "char_id": str (canonical NAME, all caps),
+          "expected": {"gender", "age", "tone", "energy"},
+          "actual":   {"gender", "age", "tone", "energy"},
+          "mismatches": [str, ...]  # one short tag per drifted field
+        }
+
+    The check is forgiving: trait matches use substring-in-actual so
+    "30s" pre-rolled matches "30s, anxious" actual, etc. A trait whose
+    actual value is missing or unparseable is reported as
+    'mismatch:absent'. Failure of the regex itself is swallowed -- the
+    whole pipeline never blocks on a soft-warning collection.
+    """
+    if not pre_rolled_cast_traits:
+        return []
+    try:
+        # [VOICE: NAME, gender, age, tone, energy]
+        # Allow optional whitespace and accept gender words wrapped in <>
+        # placeholders the LLM may leak from prompt scaffolding.
+        pattern = re.compile(
+            r'\[VOICE:\s*'
+            r'([A-Z][A-Z0-9 _\-]+?)\s*,'   # name
+            r'\s*<?([^,\]<>]+)>?\s*,'      # gender
+            r'\s*<?([^,\]<>]+)>?\s*,'      # age
+            r'\s*<?([^,\]<>]+)>?\s*,'      # tone
+            r'\s*<?([^,\]<>]+)>?\s*\]',    # energy
+            re.IGNORECASE,
+        )
+        warnings_out = []
+        for m in pattern.finditer(script_text or ""):
+            raw_name = (m.group(1) or "").strip().upper()
+            if not raw_name or raw_name == "ANNOUNCER":
+                continue
+            traits = pre_rolled_cast_traits.get(raw_name)
+            if not traits:
+                continue
+            exp_gender, exp_age, exp_tone, exp_energy = traits[:4]
+            act_gender = (m.group(2) or "").strip().lower()
+            act_age    = (m.group(3) or "").strip().lower()
+            act_tone   = (m.group(4) or "").strip().lower()
+            act_energy = (m.group(5) or "").strip().lower()
+            mismatches = []
+            if exp_gender.lower() not in act_gender:
+                mismatches.append(f"gender:{exp_gender}!={act_gender}")
+            if exp_age.lower() not in act_age:
+                mismatches.append(f"age:{exp_age}!={act_age}")
+            if exp_tone.lower() not in act_tone:
+                mismatches.append(f"tone:{exp_tone}!={act_tone}")
+            if exp_energy.lower() not in act_energy:
+                mismatches.append(f"energy:{exp_energy}!={act_energy}")
+            if mismatches:
+                warnings_out.append({
+                    "char_id":  raw_name,
+                    "expected": {"gender": exp_gender, "age": exp_age,
+                                 "tone": exp_tone,    "energy": exp_energy},
+                    "actual":   {"gender": act_gender, "age": act_age,
+                                 "tone": act_tone,    "energy": act_energy},
+                    "mismatches": mismatches,
+                })
+        return warnings_out
+    except Exception:  # noqa: BLE001 - soft-warning collection never blocks
+        return []
+
+
 # Voice presets mapped by gender + vocal quality + language code.
 # English-native presets (en_speaker_*) have known vocal qualities.
 # International presets (xx_speaker_*) are grouped by speaker index tendencies.
@@ -2884,11 +2978,13 @@ BANNED PATTERNS - these are hallmarks of generic LLM output. NEVER use them:
 - "not just X, but Y" / "not only... but also" constructions
 - Rule-of-three adjective lists (cap adjective runs at TWO)
 - Stock idioms ("blood ran cold", "heart skipped a beat", "silence was deafening")
+- Animated-environment cliches ("shadows danced", "rain wept", "the wind whispered", "sun bled across the horizon") -- the world does NOT have human emotions; describe it with sonic verbs and physical action instead
 - Decorative em-dashes (em-dash is ONLY for interruptions between speakers)
 - Pseudo-profound one-liners that sound deep but say nothing
 - Grand summary metaphors at the end of scenes
 - Somatic posture filler ("she clenched her fists", "he squared his shoulders")
 - Narrating silence ("the room fell quiet", "a heavy silence descended")
+- Telegraphed emotion in dialogue ("I'm so scared", "this is terrifying", "I feel so alone") -- characters do NOT narrate their own feelings; emotion comes from [VOICE:] tag tone, sonic verbs, broken cadence, and what they choose to say or refuse to say
 REPLACEMENT RULES:
 - Bombs beep. No abstract emotion without an audible physical cue via [SFX:] or sonic verb.
 - Break cadence constantly. Vary line lengths. Never let three consecutive lines have similar rhythm.
@@ -3932,35 +4028,87 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         seed_str = f"{episode_title}_{target_words}_{style_variant}_{time.time()}"
         cast_rng = random.Random(seed_str)
         
+        # `pre_rolled_cast` stays a list[str] for backward compat with every
+        # downstream consumer (name cleanup, fallback_cast, set difference
+        # against parsed names, etc.). The new `pre_rolled_cast_traits` dict
+        # carries (gender, age, tone, energy, register, signature) per name
+        # so the writer prompt can inject voice profiles AND the post-script
+        # voice-consistency check can verify the LLM kept the profiles
+        # stable across every [VOICE:] tag.
         pre_rolled_cast = []
+        pre_rolled_cast_traits = {}
         seen_first = set()
         seen_last = set()
+        seen_traits_idx = set()
         num_non_announcers = max(1, num_characters)
-        
-        # Injected Lemmy: if he rolled in, he occupies one of the cast slots 
-        # so he appears in the MANDATORY CAST ROSTER (ensuring Gemma uses him).
+
+        # Injected Lemmy: if he rolled in, he occupies one of the cast slots
+        # so he appears in the MANDATORY CAST ROSTER (ensuring the writer
+        # uses him). Lemmy gets the first trait slot deterministically so
+        # his voice profile is reproducible across episodes.
         if lemmy_roll:
             pre_rolled_cast.append("LEMMY")
+            pre_rolled_cast_traits["LEMMY"] = _VOICE_TRAITS[0]
             seen_first.add("LEMMY")
+            seen_traits_idx.add(0)
 
         while len(pre_rolled_cast) < num_non_announcers:
             f_name = cast_rng.choice(_FIRST_NAMES).upper()
             l_name = cast_rng.choice(_LAST_NAMES).upper()
-            if f_name not in seen_first and l_name not in seen_last:
-                seen_first.add(f_name)
-                seen_last.add(l_name)
-                pre_rolled_cast.append(f"{f_name} {l_name}")
+            if f_name in seen_first or l_name in seen_last:
+                continue
+            # Pick an unused voice profile so every cast member sounds
+            # distinct. If the requested cast size exceeds the trait pool,
+            # cycle the pool rather than fail.
+            available_traits = [
+                i for i in range(len(_VOICE_TRAITS)) if i not in seen_traits_idx
+            ]
+            if not available_traits:
+                seen_traits_idx.clear()
+                available_traits = list(range(len(_VOICE_TRAITS)))
+            trait_idx = cast_rng.choice(available_traits)
+            full_name = f"{f_name} {l_name}"
+            seen_first.add(f_name)
+            seen_last.add(l_name)
+            seen_traits_idx.add(trait_idx)
+            pre_rolled_cast.append(full_name)
+            pre_rolled_cast_traits[full_name] = _VOICE_TRAITS[trait_idx]
+
+        # Build the cast roster block with per-character voice profiles
+        # injected. Each line carries the fixed (gender, age, tone, energy)
+        # quad plus the vocab register and signature speech tic. The writer
+        # prompt references these explicitly so the LLM does not improvise
+        # traits inside each [VOICE:] tag.
+        _cast_lines = []
+        for _name in pre_rolled_cast:
+            _traits = pre_rolled_cast_traits.get(_name)
+            if not _traits:
+                _cast_lines.append(f"- {_name}")
+                continue
+            _g, _a, _t, _e, _reg, _sig = _traits
+            _cast_lines.append(
+                f"- {_name} ({_g}, {_a}, {_t}, {_e} energy)"
+                f" - register: {_reg}; signature: {_sig}"
+            )
 
         cast_roster_block = (
-            "MANDATORY CAST ROSTER:\n"
-            f"You MUST use exactly these {num_non_announcers} character names and no others for your speaking roles:\n"
-            + "\n".join(f"- {n}" for n in pre_rolled_cast) + "\n"
-            "Preserve spelling exactly. Do not introduce substitute names, nicknames, or titles. "
+            "MANDATORY CAST ROSTER WITH VOICE PROFILES:\n"
+            f"You MUST use exactly these {num_non_announcers} character names "
+            "and no others for your speaking roles.\n"
+            "Each character has a fixed voice profile -- keep it CONSISTENT "
+            "across every [VOICE:] tag for that character:\n"
+            + "\n".join(_cast_lines) + "\n"
+            "Preserve spelling exactly. Do not introduce substitute names, "
+            "nicknames, or titles. When you write a [VOICE: NAME, ...] tag "
+            "for a character, use THAT character's gender, age, tone, and "
+            "energy from the profile above -- not improvised values. "
             "If ANNOUNCER is present, it does not count as a cast invention."
         )
 
         # -- Write canonical cast to config/episode_cast.txt --
         # Single source of truth for the name cleanup pass downstream.
+        # Pre-rolled traits include gender, so the cast config now records
+        # gender at pre-roll time instead of waiting on the Director.
         _cast_config_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "config", "episode_cast.txt"
         )
@@ -3969,8 +4117,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             with open(_cast_config_path, "w", encoding="utf-8") as _cf:
                 _cf.write("# Episode Cast - auto-generated per episode\n")
                 for _cname in pre_rolled_cast:
-                    # Gender not known yet at pre-roll; will be resolved by Director
-                    _cf.write(f"{_cname} | unknown\n")
+                    _ctraits = pre_rolled_cast_traits.get(_cname)
+                    _cgender = _ctraits[0] if _ctraits else "unknown"
+                    _cf.write(f"{_cname} | {_cgender}\n")
             _runtime_log(f"ScriptWriter: CAST_CONFIG written: {len(pre_rolled_cast)} characters -> {_cast_config_path}")
         except Exception as _cast_err:
             log.warning("[ScriptWriter] Failed to write cast config: %s", _cast_err)
@@ -4946,6 +5095,31 @@ TITLE: <your chosen title>
             led.set_cast(cast_rows)
             led.set_scenes(scene_rows)
             led.set_lines(line_rows)
+            # Voice-consistency soft warnings: walk every [VOICE:] tag in
+            # the FINAL script_text and compare LLM-chosen traits against
+            # the pre-rolled cast traits. Mismatches are logged for
+            # forward analysis (no schema bump, no run abort). After 2-3
+            # episodes of warning data accumulate the spine-ledger
+            # ticket can use them to size the structural-validation
+            # follow-up. Failure of the check is silent; voice_warnings
+            # may be absent on legacy ledgers.
+            try:
+                _voice_warnings = _check_voice_consistency(
+                    script_text, pre_rolled_cast_traits
+                )
+                if _voice_warnings:
+                    led.data["voice_warnings"] = _voice_warnings
+                    _runtime_log(
+                        f"VOICE_CONSISTENCY: {len(_voice_warnings)} drifted "
+                        f"[VOICE:] tag(s) recorded to ledger.voice_warnings"
+                    )
+                else:
+                    _runtime_log(
+                        "VOICE_CONSISTENCY: all [VOICE:] tags matched "
+                        "pre-rolled cast traits (or no cast traits set)"
+                    )
+            except Exception as _vc_err:  # noqa: BLE001
+                log.warning("[ScriptWriter] voice consistency check failed: %s", _vc_err)
             led.save()
         except Exception as _e:  # noqa: BLE001
             log.warning("[Ledger] ScriptWriter-stage snapshot failed: %s", _e)
