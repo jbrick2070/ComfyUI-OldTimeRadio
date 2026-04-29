@@ -3286,8 +3286,8 @@ class LLMScriptWriter:
                     "tooltip": "Sub-genre flavor for the episode"
                 }),
                 "target_words": ("INT", {
-                    "default": 700, "min": 350, "max": 10000, "step": 50,
-                    "tooltip": "Target spoken dialogue words at ~140 wpm: 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. For smoke tests below 350, pick target_length='tiny (smoke, 1 act)' which forces target_words=100 + num_characters=2 internally regardless of these widget values."
+                    "default": 700, "min": 100, "max": 10000, "step": 50,
+                    "tooltip": "Target spoken dialogue words at ~140 wpm: 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For one-click smoke (100 words + 1 act bundled), pick target_length='tiny (smoke, 1 act)' instead -- it forces target_words=100 internally regardless of this widget value."
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 1, "max": 8, "step": 1,
