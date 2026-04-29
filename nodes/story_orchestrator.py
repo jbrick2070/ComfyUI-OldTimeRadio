@@ -3187,12 +3187,13 @@ class LLMScriptWriter:
                 # follow-up is a two-LLM split (creative model writes the
                 # script, structured model handles cleanup phases).
                 "model_id": (["mistralai/Mistral-Nemo-Instruct-2407",
-                              "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-                              "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
                               "google/gemma-2-2b-it",
                               "google/gemma-2-9b-it",
+                              "google/gemma-4-E2B-it",
                               "google/gemma-4-E4B-it",
-                              "Qwen/Qwen2.5-14B-Instruct [ALPHA]"], {
+                              "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+                              "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+                              "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)"], {
                     "default": "mistralai/Mistral-Nemo-Instruct-2407",
                     "tooltip": "Hugging Face model ID for LLM. "
                                "Mistral-Nemo is the production default "
@@ -3224,12 +3225,13 @@ class LLMScriptWriter:
                 "cleanup_model_id": ([
                     "auto (use story model)",
                     "mistralai/Mistral-Nemo-Instruct-2407",
-                    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-                    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
                     "google/gemma-2-2b-it",
                     "google/gemma-2-9b-it",
+                    "google/gemma-4-E2B-it",
                     "google/gemma-4-E4B-it",
                     "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+                    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+                    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
                 ], {
                     "default": "auto (use story model)",
                     "tooltip": "Optional second LLM for structured rescue "

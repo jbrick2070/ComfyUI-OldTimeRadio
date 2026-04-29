@@ -43,12 +43,13 @@ log = logging.getLogger("OTR.visual.llm_selector")
 _LLM_MODEL_CHOICES: list[str] = [
     "none",
     "mistralai/Mistral-Nemo-Instruct-2407",
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
     "google/gemma-2-2b-it",
     "google/gemma-2-9b-it",
+    "google/gemma-4-E2B-it",
     "google/gemma-4-E4B-it",
     "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
 ]
 _LLM_DEFAULT: str = "mistralai/Mistral-Nemo-Instruct-2407"
 
