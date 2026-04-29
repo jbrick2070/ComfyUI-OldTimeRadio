@@ -276,6 +276,49 @@ def _slice_audio_tensor(audio_dict: dict, start_s: float, dur_s: float) -> dict:
     return {"waveform": sliced.contiguous(), "sample_rate": sr}
 
 
+def _pad_audio_silence_lead(audio_dict: dict, pad_samples: int) -> dict:
+    """BUG-LOCAL-102: prepend ``pad_samples`` of digital silence
+    (zero samples) to a sliced AUDIO dict. Used to give HuMo's audio
+    cross-attention some leading silence so the model burns its
+    intrinsic ~3-6-frame motion-onset freeze on silence rather than
+    on the first dialogue phoneme. ChatGPT + Gemini round-robin
+    2026-04-28 PM both confirm zeros are sufficient (Whisper / HuMo
+    audio encoders treat zeros, low-noise, and room tone identically
+    for the purpose of "no speech here"). Returns a new audio dict;
+    sample_rate is preserved.
+    """
+    if pad_samples <= 0:
+        return audio_dict
+    import torch  # type: ignore  # lazy: this module is imported headless by tests
+    waveform = audio_dict["waveform"]
+    sr = int(audio_dict["sample_rate"])
+    pad_shape = list(waveform.shape)
+    pad_shape[-1] = int(pad_samples)
+    silence = torch.zeros(pad_shape, dtype=waveform.dtype, device=waveform.device)
+    padded = torch.cat([silence, waveform], dim=-1).contiguous()
+    return {"waveform": padded, "sample_rate": sr}
+
+
+def _trim_audio_lead(audio_dict: dict, pad_samples: int) -> dict:
+    """Inverse of ``_pad_audio_silence_lead``: drop the leading
+    ``pad_samples`` from an AUDIO dict. Used at HuMo clip save time
+    so the on-disk mp4 contains only the dialogue audio (no leading
+    silence), keeping VideoComposite placement math unchanged.
+    """
+    if pad_samples <= 0:
+        return audio_dict
+    waveform = audio_dict["waveform"]
+    sr = int(audio_dict["sample_rate"])
+    pad_samples = int(pad_samples)
+    if waveform.shape[-1] <= pad_samples:
+        # Nothing left after trim -- caller should never hit this with
+        # a positive pad_ms; degrade by returning a minimal 1-sample slice.
+        trimmed = waveform[..., :1]
+    else:
+        trimmed = waveform[..., pad_samples:]
+    return {"waveform": trimmed.contiguous(), "sample_rate": sr}
+
+
 def _resolve_cast_stills_from_ledger(
     cast: list[dict],
     portraits_dir: Path,
@@ -658,6 +701,24 @@ class BatchHumoRender:
                         "edge matters."
                     ),
                 }),
+                "humo_warmup_pad_ms": ("INT", {
+                    "default": 200,
+                    "min": 0,
+                    "max": 500,
+                    "step": 10,
+                    "tooltip": (
+                        "BUG-LOCAL-102: leading silence (in ms) padded "
+                        "onto each line's audio before HuMo's audio "
+                        "cross-attention. Burns HuMo's intrinsic ~3-6 "
+                        "frame motion-onset freeze on silence rather "
+                        "than on the first dialogue word, eliminating "
+                        "the constant audio-leads-lips lag the listener "
+                        "hears in the rendered episode. The pad is "
+                        "trimmed back off the on-disk clip so timeline "
+                        "placement math is unchanged. Set to 0 to "
+                        "disable (reverts to pre-BUG-102 behavior)."
+                    ),
+                }),
             },
         }
 
@@ -676,6 +737,7 @@ class BatchHumoRender:
         width: int,
         height: int,
         flux_done_gate=None,  # BUG-LOCAL-086: dependency gate, value ignored
+        humo_warmup_pad_ms: int = 200,  # BUG-LOCAL-102: see INPUT_TYPES tooltip
     ):
         t_start = time.time()
         # BUG-LOCAL-086: flux_done_gate is intentionally not consumed.
@@ -683,6 +745,9 @@ class BatchHumoRender:
         # topological scheduler runs the FLUX -> UnloadAll branch
         # BEFORE this node starts.
         del flux_done_gate
+
+        # BUG-LOCAL-102: clamp the pad to sane bounds. 0 disables.
+        warmup_pad_ms = max(0, min(500, int(humo_warmup_pad_ms)))
 
         # ---- 1. Parse ledger ----
         ledger, ledger_path = self._load_ledger_with_path(ledger_json)
@@ -909,7 +974,13 @@ class BatchHumoRender:
 
             # Cap to clip_length
             dur_s = min(dur_s, float(clip_length))
-            humo_length = humo_length_for_dur(dur_s)
+            # BUG-LOCAL-102: extend humo_length to cover the leading
+            # silence pad so HuMo has frames to render BOTH the
+            # warm-up freeze AND the dialogue. The pad frames are
+            # trimmed off the on-disk clip below so timeline math
+            # stays in terms of dur_s.
+            pad_s = warmup_pad_ms / 1000.0
+            humo_length = humo_length_for_dur(dur_s + pad_s)
 
             # Resolve portrait. BUG-LOCAL-088 priority:
             #   1. ledger-driven cast_still_map (this-episode FLUX)
@@ -942,6 +1013,15 @@ class BatchHumoRender:
                 continue
 
             line_audio = _slice_audio_tensor(audio, start_s, dur_s)
+            # BUG-LOCAL-102: pad the line's audio with leading silence
+            # so HuMo's first few frames (motion-onset freeze) happen
+            # during silence, not during the first phoneme. The pad is
+            # at the slice's own sample rate.
+            pad_samples = (
+                int(warmup_pad_ms * int(line_audio.get("sample_rate", 0)) / 1000)
+                if warmup_pad_ms > 0 else 0
+            )
+            line_audio = _pad_audio_silence_lead(line_audio, pad_samples)
             pos_text = _build_pos_prompt(speaker, ln, cast)
 
             # BUG-LOCAL-088: log which still each line consumed + source
@@ -971,6 +1051,15 @@ class BatchHumoRender:
                 "pos_text": pos_text, "ref_image": ref_image,
                 "audio": line_audio, "ref_png_name": ref_png.name,
                 "ref_source": ref_source,
+                # BUG-LOCAL-102: how many leading samples / frames the
+                # save step must trim back off so the on-disk clip is
+                # aligned (audio = dialogue from sample 0; video =
+                # articulated motion from frame 0, no warm-up freeze).
+                "warmup_pad_samples": pad_samples,
+                "warmup_pad_frames": (
+                    int(warmup_pad_ms * HUMO_FPS / 1000)
+                    if warmup_pad_ms > 0 else 0
+                ),
             })
 
         if not plan:
@@ -1122,6 +1211,32 @@ class BatchHumoRender:
 
                 images_out = _call(vae_decoder, samples=samples, vae=vae)[0]
 
+                # BUG-LOCAL-102: trim the leading warmup window. HuMo
+                # rendered N extra frames against the silence we
+                # padded onto the audio so the model's intrinsic
+                # motion-onset freeze (~3-6 frames) burned down before
+                # the first dialogue phoneme. Drop those leading frames
+                # from the decoded image tensor and the matching
+                # leading silence from the audio so the on-disk clip
+                # starts at the first articulated motion / first
+                # dialogue word. Timeline placement (clips[].start_s)
+                # therefore stays in terms of the original dur_s.
+                pad_frames = int(entry.get("warmup_pad_frames", 0) or 0)
+                pad_samples_save = int(entry.get("warmup_pad_samples", 0) or 0)
+                if pad_frames > 0 and isinstance(images_out, torch.Tensor):
+                    if images_out.shape[0] > pad_frames:
+                        images_out = images_out[pad_frames:].contiguous()
+                    else:
+                        log.warning(
+                            "[BatchHumoRender] BUG-102: line %s has %d frames "
+                            "but pad_frames=%d -- skipping trim (degraded)",
+                            line_id, images_out.shape[0], pad_frames,
+                        )
+                audio_for_save = (
+                    _trim_audio_lead(entry["audio"], pad_samples_save)
+                    if pad_samples_save > 0 else entry["audio"]
+                )
+
                 # BUG-LOCAL-083: ComfyUI v0.20.1's SaveVideo (and the
                 # paired CreateVideo) is a V3-style node that expects
                 # `cls.hidden` to be populated by the executor with
@@ -1139,7 +1254,7 @@ class BatchHumoRender:
                 clip_mp4_path = clips_dir_path / f"{line_id}.mp4"
                 _save_clip_via_ffmpeg(
                     images=images_out,
-                    audio_dict=entry["audio"],
+                    audio_dict=audio_for_save,
                     out_path=clip_mp4_path,
                     fps=25,
                 )
@@ -1159,6 +1274,10 @@ class BatchHumoRender:
                     "humo_length": int(entry["humo_length"]),
                     "ref_png_name": entry.get("ref_png_name"),
                     "ref_source": entry.get("ref_source"),
+                    # BUG-LOCAL-102: how many ms of leading silence the
+                    # model rendered against (and that the save trim
+                    # removed). Recorded for post-mortem traceability.
+                    "warmup_pad_ms": int(warmup_pad_ms),
                 })
 
                 shot_ms = int((time.time() - shot_t0) * 1000)

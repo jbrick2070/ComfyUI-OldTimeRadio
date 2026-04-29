@@ -2820,6 +2820,34 @@ Invent fresh, original names for every episode. Do NOT reuse names from previous
 - NEVER use (parentheses) for anything except the (beat) tag.
 - NEVER write stage directions in the dialogue text.
 
+=== [EMOJI] 3a. THE [VOICE:] LINE CONTRACT (BUG-LOCAL-100, NON-NEGOTIABLE) ===
+The text that follows the closing ] of a [VOICE:] tag is read aloud
+VERBATIM by a TTS engine. It is NOT a description of what the character
+does -- it is the WORDS the character SAYS. Treat the [VOICE:] line as
+a one-way speaker, not as a screenplay action line.
+
+WRONG (this gets read aloud as the character's own voice):
+  [VOICE: LEV SHAW, male, 50s, urgent] Lev bursts onto the catwalk deck.
+  Got the newest readings yet?
+
+RIGHT (the action goes in [SFX:] / [ENV:], the dialogue is verbatim speech):
+  [SFX: hurried boot strikes on catwalk grating, airlock seal hiss]
+  [VOICE: LEV SHAW, male, 50s, urgent] Got the newest readings yet?
+
+WRONG (third-person prose between tag and quote):
+  [VOICE: STANLEY CRANSTON, male, 60s, calm] Stanley follows closely.
+  Not encouraging. Shadow overlap keeps pushing our window.
+
+RIGHT (the [VOICE:] line is ONLY what the speaker says):
+  [SFX: trailing footfalls, distant wind across the deck]
+  [VOICE: STANLEY CRANSTON, male, 60s, calm] Not encouraging. Shadow overlap keeps pushing our window.
+
+If a character performs an action without speaking, do NOT create a
+[VOICE:] line for them. Use [SFX:] or [ENV:] for the action and let
+the next speaker's [VOICE:] tag carry the scene forward. Stage
+directions, narration, and third-person prose NEVER appear in a
+[VOICE:] line, with or without surrounding quotes.
+
 === [EMOJI] WORLDBUILDING, RHYTHM, & SONIC ARCHITECTURE RULES ===
 
 1. OMNI-RETRO CULTURAL COLLISION:
