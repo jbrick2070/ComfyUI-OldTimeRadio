@@ -1259,11 +1259,34 @@ class BatchHumoRender:
                     fps=25,
                 )
 
+                # Capture timing + post-trim measurements BEFORE
+                # building the ledger record so all diagnostic fields
+                # are populated in one place.
+                shot_ms = int((time.time() - shot_t0) * 1000)
+
+                # Schema l3 (2026-04-28) diagnostic fields:
+                # mp4_frames is the post-trim image-tensor frame count
+                # (= what the saved mp4 actually contains).
+                # mp4_dur_s = mp4_frames / HUMO_FPS (target on-disk dur).
+                # audio_fed_to_humo_dur_s = padded audio duration the
+                # model actually saw (= line dur + warmup pad).
+                _pad_s_for_meta = float(warmup_pad_ms) / 1000.0
+                _mp4_frames = (
+                    int(images_out.shape[0])
+                    if isinstance(images_out, torch.Tensor)
+                       and images_out.dim() >= 1
+                    else int(entry["humo_length"]) - int(pad_frames)
+                )
+                _mp4_dur_s = float(_mp4_frames) / float(HUMO_FPS)
+                _audio_fed_dur_s = float(entry["dur_s"]) + _pad_s_for_meta
+
                 # BUG-LOCAL-089: record this clip in the per-run
                 # ledger.clips[] array. Includes line_id, char_id,
                 # mp4_path, start_s, dur_s, source-tier, ref_png so
                 # concat (VideoComposite) can resolve every clip via
-                # ledger lookup instead of glob heuristics.
+                # ledger lookup instead of glob heuristics. Schema l3
+                # added humo_render_ms / mp4_frames / mp4_dur_s /
+                # audio_fed_to_humo_dur_s for sync diagnosis.
                 clip_records.append({
                     "line_id": line_id,
                     "char_id": (lines[entry["idx"]].get("char_id") or "").strip() or None,
@@ -1278,9 +1301,12 @@ class BatchHumoRender:
                     # model rendered against (and that the save trim
                     # removed). Recorded for post-mortem traceability.
                     "warmup_pad_ms": int(warmup_pad_ms),
+                    # Schema l3 diagnostic fields (sync regression bait):
+                    "humo_render_ms": int(shot_ms),
+                    "mp4_frames": int(_mp4_frames),
+                    "mp4_dur_s": float(_mp4_dur_s),
+                    "audio_fed_to_humo_dur_s": float(_audio_fed_dur_s),
                 })
-
-                shot_ms = int((time.time() - shot_t0) * 1000)
                 report_lines.append(
                     f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
                     f"(length={entry['humo_length']} ref={entry['ref_png_name']})"
@@ -1303,17 +1329,39 @@ class BatchHumoRender:
         # can resolve every clip via ledger lookup. Skipped silently
         # when the ledger came from an inline JSON blob (no source
         # path to write back to).
+        # Schema l3 (2026-04-28) also stamps meta.git_commit +
+        # meta.phase_ms.humo_batch + meta.schema_version so post-mortem
+        # can correlate ledger contents with the code that produced
+        # them.
         if ledger_path is not None and clip_records:
             try:
+                from . import _otr_ledger as _OTRL  # type: ignore
+            except ImportError:
+                # Same dual-import pattern used elsewhere in this file
+                # for sibling helpers. Tests load this module directly
+                # via spec_from_file_location with no parent package.
+                _NODES_DIR_2 = Path(__file__).resolve().parent
+                if str(_NODES_DIR_2) not in _sys.path:
+                    _sys.path.insert(0, str(_NODES_DIR_2))
+                import _otr_ledger as _OTRL  # type: ignore
+
+            try:
                 ledger["clips"] = clip_records
-                with open(ledger_path, "w", encoding="utf-8") as f:
-                    json.dump(ledger, f, indent=2, ensure_ascii=False)
+                # Schema l3: meta block + phase timing + git commit
+                _OTRL.record_phase_ms(ledger, "humo_batch", int(total_ms))
+                _gc = _OTRL.lookup_git_commit(Path(__file__).resolve().parents[1])
+                if _gc:
+                    _OTRL.set_meta(ledger, "git_commit", _gc)
+                _OTRL.save_ledger_safe(ledger_path, ledger)
                 log.info(
-                    "[BatchHumoRender] ledger updated: %d clip records -> %s",
+                    "[BatchHumoRender] ledger updated: %d clip records -> %s "
+                    "(schema=%s, git=%s)",
                     len(clip_records), ledger_path.name,
+                    _OTRL.CURRENT_SCHEMA_VERSION, _gc or "n/a",
                 )
                 report_lines.append(
-                    f"  ledger updated: {len(clip_records)} clip records"
+                    f"  ledger updated: {len(clip_records)} clip records "
+                    f"(schema {_OTRL.CURRENT_SCHEMA_VERSION})"
                 )
             except Exception as exc:
                 log.warning(

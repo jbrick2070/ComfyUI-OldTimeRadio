@@ -23,6 +23,7 @@ v1.0  2026-04-04  Jeffrey Brick
 import json
 import logging
 import gc
+import time
 import warnings
 
 import numpy as np
@@ -553,6 +554,11 @@ class BatchBarkGenerator:
         from .bark_tts import _load_bark
         model, processor = _load_bark("suno/bark")
 
+        # Schema l3: track overall Bark phase wall-clock for the
+        # ledger meta.phase_ms.bark field. Per-line render_ms is
+        # captured separately on each item.
+        _phase_t0 = time.time()
+
         # Results dict: script_idx - (audio_np, sample_rate)
         results = {}
         batch_log = []
@@ -589,11 +595,25 @@ class BatchBarkGenerator:
                              preset)
 
                 try:
+                    # Schema l3 (BUG-LOCAL-101 audit aid): capture the
+                    # exact post-cleanup text fed to Bark so the ledger
+                    # records WHAT the TTS actually saw -- catching any
+                    # future regression where parens / narration leak
+                    # back in. _clean_text_for_bark is idempotent so
+                    # calling it twice is harmless.
+                    _text_for_tts = _clean_text_for_bark(line)
+                    _bark_t0 = time.time()
                     audio_np, sr = _generate_single_line(
                         line, preset, model, processor, temperature,
                         is_first_line=is_first,
                     )
+                    _bark_render_ms = int((time.time() - _bark_t0) * 1000)
                     dur = len(audio_np) / sr
+                    # Stash the new diagnostic fields onto the item for
+                    # the ledger write-back loop below.
+                    item["_bark_wav_dur_s"] = float(dur)
+                    item["_bark_render_ms"] = int(_bark_render_ms)
+                    item["_text_for_tts"] = str(_text_for_tts)
                     results[idx] = (audio_np, sr)
                     batch_log.append(f"  [{idx}] {character_name}: {line[:45]}... ({dur:.1f}s)")
                     generated += 1
@@ -670,8 +690,12 @@ class BatchBarkGenerator:
         # the ledger line whose `text` equals the item's `line`.
         # Walk in script order so duplicate-text collisions resolve
         # to the first unmatched ledger row.
+        # Compute overall Bark phase duration for the meta block.
+        _total_bark_ms = int((time.time() - _phase_t0) * 1000)
+
         try:
             import json as _json
+            from pathlib import Path as _Path
             audio_dir = otr_audio_dir()
             if audio_dir.exists():
                 cands = list(audio_dir.glob("*_ledger.json"))
@@ -710,13 +734,49 @@ class BatchBarkGenerator:
                         row = ledger_lines[ledger_idx]
                         row["dur_s"] = dur
                         row["start_s"] = cumulative_start
+                        # Schema l3 (2026-04-28) per-line diagnostic
+                        # fields. bark_wav_dur_s = same as dur_s but
+                        # explicitly named so the field is distinct
+                        # from the post-SceneSequencer dur_s (which
+                        # may differ after crossfade trimming).
+                        # bark_render_ms = wall-clock time Bark spent
+                        # generating this line. text_for_tts = the
+                        # exact post-cleanup string fed to the model
+                        # (BUG-LOCAL-101 audit aid).
+                        if "_bark_wav_dur_s" in item:
+                            row["bark_wav_dur_s"] = float(item["_bark_wav_dur_s"])
+                        if "_bark_render_ms" in item:
+                            row["bark_render_ms"] = int(item["_bark_render_ms"])
+                        if "_text_for_tts" in item:
+                            row["text_for_tts"] = str(item["_text_for_tts"])
                         cumulative_start += dur
                         updated += 1
                     if updated:
-                        ledger_path.write_text(
-                            _json.dumps(led, indent=2, ensure_ascii=False),
-                            encoding="utf-8",
-                        )
+                        # Schema l3: stamp phase timing + git commit
+                        # alongside the per-line writes so the ledger
+                        # shows which version of the code produced it.
+                        try:
+                            from . import _otr_ledger as _OTRL  # type: ignore
+                            _OTRL.record_phase_ms(led, "bark", int(_total_bark_ms))
+                            _gc_b = _OTRL.lookup_git_commit(
+                                _Path(__file__).resolve().parents[1]
+                            )
+                            if _gc_b:
+                                _OTRL.set_meta(led, "git_commit", _gc_b)
+                            _OTRL.save_ledger_safe(ledger_path, led)
+                        except Exception as _meta_exc:
+                            # Schema-l3 metadata is best-effort; if the
+                            # helper import or save fails, fall back to
+                            # the legacy raw write so the BUG-096
+                            # per-line update is still persisted.
+                            log.warning(
+                                "[BatchBark] schema-l3 helper failed (%s); "
+                                "falling back to raw write", _meta_exc,
+                            )
+                            ledger_path.write_text(
+                                _json.dumps(led, indent=2, ensure_ascii=False),
+                                encoding="utf-8",
+                            )
                         log.info(
                             "[BatchBark] BUG-096 ledger updated: %d line "
                             "dur_s + start_s timings written to %s",
