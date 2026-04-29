@@ -38,6 +38,21 @@ _DEFAULT_STYLE_SUFFIX = (
     "heavy vignette, muted color grade, sharp focus"
 )
 
+# Step 1 (ROADMAP) -- radio bookend FLUX prompt. Hard-coded canon
+# across episodes so the same vintage-radio anchor opens and closes
+# every Signal Lost broadcast. Used as the visual reference image
+# for HuMo lip-sync renders during music + SFX windows (the bits
+# where there's no character speaking but the audio still warrants
+# a "the radio reacts" cue). Per Jeffrey 2026-04-29: people
+# speaking get people lip-syncing, sfx and music get the radio
+# lip-syncing; this prompt anchors the radio half of that contract.
+_DEFAULT_RADIO_BOOKEND_PROMPT = (
+    "1940s vintage console radio, glowing amber dials, walnut "
+    "cabinet, vacuum tube halo, fabric speaker grille, dimly lit "
+    "listening room, cinematic 35mm film aesthetic, sharp focus, "
+    "centered composition, 1080p"
+)
+
 
 def _lazy_nodes():
     refs: dict[str, Any] = {}
@@ -240,13 +255,38 @@ class BatchFluxRender:
                 "style_suffix": ("STRING", {"multiline": False, "default": _DEFAULT_STYLE_SUFFIX}),
                 "freeze_seed": ("BOOLEAN", {"default": False}),
                 "fast_batch": ("BOOLEAN", {"default": True}),
+                "radio_bookend_prompt": ("STRING", {
+                    "multiline": True,
+                    "default": _DEFAULT_RADIO_BOOKEND_PROMPT,
+                    "tooltip": (
+                        "Step 1: Hard-canned 1940s vintage radio prompt. "
+                        "Rendered as one extra FLUX shot at the end of "
+                        "the batch, saved to "
+                        "output/otr/stills/radio_bookend_<ep_id>.png, "
+                        "and stamped into ledger.radio_bookend_path. "
+                        "Used as the HuMo reference image for music + "
+                        "SFX windows. Set empty to disable."
+                    ),
+                }),
+                "radio_bookend_seed": ("INT", {
+                    "default": 4242,
+                    "min": 0,
+                    "max": 0xFFFFFFFFFFFFFFFF,
+                    "tooltip": (
+                        "Deterministic seed for the radio bookend so "
+                        "the same image gets used across episodes "
+                        "(unless explicitly changed)."
+                    ),
+                }),
             },
         }
 
     def execute(self, model, clip, vae, script_json, batch_limit, seed, steps,
                 cfg, sampler_name, scheduler, width, height, guidance,
                 fallback_prompt=_DEFAULT_FALLBACK, style_suffix=_DEFAULT_STYLE_SUFFIX,
-                freeze_seed=False, fast_batch=True):
+                freeze_seed=False, fast_batch=True,
+                radio_bookend_prompt=_DEFAULT_RADIO_BOOKEND_PROMPT,
+                radio_bookend_seed=4242):
         t_start = time.time()
         prompts = _parse_env_prompts(script_json, batch_limit, fallback_prompt, style_suffix)
 
@@ -347,7 +387,124 @@ class BatchFluxRender:
             f"Total: {len(images)} image(s) in {total_ms} ms (avg {total_ms // max(len(images), 1)} ms/shot)"
         )
         log.info("[BatchFluxRender] batch complete: %d image(s) in %d ms", len(images), total_ms)
+
+        # Step 1 (ROADMAP) -- render the radio bookend still and stamp
+        # ledger.radio_bookend_path. Used by BatchHumoRender as the
+        # reference image for music + SFX HuMo windows. Best-effort:
+        # any failure logs WARNING but does not abort the main batch.
+        if radio_bookend_prompt and radio_bookend_prompt.strip():
+            try:
+                self._render_and_save_radio_bookend(
+                    prompt_text=radio_bookend_prompt.strip(),
+                    model=model, clip=clip, vae=vae,
+                    text_enc=text_enc, guidance_node=guidance_node,
+                    empty_latent_cls=empty_latent_cls, sampler=sampler,
+                    decoder=decoder, negative=negative,
+                    seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
+                    sampler_name=sampler_name, scheduler=scheduler,
+                    width=width, height=height, guidance=guidance,
+                    report_lines=report_lines,
+                )
+            except Exception as exc:
+                log.warning("[BatchFluxRender] radio bookend render failed: %s", exc)
+                report_lines.append(f"  radio_bookend: FAILED ({exc})")
+
         return (image_batch, "\n".join(report_lines))
+
+    @staticmethod
+    def _render_and_save_radio_bookend(
+        prompt_text, model, clip, vae, text_enc, guidance_node,
+        empty_latent_cls, sampler, decoder, negative,
+        seed, steps, cfg, sampler_name, scheduler,
+        width, height, guidance, report_lines,
+    ):
+        """Step 1: render the radio bookend still (one extra FLUX call)
+        and save it to ``output/otr/stills/radio_bookend_<ep_id>.png``.
+
+        Also stamps ``ledger.radio_bookend_path`` for downstream
+        BatchHumoRender consumption (music + SFX HuMo windows use this
+        as the reference image; per Jeffrey 2026-04-29 "people speaking
+        get people lip-syncing, sfx and music get the radio
+        lip-syncing").
+        """
+        import torch  # type: ignore
+        import numpy as np  # type: ignore
+        from pathlib import Path
+        from PIL import Image  # type: ignore
+
+        t0 = time.time()
+        positive = text_enc.encode(clip, prompt_text)[0]
+        if guidance_node is not None:
+            positive = guidance_node.append(positive, guidance)[0]
+        latent = empty_latent_cls.generate(width, height, 1)[0]
+        samples = sampler.sample(
+            model, seed, steps, cfg, sampler_name, scheduler,
+            positive, negative, latent, 1.0,
+        )[0]
+        img = decoder.decode(vae, samples)[0]
+        # img shape: [B, H, W, C] in 0..1 float
+
+        # Lazily import the path + ledger helpers from nodes/. visual/
+        # is a sibling package so we add nodes/ to sys.path before the
+        # import (same pattern SceneSequencer uses for sibling helpers).
+        try:
+            import sys as _sys
+            _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
+            if str(_NODES_DIR) not in _sys.path:
+                _sys.path.insert(0, str(_NODES_DIR))
+            import _otr_paths as _OTRP  # type: ignore
+            import _otr_ledger as _OTRL  # type: ignore
+        except Exception as exc:
+            log.warning(
+                "[BatchFluxRender] radio bookend: helper import failed (%s)",
+                exc,
+            )
+            return
+
+        stills_dir = _OTRP.otr_stills_dir()
+        stills_dir.mkdir(parents=True, exist_ok=True)
+
+        # Derive episode_id from the most-recent ledger if available.
+        ledger_p = _OTRL.find_most_recent_ledger(
+            [_OTRP.otr_audio_dir(), _OTRP.otr_legacy_audio_dir()]
+        )
+        episode_id = "episode"
+        led = None
+        if ledger_p is not None:
+            led = _OTRL.load_ledger_safe(ledger_p)
+            if led is not None:
+                episode_id = (led.get("episode_id") or "episode").strip()
+
+        out_path = stills_dir / f"radio_bookend_{episode_id}.png"
+
+        # Save image. img is shape [1, H, W, C] tensor; convert to PIL.
+        try:
+            arr = img[0].detach().cpu().numpy() if hasattr(img, "detach") else np.asarray(img[0])
+            arr = np.clip(arr * 255.0, 0, 255).astype("uint8")
+            Image.fromarray(arr).save(out_path)
+        except Exception as exc:
+            log.warning("[BatchFluxRender] radio bookend save failed: %s", exc)
+            return
+
+        elapsed_ms = int((time.time() - t0) * 1000)
+        log.info(
+            "[BatchFluxRender] radio bookend rendered + saved: %s (%d ms)",
+            out_path, elapsed_ms,
+        )
+        report_lines.append(
+            f"  radio_bookend: {elapsed_ms} ms -> {out_path.name}"
+        )
+
+        # Stamp ledger.radio_bookend_path for BatchHumoRender to find.
+        if ledger_p is not None and led is not None:
+            try:
+                led["radio_bookend_path"] = str(out_path)
+                _OTRL.save_ledger_safe(ledger_p, led)
+            except Exception as exc:
+                log.warning(
+                    "[BatchFluxRender] radio bookend ledger stamp failed: %s",
+                    exc,
+                )
 
 
 __all__ = ["BatchFluxRender"]
