@@ -4462,11 +4462,33 @@ TITLE: <your chosen title>
                 "Pre-rolled cast: %s", ", ".join(pre_rolled_cast)
             )
 
-        if _word_ratio < 0.70 and _target_words > 150:
+        # BUG-LOCAL-109 (2026-04-29): retry the extension pass up to N
+        # times if the LLM's first extension still leaves us under
+        # threshold. Captain-Eris with "maximum chaos" + short target
+        # words (350) tends to produce a 3-line shell on the first
+        # call AND a barely-extended one on the second; the only
+        # reliable cure is to keep asking until the model fills out
+        # the scenes, with a "no-progress -> abort" guard so we don't
+        # spin forever. Threshold also tightened from 70% to 80%.
+        # (wormhole_swallowing_phobos 2026-04-29 produced 65/350 words
+        # = 18.6% on a single extension; the retry loop closes that
+        # gap or surfaces the LLM's actual ceiling.)
+        _BUG_109_RATIO_TARGET = 0.80
+        _BUG_109_MAX_RETRIES = 3
+        _retry_count = 0
+        while (
+            _word_ratio < _BUG_109_RATIO_TARGET
+            and _target_words > 150
+            and _retry_count < _BUG_109_MAX_RETRIES
+        ):
+            _retry_count += 1
             _deficit = _target_words - _raw_dialogue_words
+            _prev_words = _raw_dialogue_words
             _runtime_log(
-                f"WORD_ENFORCEMENT: UNDER THRESHOLD ({_word_ratio:.0%} < 70%) - "
-                f"deficit {_deficit} words - running extension pass"
+                f"WORD_ENFORCEMENT: UNDER THRESHOLD ({_word_ratio:.0%} < "
+                f"{int(_BUG_109_RATIO_TARGET * 100)}%) -- attempt "
+                f"{_retry_count}/{_BUG_109_MAX_RETRIES}, deficit "
+                f"{_deficit} words"
             )
             # WORD_EXTEND is structured rescue -- use cleanup model.
             script_text = self._extend_script_dialogue(
@@ -4481,9 +4503,66 @@ TITLE: <your chosen title>
             )
             _word_ratio = _raw_dialogue_words / max(1, _target_words)
             _runtime_log(
-                f"WORD_ENFORCEMENT: Post-extension: {_raw_dialogue_words} words "
-                f"({_word_ratio:.0%}) | ~{_raw_dialogue_words / 140:.1f} min"
+                f"WORD_ENFORCEMENT: Post-extension {_retry_count}: "
+                f"{_raw_dialogue_words} words ({_word_ratio:.0%}) | "
+                f"+{_raw_dialogue_words - _prev_words} this pass | "
+                f"~{_raw_dialogue_words / 140:.1f} min"
             )
+            # No-progress guard: if the LLM didn't add words this
+            # pass, stop retrying -- it has nothing more to say.
+            if _raw_dialogue_words <= _prev_words:
+                _runtime_log(
+                    f"WORD_ENFORCEMENT: extension {_retry_count} added 0 "
+                    f"words, model stalled at {_word_ratio:.0%} -- aborting "
+                    f"retries"
+                )
+                break
+
+        if _word_ratio < _BUG_109_RATIO_TARGET and _target_words > 150:
+            log.warning(
+                "[BUG-109] Script ended at %d/%d words (%.0f%%) after "
+                "%d extension pass(es). LLM under-delivered; downstream "
+                "audio will be %d sec instead of ~%d sec target.",
+                _raw_dialogue_words, _target_words, _word_ratio * 100,
+                _retry_count, int(_raw_dialogue_words / 140 * 60),
+                int(_target_words / 140 * 60),
+            )
+
+        # BUG-LOCAL-109b (visibility): surface per-cast / per-scene
+        # gaps so we can see at a glance whether the script was
+        # uniformly thin (small word target) vs. structurally lopsided
+        # (some scenes / characters with zero dialogue). This is
+        # diagnostic-only -- it does not re-prompt; that would
+        # require another tool round-trip and is queued for a
+        # follow-up commit. The runtime log lets us spot whether
+        # bug 109 is a "global thinness" or "structural gap" failure
+        # mode on the next render.
+        try:
+            _post_pairs = _raw_dialogue_pairs
+            _names_with_lines = {n for n, _ in _post_pairs}
+            _missing_cast = sorted(
+                set(pre_rolled_cast) - _names_with_lines
+            ) if pre_rolled_cast else []
+            _scene_count = max(1, len(re.findall(r'=== SCENE', script_text)))
+            # Approximate per-scene line counts by splitting on === SCENE
+            _scene_blocks = re.split(r'^===\s*SCENE', script_text, flags=re.MULTILINE)
+            _empty_scenes = sum(
+                1 for blk in _scene_blocks[1:]  # skip pre-scene preamble
+                if not _extract_all_dialogue("=== SCENE" + blk)
+            )
+            if _missing_cast:
+                _runtime_log(
+                    f"BUG-109b: cast members with 0 lines: "
+                    f"{', '.join(_missing_cast)}"
+                )
+            if _empty_scenes:
+                _runtime_log(
+                    f"BUG-109b: {_empty_scenes}/{_scene_count} scene(s) "
+                    f"have 0 dialogue lines"
+                )
+        except Exception as _exc:
+            _runtime_log(f"BUG-109b: gap-audit skipped ({_exc})")
+
         _log_scene_checkpoint("02_AFTER_WORD_EXTEND", script_text)
 
         # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
