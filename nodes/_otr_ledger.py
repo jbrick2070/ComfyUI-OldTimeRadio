@@ -106,9 +106,22 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
 # ---------------------------------------------------------------------------
 
 def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
-    """Search the supplied dirs for ``*_ledger.json`` (excluding
-    pending_*) and return the newest by mtime. Returns None if no
-    candidates found.
+    """Search the supplied dirs for ``*_ledger.json`` and return the
+    newest by mtime. Returns None if no candidates found.
+
+    BUG-LOCAL-103 (2026-04-29 morning): we used to filter out
+    ``pending_*_ledger.json`` here, which silently broke every
+    audio-node ledger write. BatchBark / SceneSequencer /
+    AudioEnhance / EpisodeAssembler all run while the ledger is
+    still ``pending_<title>_ledger.json`` (LLMScriptWriter creates
+    the pending file; SignalLostVideo renames it once the audio
+    title is finalized). Filtering pending_* meant those four
+    nodes' write-backs no-op'd because they couldn't find the
+    in-flight ledger. The deep_earth_echoes 2026-04-28 overnight
+    run shipped with audio_gates=[] and meta.phase_ms missing 4
+    of the 5 phases as a result. Fix: include pending_* in the
+    glob; mtime sort still prefers the newest, so a renamed
+    canonical ledger naturally wins after rename.
 
     Use ``otr_audio_dir()`` + ``otr_legacy_audio_dir()`` from
     ``_otr_paths`` as the canonical search list.
@@ -119,10 +132,7 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             d = Path(d)
             if not d.exists():
                 continue
-            candidates.extend(
-                p for p in d.glob("*_ledger.json")
-                if not p.name.startswith("pending_")
-            )
+            candidates.extend(d.glob("*_ledger.json"))
         except Exception as exc:
             log.warning("[OTR_Ledger] ledger glob failed in %s: %s", d, exc)
     if not candidates:

@@ -315,19 +315,22 @@ def main() -> int:
             prev_mtime = 0.0
             # On first sighting of THIS ledger, capture whether it is
             # already complete -- if yes, we need a NEW ledger to
-            # appear before any final-audit fires.
+            # appear before any final-audit fires. BUG-104: require
+            # BOTH final_video_path AND non-empty clips[]; the path
+            # alone can be pre-populated by an upstream node before
+            # HuMo actually runs.
             if initial_ledger_pinned is None:
                 initial_ledger_pinned = ledger_p
                 try:
                     _peek = json.loads(
                         ledger_p.read_text(encoding="utf-8")
                     )
-                    if _peek.get("final_video_path"):
+                    if _peek.get("final_video_path") and (_peek.get("clips") or []):
                         initial_ledger_was_complete = True
                         log(
                             f"  initial ledger is already complete "
-                            f"(final_video_path set) -- waiting for "
-                            f"NEW ledger from a fresh run"
+                            f"(final_video_path set + clips populated) -- "
+                            f"waiting for NEW ledger from a fresh run"
                         )
                 except Exception:
                     pass
@@ -356,7 +359,20 @@ def main() -> int:
             log(d)
         prev_snap = curr
 
-        if curr["final_video_path"] and not audit_done:
+        # BUG-LOCAL-104 (2026-04-29 morning): treat the run as
+        # complete only when BOTH final_video_path is set AND clips[]
+        # is non-empty. Some upstream node (SignalLostVideo or
+        # EpisodeAssembler) pre-populates final_video_path with the
+        # expected output location BEFORE BatchHumoRender runs --
+        # that left the deep_earth_echoes overnight watcher exiting
+        # at 23:03:25 instead of ~03:30 when HuMo actually finished,
+        # missing 5+ hours of progress. Requiring clips[] populated
+        # ensures HuMo has at least started saving real renders.
+        run_complete = (
+            curr["final_video_path"]
+            and curr["clips_count"] > 0
+        )
+        if run_complete and not audit_done:
             # Only run audit if THIS ledger started incomplete and is
             # now complete -- skip if it was already complete on first
             # sight (the user started us before queueing the FULL run).

@@ -980,6 +980,20 @@ class BatchHumoRender:
             # trimmed off the on-disk clip below so timeline math
             # stays in terms of dur_s.
             pad_s = warmup_pad_ms / 1000.0
+            # BUG-LOCAL-105 (deep_earth_echoes 2026-04-28 ledger
+            # showed mp4_dur_s ~0.12s short of dur_s on every 7.0s
+            # line): when (dur_s + pad_s) pushes humo_length_for_dur
+            # past HUMO_MAX_FRAMES, the cap silently steals frames
+            # off the END of the clip, leaving the last ~120 ms of
+            # audio playing without HuMo lip-sync. Clamp dur_s here
+            # so dur_s + pad_s never exceeds the cap; the clamp loses
+            # at most ~120 ms of room tone at the line's tail (the
+            # SceneSequencer trim_trailing_silence preserves a tiny
+            # decay pad upstream, so what we drop is tone, not words
+            # -- per Gemini consult 2026-04-29).
+            _cap_dur_s = float(HUMO_MAX_FRAMES) / float(HUMO_FPS)
+            if (dur_s + pad_s) > _cap_dur_s:
+                dur_s = max(0.04, _cap_dur_s - pad_s)
             humo_length = humo_length_for_dur(dur_s + pad_s)
 
             # Resolve portrait. BUG-LOCAL-088 priority:
