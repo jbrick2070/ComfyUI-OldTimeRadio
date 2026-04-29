@@ -73,8 +73,12 @@ class TestLedgerBasics:
     def test_new_ledger_creates_structure(self, tmp_out):
         led = Ledger("signal_lost_test_20260424_000000", str(tmp_out))
         assert led.episode_id == "signal_lost_test_20260424_000000"
-        # Schema bumped 2026-04-25 PM (l1 -> l2) for the beats[] hierarchy.
-        assert led.data["schema_version"].startswith("l2-")
+        # Schema bumped 2026-04-29 (l2 -> l3) for the BUG-LOCAL-100..107
+        # diagnostic expansion (text_for_tts, audio_gates, transitions,
+        # warmup_pad_ms, mp4_dur_s, etc). Live-pulled from
+        # _otr_ledger.CURRENT_SCHEMA_VERSION so both write paths stay
+        # in lockstep.
+        assert led.data["schema_version"].startswith("l3-")
         for key in ("cast", "scenes", "shots", "beats", "lines",
                     "sfx", "music", "clips"):
             assert led.data[key] == []
@@ -159,6 +163,123 @@ class TestLedgerBeats:
         led.rename_episode("signal_lost_black_sphere_20260424_142006")
         assert led.data["episode_id"] == "signal_lost_black_sphere_20260424_142006"
         assert "black_sphere" in led.path
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-108: dual-ledger fix
+# ---------------------------------------------------------------------------
+
+class TestDualLedgerFix:
+    """rename_episode must atomically move the on-disk file so audio
+    nodes' schema-l3 writes don't get orphaned at the pending path.
+    save() must merge any schema-l3 fields from disk so it doesn't
+    nuke fields the Ledger class doesn't manage."""
+
+    def test_rename_episode_moves_file_on_disk(self, tmp_out):
+        import json as _json
+        led = Ledger("pending_20260424_000000", str(tmp_out))
+        led.save()
+        old_path = Path(led.path)
+        assert old_path.exists()
+        led.rename_episode("signal_lost_black_sphere_20260424_142006")
+        new_path = Path(led.path)
+        # Old pending file should NO LONGER exist; new canonical
+        # should exist with the same contents.
+        assert not old_path.exists(), "BUG-108: old pending file orphaned"
+        assert new_path.exists()
+
+    def test_rename_episode_idempotent_when_id_unchanged(self, tmp_out):
+        led = Ledger("pending_test", str(tmp_out))
+        led.save()
+        path1 = Path(led.path)
+        led.rename_episode("pending_test")  # same id
+        assert Path(led.path) == path1
+        assert path1.exists()
+
+    def test_save_merges_schema_l3_fields_from_disk(self, tmp_out):
+        """Audio nodes write schema-l3 fields directly via
+        _otr_ledger.save_ledger_safe. The Ledger class must
+        NOT clobber those fields when its own .save() fires."""
+        import json as _json
+        led = Ledger("merge_test", str(tmp_out))
+        led.set_lines([
+            {"line_id": "l001", "text": "hello",
+             "char_id": "c01", "char_count": 5, "word_count": 1},
+        ])
+        led.save()
+        path = Path(led.path)
+        # Simulate an audio-node write: read the on-disk file, add
+        # schema-l3 fields, write back.
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        on_disk["audio_gates"] = [
+            {"gate": "post_bark", "sha256_first_kb": "abc123",
+             "dur_s": 10.0, "sample_count": 240000, "sample_rate": 24000},
+        ]
+        on_disk["meta"] = {"phase_ms": {"bark": 145000}, "git_commit": "deadbee"}
+        on_disk["transitions"] = [
+            {"from_line_id": "opening_theme", "to_line_id": "scene_audio",
+             "crossfade_ms": 500, "boundary_s": 9.5},
+        ]
+        on_disk["radio_bookend_path"] = "/tmp/radio.png"
+        on_disk["lines"][0]["text_for_tts"] = "hello"
+        on_disk["lines"][0]["bark_wav_dur_s"] = 0.42
+        on_disk["lines"][0]["start_s"] = 9.5
+        on_disk["lines"][0]["start_s_space"] = "master_mix"
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+        # Now the Ledger class re-saves (e.g. SignalLostVideo's
+        # post-rename save). Its in-memory state has only the
+        # original lines[] without schema-l3. The merge must
+        # preserve all the schema-l3 fields above.
+        led.save()
+        merged = _json.loads(path.read_text(encoding="utf-8"))
+        assert "audio_gates" in merged and len(merged["audio_gates"]) == 1
+        assert merged["audio_gates"][0]["gate"] == "post_bark"
+        assert merged["meta"]["phase_ms"]["bark"] == 145000
+        assert merged["meta"]["git_commit"] == "deadbee"
+        assert "transitions" in merged and len(merged["transitions"]) == 1
+        assert merged["radio_bookend_path"] == "/tmp/radio.png"
+        l001 = merged["lines"][0]
+        assert l001["text_for_tts"] == "hello"
+        assert l001["bark_wav_dur_s"] == 0.42
+        assert l001["start_s"] == 9.5
+        assert l001["start_s_space"] == "master_mix"
+
+    def test_save_does_not_overwrite_in_mem_with_disk(self, tmp_out):
+        """In-memory values for fields the Ledger class manages must
+        win over disk values (it's the fresh state). Only fields the
+        class doesn't manage get merged from disk."""
+        import json as _json
+        led = Ledger("freshness_test", str(tmp_out))
+        led.set_lines([{"line_id": "l001", "text": "ORIGINAL",
+                        "char_id": "c01", "char_count": 8, "word_count": 1}])
+        led.save()
+        path = Path(led.path)
+        # Disk value for `text` is "ORIGINAL" too. Update in-memory.
+        led.set_lines([{"line_id": "l001", "text": "UPDATED",
+                        "char_id": "c01", "char_count": 7, "word_count": 1}])
+        led.save()
+        merged = _json.loads(path.read_text(encoding="utf-8"))
+        assert merged["lines"][0]["text"] == "UPDATED", \
+            "in-memory text must win over stale on-disk value"
+
+    def test_save_preserves_disk_rows_when_in_mem_array_empty(self, tmp_out):
+        """If memory has no rows for an array but disk has rows
+        (e.g. audio_gates populated by audio nodes, in-mem Ledger
+        never set them), keep the disk rows."""
+        import json as _json
+        led = Ledger("empty_mem_test", str(tmp_out))
+        led.save()
+        path = Path(led.path)
+        on_disk = _json.loads(path.read_text(encoding="utf-8"))
+        on_disk["sfx"] = [
+            {"cue_id": "sfx_door_slam", "start_s": 22.4, "dur_s": 1.2,
+             "description": "door slam", "start_s_space": "master_mix"},
+        ]
+        path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
+        led.save()  # in-mem sfx is empty []
+        merged = _json.loads(path.read_text(encoding="utf-8"))
+        assert len(merged["sfx"]) == 1
+        assert merged["sfx"][0]["cue_id"] == "sfx_door_slam"
 
 
 # ---------------------------------------------------------------------------

@@ -190,11 +190,28 @@ class Ledger:
     # Schema version bumped 2026-04-25 PM:
     #   l1-2026-04-24  -> baseline (cast, scenes, shots, lines, sfx, music, clips)
     #   l2-2026-04-25  -> adds beats[] hierarchy
+    #   l3-2026-04-28  -> diagnostic expansion (meta.phase_ms,
+    #                     audio_gates[] sha256, lines[].text_for_tts +
+    #                     bark_wav_dur_s + bark_render_ms,
+    #                     clips[].warmup_pad_ms + humo_render_ms +
+    #                     mp4_dur_s + mp4_frames + audio_fed_to_humo_dur_s,
+    #                     start_s_space tag, transitions[] crossfades,
+    #                     radio_bookend_path) -- see _otr_ledger.py
+    #                     and BUG-LOCAL-100..107 entries.
     #
     # Beat = single-speaker continuous turn within a shot. Hierarchy:
     #     Scene > Shot > Beat > Clip
     # See ROADMAP Goal 3 + docs/2026-04-25-humo-continuity-brief.md.
-    SCHEMA_VERSION = "l2-2026-04-25"
+    #
+    # SCHEMA_VERSION pulled live from _otr_ledger so the two ledger
+    # write paths stay in lockstep. Falls back to a hardcoded l3
+    # string if _otr_ledger import fails (defensive).
+    try:
+        from . import _otr_ledger as _OTRL_FOR_SCHEMA  # type: ignore
+        SCHEMA_VERSION = _OTRL_FOR_SCHEMA.CURRENT_SCHEMA_VERSION
+        del _OTRL_FOR_SCHEMA
+    except Exception:  # pragma: no cover -- defensive fallback
+        SCHEMA_VERSION = "l3-2026-04-28"
 
     def __init__(self, episode_id: str, out_dir: str):
         self.episode_id = episode_id
@@ -227,10 +244,44 @@ class Ledger:
     # -- identity ------------------------------------------------------
 
     def rename_episode(self, new_id: str) -> None:
-        """Rename the episode id. The on-disk file path follows."""
+        """Rename the episode id and atomically move the on-disk file.
+
+        BUG-LOCAL-108 (2026-04-29 morning): the prior implementation
+        only changed the in-memory ``self.episode_id``. The on-disk
+        ``pending_<ts>_ledger.json`` was left orphaned, while the
+        next ``save()`` wrote a fresh file at the canonical path. If
+        any other writer (audio nodes' schema-l3 helpers, etc.) had
+        added fields to the pending file in between, that work
+        landed on the orphan and was never picked up by downstream
+        readers (BatchHumoRender, VideoComposite). Net effect: lines[]
+        positions, audio_gates, text_for_tts all silently lost,
+        BatchHumoRender fell back to BUG-094 estimator and rendered
+        HuMo against wrong audio slices (deep_earth_echoes /
+        solar_flare_spark 2026-04-28/29).
+
+        Fix: also ``os.replace`` (atomic on Windows, POSIX) the file
+        so there's exactly ONE ledger file per run on disk.
+        """
         old = self.episode_id
+        if old == new_id:
+            return
+        old_path = self.path
         self.episode_id = new_id
         self.data["episode_id"] = new_id
+        new_path = self.path
+        if old_path != new_path and os.path.exists(old_path):
+            try:
+                os.replace(old_path, new_path)
+                log.info(
+                    "[Ledger] file moved %s -> %s",
+                    os.path.basename(old_path),
+                    os.path.basename(new_path),
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[Ledger] BUG-108 file move failed (%s -> %s): %s",
+                    old_path, new_path, exc,
+                )
         log.info("[Ledger] renamed %s -> %s", old, new_id)
 
     @property
@@ -471,14 +522,31 @@ class Ledger:
 
     def save(self) -> Optional[str]:
         """Write the ledger to disk. Returns the path on success, None on
-        failure. Never raises."""
+        failure. Never raises.
+
+        BUG-LOCAL-108 (2026-04-29 morning): merge with on-disk content
+        BEFORE writing so that schema-l3 fields written by audio
+        nodes (via _otr_ledger.save_ledger_safe) are not silently
+        clobbered. The Ledger class doesn't know about
+        ``meta``/``audio_gates``/``transitions``/``radio_bookend_path``
+        or the per-row ``start_s_space``/``text_for_tts``/
+        ``warmup_pad_ms``/``bark_wav_dur_s`` fields, but it MUST NOT
+        destroy them when its in-memory state is flushed.
+        """
         try:
             self._recompute_totals()
             path = self.path
+
+            # Build the payload to write: start from in-memory data,
+            # then merge any schema-l3 extras from the existing
+            # on-disk version. Per-row merge is keyed by line_id /
+            # cue_id so audio-node row updates survive.
+            merged = self._merge_with_disk(dict(self.data), path)
+
             # Atomic write: temp file + replace
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
+                json.dump(merged, f, indent=2, ensure_ascii=False)
                 f.flush()
                 try:
                     os.fsync(f.fileno())
@@ -493,6 +561,77 @@ class Ledger:
         except Exception as e:  # noqa: BLE001
             log.warning("[Ledger] save failed: %s", e)
             return None
+
+    @staticmethod
+    def _merge_with_disk(in_mem: Dict[str, Any], path: str) -> Dict[str, Any]:
+        """BUG-LOCAL-108 helper. Read the on-disk JSON at ``path`` (if
+        any) and merge any schema-l3 fields the Ledger class doesn't
+        know about into ``in_mem``. Returns the merged dict. On any
+        error returns ``in_mem`` unchanged (best-effort).
+
+        Top-level fields preserved from disk:
+          schema_version, meta, audio_gates, transitions,
+          radio_bookend_path, final_audio_path
+
+        Per-row fields preserved (keyed by line_id / cue_id):
+          For each lines[i] / clips[i] / sfx[i] / music[i]: copy
+          forward any key present on disk that is missing or
+          empty/null in the in-mem row.
+        """
+        try:
+            if not os.path.exists(path):
+                return in_mem
+            with open(path, "r", encoding="utf-8") as f:
+                on_disk = json.load(f)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("[Ledger] BUG-108 merge: on-disk read failed: %s", exc)
+            return in_mem
+
+        # Top-level fields the Ledger class doesn't manage but must
+        # not destroy. final_audio_path is on the kept-list because
+        # SignalLostVideo overwrites it via set_final_paths -- that's
+        # an explicit overwrite, not a merge concern.
+        TOP_PRESERVE = (
+            "schema_version", "meta", "audio_gates", "transitions",
+            "radio_bookend_path",
+        )
+        for k in TOP_PRESERVE:
+            if k in on_disk and (k not in in_mem or in_mem.get(k) in (None, "", [], {})):
+                in_mem[k] = on_disk[k]
+
+        # Per-row merge. Keyed by line_id (lines, clips) or cue_id
+        # (sfx, music).
+        ROW_KEYED = {
+            "lines": "line_id",
+            "clips": "line_id",
+            "sfx": "cue_id",
+            "music": "cue_id",
+        }
+        for arr_name, key_field in ROW_KEYED.items():
+            on_disk_rows = on_disk.get(arr_name) or []
+            in_mem_rows = in_mem.get(arr_name) or []
+            if not on_disk_rows or not in_mem_rows:
+                # If disk has rows and memory doesn't, prefer disk.
+                if on_disk_rows and not in_mem_rows:
+                    in_mem[arr_name] = on_disk_rows
+                continue
+            on_disk_map = {
+                r.get(key_field): r for r in on_disk_rows
+                if r.get(key_field)
+            }
+            for row in in_mem_rows:
+                key = row.get(key_field)
+                if not key or key not in on_disk_map:
+                    continue
+                disk_row = on_disk_map[key]
+                # Copy forward keys present on disk but absent or
+                # null in memory. Never overwrite a present in-mem
+                # value with a disk value -- in-memory is fresher
+                # for rows the Ledger class actually manages.
+                for k, v in disk_row.items():
+                    if k not in row or row.get(k) in (None, "", [], {}):
+                        row[k] = v
+        return in_mem
 
 
 __all__ = [
