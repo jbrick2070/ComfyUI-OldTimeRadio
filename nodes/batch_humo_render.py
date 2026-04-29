@@ -1342,6 +1342,34 @@ class BatchHumoRender:
                 )
                 log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
                 rendered += 1
+
+                # 2026-04-29: per-clip incremental ledger save. Each HuMo
+                # clip takes ~9-10 min on Blackwell; without per-clip
+                # persistence a crash on clip 20 of 33 wipes ~3 hours of
+                # state from the ledger (the post-loop write-back never
+                # fires). With this save, every completed clip is on disk
+                # immediately, the watcher / /otr/latest_ledger / tail
+                # tools see real-time progress, and a crash leaves
+                # recoverable state behind. Cost: ~5-15 ms per save via
+                # BUG-108's atomic-rename + on-disk merge. ~0.3 sec
+                # cumulative over a 33-clip / 5-hour render. Trivial.
+                if ledger_path is not None:
+                    try:
+                        try:
+                            from . import _otr_ledger as _OTRL_INC  # type: ignore
+                        except ImportError:
+                            _NODES_DIR_INC = Path(__file__).resolve().parent
+                            if str(_NODES_DIR_INC) not in _sys.path:
+                                _sys.path.insert(0, str(_NODES_DIR_INC))
+                            import _otr_ledger as _OTRL_INC  # type: ignore
+                        ledger["clips"] = list(clip_records)
+                        _OTRL_INC.save_ledger_safe(ledger_path, ledger)
+                    except Exception as _inc_exc:  # noqa: BLE001 -- per-clip save never blocks rendering
+                        log.warning(
+                            "[BatchHumoRender] per-clip ledger save failed "
+                            "(non-fatal, render continues): %s",
+                            _inc_exc,
+                        )
             except Exception as exc:
                 log.exception("[BatchHumoRender] line %s failed: %s", line_id, exc)
                 report_lines.append(f"  {line_id}: FAILED ({exc})")
