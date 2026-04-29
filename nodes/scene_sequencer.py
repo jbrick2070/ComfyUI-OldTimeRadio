@@ -704,6 +704,21 @@ class SceneSequencer:
 
         current_sample_pos = 0
 
+        # BUG-LOCAL-106 (2026-04-29): track per-dialogue-line positions
+        # in scene_audio space so we can write authoritative start_s /
+        # dur_s back to ledger.lines[] at the end of this method. The
+        # BUG-094 word-share estimator was placing HuMo clips at
+        # cumulative-bark-only positions which DON'T account for the
+        # breath/beat/SFX gaps SceneSequencer inserts here -- net
+        # result was lip-sync drift growing line-by-line and HuMo
+        # rendering motion during music intros (deep_earth_echoes
+        # 2026-04-28 ledger showed l001 placed at 0.0s but the actual
+        # announcer audio in the master started at 0:09).
+        # We record positions in SCENE-AUDIO space (no opening theme).
+        # EpisodeAssembler shifts these to MASTER-MIX space when it
+        # prepends the opening_theme.
+        dialogue_positions: list[dict] = []
+
         for i, item in enumerate(lines_to_render):
             item_type = item.get("type", "dialogue")
             global_idx = start_line + i
@@ -799,6 +814,18 @@ class SceneSequencer:
                 seg_len = len(segment_np)
                 env_timeline.append((current_sample_pos, current_sample_pos + seg_len, current_env))
                 all_segments.append(segment_np)
+                # BUG-LOCAL-106: capture authoritative scene-audio
+                # position for every dialogue line so the ledger
+                # write-back below can give BatchHumoRender real
+                # placements instead of the BUG-094 word-share
+                # estimator's wrong-when-music-or-pauses-exist guess.
+                if item_type == "dialogue":
+                    dialogue_positions.append({
+                        "text": (item.get("line") or "").strip(),
+                        "speaker": item.get("character_name", "UNKNOWN"),
+                        "start_s": float(current_sample_pos) / float(sample_rate),
+                        "dur_s": float(seg_len) / float(sample_rate),
+                    })
                 current_sample_pos += seg_len
 
         # Log clip usage stats
@@ -880,6 +907,35 @@ class SceneSequencer:
                         sample_rate=int(sample_rate),
                     )
                     _OTRL.append_audio_gate(_led, _gate)
+
+                    # BUG-LOCAL-106: write authoritative scene-audio
+                    # positions back to ledger.lines[]. Match by
+                    # text (same strategy as BatchBark BUG-096) so
+                    # the order of dialogue_positions vs ledger.lines
+                    # is robust to ANNOUNCER routing / SFX gaps.
+                    # Positions are in SCENE-AUDIO space here;
+                    # EpisodeAssembler shifts them to MASTER-MIX
+                    # space when it prepends the opening_theme.
+                    _ledger_lines = _led.get("lines") or []
+                    _text_to_idx: dict[str, list[int]] = {}
+                    for _li, _ln in enumerate(_ledger_lines):
+                        _t = (_ln.get("text") or "").strip()
+                        if _t:
+                            _text_to_idx.setdefault(_t, []).append(_li)
+                    _matched = 0
+                    for _pos in dialogue_positions:
+                        _cands = _text_to_idx.get(_pos["text"]) or []
+                        if not _cands:
+                            continue
+                        _ledger_idx = _cands.pop(0)
+                        _row = _ledger_lines[_ledger_idx]
+                        _row["start_s"] = float(_pos["start_s"])
+                        _row["dur_s"] = float(_pos["dur_s"])
+                        # Mark these positions as scene-audio-relative
+                        # so EpisodeAssembler knows whether to shift.
+                        _row["start_s_space"] = "scene_audio"
+                        _matched += 1
+
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     )
@@ -888,8 +944,8 @@ class SceneSequencer:
                     _OTRL.save_ledger_safe(_ledger_p, _led)
                     log.info(
                         "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
-                        "gate=post_scene_sequencer dur=%.1fs",
-                        _phase_ms, total_sec,
+                        "gate=post_scene_sequencer dur=%.1fs lines_positioned=%d/%d",
+                        _phase_ms, total_sec, _matched, len(dialogue_positions),
                     )
         except Exception as _meta_exc:
             log.warning(
@@ -1048,9 +1104,9 @@ class EpisodeAssembler:
         log.info(f"[EpisodeAssembler] '{episode_title}' - {total_sec/60:.1f} min")
 
         # Schema l3 ledger write-back: phase_ms.episode_assembler +
-        # audio_gates "post_episode_assembler" sha256 + transitions[]
-        # entries for the segment crossfades that happened in this
-        # assemble() call. Best-effort; failures are warned not raised.
+        # audio_gates "post_episode_assembler" sha256 + BUG-LOCAL-106
+        # opening-theme offset shift on lines[].start_s and
+        # clips[].start_s. Best-effort; failures are warned not raised.
         try:
             from . import _otr_ledger as _OTRL  # type: ignore
             from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
@@ -1078,6 +1134,78 @@ class EpisodeAssembler:
                         sample_rate=int(sample_rate),
                     )
                     _OTRL.append_audio_gate(_led, _gate)
+
+                    # BUG-LOCAL-106: shift lines[].start_s and
+                    # clips[].start_s by the actual master-timeline
+                    # offset of the scene audio. Compute the offset
+                    # from the segments that were prepended BEFORE
+                    # the scene segment. With the equal-power
+                    # crossfade in this method, scene audio starts
+                    # at (sum of pre-scene segment lengths) -
+                    # (number of crossfades crossed * xfade_samples).
+                    # Most builds: opening_theme prepended -> scene
+                    # starts at opening_theme_dur_samples - xfade.
+                    # Compute generically: segments[] is built in
+                    # order, scene_audio is at index `_scene_idx`.
+                    # _shift_samples = sum of all segments before
+                    # scene minus xfade_samples * num_crossfades.
+                    try:
+                        # `segments` and `xfade_samples` are local to
+                        # this method (defined above). We track the
+                        # scene's index in the segments list -- with
+                        # the current code, segments is opening +
+                        # scene + closing so scene is at index 1 if
+                        # opening_theme present, else 0.
+                        _scene_idx = (
+                            1 if opening_theme_audio is not None else 0
+                        )
+                        _shift_samples = 0
+                        for _i, _seg in enumerate(segments[:_scene_idx]):
+                            _shift_samples += int(_seg.shape[-1])
+                        # Each pre-scene segment that crossfades into
+                        # the next subtracts xfade_samples from the
+                        # shift (the overlap region eats time off
+                        # both sides). With opening->scene only, one
+                        # crossfade boundary applies.
+                        if _scene_idx > 0:
+                            _shift_samples -= int(xfade_samples) * _scene_idx
+                            _shift_samples = max(0, _shift_samples)
+                        _shift_s = float(_shift_samples) / float(sample_rate)
+                    except Exception:
+                        _shift_s = 0.0
+
+                    _shifted_lines = 0
+                    _shifted_clips = 0
+                    if _shift_s > 0.0:
+                        for _ln in (_led.get("lines") or []):
+                            # Only shift entries that are in
+                            # scene-audio space (set by SceneSequencer
+                            # write-back). Avoids double-shifting on
+                            # re-runs.
+                            if (
+                                _ln.get("start_s_space") == "scene_audio"
+                                and isinstance(_ln.get("start_s"), (int, float))
+                            ):
+                                _ln["start_s"] = float(_ln["start_s"]) + _shift_s
+                                _ln["start_s_space"] = "master_mix"
+                                _shifted_lines += 1
+                        for _cl in (_led.get("clips") or []):
+                            # clips[] start_s is currently written by
+                            # BatchHumoRender BEFORE EpisodeAssembler
+                            # in some workflow orderings. If clips
+                            # already exist when this runs, shift
+                            # them too. Use a flag to be idempotent.
+                            if _cl.get("start_s_space") in (None, "scene_audio") and isinstance(_cl.get("start_s"), (int, float)):
+                                _cl["start_s"] = float(_cl["start_s"]) + _shift_s
+                                _cl["start_s_space"] = "master_mix"
+                                _shifted_clips += 1
+
+                    if _shift_s > 0.0:
+                        log.info(
+                            "[EpisodeAssembler] BUG-106 master-mix shift: "
+                            "+%.3fs applied to %d line(s) + %d clip(s)",
+                            _shift_s, _shifted_lines, _shifted_clips,
+                        )
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     )

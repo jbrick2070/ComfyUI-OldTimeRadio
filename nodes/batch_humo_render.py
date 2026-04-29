@@ -1320,6 +1320,21 @@ class BatchHumoRender:
                     "mp4_frames": int(_mp4_frames),
                     "mp4_dur_s": float(_mp4_dur_s),
                     "audio_fed_to_humo_dur_s": float(_audio_fed_dur_s),
+                    # BUG-LOCAL-106: stamp the timeline-space of
+                    # start_s so EpisodeAssembler's shift stays
+                    # idempotent. Whatever lines[].start_s_space
+                    # was when we read it propagates here. If
+                    # SceneSequencer + EpisodeAssembler ran before
+                    # this node (FULL workflow), start_s is already
+                    # master_mix and EpisodeAssembler will skip
+                    # re-shifting on a re-run. If only Scene ran
+                    # but Episode didn't (smoke), the value is
+                    # scene_audio and a future Episode pass would
+                    # apply the shift correctly.
+                    "start_s_space": (
+                        lines[entry["idx"]].get("start_s_space")
+                        or "master_mix"
+                    ),
                 })
                 report_lines.append(
                     f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
