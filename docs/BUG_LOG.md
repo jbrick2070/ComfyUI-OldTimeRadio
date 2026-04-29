@@ -5,6 +5,24 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-110: gemma-2-2b-it CUDA device-side assert during inference on Blackwell sm_120 + bitsandbytes 4-bit NF4 + torch 2.10.0 + CUDA 13.0; same NF4 path is what gemma-2-9b-it would use, so the entire Gemma 2 family is treated as not viable on this hardware [FIXED by removing Gemma 2 family from dropdown]
+
+- **Date:** 2026-04-29 AM | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** First edge-case test of gemma-2-2b-it (balanced / 350 / short) failed with `CUDA error: device-side assert triggered` during the OpenClose Spine inference. Console excerpt:
+    ```
+    Loading LLM model: google/gemma-2-2b-it (quantized=True)
+    [StoryOrchestrator] Enabling 4-bit quantization (NF4) for Ultra-Low VRAM
+    [StoryOrchestrator] Prompt truncated: 9623 -> 8042 tokens to fit context cap 8192
+    [StoryOrchestrator] Starting inference (max_new_tokens=150)...
+    [OpenClose] SPINE CHARACTER-DRIVEN failed: CUDA error: device-side assert triggered
+    ```
+    Model downloaded fresh (was not in cache, took ~4 min via Fetching 2 files). Loaded successfully through bitsandbytes 4-bit NF4. CUDA warmup completed cleanly (0.1s). The assert fires during the first generate() call on a quantized weight kernel.
+- **Cause:** Most likely bitsandbytes 4-bit NF4 dequantize kernel does not have proper sm_120 (Blackwell) support on torch 2.10.0 + CUDA 13.0. bitsandbytes has historically lagged on newest GPU architectures; sm_120 is brand-new. Secondary hypotheses (Gemma 2 sliding-window attention boundary at 8042/8192, malformed control-token in truncated prompt) are less likely fingerprints for a device-side assert. Either way, the failure is reproducible on this combination, and gemma-2-9b-it would route through the same NF4 quantization path.
+- **Fix:** Remove `google/gemma-2-2b-it` and `google/gemma-2-9b-it` from `model_id` and `cleanup_model_id` dropdowns in `nodes/story_orchestrator.py`, from `_LLM_MODEL_CHOICES` in `visual/llm_selector.py`, and from the test fixture in `tests/test_widget_drift_guard.py`. The `docs/2026-04-29-llm-edge-case-matrix.md` doc records the failure and prunes the Gemma 2 rows. Gemma 4 E2B / E4B are retained as the sole Gemma path -- they are Google's edge-targeted successor family with different kernel paths and have not been disqualified by any test yet.
+- **Verify:** (a) Tests: 200 passed Windows-side after dropdown changes (widget_drift_guard 27, two_llm_split 15, dropdown_guardrails 50, test_core 108). (b) Saved workflow `otr_scifi_16gb_full.json` pins Mistral-Nemo only -- no JSON references gemma-2-* so no workflow breaks on load. (c) On the next run with any non-Gemma-2 model, the original lockup pattern should not recur.
+- **Bible promotion notes:** Bible candidate. Generalisable rule: **bitsandbytes 4-bit NF4 quantization paths on bleeding-edge GPU architectures (Blackwell sm_120, future Hopper-Next, etc.) require explicit version-pinned validation before being offered in production dropdowns.** Subsidiary rules: (i) "model loads from cache" does not imply "model can generate"; the assert fires during generate(), not during load; (ii) the appropriate failure response is to remove the model from user-facing surfaces, not to wrap the assert in try/except (the assert poisons the CUDA context and the next render in the same process will likely fail too); (iii) when removing a single problematic model, audit the same-family / same-kernel-path siblings for the same failure mode (gemma-2-9b would have used the same NF4 kernel); (iv) backward-compat check: confirm no saved workflow JSON pins the removed model before pruning -- if any does, leave the entry but tag (BROKEN-DO-NOT-USE) instead of removing. Sister repo: `BUG_BIBLE.yaml` under `bnb-nf4-blackwell-incompat`; legacy id BUG-LOCAL-110; tags `bitsandbytes`, `nf4`, `blackwell`, `sm_120`, `cuda-device-side-assert`, `gemma-2`, `bible-candidate`.
+- **Tags:** bitsandbytes, nf4-quantization, blackwell, sm_120, cuda-device-side-assert, gemma-2, dropdown-cleanup, bible-candidate
+
 ### BUG-LOCAL-102: HuMo's intrinsic ~3-6 frame motion-onset freeze produced a constant ~120-240 ms audio-leads-lips perception across every episode; the model anchors its first frame on the reference image and "warms up" before articulation begins, so the first audible phoneme always arrives during the freeze [FIXED by audio pre-pad with leading silence + matching trim before save]
 
 - **Date:** 2026-04-28 PM | **Phase:** 0 | **Bible candidate:** yes
@@ -959,5 +977,3 @@ When inventing a new node in Python, build the dict from this template and overr
 - **Fix:** Removed all runtime_preset references from tests. Replaced `runtime_preset="[FAST] quick (5 min)"` with `target_minutes=5`, etc. Added `test_runtime_preset_removed` assertion alongside existing dead-param checks. Removed obsolete `test_no_1min_test_preset` and `test_runtime_presets_produce_different_target_minutes`.
 - **Verify:** `pytest tests/test_dropdown_guardrails.py -v` shows 133 passed, 0 failed.
 - **Tags:** test-suite, runtime-preset, cleanup, phase-0.5
-
-

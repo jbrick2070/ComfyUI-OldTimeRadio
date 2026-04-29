@@ -3187,8 +3187,6 @@ class LLMScriptWriter:
                 # follow-up is a two-LLM split (creative model writes the
                 # script, structured model handles cleanup phases).
                 "model_id": (["mistralai/Mistral-Nemo-Instruct-2407",
-                              "google/gemma-2-2b-it",
-                              "google/gemma-2-9b-it",
                               "google/gemma-4-E2B-it",
                               "google/gemma-4-E4B-it",
                               "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
@@ -3199,17 +3197,20 @@ class LLMScriptWriter:
                                "Mistral-Nemo is the production default "
                                "(12B, 4-bit NF4, _cap=6144). It cleared "
                                "BUG-061/062/063 format hardening. "
-                               "Captain-Eris-Violet and MN-12B-Mag-Mell-R1 "
-                               "are EXPERIMENTAL RP fine-tunes -- they "
-                               "produce vibey draft prose but routinely "
-                               "short-output structured rescue prompts "
-                               "(BUG-109 retry loop cannot rescue them at "
-                               "high creativity / short target_length). "
-                               "Pair them as the story model with "
-                               "Mistral-Nemo as cleanup_model_id, or just "
-                               "stay on Mistral-Nemo. Gemma variants are "
-                               "smaller alternates. Qwen-2.5-14B is alpha. "
-                               "Suffix tags are stripped before HF lookup."
+                               "Gemma 4 E2B (effective 2B) and E4B "
+                               "(effective 4B) are Google's edge-targeted "
+                               "lightweight models, untested on Blackwell "
+                               "yet. Qwen-2.5-14B is alpha. Captain-Eris "
+                               "and MN-12B-Mag-Mell-R1 are EXPERIMENTAL "
+                               "RP fine-tunes -- they produce vibey draft "
+                               "prose but routinely short-output "
+                               "structured rescue prompts (BUG-109 retry "
+                               "loop cannot rescue them at high "
+                               "creativity / short target_length). Pair "
+                               "them as the story model with Mistral-Nemo "
+                               "as cleanup_model_id, or just stay on "
+                               "Mistral-Nemo. Suffix tags are stripped "
+                               "before HF lookup."
                 }),
                 # 2026-04-26 PM two-LLM split (task #56): creative LLM
                 # writes the script (draft / revision / arc / spines /
@@ -3225,8 +3226,6 @@ class LLMScriptWriter:
                 "cleanup_model_id": ([
                     "auto (use story model)",
                     "mistralai/Mistral-Nemo-Instruct-2407",
-                    "google/gemma-2-2b-it",
-                    "google/gemma-2-9b-it",
                     "google/gemma-4-E2B-it",
                     "google/gemma-4-E4B-it",
                     "Qwen/Qwen2.5-14B-Instruct [ALPHA]",

@@ -52,8 +52,6 @@ def _script_writer_schema():
                 "optional": {
                     "model_id": (
                         ["mistralai/Mistral-Nemo-Instruct-2407",
-                         "google/gemma-2-2b-it",
-                         "google/gemma-2-9b-it",
                          "google/gemma-4-E2B-it",
                          "google/gemma-4-E4B-it",
                          "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
@@ -64,8 +62,6 @@ def _script_writer_schema():
                     "cleanup_model_id": (
                         ["auto (use story model)",
                          "mistralai/Mistral-Nemo-Instruct-2407",
-                         "google/gemma-2-2b-it",
-                         "google/gemma-2-9b-it",
                          "google/gemma-4-E2B-it",
                          "google/gemma-4-E4B-it",
                          "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
