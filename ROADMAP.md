@@ -1194,3 +1194,60 @@ Previously blocked on the retired Gate 0. Now blocked on video stack sprint Day 
 - One `git push` attempt max — if it fails, hand Jeffrey a cmd block with `cd /d` included.
 - Verify every push: local HEAD == origin HEAD, no 0-byte files, no BOM, workflow JSONs valid.
 - Log bugs the moment they surface. Don't batch. Promote `Bible candidate: yes` to the survival guide only after the fix is verified.
+
+---
+
+## v2.0-alpha session log -- 2026-04-29 (LLM dropdown trim + prompt-engineering audit + GGUF parked)
+
+Four commits shipped today on `v2.0-alpha`:
+
+- **`b123ade`** -- Mark Captain-Eris-Violet and MN-12B-Mag-Mell-R1 as `(EXPERIMENTAL)` in both `model_id` and `cleanup_model_id` dropdowns (`nodes/story_orchestrator.py` and `visual/llm_selector.py`). VisualLLMSelector.select() strips suffix tags before broadcasting downstream so HF lookup still gets a clean ID. Drove off the empirical evidence: wormhole_swallowing_phobos and echo_chamber runs both produced 6-19% of target word count under Captain-Eris + maximum chaos.
+- **`db145bd`** -- Reorder dropdown so EXPERIMENTAL models drop to the bottom, validated models surface first. Add `google/gemma-4-E2B-it` (Gemma 4 effective-2B featherweight, edge-targeted). Adds `docs/2026-04-29-llm-edge-case-matrix.md` (8-row test plan; later trimmed to 6 rows after Gemma 2 family removal).
+- **`fa83ee2`** -- Remove Gemma 2 family (`gemma-2-2b-it` + `gemma-2-9b-it`). gemma-2-2b proved CUDA-incompatible on Blackwell sm_120 + bnb 4-bit NF4 + torch 2.10.0 + CUDA 13.0 (BUG-LOCAL-110, Bible candidate). gemma-2-9b would route through the same NF4 quantization path so the entire family is treated as not viable on this hardware. Edge-case matrix doc renumbered to 6 rows.
+- **`4fa1ec5`** -- Per-character voice priming + AISM bullets + voice consistency soft-warnings. Cast pre-roll now uses `_VOICE_TRAITS` pool so each character carries fixed (gender, age, tone, energy, register, signature) tuples across all scenes. AISM Filter list gains two bullets (animated-environment cliches + telegraphed emotion in dialogue). New `_check_voice_consistency()` walks every `[VOICE:]` tag in the final script and stamps drift mismatches to `ledger.voice_warnings[]` (no schema bump; Ledger.save() merge from BUG-108 preserves arbitrary keys).
+
+Tests across all four commits: 200/200 passed Windows-side venv Python 3.12, run time ~108-110s each (widget_drift_guard 27, two_llm_split 15, dropdown_guardrails 50, test_core 108).
+
+GGUF loader (TheDrummer Rocinante / DavidAU Gemma-The-Writer creative fine-tunes) was attempted via Path X (prebuilt llama-cpp-python wheel) and parked. Latest cp312 Windows wheel on abetlen's index is 0.3.4 built against CUDA 12.4; host runtime is CUDA 13.0; `llama.dll` failed to load due to missing `cudart64_12.dll` / `cublas64_12.dll`. Path Y (full source build with VS Build Tools 2022 + CUDA 13 Toolkit + CMake) is the deterministic path; reopens when Jeffrey schedules the 90-min install window OR when a native cu13 Windows wheel with sm_120 PTX ships. Filed in `docs/2026-04-29-gguf-parked.md` with explicit unblock conditions.
+
+### Next session priorities (CANNOT do this session)
+
+In execution order:
+
+1. **Diff 3 -- spine ledger-stamping with bundled metadata expansion + schema bump** (`docs/2026-04-29-spine-ledger-stamping-ticket.md`).
+   - New ledger fields: `outline` (string), `beats[]` (array of `{beat_id, scene_id, summary, characters_present, expected_dialogue_lines}`), `spine_meta` (`{open_hook, close_payoff, character_arcs}`).
+   - Bundled metadata additions in same commit (rationale: one regression validates entire ledger-shape expansion):
+     - **Items 1-5** (single touch site in `story_orchestrator.write_script()`): `episode_title` top-level, `meta.gen_params` (model_id + cleanup_model_id + target_words + num_characters + target_length + style_variant + creativity + genre_flavor + optimization_profile), `meta.news_seed` (headline + source + url + fetched_at), `meta.bug_109_retries` (count + initial_ratio + final_ratio + fired), `meta.word_ratio_pct`.
+     - **Items 6-7** (separate node touches): `meta.title_source` ("user" / "auto_from_spine" / "llm_derived" / "stuck_default") in story_orchestrator, `meta.episode_breakdown_s` (`{opening_s, scene_audio_s, closing_s, total_s}`) in EpisodeAssembler.
+   - Schema version bump `l3-2026-04-28` -> `l4-YYYY-MM-DD`.
+   - SceneSequencer validates parsed scenes against `ledger.beats[]` as soft warnings to `ledger.structural_warnings[]` (same pattern as today's `voice_warnings[]`).
+   - Round-robin consult before kickoff (per CLAUDE.md, schema bumps qualify).
+   - Estimated: half a day to a day.
+   - **Unblock conditions explicit in the ticket:** (1) 2-3 real-episode runs of `voice_warnings[]` data accumulated, (2) Mistral-Nemo + Gemma 4 E4B both have at least one PASS in the LLM edge-case matrix, (3) v2.0-alpha video stack feature-complete and renders end-to-end without surfacing new BUG-LOCAL-1xx in the audio path, (4) the seven metadata fields are designed and stub-tested alongside the spine fields so the schema bump validates everything at once.
+
+2. **LLM edge-case matrix sweep** (`docs/2026-04-29-llm-edge-case-matrix.md`). Six rows queued. Run them to populate the unblock data Diff 3 needs:
+   - Row 1: Mag-Mell (EXPERIMENTAL) / maximum chaos / 350 / short -- does it short-output the way Captain-Eris did?
+   - Row 2: gemma-4-E2B-it / balanced / 350 / short -- featherweight kernel-path validation
+   - Row 3: gemma-4-E4B-it / balanced / 350 / short -- edge sweet spot for 16 GB
+   - Row 4: gemma-4-E4B-it / maximum chaos / 350 / short -- BUG-109 retry on a base model
+   - Row 5: Qwen 2.5 14B [ALPHA] / balanced / 700 / medium -- larger model + alpha tag suffix-strip + format gates
+   - Row 6: Mistral-Nemo / maximum chaos / 350 / short -- baseline confirmation that today's commits didn't break the validated path
+   - Per-run capture template lives in the matrix doc.
+
+3. **GGUF unblock check (lazy poll, do not actively work)** -- on the off chance abetlen ships a cu13 Windows cp312 wheel with sm_120 PTX before Jeffrey schedules the Path Y install window, this becomes a 5-min commit. Curl the `cu130/llama-cpp-python/` index occasionally; otherwise the parked-doc unblock conditions hold.
+
+4. **Voice consistency data analysis** -- after 2-3 real-episode runs accumulate `ledger.voice_warnings[]` entries, summarise the drift pattern (which fields drift most -- gender/age vs tone/energy; which models are worst). The summary is one of the inputs that sizes Diff 3's structural validation work.
+
+### What remains stable after today
+
+- `nodes/_otr_paths.py` portable-paths refactor (committed earlier in the 2026-04-28 marathon)
+- Schema l3 (audio_gates with sha256, transitions, master-mix offset shift, dual-ledger atomic-rename fix)
+- BUG-100 / BUG-101 / BUG-102 fixes (narration filter, paren-strip, HuMo motion-onset pad)
+- BUG-108 dual-ledger fix (atomic rename + on-disk merge in Ledger.save)
+- BUG-109 WORD_EXTEND retry loop with no-progress guard
+- BUG-110 dropdown trim (Gemma 2 removal -- documented; do not re-add)
+- Per-character voice profile pool (`_VOICE_TRAITS` + `pre_rolled_cast_traits`) -- voice_warnings collection is the data-foundation for Diff 3
+
+### Branch & tag plan
+
+`v2.0-alpha` HEAD at session close: **`4fa1ec5`**. Origin lockstep verified. Next session continues on this same branch -- do NOT re-base or merge to main. Tag cut for v2.0-alpha-video-stack happens only after Diff 3 lands AND a clean end-to-end episode renders with the new schema.

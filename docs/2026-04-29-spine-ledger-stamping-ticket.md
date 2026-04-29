@@ -102,3 +102,50 @@ real-episode run.
 - Today's commit (voice priming + AISM + voice_warnings): see git log on v2.0-alpha after this ticket file is committed
 - Existing two-LLM split feature: nodes/story_orchestrator.py `cleanup_model_id` widget; `_resolve_cleanup_model_id` resolver in tests/test_two_llm_split.py
 - Existing live ledger streaming: nodes/story_orchestrator.py L1.5 hook (search "live_ledger=True")
+
+## Bundled metadata additions (ship in same session as schema bump)
+
+Ledger metadata audit on 2026-04-29 (separate from the prompt-engineering
+audit) surfaced seven additive fields. All seven are ledger-shape changes
+and bundle naturally with the l3 -> l4 schema bump in this ticket: a
+single regression run validates the entire ledger metadata expansion
+plus the spine fields, instead of fragmenting validation across multiple
+commits.
+
+### Items 1-5: single touch site in `story_orchestrator.write_script()`
+
+| # | field                       | source                              | purpose                                                          |
+|---|-----------------------------|-------------------------------------|------------------------------------------------------------------|
+| 1 | `episode_title` (top-level) | finalised after AUTO_TITLE_FROM_SPINE | human-readable title; today only the slug `episode_id` is stored |
+| 2 | `meta.gen_params`           | INPUT_TYPES widget values           | reproducibility -- model_id, cleanup_model_id, target_words, num_characters, target_length, style_variant, creativity, genre_flavor, optimization_profile |
+| 3 | `meta.news_seed`            | NewsFetcher result row              | origin trace -- headline, source, url, fetched_at                |
+| 4 | `meta.bug_109_retries`      | BUG-109 retry loop exit             | observability -- retry_count, initial_ratio, final_ratio, fired  |
+| 5 | `meta.word_ratio_pct`       | derived (total_word_count / target) | one-glance health metric; flag if <80                            |
+
+### Items 6-7: separate node touch sites, bundle with Diff 3
+
+| # | field                          | source                              | purpose                                                          |
+|---|--------------------------------|-------------------------------------|------------------------------------------------------------------|
+| 6 | `meta.title_source`            | story_orchestrator title decision   | one of: "user", "auto_from_spine", "llm_derived", "stuck_default" |
+| 7 | `meta.episode_breakdown_s`     | EpisodeAssembler                    | `{opening_s, scene_audio_s, closing_s, total_s}` for inspectable master-mix structure |
+
+### Rationale for bundling
+
+All seven additions plus the spine fields (`outline`, `beats[]`,
+`spine_meta`) are ledger-shape changes. Splitting across two commits
+forces two schema-version sniffs from downstream consumers; bundling
+with the l3 -> l4 bump means one regression validates the entire
+expansion and downstream consumers that hardcoded `l3-` fail loudly
+once instead of in two separate windows.
+
+The voice_warnings collection (already shipped in commit 4fa1ec5,
+2026-04-29) deliberately did NOT carry a schema bump because it was
+the data-foundation precursor; this bundle is the consolidation pass.
+
+### Updated unblock conditions
+
+The three original unblock conditions still apply. Add a fourth:
+
+4. The seven metadata fields above are designed and stub-tested
+   alongside the spine fields, so the schema bump validates everything
+   at once rather than fragmenting into two ledger-shape commits.
