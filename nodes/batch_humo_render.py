@@ -42,9 +42,27 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sys as _sys
 import time
 from pathlib import Path
 from typing import Any
+
+# Path-helper bootstrap: ``_otr_paths`` is a sibling module. In
+# production ComfyUI imports this file as ``nodes.batch_humo_render``
+# so a relative import works. In tests + ad-hoc scripts the module is
+# loaded directly via ``importlib.util.spec_from_file_location`` with
+# no parent package, breaking relative imports. The sys.path prepend
+# below makes ``_otr_paths`` reachable as a top-level module in both
+# contexts; the import is idempotent across multiple node loads.
+_NODES_DIR = Path(__file__).resolve().parent
+if str(_NODES_DIR) not in _sys.path:
+    _sys.path.insert(0, str(_NODES_DIR))
+from _otr_paths import (  # noqa: E402
+    comfy_output_dir,
+    otr_audio_dir,
+    otr_legacy_audio_dir,
+    otr_videos_dir,
+)
 
 log = logging.getLogger("OTR.batch_humo_render")
 
@@ -692,16 +710,15 @@ class BatchHumoRender:
         # both `otr/portraits/<ep_id>/otr_humo_pass1_portrait_*.png`
         # AND `otr/stills/full_env_*.png` AND `otr/stills/pass1_*.png`.
         # User-supplied input wins if non-empty.
-        comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
         if not portraits_dir or not portraits_dir.strip():
-            portraits_dir_path = comfy_output
+            portraits_dir_path = comfy_output_dir()
         else:
             portraits_dir_path = Path(portraits_dir)
         log.info("[BatchHumoRender] portraits_dir=%s", portraits_dir_path)
 
         # ---- 3. Resolve clips output_dir (canonical OTR tree) ----
         # output_dir = ComfyUI/output/otr/videos/<episode_id>/
-        clips_dir_path = comfy_output / "otr" / "videos" / episode_id
+        clips_dir_path = otr_videos_dir(episode_id)
         clips_dir_path.mkdir(parents=True, exist_ok=True)
 
         # ---- 4. Lazy-load Comfy nodes ----
@@ -1227,8 +1244,8 @@ class BatchHumoRender:
         # Auto-pick fallback when input empty
         if not s:
             audio_dirs = [
-                Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio"),
-                Path(r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"),
+                otr_audio_dir(),
+                otr_legacy_audio_dir(),
             ]
             cands = []
             for d in audio_dirs:

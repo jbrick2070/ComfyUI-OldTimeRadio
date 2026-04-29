@@ -46,6 +46,9 @@ from .project_state import ProjectState
 # Per-phase VRAM telemetry (v1.4 Theme C). CUDA-absent safe.
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 
+# Canonical OTR paths -- single source of truth for output locations.
+from ._otr_paths import director_raw_dump_dir
+
 
 def _flush_vram_keep_llm():
     """Lightweight VRAM flush: clears KV cache fragments and fragmentation
@@ -8840,8 +8843,7 @@ class LLMDirector:
         # downstream phases use the actual script content.
         try:
             import os, time as _time
-            from pathlib import Path as _Path
-            dump_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            dump_dir = director_raw_dump_dir()
             dump_dir.mkdir(parents=True, exist_ok=True)
             dump_path = dump_dir / f"director_raw_{int(_time.time())}.txt"
             dump_path.write_text(text or "", encoding="utf-8")

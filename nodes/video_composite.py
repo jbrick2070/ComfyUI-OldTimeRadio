@@ -68,9 +68,23 @@ import json
 import logging
 import shutil
 import subprocess
+import sys as _sys
 import time
 from pathlib import Path
 from typing import Any
+
+# Path-helper bootstrap (see ``batch_humo_render.py`` for full
+# rationale). ``_otr_paths`` lives as a sibling module; this prepend
+# makes it importable both via the parent ``nodes`` package
+# (production) and via direct file load (test fixtures).
+_NODES_DIR = Path(__file__).resolve().parent
+if str(_NODES_DIR) not in _sys.path:
+    _sys.path.insert(0, str(_NODES_DIR))
+from _otr_paths import (  # noqa: E402
+    episodes_for_obs_dir,
+    otr_audio_dir,
+    otr_legacy_audio_dir,
+)
 
 log = logging.getLogger("OTR.video_composite")
 
@@ -117,8 +131,8 @@ def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
 
     if not s:
         audio_dirs = [
-            Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio"),
-            Path(r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio"),
+            otr_audio_dir(),
+            otr_legacy_audio_dir(),
         ]
         cands = []
         for d in audio_dirs:
@@ -373,8 +387,7 @@ class VideoComposite:
         # can point at output/episodes_for_obs/ and only see finished
         # episodes -- never the per-line HuMo clip pieces under
         # output/otr/videos/<ep_id>/.
-        comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
-        out_dir = comfy_output / "episodes_for_obs" / episode_id
+        out_dir = episodes_for_obs_dir(episode_id)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / f"{episode_id}.mp4"
 

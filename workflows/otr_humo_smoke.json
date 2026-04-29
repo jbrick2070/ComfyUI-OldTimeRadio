@@ -33,7 +33,7 @@
         "Node name for S&R": "LoadAudio"
       },
       "widgets_values": [
-        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_resonance_chamber_20260427_164718.mp4"
+        ""
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
@@ -341,7 +341,7 @@
         "Node name for S&R": "OTR_BatchHumoRender"
       },
       "widgets_values": [
-        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_resonance_chamber_20260427_164718.mp4",
+        "",
         "",
         7.0,
         3,
@@ -402,9 +402,9 @@
         "Node name for S&R": "OTR_VideoComposite"
       },
       "widgets_values": [
-        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_resonance_chamber_20260427_164718.mp4",
         "",
-        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_resonance_chamber_20260427_164718.mp4",
+        "",
+        "",
         "lighten",
         0.0,
         1920,

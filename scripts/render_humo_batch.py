@@ -48,6 +48,14 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import uuid
+from pathlib import Path as _BootstrapPath
+
+# Make ``nodes._otr_paths`` importable when running this script directly
+# from the repo root (no ComfyUI process required).
+_REPO_ROOT = _BootstrapPath(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from nodes._otr_paths import comfy_output_dir  # noqa: E402
 from pathlib import Path
 from typing import Any
 
@@ -79,9 +87,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--portraits-dir",
         type=Path,
-        default=Path(r"C:\Users\jeffr\Documents\ComfyUI\output"),
+        default=comfy_output_dir(),
         help="Directory containing PASS1 character portraits "
-        "(otr_humo_pass1_portrait_*.png).",
+        "(otr_humo_pass1_portrait_*.png). Defaults to the ComfyUI "
+        "output root; override globally via OTR_OUTPUT_DIR.",
     )
     p.add_argument(
         "--out-dir",
@@ -1039,7 +1048,7 @@ def main() -> int:
         # `comfy_output_root`, and the orchestrator died after clip 1.
         # BUG-LOCAL-074 (Bug B): point the search at the actual save
         # root and keep the legacy paths as a back-compat fallback.
-        _comfy_output = Path(r"C:\Users\jeffr\Documents\ComfyUI\output")
+        _comfy_output = comfy_output_dir()
         _ep_id = ledger.get("episode_id", "episode")
         save_root = _comfy_output / "otr" / "videos" / _ep_id
         search_roots = [

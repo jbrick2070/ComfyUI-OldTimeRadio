@@ -46,6 +46,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+# Make ``nodes._otr_paths`` importable when running this script directly.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from nodes._otr_paths import comfy_output_dir  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Defaults (mirror SeedVR2_HD_video_upscale.json widget values)
 # ---------------------------------------------------------------------------
@@ -113,10 +119,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--poll-interval", type=float, default=5.0,
                    help="Seconds between /history polls.")
     p.add_argument("--comfy-output-dir", type=Path,
-                   default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output"),
-                   help="ComfyUI output directory (used for promotion).")
+                   default=comfy_output_dir(),
+                   help="ComfyUI output directory (used for promotion). "
+                        "Override globally via OTR_OUTPUT_DIR.")
     p.add_argument("--episodes-dir", type=Path,
-                   default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes"),
+                   default=comfy_output_dir() / "otr" / "episodes",
                    help="Flat directory for final-good deliverables. After "
                         "SeedVR2 finishes, the 1080p mp4 (and any sibling "
                         ".vtt) is copied here with a clean filename so "

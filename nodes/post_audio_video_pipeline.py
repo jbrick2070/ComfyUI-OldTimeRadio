@@ -87,11 +87,20 @@ log = logging.getLogger("OTR.post_audio_video_pipeline")
 # Constants
 # ---------------------------------------------------------------------------
 
+import sys as _sys
+
+# Path-helper bootstrap (see ``nodes/batch_humo_render.py`` for the
+# full rationale). Sibling-module ``_otr_paths`` must be reachable
+# both via the parent ``nodes`` package (production) and via direct
+# file load (test fixtures using ``spec_from_file_location``).
+_NODES_DIR = Path(__file__).resolve().parent
+if str(_NODES_DIR) not in _sys.path:
+    _sys.path.insert(0, str(_NODES_DIR))
+from _otr_paths import otr_audio_dir, otr_legacy_audio_dir  # noqa: E402
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _WRAPPER_PATH = _REPO_ROOT / "scripts" / "test_humo_batch_concat.ps1"
 _LOG_DIR = _REPO_ROOT / "scripts"
-_AUDIO_OUTPUT_DIR = Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
-_LEGACY_AUDIO_DIR = Path(r"C:\Users\jeffr\Documents\ComfyUI\output\old_time_radio")
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +121,7 @@ def _resolve_ledger_from_input(path_str: str) -> Path | None:
     if not path_str or not path_str.strip():
         # Fall back to scanning the canonical audio dirs
         candidates: list[Path] = []
-        for d in (_AUDIO_OUTPUT_DIR, _LEGACY_AUDIO_DIR):
+        for d in (otr_audio_dir(), otr_legacy_audio_dir()):
             if d.exists():
                 candidates.extend(
                     p for p in d.glob("*_ledger.json")

@@ -29,6 +29,7 @@ import re
 import numpy as np
 import torch
 
+from ._otr_paths import otr_audio_dir
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -274,8 +275,7 @@ class BatchAudioGenGenerator:
         # is on disk yet. Errors logged, never crash.
         try:
             import json as _json
-            from pathlib import Path as _Path
-            audio_dir = _Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\audio")
+            audio_dir = otr_audio_dir()
             if audio_dir.exists():
                 cands = list(audio_dir.glob("*_ledger.json"))
                 if cands:

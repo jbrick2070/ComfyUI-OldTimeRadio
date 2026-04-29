@@ -34,7 +34,7 @@ Usage:
   python scripts/render_episode_concat.py \\
       --ledger   output/old_time_radio/silent_test_<episode>/ledger.json \\
       --audio-mp4 output/old_time_radio/<episode>.mp4 \\
-      --comfy-output-dir C:/Users/jeffr/Documents/ComfyUI/output
+      --comfy-output-dir output  # or omit to use OTR_OUTPUT_DIR / auto-resolve
 
 Subtitles: every dialogue line becomes one .vtt cue with start_s,
 start_s + dur_s, and the line text. Atmospheric (kind=ambient) beats
@@ -49,6 +49,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Make ``nodes._otr_paths`` importable when running this script directly
+# from the repo root (no ComfyUI process required).
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from nodes._otr_paths import comfy_output_dir  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -61,11 +68,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ledger", required=True, type=Path,
                    help="Path to silent_test_<episode>/ledger.json")
     p.add_argument("--comfy-output-dir", type=Path,
-                   default=Path(r"C:/Users/jeffr/Documents/ComfyUI/output"),
+                   default=comfy_output_dir(),
                    help="ComfyUI output directory (HuMo clips live in "
                         "<this>/otr/videos/<episode_id>/ as <line_id>.mp4 "
                         "or humo_<line_id>_*.mp4; mid-day legacy fallback "
-                        "to <this>/otr_videos/<episode_id>/)")
+                        "to <this>/otr_videos/<episode_id>/). Override "
+                        "globally via the OTR_OUTPUT_DIR env var.")
     audio = p.add_mutually_exclusive_group(required=True)
     audio.add_argument("--audio-mp4", type=Path,
                        help="Path to the audio episode mp4 (audio extracted)")

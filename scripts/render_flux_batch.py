@@ -26,7 +26,7 @@ Two target kinds:
 Usage (production):
   python scripts/render_flux_batch.py \\
       --ledger output/old_time_radio/silent_test_astrotech/ledger.json \\
-      --out-dir C:/Users/jeffr/Documents/ComfyUI/output \\
+      --out-dir output  # or omit to use OTR_OUTPUT_DIR / auto-resolve \\
       --comfyui-url http://localhost:8000 \\
       --scope all
 
@@ -52,6 +52,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+# Make ``nodes._otr_paths`` importable when running this script directly.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from nodes._otr_paths import comfy_output_dir  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -72,8 +78,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--out-dir",
         type=Path,
-        default=Path(r"C:\Users\jeffr\Documents\ComfyUI\output"),
-        help="ComfyUI output directory where FLUX images land.",
+        default=comfy_output_dir(),
+        help="ComfyUI output directory where FLUX images land. "
+        "Defaults via OTR_OUTPUT_DIR / ComfyUI's own output dir / "
+        "walk-up to the ComfyUI repo root.",
     )
     p.add_argument(
         "--comfyui-url",
