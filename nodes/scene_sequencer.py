@@ -936,6 +936,29 @@ class SceneSequencer:
                         _row["start_s_space"] = "scene_audio"
                         _matched += 1
 
+                    # BUG-LOCAL-107 (authoritative-log expansion):
+                    # write-back SFX cue placements to ledger.sfx[].
+                    # SceneSequencer's sfx_timeline holds (start_sample,
+                    # sfx_np, desc) tuples in script order; ledger.sfx[]
+                    # is also in script order so we walk both in
+                    # parallel. Positions are in SCENE-AUDIO space;
+                    # EpisodeAssembler shifts them to MASTER-MIX
+                    # alongside lines[] / clips[].
+                    _ledger_sfx = _led.get("sfx") or []
+                    _sfx_matched = 0
+                    for _sfx_idx, (_sfx_pos, _sfx_np, _sfx_desc) in enumerate(sfx_timeline):
+                        if _sfx_idx >= len(_ledger_sfx):
+                            break
+                        _sfx_row = _ledger_sfx[_sfx_idx]
+                        _sfx_row["start_s"] = float(_sfx_pos) / float(sample_rate)
+                        _sfx_row["dur_s"] = float(len(_sfx_np)) / float(sample_rate)
+                        _sfx_row["start_s_space"] = "scene_audio"
+                        # Capture the description SceneSequencer
+                        # actually placed (for diagnostic clarity).
+                        if _sfx_desc and not _sfx_row.get("description"):
+                            _sfx_row["description"] = str(_sfx_desc)
+                        _sfx_matched += 1
+
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                     )
@@ -944,8 +967,11 @@ class SceneSequencer:
                     _OTRL.save_ledger_safe(_ledger_p, _led)
                     log.info(
                         "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
-                        "gate=post_scene_sequencer dur=%.1fs lines_positioned=%d/%d",
-                        _phase_ms, total_sec, _matched, len(dialogue_positions),
+                        "gate=post_scene_sequencer dur=%.1fs "
+                        "lines_positioned=%d/%d sfx_positioned=%d/%d",
+                        _phase_ms, total_sec,
+                        _matched, len(dialogue_positions),
+                        _sfx_matched, len(sfx_timeline),
                     )
         except Exception as _meta_exc:
             log.warning(
@@ -1176,6 +1202,7 @@ class EpisodeAssembler:
 
                     _shifted_lines = 0
                     _shifted_clips = 0
+                    _shifted_sfx = 0
                     if _shift_s > 0.0:
                         for _ln in (_led.get("lines") or []):
                             # Only shift entries that are in
@@ -1199,12 +1226,83 @@ class EpisodeAssembler:
                                 _cl["start_s"] = float(_cl["start_s"]) + _shift_s
                                 _cl["start_s_space"] = "master_mix"
                                 _shifted_clips += 1
+                        # BUG-LOCAL-107: same shift for SFX cues so
+                        # ledger.sfx[].start_s is master-mix space too.
+                        for _sx in (_led.get("sfx") or []):
+                            if (
+                                _sx.get("start_s_space") == "scene_audio"
+                                and isinstance(_sx.get("start_s"), (int, float))
+                            ):
+                                _sx["start_s"] = float(_sx["start_s"]) + _shift_s
+                                _sx["start_s_space"] = "master_mix"
+                                _shifted_sfx += 1
+
+                    # BUG-LOCAL-107: stamp the music cue placements.
+                    # Opening theme starts at master t=0 and ends at
+                    # opening_theme_dur. Closing theme starts at
+                    # (scene_end - xfade) + scene_dur - xfade
+                    # = total_master - closing_dur. Write them by
+                    # cue_id match against ledger.music[].
+                    _music_rows = _led.get("music") or []
+                    if _music_rows and segments:
+                        _opening_dur_s = (
+                            float(segments[0].shape[-1]) / float(sample_rate)
+                            if opening_theme_audio is not None else 0.0
+                        )
+                        _closing_dur_s = (
+                            float(segments[-1].shape[-1]) / float(sample_rate)
+                            if closing_theme_audio is not None and len(segments) > 1
+                            else 0.0
+                        )
+                        _master_total_s = (
+                            float(episode_waveform.shape[-1]) / float(sample_rate)
+                        )
+                        for _mc in _music_rows:
+                            _cue = (_mc.get("cue_id") or "").lower()
+                            if _cue == "opening" and opening_theme_audio is not None:
+                                _mc["start_s"] = 0.0
+                                _mc["dur_s"] = _opening_dur_s
+                                _mc["start_s_space"] = "master_mix"
+                            elif _cue == "closing" and closing_theme_audio is not None:
+                                _mc["start_s"] = max(
+                                    0.0, _master_total_s - _closing_dur_s
+                                )
+                                _mc["dur_s"] = _closing_dur_s
+                                _mc["start_s_space"] = "master_mix"
+
+                    # BUG-LOCAL-107: append crossfade boundaries to
+                    # ledger.transitions[] so post-mortem can audit
+                    # the seam between opening->scene and scene->closing.
+                    _xfade_ms = int(crossfade_ms)
+                    if opening_theme_audio is not None and len(segments) >= 2:
+                        _OTRL.append_transition(
+                            _led,
+                            from_line_id="opening_theme",
+                            to_line_id="scene_audio",
+                            crossfade_ms=_xfade_ms,
+                            boundary_s=(
+                                float(segments[0].shape[-1]) / float(sample_rate)
+                            ),
+                        )
+                    if closing_theme_audio is not None and len(segments) >= 2:
+                        _OTRL.append_transition(
+                            _led,
+                            from_line_id="scene_audio",
+                            to_line_id="closing_theme",
+                            crossfade_ms=_xfade_ms,
+                            boundary_s=(
+                                float(episode_waveform.shape[-1]) / float(sample_rate)
+                                - float(segments[-1].shape[-1]) / float(sample_rate)
+                            ),
+                        )
 
                     if _shift_s > 0.0:
                         log.info(
                             "[EpisodeAssembler] BUG-106 master-mix shift: "
-                            "+%.3fs applied to %d line(s) + %d clip(s)",
+                            "+%.3fs applied to %d line(s) + %d clip(s) "
+                            "+ %d sfx",
                             _shift_s, _shifted_lines, _shifted_clips,
+                            _shifted_sfx,
                         )
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
