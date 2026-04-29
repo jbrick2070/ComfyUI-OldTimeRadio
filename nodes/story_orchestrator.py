@@ -3619,6 +3619,32 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 _early_led.save()
             except Exception:  # noqa: BLE001 -- snapshot is observability, never blocks
                 pass
+            # Log path stamping. Tells anyone reading the ledger
+            # (watcher script, /otr/latest_ledger consumer, post-mortem
+            # tail) exactly which log files captured the verbose state
+            # of THIS run. ComfyUI core log catches stdout (Loading LLM
+            # model, [OpenClose] Starting..., parse-fatal traces, etc.).
+            # OTR runtime log catches the throttled heartbeat (tok/s,
+            # scene count, dialogue count, VRAM peaks). Both paths are
+            # absolute so a watcher process can `tail -f` them without
+            # knowing the user's directory layout.
+            try:
+                _log_paths = {}
+                _otr_log = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)),
+                    "otr_runtime.log",
+                )
+                _log_paths["otr_runtime"] = _otr_log
+                try:
+                    import folder_paths as _fp  # noqa: PLC0415 -- ComfyUI runtime import
+                    _user_dir = _fp.get_user_directory()
+                    _log_paths["comfyui_core"] = os.path.join(_user_dir, "comfyui.log")
+                except Exception:  # noqa: BLE001 -- folder_paths may be missing in CLI envs
+                    _log_paths["comfyui_core"] = None
+                _early_led.data.setdefault("meta", {})["log_paths"] = _log_paths
+                _early_led.save()
+            except Exception:  # noqa: BLE001 -- log-path stamp is observability, never blocks
+                pass
             _runtime_log(
                 f"EARLY_LEDGER: pending ledger initialized at write_script entry "
                 f"(model_id={model_id}, target_words={target_words})"
