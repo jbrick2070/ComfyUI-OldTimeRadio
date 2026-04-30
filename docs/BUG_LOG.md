@@ -5,6 +5,65 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-116: TITLE_RESOLVE_FAIL regression — `pending_20260430_061112` aborted in `OTR_SignalLostVideo.render_video` after 14:43 elapsed; writer never emitted a usable title token [AUTO-LOGGED]
+
+- **Date:** 2026-04-30 06:25 | **Phase:** 0 | **Bible candidate:** TBD
+- **Symptom:** ComfyUI log tail (last error before idle, run finished revision then crashed in video stage):
+    ```
+    [2026-04-30 06:25:55.780] [error] !!! Exception during processing !!! TITLE_RESOLVE_FAIL: no usable episode title. script_json_title='', widget=''. Writer must emit a {"type":"title"} token or the widget must be set to a non-stuck value.
+    File "C:\...\ComfyUI-OldTimeRadio\nodes\video_engine.py", line 1271, in render_video
+      raise RuntimeError(
+    RuntimeError: TITLE_RESOLVE_FAIL: no usable episode title. script_json_title='', widget=''.
+    [2026-04-30 06:25:55.783] [info]  Prompt executed in 00:14:43
+    ```
+  ScriptCritic verdict=REVISE score=87 ran cleanly (06:20:05) and the reviser successfully applied (1995 -> 2023 chars at 06:20:41). All audio phases completed (EpisodeAssembler stamped post_episode_assembler dur=95.0s at 06:25:55). The crash happened in `render_video` at the very end. Ledger `pending_20260430_061112_ledger.json` shows `final_audio_path=''`, `final_video_path=''`, `clips=0`. This is the loud failure designed in BUG-LOCAL-035; means upstream title-resolution path is broken again — the writer either did not stamp `{"type":"title"}` into `script_lines` after the revision pass, OR the revision pass dropped/overwrote the title token, OR the widget default was reset to empty. Impact: 14m43s of audio work discarded, no shippable artifact.
+- **Cause:** TBD (auto-logged by scheduled tailer; manual triage required) — leading hypothesis: the revision pass (verdict=REVISE -> reviser at 06:20:41 added 28 chars to the script) may have rewritten `script_lines` without re-injecting the `{"type":"title"}` token that the writer prepended pre-critic. Alt: writer never emitted `TITLE: ...` as the first line on this run (Mistral-Nemo low-temp drift). Need TITLE_TRACE log line from this run to confirm which.
+- **Fix:** TBD
+- **Verify:** TBD
+- **Tags:** unexpected_traceback, title-resolve-fail, video-engine, regression, script-revisions, auto-logged, soak-tailer
+
+---
+
+### BUG-LOCAL-115: ScriptCritic verdict=REVISE on `signal_lost_causality_lock_20260429_213229` but ledger.script_revisions[] is empty — reviser path did not execute or did not stamp [AUTO-LOGGED]
+
+- **Date:** 2026-04-30 00:13 | **Phase:** 0 | **Bible candidate:** TBD
+- **Symptom:** ledger inspection via `scripts/_check_critic_ran.py` reports:
+    ```
+    signal_lost_causality_lock_20260429_213229    lines=  15 words=   236 gates=1 revs=0
+        gate: verdict=REVISE score=78 model=mistralai/Mistral-Nemo-Instruct-2407
+    ```
+  Critic returned REVISE (score=78, threshold not met) but `ledger.script_revisions[]` length is 0 — no revision attempt was stamped. Two newer ledgers in the same window (`containment_breach_echoes_20260429_215535`, `crustal_echoes_beneath_20260430_000631`) both show verdict=PASS so no revision was needed there; this entry is the only REVISE-verdict ledger in the last 5 finished runs, and it has no corresponding reviser stamp.
+- **Cause:** TBD (auto-logged by scheduled tailer; manual triage required) — possible paths: (a) reviser node short-circuited because score=78 was just under the PASS threshold and the orchestrator decided to ship as-is, (b) reviser ran but failed to stamp `script_revisions[]`, (c) reviser disabled at runtime despite default-ON config.
+- **Fix:** TBD
+- **Verify:** TBD
+- **Tags:** revise_failed, script-critic, reviser, ledger-stamp, auto-logged, soak-tailer
+
+---
+
+### BUG-LOCAL-115: TITLE_RESOLVE_FAIL on overnight soak — auto-title-from-spine doesn't reach script_json, widget empty, run dies after ~3 min of writer work [PARTIAL FIX in commit pending: third fallback to news_seed.headline]
+
+- **Date:** 2026-04-30 06:25 | **Phase:** 0-3 | **Bible candidate:** yes
+- **Symptom:** Overnight Gemma-4 E4B soak run #5 crashed at SignalLostVideo with:
+    ```
+    RuntimeError: TITLE_RESOLVE_FAIL: no usable episode title.
+    script_json_title='', widget=''.
+    ```
+  Log timeline showed:
+    ```
+    06:14:24 [ScriptWriter] AUTO_TITLE_FROM_SPINE: 'Gait Pattern Fracture' (was: '')
+    06:21:02 "episode_title": "Signal Lost: Episode 1"     <- LLMDirector default-looking
+    06:25:55 RuntimeError: TITLE_RESOLVE_FAIL              <- script_json title='', widget=''
+    ```
+  Auto-title computed a real title from the news spine but it never made it into the writer's script_json output as a `{"type":"title", "value":"..."}` token. SignalLostVideo's resolver requires either that token OR a non-stuck widget value; both empty -> hard fail.
+  Earlier overnight runs (Crustal Echoes Beneath, Sound of Disintegration, Perception Versus Permanence) succeeded with auto-title intact, so this is intermittent — Gemma-4 E4B sometimes drops the title token in its script_json output even when the spine helper computed one.
+- **Cause:** writer's auto-title-from-spine logic stamps the title to a transient variable but the LLM-generated script_json doesn't always carry it through. The LLM may be replacing it with a default ("Signal Lost: Episode 1") that's NOT in `_STUCK_TITLE_DEFAULTS` (the set is missing this prefix variant), so it slips past the writer's own validator.
+- **Fix (band-aid for soak):** add a third fallback in `nodes/video_engine.py::SignalLostVideoRenderer.render_video` -- if both script_json title and widget title fail/are stuck, derive from `ledger.meta.news_seed.headline` (always populated by NewsFetcher). Final last-resort: timestamp-based unique title that always passes stuck-check. Run never crashes on title resolution again. Logs WARNING with all three sources so triage is clear.
+- **Fix (root cause, deferred):** writer-side -- ensure `{"type":"title"}` token is always prepended to script_json regardless of LLM output behavior. Add stuck-check on the writer side too so "Signal Lost: Episode 1" gets caught before it reaches downstream.
+- **Verify:** next overnight run that would have crashed on TITLE_RESOLVE_FAIL now logs WARNING `TITLE FALLBACK to news_seed: ...` and continues to FLUX/HuMo. Episode title becomes the news article headline (truncated to 80 chars).
+- **Tags:** writer, auto-title, signal-lost-video, soak, gemma-4-E4B, news-seed-fallback, soak-tailer
+
+---
+
 ### BUG-LOCAL-114: LLMDirector SFX plan rejected by schema validator on Gemma-4 E2B writer runs — sfx_plan=0 in final ledger despite Director attempting to emit cues
 
 - **Date:** 2026-04-29 PM | **Phase:** 0-3 | **Bible candidate:** yes

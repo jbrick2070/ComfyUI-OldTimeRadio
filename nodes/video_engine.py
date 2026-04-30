@@ -1256,23 +1256,55 @@ class SignalLostVideoRenderer:
         except Exception as _te:
             log.warning("[Video] Title extraction from script_json failed: %s", _te)
 
+        # BUG-LOCAL-115 hardening (2026-04-30): third fallback chain.
+        # During overnight soak runs the auto-title-from-spine writer
+        # helper sometimes fails to inject a {"type":"title"} token
+        # into script_json (the LLM's output drops it) AND the
+        # workflow widget is left empty by the user. Both legacy
+        # sources fail and the run dies after ~3 minutes of writer
+        # work. New fallback: pull from ledger.meta.news_seed.headline
+        # (always populated by NewsFetcher) -- if the writer didn't
+        # name the episode, the news article that seeded it is a
+        # reasonable last-resort title.
+        _news_title = ""
+        try:
+            from .production_ledger import get_ledger as _get_ledger
+            _led = _get_ledger().data
+            _news = (_led.get("meta") or {}).get("news_seed") or {}
+            _news_title = (_news.get("headline") or "").strip()
+        except Exception as _ne:  # noqa: BLE001
+            log.debug("[Video] news_seed title fallback unavailable: %s", _ne)
+
         if _script_title and _script_title.lower() not in _STUCK_TITLE_DEFAULTS:
             episode_title = _script_title
             _title_source = "script_json"
         elif _widget_title and _widget_title.lower() not in _STUCK_TITLE_DEFAULTS:
             episode_title = _widget_title
             _title_source = "widget_override"
-        else:
-            # Fail loud: we'd write a stuck-default filename again. Surface it.
-            _runtime_log(
-                f"TITLE_TRACE | source=NONE | script_json_title='{_script_title}' "
-                f"| widget_title='{_widget_title}' -> TITLE_RESOLVE_FAIL"
+        elif _news_title and _news_title.lower() not in _STUCK_TITLE_DEFAULTS:
+            # Trim news headline to a reasonable episode-title length;
+            # prefix with "Signal Lost — " is left to the user via
+            # downstream cosmetic processing.
+            episode_title = _news_title[:80]
+            _title_source = "news_seed_fallback"
+            log.warning(
+                "[Video] TITLE FALLBACK to news_seed: writer omitted "
+                "{\"type\":\"title\"} token AND widget was empty. Using "
+                "ledger.meta.news_seed.headline = %r. "
+                "(BUG-LOCAL-115 -- writer auto-title regression.)",
+                episode_title,
             )
-            raise RuntimeError(
-                f"TITLE_RESOLVE_FAIL: no usable episode title. "
-                f"script_json_title='{_script_title}', widget='{_widget_title}'. "
-                f"Writer must emit a {{\"type\":\"title\"}} token or the "
-                f"widget must be set to a non-stuck value."
+        else:
+            # Final fallback: timestamp-based unique title. Guarantees
+            # we never crash the run; passes stuck-check by uniqueness.
+            episode_title = f"Signal Lost {_time.strftime('%Y%m%d %H%M%S')}"
+            _title_source = "timestamp_lastresort"
+            log.warning(
+                "[Video] TITLE LAST-RESORT: script_json='%s', widget='%s', "
+                "news_seed='%s' -- ALL EMPTY/STUCK. Using timestamp "
+                "fallback %r so the run can finish. Investigate the "
+                "writer's auto-title pipeline.",
+                _script_title, _widget_title, _news_title, episode_title,
             )
 
         _runtime_log(
