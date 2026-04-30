@@ -5,6 +5,77 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-114: LLMDirector SFX plan rejected by schema validator on Gemma-4 E2B writer runs — sfx_plan=0 in final ledger despite Director attempting to emit cues
+
+- **Date:** 2026-04-29 PM | **Phase:** 0-3 | **Bible candidate:** yes
+- **Symptom:** Containment Breach Echoes run (`signal_lost_containment_breach_echoes_20260429_215535`, writer=Gemma-4 E2B, cleanup/director=Mistral-Nemo) produced `ledger.sfx == []` even though the Director's log line read:
+    ```
+    [LLMDirector] DIRECTOR_SCHEMA: sfx_plan[2] missing required fields, skipping
+    [LLMDirector] DIRECTOR_SCHEMA: sfx_plan[3] missing required fields, skipping
+    [LLMDirector] DIRECTOR_SCHEMA validation complete: voice_assignments=3, sfx_plan=0, music_plan=3
+    ```
+  Two SFX entries were produced by the LLM but ALL were dropped by the schema validator. Music plan landed (3 cues), voice assignments landed (3), only SFX was lost.
+- **Cause:** suspected — small-model collapse (Gemma-4 E2B effective ~2B params) emits SFX entries with missing required fields per the Director's strict JSON schema. Validator drops anything malformed. Larger models (Mistral-Nemo 12B as writer) should not exhibit this — write-then-cleanup ran in this episode but the Director itself was driven by Mistral-Nemo as cleanup_model_id, not Gemma-4 E2B writer; need to confirm which model was prompted for the Director JSON.
+- **Impact:** SFX layer is silent on small-model runs. The "talking radio" experience relies on ANNOUNCER + MUSIC + SFX layered together; losing SFX leaves the dramatic stings hollow. ANNOUNCER (4 lines) and MUSIC (3 cues) are intact on this episode, so 2 of the 3 talking-radio elements survived.
+- **Fix:** TBD — repro on Mistral-Nemo writer first to confirm whether this is small-model-only, then either (a) loosen the SFX schema to accept partial entries with sensible defaults for missing fields, or (b) add a re-prompt-on-empty-SFX retry path that asks the Director to fix the malformed entries.
+- **Verify:** TBD — re-run with writer=Mistral-Nemo target_words=350, confirm `ledger.sfx` length > 0.
+- **Tags:** llm-director, sfx, schema-validation, small-model-collapse, talking-radio
+
+---
+
+### BUG-LOCAL-113: Radio bookend FLUX still not rendering on recent runs — regression between AM (works) and PM (broken) on 2026-04-29
+
+- **Date:** 2026-04-29 PM | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** No `radio_bookend_<episode_id>.png` produced for any PM run today (`signal_lost_vessel_and_verdict_20260429_173111`, `signal_lost_viral_bloom_protocol_20260429_175715`, `signal_lost_causality_lock_20260429_213229`, `signal_lost_containment_breach_echoes_20260429_215535`). AM runs (`wormhole_swallowing_phobos_20260429_101909`, `echo_chamber_20260429_105002`) DID produce `output/otr/stills/radio_bookend_<episode_id>.png` on disk.
+  Confirmed:
+    - `workflows/otr_scifi_16gb_full.json` BatchFluxRender widgets_values[15] HAS the bookend prompt set: `"1940s vintage console radio, glowing amber dials, walnut cabinet, vacuum tube halo, fabric speaker grille, dimly lit li..."`.
+    - `visual/batch_flux_render.py` HAS the `_render_and_save_radio_bookend` method (lines 415-501) and the gate `if radio_bookend_prompt and radio_bookend_prompt.strip():` (line 395).
+    - Ledger does NOT have `meta.radio_bookend_path` or any field referencing a rendered radio image.
+    - Ledger `shots[].png_path` is `null` for all 5 shots in the current run too — suggests broader BatchFluxRender ledger write-back may be off.
+- **Cause:** suspected — silent failure in `_render_and_save_radio_bookend`. The except block writes failures to `report_lines` (the STRING output) but NOT to the log:
+    ```python
+    except Exception as exc:
+        report_lines.append(f"  radio_bookend: FAILED ({exc})")
+    ```
+  Failures are invisible in the ComfyUI log. Root cause might be: (a) FLUX VRAM-state mid-run, (b) HF cache-migration-related path issue (this AM the bookend worked, this PM after the C:\ComfyUI-Models migration it stopped), (c) the bookend code path got bypassed by some workflow-state change, (d) ComfyUI loaded a stale in-memory copy of the workflow without the widget value populated.
+- **Fix:** TBD — three-step:
+  1. Add `log.warning(...)` inside the bookend except block so failures aren't invisible.
+  2. Verify the entire BatchFluxRender ledger write-back is intact: `shots[].png_path` AND `meta.radio_bookend_path` should both stamp.
+  3. Repro with a clean ComfyUI restart + workflow reload to rule out stale in-memory state.
+- **Verify:** TBD — next clean run should produce `output/otr/stills/radio_bookend_<episode_id>.png` AND `ledger.meta.radio_bookend_path` populated.
+- **Tags:** flux, radio-bookend, ledger-write-back, silent-failure, hf-cache-migration
+
+---
+
+### BUG-LOCAL-112: news-history dedup + reset path was a no-op — "All N candidates filtered" branch never restored the unfiltered pool, body-fetch processed 0 candidates [FIXED in commit 61a85b3]
+
+- **Date:** 2026-04-29 PM | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** Run `pending_20260429_204318` showed:
+    ```
+    [NewsFetcher] Filtered 43 previously-used candidate(s) via news_history (0 remaining of 43)
+    All candidates filtered out by history -- using the unfiltered pool
+    [NewsFetcher] Body-fetching top 0 candidate(s) in parallel...
+    [NewsFetcher] Body-fetch complete in 0.00s
+    ```
+  Pool went to zero; body-fetch saw nothing; writer fell back to no-news mode. News-seeded plot was lost.
+- **Cause:** Original implementation had a comment admitting the no-op: *"we just clear used_urls so the LLM-rank step can still operate on the original (unfiltered) pool"* — but `pool` was already mutated in-place by the filter step. The reset cleared `used_urls` but never restored `pool`.
+- **Fix:** Stash unfiltered pool before history-dedup filter; restore it on full wipe. Code at `nodes/story_orchestrator.py::_fetch_science_news`. Better to pick a recent repeat than starve the writer with zero context.
+- **Verify:** Next run after the fix correctly logged `restoring unfiltered pool` and continued with 43 candidates.
+- **Tags:** news-fetcher, history-dedup, reset-path, fallback-logic
+
+---
+
+### BUG-LOCAL-111: cudaErrorIllegalAddress on next phase after FuturesTimeout — orphan worker thread mutating cached LLM tensors after timeout [FIXED in commit referenced in story_orchestrator.py]
+
+- **Date:** 2026-04-29 PM | **Phase:** 0 | **Bible candidate:** yes
+- **Symptom:** When NewsSummary or NewsCuration phase exceeded its 60-65s timeout, the orphan worker thread continued running an LLM forward pass on GPU. Python cannot safely terminate threads, and `executor.shutdown(wait=False)` does NOT kill the worker. The cached `_LLM_CACHE` instance thought it was idle, but the orphan was still mutating its tensors. Next phase that called `model.cpu()` or `_load_llm()` collided with the orphan's stale ops and Python aborted with `cudaErrorIllegalAddress`.
+- **Cause:** `_run_with_timeout` raised `_LLMTimeout` on FuturesTimeout but did not invalidate the cache. Cached references kept the corrupt model alive across phase boundaries.
+- **Fix:** On `FuturesTimeout`, set `_LLM_CACHE["model"] = None`, `["tokenizer"] = None`, etc. Frees our REFERENCES; the orphan worker's tensors get garbage-collected naturally once its frame returns. We don't try to forcibly empty CUDA cache (orphan is still using it; would race the kernel writes). Cost: ~10-15s extra reload time on next phase. Benefit: no crash.
+- **Verify:** Subsequent runs that hit the 65s news-curation timeout now load fresh on the next phase instead of crashing.
+- **Tags:** llm-cache, timeout-recovery, orphan-thread, cuda-illegal-address
+
+---
+
 ### BUG-LOCAL-110: gemma-2-2b-it CUDA device-side assert during inference on Blackwell sm_120 + bitsandbytes 4-bit NF4 + torch 2.10.0 + CUDA 13.0; same NF4 path is what gemma-2-9b-it would use, so the entire Gemma 2 family is treated as not viable on this hardware [FIXED by removing Gemma 2 family from dropdown]
 
 - **Date:** 2026-04-29 AM | **Phase:** 0 | **Bible candidate:** yes
