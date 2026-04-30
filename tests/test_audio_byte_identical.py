@@ -8,14 +8,14 @@ Audio is king. If this test fails, the change is reverted.
 Usage:
 ------
 1. Capture baseline (run once on clean v1.5 with fixed seed):
-     python tests/v2/test_audio_byte_identical.py --capture-baseline
+     python tests/test_audio_byte_identical.py --capture-baseline
 
 2. Regression gate (run after every code change):
-     pytest tests/v2/test_audio_byte_identical.py -v
+     pytest tests/test_audio_byte_identical.py -v
 
 The baseline WAV and its SHA-256 hash are stored in:
-  tests/v2/fixtures/baseline_v1.5.wav
-  tests/v2/fixtures/baseline_v1.5.sha256
+  tests/fixtures/baseline_v1.5.wav
+  tests/fixtures/baseline_v1.5.sha256
 
 If fixtures are missing, tests skip with instructions to capture first.
 """
@@ -27,24 +27,24 @@ import json
 import pytest
 
 # ---------------------------------------------------------------------------
-# Path setup — ensure repo root is on sys.path so `tests.v2` resolves
+# Path setup — ensure repo root is on sys.path so sibling test helpers resolve
 # whether invoked via pytest (from repo root) or as a standalone script.
 # ---------------------------------------------------------------------------
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.normpath(os.path.join(_HERE, "..", ".."))
+_REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 _FIXTURES = os.path.join(_HERE, "fixtures")
 _BASELINE_WAV = os.path.join(_FIXTURES, "baseline_v1.5.wav")
 _BASELINE_SHA = os.path.join(_FIXTURES, "baseline_v1.5.sha256")
-_WORKFLOW = os.path.join(_HERE, "..", "..", "workflows", "otr_scifi_16gb_full.json")
+_WORKFLOW = os.path.join(_HERE, "..", "workflows", "otr_scifi_16gb_full.json")
 
 # Fixed seed for deterministic audio output.
 # These override the workflow's randomized seeds at runtime.
 FIXED_SEEDS = {
-    "OTR_Gemma4ScriptWriter": 42,
-    "OTR_Gemma4Director": 42,
+    "OTR_LLMScriptWriter": 42,
+    "OTR_LLMDirector": 42,
     "OTR_BatchBarkGenerator": 42,
     "OTR_KokoroAnnouncer": 42,
     "OTR_BatchAudioGenGenerator": 42,
@@ -77,7 +77,7 @@ _HAS_BASELINE = os.path.isfile(_BASELINE_WAV) and os.path.isfile(_BASELINE_SHA)
 
 _SKIP_MSG = (
     "Audio baseline not captured yet. Run on your machine with GPU:\n"
-    "  python tests/v2/test_audio_byte_identical.py --capture-baseline"
+    "  python tests/test_audio_byte_identical.py --capture-baseline"
 )
 
 
@@ -177,7 +177,7 @@ class TestAudioRegressionGate:
         """
         # Import only when actually running the regression
         # (avoids torch/comfyui import errors in CI/sandbox)
-        from tests.v2._run_baseline import run_episode_and_get_audio_bytes
+        from tests._run_baseline import run_episode_and_get_audio_bytes
 
         audio_bytes = run_episode_and_get_audio_bytes(FIXED_SEEDS)
         actual_hash = sha256_bytes(audio_bytes)
@@ -199,7 +199,7 @@ def _capture_baseline():
     """Capture the v1.5 audio baseline.
 
     Run this once on clean v1.5 with GPU available:
-      python tests/v2/test_audio_byte_identical.py --capture-baseline
+      python tests/test_audio_byte_identical.py --capture-baseline
     """
     print("=" * 60)
     print("Phase 0: Capturing audio baseline")
@@ -210,7 +210,7 @@ def _capture_baseline():
     os.makedirs(_FIXTURES, exist_ok=True)
 
     try:
-        from tests.v2._run_baseline import run_episode_and_save_wav
+        from tests._run_baseline import run_episode_and_save_wav
     except ImportError as e:
         print(f"Cannot import baseline runner: {e}")
         print("Make sure ComfyUI and torch are available.")
@@ -239,5 +239,5 @@ if __name__ == "__main__":
         _capture_baseline()
     else:
         print("Usage:")
-        print("  Capture: python tests/v2/test_audio_byte_identical.py --capture-baseline")
-        print("  Test:    pytest tests/v2/test_audio_byte_identical.py -v")
+        print("  Capture: python tests/test_audio_byte_identical.py --capture-baseline")
+        print("  Test:    pytest tests/test_audio_byte_identical.py -v")
