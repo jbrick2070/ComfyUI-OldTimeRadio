@@ -63,8 +63,47 @@ from _otr_paths import (  # noqa: E402
     otr_legacy_audio_dir,
     otr_videos_dir,
 )
+from _otr_speaker_role import (  # noqa: E402
+    SPEAKER_ROLE_CHARACTER,
+    is_radio_role,
+    resolve_speaker_role,
+)
 
 log = logging.getLogger("OTR.batch_humo_render")
+
+
+def _resolve_radio_still_path(ledger):
+    """Pull the radio still path from the ledger, in either schema
+    location (top-level or under meta).  Returns ``Path`` if it
+    points at an existing file, else ``None``.
+
+    Both locations are checked because BatchFluxRender stamps to
+    BOTH (belt-and-suspenders since 2026-04-30) and older ledgers
+    may have only one.  Existence-check is critical: a stamped
+    path that no longer exists on disk should fall through to the
+    legacy portrait resolver, not break the run.
+    """
+    if not isinstance(ledger, dict):
+        return None
+    cand = ledger.get("radio_bookend_path")
+    if not cand:
+        meta = ledger.get("meta") or {}
+        if isinstance(meta, dict):
+            cand = meta.get("radio_bookend_path")
+    if not cand:
+        return None
+    try:
+        p = Path(cand)
+    except Exception:  # noqa: BLE001
+        return None
+    if p.is_file():
+        return p
+    log.warning(
+        "[BatchHumoRender] ledger radio_bookend_path=%s does not "
+        "exist on disk; radio-role lines will fall through to "
+        "portrait resolver", p,
+    )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -788,6 +827,28 @@ class BatchHumoRender:
             (ledger_path.name if ledger_path is not None else "<inline>"),
         )
 
+        # ---- 1b. Resolve radio still ref-image path ----
+        # Step 5 (ROADMAP P0, 2026-04-30 lock): non-dialogue lines
+        # (announcer, music_*, sfx) use this as the I2V reference
+        # image instead of the cast portrait.  Stamped by
+        # BatchFluxRender's _render_and_save_radio_bookend; checked
+        # in both top-level ledger.radio_bookend_path AND
+        # ledger.meta.radio_bookend_path.  None is non-fatal --
+        # radio-role lines simply fall through to the legacy
+        # portrait resolver in that case (with a warning), so an
+        # episode without a rendered radio still still completes.
+        radio_still_path = _resolve_radio_still_path(ledger)
+        if radio_still_path is not None:
+            log.info(
+                "[BatchHumoRender] radio_still_path=%s (used for "
+                "non-dialogue speaker_role lines)", radio_still_path,
+            )
+        else:
+            log.info(
+                "[BatchHumoRender] radio_still_path=None (radio-role "
+                "lines will fall through to portrait resolver)"
+            )
+
         # ---- 2. Resolve portraits dir ----
         # Default = ComfyUI output root so _find_portrait's globs hit
         # both `otr/portraits/<ep_id>/otr_humo_pass1_portrait_*.png`
@@ -1014,28 +1075,61 @@ class BatchHumoRender:
                 dur_s = max(0.04, _cap_dur_s - pad_s)
             humo_length = humo_length_for_dur(dur_s + pad_s)
 
-            # Resolve portrait. BUG-LOCAL-088 priority:
-            #   1. ledger-driven cast_still_map (this-episode FLUX)
-            #   2. _find_composite (per-shot pass3 composite)
-            #   3. _find_portrait (legacy tiers; mtime-sorted post BUG-087)
+            # Step 5 (ROADMAP P0, 2026-04-30 lock) -- I2V ref-image
+            # selection branches on speaker_role.  Non-dialogue lines
+            # (announcer, music_*, sfx) get the radio still; dialogue
+            # lines (character) fall through the existing BUG-088
+            # portrait resolution chain.
+            speaker_role = resolve_speaker_role(ln)
             shot_id = ln.get("shot_id")
             ref_png: Path | None = None
             ref_source = "none"
-            if char_id and char_id in cast_still_map:
-                ref_png = cast_still_map[char_id]
-                ref_source = "ledger-cast-fresh"
+
+            if is_radio_role(speaker_role) and radio_still_path is not None:
+                # Non-dialogue line + radio still rendered + on disk.
+                # This is the wall-to-wall HuMo coverage path.
+                ref_png = radio_still_path
+                ref_source = f"radio-still ({speaker_role})"
+            else:
+                # Dialogue line OR radio-role line whose radio still
+                # wasn't rendered/missing.  Use the BUG-LOCAL-088
+                # portrait priority chain:
+                #   1. ledger-driven cast_still_map (this-episode FLUX)
+                #   2. _find_composite (per-shot pass3 composite)
+                #   3. _find_portrait (legacy tiers; mtime-sorted post BUG-087)
+                if char_id and char_id in cast_still_map:
+                    ref_png = cast_still_map[char_id]
+                    ref_source = "ledger-cast-fresh"
+                if not ref_png:
+                    ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
+                    if ref_png:
+                        ref_source = "find_composite"
+                if not ref_png:
+                    ref_png = _find_portrait(speaker, cast, portraits_dir_path)
+                    if ref_png:
+                        ref_source = "find_portrait"
+                # Diagnostic for the "wanted radio, fell through to
+                # portrait" case so the failure is loud in the log
+                # (otherwise easy to miss in a long render).
+                if is_radio_role(speaker_role) and ref_png:
+                    log.warning(
+                        "[BatchHumoRender] line %s speaker_role=%s "
+                        "wanted radio still but it's missing; using "
+                        "%s (source=%s) instead -- audio will be "
+                        "muxed lossless either way, but visual won't "
+                        "be the radio",
+                        line_id, speaker_role, ref_png.name, ref_source,
+                    )
+
             if not ref_png:
-                ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
-                if ref_png:
-                    ref_source = "find_composite"
-            if not ref_png:
-                ref_png = _find_portrait(speaker, cast, portraits_dir_path)
-                if ref_png:
-                    ref_source = "find_portrait"
-            if not ref_png:
-                report_lines.append(f"  {line_id}: SKIP no portrait")
-                log.warning("[BatchHumoRender] line %s speaker=%r: no portrait",
-                            line_id, speaker)
+                report_lines.append(
+                    f"  {line_id}: SKIP no portrait (role={speaker_role})"
+                )
+                log.warning(
+                    "[BatchHumoRender] line %s speaker=%r role=%s: "
+                    "no portrait AND no radio still",
+                    line_id, speaker, speaker_role,
+                )
                 continue
 
             try:
@@ -1071,14 +1165,15 @@ class BatchHumoRender:
             except OSError:
                 age_str = "unknown"
             log.info(
-                "[BatchHumoRender] line %s speaker=%s char_id=%s "
-                "ref=%s source=%s age=%s",
-                line_id, speaker or "?", char_id or "?",
-                ref_png.name, ref_source, age_str,
+                "[BatchHumoRender] line %s speaker=%s role=%s "
+                "char_id=%s ref=%s source=%s age=%s",
+                line_id, speaker or "?", speaker_role,
+                char_id or "?", ref_png.name, ref_source, age_str,
             )
 
             plan.append({
                 "idx": idx, "line_id": line_id, "speaker": speaker,
+                "speaker_role": speaker_role,
                 "start_s": start_s, "dur_s": dur_s, "humo_length": humo_length,
                 "pos_text": pos_text, "ref_image": ref_image,
                 "audio": line_audio, "ref_png_name": ref_png.name,
