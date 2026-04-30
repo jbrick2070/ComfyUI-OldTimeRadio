@@ -387,6 +387,223 @@ def _resolve_bookend_image(
     return fallback
 
 
+def _pillarbox_humo_silent(
+    clip: Path,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    humo_target_h: int,
+    out_path: Path,
+    ffmpeg: str,
+) -> Path:
+    """Pillarbox a HuMo clip into the canvas dimensions and STRIP
+    its audio entirely (-an).  Video re-encodes via libx264; audio
+    is dropped so the downstream mux step can attach the master mix
+    audio with `-c:a copy` (no audio re-encode anywhere).
+
+    Used by the master_mix_per_clip_mux mode (Step 6 of ROADMAP P0,
+    2026-04-30 lock).  The whole point of this helper vs.
+    `_normalize_humo_segment` is that this one drops the audio so
+    the C7 byte-perfect path doesn't contaminate the master mix
+    with a re-encoded HuMo native audio it'll discard anyway.
+    """
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-i", str(clip),
+        "-vf", (
+            f"scale=-2:{humo_target_h}:force_original_aspect_ratio=decrease,"
+            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"fps={canvas_fps}"
+        ),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        "-an",  # KEY: strip audio.  Master mix attaches at mux step.
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out_path
+
+
+def _render_master_mix_per_clip_mux_mode(
+    *,
+    ledger: dict,
+    clips_dir: Path,
+    procgen: Path,
+    out_mp4: Path,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    humo_target_h: int,
+    fallback_clip_length: float,
+    ffmpeg: str,
+    ffprobe: str,
+) -> tuple[Path, list[str]]:
+    """C7-byte-perfect mode (Step 6 of ROADMAP P0, 2026-04-30 lock).
+
+    Pipeline:
+      1. Sort ledger.lines[] by start_s; resolve each line's HuMo
+         silent video on disk (clips_dir/<line_id>.mp4).
+      2. For each line, pillarbox the HuMo clip to canvas dims with
+         ``-an`` (strip audio).  Video gets one libx264 re-encode;
+         audio is dropped entirely so it can't contaminate the
+         master mix that attaches at step 4.
+      3. concat-demuxer the pillarboxed silent clips with ``-c copy``
+         (no video re-encode, no audio at all yet).
+      4. Mux the silent combined video with the procgen master mix
+         audio (single ffmpeg call, ``-c:v copy -c:a copy
+         -shortest``).  Audio passes through with ZERO re-encodes.
+
+    Total audio encodes vs. the existing ``humo_concat`` path:
+      humo_concat: 3 ^^ AAC re-encodes (gap_segment + per-clip
+                   normalize + final concat, lines 318/350/522).
+      this mode:   0 audio re-encodes downstream of
+                   SignalLostVideo's CreateVideo step.
+
+    Returns (final_mp4_path, report_lines).  Raises on any
+    unrecoverable subprocess failure so the caller can fall back to
+    the legacy mode.
+
+    Crossfade overlap regions (~500ms) between music_open and the
+    first scene line, and the last scene line + music_close, are
+    NOT crossfaded visually here -- the final concat is a hard cut.
+    Adding a video crossfade would require re-encoding.  For
+    SIGNAL LOST aesthetic, hard cuts on broadcast-distress
+    transitions are acceptable; promote to filter-based crossfade
+    if a future revision wants smoother seams.
+    """
+    report: list[str] = []
+    t0 = time.time()
+
+    # 1. Build timeline from ledger.lines[] (Step 4b/4c populated
+    # speaker_role + start_s + dur_s for ALL audio events: dialogue,
+    # announcer, sfx, music_open, music_close).  Walk lines instead
+    # of clips so we honour the unified-coverage contract.
+    ledger_lines = ledger.get("lines") or []
+    timeline: list[dict] = []
+    for ln in ledger_lines:
+        line_id = str(ln.get("line_id") or "")
+        if not line_id:
+            continue
+        start_s = ln.get("start_s")
+        dur_s = ln.get("dur_s")
+        if not isinstance(start_s, (int, float)) or not isinstance(dur_s, (int, float)):
+            continue
+        if dur_s <= 0:
+            continue
+        clip_path = clips_dir / f"{line_id}.mp4"
+        if not clip_path.is_file():
+            log.info(
+                "[VideoComposite/per_clip_mux] skip %s: clip not on disk "
+                "(speaker_role=%s start_s=%.3f dur_s=%.3f)",
+                line_id, ln.get("speaker_role") or "?",
+                float(start_s), float(dur_s),
+            )
+            continue
+        timeline.append({
+            "line_id": line_id,
+            "start_s": float(start_s),
+            "dur_s": float(dur_s),
+            "clip_path": clip_path,
+            "speaker_role": ln.get("speaker_role") or "character",
+        })
+
+    if not timeline:
+        raise RuntimeError(
+            "per_clip_mux: no usable HuMo clips for any line in "
+            "ledger.lines[] (Step 6 requires Step 4b/4c-stamped roles "
+            "and BatchHumoRender output for every audio event)"
+        )
+
+    timeline.sort(key=lambda x: x["start_s"])
+    report.append(
+        f"per_clip_mux: timeline = {len(timeline)} clip(s) "
+        f"({sum(1 for e in timeline if e['speaker_role']=='character')} char + "
+        f"{sum(1 for e in timeline if e['speaker_role']=='announcer')} announcer + "
+        f"{sum(1 for e in timeline if e['speaker_role']=='sfx')} sfx + "
+        f"{sum(1 for e in timeline if e['speaker_role'] in ('music_open','music_close','music_inter'))} music)"
+    )
+
+    # 2. Pillarbox each HuMo clip to canvas dims and strip audio.
+    seg_dir = out_mp4.parent / "_per_clip_mux_segments"
+    seg_dir.mkdir(parents=True, exist_ok=True)
+    pillarboxed: list[Path] = []
+    pb_failures = 0
+    for entry in timeline:
+        seg_out = seg_dir / f"pb_{entry['line_id']}.mp4"
+        try:
+            _pillarbox_humo_silent(
+                clip=entry["clip_path"],
+                canvas_w=canvas_w, canvas_h=canvas_h,
+                canvas_fps=canvas_fps, humo_target_h=humo_target_h,
+                out_path=seg_out, ffmpeg=ffmpeg,
+            )
+            pillarboxed.append(seg_out)
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+            log.warning(
+                "[VideoComposite/per_clip_mux] pillarbox %s failed: %s",
+                entry["line_id"], stderr[:200],
+            )
+            report.append(
+                f"  pillarbox {entry['line_id']}: FAILED ({stderr[:120]})"
+            )
+            pb_failures += 1
+
+    if not pillarboxed:
+        raise RuntimeError(
+            "per_clip_mux: no segments survived pillarbox pass "
+            "(check ffmpeg invocations + HuMo clip integrity)"
+        )
+    if pb_failures:
+        report.append(
+            f"per_clip_mux: WARNING {pb_failures} clip(s) lost during "
+            f"pillarbox pass; proceeding with {len(pillarboxed)} survivors"
+        )
+
+    # 3. concat-demuxer the silent pillarboxed clips with -c copy.
+    list_file = seg_dir / "concat.txt"
+    list_file.write_text(
+        "\n".join(f"file '{s.as_posix()}'" for s in pillarboxed),
+        encoding="utf-8",
+    )
+    silent_combined = seg_dir / "silent_combined.mp4"
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "warning",
+        "-f", "concat", "-safe", "0",
+        "-i", str(list_file),
+        "-c", "copy",   # NO re-encode -- pillarbox already produced
+                        # uniform H.264 yuv420p at canvas dims.
+        str(silent_combined),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    report.append(
+        f"per_clip_mux: concat OK -> silent_combined {silent_combined.name}"
+    )
+
+    # 4. Mux silent_combined video + procgen master-mix audio with
+    # -c copy throughout.  This is the C7-critical step: audio
+    # passes through without re-encode.  -shortest trims any audio
+    # overhang past the combined video length.
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "warning",
+        "-i", str(silent_combined),
+        "-i", str(procgen),
+        "-map", "0:v",   # video from concatenated HuMo
+        "-map", "1:a",   # audio from procgen master mix
+        "-c:v", "copy",
+        "-c:a", "copy",
+        "-shortest",
+        str(out_mp4),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    elapsed = time.time() - t0
+    report.append(
+        f"per_clip_mux: assembled {out_mp4.name} in {elapsed:.1f}s "
+        f"(audio passthrough, 0 re-encodes downstream of SignalLostVideo)"
+    )
+    return out_mp4, report
+
+
 def _render_humo_concat_mode(
     *,
     ledger: dict,
@@ -619,25 +836,28 @@ class VideoComposite:
                     ),
                 }),
                 "audio_source": (
-                    ["humo_concat", "master_mix"],
-                    {"default": "humo_concat",
+                    ["master_mix_per_clip_mux", "humo_concat", "master_mix"],
+                    {"default": "master_mix_per_clip_mux",
                      "tooltip": (
-                         "humo_concat (DEFAULT, talking-radio): "
-                         "concat-demuxer pipeline where each HuMo clip "
-                         "keeps its NATIVE audio (mechanical lip-sync) "
-                         "and gap windows render the radio bookend image "
-                         "with master_mix audio slices (music + SFX + "
-                         "ANNOUNCER continuous in the gaps). "
-                         "Falls back to procgen frame if "
-                         "ledger.radio_bookend_path is missing. On any "
-                         "internal failure, falls through to master_mix "
-                         "so the run never breaks.\n\n"
+                         "master_mix_per_clip_mux (DEFAULT, C7 BYTE-PERFECT): "
+                         "Step 6 of the 2026-04-30 ROADMAP P0 lock. Pillarbox "
+                         "each HuMo clip silent (one libx264 video re-encode), "
+                         "concat-demux with -c copy, then mux procgen master "
+                         "mix audio onto the silent combined video with "
+                         "-c:a copy. Net audio re-encodes downstream of "
+                         "SignalLostVideo: ZERO. Requires Step 4b/4c "
+                         "speaker_role coverage (every audio event in "
+                         "ledger.lines[]). Falls through to humo_concat on "
+                         "any unrecoverable subprocess failure.\n\n"
+                         "humo_concat: concat-demuxer pipeline where each "
+                         "HuMo clip keeps its NATIVE audio. Re-encodes audio "
+                         "to AAC 192k three times (gap fill + per-clip "
+                         "normalize + final concat). Pre-2026-04-30 default; "
+                         "kept as fallback.\n\n"
                          "master_mix: legacy 2-layer filter graph. Audio "
                          "= procgen.wav (master_mix). HuMo clips overlay "
                          "as VIDEO only; their native audio is discarded. "
-                         "Risk: lip-sync drift if master_mix differs from "
-                         "what HuMo was conditioned on. Use only for "
-                         "comparison or if humo_concat fails to deliver."
+                         "Use only for comparison or if both new modes fail."
                      )},
                 ),
             },
@@ -657,7 +877,7 @@ class VideoComposite:
         fallback_clip_length: float = 7.0,
         ffmpeg: str = "ffmpeg",
         cleanup_clips_after_assembly: bool = False,
-        audio_source: str = "humo_concat",
+        audio_source: str = "master_mix_per_clip_mux",
     ):
         # `cleanup_clips_after_assembly` widget is wired but the deletion
         # logic itself is deferred (would happen post-assembly when the
@@ -698,12 +918,74 @@ class VideoComposite:
         out_mp4 = out_dir / f"{episode_id}.mp4"
 
         # ---- Branch on audio_source ----
+        # master_mix_per_clip_mux: 2026-04-30 C7 byte-perfect mode.
+        # Pillarbox + concat HuMo clips silent, then mux master mix
+        # audio onto the combined video with -c copy.  Falls through
+        # to humo_concat if the pillarbox/concat/mux pipeline fails.
+        if audio_source == "master_mix_per_clip_mux":
+            log.info(
+                "[VideoComposite] audio_source=master_mix_per_clip_mux -- "
+                "C7 byte-perfect path (pillarbox + concat + mux, "
+                "0 audio re-encodes downstream of SignalLostVideo)"
+            )
+            try:
+                final_mp4, mux_report = _render_master_mix_per_clip_mux_mode(
+                    ledger=ledger,
+                    clips_dir=clips,
+                    procgen=procgen,
+                    out_mp4=out_mp4,
+                    canvas_w=canvas_width,
+                    canvas_h=canvas_height,
+                    canvas_fps=canvas_fps,
+                    humo_target_h=humo_target_height,
+                    fallback_clip_length=fallback_clip_length,
+                    ffmpeg=ffmpeg,
+                    ffprobe=ffprobe,
+                )
+            except Exception as exc:
+                log.exception(
+                    "[VideoComposite] master_mix_per_clip_mux failed; "
+                    "falling back to humo_concat: %s", exc,
+                )
+                # Fall through to humo_concat path on failure.
+                # humo_concat itself falls through to master_mix on
+                # its own failure, so we get a 3-tier fallback chain
+                # without any one failure mode breaking the run.
+            else:
+                # Stamp final_video_path in ledger.
+                if ledger_path is not None:
+                    try:
+                        ledger["final_video_path"] = str(final_mp4)
+                        ledger.setdefault("meta", {})["audio_source"] = (
+                            "master_mix_per_clip_mux"
+                        )
+                        from . import _otr_ledger as _OTRL  # type: ignore
+                        _OTRL.save_ledger_safe(ledger_path, ledger)
+                    except Exception as stamp_exc:  # noqa: BLE001
+                        log.warning(
+                            "[VideoComposite] per_clip_mux ledger stamp "
+                            "failed: %s", stamp_exc,
+                        )
+                report_lines = [
+                    f"VideoComposite (master_mix_per_clip_mux mode)",
+                    f"  episode_id: {episode_id}",
+                    f"  out_mp4:    {final_mp4}",
+                    "",
+                    *mux_report,
+                ]
+                elapsed = time.time() - t_start
+                log.info(
+                    "[VideoComposite] per_clip_mux complete in %.1fs: %s",
+                    elapsed, final_mp4,
+                )
+                return (str(final_mp4), "\n".join(report_lines))
+
         # humo_concat mode: bypass the existing 2-layer filter graph
         # entirely. Build a concat-demuxer pipeline where each HuMo
         # clip keeps its NATIVE audio (mechanical lip-sync) and gap
         # windows are filled with the radio bookend image + master_mix
         # audio slices (talking-radio identity continuous).
-        if audio_source == "humo_concat":
+        if audio_source == "humo_concat" or audio_source == "master_mix_per_clip_mux":
             log.info(
                 "[VideoComposite] audio_source=humo_concat -- routing to "
                 "concat-demuxer pipeline (perfect lip-sync, bookend gaps)"
