@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 53,
-  "last_link_id": 84,
+  "last_link_id": 85,
   "nodes": [
     {
       "id": 1,
@@ -42,7 +42,6 @@
           "name": "script_text",
           "type": "STRING",
           "links": [
-            1,
             84
           ],
           "slot_index": 0
@@ -51,11 +50,7 @@
           "name": "script_json",
           "type": "STRING",
           "links": [
-            2,
-            12,
-            16,
-            19,
-            24
+            85
           ],
           "slot_index": 1
         },
@@ -1504,7 +1499,7 @@
       ],
       "size": [
         400,
-        222
+        280
       ],
       "flags": {},
       "order": 53,
@@ -1517,26 +1512,48 @@
           "widget": {
             "name": "script"
           }
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 85,
+          "widget": {
+            "name": "script_json"
+          }
         }
       ],
       "outputs": [
         {
           "name": "script",
           "type": "STRING",
-          "links": null,
+          "links": [
+            1
+          ],
           "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            2,
+            12,
+            16,
+            19,
+            24
+          ],
+          "slot_index": 1
         },
         {
           "name": "critic_report",
           "type": "STRING",
           "links": null,
-          "slot_index": 1
+          "slot_index": 2
         },
         {
           "name": "verdict",
           "type": "STRING",
           "links": null,
-          "slot_index": 2
+          "slot_index": 3
         }
       ],
       "properties": {
@@ -1546,6 +1563,7 @@
       "title": "Script Critic (gate)",
       "widgets_values": [
         false,
+        false,
         90
       ]
     }
@@ -1553,7 +1571,7 @@
   "links": [
     [
       1,
-      1,
+      53,
       0,
       2,
       0,
@@ -1561,7 +1579,7 @@
     ],
     [
       2,
-      1,
+      53,
       1,
       3,
       0,
@@ -1593,7 +1611,7 @@
     ],
     [
       12,
-      1,
+      53,
       1,
       11,
       0,
@@ -1625,7 +1643,7 @@
     ],
     [
       16,
-      1,
+      53,
       1,
       12,
       1,
@@ -1649,7 +1667,7 @@
     ],
     [
       19,
-      1,
+      53,
       1,
       13,
       0,
@@ -1689,7 +1707,7 @@
     ],
     [
       24,
-      1,
+      53,
       1,
       15,
       0,
@@ -1893,6 +1911,14 @@
       0,
       53,
       0,
+      "STRING"
+    ],
+    [
+      85,
+      1,
+      1,
+      53,
+      1,
       "STRING"
     ]
   ],

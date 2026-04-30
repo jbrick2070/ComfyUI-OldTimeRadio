@@ -46,6 +46,7 @@ Failure modes:
 from __future__ import annotations
 
 import logging
+import json
 import re
 import time
 from pathlib import Path
@@ -522,6 +523,108 @@ def _stamp_ledger_gate(
         log.warning("[ScriptCritic] ledger stamp failed (non-fatal): %s", exc)
 
 
+def _build_revision_prompt(
+    script: str,
+    issues: list[str],
+    genre_flavor: str,
+) -> str:
+    """Build the prompt that asks the LLM to rewrite the script in
+    light of the critic's findings.
+
+    Conservative shape: keep story / cast / plot / Audio Token
+    grammar / approximate word count. Only fix the items in `issues`.
+    Output is the revised script verbatim, no commentary.
+    """
+    genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+    issues_block = "\n".join(f"- {ln}" for ln in issues[:20])
+    return (
+        f"You are revising a 1940s {genre_human} radio drama script. "
+        f"The script has been scored against an anti-slop rubric and "
+        f"flagged with these specific issues:\n\n"
+        f"{issues_block}\n\n"
+        f"Revise the script to fix these issues. Hard constraints:\n\n"
+        f"- KEEP the same story, plot, cast list, and character names.\n"
+        f"- KEEP the Audio Token grammar: [VOICE: NAME] dialogue, "
+        f"[SFX: brief sound], [ENV: brief ambient], (beat) for pauses, "
+        f"scene headers as plain text or '---'.\n"
+        f"- KEEP the approximate word count (within +/-15%).\n"
+        f"- KEEP the news article spine (do NOT invent a different "
+        f"plot).\n"
+        f"- FIX every flagged issue above.\n\n"
+        f"Output ONLY the revised script. No preamble, no explanation, "
+        f"no markdown fences.\n\n"
+        f"ORIGINAL SCRIPT:\n---\n{script.strip()}\n---\n\n"
+        f"REVISED SCRIPT:\n"
+    )
+
+
+def _extract_revised_script(raw: str) -> str:
+    """Pull the revised script from the LLM response.
+
+    Handles common LLM verbosity: strips any leading "Revised script:"
+    label, leading/trailing markdown fences, and `---` framers. The
+    rest passes through as-is so the writer's parser can do its
+    canonical Audio Token parse.
+    """
+    text = (raw or "").strip()
+    # Strip a leading label some models add despite instructions.
+    text = re.sub(
+        r"^\s*(?:revised\s+script\s*[:\-]?|here\s+is\s+the\s+revised\s+script\s*[:\-]?)\s*\n",
+        "",
+        text,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    # Strip leading/trailing triple-backtick fences.
+    text = re.sub(r"^\s*```[a-zA-Z]*\s*\n", "", text)
+    text = re.sub(r"\n\s*```\s*$", "", text)
+    # Strip leading/trailing `---` framers if both present.
+    if text.startswith("---"):
+        text = text[3:].lstrip("\n")
+    if text.endswith("---"):
+        text = text[:-3].rstrip("\n")
+    return text.strip()
+
+
+def _stamp_revision_to_ledger(
+    before_chars: int,
+    after_chars: int,
+    elapsed_s: float,
+    verdict_before: str,
+    issues_addressed: int,
+    model_id: str,
+) -> None:
+    """Append a revision record to ledger.script_revisions[].
+
+    Best-effort: a failure here logs a warning but does not abort
+    the run. Mirrors the audio_gates[] / script_gates[] pattern.
+    """
+    try:
+        from .production_ledger import get_ledger
+        led = get_ledger()
+        led.data.setdefault("script_revisions", []).append({
+            "model_id":          model_id,
+            "verdict_before":    verdict_before,
+            "issues_addressed":  issues_addressed,
+            "before_chars":      before_chars,
+            "after_chars":       after_chars,
+            "delta_chars":       after_chars - before_chars,
+            "elapsed_s":         round(elapsed_s, 2),
+            "stamped_at":        time.strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+        led.save()
+        log.info(
+            "[ScriptCritic] stamped script_revisions[] entry "
+            "(%d -> %d chars, %.1fs)",
+            before_chars, after_chars, elapsed_s,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[ScriptCritic] revision ledger stamp failed (non-fatal): %s",
+            exc,
+        )
+
+
 class LLMScriptCritic:
     """Two-immune-system evaluation gate.
 
@@ -533,8 +636,8 @@ class LLMScriptCritic:
 
     CATEGORY = "OTR/v2/Quality"
     FUNCTION = "execute"
-    RETURN_TYPES = ("STRING", "STRING", "STRING")
-    RETURN_NAMES = ("script", "critic_report", "verdict")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("script", "script_json", "critic_report", "verdict")
     OUTPUT_NODE = True
 
     @classmethod
@@ -544,13 +647,35 @@ class LLMScriptCritic:
                 "script": ("STRING", {
                     "forceInput": True,
                     "tooltip": (
-                        "Draft script text. Usually wired from "
-                        "LLMScriptWriter's output, but any STRING "
-                        "source works."
+                        "Draft script text. Wired from LLMScriptWriter's "
+                        "script_text output."
+                    ),
+                }),
+                "script_json": ("STRING", {
+                    "forceInput": True,
+                    "tooltip": (
+                        "Parsed script JSON. Wired from LLMScriptWriter's "
+                        "script_json output. Passes through unchanged when "
+                        "the critic is observe-only; re-parsed from the "
+                        "revised script when revise_on_findings fires."
                     ),
                 }),
             },
             "optional": {
+                "revise_on_findings": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "When TRUE: on REVISE/REJECT verdicts, run a "
+                        "second LLM pass that rewrites the script in "
+                        "light of the rubric findings, then re-parses to "
+                        "script_json. Adds ~30-60s per run. When FALSE "
+                        "(default): the critic is OBSERVE-ONLY -- script "
+                        "+ script_json pass through unchanged regardless "
+                        "of verdict, findings still stamp the ledger. "
+                        "Flip ON once the critic's calibration is "
+                        "trusted."
+                    ),
+                }),
                 # genre_flavor, critic_model_id, optimization_profile
                 # are NOT widgets here. All three inherit from the
                 # ledger's gen_params_initial (which LLMScriptWriter
@@ -591,6 +716,8 @@ class LLMScriptCritic:
     def execute(
         self,
         script: str,
+        script_json: str = "",
+        revise_on_findings: bool = False,
         block_on_reject: bool = False,
         timeout_sec: int = 90,
     ):
@@ -666,7 +793,7 @@ class LLMScriptCritic:
                 elapsed_s=time.time() - t0,
                 skipped_reason="empty_script",
             )
-            return (script, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
+            return (script, script_json, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
 
         log.info(
             "[ScriptCritic] inherited from %s: model=%s genre=%s profile=%s",
@@ -720,7 +847,7 @@ class LLMScriptCritic:
                 f"SKIPPED ({type(exc).__name__}): script passes through "
                 f"unchanged. Run continues.\n"
             )
-            return (script, report, "PASS")
+            return (script, script_json, report, "PASS")
 
         elapsed = time.time() - t0
         parsed = _parse_critic_response(str(response or ""))
@@ -788,7 +915,100 @@ class LLMScriptCritic:
                 f"Top issues: {issues[:3]}"
             )
 
-        return (script, report, verdict)
+        # Revision pass: if revise_on_findings is True and the critic
+        # flagged the script (REVISE or REJECT), run a second LLM call
+        # to rewrite the script in light of the findings, then re-parse
+        # to keep script_json synchronised. Default OFF -- when OFF,
+        # both outputs pass through unchanged regardless of verdict.
+        revised_script = script
+        revised_json = script_json
+        revision_applied = False
+        if revise_on_findings and verdict in ("REVISE", "REJECT") and issues:
+            log.info(
+                "[ScriptCritic] revise_on_findings=ON, verdict=%s, %d issues -> "
+                "running revision LLM call",
+                verdict, len(issues),
+            )
+            try:
+                rev_prompt = _build_revision_prompt(
+                    script, issues, genre_flavor,
+                )
+
+                def _do_revision_call():
+                    return _SO._generate_with_llm(
+                        rev_prompt,
+                        model_id=critic_id,
+                        max_new_tokens=max(1024, len(script.split()) * 6),
+                        temperature=0.7,
+                        top_p=0.9,
+                        optimization_profile=optimization_profile,
+                    )
+
+                rev_t0 = time.time()
+                rev_response = _SO._run_with_timeout(
+                    _do_revision_call,
+                    timeout_sec=max(120, timeout_sec * 2),
+                    phase_label="ScriptRevision",
+                )
+                rev_elapsed = time.time() - rev_t0
+                rev_text = _extract_revised_script(str(rev_response or ""))
+                if rev_text and len(rev_text.strip()) >= max(100, int(len(script) * 0.3)):
+                    # Re-parse via the writer's parser to produce a
+                    # synchronised script_json. Transient instance --
+                    # _parse_script only reads class-level constants
+                    # (_GENDER_WORDS), no real writer state.
+                    revised_script = rev_text
+                    try:
+                        from .story_orchestrator import LLMScriptWriter as _LW
+                        parsed_lines = _LW()._parse_script(rev_text)
+                        revised_json = json.dumps(parsed_lines, indent=2)
+                    except Exception as parse_exc:  # noqa: BLE001
+                        log.warning(
+                            "[ScriptCritic] re-parse failed (%s) - keeping "
+                            "revised text but original script_json. "
+                            "Audio chain will use unrevised dialogue.",
+                            parse_exc,
+                        )
+                        revised_json = script_json
+                    revision_applied = True
+                    log.info(
+                        "[ScriptCritic] revision applied (%.1fs): "
+                        "%d -> %d chars",
+                        rev_elapsed, len(script), len(revised_script),
+                    )
+                    _stamp_revision_to_ledger(
+                        before_chars=len(script),
+                        after_chars=len(revised_script),
+                        elapsed_s=rev_elapsed,
+                        verdict_before=verdict,
+                        issues_addressed=len(issues),
+                        model_id=critic_model_id,
+                    )
+                else:
+                    log.warning(
+                        "[ScriptCritic] revision response too short or "
+                        "empty (got %d chars) - keeping original script",
+                        len(rev_text) if rev_text else 0,
+                    )
+            except Exception as rev_exc:  # noqa: BLE001
+                log.warning(
+                    "[ScriptCritic] revision call failed (%s) - keeping "
+                    "original script (run continues)",
+                    rev_exc,
+                )
+
+        if revision_applied:
+            report += (
+                f"\n### Revision\n\n"
+                f"- **applied**: yes\n"
+                f"- **before**: {len(script)} chars / "
+                f"{len(script.split())} words\n"
+                f"- **after**:  {len(revised_script)} chars / "
+                f"{len(revised_script.split())} words\n"
+                f"- **issues addressed**: {len(issues)}\n"
+            )
+
+        return (revised_script, revised_json, report, verdict)
 
 
 __all__ = ["LLMScriptCritic"]
