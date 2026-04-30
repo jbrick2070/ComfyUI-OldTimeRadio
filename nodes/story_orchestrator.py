@@ -1305,11 +1305,17 @@ def _llm_rank_news_candidates(
         # we added in BUG-LOCAL-111 (commit 27e54e9) also fires here so
         # the orphan worker doesn't poison the next phase's CUDA state.
         def _do_rank_call():
+            # 2026-04-29 fix: transformers rejects temperature=0.0 with
+            # "must be strictly positive". For greedy-deterministic
+            # ranking, use a tiny positive (0.05) -- effectively argmax
+            # but passes the validator. The ranking output is just a
+            # comma-separated list of indices so any low-temp value
+            # produces stable picks.
             return _generate_with_llm(
                 prompt,
                 model_id=model_id,
                 max_new_tokens=64,
-                temperature=0.0,
+                temperature=0.05,
                 top_p=1.0,
                 optimization_profile=optimization_profile,
             )
@@ -1581,6 +1587,31 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
     except Exception as _hist_exc:  # noqa: BLE001
         log.warning("[NewsFetcher] history record failed (non-fatal): %s",
                     _hist_exc)
+
+    # 2026-04-29: stamp the chosen article's identity into the live
+    # ledger's meta.news_seed for per-episode auditability. Anyone
+    # reading the ledger now knows EXACTLY which article seeded the
+    # script, where it came from, and how big the body was. Pairs with
+    # the existing per-episode ledger fields (cast, lines, clips) so a
+    # render's full origin chain is on disk in one file.
+    try:
+        from .production_ledger import get_ledger as _get_led
+        _led = _get_led()
+        _led.data.setdefault("meta", {})["news_seed"] = {
+            "headline":     str(chosen.get("headline", ""))[:240],
+            "source":       str(chosen.get("source", ""))[:120],
+            "url":          str(chosen.get("link", "")),
+            "date":         str(chosen.get("date", "")),
+            "body_chars":   len(chosen.get("full_text", "") or ""),
+            "genre_flavor": str(genre_flavor),
+            "selected_at":  datetime.now().isoformat(timespec="seconds"),
+        }
+        _led.save()
+        log.info("[NewsFetcher] stamped meta.news_seed in ledger: %s",
+                 (chosen.get("headline") or "")[:60])
+    except Exception as _seed_exc:  # noqa: BLE001
+        log.warning("[NewsFetcher] news_seed ledger stamp failed (non-fatal): %s",
+                    _seed_exc)
 
     return [chosen]
 
