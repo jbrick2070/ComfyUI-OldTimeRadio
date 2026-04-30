@@ -113,3 +113,33 @@ outputs/
 nodes/vendor/
 # Reference clones staged in /tmp during license-audit sessions
 /tmp/otr_vendor_stage/
+
+# --- 2026-04-30 AI-agent exhaust hygiene ---
+# Recurring tail/scan helpers and their captured output, produced by
+# the AI coding agent's PowerShell tailers.  These were polluting
+# git status on every session (see 2026-04-30 round-robin QA report).
+# Pattern-level ignore so they stop reappearing instead of one-shot
+# cleanup.
+.claude_tail_*
+.tailer_*
+.otr_tailer_*
+.otr_*.tmp.*
+_tail_*.ps1
+_scan_*.ps1
+_anomaly_scan.ps1
+_episode_scan.ps1
+_ledger_inspect.ps1
+_progress.ps1
+# Pytest output dumps
+pytest_*.txt
+# Backup workflow files (use git history instead)
+workflows/*.json.bak
+
+# --- 2026-04-30 QA tooling exemptions ---
+# The blanket `scripts/_*.py` ignore above (line ~71) hid the
+# consultation clients used by the round-robin pattern.  Force them
+# back in by exception so future variants don't get silently dropped.
+!scripts/_consult_openai.py
+!scripts/_consult_nvidia.py
+!scripts/_consult_round_robin.py
+
