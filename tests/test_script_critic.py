@@ -1,0 +1,305 @@
+"""Unit tests for nodes/script_critic.py.
+
+Pure-Python coverage (no LLM load) for the parser, prompt builder,
+ledger stamper, and canon updater. The critic's actual LLM call is
+exercised via integration runs, not pytest.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+# Make the OTR root importable so we can import nodes.script_critic
+# without invoking ComfyUI's plugin loader.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+
+@pytest.fixture(scope="module")
+def critic_module():
+    """Import the module under test."""
+    # Module path bypasses the package-level __init__ to avoid heavy
+    # imports the critic tests don't need.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "script_critic_under_test",
+        _REPO_ROOT / "nodes" / "script_critic.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# ---------------------------------------------------------------------------
+# _parse_critic_response
+# ---------------------------------------------------------------------------
+
+class TestParseCriticResponse:
+
+    def test_clean_pass(self, critic_module):
+        raw = (
+            "SCORE: 92\n"
+            "VERDICT: PASS\n"
+            "ISSUES:\n"
+            "- none\n"
+        )
+        out = critic_module._parse_critic_response(raw)
+        assert out["score"] == 92
+        assert out["verdict"] == "PASS"
+        assert out["issues"] == []
+
+    def test_revise_with_issues(self, critic_module):
+        raw = (
+            "SCORE: 72\n"
+            "VERDICT: REVISE\n"
+            "ISSUES:\n"
+            "- voice: characters use the same vocabulary register\n"
+            "- period: 'okay' used in 1940s dialogue\n"
+            "- transitions: 'I'll explain on the way' bridges scene 2 to 3\n"
+        )
+        out = critic_module._parse_critic_response(raw)
+        assert out["score"] == 72
+        assert out["verdict"] == "REVISE"
+        assert len(out["issues"]) == 3
+        assert "voice" in out["issues"][0]
+        assert "period" in out["issues"][1]
+
+    def test_reject(self, critic_module):
+        raw = (
+            "SCORE: 35\n"
+            "VERDICT: REJECT\n"
+            "ISSUES:\n"
+            "- structure: no character dialogue, narration only\n"
+        )
+        out = critic_module._parse_critic_response(raw)
+        assert out["score"] == 35
+        assert out["verdict"] == "REJECT"
+
+    def test_score_only_derives_verdict_pass(self, critic_module):
+        raw = "SCORE: 90\nISSUES:\n- none"
+        out = critic_module._parse_critic_response(raw)
+        assert out["score"] == 90
+        assert out["verdict"] == "PASS"
+
+    def test_score_only_derives_verdict_revise(self, critic_module):
+        raw = "SCORE: 70"
+        out = critic_module._parse_critic_response(raw)
+        assert out["verdict"] == "REVISE"
+
+    def test_score_only_derives_verdict_reject(self, critic_module):
+        raw = "SCORE: 40"
+        out = critic_module._parse_critic_response(raw)
+        assert out["verdict"] == "REJECT"
+
+    def test_no_parse_returns_advisory_pass(self, critic_module):
+        out = critic_module._parse_critic_response(
+            "I'm sorry, I can't comply with this request."
+        )
+        # Advisory fallback: score=None, verdict=PASS so the run continues.
+        assert out["score"] is None
+        assert out["verdict"] == "PASS"
+        assert out["issues"] == []
+
+    def test_empty_response_returns_advisory_pass(self, critic_module):
+        out = critic_module._parse_critic_response("")
+        assert out["score"] is None
+        assert out["verdict"] == "PASS"
+
+    def test_score_clamped_to_valid_range(self, critic_module):
+        raw = "SCORE: 999\nVERDICT: PASS"
+        out = critic_module._parse_critic_response(raw)
+        # 999 is out of 0-100; parser rejects it -> score stays None
+        assert out["score"] is None
+
+    def test_issues_capped(self, critic_module):
+        many = "ISSUES:\n" + "\n".join([f"- finding {i}" for i in range(30)])
+        out = critic_module._parse_critic_response("SCORE: 50\n" + many)
+        # Cap is 12 in the parser
+        assert len(out["issues"]) <= 12
+
+    def test_long_issue_truncated(self, critic_module):
+        long_text = "x" * 500
+        raw = f"SCORE: 80\nVERDICT: PASS\nISSUES:\n- voice: {long_text}"
+        out = critic_module._parse_critic_response(raw)
+        assert len(out["issues"]) == 1
+        # Cap at 280 chars per the parser
+        assert len(out["issues"][0]) <= 280
+
+    def test_bullet_styles_accepted(self, critic_module):
+        # Mix of dash, asterisk, bullet
+        raw = (
+            "SCORE: 80\nVERDICT: PASS\nISSUES:\n"
+            "- a\n"
+            "* b\n"
+            "• c\n"
+        )
+        out = critic_module._parse_critic_response(raw)
+        assert len(out["issues"]) == 3
+
+    def test_case_insensitive_field_names(self, critic_module):
+        raw = "score: 90\nverdict: pass\nissues:\n- none"
+        out = critic_module._parse_critic_response(raw)
+        assert out["score"] == 90
+        assert out["verdict"] == "PASS"
+
+
+# ---------------------------------------------------------------------------
+# _build_critic_prompt
+# ---------------------------------------------------------------------------
+
+class TestBuildCriticPrompt:
+
+    def test_includes_script_and_genre(self, critic_module):
+        prompt = critic_module._build_critic_prompt(
+            script_text="ANNOUNCER: Hello.",
+            genre_flavor="hard_sci_fi",
+            anti_slop="",
+        )
+        assert "ANNOUNCER: Hello." in prompt
+        assert "hard sci fi" in prompt  # genre_flavor with underscore replaced
+
+    def test_uses_anti_slop_when_provided(self, critic_module):
+        prompt = critic_module._build_critic_prompt(
+            script_text="x",
+            genre_flavor="space_opera",
+            anti_slop="MY CUSTOM RUBRIC HERE",
+        )
+        assert "MY CUSTOM RUBRIC HERE" in prompt
+        # built-in fallback should NOT be present when external anti-slop given
+        assert "GENERAL RUBRIC" not in prompt
+
+    def test_uses_builtin_when_anti_slop_blank(self, critic_module):
+        prompt = critic_module._build_critic_prompt(
+            script_text="x",
+            genre_flavor="dystopian",
+            anti_slop="",
+        )
+        assert "GENERAL RUBRIC" in prompt
+
+    def test_explicit_format_request(self, critic_module):
+        prompt = critic_module._build_critic_prompt("x", "x", "")
+        assert "SCORE:" in prompt
+        assert "VERDICT:" in prompt
+        assert "ISSUES:" in prompt
+        # Stopping clause from the autonovel pattern
+        assert "don't have to find defects" in prompt.lower()
+
+
+# ---------------------------------------------------------------------------
+# _canon_update
+# ---------------------------------------------------------------------------
+
+class TestCanonUpdate:
+
+    def _seed_canon(self, tmp_path: Path) -> Path:
+        canon = tmp_path / "OTR-CANON.md"
+        canon.write_text(
+            "# OTR Canon\n\n"
+            "## Tonal canon\n\nfoo\n\n"
+            "## Used premises (auto-updated)\n\n"
+            "- _no entries yet — first canonical episode pending_\n\n"
+            "## Used twists (auto-updated)\n\n"
+            "- _no entries yet_\n\n"
+            "## Used motifs (auto-updated)\n\n"
+            "- _no entries yet_\n",
+            encoding="utf-8",
+        )
+        return canon
+
+    def test_no_op_when_all_blank(self, critic_module, tmp_path):
+        canon = self._seed_canon(tmp_path)
+        before = canon.read_text(encoding="utf-8")
+        result = critic_module._canon_update(canon_path=canon)
+        assert result is False
+        assert canon.read_text(encoding="utf-8") == before
+
+    def test_appends_premise(self, critic_module, tmp_path):
+        canon = self._seed_canon(tmp_path)
+        result = critic_module._canon_update(
+            canon_path=canon,
+            premise="Sickle cell gene therapy goes wrong on the moon",
+        )
+        assert result is True
+        text = canon.read_text(encoding="utf-8")
+        assert "Sickle cell gene therapy goes wrong on the moon" in text
+        # Placeholder removed
+        assert "_no entries yet — first canonical episode pending_" not in text
+
+    def test_skips_duplicate(self, critic_module, tmp_path):
+        canon = self._seed_canon(tmp_path)
+        critic_module._canon_update(canon_path=canon, premise="Alpha")
+        critic_module._canon_update(canon_path=canon, premise="alpha")  # dupe
+        text = canon.read_text(encoding="utf-8")
+        # Should appear exactly once in the premise section
+        assert text.count("Alpha") + text.count("alpha") == 1
+
+    def test_missing_canon_file_no_throw(self, critic_module, tmp_path):
+        missing = tmp_path / "does-not-exist.md"
+        result = critic_module._canon_update(canon_path=missing, premise="x")
+        assert result is False  # logged warning, no exception
+
+    def test_cap_per_section(self, critic_module, tmp_path):
+        canon = self._seed_canon(tmp_path)
+        # Append 30 entries with cap=5
+        for i in range(30):
+            critic_module._canon_update(
+                canon_path=canon,
+                premise=f"Premise number {i:02d}",
+                cap_per_section=5,
+            )
+        text = canon.read_text(encoding="utf-8")
+        # Find the premise section and count its entries
+        section = text.split("## Used premises (auto-updated)")[1].split("## ")[0]
+        entries = [
+            ln for ln in section.splitlines()
+            if ln.strip().startswith("- ") and "_no entries" not in ln
+        ]
+        assert len(entries) == 5
+        # Should be the LAST 5
+        assert "Premise number 25" in section
+        assert "Premise number 29" in section
+        assert "Premise number 00" not in section
+
+
+# ---------------------------------------------------------------------------
+# Node class structure
+# ---------------------------------------------------------------------------
+
+class TestNodeStructure:
+
+    def test_node_class_exists(self, critic_module):
+        assert hasattr(critic_module, "LLMScriptCritic")
+
+    def test_required_class_attrs(self, critic_module):
+        cls = critic_module.LLMScriptCritic
+        assert cls.CATEGORY == "OTR/v2/Quality"
+        assert cls.FUNCTION == "execute"
+        assert cls.RETURN_TYPES == ("STRING", "STRING", "STRING")
+        assert cls.RETURN_NAMES == ("script", "critic_report", "verdict")
+        assert cls.OUTPUT_NODE is True
+
+    def test_input_types_includes_required_widgets(self, critic_module):
+        spec = critic_module.LLMScriptCritic.INPUT_TYPES()
+        assert "required" in spec
+        for k in ("script", "genre_flavor", "critic_model_id"):
+            assert k in spec["required"], f"missing required widget: {k}"
+        assert "block_on_reject" in spec["optional"]
+        assert "timeout_sec" in spec["optional"]
+
+    def test_default_critic_model_is_separate_from_writer(self, critic_module):
+        spec = critic_module.LLMScriptCritic.INPUT_TYPES()
+        default = spec["required"]["critic_model_id"][1]["default"]
+        # MUST not be the writer's default (Mistral-Nemo)
+        assert "Mistral-Nemo" not in default
+        # Default should be the small fast critic
+        assert "gemma-4-E4B" in default
+
+    def test_block_on_reject_defaults_off(self, critic_module):
+        spec = critic_module.LLMScriptCritic.INPUT_TYPES()
+        default = spec["optional"]["block_on_reject"][1]["default"]
+        assert default is False, "advisory-by-default per design"

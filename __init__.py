@@ -108,6 +108,7 @@ _NODE_MODULES = {
     "OTR_MusicGenTheme":      (".nodes.musicgen_theme",        "MusicGenTheme",           " MusicGen Theme"),
     "OTR_VRAMGuardian":       (".nodes.vram_guardian",          "VRAMGuardian",            " VRAM Guardian"),
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
+    "OTR_LLMScriptCritic":    (".nodes.script_critic",          "LLMScriptCritic",         " LLM Script Critic (gate)"),
     # v2.0 Visual Generation Trio
     # Sidecar-isolated visual (stills/portraits/motion) generation from
     # OTR Director output. Audio path NEVER touched. Falls back to
