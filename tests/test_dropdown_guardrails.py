@@ -298,13 +298,23 @@ class TestGuardrails:
         # Should clamp to 4 first (<=5 min), then to 3 (<=3 min)
         assert any("Clamped num_characters to 3" in l for l in logs)
 
-    def test_too_few_chars_long_episode(self, writer):
-        """2 characters + long (7-8 acts) -> clamped to 3."""
+    def test_too_few_chars_long_episode_respects_user(self, writer):
+        """2 characters + long (7-8 acts) -> NO clamp (user-explicit override).
+
+        Per ROADMAP 2026-04-29: monologue mode added (num_characters min 2->1).
+        Orchestrator now respects user-explicit 1 or 2 on long episodes
+        (1=monologue, 2=duo are deliberate narrative choices) instead of
+        upclamping to 3.  Regression guard against accidentally re-introducing
+        the clamp.
+        """
         logs = _run_preflight(writer,
                               target_words=2100,
                               target_length="long (7-8 acts)",
                               num_characters=2)
-        assert any("Clamped num_characters to 3" in l for l in logs)
+        assert not any("Clamped num_characters" in l for l in logs), \
+            f"Expected NO clamp on user-explicit num_characters=2, got: {logs}"
+        assert any("respecting user-explicit num_characters=2" in l for l in logs), \
+            f"Expected explicit respect log, got: {logs}"
 
     def test_obsidian_caps_runtime(self, writer):
         """Obsidian + 20 min -> clamped to 10 min."""
@@ -405,7 +415,12 @@ class TestNoDeadOptions:
         tooltip = _OPTIONAL["target_length"][1].get("tooltip", "")
         assert "DEPRECATED" not in tooltip, "target_length should NOT be deprecated"
 
-    def test_minimum_target_words_is_350(self):
-        """target_words min must be 350."""
+    def test_minimum_target_words_is_100(self):
+        """target_words min must be 100 (smoke step-down floor).
+
+        Per ROADMAP 2026-04-29: target_words widget min was lowered 350 -> 100
+        to support the new 'smoke (1 act)' tier.  Floor below 100 still rejected
+        (smoke tier needs enough words to exercise the full pipeline).
+        """
         meta = _REQUIRED["target_words"][1]
-        assert meta["min"] == 350, f"target_words min should be 350, got {meta['min']}"
+        assert meta["min"] == 100, f"target_words min should be 100, got {meta['min']}"
