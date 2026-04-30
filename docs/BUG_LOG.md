@@ -40,6 +40,25 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-118: BatchHumoRender ledger lookup fails when SignalLostVideo's title sanitizer doubles an underscore that the Ledger renamer left single [FIXED in commit pending]
+
+- **Date:** 2026-04-30 08:51 | **Phase:** 0-3 | **Bible candidate:** yes
+- **Symptom:** Episode `signal_lost_scientists_restore_memory_by_blocking_a__20260430_084741` (note: "_a__20260430") completed audio + video successfully through SignalLostVideo. BatchHumoRender then tried to load the ledger and crashed:
+    ```
+    RuntimeError: BatchHumoRender: derived ledger from .mp4 not found:
+      ...signal_lost_scientists_restore_memory_by_blocking_a__20260430_084741_ledger.json
+    ```
+  The actual ledger on disk was named `..._a_20260430_084741_ledger.json` (SINGLE underscore between "a" and "20260430"), but BatchHumoRender derived the path from `final_video_path` which had `..._a__20260430...` (DOUBLE).
+- **Cause:** SignalLostVideo's title sanitizer collapses certain characters into a different underscore sequence than the Ledger.rename_episode joiner. Title fallback to `news_seed.headline` produced "Scientists restore memory by blocking a [tau-tangle protein]" -> sanitized to a stem ending in "..._blocking_a" -> SignalLostVideo joined with timestamp using "_" while the ledger renamer used "__". The two filename conventions diverged.
+- **Fix:** in `nodes/batch_humo_render.py::_load_ledger_with_path`, when the .mp4-derived path isn't found, try a fallback chain:
+  (1) collapsed-underscore variant of the stem (`__` -> `_`)
+  (2) directory scan for newest `*_ledger.json` whose normalized episode_id substring-matches the .mp4 stem (capped at 1-hour age so we don't bind to stale ledgers)
+  (3) raise the original error only if all three fail
+- **Verify:** next run with the same title-fallback path should produce a `[BatchHumoRender] BUG-LOCAL-118 underscore-mismatch fallback` WARNING and continue. Long-term: align SignalLostVideo + Ledger renamer on a single sanitization rule (deferred).
+- **Tags:** batch-humo-render, ledger-lookup, signal-lost-video, title-fallback, BUG-115-cascade, soak-tailer, auto-logged
+
+---
+
 ### BUG-LOCAL-117: SceneSequencer ran successfully but did NOT write back lines[].start_s / dur_s / bark_wav_path to ledger; downstream consumers see nulls [FIXED in commit pending]
 
 - **Root cause:** the Reviser rewrites the script TEXT but doesn't update `ledger.lines[].text`. SceneSequencer matches dialogue_positions against `ledger.lines[].text` -- after revision, the texts diverge so NO matches succeed and the per-line write-back loop falls through silently.

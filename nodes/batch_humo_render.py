@@ -1555,14 +1555,78 @@ class BatchHumoRender:
 
         p = Path(s)
         # .mp4 path -> swap suffix to _ledger.json (SignalLostVideo
-        # convention)
+        # convention). BUG-LOCAL-118 hardening 2026-04-30: the
+        # SignalLostVideo title sanitizer and the Ledger.rename_episode
+        # joiner sometimes disagree on underscore-collapse rules
+        # (e.g. .mp4 stem "..._a__20260430..." vs ledger
+        # "..._a_20260430..."), so the strict stem-match lookup
+        # raised a fatal error even though the right ledger was on
+        # disk a few characters away. New logic tries a fallback chain:
+        # (1) exact match, (2) collapsed-underscore variant,
+        # (3) scan the directory for the newest ledger whose
+        # episode_id appears in the .mp4 stem or vice versa.
         if p.suffix.lower() == ".mp4":
-            ledger_p = p.with_suffix("").parent / f"{p.stem}_ledger.json"
+            audio_dir = p.parent
+            stem = p.stem
+
+            # 1. Direct match
+            ledger_p = audio_dir / f"{stem}_ledger.json"
             if ledger_p.exists():
                 with open(ledger_p, "r", encoding="utf-8") as f:
                     return json.load(f), ledger_p
+
+            # 2. Underscore-collapse variant (a__20260430 -> a_20260430).
+            collapsed = stem
+            while "__" in collapsed:
+                collapsed = collapsed.replace("__", "_")
+            if collapsed != stem:
+                cand = audio_dir / f"{collapsed}_ledger.json"
+                if cand.exists():
+                    log.warning(
+                        "[BatchHumoRender] BUG-LOCAL-118 underscore-mismatch "
+                        "fallback: .mp4 stem %r had double underscores; "
+                        "loaded matching ledger %r instead.",
+                        stem, cand.name,
+                    )
+                    with open(cand, "r", encoding="utf-8") as f:
+                        return json.load(f), cand
+
+            # 3. Scan the directory for the newest ledger whose
+            # episode_id is a substring of (or contains) the .mp4 stem.
+            # Conservative: only accept a candidate that's < 1 hour old
+            # so we don't bind to a stale ledger from yesterday.
+            try:
+                cands = list(audio_dir.glob("*_ledger.json"))
+                cands.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                stem_norm = collapsed
+                for cand in cands[:10]:
+                    cand_eid = cand.stem
+                    if cand_eid.endswith("_ledger"):
+                        cand_eid = cand_eid[: -len("_ledger")]
+                    cand_norm = cand_eid
+                    while "__" in cand_norm:
+                        cand_norm = cand_norm.replace("__", "_")
+                    if cand_norm == stem_norm or cand_norm in stem_norm or stem_norm in cand_norm:
+                        age_s = time.time() - cand.stat().st_mtime
+                        if age_s > 3600:
+                            continue
+                        log.warning(
+                            "[BatchHumoRender] BUG-LOCAL-118 fuzzy fallback: "
+                            "binding to %r (age %.0fs) for .mp4 stem %r.",
+                            cand.name, age_s, stem,
+                        )
+                        with open(cand, "r", encoding="utf-8") as f:
+                            return json.load(f), cand
+            except Exception as scan_exc:
+                log.warning(
+                    "[BatchHumoRender] BUG-LOCAL-118 directory-scan fallback "
+                    "failed (%s) - falling through to error.", scan_exc,
+                )
+
             raise RuntimeError(
-                f"BatchHumoRender: derived ledger from .mp4 not found: {ledger_p}"
+                f"BatchHumoRender: derived ledger from .mp4 not found: "
+                f"{ledger_p} (also tried collapsed-underscore variant + "
+                f"directory scan in {audio_dir})"
             )
 
         # Plain ledger.json path
