@@ -1546,7 +1546,6 @@
       "title": "Script Critic (gate)",
       "widgets_values": [
         false,
-        "Standard",
         90
       ]
     }

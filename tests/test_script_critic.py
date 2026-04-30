@@ -513,21 +513,23 @@ class TestNodeStructure:
         assert "block_on_reject" in spec["optional"]
         assert "timeout_sec" in spec["optional"]
 
-    def test_critic_model_and_genre_are_inherited_not_widgets(self, critic_module):
-        """Both genre_flavor and critic_model_id must inherit from
-        LLMScriptWriter via the ledger, not be duplicated as critic
-        widgets. This is the UI design constraint Jeffrey set: one
-        place to configure each setting."""
+    def test_writer_settings_are_inherited_not_widgets(self, critic_module):
+        """genre_flavor, critic_model_id, and optimization_profile must
+        inherit from LLMScriptWriter via the ledger, not be duplicated
+        as critic widgets. UI design constraint Jeffrey set: one place
+        to configure each setting."""
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
         all_keys = list(spec.get("required", {}).keys()) + list(spec.get("optional", {}).keys())
         assert "genre_flavor" not in all_keys, (
-            "genre_flavor must inherit from ledger.gen_params_initial, "
-            "not be a critic widget"
+            "genre_flavor must inherit from ledger.gen_params_initial"
         )
         assert "critic_model_id" not in all_keys, (
             "critic_model_id must inherit from "
-            "ledger.gen_params_initial.cleanup_model_id, "
-            "not be a critic widget"
+            "ledger.gen_params_initial.cleanup_model_id"
+        )
+        assert "optimization_profile" not in all_keys, (
+            "optimization_profile must inherit from "
+            "ledger.gen_params_initial.optimization_profile"
         )
 
     def test_block_on_reject_defaults_off(self, critic_module):

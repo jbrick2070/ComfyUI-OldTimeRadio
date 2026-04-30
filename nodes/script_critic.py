@@ -551,17 +551,19 @@ class LLMScriptCritic:
                 }),
             },
             "optional": {
-                # genre_flavor and critic_model_id are NOT widgets here.
-                # They're inherited from the ledger's gen_params_initial
-                # (which LLMScriptWriter stamps at workflow entry):
-                #   - genre_flavor   <- gen_params_initial.genre_flavor
-                #   - critic_model_id <- gen_params_initial.cleanup_model_id
+                # genre_flavor, critic_model_id, optimization_profile
+                # are NOT widgets here. All three inherit from the
+                # ledger's gen_params_initial (which LLMScriptWriter
+                # stamps at workflow entry):
+                #   - genre_flavor         <- gen_params_initial.genre_flavor
+                #   - critic_model_id      <- gen_params_initial.cleanup_model_id
                 #     (or model_id as fallback). The cleanup model is the
                 #     LLMScriptWriter's "second LLM" widget so wiring the
                 #     critic to it lets one place control which model
                 #     judges the script. Set the writer's cleanup model
                 #     to a different family than its story model to keep
                 #     the two-immune-system property.
+                #   - optimization_profile <- gen_params_initial.optimization_profile
                 "block_on_reject": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
@@ -573,13 +575,6 @@ class LLMScriptCritic:
                         "critic's calibration is validated across runs."
                     ),
                 }),
-                "optimization_profile": (
-                    ["Standard", "Pro (Ultra Quality)", "Obsidian (UNSTABLE/4GB)"],
-                    {"default": "Standard",
-                     "tooltip": "Same widget as LLMScriptWriter -- "
-                                "controls 4-bit NF4 vs full precision "
-                                "for the critic load."},
-                ),
                 "timeout_sec": ("INT", {
                     "default": 90, "min": 30, "max": 600, "step": 10,
                     "tooltip": (
@@ -597,7 +592,6 @@ class LLMScriptCritic:
         self,
         script: str,
         block_on_reject: bool = False,
-        optimization_profile: str = "Standard",
         timeout_sec: int = 90,
     ):
         # Late imports so the node loads cleanly even if the orchestrator
@@ -624,6 +618,7 @@ class LLMScriptCritic:
         rubric_params: dict = {}
         inherited_genre = "hard sci fi"
         inherited_model = "google/gemma-4-E4B-it"  # last-resort fallback
+        inherited_profile = "Standard"
         inherited_source = "fallback (no ledger params)"
         try:
             from .production_ledger import get_ledger
@@ -644,6 +639,13 @@ class LLMScriptCritic:
             elif wm:
                 inherited_model = str(wm)
                 inherited_source = "ledger.model_id (cleanup was auto)"
+            # optimization_profile inherits straight from the writer's
+            # widget (Pro / Standard / Obsidian). Critic uses the same
+            # 4-bit NF4 vs full-precision setting the rest of the run
+            # already chose.
+            ip = rubric_params.get("optimization_profile")
+            if ip:
+                inherited_profile = str(ip)
         except Exception as exc:  # noqa: BLE001
             log.warning(
                 "[ScriptCritic] failed to read gen_params_initial from "
@@ -652,6 +654,7 @@ class LLMScriptCritic:
 
         critic_model_id = inherited_model
         genre_flavor = inherited_genre
+        optimization_profile = inherited_profile
 
         if not script.strip():
             log.warning("[ScriptCritic] empty script - SKIPPED")
@@ -666,8 +669,8 @@ class LLMScriptCritic:
             return (script, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
 
         log.info(
-            "[ScriptCritic] inherited from %s: model=%s genre=%s",
-            inherited_source, critic_model_id, genre_flavor,
+            "[ScriptCritic] inherited from %s: model=%s genre=%s profile=%s",
+            inherited_source, critic_model_id, genre_flavor, optimization_profile,
         )
 
         anti_slop = _load_anti_slop_rubric(rubric_params)
