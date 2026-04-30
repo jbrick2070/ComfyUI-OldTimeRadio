@@ -1293,13 +1293,30 @@ def _llm_rank_news_candidates(
             f"Headlines:\n{headline_list}\n\n"
             f"Top {top_k} indices:"
         )
-        response = _generate_with_llm(
-            prompt,
-            model_id=model_id,
-            max_new_tokens=64,
-            temperature=0.0,
-            top_p=1.0,
-            optimization_profile=optimization_profile,
+        # 2026-04-29: 65-second wall-clock budget for the curation LLM call
+        # (Jeffrey requested: "give it 65 secs to do the search"). The
+        # ranker is a short-output call (~64 tokens of indices) so under
+        # normal conditions it returns in 5-15 sec. The 65s budget is a
+        # ceiling, not a target -- it bounds the worst-case where prompt
+        # processing on a cold cache or a 12B model takes longer than
+        # expected. On timeout, _run_with_timeout raises _LLMTimeout and
+        # the outer except block below falls back to shuffle order, so
+        # the run continues without LLM ranking. The cache-invalidation
+        # we added in BUG-LOCAL-111 (commit 27e54e9) also fires here so
+        # the orphan worker doesn't poison the next phase's CUDA state.
+        def _do_rank_call():
+            return _generate_with_llm(
+                prompt,
+                model_id=model_id,
+                max_new_tokens=64,
+                temperature=0.0,
+                top_p=1.0,
+                optimization_profile=optimization_profile,
+            )
+        response = _run_with_timeout(
+            _do_rank_call,
+            timeout_sec=65,
+            phase_label="NewsCuration",
         )
         # Parse: extract integers, dedupe, cap at top_k
         seen = set()
