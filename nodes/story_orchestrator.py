@@ -217,9 +217,56 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
             log.warning("[Timeout] %s phase exceeded %ds - abandoning and falling back",
                         phase_label, timeout_sec)
             vram_snapshot(f"{phase_label}_timeout")
+
+            # 2026-04-29 BUG-LOCAL-111 fix: timeout-recovery cache invalidation.
+            #
+            # When FuturesTimeout fires, the worker thread is still running an
+            # LLM forward pass on GPU. Python cannot safely terminate threads,
+            # and `executor.shutdown(wait=False)` below does NOT kill the
+            # worker -- it keeps churning until its forward pass completes
+            # naturally (could be 30-60+ more seconds for a 16K prompt).
+            # Result: the GPU has in-flight kernels the main thread doesn't
+            # control. The cached model instance in _LLM_CACHE thinks it's
+            # idle but the orphan is still mutating its tensors. The NEXT
+            # phase that calls model.cpu() / _load_llm() / any CUDA op
+            # collides with the orphan's stale ops and Python aborts with
+            # `cudaErrorIllegalAddress`.
+            #
+            # Fix: invalidate _LLM_CACHE so the NEXT _load_llm() call forces
+            # a fresh load from disk. The orphan worker's tensors get
+            # garbage-collected naturally once its frame returns; we just
+            # don't try to reuse them. Cost: ~10-15s extra reload time on
+            # the next phase. Benefit: no crash, run continues.
+            try:
+                global _LLM_CACHE
+                _LLM_CACHE["model"]     = None
+                _LLM_CACHE["tokenizer"] = None
+                _LLM_CACHE["model_id"]  = None
+                _LLM_CACHE["device"]    = None
+                _LLM_CACHE["context_cap"] = None
+                # Free our REFERENCES to the cached model. Python's gc will
+                # release the actual VRAM when the orphan worker also drops
+                # its reference. We don't try to forcibly empty CUDA cache
+                # here -- the orphan is still using it and an empty_cache
+                # call from the main thread would race the kernel writes.
+                _runtime_log(
+                    f"TIMEOUT_RECOVERY: invalidated _LLM_CACHE so next "
+                    f"phase forces a fresh load (avoids "
+                    f"cudaErrorIllegalAddress from orphan {phase_label} "
+                    f"worker still on GPU)"
+                )
+            except Exception as _recovery_exc:  # noqa: BLE001
+                log.warning(
+                    "[Timeout] cache invalidation failed (next phase may "
+                    "still crash on stale CUDA state): %s",
+                    _recovery_exc,
+                )
+
             raise _LLMTimeout(f"{phase_label} exceeded {timeout_sec}s")
     finally:
         # Don't wait for the orphaned worker - let it drain in the background.
+        # Combined with the cache invalidation above, the orphan completes
+        # in its own time WITHOUT the next phase trying to reuse its tensors.
         executor.shutdown(wait=False)
 
 
