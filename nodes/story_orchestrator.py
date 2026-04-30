@@ -3296,16 +3296,25 @@ _CANON_PATH = os.path.join(
 )
 
 
-def _load_canon_for_writer(skip: bool = False) -> str:
+def _load_canon_for_writer(skip: bool = False, compact: bool = False) -> str:
     """Build a writer-prompt canon block from OTR-CANON.md.
 
     Pulls the writer-relevant sections (Tonal canon, Period rules,
     Recurring motifs, Used premises/twists/motifs) and wraps them in
     an XML-flavored block prepended to SCAFFOLDING_PREAMBLE. Returns
     the empty string on:
-      - skip=True (small-model collapse guard)
+      - skip=True (legacy small-model collapse guard, kept for back-compat)
       - missing file (logs warning, never fatal)
       - parse error (logs warning, never fatal)
+
+    `compact=True` returns a shrunk-down period+tonal anchor that
+    still fits comfortably in a small-model's context (Gemma-4 E2B,
+    ~2B effective). Drops the "Used premises / twists / motifs"
+    sections (they exist for de-duplication, not period anchoring)
+    and the prose-heavy "Tonal canon" / "Recurring motifs" sections.
+    Keeps only "Period rules" -- the part that actually moves the
+    needle on small-model anachronism leakage (BUG-LOCAL-114-class
+    issues caught by the critic's A15-A19 rules).
 
     The returned block has NO `{placeholders}` so `.format()` on the
     full system prompt won't choke on canon content.
@@ -3323,14 +3332,20 @@ def _load_canon_for_writer(skip: bool = False) -> str:
         return ""
     # Pull only the sections the writer needs. Order matters (rules
     # before "do not repeat" list).
-    keep_headers = (
-        "## Tonal canon",
-        "## Period rules",
-        "## Recurring motifs",
-        "## Used premises (auto-updated)",
-        "## Used twists (auto-updated)",
-        "## Used motifs (auto-updated)",
-    )
+    # Compact mode keeps ONLY the section that gives small-model
+    # writers a real period anchor (Gemma-4 E2B-class). Larger models
+    # get the full canon including motifs + de-dup hints.
+    if compact:
+        keep_headers = ("## Period rules",)
+    else:
+        keep_headers = (
+            "## Tonal canon",
+            "## Period rules",
+            "## Recurring motifs",
+            "## Used premises (auto-updated)",
+            "## Used twists (auto-updated)",
+            "## Used motifs (auto-updated)",
+        )
     parts: list[str] = []
     for header in keep_headers:
         idx = text.find(header)
@@ -3572,6 +3587,33 @@ REPLACEMENT RULES:
 - Break cadence constantly. Vary line lengths. Never let three consecutive lines have similar rhythm.
 - Tone lives ONLY inside the [VOICE:] tag parameters, not in dialogue prose.
 - Every line must fit in one natural breath when spoken aloud.
+
+WRITER PRE-CHECK (these are the EXACT rules a separate critic LLM will grade you on; pre-screening here means your first draft passes):
+
+OPENING DISCIPLINE:
+- DO NOT open the script with [SFX:] or [ENV:] cues. The first emitted line MUST be a [VOICE:] block.
+- DO NOT use cold-open tropes: alarm clocks, coffee pouring, radio tuning, yawning, waking up.
+- DO NOT have a character introduce themselves with full name + title in the opening. Open mid-conflict.
+
+PERIOD VOCABULARY (1947 setting; small-model writers especially leak modern words):
+- BANNED words: "okay", "guys", "no problem", "you got this", "for sure".
+- BANNED contractions: "gonna", "wanna", "kinda", "lemme", "shoulda", "outta".
+- BANNED slang: "cool", "awesome", "whatever", "literally", "vibe", "mate".
+- BANNED tech anachronisms: "software", "download", "digital", "database", "wifi", "online", "computer", "app", "upload".
+- BANNED therapy-speak: "trauma", "toxic", "boundaries", "process this", "gaslighting".
+- USE INSTEAD: "very well", "indeed", "see here", "now then", "fellows", "the team", "no trouble".
+
+LLM-TELL VOCABULARY (default training-data tropes):
+- BANNED words: "tapestry", "kaleidoscope", "delve", "journey", "embrace" (as verb), "navigate" (as metaphor), "beacon", "echoes" (as metaphor), "forge" (as verb).
+
+[SFX:] AND [ENV:] DISCIPLINE:
+- [SFX:] tags ONLY describe RECORDABLE sounds (a knock, a hiss, a tone). NEVER abstract feelings: NO "dread", "tension", "menace", "unease".
+- [ENV:] tags describe AMBIENT BED only. NEVER use emotional adjectives: NO "ominous", "foreboding", "sinister", "eerie".
+
+ENDING DISCIPLINE:
+- DO NOT end with "or so they thought", "little did they know", "time will tell", "we'll see".
+- Close on a CONCRETE unresolved object (a name, a sound, a held breath), not a moral.
+- DO NOT close with "Tune in next week..." -- announcer wraps differently each episode.
 
 === [EMOJI] 4. STORYTELLING: SIGNAL LOST ===
 - You are a STORYTELLER first, scientist second. The science news is your SEED - grow it into a gripping human drama.
@@ -4718,7 +4760,17 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # the writer's system prompt so the LLM has explicit
         # anti-repeat guidance and tonal anchors. Skipped on small
         # models to avoid Model Collapse from prompt size.
-        canon_block = _load_canon_for_writer(skip=is_small_model)
+        # 2026-04-30: future-proofing for E2B-only users. Previously
+        # the canon block was SKIPPED entirely on small models; that
+        # left the writer with NO 1947-period anchor and contributed
+        # to A15-A19 anachronism leakage caught by the critic. Now
+        # small models get a COMPACT canon (period rules only --
+        # ~200 tokens vs ~800 for the full block) so the period
+        # discipline still reaches them without bloating the prompt.
+        canon_block = _load_canon_for_writer(
+            skip=False,
+            compact=is_small_model,
+        )
         system_base = canon_block + SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
         if is_small_model:
             # Gemma 2B Lite role prevents prose and header hallucinations
