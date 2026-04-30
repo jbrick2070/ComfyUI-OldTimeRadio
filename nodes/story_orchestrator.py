@@ -1581,6 +1581,18 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
     #    the LLM is the same one NewsSummary will load anyway, so the
     #    NewsSummary phase that follows hits a cache HIT instead of
     #    paying the load cost twice.
+    # 2026-04-29 BUG-LOCAL-112: history-wipe restoration. The previous
+    # implementation had a comment admitting the reset was a "no-op" --
+    # if every URL in the fresh fetch was already in news_history.json,
+    # the filter emptied `pool` and the fall-through logged a warning
+    # but never restored the pool. Result: body-fetch saw 0 candidates,
+    # writer fell back to no-news, news-seeded plot was lost.
+    # Real fix: stash the unfiltered pool before filtering, restore it
+    # if the filter wipes everything. The history dedup still wins on
+    # the typical day; the reset only fires when every fresh headline
+    # is in history (which means the rolling cap is too small for the
+    # user's run cadence and we'd rather repeat than starve).
+    unfiltered_pool = list(pool)
     used_urls = _load_news_history()
     if used_urls:
         before = len(pool)
@@ -1596,21 +1608,18 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
                 dropped, len(pool), before,
             )
     if not pool:
-        # All 43 candidates were already used. Reset history dedup for
-        # this run -- better to pick a recent repeat than to fail.
+        # All N candidates were already used. Restore the unfiltered
+        # pool -- better to pick a recent repeat than to starve the
+        # writer with zero news context.
         log.warning(
-            "[NewsFetcher] All candidates filtered out by history -- using "
-            "the unfiltered pool (history dedup will eventually wrap "
-            "around as new headlines come in)"
+            "[NewsFetcher] All %d candidate(s) filtered out by history -- "
+            "restoring unfiltered pool so the writer still gets a real "
+            "article (history dedup will catch up as new headlines come "
+            "in; consider raising the rolling cap if this happens often)",
+            len(unfiltered_pool),
         )
-        # Reload pool: walk the shuffled feeds again with no filter
+        pool = list(unfiltered_pool)
         used_urls = set()
-        # No-op: pool is already empty here; the next block also handles
-        # that case. We just clear used_urls so the LLM-rank step below
-        # can still operate on the original (unfiltered) pool by
-        # re-running the inner fetch logic via the fall-through.
-        # (For a more elegant fix, refactor to fetch+filter+fallback
-        # as a single unit; minimal change for now.)
 
     random.shuffle(pool)
 
