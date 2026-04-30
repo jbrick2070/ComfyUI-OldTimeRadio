@@ -38,20 +38,154 @@ _DEFAULT_STYLE_SUFFIX = (
     "heavy vignette, muted color grade, sharp focus"
 )
 
-# Step 1 (ROADMAP) -- radio bookend FLUX prompt. Hard-coded canon
-# across episodes so the same vintage-radio anchor opens and closes
-# every Signal Lost broadcast. Used as the visual reference image
-# for HuMo lip-sync renders during music + SFX windows (the bits
-# where there's no character speaking but the audio still warrants
-# a "the radio reacts" cue). Per Jeffrey 2026-04-29: people
-# speaking get people lip-syncing, sfx and music get the radio
-# lip-syncing; this prompt anchors the radio half of that contract.
-_DEFAULT_RADIO_BOOKEND_PROMPT = (
-    "1940s vintage console radio, glowing amber dials, walnut "
-    "cabinet, vacuum tube halo, fabric speaker grille, dimly lit "
-    "listening room, cinematic 35mm film aesthetic, sharp focus, "
-    "centered composition, 1080p"
+# Step 1 (ROADMAP P0, 2026-04-30 lock) -- radio still FLUX prompt.
+# Used as the I2V reference image for HuMo lip-sync renders during
+# ANY non-dialogue line (announcer, music_open, music_close,
+# music_inter, sfx).  Per Jeffrey 2026-04-30: every audio second
+# of every episode is a HuMo clip; people speaking get people
+# lip-syncing, sfx + music + announcer all get the radio
+# lip-syncing -- the radio is the performer, not a static prop.
+#
+# Prompt is built DYNAMICALLY per episode from story context
+# (ledger.meta.gen_params.genre_flavor + style_variant) so the
+# radio's aesthetic matches the episode's tone.  See
+# `_build_dynamic_radio_prompt()` below.  This constant is the
+# safety fallback used only when ledger context is unavailable.
+_RADIO_FALLBACK_PROMPT = (
+    "sci-fi retrofuturistic radio broadcast unit, glowing CRT "
+    "frequency display, copper vacuum tubes haloed in plasma, "
+    "brushed steel chassis with art-deco engraving, dim amber "
+    "and cyan rim lighting, dust-mote atmosphere, 35mm film "
+    "grain, broadcast-distressed cinematic aesthetic, sharp "
+    "focus, centered composition, 1080p"
 )
+
+
+# Genre -> radio aesthetic.  Each value is the leading description;
+# the SIGNAL LOST universal suffix gets appended in
+# `_build_dynamic_radio_prompt`.  Add new entries as new
+# genre_flavor values appear in `gen_params`.
+_GENRE_RADIO_AESTHETIC = {
+    "sci-fi": (
+        "sci-fi retrofuturistic radio broadcast unit, glowing CRT "
+        "frequency display, copper vacuum tubes haloed in plasma, "
+        "brushed steel chassis with art-deco engraving, dim amber "
+        "and cyan rim lighting"
+    ),
+    "noir": (
+        "art-deco bakelite radio cabinet, smoked amber dial glass, "
+        "brass fittings, deep tungsten shadows, curling cigarette "
+        "smoke atmosphere"
+    ),
+    "horror": (
+        "weathered wooden radio cabinet, cracked dial face, dim "
+        "flickering vacuum tubes, oppressive shadow, mold-stained "
+        "fabric grille"
+    ),
+    "post-apocalyptic": (
+        "battered military-surplus radio, exposed wiring, scorched "
+        "chassis, cracked screen, makeshift wire antenna"
+    ),
+    "cosmic-horror": (
+        "alien-geometry radio cabinet, impossible angles, eldritch "
+        "dial markings, sickly green glow, shifting chrome "
+        "reflections"
+    ),
+    "western": (
+        "rustic wooden ranch radio, tarnished brass dial, oil-lamp "
+        "glow, weathered leather strap, dust-haze atmosphere"
+    ),
+    "thriller": (
+        "minimalist mid-century radio chassis, cold-blue display "
+        "readout, sharp tungsten downlight, austere shadow lines"
+    ),
+    "cyberpunk": (
+        "neon-drenched broadcast deck, holographic frequency "
+        "overlay, exposed circuit ribs, magenta and teal glow, "
+        "rain-streaked plexi housing"
+    ),
+    "fantasy": (
+        "ornate brass-and-mahogany radio, etched runic dial, "
+        "candle-warm glow, velvet-draped backdrop"
+    ),
+    "comedy": (
+        "cheery red-and-cream radio cabinet, polished chrome dial, "
+        "warm domestic lighting, crisp clear focus"
+    ),
+}
+
+
+# Style_variant -> mood adjectives.  Optional layer added when
+# `gen_params.style_variant` is set.
+_STYLE_MOOD_LAYER = {
+    "atmospheric": "heavy dust-mote atmosphere, slow shutter ghosting",
+    "kinetic": "high-contrast strobe-edge, motion-blur dial",
+    "minimalist": "clean negative space, single-source lighting",
+    "baroque": "ornate filigree details, layered reflections, "
+               "lush vignette",
+    "documentary": "naturalistic light, archival film grain",
+    "dreamlike": "soft halation bloom, gauzy edges, faded color",
+    "gritty": "harsh practical light, deep grain, micro-scratches",
+}
+
+
+# SIGNAL LOST universal suffix.  Appended to every radio prompt
+# regardless of genre/style so all radios share the broadcast-
+# distress identity.
+_RADIO_PROMPT_SUFFIX = (
+    "35mm film grain, broadcast-distressed cinematic aesthetic, "
+    "sharp focus, centered composition, 1080p"
+)
+
+
+def _build_dynamic_radio_prompt(led):
+    """Build a radio still FLUX prompt from story context.
+
+    Reads from the ledger that ``story_orchestrator`` stamps at
+    phase 0 (early ledger init, before any audio renders).  Field
+    resolution order:
+      1. ``ledger.meta.gen_params_initial``  (current, stamped at
+         write_script entry per BUG-LOCAL-097 line 4240)
+      2. ``ledger.meta.gen_params``          (forward-compat for
+         the spine-ledger ticket's bundled metadata schema)
+
+    Within whichever bag wins, pulls:
+      - ``genre_flavor``  -> base radio aesthetic (era, materials,
+                             lighting)
+      - ``style_variant`` -> optional mood layer
+
+    Returns a finished prompt string with the SIGNAL LOST universal
+    suffix appended.  Falls back to ``_RADIO_FALLBACK_PROMPT`` if
+    ``led`` is None.  Unknown / blank genres default to ``sci-fi``
+    so the radio is always visible -- a black FLUX render would be
+    a worse failure than a generic-aesthetic radio.
+
+    Hostile-input safe: any string that should be a dict, or any
+    bag that's missing keys, lands on safe defaults.
+    """
+    if not led:
+        return _RADIO_FALLBACK_PROMPT
+    meta = led.get("meta") if isinstance(led, dict) else None
+    if not isinstance(meta, dict):
+        meta = {}
+    gp = meta.get("gen_params_initial")
+    if not isinstance(gp, dict):
+        gp = meta.get("gen_params")
+    if not isinstance(gp, dict):
+        gp = {}
+    genre = (gp.get("genre_flavor") or "").strip().lower() if isinstance(gp.get("genre_flavor"), str) else ""
+    style = (gp.get("style_variant") or "").strip().lower() if isinstance(gp.get("style_variant"), str) else ""
+    base = _GENRE_RADIO_AESTHETIC.get(genre)
+    if base is None:
+        # Unknown / blank genre -- fall through to sci-fi default
+        # rather than skipping; keeps the radio visible.
+        base = _GENRE_RADIO_AESTHETIC["sci-fi"]
+    parts = [base]
+    mood = _STYLE_MOOD_LAYER.get(style)
+    if mood:
+        parts.append(mood)
+    parts.append(_RADIO_PROMPT_SUFFIX)
+    return ", ".join(parts)
 
 
 def _lazy_nodes():
@@ -257,15 +391,19 @@ class BatchFluxRender:
                 "fast_batch": ("BOOLEAN", {"default": True}),
                 "radio_bookend_prompt": ("STRING", {
                     "multiline": True,
-                    "default": _DEFAULT_RADIO_BOOKEND_PROMPT,
+                    "default": "",
                     "tooltip": (
-                        "Step 1: Hard-canned 1940s vintage radio prompt. "
-                        "Rendered as one extra FLUX shot at the end of "
-                        "the batch, saved to "
-                        "output/otr/stills/radio_bookend_<ep_id>.png, "
-                        "and stamped into ledger.radio_bookend_path. "
-                        "Used as the HuMo reference image for music + "
-                        "SFX windows. Set empty to disable."
+                        "Radio still FLUX prompt. Default (empty) "
+                        "builds dynamically from ledger.meta.gen_params "
+                        "(genre_flavor + style_variant) so each "
+                        "episode's radio matches its tone. Set this "
+                        "field to a non-empty string to override the "
+                        "dynamic builder with your verbatim prompt. "
+                        "Set to literal 'DISABLED' (case-insensitive) "
+                        "to skip rendering entirely. Output saved to "
+                        "output/otr/stills/radio_bookend_<ep_id>.png "
+                        "and stamped into ledger.radio_bookend_path "
+                        "+ ledger.meta.radio_bookend_path."
                     ),
                 }),
                 "radio_bookend_seed": ("INT", {
@@ -285,7 +423,7 @@ class BatchFluxRender:
                 cfg, sampler_name, scheduler, width, height, guidance,
                 fallback_prompt=_DEFAULT_FALLBACK, style_suffix=_DEFAULT_STYLE_SUFFIX,
                 freeze_seed=False, fast_batch=True,
-                radio_bookend_prompt=_DEFAULT_RADIO_BOOKEND_PROMPT,
+                radio_bookend_prompt="",
                 radio_bookend_seed=4242):
         t_start = time.time()
         prompts = _parse_env_prompts(script_json, batch_limit, fallback_prompt, style_suffix)
@@ -388,22 +526,37 @@ class BatchFluxRender:
         )
         log.info("[BatchFluxRender] batch complete: %d image(s) in %d ms", len(images), total_ms)
 
-        # Step 1 (ROADMAP) -- render the radio bookend still and stamp
-        # ledger.radio_bookend_path. Used by VideoComposite as the
-        # full-canvas image during music + SFX windows (talking-radio
-        # identity). BUG-LOCAL-113 hardening 2026-04-29 PM: log every
-        # decision branch so future "why didn't bookend render" debug
-        # cycles don't have to start from scratch.
-        if radio_bookend_prompt and radio_bookend_prompt.strip():
+        # Step 1 (ROADMAP P0, 2026-04-30 lock) -- render the radio
+        # still and stamp ledger.radio_bookend_path.  Three modes:
+        #
+        #   widget == "DISABLED" (case-insensitive): skip rendering.
+        #   widget non-empty otherwise: use as verbatim override.
+        #   widget empty (default): build dynamically from ledger
+        #       context (genre_flavor + style_variant).
+        #
+        # The radio still is consumed by BatchHumoRender as the I2V
+        # reference for all non-dialogue HuMo clips (announcer,
+        # music_*, sfx).  Rendering ALWAYS attempts under the new
+        # default so wall-to-wall HuMo coverage has its non-dialogue
+        # reference image ready.
+        widget_str = (radio_bookend_prompt or "").strip()
+        if widget_str.upper() == "DISABLED":
             log.info(
-                "[BatchFluxRender] radio bookend ENABLED: prompt_len=%d, "
-                "seed=%d, attempting render...",
-                len(radio_bookend_prompt.strip()),
-                int(radio_bookend_seed),
+                "[BatchFluxRender] radio bookend DISABLED via widget "
+                "sentinel (no render attempted)"
+            )
+            report_lines.append("  radio_bookend: DISABLED (widget)")
+        else:
+            mode = "OVERRIDE" if widget_str else "DYNAMIC"
+            log.info(
+                "[BatchFluxRender] radio bookend %s mode (seed=%d)",
+                mode, int(radio_bookend_seed),
             )
             try:
                 self._render_and_save_radio_bookend(
-                    prompt_text=radio_bookend_prompt.strip(),
+                    # widget_str is "" in DYNAMIC mode -- callee detects
+                    # the empty string and builds dynamically.
+                    prompt_text=widget_str,
                     model=model, clip=clip, vae=vae,
                     text_enc=text_enc, guidance_node=guidance_node,
                     empty_latent_cls=empty_latent_cls, sampler=sampler,
@@ -414,20 +567,13 @@ class BatchFluxRender:
                     report_lines=report_lines,
                 )
             except Exception as exc:
-                log.warning("[BatchFluxRender] radio bookend render failed: %s", exc)
-                report_lines.append(f"  radio_bookend: FAILED ({exc})")
-        else:
-            # SKIP path -- the silent-regression mode that left
-            # BUG-LOCAL-113 undiagnosable. Now any miss is loud.
-            log.warning(
-                "[BatchFluxRender] radio bookend SKIPPED: prompt is empty "
-                "or unset (got %r). Causes: (a) workflow widget value "
-                "blank, (b) ComfyUI loaded a pre-bookend version of this "
-                "module before restart, (c) widget ordering drift between "
-                "INPUT_TYPES and workflow JSON.",
-                radio_bookend_prompt,
-            )
-            report_lines.append("  radio_bookend: SKIPPED (prompt empty)")
+                log.warning(
+                    "[BatchFluxRender] radio bookend render failed: %s",
+                    exc,
+                )
+                report_lines.append(
+                    f"  radio_bookend: FAILED ({exc})"
+                )
 
         return (image_batch, "\n".join(report_lines))
 
@@ -438,22 +584,94 @@ class BatchFluxRender:
         seed, steps, cfg, sampler_name, scheduler,
         width, height, guidance, report_lines,
     ):
-        """Step 1: render the radio bookend still (one extra FLUX call)
-        and save it to ``output/otr/stills/radio_bookend_<ep_id>.png``.
+        """Step 1: render the radio still (one extra FLUX call) and
+        save it to ``output/otr/stills/radio_bookend_<ep_id>.png``.
 
-        Also stamps ``ledger.radio_bookend_path`` for downstream
-        BatchHumoRender consumption (music + SFX HuMo windows use this
-        as the reference image; per Jeffrey 2026-04-29 "people speaking
-        get people lip-syncing, sfx and music get the radio
-        lip-syncing").
+        ``prompt_text``:
+          - Empty string  -> build dynamically from ledger context
+                             (genre_flavor + style_variant); falls
+                             back to ``_RADIO_FALLBACK_PROMPT`` if
+                             ledger is unavailable.
+          - Non-empty     -> use verbatim as override.
+
+        Stamps both ``ledger.radio_bookend_path`` (top-level) AND
+        ``ledger.meta.radio_bookend_path`` for belt-and-suspenders.
+        Downstream (BatchHumoRender) reads the radio still as the
+        I2V reference image for any non-dialogue HuMo clip
+        (announcer, music_*, sfx).  Per Jeffrey 2026-04-30: every
+        audio second is a HuMo clip; people speaking get people
+        lip-syncing, everything else gets the radio lip-syncing.
         """
-        import torch  # type: ignore
         import numpy as np  # type: ignore
         from pathlib import Path
         from PIL import Image  # type: ignore
 
+        # Lazily import path + ledger helpers from nodes/.  Done up
+        # front (BEFORE FLUX render) so dynamic-prompt mode can pull
+        # genre/style from the ledger before the render kicks off.
+        try:
+            import sys as _sys
+            _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
+            if str(_NODES_DIR) not in _sys.path:
+                _sys.path.insert(0, str(_NODES_DIR))
+            import _otr_paths as _OTRP  # type: ignore
+            import _otr_ledger as _OTRL  # type: ignore
+        except Exception as exc:
+            log.warning(
+                "[BatchFluxRender] radio still: helper import failed (%s)",
+                exc,
+            )
+            return
+
+        # Locate ledger first so we can both (a) build the dynamic
+        # prompt and (b) stamp paths after render -- single load.
+        ledger_p = _OTRL.find_most_recent_ledger(
+            [_OTRP.otr_audio_dir(), _OTRP.otr_legacy_audio_dir()]
+        )
+        led = None
+        episode_id = "episode"
+        if ledger_p is not None:
+            led = _OTRL.load_ledger_safe(ledger_p)
+            if led is not None:
+                episode_id = (led.get("episode_id") or "episode").strip()
+
+        # Resolve the prompt: empty widget -> dynamic build; non-empty
+        # widget -> verbatim override.
+        widget_prompt = (prompt_text or "").strip()
+        if widget_prompt:
+            resolved_prompt = widget_prompt
+            prompt_source = "override"
+        else:
+            resolved_prompt = _build_dynamic_radio_prompt(led)
+            # Diagnose which branch the dynamic builder took.  Mirror
+            # the field-resolution order in `_build_dynamic_radio_prompt`
+            # so the diagnostic line matches what the builder actually
+            # used.
+            if led is None:
+                prompt_source = "fallback (no ledger)"
+            else:
+                meta = led.get("meta") or {}
+                gp = meta.get("gen_params_initial") or meta.get("gen_params") or {}
+                if not isinstance(gp, dict):
+                    gp = {}
+                raw_genre = gp.get("genre_flavor")
+                genre = (raw_genre or "").strip().lower() if isinstance(raw_genre, str) else ""
+                if genre and genre in _GENRE_RADIO_AESTHETIC:
+                    prompt_source = f"dynamic (genre={genre})"
+                elif genre:
+                    prompt_source = f"dynamic (unknown genre={genre} -> sci-fi default)"
+                else:
+                    prompt_source = "dynamic (no genre -> sci-fi default)"
+
+        log.info(
+            "[BatchFluxRender] radio still prompt source=%s, len=%d, "
+            "first 80 chars: %s",
+            prompt_source, len(resolved_prompt), resolved_prompt[:80],
+        )
+
+        # Now run the FLUX render with the resolved prompt.
         t0 = time.time()
-        positive = text_enc.encode(clip, prompt_text)[0]
+        positive = text_enc.encode(clip, resolved_prompt)[0]
         if guidance_node is not None:
             positive = guidance_node.append(positive, guidance)[0]
         latent = empty_latent_cls.generate(width, height, 1)[0]
@@ -464,37 +682,8 @@ class BatchFluxRender:
         img = decoder.decode(vae, samples)[0]
         # img shape: [B, H, W, C] in 0..1 float
 
-        # Lazily import the path + ledger helpers from nodes/. visual/
-        # is a sibling package so we add nodes/ to sys.path before the
-        # import (same pattern SceneSequencer uses for sibling helpers).
-        try:
-            import sys as _sys
-            _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
-            if str(_NODES_DIR) not in _sys.path:
-                _sys.path.insert(0, str(_NODES_DIR))
-            import _otr_paths as _OTRP  # type: ignore
-            import _otr_ledger as _OTRL  # type: ignore
-        except Exception as exc:
-            log.warning(
-                "[BatchFluxRender] radio bookend: helper import failed (%s)",
-                exc,
-            )
-            return
-
         stills_dir = _OTRP.otr_stills_dir()
         stills_dir.mkdir(parents=True, exist_ok=True)
-
-        # Derive episode_id from the most-recent ledger if available.
-        ledger_p = _OTRL.find_most_recent_ledger(
-            [_OTRP.otr_audio_dir(), _OTRP.otr_legacy_audio_dir()]
-        )
-        episode_id = "episode"
-        led = None
-        if ledger_p is not None:
-            led = _OTRL.load_ledger_safe(ledger_p)
-            if led is not None:
-                episode_id = (led.get("episode_id") or "episode").strip()
-
         out_path = stills_dir / f"radio_bookend_{episode_id}.png"
 
         # Save image. img is shape [1, H, W, C] tensor; convert to PIL.
@@ -503,28 +692,48 @@ class BatchFluxRender:
             arr = np.clip(arr * 255.0, 0, 255).astype("uint8")
             Image.fromarray(arr).save(out_path)
         except Exception as exc:
-            log.warning("[BatchFluxRender] radio bookend save failed: %s", exc)
+            log.warning(
+                "[BatchFluxRender] radio still save failed: %s", exc,
+            )
             return
 
         elapsed_ms = int((time.time() - t0) * 1000)
         log.info(
-            "[BatchFluxRender] radio bookend rendered + saved: %s (%d ms)",
+            "[BatchFluxRender] radio still rendered + saved: %s (%d ms)",
             out_path, elapsed_ms,
         )
         report_lines.append(
-            f"  radio_bookend: {elapsed_ms} ms -> {out_path.name}"
+            f"  radio_bookend: {elapsed_ms} ms -> {out_path.name} "
+            f"({prompt_source})"
         )
 
-        # Stamp ledger.radio_bookend_path for BatchHumoRender to find.
+        # Stamp ledger paths for BatchHumoRender + VideoComposite to
+        # find.  Belt-and-suspenders: stamp under both top-level
+        # `radio_bookend_path` AND `meta.radio_bookend_path` since
+        # video_composite.py reads either location.
         if ledger_p is not None and led is not None:
             try:
                 led["radio_bookend_path"] = str(out_path)
+                meta = led.setdefault("meta", {})
+                meta["radio_bookend_path"] = str(out_path)
+                meta["radio_bookend_prompt_source"] = prompt_source
                 _OTRL.save_ledger_safe(ledger_p, led)
+                log.info(
+                    "[BatchFluxRender] radio still ledger stamp OK: "
+                    "ledger=%s, path=%s",
+                    ledger_p.name, out_path,
+                )
             except Exception as exc:
                 log.warning(
-                    "[BatchFluxRender] radio bookend ledger stamp failed: %s",
+                    "[BatchFluxRender] radio still ledger stamp failed: %s",
                     exc,
                 )
+        else:
+            log.warning(
+                "[BatchFluxRender] radio still ledger stamp SKIPPED: "
+                "no ledger found in audio dirs (file rendered but "
+                "downstream nodes will not be able to locate it)"
+            )
 
 
 __all__ = ["BatchFluxRender"]
