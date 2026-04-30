@@ -73,20 +73,233 @@ _ANTI_SLOP_PATH = Path(__file__).resolve().parent.parent / "docs" / "OTR-ANTI-SL
 _CANON_PATH      = Path(__file__).resolve().parent.parent / "docs" / "OTR-CANON.md"
 
 
-def _load_anti_slop_rubric() -> str:
-    """Read OTR-ANTI-SLOP.md and return the bullet contents.
+# Gate parser: extracts the boolean expression after "applies_when:".
+_GATE_RE = re.compile(r"\[applies_when:\s*([^\]]+)\]")
+
+# scene_count derivation -- single source of truth for the
+# smoke/short/medium length labels. If you add a new length tier in
+# the workflow, add it here too.
+_SCENE_COUNT_BY_LENGTH = {
+    "smoke":  1,
+    "short":  3,
+    "medium": 5,
+}
+
+# Variables the rubric's [applies_when: ...] gates and {placeholder}
+# tokens read. The ledger stamps `gen_params_initial` at write_script
+# entry (see BUG-72), so all of these have real values by the time
+# the critic runs. Listed here so the loader can detect missing
+# fields and warn explicitly -- no silent fallbacks.
+_REQUIRED_PARAM_KEYS = (
+    "target_words",
+    "num_characters",
+    "genre_flavor",
+    "target_length",
+)
+
+
+def _normalize_target_length(raw: str) -> str:
+    """Normalize a target_length widget value to one of {smoke, short, medium}.
+
+    The dropdown shows free-form labels like 'tiny (smoke, 1 act)' or
+    'short (3 acts)'. The gate language uses canonical identifiers.
+    This bridge keeps the user-facing copy editable without breaking
+    rule gates downstream. New legacy labels can be added here without
+    touching the rubric.
+    """
+    s = (raw or "").strip().lower()
+    if not s:
+        return "short"
+    # Order matters: "1 act" must beat "5 acts" since 'short' contains
+    # the substring 'sh' but never '1 act'.
+    if "smoke" in s or "1 act" in s or "1-act" in s or "tiny" in s:
+        return "smoke"
+    if "5 act" in s or "5-act" in s or "medium" in s:
+        return "medium"
+    if "3 act" in s or "3-act" in s or "short" in s:
+        return "short"
+    return "short"
+
+
+def _evaluate_gate(expr: str, params: dict) -> bool:
+    """Evaluate an applies_when boolean expression against ledger params.
+
+    Supports the operators documented in OTR-ANTI-SLOP.md:
+        ==, !=, >=, <=, >, <, AND, OR
+
+    Strings are quoted, ints are passed through. The expression is
+    sandboxed by passing __builtins__={} -- no name lookups, no
+    function calls, no attribute access can succeed.
+
+    Returns True on parse failure so a bad gate does not silently
+    delete the rule -- noisy is safer than missing.
+    """
+    raw = (expr or "").strip()
+    if not raw or raw.lower() == "always":
+        return True
+    safe = raw
+    # Substitute placeholder names with quoted/int literals. Sort by
+    # length descending so "target_length" doesn't get clobbered by
+    # the prefix "target".
+    for k in sorted(params.keys(), key=lambda s: -len(s)):
+        v = params[k]
+        if isinstance(v, str):
+            replacement = repr(v.lower())  # case-insensitive comparisons
+        else:
+            replacement = str(v)
+        safe = re.sub(rf"\b{re.escape(k)}\b", replacement, safe)
+    # Lowercase string literals already substituted; lowercase any RHS
+    # bare-word comparator now (e.g. `target_length != smoke`). We do
+    # this AFTER variable substitution to avoid touching numeric ops.
+    safe = re.sub(
+        r"!=\s*([A-Za-z][A-Za-z0-9_]*)",
+        lambda m: f"!= {m.group(1).lower()!r}",
+        safe,
+    )
+    safe = re.sub(
+        r"==\s*([A-Za-z][A-Za-z0-9_]*)",
+        lambda m: f"== {m.group(1).lower()!r}",
+        safe,
+    )
+    safe = safe.replace(" AND ", " and ").replace(" OR ", " or ")
+    try:
+        return bool(eval(safe, {"__builtins__": {}}, {}))  # noqa: S307
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[ScriptCritic] gate eval failed (expr=%r safe=%r err=%s) - "
+            "keeping rule (fail-open)",
+            raw, safe, exc,
+        )
+        return True
+
+
+def _coerce_params(raw: Optional[dict]) -> dict:
+    """Coerce raw ledger params for use in the rubric loader.
+
+    The ledger's `gen_params_initial` is the source of truth -- this
+    function does NOT supply default values. If a required field is
+    missing or unparseable, it stays absent in the output dict and a
+    warning is logged. The gate evaluator's `fail-open` behaviour
+    means missing fields produce a slightly broader rubric (rules
+    that depend on a missing field still fire), which is the safe
+    direction.
+
+    Always-derived fields (`scene_count`, `scene_word_budget`,
+    normalized `target_length`) are computed only when their inputs
+    are present and parseable.
+    """
+    p: dict = dict(raw or {})
+
+    # Numeric coercions: drop the field if unparseable so the gate
+    # evaluator sees it as missing instead of as 0.
+    for k in ("target_words", "num_characters"):
+        if k not in p:
+            continue
+        try:
+            p[k] = int(p[k])
+        except (TypeError, ValueError):
+            log.warning(
+                "[ScriptCritic] ledger field %s=%r is not an int - "
+                "dropped from gate evaluation", k, p[k],
+            )
+            del p[k]
+
+    # Normalize target_length and derive scene_count / scene_word_budget
+    # ONLY when the source values are present.
+    if "target_length" in p:
+        p["target_length"] = _normalize_target_length(str(p["target_length"]))
+        scene_count = _SCENE_COUNT_BY_LENGTH.get(p["target_length"])
+        if scene_count is not None:
+            p["scene_count"] = scene_count
+            if isinstance(p.get("target_words"), int):
+                p["scene_word_budget"] = max(1, p["target_words"] // scene_count)
+
+    # Friendly form for free-text fields (do not invent values).
+    if isinstance(p.get("genre_flavor"), str):
+        p["genre_flavor"] = p["genre_flavor"].replace("_", " ")
+    if isinstance(p.get("creativity"), str):
+        p["creativity"] = p["creativity"].lower()
+
+    # Detect missing required fields up-front and warn once.
+    missing = [k for k in _REQUIRED_PARAM_KEYS if k not in p]
+    if missing:
+        log.warning(
+            "[ScriptCritic] ledger missing required rubric params %s - "
+            "rubric will fail-open on gates that reference them. Check "
+            "that the workflow's LLMScriptWriter ran first and stamped "
+            "gen_params_initial.",
+            missing,
+        )
+
+    return p
+
+
+def _filter_rubric(template_text: str, params: dict) -> str:
+    """Filter the rubric template against ledger params + substitute placeholders.
+
+    Walks the template line by line:
+      - Lines with `[applies_when: <expr>]` are kept only if the gate
+        evaluates true. The gate tag is stripped from the kept line.
+      - All `{placeholder}` tokens are replaced from the params dict.
+      - Lines without a gate are passed through unchanged.
+
+    Substitution happens AFTER gate filtering so we don't burn
+    parsing on rules we won't ship to the critic.
+    """
+    out_lines: list[str] = []
+    for line in (template_text or "").splitlines():
+        m = _GATE_RE.search(line)
+        if m:
+            if not _evaluate_gate(m.group(1), params):
+                continue  # rule excluded by gate
+            line = _GATE_RE.sub("", line).rstrip()
+        # Substitute placeholders. Use a partial-tolerant approach so
+        # an unrecognized `{token}` in the template doesn't crash the
+        # whole filter (it stays in the output as a visible diagnostic).
+        try:
+            line = line.format_map(_SafeMissing(params))
+        except Exception as exc:  # noqa: BLE001
+            log.debug("[ScriptCritic] format_map failed on line=%r: %s", line, exc)
+        out_lines.append(line)
+    return "\n".join(out_lines)
+
+
+class _SafeMissing(dict):
+    """dict subclass that returns the literal `{key}` for missing keys.
+
+    Lets `str.format_map` pass through `{unknown}` placeholders rather
+    than raising KeyError -- useful when the template has tokens we
+    haven't wired into params yet.
+    """
+
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+def _load_anti_slop_rubric(params: Optional[dict] = None) -> str:
+    """Read OTR-ANTI-SLOP.md, filter by params, and return the result.
 
     Returns an empty string on missing file or read error -- the
     critic prompt has a sane built-in fallback rubric so this is
     not a hard requirement.
     """
     try:
-        if _ANTI_SLOP_PATH.exists():
-            return _ANTI_SLOP_PATH.read_text(encoding="utf-8")
+        if not _ANTI_SLOP_PATH.exists():
+            return ""
+        raw = _ANTI_SLOP_PATH.read_text(encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
         log.warning("[ScriptCritic] anti-slop read failed (%s) - using "
                     "built-in fallback rubric", exc)
-    return ""
+        return ""
+    p = _coerce_params(params)
+    try:
+        return _filter_rubric(raw, p)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[ScriptCritic] rubric filter failed (%s) - returning "
+            "unfiltered template (critic will see gate metadata)", exc,
+        )
+        return raw
 
 
 def _build_critic_prompt(
@@ -95,6 +308,12 @@ def _build_critic_prompt(
     anti_slop: str,
 ) -> str:
     """Build the rejection-rubric prompt for the critic LLM.
+
+    The anti_slop string is expected to already be filtered + template-
+    filled by `_load_anti_slop_rubric(params)`. If the caller passes a
+    bare template (with gate tags and `{placeholder}` tokens still in
+    it) we ship it as-is and the critic will likely score lower than
+    intended -- that's a caller bug, not an excuse for a hard fail.
 
     Critic is asked for a bounded structured response (SCORE / VERDICT
     / ISSUES) so we can parse without invoking another LLM. Temperature
@@ -415,7 +634,27 @@ class LLMScriptCritic:
             )
             return (script, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
 
-        anti_slop = _load_anti_slop_rubric()
+        # Pull rubric params from the ledger's gen_params_initial. The
+        # writer stamps these at workflow entry (BUG-72), so they're
+        # the ground truth for what the user actually requested. We
+        # only override genre_flavor here because the critic node has
+        # its own widget for it (lets you re-judge an existing script
+        # against a different genre lens without re-running the writer).
+        rubric_params: dict = {}
+        try:
+            from .production_ledger import get_ledger
+            led_data = get_ledger().data
+            rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[ScriptCritic] failed to read gen_params_initial from "
+                "ledger (%s) - rubric will fail-open on every gate", exc,
+            )
+        # The genre_flavor widget on this node wins over the ledger
+        # value so the critic can re-score against a different lens.
+        rubric_params["genre_flavor"] = genre_flavor
+
+        anti_slop = _load_anti_slop_rubric(rubric_params)
         prompt = _build_critic_prompt(script, genre_flavor, anti_slop)
 
         log.info(
