@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 53,
-  "last_link_id": 84,
+  "last_node_id": 52,
+  "last_link_id": 83,
   "nodes": [
     {
       "id": 1,
@@ -42,8 +42,7 @@
           "name": "script_text",
           "type": "STRING",
           "links": [
-            1,
-            84
+            1
           ],
           "slot_index": 0
         },
@@ -1494,63 +1493,6 @@
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
-    },
-    {
-      "id": 53,
-      "type": "OTR_LLMScriptCritic",
-      "pos": [
-        50,
-        600
-      ],
-      "size": [
-        400,
-        222
-      ],
-      "flags": {},
-      "order": 53,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "script",
-          "type": "STRING",
-          "link": 84,
-          "widget": {
-            "name": "script"
-          }
-        }
-      ],
-      "outputs": [
-        {
-          "name": "script",
-          "type": "STRING",
-          "links": null,
-          "slot_index": 0
-        },
-        {
-          "name": "critic_report",
-          "type": "STRING",
-          "links": null,
-          "slot_index": 1
-        },
-        {
-          "name": "verdict",
-          "type": "STRING",
-          "links": null,
-          "slot_index": 2
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_LLMScriptCritic",
-        "cnr_id": "ComfyUI-OldTimeRadio"
-      },
-      "title": "Script Critic (gate)",
-      "widgets_values": [
-        "hard_sci_fi",
-        "google/gemma-4-E4B-it",
-        false,
-        "Standard",
-        90
-      ]
     }
   ],
   "links": [
@@ -1889,14 +1831,6 @@
       51,
       7,
       "IMAGE"
-    ],
-    [
-      84,
-      1,
-      0,
-      53,
-      0,
-      "STRING"
     ]
   ],
   "groups": [],

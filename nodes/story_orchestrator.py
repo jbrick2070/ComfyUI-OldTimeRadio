@@ -3287,6 +3287,82 @@ def _inject_scene_transitions(script_text):
 # NODE 1: SCRIPT WRITER
 # -----------------------------------------------------------------------------
 
+# Path to the SIGNAL LOST canon file. Read at write_script time (not at
+# module load) so editing the canon between runs takes effect on the
+# next render without restarting ComfyUI.
+_CANON_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "docs", "OTR-CANON.md",
+)
+
+
+def _load_canon_for_writer(skip: bool = False) -> str:
+    """Build a writer-prompt canon block from OTR-CANON.md.
+
+    Pulls the writer-relevant sections (Tonal canon, Period rules,
+    Recurring motifs, Used premises/twists/motifs) and wraps them in
+    an XML-flavored block prepended to SCAFFOLDING_PREAMBLE. Returns
+    the empty string on:
+      - skip=True (small-model collapse guard)
+      - missing file (logs warning, never fatal)
+      - parse error (logs warning, never fatal)
+
+    The returned block has NO `{placeholders}` so `.format()` on the
+    full system prompt won't choke on canon content.
+    """
+    if skip:
+        return ""
+    try:
+        if not os.path.exists(_CANON_PATH):
+            log.warning("[Canon] OTR-CANON.md missing at %s - skipping", _CANON_PATH)
+            return ""
+        with open(_CANON_PATH, "r", encoding="utf-8") as _f:
+            text = _f.read()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[Canon] read failed (%s) - skipping", exc)
+        return ""
+    # Pull only the sections the writer needs. Order matters (rules
+    # before "do not repeat" list).
+    keep_headers = (
+        "## Tonal canon",
+        "## Period rules",
+        "## Recurring motifs",
+        "## Used premises (auto-updated)",
+        "## Used twists (auto-updated)",
+        "## Used motifs (auto-updated)",
+    )
+    parts: list[str] = []
+    for header in keep_headers:
+        idx = text.find(header)
+        if idx < 0:
+            continue
+        # Find the next "## " heading (or end of file)
+        next_idx = text.find("\n## ", idx + len(header))
+        if next_idx < 0:
+            section = text[idx:]
+        else:
+            section = text[idx:next_idx]
+        # Strip trailing blank lines
+        parts.append(section.rstrip())
+    if not parts:
+        return ""
+    body = "\n\n".join(parts)
+    # Escape literal braces so .format() doesn't try to interpolate
+    # any "{...}" tokens that may appear in canon prose.
+    body = body.replace("{", "{{").replace("}", "}}")
+    block = (
+        "<canon>\n"
+        "The following is established SIGNAL LOST canon. Honour it. Do not\n"
+        "contradict the tonal rules, period rules, or recurring motifs.\n"
+        "Avoid repeating any premise, twist, or motif listed under\n"
+        "\"Used ... (auto-updated)\" -- pick a fresh angle for this\n"
+        "episode.\n\n"
+        f"{body}\n"
+        "</canon>\n\n"
+    )
+    return block
+
+
 # ============================================================================
 # PATTERN 2 - SCAFFOLDING & PARSING MATRIX (v1.2 narrative)
 # XML-wrapped dramaturg role preamble. Prepended to SCRIPT_SYSTEM_PROMPT at
@@ -4636,8 +4712,14 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # prompt is too complex. We swap to a "LITE" version for these.
         # Check for 2B specifically (avoiding false hits on 26b or 31b)
         is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
-        
-        system_base = SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
+
+        # 2026-04-29: prepend SIGNAL LOST canon (tonal rules, period
+        # rules, recurring motifs, used premises/twists/motifs) to
+        # the writer's system prompt so the LLM has explicit
+        # anti-repeat guidance and tonal anchors. Skipped on small
+        # models to avoid Model Collapse from prompt size.
+        canon_block = _load_canon_for_writer(skip=is_small_model)
+        system_base = canon_block + SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
         if is_small_model:
             # Gemma 2B Lite role prevents prose and header hallucinations
             lite_role = "<system_role>STRICT OTR TAGS ONLY. No prose. Start every line with a tag.</system_role>"
