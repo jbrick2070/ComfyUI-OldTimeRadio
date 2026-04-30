@@ -1545,8 +1545,6 @@
       },
       "title": "Script Critic (gate)",
       "widgets_values": [
-        "hard_sci_fi",
-        "google/gemma-4-E4B-it",
         false,
         "Standard",
         90

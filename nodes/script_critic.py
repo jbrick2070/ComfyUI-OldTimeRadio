@@ -549,25 +549,19 @@ class LLMScriptCritic:
                         "source works."
                     ),
                 }),
-                "genre_flavor": ("STRING", {
-                    "default": "hard_sci_fi",
-                    "tooltip": (
-                        "Genre tag inlined into the critic's prompt "
-                        "framing. Mirrors LLMScriptWriter's same-named "
-                        "widget so the critic judges by the same lens."
-                    ),
-                }),
-                "critic_model_id": (_LLM_MODEL_CHOICES, {
-                    "default": "google/gemma-4-E4B-it",
-                    "tooltip": (
-                        "Critic LLM. MUST be different from the writer "
-                        "model -- a model cannot grade its own work. "
-                        "Default Gemma-4 E4B is small, fast, and "
-                        "co-resides cleanly via cache-swap."
-                    ),
-                }),
             },
             "optional": {
+                # genre_flavor and critic_model_id are NOT widgets here.
+                # They're inherited from the ledger's gen_params_initial
+                # (which LLMScriptWriter stamps at workflow entry):
+                #   - genre_flavor   <- gen_params_initial.genre_flavor
+                #   - critic_model_id <- gen_params_initial.cleanup_model_id
+                #     (or model_id as fallback). The cleanup model is the
+                #     LLMScriptWriter's "second LLM" widget so wiring the
+                #     critic to it lets one place control which model
+                #     judges the script. Set the writer's cleanup model
+                #     to a different family than its story model to keep
+                #     the two-immune-system property.
                 "block_on_reject": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
@@ -602,8 +596,6 @@ class LLMScriptCritic:
     def execute(
         self,
         script: str,
-        genre_flavor: str,
-        critic_model_id: str,
         block_on_reject: bool = False,
         optimization_profile: str = "Standard",
         timeout_sec: int = 90,
@@ -622,6 +614,45 @@ class LLMScriptCritic:
 
         t0 = time.time()
         script = script or ""
+
+        # Pull rubric params + inherited model/genre from the ledger's
+        # gen_params_initial. The writer stamps these at workflow entry
+        # (BUG-72), so they're the ground truth for what the user
+        # selected on the LLMScriptWriter widgets. We do NOT expose
+        # critic_model_id or genre_flavor as critic-node widgets -- one
+        # place to configure them keeps the UI clean and prevents drift.
+        rubric_params: dict = {}
+        inherited_genre = "hard sci fi"
+        inherited_model = "google/gemma-4-E4B-it"  # last-resort fallback
+        inherited_source = "fallback (no ledger params)"
+        try:
+            from .production_ledger import get_ledger
+            led_data = get_ledger().data
+            rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
+            if rubric_params.get("genre_flavor"):
+                inherited_genre = str(rubric_params["genre_flavor"])
+            # Critic uses the writer's CLEANUP model when available so
+            # the same widget that controls the writer's structural
+            # cleanup pass also controls the critic. If the user wants
+            # a separate-model critic gate, they set cleanup_model_id
+            # to something different from model_id on the writer node.
+            cm = rubric_params.get("cleanup_model_id")
+            wm = rubric_params.get("model_id")
+            if cm and str(cm).lower() not in ("auto", "(auto)", ""):
+                inherited_model = str(cm)
+                inherited_source = "ledger.cleanup_model_id"
+            elif wm:
+                inherited_model = str(wm)
+                inherited_source = "ledger.model_id (cleanup was auto)"
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[ScriptCritic] failed to read gen_params_initial from "
+                "ledger (%s) - falling back to defaults", exc,
+            )
+
+        critic_model_id = inherited_model
+        genre_flavor = inherited_genre
+
         if not script.strip():
             log.warning("[ScriptCritic] empty script - SKIPPED")
             _stamp_ledger_gate(
@@ -634,25 +665,10 @@ class LLMScriptCritic:
             )
             return (script, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
 
-        # Pull rubric params from the ledger's gen_params_initial. The
-        # writer stamps these at workflow entry (BUG-72), so they're
-        # the ground truth for what the user actually requested. We
-        # only override genre_flavor here because the critic node has
-        # its own widget for it (lets you re-judge an existing script
-        # against a different genre lens without re-running the writer).
-        rubric_params: dict = {}
-        try:
-            from .production_ledger import get_ledger
-            led_data = get_ledger().data
-            rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[ScriptCritic] failed to read gen_params_initial from "
-                "ledger (%s) - rubric will fail-open on every gate", exc,
-            )
-        # The genre_flavor widget on this node wins over the ledger
-        # value so the critic can re-score against a different lens.
-        rubric_params["genre_flavor"] = genre_flavor
+        log.info(
+            "[ScriptCritic] inherited from %s: model=%s genre=%s",
+            inherited_source, critic_model_id, genre_flavor,
+        )
 
         anti_slop = _load_anti_slop_rubric(rubric_params)
         prompt = _build_critic_prompt(script, genre_flavor, anti_slop)

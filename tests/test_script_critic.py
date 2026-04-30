@@ -507,18 +507,28 @@ class TestNodeStructure:
     def test_input_types_includes_required_widgets(self, critic_module):
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
         assert "required" in spec
-        for k in ("script", "genre_flavor", "critic_model_id"):
-            assert k in spec["required"], f"missing required widget: {k}"
+        # Only `script` is required; everything else is inherited from
+        # the ledger or has a sensible optional default.
+        assert "script" in spec["required"]
         assert "block_on_reject" in spec["optional"]
         assert "timeout_sec" in spec["optional"]
 
-    def test_default_critic_model_is_separate_from_writer(self, critic_module):
+    def test_critic_model_and_genre_are_inherited_not_widgets(self, critic_module):
+        """Both genre_flavor and critic_model_id must inherit from
+        LLMScriptWriter via the ledger, not be duplicated as critic
+        widgets. This is the UI design constraint Jeffrey set: one
+        place to configure each setting."""
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
-        default = spec["required"]["critic_model_id"][1]["default"]
-        # MUST not be the writer's default (Mistral-Nemo)
-        assert "Mistral-Nemo" not in default
-        # Default should be the small fast critic
-        assert "gemma-4-E4B" in default
+        all_keys = list(spec.get("required", {}).keys()) + list(spec.get("optional", {}).keys())
+        assert "genre_flavor" not in all_keys, (
+            "genre_flavor must inherit from ledger.gen_params_initial, "
+            "not be a critic widget"
+        )
+        assert "critic_model_id" not in all_keys, (
+            "critic_model_id must inherit from "
+            "ledger.gen_params_initial.cleanup_model_id, "
+            "not be a critic widget"
+        )
 
     def test_block_on_reject_defaults_off(self, critic_module):
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
