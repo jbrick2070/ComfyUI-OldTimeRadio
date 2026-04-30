@@ -619,24 +619,25 @@ class VideoComposite:
                     ),
                 }),
                 "audio_source": (
-                    ["master_mix", "humo_concat"],
-                    {"default": "master_mix",
+                    ["humo_concat", "master_mix"],
+                    {"default": "humo_concat",
                      "tooltip": (
-                         "master_mix (DEFAULT): existing 2-layer filter "
-                         "graph. Audio = procgen.wav (master_mix). HuMo "
-                         "clips overlay as VIDEO only; their native audio "
-                         "is discarded. Risk: lip-sync drift if master_mix "
-                         "differs from what HuMo was conditioned on.\n\n"
-                         "humo_concat: hybrid concat-demuxer pipeline. "
-                         "Each HuMo clip is concat'd with its NATIVE audio "
-                         "intact (mechanically perfect lip-sync). Gap "
-                         "windows between dialogue lines render the radio "
-                         "bookend full-canvas with a master_mix audio "
-                         "slice. Talking-radio identity stays continuous "
-                         "(music + SFX in gaps); lip-sync during dialogue "
-                         "is HuMo's untouched native audio.\n\n"
-                         "Requires ledger.radio_bookend_path; falls back "
-                         "to a procgen frame if the bookend missed."
+                         "humo_concat (DEFAULT, talking-radio): "
+                         "concat-demuxer pipeline where each HuMo clip "
+                         "keeps its NATIVE audio (mechanical lip-sync) "
+                         "and gap windows render the radio bookend image "
+                         "with master_mix audio slices (music + SFX + "
+                         "ANNOUNCER continuous in the gaps). "
+                         "Falls back to procgen frame if "
+                         "ledger.radio_bookend_path is missing. On any "
+                         "internal failure, falls through to master_mix "
+                         "so the run never breaks.\n\n"
+                         "master_mix: legacy 2-layer filter graph. Audio "
+                         "= procgen.wav (master_mix). HuMo clips overlay "
+                         "as VIDEO only; their native audio is discarded. "
+                         "Risk: lip-sync drift if master_mix differs from "
+                         "what HuMo was conditioned on. Use only for "
+                         "comparison or if humo_concat fails to deliver."
                      )},
                 ),
             },
@@ -656,7 +657,7 @@ class VideoComposite:
         fallback_clip_length: float = 7.0,
         ffmpeg: str = "ffmpeg",
         cleanup_clips_after_assembly: bool = False,
-        audio_source: str = "master_mix",
+        audio_source: str = "humo_concat",
     ):
         # `cleanup_clips_after_assembly` widget is wired but the deletion
         # logic itself is deferred (would happen post-assembly when the

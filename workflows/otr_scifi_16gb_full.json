@@ -1485,7 +1485,9 @@
         25,
         1080,
         7.0,
-        "ffmpeg"
+        "ffmpeg",
+        false,
+        "humo_concat"
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
