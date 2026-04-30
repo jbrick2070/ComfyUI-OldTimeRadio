@@ -299,12 +299,30 @@ BOTTOM: LTX animated background -- full canvas, opaque
 
 **Why CRT-on-top in `lighten` mode is more truthful:** a failing broadcast's scanlines + audio-peak flicker should cover the WHOLE frame including the speaker's face -- the interference doesn't politely stop at the pillarbox edges. Lighten mode takes max(CRT, underlying) per channel so artifacts ride on top without erasing detail; ~0.3 opacity keeps HuMo lip-sync readable while audio-reactive peaks make the CRT flare across LTX + HuMo together for unified broadcast-medium feel.
 
-**LTX render budget (per Jeffrey's loop + framerate refinements):**
-- **1-2 LTX clips per SCENE** (NOT per shot). Each ~5-10s. Loop across the scene's full duration via ffmpeg `-stream_loop -1` or filter-graph repetition with optional crossfade or ping-pong reverse to mask the loop tell.
-- **Render LTX at 12 fps** (not 24 fps). Atmospheric backgrounds (Mars dust drift, corridor smoke, slow zoom) read fine at 12 fps because the motion is slow. Halves the per-clip render time. Bonus: 12 fps matches old broadcast-TV cadence and reinforces the "Signal Lost" failing-broadcast aesthetic. ffmpeg `fps=25` filter handles upsample to canvas rate via frame doubling -- the eye doesn't notice the 12→25 stutter on slow-moving environmental content.
-- For Stellar-Shadows-sized episodes (1 scene, 3-5 min): 1 LTX render -> looped 30+ times. Budget: ~15-30s of LTX render time per episode (with 12 fps cut).
-- For 4-scene episodes: 4 LTX renders. Budget: ~1-2 min total.
-- Compare with per-shot LTX at 24 fps: would be 5-10 LTX renders per episode at full framerate = ~10-20 min. The per-scene-with-loop-at-12-fps pattern is ~10x cheaper without losing the "animated background" feel.
+**LTX render budget (Jeffrey-locked 2026-04-29 PM — render-native + slow-mo):**
+
+**Decision:** render LTX at its trained native fps (24 fps), then slow-mo to 12 fps in ffmpeg post. The same N frames cover 2× the timeline duration, motion stays coherent (LTX was trained at 24 fps so its temporal layers expect that cadence), and the slow-mo IS the SIGNAL LOST broadcast-degraded aesthetic. Three wins from one trick.
+
+- **1-2 LTX clips per SCENE** (NOT per shot). Loop across the scene's duration via ffmpeg `-stream_loop -1` with optional crossfade or ping-pong reverse to mask the loop tell on long scenes.
+- **Render at 24 fps native, then slow to 12 fps via ffmpeg `setpts=PTS*2,fps=12`.** LTX's diffusion temporal layers were trained at this cadence; rendering at 12 fps native produces stuttery / wrong-pace motion on environmental content. Render-native + post-slow keeps motion coherent AND reinforces the broadcast-degraded aesthetic.
+- **Frame budget: 193 frames per clip = 8 sec native = 16 sec apparent after 2× slow-mo.** Math: LTX uses 8x temporal VAE compression so frame counts must be `8n+1`. 193 = 24*8 + 1, sweet spot for 16 GB tier with FLUX/HuMo unloaded.
+- Optional dial-up to 241 frames (10 sec native, 20 sec apparent) when scenes are long and loop-tells become visible. Documented LTX-2.3 max is 257 frames per clip.
+- **Steps: distilled 4-8 steps** (default 6). Full-model 20-50 steps overkill for background loops -- HuMo is the hero, LTX is atmospheric.
+
+**Per-episode LTX wall-clock:**
+- Smoke run (1 scene): 1 x 50s LTX = ~50s per episode
+- Short run (3 scenes): ~2.5 min total
+- Medium run (5 scenes): ~4 min total
+
+That's negligible vs HuMo (~10 min per dialogue line). Total pipeline cost goes up by ~2-4 min for a richer 3-layer composite vs 2-layer.
+
+**Frame-count widget on `OTR_BatchLTXRender`:**
+```
+ltx_frames:    [97, 145, 193, 241]   (8n+1 dropdown, default 193)
+ltx_steps:     [4, 6, 8]             (distilled, default 6)
+slow_mo_factor: float (default 2.0)  (1.0 = no slow, 2.0 = half-speed)
+target_fps:    int (default 12)      (post-slow display rate)
+```
 
 **Implementation sketch:**
 - `OTR_VideoComposite` gains an optional `bottom_video` STRING input (path to LTX clip OR a list of one-per-scene clip paths). When set -> 3-layer mode, procgen flips to top-overlay-with-lighten. When unset -> current 2-layer architecture stands (BUG-092 unchanged).
