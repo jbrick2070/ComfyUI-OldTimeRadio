@@ -507,15 +507,16 @@ class TestNodeStructure:
         assert cls.RETURN_NAMES == ("script", "script_json", "critic_report", "verdict")
         assert cls.OUTPUT_NODE is True
 
-    def test_revise_on_findings_widget_present_and_off_by_default(self, critic_module):
+    def test_revise_on_findings_widget_present_and_on_by_default(self, critic_module):
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
         assert "revise_on_findings" in spec.get("optional", {}), (
             "revise_on_findings widget must exist on the critic node"
         )
         default = spec["optional"]["revise_on_findings"][1]["default"]
-        assert default is False, (
-            "revise_on_findings must default to OFF -- opt-in only "
-            "until critic calibration is trusted."
+        assert default is True, (
+            "revise_on_findings must default to ON -- the reviser is "
+            "the point of having a critic in the graph; set FALSE only "
+            "to inspect raw critic verdicts without rewriting."
         )
 
     def test_script_json_input_present(self, critic_module):

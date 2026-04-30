@@ -663,17 +663,19 @@ class LLMScriptCritic:
             },
             "optional": {
                 "revise_on_findings": ("BOOLEAN", {
-                    "default": False,
+                    "default": True,
                     "tooltip": (
-                        "When TRUE: on REVISE/REJECT verdicts, run a "
-                        "second LLM pass that rewrites the script in "
-                        "light of the rubric findings, then re-parses to "
-                        "script_json. Adds ~30-60s per run. When FALSE "
-                        "(default): the critic is OBSERVE-ONLY -- script "
-                        "+ script_json pass through unchanged regardless "
-                        "of verdict, findings still stamp the ledger. "
-                        "Flip ON once the critic's calibration is "
-                        "trusted."
+                        "When TRUE (default): on REVISE/REJECT "
+                        "verdicts, run a second LLM pass that rewrites "
+                        "the script in light of the rubric findings, "
+                        "then re-parses to script_json. Adds ~30-60s "
+                        "per run but the audio chain consumes the "
+                        "revised script. When FALSE: the critic is "
+                        "OBSERVE-ONLY -- script + script_json pass "
+                        "through unchanged regardless of verdict, "
+                        "findings still stamp the ledger. Flip OFF if "
+                        "you want to inspect raw critic verdicts "
+                        "without auto-rewriting."
                     ),
                 }),
                 # genre_flavor, critic_model_id, optimization_profile

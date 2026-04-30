@@ -1562,7 +1562,7 @@
       },
       "title": "Script Critic (gate)",
       "widgets_values": [
-        false,
+        true,
         false,
         90
       ]
