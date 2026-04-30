@@ -40,6 +40,51 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-117: SceneSequencer ran successfully but did NOT write back lines[].start_s / dur_s / bark_wav_path to ledger; downstream consumers see nulls
+
+- **Date:** 2026-04-30 06:21 | **Phase:** 0-3 | **Bible candidate:** yes
+- **Symptom:** Pending ledger `pending_20260430_061112` shows audio_gates[] with three completed stages (post_scene_sequencer 78s, post_audio_enhance 78s, post_episode_assembler 95s) AND voice_warnings populated AND transitions[] populated -- proving SceneSequencer + AudioEnhance + EpisodeAssembler all ran cleanly. But every entry in ledger.lines[] has `start_s: null`, `dur_s: null`, `bark_wav_path: null` after that pipeline. Two BUG-LOCAL-106 protective fixes were supposed to make SceneSequencer write per-line positions back into ledger.lines[]; they appear to have regressed OR the BUG-LOCAL-108 atomic-save/merge path is racing with the writer's initial ledger write and clobbering SceneSequencer's updates.
+- **Cause:** suspected -- two candidate causes, need to repro:
+  - (a) SceneSequencer's per-line write-back code path is broken on master since BUG-106 shipped
+  - (b) Production Ledger's atomic save loads stale on-disk state during one of the post-SceneSeq phases and overwrites the line timing fields with the writer's initial nulls
+  Direction (b) is more likely since SOME write-backs DID land (transitions[], audio_gates[], voice_warnings[]) but lines[] timing did not -- different fields take different write paths and the lines[] path may be the only one not whitelisted in BUG-108's merge logic.
+- **Impact:** scripts/qa_waveforms.py can't slice per-line audio without start_s. Any downstream tool that reads ledger.lines[] for timing sees nulls. HuMo render still works because it reads ledger.clips[] (its own output, post-write-back). But audio QA + ledger-driven post-production tooling is blind to per-line timing.
+- **Fix:** TBD -- needs targeted repro:
+  - Add log.info at SceneSequencer's write-back call site
+  - Add log.info at Production Ledger save() showing which fields land
+  - Run a fresh smoke episode and grep for the trace
+- **Verify:** TBD -- next clean run's `signal_lost_*_ledger.json` lines[] should have non-null start_s.
+- **Tags:** scene-sequencer, ledger-writeback, BUG-106-related, BUG-108-related, soak-tailer, auto-logged
+
+---
+
+### BUG-LOCAL-116: SFX render produces 3-millisecond WAVs (150 samples / 48000 sr) — entire SFX layer effectively silent
+
+- **Date:** 2026-04-30 06:20 | **Phase:** 0-3 | **Bible candidate:** yes
+- **Symptom:** Pending ledger `pending_20260430_061112` shows `ledger.sfx[]` with 6 entries:
+    ```
+    sfx_001: wav_path set, dur_s = 0.003125
+    sfx_002: wav_path set, dur_s = 0.003125
+    sfx_003: wav_path set, dur_s = 0.003125
+    sfx_004: wav_path set, dur_s = 0.003125
+    sfx_005: wav_path set, dur_s = 0.003125
+    sfx_006: wav_path = null,  dur_s = null
+    ```
+  All five rendered SFX cues are EXACTLY 3.125 ms -- math is `150 / 48000 = 0.003125`, suggesting BatchAudioGenGenerator is producing a constant 150-sample output regardless of the requested duration. The 6th cue ("Ominous rumble") didn't render at all (wav_path null).
+- **Cause:** suspected -- BatchAudioGenGenerator has a bug where the sample-count or duration argument is being clamped or replaced by a constant default. Either:
+  - (a) the duration request from Director (sfx_plan[i].dur_s) isn't being passed through to AudioGen's generate() call
+  - (b) AudioGen is being called with a 150-sample max_new_tokens / num_samples that should be much higher (~3-10 seconds * 48000 = ~150k-480k samples)
+  - (c) the generation succeeded at full length but the writeback truncates to a 150-sample header
+- **Impact:** "TALKING RADIO" identity loses one of its three voices entirely. Music + ANNOUNCER survive; SFX (dramatic stings, environmental ambience, electrical surge, mechanical hum) all silent. Episodes feel hollow during the gaps.
+- **Fix:** TBD -- BatchAudioGenGenerator code audit needed:
+  - Find the sample/duration math in nodes/batch_audiogen_generator.py
+  - Compare against Director's sfx_plan[i].dur_s values
+  - Verify the actual on-disk WAVs (`models/sfx_cache/sfx_*.wav`) are 3ms or longer; if longer, the bug is in the writeback / dur_s stamp; if 3ms, the bug is in the generate call
+- **Verify:** TBD -- next clean run's `ledger.sfx[].dur_s` should be > 1.0s for every entry; sox / ffprobe on the on-disk WAV should show multi-second duration.
+- **Tags:** audiogen, sfx, talking-radio, sample-count, soak-tailer, auto-logged
+
+---
+
 ### BUG-LOCAL-115: TITLE_RESOLVE_FAIL on overnight soak — auto-title-from-spine doesn't reach script_json, widget empty, run dies after ~3 min of writer work [PARTIAL FIX in commit pending: third fallback to news_seed.headline]
 
 - **Date:** 2026-04-30 06:25 | **Phase:** 0-3 | **Bible candidate:** yes
