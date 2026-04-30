@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Last updated:** 2026-04-26 PM (peer-review fixes landed: ITU loudness normalization + ffprobe corrupt-clip guard in concat orchestrator; LLM dropdown now defaults to Mistral-Nemo-Instruct-2407 again — Captain-Eris-Violet and Mag-Mell-R1 RP fine-tunes remain in the dropdown for users who want creative voice but they fail structured rescue prompts; planned follow-up is a two-LLM split (creative + cleanup model_id widgets); cache-mismatch reload thrash fixed at the LLM cache layer (BUG-LOCAL-065); silent dialogue drop between Grammarian and parser fixed at three asymmetric stages (BUG-LOCAL-066); FLUX pass1+pass3 + verifier shipped, FULL workflow trial green for audio+FLUX+1 HuMo demo, auto-title from spine + SeedVR2 1080p upscale orchestrator landed; v2.0-alpha delivery-chain orchestrators shipped — concat-and-mux + cabinet-frame composite are in scripts/, awaiting first end-to-end episode test)
+**Last updated:** 2026-04-29 PM (enhanced-narrative pipeline shipped end-to-end: ScriptCritic gate (Gemma-4 E4B as separate judge) wired into otr_scifi_16gb_full.json, OTR-CANON.md auto-included in writer's system prompt, dynamic anti-slop rubric with [applies_when] gates filtered per-run from ledger gen_params_initial, news curation Option B (parallel body-fetch + body-aware LLM re-rank), news-history dedup with full-wipe restoration BUG-LOCAL-112 fix, news_seed stamped in ledger.meta, VideoComposite cleanup_clips_after_assembly TypeError fixed, INPUT_TYPES vs FUNCTION audit script (66 classes, 0 HIGH-priority issues), QA tooling for episode review (qa_frames + qa_waveforms + qa_episode), per-model context_cap dict, in-workflow VRAMContextTest node, HF cache migration to C:\ComfyUI-Models, early ledger init at workflow phase 0, per-clip incremental ledger save during HuMo render, smoke preset target_words=100 + 1-act, Gemma-4 E2B/E4B added to dropdown + Gemma 2 family removed, Captain-Eris/Mag-Mell marked EXPERIMENTAL; 186/186 tests passing)
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 
@@ -50,6 +50,61 @@ The Step 1-5 work below is **gated on the next FULL queue's QA pass.** Verify in
 4. User perception of lip-sync: alignment within ~30 ms across whole episode (audio no longer reliably leads lips).
 
 If any of (1)-(4) fail, triage / re-tune the relevant fix BEFORE starting Step 1. Do not stack new visual work on top of a still-broken audio stack.
+
+---
+
+## v2.0-alpha session log — 2026-04-29 PM (enhanced narrative pipeline)
+
+Eight commits shipped today on `v2.0-alpha`. End-to-end enhanced narrative path is now active:
+
+- **`62382dd`** — Option B news curation. `_llm_rerank_with_bodies` plus parallel `ThreadPoolExecutor` body-fetch of top 5 candidates. The old serial walk-the-list bailed at the first acceptable headline; the new flow body-fetches all five in parallel (~10s) then asks the LLM to re-rank by article content, not catchy title. Total ~50s, comfortably under the 65s news-curation budget. Side fix: `vram_context_test.py` writes report through `folder_paths.get_output_directory()` to satisfy BUG-01.02.
+- **`b1b422b`** — `nodes/script_critic.py` (`OTR_LLMScriptCritic` node), `docs/OTR-ANTI-SLOP.md` (placeholder rubric), `docs/OTR-CANON.md` (SIGNAL LOST canon — tonal rules, period rules, motifs, used premises/twists/motifs sections). Critic node is OUTPUT_NODE=True, advisory by default (`block_on_reject=False`), default judge model is Gemma-4 E4B (different from Mistral-Nemo writer = two-immune-system gate). 27 unit tests. Cache invalidation between writer→critic→writer model swaps via the BUG-LOCAL-111 plumbing.
+- **`7f37fe9`** — Anti-slop dynamic template. 46-rule rubric (A1-A46) plus 12 directives (B1-B12) with `[applies_when: ...]` gates and `{placeholder}` tokens. Loader (`_normalize_target_length`, `_evaluate_gate` sandboxed eval, `_coerce_params` no-defaults, `_filter_rubric`, `_SafeMissing` partial-tolerant placeholder substitution) filters per-run from ledger `gen_params_initial`. Drops "tiny" → "smoke", removes default-value masking. 28 new unit tests.
+- **`21aba38`** — VideoComposite TypeError fix. `cleanup_clips_after_assembly` widget was added to INPUT_TYPES earlier this session but execute() signature was never updated; ComfyUI passes every INPUT_TYPES key as a kwarg, function rejected with TypeError. Added param with `default=False`, log-only when True (deletion logic still deferred per session plan).
+- **`f520e12`** — `scripts/audit_input_types_vs_signatures.py`. AST walks every OTR node class, extracts INPUT_TYPES widget keys, finds the matching FUNCTION method, flags any widget the function won't accept. Audit on commit 21aba38: 66 classes, 0 HIGH-priority issues. Run before any push that touches a node's widgets.
+- **`5ec2fcd`** — QA tooling. `scripts/qa_frames.py` (smart per-clip frame extraction at boundary stress points, hard-cap 60 frames), `scripts/qa_waveforms.py` (matplotlib per-line waveform PNGs + episode summary, with prepad/tail-silence markers, falls back to ffmpeg audio extraction when `final_audio_path` is null), `scripts/qa_episode.py` (one-shot wrapper). Live-tested on `signal_lost_viral_bloom_protocol_20260429_175715`: 10/10 frames + 2/2 line plots in <4s. Cowork's native Read tool consumes both formats cleanly.
+- **`61a85b3`** — BUG-LOCAL-112: news-history reset actually restores the unfiltered pool. Symptom from `pending_20260429_204318`: news fetch returned 43 headlines, history-dedup filtered ALL 43, the warning fired but the "reset" was a no-op. Real fix: stash the unfiltered pool before filtering, restore on full wipe. Better to pick a recent repeat than starve the writer with zero context.
+- **`16294df`** — Wire ScriptCritic into `workflows/otr_scifi_16gb_full.json` (id=53, link=84 from writer slot 0 → critic slot 0; writer's link to Director unchanged). Wire OTR-CANON.md into the writer's system prompt at `write_script` entry: new `_load_canon_for_writer()` helper reads tonal rules / period rules / recurring motifs / used premises/twists/motifs, escapes literal `{}` so `.format()` doesn't choke, prepends to `SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT`. Skipped on small models (Gemma-4 E2B and below) to avoid Model Collapse.
+
+### Earlier in this same session (commits before the enhanced-narrative push)
+
+- Per-model `_MODEL_CONTEXT_CAPS` dict replacing the primitive heuristic (Mistral-Nemo→16384, Gemma 4 E2B/E4B→16384, Qwen 14B→12288, EXPERIMENTAL→12288, default→8192).
+- `nodes/vram_context_test.py` — in-workflow `OTR_VRAMContextTest` node (production-accurate VRAM measurement). Three-column reporting (VRAM nvml = nvidia-smi truth, VRAM torch = process allocator, CPU RAM = host-side, never mixed into VRAM accounting).
+- `_run_with_timeout` BUG-LOCAL-111: invalidate `_LLM_CACHE` on `FuturesTimeout` so the next phase forces a fresh load and avoids `cudaErrorIllegalAddress` from orphan worker threads.
+- HF cache architecture: `setx HF_HUB_CACHE / HF_HOME / OTR_MODELS_DIR` to `C:\ComfyUI-Models`, NTFS rename of `Documents\ComfyUI\models` → `C:\ComfyUI-Models` (~316 GB moved in 5 sec), `scripts/consolidate_hf_cache.py` recovered ~50 GB of deduped AppData shadow.
+- Early ledger init at `write_script` entry — closes the 5+ minute observability gap, stamps `gen_params_initial` and `log_paths` from t=0.
+- Per-clip incremental ledger save inside `BatchHumoRender` loop — crash resilience. New `resume_from_ledger` BOOLEAN widget (default ON) skips already-rendered clips on retry.
+- Per-character voice priming + AISM negative-constraint bullets in `SCRIPT_SYSTEM_PROMPT` (animated-environment cliches, telegraphed emotion).
+- `num_characters` widget min: 2 → 1 (monologue mode).
+- `target_words` widget min: 350 → 100 (smoke step-down).
+- `target_length` dropdown: added "smoke (1 act)" tier.
+- 1-character monologue support (`PreFlight` char clamp respects user-explicit num_characters=1, `has_cast` assertion >= 1).
+- `_VOICE_TRAITS` constant + `_check_voice_consistency()` helper stamps `ledger.voice_warnings`.
+- LLM dropdown: Gemma 4 E2B/E4B added, Gemma 2 family removed (BUG-LOCAL-110 — bnb NF4 + Gemma 2 + Blackwell sm_120 = CUDA assert), Captain-Eris/Mag-Mell marked EXPERIMENTAL and reordered to bottom.
+
+### Open items after today's session (testing-gated)
+
+The next FULL workflow run is the QA gate. After it lands clean, prioritise in this order:
+
+1. **Inspect `ledger.script_gates[]`** in the new ledger. Read the critic's verdict, score, fired rules. Tune the rubric thresholds (90/70/0) if calibration is off.
+2. **Decide if `block_on_reject=True` is safe to flip** based on calibration data from 3-5 runs.
+3. **Drop "tiny" label** from the workflow JSON / target_length dropdown UI display (rubric loader already normalizes; this is just UX polish).
+4. **News-history fuzzy dedup for syndication edge case** — URL dedup catches direct repeats; same content with different URLs (Orion Flywheel duplicate yesterday) needs a fuzzy headline match. Filed.
+5. **Empty-section pruning in filtered rubric** — a 1-character run keeps the `### Ensemble-voice collapse` heading even after all 3 rules are filtered out. Wastes a few tokens, doesn't break anything. Low priority.
+6. **Diff 3 — spine ledger-stamping with bundled metadata + schema bump l3 → l4** (filed in `docs/2026-04-29-spine-ledger-stamping-ticket.md`, scheduled with explicit unblock conditions).
+7. **LLM edge-case matrix sweep** (6 rows queued in `docs/2026-04-29-llm-edge-case-matrix.md`).
+8. **VRAM measurement runs via `OTR_VRAMContextTest` node** to tune `_MODEL_CONTEXT_CAPS` from real data (currently conservative defaults).
+9. **GGUF unblock check** — lazy poll for cu13 wheel OR Path Y install window (filed in `docs/2026-04-29-gguf-parked.md`).
+10. **VideoComposite cleanup deletion logic** — widget shipped, no-op for now. Wire actual deletion when stable enough to trust.
+11. **Auto-update `OTR-CANON.md` from passing critic verdicts** — `_canon_update()` helper exists in `script_critic.py` but is intentionally not called yet. Wire in once we have 3-5 runs of critic data.
+
+### Acceptance gate for this session's work
+
+- Critic stamps `ledger.script_gates[]` on every run (advisory mode).
+- Body-aware news re-rank logs `[NewsFetcher] body re-rank chose #N: ...`.
+- News history reset never produces a "Body-fetching top 0 candidate(s)" line again.
+- Writer system prompt contains `<canon>...</canon>` block on every Mistral-Nemo run (skipped silently on small models).
+- `qa_episode.py --latest` produces frames + waveforms for the next finished episode.
 
 ---
 
