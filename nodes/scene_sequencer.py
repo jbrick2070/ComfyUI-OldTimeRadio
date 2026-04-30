@@ -820,9 +820,17 @@ class SceneSequencer:
                 # placements instead of the BUG-094 word-share
                 # estimator's wrong-when-music-or-pauses-exist guess.
                 if item_type == "dialogue":
+                    # ROADMAP P0 step 4b (2026-04-30): tag the line's
+                    # speaker_role so the ledger write-back can stamp
+                    # it onto ledger.lines[].  Announcer dialogue
+                    # routes BatchHumoRender to the radio still I2V
+                    # ref; everything else uses the cast portrait.
+                    _ch_upper = item.get("character_name", "").strip().upper()
+                    _role = "announcer" if _ch_upper == "ANNOUNCER" else "character"
                     dialogue_positions.append({
                         "text": (item.get("line") or "").strip(),
                         "speaker": item.get("character_name", "UNKNOWN"),
+                        "speaker_role": _role,
                         "start_s": float(current_sample_pos) / float(sample_rate),
                         "dur_s": float(seg_len) / float(sample_rate),
                     })
@@ -934,6 +942,14 @@ class SceneSequencer:
                         # Mark these positions as scene-audio-relative
                         # so EpisodeAssembler knows whether to shift.
                         _row["start_s_space"] = "scene_audio"
+                        # ROADMAP P0 step 4b (2026-04-30): stamp
+                        # speaker_role so BatchHumoRender's
+                        # ref-image swap branches on the right value.
+                        # Default to "character" if dialogue_positions
+                        # somehow didn't supply a role (defensive).
+                        _row["speaker_role"] = (
+                            _pos.get("speaker_role") or "character"
+                        )
                         _matched += 1
 
                     # BUG-LOCAL-107 (authoritative-log expansion):
@@ -946,6 +962,14 @@ class SceneSequencer:
                     # alongside lines[] / clips[].
                     _ledger_sfx = _led.get("sfx") or []
                     _sfx_matched = 0
+                    # ROADMAP P0 step 4b (2026-04-30): also collect
+                    # SFX entries in a parallel list for mirroring
+                    # into ledger.lines[] below.  This is what gives
+                    # BatchHumoRender wall-to-wall iteration coverage
+                    # without it having to walk a separate ledger
+                    # array.  ledger.sfx[] stays populated for any
+                    # back-compat consumers.
+                    _sfx_to_mirror_into_lines = []
                     for _sfx_idx, (_sfx_pos, _sfx_np, _sfx_desc) in enumerate(sfx_timeline):
                         if _sfx_idx >= len(_ledger_sfx):
                             break
@@ -958,6 +982,45 @@ class SceneSequencer:
                         if _sfx_desc and not _sfx_row.get("description"):
                             _sfx_row["description"] = str(_sfx_desc)
                         _sfx_matched += 1
+                        # Mirror entry candidate.
+                        _sfx_to_mirror_into_lines.append({
+                            "line_id": _sfx_row.get("sfx_id") or _sfx_row.get("id") or f"sfx_{_sfx_idx:03d}",
+                            "speaker": "SFX",
+                            "speaker_role": "sfx",
+                            "text": str(_sfx_desc) if _sfx_desc else "",
+                            "start_s": float(_sfx_pos) / float(sample_rate),
+                            "dur_s": float(len(_sfx_np)) / float(sample_rate),
+                            "start_s_space": "scene_audio",
+                            "shot_id": _sfx_row.get("shot_id"),
+                        })
+
+                    # ROADMAP P0 step 4b: append SFX mirrors to
+                    # ledger.lines[] so BatchHumoRender's existing
+                    # speaker_role-aware loop picks them up.  Skip
+                    # if any line already has a matching line_id
+                    # (idempotent across reruns; protects resume
+                    # behavior).  ledger.sfx[] is NOT removed -- it
+                    # remains the canonical SFX index for any
+                    # consumer that walks SFX explicitly.
+                    if _sfx_to_mirror_into_lines:
+                        _existing_ids = {
+                            ln.get("line_id") for ln in _ledger_lines
+                            if isinstance(ln, dict) and ln.get("line_id")
+                        }
+                        _appended = 0
+                        for _mirror in _sfx_to_mirror_into_lines:
+                            if _mirror["line_id"] in _existing_ids:
+                                continue
+                            _ledger_lines.append(_mirror)
+                            _appended += 1
+                        if _appended:
+                            _led["lines"] = _ledger_lines
+                            log.info(
+                                "[SceneSequencer] mirrored %d SFX cue(s) "
+                                "into ledger.lines[] with speaker_role=sfx "
+                                "(BatchHumoRender wall-to-wall coverage)",
+                                _appended,
+                            )
 
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
