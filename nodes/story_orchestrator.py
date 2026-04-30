@@ -1356,6 +1356,103 @@ def _llm_rank_news_candidates(
         return list(pool[:top_k])
 
 
+def _llm_rerank_with_bodies(
+    candidates_with_body: list[dict],
+    genre_flavor: str,
+    model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
+    optimization_profile: str = "Standard",
+) -> list[dict]:
+    """Body-aware second-pass news rank ("Option B / 65s budget").
+
+    Phase-1 ranking (`_llm_rank_news_candidates`) operates on headlines
+    only -- ~160 chars each. This pass feeds the LLM the first ~800
+    chars of each candidate's actual article body so the pick is based
+    on narrative bones, not the catchy title. Returns the input list
+    re-ordered (best first). On ANY failure (timeout, parse error, LLM
+    unavailable) returns the input list unchanged so the caller's
+    normal fallback walk still works. Body re-rank is an enhancement,
+    never a blocker.
+
+    Designed to fit inside the 65-second news-curation wall-clock
+    budget alongside Phase 1: Phase 1 ~10-15s + parallel body-fetch
+    ~5-10s + this re-rank ~25-40s ~= 50s total.
+    """
+    if len(candidates_with_body) <= 1:
+        return list(candidates_with_body)
+    try:
+        BODY_PREVIEW_CHARS = 800
+        blocks = []
+        for i, c in enumerate(candidates_with_body):
+            headline = (c.get("headline") or "").strip()[:160]
+            body = (c.get("full_text") or c.get("summary") or "").strip()
+            body_preview = body[:BODY_PREVIEW_CHARS].replace("\n", " ")
+            blocks.append(
+                f"{i + 1}. HEADLINE: {headline}\n   ARTICLE: {body_preview}"
+            )
+        text = "\n\n".join(blocks)
+        genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+        prompt = (
+            f"You are picking ONE news story to seed a {genre_human} radio "
+            f"drama. You have already shortlisted {len(candidates_with_body)} "
+            f"candidates by headline. Now you can read each article body. "
+            f"Choose the SINGLE story with the strongest narrative bones "
+            f"for a 1940s-style radio drama: specific human stakes, "
+            f"mystery, scientific breakthrough, or vivid scene potential. "
+            f"Avoid press releases, funding announcements, and generic "
+            f"'researchers find X' filler.\n\n"
+            f"Return ONLY the chosen index, no other text. Example: 3\n\n"
+            f"Candidates:\n{text}\n\n"
+            f"Best index:"
+        )
+
+        def _do_rerank_call():
+            # Same temperature=0.05 trick as headline rank: transformers
+            # rejects 0.0; tiny positive value is effectively argmax.
+            return _generate_with_llm(
+                prompt,
+                model_id=model_id,
+                max_new_tokens=8,
+                temperature=0.05,
+                top_p=1.0,
+                optimization_profile=optimization_profile,
+            )
+
+        response = _run_with_timeout(
+            _do_rerank_call,
+            timeout_sec=40,
+            phase_label="NewsCurationDeep",
+        )
+        m = re.search(r"\d+", str(response or ""))
+        if not m:
+            log.warning(
+                "[NewsFetcher] body re-rank returned no parseable index "
+                "(response=%r) - keeping headline order",
+                str(response)[:120],
+            )
+            return list(candidates_with_body)
+        idx = int(m.group(0)) - 1
+        if not (0 <= idx < len(candidates_with_body)):
+            log.warning(
+                "[NewsFetcher] body re-rank index %d out of range "
+                "(have %d) - keeping headline order",
+                idx + 1, len(candidates_with_body),
+            )
+            return list(candidates_with_body)
+        chosen = candidates_with_body[idx]
+        rest = [c for i, c in enumerate(candidates_with_body) if i != idx]
+        log.info(
+            "[NewsFetcher] body re-rank chose #%d: %s",
+            idx + 1, (chosen.get("headline") or "")[:80],
+        )
+        return [chosen] + rest
+    except Exception as exc:  # noqa: BLE001 -- enhancement, never blocks
+        log.warning(
+            "[NewsFetcher] body re-rank failed (%s) - keeping headline order",
+            exc,
+        )
+        return list(candidates_with_body)
+
+
 def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
                          model_id=None, optimization_profile="Standard"):
     """Fetch science stories from multiple RSS feeds in parallel.
@@ -1535,46 +1632,104 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
         non_ranked = [p for p in pool if p.get("link") not in ranked_links]
         pool = ranked + non_ranked
 
-    # Content quality floor: try up to 5 candidates until we get a rich article.
-    # Thin content (<400 chars) gives Gemma too little to extrapolate from -
-    # the story ends up generic rather than grounded in real science.
+    # 2026-04-29 Option B: parallel body-fetch + LLM body-aware re-rank.
+    # Old behavior: serial walk-the-list, break at first candidate above
+    # the content floor. Time spent: only as long as candidate-1 fetch
+    # took. New behavior: body-fetch ALL top-N in parallel (network-
+    # bound, fast), then ask the LLM to re-pick using actual article
+    # text instead of just the headline. Total budget ~50s, comfortably
+    # under the 65s news-curation ceiling. The LLM stays warm for
+    # NewsSummary which fires next, so the re-rank's GPU time is not
+    # wasted.
+    #
+    # Thin content (<400 chars) gives the writer too little to
+    # extrapolate from -- the story ends up generic rather than
+    # grounded in real science. Anything below the floor is excluded
+    # from the re-rank pool.
     CONTENT_FLOOR = 400
     MAX_ATTEMPTS = 5
-    chosen = None
 
-    for candidate in pool[:MAX_ATTEMPTS]:
-        result = candidate
-
-        # Resolve full article text - 3-tier: rss_full - URL scrape - summary
-        if result.get("rss_full") and len(result["rss_full"]) > 300:
-            result["full_text"] = result["rss_full"]
-            log.info("[NewsFetcher] Full text from RSS content field: %d chars", len(result["full_text"]))
-        elif result.get("link"):
-            log.info("[NewsFetcher] Attempting to fetch full article: %s", result["link"])
-            fetched = _fetch_full_article(result["link"], timeout=5)
+    def _resolve_body(candidate: dict) -> dict:
+        """Body resolver for one candidate. Pure; thread-safe."""
+        out = dict(candidate)
+        if out.get("rss_full") and len(out["rss_full"]) > 300:
+            out["full_text"] = out["rss_full"]
+            out["_body_source"] = "rss_full"
+            log.info(
+                "[NewsFetcher] [%s] RSS full body: %d chars",
+                (out.get("headline") or "")[:50],
+                len(out["full_text"]),
+            )
+        elif out.get("link"):
+            fetched = _fetch_full_article(out["link"], timeout=5)
             if fetched and len(fetched) > 300:
-                result["full_text"] = fetched
-                log.info("[NewsFetcher] Full article fetched: %d chars", len(result["full_text"]))
+                out["full_text"] = fetched
+                out["_body_source"] = "url_scrape"
+                log.info(
+                    "[NewsFetcher] [%s] scraped article: %d chars",
+                    (out.get("headline") or "")[:50],
+                    len(out["full_text"]),
+                )
             else:
-                result["full_text"] = result["summary"]
-                log.info("[NewsFetcher] Article fetch failed or blocked - falling back to RSS summary (%d chars)", len(result["full_text"]))
+                out["full_text"] = out.get("summary", "")
+                out["_body_source"] = "summary_fallback"
+                log.info(
+                    "[NewsFetcher] [%s] scrape blocked - RSS summary (%d chars)",
+                    (out.get("headline") or "")[:50],
+                    len(out["full_text"]),
+                )
         else:
-            result["full_text"] = result["summary"]
-            log.info("[NewsFetcher] No URL - using RSS summary (%d chars)", len(result["full_text"]))
+            out["full_text"] = out.get("summary", "")
+            out["_body_source"] = "summary_only"
+        return out
 
-        if len(result.get("full_text", "")) >= CONTENT_FLOOR:
-            chosen = result
-            break
-        else:
-            log.warning("[NewsFetcher] Article too thin (%d chars) - trying next candidate: %s",
-                        len(result.get("full_text", "")), result["headline"][:60])
+    attempts = pool[:MAX_ATTEMPTS]
+    log.info(
+        "[NewsFetcher] Body-fetching top %d candidate(s) in parallel...",
+        len(attempts),
+    )
+    body_start = time.time()
+    # Cap workers at len(attempts) -- ThreadPoolExecutor errors on max_workers=0.
+    with ThreadPoolExecutor(max_workers=max(1, len(attempts))) as ex:
+        fetched = list(ex.map(_resolve_body, attempts))
+    log.info(
+        "[NewsFetcher] Body-fetch complete in %.2fs",
+        time.time() - body_start,
+    )
 
-    if chosen is None:
-        # All candidates were thin - take the richest one we found
-        chosen = max(pool[:MAX_ATTEMPTS], key=lambda x: len(x.get("full_text", x.get("summary", ""))))
+    rich = [
+        c for c in fetched
+        if len(c.get("full_text", "")) >= CONTENT_FLOOR
+    ]
+
+    if rich:
+        log.info(
+            "[NewsFetcher] %d/%d candidate(s) passed content floor "
+            "(>=%d chars) -> body re-rank",
+            len(rich), len(fetched), CONTENT_FLOOR,
+        )
+        if model_id and len(rich) > 1:
+            rich = _llm_rerank_with_bodies(
+                rich,
+                genre_flavor=genre_flavor,
+                model_id=model_id,
+                optimization_profile=optimization_profile,
+            )
+        chosen = rich[0]
+    else:
+        # All candidates thin - take the richest available so the run
+        # continues. Better a thin real story than a hard fail.
+        chosen = max(
+            fetched,
+            key=lambda x: len(x.get("full_text", x.get("summary", ""))),
+        )
         chosen.setdefault("full_text", chosen.get("summary", ""))
-        log.warning("[NewsFetcher] All %d candidates were thin - using richest available (%d chars): %s",
-                    MAX_ATTEMPTS, len(chosen["full_text"]), chosen["headline"][:60])
+        log.warning(
+            "[NewsFetcher] All %d candidate(s) were thin - using richest "
+            "available (%d chars): %s",
+            len(fetched), len(chosen["full_text"]),
+            chosen.get("headline", "")[:60],
+        )
 
     # Record selection so back-to-back runs don't repeat. Best-effort;
     # logged warning on failure, never blocks generation.

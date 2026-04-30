@@ -355,6 +355,27 @@ class VRAMContextTest:
                 )
 
         report = "\n".join(lines) + "\n"
+
+        # Side-effect: persist the report to ComfyUI's standard output
+        # directory so it survives the session and can be diffed across
+        # runs. Use folder_paths (BUG-01.02 rule -- output nodes must
+        # NEVER hardcode paths). Best-effort; failure here doesn't
+        # block returning the in-memory report to the workflow.
+        try:
+            import folder_paths  # type: ignore
+            out_root = Path(folder_paths.get_output_directory()) / "otr" / "vram_tests"
+            out_root.mkdir(parents=True, exist_ok=True)
+            stamp = time.strftime("%Y%m%d_%H%M%S")
+            safe_model = model_id.replace("/", "_").replace(":", "_")
+            out_path = out_root / f"vram_test_{stamp}_{safe_model}.md"
+            out_path.write_text(report, encoding="utf-8")
+            log.info("[VRAMContextTest] report written: %s", out_path)
+        except Exception as save_exc:  # noqa: BLE001
+            log.warning(
+                "[VRAMContextTest] report save failed (non-fatal): %s",
+                save_exc,
+            )
+
         log.info("[VRAMContextTest] complete (%d probes)", len(results))
         return (report,)
 
