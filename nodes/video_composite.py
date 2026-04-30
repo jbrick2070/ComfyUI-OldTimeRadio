@@ -381,7 +381,20 @@ class VideoComposite:
         humo_target_height: int = 1080,
         fallback_clip_length: float = 7.0,
         ffmpeg: str = "ffmpeg",
+        cleanup_clips_after_assembly: bool = False,
     ):
+        # `cleanup_clips_after_assembly` widget is wired but the deletion
+        # logic itself is deferred (would happen post-assembly when the
+        # final mp4 is verified). Until then we just accept the kwarg
+        # without crashing and log if it was requested -- ComfyUI passes
+        # every INPUT_TYPES key as a kwarg, so the parameter MUST be in
+        # the signature even if the side-effect isn't implemented yet.
+        if cleanup_clips_after_assembly:
+            log.info(
+                "[VideoComposite] cleanup_clips_after_assembly=True requested "
+                "but deletion logic is not yet implemented -- clips kept "
+                "for now (this is a known TODO, not a regression)."
+            )
         t_start = time.time()
         ffprobe = ffmpeg.replace("ffmpeg", "ffprobe") if ffmpeg.endswith("ffmpeg") else "ffprobe"
 
