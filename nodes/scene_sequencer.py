@@ -1333,6 +1333,73 @@ class EpisodeAssembler:
                                 _mc["dur_s"] = _closing_dur_s
                                 _mc["start_s_space"] = "master_mix"
 
+                        # ROADMAP P0 step 4c (2026-04-30): mirror music
+                        # cues into ledger.lines[] with speaker_role so
+                        # BatchHumoRender renders them as HuMo clips
+                        # using the radio still as I2V reference.  This
+                        # closes the wall-to-wall coverage gap -- no
+                        # more silent music windows in the visual.
+                        # Idempotent: skip cues whose line_id is already
+                        # present (resume safety).  Only mirrors cues
+                        # that have actual master_mix-space timing
+                        # populated (so we don't append placeholder
+                        # rows when a workflow runs without themes).
+                        _lines_for_music = _led.get("lines") or []
+                        _existing_music_ids = {
+                            ln.get("line_id") for ln in _lines_for_music
+                            if isinstance(ln, dict) and ln.get("line_id")
+                        }
+                        _CUE_TO_ROLE = {
+                            "opening":   "music_open",
+                            "closing":   "music_close",
+                            # Future-proofing: any other cue_id we see
+                            # gets the music_inter role -- safer than
+                            # dropping it on the floor.
+                        }
+                        _appended_music = 0
+                        for _mc in _music_rows:
+                            if (
+                                _mc.get("start_s_space") != "master_mix"
+                                or not isinstance(_mc.get("dur_s"), (int, float))
+                                or float(_mc.get("dur_s", 0.0)) <= 0.0
+                            ):
+                                continue
+                            _cue = (_mc.get("cue_id") or "").strip().lower()
+                            _role = _CUE_TO_ROLE.get(_cue, "music_inter")
+                            _line_id = (
+                                _mc.get("line_id")
+                                or f"music_{_cue or 'inter'}_{_mc.get('cue_id') or _appended_music:>03}"
+                            )
+                            if _line_id in _existing_music_ids:
+                                continue
+                            _lines_for_music.append({
+                                "line_id":      _line_id,
+                                "speaker":      "RADIO",
+                                "speaker_role": _role,
+                                "text":         (
+                                    _mc.get("description")
+                                    or _mc.get("title")
+                                    or f"{_cue or 'interstitial'} music"
+                                ),
+                                "start_s":      float(_mc.get("start_s") or 0.0),
+                                "dur_s":        float(_mc.get("dur_s")),
+                                # Already in master_mix space because
+                                # the cue_id stamp above wrote
+                                # _mc["start_s_space"] = "master_mix".
+                                "start_s_space": "master_mix",
+                                "shot_id":      _mc.get("shot_id"),
+                            })
+                            _appended_music += 1
+                        if _appended_music:
+                            _led["lines"] = _lines_for_music
+                            log.info(
+                                "[EpisodeAssembler] mirrored %d music cue(s) "
+                                "into ledger.lines[] with speaker_role "
+                                "(BatchHumoRender wall-to-wall coverage "
+                                "via radio still I2V ref)",
+                                _appended_music,
+                            )
+
                     # BUG-LOCAL-107: append crossfade boundaries to
                     # ledger.transitions[] so post-mortem can audit
                     # the seam between opening->scene and scene->closing.
