@@ -960,6 +960,7 @@ class LLMScriptCritic:
                     # _parse_script only reads class-level constants
                     # (_GENDER_WORDS), no real writer state.
                     revised_script = rev_text
+                    parsed_lines = None
                     try:
                         from .story_orchestrator import LLMScriptWriter as _LW
                         parsed_lines = _LW()._parse_script(rev_text)
@@ -978,6 +979,57 @@ class LLMScriptCritic:
                         "%d -> %d chars",
                         rev_elapsed, len(script), len(revised_script),
                     )
+
+                    # BUG-LOCAL-117 fix 2026-04-30: when the reviser
+                    # rewrites the script, ledger.lines[] (stamped by
+                    # the writer with the ORIGINAL text) becomes stale.
+                    # Downstream SceneSequencer text-matches dialogue
+                    # against ledger.lines[].text to write start_s/dur_s
+                    # back -- with stale text, no matches, ALL line
+                    # timings end up null. Cascade hits qa_waveforms.py
+                    # and any tooling reading ledger.lines[] timing.
+                    # Fix: replace ledger.lines[] dialogue text with
+                    # the revised parsed_lines so SceneSequencer's
+                    # text-match succeeds. Other ledger.lines[] fields
+                    # (line_id, char_id, traits) stay untouched -- only
+                    # the .text field is updated, by parallel index.
+                    try:
+                        from .production_ledger import get_ledger as _get_led
+                        _led = _get_led()
+                        _ledger_lines = _led.data.get("lines") or []
+                        if parsed_lines and _ledger_lines:
+                            _revised_dialogue = [
+                                p for p in parsed_lines
+                                if isinstance(p, dict) and p.get("type") == "dialogue"
+                            ]
+                            _updated = 0
+                            _ridx = 0
+                            for _ln in _ledger_lines:
+                                if _ridx >= len(_revised_dialogue):
+                                    break
+                                _new = _revised_dialogue[_ridx]
+                                _new_text = (_new.get("line") or "").strip()
+                                if _new_text:
+                                    _ln["text"] = _new_text
+                                    _updated += 1
+                                _ridx += 1
+                            if _updated:
+                                _led.save()
+                                log.info(
+                                    "[ScriptCritic] BUG-LOCAL-117 fix: "
+                                    "updated %d ledger.lines[].text from "
+                                    "revised script so SceneSequencer "
+                                    "text-match writes start_s/dur_s "
+                                    "back correctly.",
+                                    _updated,
+                                )
+                    except Exception as _ll_exc:  # noqa: BLE001
+                        log.warning(
+                            "[ScriptCritic] BUG-117 ledger.lines text "
+                            "update failed (non-fatal): %s",
+                            _ll_exc,
+                        )
+
                     _stamp_revision_to_ledger(
                         before_chars=len(script),
                         after_chars=len(revised_script),

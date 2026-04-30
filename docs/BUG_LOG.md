@@ -40,7 +40,15 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-117: SceneSequencer ran successfully but did NOT write back lines[].start_s / dur_s / bark_wav_path to ledger; downstream consumers see nulls
+### BUG-LOCAL-117: SceneSequencer ran successfully but did NOT write back lines[].start_s / dur_s / bark_wav_path to ledger; downstream consumers see nulls [FIXED in commit pending]
+
+- **Root cause:** the Reviser rewrites the script TEXT but doesn't update `ledger.lines[].text`. SceneSequencer matches dialogue_positions against `ledger.lines[].text` -- after revision, the texts diverge so NO matches succeed and the per-line write-back loop falls through silently.
+- **Fix:** in `nodes/script_critic.py::execute()`, after a successful revision + re-parse, walk `ledger.lines[]` in order and replace each `.text` field with the corresponding revised dialogue line's `.line` text. Save the ledger. SceneSequencer's text-match now succeeds and per-line start_s/dur_s/start_s_space land correctly.
+- **Verify:** next run's `signal_lost_*_ledger.json` should have non-null `lines[].start_s` for every dialogue line.
+
+---
+
+### BUG-LOCAL-117 (original entry preserved below for triage history):
 
 - **Date:** 2026-04-30 06:21 | **Phase:** 0-3 | **Bible candidate:** yes
 - **Symptom:** Pending ledger `pending_20260430_061112` shows audio_gates[] with three completed stages (post_scene_sequencer 78s, post_audio_enhance 78s, post_episode_assembler 95s) AND voice_warnings populated AND transitions[] populated -- proving SceneSequencer + AudioEnhance + EpisodeAssembler all ran cleanly. But every entry in ledger.lines[] has `start_s: null`, `dur_s: null`, `bark_wav_path: null` after that pipeline. Two BUG-LOCAL-106 protective fixes were supposed to make SceneSequencer write per-line positions back into ledger.lines[]; they appear to have regressed OR the BUG-LOCAL-108 atomic-save/merge path is racing with the writer's initial ledger write and clobbering SceneSequencer's updates.
@@ -58,7 +66,17 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-116: SFX render produces 3-millisecond WAVs (150 samples / 48000 sr) — entire SFX layer effectively silent
+### BUG-LOCAL-116: SFX render produces 3-millisecond WAVs (150 samples / 48000 sr) — entire SFX layer effectively silent [FIXED in commit pending]
+
+- **Root cause:** two independent bugs stacked:
+  1. `nodes/batch_audiogen_generator.py::generate()` always set `duration = default_duration` -- Director's `sfx_plan[i].dur_s` was IGNORED for every cue.
+  2. The `audio_values[0, 0]` slice assumed a 3D `[batch, channels, samples]` output but newer transformers AudioGen returns `[batch, samples]` (2D) where `[0, 0]` becomes a SCALAR -- a single sample, ~3 ms WAV.
+- **Fix:** in BatchAudioGenGenerator: (a) honor `sfx_plan[i].dur_s` / `.duration_sec` / `.duration` (any of the schema variants), clamped to [0.5, 10.0] sec; (b) shape-detect the AudioGen output (1D / 2D / 3D / wrapped); (c) sanity-check minimum sample count (>= 0.25 sec at 32 kHz) and fall back to silence at requested duration if generation produced obvious garbage; (d) log shape + duration of every render so future regressions are visible.
+- **Verify:** next run's `ledger.sfx[].dur_s` should be > 0.5 s for every cue. Disk WAVs in `models/sfx_cache/sfx_*.wav` should be multi-second when ffprobed.
+
+---
+
+### BUG-LOCAL-116 (original entry preserved below for triage history):
 
 - **Date:** 2026-04-30 06:20 | **Phase:** 0-3 | **Bible candidate:** yes
 - **Symptom:** Pending ledger `pending_20260430_061112` shows `ledger.sfx[]` with 6 entries:

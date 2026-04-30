@@ -145,16 +145,37 @@ class BatchAudioGenGenerator:
         batch_log.append(f"Found {len(sfx_tags)} SFX cues in script.")
         
         # 2. Match tags to plan prompts
+        # BUG-LOCAL-116 fix 2026-04-30: honor Director's sfx_plan[i].dur_s
+        # (or .duration_sec / .duration) instead of always using default.
+        # The Director plans per-cue durations to fit narrative beats;
+        # ignoring them was producing a 3.0s render of every SFX even
+        # when the cue was a short sting. Combined with the output-shape
+        # bug, the cache_key collision meant short/long stings shared
+        # cache files. Both fixed here.
         render_queue = []
         for i, tag in enumerate(sfx_tags):
             prompt = tag
-            duration = default_duration
-            
+            duration = float(default_duration)
+
             # Try to match to sfx_plan by order or description
             if i < len(sfx_plan):
-                plan_entry = sfx_plan[i]
-                prompt = plan_entry.get("generation_prompt") or plan_entry.get("description") or tag
-            
+                plan_entry = sfx_plan[i] if isinstance(sfx_plan[i], dict) else {}
+                prompt = (
+                    plan_entry.get("generation_prompt")
+                    or plan_entry.get("description")
+                    or tag
+                )
+                # Director-specified duration takes precedence over default.
+                # Several schema variants exist across versions of the
+                # Director output -- accept any of them.
+                for _key in ("dur_s", "duration_sec", "duration"):
+                    _v = plan_entry.get(_key)
+                    if isinstance(_v, (int, float)) and _v > 0:
+                        # Clamp to AudioGen's reasonable bounds so a
+                        # hallucinated 60-second cue doesn't OOM.
+                        duration = max(0.5, min(10.0, float(_v)))
+                        break
+
             cache_path = os.path.join(_cache_dir(), _cache_key(prompt, duration, episode_seed))
             render_queue.append({
                 "index": i,
@@ -204,25 +225,84 @@ class BatchAudioGenGenerator:
                         prompt = item["prompt"]
                         duration = item["duration"]
                         max_new_tokens = int(duration * tokens_per_sec)
-                        
-                        batch_log.append(f"  Generating [{idx}]: {prompt[:50]}...")
-                        inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
-                        
+
+                        batch_log.append(
+                            f"  Generating [{idx}] dur={duration:.2f}s "
+                            f"max_new_tokens={max_new_tokens}: {prompt[:50]}..."
+                        )
+                        inputs = processor(
+                            text=[prompt], padding=True, return_tensors="pt"
+                        ).to(device)
+
                         with torch.no_grad():
                             audio_values = model.generate(
-                                **inputs, 
+                                **inputs,
                                 max_new_tokens=max_new_tokens,
                                 do_sample=True,
-                                guidance_scale=guidance_scale
+                                guidance_scale=guidance_scale,
                             )
-                        
-                        audio_np = audio_values[0, 0].detach().cpu().float().numpy()
+
+                        # BUG-LOCAL-116 fix 2026-04-30: robust shape
+                        # extraction. AudioGen's transformers output shape
+                        # has varied across versions:
+                        #   - [batch, channels, samples]  (older, decoded)
+                        #   - [batch, samples]            (newer, decoded mono)
+                        #   - [batch, num_codebooks, seq] (token IDs - bug)
+                        # The OLD code did audio_values[0, 0] which on a
+                        # 2D tensor returns a SCALAR, and on a token-ID
+                        # tensor returns the codebook 0 token sequence
+                        # (~150 ints). Result: 3 ms WAVs.
+                        # New logic: find the longest float-ish 1D slice
+                        # and validate length is plausibly audio.
+                        _av = audio_values
+                        if hasattr(_av, "audio_values"):
+                            _av = _av.audio_values   # named-tuple wrapper
+                        _av = _av.detach().cpu().float()
+                        if _av.dim() == 3:
+                            audio_np = _av[0, 0].numpy()
+                        elif _av.dim() == 2:
+                            audio_np = _av[0].numpy()
+                        elif _av.dim() == 1:
+                            audio_np = _av.numpy()
+                        else:
+                            audio_np = _av.flatten().numpy()
+
+                        # Sanity check: minimum 0.25 sec of real audio
+                        # (= 8000 samples @ 32kHz). Anything shorter is
+                        # an output-shape bug or generation failure;
+                        # fall back to silence at the requested duration
+                        # so the timeline still has a plausible slot
+                        # rather than a 3 ms blip.
+                        _min_samples = int(AUDIOGEN_SAMPLE_RATE * 0.25)
+                        if audio_np.size < _min_samples:
+                            log.warning(
+                                "[BatchAudioGen] [%d] generated audio too "
+                                "short (%d samples = %.4fs) -- expected "
+                                ">= %.2fs. Output shape was %s. "
+                                "Falling back to silence at %.2fs. "
+                                "(BUG-LOCAL-116 / transformers AudioGen "
+                                "output-shape regression.)",
+                                idx, audio_np.size,
+                                audio_np.size / AUDIOGEN_SAMPLE_RATE,
+                                _min_samples / AUDIOGEN_SAMPLE_RATE,
+                                tuple(audio_values.shape) if hasattr(audio_values, "shape") else "?",
+                                duration,
+                            )
+                            audio_np = np.zeros(
+                                int(AUDIOGEN_SAMPLE_RATE * duration),
+                                dtype=np.float32,
+                            )
+
                         # Peak normalize
                         peak = np.abs(audio_np).max() or 1.0
                         audio_np = (audio_np / peak * 0.9).astype(np.float32)
-                        
+
                         _save_wav(item["cache_path"], audio_np, AUDIOGEN_SAMPLE_RATE)
                         final_clips[idx] = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
+                        batch_log.append(
+                            f"    [{idx}] saved {audio_np.size} samples "
+                            f"({audio_np.size / AUDIOGEN_SAMPLE_RATE:.2f}s)"
+                        )
                         
                 finally:
                     # 2026-04-26 PM BUG-LOCAL-073 GUARD: synchronize before
