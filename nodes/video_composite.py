@@ -278,6 +278,259 @@ def _build_filter_graph(
 
 
 # ---------------------------------------------------------------------------
+# humo_concat mode helpers (audio_source = "humo_concat")
+# ---------------------------------------------------------------------------
+
+def _make_gap_segment(
+    image: Path,
+    audio_source: Path,
+    start_s: float,
+    end_s: float,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    out_path: Path,
+    ffmpeg: str,
+) -> Path:
+    """Render a static-image mp4 covering [start_s, end_s] of the
+    timeline. Image is letterboxed to canvas dimensions; audio is
+    sliced from `audio_source` (typically the procgen mp4 carrying
+    the master_mix track).
+
+    Used to fill gap windows between HuMo dialogue clips in the
+    humo_concat mode so the timeline has full visual + audio
+    coverage. Falls back to silence if audio_source missing.
+    """
+    dur = max(0.0, end_s - start_s)
+    if dur <= 0.0:
+        raise ValueError(f"_make_gap_segment: non-positive duration {dur}")
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-loop", "1", "-framerate", str(canvas_fps), "-i", str(image),
+        "-ss", f"{start_s:.4f}", "-i", str(audio_source),
+        "-vf", (
+            f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease,"
+            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"fps={canvas_fps}"
+        ),
+        "-t", f"{dur:.4f}",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        "-shortest",
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out_path
+
+
+def _normalize_humo_segment(
+    clip: Path,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    humo_target_h: int,
+    out_path: Path,
+    ffmpeg: str,
+) -> Path:
+    """Pillarbox a HuMo clip into the canvas dimensions while
+    PRESERVING its native audio (the source of mechanical lip-sync
+    for the humo_concat mode). HuMo clips are 480x832 portrait;
+    pillarbox to canvas_w x canvas_h with black side bars.
+    """
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-i", str(clip),
+        "-vf", (
+            f"scale=-2:{humo_target_h}:force_original_aspect_ratio=decrease,"
+            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"fps={canvas_fps}"
+        ),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        # KEY: keep HuMo's native audio for perfect lip-sync.
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out_path
+
+
+def _resolve_bookend_image(
+    ledger: dict,
+    procgen: Path,
+    fallback_dir: Path,
+    ffmpeg: str,
+) -> Path:
+    """Locate the radio bookend image. Priority:
+    1. ledger.radio_bookend_path (top-level field stamped by BatchFluxRender)
+    2. ledger.meta.radio_bookend_path
+    3. Fallback: extract first frame from procgen mp4
+    """
+    cand = ledger.get("radio_bookend_path") or ledger.get("meta", {}).get("radio_bookend_path")
+    if cand:
+        p = Path(cand)
+        if p.exists():
+            return p
+        log.warning(
+            "[VideoComposite] ledger.radio_bookend_path=%s does not exist; "
+            "falling back to procgen frame",
+            p,
+        )
+    fallback = fallback_dir / "bookend_fallback.png"
+    if not fallback.exists():
+        cmd = [
+            ffmpeg, "-y", "-loglevel", "error",
+            "-i", str(procgen), "-vframes", "1",
+            str(fallback),
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        log.info("[VideoComposite] bookend fallback: extracted %s", fallback)
+    return fallback
+
+
+def _render_humo_concat_mode(
+    *,
+    ledger: dict,
+    clips_dir: Path,
+    procgen: Path,
+    out_mp4: Path,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    humo_target_h: int,
+    fallback_clip_length: float,
+    ffmpeg: str,
+    ffprobe: str,
+) -> tuple[Path, list[str]]:
+    """Build the final mp4 in humo_concat mode.
+
+    Pipeline:
+      1. Sort ledger.clips[] by start_s, build (clip_path, start_s, dur_s)
+         tuples honouring REAL master-mix timestamps (not cumulative).
+      2. Resolve radio bookend image (or procgen-frame fallback).
+      3. For each pair of adjacent clips with a gap between them,
+         create a gap segment: bookend image + master_mix audio slice.
+      4. For each HuMo clip, normalize to canvas dims keeping native
+         audio (mechanical lip-sync guarantee).
+      5. ffmpeg concat-demuxer joins all segments in time order.
+
+    Returns (final_mp4_path, report_lines).
+    """
+    report: list[str] = []
+    t0 = time.time()
+
+    # 1. Build timeline from ledger.clips[] using real master-mix start_s
+    ledger_clips = ledger.get("clips") or []
+    timeline: list[tuple[Path, float, float]] = []
+    for entry in ledger_clips:
+        line_id = str(entry.get("line_id") or "")
+        if not line_id:
+            continue
+        cp = Path(entry.get("mp4_path") or "")
+        if not cp.exists():
+            cp = clips_dir / f"{line_id}.mp4"
+        if not cp.exists():
+            log.info(
+                "[VideoComposite/humo_concat] skip %s: clip not on disk",
+                line_id,
+            )
+            continue
+        start_s = float(entry.get("start_s") or 0.0)
+        dur_s = float(entry.get("dur_s") or 0.0)
+        if dur_s <= 0:
+            dur_s = _ffprobe_dur(cp, ffprobe) or float(fallback_clip_length)
+        timeline.append((cp, start_s, dur_s))
+    if not timeline:
+        raise RuntimeError("humo_concat: no usable HuMo clips in ledger.clips[]")
+    timeline.sort(key=lambda t: t[1])
+
+    # 2. Episode duration (from procgen so we cover trailing music)
+    episode_dur = _ffprobe_dur(procgen, ffprobe) or (timeline[-1][1] + timeline[-1][2])
+    report.append(
+        f"humo_concat: {len(timeline)} HuMo clip(s), episode duration "
+        f"{episode_dur:.2f}s"
+    )
+
+    # 3. Resolve bookend image
+    seg_dir = out_mp4.parent / "_humo_concat_segments"
+    seg_dir.mkdir(parents=True, exist_ok=True)
+    bookend = _resolve_bookend_image(ledger, procgen, seg_dir, ffmpeg)
+    report.append(f"humo_concat: bookend image = {bookend.name}")
+
+    # 4. Build segment list (alternating gap, clip, gap, ...)
+    segments: list[Path] = []
+    cursor = 0.0
+    for i, (clip_path, start_s, dur_s) in enumerate(timeline):
+        if start_s - cursor > 0.05:  # 50ms tolerance for float drift
+            gap_path = seg_dir / f"gap_{i:03d}.mp4"
+            try:
+                _make_gap_segment(
+                    bookend, procgen, cursor, start_s,
+                    canvas_w, canvas_h, canvas_fps,
+                    gap_path, ffmpeg,
+                )
+                segments.append(gap_path)
+            except Exception as exc:
+                log.warning(
+                    "[VideoComposite/humo_concat] gap[%d, %.2f-%.2f] failed: %s",
+                    i, cursor, start_s, exc,
+                )
+        clip_seg = seg_dir / f"clip_{i:03d}.mp4"
+        try:
+            _normalize_humo_segment(
+                clip_path, canvas_w, canvas_h, canvas_fps,
+                humo_target_h, clip_seg, ffmpeg,
+            )
+            segments.append(clip_seg)
+        except Exception as exc:
+            log.warning(
+                "[VideoComposite/humo_concat] clip[%d] %s normalize failed: %s",
+                i, clip_path.name, exc,
+            )
+            continue
+        cursor = start_s + dur_s
+    # Trailing gap
+    if cursor < episode_dur - 0.05:
+        try:
+            tail_seg = seg_dir / "gap_999.mp4"
+            _make_gap_segment(
+                bookend, procgen, cursor, episode_dur,
+                canvas_w, canvas_h, canvas_fps,
+                tail_seg, ffmpeg,
+            )
+            segments.append(tail_seg)
+        except Exception as exc:
+            log.warning(
+                "[VideoComposite/humo_concat] trailing gap %.2f-%.2f failed: %s",
+                cursor, episode_dur, exc,
+            )
+
+    if not segments:
+        raise RuntimeError("humo_concat: no segments produced")
+    report.append(f"humo_concat: {len(segments)} segment(s) ready for concat")
+
+    # 5. Concat-demuxer assembly
+    list_file = seg_dir / "concat.txt"
+    list_file.write_text(
+        "\n".join(f"file '{s.as_posix()}'" for s in segments),
+        encoding="utf-8",
+    )
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "warning",
+        "-f", "concat", "-safe", "0",
+        "-i", str(list_file),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+        str(out_mp4),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    elapsed = time.time() - t0
+    report.append(
+        f"humo_concat: assembled {out_mp4.name} in {elapsed:.1f}s"
+    )
+    return out_mp4, report
+
+
+# ---------------------------------------------------------------------------
 # Node class
 # ---------------------------------------------------------------------------
 
@@ -365,6 +618,27 @@ class VideoComposite:
                         "clip without re-running the 5-hour HuMo render."
                     ),
                 }),
+                "audio_source": (
+                    ["master_mix", "humo_concat"],
+                    {"default": "master_mix",
+                     "tooltip": (
+                         "master_mix (DEFAULT): existing 2-layer filter "
+                         "graph. Audio = procgen.wav (master_mix). HuMo "
+                         "clips overlay as VIDEO only; their native audio "
+                         "is discarded. Risk: lip-sync drift if master_mix "
+                         "differs from what HuMo was conditioned on.\n\n"
+                         "humo_concat: hybrid concat-demuxer pipeline. "
+                         "Each HuMo clip is concat'd with its NATIVE audio "
+                         "intact (mechanically perfect lip-sync). Gap "
+                         "windows between dialogue lines render the radio "
+                         "bookend full-canvas with a master_mix audio "
+                         "slice. Talking-radio identity stays continuous "
+                         "(music + SFX in gaps); lip-sync during dialogue "
+                         "is HuMo's untouched native audio.\n\n"
+                         "Requires ledger.radio_bookend_path; falls back "
+                         "to a procgen frame if the bookend missed."
+                     )},
+                ),
             },
         }
 
@@ -382,6 +656,7 @@ class VideoComposite:
         fallback_clip_length: float = 7.0,
         ffmpeg: str = "ffmpeg",
         cleanup_clips_after_assembly: bool = False,
+        audio_source: str = "master_mix",
     ):
         # `cleanup_clips_after_assembly` widget is wired but the deletion
         # logic itself is deferred (would happen post-assembly when the
@@ -421,7 +696,56 @@ class VideoComposite:
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / f"{episode_id}.mp4"
 
-        # ---- Build clip timeline ----
+        # ---- Branch on audio_source ----
+        # humo_concat mode: bypass the existing 2-layer filter graph
+        # entirely. Build a concat-demuxer pipeline where each HuMo
+        # clip keeps its NATIVE audio (mechanical lip-sync) and gap
+        # windows are filled with the radio bookend image + master_mix
+        # audio slices (talking-radio identity continuous).
+        if audio_source == "humo_concat":
+            log.info(
+                "[VideoComposite] audio_source=humo_concat -- routing to "
+                "concat-demuxer pipeline (perfect lip-sync, bookend gaps)"
+            )
+            try:
+                final_mp4, concat_report = _render_humo_concat_mode(
+                    ledger=ledger,
+                    clips_dir=clips,
+                    procgen=procgen,
+                    out_mp4=out_mp4,
+                    canvas_w=canvas_width,
+                    canvas_h=canvas_height,
+                    canvas_fps=canvas_fps,
+                    humo_target_h=humo_target_height,
+                    fallback_clip_length=fallback_clip_length,
+                    ffmpeg=ffmpeg,
+                    ffprobe=ffprobe,
+                )
+            except Exception as exc:
+                log.exception(
+                    "[VideoComposite] humo_concat failed; falling back to "
+                    "master_mix mode: %s", exc,
+                )
+                # Fall through to master_mix path on any failure.
+            else:
+                # Stamp final_video_path in ledger same as master_mix path.
+                if ledger_path is not None:
+                    try:
+                        ledger["final_video_path"] = str(final_mp4)
+                        with open(ledger_path, "w", encoding="utf-8") as _f:
+                            json.dump(ledger, _f, indent=2)
+                    except Exception as _stamp_exc:  # noqa: BLE001
+                        log.warning(
+                            "[VideoComposite] humo_concat ledger stamp failed: %s",
+                            _stamp_exc,
+                        )
+                report_text = (
+                    "VideoComposite (humo_concat mode)\n"
+                    + "\n".join(f"  {ln}" for ln in concat_report)
+                )
+                return (str(final_mp4), report_text)
+
+        # ---- Build clip timeline (master_mix mode) ----
         timeline = _build_clip_timeline(ledger, clips, fallback_clip_length, ffprobe)
         if not timeline:
             return ("", f"error: no HuMo clips found in {clips}")

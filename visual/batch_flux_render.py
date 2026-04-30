@@ -389,10 +389,18 @@ class BatchFluxRender:
         log.info("[BatchFluxRender] batch complete: %d image(s) in %d ms", len(images), total_ms)
 
         # Step 1 (ROADMAP) -- render the radio bookend still and stamp
-        # ledger.radio_bookend_path. Used by BatchHumoRender as the
-        # reference image for music + SFX HuMo windows. Best-effort:
-        # any failure logs WARNING but does not abort the main batch.
+        # ledger.radio_bookend_path. Used by VideoComposite as the
+        # full-canvas image during music + SFX windows (talking-radio
+        # identity). BUG-LOCAL-113 hardening 2026-04-29 PM: log every
+        # decision branch so future "why didn't bookend render" debug
+        # cycles don't have to start from scratch.
         if radio_bookend_prompt and radio_bookend_prompt.strip():
+            log.info(
+                "[BatchFluxRender] radio bookend ENABLED: prompt_len=%d, "
+                "seed=%d, attempting render...",
+                len(radio_bookend_prompt.strip()),
+                int(radio_bookend_seed),
+            )
             try:
                 self._render_and_save_radio_bookend(
                     prompt_text=radio_bookend_prompt.strip(),
@@ -408,6 +416,18 @@ class BatchFluxRender:
             except Exception as exc:
                 log.warning("[BatchFluxRender] radio bookend render failed: %s", exc)
                 report_lines.append(f"  radio_bookend: FAILED ({exc})")
+        else:
+            # SKIP path -- the silent-regression mode that left
+            # BUG-LOCAL-113 undiagnosable. Now any miss is loud.
+            log.warning(
+                "[BatchFluxRender] radio bookend SKIPPED: prompt is empty "
+                "or unset (got %r). Causes: (a) workflow widget value "
+                "blank, (b) ComfyUI loaded a pre-bookend version of this "
+                "module before restart, (c) widget ordering drift between "
+                "INPUT_TYPES and workflow JSON.",
+                radio_bookend_prompt,
+            )
+            report_lines.append("  radio_bookend: SKIPPED (prompt empty)")
 
         return (image_batch, "\n".join(report_lines))
 
