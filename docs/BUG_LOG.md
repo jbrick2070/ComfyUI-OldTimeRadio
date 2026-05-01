@@ -57,7 +57,7 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-128: master_mix_per_clip_mux concat-and-shortest truncates ~70s of dialogue audio when sum(clip.dur_s) << ledger.total_episode_dur_s [tail-pad pointer FIXED in commit pending; dur_s gap still pending commits 2-3]
+### BUG-LOCAL-128: master_mix_per_clip_mux concat-and-shortest truncates ~70s of dialogue audio when sum(clip.dur_s) << ledger.total_episode_dur_s [tail-pad pointer FIXED 53934eb; static-fill coverage path FIXED via BUG-129a; full close pending BUG-129b role-policy flip]
 
 - **Date:** 2026-05-01 ~14:35 (surfaced during read-only QA of episode `signal_lost_nasa_artemis_ii_crew_rings_nasdaq_closin_20260501_110019`, commit 620013e, audio_path_selected=`master_mix_per_clip_mux`, strict_c7=true) | **Phase:** 0 | **Bible candidate:** YES (textbook concat-demuxer + `-shortest` mismatch when per-event coverage is partial)
 - **Symptom:**

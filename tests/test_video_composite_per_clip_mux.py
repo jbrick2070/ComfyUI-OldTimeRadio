@@ -423,6 +423,196 @@ class TestRenderMasterMixPerClipMux:
         assert names == ["ok", "ok"]
 
 
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-129a: static-radio fallback for missing HuMo clips
+# ---------------------------------------------------------------------------
+
+class TestStaticRadioFallback:
+    """When a ledger line has no HuMo clip on disk, generate a
+    deterministic static segment from the radio bookend PNG so the
+    line still gets visual coverage. Closes the per-line dur_s gap
+    that fed BUG-LOCAL-128's audio truncation."""
+
+    def _make_radio_png(self, tmp_path: Path) -> Path:
+        # Anything >= _MIN_RADIO_STILL_BYTES (256) passes the validity check.
+        p = tmp_path / "radio_bookend.png"
+        p.write_bytes(b"\x89PNG\r\n\x1a\n" + (b"x" * 512))
+        return p
+
+    def test_resolve_radio_still_top_level_path(self, tmp_path):
+        radio = self._make_radio_png(tmp_path)
+        led = {"radio_bookend_path": str(radio)}
+        out = VC._resolve_radio_still_for_static(led)
+        assert out is not None
+        assert out.resolve() == radio.resolve()
+
+    def test_resolve_radio_still_meta_path(self, tmp_path):
+        radio = self._make_radio_png(tmp_path)
+        led = {"meta": {"radio_bookend_path": str(radio)}}
+        out = VC._resolve_radio_still_for_static(led)
+        assert out is not None
+        assert out.resolve() == radio.resolve()
+
+    def test_resolve_radio_still_rejects_truncated(self, tmp_path):
+        # < 256 bytes -> rejected as truncated.
+        bad = tmp_path / "bad.png"
+        bad.write_bytes(b"\x89PNG\r\n")
+        led = {"radio_bookend_path": str(bad)}
+        out = VC._resolve_radio_still_for_static(led)
+        assert out is None
+
+    def test_resolve_radio_still_rejects_path_traversal_episode_id(self, tmp_path):
+        led = {"episode_id": "../escape"}
+        out = VC._resolve_radio_still_for_static(led)
+        assert out is None
+
+    def test_static_segment_command_shape(self, tmp_path):
+        """Verify the ffmpeg command for a static segment carries:
+          - ``-loop 1`` (still-image input)
+          - ``-frames:v <int>`` (exact frame count, NOT ``-t``)
+          - ``-r 25`` (canvas fps locked to HuMo's 25)
+          - ``-an`` (no audio)
+          - ``-video_track_timescale 12800`` (HuMo container timebase)
+          - libx264 yuv420p (matches pillarbox profile)
+        """
+        radio = self._make_radio_png(tmp_path)
+        out = tmp_path / "static_segment.mp4"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            VC._render_static_radio_segment(
+                radio_png=radio,
+                dur_s=4.0,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                out_path=out, ffmpeg="ffmpeg",
+            )
+            cmd = mock_run.call_args[0][0]
+        assert "-loop" in cmd
+        assert cmd[cmd.index("-loop") + 1] == "1"
+        assert "-frames:v" in cmd
+        # 4.0 s @ 25 fps = 100 frames
+        assert cmd[cmd.index("-frames:v") + 1] == "100"
+        assert "-r" in cmd
+        assert cmd[cmd.index("-r") + 1] == "25"
+        assert "-an" in cmd, "static segment must have no audio"
+        assert "-t" not in cmd, (
+            "use -frames:v for exact frame count, not -t (Jeffrey "
+            "review Q3): -t rounds based on timestamps and produces "
+            "off-by-one drift accumulating across many segments"
+        )
+        assert "-video_track_timescale" in cmd
+        assert cmd[cmd.index("-video_track_timescale") + 1] == "12800"
+        cv_idx = cmd.index("-c:v")
+        assert cmd[cv_idx + 1] == "libx264"
+        pix_idx = cmd.index("-pix_fmt")
+        assert cmd[pix_idx + 1] == "yuv420p"
+
+    def test_static_segment_frame_count_rounds_to_nearest(self, tmp_path):
+        """1.05 s @ 25 fps = 26.25 frames -> round to 26."""
+        radio = self._make_radio_png(tmp_path)
+        out = tmp_path / "static.mp4"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            VC._render_static_radio_segment(
+                radio_png=radio, dur_s=1.05,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                out_path=out, ffmpeg="ffmpeg",
+            )
+            cmd = mock_run.call_args[0][0]
+        assert cmd[cmd.index("-frames:v") + 1] == "26"
+
+    def test_missing_clip_with_radio_generates_static_fill(
+        self, populated_ledger, fake_procgen, tmp_path,
+    ):
+        """When a line's HuMo clip is missing AND a radio still is on
+        disk, the timeline gets a static-fill entry instead of a
+        skip. Pillarbox processes it normally."""
+        clips_dir = tmp_path / "partial"
+        clips_dir.mkdir()
+        # Only middle line has a HuMo clip; music_open + music_close
+        # are missing and must fall back to static.
+        (clips_dir / "char_l001.mp4").write_bytes(b"x")
+
+        radio = self._make_radio_png(tmp_path)
+        led = dict(populated_ledger)
+        led["radio_bookend_path"] = str(radio)
+
+        out = tmp_path / "out.mp4"
+        # Track ALL ffmpeg calls (static-segment generator + pillarbox + concat + mux).
+        all_cmds: list[list[str]] = []
+
+        def _record_run(cmd, **_kw):
+            all_cmds.append(list(cmd))
+            if str(cmd[-1]).endswith(".mp4"):
+                Path(cmd[-1]).parent.mkdir(parents=True, exist_ok=True)
+                Path(cmd[-1]).write_bytes(b"x")
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=b"", stderr=b"",
+            )
+
+        with patch("subprocess.run", side_effect=_record_run):
+            VC._render_master_mix_per_clip_mux_mode(
+                ledger=led, clips_dir=clips_dir, procgen=fake_procgen,
+                out_mp4=out,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                fallback_clip_length=7.0,
+                ffmpeg="ffmpeg", ffprobe="ffprobe",
+            )
+
+        # Static-fill ffmpeg invocations: detected by `-loop 1` + radio png as input.
+        static_cmds = [
+            c for c in all_cmds
+            if "-loop" in c and str(radio) in c
+        ]
+        # Two missing lines (music_open_001 and music_close_001) -> two static fills.
+        assert len(static_cmds) == 2, (
+            f"expected 2 static-radio fills (music_open + music_close), "
+            f"got {len(static_cmds)}"
+        )
+
+    def test_missing_clip_no_radio_still_skips(
+        self, populated_ledger, fake_procgen, tmp_path,
+    ):
+        """When a line's clip is missing AND no radio still is on
+        disk, fall back to silent-skip (current pre-129a behaviour)
+        rather than crashing."""
+        clips_dir = tmp_path / "partial"
+        clips_dir.mkdir()
+        (clips_dir / "char_l001.mp4").write_bytes(b"x")
+
+        # No radio_bookend_path on ledger and no fs fallback file.
+        out = tmp_path / "out.mp4"
+        all_cmds: list[list[str]] = []
+
+        def _record_run(cmd, **_kw):
+            all_cmds.append(list(cmd))
+            if str(cmd[-1]).endswith(".mp4"):
+                Path(cmd[-1]).parent.mkdir(parents=True, exist_ok=True)
+                Path(cmd[-1]).write_bytes(b"x")
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=b"", stderr=b"",
+            )
+
+        with patch("subprocess.run", side_effect=_record_run):
+            VC._render_master_mix_per_clip_mux_mode(
+                ledger=populated_ledger,
+                clips_dir=clips_dir, procgen=fake_procgen,
+                out_mp4=out,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                fallback_clip_length=7.0,
+                ffmpeg="ffmpeg", ffprobe="ffprobe",
+            )
+
+        # No static fills when radio still is unavailable.
+        static_cmds = [c for c in all_cmds if "-loop" in c]
+        assert len(static_cmds) == 0
+
+
 class TestTailPad:
     """The last clip in the timeline gets extend_tail_s passed so
     silent_combined.mp4 ends slightly after the master mix audio.
