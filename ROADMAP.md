@@ -94,14 +94,19 @@ Two coupled bugs surfaced during QA of episode `signal_lost_..._20260501_110019`
 
 The code path is in place; what's open is real-run verification. Every item below is something to confirm or surface during the next ComfyUI episode test, NOT new design work.
 
-**Verify on the next clean run:**
+**Verify on the next clean run (post BUG-128 + BUG-129 fixes, 2026-05-01):**
 
 - `ledger.lines[]` carries a `speaker_role` on every entry. No nulls, no missing rows. Roles: `character` / `announcer` / `music_open` / `music_close` / `music_inter` / `sfx`.
 - `ledger.meta.audio_path_selected = "master_mix_per_clip_mux"` and `audio_path_reason = "ok (zero audio re-encodes downstream of SignalLostVideo)"`.
-- For every line where `speaker_role ∈ {announcer, music_*, sfx}`, the `BatchHumoRender` log line shows `ref=radio_bookend_<ep>.png source=radio-still (...)` — radio still I2V dispatch confirmed.
-- `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (genre=sci-fi)"`).
+- BUG-129 routing (locked 2026-05-01):
+  - `character` and `announcer` lines: `BatchHumoRender` dispatches HuMo with the cast portrait. Log line: `ref=full_env_NNNNN_.png source=ledger-cast-fresh` (or composite/portrait fallback).
+  - `music_*` and standalone `sfx` lines: `BatchHumoRender` log line shows `SKIP HuMo (role=<role>, covered by VideoComposite static-radio fill)`. No HuMo render fires for these.
+  - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed (`_RADIO_ROLES` was repopulated). Test `test_speaker_role.py::test_is_radio_role_always_false_post_bug129` would also be failing.
+- `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (style='space opera epic')"`).
+- BUG-129a static-fill fires for any line with no clip on disk. VideoComposite report includes `[<n_humo> humo + <n_static> static]` summary; expect static count > 0 if any music_*/sfx lines exist.
+- BUG-128 tail-pad: VideoComposite report shows `tail-pad: +0.500s on <line_id>` after the pillarbox loop completes. The line_id matches the actual surviving last clip, not necessarily the last in the original timeline.
 - Music tracks > 7s show up as multiple chunked entries (`music_open_001`, `music_open_002`, ...) — chunking math fired.
-- ffprobe on the final mp4: video + audio streams both present; final mp4 audio `codec_name == aac` (passthrough from procgen).
+- ffprobe on the final mp4: video + audio streams both present; final mp4 audio `codec_name == aac` (passthrough from procgen); duration ≈ master mix duration (no `-shortest` truncation).
 - No `[VideoComposite] master_mix_per_clip_mux FAILED` in the log. With `strict_c7=True` (default), any failure would have raised.
 
 **Open follow-ups (in priority order):**
