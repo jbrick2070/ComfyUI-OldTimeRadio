@@ -3894,7 +3894,7 @@ class LLMScriptWriter:
                 }),
                 "target_words": ("INT", {
                     "default": 700, "min": 100, "max": 10000, "step": 50,
-                    "tooltip": "Target spoken dialogue words at ~140 wpm: 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For one-click smoke (100 words + 1 act bundled), pick target_length='tiny (smoke, 1 act)' instead -- it forces target_words=100 internally regardless of this widget value."
+                    "tooltip": "Target spoken dialogue words at ~140 wpm: 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For 30-word ultra-smoke pick target_length='30 words (smoke, 1 act)' (forces target_words=30 + lowers line-count floor). For 100-word smoke pick target_length='tiny (smoke, 1 act)' (forces target_words=100). Both override this widget."
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 1, "max": 8, "step": 1,
@@ -4034,9 +4034,9 @@ class LLMScriptWriter:
                         "faster cheaper runs at the cost of plot variety."
                     ),
                 }),
-                "target_length": (["tiny (smoke, 1 act)", "short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
+                "target_length": (["30 words (smoke, 1 act)", "tiny (smoke, 1 act)", "short (3 acts)", "medium (5 acts)", "long (7-8 acts)", "epic (10+ acts)"], {
                     "default": "medium (5 acts)",
-                    "tooltip": "Act structure preset. Tiny=1 act smoke test (pair with target_words=100, num_characters=2 for fastest end-to-end pipeline validation, ~45 sec audio + ~6 HuMo clips). Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
+                    "tooltip": "Act structure preset. '30 words (smoke, 1 act)' = fastest possible end-to-end pipeline check (~13s audio, ~3 dialogue lines, forces target_words=30 + lowers the 18-line floor; pair with num_characters=2). 'tiny (smoke, 1 act)' = 100-word smoke (~45s audio, ~6 HuMo clips). Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
                 }),
                 "style": ([
                     "tense claustrophobic",
@@ -4296,7 +4296,21 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # set the num_characters widget to 2 directly (it accepts
         # min=2). Override BEFORE the early ledger init so the
         # gen_params snapshot reflects the effective target_words.
-        if isinstance(target_length, str) and target_length.lower().startswith("tiny"):
+        #
+        # 2026-05-01 ULTRA-SMOKE PRESET (30 words). The "30 words
+        # (smoke, 1 act)" target length forces target_words=30 for
+        # the absolute fastest end-to-end check -- a few HuMo clips
+        # plus the BUG-128/129 routing path exercised on a couple
+        # of speaker_role variants without committing to a 27-min
+        # render. Detected before the "tiny" check so the longer
+        # prefix wins (both start the same in lower()).
+        if isinstance(target_length, str) and target_length.lower().startswith("30 words"):
+            target_words = 30
+            _runtime_log(
+                "ScriptWriter: ULTRA-SMOKE preset detected (target_length=30 words) "
+                f"-> target_words=30 forced (num_characters={num_characters} unchanged)"
+            )
+        elif isinstance(target_length, str) and target_length.lower().startswith("tiny"):
             target_words = 100
             _runtime_log(
                 "ScriptWriter: SMOKE-TEST preset detected (target_length=tiny) "
@@ -4495,7 +4509,14 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # HARD MINIMUMS - word-count based enforcement (BUG-012/020 fix).
         # Widget is now target_words directly. No conversion needed.
         _target_words = target_words
-        _min_lines = max(18, target_words // 18)  # ~8 lines per minute at 140 wpm
+        # ~8 lines per minute at 140 wpm. The 18-line floor is a baseline
+        # for >=100 word episodes; for the 30-word ultra-smoke preset
+        # 18 lines would force ~1.6 words/line (incoherent). Drop the
+        # floor for very short runs.
+        if target_words <= 50:
+            _min_lines = 3  # 30-word ultra-smoke -> 3-5 lines, ~6-10 words/line
+        else:
+            _min_lines = max(18, target_words // 18)
         _act_label = {
             "short (3 acts)": "3 acts",
             "medium (5 acts)": "5 acts",
@@ -4576,7 +4597,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # rationale: 1-char monologue is a legitimate narrative form
         # (audio diary, war journal, last-broadcaster), and forcing it
         # back to 3 silently destroys the user's intent.
-        _act_count_for_clamp = {"tiny (smoke, 1 act)": 1, "short (3 acts)": 3,
+        _act_count_for_clamp = {"30 words (smoke, 1 act)": 1,
+                                "tiny (smoke, 1 act)": 1, "short (3 acts)": 3,
                                 "medium (5 acts)": 5, "long (7-8 acts)": 8,
                                 "epic (10+ acts)": 12}.get(target_length, 5)
         if _act_count_for_clamp >= 7 and num_characters < 3 and num_characters not in (1, 2):
@@ -6802,6 +6824,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
         # v1.5 FIX: Respect the target_length widget for act counts
         # Map: short=3, medium=5, long=8, epic=12
         _act_map = {
+            "30 words (smoke, 1 act)": 1,
             "tiny (smoke, 1 act)": 1,
             "short (3 acts)":  3,
             "medium (5 acts)": 5,
