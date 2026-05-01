@@ -3893,8 +3893,8 @@ class LLMScriptWriter:
                     "tooltip": "Episode title (leave blank for Gemma to generate one; see BUG-LOCAL-035)"
                 }),
                 "target_words": ("INT", {
-                    "default": 700, "min": 100, "max": 10000, "step": 50,
-                    "tooltip": "Target spoken dialogue words at ~140 wpm: 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For 30-word ultra-smoke pick target_length='30 words (smoke, 1 act)' (forces target_words=30 + lowers line-count floor). For 100-word smoke pick target_length='tiny (smoke, 1 act)' (forces target_words=100). Both override this widget."
+                    "default": 700, "min": 30, "max": 10000, "step": 10,
+                    "tooltip": "Target spoken dialogue words at ~140 wpm: 30=ultra-smoke (~13s, ~3 lines, BUG-128/129 routing check), 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For one-click ultra-smoke pick target_length='30 words (smoke, 1 act)' (also lowers the 18-line floor to 3); for 100-word smoke pick target_length='tiny (smoke, 1 act)'. Both presets override this widget."
                 }),
                 "num_characters": ("INT", {
                     "default": 4, "min": 1, "max": 8, "step": 1,

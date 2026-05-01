@@ -420,12 +420,18 @@ class TestNoDeadOptions:
         tooltip = _OPTIONAL["target_length"][1].get("tooltip", "")
         assert "DEPRECATED" not in tooltip, "target_length should NOT be deprecated"
 
-    def test_minimum_target_words_is_100(self):
-        """target_words min must be 100 (smoke step-down floor).
+    def test_minimum_target_words_is_30(self):
+        """target_words min must be 30 (ultra-smoke step-down floor).
 
-        Per ROADMAP 2026-04-29: target_words widget min was lowered 350 -> 100
-        to support the new 'smoke (1 act)' tier.  Floor below 100 still rejected
-        (smoke tier needs enough words to exercise the full pipeline).
+        History:
+          - 2026-04-29: lowered 350 -> 100 to support the 'tiny (smoke, 1 act)' preset.
+          - 2026-05-01: lowered 100 -> 30 to support the new '30 words (smoke, 1 act)'
+            ultra-smoke preset added alongside the BUG-128/129 fixes. Step also
+            lowered 50 -> 10 so the slider can hit 30 / 40 / 50 / ... / 100 directly
+            without forcing users into the preset.
+        Floor below 30 still rejected (ultra-smoke needs enough words to exercise
+        at least 3 dialogue lines + the static-radio fill path).
         """
         meta = _REQUIRED["target_words"][1]
-        assert meta["min"] == 100, f"target_words min should be 100, got {meta['min']}"
+        assert meta["min"] == 30, f"target_words min should be 30, got {meta['min']}"
+        assert meta["step"] == 10, f"target_words step should be 10, got {meta['step']}"
