@@ -5,6 +5,25 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-123: ComfyUI keeps models resident across prompts; Run 2 OOMs because Run 1's HuMo+WanTE+WanVAE+Whisper never unloaded [FIXED in commit pending]
+
+- **Date:** 2026-04-30 ~23:55 | **Phase:** 0 | **Bible candidate:** YES (clean repro, generic to any multi-stage ComfyUI pipeline that uses heavy models)
+- **Symptom:** Run 1 completed clean (`Prompt executed in 02:48:31`, 14/14 HuMo clips, mp4 generated). Run 2 started immediately in the same ComfyUI process, succeeded through 3-spine evaluator (max_new_tokens=150-800), then OOM'd at the full-script generate (max_new_tokens=1024) inside Mistral-Nemo `_prefill` SDPA attention:
+    ```
+    torch.OutOfMemoryError: Allocation on device 0 would exceed allowed memory
+    Currently allocated: 24.76 GiB
+    Requested: 3.99 GiB
+    Device limit: 15.92 GiB
+    Free (according to CUDA): 0 bytes
+    ```
+  Memory summary at OOM: peak alloc 30026 MiB, peak reserved 30240 MiB on a 16 GiB device — same paging-counter overstatement pattern, but Free=0 was real because models from Run 1 were still resident.
+- **Cause:** ComfyUI's `model_management` deliberately keeps loaded models resident across prompts to amortize cold-load time. For OTR runs that load HuMo (16.5 GB) + WanTE (6.4 GB) + WanVAE + Whisper, that means ~24 GB of "loaded models" stay in the LRU table between consecutive runs. The next run's small spine generations succeed (low KV cache pressure) but the 1024-token full-script generate's prefill K/V allocation requires more contiguous device memory than is free — OOM. No cudaMalloc retries because PyTorch's allocator doesn't know it can evict ComfyUI's loaded models without explicit `unload_all_models()`.
+- **Fix:** `nodes/video_composite.py::execute()` wrapped in try/finally that calls new `_end_of_run_cleanup()` static method on every exit path (success, error, raise). Cleanup pipeline: `comfy.model_management.unload_all_models()` -> `soft_empty_cache(force=True)` -> torch fallback (`gc.collect()` + `cuda.synchronize()` + `cuda.empty_cache()`). Every step has its own try/except + log so a single failure never breaks the run. VideoComposite is the LAST node in every OTR workflow, so this catches all paths.
+- **Verify:** Run two OTR episodes back-to-back in the same ComfyUI process. After Run 1 finishes, log should show `[VideoComposite] end-of-run cleanup: unloading all models` -> `unload_all_models() OK` -> `soft_empty_cache(force=True) OK`. Run 2's Mistral-Nemo prefill must NOT OOM on the 1024-token generate. Memory summary at start of Run 2's LLM phase should show Free > 8 GiB.
+- **Tags:** vram, oom, end-of-run-cleanup, model-management, multi-prompt, comfyui-residency, mistral-nemo, prefill, sdpa
+
+---
+
 ### BUG-LOCAL-122: Ledger not progressively updated during render — empty ledger mid-pipeline misleads observers
 
 - **Date:** 2026-04-30 ~22:05 | **Phase:** 0 | **Bible candidate:** TBD (likely yes — affects every observability surface)

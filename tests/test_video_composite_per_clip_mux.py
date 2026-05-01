@@ -547,3 +547,159 @@ class TestC7Contract:
                 f"Found -ar (sample rate) in ffmpeg cmd, implies "
                 f"re-encode: {cmd}"
             )
+
+
+class TestEndOfRunCleanup:
+    """BUG-LOCAL-123 (2026-04-30): VideoComposite must unload all
+    models from VRAM at end of run so the next ComfyUI prompt starts
+    with a clean VRAM slate. ComfyUI's model_management deliberately
+    keeps loaded models resident across prompts; OTR explicitly does
+    not want that for the LAST node in a run.
+
+    These tests verify that the cleanup helper is callable, idempotent,
+    and never raises -- even when comfy.model_management is unavailable
+    (e.g. unit-test environment without ComfyUI installed).
+    """
+
+    def test_end_of_run_cleanup_never_raises_in_test_env(self):
+        # comfy.model_management is not importable in unit-test env.
+        # The helper MUST log warnings and continue, not raise.
+        VC.VideoComposite._end_of_run_cleanup()
+
+    def test_end_of_run_cleanup_calls_unload_when_available(self):
+        # Inject a fake comfy.model_management module and confirm
+        # both unload_all_models and soft_empty_cache get called.
+        called = {"unload": False, "empty_cache": False}
+
+        class FakeMM:
+            @staticmethod
+            def unload_all_models():
+                called["unload"] = True
+
+            @staticmethod
+            def soft_empty_cache(force=False):
+                called["empty_cache"] = True
+                assert force is True, (
+                    "VideoComposite must pass force=True to "
+                    "soft_empty_cache so the CUDA pool actually drops"
+                )
+
+        # Patch sys.modules so `import comfy.model_management` resolves
+        # to our fake.
+        import sys as _sys
+        fake_pkg = type(_sys)("comfy")
+        fake_pkg.model_management = FakeMM
+        original_comfy = _sys.modules.get("comfy")
+        original_mm = _sys.modules.get("comfy.model_management")
+        _sys.modules["comfy"] = fake_pkg
+        _sys.modules["comfy.model_management"] = FakeMM
+        try:
+            VC.VideoComposite._end_of_run_cleanup()
+        finally:
+            # Restore.
+            if original_comfy is not None:
+                _sys.modules["comfy"] = original_comfy
+            else:
+                _sys.modules.pop("comfy", None)
+            if original_mm is not None:
+                _sys.modules["comfy.model_management"] = original_mm
+            else:
+                _sys.modules.pop("comfy.model_management", None)
+        assert called["unload"] is True, (
+            "_end_of_run_cleanup must call comfy.model_management."
+            "unload_all_models()"
+        )
+        assert called["empty_cache"] is True, (
+            "_end_of_run_cleanup must call comfy.model_management."
+            "soft_empty_cache(force=True)"
+        )
+
+    def test_end_of_run_cleanup_swallows_unload_exception(self):
+        # If unload_all_models raises, cleanup should still attempt
+        # soft_empty_cache, and never raise to the caller.
+        class FakeMMUnloadRaises:
+            @staticmethod
+            def unload_all_models():
+                raise RuntimeError("simulated unload failure")
+
+            @staticmethod
+            def soft_empty_cache(force=False):
+                # This should still get called despite the unload
+                # failure -- they are independent steps.
+                pass
+
+        import sys as _sys
+        fake_pkg = type(_sys)("comfy")
+        fake_pkg.model_management = FakeMMUnloadRaises
+        original_comfy = _sys.modules.get("comfy")
+        original_mm = _sys.modules.get("comfy.model_management")
+        _sys.modules["comfy"] = fake_pkg
+        _sys.modules["comfy.model_management"] = FakeMMUnloadRaises
+        try:
+            # Must not raise.
+            VC.VideoComposite._end_of_run_cleanup()
+        finally:
+            if original_comfy is not None:
+                _sys.modules["comfy"] = original_comfy
+            else:
+                _sys.modules.pop("comfy", None)
+            if original_mm is not None:
+                _sys.modules["comfy.model_management"] = original_mm
+            else:
+                _sys.modules.pop("comfy.model_management", None)
+
+    def test_execute_calls_cleanup_on_success(self):
+        # The execute() wrapper must call _end_of_run_cleanup() in
+        # finally even when _execute_body returns normally.
+        cleanup_calls = {"count": 0}
+
+        original_cleanup = VC.VideoComposite._end_of_run_cleanup
+        original_body = VC.VideoComposite._execute_body
+
+        @staticmethod
+        def fake_cleanup():
+            cleanup_calls["count"] += 1
+
+        def fake_body(self, **kwargs):
+            return ("/fake/path.mp4", "fake report")
+
+        VC.VideoComposite._end_of_run_cleanup = fake_cleanup
+        VC.VideoComposite._execute_body = fake_body
+        try:
+            inst = VC.VideoComposite()
+            result = inst.execute(procgen_video_path="x", clips_dir="y", ledger_json="{}")
+            assert result == ("/fake/path.mp4", "fake report")
+            assert cleanup_calls["count"] == 1
+        finally:
+            VC.VideoComposite._end_of_run_cleanup = original_cleanup
+            VC.VideoComposite._execute_body = original_body
+
+    def test_execute_calls_cleanup_on_exception(self):
+        # The execute() wrapper must call _end_of_run_cleanup() in
+        # finally even when _execute_body raises.  This is the
+        # critical case: a failed render still needs to drop VRAM
+        # so the next attempt isn't poisoned.
+        cleanup_calls = {"count": 0}
+
+        original_cleanup = VC.VideoComposite._end_of_run_cleanup
+        original_body = VC.VideoComposite._execute_body
+
+        @staticmethod
+        def fake_cleanup():
+            cleanup_calls["count"] += 1
+
+        def fake_body_raises(self, **kwargs):
+            raise RuntimeError("simulated render failure")
+
+        VC.VideoComposite._end_of_run_cleanup = fake_cleanup
+        VC.VideoComposite._execute_body = fake_body_raises
+        try:
+            inst = VC.VideoComposite()
+            with pytest.raises(RuntimeError, match="simulated render failure"):
+                inst.execute(procgen_video_path="x", clips_dir="y", ledger_json="{}")
+            assert cleanup_calls["count"] == 1, (
+                "Cleanup MUST fire even when _execute_body raises"
+            )
+        finally:
+            VC.VideoComposite._end_of_run_cleanup = original_cleanup
+            VC.VideoComposite._execute_body = original_body

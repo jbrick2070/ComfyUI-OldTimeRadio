@@ -914,7 +914,71 @@ class VideoComposite:
             },
         }
 
-    def execute(
+    @staticmethod
+    def _end_of_run_cleanup():
+        """End-of-run VRAM release (BUG-LOCAL-123 fix 2026-04-30).
+
+        VideoComposite is the LAST node in every OTR run. ComfyUI's
+        ``model_management`` deliberately keeps loaded models resident
+        across prompts to amortize load time, but for OTR that means
+        HuMo (16.5 GB) + WanTE + WanVAE + Whisper stay parked in VRAM
+        between consecutive runs. The next run then OOMs when Mistral-
+        Nemo's _prefill tries to allocate KV cache.
+
+        This helper fires unconditionally in execute()'s finally block
+        so the next prompt starts with a clean VRAM slate, regardless
+        of whether the current run succeeded, failed, or raised.
+
+        Idempotent and bounded: never raises, always logs.
+        """
+        log.info("[VideoComposite] end-of-run cleanup: unloading all models")
+        try:
+            import comfy.model_management as mm  # type: ignore
+            mm.unload_all_models()
+            log.info("[VideoComposite] end-of-run: unload_all_models() OK")
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[VideoComposite] end-of-run unload_all_models() failed: %s",
+                exc,
+            )
+        try:
+            import comfy.model_management as mm  # type: ignore
+            mm.soft_empty_cache(force=True)
+            log.info(
+                "[VideoComposite] end-of-run: soft_empty_cache(force=True) OK"
+            )
+        except Exception as exc_mm:  # noqa: BLE001
+            log.warning(
+                "[VideoComposite] end-of-run soft_empty_cache failed: %s; "
+                "trying torch fallback",
+                exc_mm,
+            )
+            try:
+                import gc
+                import torch  # type: ignore
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+                log.info(
+                    "[VideoComposite] end-of-run: torch fallback cleanup OK"
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[VideoComposite] end-of-run torch fallback failed: %s",
+                    exc,
+                )
+
+    def execute(self, **kwargs):
+        """Thin wrapper around ``_execute_body`` that guarantees
+        end-of-run VRAM cleanup via a finally block.  See
+        ``_end_of_run_cleanup`` for rationale (BUG-LOCAL-123)."""
+        try:
+            return self._execute_body(**kwargs)
+        finally:
+            self._end_of_run_cleanup()
+
+    def _execute_body(
         self,
         procgen_video_path: str,
         clips_dir: str,
