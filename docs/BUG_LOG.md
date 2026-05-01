@@ -5,7 +5,32 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-116: TITLE_RESOLVE_FAIL regression — `pending_20260430_061112` aborted in `OTR_SignalLostVideo.render_video` after 14:43 elapsed; writer never emitted a usable title token [AUTO-LOGGED]
+### BUG-LOCAL-122: Ledger not progressively updated during render — empty ledger mid-pipeline misleads observers
+
+- **Date:** 2026-04-30 ~22:05 | **Phase:** 0 | **Bible candidate:** TBD (likely yes — affects every observability surface)
+- **Symptom:** Live run mid-HuMo-render: `pending_20260430_210737_ledger.json` shows `cast=[]`, `lines=[]`, `scenes[].line_count=0`, `clips=[]` while BatchHumoRender console output reports `cast-still binding: 3/3 cast members matched` and `BUG-094 estimated 14 line timings across 177.8s episode`. Ledger is stale relative to actual pipeline progress. Owner expects real-time updates whenever possible.
+- **Cause:** Ledger gets stamped only at specific milestones (post-news-selection, then again at episode finalize). LLM, Director, Bark, FLUX, and BatchHumoRender phases run with in-memory state; their outputs are not progressively written back to the pending ledger file. Any observer (the owner, the soak tailer, future watchdog UIs) sees an empty ledger until the run finishes — by which point the value of real-time observability is already lost.
+- **Fix (proposed, multi-phase work):**
+  1. Add `_ledger_write_stamp(ledger_path, phase_label, payload)` helper that does an atomic JSON merge-and-write (open, parse, deep-merge, write to .tmp, rename) so concurrent reads never see a half-written ledger.
+  2. Wire stamps after each major phase: ScriptWriter (cast + scenes + lines populated), Director (sfx[] + music[] + beats[]), Step 4b/4c mirror (lines[] with speaker_role tagged), Bark (audio paths populated), FLUX (radio_bookend_path + cast_still paths), BatchHumoRender (clips[] with per-line render plan + timestamps), VideoComposite (final_video_path).
+  3. Add `ledger.meta.last_phase_completed` and `ledger.meta.last_phase_stamped_at` so observers can tell at a glance how far along the run is.
+- **Verify:** Tail the pending ledger every 30s during a long run. Confirm `cast` populates within ~3 min, `lines[]` within ~5-10 min, `clips[]` populating progressively as HuMo dispatches each clip. No file corruption from concurrent reads (atomic .tmp + rename).
+- **Tags:** ledger, observability, real-time, atomic-write, multi-phase-fix, pipeline-instrumentation
+
+---
+
+### BUG-LOCAL-121: Radio bookend FLUX render gated on `open_close=true`, but ANNOUNCER role can exist without `open_close` — radio HuMo dispatch falls back to cast-still face
+
+- **Date:** 2026-04-30 ~22:00 | **Phase:** 0 | **Bible candidate:** TBD (likely yes — clean repro pattern)
+- **Symptom:** Live ComfyUI run with `gen_params_initial.open_close=false`, Mistral-Nemo + Pro Ultra Quality, target_words=420. Director generated cast `c03=ANNOUNCER` despite `open_close=false`. Step 4b/4c speaker_role tagging worked correctly (l001 tagged `speaker_role=announcer`). BatchHumoRender log:
+    ```
+    [BatchHumoRender] line l001 speaker_role=announcer wanted radio still but it's missing; using full_env_00154_.png (source=ledger-cast-fresh) instead -- audio will be muxed lossless either way, but visual won't be the radio
+    ```
+  Audio path holds (C7 lossless mux), but the visual intent for radio roles (announcer / music_* / sfx) collapses to "person face" rather than "1940s radio device prop." Tier-honest degraded state — pipeline does NOT crash.
+- **Cause:** Radio bookend FLUX render is gated on `open_close=true` in the workflow. When `open_close=false`, no `radio_bookend_<ep>.png` is generated and no `ledger.radio_bookend_path` / `ledger.meta.radio_bookend_path` is stamped. But Director can still spawn an ANNOUNCER (and music/sfx rows) regardless of `open_close`, so the radio HuMo dispatch path activates without its source asset present. `_resolve_radio_still_path(ledger)` correctly returns None (file doesn't exist), and the BUG-088 cast-still fallback chain takes over gracefully.
+- **Fix (proposed):** Decouple radio bookend render gating from `open_close`. Two options: (a) Render `radio_bookend_<ep>.png` whenever any line in `ledger.lines[]` has `is_radio_role(speaker_role) == True` — gate on script content, not the open_close framing toggle; (b) Always render a generic radio still as fallback regardless of `open_close`, since cost is one FLUX call per episode. Option (b) is simpler. Option (a) is more elegant.
+- **Verify:** With `open_close=false` and a Director that spawns an ANNOUNCER role, confirm `radio_bookend_<ep>.png` exists on disk and BatchHumoRender log line shows `ref=radio_bookend_<ep>.png source=radio-still` for the announcer line, NOT a fallback message.
+- **Tags:** radio-bookend, speaker-role, flux-gating, open_close, bug-088-fallback, tier-honest-degrade, non-fatal — `pending_20260430_061112` aborted in `OTR_SignalLostVideo.render_video` after 14:43 elapsed; writer never emitted a usable title token [AUTO-LOGGED]
 
 - **Date:** 2026-04-30 06:25 | **Phase:** 0 | **Bible candidate:** TBD
 - **Symptom:** ComfyUI log tail (last error before idle, run finished revision then crashed in video stage):
@@ -37,6 +62,50 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 - **Fix:** TBD
 - **Verify:** TBD
 - **Tags:** revise_failed, script-critic, reviser, ledger-stamp, auto-logged, soak-tailer
+
+---
+
+### BUG-LOCAL-120: ScriptCritic verdict=REJECT score=55 on active episode `signal_lost_usindian_spacecraft_captures_mexico_city_20260430_093721` — writer produced 8 rubric violations on first pass; reviser successfully applied (61.1s, 2740 -> 2723 chars) [AUTO-LOGGED]
+
+- **Date:** 2026-04-30 09:30 | **Phase:** 0 | **Bible candidate:** TBD
+- **Symptom:** ScriptCritic reported verdict=REJECT score=55 with 8 distinct findings against the rubric. Tail excerpt:
+    ```
+    [ScriptCritic] running critic model=google/gemma-4-E2B-it len=2740 timeout=90s
+    [ScriptCritic] verdict=REJECT score=55 issues=8 elapsed=32.4s
+    [ScriptCritic]   - A1: Script opens with ANNOUNCER cue before any VOICE line -> B1
+    [ScriptCritic]   - A3: Cold open uses alarm clock, radio tuning, coffee pouring, or yawning -> B1
+    [ScriptCritic]   - A4: Character delivers full name and title in opening line -> B10
+    [ScriptCritic]   - A24: [SFX:] describes feeling not sound: "shuddering" -> B6
+    [ScriptCritic]   - A33: [ENV:] tag uses emotional adjectives: "thick with ozone" -> B8
+    [ScriptCritic]   - A34: Final line contains "unsettling reality of orbital mechanics" -> B9
+    [ScriptCritic]   - A38: Character introduced by voice-type descriptor instead of name -> B10
+    [ScriptCritic]   - A43: Any single scene exceeds 1.6x33 words (scene-bloat) -> B11
+    [ScriptCritic] revise_on_findings=ON, verdict=REJECT, 8 issues -> running revision LLM call
+    [ScriptCritic] revision applied (61.1s): 2740 -> 2723 chars
+    ```
+  Reviser path executed cleanly — `script_revisions[]` was stamped (revs=1 in ledger). Run continues into video phase. This is NOT a system failure; gate caught a low-quality first draft, reviser fixed it. Logged here so writer-quality regressions can be tracked across the soak.
+- **Cause:** TBD (auto-logged by scheduled tailer; manual triage required) — leading hypothesis: gemma-4-E2B-it writer profile drifted from rubric guidance for `space_opera` genre + `Pro (Ultra Quality)` profile. Findings cluster around opening conventions (A1/A3/A4/A38) and SFX/ENV tag discipline (A24/A33), suggesting the writer prompt's bad-pattern bullets aren't pinned tightly enough for this model.
+- **Fix:** TBD
+- **Verify:** TBD — does the reviser's 17-char delta (2740 -> 2723) actually resolve the 8 issues? Compare pre/post script_critic reports; if the same A1/A3/A4 violations survive the revision, that's a reviser-quality bug separate from this writer-quality one.
+- **Tags:** critic_reject, script-critic, writer-quality, gemma-4-e2b, auto-logged, soak-tailer
+
+---
+
+### BUG-LOCAL-119: news_history dedup wiped full 43-candidate pool on active episode (`Filtered 43 ... 0 remaining of 43`); BUG-LOCAL-112 recovery path engaged correctly and body-fetched top 5 [AUTO-LOGGED]
+
+- **Date:** 2026-04-30 09:21 | **Phase:** 0 | **Bible candidate:** TBD
+- **Symptom:** Active episode `signal_lost_usindian_spacecraft_captures_mexico_city_20260430_093721` triggered the post-BUG-112 wipe-and-recover path:
+    ```
+    [NewsFetcher] Filtered 43 previously-used candidate(s) via news_history (0 remaining of 43)
+    [NewsFetcher] Body-fetching top 5 candidate(s) in parallel...
+    [NewsFetcher] body re-rank chose #2: US-Indian Spacecraft Captures Mexico City Subsidence
+    [NewsFetcher] stamped meta.news_seed in ledger: US-Indian Spacecraft Captures Mexico City Subsidence
+    ```
+  All 43 fetch-pool candidates were filtered out by news_history; the BUG-LOCAL-112 fix correctly restored the unfiltered pool and body-fetched the top 5, which body re-rank then selected from. News-seeded plot was preserved. This is the auto-tailer flagging that the news_history pool is at saturation (every recent candidate is a recent repeat) — not a code bug, but a sign that history-window or fetch-pool size needs revisiting before duplicate news_seeds start showing up.
+- **Cause:** TBD (auto-logged by scheduled tailer; manual triage required) — soak run has now consumed every fresh science-news headline available via current fetch path. Either (a) the news_history retention window is too long, (b) the fetch pool is too small to keep ahead of consumption, or (c) the science-news source has stopped returning new items in the polling window.
+- **Fix:** TBD
+- **Verify:** TBD — confirm how many distinct `meta.news_seed.headline` values appear across the last ~50 ledgers; if duplicate seeds start appearing within a 7-day window, news_history needs a TTL prune or the fetch pool needs widening.
+- **Tags:** news_history_filter_wipe, news-fetcher, history-saturation, auto-logged, soak-tailer
 
 ---
 

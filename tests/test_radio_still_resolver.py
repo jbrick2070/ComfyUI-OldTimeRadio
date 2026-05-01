@@ -135,3 +135,115 @@ class TestPathConversion:
         # Path() may or may not raise on this; either way resolver
         # should land on None (file doesn't exist).
         assert _resolve_radio_still_path(led) is None
+
+
+class TestFilesystemFallback:
+    """BUG-LOCAL-121 filesystem-fallback layer (2026-04-30).
+
+    When ledger stamping fails silently but the FLUX phase still saved
+    the radio still to its deterministic location, the resolver should
+    find it by reconstructing the path from ``ledger.episode_id``.
+    """
+
+    def test_filesystem_fallback_finds_by_episode_id(
+        self, tmp_path: Path, monkeypatch
+    ):
+        # Monkeypatch otr_stills_dir to point at tmp.
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+
+        # Place the radio still where FLUX would have saved it, with
+        # episode_id-based naming.
+        ep_id = "pending_20260430_210737"
+        radio_file = tmp_path / f"radio_bookend_{ep_id}.png"
+        radio_file.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        # Ledger has episode_id but NO radio_bookend_path stamp.
+        led = {"episode_id": ep_id}
+        result = _resolve_radio_still_path(led)
+        assert result is not None
+        assert result == radio_file
+        assert result.is_file()
+
+    def test_filesystem_fallback_when_ledger_path_stale(
+        self, tmp_path: Path, monkeypatch
+    ):
+        # Ledger has a stamped path that no longer exists on disk
+        # (e.g. file deleted, drive reorg) but the FLUX-saved file
+        # IS at the deterministic episode_id location.  Resolver
+        # should fall through to filesystem layer.
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        ep_id = "ep001"
+        radio_file = tmp_path / f"radio_bookend_{ep_id}.png"
+        radio_file.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        stale = tmp_path / "old_stamped_path_gone.png"
+        led = {
+            "episode_id": ep_id,
+            "radio_bookend_path": str(stale),
+        }
+        result = _resolve_radio_still_path(led)
+        assert result == radio_file
+
+    def test_filesystem_fallback_returns_none_if_no_episode_id(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        # Even with a radio file present, no episode_id means we
+        # can't reconstruct the deterministic name.
+        (tmp_path / "radio_bookend_anything.png").write_bytes(b"\x89PNG")
+        led = {}  # no episode_id
+        assert _resolve_radio_still_path(led) is None
+
+    def test_filesystem_fallback_returns_none_if_episode_id_blank(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        led = {"episode_id": "   "}  # whitespace-only
+        assert _resolve_radio_still_path(led) is None
+
+    def test_filesystem_fallback_returns_none_if_episode_id_not_string(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        led = {"episode_id": 12345}  # int, not str
+        assert _resolve_radio_still_path(led) is None
+
+    def test_filesystem_fallback_returns_none_if_file_missing(
+        self, tmp_path: Path, monkeypatch
+    ):
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        # episode_id present but no matching file in stills dir.
+        led = {"episode_id": "ep_no_match"}
+        assert _resolve_radio_still_path(led) is None
+
+    def test_ledger_path_takes_precedence_over_filesystem(
+        self, tmp_path: Path, monkeypatch, radio_png
+    ):
+        # If both the ledger-stamped path AND a filesystem-deterministic
+        # file exist, the ledger path wins (it's the canonical signal).
+        import batch_humo_render as bhr  # noqa: E402
+
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        ep_id = "ep_precedence"
+        fs_path = tmp_path / f"radio_bookend_{ep_id}.png"
+        fs_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        led = {
+            "episode_id": ep_id,
+            "radio_bookend_path": str(radio_png),  # ledger-stamped
+        }
+        result = _resolve_radio_still_path(led)
+        assert result == radio_png  # ledger wins
+        assert result != fs_path

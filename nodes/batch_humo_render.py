@@ -61,6 +61,7 @@ from _otr_paths import (  # noqa: E402
     comfy_output_dir,
     otr_audio_dir,
     otr_legacy_audio_dir,
+    otr_stills_dir,
     otr_videos_dir,
 )
 from _otr_speaker_role import (  # noqa: E402
@@ -77,32 +78,62 @@ def _resolve_radio_still_path(ledger):
     location (top-level or under meta).  Returns ``Path`` if it
     points at an existing file, else ``None``.
 
-    Both locations are checked because BatchFluxRender stamps to
-    BOTH (belt-and-suspenders since 2026-04-30) and older ledgers
-    may have only one.  Existence-check is critical: a stamped
-    path that no longer exists on disk should fall through to the
-    legacy portrait resolver, not break the run.
+    Resolution order (BUG-LOCAL-121 fix 2026-04-30):
+      1. ``ledger.radio_bookend_path`` (top-level)
+      2. ``ledger.meta.radio_bookend_path``
+      3. **Filesystem fallback:** ``output/otr/stills/radio_bookend_<episode_id>.png``
+         derived from ``ledger.episode_id``.  This handles the case where
+         BatchFluxRender successfully rendered the radio bookend image
+         but the ledger stamp failed silently (e.g. ledger overwritten by
+         a later phase, atomic write race, etc.).
+
+    All three checks include an existence-check on disk: a stamped path
+    that no longer exists falls through to the next layer rather than
+    breaking the run.
     """
     if not isinstance(ledger, dict):
         return None
+    # Layer 1: top-level ledger path
     cand = ledger.get("radio_bookend_path")
+    # Layer 2: meta ledger path
     if not cand:
         meta = ledger.get("meta") or {}
         if isinstance(meta, dict):
             cand = meta.get("radio_bookend_path")
-    if not cand:
+    if cand:
+        try:
+            p = Path(cand)
+        except Exception:  # noqa: BLE001
+            p = None
+        if p is not None and p.is_file():
+            return p
+        if p is not None:
+            log.warning(
+                "[BatchHumoRender] ledger radio_bookend_path=%s does "
+                "not exist on disk; trying filesystem fallback",
+                p,
+            )
+    # Layer 3: filesystem fallback by episode_id (BUG-LOCAL-121).
+    # Even if ledger stamp is missing/stale, the FLUX phase saves
+    # the radio bookend at a deterministic path we can reconstruct.
+    episode_id = ledger.get("episode_id")
+    if not isinstance(episode_id, str) or not episode_id.strip():
         return None
     try:
-        p = Path(cand)
-    except Exception:  # noqa: BLE001
+        fs_path = otr_stills_dir() / f"radio_bookend_{episode_id.strip()}.png"
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[BatchHumoRender] radio still filesystem fallback failed: %s",
+            exc,
+        )
         return None
-    if p.is_file():
-        return p
-    log.warning(
-        "[BatchHumoRender] ledger radio_bookend_path=%s does not "
-        "exist on disk; radio-role lines will fall through to "
-        "portrait resolver", p,
-    )
+    if fs_path.is_file():
+        log.info(
+            "[BatchHumoRender] radio still resolved via filesystem "
+            "fallback (ledger stamp missing): %s",
+            fs_path,
+        )
+        return fs_path
     return None
 
 

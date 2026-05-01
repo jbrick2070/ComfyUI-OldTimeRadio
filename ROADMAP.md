@@ -24,8 +24,25 @@ Every consumer of `ledger.json` must understand all four levels.
 Lock these. Any work item that contradicts this list is wrong.
 
 - RTX 5080 Laptop, 16 GB VRAM, Blackwell sm_120, single GPU, no cloud.
-- Windows, Python 3.12, torch 2.10.0, CUDA 13.0, SageAttention + SDPA.
-- Flash Attention 2/3: NOT AVAILABLE. Do not chase.
+- Windows, Python 3.12, torch 2.10.0, CUDA 13.0.
+
+**Canonical stack (do not downgrade):**
+- CUDA 13.x / cu130
+- PyTorch cu130 matching the ComfyUI environment
+- SDPA as guaranteed fallback
+- SageAttention only when the cu130 wheel/source build matches Python + Torch exactly
+- FlashAttention not required for shipped OTR
+
+CUDA 13 is non-negotiable because (1) Blackwell sm_120 support is the point, (2) NVFP4 / FP4 model support in ComfyUI requires `comfy-kitchen` which requires CUDA 13+, (3) Task #2 SeedVR2 v2.5 NVFP4 path needs cu130 downstream. The cu128 SageAttention path exists in the wild and is the easier wheel target, but it belongs in a SEPARATE experimental ComfyUI folder if needed for sandbox work — never in the production OTR pipeline.
+
+**Attention backend policy:**
+- Default: PyTorch SDPA (boring, safe, in-tree).
+- Preferred acceleration: SageAttention via KJNodes "Patch Sage Attention" node, tested per-workflow only.
+- Do NOT use global `--use-sage-attention` unless a specific model/workflow has passed smoke testing — Triton route can produce black outputs with some models.
+- FlashAttention 2/3: out of scope on Windows Blackwell. Do not chase community wheels for the shipped pipeline.
+- FlashAttention 4: real and worth tracking (`pip install flash-attn-4`, exposes `flash_attn.cute` namespace), but NOT a ComfyUI production dependency yet. Older FA2-style custom nodes hard-coding the top-level import won't see it. FA4 is the future-looking transformer/training answer; SageAttention is the practical diffusion/ComfyUI answer today.
+- Any third-party attention wheel must pass before shipping: import test → one FLUX smoke → one Wan/HuMo smoke → no black frames → no VRAM regression → no audio-path impact. Then it's blessed.
+- Note on SageAttention wheel sourcing: `mobcat40/sageattention-blackwell` is the leading prebuilt wheel repo for sm_120, but its primary build line is PyTorch 2.11 nightly + CUDA 12.8. A cu130 build exists in that repo, but verify with smoke workflow on our pinned torch 2.10.0 / CUDA 13.0 stack before blessing.
 - 100% local, offline-first, open source, no API keys for the shipped pipeline. Cloud LLMs (OpenAI / Gemini / NVIDIA NIM) are for **internal QA round-robins only**, never shipped output.
 - VRAM ceiling: **14.5 GB audio** / **15.5 GB video** (lifted 2026-04-17 for the video stack only — audio stays at 14.5 GB).
 - Audio is king (rule **C7**). Full narrative output must never break, shorten, or degrade. If video breaks audio, revert immediately. Audio output must remain byte-identical to v1.5 baseline at every gate.
@@ -132,14 +149,19 @@ Blocked on video-stack maturity. Design begins once stack empirics exist from th
 
 **Stance:** v2.0 doesn't release until 8GB-class users get an enhanced visual output too.
 
-**Architecture (Jeffrey 2026-04-28):** Single master JSON with bypassable video-stack groups. Shared audio chain → procgen, then multiple side-by-side render groups — each group bypassable via Ctrl+B. Final VideoComposite takes whichever group is active. 8 GB users bypass the HuMo + FLUX-fp8 (16 GB) groups and enable the GGUF (8 GB) groups.
+**Architecture (Locked 2026-04-30):** Single master JSON with bypassable video-stack groups. Shared audio chain → procgen, then multiple side-by-side render groups — each group bypassable via Ctrl+B. Final VideoComposite takes whichever group is active.
 
-**Locked picks (2026-04-30, after evaluating LTX 2.3, LTX-2 19B, ERNIE Image, NVIDIA CES 2026 NVFP4 announcement):**
+**Stance:** 8 GB tier does NOT get "full animated backgrounds" or generative character video. They get an **enhanced visual mode** optimized for their VRAM limits: still + parallax + interpolation for motion, with optional Wan 2.2 5B B-roll for users who want to gamble on render time.
+
+**Do NOT offer:** HuMo, LTX-2, LTX-2.3, or 14B Wan to 8 GB users. The support burden and OOM risk are too high.
+
+**Locked picks (2026-04-30, after evaluating LTX 2.3, LTX-2 19B, ERNIE Image, NVIDIA CES 2026 NVFP4, and round-robin consult on background models):**
 
 | Component | 16 GB tier | 8 GB tier | Why |
 |---|---|---|---|
-| **Stills** | **NVFP4 FLUX.2** (RTX 50 Series, ~5 GB; falls back to FLUX-fp8 ~12 GB if NVFP4 unavailable) | **FLUX.1-dev Q4_K_S** (city96 GGUF, ~5-6 GB) | NVFP4 is the new official quantization NVIDIA announced at CES 2026 — 3x faster, 60% less VRAM than fp8 on RTX 50 Series. Q4_K_S is the safe 8GB GGUF option. |
-| **Video** | **HuMo 14B fp8** + master_mix_per_clip_mux | **Wan 2.2 5B TI2V** (native ComfyUI template) | HuMo for character lip-sync (drives video from OUR Bark/Kokoro audio — the whole reason it exists). Wan 5B for 8GB atmospheric B-roll. |
+| **Stills** | **NVFP4 FLUX.2** (RTX 50 Series, ~5 GB; falls back to FLUX-fp8 ~12 GB if NVFP4 unavailable) | **FLUX.1-dev Q4_K_S** (city96 GGUF, ~5-6 GB) | FLUX is the visual anchor for both tiers. NVFP4 is the new official quantization NVIDIA announced at CES 2026 — 3x faster, 60% less VRAM than fp8 on RTX 50 Series. Q4_K_S is the safe 8GB GGUF option. |
+| **Motion** | **HuMo 14B fp8** + master_mix_per_clip_mux + LTXV background layer | **Still + Parallax + Interpolation** (deterministic Ken-Burns + frame interp on FLUX stills) | HuMo for 16 GB character lip-sync. 8 GB gets safest, fastest, most deterministic motion — high quality, zero VRAM spikes, no diffusion-per-beat. |
+| **Optional B-roll** | n/a (HuMo covers all character beats; LTXV covers backgrounds) | **Wan 2.2 5B TI2V** (native ComfyUI template, optional toggle) | Strictly optional B-roll lane for 8 GB users who want generative motion on non-dialogue beats. Slow, not guaranteed; document expectation upfront. |
 | **Upscale — Speed option** | **RTX Video Super Resolution ULTRA** (~0 GB, HW-accelerated, target 4K, real-time) | **RTX VSR ULTRA** (same node, same zero VRAM cost) | Default. NVIDIA CES 2026 ComfyUI node. Whole-episode upscale, near-real-time, ships with RTX driver. Use this when speed matters more than maximum diffusion-based detail. |
 | **Upscale — Quality option** | **SeedVR2 v2.5 NVFP4** (7B, ~6 GB on RTX 50 NVFP4, ~78 s per 65-frame 720p→1080p clip — full episode ~2-3 h on a 5-min run) | not viable on 8 GB | Whole-episode upscale via the diffusion upscaler. Quality king for AI-generated content. SeedVR2 v2.5 NVFP4 support landed via [PR #486](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler/pull/486). On RTX 50 NVFP4: 3x faster + 60% less VRAM vs fp16 baseline. |
 
@@ -173,36 +195,107 @@ Both upscale options run on the WHOLE episode (every clip), exposed as a workflo
 
 ## v2.0-beta candidates
 
-### LTX-Video animated backgrounds (3-layer composite)
+### Animated backgrounds (3-layer composite, 16 GB only)
 
-Promotes the current 2-layer composite (procgen-base + HuMo-overlay, BUG-092) into a 3-layer composite when LTX is wired in:
+Promotes the current 2-layer composite (procgen-base + HuMo-overlay, BUG-092) into a 3-layer composite. **8 GB tier does NOT get a background layer** (procgen sides only — keeps 8 GB lean).
 
 ```
 TOP:    Procgen / CRT audio-reactive overlay -- `lighten` blend, ~0.3 opacity
 MID:    HuMo lip-sync portrait -- center pillarbox during dialogue, opaque
-BOTTOM: LTX animated background -- full canvas, opaque
+BOTTOM: Animated background (model TBD) -- full canvas, opaque
 ```
 
 **Why CRT-on-top in lighten mode is more truthful:** a failing broadcast's scanlines + audio-peak flicker should cover the WHOLE frame including the speaker's face — the interference doesn't politely stop at the pillarbox edges. Lighten mode takes max(CRT, underlying) per channel so artifacts ride on top without erasing detail.
 
-**LTX render budget (locked 2026-04-29 PM — render-native + slow-mo):**
-- Render at LTX's trained native 24 fps, then slow to 12 fps via ffmpeg `setpts=PTS*2,fps=12`. The slow-mo IS the SIGNAL LOST broadcast-degraded aesthetic.
-- 1-2 LTX clips per SCENE (not per shot). Loop across the scene's duration via `-stream_loop -1` with optional crossfade or ping-pong reverse.
-- 193 frames per clip = 8 sec native = 16 sec apparent after 2× slow-mo. Math: LTX uses 8x temporal VAE compression so frame counts must be `8n + 1`. 193 = 24*8 + 1.
-- Optional dial-up to 241 frames (10 sec native, 20 sec apparent) for long scenes. Documented LTX max is 257.
-- Distilled 4-8 steps (default 6).
+**Render budget (locked 2026-04-29 PM — render-native + slow-mo, model-agnostic):**
+- Render at the chosen model's native fps, then slow to 12 fps via ffmpeg `setpts=PTS*2,fps=12`. The slow-mo IS the SIGNAL LOST broadcast-degraded aesthetic.
+- 1-2 clips per SCENE (not per shot). Loop across the scene's duration via `-stream_loop -1` with optional crossfade or ping-pong reverse.
+- For LTX: 193 frames per clip = 8 sec native = 16 sec apparent after 2× slow-mo. LTX uses 8× temporal VAE compression so frame counts must be `8n + 1`. 193 = 24*8 + 1. Max 257.
+- For Wan: frame-count math TBD per model card during implementation.
+- Distilled 4-8 steps (default 6 for LTX; Wan TBD).
 
-**Per-episode wall-clock:** smoke (1 scene) ~50 s; short (3 scenes) ~2.5 min; medium (5 scenes) ~4 min. Negligible vs HuMo (~10 min per dialogue line).
+**Per-episode wall-clock estimate:** smoke (1 scene) ~50 s; short (3 scenes) ~2.5 min; medium (5 scenes) ~4 min. Negligible vs HuMo (~10 min per dialogue line).
 
-**Frame-count widget on `OTR_BatchLTXRender`:**
+**Frame-count widget shape (model-specific names locked at impl):**
 ```
-ltx_frames:    [97, 145, 193, 241]   (8n+1 dropdown, default 193)
-ltx_steps:     [4, 6, 8]             (distilled, default 6)
-slow_mo_factor: float (default 2.0)  (1.0 = no slow, 2.0 = half-speed)
-target_fps:    int (default 12)      (post-slow display rate)
+frames:         dropdown of valid frame counts for chosen model
+steps:          distilled step dropdown
+slow_mo_factor: float (default 2.0)
+target_fps:    int (default 12)
 ```
 
-**Bonus for 8 GB tier:** LTX 0.9 fp16 fits on 8 GB cards. Same `OTR_BatchLTXRender` node serves both 16 GB tier (background layer) and 8 GB tier (primary visual; HuMo bypassed). Single model, two roles via workflow toggle.
+#### Background-model selection — LOCKED 2026-04-30
+
+**Round-robin verdict:** Keep the background layer cheap, stable, and visually appropriate for being blurred/degraded under the HuMo dialogue pillarbox. Foundation-model chasing for a layer that gets slowed to 12 fps and composited under a foreground is the wrong engineering bet.
+
+| Candidate | Size on disk | Peak VRAM | Role | Verdict |
+|---|---|---|---|---|
+| **LTXV 0.9.x 2B distilled fp16** | ~5 GB | ~7-8 GB w/ VAE | **Default (16 GB)** | **LOCK.** Fits the degraded-broadcast aesthetic perfectly. 193 frames (8n+1), 4-8 distilled steps, then ffmpeg slow-mo to 12 fps. Both ChatGPT + Gemini endorsed. |
+| **Still + Parallax + Interpolation** | ~5-6 GB (FLUX still only) | ~7 GB | **Default (8 GB)** | **PLAN B / 8 GB PATH.** Lowest risk, highly deterministic Ken-Burns + frame interp on FLUX stills. Likely enough motion for radio drama without diffusion overhead. ChatGPT's smallest-change biggest-payoff suggestion. |
+| **Wan 2.2 5B native FP8** | ~6 GB | ~8-9 GB w/ VAE | Fallback | Keep as a fallback if LTXV introduces unacceptable motion artifacts during live-test. Also serves 8 GB tier as optional B-roll lane. |
+| **LTX-2 19B / 2.3 22B GGUF** | 12-14 GB | 14-17 GB w/ VAE decode spike | **REJECTED** | **DO NOT USE FOR BACKGROUNDS.** Audio-video foundation models are a paradigm mismatch and too heavy for a sidecar background layer on a 16 GB VRAM ceiling. VAE temporal decode adds 2-3 GB at decode → OOM. ChatGPT also flagged "1.1" version label as community packaging, not a confirmed upstream tag. |
+| **HunyuanVideo distilled** | varies | varies | Not recommended | ChatGPT mentions; operationally heavier than LTXV. Skip. |
+| **Stable Video 3 (8B)** | unknown | unknown | Suspect | NVIDIA round suggested with hallucinated specifics; do not pursue without independent verification. |
+
+**Quantization gotchas on Blackwell sm_120 (both ChatGPT + Gemini):** Don't depend on FP8 / NVFP4 paths for video models yet — Blackwell support arrives in layers (PyTorch → CUDA kernels → custom ops → quant backends → custom nodes), and ComfyUI custom video nodes are exactly where "advertised support" and "production-safe support" diverge. Prefer fp16 / bf16 paths that already work.
+
+**Pin format locked:**
+```yaml
+background_video:
+  family: "ltxv"
+  upstream_repo: "Lightricks/LTX-Video"
+  model_file: "<exact 0.9.x safetensors filename to confirm at impl>"
+  upstream_commit: "<HF commit SHA at impl>"
+  comfyui_node_repo: "<exact custom node repo>"
+  comfyui_node_commit: "<SHA at impl>"
+  precision: "fp16"   # prefer over fp8 for stability on this layer
+  frames_rule: "8n+1"
+  target_frames: 193
+  sampler_steps: 6
+  postprocess: "setpts=PTS*2,fps=12"
+```
+
+#### TTS palette expansion — LOCKED LADDER 2026-04-30
+
+NOT replacing the canonical pipeline (Bark + Kokoro + MusicGen + AudioGen → master mix). EXPANDING the per-character voice palette. Round-robin consult 2026-04-30 produced strong agreement on direction.
+
+**Production add-order ladder (Parler-TTS REJECTED — owner pref; vintage sound stays in the deterministic DSP chain):**
+
+| Priority | Engine | License | Peak VRAM | C7-deterministic? | Verdict |
+|---|---|---|---|---|---|
+| **1** | **Kokoro** (current) | MIT | ~1 GB | Yes | **KEEP.** Undisputed workhorse for strict lip-sync and clean narration. Gemini calls "undisputed king of low-VRAM deterministic phoneme TTS." |
+| **2** | **Bark** (current) | MIT | ~6 GB | Yes (vram_sentinel + length-sort batching shipped) | **KEEP.** Unmatched for period vibe, character texture, and emotional color. |
+| **3** | **CosyVoice 2** | Apache-2.0 | ~3-4 GB | Yes (flow-matching ODE solver + fixed seed = byte-identical) | **ADD NEXT.** Strongest production candidate for expanding the dramatic voice palette. Both ChatGPT + Gemini endorsed. |
+| **4** | **Piper** | MIT | ~1 GB | Yes | **8 GB / UTILITY FALLBACK.** Tiny, deterministic, fast. Ideal for minor announcer roles or 8 GB emergency fallback. ChatGPT's recommendation for utility voices. |
+| **5** | **CosyVoice 3** | Apache-2.0 | unknown | Unverified | **RESEARCH LANE.** Both flag as too new for production. Needs strict C7 hash proof before promotion. NVIDIA round claimed v3.2.1 production-ready with hallucinated commit SHA; ignore that signal. |
+| **6** | **Qwen3-TTS** | needs license audit | unknown | **C7 RISK** | **RESEARCH LANE.** Gemini flags autoregressive + flow-matching hybrid as hard to make byte-identical. Highly expressive but requires deep C7 verification before any merge. |
+
+**REJECTED candidates:**
+- **Parler-TTS Mini** — owner preference; vintage broadcast sound stays in the deterministic DSP mastering chain (band-limit + tube saturation + plate flavor + noise floor + AM EQ). Pinned exactly there, model-side stylization rejected.
+- **Fish Speech** — license incompatible with MIT downstream.
+- **XTTS / Tortoise / StyleTTS family** — license ambiguity, Windows friction, C7 determinism risk. Evaluate only if a specific gap appears that priorities 1-4 don't fill.
+
+**C7 qualification protocol (apply to any new TTS before merge):**
+1. Same prompt + same seed + same model revision + same driver/torch/CUDA/cuDNN + same batch size + same output format.
+2. Run 10 repeated generations across cold start, warm start, and process restarts.
+3. Hash final WAV bytes. If any hashes differ → engine is NOT qualified for OTR.
+
+**Period-style controls — locked position:** Vintage broadcast sound lives in the deterministic DSP mastering chain (band-limit, tube saturation, plate flavor, noise floor, AM EQ shaping). TTS engines provide diction / cadence / timbre baseline only. Any model offering "1940s radio" as a text-prompted style is out of scope — we own the vintage sound, the model doesn't get to drift it.
+
+**Pin format to lock once each engine ships:**
+```yaml
+tts_palette:
+  engines:
+    - name: "kokoro" / "bark" / "cosyvoice2" / "piper"
+      upstream_repo: "<exact repo>"
+      model_revision: "<tag/SHA>"
+      tokenizer_revision: "<tag/SHA>"
+      vocoder_revision: "<tag/SHA>"
+      decode_mode: "<greedy|ode_solver|other>"
+      sample_rate: "<Hz>"
+      wav_hash_test: true
+      role: "<character|announcer|narrator|utility>"
+```
 
 ### LLM character normalize pass
 
@@ -238,7 +331,11 @@ Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_P
 - `docs/BUG_LOG.md` — live bug tracking
 - `docs/ROADMAP_HISTORY.md` — historical session logs and shipped-work archive (everything that used to live in this file)
 - `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
-- `docs/2026-04-30-project-qa__04_synthesis.md` — most recent round-robin QA pass (OpenAI + Gemini + NVIDIA — NVIDIA was a non-vote due to context overflow)
+- `docs/2026-04-30-project-qa__04_synthesis.md` — earlier round-robin QA pass (OpenAI + Gemini + NVIDIA — NVIDIA was a non-vote due to context overflow)
+- `docs/2026-04-30-ltx-tts-april2026__01_chatgpt.md` — ChatGPT (gpt-5.4) round on background-model + TTS-palette decisions
+- `docs/2026-04-30-ltx-tts-april2026-gemini__02_gemini.md` — Gemini (gemini-3-pro-preview) follow-up
+- `docs/2026-04-30-ltx-tts-april2026-nvidia__03_nvidia.md` — NVIDIA (mistral-nemotron) round; **discounted** for hallucinated specifics (fabricated `voxpopuli/tts-v2.1`, fake CosyVoice commit SHA, line numbers that don't match codebase)
+- **Pending:** next round-robin pass on the v2.0-beta `Background-model selection` and `TTS palette expansion` matrices in this file, using the gpt-5.5 ladder (added to `scripts/_consult_round_robin.py` 2026-04-30)
 - Survival guide / Bug Bible: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
 ---

@@ -9,9 +9,10 @@ external models until a grounded answer emerges:
 
     Round A:  ChatGPT (gpt-5.4 -> gpt-5.4-pro -> gpt-5.1-codex-max ladder)
     Round B:  Gemini   (gemini-3.1-pro-preview -> gemini-2.5-pro)
-    Round C:  Synthesis -- this script summarizes agreement / disagreement
-              between A and B so I (Claude) can decide the grounded answer
-              in the chat context after running this script.
+    Round C:  NVIDIA   (mistral-nemotron -> llama-3.3-nemotron -> ...)
+    Round D:  Synthesis -- this script summarizes agreement / disagreement
+              between A, B, and C so I (Claude) can decide the grounded
+              answer in the chat context after running this script.
 
 Per CLAUDE.md "Round-Robin Consultation" rule.  Use for non-trivial
 design choices, library picks, architecture trade-offs, or bug root
@@ -36,6 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CONSULT_BASE = ROOT / "docs"
 
 OPENAI_MODELS = [
+    "gpt-5.5",
+    "gpt-5.5-pro",
     "gpt-5.4",
     "gpt-5.4-pro",
     "gpt-5.1-codex-max",
@@ -209,7 +212,37 @@ def gemini_followup_prompt(question: str, openai_response: str, openai_model: st
     )
 
 
-def synthesis_text(question, openai_model, openai_response, gemini_model, gemini_response):
+def nvidia_followup_prompt(
+    question: str,
+    openai_response: str, openai_model: str,
+    gemini_response: str, gemini_model: str,
+) -> str:
+    return (
+        f"You are the THIRD opinion in a round-robin design consultation.\n"
+        f"Two models have already answered.  Your job is to break ties and\n"
+        f"surface anything both of them missed.\n\n"
+        f"## Original question\n\n{question}\n\n"
+        f"## ChatGPT ({openai_model}) answered:\n\n{openai_response}\n\n"
+        f"## Gemini ({gemini_model}) answered:\n\n{gemini_response}\n\n"
+        f"## Your task\n\n"
+        f"1. Where ChatGPT and Gemini AGREE, state whether you concur or "
+        f"see a flaw they missed.\n"
+        f"2. Where they DISAGREE, pick a side and explain why -- or propose "
+        f"a third path.\n"
+        f"3. List any FACTUAL ERRORS or hallucinated APIs / file paths in "
+        f"either answer.\n"
+        f"4. List anything IMPORTANT THAT BOTH OMITTED.\n"
+        f"5. Give your own prioritized recommendation (3-6 bullets).\n"
+        f"6. Note any items where you are uncertain and want verification.\n"
+    )
+
+
+def synthesis_text(
+    question,
+    openai_model, openai_response,
+    gemini_model, gemini_response,
+    nvidia_model, nvidia_response,
+):
     return (
         f"# Synthesis -- {datetime.date.today().isoformat()}\n\n"
         f"**Question:** {question}\n\n"
@@ -218,9 +251,11 @@ def synthesis_text(question, openai_model, openai_response, gemini_model, gemini
         f"---\n\n"
         f"## Gemini ({gemini_model})\n\n{gemini_response}\n\n"
         f"---\n\n"
+        f"## NVIDIA ({nvidia_model})\n\n{nvidia_response}\n\n"
+        f"---\n\n"
         f"## To decide (Claude / human)\n\n"
-        f"- [ ] Agree:\n"
-        f"- [ ] Disagree:\n"
+        f"- [ ] All three agree:\n"
+        f"- [ ] Two-vs-one splits:\n"
         f"- [ ] Facts to verify:\n"
         f"- [ ] Final grounded recommendation:\n"
     )
@@ -256,6 +291,7 @@ def main() -> int:
     parser.add_argument("--topic", type=str)
     parser.add_argument("--skip-openai", action="store_true")
     parser.add_argument("--skip-gemini", action="store_true")
+    parser.add_argument("--skip-nvidia", action="store_true")
     args = parser.parse_args()
 
     question = _read_question(args)
@@ -337,10 +373,58 @@ def main() -> int:
                 f"# Round B -- FAILED\n\n{e}\n", encoding="utf-8",
             )
 
-    out_path("03_synthesis.md").write_text(
+    nvidia_model = ""
+    nvidia_response = ""
+    if not args.skip_nvidia:
+        try:
+            # Local import so the round-robin still works if the NVIDIA
+            # module is missing or its key isn't set yet.
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            from _consult_nvidia import (  # type: ignore
+                call_nvidia, DEFAULT_MODELS as NVIDIA_MODELS,
+            )
+            nvidia_key = _read_env_var("NVIDIA_API_KEY", expected_prefix=None)
+            print(f"[round-robin] Round C -- NVIDIA ladder: {NVIDIA_MODELS}", file=sys.stderr)
+            if openai_response and gemini_response:
+                nvidia_prompt = nvidia_followup_prompt(
+                    question,
+                    openai_response, openai_model,
+                    gemini_response, gemini_model,
+                )
+            elif openai_response or gemini_response:
+                # Only one prior round succeeded -- treat NVIDIA as second opinion.
+                prior_resp = openai_response or gemini_response
+                prior_model = openai_model or gemini_model
+                nvidia_prompt = gemini_followup_prompt(question, prior_resp, prior_model)
+            else:
+                nvidia_prompt = question
+            t0 = time.time()
+            nvidia_model, nvidia_response = call_nvidia(
+                prompt=nvidia_prompt, system=SYSTEM_PROMPT,
+                api_key=nvidia_key,
+            )
+            elapsed = time.time() - t0
+            print(f"[round-robin] Round C done: {nvidia_model} in {elapsed:.1f}s", file=sys.stderr)
+            out_path("03_nvidia.md").write_text(
+                f"# Round C -- NVIDIA ({nvidia_model}) elapsed={elapsed:.1f}s\n\n{nvidia_response}\n",
+                encoding="utf-8",
+            )
+            transcript["rounds"].append({
+                "round": "C", "vendor": "nvidia", "model": nvidia_model,
+                "elapsed_sec": round(elapsed, 2), "response": nvidia_response,
+            })
+        except Exception as e:
+            print(f"[round-robin] Round C FAILED: {e}", file=sys.stderr)
+            out_path("03_nvidia.md").write_text(
+                f"# Round C -- FAILED\n\n{e}\n", encoding="utf-8",
+            )
+
+    out_path("04_synthesis.md").write_text(
         synthesis_text(
-            question, openai_model, openai_response,
+            question,
+            openai_model, openai_response,
             gemini_model, gemini_response,
+            nvidia_model, nvidia_response,
         ),
         encoding="utf-8",
     )
