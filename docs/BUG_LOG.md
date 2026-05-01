@@ -5,7 +5,43 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-124: Workflow JSON link misroute -- Node 12.video_path (mp4 path) wired into Node 51 + Node 52 ledger_json inputs (expected JSON manifest) [FIXED in commit pending]
+### BUG-LOCAL-125: `OTR_SceneSequencer.scene_manifest_json` output is a permanently-empty stub (`json.dumps([])`); slot is wired into RETURN_TYPES but never populated
+
+- **Date:** 2026-05-01 ~06:30 | **Phase:** 0 | **Bible candidate:** YES (subtle: stub outputs that look real on the graph but emit empty data)
+- **Symptom:** Wiring BatchHumoRender's `ledger_json` input to `Node 3.scene_manifest_json` (output slot 2, type STRING) delivers the literal string `"[]"`. BatchHumoRender's `_load_ledger_with_path` then tries `Path("[]")`, which doesn't exist on disk, raising `RuntimeError: BatchHumoRender: ledger path not found: []`.
+- **Cause:** In `nodes/scene_sequencer.py`:
+    - Line 689: `manifest = []` (initialized empty)
+    - Line 890: `manifest_json = json.dumps(manifest, indent=2)` -- always produces `"[]"`
+    - The `manifest` variable is NEVER appended to between init and serialize. `scene_manifest_json` is a declared output that ships with no implementation.
+- **Fix:** Two paths possible:
+  1. **Populate the manifest** -- have SceneSequencer write `{scene_id, shot_id, beat_id, start_s, dur_s, ...}` entries as it processes each item, then serialize. This is the "correct" fix for v2.0-beta but adds non-trivial code in a phase that's already complex.
+  2. **Mark the output as deprecated/unused** in the docstring + RETURN_NAMES so future graph-editors don't get fooled into wiring it. Less work but loses the option of fixing it later.
+- **Verify:** After fix #1, query `node3_outputs[2]` and confirm it's a non-empty JSON array with at least scene_id + start_s on each entry.
+- **Tags:** stub-output, scene-manifest, sequencer, v2.0-beta, deferred-fix
+- **Cross-reference:** Surfaced via the failed BUG-124 fix (see below).
+
+---
+
+### BUG-LOCAL-124: Workflow link "fix" was wrong -- QA report's static analysis didn't verify what the target output actually contained [REVERTED in commit pending]
+
+- **Date:** 2026-05-01 ~06:30 | **Phase:** 0 | **Bible candidate:** YES (lesson: static analysis can't replace runtime verification)
+- **Symptom (from earlier today):** External QA report flagged Node 12.video_path -> Node 51.ledger_json + Node 52.ledger_json as a misroute (mp4 path string going into a JSON-manifest input). Recommended wiring Node 3.scene_manifest_json (slot 2, "previously unused") in its place. Patch shipped in commit `d180b62`.
+- **Actual result:** Crashed the next live run with `RuntimeError: BatchHumoRender: ledger path not found: []` because Node 3.scene_manifest_json is an unpopulated stub that always returns `"[]"`. See BUG-LOCAL-125.
+- **Real root cause analysis:** The "misroute" the QA report flagged was actually a working pattern. BatchHumoRender's `_load_ledger_with_path` (lines 1694-1756) explicitly handles `.mp4` paths arriving as `ledger_json` input -- it derives the ledger filename from the .mp4 stem with a multi-tier fallback chain (exact match -> underscore-collapse variant -> directory scan with mtime + episode_id substring match). The "misroute" leveraged this fallback intentionally, even if the type label looks wrong on the graph.
+- **Symptoms originally attributed to the "misroute" had a different cause:**
+  - "Wanted radio still missing" was a real BUG-121 hypothesis: FLUX phase didn't render the bookend because of `open_close=true` gating, OR ledger stamping failed silently. The BUG-121 filesystem fallback (commit `cee4ebb`) is the right defensive fix and stays.
+  - "No scene cuts in composited mp4" still needs investigation -- not the manifest misroute either.
+- **Fix:** `git checkout fea2f23 -- workflows/otr_scifi_16gb_full.json` -- restore the workflow to its pre-d180b62 state. Verifier: `scripts/_verify_bug124_reverted.py` confirms links 79 + 82 are back, links 86 + 87 are gone, Node 12.video_path.links = {47, 79, 80, 82}.
+- **Verify:** Live run completes BatchHumoRender phase without `ledger path not found` error. Cast bindings populate, lines dispatch to HuMo, mp4 generated.
+- **Lessons (worth a memory note):**
+  1. Static-analysis QA reports can confidently identify a problem's surface and prescribe a wrong fix if they don't verify the assumed semantics of the target node's output.
+  2. ComfyUI's STRING type is permissive -- "wrong type label" sometimes means "the consumer has a defensive fallback for this case." Check the consumer's actual code before declaring something a misroute.
+  3. The patch script `scripts/_fix_workflow_link_misroute.py` and the post-patch verifier `scripts/_verify_workflow_link_misroute_fix.py` are kept in repo as audit trail of the failed attempt; the new `scripts/_verify_bug124_reverted.py` is what we run going forward.
+- **Tags:** workflow-revert, qa-report-wrong, static-analysis-limits, mp4-stem-fallback, audit-trail, bug-088-fallback-was-by-design
+
+---
+
+### BUG-LOCAL-124-original (pre-revert): Workflow JSON link misroute -- Node 12.video_path (mp4 path) wired into Node 51 + Node 52 ledger_json inputs (expected JSON manifest) [FIXED in commit pending]
 
 - **Date:** 2026-05-01 ~05:00 (surfaced via external static-analysis QA report) | **Phase:** 0 | **Bible candidate:** YES (this is the textbook ComfyUI silent-failure pattern: STRING type that doesn't differentiate file paths from JSON strings)
 - **Symptom:** Live runs show HuMo dispatching with no scene-boundary cuts, radio still resolution failing even when the file exists, BUG-088 cast-still fallback chains firing for every line. `signal_lost_earth_is_splitting_open_beneath_the_paci_20260430_211312.mp4` shows base radar playing straight through with HuMo clips overlaid violently rather than cutting cleanly.

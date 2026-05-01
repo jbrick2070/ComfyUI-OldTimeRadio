@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 53,
-  "last_link_id": 87,
+  "last_link_id": 85,
   "nodes": [
     {
       "id": 1,
@@ -223,10 +223,7 @@
         {
           "name": "scene_manifest_json",
           "type": "STRING",
-          "links": [
-            86,
-            87
-          ],
+          "links": null,
           "slot_index": 2
         }
       ],
@@ -470,7 +467,9 @@
           "type": "STRING",
           "links": [
             47,
-            80
+            79,
+            80,
+            82
           ],
           "slot_index": 0
         }
@@ -1349,7 +1348,7 @@
         {
           "name": "ledger_json",
           "type": "STRING",
-          "link": 86,
+          "link": 79,
           "widget": {
             "name": "ledger_json"
           }
@@ -1450,7 +1449,7 @@
         {
           "name": "ledger_json",
           "type": "STRING",
-          "link": 87,
+          "link": 82,
           "widget": {
             "name": "ledger_json"
           }
@@ -1869,6 +1868,14 @@
       "AUDIO"
     ],
     [
+      79,
+      12,
+      0,
+      51,
+      5,
+      "STRING"
+    ],
+    [
       80,
       12,
       0,
@@ -1882,6 +1889,14 @@
       0,
       52,
       1,
+      "STRING"
+    ],
+    [
+      82,
+      12,
+      0,
+      52,
+      2,
       "STRING"
     ],
     [
@@ -1906,22 +1921,6 @@
       1,
       53,
       1,
-      "STRING"
-    ],
-    [
-      86,
-      3,
-      2,
-      51,
-      5,
-      "STRING"
-    ],
-    [
-      87,
-      3,
-      2,
-      52,
-      2,
       "STRING"
     ]
   ],
