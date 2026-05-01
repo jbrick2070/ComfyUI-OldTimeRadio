@@ -408,6 +408,93 @@ class TestRenderMasterMixPerClipMux:
         assert names == ["ok"]
 
 
+class TestTailPad:
+    """The last clip in the timeline gets extend_tail_s passed so
+    silent_combined.mp4 ends slightly after the master mix audio.
+    -shortest then truncates the inaudible video tail rather than
+    nuking the trailing audio (which would silently break C7)."""
+
+    def test_pillarbox_tpad_filter_when_extend_tail_s_set(self, fake_clip, tmp_path):
+        out = tmp_path / "out.mp4"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            VC._pillarbox_humo_silent(
+                clip=fake_clip,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                out_path=out, ffmpeg="ffmpeg",
+                extend_tail_s=0.5,
+            )
+            cmd = mock_run.call_args[0][0]
+            vf = cmd[cmd.index("-vf") + 1]
+            assert "tpad=stop_mode=clone:stop_duration=0.500" in vf
+
+    def test_no_tpad_when_extend_tail_s_zero(self, fake_clip, tmp_path):
+        out = tmp_path / "out.mp4"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            VC._pillarbox_humo_silent(
+                clip=fake_clip,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                out_path=out, ffmpeg="ffmpeg",
+                extend_tail_s=0.0,
+            )
+            cmd = mock_run.call_args[0][0]
+            vf = cmd[cmd.index("-vf") + 1]
+            assert "tpad" not in vf
+
+    def test_only_last_timeline_entry_gets_tpad(
+        self, populated_ledger, populated_clips_dir, fake_procgen, tmp_path
+    ):
+        """Verify _render_master_mix_per_clip_mux_mode passes
+        extend_tail_s>0 for ONLY the last clip in the timeline."""
+        out = tmp_path / "out.mp4"
+        # Capture extend_tail_s per pillarbox call by name.
+        per_clip_tail = {}
+
+        original_pb = VC._pillarbox_humo_silent
+
+        def _spy_pb(**kwargs):
+            line_id = Path(kwargs["clip"]).stem
+            per_clip_tail[line_id] = kwargs.get("extend_tail_s", 0.0)
+            return original_pb(**kwargs)
+
+        def _record_run(cmd, **_kw):
+            if str(cmd[-1]).endswith(".mp4"):
+                Path(cmd[-1]).parent.mkdir(parents=True, exist_ok=True)
+                Path(cmd[-1]).write_bytes(b"x")
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=b"", stderr=b"",
+            )
+
+        with patch("subprocess.run", side_effect=_record_run), \
+             patch.object(VC, "_pillarbox_humo_silent", side_effect=_spy_pb):
+            VC._render_master_mix_per_clip_mux_mode(
+                ledger=populated_ledger,
+                clips_dir=populated_clips_dir,
+                procgen=fake_procgen,
+                out_mp4=out,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                fallback_clip_length=7.0,
+                ffmpeg="ffmpeg", ffprobe="ffprobe",
+            )
+
+        # Timeline sorted by start_s ascending = music_open, char,
+        # music_close.  Only music_close (the last one) should get
+        # a non-zero tail pad.
+        assert per_clip_tail["music_open_001"] == 0.0
+        assert per_clip_tail["char_l001"] == 0.0
+        assert per_clip_tail["music_close_001"] > 0.0
+        # Documented value: 0.5s
+        assert per_clip_tail["music_close_001"] == pytest.approx(0.5)
+
+
 class TestC7Contract:
     """The whole reason this mode exists: ZERO audio re-encodes
     downstream of SignalLostVideo.  Verify there is NO `-c:a aac`

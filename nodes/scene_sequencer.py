@@ -996,13 +996,36 @@ class SceneSequencer:
 
                     # ROADMAP P0 step 4b: append SFX mirrors to
                     # ledger.lines[] so BatchHumoRender's existing
-                    # speaker_role-aware loop picks them up.  Skip
-                    # if any line already has a matching line_id
-                    # (idempotent across reruns; protects resume
-                    # behavior).  ledger.sfx[] is NOT removed -- it
-                    # remains the canonical SFX index for any
-                    # consumer that walks SFX explicitly.
+                    # speaker_role-aware loop picks them up.
+                    # 2026-04-30 round-robin hardening:
+                    #   - mirrored_from="sfx" marker so a re-run can
+                    #     drop stale entries before re-mirroring
+                    #     (Gemini's append-only-leak catch).
+                    #   - sort lines[] by start_s after mirror so the
+                    #     timeline stays chronological.
+                    # ledger.sfx[] is NOT removed -- it remains the
+                    # canonical SFX index for any consumer that walks
+                    # SFX explicitly.
                     if _sfx_to_mirror_into_lines:
+                        # Refresh: drop prior SFX mirror rows before
+                        # re-mirroring so resume + reconfig stays clean.
+                        _kept_sfx = []
+                        _removed_sfx = 0
+                        for _ln in _ledger_lines:
+                            if (
+                                isinstance(_ln, dict)
+                                and _ln.get("mirrored_from") == "sfx"
+                            ):
+                                _removed_sfx += 1
+                                continue
+                            _kept_sfx.append(_ln)
+                        if _removed_sfx:
+                            log.info(
+                                "[SceneSequencer] dropped %d stale "
+                                "mirrored SFX line(s) before re-mirror",
+                                _removed_sfx,
+                            )
+                        _ledger_lines = _kept_sfx
                         _existing_ids = {
                             ln.get("line_id") for ln in _ledger_lines
                             if isinstance(ln, dict) and ln.get("line_id")
@@ -1011,15 +1034,28 @@ class SceneSequencer:
                         for _mirror in _sfx_to_mirror_into_lines:
                             if _mirror["line_id"] in _existing_ids:
                                 continue
+                            _mirror["mirrored_from"] = "sfx"
                             _ledger_lines.append(_mirror)
                             _appended += 1
-                        if _appended:
+                        if _appended or _removed_sfx:
+                            # Sort by start_s so SFX entries land in
+                            # chronological order alongside dialogue.
+                            _ledger_lines.sort(
+                                key=lambda _l: (
+                                    float(_l.get("start_s"))
+                                    if isinstance(_l, dict)
+                                    and isinstance(_l.get("start_s"), (int, float))
+                                    else 1e18
+                                )
+                            )
                             _led["lines"] = _ledger_lines
                             log.info(
-                                "[SceneSequencer] mirrored %d SFX cue(s) "
-                                "into ledger.lines[] with speaker_role=sfx "
+                                "[SceneSequencer] SFX mirror: "
+                                "appended=%d, stale_removed=%d, "
+                                "total_lines=%d "
                                 "(BatchHumoRender wall-to-wall coverage)",
-                                _appended,
+                                _appended, _removed_sfx,
+                                len(_ledger_lines),
                             )
 
                     _gc = _OTRL.lookup_git_commit(
@@ -1336,15 +1372,56 @@ class EpisodeAssembler:
                         # ROADMAP P0 step 4c (2026-04-30): mirror music
                         # cues into ledger.lines[] with speaker_role so
                         # BatchHumoRender renders them as HuMo clips
-                        # using the radio still as I2V reference.  This
-                        # closes the wall-to-wall coverage gap -- no
-                        # more silent music windows in the visual.
-                        # Idempotent: skip cues whose line_id is already
-                        # present (resume safety).  Only mirrors cues
-                        # that have actual master_mix-space timing
-                        # populated (so we don't append placeholder
-                        # rows when a workflow runs without themes).
+                        # using the radio still as I2V reference.
+                        #
+                        # 2026-04-30 round-robin hardening:
+                        #   (a) Chunk music tracks > HUMO_MAX_CLIP_DUR_S
+                        #       into multiple sequential entries so
+                        #       BatchHumoRender's 7s cap doesn't leave
+                        #       silent_combined.mp4 shorter than the
+                        #       master mix audio (which would let
+                        #       VideoComposite's -shortest truncate
+                        #       audio at the end of the episode).
+                        #   (b) Stamp ``mirrored_from = "music"`` so a
+                        #       refresh on re-run can drop stale
+                        #       entries before re-mirroring (Gemini's
+                        #       append-only-leak catch).
+                        #   (c) Sort ledger.lines[] by start_s after
+                        #       mirroring so downstream consumers walk
+                        #       the timeline in chronological order
+                        #       regardless of mirror sequence.
+
+                        # HuMo's verified 16 GB ceiling is 177 frames @
+                        # 25 fps = 7.08 s per clip.  Round to 7.0 s for
+                        # margin so we never feed BatchHumoRender a
+                        # boundary case.  Mirrors HUMO_MAX_FRAMES /
+                        # HUMO_FPS in nodes/batch_humo_render.py.
+                        _HUMO_MAX_CLIP_DUR_S = 7.0
+
                         _lines_for_music = _led.get("lines") or []
+
+                        # (b) Refresh: drop any prior mirrored music
+                        # rows so a re-run with different music config
+                        # doesn't leave stale entries behind.  Detect
+                        # by mirrored_from marker (set below).
+                        _kept = []
+                        _removed = 0
+                        for _ln in _lines_for_music:
+                            if (
+                                isinstance(_ln, dict)
+                                and _ln.get("mirrored_from") == "music"
+                            ):
+                                _removed += 1
+                                continue
+                            _kept.append(_ln)
+                        if _removed:
+                            log.info(
+                                "[EpisodeAssembler] dropped %d stale "
+                                "mirrored music line(s) before re-mirror",
+                                _removed,
+                            )
+                        _lines_for_music = _kept
+
                         _existing_music_ids = {
                             ln.get("line_id") for ln in _lines_for_music
                             if isinstance(ln, dict) and ln.get("line_id")
@@ -1357,6 +1434,7 @@ class EpisodeAssembler:
                             # dropping it on the floor.
                         }
                         _appended_music = 0
+                        _chunked_cues = 0
                         for _mc in _music_rows:
                             if (
                                 _mc.get("start_s_space") != "master_mix"
@@ -1366,38 +1444,91 @@ class EpisodeAssembler:
                                 continue
                             _cue = (_mc.get("cue_id") or "").strip().lower()
                             _role = _CUE_TO_ROLE.get(_cue, "music_inter")
-                            _line_id = (
-                                _mc.get("line_id")
-                                or f"music_{_cue or 'inter'}_{_mc.get('cue_id') or _appended_music:>03}"
+                            _full_start = float(_mc.get("start_s") or 0.0)
+                            _full_dur = float(_mc.get("dur_s"))
+                            _description = (
+                                _mc.get("description")
+                                or _mc.get("title")
+                                or f"{_cue or 'interstitial'} music"
                             )
-                            if _line_id in _existing_music_ids:
-                                continue
-                            _lines_for_music.append({
-                                "line_id":      _line_id,
-                                "speaker":      "RADIO",
-                                "speaker_role": _role,
-                                "text":         (
-                                    _mc.get("description")
-                                    or _mc.get("title")
-                                    or f"{_cue or 'interstitial'} music"
+
+                            # (a) Chunk math: how many ≤7s chunks does
+                            # this cue need?  ceil(full_dur / max).
+                            # Chunk durations are equal so the boundaries
+                            # land cleanly without remainder fragments.
+                            _chunk_count = max(
+                                1,
+                                int(
+                                    (_full_dur + _HUMO_MAX_CLIP_DUR_S - 1e-6)
+                                    // _HUMO_MAX_CLIP_DUR_S
                                 ),
-                                "start_s":      float(_mc.get("start_s") or 0.0),
-                                "dur_s":        float(_mc.get("dur_s")),
-                                # Already in master_mix space because
-                                # the cue_id stamp above wrote
-                                # _mc["start_s_space"] = "master_mix".
-                                "start_s_space": "master_mix",
-                                "shot_id":      _mc.get("shot_id"),
-                            })
-                            _appended_music += 1
-                        if _appended_music:
+                            )
+                            _chunk_dur = _full_dur / float(_chunk_count)
+                            if _chunk_count > 1:
+                                _chunked_cues += 1
+
+                            for _chunk_idx in range(_chunk_count):
+                                _chunk_start = _full_start + _chunk_idx * _chunk_dur
+                                # Namespaced ID per round-robin advice:
+                                # "music_<cue>_NNN" never collides with
+                                # dialogue line IDs ("l001", "l002").
+                                _line_id = (
+                                    f"music_{_cue or 'inter'}_"
+                                    f"{_chunk_idx + 1:03d}"
+                                )
+                                if _line_id in _existing_music_ids:
+                                    continue
+                                _lines_for_music.append({
+                                    "line_id":      _line_id,
+                                    "speaker":      "RADIO",
+                                    "speaker_role": _role,
+                                    "text":         (
+                                        _description
+                                        if _chunk_idx == 0
+                                        else f"{_description} (cont. "
+                                             f"{_chunk_idx + 1}/"
+                                             f"{_chunk_count})"
+                                    ),
+                                    "start_s":      _chunk_start,
+                                    "dur_s":        _chunk_dur,
+                                    "start_s_space": "master_mix",
+                                    "shot_id":      _mc.get("shot_id"),
+                                    # Markers for the refresh logic
+                                    # above + future post-mortem.
+                                    "mirrored_from":      "music",
+                                    "music_cue_id":       _cue or "inter",
+                                    "music_chunk_index":  _chunk_idx + 1,
+                                    "music_chunk_count":  _chunk_count,
+                                })
+                                _appended_music += 1
+
+                        if _appended_music or _removed:
+                            # (c) Sort the entire lines[] by start_s
+                            # so dialogue + announcer + sfx + music
+                            # all walk in chronological order.  Lines
+                            # without start_s sort to the end via a
+                            # large fallback key (they shouldn't exist
+                            # post Step 4b/4c but we don't crash on
+                            # legacy rows).
+                            _lines_for_music.sort(
+                                key=lambda _l: (
+                                    float(_l.get("start_s"))
+                                    if isinstance(_l, dict)
+                                    and isinstance(_l.get("start_s"), (int, float))
+                                    else 1e18
+                                )
+                            )
                             _led["lines"] = _lines_for_music
                             log.info(
-                                "[EpisodeAssembler] mirrored %d music cue(s) "
-                                "into ledger.lines[] with speaker_role "
+                                "[EpisodeAssembler] music mirror: "
+                                "appended=%d, chunked_cues=%d, "
+                                "stale_removed=%d, total_lines=%d "
                                 "(BatchHumoRender wall-to-wall coverage "
-                                "via radio still I2V ref)",
-                                _appended_music,
+                                "via radio still I2V ref; chunks fit "
+                                "the %.1fs HuMo cap)",
+                                _appended_music, _chunked_cues,
+                                _removed, len(_lines_for_music),
+                                _HUMO_MAX_CLIP_DUR_S,
                             )
 
                     # BUG-LOCAL-107: append crossfade boundaries to

@@ -395,6 +395,7 @@ def _pillarbox_humo_silent(
     humo_target_h: int,
     out_path: Path,
     ffmpeg: str,
+    extend_tail_s: float = 0.0,
 ) -> Path:
     """Pillarbox a HuMo clip into the canvas dimensions and STRIP
     its audio entirely (-an).  Video re-encodes via libx264; audio
@@ -406,15 +407,33 @@ def _pillarbox_humo_silent(
     `_normalize_humo_segment` is that this one drops the audio so
     the C7 byte-perfect path doesn't contaminate the master mix
     with a re-encoded HuMo native audio it'll discard anyway.
+
+    ``extend_tail_s`` (2026-04-30 round-robin hardening, applied to
+    the LAST clip in the timeline only): freeze-extend the final
+    frame for this many seconds via ffmpeg's tpad filter.  This
+    guarantees the silent_combined.mp4 ends slightly LATER than the
+    master mix audio so the mux step's `-shortest` truncates an
+    inaudible video tail rather than the trailing audio.  Without
+    this, video frame quantization (40ms at 25fps) plus chunk
+    rounding error can leave silent_combined a few frames short of
+    the master mix duration -- and `-shortest` would then nuke the
+    end of the audio, breaking C7 silently.  Adds zero re-encodes
+    (tpad piggybacks the libx264 pass already happening here).
     """
+    vf = (
+        f"scale=-2:{humo_target_h}:force_original_aspect_ratio=decrease,"
+        f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"fps={canvas_fps}"
+    )
+    if extend_tail_s > 0.0:
+        # tpad with stop_mode=clone replays the last frame; cleaner
+        # than introducing a second re-encode pass.  Append to the
+        # filter chain so it runs after pillarbox.
+        vf = f"{vf},tpad=stop_mode=clone:stop_duration={extend_tail_s:.3f}"
     cmd = [
         ffmpeg, "-y", "-loglevel", "error",
         "-i", str(clip),
-        "-vf", (
-            f"scale=-2:{humo_target_h}:force_original_aspect_ratio=decrease,"
-            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
-            f"fps={canvas_fps}"
-        ),
+        "-vf", vf,
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
         "-an",  # KEY: strip audio.  Master mix attaches at mux step.
         str(out_path),
@@ -523,18 +542,32 @@ def _render_master_mix_per_clip_mux_mode(
     )
 
     # 2. Pillarbox each HuMo clip to canvas dims and strip audio.
+    # 2026-04-30 round-robin hardening: freeze-extend the LAST clip
+    # by 500 ms so silent_combined ends after the master mix audio,
+    # so the mux step's `-shortest` truncates an inaudible video
+    # tail rather than the trailing audio.  Cumulative chunk-rounding
+    # error across many clips can otherwise leave silent_combined a
+    # few frames short, silently breaking C7 at episode end.
+    _TAIL_PAD_S = 0.5
     seg_dir = out_mp4.parent / "_per_clip_mux_segments"
     seg_dir.mkdir(parents=True, exist_ok=True)
     pillarboxed: list[Path] = []
     pb_failures = 0
-    for entry in timeline:
+    last_idx = len(timeline) - 1
+    for idx, entry in enumerate(timeline):
         seg_out = seg_dir / f"pb_{entry['line_id']}.mp4"
+        # Tail pad only on the last successful clip (computed below
+        # if pb_failures pruned the original last) -- simpler: always
+        # request tail pad on the last index of the original timeline.
+        # If that one fails the user gets a louder fallback signal.
+        _tail = _TAIL_PAD_S if idx == last_idx else 0.0
         try:
             _pillarbox_humo_silent(
                 clip=entry["clip_path"],
                 canvas_w=canvas_w, canvas_h=canvas_h,
                 canvas_fps=canvas_fps, humo_target_h=humo_target_h,
                 out_path=seg_out, ffmpeg=ffmpeg,
+                extend_tail_s=_tail,
             )
             pillarboxed.append(seg_out)
         except subprocess.CalledProcessError as exc:
@@ -848,7 +881,8 @@ class VideoComposite:
                          "SignalLostVideo: ZERO. Requires Step 4b/4c "
                          "speaker_role coverage (every audio event in "
                          "ledger.lines[]). Falls through to humo_concat on "
-                         "any unrecoverable subprocess failure.\n\n"
+                         "any unrecoverable subprocess failure (unless "
+                         "strict_c7 is on -- see strict_c7 tooltip).\n\n"
                          "humo_concat: concat-demuxer pipeline where each "
                          "HuMo clip keeps its NATIVE audio. Re-encodes audio "
                          "to AAC 192k three times (gap fill + per-clip "
@@ -860,6 +894,23 @@ class VideoComposite:
                          "Use only for comparison or if both new modes fail."
                      )},
                 ),
+                "strict_c7": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "C7 strict mode (2026-04-30 round-robin "
+                        "hardening). When ON (DEFAULT), the audio_source "
+                        "fallback chain is DISABLED for paths that re-encode "
+                        "audio: if master_mix_per_clip_mux fails, the node "
+                        "RAISES instead of silently dropping to humo_concat "
+                        "(which would 3x AAC re-encode and break C7 "
+                        "byte-identity).  Lossless tier failures are still "
+                        "loudly reported via ledger.meta.audio_path_selected "
+                        "+ audio_path_reason.\n\n"
+                        "Turn OFF only for ad-hoc debug runs where you'd "
+                        "rather have ANY mp4 land than an exception.  "
+                        "Production runs should leave this ON."
+                    ),
+                }),
             },
         }
 
@@ -878,6 +929,7 @@ class VideoComposite:
         ffmpeg: str = "ffmpeg",
         cleanup_clips_after_assembly: bool = False,
         audio_source: str = "master_mix_per_clip_mux",
+        strict_c7: bool = True,
     ):
         # `cleanup_clips_after_assembly` widget is wired but the deletion
         # logic itself is deferred (would happen post-assembly when the
@@ -921,12 +973,38 @@ class VideoComposite:
         # master_mix_per_clip_mux: 2026-04-30 C7 byte-perfect mode.
         # Pillarbox + concat HuMo clips silent, then mux master mix
         # audio onto the combined video with -c copy.  Falls through
-        # to humo_concat if the pillarbox/concat/mux pipeline fails.
+        # to humo_concat if the pillarbox/concat/mux pipeline fails
+        # AND strict_c7 is OFF.  When strict_c7 is ON (the default),
+        # the failure raises so a silent C7-violating fallback
+        # cannot ship.
+        # 2026-04-30 round-robin hardening: every outcome stamps
+        # ledger.meta.audio_path_selected + audio_path_reason so a
+        # post-mortem can tell at a glance which tier produced the
+        # final mp4 and why.
+        def _stamp_audio_path(selected, reason):
+            """Loud ledger signal.  Survives a failed save_ledger_safe
+            (warns, doesn't raise)."""
+            if ledger_path is None:
+                return
+            try:
+                meta = ledger.setdefault("meta", {})
+                meta["audio_path_selected"] = selected
+                meta["audio_path_reason"] = reason
+                meta["audio_source"] = selected  # back-compat alias
+                from . import _otr_ledger as _OTRL  # type: ignore
+                _OTRL.save_ledger_safe(ledger_path, ledger)
+            except Exception as stamp_exc:  # noqa: BLE001
+                log.warning(
+                    "[VideoComposite] audio_path_selected=%s stamp "
+                    "failed: %s", selected, stamp_exc,
+                )
+
         if audio_source == "master_mix_per_clip_mux":
             log.info(
                 "[VideoComposite] audio_source=master_mix_per_clip_mux -- "
                 "C7 byte-perfect path (pillarbox + concat + mux, "
-                "0 audio re-encodes downstream of SignalLostVideo)"
+                "0 audio re-encodes downstream of SignalLostVideo); "
+                "strict_c7=%s", strict_c7,
             )
             try:
                 final_mp4, mux_report = _render_master_mix_per_clip_mux_mode(
@@ -943,31 +1021,52 @@ class VideoComposite:
                     ffprobe=ffprobe,
                 )
             except Exception as exc:
+                # LOUD failure signal: log.exception + report-line
+                # WARNING prefix.  Then either raise (strict mode) or
+                # fall through to humo_concat (will re-encode audio).
                 log.exception(
-                    "[VideoComposite] master_mix_per_clip_mux failed; "
-                    "falling back to humo_concat: %s", exc,
+                    "[VideoComposite] master_mix_per_clip_mux FAILED: %s",
+                    exc,
                 )
-                # Fall through to humo_concat path on failure.
-                # humo_concat itself falls through to master_mix on
-                # its own failure, so we get a 3-tier fallback chain
-                # without any one failure mode breaking the run.
+                if strict_c7:
+                    _stamp_audio_path(
+                        "FAILED:master_mix_per_clip_mux",
+                        f"strict_c7=True; not falling back to a re-encoding "
+                        f"tier; reason={exc!r}",
+                    )
+                    raise RuntimeError(
+                        "VideoComposite: strict_c7=True and "
+                        "master_mix_per_clip_mux failed.  Refusing to "
+                        "fall back to humo_concat (which 3x AAC re-encodes "
+                        "audio and breaks C7).  Set strict_c7=False to "
+                        f"allow the legacy fallback chain.  Reason: {exc}"
+                    ) from exc
+                # strict_c7 OFF: stamp the loud signal, fall through.
+                _stamp_audio_path(
+                    "humo_concat (FALLBACK from master_mix_per_clip_mux)",
+                    f"per_clip_mux raised {exc!r}; strict_c7=False so "
+                    f"falling back to humo_concat (audio will re-encode "
+                    f"3x to AAC; C7 byte-identity NOT preserved)",
+                )
             else:
-                # Stamp final_video_path in ledger.
+                # Success path.  Stamp loud + return.
+                _stamp_audio_path(
+                    "master_mix_per_clip_mux",
+                    "ok (zero audio re-encodes downstream of SignalLostVideo)",
+                )
                 if ledger_path is not None:
                     try:
                         ledger["final_video_path"] = str(final_mp4)
-                        ledger.setdefault("meta", {})["audio_source"] = (
-                            "master_mix_per_clip_mux"
-                        )
                         from . import _otr_ledger as _OTRL  # type: ignore
                         _OTRL.save_ledger_safe(ledger_path, ledger)
                     except Exception as stamp_exc:  # noqa: BLE001
                         log.warning(
-                            "[VideoComposite] per_clip_mux ledger stamp "
-                            "failed: %s", stamp_exc,
+                            "[VideoComposite] per_clip_mux final_video "
+                            "stamp failed: %s", stamp_exc,
                         )
                 report_lines = [
-                    f"VideoComposite (master_mix_per_clip_mux mode)",
+                    f"VideoComposite (master_mix_per_clip_mux mode, "
+                    f"strict_c7={strict_c7})",
                     f"  episode_id: {episode_id}",
                     f"  out_mp4:    {final_mp4}",
                     "",
