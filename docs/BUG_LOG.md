@@ -5,6 +5,28 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-124: Workflow JSON link misroute -- Node 12.video_path (mp4 path) wired into Node 51 + Node 52 ledger_json inputs (expected JSON manifest) [FIXED in commit pending]
+
+- **Date:** 2026-05-01 ~05:00 (surfaced via external static-analysis QA report) | **Phase:** 0 | **Bible candidate:** YES (this is the textbook ComfyUI silent-failure pattern: STRING type that doesn't differentiate file paths from JSON strings)
+- **Symptom:** Live runs show HuMo dispatching with no scene-boundary cuts, radio still resolution failing even when the file exists, BUG-088 cast-still fallback chains firing for every line. `signal_lost_earth_is_splitting_open_beneath_the_paci_20260430_211312.mp4` shows base radar playing straight through with HuMo clips overlaid violently rather than cutting cleanly.
+- **Cause:** ComfyUI's STRING type system is permissive: a file path and a serialized JSON manifest carry the same type tag, so the graph editor doesn't flag the mismatch. The break happens at runtime in the consumer:
+    - **Link 79:** `Node 12 (OTR_SignalLostVideo) .video_path` -> `Node 51 (OTR_BatchHumoRender) .ledger_json` (input slot 5) -- **MISROUTE**
+    - **Link 82:** `Node 12 .video_path` -> `Node 52 (OTR_VideoComposite) .ledger_json` (input slot 2) -- **MISROUTE**
+  Both Node 51 and Node 52 call `json.loads(ledger_json)` and read scene timings, in/out marks, clip slot indices. They were instead handed the literal mp4 path string, fell through to "no manifest" defaults: HuMo skipped scene cuts, radio still resolver returned None on non-dict input, fallback chains kicked in incorrectly. This was the actual root cause behind several recent symptoms attributed to other bugs.
+- **Fix:** Surgical workflow patch (`scripts/_fix_workflow_link_misroute.py`):
+    1. Remove links 79 and 82 from `data.links` and from `Node 12.video_path.links`.
+    2. Wire `Node 3 (OTR_SceneSequencer) .scene_manifest_json` (output slot 2, previously unused) to:
+        - `Node 51.ledger_json` (input slot 5) via new link 86
+        - `Node 52.ledger_json` (input slot 2) via new link 87
+    3. Update `last_link_id` from 85 -> 87.
+  Link 47 (`Node 12 -> Node 20.audio_gate` write-completion gate) and Link 80 (`Node 12 -> Node 52.procgen_video_path` base layer) remain untouched -- both correct as-is. Verifier script: `scripts/_verify_workflow_link_misroute_fix.py` (6 invariants, all pass post-patch).
+- **Verify:** Open the workflow in ComfyUI, confirm Node 51 input 5 + Node 52 input 2 both show wires originating from Node 3 (not Node 12). Re-run a short test episode -- expect composite to cut cleanly between radar and HuMo clips at scene boundaries from `scene_manifest_json`. Spot-check Node 52's report output for any "ledger parse failed" or "manifest missing" warnings (should be absent). The "violent smash" overlay behavior should be gone.
+- **Tags:** workflow-json, comfyui-string-type, link-misroute, silent-failure, ledger-manifest, scene-cuts, root-cause-of-bug-121, root-cause-of-bug-088-fallback-storm
+
+**Cross-reference:** This finding revises the root-cause hypothesis on BUG-LOCAL-121 (radio still resolver). My earlier "radio bookend gated on open_close=true" hypothesis was wrong -- the actual cause was that BatchHumoRender was getting a video path string instead of a parseable ledger dict, so `_resolve_radio_still_path` correctly returned None on non-dict input, and the cast-still fallback chain took over. The BUG-121 filesystem fallback I shipped earlier today (commit cee4ebb) is still useful as a defensive layer (handles the case where ledger stamping fails silently), but the primary fix is this BUG-124 link surgery.
+
+---
+
 ### BUG-LOCAL-123: ComfyUI keeps models resident across prompts; Run 2 OOMs because Run 1's HuMo+WanTE+WanVAE+Whisper never unloaded [FIXED in commit pending]
 
 - **Date:** 2026-04-30 ~23:55 | **Phase:** 0 | **Bible candidate:** YES (clean repro, generic to any multi-stage ComfyUI pipeline that uses heavy models)
