@@ -134,20 +134,24 @@ Blocked on video-stack maturity. Design begins once stack empirics exist from th
 
 **Architecture (Jeffrey 2026-04-28):** Single master JSON with bypassable video-stack groups. Shared audio chain → procgen, then multiple side-by-side render groups — each group bypassable via Ctrl+B. Final VideoComposite takes whichever group is active. 8 GB users bypass the HuMo + FLUX-fp8 (16 GB) groups and enable the GGUF (8 GB) groups.
 
-**Locked picks for 8GB tier (2026-04-30, after evaluating LTX 2.3, LTX-2 19B, ERNIE Image candidates):**
+**Locked picks (2026-04-30, after evaluating LTX 2.3, LTX-2 19B, ERNIE Image, NVIDIA CES 2026 NVFP4 announcement):**
 
-| Component | 16 GB tier (current) | 8 GB tier (locked picks) | Disk size | Why |
-|---|---|---|---|---|
-| **Stills** | FLUX-fp8 (~12 GB) | **FLUX.1-dev Q4_K_S** (city96 GGUF) | ~5-6 GB | Same prompt-adherence + cross-scene visual consistency as fp8, leaves headroom for T5-FP8 + VAE on 8GB cards |
-| **Video** | HuMo 14B fp8 (~16.5 GB staged) + per-clip-mux | **Wan 2.2 5B TI2V** (native ComfyUI template) | ~5 GB | Reliable offload, plug-and-play on RTX 4060-class cards. No native audio sync — OTR keeps its master mix mux pattern unchanged |
-| **Upscale (optional)** | SeedVR2 3B fp16 | Topaz Video AI (CPU/external) OR skip | 0 GB VRAM | SeedVR2 stays as advanced opt-in for 8GB users with patience |
+| Component | 16 GB tier | 8 GB tier | Why |
+|---|---|---|---|
+| **Stills** | **NVFP4 FLUX.2** (RTX 50 Series, ~5 GB; falls back to FLUX-fp8 ~12 GB if NVFP4 unavailable) | **FLUX.1-dev Q4_K_S** (city96 GGUF, ~5-6 GB) | NVFP4 is the new official quantization NVIDIA announced at CES 2026 — 3x faster, 60% less VRAM than fp8 on RTX 50 Series. Q4_K_S is the safe 8GB GGUF option. |
+| **Video** | **HuMo 14B fp8** + master_mix_per_clip_mux | **Wan 2.2 5B TI2V** (native ComfyUI template) | HuMo for character lip-sync (drives video from OUR Bark/Kokoro audio — the whole reason it exists). Wan 5B for 8GB atmospheric B-roll. |
+| **Upscale (every clip, default)** | **RTX Video Super Resolution ULTRA** (~0 GB, HW-accelerated, target 4K, real-time) | **RTX VSR ULTRA** (same node, same zero VRAM cost) | NVIDIA CES 2026 ComfyUI node. Speed king. Use for bulk per-clip upscale on every dialogue / SFX / music clip. |
+| **Upscale (hero shots, optional)** | **SeedVR2 v2.5 NVFP4** (7B, ~6 GB on RTX 50 NVFP4, ~78 s per 65-frame 720p→1080p clip) | not viable (8 GB cards skip the hero-shot pass) | Quality king for diffusion-based upscaling. Reserved for keyframes / opening-bookend / closing-bookend / standout dialogue clips. SeedVR2 v2.5 NVFP4 support landed via [PR #486](https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler/pull/486). On RTX 50 NVFP4: 3x faster + 60% less VRAM vs fp16 baseline. |
+| **TTS / Audio** | Bark + Kokoro + MusicGen + AudioGen → master mix (canonical) | Same | OTR's TTS pipeline is the project. NEVER replaced by model-internal A/V generation (LTX-2's prompt-driven audio is a paradigm mismatch). |
 
-**8GB picks REJECTED after evaluation:**
-- **LTX 2.3 22B distilled** — smallest variant (Q5_K_M ~14 GB) doesn't fit; 22B is parameter-distilled-NOT, only step-distilled
-- **LTX-2 19B distilled** — Kijai's smallest variant Q4_K_M ~12 GB still over 8GB
-- **Wan 2.2 14B GGUF Q3/Q4** — technically runs with aggressive offload but RAM-thrashes on Windows, generates support tickets; avoid for core path
-- **FLUX.1-dev Q5_K_S** — pushes over budget once T5 + VAE + OS overhead added
-- **Z-Image Turbo / PixArt-Sigma** — faster but lose FLUX prompt-adherence consistency across radio-drama series renders
+**Picks REJECTED after evaluation:**
+- **LTX 2.3 22B distilled** — smallest GGUF (Q5_K_M ~14 GB) doesn't fit 8GB; "distilled" = step-distilled NOT param-distilled; 22B is the only param size Lightricks publishes.
+- **LTX-2 19B distilled (Kijai)** — Q4_K_M ~12 GB still over 8GB.
+- **LTX-2's built-in audio for character dialogue** — model GENERATES speech from text prompt, doesn't accept input audio. Replacing OTR's TTS would lose Bark/Kokoro voice control + script→voice mapping. Unless an audio-input ControlNet/LoRA ships, LTX-2 is visuals-only for OTR.
+- **Wan 2.2 14B GGUF Q3/Q4** — RAM-thrashes on Windows under aggressive offload; support-ticket bait.
+- **FLUX.1-dev Q5_K_S** — over 8GB budget once T5 + VAE + OS overhead added.
+- **Z-Image Turbo / PixArt-Sigma** — weaker prompt-adherence than FLUX for radio-drama series consistency.
+- **ERNIE Image 8B** — parked pending model card review (Jeffrey to provide spec link).
 
 **Acceptance for 8GB path:**
 - Full audio pipeline (LLM + Bark + AudioGen + MusicGen + SceneSequencer + EpisodeAssembler) — same as 16 GB.
