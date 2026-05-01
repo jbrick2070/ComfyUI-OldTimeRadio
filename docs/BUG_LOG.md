@@ -5,6 +5,45 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-127: Radio bookend FLUX render skipped entirely on fast_batch path -- the actual root cause of "wanted radio still but it's missing" symptom [FIXED in commit pending]
+
+- **Date:** 2026-05-01 ~10:20 (surfaced by tailing the live run after the BUG-126 strict_c7 fix landed) | **Phase:** 0 | **Bible candidate:** YES (textbook early-return-skips-side-effect pattern)
+- **Symptom:** Live run with episode `signal_lost_nasas_storie_mission_to_tell_tale_of_ear_20260501_101428` (commit 0913f1d) had BatchHumoRender hit "wanted radio still but it's missing" warning for both ANNOUNCER lines (l001, l013), falling back to cast-still (full_env_00166_.png). No `radio_bookend_<episode_id>.png` file ever appeared on disk for this episode despite `open_close=true` and `radio_bookend_prompt=""` (DYNAMIC mode).
+- **Cause:** `visual/batch_flux_render.py::execute()` had the radio bookend code (was at lines 468-511) wired AFTER the serial-loop path return at line 513. The fast_batch success path returned at line 417 BEFORE ever reaching the bookend code:
+    ```python
+    # FAST BATCH PATH
+    if fast_batch and len(prompts) > 1:
+        batched_result = _try_fast_batch(...)
+        if batched_result is not None:
+            ...
+            log.info("[BatchFluxRender] batch complete: %d image(s) (fast_batch)", ...)
+            return (image_batch, "\n".join(report_lines))   # <-- SKIPS bookend code!
+    ```
+  Since `fast_batch` defaults to True and the workflow JSON has `fast_batch=true` at widgets_values[14], every production run took the early return and silently skipped the entire radio still pipeline. The diagnostic log lines I added in commit 36bfa49 (`[BatchFluxRender] radio bookend stage: ...` and `[BatchFluxRender] radio bookend %s mode`) never fired because the code never reached those lines.
+- **Why earlier hypotheses were wrong:**
+  - BUG-LOCAL-121 hypothesis: "FLUX render attempted but failed silently" -- WRONG. FLUX never attempted.
+  - "open_close=false gating" -- WRONG. open_close was true; gating works correctly.
+  - "ledger stamping race" -- WRONG. There was nothing to stamp because nothing rendered.
+  - The BUG-121 filesystem fallback layer correctly returned None because the file genuinely doesn't exist.
+- **Fix:** Extracted lines 468-511 into a new `_render_radio_bookend_step()` helper method on the BatchFluxRender class. The helper is now invoked from BOTH paths just before their respective returns:
+  1. fast_batch success path (added at line ~427, before the existing early return at ~417)
+  2. serial-loop path (added at line ~456, before the existing return at the end of execute())
+  The helper preserves all three modes (DISABLED widget sentinel / OVERRIDE / DYNAMIC), all logging including the BUG-121 diagnostic stamps, and the never-raises contract (a bookend failure logs full traceback via log.exception and falls through, the main image batch always returns).
+- **Verify:** Next live run with default `fast_batch=true` should:
+  1. Log `[BatchFluxRender] radio bookend stage: ledger=<...> episode_id=<...>` BEFORE the bookend render (BUG-121 diag from commit 36bfa49 fires now)
+  2. Log `[BatchFluxRender] radio bookend DYNAMIC mode (seed=4242)`
+  3. Save `output/otr/stills/radio_bookend_<episode_id>.png`
+  4. Stamp `ledger.radio_bookend_path` and `ledger.meta.radio_bookend_path`
+  5. BatchHumoRender's `_resolve_radio_still_path` returns the file
+  6. ANNOUNCER (and any music_*/sfx-mirrored) lines dispatch HuMo against the radio still (talking-radio glitch animation)
+  7. Character lines continue to dispatch HuMo against cast-stills (talking heads, unchanged)
+- **Tests:** `tests/test_radio_prompt_builder.py::TestBug127BookendOnBothPaths` (4 source-grep tests confirming the helper exists, both paths invoke it, no inline duplicate). 114/114 total tests pass across radio prompt builder + radio still resolver + video composite per_clip_mux.
+- **Tags:** fast_batch, early-return, side-effect-skipped, radio-bookend, root-cause-of-symptom-2, bug-121-was-defensive-not-causal, bug-088-fallback-was-firing-correctly
+
+**Cross-reference:** This is the *actual* root cause of Symptom 2. BUG-LOCAL-121 (filesystem fallback) is still useful as defensive layering but it can never recover if the file doesn't exist on disk. BUG-LOCAL-124 (workflow link surgery) was a wrong fix for an unrelated misdiagnosis. With BUG-127 landed, all three of those (121 + 124 + 127) sequence is finally complete.
+
+---
+
 ### BUG-LOCAL-126: Silent humo_concat -> legacy master_mix fallthrough violates C7; workflow JSON also bypassed master_mix_per_clip_mux entirely [FIXED in commit pending]
 
 - **Date:** 2026-05-01 ~07:30 (surfaced by second-Opus review of round-robin recommendations) | **Phase:** 0 | **Bible candidate:** YES (textbook silent C7 violation pattern + workflow-JSON-shipped-with-wrong-default)

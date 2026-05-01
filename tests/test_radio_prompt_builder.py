@@ -246,3 +246,91 @@ class TestRealisticLedger:
         result = _build_dynamic_radio_prompt(led)
         assert result.startswith("tense claustrophobic radio broadcast unit")
         assert _RADIO_PROMPT_SUFFIX in result
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-127 (2026-05-01): the radio bookend pass was wired AFTER
+# the serial loop only.  The fast_batch path returned BEFORE reaching
+# the bookend code, so fast_batch (the default) silently skipped the
+# entire radio still pipeline.  Symptom 2 from earlier today
+# ("wanted radio still but it's missing" downstream in BatchHumoRender)
+# was caused by this -- not by FLUX render failure, not by ledger
+# stamping race.  The bookend code simply never ran.
+#
+# Fix: extracted radio bookend block into _render_radio_bookend_step()
+# helper, called from BOTH paths just before their respective returns.
+#
+# These tests source-grep the file to confirm both paths still invoke
+# the helper.  Exercising the actual path requires a real FLUX model;
+# we instead lock in the static structure so a future refactor can't
+# regress the same way.
+# ---------------------------------------------------------------------------
+
+
+class TestBug127BookendOnBothPaths:
+    """Confirm that the radio bookend helper is invoked from BOTH the
+    fast_batch return path and the serial-loop return path so the
+    bookend can never be silently skipped again."""
+
+    def _read_source(self) -> str:
+        from visual import batch_flux_render as bfr
+        return open(bfr.__file__, encoding="utf-8").read()
+
+    def test_render_radio_bookend_step_helper_exists(self):
+        src = self._read_source()
+        assert "def _render_radio_bookend_step(" in src, (
+            "BUG-LOCAL-127 fix requires a _render_radio_bookend_step "
+            "helper method that both fast_batch and serial paths call"
+        )
+
+    def test_fast_batch_path_invokes_helper_before_return(self):
+        # Read the source and isolate the fast_batch branch (between
+        # 'FAST BATCH PATH' marker and 'SERIAL LOOP PATH' marker).
+        src = self._read_source()
+        fast_idx = src.find("# FAST BATCH PATH")
+        serial_idx = src.find("# SERIAL LOOP PATH")
+        assert fast_idx != -1 and serial_idx != -1, (
+            "Could not locate FAST BATCH PATH or SERIAL LOOP PATH "
+            "markers; source structure may have changed"
+        )
+        fast_block = src[fast_idx:serial_idx]
+        assert "_render_radio_bookend_step(" in fast_block, (
+            "fast_batch path MUST invoke _render_radio_bookend_step "
+            "before its return -- this was BUG-LOCAL-127, the fast "
+            "path silently skipped the entire bookend pipeline"
+        )
+
+    def test_serial_loop_path_invokes_helper_before_return(self):
+        # The serial-loop path is the second exit point and must also
+        # call the helper.  Look for the helper call in the trailing
+        # chunk of execute() AFTER the SERIAL LOOP PATH marker but
+        # BEFORE the helper definition itself.
+        src = self._read_source()
+        serial_idx = src.find("# SERIAL LOOP PATH")
+        helper_def_idx = src.find("def _render_radio_bookend_step(")
+        assert serial_idx != -1 and helper_def_idx != -1
+        assert serial_idx < helper_def_idx, (
+            "SERIAL LOOP PATH marker must appear BEFORE the helper "
+            "definition; source ordering changed"
+        )
+        serial_block = src[serial_idx:helper_def_idx]
+        # The helper is invoked via self._render_radio_bookend_step(...)
+        # in both paths; this block must contain that call.
+        assert "_render_radio_bookend_step(" in serial_block, (
+            "serial-loop path MUST invoke _render_radio_bookend_step "
+            "before its return"
+        )
+
+    def test_no_inline_bookend_block_remains_in_execute(self):
+        # The original inline `if widget_str.upper() == "DISABLED":`
+        # block was the one that lived only in the serial path.  It
+        # should now live ONLY inside the helper, not duplicated in
+        # execute().  Count occurrences -- should be exactly 1.
+        src = self._read_source()
+        count = src.count('widget_str.upper() == "DISABLED"')
+        assert count == 1, (
+            f"Found {count} occurrences of the DISABLED-widget check; "
+            f"expected exactly 1 (inside _render_radio_bookend_step). "
+            f"If >1, the inline block wasn't fully extracted; if 0, "
+            f"the helper itself lost the check."
+        )

@@ -414,6 +414,26 @@ class BatchFluxRender:
                 )
                 log.info("[BatchFluxRender] batch complete: %d image(s) in %d ms (fast_batch)",
                          len(prompts), total_ms)
+                # BUG-LOCAL-127 fix (2026-05-01): the original code
+                # returned here without ever rendering the radio
+                # bookend, so fast_batch (the default) silently
+                # skipped the entire radio still pipeline. Symptom
+                # surfaced as "wanted radio still but it's missing"
+                # downstream in BatchHumoRender. The bookend pass is
+                # now invoked before BOTH this fast_batch return and
+                # the serial-loop return below.
+                self._render_radio_bookend_step(
+                    radio_bookend_prompt=radio_bookend_prompt,
+                    radio_bookend_seed=radio_bookend_seed,
+                    model=model, clip=clip, vae=vae,
+                    text_enc=text_enc, guidance_node=guidance_node,
+                    empty_latent_cls=empty_latent_cls, sampler=sampler,
+                    decoder=decoder, negative=negative,
+                    steps=steps, cfg=cfg,
+                    sampler_name=sampler_name, scheduler=scheduler,
+                    width=width, height=height, guidance=guidance,
+                    report_lines=report_lines,
+                )
                 return (image_batch, "\n".join(report_lines))
             log.info("[BatchFluxRender] fast_batch fell through, running serial loop")
             report_lines.append("  fast_batch failed -- fell through to serial loop")
@@ -453,18 +473,56 @@ class BatchFluxRender:
         log.info("[BatchFluxRender] batch complete: %d image(s) in %d ms", len(images), total_ms)
 
         # Step 1 (ROADMAP P0, 2026-04-30 lock) -- render the radio
-        # still and stamp ledger.radio_bookend_path.  Three modes:
-        #
-        #   widget == "DISABLED" (case-insensitive): skip rendering.
-        #   widget non-empty otherwise: use as verbatim override.
-        #   widget empty (default): build dynamically from ledger
-        #       context (style + style).
-        #
-        # The radio still is consumed by BatchHumoRender as the I2V
-        # reference for all non-dialogue HuMo clips (announcer,
-        # music_*, sfx).  Rendering ALWAYS attempts under the new
-        # default so wall-to-wall HuMo coverage has its non-dialogue
-        # reference image ready.
+        # still via the helper so BOTH this serial-loop path and the
+        # fast_batch path above invoke it.  See BUG-LOCAL-127.
+        self._render_radio_bookend_step(
+            radio_bookend_prompt=radio_bookend_prompt,
+            radio_bookend_seed=radio_bookend_seed,
+            model=model, clip=clip, vae=vae,
+            text_enc=text_enc, guidance_node=guidance_node,
+            empty_latent_cls=empty_latent_cls, sampler=sampler,
+            decoder=decoder, negative=negative,
+            steps=steps, cfg=cfg,
+            sampler_name=sampler_name, scheduler=scheduler,
+            width=width, height=height, guidance=guidance,
+            report_lines=report_lines,
+        )
+
+        return (image_batch, "\n".join(report_lines))
+
+    def _render_radio_bookend_step(
+        self,
+        radio_bookend_prompt,
+        radio_bookend_seed,
+        model, clip, vae,
+        text_enc, guidance_node,
+        empty_latent_cls, sampler,
+        decoder, negative,
+        steps, cfg,
+        sampler_name, scheduler,
+        width, height, guidance,
+        report_lines,
+    ):
+        """Render + stamp the radio still.  Called from BOTH the
+        fast_batch return path and the serial-loop return path
+        (BUG-LOCAL-127 fix 2026-05-01).
+
+        Three modes (widget value):
+          - ``"DISABLED"`` (case-insensitive): skip rendering.
+          - non-empty otherwise: use as verbatim override.
+          - empty (default): build dynamically from ledger context
+            (style + style).
+
+        The radio still is consumed by BatchHumoRender as the I2V
+        reference for all non-dialogue HuMo clips (announcer,
+        music_*, sfx).  Rendering ALWAYS attempts under the new
+        default so wall-to-wall HuMo coverage has its non-dialogue
+        reference image ready.
+
+        Never raises -- a render failure is logged with full
+        traceback (log.exception) and noted in report_lines, but the
+        outer execute() always returns the main image batch.
+        """
         widget_str = (radio_bookend_prompt or "").strip()
         if widget_str.upper() == "DISABLED":
             log.info(
@@ -472,45 +530,39 @@ class BatchFluxRender:
                 "sentinel (no render attempted)"
             )
             report_lines.append("  radio_bookend: DISABLED (widget)")
-        else:
-            mode = "OVERRIDE" if widget_str else "DYNAMIC"
-            log.info(
-                "[BatchFluxRender] radio bookend %s mode (seed=%d)",
-                mode, int(radio_bookend_seed),
+            return
+        mode = "OVERRIDE" if widget_str else "DYNAMIC"
+        log.info(
+            "[BatchFluxRender] radio bookend %s mode (seed=%d)",
+            mode, int(radio_bookend_seed),
+        )
+        try:
+            self._render_and_save_radio_bookend(
+                # widget_str is "" in DYNAMIC mode -- callee detects
+                # the empty string and builds dynamically.
+                prompt_text=widget_str,
+                model=model, clip=clip, vae=vae,
+                text_enc=text_enc, guidance_node=guidance_node,
+                empty_latent_cls=empty_latent_cls, sampler=sampler,
+                decoder=decoder, negative=negative,
+                seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
+                sampler_name=sampler_name, scheduler=scheduler,
+                width=width, height=height, guidance=guidance,
+                report_lines=report_lines,
             )
-            try:
-                self._render_and_save_radio_bookend(
-                    # widget_str is "" in DYNAMIC mode -- callee detects
-                    # the empty string and builds dynamically.
-                    prompt_text=widget_str,
-                    model=model, clip=clip, vae=vae,
-                    text_enc=text_enc, guidance_node=guidance_node,
-                    empty_latent_cls=empty_latent_cls, sampler=sampler,
-                    decoder=decoder, negative=negative,
-                    seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
-                    sampler_name=sampler_name, scheduler=scheduler,
-                    width=width, height=height, guidance=guidance,
-                    report_lines=report_lines,
-                )
-            except Exception as exc:
-                # BUG-LOCAL-121 diagnostic hardening (2026-05-01,
-                # round-robin Q3 Symptom 2):
-                # The previous warning swallowed the full traceback,
-                # so silent-failure cases (e.g. FLUX tokenizer choking
-                # on a malformed dynamic prompt) showed up downstream
-                # only as "wanted radio still but it's missing" with
-                # no upstream signal. log.exception emits the full
-                # stack trace at ERROR level so the FLUX-side root
-                # cause is visible in the log without re-running.
-                log.exception(
-                    "[BatchFluxRender] radio bookend render failed: %s",
-                    exc,
-                )
-                report_lines.append(
-                    f"  radio_bookend: FAILED ({exc})"
-                )
-
-        return (image_batch, "\n".join(report_lines))
+        except Exception as exc:
+            # BUG-LOCAL-121 diagnostic hardening (2026-05-01,
+            # round-robin Q3 Symptom 2):
+            # log.exception emits the full stack trace at ERROR level
+            # so the FLUX-side root cause is visible in the log
+            # without re-running.
+            log.exception(
+                "[BatchFluxRender] radio bookend render failed: %s",
+                exc,
+            )
+            report_lines.append(
+                f"  radio_bookend: FAILED ({exc})"
+            )
 
     @staticmethod
     def _render_and_save_radio_bookend(
