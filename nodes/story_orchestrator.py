@@ -1915,12 +1915,28 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
             # -- Zero-Prime VRAM Hardening (v1.4) --
             # We MUST detect hardware and purge memory BEFORE loading even the Tokenizer
             # to prevent the 15GB transient spike on 16GB cards.
-            
+
             # Detect Hardware
             total_vram = 0
             if torch.cuda.is_available():
                 total_vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                
+
+            # 2026-04-30: Sync BEFORE eviction.  bnb-NF4 + Blackwell sm_120 +
+            # CUDA 13 surfaces cudaErrorUnknown on the post-eviction call when
+            # async kernel completions from the prior generation are still in
+            # flight while empty_cache() touches their memory.  Reproducer:
+            # OpenClose 3-spine loop -- SPINE 1 OK, VRAM_RESET runs, SPINE 2
+            # faults.  Triple-confirmed by 2026-04-30 round-robin (ChatGPT +
+            # Gemini + NVIDIA).  See docs/2026-04-30-spine-cuda-crash/.
+            if torch.cuda.is_available():
+                try:
+                    torch.cuda.synchronize()
+                except Exception as _sync_err:  # noqa: BLE001
+                    _runtime_log(
+                        f"VRAM_RESET: pre-evict synchronize() failed "
+                        f"({_sync_err}); proceeding anyway"
+                    )
+
             # Nuclear Power Wash (Global Eviction)
             try:
                 import comfy.model_management
@@ -4319,9 +4335,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                     "target_words":         int(target_words),
                     "num_characters":       int(num_characters),
                     "target_length":        str(target_length),
-                    "style":        str(style),
+                    "style":                str(style),
+                    "style_custom":         str(style_custom),
                     "creativity":           str(creativity),
-                    "style":         str(style),
                     "optimization_profile": str(optimization_profile),
                     "arc_enhancer":         bool(arc_enhancer),
                     "include_act_breaks":   bool(include_act_breaks),
