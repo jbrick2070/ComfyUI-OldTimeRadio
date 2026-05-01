@@ -73,12 +73,57 @@ from _otr_speaker_role import (  # noqa: E402
 log = logging.getLogger("OTR.batch_humo_render")
 
 
+_MIN_RADIO_STILL_BYTES = 256  # smaller than this is almost certainly truncated
+
+
+def _is_valid_image_file(p: Path) -> bool:
+    """``p`` exists, is a file, and has plausible byte size for a PNG.
+
+    Defends against the 0-byte / truncated-file trap (BUG-LOCAL-121
+    hardening 2026-05-01): ``Path.exists()`` and ``Path.is_file()``
+    both return ``True`` for empty files left behind by an
+    interrupted FLUX render. Downstream ``Image.open()`` then crashes
+    the run instead of falling through to the portrait resolver.
+    """
+    try:
+        if not p.is_file():
+            return False
+        size = p.stat().st_size
+    except Exception:  # noqa: BLE001
+        return False
+    return size >= _MIN_RADIO_STILL_BYTES
+
+
+def _safe_episode_id(eid) -> str | None:
+    """Coerce + sanitize ``ledger.episode_id`` into a safe filename
+    component, or return ``None`` if it can't be made safe.
+
+    Defends against (BUG-LOCAL-121 hardening 2026-05-01):
+      - Non-string types (None, int, dict, etc.)
+      - Empty / whitespace-only strings
+      - Path-traversal characters (``/`` ``\\`` ``..``)
+      - Embedded NULs
+    """
+    if not isinstance(eid, str):
+        return None
+    s = eid.strip()
+    if not s:
+        return None
+    # Reject anything that could escape the stills dir or cause
+    # filesystem-API surprises.
+    forbidden = ("/", "\\", "..", "\x00")
+    for token in forbidden:
+        if token in s:
+            return None
+    return s
+
+
 def _resolve_radio_still_path(ledger):
     """Pull the radio still path from the ledger, in either schema
     location (top-level or under meta).  Returns ``Path`` if it
     points at an existing file, else ``None``.
 
-    Resolution order (BUG-LOCAL-121 fix 2026-04-30):
+    Resolution order (BUG-LOCAL-121 fix 2026-04-30, hardened 2026-05-01):
       1. ``ledger.radio_bookend_path`` (top-level)
       2. ``ledger.meta.radio_bookend_path``
       3. **Filesystem fallback:** ``output/otr/stills/radio_bookend_<episode_id>.png``
@@ -87,9 +132,10 @@ def _resolve_radio_still_path(ledger):
          but the ledger stamp failed silently (e.g. ledger overwritten by
          a later phase, atomic write race, etc.).
 
-    All three checks include an existence-check on disk: a stamped path
-    that no longer exists falls through to the next layer rather than
-    breaking the run.
+    All three checks use ``_is_valid_image_file`` (existence + non-zero
+    byte-size) so a stamped path pointing at a 0-byte / truncated PNG
+    falls through to the next layer rather than crashing
+    ``Image.open()`` downstream.
     """
     if not isinstance(ledger, dict):
         return None
@@ -105,29 +151,39 @@ def _resolve_radio_still_path(ledger):
             p = Path(cand)
         except Exception:  # noqa: BLE001
             p = None
-        if p is not None and p.is_file():
+        if p is not None and _is_valid_image_file(p):
             return p
         if p is not None:
             log.warning(
                 "[BatchHumoRender] ledger radio_bookend_path=%s does "
-                "not exist on disk; trying filesystem fallback",
+                "not exist or is truncated; trying filesystem fallback",
                 p,
             )
     # Layer 3: filesystem fallback by episode_id (BUG-LOCAL-121).
     # Even if ledger stamp is missing/stale, the FLUX phase saves
     # the radio bookend at a deterministic path we can reconstruct.
-    episode_id = ledger.get("episode_id")
-    if not isinstance(episode_id, str) or not episode_id.strip():
+    safe_eid = _safe_episode_id(ledger.get("episode_id"))
+    if safe_eid is None:
         return None
     try:
-        fs_path = otr_stills_dir() / f"radio_bookend_{episode_id.strip()}.png"
+        stills_dir = otr_stills_dir()
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[BatchHumoRender] radio still filesystem fallback failed: %s",
+            "[BatchHumoRender] otr_stills_dir() failed; cannot run "
+            "filesystem fallback: %s",
             exc,
         )
         return None
-    if fs_path.is_file():
+    try:
+        fs_path = stills_dir / f"radio_bookend_{safe_eid}.png"
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[BatchHumoRender] radio still filesystem fallback "
+            "path-build failed: %s",
+            exc,
+        )
+        return None
+    if _is_valid_image_file(fs_path):
         log.info(
             "[BatchHumoRender] radio still resolved via filesystem "
             "fallback (ledger stamp missing): %s",

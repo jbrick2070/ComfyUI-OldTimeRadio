@@ -528,12 +528,32 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
 
 
 class SceneSequencer:
-    """Render a script scene: TTS for each line, SFX cues, pauses."""
+    """Render a script scene: TTS for each line, SFX cues, pauses.
+
+    NOTE on the third output ``DEPRECATED_manifest`` (BUG-LOCAL-125,
+    deprecated 2026-05-01):
+        Originally exposed as ``scene_manifest_json``. Implementation
+        was always a stub (``manifest = []`` initialized at line 689,
+        never appended to, serialized at line 890 -> always emits the
+        literal string ``"[]"``). The slot misled an external static-
+        analysis QA report into recommending it be wired to
+        BatchHumoRender's ledger_json input (BUG-LOCAL-124), which
+        crashed the run with ``ledger path not found: []``.
+
+        Renamed to ``DEPRECATED_manifest`` so future graph editors
+        and static analyzers can't make the same mistake. Kept on
+        the class in deprecated form for one minor version so saved
+        workflow JSONs that wire to slot index 2 don't break with a
+        red-wire error. Will be removed entirely in v2.0-beta.
+
+        Downstream consumers should read the canonical scene/shot/
+        beat data from ``ledger.json`` on disk, not from this output.
+    """
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "sequence"
     RETURN_TYPES = ("AUDIO", "STRING", "STRING")
-    RETURN_NAMES = ("scene_audio", "render_log", "scene_manifest_json")
+    RETURN_NAMES = ("scene_audio", "render_log", "DEPRECATED_manifest")
 
     @classmethod
     def INPUT_TYPES(cls):

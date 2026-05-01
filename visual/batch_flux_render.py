@@ -493,7 +493,16 @@ class BatchFluxRender:
                     report_lines=report_lines,
                 )
             except Exception as exc:
-                log.warning(
+                # BUG-LOCAL-121 diagnostic hardening (2026-05-01,
+                # round-robin Q3 Symptom 2):
+                # The previous warning swallowed the full traceback,
+                # so silent-failure cases (e.g. FLUX tokenizer choking
+                # on a malformed dynamic prompt) showed up downstream
+                # only as "wanted radio still but it's missing" with
+                # no upstream signal. log.exception emits the full
+                # stack trace at ERROR level so the FLUX-side root
+                # cause is visible in the log without re-running.
+                log.exception(
                     "[BatchFluxRender] radio bookend render failed: %s",
                     exc,
                 )
@@ -560,6 +569,20 @@ class BatchFluxRender:
             led = _OTRL.load_ledger_safe(ledger_p)
             if led is not None:
                 episode_id = (led.get("episode_id") or "episode").strip()
+        # BUG-LOCAL-121 diagnostic hardening (2026-05-01,
+        # round-robin Q3 Symptom 2 hypothesis (c)):
+        # Stamp the episode_id we're about to write into the bookend
+        # filename so a downstream "wanted radio still but it's
+        # missing" warning in BatchHumoRender can be compared
+        # directly. If the two episode_ids differ, the ledger was
+        # renamed/swapped between FLUX and HuMo phases.
+        log.info(
+            "[BatchFluxRender] radio bookend stage: ledger=%s "
+            "episode_id=%s (will save as radio_bookend_%s.png)",
+            ledger_p.name if ledger_p else "<none>",
+            episode_id,
+            episode_id,
+        )
 
         # Resolve the prompt: empty widget -> dynamic build; non-empty
         # widget -> verbatim override.

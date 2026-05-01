@@ -221,7 +221,7 @@
           "slot_index": 1
         },
         {
-          "name": "scene_manifest_json",
+          "name": "DEPRECATED_manifest",
           "type": "STRING",
           "links": null,
           "slot_index": 2
