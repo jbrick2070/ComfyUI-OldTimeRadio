@@ -66,6 +66,7 @@ from _otr_paths import (  # noqa: E402
 )
 from _otr_speaker_role import (  # noqa: E402
     SPEAKER_ROLE_CHARACTER,
+    is_never_humo_role,
     is_radio_role,
     resolve_speaker_role,
 )
@@ -1182,25 +1183,67 @@ class BatchHumoRender:
                 dur_s = max(0.04, _cap_dur_s - pad_s)
             humo_length = humo_length_for_dur(dur_s + pad_s)
 
-            # Step 5 (ROADMAP P0, 2026-04-30 lock) -- I2V ref-image
-            # selection branches on speaker_role.  Non-dialogue lines
-            # (announcer, music_*, sfx) get the radio still; dialogue
-            # lines (character) fall through the existing BUG-088
-            # portrait resolution chain.
+            # I2V ref-image selection (post-BUG-LOCAL-129 routing,
+            # 2026-05-01):
+            #   character  -> existing BUG-088 portrait chain.
+            #   announcer  -> portrait chain (renders if LLM emitted
+            #                 ANNOUNCER as a cast member with a
+            #                 portrait; falls through to no-clip
+            #                 otherwise, which VideoComposite covers
+            #                 via BUG-129a static-radio fill).
+            #   music_*/sfx-> hard skip. Defense in depth via
+            #                 is_never_humo_role(): even if a
+            #                 portrait somehow resolves, do NOT
+            #                 dispatch HuMo. VideoComposite's
+            #                 BUG-129a static-fill path provides
+            #                 visual coverage for these audio events.
+            #   (no role)  -> default to character.
+            #
+            # The historical "radio role -> radio still as ref_image"
+            # branch is retained as defense-in-depth: is_radio_role()
+            # always returns False post-BUG-129, so this branch is
+            # dead. If a future commit re-populates _RADIO_ROLES, the
+            # regression resurfaces visibly via the
+            # `radio-still (...)` ref_source stamp on rendered clips.
             speaker_role = resolve_speaker_role(ln)
             shot_id = ln.get("shot_id")
             ref_png: Path | None = None
             ref_source = "none"
 
+            # BUG-LOCAL-129b (2026-05-01): hard skip for music/sfx
+            # before any portrait lookup. These roles are visual
+            # coverage only -- they get a deterministic static-radio
+            # segment in VideoComposite, never a HuMo render.
+            if is_never_humo_role(speaker_role):
+                report_lines.append(
+                    f"  {line_id}: SKIP HuMo (role={speaker_role}, "
+                    f"covered by VideoComposite static-radio fill)"
+                )
+                log.info(
+                    "[BatchHumoRender] line %s speaker_role=%s -- "
+                    "skipping HuMo render (BUG-129b: visual covered "
+                    "by VideoComposite static-fill)",
+                    line_id, speaker_role,
+                )
+                continue
+
             if is_radio_role(speaker_role) and radio_still_path is not None:
-                # Non-dialogue line + radio still rendered + on disk.
-                # This is the wall-to-wall HuMo coverage path.
+                # Defense-in-depth dead branch (BUG-LOCAL-129 fix):
+                # is_radio_role() always returns False post-BUG-129.
+                # If this fires, _RADIO_ROLES was re-populated and
+                # the regression is back. Logged loudly.
                 ref_png = radio_still_path
                 ref_source = f"radio-still ({speaker_role})"
+                log.error(
+                    "[BatchHumoRender] BUG-LOCAL-129 REGRESSION: line "
+                    "%s speaker_role=%s routed to radio still as "
+                    "HuMo ref_image. _RADIO_ROLES has been re-populated "
+                    "in _otr_speaker_role.py; HuMo will produce an "
+                    "unconstrained generic face. Revert that change.",
+                    line_id, speaker_role,
+                )
             else:
-                # Dialogue line OR radio-role line whose radio still
-                # wasn't rendered/missing.  Use the BUG-LOCAL-088
-                # portrait priority chain:
+                # Character / announcer -> portrait chain:
                 #   1. ledger-driven cast_still_map (this-episode FLUX)
                 #   2. _find_composite (per-shot pass3 composite)
                 #   3. _find_portrait (legacy tiers; mtime-sorted post BUG-087)
@@ -1215,18 +1258,6 @@ class BatchHumoRender:
                     ref_png = _find_portrait(speaker, cast, portraits_dir_path)
                     if ref_png:
                         ref_source = "find_portrait"
-                # Diagnostic for the "wanted radio, fell through to
-                # portrait" case so the failure is loud in the log
-                # (otherwise easy to miss in a long render).
-                if is_radio_role(speaker_role) and ref_png:
-                    log.warning(
-                        "[BatchHumoRender] line %s speaker_role=%s "
-                        "wanted radio still but it's missing; using "
-                        "%s (source=%s) instead -- audio will be "
-                        "muxed lossless either way, but visual won't "
-                        "be the radio",
-                        line_id, speaker_role, ref_png.name, ref_source,
-                    )
 
             if not ref_png:
                 report_lines.append(

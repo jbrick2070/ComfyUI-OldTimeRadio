@@ -5,7 +5,7 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-129: ANNOUNCER lines render as character faces despite ledger stamping ref_source="radio-still (announcer)" — radio bookend PNG renders correctly, but HuMo dispatch ignores it
+### BUG-LOCAL-129: ANNOUNCER lines render as character faces despite ledger stamping ref_source="radio-still (announcer)" — radio bookend PNG renders correctly, but HuMo dispatch ignores it [FIXED in 53934eb + 7eb9754 + commit pending: 3-commit sequence per ROADMAP P0]
 
 - **Date:** 2026-05-01 ~14:45 (surfaced when Jeffrey opened the per-clip folder and saw zero radio imagery in any clip thumbnail) | **Phase:** 0 | **Bible candidate:** YES (ledger-vs-reality divergence; the diagnostic logs were "right" while the visual was wrong)
 - **Symptom:**
@@ -57,7 +57,7 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-128: master_mix_per_clip_mux concat-and-shortest truncates ~70s of dialogue audio when sum(clip.dur_s) << ledger.total_episode_dur_s [tail-pad pointer FIXED 53934eb; static-fill coverage path FIXED via BUG-129a; full close pending BUG-129b role-policy flip]
+### BUG-LOCAL-128: master_mix_per_clip_mux concat-and-shortest truncates ~70s of dialogue audio when sum(clip.dur_s) << ledger.total_episode_dur_s [FIXED across 53934eb (tail-pad) + 7eb9754 (static-fill) + commit pending (role policy)]
 
 - **Date:** 2026-05-01 ~14:35 (surfaced during read-only QA of episode `signal_lost_nasa_artemis_ii_crew_rings_nasdaq_closin_20260501_110019`, commit 620013e, audio_path_selected=`master_mix_per_clip_mux`, strict_c7=true) | **Phase:** 0 | **Bible candidate:** YES (textbook concat-demuxer + `-shortest` mismatch when per-event coverage is partial)
 - **Symptom:**

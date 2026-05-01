@@ -113,22 +113,55 @@ class TestResolveSpeakerRole:
 # ---------------------------------------------------------------------------
 
 class TestRolePredicates:
-    """Each role classifies into exactly one of dialogue / radio."""
+    """Routing predicates for speaker_role.
+
+    BUG-LOCAL-129 (2026-05-01) retired the "radio is the visual
+    performer" premise. is_radio_role() now always returns False
+    (defense-in-depth dead predicate). Routing is split into:
+      - is_dialogue_role()   -> True for character only (HuMo with
+                                portrait)
+      - is_never_humo_role() -> True for music_*/sfx (skip HuMo;
+                                VideoComposite static-fill covers them)
+      - announcer            -> not dialogue, not never-humo: routes
+                                through portrait chain (HuMo if a
+                                portrait resolves, otherwise falls
+                                through to VideoComposite static-fill).
+    """
 
     def test_character_is_dialogue_only(self):
         assert SR.is_dialogue_role(SR.SPEAKER_ROLE_CHARACTER) is True
         assert SR.is_radio_role(SR.SPEAKER_ROLE_CHARACTER) is False
+        assert SR.is_never_humo_role(SR.SPEAKER_ROLE_CHARACTER) is False
+
+    @pytest.mark.parametrize("role", SR.VALID_SPEAKER_ROLES)
+    def test_is_radio_role_always_false_post_bug129(self, role):
+        # BUG-LOCAL-129 fix: _RADIO_ROLES is empty. Predicate kept
+        # as defense-in-depth -- if this assertion ever fails it
+        # means the regression has been reintroduced.
+        assert SR.is_radio_role(role) is False, (
+            f"BUG-LOCAL-129 regression: role {role!r} routes back to "
+            f"radio still as HuMo ref_image. _RADIO_ROLES has been "
+            f"re-populated in _otr_speaker_role.py. Revert."
+        )
 
     @pytest.mark.parametrize("role", [
-        SR.SPEAKER_ROLE_ANNOUNCER,
         SR.SPEAKER_ROLE_MUSIC_OPEN,
         SR.SPEAKER_ROLE_MUSIC_CLOSE,
         SR.SPEAKER_ROLE_MUSIC_INTER,
         SR.SPEAKER_ROLE_SFX,
     ])
-    def test_radio_roles_are_radio_not_dialogue(self, role):
-        assert SR.is_radio_role(role) is True
-        assert SR.is_dialogue_role(role) is False
+    def test_never_humo_roles_are_music_and_sfx(self, role):
+        assert SR.is_never_humo_role(role) is True
+
+    @pytest.mark.parametrize("role", [
+        SR.SPEAKER_ROLE_CHARACTER,
+        SR.SPEAKER_ROLE_ANNOUNCER,
+    ])
+    def test_character_and_announcer_can_use_humo(self, role):
+        # BUG-LOCAL-129b: announcer is intentionally NOT in the
+        # never-humo set -- if the LLM emits ANNOUNCER as a cast
+        # member with a portrait, HuMo renders it like any character.
+        assert SR.is_never_humo_role(role) is False
 
     @pytest.mark.parametrize("role", [
         SR.SPEAKER_ROLE_MUSIC_OPEN,
@@ -146,15 +179,25 @@ class TestRolePredicates:
     def test_non_music_roles_arent_music(self, role):
         assert SR.is_music_role(role) is False
 
-    def test_predicates_partition_valid_set(self):
-        # Every valid role must be EITHER dialogue OR radio (not both,
-        # not neither).
+    def test_predicates_partition_valid_set_post_bug129(self):
+        # New routing partition (BUG-LOCAL-129b, 2026-05-01):
+        #   character  -> dialogue (HuMo)
+        #   announcer  -> dialogue-eligible (HuMo if portrait, else
+        #                 falls through to VideoComposite)
+        #   music_*/sfx-> never-humo (VideoComposite static-fill)
+        # Every valid role lands in exactly one of: dialogue (only
+        # character), never-humo (music/sfx), or "humo-eligible"
+        # (announcer - the residual).
         for role in SR.VALID_SPEAKER_ROLES:
             d = SR.is_dialogue_role(role)
-            r = SR.is_radio_role(role)
-            assert d ^ r, (
-                f"Role {role!r} broke partition: dialogue={d}, radio={r}"
+            n = SR.is_never_humo_role(role)
+            # No role can be both dialogue and never-humo.
+            assert not (d and n), (
+                f"Role {role!r}: dialogue={d}, never_humo={n} -- "
+                f"contradictory."
             )
+            # is_radio_role() is always False post-BUG-129.
+            assert SR.is_radio_role(role) is False
 
 
 # ---------------------------------------------------------------------------

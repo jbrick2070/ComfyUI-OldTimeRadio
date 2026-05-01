@@ -2,24 +2,41 @@
 _otr_speaker_role.py
 ====================
 
-Speaker-role taxonomy for the v2.0-alpha "100% HuMo coverage" lock
-(ROADMAP P0, 2026-04-30).  Every line in ``ledger.lines[]`` carries
-a ``speaker_role`` that tells BatchHumoRender which I2V reference
-image to use:
+Speaker-role taxonomy for the v2.0-alpha architecture.
 
-    character   -> existing PASS3 cast portrait resolver
-                   (BUG-088 fallback chain stays intact)
-    announcer   -> ledger.radio_bookend_path  (the radio still)
-    music_open  -> ledger.radio_bookend_path
-    music_close -> ledger.radio_bookend_path
-    music_inter -> ledger.radio_bookend_path
-    sfx         -> ledger.radio_bookend_path
+**Routing contract (locked 2026-05-01 after BUG-LOCAL-129):**
 
-The radio is the visual performer for everything that isn't a
-dialogue line: announcer voice, opening/closing/interstitial music
-windows, and standalone SFX cues.  Per Jeffrey 2026-04-30: people
-speaking get people lip-syncing, everything else gets the radio
-lip-syncing.
+Every line in ``ledger.lines[]`` carries a ``speaker_role``. Routing
+in BatchHumoRender + VideoComposite is now:
+
+    character   -> HuMo, with PASS3 cast portrait resolver
+                   (BUG-088 fallback chain) as I2V reference
+    announcer   -> HuMo, with the ANNOUNCER cast portrait if the
+                   LLM emitted ANNOUNCER as a cast member; otherwise
+                   falls through to the VideoComposite static-radio
+                   fill path (BUG-129a).
+    music_open  -> non-HuMo. VideoComposite generates a deterministic
+                   static-radio segment for visual coverage.
+    music_close -> same as music_open.
+    music_inter -> same as music_open.
+    sfx         -> same as music_open (standalone SFX). SFX concurrent
+                   with dialogue should NOT have its own ledger.lines[]
+                   entry -- it's part of the surrounding character's
+                   audio and stays on that character's HuMo clip.
+
+**Why the old "radio is the visual performer" premise was retired:**
+
+BUG-LOCAL-129 (2026-05-01) discovered that HuMo's finetuned weights
+will not animate non-face references. Passing the radio still as
+HuMo's ``ref_image`` for announcer/music/sfx produced two unrelated
+generic faces (l001 + l021 of the 2026-05-01_110019 run) instead of
+the radio itself. The architectural premise that "the radio is the
+visual performer for everything that isn't dialogue" is incompatible
+with HuMo as the renderer. Round-robin consult (gpt-5.4, gemini-3-
+pro-preview, mistral-nemotron) + external code review converged on:
+HuMo for speaking faces only; everything else through a deterministic
+static-video editorial path. See ``docs/2026-05-01-humo-radio-
+architecture__*.md`` for full transcripts.
 
 This module is pure stdlib -- no torch, no comfy imports -- so it's
 safe to load from tests, scripts, and any node without adding
@@ -53,12 +70,24 @@ VALID_SPEAKER_ROLES = (
 )
 
 
-# All roles whose I2V reference is the radio still.  Lookup table
-# kept separate from the constant tuple so future role additions
-# (e.g. a new music tier) can be classified without changing the
-# canonical role list.
-_RADIO_ROLES = frozenset({
-    SPEAKER_ROLE_ANNOUNCER,
+# BUG-LOCAL-129 fix (2026-05-01): no role routes to the radio still
+# as a HuMo I2V reference any more. HuMo's weights only animate faces;
+# passing the radio still produces unconstrained generic-face output
+# (BUG-129's two-blonde-women symptom). Roles that previously routed
+# here now fall through the portrait chain in BatchHumoRender; if no
+# portrait is found the line gets a deterministic static-radio fill
+# in VideoComposite (BUG-129a). The empty set is preserved as a
+# defense-in-depth signal: if a future commit re-populates this set,
+# is_radio_role() flips True and the regression resurfaces visibly.
+_RADIO_ROLES: frozenset[str] = frozenset()
+
+
+# Roles that must NEVER trigger a HuMo render even if a portrait is
+# somehow resolvable. music_*/sfx-standalone visual coverage is the
+# job of the VideoComposite static-fill path (BUG-129a). Defense in
+# depth so a future regression that adds these to the cast portrait
+# pool can't reintroduce the problem.
+_NEVER_HUMO_ROLES = frozenset({
     SPEAKER_ROLE_MUSIC_OPEN,
     SPEAKER_ROLE_MUSIC_CLOSE,
     SPEAKER_ROLE_MUSIC_INTER,
@@ -112,15 +141,39 @@ def is_dialogue_role(role: str) -> bool:
 
 
 def is_radio_role(role: str) -> bool:
-    """True iff the role drives a radio still HuMo render.
+    """Always returns ``False`` post-BUG-LOCAL-129 (2026-05-01).
 
-    Covers announcer + all music_* + sfx.  The complement of
-    :func:`is_dialogue_role` for valid roles, but kept as an
-    explicit predicate so future additions (e.g. a hypothetical
-    ``narrator`` role driving a separate visual) can be classified
-    independently of the dialogue/radio split.
+    Historical contract: True for announcer + music_* + sfx, which
+    used the radio still PNG as HuMo's I2V reference. Retired because
+    HuMo's weights only animate faces -- passing a non-face produced
+    unconstrained generic-face output (BUG-129).
+
+    The predicate is preserved (rather than deleted) as a defense-in-
+    depth flag: callers that historically routed on this branch
+    (BatchHumoRender) keep the dead code as documentation of the
+    failed experiment, and any test that asserts ``is_radio_role(r)``
+    is True will fail loudly if a future commit re-populates
+    :data:`_RADIO_ROLES`.
     """
     return role in _RADIO_ROLES
+
+
+def is_never_humo_role(role: str) -> bool:
+    """True iff the role must NEVER dispatch a HuMo render.
+
+    Currently covers ``music_open``, ``music_close``, ``music_inter``,
+    ``sfx``. These roles get visual coverage via VideoComposite's
+    deterministic static-radio fill path (BUG-129a). Even if a
+    portrait somehow resolves for one of these speakers (e.g., an
+    SFX line gets the same speaker name as a real character), the
+    dispatch must short-circuit before HuMo is invoked.
+
+    ``announcer`` is intentionally NOT in this set: announcer lines
+    SHOULD render via HuMo if the LLM emits ANNOUNCER as a cast
+    member with a portrait; if no portrait resolves they fall through
+    to the VideoComposite static-fill path naturally.
+    """
+    return role in _NEVER_HUMO_ROLES
 
 
 def is_music_role(role: str) -> bool:
@@ -165,5 +218,6 @@ __all__ = [
     "is_dialogue_role",
     "is_radio_role",
     "is_music_role",
+    "is_never_humo_role",
     "stamp_default_role",
 ]
