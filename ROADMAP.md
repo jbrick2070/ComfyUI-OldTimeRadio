@@ -132,20 +132,34 @@ Blocked on video-stack maturity. Design begins once stack empirics exist from th
 
 **Stance:** v2.0 doesn't release until 8GB-class users get an enhanced visual output too.
 
-**Decision deferred** until first clean 16 GB FULL run lands so we have real end-to-end data before designing the 8GB fallback. File post-decision in `docs/2026-04-28-8gb-strategy-decision.md`.
+**Architecture (Jeffrey 2026-04-28):** Single master JSON with bypassable video-stack groups. Shared audio chain → procgen, then multiple side-by-side render groups — each group bypassable via Ctrl+B. Final VideoComposite takes whichever group is active. 8 GB users bypass the HuMo + FLUX-fp8 (16 GB) groups and enable the GGUF (8 GB) groups.
 
-**Leaning option (Jeffrey 2026-04-28):** Single master JSON with bypassable video-stack groups. Shared audio chain → procgen, then multiple side-by-side render groups (FLUX-fp8 stills, HuMo 14B, LTX-Video 0.9, CogVideoX-2B, SDXL+AnimateDiff, etc.) — each group bypassable via Ctrl+B. Final VideoComposite takes whichever group is active. 8 GB users bypass HuMo+FLUX, enable a lightweight pair.
+**Locked picks for 8GB tier (2026-04-30, after evaluating LTX 2.3, LTX-2 19B, ERNIE Image candidates):**
+
+| Component | 16 GB tier (current) | 8 GB tier (locked picks) | Disk size | Why |
+|---|---|---|---|---|
+| **Stills** | FLUX-fp8 (~12 GB) | **FLUX.1-dev Q4_K_S** (city96 GGUF) | ~5-6 GB | Same prompt-adherence + cross-scene visual consistency as fp8, leaves headroom for T5-FP8 + VAE on 8GB cards |
+| **Video** | HuMo 14B fp8 (~16.5 GB staged) + per-clip-mux | **Wan 2.2 5B TI2V** (native ComfyUI template) | ~5 GB | Reliable offload, plug-and-play on RTX 4060-class cards. No native audio sync — OTR keeps its master mix mux pattern unchanged |
+| **Upscale (optional)** | SeedVR2 3B fp16 | Topaz Video AI (CPU/external) OR skip | 0 GB VRAM | SeedVR2 stays as advanced opt-in for 8GB users with patience |
+
+**8GB picks REJECTED after evaluation:**
+- **LTX 2.3 22B distilled** — smallest variant (Q5_K_M ~14 GB) doesn't fit; 22B is parameter-distilled-NOT, only step-distilled
+- **LTX-2 19B distilled** — Kijai's smallest variant Q4_K_M ~12 GB still over 8GB
+- **Wan 2.2 14B GGUF Q3/Q4** — technically runs with aggressive offload but RAM-thrashes on Windows, generates support tickets; avoid for core path
+- **FLUX.1-dev Q5_K_S** — pushes over budget once T5 + VAE + OS overhead added
+- **Z-Image Turbo / PixArt-Sigma** — faster but lose FLUX prompt-adherence consistency across radio-drama series renders
 
 **Acceptance for 8GB path:**
 - Full audio pipeline (LLM + Bark + AudioGen + MusicGen + SceneSequencer + EpisodeAssembler) — same as 16 GB.
 - SignalLostVideo procgen base — same.
-- **Visual layer must be MOTION VIDEO, not stills.** Jeffrey 2026-04-28: *"i just don't want stills if we can find a 8gb vid model"*.
+- Stills via FLUX.1-dev Q4_K_S; video via Wan 2.2 5B (atmospheric B-roll / scene loops).
 - Final mp4 lands in `output/episodes_for_obs/<ep>/<ep>.mp4` same as 16 GB.
+- Wall-clock expectation: FLUX still ~45-90 s/still, Wan 5B clip ~4-8 min/clip (significantly slower than 16GB tier; document upfront).
 
-**Model research before designing the 8GB workflow:**
-- Image model under 8 GB: SDXL-Turbo, SD 3 Medium, FLUX-schnell at lower precision, SD 1.5 (last resort).
-- Video model under 8 GB: HuMo's smaller siblings if any, Wan 2.1 1.3B, LTX-Video 0.9 (~5 GB), CogVideoX-2B fp8, AnimateDiff with lightweight base. Lip-sync ideal but not required.
-- Pairing: image + video should share tokenizer/conditioning if possible to avoid double prompt-engineering surface.
+**Distribution requirements before tagging v2.0:**
+- Pin exact ComfyUI version + GGUF model versions in README; include checksums for the GGUF files.
+- README must set time expectations explicitly so 8GB users don't think the run hung.
+- Both tier workflows live in the same JSON; the README screenshot shows the "8GB mode" group toggles to enable.
 
 **Related:** flip default `optimization_profile` to `Pro (Ultra Quality)` once 16 GB FULL has shipped clean — Jeffrey: *"I almost feel we should default to Pro Ultra"*.
 
