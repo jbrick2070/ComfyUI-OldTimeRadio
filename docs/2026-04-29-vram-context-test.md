@@ -100,3 +100,18 @@ C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pip install nvidia-
 
 (empty -- waiting for first measurement run)
 
+
+
+## Run 2026-04-29 16:40:50
+
+All three memory columns are reported separately:
+
+- **VRAM nvml** -- nvidia-smi-equivalent device-wide GPU RAM (truth, includes driver overhead + other processes). USE THIS FOR CAP DECISIONS.
+- **VRAM torch** -- PyTorch caching allocator only, this process. Informative; undercounts driver overhead.
+- **CPU RAM** -- this process's resident-set size (host RAM). SEPARATE memory space from VRAM. Reported for visibility only.
+
+| Model | Context (target / actual) | VRAM nvml (GB) | VRAM torch (GB) | CPU RAM (GB) | Gen 16t (sec) | Note |
+|---|---:|---:|---:|---:|---:|---|
+| Mistral-Nemo-Instruct-2407 | -- | -- | -- | -- | -- | SKIP: mistralai/Mistral-Nemo-Instruct-2407 doe |
+| gemma-4-E2B-it | -- | -- | -- | -- | -- | SKIP: We couldn't connect to 'https://huggingf |
+| gemma-4-E4B-it | -- | -- | -- | -- | -- | SKIP: We couldn't connect to 'https://huggingf |
