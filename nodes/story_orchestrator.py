@@ -3958,8 +3958,34 @@ class LLMScriptWriter:
                                "format compliance."
                 }),
                 "custom_premise": ("STRING", {
-                    "multiline": True, "default": "",
-                    "tooltip": "Optional custom story premise (overrides news-based generation)"
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) type a custom story premise here -- "
+                        "overrides the RSS news fetch"
+                    ),
+                    "tooltip": (
+                        "OPTIONAL premise override.  Leave empty (default) "
+                        "to let the RSS news fetcher pick a real-world "
+                        "headline as the episode seed.  Type a premise "
+                        "here to BYPASS the news pipeline entirely -- "
+                        "your text becomes the spine seed and the "
+                        "OpenClose 3-spine evaluator is skipped (direct "
+                        "path to script writer).\n\n"
+                        "Use cases:\n"
+                        "  - test a specific story idea ('two scientists "
+                        "trapped in a lunar greenhouse during a solar "
+                        "storm')\n"
+                        "  - reproduce a previous run with controlled "
+                        "inputs\n"
+                        "  - work offline / skip RSS when news re-rank "
+                        "picked a weak headline\n"
+                        "  - write a series with continuity ('three "
+                        "months after the Vela incident...')\n\n"
+                        "Ledger stamps meta.custom_premise_set so "
+                        "post-mortem can tell which seed path produced "
+                        "the run."
+                    ),
                 }),
                 # news_headlines and temperature removed in v2.0 - both were dead
                 # params (news_headlines was never wired to RSS, temperature was
