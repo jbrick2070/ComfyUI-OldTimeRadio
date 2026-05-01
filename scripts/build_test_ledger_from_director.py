@@ -93,7 +93,7 @@ def extract_video_plan_widget_values(wf_path: Path) -> list[Any]:
         [0] director_json (string)
         [1] focus_character (string, "(all)" or a specific name)
         [2] shots_per_scene (int)
-        [3] genre_flavor (string)
+        [3] style (string)
         [4] style_tail (string, optional)
         [5] include_final_end_frame (bool, optional)
     """
@@ -122,7 +122,7 @@ def director_json_to_test_ledger(
     *,
     episode_id: str,
     shots_per_scene: int = 2,
-    genre_flavor: str = "hard_sci_fi",
+    style: str = "hard_sci_fi",
     style_tail: str = "",
     include_final_end_frame: bool = True,
     clip_length_s: float = 3.88,
@@ -200,7 +200,7 @@ def director_json_to_test_ledger(
         director_json,
         primary_focus,
         shots_per_scene=shots_per_scene,
-        genre_flavor=genre_flavor,
+        style=style,
         style_tail=style_tail,
         include_final_end_frame=include_final_end_frame,
     )
@@ -416,7 +416,7 @@ def main() -> int:
         director_json,
         episode_id=episode_id,
         shots_per_scene=shots_per_scene,
-        genre_flavor=str(wf_genre or "hard_sci_fi"),
+        style=str(wf_genre or "hard_sci_fi"),
         style_tail=str(wf_style_tail or ""),
         include_final_end_frame=bool(wf_include_final),
         clip_length_s=float(args.clip_length),

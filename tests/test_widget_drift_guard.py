@@ -42,7 +42,7 @@ def _script_writer_schema():
             "input": {
                 "required": {
                     "episode_title": ("STRING", {"default": ""}),
-                    "genre_flavor": (
+                    "style": (
                         ["hard_sci_fi", "space_opera", "dystopian"],
                         {"default": "hard_sci_fi"},
                     ),
@@ -77,7 +77,7 @@ def _script_writer_schema():
                         ["short (3 acts)", "medium (5 acts)", "long (7-8 acts)"],
                         {"default": "medium (5 acts)"},
                     ),
-                    "style_variant": (
+                    "style": (
                         ["tense claustrophobic", "space opera epic"],
                         {"default": "tense claustrophobic"},
                     ),
@@ -125,7 +125,7 @@ def _widgets_values():
     """Widget values in correct widget-display order (no slot for project_state)."""
     return [
         "The Last Frequency",     # 0  episode_title
-        "hard_sci_fi",            # 1  genre_flavor
+        "hard_sci_fi",            # 1  style
         700,                      # 2  target_words
         4,                        # 3  num_characters
         "mistralai/Mistral-Nemo-Instruct-2407",  # 4  model_id
@@ -135,7 +135,7 @@ def _widgets_values():
         True,                     # 8  self_critique
         True,                     # 9  open_close
         "medium (5 acts)",        # 10 target_length
-        "tense claustrophobic",   # 11 style_variant
+        "tense claustrophobic",   # 11 style
         "balanced",               # 12 creativity
         True,                     # 13 arc_enhancer
         "Standard",               # 14 optimization_profile
@@ -215,7 +215,7 @@ class TestMapperSocketOnlyFilter:
         )
         assert inputs.get("optimization_profile") == "Standard"
         assert inputs.get("creativity") == "balanced"
-        assert inputs.get("style_variant") == "tense claustrophobic"
+        assert inputs.get("style") == "tense claustrophobic"
         assert inputs.get("target_length") == "medium (5 acts)"
 
     def test_all_widget_values_land_in_correct_slots(self):
@@ -226,7 +226,12 @@ class TestMapperSocketOnlyFilter:
 
         inputs = prompt["1"]["inputs"]
         assert inputs["episode_title"] == "The Last Frequency"
-        assert inputs["genre_flavor"] == "hard_sci_fi"
+        # 2026-04-30: genre_flavor + style_variant consolidated to a
+        # single `style` dropdown.  After consolidation, style maps to
+        # the post-genre_flavor slot in the workflow JSON, which the
+        # _workflow fixture in this test populates with the tonal
+        # preset string.
+        assert inputs["style"] == "tense claustrophobic"
         assert inputs["target_words"] == 700
         assert inputs["num_characters"] == 4
         assert inputs["creativity"] == "balanced"

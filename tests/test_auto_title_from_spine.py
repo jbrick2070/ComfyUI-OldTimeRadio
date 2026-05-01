@@ -46,8 +46,7 @@ def test_clean_title_passes_through():
                return_value="The Greenhouse Gambit"):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="hard-sci-fi procedural",
+            style="hard-sci-fi procedural",
             news_block=SAMPLE_NEWS,
             model_id="mistralai/Mistral-Nemo-Instruct-2407",
             temperature=0.7,
@@ -60,8 +59,7 @@ def test_strip_title_prefix_and_quotes():
                return_value='**Title:** "Pulse"'):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="noir mystery",
+            style="noir mystery",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -74,8 +72,7 @@ def test_smart_quotes_stripped():
                return_value="“Agri-Crash”"):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="hard-sci-fi procedural",
+            style="hard-sci-fi procedural",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -89,8 +86,7 @@ def test_only_first_line_taken_explanation_dropped():
                return_value=raw):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="hard-sci-fi procedural",
+            style="hard-sci-fi procedural",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -104,8 +100,7 @@ def test_stuck_default_rejected():
                    return_value=stuck):
             out = _writer()._generate_title_from_spine(
                 winning_outline=SAMPLE_SPINE,
-                genre_flavor="cyberpunk",
-                style_variant="noir mystery",
+                style="noir mystery",
                 news_block="",
                 model_id="m",
                 temperature=0.7,
@@ -122,8 +117,7 @@ def test_overlong_sentence_rejected():
                return_value=full_sentence):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="hard-sci-fi procedural",
+            style="hard-sci-fi procedural",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -136,8 +130,7 @@ def test_empty_outline_returns_empty_no_llm_call():
     with patch("nodes.story_orchestrator._generate_with_llm") as mock_gen:
         out = _writer()._generate_title_from_spine(
             winning_outline="",
-            genre_flavor="cyberpunk",
-            style_variant="noir mystery",
+            style="noir mystery",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -155,8 +148,7 @@ def test_llm_exception_swallowed_returns_empty():
                side_effect=_boom):
         out = _writer()._generate_title_from_spine(
             winning_outline=SAMPLE_SPINE,
-            genre_flavor="cyberpunk",
-            style_variant="noir mystery",
+            style="noir mystery",
             news_block="",
             model_id="m",
             temperature=0.7,
@@ -170,8 +162,7 @@ def test_2_to_5_word_titles_pass():
                    return_value=cand):
             out = _writer()._generate_title_from_spine(
                 winning_outline=SAMPLE_SPINE,
-                genre_flavor="cyberpunk",
-                style_variant="hard-sci-fi procedural",
+                style="hard-sci-fi procedural",
                 news_block="",
                 model_id="m",
                 temperature=0.7,

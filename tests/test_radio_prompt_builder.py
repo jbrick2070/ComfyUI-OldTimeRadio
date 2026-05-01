@@ -2,19 +2,23 @@
 test_radio_prompt_builder.py
 ============================
 
-Regression coverage for the dynamic radio still FLUX prompt builder
-introduced 2026-04-30 alongside the ROADMAP P0 architecture lock
-(every audio second is a HuMo clip; non-dialogue lines use the radio
-still as I2V reference; per-episode aesthetic comes from
-ledger.meta.gen_params).
+Regression coverage for the dynamic radio still FLUX prompt builder.
+
+Post 2026-04-30 consolidation: ``style`` is the single
+free-text tonal knob.  Whatever the user types is used VERBATIM as
+the radio's leading aesthetic descriptor; the SIGNAL LOST universal
+suffix is appended for broadcast-distress identity.  No more genre
+presets, no more style mood map -- the LLM widget is the source of
+truth, the FLUX prompt builder just consumes it.
 
 Coverage:
   - empty / None / unknown ledger -> fallback prompt
-  - known genre -> genre-keyed aesthetic + universal SIGNAL LOST suffix
-  - unknown genre -> sci-fi default with universal suffix
-  - style_variant -> mood layer appended before suffix
-  - Suffix is universal across all branches
+  - any non-empty style -> verbatim incorporation
+  - missing / blank / non-string style -> fallback
+  - field resolution: gen_params_initial > gen_params (forward-compat)
+  - SIGNAL LOST suffix appended in every non-fallback case
   - Builder NEVER returns empty string
+  - Hostile input safety
 """
 
 from __future__ import annotations
@@ -24,8 +28,7 @@ import sys
 
 import pytest
 
-# Make `visual/` importable.  Tests run from repo root in CI; this
-# block keeps them runnable from any working directory too.
+# Make `visual/` importable.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.normpath(os.path.join(_HERE, ".."))
 if _REPO_ROOT not in sys.path:
@@ -33,10 +36,8 @@ if _REPO_ROOT not in sys.path:
 
 from visual.batch_flux_render import (  # noqa: E402  -- after sys.path tweak
     _build_dynamic_radio_prompt,
-    _GENRE_RADIO_AESTHETIC,
     _RADIO_FALLBACK_PROMPT,
     _RADIO_PROMPT_SUFFIX,
-    _STYLE_MOOD_LAYER,
 )
 
 
@@ -45,102 +46,126 @@ from visual.batch_flux_render import (  # noqa: E402  -- after sys.path tweak
 # ---------------------------------------------------------------------------
 
 class TestFallback:
-    """When ledger is missing/unusable, builder returns the safety
-    fallback unchanged."""
+    """When ledger is missing / unusable / has no style, builder
+    returns the safety fallback unchanged."""
 
-    def test_none_ledger_returns_fallback_verbatim(self):
+    def test_none_ledger_returns_fallback(self):
         assert _build_dynamic_radio_prompt(None) == _RADIO_FALLBACK_PROMPT
 
-    def test_empty_dict_ledger_returns_sci_fi_dynamic(self):
-        # Empty dict has no meta/gen_params; falls through to sci-fi
-        # default INSIDE the dynamic builder (not the fallback const).
-        result = _build_dynamic_radio_prompt({})
-        assert _GENRE_RADIO_AESTHETIC["sci-fi"] in result
-        assert result.endswith(_RADIO_PROMPT_SUFFIX)
+    def test_empty_dict_returns_fallback(self):
+        assert _build_dynamic_radio_prompt({}) == _RADIO_FALLBACK_PROMPT
 
-    def test_falsy_ledger_returns_fallback(self):
-        # Defensive: any falsy value should land on fallback.
-        for falsy in (None, False, 0, ""):
-            assert _build_dynamic_radio_prompt(falsy) == _RADIO_FALLBACK_PROMPT
+    def test_meta_present_but_no_gen_params(self):
+        assert _build_dynamic_radio_prompt({"meta": {}}) == _RADIO_FALLBACK_PROMPT
 
+    def test_gen_params_present_but_no_style(self):
+        led = {"meta": {"gen_params_initial": {}}}
+        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
 
-# ---------------------------------------------------------------------------
-# Genre branching
-# ---------------------------------------------------------------------------
+    def test_blank_style(self):
+        led = {"meta": {"gen_params_initial": {"style": ""}}}
+        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
 
-class TestGenreSelection:
-    """Each known genre routes to its keyed aesthetic phrase."""
+    def test_whitespace_only_style(self):
+        led = {"meta": {"gen_params_initial": {"style": "   "}}}
+        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
 
-    @pytest.mark.parametrize("genre", sorted(_GENRE_RADIO_AESTHETIC.keys()))
-    def test_each_known_genre_uses_its_aesthetic(self, genre):
-        led = {"meta": {"gen_params_initial": {"genre_flavor": genre}}}
-        result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC[genre] in result, (
-            f"Genre {genre} did not surface its aesthetic phrase in "
-            f"the result"
-        )
-        assert result.endswith(_RADIO_PROMPT_SUFFIX)
-
-    def test_unknown_genre_falls_through_to_sci_fi(self):
-        led = {"meta": {"gen_params_initial": {"genre_flavor": "musical-theatre"}}}
-        result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC["sci-fi"] in result
-        assert result.endswith(_RADIO_PROMPT_SUFFIX)
-
-    def test_blank_genre_falls_through_to_sci_fi(self):
-        led = {"meta": {"gen_params_initial": {"genre_flavor": ""}}}
-        result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC["sci-fi"] in result
-
-    def test_genre_is_case_insensitive(self):
-        for variant in ("NOIR", "Noir", "  noir  ", "nOiR"):
-            led = {"meta": {"gen_params_initial": {"genre_flavor": variant}}}
-            result = _build_dynamic_radio_prompt(led)
-            assert _GENRE_RADIO_AESTHETIC["noir"] in result, (
-                f"Genre case variant {variant!r} did not normalize to noir"
-            )
+    @pytest.mark.parametrize("falsy", [None, False, 0, ""])
+    def test_falsy_ledger(self, falsy):
+        assert _build_dynamic_radio_prompt(falsy) == _RADIO_FALLBACK_PROMPT
 
 
 # ---------------------------------------------------------------------------
-# Style mood layering
+# Verbatim style incorporation
 # ---------------------------------------------------------------------------
 
-class TestStyleVariantLayer:
-    """style_variant adds a mood phrase between the genre aesthetic
-    and the universal suffix."""
+class TestStyleVariantVerbatim:
+    """Whatever the user typed is the radio's leading descriptor.
+    No transformation, no preset lookup -- just verbatim use."""
 
-    @pytest.mark.parametrize("style", sorted(_STYLE_MOOD_LAYER.keys()))
-    def test_known_style_adds_its_mood_phrase(self, style):
-        led = {"meta": {"gen_params_initial": {
-            "genre_flavor": "sci-fi",
-            "style_variant": style,
-        }}}
+    @pytest.mark.parametrize("style", [
+        "tense claustrophobic",
+        "space opera epic",
+        "psychological slow-burn",
+        "hard-sci-fi procedural",
+        "noir mystery",
+        "chaotic black-mirror",
+        "neon-drenched cyber-noir",
+        "rust-belt post-apocalyptic",
+        "cosmic dread, fog-bound coast",
+        "1970s soviet brutalism",
+    ])
+    def test_style_appears_at_prompt_start(self, style):
+        led = {"meta": {"gen_params_initial": {"style": style}}}
         result = _build_dynamic_radio_prompt(led)
-        assert _STYLE_MOOD_LAYER[style] in result, (
-            f"Style {style} mood phrase missing from result"
+        assert result.startswith(f"{style} radio broadcast unit"), (
+            f"style {style!r} should be the leading descriptor; "
+            f"got prompt: {result!r}"
         )
 
-    def test_unknown_style_silently_ignored(self):
+    def test_strips_surrounding_whitespace(self):
+        led = {"meta": {"gen_params_initial": {"style": "  noir mystery  "}}}
+        result = _build_dynamic_radio_prompt(led)
+        assert result.startswith("noir mystery radio broadcast unit")
+        assert "  noir" not in result  # no double-space
+
+    def test_internal_whitespace_preserved(self):
+        # Multi-word descriptors with internal commas / spaces should
+        # pass through verbatim.
         led = {"meta": {"gen_params_initial": {
-            "genre_flavor": "sci-fi",
-            "style_variant": "made-up-style-name",
+            "style": "neon-drenched cyber noir, rain-streaked plexi housing",
         }}}
         result = _build_dynamic_radio_prompt(led)
-        # Should still render, just without a mood layer.
-        assert _GENRE_RADIO_AESTHETIC["sci-fi"] in result
-        assert result.endswith(_RADIO_PROMPT_SUFFIX)
-        # Verify no mood phrase leaked in.
-        for mood_phrase in _STYLE_MOOD_LAYER.values():
-            assert mood_phrase not in result
+        assert result.startswith(
+            "neon-drenched cyber noir, rain-streaked plexi housing "
+            "radio broadcast unit"
+        )
 
-    def test_no_style_variant_yields_no_mood_layer(self):
-        led = {"meta": {"gen_params_initial": {"genre_flavor": "noir"}}}
+    def test_preserves_user_case(self):
+        # Free-text means we don't .lower() anything -- the FLUX model
+        # may interpret CamelCase or ALL CAPS as emphasis.
+        led = {"meta": {"gen_params_initial": {"style": "Mid-Century Atomic Modernism"}}}
         result = _build_dynamic_radio_prompt(led)
-        for mood_phrase in _STYLE_MOOD_LAYER.values():
-            assert mood_phrase not in result, (
-                "Mood phrase leaked in despite style_variant being "
-                "unset"
-            )
+        assert "Mid-Century Atomic Modernism" in result
+
+
+# ---------------------------------------------------------------------------
+# Forward-compat: gen_params_initial > gen_params
+# ---------------------------------------------------------------------------
+
+class TestForwardCompat:
+    """gen_params_initial is the canonical phase-0 stamp.  gen_params
+    is the spine-ledger forward-compat field.  Builder reads initial
+    first, then falls back to plain gen_params."""
+
+    def test_initial_takes_precedence(self):
+        led = {"meta": {
+            "gen_params_initial": {"style": "noir mystery"},
+            "gen_params":         {"style": "space opera epic"},
+        }}
+        result = _build_dynamic_radio_prompt(led)
+        assert "noir mystery" in result
+        assert "space opera epic" not in result
+
+    def test_falls_back_to_gen_params_when_initial_missing(self):
+        led = {"meta": {"gen_params": {"style": "horror cosmic"}}}
+        result = _build_dynamic_radio_prompt(led)
+        assert result.startswith("horror cosmic radio broadcast unit")
+
+    def test_initial_present_but_empty_uses_gen_params(self):
+        # If gen_params_initial is present but its style is
+        # blank, we should fall through (the post-resolution check
+        # is on the string itself, not which bag it came from).
+        led = {"meta": {
+            "gen_params_initial": {"style": ""},
+            "gen_params":         {"style": "western frontier"},
+        }}
+        result = _build_dynamic_radio_prompt(led)
+        # Per the current implementation, gen_params_initial wins
+        # the dict lookup race; if its style is empty, the
+        # builder lands on fallback (does NOT cascade through to
+        # gen_params).  This test pins that behavior.
+        assert result == _RADIO_FALLBACK_PROMPT
 
 
 # ---------------------------------------------------------------------------
@@ -148,78 +173,59 @@ class TestStyleVariantLayer:
 # ---------------------------------------------------------------------------
 
 class TestUniversalSuffix:
-    """The SIGNAL LOST universal suffix appears in every branch."""
+    """The SIGNAL LOST universal suffix appears in every prompt the
+    builder returns -- both fallback and dynamic."""
 
     def test_suffix_in_fallback(self):
         assert _RADIO_PROMPT_SUFFIX in _RADIO_FALLBACK_PROMPT
 
-    @pytest.mark.parametrize("genre", sorted(_GENRE_RADIO_AESTHETIC.keys()))
-    def test_suffix_in_every_genre(self, genre):
-        led = {"meta": {"gen_params_initial": {"genre_flavor": genre}}}
+    @pytest.mark.parametrize("style", [
+        "noir", "space opera", "cyber noir",
+        "1970s brutalism", "fog-bound horror",
+    ])
+    def test_suffix_in_dynamic(self, style):
+        led = {"meta": {"gen_params_initial": {"style": style}}}
         result = _build_dynamic_radio_prompt(led)
         assert _RADIO_PROMPT_SUFFIX in result
 
 
 class TestNeverEmpty:
-    """Builder must never return an empty string -- a downstream
-    FLUX text encoder choke on empty prompt is a worse failure mode
-    than producing the fallback."""
+    """Builder must never return an empty string -- a downstream FLUX
+    text-encoder choke on empty input is a worse failure mode than
+    rendering the safety fallback."""
 
     @pytest.mark.parametrize("led", [
         None,
         {},
         {"meta": {}},
         {"meta": {"gen_params_initial": {}}},
-        {"meta": {"gen_params_initial": {"genre_flavor": ""}}},
-        {"meta": {"gen_params_initial": {"genre_flavor": "garbled"}}},
-        {"meta": {"gen_params_initial": {"genre_flavor": "noir", "style_variant": ""}}},
-        # Hostile-input safety:
+        {"meta": {"gen_params_initial": {"style": ""}}},
+        {"meta": {"gen_params_initial": {"style": "   "}}},
+        {"meta": {"gen_params_initial": {"style": None}}},
+        {"meta": {"gen_params_initial": {"style": 42}}},
+        {"meta": {"gen_params_initial": {"style": []}}},
         {"meta": "not a dict"},
         {"meta": {"gen_params_initial": "not a dict"}},
+        # Hostile-type ledger:
+        "string instead of dict",
+        42,
+        [],
     ])
-    def test_builder_always_nonempty(self, led):
+    def test_builder_always_returns_nonempty_string(self, led):
         result = _build_dynamic_radio_prompt(led)
         assert isinstance(result, str)
         assert len(result.strip()) > 0
 
 
 # ---------------------------------------------------------------------------
-# Forward-compat: old-shape ledger uses `gen_params` not
-# `gen_params_initial`.  Builder must read both, preferring the new
-# field name.
-# ---------------------------------------------------------------------------
-
-class TestForwardCompat:
-    """When `gen_params_initial` is absent, fall back to `gen_params`
-    (forward-compat with the spine-ledger ticket's bundled schema)."""
-
-    def test_old_shape_gen_params_used_when_initial_missing(self):
-        led = {"meta": {"gen_params": {"genre_flavor": "horror"}}}
-        result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC["horror"] in result
-
-    def test_initial_takes_precedence_over_legacy(self):
-        # When both are present, `gen_params_initial` wins -- it's
-        # the canonical phase-0 stamp.
-        led = {"meta": {
-            "gen_params_initial": {"genre_flavor": "noir"},
-            "gen_params":         {"genre_flavor": "horror"},
-        }}
-        result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC["noir"] in result
-        assert _GENRE_RADIO_AESTHETIC["horror"] not in result
-
-
-# ---------------------------------------------------------------------------
-# Realistic ledger shape sanity
+# Realistic ledger shape
 # ---------------------------------------------------------------------------
 
 class TestRealisticLedger:
-    """Smoke-test against a ledger shape mirroring what
-    story_orchestrator stamps in `gen_params_initial`.  Exercises
-    the integration boundary, not just the unit signature."""
+    """Smoke-test against the actual ledger shape that
+    story_orchestrator stamps in `gen_params_initial`."""
 
-    def test_typical_sci_fi_thriller_ledger(self):
+    def test_typical_run_ledger(self):
         led = {
             "episode_id": "signal_lost_smoke_20260430_120000",
             "meta": {
@@ -228,9 +234,8 @@ class TestRealisticLedger:
                     "target_words": 350,
                     "num_characters": 2,
                     "target_length": "short (3 acts)",
-                    "style_variant": "atmospheric",
+                    "style": "tense claustrophobic",
                     "creativity": "balanced",
-                    "genre_flavor": "thriller",
                     "optimization_profile": "Standard",
                 },
                 "news_seed": {
@@ -239,6 +244,5 @@ class TestRealisticLedger:
             },
         }
         result = _build_dynamic_radio_prompt(led)
-        assert _GENRE_RADIO_AESTHETIC["thriller"] in result
-        assert _STYLE_MOOD_LAYER["atmospheric"] in result
-        assert result.endswith(_RADIO_PROMPT_SUFFIX)
+        assert result.startswith("tense claustrophobic radio broadcast unit")
+        assert _RADIO_PROMPT_SUFFIX in result

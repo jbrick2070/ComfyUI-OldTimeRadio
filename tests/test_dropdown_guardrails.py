@@ -83,9 +83,14 @@ _INPUT_TYPES = LLMScriptWriter.INPUT_TYPES()
 _REQUIRED = _INPUT_TYPES["required"]
 _OPTIONAL = _INPUT_TYPES["optional"]
 
-GENRE_FLAVORS = _REQUIRED["genre_flavor"][0]
 TARGET_LENGTHS = _OPTIONAL["target_length"][0]
-STYLE_VARIANTS = _OPTIONAL["style_variant"][0]
+STYLE_VARIANTS = _OPTIONAL["style"][0]
+# 2026-04-30: genre_flavor + style_variant consolidated into a single
+# `style` dropdown.  Keep GENRE_FLAVORS as an alias of STYLE_VARIANTS
+# so tests that historically iterated genre flavors still iterate the
+# tonal preset list -- the LOGIC (varying the tone produces distinct
+# fingerprints) is unchanged.
+GENRE_FLAVORS = STYLE_VARIANTS
 CREATIVITY_OPTIONS = _OPTIONAL["creativity"][0]
 OPT_PROFILES = _OPTIONAL["optimization_profile"][0]
 
@@ -111,7 +116,6 @@ def _run_preflight(writer, **overrides):
 
     defaults = {
         "episode_title": "Test Episode",
-        "genre_flavor": "hard_sci_fi",
         "target_words": 1120,
         "num_characters": 4,
         "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
@@ -121,7 +125,8 @@ def _run_preflight(writer, **overrides):
         "self_critique": True,
         "open_close": True,
         "target_length": "medium (5 acts)",
-        "style_variant": "tense claustrophobic",
+        "style": "tense claustrophobic",
+        "style_custom": "",
         "creativity": "balanced",
         "arc_enhancer": True,
         "project_state": None,
@@ -182,8 +187,8 @@ class TestAllDropdownsAccepted:
     """Every single dropdown value must run through pre-flight without error."""
 
     @pytest.mark.parametrize("genre", GENRE_FLAVORS)
-    def test_genre_flavor_accepted(self, writer, genre):
-        logs = _run_preflight(writer, genre_flavor=genre)
+    def test_style_accepted(self, writer, genre):
+        logs = _run_preflight(writer, style=genre)
         assert any("ScriptWriter:" in l for l in logs)
 
     @pytest.mark.parametrize("tl", TARGET_LENGTHS)
@@ -192,8 +197,8 @@ class TestAllDropdownsAccepted:
         assert any("ScriptWriter:" in l for l in logs)
 
     @pytest.mark.parametrize("sv", STYLE_VARIANTS)
-    def test_style_variant_accepted(self, writer, sv):
-        logs = _run_preflight(writer, style_variant=sv)
+    def test_style_accepted(self, writer, sv):
+        logs = _run_preflight(writer, style=sv)
         assert any("ScriptWriter:" in l for l in logs)
 
     @pytest.mark.parametrize("cr", CREATIVITY_OPTIONS)
@@ -226,11 +231,11 @@ class TestDropdownsHaveEffect:
         assert len(seen_temps) == len(CREATIVITY_OPTIONS), \
             f"Expected {len(CREATIVITY_OPTIONS)} distinct temps, got {seen_temps}"
 
-    def test_style_variants_logged_distinctly(self, writer):
+    def test_styles_logged_distinctly(self, writer):
         """Each style variant appears in the PARAMS log line."""
         seen_styles = set()
         for sv in STYLE_VARIANTS:
-            logs = _run_preflight(writer, style_variant=sv)
+            logs = _run_preflight(writer, style=sv)
             for l in logs:
                 m = re.search(r"length=.+ style=(.+?) creativity=", l)
                 if m:
@@ -239,11 +244,11 @@ class TestDropdownsHaveEffect:
         assert len(seen_styles) == len(STYLE_VARIANTS), \
             f"Expected {len(STYLE_VARIANTS)} distinct styles, got {seen_styles}"
 
-    def test_genre_flavors_logged_distinctly(self, writer):
+    def test_styles_logged_distinctly(self, writer):
         """Each genre appears in the FINGERPRINT log (affects episode seed)."""
         seen_fingerprints = set()
         for genre in GENRE_FLAVORS:
-            logs = _run_preflight(writer, genre_flavor=genre)
+            logs = _run_preflight(writer, style=genre)
             for l in logs:
                 m = re.search(r"FINGERPRINT (\w+)", l)
                 if m:

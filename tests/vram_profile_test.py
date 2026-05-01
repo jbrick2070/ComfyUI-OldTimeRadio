@@ -144,7 +144,7 @@ def _run_gemma4_script_writer() -> None:
     from nodes.story_orchestrator import LLMScriptWriter
     res = _run_node(LLMScriptWriter,
                     episode_title="The Last Frequency",
-                    genre_flavor="hard_sci_fi",
+                    style="hard_sci_fi",
                     target_words=350,
                     num_characters=2,
                     model_id="google/gemma-4-E4B-it",

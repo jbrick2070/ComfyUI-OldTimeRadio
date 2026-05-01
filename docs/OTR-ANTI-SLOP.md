@@ -24,7 +24,7 @@ ledger gaps loud instead of silent.
 |-----------------------|------|-----------------------|--------------------------------------------------------|
 | `{target_words}`      | int  | ledger                | Word target for the script                             |
 | `{num_characters}`    | int  | ledger                | Named speaking parts, excluding NARRATOR               |
-| `{genre_flavor}`      | str  | ledger                | hard sci fi / space opera / dystopian / pulp horror    |
+| `{style}`      | str  | ledger                | hard sci fi / space opera / dystopian / pulp horror    |
 | `{target_length}`     | enum | ledger (normalized)   | smoke (1 act) / short (3 acts) / medium (5 acts)       |
 | `{creativity}`        | enum | ledger                | low / medium / maximum chaos                           |
 | `{period}`            | str  | ledger or article     | Year. Article override takes precedence over ledger    |
@@ -64,7 +64,7 @@ American, BBC Received, Australian ABC, NZ broadcast). Reference
 inspirations: *Suspense*, *X Minus One*, *Dick Barton — Special Agent*,
 ABC radio plays, NZBS drama.
 
-Genre: **{genre_flavor}**. Episode budget: **{target_words} words across
+Genre: **{style}**. Episode budget: **{target_words} words across
 {scene_count} scene(s)**, roughly **{scene_word_budget} words per scene**.
 Cast: **{num_characters} named speaking parts** plus optional NARRATOR.
 

@@ -76,11 +76,11 @@ CREATIVITIES = ["safe & tight", "balanced", "wild & rough", "maximum chaos"]
 OPT_PROFILES = ["Pro (Ultra Quality)", "Standard"]
 # NOTE: "Obsidian (UNSTABLE/4GB)" excluded -- not valid on 16 GB hardware
 
-# Node 1 (OTR_Gemma4ScriptWriter) widgets_values index map:
-#   [0] episode_title       [1] genre_flavor       [2] target_words
+# Node 1 (OTR_LLMScriptWriter) widgets_values index map:
+#   [0] episode_title       [1] style       [2] target_words
 #   [3] num_characters      [4] model_id           [5] custom_premise
 #   [6] include_act_breaks  [7] self_critique       [8] open_close
-#   [9] target_length       [10] style_variant      [11] creativity
+#   [9] target_length       [10] style      [11] creativity
 #   [12] arc_enhancer       [13] optimization_profile
 WV_GENRE = 1
 WV_TARGET_WORDS = 2
@@ -971,7 +971,7 @@ def performance_review(config, title, dialogue, vram, has_treatment, duration,
 # Primitive types that ComfyUI renders as widgets in the web UI.
 # Anything else (PROJECT_STATE, MODEL, CLIP, AUDIO, IMAGE, LATENT, CONDITIONING,
 # VAE, etc.) is socket-only and MUST NOT consume a widgets_values slot.
-_WIDGET_PRIMITIVE_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "BOOL"}
+_WIDGET_PRIMITIVE_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "BOOL", "COMBO"}
 
 
 def _is_widget_backed(spec):
@@ -1167,7 +1167,7 @@ def run_iteration(run_num):
             append_to_log(f"\n> WATCHER_NOTE (run {run_num:03d}): {note_clean}\n")
 
         for node in workflow.get("nodes", []):
-            if node.get("id") == 1 and node.get("type") == "OTR_Gemma4ScriptWriter":
+            if node.get("id") == 1 and node.get("type") == "OTR_LLMScriptWriter":
                 wv = node["widgets_values"]
                 wv[WV_GENRE] = config["genre"]
                 wv[WV_TARGET_WORDS] = config["words"]
@@ -1231,7 +1231,7 @@ def run_iteration(run_num):
                     f"optimization_profile={_li.get('optimization_profile')!r} "
                     f"project_state={_li.get('project_state')!r} "
                     f"creativity={_li.get('creativity')!r} "
-                    f"style_variant={_li.get('style_variant')!r} "
+                    f"style={_li.get('style')!r} "
                     f"target_length={_li.get('target_length')!r}"
                 )
 

@@ -47,7 +47,7 @@ frames for a whole episode" thin slice:
   end frame = S*K+1 prompts total
 * Pre-composes each prompt as:
       portrait_prompt + ", " + scene.visual_prompt + ", "
-      + era_tail[genre_flavor] + ", " + style_tail
+      + era_tail[style] + ", " + style_tail
 * Each prompt carries a ``shot_id`` so downstream save can name
   output files meaningfully when that's wired in
 
@@ -81,7 +81,7 @@ _DEFAULT_STYLE_TAIL = (
     "subtle film grain, volumetric lighting"
 )
 
-# Era-appropriate tails keyed by OTR's genre_flavor dropdown options.
+# Era-appropriate tails keyed by OTR's style dropdown options.
 # Fed into every composed prompt so FLUX dresses characters for the
 # right era without requiring per-scene costume prose.
 _ERA_TAIL_BY_GENRE: dict[str, str] = {
@@ -95,7 +95,7 @@ _ERA_TAIL_BY_GENRE: dict[str, str] = {
     "post_apocalyptic":  "post-apocalyptic scavenger chic, worn gear, sun-bleached",
 }
 
-# Fallback era tail used when genre_flavor is empty, unknown, or
+# Fallback era tail used when style is empty, unknown, or
 # when the caller explicitly passes an override.
 _DEFAULT_ERA_TAIL = "timeless cinematic aesthetic"
 
@@ -145,11 +145,11 @@ def slugify(name: str, max_len: int = 40) -> str:
     return slug[:max_len]
 
 
-def resolve_era_tail(genre_flavor: str) -> str:
-    """Return the era tail for a given genre_flavor, or the default."""
-    if not genre_flavor:
+def resolve_era_tail(style: str) -> str:
+    """Return the era tail for a given style, or the default."""
+    if not style:
         return _DEFAULT_ERA_TAIL
-    key = genre_flavor.strip().lower().replace(" ", "_").replace("-", "_")
+    key = style.strip().lower().replace(" ", "_").replace("-", "_")
     return _ERA_TAIL_BY_GENRE.get(key, _DEFAULT_ERA_TAIL)
 
 
@@ -373,7 +373,7 @@ def build_shot_plan(
     focus_character: str,
     *,
     shots_per_scene: int = 3,
-    genre_flavor: str = "",
+    style: str = "",
     style_tail: str = "",
     include_final_end_frame: bool = True,
 ) -> dict:
@@ -398,7 +398,7 @@ def build_shot_plan(
           "shots_per_scene": 3,
           "scenes_covered": 5,
           "total_prompts": 16,
-          "genre_flavor": "hard_sci_fi",
+          "style": "hard_sci_fi",
           "era_tail": "near-future industrial sci-fi, clean lines, utilitarian",
           "style_tail": "cinematic, 35mm film look, ..."
         }
@@ -429,7 +429,7 @@ def build_shot_plan(
         director = {}
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
-    era_tail = resolve_era_tail(genre_flavor)
+    era_tail = resolve_era_tail(style)
 
     # Multi-character compose: concatenate portraits for every character
     # in visual_plan.characters (the whole cast). Single-character mode
@@ -612,7 +612,7 @@ def build_shot_plan(
         "total_shots": len(shots),
         "total_segments": total_segments,
         "total_prompts": len(tokens),
-        "genre_flavor": genre_flavor,
+        "style": style,
         "era_tail": era_tail,
         "style_tail": resolved_style_tail,
     }
@@ -659,7 +659,7 @@ class OTRVideoPlan:
                     "INT",
                     {"default": 3, "min": 1, "max": 40, "step": 1},
                 ),
-                "genre_flavor": (
+                "style": (
                     genre_choices,
                     {"default": "hard_sci_fi"},
                 ),
@@ -709,7 +709,7 @@ class OTRVideoPlan:
         director_json: str,
         focus_character: str,
         shots_per_scene: int,
-        genre_flavor: str,
+        style: str,
         style_tail: str = "",
         include_final_end_frame: bool = True,
         audio_gate: str = "",
@@ -719,8 +719,8 @@ class OTRVideoPlan:
         # pipeline completes. Never read or log the value.
         _ = audio_gate
 
-        if genre_flavor == "(none)":
-            genre_flavor = ""
+        if style == "(none)":
+            style = ""
 
         # Treat the "(all)" sentinel as unset so downstream helpers
         # switch into multi-character mode.
@@ -747,7 +747,7 @@ class OTRVideoPlan:
             director_json=director_json,
             focus_character=resolved_focus,
             shots_per_scene=shots_per_scene,
-            genre_flavor=genre_flavor,
+            style=style,
             style_tail=style_tail,
             include_final_end_frame=include_final_end_frame,
         )
@@ -764,7 +764,7 @@ class OTRVideoPlan:
 
         summary_lines = [
             cast_line,
-            f"genre flavor:    {pass3['genre_flavor'] or '(none)'}",
+            f"genre flavor:    {pass3['style'] or '(none)'}",
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
             f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"

@@ -30,7 +30,7 @@ Why advisory-by-default:
 
 Wiring:
 
-  - INPUT: script (STRING, e.g. from LLMScriptWriter), genre_flavor.
+  - INPUT: script (STRING, e.g. from LLMScriptWriter), style.
   - OUTPUT: script (STRING, passthrough), critic_report (STRING,
     markdown), verdict (STRING: PASS/REVISE/REJECT).
   - SIDE-EFFECT: ledger.script_gates[] entry, plus optional
@@ -94,7 +94,7 @@ _SCENE_COUNT_BY_LENGTH = {
 _REQUIRED_PARAM_KEYS = (
     "target_words",
     "num_characters",
-    "genre_flavor",
+    "style",
     "target_length",
 )
 
@@ -216,8 +216,8 @@ def _coerce_params(raw: Optional[dict]) -> dict:
                 p["scene_word_budget"] = max(1, p["target_words"] // scene_count)
 
     # Friendly form for free-text fields (do not invent values).
-    if isinstance(p.get("genre_flavor"), str):
-        p["genre_flavor"] = p["genre_flavor"].replace("_", " ")
+    if isinstance(p.get("style"), str):
+        p["style"] = p["style"].replace("_", " ")
     if isinstance(p.get("creativity"), str):
         p["creativity"] = p["creativity"].lower()
 
@@ -305,7 +305,7 @@ def _load_anti_slop_rubric(params: Optional[dict] = None) -> str:
 
 def _build_critic_prompt(
     script_text: str,
-    genre_flavor: str,
+    style: str,
     anti_slop: str,
 ) -> str:
     """Build the rejection-rubric prompt for the critic LLM.
@@ -321,7 +321,7 @@ def _build_critic_prompt(
     is held low at the call site (0.1) so the verdict is stable across
     re-runs of the same script.
     """
-    genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+    genre_human = (style or "sci-fi").replace("_", " ")
     rubric_block = anti_slop.strip() if anti_slop.strip() else (
         "GENERAL RUBRIC (built-in fallback - prefer OTR-ANTI-SLOP.md):\n"
         "- Every scene opens with a sound cue instead of dialogue.\n"
@@ -526,7 +526,7 @@ def _stamp_ledger_gate(
 def _build_revision_prompt(
     script: str,
     issues: list[str],
-    genre_flavor: str,
+    style: str,
 ) -> str:
     """Build the prompt that asks the LLM to rewrite the script in
     light of the critic's findings.
@@ -535,7 +535,7 @@ def _build_revision_prompt(
     grammar / approximate word count. Only fix the items in `issues`.
     Output is the revised script verbatim, no commentary.
     """
-    genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+    genre_human = (style or "sci-fi").replace("_", " ")
     issues_block = "\n".join(f"- {ln}" for ln in issues[:20])
     return (
         f"You are revising a 1940s {genre_human} radio drama script. "
@@ -678,11 +678,11 @@ class LLMScriptCritic:
                         "without auto-rewriting."
                     ),
                 }),
-                # genre_flavor, critic_model_id, optimization_profile
+                # style, critic_model_id, optimization_profile
                 # are NOT widgets here. All three inherit from the
                 # ledger's gen_params_initial (which LLMScriptWriter
                 # stamps at workflow entry):
-                #   - genre_flavor         <- gen_params_initial.genre_flavor
+                #   - style         <- gen_params_initial.style
                 #   - critic_model_id      <- gen_params_initial.cleanup_model_id
                 #     (or model_id as fallback). The cleanup model is the
                 #     LLMScriptWriter's "second LLM" widget so wiring the
@@ -742,7 +742,7 @@ class LLMScriptCritic:
         # gen_params_initial. The writer stamps these at workflow entry
         # (BUG-72), so they're the ground truth for what the user
         # selected on the LLMScriptWriter widgets. We do NOT expose
-        # critic_model_id or genre_flavor as critic-node widgets -- one
+        # critic_model_id or style as critic-node widgets -- one
         # place to configure them keeps the UI clean and prevents drift.
         rubric_params: dict = {}
         inherited_genre = "hard sci fi"
@@ -753,8 +753,8 @@ class LLMScriptCritic:
             from .production_ledger import get_ledger
             led_data = get_ledger().data
             rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
-            if rubric_params.get("genre_flavor"):
-                inherited_genre = str(rubric_params["genre_flavor"])
+            if rubric_params.get("style"):
+                inherited_genre = str(rubric_params["style"])
             # Critic uses the writer's CLEANUP model when available so
             # the same widget that controls the writer's structural
             # cleanup pass also controls the critic. If the user wants
@@ -782,7 +782,7 @@ class LLMScriptCritic:
             )
 
         critic_model_id = inherited_model
-        genre_flavor = inherited_genre
+        style = inherited_genre
         optimization_profile = inherited_profile
 
         if not script.strip():
@@ -799,11 +799,11 @@ class LLMScriptCritic:
 
         log.info(
             "[ScriptCritic] inherited from %s: model=%s genre=%s profile=%s",
-            inherited_source, critic_model_id, genre_flavor, optimization_profile,
+            inherited_source, critic_model_id, style, optimization_profile,
         )
 
         anti_slop = _load_anti_slop_rubric(rubric_params)
-        prompt = _build_critic_prompt(script, genre_flavor, anti_slop)
+        prompt = _build_critic_prompt(script, style, anti_slop)
 
         log.info(
             "[ScriptCritic] running critic model=%s len=%d timeout=%ds",
@@ -933,7 +933,7 @@ class LLMScriptCritic:
             )
             try:
                 rev_prompt = _build_revision_prompt(
-                    script, issues, genre_flavor,
+                    script, issues, style,
                 )
 
                 def _do_revision_call():

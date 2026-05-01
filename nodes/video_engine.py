@@ -668,7 +668,7 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     
     return {
         "title":      episode_title,
-        "genre":      plan.get("genre_flavor", plan.get("genre", "sci-fi")),
+        "genre":      plan.get("style", plan.get("genre", "sci-fi")),
         "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
         "duration_s": duration_s,
         "resolution": f"{W}x{H}",
@@ -999,7 +999,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
                 else:
                     voices[str(k)] = str(v)
 
-        genre  = plan.get("genre_flavor", plan.get("genre", "sci-fi radio drama"))
+        genre  = plan.get("style", plan.get("genre", "sci-fi radio drama"))
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64

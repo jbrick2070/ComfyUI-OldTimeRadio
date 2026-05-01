@@ -324,7 +324,7 @@ def test_build_shot_plan_basic_counts():
         director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     # 2 scenes * 3 shots + 1 final end = 7
     assert plan["total_prompts"] == 7
@@ -341,7 +341,7 @@ def test_build_shot_plan_tokens_are_env_shaped():
         director_json,
         focus_character="BABA",
         shots_per_scene=2,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     for tok in plan["tokens"]:
         assert tok["type"] == "environment"
@@ -357,7 +357,7 @@ def test_build_shot_plan_compose_includes_portrait_and_scene():
         director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     first = plan["tokens"][0]
     desc = first["description"]
@@ -435,7 +435,7 @@ def test_build_shot_plan_unknown_genre_uses_default_era():
     director_json = json.dumps(_sample_director())
     plan = build_shot_plan(
         director_json, "BABA", shots_per_scene=1,
-        genre_flavor="gothic_romance",  # not in dict
+        style="gothic_romance",  # not in dict
     )
     assert "timeless" in plan["era_tail"].lower()
 
@@ -532,7 +532,7 @@ def test_input_types_schema():
     assert "director_json" in schema["required"]
     assert "focus_character" in schema["required"]
     assert "shots_per_scene" in schema["required"]
-    assert "genre_flavor" in schema["required"]
+    assert "style" in schema["required"]
     assert schema["required"]["director_json"][0] == "STRING"
     assert schema["required"]["shots_per_scene"][0] == "INT"
 
@@ -570,7 +570,7 @@ def test_plan_method_end_to_end():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     pass3 = json.loads(pass3_json)
     assert pass3["total_prompts"] == pass3_count
@@ -601,10 +601,10 @@ def test_plan_method_handles_none_genre():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        genre_flavor="(none)",
+        style="(none)",
     )
     payload = json.loads(pass3_json)
-    assert payload["genre_flavor"] == ""
+    assert payload["style"] == ""
 
 
 def test_plan_method_empty_scenes_still_returns_envelope():
@@ -618,7 +618,7 @@ def test_plan_method_empty_scenes_still_returns_envelope():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     assert count == 0
     payload = json.loads(pass3_json)
@@ -692,7 +692,7 @@ def test_pass3_multi_char_includes_all_portraits():
     # Empty focus_character => include all chars
     plan = build_shot_plan(
         director_json, focus_character="",
-        shots_per_scene=1, genre_flavor="hard_sci_fi",
+        shots_per_scene=1, style="hard_sci_fi",
     )
     first_desc = plan["tokens"][0]["description"]
     # Both character portraits should appear
@@ -705,7 +705,7 @@ def test_pass3_single_char_mode_only_focus_character():
     director_json = json.dumps(_multi_char_director())
     plan = build_shot_plan(
         director_json, focus_character="LEMMY",
-        shots_per_scene=1, genre_flavor="hard_sci_fi",
+        shots_per_scene=1, style="hard_sci_fi",
     )
     first_desc = plan["tokens"][0]["description"]
     # Only LEMMY's portrait in compose, not KENJI's
@@ -722,7 +722,7 @@ def test_plan_method_multi_char_default():
         director_json=director_json,
         focus_character="(all)",
         shots_per_scene=1,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 2
@@ -741,14 +741,14 @@ def test_plan_method_accepts_audio_gate_and_ignores_value():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     # With audio_gate wired (arbitrary string value)
     out_b = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
         audio_gate="C:/path/to/final_episode.mp4",
     )
     # Parse the JSON envelopes and compare — audio_gate should not affect output
@@ -777,7 +777,7 @@ def test_plan_method_single_char_when_focus_set():
         director_json=director_json,
         focus_character="LEMMY",
         shots_per_scene=1,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 1
@@ -794,7 +794,7 @@ def test_plan_output_consumable_by_batch_flux_render_parser():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=2,
-        genre_flavor="hard_sci_fi",
+        style="hard_sci_fi",
     )
     # Every pass output must match BatchFluxRender contract:
     # dict with "tokens" list where each token has type="environment"

@@ -47,7 +47,7 @@ _DEFAULT_STYLE_SUFFIX = (
 # lip-syncing -- the radio is the performer, not a static prop.
 #
 # Prompt is built DYNAMICALLY per episode from story context
-# (ledger.meta.gen_params.genre_flavor + style_variant) so the
+# (ledger.meta.gen_params.style + style) so the
 # radio's aesthetic matches the episode's tone.  See
 # `_build_dynamic_radio_prompt()` below.  This constant is the
 # safety fallback used only when ledger context is unavailable.
@@ -61,77 +61,9 @@ _RADIO_FALLBACK_PROMPT = (
 )
 
 
-# Genre -> radio aesthetic.  Each value is the leading description;
-# the SIGNAL LOST universal suffix gets appended in
-# `_build_dynamic_radio_prompt`.  Add new entries as new
-# genre_flavor values appear in `gen_params`.
-_GENRE_RADIO_AESTHETIC = {
-    "sci-fi": (
-        "sci-fi retrofuturistic radio broadcast unit, glowing CRT "
-        "frequency display, copper vacuum tubes haloed in plasma, "
-        "brushed steel chassis with art-deco engraving, dim amber "
-        "and cyan rim lighting"
-    ),
-    "noir": (
-        "art-deco bakelite radio cabinet, smoked amber dial glass, "
-        "brass fittings, deep tungsten shadows, curling cigarette "
-        "smoke atmosphere"
-    ),
-    "horror": (
-        "weathered wooden radio cabinet, cracked dial face, dim "
-        "flickering vacuum tubes, oppressive shadow, mold-stained "
-        "fabric grille"
-    ),
-    "post-apocalyptic": (
-        "battered military-surplus radio, exposed wiring, scorched "
-        "chassis, cracked screen, makeshift wire antenna"
-    ),
-    "cosmic-horror": (
-        "alien-geometry radio cabinet, impossible angles, eldritch "
-        "dial markings, sickly green glow, shifting chrome "
-        "reflections"
-    ),
-    "western": (
-        "rustic wooden ranch radio, tarnished brass dial, oil-lamp "
-        "glow, weathered leather strap, dust-haze atmosphere"
-    ),
-    "thriller": (
-        "minimalist mid-century radio chassis, cold-blue display "
-        "readout, sharp tungsten downlight, austere shadow lines"
-    ),
-    "cyberpunk": (
-        "neon-drenched broadcast deck, holographic frequency "
-        "overlay, exposed circuit ribs, magenta and teal glow, "
-        "rain-streaked plexi housing"
-    ),
-    "fantasy": (
-        "ornate brass-and-mahogany radio, etched runic dial, "
-        "candle-warm glow, velvet-draped backdrop"
-    ),
-    "comedy": (
-        "cheery red-and-cream radio cabinet, polished chrome dial, "
-        "warm domestic lighting, crisp clear focus"
-    ),
-}
-
-
-# Style_variant -> mood adjectives.  Optional layer added when
-# `gen_params.style_variant` is set.
-_STYLE_MOOD_LAYER = {
-    "atmospheric": "heavy dust-mote atmosphere, slow shutter ghosting",
-    "kinetic": "high-contrast strobe-edge, motion-blur dial",
-    "minimalist": "clean negative space, single-source lighting",
-    "baroque": "ornate filigree details, layered reflections, "
-               "lush vignette",
-    "documentary": "naturalistic light, archival film grain",
-    "dreamlike": "soft halation bloom, gauzy edges, faded color",
-    "gritty": "harsh practical light, deep grain, micro-scratches",
-}
-
-
 # SIGNAL LOST universal suffix.  Appended to every radio prompt
-# regardless of genre/style so all radios share the broadcast-
-# distress identity.
+# regardless of the user's tonal direction so all radios share
+# the broadcast-distress identity.
 _RADIO_PROMPT_SUFFIX = (
     "35mm film grain, broadcast-distressed cinematic aesthetic, "
     "sharp focus, centered composition, 1080p"
@@ -141,27 +73,29 @@ _RADIO_PROMPT_SUFFIX = (
 def _build_dynamic_radio_prompt(led):
     """Build a radio still FLUX prompt from story context.
 
-    Reads from the ledger that ``story_orchestrator`` stamps at
-    phase 0 (early ledger init, before any audio renders).  Field
-    resolution order:
-      1. ``ledger.meta.gen_params_initial``  (current, stamped at
-         write_script entry per BUG-LOCAL-097 line 4240)
-      2. ``ledger.meta.gen_params``          (forward-compat for
-         the spine-ledger ticket's bundled metadata schema)
+    Post 2026-04-30 consolidation: ``style`` is the single
+    free-text tonal/genre knob.  Whatever the user types in the
+    Story Writer's style widget is used VERBATIM as the
+    radio's leading aesthetic descriptor; the SIGNAL LOST universal
+    suffix is appended to anchor broadcast-distress identity.
 
-    Within whichever bag wins, pulls:
-      - ``genre_flavor``  -> base radio aesthetic (era, materials,
-                             lighting)
-      - ``style_variant`` -> optional mood layer
+    Field resolution order on the ledger (handles both the canonical
+    phase-0 stamp and the spine-ledger forward-compat schema):
+      1. ``ledger.meta.gen_params_initial.style``
+      2. ``ledger.meta.gen_params.style``
 
-    Returns a finished prompt string with the SIGNAL LOST universal
-    suffix appended.  Falls back to ``_RADIO_FALLBACK_PROMPT`` if
-    ``led`` is None.  Unknown / blank genres default to ``sci-fi``
-    so the radio is always visible -- a black FLUX render would be
-    a worse failure than a generic-aesthetic radio.
+    Falls back to ``_RADIO_FALLBACK_PROMPT`` only when ``led`` is
+    None or no style string can be extracted.  Hostile-input
+    safe: any wrong type lands on the safe default.
 
-    Hostile-input safe: any string that should be a dict, or any
-    bag that's missing keys, lands on safe defaults.
+    Examples (style text -> built prompt):
+      "noir mystery"
+        -> "noir mystery radio broadcast unit, 35mm film grain, ..."
+      "neon-drenched cyber-noir, rain-streaked plexi housing"
+        -> "neon-drenched cyber-noir, rain-streaked plexi housing
+            radio broadcast unit, 35mm film grain, ..."
+      "rust-belt post-apocalyptic"
+        -> "rust-belt post-apocalyptic radio broadcast unit, ..."
     """
     if not led:
         return _RADIO_FALLBACK_PROMPT
@@ -173,19 +107,11 @@ def _build_dynamic_radio_prompt(led):
         gp = meta.get("gen_params")
     if not isinstance(gp, dict):
         gp = {}
-    genre = (gp.get("genre_flavor") or "").strip().lower() if isinstance(gp.get("genre_flavor"), str) else ""
-    style = (gp.get("style_variant") or "").strip().lower() if isinstance(gp.get("style_variant"), str) else ""
-    base = _GENRE_RADIO_AESTHETIC.get(genre)
-    if base is None:
-        # Unknown / blank genre -- fall through to sci-fi default
-        # rather than skipping; keeps the radio visible.
-        base = _GENRE_RADIO_AESTHETIC["sci-fi"]
-    parts = [base]
-    mood = _STYLE_MOOD_LAYER.get(style)
-    if mood:
-        parts.append(mood)
-    parts.append(_RADIO_PROMPT_SUFFIX)
-    return ", ".join(parts)
+    raw = gp.get("style")
+    style = raw.strip() if isinstance(raw, str) else ""
+    if not style:
+        return _RADIO_FALLBACK_PROMPT
+    return f"{style} radio broadcast unit, {_RADIO_PROMPT_SUFFIX}"
 
 
 def _lazy_nodes():
@@ -395,7 +321,7 @@ class BatchFluxRender:
                     "tooltip": (
                         "Radio still FLUX prompt. Default (empty) "
                         "builds dynamically from ledger.meta.gen_params "
-                        "(genre_flavor + style_variant) so each "
+                        "(style + style) so each "
                         "episode's radio matches its tone. Set this "
                         "field to a non-empty string to override the "
                         "dynamic builder with your verbatim prompt. "
@@ -532,7 +458,7 @@ class BatchFluxRender:
         #   widget == "DISABLED" (case-insensitive): skip rendering.
         #   widget non-empty otherwise: use as verbatim override.
         #   widget empty (default): build dynamically from ledger
-        #       context (genre_flavor + style_variant).
+        #       context (style + style).
         #
         # The radio still is consumed by BatchHumoRender as the I2V
         # reference for all non-dialogue HuMo clips (announcer,
@@ -589,7 +515,7 @@ class BatchFluxRender:
 
         ``prompt_text``:
           - Empty string  -> build dynamically from ledger context
-                             (genre_flavor + style_variant); falls
+                             (style + style); falls
                              back to ``_RADIO_FALLBACK_PROMPT`` if
                              ledger is unavailable.
           - Non-empty     -> use verbatim as override.
@@ -643,10 +569,10 @@ class BatchFluxRender:
             prompt_source = "override"
         else:
             resolved_prompt = _build_dynamic_radio_prompt(led)
-            # Diagnose which branch the dynamic builder took.  Mirror
-            # the field-resolution order in `_build_dynamic_radio_prompt`
-            # so the diagnostic line matches what the builder actually
-            # used.
+            # Diagnose which branch the dynamic builder took.  Post
+            # 2026-04-30 consolidation: free-text style is
+            # the single tonal knob; either we have it (dynamic) or
+            # we don't (fallback).  No genre-vs-style split.
             if led is None:
                 prompt_source = "fallback (no ledger)"
             else:
@@ -654,14 +580,12 @@ class BatchFluxRender:
                 gp = meta.get("gen_params_initial") or meta.get("gen_params") or {}
                 if not isinstance(gp, dict):
                     gp = {}
-                raw_genre = gp.get("genre_flavor")
-                genre = (raw_genre or "").strip().lower() if isinstance(raw_genre, str) else ""
-                if genre and genre in _GENRE_RADIO_AESTHETIC:
-                    prompt_source = f"dynamic (genre={genre})"
-                elif genre:
-                    prompt_source = f"dynamic (unknown genre={genre} -> sci-fi default)"
+                raw_style = gp.get("style")
+                style = raw_style.strip() if isinstance(raw_style, str) else ""
+                if style:
+                    prompt_source = f"dynamic (style={style!r})"
                 else:
-                    prompt_source = "dynamic (no genre -> sci-fi default)"
+                    prompt_source = "fallback (no style)"
 
         log.info(
             "[BatchFluxRender] radio still prompt source=%s, len=%d, "

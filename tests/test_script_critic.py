@@ -237,7 +237,7 @@ class TestCoerceParams:
     def test_no_defaults_supplied(self, critic_module):
         # Empty input should NOT come back with defaults populated.
         out = critic_module._coerce_params(None)
-        for k in ("target_words", "num_characters", "target_length", "genre_flavor"):
+        for k in ("target_words", "num_characters", "target_length", "style"):
             assert k not in out, f"{k} should be absent from output"
 
     def test_passes_through_real_values(self, critic_module):
@@ -245,7 +245,7 @@ class TestCoerceParams:
             "target_words":   500,
             "num_characters": 2,
             "target_length":  "short",
-            "genre_flavor":   "hard sci fi",
+            "style":   "hard sci fi",
         })
         assert out["target_words"] == 500
         assert out["num_characters"] == 2
@@ -281,9 +281,9 @@ class TestCoerceParams:
         assert "target_words" not in out
         assert "num_characters" not in out
 
-    def test_genre_flavor_underscore_humanized(self, critic_module):
-        out = critic_module._coerce_params({"genre_flavor": "hard_sci_fi"})
-        assert out["genre_flavor"] == "hard sci fi"
+    def test_style_underscore_humanized(self, critic_module):
+        out = critic_module._coerce_params({"style": "hard_sci_fi"})
+        assert out["style"] == "hard sci fi"
 
 
 class TestFilterRubric:
@@ -336,7 +336,7 @@ class TestFilterRubric:
             "target_words": 100,
             "num_characters": 1,
             "target_length": "smoke",
-            "genre_flavor": "hard sci fi",
+            "style": "hard sci fi",
             "creativity": "medium",
             "period": "1947",
         })
@@ -359,7 +359,7 @@ class TestFilterRubric:
             "target_words": 1500,
             "num_characters": 3,
             "target_length": "medium",
-            "genre_flavor": "hard sci fi",
+            "style": "hard sci fi",
             "creativity": "medium",
             "period": "1947",
         })
@@ -378,16 +378,16 @@ class TestBuildCriticPrompt:
     def test_includes_script_and_genre(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="ANNOUNCER: Hello.",
-            genre_flavor="hard_sci_fi",
+            style="hard_sci_fi",
             anti_slop="",
         )
         assert "ANNOUNCER: Hello." in prompt
-        assert "hard sci fi" in prompt  # genre_flavor with underscore replaced
+        assert "hard sci fi" in prompt  # style with underscore replaced
 
     def test_uses_anti_slop_when_provided(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="x",
-            genre_flavor="space_opera",
+            style="space_opera",
             anti_slop="MY CUSTOM RUBRIC HERE",
         )
         assert "MY CUSTOM RUBRIC HERE" in prompt
@@ -397,7 +397,7 @@ class TestBuildCriticPrompt:
     def test_uses_builtin_when_anti_slop_blank(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="x",
-            genre_flavor="dystopian",
+            style="dystopian",
             anti_slop="",
         )
         assert "GENERAL RUBRIC" in prompt
@@ -536,14 +536,14 @@ class TestNodeStructure:
         assert "timeout_sec" in spec["optional"]
 
     def test_writer_settings_are_inherited_not_widgets(self, critic_module):
-        """genre_flavor, critic_model_id, and optimization_profile must
+        """style, critic_model_id, and optimization_profile must
         inherit from LLMScriptWriter via the ledger, not be duplicated
         as critic widgets. UI design constraint Jeffrey set: one place
         to configure each setting."""
         spec = critic_module.LLMScriptCritic.INPUT_TYPES()
         all_keys = list(spec.get("required", {}).keys()) + list(spec.get("optional", {}).keys())
-        assert "genre_flavor" not in all_keys, (
-            "genre_flavor must inherit from ledger.gen_params_initial"
+        assert "style" not in all_keys, (
+            "style must inherit from ledger.gen_params_initial"
         )
         assert "critic_model_id" not in all_keys, (
             "critic_model_id must inherit from "

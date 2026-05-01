@@ -1221,7 +1221,7 @@ def _load_news_history() -> set[str]:
         return set()
 
 
-def _record_news_usage(url: str, headline: str, genre_flavor: str = "") -> None:
+def _record_news_usage(url: str, headline: str, style: str = "") -> None:
     """Append (url, headline, genre, timestamp) to news_history.json.
 
     Cap at _NEWS_HISTORY_MAX_ENTRIES rolling. Older entries drop off so the
@@ -1240,7 +1240,7 @@ def _record_news_usage(url: str, headline: str, genre_flavor: str = "") -> None:
         data.append({
             "url":          str(url),
             "headline":     str(headline)[:240],
-            "genre_flavor": str(genre_flavor),
+            "style": str(style),
             "timestamp":    datetime.now().isoformat(timespec="seconds"),
         })
         if len(data) > _NEWS_HISTORY_MAX_ENTRIES:
@@ -1256,7 +1256,7 @@ def _record_news_usage(url: str, headline: str, genre_flavor: str = "") -> None:
 
 def _llm_rank_news_candidates(
     pool: list[dict],
-    genre_flavor: str,
+    style: str,
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
     top_k: int = 5,
@@ -1281,7 +1281,7 @@ def _llm_rank_news_candidates(
             f"{i + 1}. {(p.get('headline') or '').strip()[:160]}"
             for i, p in enumerate(candidates)
         )
-        genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+        genre_human = (style or "sci-fi").replace("_", " ")
         prompt = (
             f"You are picking news headlines for a {genre_human} radio "
             f"drama episode. From the numbered list below, choose the {top_k} "
@@ -1358,7 +1358,7 @@ def _llm_rank_news_candidates(
 
 def _llm_rerank_with_bodies(
     candidates_with_body: list[dict],
-    genre_flavor: str,
+    style: str,
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     optimization_profile: str = "Standard",
 ) -> list[dict]:
@@ -1390,7 +1390,7 @@ def _llm_rerank_with_bodies(
                 f"{i + 1}. HEADLINE: {headline}\n   ARTICLE: {body_preview}"
             )
         text = "\n\n".join(blocks)
-        genre_human = (genre_flavor or "sci-fi").replace("_", " ")
+        genre_human = (style or "sci-fi").replace("_", " ")
         prompt = (
             f"You are picking ONE news story to seed a {genre_human} radio "
             f"drama. You have already shortlisted {len(candidates_with_body)} "
@@ -1453,18 +1453,18 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
-def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
+def _fetch_science_news(max_feeds=10, style="hard_sci_fi",
                          model_id=None, optimization_profile="Standard"):
     """Fetch science stories from multiple RSS feeds in parallel.
 
     2026-04-29: now also (a) filters out previously-used URLs via
     config/news_history.json, (b) calls the LLM to rank remaining
-    candidates by narrative fit for the requested genre_flavor, and
+    candidates by narrative fit for the requested style, and
     (c) records the chosen article to history after selection.
 
     Original fast-path behaviour (shuffle + first-with-enough-body) is
     preserved when model_id is None or LLM ranking fails -- the dedup
-    still works regardless. Shipped behind genre_flavor + model_id so
+    still works regardless. Shipped behind style + model_id so
     legacy callers without those args fall back to the simple path.
 
     Uses ThreadPoolExecutor to hit all feeds simultaneously, dramatically
@@ -1577,7 +1577,7 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
     #    back runs no longer pick the same Orion Flywheel article).
     # 2) shuffle the remaining pool to break feed-order bias.
     # 3) optionally call the LLM to rank top 5 by narrative fit for the
-    #    requested genre_flavor. This step adds ~10-30s of LLM time but
+    #    requested style. This step adds ~10-30s of LLM time but
     #    the LLM is the same one NewsSummary will load anyway, so the
     #    NewsSummary phase that follows hits a cache HIT instead of
     #    paying the load cost twice.
@@ -1629,7 +1629,7 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
     if model_id and len(pool) > 5:
         ranked = _llm_rank_news_candidates(
             pool,
-            genre_flavor=genre_flavor,
+            style=style,
             model_id=model_id,
             optimization_profile=optimization_profile,
             top_k=5,
@@ -1720,7 +1720,7 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
         if model_id and len(rich) > 1:
             rich = _llm_rerank_with_bodies(
                 rich,
-                genre_flavor=genre_flavor,
+                style=style,
                 model_id=model_id,
                 optimization_profile=optimization_profile,
             )
@@ -1746,7 +1746,7 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
         _record_news_usage(
             url=chosen.get("link", ""),
             headline=chosen.get("headline", ""),
-            genre_flavor=genre_flavor,
+            style=style,
         )
     except Exception as _hist_exc:  # noqa: BLE001
         log.warning("[NewsFetcher] history record failed (non-fatal): %s",
@@ -1767,7 +1767,7 @@ def _fetch_science_news(max_feeds=10, genre_flavor="hard_sci_fi",
             "url":          str(chosen.get("link", "")),
             "date":         str(chosen.get("date", "")),
             "body_chars":   len(chosen.get("full_text", "") or ""),
-            "genre_flavor": str(genre_flavor),
+            "style": str(style),
             "selected_at":  datetime.now().isoformat(timespec="seconds"),
         }
         _led.save()
@@ -2615,7 +2615,7 @@ def _extract_title_from_script_text(text):
     return cand
 
 
-def _derive_title_from_script_lines(lines, genre_flavor=""):
+def _derive_title_from_script_lines(lines, style=""):
     """Deterministic fallback title when the LLM didn't emit one.
 
     Strategy: take the first 'environment' token's description, pick the
@@ -2647,7 +2647,7 @@ def _derive_title_from_script_lines(lines, genre_flavor=""):
         pass
     # Final fallback: timestamped derivative so each run is unique and
     # the filename layer never regresses to a stuck default.
-    genre = (genre_flavor or "transmission").replace("_", " ").title()
+    genre = (style or "transmission").replace("_", " ").title()
     return f"{genre} Transmission {int(time.time()) % 100000}"
 
 
@@ -3876,12 +3876,6 @@ class LLMScriptWriter:
                     "default": "",
                     "tooltip": "Episode title (leave blank for Gemma to generate one; see BUG-LOCAL-035)"
                 }),
-                "genre_flavor": (["hard_sci_fi", "space_opera", "dystopian",
-                                  "time_travel", "first_contact", "cosmic_horror",
-                                  "cyberpunk", "post_apocalyptic"], {
-                    "default": "hard_sci_fi",
-                    "tooltip": "Sub-genre flavor for the episode"
-                }),
                 "target_words": ("INT", {
                     "default": 700, "min": 100, "max": 10000, "step": 50,
                     "tooltip": "Target spoken dialogue words at ~140 wpm: 100=smoke test (~45s, ~6 lines), 200=quick (~85s), 350=2.5min, 700=5min, 1400=10min, 2100=15min, 3500=25min. Step-down works directly via this widget. For one-click smoke (100 words + 1 act bundled), pick target_length='tiny (smoke, 1 act)' instead -- it forces target_words=100 internally regardless of this widget value."
@@ -4002,9 +3996,51 @@ class LLMScriptWriter:
                     "default": "medium (5 acts)",
                     "tooltip": "Act structure preset. Tiny=1 act smoke test (pair with target_words=100, num_characters=2 for fastest end-to-end pipeline validation, ~45 sec audio + ~6 HuMo clips). Short=3 acts, Medium=5, Long=7-8, Epic=10+. More acts spread your target_words across more scenes."
                 }),
-                "style_variant": (["tense claustrophobic", "space opera epic", "psychological slow-burn", "hard-sci-fi procedural", "noir mystery", "chaotic black-mirror"], {
+                "style": ([
+                    "tense claustrophobic",
+                    "space opera epic",
+                    "psychological slow-burn",
+                    "hard-sci-fi procedural",
+                    "noir mystery",
+                    "chaotic black-mirror",
+                    "cosmic dread",
+                    "dystopian unease",
+                    "post-apocalyptic decay",
+                    "cyberpunk neon-noir",
+                ], {
                     "default": "tense claustrophobic",
-                    "tooltip": "Tonal style directive injected into the prompt"
+                    "tooltip": (
+                        "Tonal direction PRESET. Pick a preset OR "
+                        "leave it on any preset and use style_custom "
+                        "below to override with your own free-text "
+                        "phrase (style_custom wins when non-empty).\n\n"
+                        "The chosen value is interpolated into ~12 "
+                        "LLM prompt templates (writer / spine "
+                        "evaluator / critic / reviser / arc-enhancer) "
+                        "AND used VERBATIM as the FLUX radio still's "
+                        "leading aesthetic descriptor (the radio HuMo "
+                        "I2V ref for non-dialogue lines).\n\n"
+                        "2026-04-30 consolidation: this widget "
+                        "replaced genre_flavor + style_variant, which "
+                        "were redundant."
+                    ),
+                }),
+                "style_custom": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "tooltip": (
+                        "OPTIONAL free-text override.  When non-empty, "
+                        "this string replaces the style preset above "
+                        "for ALL downstream use (LLM prompts AND FLUX "
+                        "radio prompt).  Leave empty to use the preset.\n\n"
+                        "Be evocative -- the FLUX radio still echoes "
+                        "your exact wording.  Example overrides:\n"
+                        "  rust-belt cyber-noir\n"
+                        "  cosmic dread, fog-bound coast\n"
+                        "  1970s soviet brutalism\n"
+                        "  neon-drenched broadcast cathedral\n"
+                        "Override beats preset for prompt richness."
+                    ),
                 }),
                 "creativity": (["safe & tight", "balanced", "wild & rough", "maximum chaos"], {
                     "default": "balanced",
@@ -4034,7 +4070,7 @@ class LLMScriptWriter:
         """Always re-execute: news changes daily (Section 12)."""
         return time.time()
 
-    def _generate_cast_names_via_llm(self, num_names, genre_flavor, story_context,
+    def _generate_cast_names_via_llm(self, num_names, style, story_context,
                                      model_id, episode_fingerprint,
                                      from_outline=False):
         """Generate character names that organically fit the story.
@@ -4055,7 +4091,7 @@ class LLMScriptWriter:
                      f"{num_names} names ({'from outline' if from_outline else 'from context'})")
 
         if from_outline:
-            names_prompt = f"""You are a script supervisor finalizing the cast for a {genre_flavor.replace('_', ' ')} audio drama.
+            names_prompt = f"""You are a script supervisor finalizing the cast for a {style.replace('_', ' ')} audio drama.
 
 Below is the WINNING STORY OUTLINE. It already contains character names chosen to fit the world and story.
 
@@ -4070,7 +4106,7 @@ OUTLINE:
 Output ONLY {num_names} line(s) in this exact format, nothing else:
 FIRSTNAME LASTNAME: their role or key trait in one short phrase"""
         else:
-            names_prompt = f"""You are a casting director for a {genre_flavor.replace('_', ' ')} audio drama.
+            names_prompt = f"""You are a casting director for a {style.replace('_', ' ')} audio drama.
 
 Generate exactly {num_names} character name(s) that sound crisp and memorable when spoken aloud.
 
@@ -4179,19 +4215,33 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         return profiles if len(profiles) >= num_names else None
 
-    def write_script(self, episode_title, genre_flavor,
+    def write_script(self, episode_title,
                      target_words, num_characters, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                      cleanup_model_id="auto (use story model)",
                      custom_premise="", news_headlines=3, temperature=0.8,
                      include_act_breaks=True, self_critique=True,
                      open_close=True,
                      target_length="medium (5 acts)",
-                     style_variant="tense claustrophobic",
+                     style="tense claustrophobic",
+                     style_custom="",
                      creativity="balanced",
                      arc_enhancer=True,
                      project_state=None,
                      optimization_profile="Standard"):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
+
+        # 2026-04-30 STYLE OVERRIDE: when style_custom is non-empty,
+        # it replaces the dropdown preset for ALL downstream use
+        # (LLM prompts, FLUX radio still, ledger gen_params).  Keeps
+        # the dropdown as a quick-pick UI and lets power users feed
+        # FLUX more evocative phrases like "rust-belt cyber-noir".
+        if isinstance(style_custom, str) and style_custom.strip():
+            _override_tone = style_custom.strip()
+            _runtime_log(
+                f"ScriptWriter: STYLE_OVERRIDE preset {style!r} replaced "
+                f"by style_custom={_override_tone!r}"
+            )
+            style = _override_tone
 
         target_words = int(target_words)
 
@@ -4243,9 +4293,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                     "target_words":         int(target_words),
                     "num_characters":       int(num_characters),
                     "target_length":        str(target_length),
-                    "style_variant":        str(style_variant),
+                    "style":        str(style),
                     "creativity":           str(creativity),
-                    "genre_flavor":         str(genre_flavor),
+                    "style":         str(style),
                     "optimization_profile": str(optimization_profile),
                     "arc_enhancer":         bool(arc_enhancer),
                     "include_act_breaks":   bool(include_act_breaks),
@@ -4370,7 +4420,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         _runtime_log(f"ScriptWriter: PARAMS open_close={open_close} self_critique={self_critique} "
                      f"custom_premise={'(set)' if custom_premise else '(empty)'} "
                      f"target_words={target_words} chars={num_characters} "
-                     f"length={target_length} style={style_variant} creativity={creativity} arc_enhancer={arc_enhancer}")
+                     f"length={target_length} style={style} creativity={creativity} arc_enhancer={arc_enhancer}")
 
         # ======================================================================
         # CREATIVITY DIAL - temperature/top_p mapping
@@ -4448,7 +4498,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
             f"{_extend_hint}{_format_hint}"
         )
-        style_instruction = f"Style: {style_variant.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
+        style_instruction = f"Style: {style.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
         # Bark health check moved to LLMDirector to prevent VRAM OOM during script generation.
         log.info(f"[LLMScriptWriter] Feature flags: open_close={open_close}, "
@@ -4527,9 +4577,9 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
 
         # -- 1d. Episode fingerprint for reproducibility --
         import hashlib
-        fingerprint_data = f"{episode_title}|{genre_flavor}|{target_words}|{num_characters}|{temperature}"
+        fingerprint_data = f"{episode_title}|{style}|{target_words}|{num_characters}|{temperature}"
         episode_fingerprint = hashlib.sha256(fingerprint_data.encode()).hexdigest()[:12]
-        _runtime_log(f"ScriptWriter: FINGERPRINT {episode_fingerprint} | {episode_title} | {genre_flavor}")
+        _runtime_log(f"ScriptWriter: FINGERPRINT {episode_fingerprint} | {episode_title} | {style}")
 
         # -- Deterministic seeding from episode fingerprint --
         # Same fingerprint - same torch RNG state - reproducible Gemma generation.
@@ -4561,13 +4611,13 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             news_block = f"CUSTOM PREMISE (provided by user):\n{custom_premise}"
         else:
             # -- 1e. RSS fetch with deterministic fallback --
-            # 2026-04-29: pass genre_flavor + model_id + profile so the
+            # 2026-04-29: pass style + model_id + profile so the
             # LLM-rank curator picks narratively-fit headlines for this
             # specific episode's genre. Also enables history dedup so
             # back-to-back runs don't get the same Orion Flywheel.
             try:
                 news = _fetch_science_news(
-                    genre_flavor=genre_flavor,
+                    style=style,
                     model_id=model_id,
                     optimization_profile=optimization_profile,
                 )
@@ -4786,7 +4836,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         )
 
         # -- PRE-ROLL DETERMINISTIC CAST ROSTER --
-        seed_str = f"{episode_title}_{target_words}_{style_variant}_{time.time()}"
+        seed_str = f"{episode_title}_{target_words}_{style}_{time.time()}"
         cast_rng = random.Random(seed_str)
         
         # `pre_rolled_cast` stays a list[str] for backward compat with every
@@ -4892,7 +4942,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      f"condition={open_close and not custom_premise}")
         if open_close and not custom_premise:
             winning_outline = self._open_close_expansion(
-                system, genre_flavor, news_block, num_characters,
+                system, style, news_block, num_characters,
                 target_words, lemmy_directive,
                 model_id, temperature, cast_roster_block=cast_roster_block
             )
@@ -4912,8 +4962,7 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             try:
                 _spine_title = self._generate_title_from_spine(
                     winning_outline=winning_outline,
-                    genre_flavor=genre_flavor,
-                    style_variant=style_variant,
+                    style=style,
                     news_block=news_block,
                     model_id=model_id,
                     temperature=temperature,
@@ -4950,7 +4999,7 @@ WINNING {oc_mode_label} (selected by evaluator from 3 competing concepts):
 {winning_outline}
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
-GENRE: {genre_flavor.replace("_", " ")}
+GENRE: {style.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
 TARGET LENGTH: ~{target_words} words
@@ -4984,7 +5033,7 @@ LENGTH DIRECTIVE: {length_instruction}
 STYLE DIRECTIVE: {style_instruction}
 
 EPISODE TITLE: {episode_title if episode_title else "(generate a unique, evocative title for THIS episode)"}
-GENRE: {genre_flavor.replace("_", " ")}
+GENRE: {style.replace("_", " ")}
 CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
 {cast_roster_block}
 TARGET LENGTH: ~{target_words} words
@@ -5024,7 +5073,7 @@ TITLE: <your chosen title>
             full_prompt = f"{system}\n\n{user_prompt}"
 
         log.info(f"[LLMScriptWriter] Generating {target_words}-word episode "
-                 f"'{episode_title}' ({genre_flavor}) using {model_id}")
+                 f"'{episode_title}' ({style}) using {model_id}")
         log.info(f"[LLMScriptWriter] News seed: {news[0]['headline']} | {news[0]['source']}")
 
         # For episodes > 5 min, generate act-by-act to avoid token truncation.
@@ -5062,7 +5111,7 @@ TITLE: <your chosen title>
         else:
             # Long episodes: chunked act-by-act generation
             script_text = self._generate_chunked(
-                system, episode_title, genre_flavor, num_characters,
+                system, episode_title, style, num_characters,
                 target_words, custom_premise, news_block,
                 include_act_breaks, model_id, temperature,
                 target_length=target_length,
@@ -5098,7 +5147,7 @@ TITLE: <your chosen title>
             # Short scripts: full critique + revision (safe - script fits in context)
             _runtime_log("ScriptWriter: >>> ENTERING critique_and_revise (full)")
             script_text = self._critique_and_revise(
-                script_text, genre_flavor, target_words, model_id, _structural_temp,
+                script_text, style, target_words, model_id, _structural_temp,
                 optimization_profile=optimization_profile
             )
             _runtime_log("ScriptWriter: <<< EXITED critique_and_revise")
@@ -5120,7 +5169,7 @@ TITLE: <your chosen title>
             _findings = getattr(self, '_last_critique_findings', '') or ''
             _act_sums = getattr(self, '_last_act_summaries', []) or []
             script_text = self._execute_arc_enhancer(
-                script_text, genre_flavor, episode_title, news_block, model_id, _structural_temp,
+                script_text, style, episode_title, news_block, model_id, _structural_temp,
                 optimization_profile=optimization_profile,
                 critique_findings=_findings,
                 act_summaries=_act_sums
@@ -5409,7 +5458,7 @@ TITLE: <your chosen title>
             # WORD_EXTEND is structured rescue -- use cleanup model.
             script_text = self._extend_script_dialogue(
                 script_text, _deficit, _target_words,
-                _effective_cleanup_id, genre_flavor, optimization_profile,
+                _effective_cleanup_id, style, optimization_profile,
                 fallback_cast=pre_rolled_cast
             )
             # Recount after extension (dual-format)
@@ -5507,7 +5556,7 @@ TITLE: <your chosen title>
                     break
             # ANNOUNCER bookend gen is structured -- use cleanup model.
             opening_text, closing_text = self._generate_announcer_bookends(
-                [], episode_title, genre_flavor,
+                [], episode_title, style,
                 _news_head, _char_names, _effective_cleanup_id,
                 optimization_profile,
             )
@@ -5714,7 +5763,7 @@ TITLE: <your chosen title>
                 _title_source = "llm"
             else:
                 _derived_title = _derive_title_from_script_lines(
-                    script_lines, genre_flavor
+                    script_lines, style
                 )
                 if _derived_title and _derived_title.lower() not in _STUCK_TITLE_DEFAULTS:
                     _resolved_title = _derived_title
@@ -5757,7 +5806,7 @@ TITLE: <your chosen title>
                 "timestamp": datetime.now().isoformat(),
                 "params": {
                     "episode_title": episode_title,
-                    "genre_flavor": genre_flavor,
+                    "style": style,
                     "target_words": target_words,
                     "num_characters": num_characters,
                     "open_close": open_close,
@@ -5891,7 +5940,7 @@ TITLE: <your chosen title>
     # OPEN-CLOSE EXPANSION - 3 competing outlines - evaluator picks winner
     # -------------------------------------------------------------------------
 
-    def _open_close_expansion(self, system, genre_flavor, news_block,
+    def _open_close_expansion(self, system, style, news_block,
                               num_characters, target_words,
                               lemmy_directive, model_id, temperature,
                               cast_roster_block="", optimization_profile="Standard"):
@@ -5909,7 +5958,7 @@ TITLE: <your chosen title>
         """
         try:
             return self._open_close_expansion_inner(
-                system, genre_flavor, news_block, num_characters,
+                system, style, news_block, num_characters,
                 target_words, lemmy_directive,
                 model_id, temperature,
                 cast_roster_block=cast_roster_block,
@@ -5920,7 +5969,7 @@ TITLE: <your chosen title>
             _runtime_log(f"OPENCLOSE: OPENCLOSE_FALLBACK - top-level error: {e}")
             return ""
 
-    def _open_close_expansion_inner(self, system, genre_flavor, news_block,
+    def _open_close_expansion_inner(self, system, style, news_block,
                                      num_characters, target_words,
                                      lemmy_directive, model_id, temperature,
                                      cast_roster_block="", optimization_profile="Standard"):
@@ -6014,7 +6063,7 @@ TITLE: <your chosen title>
         for i, (focus_name, focus_desc) in enumerate(outline_focuses):
             if is_pitch_mode:
                 # PITCH mode: lightweight 3-5 sentence logline per concept
-                concept_body = f"""Generate a distinct story PITCH for a {genre_flavor.replace("_", " ")} radio drama episode.
+                concept_body = f"""Generate a distinct story PITCH for a {style.replace("_", " ")} radio drama episode.
 
 PRIORITY: {focus_name}
 {focus_desc}
@@ -6035,7 +6084,7 @@ Begin your PITCH now:"""
                 # Each line maps to a foundational dramatic function:
                 # 1=Inciting Incident, 2=Protagonist Goal, 3=First Obstacle,
                 # 4=Midpoint Twist, 5=Climax Prep, 6=Climax, 7=Epilogue
-                concept_body = f"""Generate a 7-LINE STORY SPINE for a {genre_flavor.replace("_", " ")} radio drama.
+                concept_body = f"""Generate a 7-LINE STORY SPINE for a {style.replace("_", " ")} radio drama.
 
 PRIORITY: {focus_name}
 {focus_desc}
@@ -6126,7 +6175,7 @@ Write your 7-line spine now:"""
 
         eval_prompt = f"""You are a veteran radio drama showrunner selecting the best story concept for production.
 
-Below are {len(valid_outlines)} competing {mode_lower}s for a {genre_flavor.replace("_", " ")} episode.
+Below are {len(valid_outlines)} competing {mode_lower}s for a {style.replace("_", " ")} episode.
 
 Evaluate each on:
 1. HOOK STRENGTH: Would a listener stay past the first 30 seconds?
@@ -6203,8 +6252,8 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
     # actual spine instead of a user-typed placeholder. Added 2026-04-26.
     # -------------------------------------------------------------------------
 
-    def _generate_title_from_spine(self, *, winning_outline, genre_flavor,
-                                   style_variant, news_block,
+    def _generate_title_from_spine(self, *, winning_outline, style,
+                                   news_block,
                                    model_id, temperature,
                                    optimization_profile="Standard"):
         """Generate a 2-5 word evocative episode title from the winning spine.
@@ -6254,7 +6303,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
             "or modern podcast feed\n\n"
             "Output ONLY the title text on a single line. Nothing else."
         )
-        # genre_flavor / style_variant are still accepted as parameters for
+        # style / style are still accepted as parameters for
         # logging + future style-pinning, but no longer baked into the prompt.
 
         try:
@@ -6319,7 +6368,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
     # CHECKS & CRITIQUES - Draft -> Critique -> Revise
     # -------------------------------------------------------------------------
 
-    def _run_critique_only(self, draft_text, genre_flavor, target_words,
+    def _run_critique_only(self, draft_text, style, target_words,
                            model_id, temperature, optimization_profile="Standard"):
         """Critique-only pass for long scripts (>3 acts).
 
@@ -6343,7 +6392,7 @@ Label it "FINAL {mode_label}:" on its own line before the text."""
                 + draft_text[-4000:]
             )
 
-        critique_prompt = f"""You are a HARSH but constructive script editor for a {genre_flavor.replace("_", " ")} radio drama.
+        critique_prompt = f"""You are a HARSH but constructive script editor for a {style.replace("_", " ")} radio drama.
 
 Below is a multi-act draft script. Your job is to identify SPECIFIC weaknesses. Do NOT rewrite anything.
 
@@ -6433,7 +6482,7 @@ YOUR CRITIQUE (numbered list only):"""
 
         return character_counts
 
-    def _critique_and_revise(self, draft_text, genre_flavor, target_words,
+    def _critique_and_revise(self, draft_text, style, target_words,
                              model_id, temperature, optimization_profile="Standard",
                              min_line_count_per_character=2):
         """Three-pass refinement: the LLM critiques its own draft, then revises.
@@ -6468,7 +6517,7 @@ YOUR CRITIQUE (numbered list only):"""
             )
 
         # -- Pass 2: CRITIQUE --
-        critique_prompt = f"""You are a HARSH but constructive script editor for a {genre_flavor.replace("_", " ")} radio drama.
+        critique_prompt = f"""You are a HARSH but constructive script editor for a {style.replace("_", " ")} radio drama.
 
 Below is a draft script. Your job is to identify SPECIFIC weaknesses. Do NOT rewrite anything.
 
@@ -6535,7 +6584,7 @@ YOUR CRITIQUE (numbered list only):"""
         log.info("[Critique] Starting revision pass with %d-char critique...", len(critique_text))
         _runtime_log("CRITIQUE: Starting revision pass")
 
-        revision_prompt = f"""You are the original writer of this {genre_flavor.replace("_", " ")} radio drama script.
+        revision_prompt = f"""You are the original writer of this {style.replace("_", " ")} radio drama script.
 A tough editor has reviewed your draft and provided specific critique.
 
 YOUR TASK: Rewrite the COMPLETE script, implementing every critique point below.
@@ -8151,7 +8200,7 @@ SCRIPT SEGMENT TO VALIDATE:
         return reassembled
 
     def _extend_script_dialogue(self, script_text, deficit_words,
-                                 target_words, model_id, genre_flavor,
+                                 target_words, model_id, style,
                                  optimization_profile="Standard",
                                  fallback_cast=None):
         """LLM extension pass: add more dialogue to raw script text.
@@ -8205,7 +8254,7 @@ SCRIPT SEGMENT TO VALIDATE:
                 f"RAW SCRIPT SKELETON:\n{_raw_trimmed}"
             )
 
-        extend_prompt = f"""You are extending a {genre_flavor.replace("_", " ")} radio drama script.
+        extend_prompt = f"""You are extending a {style.replace("_", " ")} radio drama script.
 The current script has {len(existing_dialogue)} dialogue lines but needs approximately {new_lines_needed} MORE lines
 to reach the target of {target_words} words of spoken dialogue.
 
@@ -8366,7 +8415,7 @@ REFORMATTED:"""
             return None
 
     def _generate_announcer_bookends(self, script_lines, episode_title,
-                                     genre_flavor, news_headline, character_names,
+                                     style, news_headline, character_names,
                                      model_id, optimization_profile="Standard"):
         """LLM micro-pass: generate story-specific ANNOUNCER opening and closing.
 
@@ -8390,7 +8439,7 @@ REFORMATTED:"""
 Write exactly TWO lines - an OPENING and a CLOSING - for tonight's episode.
 
 EPISODE: {episode_title}
-GENRE: {genre_flavor}
+GENRE: {style}
 NEWS SEED: {news_headline[:300] if news_headline else 'science fiction'}
 CHARACTERS: {chars_list}
 STORY PREVIEW:
