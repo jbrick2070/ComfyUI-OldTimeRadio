@@ -542,32 +542,36 @@ def _render_master_mix_per_clip_mux_mode(
     )
 
     # 2. Pillarbox each HuMo clip to canvas dims and strip audio.
-    # 2026-04-30 round-robin hardening: freeze-extend the LAST clip
-    # by 500 ms so silent_combined ends after the master mix audio,
-    # so the mux step's `-shortest` truncates an inaudible video
-    # tail rather than the trailing audio.  Cumulative chunk-rounding
-    # error across many clips can otherwise leave silent_combined a
-    # few frames short, silently breaking C7 at episode end.
+    # 2026-04-30 round-robin hardening: freeze-extend the surviving
+    # LAST clip by 500 ms so silent_combined ends after the master
+    # mix audio, so the mux step's `-shortest` truncates an inaudible
+    # video tail rather than the trailing audio. Cumulative chunk-
+    # rounding error across many clips can otherwise leave
+    # silent_combined a few frames short, silently breaking C7 at
+    # episode end.
+    #
+    # BUG-LOCAL-128 fix (2026-05-01): the previous policy padded
+    # `idx == last_idx` where `last_idx = len(timeline) - 1` was
+    # computed BEFORE the loop. If that clip failed pillarbox, the
+    # surviving last clip got no tail pad and `-shortest` truncated
+    # trailing audio. New policy: don't pad in the loop; re-pillarbox
+    # the actual `pillarboxed[-1]` with tail pad after the loop. One
+    # extra ffmpeg call when everything succeeds, correct behaviour
+    # when the original last clip fails.
     _TAIL_PAD_S = 0.5
     seg_dir = out_mp4.parent / "_per_clip_mux_segments"
     seg_dir.mkdir(parents=True, exist_ok=True)
     pillarboxed: list[Path] = []
     pb_failures = 0
-    last_idx = len(timeline) - 1
-    for idx, entry in enumerate(timeline):
+    for entry in timeline:
         seg_out = seg_dir / f"pb_{entry['line_id']}.mp4"
-        # Tail pad only on the last successful clip (computed below
-        # if pb_failures pruned the original last) -- simpler: always
-        # request tail pad on the last index of the original timeline.
-        # If that one fails the user gets a louder fallback signal.
-        _tail = _TAIL_PAD_S if idx == last_idx else 0.0
         try:
             _pillarbox_humo_silent(
                 clip=entry["clip_path"],
                 canvas_w=canvas_w, canvas_h=canvas_h,
                 canvas_fps=canvas_fps, humo_target_h=humo_target_h,
                 out_path=seg_out, ffmpeg=ffmpeg,
-                extend_tail_s=_tail,
+                extend_tail_s=0.0,
             )
             pillarboxed.append(seg_out)
         except subprocess.CalledProcessError as exc:
@@ -591,6 +595,60 @@ def _render_master_mix_per_clip_mux_mode(
             f"per_clip_mux: WARNING {pb_failures} clip(s) lost during "
             f"pillarbox pass; proceeding with {len(pillarboxed)} survivors"
         )
+
+    # 2b. BUG-LOCAL-128 fix: re-pillarbox the ACTUAL surviving last
+    # clip with tail pad. Locate the timeline entry whose line_id
+    # matches `pillarboxed[-1].stem` (stripped of "pb_" prefix), then
+    # call _pillarbox_humo_silent again with extend_tail_s set. If
+    # the re-pad call itself fails, log loudly and continue without
+    # the pad -- the user gets a clear signal in the report and audio
+    # may be tail-truncated but everything else still ships.
+    surviving_last = pillarboxed[-1]
+    surviving_line_id = surviving_last.stem
+    if surviving_line_id.startswith("pb_"):
+        surviving_line_id = surviving_line_id[3:]
+    surviving_entry = next(
+        (e for e in timeline if e["line_id"] == surviving_line_id),
+        None,
+    )
+    if surviving_entry is None:
+        log.warning(
+            "[VideoComposite/per_clip_mux] could not locate timeline "
+            "entry for surviving last clip %s; skipping tail pad",
+            surviving_line_id,
+        )
+        report.append(
+            f"  tail-pad: SKIPPED (no timeline match for {surviving_line_id})"
+        )
+    else:
+        try:
+            _pillarbox_humo_silent(
+                clip=surviving_entry["clip_path"],
+                canvas_w=canvas_w, canvas_h=canvas_h,
+                canvas_fps=canvas_fps, humo_target_h=humo_target_h,
+                out_path=surviving_last, ffmpeg=ffmpeg,
+                extend_tail_s=_TAIL_PAD_S,
+            )
+            report.append(
+                f"  tail-pad: +{_TAIL_PAD_S:.3f}s on {surviving_line_id} "
+                f"(BUG-LOCAL-128 fix)"
+            )
+            log.info(
+                "[VideoComposite/per_clip_mux] tail-pad +%.3fs on actual "
+                "surviving last clip %s (BUG-LOCAL-128 fix)",
+                _TAIL_PAD_S, surviving_line_id,
+            )
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+            log.warning(
+                "[VideoComposite/per_clip_mux] tail-pad on %s FAILED; "
+                "trailing audio may be truncated by -shortest: %s",
+                surviving_line_id, stderr[:200],
+            )
+            report.append(
+                f"  tail-pad: FAILED on {surviving_line_id} "
+                f"({stderr[:120]}) -- audio may truncate"
+            )
 
     # 3. concat-demuxer the silent pillarboxed clips with -c copy.
     list_file = seg_dir / "concat.txt"

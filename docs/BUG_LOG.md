@@ -5,6 +5,92 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-129: ANNOUNCER lines render as character faces despite ledger stamping ref_source="radio-still (announcer)" — radio bookend PNG renders correctly, but HuMo dispatch ignores it
+
+- **Date:** 2026-05-01 ~14:45 (surfaced when Jeffrey opened the per-clip folder and saw zero radio imagery in any clip thumbnail) | **Phase:** 0 | **Bible candidate:** YES (ledger-vs-reality divergence; the diagnostic logs were "right" while the visual was wrong)
+- **Symptom:**
+  - `output/otr/stills/radio_bookend_signal_lost_nasa_artemis_ii_crew_rings_nasdaq_closin_20260501_110019.png` exists, 1.04 MB, modified 11:08:44 (BUG-127 fix landed correctly — FLUX did render a real broadcast-console image: vintage radio with oscilloscope, knobs, dim teal-and-orange interior, no faces).
+  - Ledger `clips[]` entries for l001 and l021 (both ANNOUNCER role) explicitly stamp `ref_source = "radio-still (announcer)"` and `ref_png_name = radio_bookend_<episode_id>.png`.
+  - Actual rendered `l001.mp4` and `l021.mp4` first frames (extracted via ffmpeg -vframes 1): two different blonde women in domestic interiors (l001 = neutral expression in beige room, l021 = smiling in warm-lit room with mustard blouse). Zero radio imagery, zero broadcast equipment. The clips look identical in style to character lines (l002-l020) which use cast stills `full_env_00176/177/178_.png`.
+  - File-size sanity: previous 4 episodes' radio_bookend pngs are all exactly 774,981 bytes (a stuck placeholder pre-BUG-127), today's is 1,041,373 bytes (genuinely re-rendered). So the FLUX side is healthy; the dispatch side is broken.
+- **Cause — CONFIRMED via stock node source read (`comfy_extras/nodes_wan.py:1044-1108`):** The OTR-side dispatch is correct. `batch_humo_render.py:1195-1199` correctly assigns `ref_png = radio_still_path` for ANNOUNCER lines, `_png_to_tensor` (line 375-385) correctly loads the radio PNG into `[1,H,W,C]` float32 [0,1], and `WanHuMoImageToVideo` is correctly called with `ref_image=entry["ref_image"]` at line 1476. The ledger stamps match what the planner intended.
+  **The mismatch is in what `ref_image` actually does inside HuMo.** Reading the upstream node body at `nodes_wan.py:1070-1108`:
+  ```python
+  if ref_image is not None:
+      ref_image = comfy.utils.common_upscale(ref_image[:1].movedim(-1,1), W, H, "bilinear", "center").movedim(1,-1)
+      ref_latent = vae.encode(ref_image[:, :, :, :3])
+      positive = node_helpers.conditioning_set_values(positive, {"reference_latents": [ref_latent]}, append=True)
+      negative = node_helpers.conditioning_set_values(negative, {"reference_latents": [torch.zeros_like(ref_latent)]}, append=True)
+  ...
+  latent = torch.zeros([batch_size, 16, latent_t, H//8, W//8], ...)  # <- starting latent is ZEROS
+  ```
+  `ref_image` is NOT a first-frame I2V conditioner. It is encoded into a soft "reference_latents" field appended to the positive conditioning. The actual generation starts from a **zero latent** and is denoised from random noise by KSampler. The reference is a soft attention hint that HuMo (fine-tuned on human faces with audio-driven lip-sync) uses for face-identity continuity — it is not a strict first-frame lock and not a generic image-to-video starter.
+  When the reference is a human portrait, HuMo's identity attention locks to that face → consistent character across the clip. When the reference is a radio (non-face), the identity attention has nothing to lock to → HuMo falls back to text-prompt-driven face generation. The positive prompt for ANNOUNCER lines is built by `_build_pos_prompt` (line 654-666):
+  ```python
+  speaker_desc = "A announcer character speaks calmly with subtle facial expressions"
+  return f"{speaker_desc}, dimly lit interior, ambient cinematic lighting, 35mm film grain, shallow depth of field"
+  ```
+  HuMo + that prompt + per-line seed `(seed + idx*1009) & 0x7FFFFFFFFFFFFFFF` → a different generic person each clip. l001 (idx=0) and l021 (idx=20) get different seeds, hence two different blonde women. The radio PNG is encoded and attached but contributes zero face identity, so the model defaults to generic-person generation.
+- **Architectural implication (most important takeaway):** `_otr_speaker_role.py:12-22` declares "announcer → radio still, music_* → radio still, sfx → radio still — the radio is the visual performer." That premise does not hold when HuMo is the renderer. **Important framing correction (per round-robin consult 2026-05-01, Gemini and NVIDIA):** the `reference_latents` injection at `nodes_wan.py:1077` is the standard generic Wan2.1 I2V conditioning path, not a HuMo-specific mechanism. What restricts the rendered output to face animation is the **HuMo finetuned weights**, not the conditioning code. A different Wan2.1 checkpoint loaded against the same node could in principle animate non-human references. HuMo specifically cannot, because that's how it was trained. Same end conclusion (radio still cannot be the per-line visual performer when HuMo is the renderer), but the cause is in the model weights, not in the I2V node's code.
+- **Related (do not conflate):**
+  - BUG-LOCAL-127 fixed the *generation* of the radio_bookend PNG (fast_batch path early-return). Verified working — file is on disk, correct content, correct size.
+  - BUG-LOCAL-128 (audio truncation) is independent — even if every clip's ref were correct, `-shortest` would still drop 70 s of audio.
+- **Fix candidates (all PENDING — design call required, round-robin recommended since it touches the audio path's visual performer):**
+  1. **Render an actual ANNOUNCER portrait (FLUX), feed THAT to HuMo, keep the radio still as bookend-only.** Add an ANNOUNCER cast member with a 1940s-radio-host description. `BatchFluxRender` already produces cast stills via `full_env_NNNNN_.png`; add the ANNOUNCER to the cast roster and `_otr_speaker_role.py` reroutes ANNOUNCER through the existing portrait chain. Radio still becomes a static interlude (rendered separately via FFmpeg as a still frame mp4) inserted at episode open/close, not a per-line HuMo target. Smallest code change. Aesthetic: a vintage radio announcer reading from a script (HuMo can do this perfectly).
+  2. **Use a different model for non-human animation.** Route ANNOUNCER/music_*/sfx lines to LTX-2.3 (the existing 10-12 s clip path under C4) or a static Ken-Burns pan rendered via FFmpeg over the radio still. HuMo strictly for character dialogue. Adds a second video pipeline; respects the original "radio is the performer" intent.
+  3. **Hybrid:** keep HuMo for ANNOUNCER but pre-render an ANNOUNCER-with-radio composite (a face IN FRONT OF the radio set) and use that as `ref_image`. HuMo locks to the face; the radio appears as background. One added FLUX call; minimal architecture churn.
+  **DECISION (2026-05-01, post round-robin):** **Option 1**, with refinements from the consult locked in. Round-robin transcripts at `docs/2026-05-01-humo-radio-architecture__*.md`. All three external models (gpt-5.4 / gemini-3-pro-preview / mistral-nemotron) independently converged on Option 1.
+  - Speaker-role rewrite: ANNOUNCER routes through existing portrait chain. `music_*` and `sfx` route to a new non-HuMo static-video path. Hard assertion: if `speaker_role in {music_open, music_close, music_inter, sfx}` and target renderer == HuMo, **fail fast**.
+  - ANNOUNCER becomes a real cast member with description "1940s radio drama host at vintage broadcast microphone, period suit, dim studio lighting." Existing `BatchFluxRender` produces the portrait. Verify FLUX render resolution matches HuMo workflow's width/height (NVIDIA's catch).
+  - Static video path: `ffmpeg -loop 1 -i radio_bookend.png -t <round(dur_s * 25) / 25.0> -r 25 -c:v libx264 -pix_fmt yuv420p -an out.mp4`. Strict 25fps to match HUMO_FPS (NVIDIA's catch — do NOT use 24fps, that creates concat-time mismatches).
+  - SFX disambiguation: SFX concurrent with dialogue stays on the speaking character's HuMo clip (no separate visual). Only standalone SFX gets a static-video clip. Mark via `is_concurrent_with_dialogue` on the ledger line.
+  - C7 muxing pattern (Gemini's catch — also fixes BUG-LOCAL-128): concat ALL clips with `-an` to a `silent_combined.mp4`, then single final mux `ffmpeg -i silent_combined.mp4 -i master_mix.wav -c:v copy -c:a copy -map 0:v:0 -map 1:a:0 out.mp4`. Add post-mux audio SHA-256 check against `master_mix.wav`. Container repacketization on per-clip-mux can perturb audio bytes even with `-c:a copy`; the single-final-mux pattern is what actually preserves byte-identity.
+- **Verify (after Option 1):** acceptance criteria from the synthesis doc, in order:
+  1. No HuMo render job ever receives the radio still (assertion in dispatch).
+  2. ANNOUNCER clips l001 and l021 in a regression episode resolve to the same announcer portrait — no generic-blonde drift.
+  3. `music_*` / standalone-`sfx` segments render through static-video path (ledger `clips[].source_kind == "static_ffmpeg"` vs `"humo"`).
+  4. Final mp4's extracted audio SHA-256 matches the v1.5 baseline `master_mix.wav` for the same episode_id.
+  5. Peak VRAM stays below 14.5 GB.
+  6. Final video duration ≈ master mix duration (no `-shortest` truncation — also resolves BUG-LOCAL-128).
+  7. `tests/test_dropdown_guardrails.py`, `tests/test_core.py`, and the Bug Bible regression all pass.
+- **Tags:** humo-architecture, ref_image-is-soft-reference-not-i2v-firstframe, identity-attention-needs-face, wall-to-wall-humo-incompatible-with-non-human-visual, _otr_speaker_role-premise-broken, fix-via-announcer-cast-entry, radio-still-becomes-bookend-only
+
+---
+
+### BUG-LOCAL-128: master_mix_per_clip_mux concat-and-shortest truncates ~70s of dialogue audio when sum(clip.dur_s) << ledger.total_episode_dur_s [tail-pad pointer FIXED in commit pending; dur_s gap still pending commits 2-3]
+
+- **Date:** 2026-05-01 ~14:35 (surfaced during read-only QA of episode `signal_lost_nasa_artemis_ii_crew_rings_nasdaq_closin_20260501_110019`, commit 620013e, audio_path_selected=`master_mix_per_clip_mux`, strict_c7=true) | **Phase:** 0 | **Bible candidate:** YES (textbook concat-demuxer + `-shortest` mismatch when per-event coverage is partial)
+- **Symptom:**
+  - Final video mp4 duration = **137.88 s** (size 41.86 MB, h264 1920x1080 @ 25fps, AAC 48 kHz mono)
+  - Audio-only mp4 (`output/otr/audio/<ep>.mp4`) duration = **247.05 s** with bookend; ledger.total_episode_dur_s = **207.39 s** without bookend
+  - sum(ledger.lines[].dur_s) over 21 dialogue lines = **184.99 s** (master_mix-space duration of audio events only)
+  - sum(ledger.clips[].dur_s) over 21 HuMo renders = **137.52 s** ≈ silent_combined.mp4 = **137.88 s**
+  - Net effect: roughly **70 s of master-mix audio is silently dropped from the final video** by `ffmpeg -shortest`, and the ~47 s gap between line totals and clip totals means each line's HuMo render covers only the leading fraction of that line's audio (e.g., line `l001`: line.dur_s=18.057 s, clip.dur_s=6.88 s — video animates 38% of the dialogue, then the next clip's animation cuts in while the previous line's audio is still mid-sentence).
+- **Cause (per `video_composite.py::_render_master_mix_per_clip_mux_mode`, ~lines 445-637):**
+  1. Builds clip timeline from `ledger.lines[]`, sorts by `start_s` (~535).
+  2. Concat-demuxers per-clip mp4s back-to-back (~595-610) — no gap-filling, no positioning by `start_s`, no padding of inter-line silences.
+  3. Muxes resulting `silent_combined.mp4` against full procgen master mix using `-shortest` (~627).
+  Step 2 produces video = sum(clip.dur_s); step 3 truncates audio to that. Three contiguity prerequisites are violated by this run:
+  - clip.dur_s < line.dur_s for every line (HuMo renders don't cover the full audio event)
+  - inter-line silences and music beds are not represented in `ledger.lines[]` (22.4 s of total_episode_dur_s missing)
+  - bookend audio (~40 s) is not represented in `ledger.lines[]` at all
+  Combined gap: 247.05 − 137.88 = **109.17 s of dialogue/music/bookend audio dropped** by `-shortest`.
+- **Why two prior round-robin claims were wrong:**
+  - "Cold-open trope rule killed the radio intro / A3→B1 critic verdict": rule at `story_orchestrator.py:3611` is real (radio tuning is on the cold-open ban list), but the cited file `script_critic_20260501_104916_google_gemma-4-E4B-it.md` is not in any conversation upload, and the A3/B1 rule numbering does not exist in the orchestrator (only A15-A19 anachronism rules at 3333 and 4858). Cause-and-effect of this bug is not the cold-open ban.
+  - "Set humo_warmup_pad_ms=0 to remove a 250 ms lip-sync offset": widget actual value is **200**, not 250 (`otr_scifi_16gb_full.json` Node 51 widgets_values[12]; default at `batch_humo_render.py:851`). The pad is trimmed off both image frames AND audio samples before the per-clip mp4 is saved — verified live: clip `l001` shows `humo_length=177, mp4_frames=172` (5-frame trim ≈ 200 ms at 25fps), `audio_fed_to_humo_dur_s=7.08, mp4_dur_s=6.88` (200 ms audio trim). Setting it to 0 reverts pre-BUG-102 behavior (HuMo's 3-6 frame motion-onset freeze lands on the first phoneme; lips lag audio by 120-240 ms per clip). Recommendation has the sign flipped — do not change.
+- **Fix:** PENDING. Two viable approaches; needs design call:
+  1. **Pad the silent_combined timeline with black frames at line gaps** before mux — preserve master_mix audio in full, fill visual gaps with cast-still or radio-still loop. Requires gap detection from `ledger.lines[]` start_s + dur_s contiguity check.
+  2. **Stretch each clip to cover its full line.dur_s** by looping/pingpong of the rendered HuMo segment — keeps mouth movement on the speaker for the full audio event but introduces visible loop on long lines.
+  3. (Out of scope for now: render multi-pass HuMo within a single line to cover the full audio. HuMo's 97-frame cap makes this expensive.)
+  Likely correct path: option 1, with bookend rendered separately and concatenated front+back.
+- **Verify:** After fix, for any ledger:
+  - `sum(clip.mp4_dur_s) + sum(gap_dur_s) + bookend_dur_s ≈ master_mix_dur_s` (within ~50 ms)
+  - final video mp4 duration ≈ master_mix audio duration (no `-shortest` truncation)
+  - per-clip lip-sync remains tight on clip 1 (regression check on warmup_pad behavior)
+- **Tags:** master_mix_per_clip_mux, ffmpeg-shortest, concat-demuxer, audio-truncation, line-clip-duration-mismatch, bookend-not-in-lines, c7-byte-identity-violation-on-final-video, warmup-pad-correctly-implemented
+
+---
+
 ### BUG-LOCAL-127: Radio bookend FLUX render skipped entirely on fast_batch path -- the actual root cause of "wanted radio still but it's missing" symptom [FIXED in commit pending]
 
 - **Date:** 2026-05-01 ~10:20 (surfaced by tailing the live run after the BUG-126 strict_c7 fix landed) | **Phase:** 0 | **Bible candidate:** YES (textbook early-return-skips-side-effect pattern)

@@ -245,8 +245,16 @@ class TestRenderMasterMixPerClipMux:
 
         # Pillarbox order must match start_s ascending (music_open ->
         # char -> music_close), regardless of the ledger ordering.
+        # BUG-LOCAL-128 fix (2026-05-01): the surviving last clip is
+        # re-pillarboxed with tail pad after the loop, so the actual
+        # call sequence has 4 entries (3 loop + 1 re-pad on the last).
         names = [Path(p).stem for p in seen_pillarbox_inputs]
-        assert names == ["music_open_001", "char_l001", "music_close_001"]
+        assert names == [
+            "music_open_001",
+            "char_l001",
+            "music_close_001",
+            "music_close_001",  # BUG-LOCAL-128: tail-pad re-pillarbox
+        ]
 
     def test_final_mux_uses_c_copy_for_audio(
         self, populated_ledger, populated_clips_dir, fake_procgen, tmp_path
@@ -361,8 +369,12 @@ class TestRenderMasterMixPerClipMux:
             )
 
         # Only the one existing clip should have been pillarboxed.
-        assert len(seen_pillarbox_inputs) == 1
-        assert "char_l001" in seen_pillarbox_inputs[0]
+        # BUG-LOCAL-128 fix (2026-05-01): the surviving last clip is
+        # re-pillarboxed with tail pad after the loop, so when only
+        # one clip survives, pillarbox is called twice on it (once
+        # in the loop, once for tail pad).
+        assert len(seen_pillarbox_inputs) == 2
+        assert all("char_l001" in p for p in seen_pillarbox_inputs)
 
     def test_skips_lines_with_invalid_timing(self, fake_procgen, tmp_path):
         """Lines missing start_s or with non-positive dur_s get
@@ -404,8 +416,11 @@ class TestRenderMasterMixPerClipMux:
             )
 
         # Only "ok" should have been pillarboxed.
+        # BUG-LOCAL-128 fix (2026-05-01): the surviving last clip is
+        # re-pillarboxed with tail pad, so "ok" is called twice
+        # (loop pass + tail-pad re-pad).
         names = [Path(p).stem for p in seen_pillarbox_inputs]
-        assert names == ["ok"]
+        assert names == ["ok", "ok"]
 
 
 class TestTailPad:
@@ -488,11 +503,97 @@ class TestTailPad:
         # Timeline sorted by start_s ascending = music_open, char,
         # music_close.  Only music_close (the last one) should get
         # a non-zero tail pad.
+        # BUG-LOCAL-128 fix (2026-05-01): the loop pass passes
+        # extend_tail_s=0.0 for every clip; the surviving last clip
+        # gets a SECOND pillarbox call with extend_tail_s=0.5 to
+        # apply the tail pad. The dict captures the last call, so
+        # music_close_001 still ends at 0.5.
         assert per_clip_tail["music_open_001"] == 0.0
         assert per_clip_tail["char_l001"] == 0.0
         assert per_clip_tail["music_close_001"] > 0.0
         # Documented value: 0.5s
         assert per_clip_tail["music_close_001"] == pytest.approx(0.5)
+
+    def test_bug128_tailpad_lands_on_surviving_last_when_original_last_fails(
+        self, populated_ledger, populated_clips_dir, fake_procgen, tmp_path
+    ):
+        """BUG-LOCAL-128 regression: when the original last clip
+        fails pillarbox (e.g. ffmpeg subprocess raises), the actual
+        surviving last clip must receive the tail pad. Old policy
+        keyed `last_idx` from `len(timeline) - 1` BEFORE the loop, so
+        a failed last left the surviving last with no pad and
+        `-shortest` truncated trailing audio.
+
+        New policy: re-pillarbox `pillarboxed[-1]` after the loop
+        with extend_tail_s>0, regardless of which timeline index
+        survived.
+        """
+        out = tmp_path / "out.mp4"
+        # (line_id, extend_tail_s) tuples in call order
+        pb_calls: list[tuple[str, float]] = []
+
+        original_pb = VC._pillarbox_humo_silent
+
+        def _spy_pb(**kwargs):
+            line_id = Path(kwargs["clip"]).stem
+            tail = float(kwargs.get("extend_tail_s", 0.0))
+            pb_calls.append((line_id, tail))
+            # Simulate the ORIGINAL last clip (music_close_001) failing
+            # in the in-loop pass. The post-loop tail-pad re-pillarbox
+            # MUST NOT fail (different code path / different invocation).
+            if line_id == "music_close_001" and tail == 0.0:
+                raise subprocess.CalledProcessError(
+                    returncode=1, cmd=["ffmpeg"], stderr=b"simulated fail",
+                )
+            # Touch the output file so the existence check passes.
+            out_p = Path(kwargs["out_path"])
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_bytes(b"x")
+            return None
+
+        def _record_run(cmd, **_kw):
+            if str(cmd[-1]).endswith(".mp4"):
+                Path(cmd[-1]).parent.mkdir(parents=True, exist_ok=True)
+                Path(cmd[-1]).write_bytes(b"x")
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=b"", stderr=b"",
+            )
+
+        with patch("subprocess.run", side_effect=_record_run), \
+             patch.object(VC, "_pillarbox_humo_silent", side_effect=_spy_pb):
+            VC._render_master_mix_per_clip_mux_mode(
+                ledger=populated_ledger,
+                clips_dir=populated_clips_dir,
+                procgen=fake_procgen,
+                out_mp4=out,
+                canvas_w=1920, canvas_h=1080, canvas_fps=25,
+                humo_target_h=1080,
+                fallback_clip_length=7.0,
+                ffmpeg="ffmpeg", ffprobe="ffprobe",
+            )
+
+        # Loop pass: 3 calls in order, all with extend_tail_s=0.0.
+        # The third (music_close_001) fails. After the loop, the
+        # surviving last is char_l001, which gets re-pillarboxed
+        # with extend_tail_s=0.5.
+        loop_calls = [(lid, t) for lid, t in pb_calls if t == 0.0]
+        assert len(loop_calls) == 3
+        assert [lid for lid, _ in loop_calls] == [
+            "music_open_001", "char_l001", "music_close_001",
+        ]
+        # Tail pad call MUST have happened on the surviving last
+        # (char_l001) since music_close_001 failed pillarbox.
+        tail_calls = [(lid, t) for lid, t in pb_calls if t > 0.0]
+        assert len(tail_calls) == 1, (
+            f"expected exactly one tail-pad re-pillarbox call after "
+            f"loop, got: {tail_calls}"
+        )
+        assert tail_calls[0][0] == "char_l001", (
+            f"BUG-LOCAL-128: tail pad must land on actual surviving "
+            f"last (char_l001), not original timeline last "
+            f"(music_close_001). Got: {tail_calls}"
+        )
+        assert tail_calls[0][1] == pytest.approx(0.5)
 
 
 class TestC7Contract:

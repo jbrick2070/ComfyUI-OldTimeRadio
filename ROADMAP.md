@@ -51,6 +51,45 @@ CUDA 13 is non-negotiable because (1) Blackwell sm_120 support is the point, (2)
 
 ## P0 — Active focus
 
+### BUG-128 + BUG-129 fix sequence (locked 2026-05-01 after round-robin + external code review)
+
+Two coupled bugs surfaced during QA of episode `signal_lost_..._20260501_110019`:
+- **BUG-LOCAL-128:** `_render_master_mix_per_clip_mux_mode` truncates ~70 s of dialogue audio. Two layered causes — (1) sum(clip.dur_s)=137.52 s vs ledger.total_episode_dur_s=207.39 s gap (HuMo clip < line audio + line gaps + bookend not in lines[]); (2) tail-pad `last_idx` computed before the pillarbox loop (line 556), so when `pb_failures` prunes the genuine last clip the surviving last clip has no tail pad and `-shortest` truncates trailing audio.
+- **BUG-LOCAL-129:** ANNOUNCER lines render as random women instead of the radio still. Root cause is HuMo's finetuned weights, not the conditioning code (`reference_latents` injection in `nodes_wan.py:1077` is generic Wan2.1 I2V). HuMo will not animate non-face references; the architectural premise in `_otr_speaker_role.py:12-22` ("the radio is the visual performer for non-dialogue") is wrong for HuMo as the renderer.
+
+**Locked plan: three commits, in this order** (mux-first per external review — small blast radius, every downstream change inherits the fixed mux baseline):
+
+1. **Commit 1 — BUG-128 mux fix** (single-file: `nodes/video_composite.py::_render_master_mix_per_clip_mux_mode`):
+   - Compute `last_idx` from `pillarboxed[-1]` after the pillarbox loop (or drop `-shortest` and post-trim with ffprobe-measured durations). Either fix is a few lines.
+   - Add post-mux audio packet-hash check vs procgen as a separate validator (the C7 contract is byte-identity *downstream of procgen*, not vs a WAV master — current `-c:a copy` from procgen already preserves that; the hash test just proves it).
+   - No behavior change for clean runs (where `pb_failures == 0`); fix only fires when a tail clip dies.
+
+2. **Commit 2 — BUG-129a static-segment generator** (additive: `nodes/video_composite.py` only, BatchHumoRender unchanged):
+   - When `_render_master_mix_per_clip_mux_mode` finds a ledger line with no clip on disk (`clip_path.is_file() == False`), instead of silently skipping (current line 512-519), generate a deterministic static segment via ffmpeg subprocess: `-loop 1 -i radio_bookend.png -frames:v <int(round(dur_s * 25))> -r 25 -c:v libx264 -pix_fmt yuv420p -an out.mp4` with `-video_track_timescale 12800` to match HuMo's container timebase (timebase mismatch breaks concat-demuxer with `-c copy`). Use `-frames:v` not `-t` for exact frame counts.
+   - Backward-compat: if all clips on disk, static path doesn't fire — output identical to current.
+
+3. **Commit 3 — BUG-129b role policy flip** (`nodes/_otr_speaker_role.py` + `nodes/batch_humo_render.py` + LLM cast schema):
+   - Add ANNOUNCER as a real cast member in the LLM story-writer schema with description "1940s radio drama host at vintage broadcast microphone, period suit, dim studio lighting." `BatchFluxRender` produces the portrait through the existing pipeline.
+   - Reroute speaker_role: ANNOUNCER → existing portrait chain (BUG-088 resolver). `music_*` and standalone `sfx` → no HuMo render at all (the static-segment path from commit 2 fires instead).
+   - Hard assertion in BatchHumoRender dispatch: if `speaker_role in {music_open, music_close, music_inter, sfx}` and target == HuMo, fail fast.
+   - SFX disambiguation: SFX concurrent with dialogue stays on the speaking character's HuMo clip (no separate visual). Mark via `is_concurrent_with_dialogue` boolean on the ledger line; static-segment path skips concurrent SFX.
+   - Verify FLUX render width/height matches HuMo workflow's width/height (announcer portrait must match HuMo's expected resolution to avoid distortion).
+
+**Acceptance criteria (all must hold before declaring done):**
+1. No HuMo render job ever receives the radio still (assertion in dispatch).
+2. ANNOUNCER clips l001 and l021 in a regression episode resolve to the same announcer portrait family — no generic-blonde drift.
+3. `music_*` / standalone-`sfx` segments render through the static-video path (ledger `clips[].source_kind == "static_ffmpeg"` vs `"humo"`).
+4. Final mp4's extracted audio packet-hash matches procgen's audio stream byte-for-byte.
+5. Peak VRAM stays below 14.5 GB.
+6. Final video duration ≈ master mix duration (no `-shortest` truncation).
+7. `tests/test_dropdown_guardrails.py`, `tests/test_core.py`, and the Bug Bible regression all pass.
+
+**Post-Option-1 enrichment (v2.0-beta, not blocking):** ffmpeg audio-reactive overlay on the static radio segments — `showwaves` / `showspectrum` / `avectorscope` / `showvolume` filter passes composited as needle-meter or oscilloscope inset on the radio still. Pure ffmpeg, frame-deterministic, CPU only. Period-correct (1940s radios had needle meters). No model needed.
+
+**Round-robin transcripts:** `docs/2026-05-01-humo-radio-architecture__01_chatgpt.md`, `__02_gemini.md`, `__03_nvidia.md`, `__04_synthesis.md`, `__06_jeffrey_review.md`. All three external models converged on Option 1; external review pushed the sequencing from 2 commits to 3 and surfaced the tail-pad pointer bug as a separate latent issue.
+
+---
+
 ### Live-test verification of the radio-coverage + bit-perfect-audio architecture
 
 The code path is in place; what's open is real-run verification. Every item below is something to confirm or surface during the next ComfyUI episode test, NOT new design work.
