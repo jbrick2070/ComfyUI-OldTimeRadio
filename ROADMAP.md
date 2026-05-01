@@ -34,107 +34,38 @@ Lock these. Any work item that contradicts this list is wrong.
 
 ## P0 — Active focus
 
-### Locked architecture (2026-04-30): 100% HuMo video coverage + bit-perfect master audio mux
+### Live-test verification of the radio-coverage + bit-perfect-audio architecture
 
-**Decision lock:** every audio second of every episode is a HuMo-rendered video clip. Master audio mix is sliced at sample-accurate per-clip boundaries and muxed onto each HuMo clip with `-c:v copy -c:a copy` (zero re-encode). Final concat is `-c copy` (zero re-encode). Audio passes through ONE ffmpeg mux per clip, never re-encoded.
+The code path is in place; what's open is real-run verification. Every item below is something to confirm or surface during the next ComfyUI episode test, NOT new design work.
 
-**Why this lock:**
-- Confirmed 2026-04-30 audit of `nodes/video_composite.py`: the current `humo_concat` path re-encodes audio to AAC 192k **three times** (gap-filler segment encode line 318, per-clip normalize encode line 350, final concat encode line 522), plus once more upstream at HuMo's `CreateVideo` step. Audio you hear has been through 3-4 lossy encodes. C7 byte-identity is **broken** on this path.
-- Gemini's 2026-04-30 round-robin catch was correct.
-- The lossless path requires master audio to be the canonical source, not HuMo's output audio.
+**Verify on the next clean run:**
 
-**The flow:**
+- `ledger.lines[]` carries a `speaker_role` on every entry. No nulls, no missing rows. Roles: `character` / `announcer` / `music_open` / `music_close` / `music_inter` / `sfx`.
+- `ledger.meta.audio_path_selected = "master_mix_per_clip_mux"` and `audio_path_reason = "ok (zero audio re-encodes downstream of SignalLostVideo)"`.
+- For every line where `speaker_role ∈ {announcer, music_*, sfx}`, the `BatchHumoRender` log line shows `ref=radio_bookend_<ep>.png source=radio-still (...)` — radio still I2V dispatch confirmed.
+- `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (genre=sci-fi)"`).
+- Music tracks > 7s show up as multiple chunked entries (`music_open_001`, `music_open_002`, ...) — chunking math fired.
+- ffprobe on the final mp4: video + audio streams both present; final mp4 audio `codec_name == aac` (passthrough from procgen).
+- No `[VideoComposite] master_mix_per_clip_mux FAILED` in the log. With `strict_c7=True` (default), any failure would have raised.
 
-```
-1. Bark / Kokoro / MusicGen / AudioGen        → per-line audio stems
-2. SceneSequencer + AudioEnhance + EpisodeAssembler
-                                                → master mix WAV
-                                                + per-line (start_s, dur_s) populated in ledger.lines[]
-3. BatchHumoRender per line:
-   ─ snap dur_s to nearest 4n+1 frames via humo_length_for_dur()
-   ─ I2V reference image picked by speaker_role:
-       character  → PASS3 cast portrait
-       announcer  → sci-fi radio FLUX still
-       music_*    → sci-fi radio FLUX still
-       sfx        → sci-fi radio FLUX still
-   ─ feed HuMo: ref_image + line_audio (Whisper conditions video motion)
-   ─ KEEP video frames, DISCARD HuMo's CreateVideo audio output
-   ─ stamp ledger.lines[].humo_dur_s = (frames / 25)
-4. AudioSlicer (new node):
-   ─ for each line, slice master mix at [start_s, start_s + humo_dur_s]
-   ─ ffmpeg -ss <start> -t <humo_dur> -c:a copy
-   ─ sample-accurate, no re-encode
-5. VideoComposite per-clip mux:
-   ─ ffmpeg -i humo_silent.mp4 -i master_slice.wav -c:v copy -c:a copy clip.mp4
-   ─ one mux per clip, no re-encode
-6. Concat all clips:
-   ─ ffmpeg -f concat -i clips.txt -c copy out.mp4
-   ─ no re-encode
-```
+**Open follow-ups (in priority order):**
 
-**Why drift is zero by construction:**
-- HuMo clip duration = `(4n + 1) / 25` seconds, exact.
-- Audio slice duration = exactly that value, sample-accurate cut.
-- All mux steps are `-c copy` so no resample, no codec round-trip.
-- BUG-102 warmup-pad already trims HuMo's freeze-frame artifact before save, so HuMo video starts on the first phoneme — aligns naturally with the master audio slice.
-
-**Why this beats every other architecture:**
-- C7 byte-identity preserved — master mix is the canonical audio, never re-encoded.
-- HuMo never has to carry OOD music or SFX audio — Whisper still runs internally for motion conditioning, but the audio output we keep is the master slice (clean Kokoro / MusicGen / AudioGen).
-- Wall-to-wall video coverage — every audio second has a HuMo silent clip glued under it.
-- Whisper OOD doesn't matter — even if HuMo produces glitchy motion on music/SFX, that **is** the SIGNAL LOST aesthetic (broadcast distress / failing radio) and the audio you hear is master-mix clean.
-- Lip-sync drift = zero by construction.
-- 100% audio coverage, no missing audio, no lip-sync drift.
-
-**The radio is the performer, not a static prop.** The sci-fi radio FLUX still serves as the I2V reference for any non-dialogue HuMo clip. The speaker grille pulses to the announcer voice, the vacuum tubes flicker on SFX hits, the dial bounces with music peaks — that's the visual spine of the OTR identity.
-
-#### Build order (sequenced — each step gates the next)
-
-1. **SceneSequencer per-line timing population.** Populate `ledger.lines[].start_s` + `dur_s` from the assembled audio timeline. This is the gating blocker — no slice boundaries, no per-clip mux. Also tagged Task #20 in earlier roadmap.
-2. **AudioSlicer node.** New node `OTR_AudioSlicer`. Reads ledger, slices master mix at `(start_s, start_s + humo_dur_s)` per line with sample accuracy. Writes `output/otr/audio_slices/<ep_id>/line_NNN.wav`. ffmpeg `-c:a copy` (no re-encode). Stamps `ledger.lines[].audio_slice_path`.
-3. **Sci-fi radio FLUX still.** Add a widget on `OTR_BatchFluxRender` (or sibling node) to render one sci-fi radio still per episode. Saved to `output/otr/stills/radio_<ep_id>.png`. Path written to `ledger.radio_still_path`. Aesthetic prompt baseline (refine to taste): *"sci-fi retrofuturistic radio broadcast unit, glowing CRT frequency display, copper vacuum tubes haloed in plasma, brushed steel chassis with art-deco engraving, dim amber + cyan rim lighting, dust-mote atmosphere, 35mm film grain, broadcast-distressed cinematic aesthetic, 1080p"*.
-4. **`speaker_role` field on every ledger line.** ScriptParser + SceneSequencer stamp `speaker_role ∈ {character, announcer, music_open, music_close, music_inter, sfx}` on every `ledger.lines[]` entry. Existing dialogue lines default to `character`. Announcer windows (Kokoro output), music windows (MusicGen open/close/interstitial), and standalone SFX cues each get their own role tag.
-5. **`BatchHumoRender` reference-image swap.** Branch the I2V reference lookup by `speaker_role`: character → existing PASS3 portrait resolver; announcer/music/sfx → `ledger.radio_still_path`. Keep all existing BUG-088 / BUG-118 fallback chains intact for the character branch. New regression test: render one of each role end-to-end with deterministic seeds.
-6. **`VideoComposite` per-clip-mux mode.** New `audio_source = "master_mix_per_clip_mux"` (becomes default). Path:
-   - For each line in ledger, mux `humo_silent.mp4` + `audio_slice_path` with `-c:v copy -c:a copy`.
-   - Concat all per-clip mp4s with `-f concat -c copy`.
-   - No filter graph, no re-encode, no procgen overlay at this stage (procgen lighten layer ships as a v2.0-beta enhancement).
-7. **End-to-end smoke episode.** Run a smoke preset (1 act, target_words=100) against the full new pipeline. Acceptance below.
-
-#### Acceptance
-
-- `ledger.lines[].speaker_role` populated for 100% of lines (no nulls).
-- Every line has a HuMo-rendered video clip on disk. No gaps in coverage.
-- Every line has an `audio_slice_path` on disk, duration exactly matching its HuMo clip duration to sample accuracy.
-- Per-clip mux + final concat use `-c copy` exclusively. ffprobe confirms identical AAC frame boundaries vs master mix WAV (or PCM passthrough if container allows).
-- `ledger.lines[].speaker_role = announcer / music_* / sfx` lines render with the sci-fi radio still as I2V reference (logs confirm `ref_image_source = radio`).
-- Final episode mp4 audio bit-compares against master mix WAV after demux + decode (allowing for one canonical AAC encode if container requires it).
-- ffprobe on the final mp4: video stream codec_type=video AND audio stream codec_type=audio AND duration matches `sum(humo_dur_s)` to <1 frame.
+- **Audio codec ffprobe pre-flight** (P2) — confirm procgen audio stream is AAC before `-c:a copy` mux. One-line subprocess.run + assertion. Trivial; deferred until first run confirms procgen output codec.
+- **Post-mux audio stream identity validation** (P3) — extract per-stream packet hash on procgen vs final mp4, fail tier on mismatch. Concrete proof of bit-identity. Ship as a separate validation node since the ffmpeg incantation needs care on Windows.
+- **Low-motion observability for radio HuMo clips** (P3) — frame-difference metric on non-dialogue clips so "static" failures (Whisper OOD producing flat frames) surface as warnings instead of going unnoticed. No behavior change.
+- **HuMo continuity layer for >7s narrative beats** (v2.0-beta) — hybrid blending across HuMo windows so 30s narrative beats don't show 7s jump-cuts. Decoupled from the audio path; gates "production unattended."
+- **Per-scene environment FLUX still + LTX/zoompan animated background** (v2.0-beta) — bottom layer under the HuMo center pillarbox in dialogue windows.
+- **Procgen-CRT lighten layer on top** (v2.0-beta) — audio-reactive scanlines + flicker as the SIGNAL LOST signature.
+- **Drifted-filename smoke for BUG-LOCAL-118** — force an underscore-drifted .mp4 stem to verify the fallback chain fires before relying on it in a long soak.
+- **Reconcile `16294df` ROADMAP-vs-git-log mismatch** — git log says "BUG-LOCAL-112 news-history reset"; prior narrative had it as "Wire ScriptCritic." Likely a rebase artifact. Decide canonical message before the next QA pass walks the history.
 
 #### Hardware floor (locked 2026-04-25, do not relitigate)
 
 - HuMo 14B fp8 e4m3fn scaled (Kijai) — `Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`. Stock `UNETLoader`. Tuned by Kijai for 16 GB cards.
-- Fallback ladder (kept on disk, do NOT delete): `humo_17B_fp8_e4m3fn.safetensors` (highest quality, slower ~6 min/clip), `Wan2_1-HuMo-17B_Q5_K_M.gguf` (speed-tuned, fast iteration).
+- Fallback ladder (kept on disk, do NOT delete): `humo_17B_fp8_e4m3fn.safetensors` (highest quality, slower ~6 min/clip), `Wan2_1-HuMo-17B_Q5_K_M.gguf` (speed-tuned).
 - Stable shape: `length=97` (3.88 s @ 25 fps), 480x832, batch=1. Or `length=177` at 640x640 (7 s, OOD but verified working).
-- Frame count must be `4n + 1`. Wan 2.1 VAE temporal compression. Helper `humo_length_for_dur(dur_s)` snaps any duration up.
+- Frame count must be `4n + 1`. Helper `humo_length_for_dur(dur_s)` snaps. Cap mirrored to `7.0s` in EpisodeAssembler music chunking.
 - Per-step: 42 s. Per-clip: ~4:30 native, ~6:15 in TEST_humo. Cold load: ~50 s.
-
-#### HuMo coverage goals (sequenced relative to the architecture above)
-
-| Goal | Definition of done | Maps to step |
-|---|---|---|
-| 1 — Every line gets a HuMo clip | One HuMo MP4 per `ledger.lines[]` entry, regardless of speaker_role | Steps 1-5 above |
-| 2 — Per-clip mux + concat lossless | All audio passes through with `-c copy` only | Step 6 |
-| 3 — Continuity layer (drift mitigation) | Hybrid blending across HuMo windows for >7s narrative beats | Post-Step 7 (v2.0-beta candidate) |
-
-Goal 3 still gates "production unattended" runs but is now decoupled from "audio is correct" — once Steps 1-7 ship, the audio path is locked even if visual continuity needs more work.
-
-#### Other items still relevant (deferred until Steps 1-7 ship)
-
-- **Per-scene environment FLUX still + LTX/zoompan animated background.** v2.0-beta enhancement once the audio architecture is locked. Adds the bottom-layer animated background under the HuMo center pillarbox in middle (non-bookend) windows.
-- **Procgen-CRT lighten layer over the whole frame.** v2.0-beta. Audio-reactive scanlines + flicker on TOP of the HuMo + LTX composite. Sells the "failing broadcast" identity. Was the old `signal_lost_<id>.mp4` proc gen layer.
-- **Drifted-filename smoke for BUG-LOCAL-118.** Force an underscore-drifted .mp4 stem and run BatchHumoRender to verify the fallback chain fires before relying on it in a long soak.
-- **Reconcile `16294df` ROADMAP-vs-git-log mismatch.** Git log says "BUG-LOCAL-112 news-history reset" (same as `61a85b3`); prior ROADMAP narrative had it as "Wire ScriptCritic" — likely a rebase/amend artifact.
 
 ---
 
