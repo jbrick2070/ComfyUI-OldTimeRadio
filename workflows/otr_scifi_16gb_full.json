@@ -1487,7 +1487,8 @@
         7.0,
         "ffmpeg",
         false,
-        "humo_concat"
+        "master_mix_per_clip_mux",
+        true
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"

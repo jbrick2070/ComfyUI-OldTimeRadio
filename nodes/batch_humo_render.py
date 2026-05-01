@@ -765,8 +765,28 @@ class BatchHumoRender:
                     "multiline": True,
                     "default": "",
                     "tooltip": (
-                        "Production Ledger JSON. Either the JSON string "
-                        "itself or a path to *_ledger.json on disk."
+                        "Ledger source. Four accepted forms "
+                        "(duck-typed at _load_ledger_with_path in "
+                        "this file, lines 1660-1762):\n"
+                        "  1. Empty string -> auto-pick newest "
+                        "non-pending ledger from disk.\n"
+                        "  2. String starting with '{' -> parsed as "
+                        "JSON manifest directly.\n"
+                        "  3. Path to *_ledger.json -> loaded directly.\n"
+                        "  4. Path to *.mp4 -> multi-tier stem fallback "
+                        "derives the matching _ledger.json (exact "
+                        "match -> underscore-collapse variant -> "
+                        "directory scan with mtime + episode_id "
+                        "substring match). This is intentional duck "
+                        "typing; static analyzers regularly misflag "
+                        "the .mp4 form as a wiring error (see "
+                        "BUG-LOCAL-124 revert in BUG_LOG.md). Slot "
+                        "name kept as 'ledger_json' for workflow "
+                        "compat; rename would orphan existing wires "
+                        "(ComfyUI matches inputs by name on load with "
+                        "no native aliasing).\n"
+                        "Original docstring: Production Ledger JSON "
+                        "or path to *_ledger.json on disk."
                     ),
                 }),
                 "portraits_dir": ("STRING", {

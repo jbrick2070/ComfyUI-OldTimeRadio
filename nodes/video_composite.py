@@ -817,7 +817,22 @@ class VideoComposite:
                 "ledger_json": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "tooltip": "Ledger JSON or path to *_ledger.json.",
+                    "tooltip": (
+                        "Ledger source. Three accepted forms "
+                        "(duck-typed at _load_ledger_with_path in "
+                        "nodes/batch_humo_render.py lines 1660-1762):\n"
+                        "  1. Empty string -> auto-pick newest "
+                        "non-pending ledger from disk.\n"
+                        "  2. String starting with '{' -> parsed as "
+                        "JSON manifest directly.\n"
+                        "  3. Filesystem path -> if .mp4, multi-tier "
+                        "stem fallback to *_ledger.json (intentional; "
+                        "static analyzers regularly misflag this as a "
+                        "wiring error -- see BUG-124 revert).\n"
+                        "Slot name kept as 'ledger_json' for workflow "
+                        "compat; rename would orphan existing wires "
+                        "(no ComfyUI input aliasing)."
+                    ),
                 }),
             },
             "optional": {
@@ -1168,9 +1183,36 @@ class VideoComposite:
                     ffprobe=ffprobe,
                 )
             except Exception as exc:
+                # BUG-LOCAL-126 fix (2026-05-01, second-Opus review):
+                # Mirror the strict_c7 wrap that already exists at the
+                # master_mix_per_clip_mux -> humo_concat edge.  Without
+                # this, a humo_concat failure silently falls through to
+                # the legacy master_mix path at line ~1194 below, which
+                # uses `-c:a aac -b:a 192k` -- a real C7 violation.
                 log.exception(
-                    "[VideoComposite] humo_concat failed; falling back to "
-                    "master_mix mode: %s", exc,
+                    "[VideoComposite] humo_concat failed: %s", exc,
+                )
+                if strict_c7:
+                    _stamp_audio_path(
+                        "FAILED:humo_concat",
+                        f"strict_c7=True; refusing master_mix legacy "
+                        f"fallback (re-encodes audio AAC@192k); "
+                        f"reason={exc!r}",
+                    )
+                    raise RuntimeError(
+                        "VideoComposite: strict_c7=True and humo_concat "
+                        "failed.  Refusing to fall back to master_mix "
+                        "legacy mode (which AAC-re-encodes audio at "
+                        "192k and breaks C7).  Set strict_c7=False to "
+                        f"allow the legacy fallback chain.  Reason: {exc}"
+                    ) from exc
+                # strict_c7 OFF: stamp the loud signal, fall through.
+                _stamp_audio_path(
+                    "master_mix (FALLBACK from humo_concat)",
+                    f"humo_concat raised {exc!r}; strict_c7=False so "
+                    f"falling back to legacy master_mix (audio WILL "
+                    f"re-encode to AAC@192k; C7 byte-identity NOT "
+                    f"preserved)",
                 )
                 # Fall through to master_mix path on any failure.
             else:
@@ -1190,6 +1232,30 @@ class VideoComposite:
                     + "\n".join(f"  {ln}" for ln in concat_report)
                 )
                 return (str(final_mp4), report_text)
+
+        # ---- Defense-in-depth: legacy master_mix re-encodes audio ----
+        # BUG-LOCAL-126 (2026-05-01, second-Opus review): this block
+        # uses `-c:a aac -b:a 192k` further down (line ~1225).  If
+        # anyone reaches this path with strict_c7=True (current default
+        # is True), the run MUST fail loudly -- regardless of which
+        # upstream branch fell through.  Catches future fallthrough
+        # bugs that don't honor strict_c7 at their own except clauses.
+        if strict_c7:
+            _stamp_audio_path(
+                "FAILED:legacy_master_mix_blocked",
+                "strict_c7=True; legacy master_mix uses -c:a aac -b:a "
+                "192k which violates C7 byte-identity. Refusing to "
+                "execute it. Set strict_c7=False if you accept the "
+                "C7 violation.",
+            )
+            raise RuntimeError(
+                "VideoComposite: strict_c7=True and execution reached "
+                "the legacy master_mix path. This path AAC-re-encodes "
+                "audio at 192k and breaks C7 byte-identity. If you "
+                "see this raise, an upstream branch fell through "
+                "without honoring strict_c7. Either fix that branch "
+                "or set strict_c7=False at the workflow level."
+            )
 
         # ---- Build clip timeline (master_mix mode) ----
         timeline = _build_clip_timeline(ledger, clips, fallback_clip_length, ffprobe)

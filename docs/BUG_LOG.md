@@ -5,6 +5,23 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-126: Silent humo_concat -> legacy master_mix fallthrough violates C7; workflow JSON also bypassed master_mix_per_clip_mux entirely [FIXED in commit pending]
+
+- **Date:** 2026-05-01 ~07:30 (surfaced by second-Opus review of round-robin recommendations) | **Phase:** 0 | **Bible candidate:** YES (textbook silent C7 violation pattern + workflow-JSON-shipped-with-wrong-default)
+- **Symptom:** Run 1's composited mp4 had base radar playing straight through with HuMo clips overlaid violently with no scene-boundary cuts. The Run 1 log indicated `[VideoComposite] audio_source=humo_concat -- routing to concat-demuxer pipeline (perfect lip-sync, bookend gaps)`. We thought per_clip_mux had failed strict_c7 and fallen through. The actual situation was worse:
+- **Cause (two-headed):**
+  1. **Workflow JSON shipped with `audio_source="humo_concat"` hardcoded** at `workflows/otr_scifi_16gb_full.json` widgets_values[12], NOT the code's default `"master_mix_per_clip_mux"`. The `strict_c7` widget value at index 13 was missing entirely (workflow JSON predates its addition to INPUT_TYPES). So per_clip_mux never even ran, and the strict_c7=True default never had a chance to protect anything.
+  2. **humo_concat -> master_mix legacy fallthrough was unguarded** at `nodes/video_composite.py` lines 1170-1175. The strict_c7 wrap that exists for `master_mix_per_clip_mux -> humo_concat` (lines 1095-1107) had no analogue for `humo_concat -> master_mix`. When humo_concat raised, the legacy master_mix path at line 1194 took over, using `-c:a aac -b:a 192k` (lines 1225-1226) -- a real C7 violation. The "no scene cuts" symptom is the legacy master_mix overlay path, NOT humo_concat's behavior (humo_concat actually respects ledger timing correctly via `_render_humo_concat_mode`).
+- **Fix (three coordinated changes):**
+  1. **`workflows/otr_scifi_16gb_full.json` widgets_values updated**: index 12 flipped from `"humo_concat"` to `"master_mix_per_clip_mux"`, index 13 appended as `true` for `strict_c7`. Now per_clip_mux is the actual entry point.
+  2. **`nodes/video_composite.py` lines 1170-1175**: humo_concat exception now wrapped in the same strict_c7 guard pattern used for master_mix_per_clip_mux -> humo_concat. With `strict_c7=True` (default), raises with explanation; with `strict_c7=False`, stamps loud `_stamp_audio_path("master_mix (FALLBACK from humo_concat)", "C7 byte-identity NOT preserved")` warning and falls through.
+  3. **`nodes/video_composite.py` defense-in-depth at line ~1194**: top of legacy master_mix block now raises immediately if reached with `strict_c7=True`, regardless of which upstream branch fell through. Catches future fallthrough bugs that don't honor strict_c7 at their own except clauses. Stamp identifier: `FAILED:legacy_master_mix_blocked`.
+- **Verify:** Next live run with default settings should hit per_clip_mux (not humo_concat). If per_clip_mux raises, run aborts with the existing strict_c7 message. If humo_concat is explicitly selected and raises, run aborts with the new `humo_concat -> master_mix` strict_c7 message. If anything reaches the legacy master_mix path under strict_c7=True, run aborts with `FAILED:legacy_master_mix_blocked`. Tests: `tests/test_video_composite_per_clip_mux.py::TestBug126StrictC7Wraps` (2 source-grep tests confirming both guards present); 90/90 total tests pass across video composite + radio resolver + widget drift guard.
+- **Tags:** strict-c7, fallthrough, legacy-master-mix, workflow-json-default-mismatch, defense-in-depth, audio-byte-identity, second-opus-catch
+- **Cross-reference:** Surfaced by second-Opus review of the 3-vendor round-robin recommendations. Round-robin had identified per_clip_mux/humo_concat as the right area to investigate but missed the workflow JSON override that bypassed per_clip_mux entirely AND missed the unguarded humo_concat fallthrough edge.
+
+---
+
 ### BUG-LOCAL-125: `OTR_SceneSequencer.scene_manifest_json` output is a permanently-empty stub (`json.dumps([])`); slot is wired into RETURN_TYPES but never populated
 
 - **Date:** 2026-05-01 ~06:30 | **Phase:** 0 | **Bible candidate:** YES (subtle: stub outputs that look real on the graph but emit empty data)

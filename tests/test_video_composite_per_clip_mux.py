@@ -703,3 +703,64 @@ class TestEndOfRunCleanup:
         finally:
             VC.VideoComposite._end_of_run_cleanup = original_cleanup
             VC.VideoComposite._execute_body = original_body
+
+
+class TestBug126StrictC7Wraps:
+    """BUG-LOCAL-126 (2026-05-01, second-Opus review): the humo_concat
+    -> master_mix legacy fallthrough was unguarded, letting a strict_c7
+    run silently re-encode audio at -c:a aac -b:a 192k.  Two new guards:
+      1. strict_c7 wrap on humo_concat exception (mirrors the existing
+         per_clip_mux -> humo_concat wrap).
+      2. Defense-in-depth raise at the top of the legacy master_mix
+         block, catching any future fallthrough bug regardless of
+         which upstream branch failed to honor strict_c7.
+
+    These tests use grep-the-source assertions because exercising the
+    full execute() path requires real ffmpeg binaries; we instead
+    confirm the strict_c7 keyword appears in both guard sites with
+    the exact "Refusing" raise pattern that signals a hard fail.
+    """
+
+    def test_humo_concat_fallthrough_has_strict_c7_guard(self):
+        # Read the source and confirm the strict_c7 guard exists on the
+        # humo_concat -> master_mix fallthrough edge.
+        src = open(VC.__file__, encoding="utf-8").read()
+        # Sanity: the original silent fallthrough comment is GONE
+        # (or replaced).  The new pattern matches the per_clip_mux
+        # guard's wording.
+        assert (
+            "humo_concat failed" in src
+            and "strict_c7=True and humo_concat" in src
+        ), (
+            "humo_concat -> master_mix fallthrough must be wrapped "
+            "in a strict_c7 guard that raises with 'strict_c7=True "
+            "and humo_concat' in the message (BUG-LOCAL-126)"
+        )
+        # Confirm it points at the C7-violating reason.
+        assert (
+            "AAC-re-encodes audio" in src
+            and "192k" in src
+        ), (
+            "strict_c7 raise message must explain the AAC re-encode "
+            "and 192k bitrate violation"
+        )
+
+    def test_legacy_master_mix_block_has_defense_in_depth_guard(self):
+        # The legacy master_mix block at line ~1194 must have a
+        # strict_c7 guard at its top so future fallthrough bugs
+        # can't silently violate C7 even if the upstream except
+        # clauses are buggy.
+        src = open(VC.__file__, encoding="utf-8").read()
+        assert "FAILED:legacy_master_mix_blocked" in src, (
+            "legacy master_mix block must stamp "
+            "FAILED:legacy_master_mix_blocked under strict_c7 "
+            "(BUG-LOCAL-126 defense in depth)"
+        )
+        # The raise message may span multiple source lines (Python
+        # implicit string concatenation), so check for the key
+        # substrings rather than the full phrase.
+        assert "execution reached" in src and "legacy master_mix" in src, (
+            "legacy master_mix block must raise with a message that "
+            "explicitly mentions 'execution reached' the 'legacy "
+            "master_mix' path under strict_c7"
+        )
