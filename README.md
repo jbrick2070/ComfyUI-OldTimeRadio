@@ -70,6 +70,18 @@ The CLI scripts (`scripts/render_humo_batch.py`, `scripts/render_episode_concat.
 4. Wait ~3-4 hours for a 5-min episode (audio + FLUX stills are minutes; HuMo per-line is ~265s × N lines)
 5. Final mp4 lands at `output/otr/episodes/<episode_id>/<episode_id>.mp4`
 
+### Launching ComfyUI Desktop on Windows (BUG-LOCAL-003 fix)
+
+ComfyUI Desktop's bundled Python backend does **not** inherit user-scope env vars (`HKCU\Environment`) when launched from the Start menu shortcut. If you keep your HuggingFace cache outside the default `~/.cache/huggingface` location (e.g. on a separate drive at `C:\ComfyUI-Models\huggingface`), the LLM phase will fail with `local_files_only=True failed for model (...does not appear to have files named 'model-00001-of-00005.safetensors'...)` because huggingface_hub falls back to the default cache root, which is empty.
+
+**Fix:** launch ComfyUI Desktop via the helper script that reads HKCU env via PowerShell and exports it into the launch shell:
+
+```cmd
+scripts\run_comfyui.cmd
+```
+
+This sets `HF_HOME`, `HUGGINGFACE_HUB_CACHE`, `HF_HUB_OFFLINE`, and `TRANSFORMERS_OFFLINE` for the launched ComfyUI process. Edit the script to disable offline mode if you intentionally want HuggingFace to fetch updates.
+
 ### v2.0-alpha known gaps (planned, not blocking)
 
 - **Real PASS1 character portraits not rendered** — HuMo currently uses FLUX environment stills as visual stand-ins because no node renders character portraits. Faces in the composite will be visually wrong per line; pipeline runs end-to-end. Real fix is wiring a second BatchFluxRender invocation to `VideoPlan.pass1_char_prompts_json`.

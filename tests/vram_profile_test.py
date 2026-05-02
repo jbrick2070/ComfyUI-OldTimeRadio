@@ -55,9 +55,22 @@ REPORT_PATH = os.path.join(REPORT_DIR, "vram_profile_report.json")
 # ---------------------------------------------------------------------------
 
 def _torch_cuda_available() -> bool:
+    """True only when torch.cuda is functional AND a real device is visible.
+
+    BUG-LOCAL-006 fix coda: with `CUDA_VISIBLE_DEVICES=""` (set by
+    `tests/conftest.py` for the test suite), `torch.cuda.is_available()`
+    can still return True (cached at first import) while
+    `torch.cuda.device_count()` reports 0 and any subsequent
+    `get_device_name(0)` raises "Invalid device id". Guard with the
+    device count too so this profile test cleanly skips when the suite
+    is being run on CPU / under the conftest CUDA mask.
+    """
     try:
+        import os as _os
+        if _os.environ.get("CUDA_VISIBLE_DEVICES", None) == "":
+            return False
         import torch  # noqa: F401
-        return bool(torch.cuda.is_available())
+        return bool(torch.cuda.is_available()) and torch.cuda.device_count() > 0
     except Exception:
         return False
 

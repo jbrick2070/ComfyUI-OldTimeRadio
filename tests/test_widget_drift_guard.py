@@ -160,16 +160,22 @@ def _workflow(schema):
 
 
 # ---------------------------------------------------------------------------
-# Import the mapper from soak_operator without executing the module's
-# runtime init (no network, no ntfy, no mutex). The module uses guard
-# clauses and module-level constants that are safe to import.
+# Import the mapper from otr_api (BUG-LOCAL-002 fix: was soak_operator,
+# which carried stale positional WV_* indices and is now a slimmed-down
+# shim retaining only `scan_treatment`). The mapper has the same logic
+# and the same BUG-LOCAL-027 + BUG-LOCAL-029 fixes; only the public
+# import name moves. Tests below use `mod._workflow_to_api_prompt(...)`
+# via a private-aliased attribute so the assertion text doesn't churn.
 # ---------------------------------------------------------------------------
 def _import_mapper():
     import importlib
     scripts_path = os.path.join(PACK_ROOT, "scripts")
     if scripts_path not in sys.path:
         sys.path.insert(0, scripts_path)
-    mod = importlib.import_module("soak_operator")
+    mod = importlib.import_module("otr_api")
+    # Provide the legacy-named entry point used downstream.
+    if not hasattr(mod, "_workflow_to_api_prompt"):
+        mod._workflow_to_api_prompt = mod.workflow_to_api_prompt
     return mod
 
 

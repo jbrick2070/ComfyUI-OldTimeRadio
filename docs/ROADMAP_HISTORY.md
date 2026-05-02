@@ -1324,3 +1324,66 @@ In execution order:
 ### Branch & tag plan
 
 `v2.0-alpha` HEAD at session close: **`4fa1ec5`**. Origin lockstep verified. Next session continues on this same branch -- do NOT re-base or merge to main. Tag cut for v2.0-alpha-video-stack happens only after Diff 3 lands AND a clean end-to-end episode renders with the new schema.
+
+---
+
+## v2.0-alpha session log — 2026-05-02 (audit + ROADMAP forward-only rewrite + Sprint 1/2/3 codebase changes)
+
+`v2.0-alpha` HEAD at session start: **`08ecfcd`** ("BUG_LOG zeroed: all entries through 2026-05-01 promoted to survival-guide BUG_BIBLE.yaml; fresh slate for v2.0-beta").
+
+### Audit performed (read-only) — items moved out of `ROADMAP.md` into the shipped record below
+
+The current `ROADMAP.md` carried a long P0 + P1 section restating already-shipped work. Code reads (this session) confirm every claim below is on disk on `v2.0-alpha`. These line items are **not open work** going forward — they are observation candidates for the live-test cycle but not new development:
+
+**P0 — BUG-128 + BUG-129 fix sequence (3 commits, all shipped):**
+- Commit 1 — BUG-128 mux fix. `nodes/video_composite.py:798-847`: `surviving_last = pillarboxed[-1]` resolved after the pillarbox loop, tail-pad applied to actual surviving last clip (no precomputed `last_idx`). The C7 contract is preserved when a tail HuMo clip dies via `pb_failures` pruning.
+- Commit 2 — BUG-129a static-segment generator. `nodes/video_composite.py:180 _render_static_radio_segment`, dispatched from `_render_master_mix_per_clip_mux_mode` at line 691 when `clip_path.is_file() == False`, marks `source_kind="static_ffmpeg"` at line 720. Backward-compat: when all clips on disk, output identical.
+- Commit 3 — BUG-129b role policy flip. `nodes/_otr_speaker_role.py`: `_RADIO_ROLES = frozenset()` (zeroed); `_NEVER_HUMO_ROLES = frozenset({"music_open","music_close","music_inter","sfx","announcer"})` at line 96-103 with the 2026-05-01 announcer-included comment. `is_radio_role()` always returns False post-BUG-129. `nodes/batch_humo_render.py:1219` emits `{line_id}: SKIP HuMo (role={speaker_role}, covered by VideoComposite static-radio fill)` for non-character roles. `__init__.py:155` registers `OTR_BatchLTXRender` for the LTX path that handles announcer/music/sfx (workflow wiring still pending — moved to Sprint 3).
+
+**P1 audio pipeline — all 7 items code-complete on `v2.0-alpha`:**
+- `min_line_count_per_character` self-critique guard — `nodes/story_orchestrator.py:6624` (default 2), enforced at line 6868-6876 with `CRITIQUE_REJECTED` log line.
+- Director JSON schema + validator — `_DIRECTOR_SCHEMA` at line 9239, `_validate_director_plan` at line 10332, called from line 9765.
+- Length-sorted Bark batching — `nodes/batch_bark_generator.py:478` `@vram_sentinel("bark_batch", max_entry_gb=6.0)` decorates `generate_batch`.
+- VRAM-Sentinel decorator — `nodes/_vram_log.py::vram_sentinel`, used in 4 nodes (story_orchestrator, batch_bark_generator, _vram_log itself, vram_guardian).
+- High-creativity soak profile — "maximum chaos" in CREATIVITIES dropdown at `story_orchestrator.py:4087`, temp 0.95 at line 4490.
+- Per-LLM-call VRAM snapshots — `vram_snapshot("llm_generate_entry"/"exit")` brackets every `_generate_with_llm` call.
+- ScriptCritic + Reviser advisory gate — `nodes/script_critic.py`, `block_on_reject` widget defaults False (line 26 comment), wired into workflow JSON id=53. Flip to True after 3-5 successful runs.
+
+**B1 — Step 0 paths refactor (`70f4a5c`, 2026-04-28):**
+- `nodes/_otr_paths.py` ships the `OTR_OUTPUT_DIR` env → `folder_paths.get_output_directory()` → walk-up → cwd resolver. ~12-15 hardcoded `r"C:\Users\jeffr\..."` strings replaced. Workflow JSON path scrub remains (Sprint 3).
+
+**Today's commits 2026-05-01 → 2026-05-02 (HEAD `08ecfcd`):**
+- `bb1a068`, `b6182e9`, `263e985` — Native res 832x480 across procgen + LTX + HuMo + canvas; FLUX radio bookend renders 1248x720 native + Lanczos-down to 832x480.
+- `d57535a` — `OTR_BatchLTXRender` node added for announcer/music/sfx with seamless loop keyframes (registered, not yet wired into workflow JSON).
+- `ac395db` — announcer added to `_NEVER_HUMO_ROLES` set.
+- `baa3555`, `a3c357b` — 30-word ultra-smoke `target_length` preset added; `target_words` slider min 100→30, step 50→10.
+- `6454d91` — BUG-LOCAL-132 ultra-smoke length prompt enforces upper bound, not just floor.
+- `05a94cd` — BUG-LOCAL-130 music line mirror runs unconditionally on `ledger.music`, not gated by segments.
+- `d7b1f38` — BUG-LOCAL-131 ANNOUNCER bookend enforcer accepts bracketed VOICE format, plus deterministic ultimate fallback.
+- `7eb9754`, `53934eb` — BUG-LOCAL-129a static-radio fallback + BUG-LOCAL-128 partial fix on tail-pad.
+- `56a28f7` — BUG-LOCAL-129b drop radio-still HuMo route for non-character roles.
+- `f36ba88` — ROADMAP P0 refresh per landed routing.
+- `c74a09d` — repo cleanup: drop stale TEST workflow JSONs + archived/orphan docs.
+- `891831d`, `a33a55c`, `1265b5d`, `3b67558` — round-robin script overhauls (OpenAI Responses API, Gemini customtools-tuned, NVIDIA Nemotron 49B primary, typed error logging, BUG-LOCAL-133 stale-API-ladder fall-through pattern logged as Bible candidate).
+- `08ecfcd` — `docs/BUG_LOG.md` zeroed; all entries through 2026-05-01 promoted to survival-guide `BUG_BIBLE.yaml`.
+
+**Hardware floor (locked 2026-04-25, do not relitigate):** HuMo 14B fp8 e4m3fn scaled (`Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors`), fallback ladder kept on disk, stable shape `length=97` (3.88 s @ 25 fps) at 480x832, frame count `4n+1` rule, `humo_length_for_dur(dur_s)` snap helper.
+
+### Smoke results 2026-05-02 (FAILED twice, captured in `docs/BUG_LOG.md`)
+
+Two queues attempted via `scripts/queue_smoke.py` (new helper, correct widget indices):
+
+- **Run 1** (prompt_id `a455fc20-52e2-46e9-afe7-15ca12888b5a`): cancelled. ComfyUI Desktop launched without inheriting user-scope `HF_HOME`; Mistral-Nemo cache resolution failed in NewsCuration / NewsCurationDeep / NewsSummary phases. → BUG-LOCAL-003.
+- **Run 2** (prompt_id `e6b87239-16d4-4318-bfde-134468d32904`): failed. Relaunched ComfyUI with `HF_HOME=C:\ComfyUI-Models\huggingface` set in the launch shell; LLM loaded clean from cache. ScriptWriter generated 571 tokens but parser found 0 scenes / 0 dialogue lines / Characters: none → BUG-LOCAL-005. OpenClose 3-outline evaluator returned 0 chars on all 3 focuses; "OPENCLOSE: All outlines failed". Next `_generate_with_llm` call OOMed at peak 29.5 GB on a 16 GB device → BUG-LOCAL-004. No ledger, no mp4 produced.
+
+### What moved into `ROADMAP.md` as forward-only open work (this session)
+
+- **P0 — Sprint 1 (code work, blocks everything):** BUG-LOCAL-005 (port BUG-007 CHARACTER:/SCENE: enforcement to 30-word preset), BUG-LOCAL-004 (KV cache flush + parse-retry cap), BUG-LOCAL-006 (autouse conftest CUDA-mask fixture), BUG-LOCAL-003 (HF_HOME launcher helper + README doc).
+- **P0 — Live-test verification (your manual cycle):** BUG-128/129 acceptance list + 7 P1 audio-pipeline items, awaiting clean smoke + 3-5 real runs to flip ScriptCritic `block_on_reject` to True.
+- **Sprint 2 — harness + test-rot cleanup:** BUG-LOCAL-001 (8 stale `otr_v2.visual` test collectors), BUG-LOCAL-002 (delete soak_operator + supersoaker, replace with `scripts/otr_api.py`), 14 `test_backend_dispatch` failures triage.
+- **Sprint 3 — small code chores + B1 release blocker:** wire `OTR_BatchLTXRender` into `otr_scifi_16gb_full.json`; workflow JSON path scrub for B1.
+- **P2 / P3 / B2 / v2.0-beta candidates:** unchanged (carried forward verbatim).
+
+### Branch & tag plan
+
+`v2.0-alpha` HEAD at session start: **`08ecfcd`**. Tonight's mega-commit lands ROADMAP rewrite + Sprint 1/2/3 changes + regression + round-robin transcripts. Tag cut for v2.0-alpha continues to wait on Diff 3 + a clean end-to-end episode under the new schema. Do NOT re-base or merge to main.

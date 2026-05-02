@@ -5022,15 +5022,45 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
             log.warning("[ScriptWriter] Failed to write cast config: %s", _cast_err)
 
         # -- Open-Close Expansion --
+        # BUG-LOCAL-005 v2 (round-robin verdict 2026-05-02): ultra-smoke MUST
+        # bypass OpenClose entirely. The 3-outline evaluator holds three
+        # parallel KV caches simultaneously (Gemini's calculation: ~6 GB
+        # at 16k context BF16), which is the actual source of the
+        # 29.5-GB-on-16-GB OOM, not the final write_script forward pass.
+        # Detect the preset BEFORE _open_close_expansion fires and short-
+        # circuit. Same logic also skips for "tiny (smoke, 1 act)" since
+        # that preset is also a pipeline ping where outline competition
+        # buys nothing.
+        is_ultra_smoke = (
+            isinstance(target_length, str)
+            and target_length.lower().startswith("30 words")
+        )
+        is_tiny_smoke = (
+            isinstance(target_length, str)
+            and target_length.lower().startswith("tiny")
+        )
+        is_smoke_preset = is_ultra_smoke or is_tiny_smoke
+
         winning_outline = ""
-        _runtime_log(f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} (type={type(open_close).__name__}), "
-                     f"custom_premise='{custom_premise}' (bool={bool(custom_premise)}), "
-                     f"condition={open_close and not custom_premise}")
-        if open_close and not custom_premise:
+        _runtime_log(
+            f"ScriptWriter: OPEN-CLOSE CHECK: open_close={open_close} "
+            f"(type={type(open_close).__name__}), custom_premise='{custom_premise}' "
+            f"(bool={bool(custom_premise)}), is_ultra_smoke={is_ultra_smoke} "
+            f"is_tiny_smoke={is_tiny_smoke}, "
+            f"condition={open_close and not custom_premise and not is_smoke_preset}"
+        )
+        if open_close and not custom_premise and not is_smoke_preset:
             winning_outline = self._open_close_expansion(
                 system, style, news_block, num_characters,
                 target_words, lemmy_directive,
                 model_id, temperature, cast_roster_block=cast_roster_block
+            )
+        elif is_smoke_preset:
+            _runtime_log(
+                "ScriptWriter: OPEN-CLOSE SKIPPED for smoke preset "
+                f"(target_length={target_length!r}) -- prevents the 3-outline "
+                "evaluator from holding parallel KV caches that drove the "
+                "BUG-LOCAL-004 OOM."
             )
 
         # -- Auto-title from spine (added 2026-04-26) --
@@ -5075,7 +5105,56 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
         # downstream prompt asks the model to expand a PITCH (long episodes) or
         # an OUTLINE (short episodes) accordingly.
         oc_mode_label = "PITCH" if target_words >= 2100 else "OUTLINE"
-        if winning_outline:
+
+        # BUG-LOCAL-005 fix (2026-05-02). The "30 words (smoke, 1 act)" preset
+        # forces target_words=30, which is too short to fit the standard
+        # prompt's TITLE + SCENE + ENV + SFX + ANNOUNCER opening + multiple
+        # character lines + ANNOUNCER closing + MUSIC structure. The model
+        # degrades to either prose (no [VOICE: ...] markers) or empty output.
+        # Symptom captured 2026-05-02: 571 tokens generated, 0 scenes / 0
+        # dialogue lines / 0 characters parsed; OpenClose 3-outline evaluator
+        # returned 0 chars on all 3 focuses; downstream OOM at peak 29.5 GB
+        # after the parse-retry loop.
+        #
+        # This branch swaps in a minimal ULTRA_SMOKE prompt that (a) keeps the
+        # structural markers the parser greps for ([VOICE: ...], === SCENE 1
+        # ===, [SFX: ...], [MUSIC: ...]) and (b) tells the model that this is
+        # a pipeline ping, not a story -- ~30 words across 4 short lines is
+        # the explicit budget. Output is parseable by the existing v1/v2
+        # bracket-form parser at story_orchestrator.py:3021. Detected before
+        # the winning_outline branch so OpenClose's empty-result fallback
+        # doesn't reach the standard else-branch with an unsuitable prompt.
+        # is_ultra_smoke + is_tiny_smoke + is_smoke_preset already computed above
+        # at the OpenClose bypass (~line 5034). Re-using the same names here.
+        if is_ultra_smoke:
+            user_prompt = f"""Write a 30-WORD SMOKE-TEST fragment of "SIGNAL LOST". This is a PIPELINE PING, not a story -- the goal is to exercise the parser + audio + video chain end-to-end with the smallest possible script.
+
+EPISODE TITLE: {episode_title if episode_title else "(invent a 2-word evocative title)"}
+GENRE: {style.replace("_", " ")}
+CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+{cast_roster_block}
+TOTAL DIALOGUE BUDGET: ~30 words across the 4 lines below. Each line must be SHORT.
+
+REQUIRED OUTPUT (exactly this structure -- do NOT add scenes, do NOT add characters, do NOT add commentary or markdown):
+
+TITLE: <your 2-word title>
+=== SCENE 1 ===
+[ENV: one-sentence setting -- 8 words max]
+[SFX: one establishing sound]
+[VOICE: ANNOUNCER, female, 50s, authoritative, calm] Short opening sentence under 12 words.
+[VOICE: CHARACTER_1_NAME, gender, age, tone, energy] Short dialogue line under 8 words.
+[VOICE: CHARACTER_2_NAME, gender, age, tone, energy] Short dialogue line under 8 words.
+[VOICE: ANNOUNCER, female, 50s, authoritative, calm] Short closing sentence under 10 words.
+[MUSIC: Closing theme]
+
+CRITICAL FORMAT RULES (BUG-007 enforcement -- the parser depends on these):
+- EVERY dialogue line MUST start with `[VOICE: NAME, ...]` followed by the line. No exceptions.
+- The bracket-form `[VOICE: ...]` is the ONLY accepted dialogue tag here. Do NOT use bare `CHARACTER:` form, do NOT use `[CHARACTER, traits]` form, do NOT use prose narration.
+- The `=== SCENE 1 ===` marker MUST appear exactly once, on its own line, before any dialogue.
+- The TITLE: line MUST be the very first line of output.
+- Replace CHARACTER_1_NAME and CHARACTER_2_NAME with actual character names from the roster above. Do not leave the placeholder names.
+- DO NOT output anything before TITLE: or after [MUSIC: Closing theme]. No explanations, no analysis, no markdown."""
+        elif winning_outline:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING {oc_mode_label} below.
 
 LENGTH DIRECTIVE: {length_instruction}
@@ -5172,7 +5251,7 @@ TITLE: <your chosen title>
             # Floor at 1024 - even a 1-min episode needs enough tokens to
             # complete canonical structure (ENV, SFX, VOICE tags, beats).
             # Without the floor, 1-min = 260 tokens, which truncates mid-scene.
-            
+
             # BUG-012 FIX: Cap KV cache for direct generation in Obsidian profile.
             # Standard: 8192 limit. Obsidian: 2500 limit (protects 4GB VRAM ceiling).
             if optimization_profile == "Obsidian (UNSTABLE/4GB)":
@@ -5185,15 +5264,122 @@ TITLE: <your chosen title>
                 max_new_tokens = max(int(target_words * _TOKEN_RATIO_DIALOGUE), 1024)
                 max_new_tokens = min(max_new_tokens, 8192)
 
-            script_text = _generate_with_llm(
-                full_prompt,
-                model_id=model_id,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=active_top_p,
-                optimization_profile=optimization_profile,
-                live_ledger=True,  # L1.5: stream cast + lines to ledger
-            )
+            # BUG-LOCAL-005 v2 fix (round-robin verdict 2026-05-02): clamp
+            # max_new_tokens for the smoke presets. The 30-word ultra-smoke
+            # captured 571 tokens of degenerate output before parse-fail;
+            # all three reviewers (ChatGPT 5.5, Gemini 3.1, NVIDIA Nemotron 49B)
+            # flagged this as a runaway-generation symptom that the prompt
+            # alone won't stop. 256 fits the ~30-word ultra-smoke template
+            # (TITLE + scene marker + 4 [VOICE: ...] lines + [MUSIC:]) with
+            # generous slack. Tiny smoke gets 384 -- ~100 words across more
+            # lines but still tightly capped vs the 1024 floor that produced
+            # the runaway.
+            if is_ultra_smoke:
+                max_new_tokens = min(max_new_tokens, 256)
+            elif is_tiny_smoke:
+                max_new_tokens = min(max_new_tokens, 384)
+
+            # BUG-LOCAL-004 fix (2026-05-02). Force a hard VRAM flush before
+            # the main script-writer call when prior LLM phases (NewsSummary,
+            # CAST_CONFIG, OpenClose 3-outline + evaluator + synthesizer) have
+            # already accumulated KV cache + activation peaks. Symptom captured
+            # 2026-05-02: peak_gb=29.498 on a 16 GB device after OpenClose
+            # returned 3x 0-char outlines and write_script proceeded; next
+            # _generate_with_llm OOMed at the model.generate() forward pass.
+            # _generate_with_llm has a torch.cuda.empty_cache() in its finally
+            # block but that fires AFTER each call; here we flush BEFORE the
+            # call so cumulative state from prior calls in this turn doesn't
+            # ride along. Keeps the LLM weights resident (CLAUDE.md rule:
+            # use _flush_vram_keep_llm() between LLM phases, not
+            # force_vram_offload()).
+            try:
+                _flush_vram_keep_llm()
+                _runtime_log("ScriptWriter: VRAM flushed before main generation (BUG-LOCAL-004)")
+            except Exception as _flush_err:  # noqa: BLE001 -- never block on flush
+                log.debug(
+                    "[LLMScriptWriter] _flush_vram_keep_llm pre-main-gen failed: %s",
+                    _flush_err,
+                )
+
+            # BUG-LOCAL-004 fix (2026-05-02). Hard parse-retry cap. The 30-word
+            # ultra-smoke previously could fail to parse (0 lines), trigger
+            # WORD_EXTEND or related retry paths, and accumulate VRAM until
+            # OOM. Bounded retry: at most MAX_PARSE_RETRIES attempts; on
+            # exhaustion, accept whatever the last attempt returned and let
+            # the parse-fail observability stamp it in the ledger rather than
+            # OOM during a 4th forward pass.
+            MAX_PARSE_RETRIES = 2
+            _parse_attempt = 0
+            script_text = ""
+            while _parse_attempt < MAX_PARSE_RETRIES:
+                _parse_attempt += 1
+                _runtime_log(
+                    f"ScriptWriter: GENERATE attempt={_parse_attempt}/{MAX_PARSE_RETRIES} "
+                    f"max_new_tokens={max_new_tokens} target_words={target_words}"
+                )
+                script_text = _generate_with_llm(
+                    full_prompt,
+                    model_id=model_id,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
+                    top_p=active_top_p,
+                    optimization_profile=optimization_profile,
+                    live_ledger=True,  # L1.5: stream cast + lines to ledger
+                )
+                # Branch-aware parseability check (round-robin verdict 2026-05-02).
+                # The earlier permissive regex `^[A-Z][A-Z0-9_ ]{1,19}:\s*\S`
+                # accepted `TITLE:` and `GENRE:` as bare dialogue lines, which
+                # would falsely flag a degenerate "TITLE only" output as
+                # PARSE_OK and skip the retry -- exactly the failure mode of
+                # tonight's run. Negative-lookahead the structural markers
+                # (TITLE/SCENE/GENRE/ENV/SFX/MUSIC) so only true speaker
+                # labels count as bare-form hits. The [VOICE: ...] regex stays
+                # strict (Gemini + NVIDIA: relaxing it desyncs from the
+                # downstream parser and risks dropping audio lines, violating
+                # C7).
+                _text = script_text or ""
+                _has_scene = bool(re.search(
+                    r'^\s*===\s*SCENE\s+\d+\s*===\s*$', _text, re.MULTILINE
+                ))
+                _voice_hits = len(re.findall(
+                    r'^\s*\[VOICE:\s*[A-Z_]+', _text, re.MULTILINE
+                ))
+                _bare_hits = len(re.findall(
+                    r'^\s*(?!TITLE\b|SCENE\b|GENRE\b|ENV\b|SFX\b|MUSIC\b|VOICE\b|CAST\b|AUTHOR\b)'
+                    r'[A-Z][A-Z0-9_ ]{1,19}:\s*\S',
+                    _text, re.MULTILINE
+                ))
+                # Ultra-smoke: stricter contract -- [VOICE: ...] is the only
+                # accepted dialogue tag per its prompt's CRITICAL FORMAT RULES.
+                # Require the SCENE marker AND >=2 [VOICE:] lines. Bare-form
+                # output is a contract violation here even though the parser
+                # would technically accept it elsewhere.
+                if is_ultra_smoke:
+                    _parse_ok = _has_scene and _voice_hits >= 2
+                else:
+                    _parse_ok = _has_scene and (_voice_hits + _bare_hits) > 0
+                if _parse_ok:
+                    _runtime_log(
+                        f"ScriptWriter: PARSE_OK attempt={_parse_attempt} "
+                        f"has_scene={_has_scene} voice_hits={_voice_hits} "
+                        f"bare_hits={_bare_hits} ultra_smoke={is_ultra_smoke}"
+                    )
+                    break
+                _runtime_log(
+                    f"ScriptWriter: PARSE_FAIL attempt={_parse_attempt} "
+                    f"has_scene={_has_scene} voice_hits={_voice_hits} "
+                    f"bare_hits={_bare_hits} ultra_smoke={is_ultra_smoke} -- "
+                    + (
+                        f"flushing VRAM and retrying"
+                        if _parse_attempt < MAX_PARSE_RETRIES
+                        else "MAX_PARSE_RETRIES_EXCEEDED, accepting last output"
+                    )
+                )
+                if _parse_attempt < MAX_PARSE_RETRIES:
+                    try:
+                        _flush_vram_keep_llm()
+                    except Exception:  # noqa: BLE001
+                        pass
         else:
             # Long episodes: chunked act-by-act generation
             script_text = self._generate_chunked(

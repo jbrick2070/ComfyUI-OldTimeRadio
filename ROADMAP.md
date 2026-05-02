@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-04-30
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-02
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -49,67 +49,84 @@ CUDA 13 is non-negotiable because (1) Blackwell sm_120 support is the point, (2)
 
 ---
 
-## P0 — Active focus
+## P0 — Sprint 1: make smoke green (code work, blocks everything else)
 
-### BUG-128 + BUG-129 fix sequence (locked 2026-05-01 after round-robin + external code review)
+Tonight's smoke (2026-05-02, prompt_id `e6b87239-16d4-4318-bfde-134468d32904`) failed end-to-end. Six new entries in `docs/BUG_LOG.md`. The four fixes below unblock the entire BUG-128/129 acceptance verification — that work is already shipped in code, but cannot be observed because the pipeline cannot reach the audio path on the 30-word smoke.
 
-Two coupled bugs surfaced during QA of episode `signal_lost_..._20260501_110019`:
-- **BUG-LOCAL-128:** `_render_master_mix_per_clip_mux_mode` truncates ~70 s of dialogue audio. Two layered causes — (1) sum(clip.dur_s)=137.52 s vs ledger.total_episode_dur_s=207.39 s gap (HuMo clip < line audio + line gaps + bookend not in lines[]); (2) tail-pad `last_idx` computed before the pillarbox loop (line 556), so when `pb_failures` prunes the genuine last clip the surviving last clip has no tail pad and `-shortest` truncates trailing audio.
-- **BUG-LOCAL-129:** ANNOUNCER lines render as random women instead of the radio still. Root cause is HuMo's finetuned weights, not the conditioning code (`reference_latents` injection in `nodes_wan.py:1077` is generic Wan2.1 I2V). HuMo will not animate non-face references; the architectural premise in `_otr_speaker_role.py:12-22` ("the radio is the visual performer for non-dialogue") is wrong for HuMo as the renderer.
+### BUG-LOCAL-005 — 30-word ultra-smoke ScriptWriter output unparseable
 
-**Locked plan: three commits, in this order** (mux-first per external review — small blast radius, every downstream change inherits the fixed mux baseline):
+**Fix:** port the BUG-007 `CHARACTER:` / `SCENE:` enforcement clause from the "short (3 acts)" prompt into the "30 words (smoke, 1 act)" preset prompt in `nodes/story_orchestrator.py`. Add a unit test in `tests/test_dropdown_guardrails.py` (or a new `tests/test_30word_preset.py`) that asserts the compiled prompt contains the literal substrings `CHARACTER:` and `SCENE:` whenever `target_length.lower().startswith("30 words")`.
 
-1. **Commit 1 — BUG-128 mux fix** (single-file: `nodes/video_composite.py::_render_master_mix_per_clip_mux_mode`):
-   - Compute `last_idx` from `pillarboxed[-1]` after the pillarbox loop (or drop `-shortest` and post-trim with ffprobe-measured durations). Either fix is a few lines.
-   - Add post-mux audio packet-hash check vs procgen as a separate validator (the C7 contract is byte-identity *downstream of procgen*, not vs a WAV master — current `-c:a copy` from procgen already preserves that; the hash test just proves it).
-   - No behavior change for clean runs (where `pb_failures == 0`); fix only fires when a tail clip dies.
+**Verify:** re-queue the 30-word smoke, expect ≥3 dialogue lines parsed, ≥1 scene, 2 named characters in `ledger.cast`.
 
-2. **Commit 2 — BUG-129a static-segment generator** (additive: `nodes/video_composite.py` only, BatchHumoRender unchanged):
-   - When `_render_master_mix_per_clip_mux_mode` finds a ledger line with no clip on disk (`clip_path.is_file() == False`), instead of silently skipping (current line 512-519), generate a deterministic static segment via ffmpeg subprocess: `-loop 1 -i radio_bookend.png -frames:v <int(round(dur_s * 25))> -r 25 -c:v libx264 -pix_fmt yuv420p -an out.mp4` with `-video_track_timescale 12800` to match HuMo's container timebase (timebase mismatch breaks concat-demuxer with `-c copy`). Use `-frames:v` not `-t` for exact frame counts.
-   - Backward-compat: if all clips on disk, static path doesn't fire — output identical to current.
+### BUG-LOCAL-004 — OOM in script writer after parse-retry loop (peak 29.5 GB on 16 GB device)
 
-3. **Commit 3 — BUG-129b role policy flip** (`nodes/_otr_speaker_role.py` + `nodes/batch_humo_render.py` + LLM cast schema):
-   - Add ANNOUNCER as a real cast member in the LLM story-writer schema with description "1940s radio drama host at vintage broadcast microphone, period suit, dim studio lighting." `BatchFluxRender` produces the portrait through the existing pipeline.
-   - Reroute speaker_role: ANNOUNCER → existing portrait chain (BUG-088 resolver). `music_*` and standalone `sfx` → no HuMo render at all (the static-segment path from commit 2 fires instead).
-   - Hard assertion in BatchHumoRender dispatch: if `speaker_role in {music_open, music_close, music_inter, sfx}` and target == HuMo, fail fast.
-   - SFX disambiguation: SFX concurrent with dialogue stays on the speaking character's HuMo clip (no separate visual). Mark via `is_concurrent_with_dialogue` boolean on the ledger line; static-segment path skips concurrent SFX.
-   - Verify FLUX render width/height matches HuMo workflow's width/height (announcer portrait must match HuMo's expected resolution to avoid distortion).
+**Fix:** in `nodes/story_orchestrator.py::write_script`, add (a) explicit `_LLM_CACHE` cleanup between the OpenClose synthesizer and the main script-writer call, (b) a hard parse-retry cap (`MAX_PARSE_RETRIES = 2`) so a runaway 0-line parse fails with a clear `MAX_PARSE_RETRIES_EXCEEDED` instead of OOMing on the fourth forward pass. Audit `_generate_with_llm`'s finally block: `torch.cuda.empty_cache()` is in place but the model's internal `past_key_values` may need an explicit `del` before it fires. Log `prompt_token_count` alongside `vram_snapshot("llm_generate_entry")` so future OOMs can be bisected.
 
-**Acceptance criteria (all must hold before declaring done):**
-1. No HuMo render job ever receives the radio still (assertion in dispatch).
+**Verify:** re-queue 30-word smoke, expect peak_gb < 14.5 across the LLM ladder; if parse keeps failing, expect `MAX_PARSE_RETRIES_EXCEEDED` not `torch.OutOfMemoryError`.
+
+### BUG-LOCAL-006 — `pytest tests/` hangs at session-start when ComfyUI is on the GPU
+
+**Fix:** add `tests/conftest.py` with an autouse fixture that sets `CUDA_VISIBLE_DEVICES=""` for unit tests so collection never tries to bind to GPU. Optionally also lazy-import the heavy OTR modules from `__init__.py` so collection imports don't pull torch on path-only tests.
+
+**Verify:** `python -m pytest tests/ -q` runs to completion in <60 s with ComfyUI Desktop up on `:8000`.
+
+### BUG-LOCAL-003 — ComfyUI Desktop launch `HF_HOME` inheritance
+
+**Fix:** add `scripts/run_comfyui.cmd` that reads `HF_HOME` + `HUGGINGFACE_HUB_CACHE` from `HKCU\Environment` via PowerShell + `[Environment]::GetEnvironmentVariable(...,'User')` and exports them into the launch shell before `start "" "...\ComfyUI.exe"`. Document in `README.md` under "Running ComfyUI Desktop" section. Source patch into Electron is out of scope (third-party).
+
+**Verify:** kill ComfyUI, run `scripts/run_comfyui.cmd`, queue any episode that touches an HF model — expect `LLM tokenizer loaded from cache (no HTTP checks)` log line, no `local_files_only=True failed` errors.
+
+### Sprint 1 acceptance
+
+All four bugs marked `[FIXED]` in `docs/BUG_LOG.md`. `python -m pytest tests/` runs to completion. 30-word smoke produces a parseable script, reaches `master_mix_per_clip_mux`, ledger.json on disk.
+
+---
+
+## P0 — Live-test verification (already coded, awaits clean smoke + your manual cycle)
+
+The work below is **observation against shipped code**, not new development. Items can be checked off only after Sprint 1 lands and a clean smoke completes.
+
+### BUG-128/129 acceptance list (locked 2026-05-01)
+
+1. No HuMo render job ever receives the radio still (assertion in dispatch — already in `nodes/batch_humo_render.py`).
 2. ANNOUNCER clips l001 and l021 in a regression episode resolve to the same announcer portrait family — no generic-blonde drift.
-3. `music_*` / standalone-`sfx` segments render through the static-video path (ledger `clips[].source_kind == "static_ffmpeg"` vs `"humo"`).
+3. `music_*` / standalone-`sfx` segments render through the static-video path (`ledger.clips[].source_kind == "static_ffmpeg"` vs `"humo"`).
 4. Final mp4's extracted audio packet-hash matches procgen's audio stream byte-for-byte.
 5. Peak VRAM stays below 14.5 GB.
 6. Final video duration ≈ master mix duration (no `-shortest` truncation).
 7. `tests/test_dropdown_guardrails.py`, `tests/test_core.py`, and the Bug Bible regression all pass.
 
-**Post-Option-1 enrichment (v2.0-beta, not blocking):** ffmpeg audio-reactive overlay on the static radio segments — `showwaves` / `showspectrum` / `avectorscope` / `showvolume` filter passes composited as needle-meter or oscilloscope inset on the radio still. Pure ffmpeg, frame-deterministic, CPU only. Period-correct (1940s radios had needle meters). No model needed.
-
-**Round-robin transcripts:** `docs/2026-05-01-humo-radio-architecture__01_chatgpt.md`, `__02_gemini.md`, `__03_nvidia.md`, `__04_synthesis.md`, `__06_jeffrey_review.md`. All three external models converged on Option 1; external review pushed the sequencing from 2 commits to 3 and surfaced the tail-pad pointer bug as a separate latent issue.
-
----
-
 ### Live-test verification of the radio-coverage + bit-perfect-audio architecture
 
-The code path is in place; what's open is real-run verification. Every item below is something to confirm or surface during the next ComfyUI episode test, NOT new design work.
-
-**Verify on the next clean run (post BUG-128 + BUG-129 fixes, 2026-05-01):**
+Confirmation items, not new design work:
 
 - `ledger.lines[]` carries a `speaker_role` on every entry. No nulls, no missing rows. Roles: `character` / `announcer` / `music_open` / `music_close` / `music_inter` / `sfx`.
 - `ledger.meta.audio_path_selected = "master_mix_per_clip_mux"` and `audio_path_reason = "ok (zero audio re-encodes downstream of SignalLostVideo)"`.
 - BUG-129 routing (locked 2026-05-01):
   - `character` and `announcer` lines: `BatchHumoRender` dispatches HuMo with the cast portrait. Log line: `ref=full_env_NNNNN_.png source=ledger-cast-fresh` (or composite/portrait fallback).
   - `music_*` and standalone `sfx` lines: `BatchHumoRender` log line shows `SKIP HuMo (role=<role>, covered by VideoComposite static-radio fill)`. No HuMo render fires for these.
-  - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed (`_RADIO_ROLES` was repopulated). Test `test_speaker_role.py::test_is_radio_role_always_false_post_bug129` would also be failing.
+  - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed.
 - `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (style='space opera epic')"`).
 - BUG-129a static-fill fires for any line with no clip on disk. VideoComposite report includes `[<n_humo> humo + <n_static> static]` summary; expect static count > 0 if any music_*/sfx lines exist.
 - BUG-128 tail-pad: VideoComposite report shows `tail-pad: +0.500s on <line_id>` after the pillarbox loop completes. The line_id matches the actual surviving last clip, not necessarily the last in the original timeline.
 - Music tracks > 7s show up as multiple chunked entries (`music_open_001`, `music_open_002`, ...) — chunking math fired.
-- ffprobe on the final mp4: video + audio streams both present; final mp4 audio `codec_name == aac` (passthrough from procgen); duration ≈ master mix duration (no `-shortest` truncation).
+- ffprobe on the final mp4: video + audio streams both present; final mp4 audio `codec_name == aac` (passthrough from procgen); duration ≈ master mix duration.
 - No `[VideoComposite] master_mix_per_clip_mux FAILED` in the log. With `strict_c7=True` (default), any failure would have raised.
 
-**Open follow-ups (in priority order):**
+### P1 audio pipeline — live-test verification (7 items, code-shipped on `v2.0-alpha`)
+
+| Item | Confirmed in code | Awaits real-run observation |
+|---|---|---|
+| `min_line_count_per_character` self-critique guard | `nodes/story_orchestrator.py:6624` (default=2) | CRITIQUE_REJECTED log line on a real run where revision drops a character below 2 lines |
+| Director JSON schema + validator | `_DIRECTOR_SCHEMA` at `:9239`, `_validate_director_plan` at `:10332` | DIRECTOR_SCHEMA_REPAIR log line on a malformed director plan |
+| Length-sorted Bark batching | `nodes/batch_bark_generator.py:478` `@vram_sentinel` decorator | Throughput improvement vs unsorted baseline (10-15% expected) |
+| VRAM-Sentinel decorator | `nodes/_vram_log.py::vram_sentinel`, used in 4 nodes | VRAM_SENTINEL_ENTRY/EXIT lines bracketing every decorated phase |
+| High-creativity soak profile | "maximum chaos" in CREATIVITIES dropdown, temp 0.95 | One soak run on this tier; expect format-resilient output (no SFX loops, no [ACT N] injection) |
+| Per-LLM-call VRAM snapshots | `vram_snapshot("llm_generate_entry/exit")` at every `_generate_with_llm` boundary | Snapshot lines visible in runtime log; peak summable across phases |
+| ScriptCritic + Reviser advisory gate | `nodes/script_critic.py`, `block_on_reject` defaults False | 3-5 successful runs; flip to True after critic rate stabilizes |
+
+### Open follow-ups (P2/P3-flavored, not blocking smoke green)
 
 - **Audio codec ffprobe pre-flight** (P2) — confirm procgen audio stream is AAC before `-c:a copy` mux. One-line subprocess.run + assertion. Trivial; deferred until first run confirms procgen output codec.
 - **Post-mux audio stream identity validation** (P3) — extract per-stream packet hash on procgen vs final mp4, fail tier on mismatch. Concrete proof of bit-identity. Ship as a separate validation node since the ffmpeg incantation needs care on Windows.
@@ -130,19 +147,43 @@ The code path is in place; what's open is real-run verification. Every item belo
 
 ---
 
-## P1 — Audio pipeline (live-test cycle)
+## Sprint 2 — harness + test-rot cleanup
 
-All items code-complete and on `v2.0-alpha`; awaiting real-soak verification as episodes run.
+Pre-existing test infrastructure rot blocking the regression contract from being measurable.
 
-| Item | Summary | State |
-|---|---|---|
-| `min_line_count_per_character` self-critique guard | Floor=2 in `_critique_and_revise()`; rejects revision if any character drops below; falls back to pre-critique draft | Live-test |
-| Director JSON schema + validator | `_DIRECTOR_SCHEMA` + `_validate_director_plan()`; repairs missing entries, validates voice_preset, filters broken sfx, clamps duration | Live-test |
-| Length-sorted Bark batching | Sort by line length within preset group; script order restored at assembly. Pure throughput win | Live-test |
-| VRAM-Sentinel decorator | `vram_sentinel(phase_label, max_entry_gb)` on `BatchBarkGenerator.generate_batch()` at 6 GB ceiling. CUDA-absent safe | Live-test |
-| High-creativity soak profile | `"maximum chaos"` re-added to CREATIVITIES pool (~10% weighted). Catches temperature-sensitive regressions | Live-test |
-| Per-LLM-call VRAM snapshots | `vram_snapshot("llm_generate_entry"/"exit")` inside `_generate_with_llm()`; logs tokens + inference time | Live-test |
-| ScriptCritic + Reviser advisory gate | Wired into `otr_scifi_16gb_full.json` (id=53). Dynamic anti-slop rubric with `[applies_when]` gates filtered per-run from ledger `gen_params_initial`. Default `block_on_reject=False` | Live-test (3-5 runs before flipping `block_on_reject=True`) |
+### BUG-LOCAL-001 — 8 stale test collectors importing `otr_v2.visual`
+
+**Fix:** delete the 8 orphan test files (`tests/test_anchor_gen.py`, `test_camera_path_determinism.py`, `test_character_regression.py`, `test_cold_open_canary.py`, `test_episode_dry_run.py`, `test_lhm_monitor.py`, `test_three_minute_continuous.py`, `test_visual_phase_a.py`) OR rewrite them against the active video-stack code path. `otr_v2/visual/` was deleted in commit `7706660`; the test files were never updated. Triage during the cleanup: any test still asserting current behavior gets ported, the rest get deleted.
+
+**Verify:** `python -m pytest tests/ --collect-only -q` reports zero collection errors.
+
+### BUG-LOCAL-002 — `scripts/soak_operator.py` + `scripts/supersoaker.py` widget indices stale
+
+**Fix:** delete both scripts. Replace with `scripts/otr_api.py` containing: (a) `patch_widget(workflow, node_id, widget_name, value)` that reads `/object_info` for the node's input order and writes by name (no fragile `WV_*` positional indices), (b) `workflow_to_api_prompt(workflow, schemas)` ported from soak_operator's working converter, (c) `submit_prompt(api_prompt) -> prompt_id` and `poll_history(prompt_id, timeout_s) -> status` helpers. Rewire `scripts/queue_smoke.py` onto `otr_api.py`.
+
+**Verify:** running `scripts/queue_smoke.py` against `otr_scifi_16gb_full.json` produces a `/history` entry with `current_inputs` matching the patched values exactly (`target_words=30`, `num_characters=2`, `target_length="30 words (smoke, 1 act)"`).
+
+### Triage 14 `tests/test_backend_dispatch.py` failures (logged, root cause not yet bisected)
+
+Investigate during Sprint 2 — may be tied to the `otr_v2.visual` rot or to backend-dispatch refactors. Captured at baseline 2026-05-02: pytest -q output showed `FFFFFFFFFFFFFF` (14 failures) for this file. After Sprint 1's conftest CUDA-mask fixture is in place, re-run with `--tb=short` to capture exception types; fix or mark `xfail` with reason.
+
+---
+
+## Sprint 3 — small code chores + B1 release blocker
+
+### Wire `OTR_BatchLTXRender` into `workflows/otr_scifi_16gb_full.json` — DEFERRED
+
+Node registered in `__init__.py:155` and self-contained at `nodes/batch_ltx_render.py`, but not wired into the workflow JSON. Wiring requires (a) deciding the loader chain — LTX 0.9.x 2B fp16 doesn't need `CheckpointLoaderSimple` (C2 violation), use `UNETLoader` + `CLIPLoader` + `VAELoader` analogous to the HuMo chain; (b) connecting `ledger_json` from the existing `EpisodeAssembler` output; (c) routing `clips_dir` into `VideoComposite` as a sibling source to `BatchHumoRender`'s clips dir. The static-radio fallback (BUG-129a) covers non-character lines today, so this is a quality-improvement wiring, not a correctness fix.
+
+**Why deferred:** LTX node-graph wiring is a substantial JSON edit. CLAUDE.md ground rules say one git push attempt and that workflow JSONs must be valid before push — a wiring this size needs a dedicated smoke cycle to verify before commit, which the manual test cycle is the only path for. Schedule it as its own session after Sprint 1 fixes verify clean on a real run.
+
+**Acceptance (when wired):** queue an episode with announcer + music lines; ledger shows `clips[].source_kind == "ltx"` for those entries; final mp4's announcer / music windows show LTX-rendered radio motion (8n+1 frames, slow-mo to 12 fps), not the static-radio fallback.
+
+### B1 — Workflow JSON path scrub — VERIFIED SHIPPED 2026-05-02
+
+Re-audit on 2026-05-02 found zero hardcoded user paths in `workflows/otr_scifi_16gb_full.json`, `workflows/otr_humo_smoke.json`, `workflows/otr_flux_smoke.json`, or `workflows/otr_humo_radio_experiment.json`. The "Resonance Chamber" `LoadAudio` widget on the smoke workflow already has an empty default. The portability concern is closed; everything goes through `OTR_OUTPUT_DIR` / `folder_paths.get_output_directory()` as designed.
+
+The only remaining B1 work is documentation: `README.md` should explicitly state the env override pattern (`OTR_OUTPUT_DIR=/path/to/out`) for cloud / non-Windows installs.
 
 ---
 
@@ -182,10 +223,7 @@ Blocked on video-stack maturity. Design begins once stack empirics exist from th
 
 **Status:** Step 0 paths refactor shipped 2026-04-28 (`70f4a5c`) — `nodes/_otr_paths.py` helper module with resolution order: `OTR_OUTPUT_DIR` env → `folder_paths.get_output_directory()` → walk-up to ComfyUI root → cwd fallback. ~12-15 hardcoded `r"C:\Users\jeffr\..."` strings replaced.
 
-**Remaining:**
-- Workflow JSON path scrub: `workflows/otr_scifi_16gb_full.json` (`LoadAudio` widget hard-pinned `C:\...` mp4) and `workflows/otr_humo_smoke.json` (Resonance Chamber fixture path).
-- Lean toward auto-discover with placeholder defaults for the smoke (preserves drag-and-queue UX); empty defaults for the FULL workflow (audio comes from upstream nodes anyway).
-- Validation: `OTR_OUTPUT_DIR=/tmp/otr_test pytest tests/` runs cleanly with the override; documented in `README.md` for cloud / non-default installs.
+**Remaining:** see Sprint 3 above.
 
 **Why it's a release blocker:** every Windows-absolute path is a portability blocker for any non-Jeffrey user (Linux/Mac/RunPod/cloud) and a portability blocker for the 8GB-tier work. v2.0 cannot ship while paths are user-and-OS-specific.
 
@@ -315,7 +353,7 @@ NOT replacing the canonical pipeline (Bark + Kokoro + MusicGen + AudioGen → ma
 | **6** | **Qwen3-TTS** | needs license audit | unknown | **C7 RISK** | **RESEARCH LANE.** Gemini flags autoregressive + flow-matching hybrid as hard to make byte-identical. Highly expressive but requires deep C7 verification before any merge. |
 
 **REJECTED candidates:**
-- **Parler-TTS Mini** — owner preference; vintage broadcast sound stays in the deterministic DSP mastering chain (band-limit + tube saturation + plate flavor + noise floor + AM EQ). Pinned exactly there, model-side stylization rejected.
+- **Parler-TTS Mini** — owner preference; vintage broadcast sound stays in the deterministic DSP mastering chain (band-limit + tube saturation + plate flavor + noise floor + AM EQ).
 - **Fish Speech** — license incompatible with MIT downstream.
 - **XTTS / Tortoise / StyleTTS family** — license ambiguity, Windows friction, C7 determinism risk. Evaluate only if a specific gap appears that priorities 1-4 don't fill.
 
@@ -373,13 +411,9 @@ Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_P
 
 - `CLAUDE.md` — project rules, platform pins, Desktop Commander git pattern
 - `docs/BUG_LOG.md` — live bug tracking
-- `docs/ROADMAP_HISTORY.md` — historical session logs and shipped-work archive (everything that used to live in this file)
+- `docs/ROADMAP_HISTORY.md` — historical session logs and shipped-work archive
 - `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
-- `docs/2026-04-30-project-qa__04_synthesis.md` — earlier round-robin QA pass (OpenAI + Gemini + NVIDIA — NVIDIA was a non-vote due to context overflow)
-- `docs/2026-04-30-ltx-tts-april2026__01_chatgpt.md` — ChatGPT (gpt-5.4) round on background-model + TTS-palette decisions
-- `docs/2026-04-30-ltx-tts-april2026-gemini__02_gemini.md` — Gemini (gemini-3-pro-preview) follow-up
-- `docs/2026-04-30-ltx-tts-april2026-nvidia__03_nvidia.md` — NVIDIA (mistral-nemotron) round; **discounted** for hallucinated specifics (fabricated `voxpopuli/tts-v2.1`, fake CosyVoice commit SHA, line numbers that don't match codebase)
-- **Pending:** next round-robin pass on the v2.0-beta `Background-model selection` and `TTS palette expansion` matrices in this file, using the gpt-5.5 ladder (added to `scripts/_consult_round_robin.py` 2026-04-30)
+- `docs/2026-05-02-v2.0-beta-sprint-qa/` — round-robin QA on Sprint 1/2/3 plan (this session)
 - Survival guide / Bug Bible: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
 ---
