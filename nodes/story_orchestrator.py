@@ -5597,11 +5597,31 @@ TITLE: <your chosen title>
         # -- STEP 2: ANNOUNCER BOOKENDS (on raw text) -----------------
         # Check if ANNOUNCER lines exist. If not, generate and inject.
         # Runs after word extension so the ANNOUNCER sees the full story.
-        _has_announcer_open = bool(re.search(
-            r'^ANNOUNCER\s*:', script_text[:500], re.MULTILINE
+        #
+        # BUG-LOCAL-131 fix (2026-05-01): the previous regex only
+        # matched the bare-colon format `^ANNOUNCER:` but the modern
+        # LLM prompt asks for the bracketed VOICE-tag format
+        # `[VOICE: ANNOUNCER, gender, age, ...]`. The bare-colon
+        # check almost always failed against modern output, which
+        # forced the fallback _generate_announcer_bookends path to
+        # fire every run -- and when that secondary LLM call also
+        # produced empty output, the episode shipped with NO
+        # ANNOUNCER lines at all. Now matches BOTH formats so a
+        # native LLM emission is recognized correctly.
+        _ANNOUNCER_BOOKEND_RX = re.compile(
+            r'^(?:ANNOUNCER\s*:|\[VOICE\s*:\s*ANNOUNCER\b)',
+            re.MULTILINE | re.IGNORECASE,
+        )
+        # Widen the head/tail sniff windows -- 500 chars is too narrow
+        # when the LLM emits a long opening preamble before the first
+        # ANNOUNCER tag (and similarly for the tail). 2000 chars on
+        # each end captures the announcer slot under any reasonable
+        # narrative pacing.
+        _has_announcer_open = bool(_ANNOUNCER_BOOKEND_RX.search(
+            script_text[:2000]
         ))
-        _has_announcer_close = bool(re.search(
-            r'^ANNOUNCER\s*:', script_text[-500:], re.MULTILINE
+        _has_announcer_close = bool(_ANNOUNCER_BOOKEND_RX.search(
+            script_text[-2000:]
         ))
         if not _has_announcer_open or not _has_announcer_close:
             _runtime_log(
@@ -5624,6 +5644,37 @@ TITLE: <your chosen title>
                 _news_head, _char_names, _effective_cleanup_id,
                 optimization_profile,
             )
+            # BUG-LOCAL-131 ultimate fallback (2026-05-01): if the
+            # secondary LLM call (_generate_announcer_bookends) also
+            # produced empty output, the episode would have shipped
+            # WITHOUT ANNOUNCER lines at all (Jeffrey: "we should
+            # always have an announcer close end and end as
+            # requirement"). Backfill with deterministic placeholder
+            # text keyed off the episode title so the bookend is
+            # ALWAYS present, even when both LLM passes fail.
+            _safe_title = (
+                str(episode_title).strip()
+                if isinstance(episode_title, str) and episode_title.strip()
+                else "tonight's broadcast"
+            )
+            if not opening_text:
+                opening_text = (
+                    f"From the static between worlds, you're listening "
+                    f"to Signal Lost. Tonight: {_safe_title}."
+                )
+                _runtime_log(
+                    "ANNOUNCER_RAW: secondary LLM produced empty opening "
+                    "-- using deterministic fallback (BUG-131 safety net)"
+                )
+            if not closing_text:
+                closing_text = (
+                    f"And so concludes tonight's signal. "
+                    f"Until next we tune in."
+                )
+                _runtime_log(
+                    "ANNOUNCER_RAW: secondary LLM produced empty closing "
+                    "-- using deterministic fallback (BUG-131 safety net)"
+                )
             if not _has_announcer_open and opening_text:
                 script_text = f"ANNOUNCER: {opening_text}\n\n{script_text}"
                 _runtime_log(f"ANNOUNCER_RAW: Prepended opening ({len(opening_text)} chars)")
