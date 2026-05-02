@@ -71,6 +71,80 @@ def _flush_vram_keep_llm():
         gc.collect()
 
 
+# ---------------------------------------------------------------------------
+# Parse-check helper for the script-writer retry loop (BUG-LOCAL-004 + 005).
+#
+# Extracted to module scope 2026-05-02 so tests can lock the parse contract
+# without driving the whole `write_script` method end-to-end. The loop in
+# `write_script` uses `_check_parse_ok(text, is_ultra_smoke=..., is_tiny_smoke=...)`
+# and acts on the returned mapping.
+#
+# Round-robin verdict 2026-05-02 (gpt-5.5 / gemini-3.1-pro-customtools /
+# nemotron-49b): the bare-form regex MUST negative-lookahead the structural
+# markers (TITLE/SCENE/GENRE/ENV/SFX/MUSIC/VOICE/CAST/AUTHOR) so a degenerate
+# "TITLE: only" output cannot falsely PARSE_OK. The [VOICE: ...] regex stays
+# strict to mirror the downstream parser at story_orchestrator.py:3021,
+# avoiding C7 violations where the orchestrator passes a script the parser
+# then drops dialogue from.
+# ---------------------------------------------------------------------------
+import re as _re  # noqa: E402 -- placed after _flush_vram_keep_llm
+
+_PARSE_CHECK_SCENE_RE = _re.compile(
+    r'^\s*===\s*SCENE\s+\d+\s*===\s*$', _re.MULTILINE
+)
+_PARSE_CHECK_VOICE_RE = _re.compile(
+    r'^\s*\[VOICE:\s*[A-Z_]+', _re.MULTILINE
+)
+_PARSE_CHECK_BARE_RE = _re.compile(
+    r'^\s*(?!TITLE\b|SCENE\b|GENRE\b|ENV\b|SFX\b|MUSIC\b|VOICE\b|CAST\b|AUTHOR\b)'
+    r'[A-Z][A-Z0-9_ ]{1,19}:\s*\S',
+    _re.MULTILINE,
+)
+
+
+def _check_parse_ok(
+    text: str,
+    *,
+    is_ultra_smoke: bool = False,
+    is_tiny_smoke: bool = False,
+) -> dict:
+    """Cheap structural-marker parseability check for script-writer output.
+
+    Returns a dict with keys:
+        has_scene  -- bool, `=== SCENE N ===` marker present at least once
+        voice_hits -- int, count of `[VOICE: NAME...]` line starts
+        bare_hits  -- int, count of bare `CHARACTER:` line starts (excluding
+                      structural markers like TITLE/SCENE/GENRE/etc.)
+        parse_ok   -- bool, branch-aware verdict:
+                        ultra-smoke -> has_scene AND voice_hits >= 2
+                        tiny-smoke  -> has_scene AND voice_hits >= 4
+                        standard    -> has_scene AND (voice_hits + bare_hits) > 0
+
+    The cap of voice_hits >= 2 for ultra-smoke matches the prompt's REQUIRED
+    OUTPUT structure (2 character lines plus 2 ANNOUNCER lines == 4 voice
+    lines; require >= 2 to tolerate one missing line). For tiny-smoke the
+    template asks for ~6-8 voice lines; require >= 4 to allow modest droppage.
+    """
+    text = text or ""
+    has_scene = bool(_PARSE_CHECK_SCENE_RE.search(text))
+    voice_hits = len(_PARSE_CHECK_VOICE_RE.findall(text))
+    bare_hits = len(_PARSE_CHECK_BARE_RE.findall(text))
+
+    if is_ultra_smoke:
+        parse_ok = has_scene and voice_hits >= 2
+    elif is_tiny_smoke:
+        parse_ok = has_scene and voice_hits >= 4
+    else:
+        parse_ok = has_scene and (voice_hits + bare_hits) > 0
+
+    return {
+        "has_scene": has_scene,
+        "voice_hits": voice_hits,
+        "bare_hits": bare_hits,
+        "parse_ok": parse_ok,
+    }
+
+
 # Lazy heavy imports (Section 8) - torch, numpy, transformers inside methods/classes only
 
 log = logging.getLogger("OTR")
@@ -5154,6 +5228,44 @@ CRITICAL FORMAT RULES (BUG-007 enforcement -- the parser depends on these):
 - The TITLE: line MUST be the very first line of output.
 - Replace CHARACTER_1_NAME and CHARACTER_2_NAME with actual character names from the roster above. Do not leave the placeholder names.
 - DO NOT output anything before TITLE: or after [MUSIC: Closing theme]. No explanations, no analysis, no markdown."""
+        elif is_tiny_smoke:
+            # BUG-LOCAL-005 v3 (round-robin follow-up 2026-05-02): apply the
+            # smoke-template pattern to the older "tiny (smoke, 1 act)" 100-word
+            # preset too. Same structural marker contract as ultra-smoke,
+            # scaled to ~6-8 voice lines (~100 words). Reviewers ChatGPT 5.5
+            # and NVIDIA Nemotron 49B explicitly recommended this when
+            # reviewing the ultra-smoke fix; the OpenClose bypass already
+            # fires for tiny-smoke so this prompt completes the parity.
+            user_prompt = f"""Write a 100-WORD SMOKE-TEST fragment of "SIGNAL LOST". This is a PIPELINE PING with slightly more breathing room than the 30-word ultra-smoke -- still NOT a story. The goal is to exercise the parser + audio + video chain end-to-end on a script just large enough to surface multi-line bugs (line ordering, beat boundaries, music chunking) without committing to a 5-minute render.
+
+EPISODE TITLE: {episode_title if episode_title else "(invent a 3-word evocative title)"}
+GENRE: {style.replace("_", " ")}
+CHARACTERS: {num_characters} speaking roles plus ANNOUNCER
+{cast_roster_block}
+TOTAL DIALOGUE BUDGET: ~100 words across the 7 lines below. Each line should land between 8 and 18 words.
+
+REQUIRED OUTPUT (exactly this structure -- do NOT add scenes, do NOT add characters, do NOT add commentary or markdown):
+
+TITLE: <your 3-word title>
+=== SCENE 1 ===
+[ENV: one-sentence setting]
+[SFX: one establishing sound]
+[VOICE: ANNOUNCER, female, 50s, authoritative, calm] Opening sentence -- introduce time, place, premise. 14 words max.
+[VOICE: CHARACTER_1_NAME, gender, age, tone, energy] First dramatic line. 12 words max.
+[VOICE: CHARACTER_2_NAME, gender, age, tone, energy] Reaction or counter-line. 12 words max.
+[SFX: action sound]
+[VOICE: CHARACTER_1_NAME, gender, age, tone, energy] Second beat. 12 words max.
+[VOICE: CHARACTER_2_NAME, gender, age, tone, energy] Closing exchange. 12 words max.
+[VOICE: ANNOUNCER, female, 50s, authoritative, calm] Closing sentence -- echo the science hook. 14 words max.
+[MUSIC: Closing theme]
+
+CRITICAL FORMAT RULES (BUG-007 enforcement -- the parser depends on these):
+- EVERY dialogue line MUST start with `[VOICE: NAME, ...]` followed by the line. No exceptions.
+- The bracket-form `[VOICE: ...]` is the ONLY accepted dialogue tag here. Do NOT use bare `CHARACTER:` form, do NOT use `[CHARACTER, traits]` form, do NOT use prose narration.
+- The `=== SCENE 1 ===` marker MUST appear exactly once, on its own line, before any dialogue.
+- The TITLE: line MUST be the very first line of output.
+- Replace CHARACTER_1_NAME and CHARACTER_2_NAME with actual character names from the roster above. Do not leave the placeholder names.
+- DO NOT output anything before TITLE: or after [MUSIC: Closing theme]. No explanations, no analysis, no markdown."""
         elif winning_outline:
             user_prompt = f"""Write a complete episode of "SIGNAL LOST" based on the WINNING {oc_mode_label} below.
 
@@ -5326,49 +5438,32 @@ TITLE: <your chosen title>
                     optimization_profile=optimization_profile,
                     live_ledger=True,  # L1.5: stream cast + lines to ledger
                 )
-                # Branch-aware parseability check (round-robin verdict 2026-05-02).
-                # The earlier permissive regex `^[A-Z][A-Z0-9_ ]{1,19}:\s*\S`
-                # accepted `TITLE:` and `GENRE:` as bare dialogue lines, which
-                # would falsely flag a degenerate "TITLE only" output as
-                # PARSE_OK and skip the retry -- exactly the failure mode of
-                # tonight's run. Negative-lookahead the structural markers
-                # (TITLE/SCENE/GENRE/ENV/SFX/MUSIC) so only true speaker
-                # labels count as bare-form hits. The [VOICE: ...] regex stays
-                # strict (Gemini + NVIDIA: relaxing it desyncs from the
-                # downstream parser and risks dropping audio lines, violating
-                # C7).
-                _text = script_text or ""
-                _has_scene = bool(re.search(
-                    r'^\s*===\s*SCENE\s+\d+\s*===\s*$', _text, re.MULTILINE
-                ))
-                _voice_hits = len(re.findall(
-                    r'^\s*\[VOICE:\s*[A-Z_]+', _text, re.MULTILINE
-                ))
-                _bare_hits = len(re.findall(
-                    r'^\s*(?!TITLE\b|SCENE\b|GENRE\b|ENV\b|SFX\b|MUSIC\b|VOICE\b|CAST\b|AUTHOR\b)'
-                    r'[A-Z][A-Z0-9_ ]{1,19}:\s*\S',
-                    _text, re.MULTILINE
-                ))
-                # Ultra-smoke: stricter contract -- [VOICE: ...] is the only
-                # accepted dialogue tag per its prompt's CRITICAL FORMAT RULES.
-                # Require the SCENE marker AND >=2 [VOICE:] lines. Bare-form
-                # output is a contract violation here even though the parser
-                # would technically accept it elsewhere.
-                if is_ultra_smoke:
-                    _parse_ok = _has_scene and _voice_hits >= 2
-                else:
-                    _parse_ok = _has_scene and (_voice_hits + _bare_hits) > 0
+                # Branch-aware parseability check via the module-level helper
+                # `_check_parse_ok` (BUG-LOCAL-004/005, round-robin verdict
+                # 2026-05-02). Helper extracted so tests can lock the contract
+                # without driving the full write_script() method.
+                _check = _check_parse_ok(
+                    script_text,
+                    is_ultra_smoke=is_ultra_smoke,
+                    is_tiny_smoke=is_tiny_smoke,
+                )
+                _has_scene = _check["has_scene"]
+                _voice_hits = _check["voice_hits"]
+                _bare_hits = _check["bare_hits"]
+                _parse_ok = _check["parse_ok"]
                 if _parse_ok:
                     _runtime_log(
                         f"ScriptWriter: PARSE_OK attempt={_parse_attempt} "
                         f"has_scene={_has_scene} voice_hits={_voice_hits} "
-                        f"bare_hits={_bare_hits} ultra_smoke={is_ultra_smoke}"
+                        f"bare_hits={_bare_hits} "
+                        f"smoke=ultra:{is_ultra_smoke}/tiny:{is_tiny_smoke}"
                     )
                     break
                 _runtime_log(
                     f"ScriptWriter: PARSE_FAIL attempt={_parse_attempt} "
                     f"has_scene={_has_scene} voice_hits={_voice_hits} "
-                    f"bare_hits={_bare_hits} ultra_smoke={is_ultra_smoke} -- "
+                    f"bare_hits={_bare_hits} "
+                    f"smoke=ultra:{is_ultra_smoke}/tiny:{is_tiny_smoke} -- "
                     + (
                         f"flushing VRAM and retrying"
                         if _parse_attempt < MAX_PARSE_RETRIES

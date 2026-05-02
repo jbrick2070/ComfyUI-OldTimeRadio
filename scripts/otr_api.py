@@ -94,6 +94,120 @@ def _is_widget_backed(spec: Any) -> bool:
     return False
 
 
+def _spec_for(node_type: str, widget_name: str, schemas: dict) -> Any:
+    """Return the raw input-spec for a (node_type, widget_name) pair.
+
+    Looks at the schema's required+optional dicts; returns the spec value
+    (a tuple/list/str) so callers can introspect type + choices. Raises
+    KeyError if the widget is not declared on the node.
+    """
+    if node_type not in schemas:
+        raise KeyError(
+            f"node_type {node_type!r} not in /object_info schemas"
+        )
+    schema = schemas[node_type].get("input", {}) or {}
+    required = schema.get("required", {}) or {}
+    optional = schema.get("optional", {}) or {}
+    if widget_name in required:
+        return required[widget_name]
+    if widget_name in optional:
+        return optional[widget_name]
+    raise KeyError(
+        f"widget {widget_name!r} not declared on node_type {node_type!r}"
+    )
+
+
+def _validate_widget_value(
+    node_type: str,
+    widget_name: str,
+    spec: Any,
+    value: Any,
+) -> None:
+    """Assert `value` is compatible with the declared widget `spec`.
+
+    BUG-LOCAL-002 follow-up (round-robin recommendation 2026-05-02): the
+    name-keyed patcher protects against widget-position drift, but does not
+    catch a caller passing the wrong VALUE shape (e.g. `True` for a STRING
+    field, or `"medium"` for an INT). This helper adds a light type/range
+    guardrail: COMBO values must be in the declared choice list, INT/FLOAT/
+    BOOL/STRING must match Python types.
+
+    Permissive on `None` (treated as "use default"). Permissive on numeric
+    coercion (int -> FLOAT is fine; bool -> INT is rejected because bool is
+    a subclass of int and we want to catch True/False being mis-routed).
+    Raises ValueError on mismatch with a clear message naming the node + widget.
+    """
+    if value is None:
+        return  # caller deliberately omitting -- let ComfyUI use the default
+
+    type_def = (
+        spec[0]
+        if isinstance(spec, (list, tuple)) and len(spec) > 0
+        else spec
+    )
+
+    # Dropdown / COMBO -- type_def is the list of choices.
+    if isinstance(type_def, list):
+        if value not in type_def:
+            raise ValueError(
+                f"widget {widget_name!r} on node_type {node_type!r} is a "
+                f"COMBO with choices {type_def!r}; got {value!r} which is "
+                f"not in the choice list."
+            )
+        return
+
+    if not isinstance(type_def, str):
+        # Unknown spec shape -- skip validation rather than refuse.
+        return
+
+    t = type_def.upper()
+
+    if t == "BOOLEAN" or t == "BOOL":
+        if not isinstance(value, bool):
+            raise ValueError(
+                f"widget {widget_name!r} on node_type {node_type!r} is "
+                f"{t}; expected bool, got {type(value).__name__} ({value!r})"
+            )
+        return
+
+    if t == "INT":
+        # Reject bool (which is a subclass of int) because mistaken
+        # True/False routed into an INT field is a real bug class.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(
+                f"widget {widget_name!r} on node_type {node_type!r} is "
+                f"INT; expected int, got {type(value).__name__} ({value!r})"
+            )
+        return
+
+    if t == "FLOAT":
+        # Accept int -> float coercion (caller passing 0 to a FLOAT field
+        # is a normal Python idiom); reject bool.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(
+                f"widget {widget_name!r} on node_type {node_type!r} is "
+                f"FLOAT; expected number, got {type(value).__name__} "
+                f"({value!r})"
+            )
+        return
+
+    if t == "STRING":
+        if not isinstance(value, str):
+            raise ValueError(
+                f"widget {widget_name!r} on node_type {node_type!r} is "
+                f"STRING; expected str, got {type(value).__name__} "
+                f"({value!r})"
+            )
+        return
+
+    if t == "COMBO":
+        # COMBO with no inline choices -- e.g. dynamic enum populated at
+        # runtime. Skip choice validation.
+        return
+
+    # Unknown primitive -- skip.
+
+
 def _ordered_widget_names(node_type: str, schemas: dict) -> list[str]:
     """Return the widget-backed input names for a node type, in declaration order.
 
@@ -145,6 +259,28 @@ def patch_widget_by_name(
             f"widget {widget_name!r} not in widget order for {node_type!r}. "
             f"Known widgets: {widget_names!r}"
         )
+
+    # BUG-LOCAL-002 follow-up (round-robin recommendation 2026-05-02):
+    # validate the value's TYPE/CHOICES against the declared widget spec
+    # before writing. Wrong-type writes are still legal at the JSON level
+    # (the workflow is just text), but they manifest as silent runtime
+    # degradation -- e.g. a bool written to a STRING field becomes the
+    # literal string "True" downstream. Refuse loudly here so the call site
+    # gets a clear error instead of producing an episode that drifts on a
+    # mistyped widget value.
+    _spec = _spec_for(node_type, widget_name, schemas)
+    _validate_widget_value(node_type, widget_name, _spec, value)
+
+    # BUG-LOCAL-002 follow-up round 2 (round-robin verdict 2026-05-02):
+    # `None` is the documented "use the node's default" sentinel. Returning
+    # early here -- AFTER validation has accepted it -- prevents a literal
+    # `null` from being written into the workflow's widgets_values slot.
+    # Many ComfyUI core nodes treat `null` as a parser error rather than
+    # a default-fallback, so patching a value of `None` previously could
+    # crash the run at queue-time. Match the documented behavior in the
+    # _validate_widget_value docstring: None means "leave the slot alone".
+    if value is None:
+        return
 
     # ComfyUI's UI saves widgets_values in either "stripped" or "preserved"
     # mode depending on which widgets were converted to sockets. For pure
