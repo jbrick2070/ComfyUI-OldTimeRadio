@@ -145,22 +145,25 @@ class TestRolePredicates:
         )
 
     @pytest.mark.parametrize("role", [
+        SR.SPEAKER_ROLE_ANNOUNCER,
         SR.SPEAKER_ROLE_MUSIC_OPEN,
         SR.SPEAKER_ROLE_MUSIC_CLOSE,
         SR.SPEAKER_ROLE_MUSIC_INTER,
         SR.SPEAKER_ROLE_SFX,
     ])
-    def test_never_humo_roles_are_music_and_sfx(self, role):
+    def test_never_humo_roles_include_announcer_music_and_sfx(self, role):
+        # BUG-LOCAL-134 architecture (2026-05-01): announcer joins
+        # music_*/sfx in never-humo. The radio IS the host -- announcer
+        # voice plays under LTX-animated radio, no face render.
         assert SR.is_never_humo_role(role) is True
 
     @pytest.mark.parametrize("role", [
         SR.SPEAKER_ROLE_CHARACTER,
-        SR.SPEAKER_ROLE_ANNOUNCER,
     ])
-    def test_character_and_announcer_can_use_humo(self, role):
-        # BUG-LOCAL-129b: announcer is intentionally NOT in the
-        # never-humo set -- if the LLM emits ANNOUNCER as a cast
-        # member with a portrait, HuMo renders it like any character.
+    def test_only_character_can_use_humo(self, role):
+        # BUG-LOCAL-134 architecture (2026-05-01): only character
+        # dialogue lines dispatch HuMo. Announcer/music/sfx all route
+        # through LTX with the radio still as I2V ref.
         assert SR.is_never_humo_role(role) is False
 
     @pytest.mark.parametrize("role", [

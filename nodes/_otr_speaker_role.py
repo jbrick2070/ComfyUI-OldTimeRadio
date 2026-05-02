@@ -82,12 +82,19 @@ VALID_SPEAKER_ROLES = (
 _RADIO_ROLES: frozenset[str] = frozenset()
 
 
-# Roles that must NEVER trigger a HuMo render even if a portrait is
-# somehow resolvable. music_*/sfx-standalone visual coverage is the
-# job of the VideoComposite static-fill path (BUG-129a). Defense in
-# depth so a future regression that adds these to the cast portrait
-# pool can't reintroduce the problem.
+# Roles that must NEVER trigger a HuMo render. These get visual
+# coverage from LTX-2.3 (post-2026-05-01 architecture, BUG-LOCAL-134):
+# load the radio_bookend.png as I2V ref, animate the radio while the
+# audio plays underneath. Aesthetic intent: classic 1940s old-time
+# radio -- listener doesn't see the announcer's face, sees the radio
+# set. Only character DIALOGUE gets a face (HuMo lip-sync).
+#
+# Jeffrey 2026-05-01: announcer added to this set alongside music/sfx.
+# "the radio IS the host" -- announcer voice plays under animated radio,
+# no human face needed for the host. Closes the BUG-131 announcer-
+# cast-portrait dependency entirely.
 _NEVER_HUMO_ROLES = frozenset({
+    SPEAKER_ROLE_ANNOUNCER,
     SPEAKER_ROLE_MUSIC_OPEN,
     SPEAKER_ROLE_MUSIC_CLOSE,
     SPEAKER_ROLE_MUSIC_INTER,
@@ -161,17 +168,23 @@ def is_radio_role(role: str) -> bool:
 def is_never_humo_role(role: str) -> bool:
     """True iff the role must NEVER dispatch a HuMo render.
 
-    Currently covers ``music_open``, ``music_close``, ``music_inter``,
-    ``sfx``. These roles get visual coverage via VideoComposite's
-    deterministic static-radio fill path (BUG-129a). Even if a
-    portrait somehow resolves for one of these speakers (e.g., an
-    SFX line gets the same speaker name as a real character), the
-    dispatch must short-circuit before HuMo is invoked.
+    Covers ``announcer``, ``music_open``, ``music_close``,
+    ``music_inter``, ``sfx``. These roles get visual coverage via
+    LTX-2.3 animating the radio_bookend.png (BUG-LOCAL-134
+    architecture, locked 2026-05-01). Only ``character`` dispatches
+    HuMo for dialogue lip-sync; everything else is "the radio is the
+    performer."
 
-    ``announcer`` is intentionally NOT in this set: announcer lines
-    SHOULD render via HuMo if the LLM emits ANNOUNCER as a cast
-    member with a portrait; if no portrait resolves they fall through
-    to the VideoComposite static-fill path naturally.
+    Even if a portrait somehow resolves for one of these speakers
+    (e.g., an SFX line shares a speaker name with a real character),
+    the dispatch must short-circuit before HuMo is invoked.
+
+    Pre-2026-05-01: ``announcer`` was NOT in this set -- it was
+    expected to render via HuMo with a host portrait. That changed
+    with the LTX-radio routing decision: the announcer voice plays
+    under the animated radio set, no human face for the host. Closes
+    the BUG-131 dependency on having an ANNOUNCER cast member with
+    a portrait.
     """
     return role in _NEVER_HUMO_ROLES
 
