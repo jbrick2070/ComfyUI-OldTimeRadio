@@ -1363,6 +1363,12 @@ class EpisodeAssembler:
                     # = total_master - closing_dur. Write them by
                     # cue_id match against ledger.music[].
                     _music_rows = _led.get("music") or []
+                    log.info(
+                        "[EpisodeAssembler] music_rows=%d segments=%d "
+                        "(BUG-LOCAL-130 diagnostic)",
+                        len(_music_rows),
+                        len(segments) if segments else 0,
+                    )
                     if _music_rows and segments:
                         _opening_dur_s = (
                             float(segments[0].shape[-1]) / float(sample_rate)
@@ -1389,10 +1395,25 @@ class EpisodeAssembler:
                                 _mc["dur_s"] = _closing_dur_s
                                 _mc["start_s_space"] = "master_mix"
 
+                    # BUG-LOCAL-130 fix (2026-05-01): the music-line
+                    # mirror was previously nested inside the
+                    # `if _music_rows and segments:` block, so any
+                    # workflow ordering that left `segments` empty (or
+                    # any silent exception in the placement step
+                    # above) skipped the mirror entirely -- ledger.music
+                    # had valid opening/closing entries but
+                    # ledger.lines never got music_* mirror lines, so
+                    # VideoComposite saw no music timeline and the
+                    # audio bookend played without visual coverage.
+                    # Mirror now runs unconditionally on _music_rows
+                    # (filters per-row for valid start_s_space + dur_s).
+                    if _music_rows:
                         # ROADMAP P0 step 4c (2026-04-30): mirror music
                         # cues into ledger.lines[] with speaker_role so
-                        # BatchHumoRender renders them as HuMo clips
-                        # using the radio still as I2V reference.
+                        # downstream visual coverage (post-BUG-129b:
+                        # VideoComposite static-radio fill, since
+                        # music_*/sfx no longer dispatch to HuMo)
+                        # has the per-cue ledger entries to walk.
                         #
                         # 2026-04-30 round-robin hardening:
                         #   (a) Chunk music tracks > HUMO_MAX_CLIP_DUR_S
@@ -1522,6 +1543,17 @@ class EpisodeAssembler:
                                 })
                                 _appended_music += 1
 
+                        # BUG-LOCAL-130 diagnostic: log mirror outcome
+                        # ALWAYS, even when 0 lines appended, so silent
+                        # zero-mirror runs are visible in the log.
+                        log.info(
+                            "[EpisodeAssembler] music mirror outcome: "
+                            "music_rows=%d appended=%d chunked_cues=%d "
+                            "stale_removed=%d existing_music_ids=%d",
+                            len(_music_rows), _appended_music,
+                            _chunked_cues, _removed,
+                            len(_existing_music_ids),
+                        )
                         if _appended_music or _removed:
                             # (c) Sort the entire lines[] by start_s
                             # so dialogue + announcer + sfx + music
@@ -1543,9 +1575,11 @@ class EpisodeAssembler:
                                 "[EpisodeAssembler] music mirror: "
                                 "appended=%d, chunked_cues=%d, "
                                 "stale_removed=%d, total_lines=%d "
-                                "(BatchHumoRender wall-to-wall coverage "
-                                "via radio still I2V ref; chunks fit "
-                                "the %.1fs HuMo cap)",
+                                "(post-BUG-129b: music_*/sfx covered "
+                                "by VideoComposite static-radio fill, "
+                                "chunks fit the %.1fs HuMo cap as a "
+                                "future-proofing for any HuMo-eligible "
+                                "music role)",
                                 _appended_music, _chunked_cues,
                                 _removed, len(_lines_for_music),
                                 _HUMO_MAX_CLIP_DUR_S,
