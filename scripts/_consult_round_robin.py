@@ -64,18 +64,27 @@ OPENAI_MODELS = [
     "gpt-4.1",
     "gpt-4o-mini",
 ]
+# 2026-05-01 EVENING -- Gemini ladder rebuilt per Gemini 3.1 Pro's
+# own guidance to Jeffrey:
+#   gemini-3-pro-preview shut down March 2026; redirects/fails now.
+#   gemini-pro-latest / gemini-flash-latest aliases resolve unpredictably.
+#   gemini-2.5-* legacy; outclassed by 3.x in intelligence + token efficiency.
+# Active tier list:
+#   gemini-3.1-pro-preview        : flagship reasoning (1M ctx)
+#   gemini-3-flash-preview        : mid-tier balance (1M ctx, multimodal)
+#   gemini-3.1-flash-lite-preview : high-volume / cost-sensitive baseline
 GEMINI_MODELS = [
-    "gemini-3-pro-preview",        # current reasoning flagship
-    "gemini-3.1-pro-preview",      # even newer, may be gated
-    "gemini-pro-latest",           # stable alias to current pro
-    "gemini-2.5-pro",
-    "gemini-3-flash-preview",      # fast tier
+    "gemini-3.1-pro-preview",
+    "gemini-3-flash-preview",
     "gemini-3.1-flash-lite-preview",
-    "gemini-flash-latest",
-    "gemini-2.5-flash",
 ]
 
-OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+# 2026-05-01 EVENING -- switched OpenAI calls from /v1/chat/completions
+# to /v1/responses so the "pro" + reasoning-tuned variants in the ladder
+# (gpt-5.5-pro, gpt-5.4-pro, gpt-5.5 with effort="medium") actually work.
+# Chat/completions silently 4xxs them. Responses is the canonical
+# endpoint for the gpt-5.x line per platform.openai.com/docs/models.
+OPENAI_URL = "https://api.openai.com/v1/responses"
 GEMINI_URL_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 )
@@ -109,18 +118,88 @@ def _read_env_var(name: str, expected_prefix: str | None = None) -> str:
     return value
 
 
+def _extract_responses_text(data: dict) -> str:
+    """Pull the assistant text out of a /v1/responses result body.
+
+    The Responses API response shape (raw HTTP, no SDK):
+
+        {
+          "id": "...",
+          "object": "response",
+          "model": "gpt-5.5",
+          "output": [
+            {
+              "type": "message",
+              "role": "assistant",
+              "content": [
+                {"type": "output_text", "text": "..."}
+              ]
+            }
+          ],
+          ...
+        }
+
+    The SDK exposes a convenience ``response.output_text`` field; the raw
+    HTTP payload sometimes mirrors it as a top-level ``output_text`` for
+    convenience too. Try both, then walk the output array as a fallback.
+    """
+    # Convenience field (when present).
+    if isinstance(data.get("output_text"), str) and data["output_text"].strip():
+        return data["output_text"]
+    # Walk the output array, collect every output_text fragment in order.
+    chunks: list[str] = []
+    for item in data.get("output") or []:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "message":
+            # Reasoning items (type="reasoning") and tool calls show up here
+            # too; we only want the assistant message text.
+            continue
+        for part in item.get("content") or []:
+            if not isinstance(part, dict):
+                continue
+            ptype = part.get("type")
+            if ptype in ("output_text", "text") and isinstance(part.get("text"), str):
+                chunks.append(part["text"])
+    return "\n".join(c for c in chunks if c)
+
+
 def call_openai(prompt: str, system: str, api_key: str) -> tuple[str, str]:
-    """Returns (model_used, response_text).  Falls through model-not-found."""
+    """Call the OpenAI Responses API with model fallthrough.
+
+    Returns (model_used, response_text). Falls through on:
+      - HTTP 404/400 with "model"/"not_found" in body (model unknown)
+      - HTTP 403 (account doesn't have access to this model)
+      - HTTP 429 (rate-limited; try a cheaper next-rung model)
+      - HTTP 400 with "endpoint" / "responses" / "support" hints
+        (some models are scoped to specific endpoints)
+    Re-raises on auth errors (401), other 400s with no model hint, and
+    transport errors (DNS, TLS, etc.) -- those won't be fixed by the next
+    rung.
+
+    Logs the actual error type per Jeffrey 2026-05-01 EVENING note so a
+    misconfigured key (permission_error vs model_not_found vs rate_limit)
+    is visible without having to instrument the script later.
+    """
     last_err = ""
     for model in OPENAI_MODELS:
-        body = json.dumps({
+        # Responses API request shape. Reasoning models (gpt-5.x) accept
+        # the ``reasoning.effort`` knob; older models ignore it cleanly.
+        is_reasoning = model.startswith("gpt-5") or "codex" in model
+        body_dict: dict = {
             "model": model,
-            "messages": [
+            "input": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.4,
-        }).encode("utf-8")
+        }
+        if is_reasoning:
+            body_dict["reasoning"] = {"effort": "medium"}
+        else:
+            # Older models support classic temperature; reasoning models
+            # don't (it's controlled by reasoning.effort instead).
+            body_dict["temperature"] = 0.4
+        body = json.dumps(body_dict).encode("utf-8")
         req = urllib.request.Request(
             OPENAI_URL,
             data=body,
@@ -133,21 +212,64 @@ def call_openai(prompt: str, system: str, api_key: str) -> tuple[str, str]:
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            content = data["choices"][0]["message"]["content"]
+            content = _extract_responses_text(data)
+            if not content.strip():
+                # Empty response -- treat as failure, fall through.
+                last_err = f"{model} -> empty response (parse mismatch?)"
+                print(
+                    f"[openai] {model} returned empty text -- trying next...",
+                    file=sys.stderr,
+                )
+                continue
             return (model, content)
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", errors="replace")
             last_err = f"{model} -> HTTP {e.code}: {err_body[:300]}"
+            err_lower = err_body.lower()
+            # Per Jeffrey 2026-05-01: log the real error type so we can
+            # tell model_not_found from permission/rate/endpoint errors.
+            print(
+                f"[openai] {model}: HTTP {e.code} -- "
+                f"{err_body[:140].replace(chr(10), ' ')}",
+                file=sys.stderr,
+            )
+            should_fall_through = False
             if e.code in (404, 400) and (
-                "model" in err_body.lower() or "not_found" in err_body.lower()
+                "model" in err_lower
+                or "not_found" in err_lower
+                or "endpoint" in err_lower
+                or "responses" in err_lower
+                or "support" in err_lower
             ):
-                print(f"[openai] {model} unavailable, trying next...", file=sys.stderr)
+                # Wrong model name OR model not on this endpoint OR
+                # request shape mismatch -- next rung.
+                should_fall_through = True
+            elif e.code == 403:
+                # Account lacks access to this model -- next rung.
+                should_fall_through = True
+            elif e.code == 429:
+                # Rate limit -- try cheaper model in the ladder.
+                should_fall_through = True
+            if should_fall_through:
+                print(
+                    f"[openai] {model} unavailable, trying next...",
+                    file=sys.stderr,
+                )
                 continue
+            # 401 (bad key), other 400s, 5xx -- not fixable by next rung.
+            raise RuntimeError(last_err) from e
+        except (urllib.error.URLError, TimeoutError) as e:
+            # Transport layer failure: DNS, TLS, connection refused,
+            # timeout. Probably won't be fixed by the next rung either.
+            last_err = f"{model} -> {type(e).__name__}: {e}"
             raise RuntimeError(last_err) from e
         except Exception as e:
             last_err = f"{model} -> {type(e).__name__}: {e}"
+            print(f"[openai] {model}: {type(e).__name__} -- {e}", file=sys.stderr)
             raise RuntimeError(last_err) from e
-    raise RuntimeError(f"All OpenAI models failed. Last error: {last_err}")
+    raise RuntimeError(
+        f"All OpenAI models in ladder failed. Last error: {last_err}"
+    )
 
 
 def call_gemini(prompt: str, system: str, api_key: str) -> tuple[str, str]:
