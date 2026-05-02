@@ -536,6 +536,22 @@ class BatchFluxRender:
             "[BatchFluxRender] radio bookend %s mode (seed=%d)",
             mode, int(radio_bookend_seed),
         )
+        # 2026-05-01 EVENING (Jeffrey): override radio dims to match
+        # the LTX/VideoComposite consumer dims directly. The radio
+        # bookend feeds (1) OTR_BatchLTXRender as I2V ref at 832x480
+        # native LTX render dims, and (2) VideoComposite's static-
+        # radio fallback (BUG-129a) at canvas dims (also 832x480 post
+        # the native-res downscale). Rendering FLUX at 832x480 directly
+        # avoids the bilinear stretch at consumer time AND gives the
+        # FLUX prompt a landscape canvas (more natural for a wide
+        # broadcast console with knobs spread horizontally) instead of
+        # forcing the model into a square frame with wood paneling
+        # filler top/bottom.
+        # Cast stills DON'T get this override -- they keep the user's
+        # widget dims (typically 1024x1024) because HuMo I2V works
+        # best with square face crops.
+        _RADIO_BOOKEND_W = 832
+        _RADIO_BOOKEND_H = 480
         try:
             self._render_and_save_radio_bookend(
                 # widget_str is "" in DYNAMIC mode -- callee detects
@@ -547,7 +563,8 @@ class BatchFluxRender:
                 decoder=decoder, negative=negative,
                 seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
                 sampler_name=sampler_name, scheduler=scheduler,
-                width=width, height=height, guidance=guidance,
+                width=_RADIO_BOOKEND_W, height=_RADIO_BOOKEND_H,
+                guidance=guidance,
                 report_lines=report_lines,
             )
         except Exception as exc:
