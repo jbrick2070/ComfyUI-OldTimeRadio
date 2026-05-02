@@ -1437,6 +1437,12 @@ class EpisodeAssembler:
                         # margin so we never feed BatchHumoRender a
                         # boundary case.  Mirrors HUMO_MAX_FRAMES /
                         # HUMO_FPS in nodes/batch_humo_render.py.
+                        # 2026-05-01 EVENING (Jeffrey): post-BUG-129b
+                        # music cues go to LTX, not HuMo. LTX is capped
+                        # at the same 177-frame / 7s value to keep the
+                        # chunking math identical for both renderers
+                        # ("to make it easy"). See
+                        # nodes/batch_ltx_render.py LTX_MAX_FRAMES=177.
                         _HUMO_MAX_CLIP_DUR_S = 7.0
 
                         _lines_for_music = _led.get("lines") or []

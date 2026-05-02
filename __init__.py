@@ -142,6 +142,17 @@ _NODE_MODULES = {
     # Replaces scripts/render_humo_batch.py for production use; the
     # CLI script stays as an ad-hoc smoke tool.
     "OTR_BatchHumoRender":         (".nodes.batch_humo_render", "BatchHumoRender", " Batch HuMo Render"),
+    # v2.0 in-graph batch LTX-2 renderer for non-character ledger lines
+    # (announcer / music_open / music_close / music_inter / sfx).
+    # Loads LTX-Video 2B + T5 once, loops every non-character ledger
+    # line internally, feeds the radio_bookend.png as BOTH start and
+    # end keyframes via LTXVAddGuide for seamless loop, writes per-line
+    # clips alongside HuMo's output at
+    # output/otr/videos/<ep_id>/<line_id>.mp4. Architecture locked
+    # 2026-05-01 with Jeffrey after BUG-LOCAL-129 settled that HuMo
+    # cannot animate non-face references; LTX is the answer for
+    # "the radio is the visual performer for non-dialogue."
+    "OTR_BatchLTXRender":          (".nodes.batch_ltx_render", "BatchLTXRender", " Batch LTX Render (radio for music/sfx/announcer)"),
     # v2.0 in-graph episode compositor. Pillarbox HuMo center 624x1080
     # in 1920x1080 canvas + additive-blend SignalLostVideo proc gen at
     # 50% opacity + audio mux from proc gen. Single ffmpeg invocation.
