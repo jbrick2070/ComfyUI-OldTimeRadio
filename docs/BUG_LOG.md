@@ -5,6 +5,17 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-132: Ultra-smoke length prompt is a floor, not a ceiling -- 30-word smoke runs ship 200+ words and burn hours of HuMo render [FIXED in 6454d91]
+
+- **Date:** 2026-05-01 ~20:30 (Jeffrey live observation: "I thought I did" the 30-word smoke -- confirmed: target_length was set correctly, target_words got forced to 30, but LLM produced 234 words anyway in the skindeep_microneedle run) | **Phase:** 0 | **Bible candidate:** YES (textbook prompt-without-ceiling pattern; "AT LEAST N" gives the LLM permission to overshoot indefinitely)
+- **Symptom:** User picks `target_length="30 words (smoke, 1 act)"` (the new ultra-smoke preset added in `baa3555`). target_words gets correctly forced to 30 in the runtime log, BUT the resulting episode has 234 words / 9 lines (8x overshoot) and renders 9 HuMo clips taking ~3 hours -- exactly what the smoke preset was supposed to avoid.
+- **Cause:** The prompt at `story_orchestrator.py:4556-4562` instructed: "MANDATORY: ... AT LEAST {target_words} words ... Do NOT stop until you have written at least {target_words} words." That's a floor with no upper bound. Mistral-Nemo (and any LLM) takes "at least 30" as permission to write whatever feels narratively complete -- 30 words is too short for a meaningful arc, so the LLM rationally overshoots into the hundreds. The `_min_lines` floor still applied (BUG-132 hardening lowered it to 3 for ultra-smoke) but the LLM was free to write much longer LINES.
+- **Fix:** Branch the length instruction on `_target_words <= 50`. For ultra-smoke, prompt now says: "MANDATORY ULTRA-SMOKE: ... EXACTLY {target_words} words (range: {target_words}-{ceiling} HARD CAP) ... STOP writing as soon as you have a beginning, middle, and end that fit in {ceiling} words. Long monologues are FORBIDDEN." Ceiling = `max(target_words + 10, target_words * 1.4)`. For target=30, ceiling=42. Lines max = `max(_min_lines + 1, int(_min_lines * 1.5))`. Standard episodes (>50 words) keep the original "AT LEAST" phrasing because long-form dialogue should be free to grow into the full target.
+- **Verify:** Next clean run with `target_length="30 words (smoke, 1 act)"` after Comfy restart: ledger.total_word_count between 25 and 45, ledger.lines.Count between 3 and 6, total HuMo clips between 3 and 5, total wall-clock under 30 minutes.
+- **Tags:** prompt-floor-without-ceiling, llm-overshoot, smoke-preset, target_words-vs-actual-words, story-orchestrator
+
+---
+
 ### BUG-LOCAL-131: ANNOUNCER bookend enforcer regex doesn't match bracketed VOICE format -> episodes ship without announcer when secondary LLM fallback also fails [FIXED in d7b1f38]
 
 - **Date:** 2026-05-01 ~17:50 (Jeffrey live-tail observation: "we should always have an announcer close end and end as requirement") | **Phase:** 0 | **Bible candidate:** YES (textbook regex-format-drift after a prompt-format change)
