@@ -36,16 +36,33 @@ _LEADING_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}(-|$)")
 ROOT = Path(__file__).resolve().parent.parent
 CONSULT_BASE = ROOT / "docs"
 
+# 2026-05-01 EVENING -- OpenAI ladder rebuilt per current docs
+# (platform.openai.com/docs/models, developers.openai.com/api).
+#   - gpt-5.5         : flagship reasoning/coding (recommended default)
+#   - gpt-5.5-pro     : slower, higher-quality (Responses API only)
+#   - gpt-5.4         : prior frontier; serious work
+#   - gpt-5.4-pro     : Responses API only
+#   - gpt-5.4-mini    : low-latency / cheap testing
+#   - gpt-5.4-nano    : even cheaper
+#   - gpt-5.3-codex   : current coding-tuned (replaces gpt-5.1-codex-max)
+#   - gpt-5           : older flagship, still works
+#   - gpt-4.1         : last-gen fallback
+#   - gpt-4o-mini     : final fallback (plain gpt-4o is deprecated)
+# Dropped per docs review:
+#   gpt-5.1-codex-max  (deprecated by 5.3-codex)
+#   gpt-5.3-chat-latest (ChatGPT-only model, not for API use)
+#   gpt-4o             (deprecated)
 OPENAI_MODELS = [
     "gpt-5.5",
     "gpt-5.5-pro",
     "gpt-5.4",
     "gpt-5.4-pro",
-    "gpt-5.1-codex-max",
-    "gpt-5.3-chat-latest",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.3-codex",
     "gpt-5",
     "gpt-4.1",
-    "gpt-4o",
+    "gpt-4o-mini",
 ]
 GEMINI_MODELS = [
     "gemini-3-pro-preview",        # current reasoning flagship
