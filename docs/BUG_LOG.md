@@ -5,6 +5,34 @@ Every bug gets logged the moment it is found. Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-131: ANNOUNCER bookend enforcer regex doesn't match bracketed VOICE format -> episodes ship without announcer when secondary LLM fallback also fails [FIXED in d7b1f38]
+
+- **Date:** 2026-05-01 ~17:50 (Jeffrey live-tail observation: "we should always have an announcer close end and end as requirement") | **Phase:** 0 | **Bible candidate:** YES (textbook regex-format-drift after a prompt-format change)
+- **Symptom:** Some episodes ship without ANNOUNCER intro/outro lines despite the LLM prompt explicitly requiring them at lines 3700-3722. The check at `story_orchestrator.py:5600-5605` uses regex `^ANNOUNCER\s*:` against the first/last 500 chars of the raw script. The modern LLM prompt (line 5085, 5122) instructs the LLM to emit the bookends as `[VOICE: ANNOUNCER, gender, age, ...] dialogue` -- bracketed-VOICE format, not bare-colon. The bare-colon regex never matches the modern format, so `_has_announcer_open` and `_has_announcer_close` are always False. That forces the secondary LLM fallback `_generate_announcer_bookends` to fire every run. When the secondary call returns empty (LLM produced no output), nothing is injected and the episode ships ANNOUNCER-less.
+- **Cause:** Regex format drift. The bookend-detection regex was written when the prompt asked for bare-colon format; the prompt was updated to bracketed-VOICE format but the regex was not updated to match. Compounding factor: the secondary LLM call has no ultimate fallback -- if it returns empty, the original ANNOUNCER-less script ships unchanged.
+- **Fix:**
+  1. Regex now matches BOTH formats: `^(?:ANNOUNCER\s*:|\[VOICE\s*:\s*ANNOUNCER\b)` with `IGNORECASE`. Also widened the head/tail sniff window from 500 to 2000 chars so a long opening preamble doesn't hide the announcer tag.
+  2. Deterministic ultimate fallback: if `_generate_announcer_bookends` returns empty for either bookend, backfill with placeholder text keyed off `episode_title` so ANNOUNCER lines are ALWAYS present even when both LLM passes fail.
+- **Verify:** All 11 regex cases pass in `outputs/verify_announcer_regex.py` (matches: bare-colon, bracketed-VOICE, mixed-case, multiline, after-preamble; non-matches: regular text, other-character VOICE tags, the word "announcer" mid-sentence, "ANNOUNCEMENT:"). Live-run verification: ledger.lines[0].speaker_role and ledger.lines[-1].speaker_role both = "announcer" on the next clean run.
+- **Tags:** regex-format-drift, llm-prompt-mismatch, missing-bookends, ultimate-fallback, story-orchestrator
+
+---
+
+### BUG-LOCAL-130: Music line mirror gated by `segments` -> ledger.music has valid opening/closing rows but ledger.lines never gets music_* mirror lines, so VideoComposite has no music timeline coverage [FIXED in 05a94cd]
+
+- **Date:** 2026-05-01 ~17:45 (Jeffrey live-tail observation: "we do want music for every episode" + "this one not gen music") | **Phase:** 0 | **Bible candidate:** YES (silent-skip via nested-conditional gate, identical class to BUG-127's fast_batch early-return)
+- **Symptom:** Completed runs (e.g. `signal_lost_nasa_artemis_ii_..._20260501_110019`) show:
+  - `ledger.music` has 3 rows: opening (start_s=0, dur_s=10, start_s_space=master_mix), closing (start_s=199.39, dur_s=8, start_s_space=master_mix), interstitial (no placement)
+  - `ledger.transitions` has 2 rows confirming the EpisodeAssembler ledger-update block ran
+  - But `ledger.lines` has 0 entries with `mirrored_from="music"` and 0 entries with `speaker_role` in `{music_open, music_close, music_inter}`
+  - Net effect: VideoComposite walks ledger.lines[] for the timeline and sees no music-bookend coverage. After BUG-129a, this would mean static-radio fills only fire if the music rows exist as lines; without the mirror, the audio bookend music plays without visual coverage.
+- **Cause:** In `scene_sequencer.py` (EpisodeAssembler post-mix ledger update block), the music-line mirror loop at line 1419+ was nested inside `if _music_rows and segments:` (line 1366) -- the same gate that does the placement step (stamping start_s/dur_s on opening/closing music rows). Any workflow ordering or silent exception that left `segments` empty/falsy bypassed BOTH the placement AND the mirror in a single branch.
+- **Fix:** Split the gate. Placement step still runs under `if _music_rows and segments:` (it computes durations from audio segments). Mirror step now runs under a separate `if _music_rows:` so it processes whatever music rows exist, regardless of `segments` state. Per-row filter at line 1459-1463 still rejects rows missing `start_s_space=master_mix` or non-positive `dur_s` -- so a row with no placement still skips, but rows that already have valid placement (e.g. from a prior run) get mirrored. Added unconditional log line at the end of the loop (`music mirror outcome: music_rows=%d appended=%d ...`) so silent zero-mirror runs are visible in the log.
+- **Verify:** Next clean run with default `open_close=True`: ledger.lines includes `music_opening_001`, `music_closing_001` (and chunked `_002` if cue duration > 7 s). VideoComposite report shows `[N humo + M static]` with M >= 2 (music_open + music_close static fills). EpisodeAssembler log emits `music mirror outcome: music_rows=3 appended=2 chunked_cues=0 stale_removed=0 existing_music_ids=N`.
+- **Tags:** silent-conditional-skip, segments-gate-collateral-damage, ledger-music-vs-lines-divergence, mirror-step, scene-sequencer, post-bug-129a-companion
+
+---
+
 ### BUG-LOCAL-129: ANNOUNCER lines render as character faces despite ledger stamping ref_source="radio-still (announcer)" — radio bookend PNG renders correctly, but HuMo dispatch ignores it [FIXED in 53934eb + 7eb9754 + commit pending: 3-commit sequence per ROADMAP P0]
 
 - **Date:** 2026-05-01 ~14:45 (surfaced when Jeffrey opened the per-clip folder and saw zero radio imagery in any clip thumbnail) | **Phase:** 0 | **Bible candidate:** YES (ledger-vs-reality divergence; the diagnostic logs were "right" while the visual was wrong)
