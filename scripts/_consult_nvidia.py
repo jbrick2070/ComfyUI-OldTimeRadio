@@ -46,17 +46,25 @@ CONSULT_BASE = ROOT / "docs"
 API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 TIMEOUT_SEC = 180
 
-# Default ladder, newest / strongest first.  We try in order and fall back
-# on 404 / 400 ("model not found") so the script keeps working as NVIDIA
-# rotates the catalog.  Mistral-Nemotron is the OTR baseline because it
-# matches the local stack flavor.
+# Default ladder rebuilt 2026-05-01 EVENING per Jeffrey's routing
+# guidance for OTR consultations (architecture / code / bug fixes).
+#   1. Nemotron 49B  -- primary for agentic and code-pipeline tasks,
+#                       optimized for iterative tool-use + terminal
+#                       commands. Right tool for OTR's
+#                       architecture-decision consults.
+#   2. Qwen3 235B    -- heavy MoE reasoner. Bring in only if Nemotron
+#                       can't crack a logic error. Slow but deep.
+#   3. Mistral-Nemotron -- familiar baseline (matches OTR's local
+#                       Mistral-Nemo flavor, useful as a third voice
+#                       that thinks like the local writer LLM).
+# Older fallbacks dropped: meta/llama-3.3-70b-instruct,
+# mistralai/mistral-large-3-675b, stepfun-ai/step-3.5-flash. Those
+# weren't recommended specifically and the top three cover OTR's
+# needs without diluting the round-robin diversity.
 DEFAULT_MODELS = [
-    "mistralai/mistral-nemotron",
     "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-    "meta/llama-3.3-70b-instruct",
-    "mistralai/mistral-large-3-675b",
-    "stepfun-ai/step-3.5-flash",
     "qwen/qwen3-235b-a22b-instruct-2507",
+    "mistralai/mistral-nemotron",
 ]
 
 

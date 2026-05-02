@@ -64,19 +64,39 @@ OPENAI_MODELS = [
     "gpt-4.1",
     "gpt-4o-mini",
 ]
-# 2026-05-01 EVENING -- Gemini ladder rebuilt per Gemini 3.1 Pro's
-# own guidance to Jeffrey:
-#   gemini-3-pro-preview shut down March 2026; redirects/fails now.
-#   gemini-pro-latest / gemini-flash-latest aliases resolve unpredictably.
-#   gemini-2.5-* legacy; outclassed by 3.x in intelligence + token efficiency.
-# Active tier list:
-#   gemini-3.1-pro-preview        : flagship reasoning (1M ctx)
-#   gemini-3-flash-preview        : mid-tier balance (1M ctx, multimodal)
-#   gemini-3.1-flash-lite-preview : high-volume / cost-sensitive baseline
+# 2026-05-01 EVENING -- Gemini ladder rebuilt per nested Gemini 3.1
+# Pro guidance to Jeffrey, refined version of the routing rules:
+#   gemini-3.1-pro-preview-customtools : primary for OTR's actual use
+#       case (architecture/bug/code consults). The "customtools" variant
+#       is explicitly tuned for bash/custom tool workflows, which maps
+#       directly to OTR's "ingest a workflow JSON + a code excerpt + a
+#       stack trace + reason" pattern.
+#   gemini-3.1-pro-preview : same model without the tool-tuned wrapper,
+#       for when customtools doesn't fit the request shape.
+#   gemini-3-flash-preview : fast multimodal tier. OTR's consults are
+#       text-only today, but flash keeps a usable rung in the ladder
+#       AND is the right primary if a future caller passes
+#       image/video/PDF (Design QA path). 1M ctx, function calling,
+#       code execution, computer use, structured outputs.
+# Dropped from prior ladder:
+#   gemini-3-pro-preview         (shut down March 2026)
+#   gemini-pro-latest            (alias resolves unpredictably)
+#   gemini-flash-latest          (alias)
+#   gemini-2.5-pro / -flash      (legacy, outclassed by 3.x)
+#   gemini-3.1-flash-lite-preview (high-volume/cost-sensitive tier
+#                                  not used by OTR consults)
+#
+# ROUTING NOTE: this ladder is for TEXT-ONLY architecture consults
+# (the OTR use case as of 2026-05-01). For image/video/frame Design
+# QA, the right move is a separate caller targeting
+# gemini-3-flash-preview with image content blocks + a structured
+# checklist payload (screenshot + goal + constraints + checklist +
+# ask for pass/fail JSON). Don't route image-bearing payloads
+# through this round-robin.
 GEMINI_MODELS = [
+    "gemini-3.1-pro-preview-customtools",
     "gemini-3.1-pro-preview",
     "gemini-3-flash-preview",
-    "gemini-3.1-flash-lite-preview",
 ]
 
 # 2026-05-01 EVENING -- switched OpenAI calls from /v1/chat/completions
