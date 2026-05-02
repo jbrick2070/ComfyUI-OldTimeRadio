@@ -536,22 +536,31 @@ class BatchFluxRender:
             "[BatchFluxRender] radio bookend %s mode (seed=%d)",
             mode, int(radio_bookend_seed),
         )
-        # 2026-05-01 EVENING (Jeffrey): override radio dims to match
-        # the LTX/VideoComposite consumer dims directly. The radio
-        # bookend feeds (1) OTR_BatchLTXRender as I2V ref at 832x480
-        # native LTX render dims, and (2) VideoComposite's static-
-        # radio fallback (BUG-129a) at canvas dims (also 832x480 post
-        # the native-res downscale). Rendering FLUX at 832x480 directly
-        # avoids the bilinear stretch at consumer time AND gives the
-        # FLUX prompt a landscape canvas (more natural for a wide
-        # broadcast console with knobs spread horizontally) instead of
-        # forcing the model into a square frame with wood paneling
-        # filler top/bottom.
+        # 2026-05-01 EVENING (Jeffrey, post round-robin pixel-policy
+        # synthesis): render the radio still at FLUX-native ~1MP, then
+        # Lanczos-downscale to 832x480 before save.
+        #
+        # Why 1248x720:
+        #   - FLUX is trained on a ~1MP pixel manifold. Rendering below
+        #     ~1MP (e.g. 832x480 = 0.4MP) degrades composition + anatomy
+        #     visibly per Gemini round-robin 2026-05-01 (both ladders
+        #     converged on this).
+        #   - 1248x720 is EXACT 1.7333:1 (= 832/480), so no aspect
+        #     distortion and no crop math when downscaling. Both round-
+        #     robin runs proposed 1344x768 (1.75:1) which requires a
+        #     center-crop to 1332x768 to preserve aspect; 1248x720
+        #     is the cleaner alternative the consults didn't surface.
+        #   - 1248/8 = 156 and 720/8 = 90, both mod-8 valid for FLUX.
+        #   - 1248/832 = 1.5 exactly and 720/480 = 1.5 exactly --
+        #     clean integer-ratio downscale, no fractional resampling.
+        #   - 0.898 MP is a hair below FLUX's 1MP sweet spot but well
+        #     within its trained manifold (FLUX handles 0.85-1.15 MP
+        #     fluently per community benchmarks).
         # Cast stills DON'T get this override -- they keep the user's
         # widget dims (typically 1024x1024) because HuMo I2V works
         # best with square face crops.
-        _RADIO_BOOKEND_W = 832
-        _RADIO_BOOKEND_H = 480
+        _RADIO_BOOKEND_W = 1248
+        _RADIO_BOOKEND_H = 720
         try:
             self._render_and_save_radio_bookend(
                 # widget_str is "" in DYNAMIC mode -- callee detects
@@ -702,11 +711,40 @@ class BatchFluxRender:
         stills_dir.mkdir(parents=True, exist_ok=True)
         out_path = stills_dir / f"radio_bookend_{episode_id}.png"
 
-        # Save image. img is shape [1, H, W, C] tensor; convert to PIL.
+        # 2026-05-01 EVENING: render at FLUX-native 1248x720 (above),
+        # then Lanczos-downscale to the canonical 832x480 consumer dims
+        # before saving. Result on disk is the same 832x480 PNG every
+        # downstream node already expects (LTX I2V ref, VideoComposite
+        # static-radio fill via BUG-129a) -- no consumer code needs to
+        # change. The downscale gives us FLUX's 1MP-class detail compressed
+        # cleanly into 832x480, instead of asking FLUX to render at
+        # sub-megapixel where it composes weakly. Lanczos is the
+        # canonical anti-aliased downsample for high-frequency detail
+        # like dial markings + tube edges -- bilinear (PIL.BILINEAR)
+        # would soften the radio's mechanical detail.
+        _CONSUMER_W = 832
+        _CONSUMER_H = 480
+
+        # Save image. img is shape [1, H, W, C] tensor; convert to PIL,
+        # downscale Lanczos, then save.
         try:
             arr = img[0].detach().cpu().numpy() if hasattr(img, "detach") else np.asarray(img[0])
             arr = np.clip(arr * 255.0, 0, 255).astype("uint8")
-            Image.fromarray(arr).save(out_path)
+            pil_img = Image.fromarray(arr)
+            # Only downscale if we rendered larger than consumer dims.
+            # Defensive: a future override could pass _RADIO_BOOKEND_W ==
+            # _CONSUMER_W in which case PIL.resize would still work but
+            # be a no-op.
+            if pil_img.width > _CONSUMER_W or pil_img.height > _CONSUMER_H:
+                pil_img = pil_img.resize(
+                    (_CONSUMER_W, _CONSUMER_H), Image.Resampling.LANCZOS,
+                )
+                log.info(
+                    "[BatchFluxRender] radio still Lanczos-downscaled "
+                    "%dx%d -> %dx%d (FLUX-native render -> consumer dims)",
+                    arr.shape[1], arr.shape[0], _CONSUMER_W, _CONSUMER_H,
+                )
+            pil_img.save(out_path)
         except Exception as exc:
             log.warning(
                 "[BatchFluxRender] radio still save failed: %s", exc,
