@@ -738,14 +738,14 @@ class LLMScriptCritic:
         t0 = time.time()
         script = script or ""
 
-        # Pull rubric params + inherited model/genre from the ledger's
+        # Pull rubric params + inherited model/style from the ledger's
         # gen_params_initial. The writer stamps these at workflow entry
         # (BUG-72), so they're the ground truth for what the user
         # selected on the LLMScriptWriter widgets. We do NOT expose
         # critic_model_id or style as critic-node widgets -- one
         # place to configure them keeps the UI clean and prevents drift.
         rubric_params: dict = {}
-        inherited_genre = "hard sci fi"
+        inherited_style = "hard sci fi"
         inherited_model = "google/gemma-4-E4B-it"  # last-resort fallback
         inherited_profile = "Standard"
         inherited_source = "fallback (no ledger params)"
@@ -754,7 +754,7 @@ class LLMScriptCritic:
             led_data = get_ledger().data
             rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
             if rubric_params.get("style"):
-                inherited_genre = str(rubric_params["style"])
+                inherited_style = str(rubric_params["style"])
             # Critic uses the writer's CLEANUP model when available so
             # the same widget that controls the writer's structural
             # cleanup pass also controls the critic. If the user wants
@@ -782,7 +782,7 @@ class LLMScriptCritic:
             )
 
         critic_model_id = inherited_model
-        style = inherited_genre
+        style = inherited_style
         optimization_profile = inherited_profile
 
         if not script.strip():
@@ -798,7 +798,7 @@ class LLMScriptCritic:
             return (script, script_json, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
 
         log.info(
-            "[ScriptCritic] inherited from %s: model=%s genre=%s profile=%s",
+            "[ScriptCritic] inherited from %s: model=%s style=%s profile=%s",
             inherited_source, critic_model_id, style, optimization_profile,
         )
 

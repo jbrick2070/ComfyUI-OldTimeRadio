@@ -2737,8 +2737,8 @@ def _derive_title_from_script_lines(lines, style=""):
         pass
     # Final fallback: timestamped derivative so each run is unique and
     # the filename layer never regresses to a stuck default.
-    genre = (style or "transmission").replace("_", " ").title()
-    return f"{genre} Transmission {int(time.time()) % 100000}"
+    _style_label = (style or "transmission").replace("_", " ").title()
+    return f"{_style_label} Transmission {int(time.time()) % 100000}"
 
 
 def _extract_all_dialogue(text):
@@ -7164,7 +7164,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                      (similarity * 100, len(revised_text) / len(draft_text) * 100))
         return revised_text
 
-    def _generate_chunked(self, system, title, genre, num_chars,
+    def _generate_chunked(self, system, title, style, num_chars,
                           target_words, premise, news_block, act_breaks,
                           model_id, temperature, target_length="medium (5 acts)",
                           lemmy_directive="", top_p=0.95,
@@ -7198,7 +7198,7 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
 
 Create a detailed OUTLINE for a {target_words}-word episode of "SIGNAL LOST."
 Title: {title}
-Genre: {genre.replace("_", " ")}
+Style: {style.replace("_", " ")}
 Characters: {num_chars} speaking roles plus ANNOUNCER
 {cast_roster_block}
 {lemmy_directive}
@@ -7478,7 +7478,7 @@ Write Act {act_num} now:"""
 
         return combined
 
-    def _execute_arc_enhancer(self, script_text, genre, title, news_block, model_id, temperature, optimization_profile="Standard", critique_findings="", act_summaries=None):
+    def _execute_arc_enhancer(self, script_text, style, title, news_block, model_id, temperature, optimization_profile="Standard", critique_findings="", act_summaries=None):
         """Phase A-C: Paired opening + closing bookend rewrite for narrative coherence.
         
         v1.5: Now accepts optional critique_findings and act_summaries.
@@ -7545,7 +7545,7 @@ DIRECTIONS:
 6. Do NOT contradict the MIDDLE EVENTS summary below. The closing must honor what happened in the middle of the story - no resurrected characters, no forgotten revelations, no reversed outcomes.
 7. Return ONLY the rewritten blocks inside the XML tags below.
 
-GENRE: {genre.replace("_", " ")}
+STYLE: {style.replace("_", " ")}
 TITLE: {title}
 SCIENCE CONTEXT: {news_block}
 

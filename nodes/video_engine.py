@@ -512,7 +512,7 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 # Rendered AFTER the episode audio ends.  No spoilers during playback.
 #
 # Layout:
-#   LEFT  (30 %) - static: title, genre, news seed, cast & voices
+#   LEFT  (30 %) - static: title, style, news seed, cast & voices
 #   DIV         - 1 px phosphor-green divider
 #   RIGHT (70 %) - scrolling classified transcript (scene arc + full script)
 # -----------------------------------------------------------------------------
@@ -668,7 +668,9 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     
     return {
         "title":      episode_title,
-        "genre":      plan.get("style", plan.get("genre", "sci-fi")),
+        # Master style key. Backward-compat reads of legacy "genre" keys
+        # in old saved plans still resolve via the inner .get() fallback.
+        "style":      plan.get("style", plan.get("genre", "sci-fi")),
         "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
         "duration_s": duration_s,
         "resolution": f"{W}x{H}",
@@ -790,7 +792,10 @@ class _TelemetryHUDRenderer:
         lbl_w = _fw("DATE  ", self.f_body)
         for lbl, val in [
             ("TITLE", self.data.get("title", "?")),
-            ("GENRE", self.data.get("genre", "?")),
+            # Backward-compat: read "style" first (canonical post-2026-05-02
+            # cleanup), fall back to "genre" key for HUD frames built from
+            # an older cached plan.
+            ("STYLE", self.data.get("style", self.data.get("genre", "?"))),
             ("LEN",   f'{self.data.get("duration_s", 0) / 60:.1f} min'),
             ("RES",   self.data.get("resolution", "?")),
             ("DATE",  self.data.get("produced", "")[:10]),
@@ -999,7 +1004,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
                 else:
                     voices[str(k)] = str(v)
 
-        genre  = plan.get("style", plan.get("genre", "sci-fi radio drama"))
+        style  = plan.get("style", plan.get("genre", "sci-fi radio drama"))
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64
@@ -1013,7 +1018,7 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(DBAR)
         W_()
         W_(f'  Title    :  "{episode_title}"')
-        W_(f"  Genre    :  {genre}")
+        W_(f"  Style    :  {style}")
         W_(f"  Produced :  {ts}")
         W_()
 

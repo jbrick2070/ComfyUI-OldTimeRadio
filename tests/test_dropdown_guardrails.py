@@ -86,11 +86,9 @@ _OPTIONAL = _INPUT_TYPES["optional"]
 TARGET_LENGTHS = _OPTIONAL["target_length"][0]
 STYLE_VARIANTS = _OPTIONAL["style"][0]
 # 2026-04-30: genre_flavor + style_variant consolidated into a single
-# `style` dropdown.  Keep GENRE_FLAVORS as an alias of STYLE_VARIANTS
-# so tests that historically iterated genre flavors still iterate the
-# tonal preset list -- the LOGIC (varying the tone produces distinct
-# fingerprints) is unchanged.
-GENRE_FLAVORS = STYLE_VARIANTS
+# `style` dropdown.  2026-05-02: legacy GENRE_FLAVORS alias dropped --
+# tests now iterate STYLE_VARIANTS directly. The LOGIC (varying the
+# tone produces distinct fingerprints) is unchanged.
 CREATIVITY_OPTIONS = _OPTIONAL["creativity"][0]
 OPT_PROFILES = _OPTIONAL["optimization_profile"][0]
 
@@ -186,9 +184,9 @@ def writer():
 class TestAllDropdownsAccepted:
     """Every single dropdown value must run through pre-flight without error."""
 
-    @pytest.mark.parametrize("genre", GENRE_FLAVORS)
-    def test_style_accepted(self, writer, genre):
-        logs = _run_preflight(writer, style=genre)
+    @pytest.mark.parametrize("style_value", STYLE_VARIANTS)
+    def test_style_accepted(self, writer, style_value):
+        logs = _run_preflight(writer, style=style_value)
         assert any("ScriptWriter:" in l for l in logs)
 
     @pytest.mark.parametrize("tl", TARGET_LENGTHS)
@@ -245,17 +243,17 @@ class TestDropdownsHaveEffect:
             f"Expected {len(STYLE_VARIANTS)} distinct styles, got {seen_styles}"
 
     def test_styles_logged_distinctly(self, writer):
-        """Each genre appears in the FINGERPRINT log (affects episode seed)."""
+        """Each style variant appears in the FINGERPRINT log (affects episode seed)."""
         seen_fingerprints = set()
-        for genre in GENRE_FLAVORS:
-            logs = _run_preflight(writer, style=genre)
+        for style_value in STYLE_VARIANTS:
+            logs = _run_preflight(writer, style=style_value)
             for l in logs:
                 m = re.search(r"FINGERPRINT (\w+)", l)
                 if m:
                     seen_fingerprints.add(m.group(1))
                     break
-        assert len(seen_fingerprints) == len(GENRE_FLAVORS), \
-            f"Expected {len(GENRE_FLAVORS)} distinct fingerprints, got {len(seen_fingerprints)}"
+        assert len(seen_fingerprints) == len(STYLE_VARIANTS), \
+            f"Expected {len(STYLE_VARIANTS)} distinct fingerprints, got {len(seen_fingerprints)}"
 
 
 # ===========================================================================

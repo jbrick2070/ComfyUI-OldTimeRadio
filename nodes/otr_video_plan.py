@@ -764,7 +764,7 @@ class OTRVideoPlan:
 
         summary_lines = [
             cast_line,
-            f"genre flavor:    {pass3['style'] or '(none)'}",
+            f"style flavor:    {pass3['style'] or '(none)'}",
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
             f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"
