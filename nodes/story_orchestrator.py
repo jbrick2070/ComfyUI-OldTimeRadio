@@ -4553,14 +4553,36 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                 "REJECTED. Even with only 3 acts, every line must be tagged and "
                 "the conversation between characters must carry the story."
             )
-        length_instruction = (
-            f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
-            f"(minimum {_min_lines} dialogue lines, NOT counting ANNOUNCER).{_subplot_hint} "
-            f"This script will be read aloud by voice actors at ~140 words per minute, "
-            f"so {_target_words} words = ~{max(1, round(_target_words / 140))} minutes of audio. "
-            f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
-            f"{_extend_hint}{_format_hint}"
-        )
+        # BUG-LOCAL-132 fix (2026-05-01): for ultra-smoke (<=50 words)
+        # the prompt must impose an UPPER BOUND, not a floor. Previous
+        # wording was "AT LEAST {N} words ... do not stop until you've
+        # written at least {N}" -- which is a floor with no ceiling.
+        # The LLM took the 30-word smoke target as permission to write
+        # 234 words (run signal_lost_skindeep_microneedle_..._163736),
+        # turning a ~25-min smoke into a ~3 hr render. Smoke runs
+        # need a HARD ceiling so the verification stays fast.
+        if _target_words <= 50:
+            _ceiling = max(_target_words + 10, int(_target_words * 1.4))
+            length_instruction = (
+                f"MANDATORY ULTRA-SMOKE: {_act_label}, EXACTLY {_target_words} words "
+                f"of spoken dialogue (range: {_target_words}-{_ceiling} words HARD CAP, "
+                f"NOT counting ANNOUNCER). Minimum {_min_lines} dialogue lines, maximum "
+                f"{max(_min_lines + 1, int(_min_lines * 1.5))} lines. This is a SMOKE TEST "
+                f"intended to verify the pipeline end-to-end in ~25 minutes; do NOT pad. "
+                f"At ~140 wpm this is ~{max(3, int(_target_words / 140 * 60))} seconds of "
+                f"audio. STOP writing as soon as you have a beginning, middle, and end "
+                f"that fit in {_ceiling} words. Long monologues are FORBIDDEN."
+                f"{_format_hint}"
+            )
+        else:
+            length_instruction = (
+                f"MANDATORY: {_act_label}, AT LEAST {_target_words} words of spoken dialogue "
+                f"(minimum {_min_lines} dialogue lines, NOT counting ANNOUNCER).{_subplot_hint} "
+                f"This script will be read aloud by voice actors at ~140 words per minute, "
+                f"so {_target_words} words = ~{max(1, round(_target_words / 140))} minutes of audio. "
+                f"Do NOT stop until you have written at least {_target_words} words of character dialogue."
+                f"{_extend_hint}{_format_hint}"
+            )
         style_instruction = f"Style: {style.upper()}. Lean hard into that tone throughout - every line should reflect this tone."
 
         # Bark health check moved to LLMDirector to prevent VRAM OOM during script generation.
