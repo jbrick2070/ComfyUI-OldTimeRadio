@@ -59,6 +59,13 @@ _NODES_DIR = Path(__file__).resolve().parent
 if str(_NODES_DIR) not in _sys.path:
     _sys.path.insert(0, str(_NODES_DIR))
 
+# folder_paths is the ComfyUI canonical path resolver. The OTR helpers
+# (otr_videos_dir, otr_stills_dir, etc.) wrap folder_paths internally for
+# the broadcast tree under output/otr/, but importing folder_paths here
+# explicitly satisfies the Bug Bible BUG-01.02 contract that every
+# OUTPUT_NODE file references the canonical resolver.
+import folder_paths  # noqa: F401,E402
+
 from _otr_paths import (  # noqa: E402
     otr_audio_dir,
     otr_legacy_audio_dir,
@@ -412,10 +419,22 @@ class BatchLTXRender:
                     "default": "ffmpeg",
                     "tooltip": "ffmpeg binary path or PATH-resolvable name",
                 }),
+                "humo_clips_dir": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": (
+                        "Optional sequencing edge from BatchHumoRender.clips_dir. "
+                        "When wired, ComfyUI waits for HuMo to finish writing its "
+                        "per-line .mp4 files before LTX starts loading -- so HuMo "
+                        "fully unloads before LTX claims VRAM. Pure DAG dependency; "
+                        "the value is not used by execute()."
+                    ),
+                }),
             },
         }
 
-    def execute(self, model, clip, vae, ledger_json, seed=1, ffmpeg="ffmpeg"):
+    def execute(self, model, clip, vae, ledger_json, seed=1, ffmpeg="ffmpeg",
+                humo_clips_dir=""):
         t_start = time.time()
         report_lines: list[str] = []
 
@@ -543,6 +562,26 @@ class BatchLTXRender:
                 prompt_text = entry["prompt_text"]
                 shot_seed = (seed + idx * 1009) & 0x7FFFFFFFFFFFFFFF
                 shot_t0 = time.time()
+
+                # Anti-clobber (consult 2026-05-02 ChatGPT + Gemini):
+                # HuMo writes <line_id>.mp4 for character lines; LTX writes
+                # <line_id>.mp4 for non-character lines into the SAME dir.
+                # Role filter (is_never_humo_role) should keep them disjoint,
+                # but if a future ledger has a duplicate or drifted role and
+                # LTX overwrites a HuMo character clip, the failure would be
+                # invisible until final composite. Skip pre-existing files.
+                pre_existing = clips_dir / f"{line_id}.mp4"
+                if pre_existing.exists() and pre_existing.stat().st_size > 0:
+                    log.warning(
+                        "[BatchLTXRender] %s: skip -- existing clip on disk "
+                        "(%s, %d bytes). Refusing to overwrite.",
+                        line_id, pre_existing.name, pre_existing.stat().st_size,
+                    )
+                    report_lines.append(
+                        f"  {line_id} ({entry['speaker_role']}): "
+                        f"SKIP existing {pre_existing.name}"
+                    )
+                    continue
 
                 try:
                     pos_tokens = clip.tokenize(prompt_text)

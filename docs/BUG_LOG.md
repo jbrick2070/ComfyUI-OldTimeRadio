@@ -89,6 +89,79 @@ Non-blocking follow-ups for next session: investigate `live_ledger=True` for ret
 
 Post-fix regression: `python -m pytest tests/ --ignore=tests/test_dropdown_guardrails.py -q` → **932 passed, 6 skipped, 0 failed in 10.8 s**. AST-clean.
 
+---
 
+## 2026-05-02 — Sprint 3 mega-sprint (LTX wiring + RTX VSR upscale)
 
+### BUG-LOCAL-007 [DEVIATION-LOGGED]: LTX 2B v0.9 bundled checkpoint forces CheckpointLoaderSimple-family loader
+
+- **Date:** 2026-05-02 | **Phase:** S3.1 (LTX wiring) | **Bible candidate:** yes
+- **Symptom:** ROADMAP Architecture Truth (locked 2026-05-02) specified `UNETLoader + CLIPLoader (T5) + VAELoader` for LTX 2B fp16, "NOT CheckpointLoaderSimple". Reason given: split-load lets ComfyUI offload T5/VAE independently; bundled-load on a hot HuMo cache is the OOM shape C2 was written to prevent.
+- **Cause:** Lightricks ships LTX 2B v0.9 ONLY as a bundled `ltx-video-2b-v0.9.safetensors` (8.7 GB, all components in one safetensors file). No standalone LTX UNet / LTX VAE artifacts exist on the upstream HF repo for the 2B v0.9 line. The Architecture Truth assumed split files exist; they don't.
+- **Fix:** Use ComfyUI-LTXVideo's `LowVRAMCheckpointLoader` for LTX 2B v0.9 (it IS a `CheckpointLoaderSimple` subclass, but adds a `dependencies` input that ComfyUI uses to force sequential load). The C2 sequencing intent (HuMo unloads before LTX claims VRAM) is satisfied via the dependency edge + the existing strict teardown in `batch_humo_render.py` (`unload_all_models + gc + empty_cache + cuda.synchronize` in finally). The "no carve-out for CheckpointLoaderSimple" rule was about preventing OOM from parallel-load on a hot cache; sequencing eliminates that risk.
+- **Verify:** Log line `[OTR_HUMO] teardown complete` precedes `[OTR_LTX_LOADER] loading ltx-video-2b-v0.9.safetensors`. No `Allocation on device 0 would exceed allowed memory` between HuMo teardown and LTX render.
+- **Promote-to-Bible-only-if:** a future LTX line (3B, 5B, 13B) ships with split UNet/T5/VAE artifacts AND we re-validate that LowVRAMCheckpointLoader's dependency edge keeps the C2 sequencing guarantee under 14.5 GB. Until then this stays as a documented OTR-local deviation.
+- **Tags:** ltx, loader, c2-deviation, sequencing, deps-edge
+
+### BUG-LOCAL-008 [DOCUMENTED]: LTX CFG=1.0 mathematically erases the negative prompt
+
+- **Date:** 2026-05-02 | **Phase:** S3.1 (LTX wiring) | **Bible candidate:** yes
+- **Symptom:** Round-robin Gemini caught: standard CFG math is `output = uncond + CFG * (cond - uncond)`. At CFG=1.0 this simplifies to `output = cond` -- the negative prompt is 100% unused. ROADMAP locks `LTX_CFG = 1.0` for the distilled sigma schedule. So the negative prompt in `_LTX_NEGATIVE` ("person, human, face, woman, man, hands, fingers, body, ...") is mathematically discarded by the sampler. Faces / people may still appear in LTX clips because the prompt suppression we *thought* was active isn't.
+- **Cause:** Distilled LTX (`LTX_DISTILLED_SIGMAS` from Goofer) is tuned for CFG=1.0 because higher CFG with low-step distillation produces overcooked / artifacted output. The negative prompt was carried over from non-distilled LTX patterns where CFG≥1.5 made the negative effective.
+- **Fix (deferred):** Two options for next sprint, both empirical:
+  1. Raise CFG to 1.3-2.0 and re-tune sigma schedule (changes motion characteristics; needs A/B smoke).
+  2. Remove the negative prompt encode entirely (saves T5 forward pass; output unchanged at CFG=1.0).
+  Until then: tighten POSITIVE prompts in `_PROMPT_BY_ROLE` to avoid human-implying terms ("announcer at microphone" → "vintage microphone on desk"), since the positive branch is the only one the sampler sees at CFG=1.0.
+- **Verify:** ffprobe + visual review of LTX clips after smoke. If `_PROMPT_BY_ROLE` text contains "announcer / radio host / broadcaster" terms AND faces appear in the rendered output, this bug is the cause.
+- **Tags:** ltx, cfg, prompt-policy, distilled-sigma
+
+### BUG-LOCAL-009 [DEFERRED]: Per-stage VRAM logging across HuMo→LTX→VC→RTX boundary
+
+- **Date:** 2026-05-02 | **Phase:** S3 observability | **Bible candidate:** no (observability, not behavior)
+- **Symptom:** No production VRAM snapshot at HuMo teardown / LTX loader entry / LTX teardown / RTX upscale entry. If a 16 GB OOM appears at any boundary, we have no per-stage signal to bisect from.
+- **Fix (deferred to next sprint):** Add `[OTR_VRAM] free=X.XX allocated=Y.YY reserved=Z.ZZ` lines at:
+  - `batch_humo_render.py` end of teardown
+  - `batch_ltx_render.py` after `mm.load_models_gpu([model])` and after teardown
+  - `rtx_upscale.py` after each chunk and at upscale exit
+  Pattern matches existing `vram_snapshot()` helper in `nodes/_vram_log.py`.
+- **Verify:** smoke run produces a clean VRAM ladder log; `peak_gb` per stage extractable via grep.
+- **Tags:** vram, observability, deferred
+
+### Round-robin QA — 2026-05-02 mega-sprint pre-smoke
+
+`docs/2026-05-02-mega-sprint-consult__01_chatgpt.md` (gpt-5.5, 140s), `__02_gemini.md` (gemini-3.1-pro-preview-customtools, 40s). NVIDIA round did not complete in window; two-of-three is sufficient per CLAUDE.md round-robin rule.
+
+**Must-fix items applied before smoke:**
+1. **Anti-clobber in `batch_ltx_render.py`** (ChatGPT + Gemini converged): `if out_mp4.exists(): skip` defends against role-filter drift overwriting HuMo character clips.
+2. **Windows ffmpeg pipe deadlock** (Gemini): `rtx_upscale.py` was using `stderr=subprocess.PIPE` which blocks at 64 KB on Windows. Routed to `subprocess.DEVNULL`.
+3. **ComfyUI cache desync** (Gemini): rewired link 86 from `BatchHumoRender.clips_dir` (slot 0, stable per episode_id) to `BatchHumoRender.report` (slot 2, varies per run from per-clip elapsed_ms). Forces ComfyUI to re-evaluate `LowVRAMCheckpointLoader` on every queue, keeping the loader's state machine in sync with the actual mm-unload call HuMo makes.
+4. **Drop `-shortest`** (Gemini): silent video and audio source share frame count by construction; flag was at best dead code, at worst a footgun.
+
+**Disagreement caught:**
+- ChatGPT framed CFG=1.0 negative prompt influence as "weak"; Gemini corrected with the math: `output = uncond + CFG * (cond - uncond)` reduces to `output = cond` at CFG=1.0, so the negative prompt is 100% ignored, not weak. Logged as BUG-LOCAL-008 (deferred to next sprint, since changing CFG mid-sprint deviates from locked architecture).
+
+**Documented for next sprint (not blocking smoke):**
+- BUG-LOCAL-008 — CFG=1.0 + negative prompt mathematically inert.
+- BUG-LOCAL-009 — per-stage VRAM logging missing.
+- Gemini false alarm: `temporal_size=4096` in tiled VAE decode is fine because LTX_MAX_FRAMES=177 (the temporal window only matters above its value; 4096 means "decode whole sequence in one temporal pass", spatial tiling handles VRAM). Goofer-proven on RTX 5080 Blackwell.
+
+### BUG-LOCAL-010 [BLOCKER on Sprint 3 acceptance]: LLM OOM regression at write_script main call (BUG-LOCAL-004 returns)
+
+- **Date:** 2026-05-02 | **Phase:** S3 acceptance smoke | **Bible candidate:** yes
+- **Symptom:** Sprint 3 smoke prompt_id `bc7136bb-50ab-471f-8caf-83e9cfefa481` (`target_words=30`, `num_characters=2`, `target_length="30 words (smoke, 1 act)"`, `optimization_profile=Standard`) OOM'd at `OTR_LLMScriptWriter` -> `write_script` (line 5432) -> `_generate_with_llm` (line 3211) -> `model.generate(...)`. Exact error: `Allocation on device 0 would exceed allowed memory. Currently allocated: 24.54 GiB / Device limit: 15.92 GiB / Free: 0 bytes / Requested: 3.94 GiB`. Peak allocated `29005 MiB` per torch's allocator print.
+- **Cause (hypothesis):** BUG-LOCAL-004 fix (Sprint 1) added `_flush_vram_keep_llm()` before the main write_script `_generate_with_llm` call. BUG-LOCAL-005 fix (Sprint 1) added max_new_tokens clamp 256 for ultra_smoke and short-circuited the OpenClose 3-outline evaluator. Both are confirmed active on this run (runtime log shows `Loading LLM model: mistralai/Mistral-Nemo-Instruct-2407 (quantized=True)` plus the three sequential `[StoryOrchestrator] Starting inference` lines at max_new_tokens 64 / 800 / 256). Despite both fixes, peak allocated still hits ~29 GB. Likely roots: (a) `_flush_vram_keep_llm()` is not actually clearing the prior phases' KV cache + activations -- a Python reference is keeping intermediates alive; (b) NewsSummary's `max_new_tokens=800` build-up is the actual culprit, not write_script's call (the OOM fires DURING write_script's prefill but the 24 GB was already accumulated before that call started); (c) the Mistral-Nemo `_prefill` path in transformers 4.x has a regression where `past_key_values` is not freed between `model.generate` invocations even with explicit `torch.cuda.empty_cache()`.
+- **Fix:** **Pending -- needs its own bisect window.** Plan: (a) instrument `_generate_with_llm` to log `torch.cuda.memory_allocated()` at entry / after generate / after the explicit `del` / after empty_cache call, so the actual leak source surfaces; (b) check that `_flush_vram_keep_llm()` survived the recent refactors and is in fact called between NewsSummary and write_script; (c) audit whether NewsSummary leaves a `transformers.cache_utils.DynamicCache` instance on the model object; (d) if (c) confirmed, monkey-patch `model._cache_implementation` to `None` between phases.
+- **Verify:** re-queue 30-word smoke with `optimization_profile=Standard`, expect `peak_gb < 14.5 GB` across the LLM ladder (instrumented snapshot lines), expect to reach `OTR_SignalLostVideo` (the audio gate) without OOM.
+- **Tags:** vram, oom, llm-cache, regression, blocks-s3-acceptance
+
+### Sprint 3 mega-sprint: shipped code, live acceptance BLOCKED
+
+The Sprint 3 mega-sprint code (LTX wiring + RTX VSR upscale + consult fixes) is committed on `v2.0-alpha`. The wiring is:
+- AST-clean (3 modified .py files all parse).
+- Regression-clean (Bug Bible, dropdown_guardrails, core, parse_retry, otr_api_type all green; 23 + 46 + 108 + 48 = 225 tests pass).
+- Workflow JSON valid (`json.loads` round-trips, `last_link_id=93`, all 51 links intact, no orphan inputs).
+- ComfyUI registers all three new nodes (`OTR_BatchLTXRender`, `OTR_RTXUpscale`, `LowVRAMCheckpointLoader`).
+- ComfyUI accepts the patched workflow at `/prompt` and runs to OTR_LLMScriptWriter, where it hits BUG-LOCAL-010 (LLM OOM, pre-existing).
+
+**Sprint 3 acceptance is BLOCKED on BUG-LOCAL-010**, NOT on a Sprint 3 wiring failure. The video-wiring code never executed because the smoke can't get past the LLM phase. Once BUG-LOCAL-010 is fixed in a follow-up bisect, re-queue the same workflow JSON and the S3.x acceptance bullets (ledger source_kind=ltx rows, ffprobe 832x480 pre-upscale + 1920x1080 post-upscale, audio byte-identity via stream MD5, peak VRAM < 14.5/15.5 GB) become directly observable.
 

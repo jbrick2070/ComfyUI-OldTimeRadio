@@ -158,6 +158,13 @@ _NODE_MODULES = {
     # 50% opacity + audio mux from proc gen. Single ffmpeg invocation.
     # Replaces scripts/render_episode_concat.py for production use.
     "OTR_VideoComposite":          (".nodes.video_composite", "VideoComposite", " Video Composite (1080p)"),
+    # v2.0 final-stage RTX VSR upscaler. Path-in / path-out wrapper around
+    # NVIDIA's RTXVideoSuperResolution that preserves C7 audio identity:
+    # decodes video frames in chunks via ffmpeg pipe, runs nvvfx HW-accel
+    # upscale, encodes silent libx264 yuv420p, then muxes the original mp4
+    # audio with -c:a copy (zero audio re-encode). Bypassable via the
+    # `bypass` widget for raw 832x480 deliverables.
+    "OTR_RTXUpscale":              (".nodes.rtx_upscale", "RTXUpscale", " RTX VSR Upscale (1080p)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

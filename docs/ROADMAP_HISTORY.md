@@ -1387,3 +1387,42 @@ Two queues attempted via `scripts/queue_smoke.py` (new helper, correct widget in
 ### Branch & tag plan
 
 `v2.0-alpha` HEAD at session start: **`08ecfcd`**. Tonight's mega-commit lands ROADMAP rewrite + Sprint 1/2/3 changes + regression + round-robin transcripts. Tag cut for v2.0-alpha continues to wait on Diff 3 + a clean end-to-end episode under the new schema. Do NOT re-base or merge to main.
+
+---
+
+## 2026-05-02 — Sprint 3 mega-sprint shipped on `v2.0-alpha` (acceptance blocked on BUG-LOCAL-010)
+
+**Scope shipped (one mega-commit):**
+
+1. **OTR_BatchLTXRender wired into `workflows/otr_scifi_16gb_full.json`.** New node IDs: 54 (LowVRAMCheckpointLoader for LTX 2B v0.9), 55 (OTR_BatchLTXRender). Architecture-Truth deviation logged as BUG-LOCAL-007: Lightricks ships LTX 2B v0.9 only as a bundled `ltx-video-2b-v0.9.safetensors` (no standalone UNet/T5/VAE artifacts), so `LowVRAMCheckpointLoader` (a `CheckpointLoaderSimple` subclass that adds a `dependencies` input for sequential load) is used in place of the locked `UNETLoader+CLIPLoader+VAELoader` triplet. C2 sequencing intent is satisfied via the dependency edge plus the existing strict teardown in `batch_humo_render.py`.
+
+2. **OTR_RTXUpscale built from scratch and wired as the final stage.** Path-in / path-out wrapper around NVIDIA's `RTXVideoSuperResolution` (`Nvidia_RTX_Nodes_ComfyUI` custom node). Decodes video frames via ffmpeg pipe in 64-frame chunks, runs `nvvfx.VideoSuperRes` per frame, encodes silent libx264 yuv420p mp4, then muxes original mp4 audio with `-c:a copy` (zero audio re-encode -- preserves C7 byte-identity). Bypassable via the `bypass=True` widget for raw 832x480 deliverables. Output: `<ep>_1080p.mp4` when on, source path when bypassed.
+
+3. **`humo_clips_dir` optional STRING input added to `OTR_BatchLTXRender`.** Pure DAG dependency edge from `BatchHumoRender.report` (slot 2) -- explicitly varies per run so ComfyUI's per-node cache can't desync from HuMo's actual mm.unload_all_models() call. Render code ignores the value; the edge is for sequencing only.
+
+4. **VideoComposite rewired downstream of LTX.** Old link 81 (BatchHumoRender.clips_dir -> VideoComposite.clips_dir) removed; new link 92 (BatchLTXRender.clips_dir -> VideoComposite.clips_dir). Both renderers write to the same `otr_videos_dir(episode_id)`; VideoComposite picks up the union by line_id without code change.
+
+5. **Round-robin consult applied (gpt-5.5 + gemini-3.1-pro-preview-customtools).** Must-fix items applied before smoke:
+   - **A.** `rtx_upscale.py` ffmpeg pipes now route stderr to DEVNULL (Windows pipe-deadlock fix; Gemini catch).
+   - **B.** Cache-buster -- link 86 routed through `BatchHumoRender.report` instead of `clips_dir` (Gemini catch).
+   - **C.** Anti-clobber `if out_mp4.exists(): skip` added to `batch_ltx_render.py` (ChatGPT + Gemini converged).
+   - **F.** `-shortest` flag dropped from upscale audio mux (Gemini catch).
+   - Documented for next sprint: BUG-LOCAL-008 (CFG=1.0 mathematically erases the LTX negative prompt), BUG-LOCAL-009 (per-stage VRAM logging deferred). Consult transcripts: `docs/2026-05-02-mega-sprint-consult__01_chatgpt.md` and `__02_gemini.md`.
+
+6. **Test-contract maintenance.**
+   - `nodes/batch_ltx_render.py` and `nodes/rtx_upscale.py` import `folder_paths` explicitly (Bug Bible BUG-01.02 grep contract).
+   - `tests/test_core.py::TestWorkflowJSONFull::test_node_types_otr_or_known` allow-list extended with `LowVRAMCheckpointLoader`.
+   - Pre-existing `last_link_id` drift in `workflows/otr_humo_radio_experiment.json` patched (18 -> 19).
+
+**Regression status (post-mega-sprint):**
+
+- `bug_bible_regression.py`: **23 passed**, 1 skipped, 2 xfailed -- AST-clean, no BOM, all OUTPUT_NODE files reference `folder_paths`, all workflow JSONs have valid `last_link_id`.
+- `tests/test_dropdown_guardrails.py`: **46 passed**, 1 deselected (the known BUG-LOCAL-006 PARTIAL hang on `test_creativity_produces_different_temps` -- separate bisect window, out of mega-sprint scope).
+- `tests/test_core.py`: **108 passed**.
+- `tests/test_parse_retry.py + test_otr_api_type_validation.py`: **48 passed**.
+
+**Live smoke status:**
+
+Smoke prompt_id `bc7136bb-50ab-471f-8caf-83e9cfefa481` queued via `scripts/queue_smoke.py` against the Sprint 3 wired workflow. ComfyUI accepted the prompt cleanly (all node validation green, all link types resolve). Execution OOM'd at `OTR_LLMScriptWriter.write_script` line 5432 with peak allocated 29 GB on a 16 GB device -- this is BUG-LOCAL-010, a regression of the prior session's BUG-LOCAL-004 fix (the Sprint 1 `_flush_vram_keep_llm()` patch for the LLM ladder is not actually freeing the cumulative KV cache). The Sprint 3 video-wiring code never executed because the LLM phase couldn't progress to the audio gate.
+
+**Sprint 3 acceptance is BLOCKED on BUG-LOCAL-010**, NOT on a Sprint 3 wiring failure. The workflow JSON is in place, the new nodes are loadable, the consult-validated wiring is committed. Once BUG-LOCAL-010 lands a fix in a follow-up bisect window, re-queue the same workflow JSON and the S3.x acceptance bullets become directly observable. See `docs/BUG_LOG.md` BUG-LOCAL-010 for the next-session repro and bisect plan.

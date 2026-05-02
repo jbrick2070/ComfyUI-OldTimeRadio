@@ -103,10 +103,10 @@ Confirmation items, not new design work:
 
 - `ledger.lines[]` carries a `speaker_role` on every entry. No nulls, no missing rows. Roles: `character` / `announcer` / `music_open` / `music_close` / `music_inter` / `sfx`.
 - `ledger.meta.audio_path_selected = "master_mix_per_clip_mux"` and `audio_path_reason = "ok (zero audio re-encodes downstream of SignalLostVideo)"`.
-- BUG-129 routing (locked 2026-05-01):
-  - `character` and `announcer` lines: `BatchHumoRender` dispatches HuMo with the cast portrait. Log line: `ref=full_env_NNNNN_.png source=ledger-cast-fresh` (or composite/portrait fallback).
-  - `music_*` and standalone `sfx` lines: `BatchHumoRender` log line shows `SKIP HuMo (role=<role>, covered by VideoComposite static-radio fill)`. No HuMo render fires for these.
-  - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed.
+- BUG-129 routing (locked 2026-05-02 — see Architecture Truth section below):
+  - `character` lines ONLY: `BatchHumoRender` dispatches HuMo with the cast portrait. Log line: `ref=full_env_NNNNN_.png source=ledger-cast-fresh` (or composite/portrait fallback).
+  - `announcer` / `music_*` / standalone `sfx` lines: `BatchHumoRender` log line shows `SKIP HuMo (role=<role>, covered by VideoComposite static-radio fill)`. `is_never_humo_role()` short-circuits before any portrait lookup. No HuMo render fires for these.
+  - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed (`_RADIO_ROLES` was re-populated in `_otr_speaker_role.py`).
 - `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (style='space opera epic')"`).
 - BUG-129a static-fill fires for any line with no clip on disk. VideoComposite report includes `[<n_humo> humo + <n_static> static]` summary; expect static count > 0 if any music_*/sfx lines exist.
 - BUG-128 tail-pad: VideoComposite report shows `tail-pad: +0.500s on <line_id>` after the pillarbox loop completes. The line_id matches the actual surviving last clip, not necessarily the last in the original timeline.
@@ -169,15 +169,111 @@ Investigate during Sprint 2 — may be tied to the `otr_v2.visual` rot or to bac
 
 ---
 
-## Sprint 3 — small code chores + B1 release blocker
+## Sprint 3 — MEGA-SPRINT: status (2026-05-02)
 
-### Wire `OTR_BatchLTXRender` into `workflows/otr_scifi_16gb_full.json` — DEFERRED
+**Wiring SHIPPED on `v2.0-alpha`. Live acceptance BLOCKED on BUG-LOCAL-010 (pre-existing LLM-phase OOM regression).**
 
-Node registered in `__init__.py:155` and self-contained at `nodes/batch_ltx_render.py`, but not wired into the workflow JSON. Wiring requires (a) deciding the loader chain — LTX 0.9.x 2B fp16 doesn't need `CheckpointLoaderSimple` (C2 violation), use `UNETLoader` + `CLIPLoader` + `VAELoader` analogous to the HuMo chain; (b) connecting `ledger_json` from the existing `EpisodeAssembler` output; (c) routing `clips_dir` into `VideoComposite` as a sibling source to `BatchHumoRender`'s clips dir. The static-radio fallback (BUG-129a) covers non-character lines today, so this is a quality-improvement wiring, not a correctness fix.
+The Sprint 3 mega-sprint code is in place: LTX wiring (LowVRAMCheckpointLoader + OTR_BatchLTXRender), RTX VSR upscale (OTR_RTXUpscale), VideoComposite rewired downstream of LTX, anti-clobber + pipe-deadlock + cache-buster fixes from the round-robin consult. AST-clean, regression-clean (225 tests pass), workflow JSON valid, all three new nodes register, ComfyUI accepts the patched workflow at /prompt. The smoke OOM'd at OTR_LLMScriptWriter (BUG-LOCAL-010 in `docs/BUG_LOG.md`) -- the wiring code never executed because the LLM phase couldn't progress.
 
-**Why deferred:** LTX node-graph wiring is a substantial JSON edit. CLAUDE.md ground rules say one git push attempt and that workflow JSONs must be valid before push — a wiring this size needs a dedicated smoke cycle to verify before commit, which the manual test cycle is the only path for. Schedule it as its own session after Sprint 1 fixes verify clean on a real run.
+Once BUG-LOCAL-010 is fixed in a separate bisect window, re-queue the same workflow JSON and the S3.x acceptance bullets become directly observable. The full shipped scope and consult transcripts live in `docs/ROADMAP_HISTORY.md` under the 2026-05-02 mega-sprint entry; the Architecture Truth (locked 2026-05-02) is preserved there too.
 
-**Acceptance (when wired):** queue an episode with announcer + music lines; ledger shows `clips[].source_kind == "ltx"` for those entries; final mp4's announcer / music windows show LTX-rendered radio motion (8n+1 frames, slow-mo to 12 fps), not the static-radio fallback.
+**Locked-but-not-yet-verified S3.x acceptance bullets** (move to Done after a clean post-LLM-fix smoke):
+
+- `ledger.clips[].source_kind == "ltx"` on announcer / music / sfx rows.
+- VideoComposite report logs `[N humo + N ltx + N static]`.
+- Pre-upscale ffprobe: width=832 height=480.
+- Post-upscale ffprobe: width=1920 height=1080.
+- Bypass path produces 832x480 unchanged.
+- Audio byte-identical between pre- and post-upscale (stream MD5 match).
+- Peak VRAM stays below 14.5 GB audio / 15.5 GB video.
+
+### Architecture Truth (locked 2026-05-02 — do not relitigate)
+
+The decisions below are settled. Any future session that tries to "improve" them must show a real-run failure first, not theory.
+
+**Resolution policy — native 832x480 end-to-end:**
+- `SignalLostVideo` procgen: 832x480 (canonical OTR landscape).
+- `OTR_BatchLTXRender`: 832x480 (matches procgen + canvas; no upscale at composite time).
+- `VideoComposite` canvas: 832x480 default (was 1920x1080 — corrected to native).
+- `BatchHumoRender`: stays portrait pillarbox (480x832 internal, 832x480 letterboxed on canvas).
+- `BatchFluxRender` cast portraits: 1024x1024 (FLUX-native square; HuMo `ref_image` is face-centered conditioning, not first-frame I2V).
+- `BatchFluxRender` radio bookend: renders at **1248x720** then Lanczos-downscales to 832x480 in-node. Pixel budget locked — do NOT switch to 1344x768 or 1280x720.
+
+**Role routing — `_NEVER_HUMO_ROLES` is the single source of truth:**
+- Defined in `nodes/_otr_speaker_role.py` as a frozenset including `announcer`, `music_open`, `music_close`, `music_inter`, `sfx`. `_RADIO_ROLES` is empty (defense-in-depth).
+- `BatchHumoRender` short-circuits via `is_never_humo_role()` BEFORE any portrait lookup. HuMo's `ref_image` is face-locked conditioning — it cannot animate the radio still as a non-face reference (verified in `comfy_extras/nodes_wan.py:1070-1108`).
+- Coverage for non-character lines: `OTR_BatchLTXRender` (motion radio loops) takes precedence; `VideoComposite` static-radio fallback (BUG-129a) covers any line LTX skipped.
+
+**LTX seamless-loop architecture — radio still as both start AND end keyframe:**
+- `OTR_BatchLTXRender` uses `LTXVAddGuide` twice in the conditioning chain: `frame_idx=0` with strength 0.75 (start), `frame_idx=-1` with strength 0.6 (end). Both reference the same radio still PNG so the clip loops cleanly back to the bookend frame — no visible cut at loop boundary.
+- Frame-count rule: `8n + 1` (LTX VAE temporal compression of 8). `LTX_MAX_FRAMES = 177` to match HuMo's verified ceiling on 16 GB; do NOT raise to 257 without a fresh VRAM smoke.
+- Tiling: `LTX_TILE_SIZE=512`, `OVERLAP=64`, `TEMPORAL_SIZE=4096`, `TEMPORAL_OVERLAP=8` (Goofer-proven Blackwell params; see Jeffrey's `ComfyUI-Goofer` project).
+- Strict teardown after the per-line loop: `unload_all_models()` + `gc.collect()` + `torch.cuda.empty_cache()` + `torch.cuda.synchronize()` in `finally`. LTX must fully release VRAM before the next pipeline stage.
+
+**Loader policy — UNETLoader chain, NO C2 carve-out:**
+- LTX 2B fp16 wires through `UNETLoader` + `CLIPLoader` (T5) + `VAELoader`. NOT `CheckpointLoaderSimple`.
+- Reason: C2 stays intact (no carve-out drift); split-load lets ComfyUI offload T5 / VAE independently; bundled-load on a hot HuMo cache is the OOM shape C2 was written to prevent.
+
+**DAG sequencing — `humo_clips_dir` optional dependency edge:**
+- `OTR_BatchLTXRender` accepts an optional `humo_clips_dir` STRING input. When present, LTX waits for HuMo to finish writing its clips before starting — this is a pure dependency edge, not data flow. Sequential model load: HuMo loads → renders character clips → unloads → LTX loads → renders radio loops → unloads.
+- LTX clips stamp `ledger.clips[].source_kind == "ltx"` (NOT `"humo"`). One-line clip-emit fix in `batch_ltx_render.py`; ship in the same commit as the wiring.
+
+**Round-robin ladders (locked 2026-05-02):**
+- OpenAI: `gpt-5.5` via `/v1/responses`. Gemini: `gemini-3.1-pro-preview-customtools`. NVIDIA: `nvidia/llama-3.3-nemotron-super-49b-v1.5`.
+- See `scripts/_consult_round_robin.py` + `scripts/_consult_nvidia.py`. Typed error logging (404/400/403/429 fall through; 401/transport re-raise).
+- Internal QA only — never shipped output.
+
+### S3.1 — Wire `OTR_BatchLTXRender` into `workflows/otr_scifi_16gb_full.json`
+
+Node already built (`nodes/batch_ltx_render.py`, registered `__init__.py:155`). This is JSON wiring, not Python.
+
+**Scope:**
+1. Add `UNETLoader` + `CLIPLoader` (T5) + `VAELoader` triplet for LTX 2B fp16. Distinct `_meta.title` per loader.
+2. `EpisodeAssembler.ledger_json` → `OTR_BatchLTXRender.ledger_json`.
+3. `BatchHumoRender.clips_dir` → `OTR_BatchLTXRender.humo_clips_dir` (optional STRING dependency edge; sequencing only).
+4. `OTR_BatchLTXRender.clips_dir` → `VideoComposite` as sibling source to HuMo's `clips_dir`. VideoComposite already merges by `line_id`.
+5. Add `humo_clips_dir` optional STRING to `INPUT_TYPES` if missing.
+6. Confirm clip-emit stamps `source_kind="ltx"`.
+
+**Acceptance:**
+- `ledger.clips[].source_kind == "ltx"` on announcer / music / sfx rows.
+- Final mp4 shows LTX motion on those windows, looping seamlessly back to bookend.
+- VideoComposite report logs `[N humo + N ltx + N static]`.
+- Peak VRAM < 14.5 GB.
+- Audio byte-identical to no-LTX baseline.
+
+### S3.2 — FLUX radio bookend visual confirmation
+
+Already coded. Observation only on next smoke.
+
+**Acceptance:**
+- Saved radio bookend PNG is exactly 832x480.
+- Image is sharp (Lanczos downscale, not box / nearest).
+- Same PNG hash feeds VideoComposite static fallback AND LTX start/end keyframes.
+
+### S3.3 — 832x480 native end-to-end audit
+
+**Acceptance:**
+- `ffprobe` on the final composited mp4 (pre-upscale): `width=832 height=480` exactly.
+- All segments (procgen / LTX / HuMo-pillarboxed / static-radio) composite onto 832x480 with no scale ops.
+
+### S3.4 — RTX VSR ULTRA upscale to 1080p
+
+Wire NVIDIA's RTX Video Super Resolution ULTRA ComfyUI node as the final stage after VideoComposite. ~0 GB VRAM (HW-accelerated via RTX driver), near-real-time. Output is the saved deliverable.
+
+**Scope:**
+1. Add RTX VSR ULTRA node to `workflows/otr_scifi_16gb_full.json` after VideoComposite's mp4 output.
+2. Target resolution: 1920x1080 (16:9 from 832x480 source — the upscaler's standard 1080p mode).
+3. Workflow toggle (Ctrl+B bypassable) so the user can disable per-run for raw 832x480 output.
+4. Saved deliverable: `output/episodes_for_obs/<ep>/<ep>_1080p.mp4` when upscale on; `<ep>.mp4` when bypassed.
+
+**Acceptance:**
+- `ffprobe` on the upscaled mp4: `width=1920 height=1080`.
+- Audio stream byte-identical to pre-upscale mp4 (RTX VSR is video-only; passthrough audio).
+- Wall-clock for upscale stage: target near-real-time (≤ episode duration on a 5 min episode).
+- Bypass path produces the original 832x480 mp4 unchanged.
+
+**Deferred (NOT this sprint):** SeedVR2 v2.5 NVFP4 quality upscale lane — adds as second toggle once the RTX VSR fast path is validated. Wall-clock for SeedVR2 is ~2-3 h per 5 min episode, so it needs its own session and a dedicated VRAM smoke.
 
 ### B1 — Workflow JSON path scrub — VERIFIED SHIPPED 2026-05-02
 

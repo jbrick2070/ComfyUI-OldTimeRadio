@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 53,
-  "last_link_id": 85,
+  "last_node_id": 56,
+  "last_link_id": 93,
   "nodes": [
     {
       "id": 1,
@@ -469,7 +469,8 @@
             47,
             79,
             80,
-            82
+            82,
+            90
           ],
           "slot_index": 0
         }
@@ -1373,7 +1374,7 @@
           "name": "clips_dir",
           "type": "STRING",
           "links": [
-            81
+            91
           ],
           "shape": 3,
           "slot_index": 0
@@ -1388,7 +1389,9 @@
         {
           "name": "report",
           "type": "STRING",
-          "links": null,
+          "links": [
+            86
+          ],
           "shape": 3,
           "slot_index": 2
         }
@@ -1441,7 +1444,7 @@
         {
           "name": "clips_dir",
           "type": "STRING",
-          "link": 81,
+          "link": 92,
           "widget": {
             "name": "clips_dir"
           }
@@ -1459,7 +1462,9 @@
         {
           "name": "final_mp4_path",
           "type": "STRING",
-          "links": null,
+          "links": [
+            93
+          ],
           "shape": 3,
           "slot_index": 0
         },
@@ -1569,6 +1574,198 @@
         false,
         90
       ]
+    },
+    {
+      "id": 54,
+      "type": "LowVRAMCheckpointLoader",
+      "pos": [
+        3500,
+        1700
+      ],
+      "size": [
+        380,
+        100
+      ],
+      "flags": {},
+      "order": 9000,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dependencies",
+          "type": "*",
+          "shape": 7,
+          "link": 86
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            87
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            88
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            89
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-ltxvideo",
+        "Node name for S&R": "LowVRAMCheckpointLoader"
+      },
+      "widgets_values": [
+        "ltx-video-2b-v0.9.safetensors"
+      ],
+      "_meta": {
+        "title": "LowVRAM Loader (LTX 2B v0.9)"
+      }
+    },
+    {
+      "id": 55,
+      "type": "OTR_BatchLTXRender",
+      "pos": [
+        3920,
+        1700
+      ],
+      "size": [
+        420,
+        240
+      ],
+      "flags": {},
+      "order": 9100,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 87
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 88
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 89
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "widget": {
+            "name": "ledger_json"
+          },
+          "link": 90
+        },
+        {
+          "name": "humo_clips_dir",
+          "type": "STRING",
+          "shape": 7,
+          "widget": {
+            "name": "humo_clips_dir"
+          },
+          "link": 91
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "links": [
+            92
+          ]
+        },
+        {
+          "name": "clip_count",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_BatchLTXRender"
+      },
+      "widgets_values": [
+        "",
+        1,
+        "fixed",
+        "ffmpeg",
+        ""
+      ],
+      "_meta": {
+        "title": "Batch LTX Render (radio)"
+      }
+    },
+    {
+      "id": 56,
+      "type": "OTR_RTXUpscale",
+      "pos": [
+        4400,
+        1100
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 9200,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "widget": {
+            "name": "source_mp4_path"
+          },
+          "link": 93
+        }
+      ],
+      "outputs": [
+        {
+          "name": "upscaled_mp4_path",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_RTXUpscale"
+      },
+      "widgets_values": [
+        "",
+        false,
+        1920,
+        1080,
+        "ULTRA",
+        64,
+        "ffmpeg",
+        "_1080p"
+      ],
+      "_meta": {
+        "title": "RTX VSR Upscale (1080p)"
+      }
     }
   ],
   "links": [
@@ -1885,14 +2082,6 @@
       "STRING"
     ],
     [
-      81,
-      51,
-      0,
-      52,
-      1,
-      "STRING"
-    ],
-    [
       82,
       12,
       0,
@@ -1922,6 +2111,70 @@
       1,
       53,
       1,
+      "STRING"
+    ],
+    [
+      86,
+      51,
+      2,
+      54,
+      0,
+      "STRING"
+    ],
+    [
+      87,
+      54,
+      0,
+      55,
+      0,
+      "MODEL"
+    ],
+    [
+      88,
+      54,
+      1,
+      55,
+      1,
+      "CLIP"
+    ],
+    [
+      89,
+      54,
+      2,
+      55,
+      2,
+      "VAE"
+    ],
+    [
+      90,
+      12,
+      0,
+      55,
+      3,
+      "STRING"
+    ],
+    [
+      91,
+      51,
+      0,
+      55,
+      4,
+      "STRING"
+    ],
+    [
+      92,
+      55,
+      0,
+      52,
+      1,
+      "STRING"
+    ],
+    [
+      93,
+      52,
+      0,
+      56,
+      0,
       "STRING"
     ]
   ],

@@ -583,6 +583,10 @@ class TestWorkflowJSONFull:
         # The HuMo in-graph loader chain (BUG-078) needs UNETLoader / CLIPLoader
         # / VAELoader / AudioEncoderLoader / LoraLoaderModelOnly / ModelSamplingSD3
         # plus the KJNodes SageAttention patcher.
+        # Sprint 3 (2026-05-02): the LTX 2B v0.9 stage uses ComfyUI-LTXVideo's
+        # LowVRAMCheckpointLoader (a CheckpointLoaderSimple subclass with a
+        # `dependencies` input for sequential model load -- ensures HuMo unloads
+        # before LTX claims VRAM, satisfying the C2 sequencing intent).
         known = {
             "PreviewAudio", "PreviewImage", "Note",
             "CheckpointLoaderSimple", "SaveImage",
@@ -590,6 +594,8 @@ class TestWorkflowJSONFull:
             "UNETLoader", "CLIPLoader", "VAELoader",
             "AudioEncoderLoader", "LoraLoaderModelOnly",
             "ModelSamplingSD3", "PathchSageAttentionKJ",
+            # LTX loader chain (Sprint 3)
+            "LowVRAMCheckpointLoader",
         }
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known
