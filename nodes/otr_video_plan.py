@@ -84,7 +84,7 @@ _DEFAULT_STYLE_TAIL = (
 # Era-appropriate tails keyed by OTR's style dropdown options.
 # Fed into every composed prompt so FLUX dresses characters for the
 # right era without requiring per-scene costume prose.
-_ERA_TAIL_BY_GENRE: dict[str, str] = {
+_ERA_TAIL_BY_STYLE: dict[str, str] = {
     "hard_sci_fi":       "near-future industrial sci-fi, clean lines, utilitarian",
     "space_opera":       "grand operatic space-opera scale, ornate costumes, vibrant",
     "dystopian":         "oppressive dystopian regime, drab uniforms, concrete",
@@ -150,7 +150,7 @@ def resolve_era_tail(style: str) -> str:
     if not style:
         return _DEFAULT_ERA_TAIL
     key = style.strip().lower().replace(" ", "_").replace("-", "_")
-    return _ERA_TAIL_BY_GENRE.get(key, _DEFAULT_ERA_TAIL)
+    return _ERA_TAIL_BY_STYLE.get(key, _DEFAULT_ERA_TAIL)
 
 
 def resolve_character_portrait(
@@ -628,8 +628,8 @@ class OTRVideoPlan:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Genre flavors matched to OTR_LLMScriptWriter dropdown
-        genre_choices = list(_ERA_TAIL_BY_GENRE.keys()) + ["(none)"]
+        # Style values matched to OTR_LLMScriptWriter dropdown
+        style_choices = list(_ERA_TAIL_BY_STYLE.keys()) + ["(none)"]
         return {
             "required": {
                 "director_json": (
@@ -660,7 +660,7 @@ class OTRVideoPlan:
                     {"default": 3, "min": 1, "max": 40, "step": 1},
                 ),
                 "style": (
-                    genre_choices,
+                    style_choices,
                     {"default": "hard_sci_fi"},
                 ),
             },
@@ -764,7 +764,7 @@ class OTRVideoPlan:
 
         summary_lines = [
             cast_line,
-            f"style flavor:    {pass3['style'] or '(none)'}",
+            f"style:           {pass3['style'] or '(none)'}",
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
             f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"
