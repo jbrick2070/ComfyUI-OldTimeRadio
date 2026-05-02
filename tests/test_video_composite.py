@@ -274,12 +274,17 @@ def test_default_blend_mode_is_lighten_with_zero_opacity(m) -> None:
     }
 
 
-def test_default_canvas_is_1920x1080_at_25fps(m) -> None:
-    """Pin the canonical canvas geometry."""
+def test_default_canvas_is_native_832x480_at_25fps(m) -> None:
+    """Pin the canonical canvas geometry. 2026-05-01 EVENING (Jeffrey):
+    downscaled from 1920x1080 to native 832x480 to match HuMo + LTX
+    render dims directly. Upscale (RTX VSR) added as a separate later
+    stage rather than baked into the base canvas. Pre-2026-05-01 this
+    test was named test_default_canvas_is_1920x1080_at_25fps."""
     inp = m.VideoComposite.INPUT_TYPES()
-    assert inp["optional"]["canvas_width"][1]["default"] == 1920
-    assert inp["optional"]["canvas_height"][1]["default"] == 1080
+    assert inp["optional"]["canvas_width"][1]["default"] == 832
+    assert inp["optional"]["canvas_height"][1]["default"] == 480
     assert inp["optional"]["canvas_fps"][1]["default"] == 25
+    assert inp["optional"]["humo_target_height"][1]["default"] == 480
 
 
 # ---------------------------------------------------------------------------

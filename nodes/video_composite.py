@@ -1108,11 +1108,18 @@ class VideoComposite:
                 "blend_opacity": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05,
                 }),
-                "canvas_width": ("INT", {"default": 1920, "min": 256, "max": 3840, "step": 8}),
-                "canvas_height": ("INT", {"default": 1080, "min": 256, "max": 2160, "step": 8}),
+                # 2026-05-01 EVENING (Jeffrey): downscale to NATIVE
+                # render dims so the iteration cycle is fast. HuMo and
+                # LTX both render at 832x480 natively; pre-this change
+                # we pillarboxed up to 1920x1080 (slow per-frame
+                # encode) before final mux. New default: same canvas
+                # as native render, no upscale until a separate
+                # upscaler stage (RTX VSR) is added later.
+                "canvas_width": ("INT", {"default": 832, "min": 256, "max": 3840, "step": 8}),
+                "canvas_height": ("INT", {"default": 480, "min": 256, "max": 2160, "step": 8}),
                 "canvas_fps": ("INT", {"default": 25, "min": 12, "max": 60}),
                 "humo_target_height": ("INT", {
-                    "default": 1080, "min": 480, "max": 2160, "step": 8,
+                    "default": 480, "min": 256, "max": 2160, "step": 8,
                 }),
                 "fallback_clip_length": ("FLOAT", {
                     "default": 7.0, "min": 1.0, "max": 9.0, "step": 0.04,

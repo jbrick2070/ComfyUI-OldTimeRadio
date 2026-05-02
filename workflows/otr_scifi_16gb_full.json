@@ -427,7 +427,7 @@
         "{}",
         "[]",
         24,
-        "1920x1080",
+        "832x480",
         ""
       ],
       "inputs": [
@@ -1428,7 +1428,7 @@
       "flags": {},
       "order": 29,
       "mode": 0,
-      "title": "Video Composite (1080p pillarbox + additive proc gen)",
+      "title": "Video Composite (native 832x480 + additive proc gen, upscale later)",
       "inputs": [
         {
           "name": "procgen_video_path",
@@ -1480,10 +1480,10 @@
         "",
         "lighten",
         0.0,
-        1920,
-        1080,
+        832,
+        480,
         25,
-        1080,
+        480,
         7.0,
         "ffmpeg",
         false,

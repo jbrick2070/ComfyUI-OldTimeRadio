@@ -1196,9 +1196,20 @@ class SignalLostVideoRenderer:
                     "default": 24, "min": 12, "max": 60, "step": 1,
                     "tooltip": "Frames per second (24 = cinematic)"
                 }),
-                "resolution": (["1920x1080", "1280x720", "3840x2160"], {
-                    "default": "1920x1080",
-                    "tooltip": "Output video resolution"
+                # 2026-05-01 EVENING (Jeffrey): 832x480 added as
+                # default. Pixel-identical to HuMo native (832x480)
+                # and LTX render dims (832x480), so procgen + HuMo
+                # + LTX all share THE EXACT SAME RESOLUTION -- no
+                # per-clip pillarbox or scale at composite time.
+                # 832x480 = 1.733:1 (~2% narrower than strict 16:9
+                # which is 1.778:1) but it's the HuMo-native aspect
+                # so trying for true 16:9 (854x480) would force a
+                # pillarbox on HuMo clips and break the "all same
+                # pixel res" property. RTX VSR final-pass upscale
+                # adds later as a separate stage when needed.
+                "resolution": (["832x480", "854x480", "1920x1080", "1280x720", "3840x2160"], {
+                    "default": "832x480",
+                    "tooltip": "Output video resolution. 832x480 = HuMo + LTX native (default, fastest -- no pillarbox at composite time). 854x480 = strict 16:9 at native height. 1920x1080/1280x720/3840x2160 retain the legacy upscale-at-source path."
                 }),
                 "episode_title": ("STRING", {
                     "default": "",
@@ -1215,7 +1226,7 @@ class SignalLostVideoRenderer:
         return _time.time()
 
     def render_video(self, audio, script_json, production_plan_json,
-                     news_used, fps=24, resolution="1920x1080",
+                     news_used, fps=24, resolution="832x480",
                      episode_title="", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
