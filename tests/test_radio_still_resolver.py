@@ -153,7 +153,7 @@ class TestFilesystemFallback:
         # Monkeypatch otr_stills_dir to point at tmp.
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
 
         # Place the radio still where FLUX would have saved it, with
         # episode_id-based naming.
@@ -177,7 +177,7 @@ class TestFilesystemFallback:
         # should fall through to filesystem layer.
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         ep_id = "ep001"
         radio_file = tmp_path / f"radio_bookend_{ep_id}.png"
         radio_file.write_bytes(b"\x89PNG\r\n\x1a\n" + (b"\x00" * 256))
@@ -195,7 +195,7 @@ class TestFilesystemFallback:
     ):
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         # Even with a radio file present, no episode_id means we
         # can't reconstruct the deterministic name.
         (tmp_path / "radio_bookend_anything.png").write_bytes(b"\x89PNG")
@@ -207,7 +207,7 @@ class TestFilesystemFallback:
     ):
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         led = {"episode_id": "   "}  # whitespace-only
         assert _resolve_radio_still_path(led) is None
 
@@ -216,7 +216,7 @@ class TestFilesystemFallback:
     ):
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         led = {"episode_id": 12345}  # int, not str
         assert _resolve_radio_still_path(led) is None
 
@@ -225,7 +225,7 @@ class TestFilesystemFallback:
     ):
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         # episode_id present but no matching file in stills dir.
         led = {"episode_id": "ep_no_match"}
         assert _resolve_radio_still_path(led) is None
@@ -237,7 +237,7 @@ class TestFilesystemFallback:
         # file exist, the ledger path wins (it's the canonical signal).
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         ep_id = "ep_precedence"
         fs_path = tmp_path / f"radio_bookend_{ep_id}.png"
         fs_path.write_bytes(b"\x89PNG\r\n\x1a\n" + (b"\x00" * 256))
@@ -284,7 +284,7 @@ class TestBug121Hardening:
         # path has a real file.
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         ep_id = "ep_zero_fallthrough"
         empty = tmp_path / "stale_zero.png"
         empty.write_bytes(b"")
@@ -314,7 +314,7 @@ class TestBug121Hardening:
         # use it. Better None than a path-traversal escape.
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         led = {"episode_id": hostile_eid}
         assert _resolve_radio_still_path(led) is None
 
@@ -329,7 +329,7 @@ class TestBug121Hardening:
         # covers int, the new sanitizer rejects the full hostile-type set.
         import batch_humo_render as bhr  # noqa: E402
 
-        monkeypatch.setattr(bhr, "otr_stills_dir", lambda: tmp_path)
+        monkeypatch.setattr(bhr, "otr_stills_dir", lambda *a, **kw: tmp_path)
         led = {"episode_id": non_string_eid}
         assert _resolve_radio_still_path(led) is None
 

@@ -159,9 +159,21 @@ class TestLedgerBeats:
         assert not Path(tmp_out / "atomic_test_ledger.json.tmp").exists()
 
     def test_rename_updates_path_and_data(self, tmp_out):
-        led = Ledger("pending_20260424_000000", str(tmp_out))
-        led.rename_episode("signal_lost_black_sphere_20260424_142006")
-        assert led.data["episode_id"] == "signal_lost_black_sphere_20260424_142006"
+        # BUG-LOCAL-019 (Phase B fallout): use a proper per-episode dir
+        # structure so rename_episode's hard-fail invariant has clean
+        # room to operate. Earlier shape (passing tmp_out as audio_dir
+        # directly) walked os.path.dirname up to the user's TEMP root,
+        # which is shared across pytest sessions and quickly accumulates
+        # signal_lost_*/ siblings from prior runs -- triggering the
+        # Phase B both-source-and-destination-exist guard.
+        old_id = "pending_20260424_000000"
+        new_id = "signal_lost_black_sphere_20260424_142006"
+        ep_dir = tmp_out / "episodes" / old_id
+        audio_dir = ep_dir / "audio"
+        audio_dir.mkdir(parents=True)
+        led = Ledger(old_id, str(audio_dir))
+        led.rename_episode(new_id)
+        assert led.data["episode_id"] == new_id
         assert "black_sphere" in led.path
 
 
@@ -176,12 +188,19 @@ class TestDualLedgerFix:
     nuke fields the Ledger class doesn't manage."""
 
     def test_rename_episode_moves_file_on_disk(self, tmp_out):
+        # BUG-LOCAL-019 (Phase B fallout): see test_rename_updates_path_and_data
+        # comment -- same fix shape, proper per-episode dir structure.
         import json as _json
-        led = Ledger("pending_20260424_000000", str(tmp_out))
+        old_id = "pending_20260424_000000"
+        new_id = "signal_lost_black_sphere_20260424_142006"
+        ep_dir = tmp_out / "episodes" / old_id
+        audio_dir = ep_dir / "audio"
+        audio_dir.mkdir(parents=True)
+        led = Ledger(old_id, str(audio_dir))
         led.save()
         old_path = Path(led.path)
         assert old_path.exists()
-        led.rename_episode("signal_lost_black_sphere_20260424_142006")
+        led.rename_episode(new_id)
         new_path = Path(led.path)
         # Old pending file should NO LONGER exist; new canonical
         # should exist with the same contents.
