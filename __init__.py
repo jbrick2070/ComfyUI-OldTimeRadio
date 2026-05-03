@@ -171,6 +171,14 @@ _NODE_MODULES = {
     # at runtime and routes images to output/otr/episodes/<ep>/stills/
     # or .../portraits/. Falls back to legacy flat dirs in headless/test.
     "OTR_SaveToEpisodeWorkspace":  (".nodes.otr_save_to_episode_workspace", "SaveToEpisodeWorkspace", " Save to Episode Workspace (FLUX stills/portraits)"),
+    # BUG-LOCAL-030 Phase B (2026-05-03 EVENING): post-RTXUpscale procgen
+    # visual blend. Overlays 1920x1080 native procgen on the upscaled
+    # HuMo + LTX composite at delivery res. Audio passes through with
+    # -c:a copy so C7 byte-identity holds end-to-end. Fills the visible
+    # HuMo black pillarbox bars from Phase A simple-pillarbox composite
+    # with the SIGNAL LOST CRT signature (audio-reactive scanlines +
+    # flicker over the otherwise-static black surround).
+    "OTR_PostUpscaleProcgenBlend": (".nodes.otr_post_upscale_procgen_blend", "PostUpscaleProcgenBlend", " Post-Upscale Procgen Blend (1080p)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

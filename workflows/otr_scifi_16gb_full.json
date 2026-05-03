@@ -418,7 +418,7 @@
         400,
         280
       ],
-      "title": "8. Signal Lost Video (audio-only fallback)",
+      "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
       "properties": {
         "Node name for S&R": "OTR_SignalLostVideo"
       },
@@ -427,7 +427,7 @@
         "{}",
         "[]",
         24,
-        "832x480",
+        "1920x1080",
         ""
       ],
       "inputs": [

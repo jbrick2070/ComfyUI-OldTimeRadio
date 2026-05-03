@@ -1201,20 +1201,26 @@ class SignalLostVideoRenderer:
                     "default": 24, "min": 12, "max": 60, "step": 1,
                     "tooltip": "Frames per second (24 = cinematic)"
                 }),
-                # 2026-05-01 EVENING (Jeffrey): 832x480 added as
-                # default. Pixel-identical to HuMo native (832x480)
-                # and LTX render dims (832x480), so procgen + HuMo
-                # + LTX all share THE EXACT SAME RESOLUTION -- no
-                # per-clip pillarbox or scale at composite time.
-                # 832x480 = 1.733:1 (~2% narrower than strict 16:9
-                # which is 1.778:1) but it's the HuMo-native aspect
-                # so trying for true 16:9 (854x480) would force a
-                # pillarbox on HuMo clips and break the "all same
-                # pixel res" property. RTX VSR final-pass upscale
-                # adds later as a separate stage when needed.
-                "resolution": (["832x480", "854x480", "1920x1080", "1280x720", "3840x2160"], {
-                    "default": "832x480",
-                    "tooltip": "Output video resolution. 832x480 = HuMo + LTX native (default, fastest -- no pillarbox at composite time). 854x480 = strict 16:9 at native height. 1920x1080/1280x720/3840x2160 retain the legacy upscale-at-source path."
+                # 2026-05-03 EVENING (BUG-LOCAL-030 Phase B, Jeffrey
+                # final spec): default RAISED from 832x480 to 1920x1080
+                # so procgen renders directly at delivery resolution.
+                # Per Jeffrey: "proc gen 1920x1080 ... then a final
+                # ffmpeg w/ the proc gen mix for final 1080p". Procgen
+                # is now SEPARATE from the per-clip-mux composite path
+                # (which stays at 1472x832 native + RTXUpscaled to
+                # 1920x1080). The OTR_PostUpscaleProcgenBlend node
+                # overlays this 1920x1080 procgen on the upscaled mp4
+                # at delivery res. Result: procgen's CRT scanline /
+                # audio-reactive flicker stays CRISP at 1080p (would
+                # have been smeared if upscaled by RTX VSR -- synthetic
+                # patterns + AI upscaler = ringing / softening), and
+                # fills the visible HuMo black pillarbox bars from
+                # BUG-030 Phase A as the SIGNAL LOST visual signature.
+                # 832x480 retained as legacy mode for the prior path
+                # (composite-then-RTXUpscale-everything-together).
+                "resolution": (["1920x1080", "1280x720", "832x480", "854x480", "3840x2160"], {
+                    "default": "1920x1080",
+                    "tooltip": "Procgen output resolution. 1920x1080 = delivery res for post-RTXUpscale blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
                 }),
                 "episode_title": ("STRING", {
                     "default": "",
