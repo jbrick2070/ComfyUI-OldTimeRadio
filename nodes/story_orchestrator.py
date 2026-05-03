@@ -6913,15 +6913,32 @@ YOUR CRITIQUE (numbered list only):"""
 
         # Pattern: NAME: dialogue (uppercase name, optional parenthetical emotion,
         # colon, then content). Allow optional asterisks (character emphasis).
-        pattern = r'^\s*\*{0,2}([A-Z][A-Z0-9_ ]+?)\*{0,2}\s*(?:\([^)]*\))?\s*:'
+        # BUG-LOCAL-027 fix (2026-05-03): also accept the writer's actual
+        # ``[N] CHARNAME: dialogue`` numbered-bracket format. The original
+        # regex required the line to START with the uppercase name, so any
+        # script with the ``[12] FLETCHER WELLS:`` prefix returned ``{}``
+        # for both draft and revised — the per-character preservation gate
+        # at line ~7174 then iterated an empty dict and accepted any
+        # dialogue-stripped revision. Three runs on 2026-05-03 between
+        # 22:00 and 00:16 shipped revisions with zero character lines
+        # because of this. The new optional non-capturing group
+        # ``(?:\[\d+\]\s+)?`` makes the prefix optional so BOTH
+        # ``CHARNAME:`` and ``[N] CHARNAME:`` formats parse correctly.
+        pattern = r'^\s*(?:\[\d+\]\s+)?\*{0,2}([A-Z][A-Z0-9_ ]+?)\*{0,2}\s*(?:\([^)]*\))?\s*:'
 
         character_counts = {}
         for line in text.split('\n'):
             match = re.match(pattern, line)
             if match:
                 char_name = match.group(1).strip()
-                # Skip structural tokens
-                if char_name not in _struct_exclude:
+                # BUG-LOCAL-027 fix (2026-05-03): exclude structural tokens
+                # by EXACT match OR first-word match, so "ACT 2", "SCENE 3",
+                # "MUSIC theme" etc all get filtered. Prior to this the
+                # exact-match exclude let "ACT 2:" line headers count as a
+                # character, which inflated draft_total and could cause the
+                # total-collapse gate to misfire.
+                first_word = char_name.split()[0] if char_name else ""
+                if char_name not in _struct_exclude and first_word not in _struct_exclude:
                     character_counts[char_name] = character_counts.get(char_name, 0) + 1
 
         return character_counts
@@ -7034,9 +7051,12 @@ A tough editor has reviewed your draft and provided specific critique.
 YOUR TASK: Rewrite the COMPLETE script, implementing every critique point below.
 Keep everything that already works. Fix only what the editor flagged.
 
+ABSOLUTE REQUIREMENT — DIALOGUE MUST SURVIVE THE REVISION:
+The revised script MUST contain CHARACTER dialogue lines. Producing a script with only SCENE/ENV/SFX/MUSIC scaffolding and zero spoken character lines is a TOTAL FAILURE — the radio drama becomes silent narration. Every CHARACTER speaker present in the draft MUST appear in the revision. You may rewrite their lines for sharper dialogue, emotional grounding, or pacing — but you may NEVER delete a character's voice entirely. If you find yourself writing only ENV: and SFX: tags with no CHARACTER: lines, STOP and re-include the dialogue.
+
 RULES:
 - Output the FULL revised script - not a summary, not highlights, the COMPLETE script.
-- CRITICAL: Every spoken line MUST use the format 'CHARACTER_NAME: dialogue text' (all caps name, colon, space, then dialogue). Also preserve [SFX:], [ENV:], (beat), === SCENE N === tags.
+- CRITICAL: Every spoken line MUST use the format 'CHARACTER_NAME: dialogue text' (all caps name, colon, space, then dialogue). Also preserve [SFX:], [ENV:], (beat), === SCENE N === tags. The optional line-number prefix '[N]' from the draft (e.g. '[12] FLETCHER WELLS: ...') may be kept or omitted — both formats parse correctly.
 - Do NOT add new characters unless the critique specifically demands it.
 - Do NOT change character names.
 - Do NOT remove the ANNOUNCER opening or closing epilogue.
@@ -7182,6 +7202,37 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
                     )
                     _runtime_log(f"CRITIQUE: CRITIQUE_REJECTED - character '{char_name}' dropped from {draft_count} to {revised_count} lines (floor={min_line_count_per_character})")
                     return draft_text
+
+        # BUG-LOCAL-027 hard total-collapse gate (2026-05-03): belt-and-
+        # suspenders for the per-character check above. The per-character
+        # loop catches "FLETCHER dropped from 8 to 1"; this catches "every
+        # character wiped at once" (the actual failure mode observed on
+        # 2026-05-03 — three soak runs returned revisions with zero
+        # character lines because the model under temp=0.95 padded the
+        # output with SCENE/ENV/SFX prose and dropped every CHARACTER:
+        # line). Threshold: revised total must be >= 50% of draft total
+        # whenever the draft had >= 3 character lines. Below 3 lines the
+        # draft itself is too short to apply a meaningful ratio — let the
+        # per-character check (with min_line_count_per_character floor)
+        # handle that case.
+        import math as _math
+        draft_total = sum(draft_char_counts.values())
+        revised_total = sum(revised_char_counts.values())
+        if draft_total >= 3:
+            min_revised = max(1, _math.ceil(draft_total * 0.5))
+            if revised_total < min_revised:
+                log.warning(
+                    "[Critique] Total character-line count collapsed from %d "
+                    "to %d (minimum %d, threshold=50%% of draft). Revision "
+                    "appears to be SCENE/ENV/SFX-only — keeping original draft.",
+                    draft_total, revised_total, min_revised,
+                )
+                _runtime_log(
+                    f"CRITIQUE: CRITIQUE_REJECTED - total character lines "
+                    f"collapsed from {draft_total} to {revised_total} "
+                    f"(min={min_revised}, threshold=50%%)"
+                )
+                return draft_text
 
         log.info("[Critique] Checks & Critiques complete - revised script accepted "
                  "(similarity=%.1f%%, length ratio=%.0f%%).",

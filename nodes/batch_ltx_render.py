@@ -361,7 +361,16 @@ def _resolve_radio_still_path(ledger: dict | None) -> Path | None:
     if not eid or any(t in eid for t in ("/", "\\", "..", "\x00")):
         return None
     try:
-        fs_path = otr_stills_dir() / f"radio_bookend_{eid}.png"
+        # BUG-LOCAL-028 fix (2026-05-03): pass episode_id so the lookup
+        # resolves to ``output/otr/episodes/<eid>/stills/radio_bookend_<eid>.png``
+        # (the canonical Phase B per-episode workspace). Prior to this
+        # fix, ``otr_stills_dir()`` with no arg fell back to
+        # ``output/otr/_legacy_stills/`` per ``nodes/_otr_paths.py:208-218``;
+        # after BUG-028's writer fix, the radio bookend now lands in the
+        # per-episode dir and this READ site needs to point there too,
+        # otherwise LTX can't find the radio still and falls back to a
+        # generic motion clip with no scene continuity.
+        fs_path = otr_stills_dir(eid) / f"radio_bookend_{eid}.png"
     except Exception as exc:  # noqa: BLE001
         log.warning("[BatchLTXRender] otr_stills_dir lookup failed: %s", exc)
         return None

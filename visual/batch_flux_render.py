@@ -830,7 +830,19 @@ class BatchFluxRender:
         img = decoder.decode(vae, samples)[0]
         # img shape: [B, H, W, C] in 0..1 float
 
-        stills_dir = _OTRP.otr_stills_dir()
+        # BUG-LOCAL-028 fix (2026-05-03): pass episode_id so the radio
+        # bookend lands in the per-episode workspace at
+        # ``output/otr/episodes/<ep>/stills/radio_bookend_<ep>.png``
+        # instead of the legacy ``output/otr/_legacy_stills/`` flat dir.
+        # Without the arg, ``otr_stills_dir()`` falls back to
+        # ``_legacy_stills/`` per ``nodes/_otr_paths.py:208-218``, which
+        # orphans the radio still from the per-episode workspace and
+        # leaves VideoComposite (which reads from the per-episode
+        # ``stills/`` subdir) with no scenery layer. Same Phase G blast
+        # radius as BUG-LOCAL-021 — that fix updated the LEDGER discovery
+        # to use the singleton; this fix updates the SAVE PATH to use the
+        # episode_id we already resolved (line 768/772 above).
+        stills_dir = _OTRP.otr_stills_dir(episode_id)
         stills_dir.mkdir(parents=True, exist_ok=True)
         out_path = stills_dir / f"radio_bookend_{episode_id}.png"
 

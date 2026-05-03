@@ -165,6 +165,12 @@ _NODE_MODULES = {
     # audio with -c:a copy (zero audio re-encode). Bypassable via the
     # `bypass` widget for raw 832x480 deliverables.
     "OTR_RTXUpscale":              (".nodes.rtx_upscale", "RTXUpscale", " RTX VSR Upscale (1080p)"),
+    # BUG-LOCAL-028 fix (2026-05-03): per-episode-aware image save sink.
+    # Replaces stock SaveImage nodes whose hardcoded filename_prefix
+    # couldn't track the in-flight episode_id. Reads the Ledger singleton
+    # at runtime and routes images to output/otr/episodes/<ep>/stills/
+    # or .../portraits/. Falls back to legacy flat dirs in headless/test.
+    "OTR_SaveToEpisodeWorkspace":  (".nodes.otr_save_to_episode_workspace", "SaveToEpisodeWorkspace", " Save to Episode Workspace (FLUX stills/portraits)"),
 }
 
 for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():

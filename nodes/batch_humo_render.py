@@ -328,10 +328,17 @@ def _find_portrait(
     #    BUG-LOCAL-087: sort by mtime descending so the newest stills
     #    (this episode's FLUX output) come first -- cast index 0 maps
     #    to the freshest still.
+    #    BUG-LOCAL-028 (2026-05-03): added per-episode workspace glob
+    #    `otr/episodes/*/stills/full_env_*.png` alongside the legacy
+    #    flat-dir patterns. After BUG-028 fix, OTR_SaveToEpisodeWorkspace
+    #    writes new env stills to the per-episode subdir; without this
+    #    glob, downstream HuMo would fall back to stale prior-episode
+    #    stills (or find nothing) and char_id->still binding would fail.
     if speaker_norm in cast_names:
         idx = cast_names.index(speaker_norm)
         candidates = sorted(
-            list(portraits_dir.glob("otr/stills/full_env_*.png"))
+            list(portraits_dir.glob("otr/episodes/*/stills/full_env_*.png"))
+            + list(portraits_dir.glob("otr/stills/full_env_*.png"))
             + list(portraits_dir.glob("otr_stills/full_env_*.png")),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
@@ -341,7 +348,8 @@ def _find_portrait(
 
     # 5. Any FLUX env still (last resort) -- newest first
     candidates = sorted(
-        list(portraits_dir.glob("otr/stills/full_env_*.png"))
+        list(portraits_dir.glob("otr/episodes/*/stills/full_env_*.png"))
+        + list(portraits_dir.glob("otr/stills/full_env_*.png"))
         + list(portraits_dir.glob("otr_stills/full_env_*.png")),
         key=lambda p: p.stat().st_mtime,
         reverse=True,
@@ -483,8 +491,18 @@ def _resolve_cast_stills_from_ledger(
         # written in the last 30 minutes.
         fresh_floor = _time.time() - 30 * 60
 
+    # BUG-LOCAL-028 (2026-05-03): added per-episode workspace pattern.
+    # The first pattern walks the new canonical layout
+    # ``output/otr/episodes/*/stills/full_env_*.png``; the second + third
+    # are the legacy flat-dir patterns kept for back-compat. Mtime filter
+    # below still enforces episode freshness so wrong-episode pollution
+    # cannot survive even when multiple per-episode dirs exist on disk.
     candidates_all: list[Path] = []
-    for pattern in ("otr/stills/full_env_*.png", "otr_stills/full_env_*.png"):
+    for pattern in (
+        "otr/episodes/*/stills/full_env_*.png",
+        "otr/stills/full_env_*.png",
+        "otr_stills/full_env_*.png",
+    ):
         for p in portraits_dir.glob(pattern):
             try:
                 if p.stat().st_mtime >= fresh_floor:

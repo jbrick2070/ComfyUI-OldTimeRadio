@@ -1005,7 +1005,7 @@
     },
     {
       "id": 25,
-      "type": "SaveImage",
+      "type": "OTR_SaveToEpisodeWorkspace",
       "pos": [
         2180,
         1200
@@ -1017,7 +1017,7 @@
       "flags": {},
       "order": 5,
       "mode": 0,
-      "title": "Save FLUX environment stills (otr/stills/full_env_*)",
+      "title": "Save FLUX environment stills (per-episode workspace)",
       "inputs": [
         {
           "name": "images",
@@ -1027,10 +1027,11 @@
       ],
       "outputs": [],
       "properties": {
-        "Node name for S&R": "SaveImage"
+        "Node name for S&R": "OTR_SaveToEpisodeWorkspace"
       },
       "widgets_values": [
-        "otr/stills/full_env"
+        "stills",
+        "full_env"
       ]
     },
     {

@@ -1,14 +1,14 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `03dfbfa` | **Last refactored:** 2026-05-03
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `<this commit>` | **Last refactored:** 2026-05-03 EVENING
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
 ---
 
-## Status snapshot — 2026-05-03 (post BUG-026 hotfix)
+## Status snapshot — 2026-05-03 EVENING (post BUG-027 + BUG-028 soak fixes)
 
-**Code work for the v2.0-alpha cycle is complete.** All 17 BUG-LOCAL entries below are `[FIXED]` in code and pushed to `origin/v2.0-alpha`. The remaining work is **a single real-run acceptance soak** — every fix has a code-side verification (AST, regression suites, targeted tests all green at 1150/8/1) but needs a clean end-to-end run on Jeffrey's RTX 5080 to confirm the live behavior.
+**Code work for the v2.0-alpha cycle is now 19 entries deep.** All 19 BUG-LOCAL entries below are `[FIXED]` in code and pushed to `origin/v2.0-alpha`. The 2026-05-03 EVENING soak surfaced two new failure modes (BUG-027 dialogue wipe + BUG-028 FLUX legacy save paths); both were fixed in the same autonomous session per direct user directive ("yes ofrget rop8u7hnd robins just fix fix fix"). Round-robin consult was SKIPPED for both fixes per the same directive — extra verification in lieu (AST + format-safety + targeted regression + Bug Bible regression all green pre-commit). The remaining work is **a single real-run acceptance soak** to confirm the live behavior on Jeffrey's RTX 5080.
 
 **Committed and pushed (in chronological order):**
 
@@ -30,18 +30,26 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 | 023 | H | `5075b9e` | ANNOUNCER portrait wasted FLUX context + skewed scene composition |
 | 024 | H | `5075b9e` | Radio bookend FLUX prompt fell back to generic when style missing OR ledger stale |
 | 025 | H | `5075b9e` | LTX role prompts ignore story style + scene context (every episode looked the same) |
-| **026** | **G/H hotfix** | **`03dfbfa`** | **DIRECTOR_PROMPT.format crash from Phase H unescaped curly braces (caused soak crash 23:46)** |
+| 026 | G/H hotfix | `03dfbfa` | DIRECTOR_PROMPT.format crash from Phase H unescaped curly braces (caused soak crash 23:46) |
+| **027** | **soak fix** | **`<this commit>`** | **Critique/revision pass strips all CHARACTER dialogue (parser regex didn't accept `[N] CHARNAME:` format + acceptance gate had no total-collapse check + revision LLM under temp=0.95 would happily produce SCENE/ENV/SFX-only output). 3-part fix: regex + total-collapse hard gate + ABSOLUTE REQUIREMENT prompt clause.** |
+| **028** | **soak fix** | **`<this commit>`** | **FLUX env stills + radio bookend save to legacy flat dirs (`_legacy_stills/` + flat `otr/stills/` shared global counter) instead of per-episode workspace — VideoComposite + BatchHumo + BatchLTX all looked in the wrong places after Phase B reorg. 4-site write+read alignment fix.** |
 
-**Cumulative regression test count:** 1150 passed / 8 skipped / 1 xfailed in 131s (full `tests/` directory + Bug Bible regression).
+**Cumulative regression test count (post-027/028):** 155 passed in 3.27s (targeted set: production_ledger + radio_still_resolver + filename_pattern_audit + cache_key_mutations + meta_paths + ledger_rename + critique_dialogue_preservation + save_to_episode_workspace + prompt_format_safety) PLUS Bug Bible regression 24 passed / 1 skipped / 1 xfailed in 1.24s. Full `tests/` directory NOT re-run (BUG-LOCAL-006 dropdown_guardrails hang resurfaced under live ComfyUI; pre-existing, not caused by these fixes; documented as known regression in cohabit mode).
 
-**Promotion to Bug Bible:** All 17 entries are Bible candidates. Promotion happens after the next real-run soak confirms behavior end-to-end.
+**Promotion to Bug Bible:** All 19 entries are Bible candidates. Promotion happens after the next real-run soak confirms behavior end-to-end.
 
 ### What still needs Jeffrey's hands
 
-1. **Restart ComfyUI Desktop** so the `03dfbfa` code is loaded (custom node `.py` files are cached in `sys.modules`; mid-process changes don't hot-reload).
-2. **Re-queue with a richer episode title** than "Test" — give the LLM hook for character dialogue. The "Cold Circuit" run earlier today produced 7 lines + 3 chars cleanly. "Test" + scifi + short(3) reproducibly fails.
-3. **Tail the run** and confirm the Phase G/H signatures appear (see "Real-run acceptance signatures" section at the bottom of this file).
-4. **On a green soak,** promote all 17 BUG-LOCAL entries to the Bug Bible together.
+1. **Restart ComfyUI Desktop** so the new code is loaded (custom node `.py` files are cached in `sys.modules`; mid-process changes don't hot-reload). Especially important after BUG-028 because a NEW node class (`OTR_SaveToEpisodeWorkspace`) was registered in `__init__.py` and the workflow JSON now references it.
+2. **Re-queue any episode** — the BUG-027 + BUG-028 fixes are general-purpose, no special title needed.
+3. **Tail the run** and confirm the new acceptance signatures:
+   - `CRITIQUE: Character line counts - draft={'CHAR1': N, ...} revised={...}` with NON-EMPTY draft dict (BUG-027 parser fix)
+   - If revision wipes dialogue: `CRITIQUE: CRITIQUE_REJECTED - total character lines collapsed from N to M` (BUG-027 hard gate fires)
+   - `[BatchBark] Found >=1 dialogue lines in Canonical 1.0 format` (downstream confirms dialogue survived)
+   - `output/otr/episodes/<ep>/stills/full_env_NNNNN_.png` files exist with counter starting at 1 (BUG-028 writer fix)
+   - `output/otr/episodes/<ep>/stills/radio_bookend_<ep>.png` exists (BUG-028 writer fix)
+   - `[BatchHumoRender] cast-still binding: N/M cast members matched to fresh stills` reports N>0 (BUG-028 reader fix)
+4. **On a green soak,** promote all 19 BUG-LOCAL entries to the Bug Bible together.
 
 ### Known remaining suspects (NOT blocking the soak — Phase H+ candidates)
 
