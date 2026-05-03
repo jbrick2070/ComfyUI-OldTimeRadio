@@ -27,7 +27,16 @@ def _capture_run():
     captured = {}
 
     def _fake_run(cmd, **kwargs):
+        # Always update captured["cmd"] to the LAST cmd (back-compat).
+        # Also track ffmpeg-only cmds so tests can find the blend cmd
+        # even when the node also invokes git rev-parse via ledger save.
         captured["cmd"] = cmd
+        captured.setdefault("all", []).append(cmd)
+        if cmd and isinstance(cmd, list):
+            head = str(cmd[0]).lower()
+            if (head.endswith("ffmpeg") or head.endswith("ffmpeg.exe")) and \
+               captured.get("ffmpeg") is None:
+                captured["ffmpeg"] = cmd
 
         class _R:
             returncode = 0
@@ -68,16 +77,24 @@ def test_blend_cmd_uses_audio_passthrough(node, tmp_path):
     captured, fake_run = _capture_run()
     from nodes import otr_post_upscale_procgen_blend as M
 
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run):
-        out, report = node.blend(
+    # Stub the ledger stamp helper so its subprocess side-effects (git
+    # rev-parse via the canonical Ledger.save commit lookup) don't
+    # contaminate the captured ffmpeg cmd. Stamp behavior is covered by
+    # its own dedicated tests further down.
+    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+         mock.patch.object(M, "_stamp_ledger_final_video_path",
+                           return_value=(False, "stubbed for cmd-shape test")):
+        node.blend(
             source_mp4_path=str(src),
             procgen_mp4_path=str(pgn),
             blend_mode="lighten",
             blend_opacity=0.5,
         )
-    cmd = captured["cmd"]
+    # Look at the ffmpeg cmd specifically (filtering out any other
+    # subprocess invocations e.g. git rev-parse from ledger save).
+    cmd = captured.get("ffmpeg") or captured["cmd"]
     # C7 audio passthrough
-    assert "-c:a" in cmd
+    assert "-c:a" in cmd, f"expected -c:a in ffmpeg cmd; got {cmd}"
     assert cmd[cmd.index("-c:a") + 1] == "copy", (
         "audio MUST be -c:a copy (zero re-encodes for C7 byte-identity)"
     )
@@ -109,9 +126,13 @@ def test_blend_cmd_does_NOT_use_shortest_for_c7_safety(node, tmp_path):
     captured, fake_run = _capture_run()
     from nodes import otr_post_upscale_procgen_blend as M
 
-    with mock.patch.object(M.subprocess, "run", side_effect=fake_run):
+    # Stub ledger stamp -- this test is about the ffmpeg cmd shape, not
+    # the ledger stamp side-effect (covered by other tests below).
+    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+         mock.patch.object(M, "_stamp_ledger_final_video_path",
+                           return_value=(False, "stubbed for cmd-shape test")):
         node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
-    cmd = captured["cmd"]
+    cmd = captured.get("ffmpeg") or captured["cmd"]
     assert "-shortest" not in cmd, (
         f"-shortest must NOT be present in PostUpscaleProcgenBlend cmd "
         f"(C7 audio truncation risk per BUG-LOCAL-030 round-robin); got {cmd}"
@@ -201,6 +222,151 @@ def test_node_registered_in_init():
         )
     finally:
         sys.path.pop(0)
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-030 audit gap fix (2026-05-03 EVENING): ledger stamp
+# ---------------------------------------------------------------------------
+
+def test_ledger_stamped_after_successful_blend(node, tmp_path):
+    """On successful blend: ledger.final_video_path + meta.paths.obs_final_blended
+    + meta.post_upscale_blend forensics block all updated."""
+    import json
+    src = tmp_path / "src_1080p.mp4"; src.write_bytes(b"src")
+    pgn = tmp_path / "pgn_1080p.mp4"; pgn.write_bytes(b"pgn")
+    # Build a fake ledger on disk + point in_flight_ledger_path at it.
+    ep_id = "signal_lost_test_20260503_010101"
+    ep_dir = tmp_path / "fake_output" / "otr" / "episodes" / ep_id
+    audio_dir = ep_dir / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    ledger_path = audio_dir / f"{ep_id}_ledger.json"
+    initial_ledger = {
+        "episode_id": ep_id,
+        "schema_version": "l3-test",
+        "final_video_path": str(tmp_path / "obs" / f"{ep_id}_1080p.mp4"),  # pre-blend
+        "meta": {"schema_version": "l3-test", "paths": {"audio_dir": str(audio_dir)}},
+    }
+    ledger_path.write_text(json.dumps(initial_ledger), encoding="utf-8")
+
+    captured, fake_run = _capture_run()
+    from nodes import otr_post_upscale_procgen_blend as M
+
+    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+         mock.patch("nodes._otr_ledger.in_flight_ledger_path", return_value=ledger_path):
+        out, report = node.blend(
+            source_mp4_path=str(src),
+            procgen_mp4_path=str(pgn),
+            blend_mode="lighten",
+            blend_opacity=0.5,
+        )
+
+    # Ledger on disk should now reflect the blended path.
+    led = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert led["final_video_path"].endswith("_procgen_blended.mp4"), (
+        f"final_video_path must point at the blended output; got {led['final_video_path']}"
+    )
+    # NOTE: meta.paths is owned by _build_meta_paths (per schema doc rule
+    # "Never write to meta.paths from outside _build_meta_paths"). The
+    # blended path is discoverable via top-level final_video_path AND
+    # via meta.post_upscale_blend.blended_mp4 (the forensics block).
+    assert led["meta"]["post_upscale_blend"]["blended_mp4"].endswith("_procgen_blended.mp4")
+
+    # Forensics block populated correctly.
+    fb = led["meta"]["post_upscale_blend"]
+    assert fb["source_mp4"] == str(src)
+    assert fb["procgen_mp4"] == str(pgn)
+    assert fb["blended_mp4"].endswith("_procgen_blended.mp4")
+    assert fb["blend_mode"] == "lighten"
+    assert fb["blend_opacity"] == 0.5
+
+    # Report mentions the stamp.
+    assert "ledger" in report.lower()
+    assert "stamped" in report.lower()
+
+
+def test_ledger_NOT_stamped_on_bypass_mode(node, tmp_path):
+    """bypass=True: do NOT touch the ledger (output is a verbatim copy of
+    source; final_video_path should remain whatever RTXUpscale set)."""
+    import json
+    src = tmp_path / "src.mp4"; src.write_bytes(b"src")
+    pgn = tmp_path / "pgn.mp4"; pgn.write_bytes(b"pgn")
+    ep_id = "test_ep_001"
+    audio_dir = tmp_path / "fake_output" / "otr" / "episodes" / ep_id / "audio"
+    audio_dir.mkdir(parents=True)
+    ledger_path = audio_dir / f"{ep_id}_ledger.json"
+    pre_blend_path = "C:/some/preblend.mp4"
+    initial_ledger = {
+        "episode_id": ep_id,
+        "schema_version": "l3-test",
+        "final_video_path": pre_blend_path,
+        "meta": {"schema_version": "l3-test"},
+    }
+    ledger_path.write_text(json.dumps(initial_ledger), encoding="utf-8")
+
+    from nodes import otr_post_upscale_procgen_blend as M
+    with mock.patch("nodes._otr_ledger.in_flight_ledger_path", return_value=ledger_path):
+        node.blend(
+            source_mp4_path=str(src), procgen_mp4_path=str(pgn),
+            bypass=True,
+        )
+
+    # Ledger should be UNCHANGED — bypass means the output is just a
+    # copy of source, the original final_video_path is still correct.
+    led = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert led["final_video_path"] == pre_blend_path, (
+        f"bypass mode must NOT change ledger.final_video_path; was {pre_blend_path}, "
+        f"now {led['final_video_path']}"
+    )
+    assert "post_upscale_blend" not in led["meta"], (
+        "bypass mode must NOT add post_upscale_blend forensics block"
+    )
+
+
+def test_ledger_NOT_stamped_when_procgen_missing(node, tmp_path):
+    """Procgen file missing: degraded copy mode, do NOT stamp ledger
+    (output is a copy of source, not a real blend)."""
+    import json
+    src = tmp_path / "src.mp4"; src.write_bytes(b"src")
+    ep_id = "test_ep_002"
+    audio_dir = tmp_path / "fake_output" / "otr" / "episodes" / ep_id / "audio"
+    audio_dir.mkdir(parents=True)
+    ledger_path = audio_dir / f"{ep_id}_ledger.json"
+    pre_blend_path = "C:/some/preblend.mp4"
+    initial_ledger = {
+        "episode_id": ep_id,
+        "schema_version": "l3-test",
+        "final_video_path": pre_blend_path,
+        "meta": {"schema_version": "l3-test"},
+    }
+    ledger_path.write_text(json.dumps(initial_ledger), encoding="utf-8")
+
+    with mock.patch("nodes._otr_ledger.in_flight_ledger_path", return_value=ledger_path):
+        node.blend(
+            source_mp4_path=str(src),
+            procgen_mp4_path=str(tmp_path / "missing_procgen.mp4"),
+        )
+
+    led = json.loads(ledger_path.read_text(encoding="utf-8"))
+    assert led["final_video_path"] == pre_blend_path
+    assert "post_upscale_blend" not in led["meta"]
+
+
+def test_ledger_stamp_helper_never_raises_on_no_singleton(tmp_path):
+    """If no in-flight ledger singleton + no fallback ledger, the helper
+    must return (False, msg) -- never raise. The blend node must still
+    succeed and produce its output."""
+    from nodes import otr_post_upscale_procgen_blend as M
+    src = tmp_path / "src.mp4"; src.write_bytes(b"src")
+    pgn = tmp_path / "pgn.mp4"; pgn.write_bytes(b"pgn")
+    blended = tmp_path / "src_procgen_blended.mp4"
+
+    with mock.patch("nodes._otr_ledger.in_flight_ledger_path", return_value=None):
+        stamped, msg = M._stamp_ledger_final_video_path(
+            blended_mp4=blended, source_mp4=src, procgen_mp4=pgn,
+            blend_mode="lighten", blend_opacity=0.5,
+        )
+    assert stamped is False
+    assert "no in-flight ledger" in msg.lower() or "skipped" in msg.lower()
 
 
 def test_signal_lost_video_resolution_default_is_1080p():

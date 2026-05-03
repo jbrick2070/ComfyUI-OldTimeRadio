@@ -51,6 +51,85 @@ _DEFAULT_BLEND_MODE = "lighten"
 _BLEND_MODE_CHOICES = ["lighten", "screen", "addition", "overlay", "normal"]
 
 
+def _stamp_ledger_final_video_path(
+    blended_mp4: Path,
+    source_mp4: Path,
+    procgen_mp4: Path,
+    blend_mode: str,
+    blend_opacity: float,
+) -> tuple[bool, str]:
+    """Stamp the in-flight ledger with the post-blend final deliverable path.
+
+    BUG-LOCAL-030 audit gap fix (2026-05-03 EVENING): without this stamp,
+    ``ledger.final_video_path`` still pointed at the pre-blend ``_1080p.mp4``
+    that RTXUpscale wrote, even though the actual final deliverable is
+    the procgen-blended ``_1080p_procgen_blended.mp4``. Anyone reading
+    the ledger to find "the final mp4" picked the wrong file.
+
+    Updates two fields (avoiding the meta.paths block per the schema
+    doc rule "Never write to meta.paths from outside _build_meta_paths"
+    -- that block is owned by the ledger save path and rebuilt fresh
+    on every save):
+      - ``ledger["final_video_path"]`` -> blended mp4 absolute path
+        (top-level; this is the canonical "final mp4" pointer that
+        downstream tooling reads)
+      - ``ledger["meta"]["post_upscale_blend"]`` -> forensics block
+        with source/procgen/out paths + blend params (so a future
+        debugger can see what got blended into what AND find the
+        blended file directly via meta.post_upscale_blend.blended_mp4)
+
+    Best-effort -- never raises. Failure to stamp is logged as a warning;
+    the actual blended mp4 is still on disk and discoverable via the
+    canonical filename pattern. Returns ``(stamped: bool, msg: str)``.
+
+    Uses ``in_flight_ledger_path()`` (BUG-LOCAL-021 Phase G singleton
+    discovery) to find the ledger file. If no singleton is active (e.g.
+    headless test), the stamp is silently skipped.
+    """
+    try:
+        # Late imports: keep this helper standalone (no side-effects at
+        # module import) so the broader pipeline doesn't gain a new
+        # import chain just because the blend node is registered.
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+        except ImportError:  # pragma: no cover -- direct-script fallback
+            import sys as _sys
+            _NODES_DIR = Path(__file__).resolve().parent
+            if str(_NODES_DIR) not in _sys.path:
+                _sys.path.insert(0, str(_NODES_DIR))
+            import _otr_ledger as _OTRL  # type: ignore
+
+        ledger_p = _OTRL.in_flight_ledger_path()
+        if ledger_p is None:
+            return (False, "no in-flight ledger singleton; skipped stamp")
+
+        led = _OTRL.load_ledger_safe(ledger_p)
+        if led is None:
+            return (False, f"could not load ledger {ledger_p.name}; skipped stamp")
+
+        # Update top-level final_video_path.
+        led["final_video_path"] = str(blended_mp4)
+
+        # Forensics block: what got blended into what + with what params.
+        # Stamped under meta.post_upscale_blend (NOT under meta.paths,
+        # which is owned exclusively by _build_meta_paths per schema doc).
+        meta = led.setdefault("meta", {})
+        meta["post_upscale_blend"] = {
+            "source_mp4": str(source_mp4),
+            "procgen_mp4": str(procgen_mp4),
+            "blended_mp4": str(blended_mp4),
+            "blend_mode": blend_mode,
+            "blend_opacity": float(blend_opacity),
+        }
+
+        ok = _OTRL.save_ledger_safe(ledger_p, led)
+        if not ok:
+            return (False, f"save_ledger_safe returned False for {ledger_p.name}")
+        return (True, f"stamped ledger {ledger_p.name}: final_video_path -> {blended_mp4.name}")
+    except Exception as exc:  # noqa: BLE001
+        return (False, f"ledger stamp failed: {type(exc).__name__}: {exc}")
+
+
 def _build_blend_cmd(
     source_mp4: Path,
     procgen_mp4: Path,
@@ -266,6 +345,29 @@ class PostUpscaleProcgenBlend:
             f"{output_path.name} (mode={blend_mode}, opacity={blend_opacity:.3f})"
         )
         log.info("[PostUpscaleProcgenBlend] %s", report_lines[-1])
+
+        # BUG-LOCAL-030 audit gap fix: stamp ledger.final_video_path with
+        # the post-blend deliverable path so downstream tooling reading
+        # the ledger picks the right "final mp4" -- not the pre-blend
+        # _1080p.mp4 RTXUpscale wrote earlier. Best-effort; never raises.
+        # Only invoked on successful real blend (NOT bypass / missing
+        # procgen / ffmpeg failure paths -- those leave the previous
+        # ledger.final_video_path intact, which is correct for those
+        # fallback modes since the output IS just a copy of source).
+        stamped, stamp_msg = _stamp_ledger_final_video_path(
+            blended_mp4=output_path,
+            source_mp4=src,
+            procgen_mp4=pgn,
+            blend_mode=blend_mode,
+            blend_opacity=float(blend_opacity),
+        )
+        if stamped:
+            log.info("[PostUpscaleProcgenBlend] %s", stamp_msg)
+            report_lines.append(f"  ledger: {stamp_msg}")
+        else:
+            log.warning("[PostUpscaleProcgenBlend] ledger NOT stamped: %s", stamp_msg)
+            report_lines.append(f"  ledger: WARN ledger not stamped ({stamp_msg})")
+
         return (str(output_path), "\n".join(report_lines))
 
 
