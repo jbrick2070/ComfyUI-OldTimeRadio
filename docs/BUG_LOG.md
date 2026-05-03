@@ -3,6 +3,21 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-014 [FIXED]: Spacesaver wrong-episode wipe via global mtime ledger scan
+- **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after real two-episode run)
+- **Symptom:** `_spacesaver_cleanup_if_flagged` in `nodes/rtx_upscale.py` discovered the ledger to read the `meta.perfect_run_spacesaver` flag from by calling `_otr_ledger.find_most_recent_ledger([otr_episodes_root(), otr_legacy_audio_dir()])`. That walker returns the newest `*_ledger.json` by mtime across the **entire** `otr/episodes/` tree. If Episode A is mid-RTXUpscale when Episode B is queued and writes its pending ledger, A's spacesaver pass would discover B's ledger, derive `ep_dir = ledger.parent.parent` (B's tree), and wipe B's `stills/`, `portraits/`, `videos/`, `composited/` while B was still rendering.
+- **Cause:** Use of a global mtime-based discovery in a destructive code path. The existing substring sanity guard (`"episodes" in parts and "otr" in parts`) only verified the wiped tree was *somewhere* under `otr/episodes/`, not that it was the **right** episode for the current RTXUpscale call.
+- **Fix:** Derive `ep_dir` directly from the `src` argument the upstream node already passes in. `src` is always `otr/episodes/<ep>/composited/<ep>.mp4` (the VideoComposite output), so `src.resolve().parent.parent` is the episode root by construction. Replace substring guard with `ep_dir.relative_to(otr_episodes_root().resolve())` plus a `len(rel.parts) == 1` depth-1 invariant. Load the ledger from THIS episode's `audio/*_ledger.json` glob, prefer non-pending. Add an OBS-existence precondition (`otr/obs/<ep>.mp4` must exist on disk) so spacesaver refuses to fire if the run order ever flips and the final deliverable hasn't landed yet. Build the keep-list from real on-disk filenames (`audio_dir.glob("*_treatment.txt")` plus the discovered ledger path) so a slug mismatch between `ep_id` and the on-disk filename can't accidentally delete the ledger or treatment.
+- **Verify:**
+  - AST + Bug Bible regression (23 passed / 1 skipped / 2 xfailed) + `tests/test_dropdown_guardrails.py` + `tests/test_core.py` (155 passed in 107.84s) all green post-fix.
+  - Source no longer references `find_most_recent_ledger` from the spacesaver path (verified by grep + AST sanity script).
+  - **Real-run acceptance (pending):** queue Episode A, queue Episode B before A's RTXUpscale fires; inspect `[OTR_RTXUpscale] spacesaver:` log lines and confirm `ep_dir` resolves to A's path, never B's. Bypass-safety run with `src` outside `otr/episodes/` should log `refusing destructive cleanup` with no deletion. Delete `otr/obs/<ep>.mp4` before cleanup fires and confirm the new precondition aborts.
+- **Tags:** spacesaver, ledger, two-episode, destructive-cleanup, qa-pass-2026-05-02
+- **Consult sources:** `docs/2026-05-02-path-reorg-spacesaver-qa__01_chatgpt.md`, `docs/2026-05-02-path-reorg-spacesaver-qa__02_gemini.md`, `docs/2026-05-02-rtx-upscale-qa-pass.md` (Phase A)
+- **Follow-up phases queued:** B (production_ledger.py treatment rename + os.replace fallback), C (slug-reconstruction sweep), D (cache-key timestamp drop), E (schema bump + meta.paths block)
+
+---
+
 ### BUG-LOCAL-001: Pre-existing test infrastructure rot blocks `pytest tests/` regression baseline
 - **Date:** 2026-05-02 | **Phase:** 0 (regression infra) | **Bible candidate:** yes
 - **Symptom:** Running the canonical `python -m pytest tests/` cannot reach a clean green pass. Three distinct failure modes observed in one run:

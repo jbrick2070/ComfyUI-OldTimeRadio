@@ -510,15 +510,17 @@ def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
     every per-episode intermediate file under otr/episodes/<ep>/ EXCEPT
     the ledger json + the treatment txt. No-op when the flag is False.
 
-    The ledger is found by walking up from the composite intermediate's
-    path (`src` = the VideoComposite mp4 = otr/episodes/<ep>/composited/<ep>.mp4
-    or, in legacy/bypass scenarios, the source mp4 path itself). We
-    derive the per-episode root as the grandparent of the composite, OR
-    the parent of the source if the source is already in the audio dir.
+    The episode directory is derived DIRECTLY from `src` -- which is
+    always otr/episodes/<ep>/composited/<ep>.mp4 (the VideoComposite
+    output). No global ledger scan: that approach was wrong-episode-
+    unsafe when two episodes were in flight (BUG-LOCAL-014, consult
+    2026-05-02 -- both reviewers flagged it). src.parent.parent IS the
+    episode root, by construction.
 
     Keep list (NOT deleted):
-      - otr/episodes/<ep>/audio/<ep>_ledger.json
-      - otr/episodes/<ep>/audio/<ep>_treatment.txt
+      - otr/episodes/<ep>/audio/*_ledger.json (whichever ledger lives there)
+      - otr/episodes/<ep>/audio/*_treatment.txt (built from real on-disk
+        filenames, not slug-reconstructed -- see Finding 4 in QA pass)
 
     Wipe list (everything else under otr/episodes/<ep>/):
       - audio/<ep>.mp4 (procgen base)
@@ -529,26 +531,64 @@ def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
       - portraits/                    (PASS1 character portraits)
       - videos/                       (per-line piece clips)
       - composited/                   (832x480 intermediate)
+
+    Hard-stops (no destructive action taken):
+      - src is not under otr/episodes/                  (legacy flat / bypass)
+      - ep_dir is not a direct child of otr/episodes/   (depth-1 invariant)
+      - no *_ledger.json found in <ep>/audio/           (nothing to read flag from)
+      - perfect_run_spacesaver flag is False            (not opted in)
+      - obs/<ep>.mp4 not on disk                        (final hasn't landed yet)
     """
-    # Find the ledger -- the walker handles both per-episode and legacy
-    # flat layouts. If no ledger, no flag to read; skip cleanup.
-    # Sibling-absolute imports (rtx_upscale lives at nodes/, gets its
-    # parent dir prepended to sys.path at module load time).
+    # Derive the episode dir from src. src is the composited mp4:
+    #   otr/episodes/<ep>/composited/<ep>.mp4
+    # so src.parent.parent is the episode root. No mtime guessing.
     try:
-        import _otr_ledger as _OTRL  # type: ignore
-        from _otr_paths import otr_episodes_root, otr_legacy_audio_dir
-        ledger_path = _OTRL.find_most_recent_ledger(
-            [otr_episodes_root(), otr_legacy_audio_dir()]
-        )
+        from _otr_paths import otr_episodes_root
     except Exception as exc:  # noqa: BLE001
         log.debug(
-            "[OTR_RTXUpscale] spacesaver: ledger lookup failed (%s); skipping",
+            "[OTR_RTXUpscale] spacesaver: path import failed (%s); skipping",
             exc,
         )
         return
-    if ledger_path is None:
-        log.debug("[OTR_RTXUpscale] spacesaver: no ledger found; skipping")
+
+    ep_dir = src.resolve().parent.parent
+    audio_dir = ep_dir / "audio"
+
+    # Sanity guard: ep_dir MUST be a direct child of otr/episodes/.
+    # Anything else (legacy flat layout, bypass with a non-OTR source,
+    # user-typed path outside the workspace) bails with no destructive
+    # action. Replaces the prior substring-only check that could be
+    # tricked by user-named folders.
+    try:
+        rel = ep_dir.relative_to(otr_episodes_root().resolve())
+    except ValueError:
+        log.warning(
+            "[OTR_RTXUpscale] spacesaver: src %s is not under otr/episodes/; "
+            "refusing destructive cleanup",
+            src,
+        )
         return
+    if len(rel.parts) != 1:
+        log.warning(
+            "[OTR_RTXUpscale] spacesaver: ep_dir %s is not a direct child of "
+            "otr/episodes/ (got depth %d); refusing cleanup",
+            ep_dir, len(rel.parts),
+        )
+        return
+
+    # Load the ledger from THIS episode's audio dir, not a global scan.
+    # Multiple ledgers in one episode dir means a stale pending_ wasn't
+    # cleaned up -- prefer the finalized (non-pending) one; if all are
+    # pending, use newest.
+    ledger_candidates = sorted(audio_dir.glob("*_ledger.json"))
+    if not ledger_candidates:
+        log.debug(
+            "[OTR_RTXUpscale] spacesaver: no ledger in %s; skipping",
+            audio_dir,
+        )
+        return
+    finalized = [p for p in ledger_candidates if not p.name.startswith("pending_")]
+    ledger_path = finalized[-1] if finalized else ledger_candidates[-1]
 
     import json as _json
     try:
@@ -565,28 +605,32 @@ def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
         log.debug("[OTR_RTXUpscale] spacesaver flag OFF; no cleanup")
         return
 
-    # Per-episode root = ledger_path.parent.parent (since ledger lives
-    # at otr/episodes/<ep>/audio/<ep>_ledger.json).
-    audio_dir = Path(ledger_path).parent
-    ep_dir = audio_dir.parent
     ep_id = led.get("episode_id") or ep_dir.name
 
-    # Sanity guard: refuse to wipe if ep_dir doesn't look like a
-    # per-episode dir under otr/episodes/. Prevents accidental wipe of
-    # the wrong tree if the resolver got confused.
-    parts_lower = [p.lower() for p in ep_dir.parts]
-    if "episodes" not in parts_lower or "otr" not in parts_lower:
+    # OBS-existence precondition: spacesaver MUST NOT wipe intermediates
+    # if the final deliverable hasn't landed on disk yet. The OBS final
+    # lives at otr/obs/<ep>.mp4 -- a sibling of episodes/, NOT a child --
+    # so the depth-1 guard above can't reach it. This is a separate
+    # safety net for the run-order contract:
+    #   _chunked_upscale -> _mux_audio_passthrough -> out_mp4 written
+    #   -> _spacesaver_cleanup_if_flagged
+    # If anything ever reorders that, this guard catches it before
+    # destructive action.
+    obs_final = ep_dir.parent.parent / "obs" / f"{ep_id}.mp4"
+    if not obs_final.exists():
         log.warning(
-            "[OTR_RTXUpscale] spacesaver: refusing to wipe %s (not under "
-            "otr/episodes/); skipping for safety",
-            ep_dir,
+            "[OTR_RTXUpscale] spacesaver: OBS deliverable %s not on disk; "
+            "refusing cleanup until final lands",
+            obs_final,
         )
         return
 
-    keep_files = {
-        audio_dir / f"{ep_id}_ledger.json",
-        audio_dir / f"{ep_id}_treatment.txt",
-    }
+    # Keep-list built from REAL filenames on disk, not slug-reconstructed
+    # from ep_id. Avoids the slug-mismatch trap where ep_id was slugged
+    # differently than the on-disk file name (Finding 4 in QA pass).
+    keep_files = {ledger_path}
+    for tx in audio_dir.glob("*_treatment.txt"):
+        keep_files.add(tx)
     deleted_files = 0
     deleted_bytes = 0
     deleted_dirs = 0
