@@ -288,3 +288,102 @@ def test_revision_prompt_preserves_dialogue_clause_present():
         "DIALOGUE MUST SURVIVE THE REVISION header missing from "
         "story_orchestrator.py (BUG-027 prompt-side fix regressed)"
     )
+
+
+# ---------------------------------------------------------------------------
+# (4) ULTRA_SMOKE format normalization (BUG-027 extension, 2026-05-03 EVENING)
+# ---------------------------------------------------------------------------
+
+def _load_normalize_fn():
+    from nodes import story_orchestrator as so  # noqa: WPS433
+    return so.LLMScriptWriter._normalize_voice_format_to_standard
+
+
+def test_normalize_standalone_voice_prefix_to_charname():
+    """`[VOICE: NAME, attr, ...]: text` -> `NAME: text`."""
+    norm = _load_normalize_fn()
+    src = "[VOICE: KENJI BERNARD, male, 50s, weathered, low]: Code input confirmed."
+    out = norm(src)
+    assert out.startswith("KENJI BERNARD: Code input confirmed."), (
+        f"expected normalized to start with 'KENJI BERNARD: Code input confirmed.', "
+        f"got {out!r}"
+    )
+
+
+def test_normalize_voice_with_no_attrs():
+    """`[VOICE: NAME]: text` (no comma-attrs) -> `NAME: text`."""
+    norm = _load_normalize_fn()
+    src = "[VOICE: ANNOUNCER]: Welcome to Signal Lost."
+    assert norm(src) == "ANNOUNCER: Welcome to Signal Lost."
+
+
+def test_normalize_strips_inline_voice_block_from_dialogue():
+    """`[N] CHARNAME: [VOICE: ...]: text` keeps `[N] CHARNAME:` and removes inline VOICE."""
+    norm = _load_normalize_fn()
+    src = "[18] KENJI BERNARD: [VOICE: KENJI BERNARD, male, 50s, weathered, low]: continue"
+    out = norm(src)
+    # The inline [VOICE: ...] block should be stripped; the [N] CHARNAME: prefix preserved.
+    assert "[VOICE:" not in out, f"inline VOICE block not stripped: {out!r}"
+    assert "[18]" in out and "KENJI BERNARD" in out, f"prefix lost: {out!r}"
+    assert "continue" in out, f"dialogue lost: {out!r}"
+
+
+def test_normalize_idempotent_on_standard_format():
+    """Already-standard text passes through unchanged."""
+    norm = _load_normalize_fn()
+    src = """=== SCENE 1 ===
+ENV: dim lighting
+[1] ALICE: Hello there.
+[2] BOB: Hello back.
+"""
+    assert norm(src) == src
+
+
+def test_normalize_handles_empty_and_none():
+    norm = _load_normalize_fn()
+    assert norm("") == ""
+    assert norm(None) is None
+
+
+def test_normalize_then_count_recovers_dialogue_for_ultra_smoke():
+    """End-to-end: normalize + count yields correct character counts on a
+    realistic ULTRA_SMOKE-style draft. This is the actual failure mode from
+    the 2026-05-03 EVENING soak (otr_runtime.log L47868)."""
+    norm = _load_normalize_fn()
+    count = _load_count_fn()
+    # Draft mixing standalone VOICE prefixes + standard format
+    draft = """=== SCENE 1 ===
+ENV: tunnel ambience
+[VOICE: ANNOUNCER, female, 40s, warm broadcast]: Tonight's broadcast comes from deep beneath.
+[VOICE: REN KANE, male, 30s, urgent]: Did ya check the relay logs yet?
+[VOICE: PETER ECKELS, male, 40s, scientist, calm]: Logs useless now.
+[VOICE: ANNOUNCER, female, 40s, warm broadcast]: Listen for truth in the noise tonight.
+"""
+    normalized = norm(draft)
+    counts = count(normalized)
+    assert counts.get("ANNOUNCER") == 2, f"ANNOUNCER expected 2 got {counts}"
+    assert counts.get("REN KANE") == 1, f"REN KANE expected 1 got {counts}"
+    assert counts.get("PETER ECKELS") == 1, f"PETER ECKELS expected 1 got {counts}"
+
+
+def test_critique_calls_normalize_at_function_entry():
+    """Static check: _critique_and_revise body calls _normalize_voice_format_to_standard
+    before the critique pass runs, on BOTH draft_text AND revised_text."""
+    src_path = _REPO_ROOT / "nodes" / "story_orchestrator.py"
+    src = src_path.read_text(encoding="utf-8")
+    # Locate the _critique_and_revise function body.
+    fn_match = re.search(
+        r"def _critique_and_revise\(self.*?\n(.+?)\n    def ",
+        src,
+        flags=re.DOTALL,
+    )
+    assert fn_match is not None, "could not find _critique_and_revise body in source"
+    body = fn_match.group(1)
+    assert "_normalize_voice_format_to_standard(draft_text)" in body, (
+        "_critique_and_revise must call _normalize_voice_format_to_standard "
+        "on draft_text at function entry (BUG-027 extension)"
+    )
+    assert "_normalize_voice_format_to_standard(revised_text)" in body, (
+        "_critique_and_revise must call _normalize_voice_format_to_standard "
+        "on revised_text after the revision pass (BUG-027 extension)"
+    )

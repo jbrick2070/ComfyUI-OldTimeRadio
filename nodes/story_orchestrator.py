@@ -6888,6 +6888,66 @@ YOUR CRITIQUE (numbered list only):"""
             return ""
 
     @staticmethod
+    def _normalize_voice_format_to_standard(text):
+        """Convert ULTRA_SMOKE-style ``[VOICE: NAME, attrs, ...]: text`` lines
+        into the canonical ``NAME: text`` format that ``_count_character_lines``
+        and the rest of the critique/revise pipeline expect.
+
+        BUG-LOCAL-027 extension (2026-05-03 EVENING, Jeffrey directive): the
+        ULTRA_SMOKE preset's PARSE_OK validator counts ``[VOICE: ...]`` markers
+        as voice_hits, but ``_count_character_lines`` only matches bare
+        ``CHARNAME:`` and ``[N] CHARNAME:`` formats. Without normalization, the
+        critique-pipeline counter returns ``{}`` for ULTRA_SMOKE drafts and the
+        total-collapse hard gate has no signal to enforce the dialogue floor.
+
+        Per Jeffrey 2026-05-03: "ULTRA_SMOKE need to abide by all the rules".
+        Normalizing here means ULTRA_SMOKE goes through the SAME critique +
+        gate machinery as the standard short(3 acts) path -- one source of
+        truth for dialogue preservation.
+
+        Two transformations:
+
+        1. **Standalone VOICE-prefix lines.** Lines of the form
+           ``[VOICE: NAME, attr, attr, ...]: text`` become ``NAME: text``.
+           Captures the speaker name (first comma-separated token after
+           ``[VOICE:``) and treats the rest as voice metadata to discard.
+
+        2. **Inline VOICE blocks within dialogue.** Lines that already start
+           with ``[N] CHARNAME:`` or ``CHARNAME:`` but contain a trailing
+           ``[VOICE: ...]`` block in the dialogue text get the inline VOICE
+           block stripped (Bark / Kokoro don't speak voice metadata aloud).
+
+        Idempotent: text that is already in standard format passes through
+        unchanged. C7-safe: deterministic regex transformation of the same
+        input always produces the same output.
+        """
+        if not text:
+            return text
+
+        # Pattern 1: standalone [VOICE: NAME, ...]: text -> NAME: text
+        # Capture the first identifier after [VOICE:; treat everything up to
+        # the closing ] as voice metadata.
+        _voice_line_pat = re.compile(
+            r'^(\s*)\[VOICE:\s*([A-Z][A-Z0-9_ \-]*?)(?:\s*,[^\]]*)?\]\s*:\s*(.*)$'
+        )
+        # Pattern 2: inline [VOICE: ...] block to strip from within a dialogue
+        # line that already starts with a CHARNAME: marker.
+        _inline_voice_pat = re.compile(r'\s*\[VOICE:[^\]]*\]\s*:?\s*')
+
+        out_lines = []
+        for line in text.split('\n'):
+            m = _voice_line_pat.match(line)
+            if m:
+                indent, name, content = m.group(1), m.group(2).strip(), m.group(3)
+                out_lines.append(f"{indent}{name}: {content}")
+                continue
+            # Already standard or no VOICE prefix -- strip any inline VOICE
+            # blocks that appear after the colon (don't break the structure).
+            stripped = _inline_voice_pat.sub(' ', line)
+            out_lines.append(stripped)
+        return '\n'.join(out_lines)
+
+    @staticmethod
     def _count_character_lines(text):
         """Count dialogue lines per character in script text.
 
@@ -6964,6 +7024,23 @@ YOUR CRITIQUE (numbered list only):"""
         """
         log.info("[Critique] Starting Checks & Critiques loop (Draft -> Critique -> Revise)...")
         _runtime_log("CRITIQUE: Starting self-critique pass")
+
+        # BUG-LOCAL-027 extension (2026-05-03 EVENING, Jeffrey directive):
+        # Normalize ULTRA_SMOKE-style ``[VOICE: NAME, attrs, ...]: text`` lines
+        # into canonical ``NAME: text`` BEFORE the critique pass runs. This
+        # ensures the critique LLM, the per-character preservation gate, AND
+        # the total-collapse hard gate all see the same canonical format
+        # regardless of whether the writer was in ULTRA_SMOKE mode or standard
+        # short(3 acts) mode. Prior to this normalization, ULTRA_SMOKE drafts
+        # parsed as ``draft={}`` in the counter and the gate was a no-op.
+        # Idempotent on already-standard text; C7-safe (deterministic).
+        _pre_norm_len = len(draft_text)
+        draft_text = self._normalize_voice_format_to_standard(draft_text)
+        if len(draft_text) != _pre_norm_len:
+            _runtime_log(
+                f"CRITIQUE: ULTRA_SMOKE format normalized "
+                f"({_pre_norm_len} -> {len(draft_text)} chars)"
+            )
 
         # -- Truncate draft for critique context --
         # Keep the full draft but cap at ~12k chars to stay within context window.
@@ -7113,6 +7190,19 @@ REVISED SCRIPT (complete, from === SCENE 1 === to [MUSIC: Closing theme]):"""
             log.warning("[Critique] Revision pass failed: %s - returning original draft", e)
             _runtime_log(f"CRITIQUE: Revision failed - {e}")
             return f"{draft_text}\n\n[SYSTEM_SENTINEL: TIMEOUT_FALLBACK]"
+
+        # BUG-LOCAL-027 extension: normalize the revised text too, so the
+        # downstream gate counter sees consistent format regardless of what
+        # variant the revision LLM emitted. The revision prompt asks for
+        # ``CHARACTER_NAME: dialogue`` but the model may slip back into
+        # ``[VOICE: ...]`` shape under high-temp creativity.
+        _pre_norm_revised_len = len(revised_text)
+        revised_text = self._normalize_voice_format_to_standard(revised_text)
+        if len(revised_text) != _pre_norm_revised_len:
+            _runtime_log(
+                f"CRITIQUE: revised text VOICE-format normalized "
+                f"({_pre_norm_revised_len} -> {len(revised_text)} chars)"
+            )
 
         # -- Phase 2b: Critique length & format guardrails --
 
