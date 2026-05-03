@@ -630,7 +630,7 @@ Continually monitoring the footprint and removing unused nodes. Boot log confirm
 
 ## License & Credits
 
-MIT License
+**MIT License.** ComfyUI itself is GPL-3.0; OldTimeRadio is treated as a separate work combined at runtime via ComfyUI's plugin interface, consistent with community convention for custom node packs. Do not vendor code from GPL-3.0 packs (e.g., ComfyUI-VideoHelperSuite); reimplement or use permissively-licensed equivalents (Apache-2.0 / MIT) instead. ffmpeg is invoked as an external subprocess, not linked.
 
 - **Mistral Nemo 12B** by [Mistral AI](https://huggingface.co/mistralai/Mistral-Nemo-Instruct-2407)
 - **Bark** by [Suno AI](https://github.com/suno-ai/bark)
