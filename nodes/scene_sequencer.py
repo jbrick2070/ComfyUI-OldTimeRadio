@@ -917,10 +917,10 @@ class SceneSequencer:
         # we know audio drift slipped in.
         try:
             from . import _otr_ledger as _OTRL  # type: ignore
-            from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
+            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             _ledger_p = _OTRL.find_most_recent_ledger(
-                [otr_audio_dir(), otr_legacy_audio_dir()]
+                [otr_episodes_root(), otr_legacy_audio_dir()]
             )
             if _ledger_p is not None:
                 _led = _OTRL.load_ledger_safe(_ledger_p)
@@ -1254,10 +1254,10 @@ class EpisodeAssembler:
         # clips[].start_s. Best-effort; failures are warned not raised.
         try:
             from . import _otr_ledger as _OTRL  # type: ignore
-            from ._otr_paths import otr_audio_dir, otr_legacy_audio_dir
+            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             _ledger_p = _OTRL.find_most_recent_ledger(
-                [otr_audio_dir(), otr_legacy_audio_dir()]
+                [otr_episodes_root(), otr_legacy_audio_dir()]
             )
             if _ledger_p is not None:
                 _led = _OTRL.load_ledger_safe(_ledger_p)

@@ -60,6 +60,7 @@ if str(_NODES_DIR) not in _sys.path:
 from _otr_paths import (  # noqa: E402
     comfy_output_dir,
     otr_audio_dir,
+    otr_episodes_root,
     otr_legacy_audio_dir,
     otr_stills_dir,
     otr_videos_dir,
@@ -167,11 +168,12 @@ def _resolve_radio_still_path(ledger):
     if safe_eid is None:
         return None
     try:
-        stills_dir = otr_stills_dir()
+        stills_dir = otr_stills_dir(safe_eid)
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[BatchHumoRender] otr_stills_dir() failed; cannot run "
+            "[BatchHumoRender] otr_stills_dir(%r) failed; cannot run "
             "filesystem fallback: %s",
+            safe_eid,
             exc,
         )
         return None
@@ -1767,7 +1769,7 @@ class BatchHumoRender:
         # Auto-pick fallback when input empty
         if not s:
             audio_dirs = [
-                otr_audio_dir(),
+                otr_episodes_root(),
                 otr_legacy_audio_dir(),
             ]
             cands = []

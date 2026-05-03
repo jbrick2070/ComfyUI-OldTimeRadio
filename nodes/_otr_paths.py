@@ -152,9 +152,48 @@ def comfy_input_dir() -> Path:
     return Path.cwd() / "input"
 
 
-def otr_audio_dir() -> Path:
-    """Canonical ledger / master-audio dir: ``<output>/otr/audio/``."""
-    return comfy_output_dir() / "otr" / "audio"
+def otr_episodes_root() -> Path:
+    """Root of the per-episode workspace tree: ``<output>/otr/episodes/``.
+
+    Each episode has its own subdir under here:
+    ``<output>/otr/episodes/<episode_id>/{audio,stills,portraits,videos,
+    composited}/``. The ledger auto-pick logic walks this root looking
+    for ``*/audio/*_ledger.json`` files across all episodes.
+
+    Added 2026-05-02 EVENING per Jeffrey directive: every per-episode
+    working file nests inside that episode's own folder so the
+    workspace is organized by episode, not by file type.
+    """
+    return comfy_output_dir() / "otr" / "episodes"
+
+
+def otr_audio_dir(episode_id: str = "") -> Path:
+    """Per-episode audio + ledger dir: ``<output>/otr/episodes/<episode_id>/audio/``.
+
+    Holds the procgen mp4, the canonical ``<episode_id>_ledger.json``,
+    Bark / Kokoro output wavs, MusicGen + AudioGen cache files for
+    this episode, and the LLMDirector raw-output dump for this episode.
+
+    The ``episode_id`` argument is REQUIRED for new code. Calls without
+    it fall back to a degraded per-episode-less path under
+    ``<output>/otr/_legacy_audio/`` -- this exists ONLY so legacy code
+    paths that auto-pick across episodes don't crash; production
+    write-sites must pass a real ``episode_id``.
+
+    For ledger auto-pick across all episodes, use
+    ``otr_episodes_root()`` and walk ``*/audio/*_ledger.json``.
+
+    Cache trade-off (Jeffrey acknowledged 2026-05-02 EVENING):
+    MusicGen + AudioGen used to write SHA-keyed cache files into a
+    single shared ``otr/audio/`` dir so the same prompt across two
+    episodes hit the cache. Per-episode audio dirs lose that
+    cross-episode cache hit -- each episode now re-renders music + sfx
+    even when prompts are identical. Acceptable cost for the cleaner
+    organization; revisit only if cache loss becomes a wallclock pain.
+    """
+    if episode_id:
+        return otr_episodes_root() / episode_id / "audio"
+    return comfy_output_dir() / "otr" / "_legacy_audio"
 
 
 def otr_legacy_audio_dir() -> Path:
@@ -166,19 +205,50 @@ def otr_legacy_audio_dir() -> Path:
     return comfy_output_dir() / "old_time_radio"
 
 
-def otr_stills_dir() -> Path:
-    """FLUX cast / environment stills: ``<output>/otr/stills/``."""
-    return comfy_output_dir() / "otr" / "stills"
+def otr_stills_dir(episode_id: str = "") -> Path:
+    """Per-episode FLUX cast / environment stills + radio bookend dir:
+    ``<output>/otr/episodes/<episode_id>/stills/``.
+
+    Holds ``full_env_NNNNN_.png`` cast environment portraits and the
+    ``radio_bookend_<episode_id>.png`` LTX I2V reference still.
+    Without ``episode_id`` falls back to ``<output>/otr/_legacy_stills/``.
+    """
+    if episode_id:
+        return otr_episodes_root() / episode_id / "stills"
+    return comfy_output_dir() / "otr" / "_legacy_stills"
 
 
-def otr_portraits_dir() -> Path:
-    """PASS1 character portraits: ``<output>/otr/portraits/``."""
-    return comfy_output_dir() / "otr" / "portraits"
+def otr_portraits_dir(episode_id: str = "") -> Path:
+    """Per-episode PASS1 character portrait dir:
+    ``<output>/otr/episodes/<episode_id>/portraits/``.
+    Without ``episode_id`` falls back to ``<output>/otr/_legacy_portraits/``.
+    """
+    if episode_id:
+        return otr_episodes_root() / episode_id / "portraits"
+    return comfy_output_dir() / "otr" / "_legacy_portraits"
 
 
 def otr_videos_dir(episode_id: str) -> Path:
-    """Per-episode HuMo clip dir: ``<output>/otr/videos/<episode_id>/``."""
-    return comfy_output_dir() / "otr" / "videos" / episode_id
+    """Per-episode per-line HuMo + LTX clip dir:
+    ``<output>/otr/episodes/<episode_id>/videos/``.
+
+    Holds the per-line piece clips: ``l002.mp4`` (HuMo character),
+    ``music_opening_001.mp4`` (LTX music), ``l001.mp4`` (LTX announcer),
+    etc. VideoComposite reads these and assembles the final composite.
+    """
+    return otr_episodes_root() / episode_id / "videos"
+
+
+def otr_composited_dir(episode_id: str) -> Path:
+    """Per-episode VideoComposite intermediate dir:
+    ``<output>/otr/episodes/<episode_id>/composited/``.
+
+    Holds the 832x480 composited mp4 written by VideoComposite as
+    ``<episode_id>.mp4``. Downstream OTR_RTXUpscale reads from here
+    and writes the final to ``<output>/otr/obs/<episode_id>.mp4``
+    (see ``otr_obs_dir``).
+    """
+    return otr_episodes_root() / episode_id / "composited"
 
 
 def otr_obs_dir() -> Path:
@@ -207,25 +277,24 @@ def otr_obs_dir() -> Path:
 
 
 def episodes_for_obs_dir(episode_id: str = "") -> Path:
-    """VideoComposite intermediate-mp4 dir -- FLAT layout.
+    """VideoComposite intermediate-mp4 dir -- per-episode workspace.
 
-    Path: ``<output>/otr/episodes/`` (no per-episode subfolder).
+    Path: ``<output>/otr/episodes/<episode_id>/composited/`` when
+    ``episode_id`` is given. Returns ``otr_episodes_root()`` (the
+    parent of all per-episode subdirs) when called without an
+    episode_id, for legacy callers that scan the tree.
 
     Holds the 832x480 native composite mp4 written by VideoComposite
     as ``<episode_id>.mp4`` (one per episode). This is the
     INTERMEDIATE -- the downstream OTR_RTXUpscale stage reads from
-    here and writes the final 1080p upscaled mp4 to the OBS-watched
-    dir at ``<output>/otr/obs/<episode_id>.mp4`` (see ``otr_obs_dir``).
+    here and writes the final mp4 to the OBS-watched dir at
+    ``<output>/otr/obs/<episode_id>.mp4`` (see ``otr_obs_dir``).
 
     Despite the historical name ``episodes_for_obs_dir``, this dir
     is NOT what OBS watches anymore -- that role moved to ``otr/obs/``
     on 2026-05-02 EVENING. Function name kept for back-compat with
-    existing imports; canonical OBS-watched dir is now ``otr_obs_dir``.
-
-    The ``episode_id`` argument is accepted for back-compat with older
-    callers but is intentionally ignored -- the layout is FLAT, every
-    episode lands in the same parent dir keyed by its ``<episode_id>``
-    in the FILENAME, not the path.
+    existing imports; canonical OBS-watched dir is now ``otr_obs_dir``;
+    canonical intermediate dir helper is ``otr_composited_dir``.
 
     History (canonical change-log for this path):
       - Originally ``<output>/episodes_for_obs/<episode_id>/``,
@@ -235,22 +304,27 @@ def episodes_for_obs_dir(episode_id: str = "") -> Path:
       - 2026-05-02 EVENING (Jeffrey directive 2): flatten ->
         ``<output>/otr/episodes/`` (no per-episode subfolder).
       - 2026-05-02 EVENING (Jeffrey directive 3): split intermediate
-        from final. This dir keeps the VideoComposite intermediate;
-        new ``otr_obs_dir()`` holds the single final upscaled mp4
-        per episode.
+        vs final -- new ``otr_obs_dir()`` for the single final mp4
+        per episode; this dir keeps the intermediate.
+      - 2026-05-02 EVENING (Jeffrey directive 4): per-episode workspace.
+        Intermediate moves to per-episode subdir
+        ``<output>/otr/episodes/<episode_id>/composited/<episode_id>.mp4``.
     """
-    del episode_id  # accepted for back-compat; FLAT layout ignores it
-    return comfy_output_dir() / "otr" / "episodes"
+    if episode_id:
+        return otr_composited_dir(episode_id)
+    return otr_episodes_root()
 
 
-def director_raw_dump_dir() -> Path:
+def director_raw_dump_dir(episode_id: str = "") -> Path:
     """Where ``LLMDirector`` parks raw output dumps for BUG-090.
 
-    Lives alongside the ledger files (``otr/audio/``) so a single
-    ``ls`` of the audio dir surfaces both the ledger and any
-    failed-parse raw dumps for the same run.
+    Lives alongside the ledger files (per-episode ``otr/episodes/<ep>/audio/``)
+    so a single ``ls`` of the audio dir surfaces both the ledger and any
+    failed-parse raw dumps for the same run. Falls back to the legacy
+    audio dir when no ``episode_id`` is given (for callers that don't
+    yet have one).
     """
-    return otr_audio_dir()
+    return otr_audio_dir(episode_id)
 
 
 def comfyui_log_path() -> Optional[str]:

@@ -29,7 +29,8 @@ import warnings
 import numpy as np
 import torch
 
-from ._otr_paths import otr_audio_dir
+from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+from . import _otr_ledger as _OTRL_PATHS
 from .story_orchestrator import _runtime_log
 from ._vram_log import force_vram_offload, vram_sentinel
 
@@ -696,123 +697,125 @@ class BatchBarkGenerator:
         try:
             import json as _json
             from pathlib import Path as _Path
-            audio_dir = otr_audio_dir()
-            if audio_dir.exists():
-                cands = list(audio_dir.glob("*_ledger.json"))
-                if cands:
-                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
-                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                    ledger_lines = led.get("lines") or []
-                    # Build text -> [unused ledger indices] map
-                    text_to_idx: dict[str, list[int]] = {}
-                    for li, ln in enumerate(ledger_lines):
-                        t = (ln.get("text") or "").strip()
-                        if not t:
-                            continue
-                        text_to_idx.setdefault(t, []).append(li)
-                    # Walk dialogue_items in script order; cumulative
-                    # start_s tracks Bark's contribution to the
-                    # assembled timeline (announcer / sfx gaps not
-                    # accounted for here -- this is approximate but
-                    # WAY closer than BUG-094 word-share).
-                    cumulative_start = 0.0
-                    updated = 0
-                    for item in dialogue_items:
-                        idx = item.get("script_idx")
-                        if idx not in results:
-                            continue
-                        audio_np, sr = results[idx]
+            # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
+            # via the centralized helper so both layouts (legacy flat +
+            # per-episode tree) are searched.
+            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
+                [otr_episodes_root(), otr_legacy_audio_dir()]
+            )
+            if ledger_path is not None:
+                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                ledger_lines = led.get("lines") or []
+                # Build text -> [unused ledger indices] map
+                text_to_idx: dict[str, list[int]] = {}
+                for li, ln in enumerate(ledger_lines):
+                    t = (ln.get("text") or "").strip()
+                    if not t:
+                        continue
+                    text_to_idx.setdefault(t, []).append(li)
+                # Walk dialogue_items in script order; cumulative
+                # start_s tracks Bark's contribution to the
+                # assembled timeline (announcer / sfx gaps not
+                # accounted for here -- this is approximate but
+                # WAY closer than BUG-094 word-share).
+                cumulative_start = 0.0
+                updated = 0
+                for item in dialogue_items:
+                    idx = item.get("script_idx")
+                    if idx not in results:
+                        continue
+                    audio_np, sr = results[idx]
+                    try:
+                        dur = float(len(audio_np)) / float(sr)
+                    except Exception:
+                        dur = 0.0
+                    item_text = (item.get("line") or "").strip()
+                    candidates = text_to_idx.get(item_text) or []
+                    if not candidates:
+                        continue
+                    ledger_idx = candidates.pop(0)
+                    row = ledger_lines[ledger_idx]
+                    row["dur_s"] = dur
+                    row["start_s"] = cumulative_start
+                    # Schema l3 (2026-04-28) per-line diagnostic
+                    # fields. bark_wav_dur_s = same as dur_s but
+                    # explicitly named so the field is distinct
+                    # from the post-SceneSequencer dur_s (which
+                    # may differ after crossfade trimming).
+                    # bark_render_ms = wall-clock time Bark spent
+                    # generating this line. text_for_tts = the
+                    # exact post-cleanup string fed to the model
+                    # (BUG-LOCAL-101 audit aid).
+                    if "_bark_wav_dur_s" in item:
+                        row["bark_wav_dur_s"] = float(item["_bark_wav_dur_s"])
+                    if "_bark_render_ms" in item:
+                        row["bark_render_ms"] = int(item["_bark_render_ms"])
+                    if "_text_for_tts" in item:
+                        row["text_for_tts"] = str(item["_text_for_tts"])
+                    cumulative_start += dur
+                    updated += 1
+                if updated:
+                    # Schema l3: stamp phase timing + git commit +
+                    # post_bark audio gate alongside the per-line
+                    # writes so the ledger shows which version of
+                    # the code produced it.
+                    try:
+                        from . import _otr_ledger as _OTRL  # type: ignore
+                        _OTRL.record_phase_ms(led, "bark", int(_total_bark_ms))
+                        _gc_b = _OTRL.lookup_git_commit(
+                            _Path(__file__).resolve().parents[1]
+                        )
+                        if _gc_b:
+                            _OTRL.set_meta(led, "git_commit", _gc_b)
+                        # post_bark audio gate. The batch_tensor is
+                        # [B, 1, max_T] with per-line clips zero-
+                        # padded to the longest length. Hash the
+                        # leading 1KB of the raw byte buffer; this
+                        # tripwires any change to bark output, pad
+                        # ordering, or sample-rate drift.
                         try:
-                            dur = float(len(audio_np)) / float(sr)
-                        except Exception:
-                            dur = 0.0
-                        item_text = (item.get("line") or "").strip()
-                        candidates = text_to_idx.get(item_text) or []
-                        if not candidates:
-                            continue
-                        ledger_idx = candidates.pop(0)
-                        row = ledger_lines[ledger_idx]
-                        row["dur_s"] = dur
-                        row["start_s"] = cumulative_start
-                        # Schema l3 (2026-04-28) per-line diagnostic
-                        # fields. bark_wav_dur_s = same as dur_s but
-                        # explicitly named so the field is distinct
-                        # from the post-SceneSequencer dur_s (which
-                        # may differ after crossfade trimming).
-                        # bark_render_ms = wall-clock time Bark spent
-                        # generating this line. text_for_tts = the
-                        # exact post-cleanup string fed to the model
-                        # (BUG-LOCAL-101 audit aid).
-                        if "_bark_wav_dur_s" in item:
-                            row["bark_wav_dur_s"] = float(item["_bark_wav_dur_s"])
-                        if "_bark_render_ms" in item:
-                            row["bark_render_ms"] = int(item["_bark_render_ms"])
-                        if "_text_for_tts" in item:
-                            row["text_for_tts"] = str(item["_text_for_tts"])
-                        cumulative_start += dur
-                        updated += 1
-                    if updated:
-                        # Schema l3: stamp phase timing + git commit +
-                        # post_bark audio gate alongside the per-line
-                        # writes so the ledger shows which version of
-                        # the code produced it.
-                        try:
-                            from . import _otr_ledger as _OTRL  # type: ignore
-                            _OTRL.record_phase_ms(led, "bark", int(_total_bark_ms))
-                            _gc_b = _OTRL.lookup_git_commit(
-                                _Path(__file__).resolve().parents[1]
+                            _bt_cpu = (
+                                batch_tensor.detach().cpu().numpy()
+                                if hasattr(batch_tensor, "detach")
+                                else batch_tensor.numpy()
                             )
-                            if _gc_b:
-                                _OTRL.set_meta(led, "git_commit", _gc_b)
-                            # post_bark audio gate. The batch_tensor is
-                            # [B, 1, max_T] with per-line clips zero-
-                            # padded to the longest length. Hash the
-                            # leading 1KB of the raw byte buffer; this
-                            # tripwires any change to bark output, pad
-                            # ordering, or sample-rate drift.
-                            try:
-                                _bt_cpu = (
-                                    batch_tensor.detach().cpu().numpy()
-                                    if hasattr(batch_tensor, "detach")
-                                    else batch_tensor.numpy()
-                                )
-                                _bt_bytes = bytes(_bt_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
-                                _bark_gate = _OTRL.audio_gate_record(
-                                    gate_name="post_bark",
-                                    waveform_bytes=_bt_bytes,
-                                    dur_s=float(max_len) / float(target_sr),
-                                    sample_count=int(max_len),
-                                    sample_rate=int(target_sr),
-                                )
-                                _OTRL.append_audio_gate(led, _bark_gate)
-                            except Exception as _gexc:
-                                log.warning(
-                                    "[BatchBark] post_bark audio gate failed: %s",
-                                    _gexc,
-                                )
-                            _OTRL.save_ledger_safe(ledger_path, led)
-                        except Exception as _meta_exc:
-                            # Schema-l3 metadata is best-effort; if the
-                            # helper import or save fails, fall back to
-                            # the legacy raw write so the BUG-096
-                            # per-line update is still persisted.
+                            _bt_bytes = bytes(_bt_cpu.tobytes()[: _OTRL.GATE_HASH_BYTES])
+                            _bark_gate = _OTRL.audio_gate_record(
+                                gate_name="post_bark",
+                                waveform_bytes=_bt_bytes,
+                                dur_s=float(max_len) / float(target_sr),
+                                sample_count=int(max_len),
+                                sample_rate=int(target_sr),
+                            )
+                            _OTRL.append_audio_gate(led, _bark_gate)
+                        except Exception as _gexc:
                             log.warning(
-                                "[BatchBark] schema-l3 helper failed (%s); "
-                                "falling back to raw write", _meta_exc,
+                                "[BatchBark] post_bark audio gate failed: %s",
+                                _gexc,
                             )
-                            ledger_path.write_text(
-                                _json.dumps(led, indent=2, ensure_ascii=False),
-                                encoding="utf-8",
-                            )
-                        log.info(
-                            "[BatchBark] BUG-096 ledger updated: %d line "
-                            "dur_s + start_s timings written to %s",
-                            updated, ledger_path.name,
+                        _OTRL.save_ledger_safe(ledger_path, led)
+                    except Exception as _meta_exc:
+                        # Schema-l3 metadata is best-effort; if the
+                        # helper import or save fails, fall back to
+                        # the legacy raw write so the BUG-096
+                        # per-line update is still persisted.
+                        log.warning(
+                            "[BatchBark] schema-l3 helper failed (%s); "
+                            "falling back to raw write", _meta_exc,
                         )
-                        batch_log.append(
-                            f"BUG-096 ledger updated: {updated} line "
-                            f"timings -> {ledger_path.name}"
+                        ledger_path.write_text(
+                            _json.dumps(led, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
                         )
+                    log.info(
+                        "[BatchBark] BUG-096 ledger updated: %d line "
+                        "dur_s + start_s timings written to %s",
+                        updated, ledger_path.name,
+                    )
+                    batch_log.append(
+                        f"BUG-096 ledger updated: {updated} line "
+                        f"timings -> {ledger_path.name}"
+                    )
         except Exception as _exc:
             log.warning("[BatchBark] BUG-096 ledger write-back failed: %s", _exc)
 

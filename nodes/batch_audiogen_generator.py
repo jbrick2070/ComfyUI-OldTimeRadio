@@ -29,7 +29,8 @@ import re
 import numpy as np
 import torch
 
-from ._otr_paths import otr_audio_dir
+from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+from . import _otr_ledger as _OTRL_PATHS
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -52,12 +53,27 @@ def _cache_dir() -> str:
 
 
 def _cache_key(prompt: str, duration_sec: float, episode_seed: str) -> str:
-    """Deterministic cache filename."""
+    """Per-render SFX filename, guaranteed unique across episodes.
+
+    Format: ``sfx_<safe_prompt_prefix>_<sha8>_<timestamp_ms>.wav``
+      - ``safe_prompt_prefix`` -- first 20 chars of prompt, sanitized
+        for filenames (human-readable cue identifier)
+      - ``sha8`` -- 8 hex chars of SHA256(duration|prompt|episode_seed),
+        kept for forensic traceability of which prompt produced this file
+      - ``timestamp_ms`` -- millisecond launch timestamp so filenames
+        are ALWAYS unique per render (Jeffrey directive 2026-05-02
+        EVENING: every output asset gets a unique identifier so two
+        episodes can never collide on the same cache file). Trade-off:
+        no cross-episode cache reuse -- every AudioGen call renders
+        fresh. Acceptable because OTR SFX prompts vary per episode
+        anyway, so cross-episode hits were rare in practice.
+    """
+    import time as _time
     payload = f"{duration_sec}|{prompt}|{episode_seed}".encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()[:16]
-    # Sanitize prompt for filename context (first 20 chars)
+    digest = hashlib.sha256(payload).hexdigest()[:8]
     safe_name = re.sub(r'[^a-zA-Z0-9]', '_', prompt[:20]).lower()
-    return f"sfx_{safe_name}_{digest}.wav"
+    ts_ms = int(_time.time() * 1000)
+    return f"sfx_{safe_name}_{digest}_{ts_ms}.wav"
 
 
 def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
@@ -355,40 +371,42 @@ class BatchAudioGenGenerator:
         # is on disk yet. Errors logged, never crash.
         try:
             import json as _json
-            audio_dir = otr_audio_dir()
-            if audio_dir.exists():
-                cands = list(audio_dir.glob("*_ledger.json"))
-                if cands:
-                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
-                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                    sfx_rows = led.get("sfx") or []
-                    updated = 0
-                    for i, item in enumerate(render_queue):
-                        if i >= len(sfx_rows):
-                            break
-                        row = sfx_rows[i]
-                        cache_path = item.get("cache_path")
-                        clip_t = final_clips[i] if i < len(final_clips) else None
-                        dur = None
-                        if clip_t is not None:
-                            try:
-                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
-                            except Exception:
-                                dur = None
-                        if cache_path:
-                            row["wav_path"] = str(cache_path)
-                        if dur is not None:
-                            row["dur_s"] = dur
-                        updated += 1
-                    if updated:
-                        ledger_path.write_text(
-                            _json.dumps(led, indent=2, ensure_ascii=False),
-                            encoding="utf-8",
-                        )
-                        batch_log.append(
-                            f"BUG-095 ledger updated: {updated} sfx wav_path(s) -> "
-                            f"{ledger_path.name}"
-                        )
+            # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
+            # via the centralized helper so both layouts (legacy flat +
+            # per-episode tree) are searched.
+            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
+                [otr_episodes_root(), otr_legacy_audio_dir()]
+            )
+            if ledger_path is not None:
+                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                sfx_rows = led.get("sfx") or []
+                updated = 0
+                for i, item in enumerate(render_queue):
+                    if i >= len(sfx_rows):
+                        break
+                    row = sfx_rows[i]
+                    cache_path = item.get("cache_path")
+                    clip_t = final_clips[i] if i < len(final_clips) else None
+                    dur = None
+                    if clip_t is not None:
+                        try:
+                            dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
+                        except Exception:
+                            dur = None
+                    if cache_path:
+                        row["wav_path"] = str(cache_path)
+                    if dur is not None:
+                        row["dur_s"] = dur
+                    updated += 1
+                if updated:
+                    ledger_path.write_text(
+                        _json.dumps(led, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    batch_log.append(
+                        f"BUG-095 ledger updated: {updated} sfx wav_path(s) -> "
+                        f"{ledger_path.name}"
+                    )
         except Exception as _exc:
             batch_log.append(f"BUG-095 ledger write-back failed: {_exc}")
 

@@ -38,7 +38,8 @@ import os
 import numpy as np
 import torch
 
-from ._otr_paths import otr_audio_dir
+from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+from . import _otr_ledger as _OTRL_PATHS
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -91,12 +92,26 @@ def _cache_dir() -> str:
 
 
 def _cache_key(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
-    """Deterministic cache filename. Episode seed is part of the key so two
-    episodes with identical prompts still get their own cached files if the
-    user explicitly scoped them by seed."""
+    """Per-render cache filename, guaranteed unique across episodes.
+
+    Format: ``<cue_id>_<sha8>_<timestamp_ms>.wav``
+      - ``cue_id`` -- human-readable cue (opening / closing / interstitial)
+      - ``sha8`` -- 8 hex chars of SHA256(cue_id|duration|prompt|seed),
+        kept for forensic traceability of which prompt produced which file
+      - ``timestamp_ms`` -- millisecond launch timestamp so filenames are
+        ALWAYS unique per render (Jeffrey directive 2026-05-02 EVENING:
+        every output asset gets a unique identifier so two episodes can
+        never collide on the same cache file). Trade-off: no cross-episode
+        cache reuse -- every MusicGen call renders fresh. Acceptable
+        because OTR prompts vary per news_seed + style anyway, so
+        cross-episode hits were rare in practice. Net cost ~22s of music
+        rendering per episode that we'd otherwise have skipped via cache.
+    """
+    import time as _time
     payload = f"{cue_id}|{duration_sec}|{prompt}|{episode_seed}".encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()[:16]
-    return f"{cue_id}_{digest}.wav"
+    digest = hashlib.sha256(payload).hexdigest()[:8]
+    ts_ms = int(_time.time() * 1000)
+    return f"{cue_id}_{digest}_{ts_ms}.wav"
 
 
 def _load_cached_wav(path: str) -> torch.Tensor | None:
@@ -332,51 +347,53 @@ class MusicGenTheme:
         try:
             import json as _json
             import time as _time
-            audio_dir = otr_audio_dir()
-            if audio_dir.exists():
-                cands = list(audio_dir.glob("*_ledger.json"))
-                if cands:
-                    ledger_path = max(cands, key=lambda x: x.stat().st_mtime)
-                    led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                    music_rows = led.get("music") or []
-                    # Build a lookup by cue_id; if a row is missing for
-                    # one of our cues, skip that one (don't synthesize
-                    # ledger schema -- keep node side-effect bounded).
-                    music_by_id = {(r.get("cue_id") or ""): r for r in music_rows}
-                    updated = 0
-                    for cue_id in CUE_IDS:
-                        cue_dict = cues.get(cue_id) or {}
-                        cache_path = cue_dict.get("cache_path")
-                        result_dict = results.get(cue_id) or {}
-                        wf = result_dict.get("waveform")
-                        sr = int(result_dict.get("sample_rate", 0)) or MUSICGEN_SAMPLE_RATE
-                        dur = None
-                        if wf is not None and sr > 0:
-                            try:
-                                dur = float(wf.shape[-1]) / float(sr)
-                            except Exception:
-                                dur = None
-                        row = music_by_id.get(cue_id)
-                        if row is not None:
-                            if cache_path:
-                                row["wav_path"] = str(cache_path)
-                            if dur is not None:
-                                row["dur_s"] = dur
-                            updated += 1
-                    if updated:
-                        ledger_path.write_text(
-                            _json.dumps(led, indent=2, ensure_ascii=False),
-                            encoding="utf-8",
-                        )
-                        log.info(
-                            "[MusicGenTheme] BUG-095 ledger updated: "
-                            "%d music cue path(s) written to %s",
-                            updated, ledger_path.name,
-                        )
-                        render_log.append(
-                            f"ledger updated: {updated} music wav_path(s) -> "
-                            f"{ledger_path.name}"
-                        )
+            # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
+            # via the centralized helper so both layouts (legacy flat +
+            # per-episode tree) are searched.
+            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
+                [otr_episodes_root(), otr_legacy_audio_dir()]
+            )
+            if ledger_path is not None:
+                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                music_rows = led.get("music") or []
+                # Build a lookup by cue_id; if a row is missing for
+                # one of our cues, skip that one (don't synthesize
+                # ledger schema -- keep node side-effect bounded).
+                music_by_id = {(r.get("cue_id") or ""): r for r in music_rows}
+                updated = 0
+                for cue_id in CUE_IDS:
+                    cue_dict = cues.get(cue_id) or {}
+                    cache_path = cue_dict.get("cache_path")
+                    result_dict = results.get(cue_id) or {}
+                    wf = result_dict.get("waveform")
+                    sr = int(result_dict.get("sample_rate", 0)) or MUSICGEN_SAMPLE_RATE
+                    dur = None
+                    if wf is not None and sr > 0:
+                        try:
+                            dur = float(wf.shape[-1]) / float(sr)
+                        except Exception:
+                            dur = None
+                    row = music_by_id.get(cue_id)
+                    if row is not None:
+                        if cache_path:
+                            row["wav_path"] = str(cache_path)
+                        if dur is not None:
+                            row["dur_s"] = dur
+                        updated += 1
+                if updated:
+                    ledger_path.write_text(
+                        _json.dumps(led, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    log.info(
+                        "[MusicGenTheme] BUG-095 ledger updated: "
+                        "%d music cue path(s) written to %s",
+                        updated, ledger_path.name,
+                    )
+                    render_log.append(
+                        f"ledger updated: {updated} music wav_path(s) -> "
+                        f"{ledger_path.name}"
+                    )
         except Exception as _exc:
             log.warning("[MusicGenTheme] BUG-095 ledger write-back failed: %s", _exc)
 

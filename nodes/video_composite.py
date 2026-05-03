@@ -82,7 +82,7 @@ if str(_NODES_DIR) not in _sys.path:
     _sys.path.insert(0, str(_NODES_DIR))
 from _otr_paths import (  # noqa: E402
     episodes_for_obs_dir,
-    otr_audio_dir,
+    otr_episodes_root,
     otr_legacy_audio_dir,
     otr_stills_dir,
 )
@@ -160,11 +160,11 @@ def _resolve_radio_still_for_static(ledger: dict | None) -> Path | None:
     if not eid or any(t in eid for t in ("/", "\\", "..", "\x00")):
         return None
     try:
-        fs_path = otr_stills_dir() / f"radio_bookend_{eid}.png"
+        fs_path = otr_stills_dir(eid) / f"radio_bookend_{eid}.png"
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[VideoComposite/static] otr_stills_dir lookup failed: %s",
-            exc,
+            "[VideoComposite/static] otr_stills_dir(%r) lookup failed: %s",
+            eid, exc,
         )
         return None
     if _is_valid(fs_path):
@@ -278,7 +278,7 @@ def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
 
     if not s:
         audio_dirs = [
-            otr_audio_dir(),
+            otr_episodes_root(),
             otr_legacy_audio_dir(),
         ]
         cands = []
@@ -1301,17 +1301,15 @@ class VideoComposite:
         ledger, ledger_path = _load_ledger_with_path(ledger_json)
         episode_id = ledger.get("episode_id", "episode")
 
-        # ---- Resolve output_dir (broadcast tree, OBS-safe) ----
-        # output_dir = ComfyUI/output/otr/episodes/    (FLAT, no subfolder)
-        # OBS's directory_sorter reads this single dir sorted by mtime
-        # and queues each <episode_id>.mp4 in turn. Every episode keys
-        # off its unique <episode_id>-prefixed filename, not a nested
-        # path. Per-line HuMo + LTX clip pieces live at
-        # output/otr/videos/<episode_id>/ so OBS never sees them.
-        # Originally output/episodes_for_obs/<id>/ (sibling of otr/),
-        # then output/otr/episodes/<id>/ (nested), then flattened to
-        # output/otr/episodes/ on 2026-05-02 EVENING.
-        out_dir = episodes_for_obs_dir()
+        # ---- Resolve output_dir (intermediate composite, per-episode) ----
+        # output_dir = ComfyUI/output/otr/episodes/<episode_id>/composited/
+        # This is the INTERMEDIATE 832x480 composite. The downstream
+        # OTR_RTXUpscale stage reads this and writes the final mp4 to
+        # the OBS-watched dir at output/otr/obs/<episode_id>.mp4
+        # (see otr_obs_dir). Per-episode workspace puts every working
+        # file for THIS episode under one parent (audio, stills,
+        # portraits, videos, composited) for tidy organization.
+        out_dir = episodes_for_obs_dir(episode_id)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / f"{episode_id}.mp4"
 

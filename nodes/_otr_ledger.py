@@ -109,6 +109,12 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     """Search the supplied dirs for ``*_ledger.json`` and return the
     newest by mtime. Returns None if no candidates found.
 
+    Walks each given dir at TWO levels:
+      1. ``<dir>/*_ledger.json``                   (legacy flat layout)
+      2. ``<dir>/<episode_id>/audio/*_ledger.json``  (per-episode workspace
+         layout, post 2026-05-02 EVENING reorg -- see
+         ``otr_episodes_root()`` in ``_otr_paths``)
+
     BUG-LOCAL-103 (2026-04-29 morning): we used to filter out
     ``pending_*_ledger.json`` here, which silently broke every
     audio-node ledger write. BatchBark / SceneSequencer /
@@ -117,13 +123,12 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     the pending file; SignalLostVideo renames it once the audio
     title is finalized). Filtering pending_* meant those four
     nodes' write-backs no-op'd because they couldn't find the
-    in-flight ledger. The deep_earth_echoes 2026-04-28 overnight
-    run shipped with audio_gates=[] and meta.phase_ms missing 4
-    of the 5 phases as a result. Fix: include pending_* in the
-    glob; mtime sort still prefers the newest, so a renamed
-    canonical ledger naturally wins after rename.
+    in-flight ledger. Fix: include pending_* in the glob; mtime
+    sort still prefers the newest, so a renamed canonical ledger
+    naturally wins after rename.
 
-    Use ``otr_audio_dir()`` + ``otr_legacy_audio_dir()`` from
+    Use ``otr_episodes_root()`` (per-episode workspace) +
+    ``otr_legacy_audio_dir()`` (pre-cutover legacy) from
     ``_otr_paths`` as the canonical search list.
     """
     candidates: list[Path] = []
@@ -132,7 +137,11 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             d = Path(d)
             if not d.exists():
                 continue
+            # Legacy flat layout: ledgers directly in the dir.
             candidates.extend(d.glob("*_ledger.json"))
+            # Per-episode workspace layout (post 2026-05-02 EVENING):
+            # ledgers under <dir>/<episode_id>/audio/*_ledger.json.
+            candidates.extend(d.glob("*/audio/*_ledger.json"))
         except Exception as exc:
             log.warning("[OTR_Ledger] ledger glob failed in %s: %s", d, exc)
     if not candidates:

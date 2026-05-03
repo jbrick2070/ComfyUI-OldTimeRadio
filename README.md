@@ -266,56 +266,57 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 ## Output Layout
 
-Every project output nests under one tidy `output/otr/` umbrella. Final user-facing deliverables sit in `otr/episodes/`; intermediate work files (audio, stills, portraits, per-line clip pieces, QA dumps) live in their own subfolders next to it. Resolved by `nodes/_otr_paths.py` so every node writes through one set of helpers.
+Every project output nests under one tidy `output/otr/` umbrella. Final user-facing deliverables sit FLAT in `otr/obs/` (point OBS here). Per-episode working files (audio, stills, portraits, per-line clip pieces, composite intermediate, scene-sequencer mixdowns) live inside that episode's own subfolder under `otr/episodes/<episode_id>/`. Resolved by `nodes/_otr_paths.py` so every node writes through one set of helpers.
 
 ```
 ComfyUI/
-└── output/                                # ComfyUI base output dir
-    └── otr/                               # ALL OldTimeRadio outputs nested here
+└── output/                                       # ComfyUI base output dir
+    └── otr/                                      # ALL OldTimeRadio outputs nested here
         │
-        ├── episodes/                      # ★ FINAL DELIVERABLES (point OBS here, FLAT)
-        │   ├── <episode_id>.mp4                  # 832x480 composited
-        │   ├── <episode_id>_1080p.mp4            # RTX VSR upscaled
-        │   ├── <other_episode>.mp4               # next finished episode (no subfolder)
-        │   └── ...                               # OBS sorts by mtime / filename
+        ├── obs/                                  # ★ FINAL DELIVERABLES (point OBS here, FLAT)
+        │   ├── <episode_id>.mp4                          # ONE final mp4 per episode
+        │   ├── <other_episode>.mp4                       # next finished episode
+        │   └── ...                                       # OBS sorts by mtime / filename
         │
-        ├── audio/                         # Procgen mp4 + ledger + audio cache
-        │   ├── <episode_id>.mp4                  # SignalLostVideo procgen base
-        │   ├── <episode_id>_ledger.json          # Production ledger (l3 schema)
-        │   ├── pending_*_ledger.json             # In-flight ledger (LLM phase)
-        │   ├── musicgen_cue_<sha>.wav            # MusicGen cache (theme stems)
-        │   ├── audiogen_<sha>.wav                # AudioGen cache (SFX stems)
-        │   └── director_dump_<ts>.txt            # LLMDirector raw dumps (BUG-090)
-        │
-        ├── stills/                        # FLUX environment + radio bookends
-        │   ├── full_env_NNNNN_.png               # Cast environment portraits
-        │   └── radio_bookend_<episode_id>.png    # 832x480 radio still (LTX I2V ref)
-        │
-        ├── portraits/                     # PASS1 character portraits
-        │   └── <character_name>.png
-        │
-        ├── videos/                        # ✂ PER-LINE PIECES (not final episodes)
-        │   └── <episode_id>/
-        │       ├── l002.mp4                      # HuMo character clip
-        │       ├── l003.mp4                      # HuMo character clip
-        │       ├── music_opening_001.mp4         # LTX music piece
-        │       ├── l001.mp4                      # LTX announcer piece
-        │       └── ...                           # one .mp4 per ledger.lines[]
-        │
-        ├── script_gates/                  # OTR_LLMScriptCritic dumps
-        │   └── script_critic_<ts>_<model>.md
-        │
-        ├── qa_frames/                     # QA frame samples (manual review)
-        ├── qa_waveforms/                  # QA waveform PNGs
-        └── vram_tests/                    # VRAMContextTest output (created on demand)
+        └── episodes/                             # PER-EPISODE WORKSPACES
+            └── <episode_id>/                     # everything for THIS episode lives here
+                ├── audio/                                # procgen + ledger + audio caches
+                │   ├── <episode_id>.mp4                      # SignalLostVideo procgen base
+                │   ├── <episode_id>_ledger.json              # Production ledger (l3 schema)
+                │   ├── pending_*_ledger.json                 # In-flight (LLM phase, pre-rename)
+                │   └── director_dump_<ts>.txt                # LLMDirector raw dumps (BUG-090)
+                │
+                ├── stills/                               # FLUX environment + radio bookend
+                │   ├── full_env_NNNNN_.png                   # Cast environments
+                │   └── radio_bookend_<episode_id>.png        # 832x480 LTX I2V ref
+                │
+                ├── portraits/                            # PASS1 character portraits
+                │
+                ├── videos/                               # ✂ per-line piece clips (NOT final)
+                │   ├── l002.mp4                              # HuMo character clip
+                │   ├── music_opening_001.mp4                 # LTX music piece
+                │   ├── l001.mp4                              # LTX announcer piece
+                │   └── ...                                   # one .mp4 per ledger.lines[]
+                │
+                └── composited/                           # VideoComposite intermediate
+                    └── <episode_id>.mp4                      # 832x480 pre-upscale (debug / re-upscale)
 ```
 
 **Key invariants:**
 
-- **`otr/episodes/`** holds ONLY the user-facing final mp4s -- FLAT, no per-episode subfolder. Each episode lands as `<episode_id>.mp4` and `<episode_id>_1080p.mp4`. Point OBS / external streaming tools at this dir; sorts naturally by mtime / filename.
-- **`otr/videos/<ep>/`** holds the per-line clip *pieces* (HuMo character clips + LTX announcer / music / sfx clips). VideoComposite reads these and assembles the final `otr/episodes/<ep>.mp4`.
-- **`otr/audio/<ep>_ledger.json`** is the canonical production ledger. Every node reads from + writes back to this single file.
-- **Path consolidation history:** through 2026-05-02 the final episode mp4 lived at `output/episodes_for_obs/<ep>/` (sibling of `otr/`). Moved under `otr/` after the first end-to-end Sprint 3 smoke landed clean.
+- **`otr/obs/`** is the only place finished episodes land. ONE mp4 per episode, named `<episode_id>.mp4` (no resolution suffix). Point OBS / external streaming tools at this dir, FLAT, no descend.
+- **`otr/episodes/<episode_id>/`** is the per-episode working folder. Everything for that one episode (audio, stills, portraits, per-line clip pieces, composite intermediate) lives in subfolders under it. Delete one episode's folder = delete that whole episode's working set.
+- **`otr/episodes/<episode_id>/audio/<episode_id>_ledger.json`** is the canonical production ledger. The auto-pick walker (in `_otr_ledger.find_most_recent_ledger`) walks `otr/episodes/*/audio/*_ledger.json` for cross-episode discovery.
+- **`otr/episodes/<episode_id>/composited/<episode_id>.mp4`** is the 832x480 intermediate VideoComposite writes. RTXUpscale reads it and writes the final to `otr/obs/<episode_id>.mp4`.
+- **MusicGen + AudioGen caches** still live at `models/musicgen_cache/` and `models/sfx_cache/` (NOT under `otr/`). Filenames now carry a `_<timestamp_ms>` suffix so two runs never collide on the same cache file. Cross-episode cache reuse is gone by design — each render produces a fresh, uniquely-named file.
+- **Sibling utility dirs** under `otr/` for cross-episode artifacts: `script_gates/`, `qa_frames/`, `qa_waveforms/`, `vram_tests/`.
+
+**Path layout history (2026-05-02 EVENING — three rapid iterations after first end-to-end smoke landed):**
+1. Original: final mp4 at `output/episodes_for_obs/<ep>/` (sibling of otr/, BUG-LOCAL-084).
+2. Consolidate under otr/: `output/otr/episodes/<ep>/` (nested).
+3. Flatten: `output/otr/episodes/` (no per-ep subfolder).
+4. Split intermediate vs final: `otr/obs/` for finals, `otr/episodes/<ep>.mp4` for intermediate.
+5. Per-episode workspace + one-stop-shop: ALL per-episode work files into `otr/episodes/<ep>/{audio,stills,portraits,videos,composited}/`. Final mp4 lives FLAT in `otr/obs/`.
 
 **Sibling directories created by other ComfyUI work** (NOT touched by OTR):
 - `output/old_time_radio/` — pre-BUG-079 legacy OTR audio (kept readable for back-compat ledger discovery)
