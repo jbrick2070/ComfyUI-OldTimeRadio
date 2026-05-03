@@ -50,6 +50,8 @@ if str(_NODES_DIR) not in _sys.path:
 # references the canonical resolver.
 import folder_paths  # noqa: F401,E402
 
+from _otr_paths import otr_obs_dir  # noqa: E402
+
 log = logging.getLogger("OTR.rtx_upscale")
 
 
@@ -376,14 +378,6 @@ class RTXUpscale:
                     "multiline": False,
                     "tooltip": "ffmpeg binary path or PATH-resolvable name.",
                 }),
-                "out_suffix": ("STRING", {
-                    "default": "_1080p",
-                    "multiline": False,
-                    "tooltip": (
-                        "Suffix for the upscaled deliverable filename. "
-                        "<ep>.mp4 -> <ep><suffix>.mp4. Default '_1080p'."
-                    ),
-                }),
             },
         }
 
@@ -396,7 +390,6 @@ class RTXUpscale:
         quality: str = "ULTRA",
         chunk_frames: int = DEFAULT_CHUNK_FRAMES,
         ffmpeg: str = "ffmpeg",
-        out_suffix: str = "_1080p",
     ):
         t_start = time.time()
         report_lines: list[str] = []
@@ -413,13 +406,26 @@ class RTXUpscale:
         if not (shutil.which(ffmpeg) or Path(ffmpeg).exists()):
             return ("", f"error: ffmpeg not found at {ffmpeg!r}")
 
+        # Final mp4 always lands in otr_obs_dir() under the source's
+        # filename (one mp4 per episode in the OBS-watched flat dir).
+        out_dir = otr_obs_dir()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_mp4 = out_dir / src.name
+
         if bypass:
+            # Bypass: copy the composite intermediate into otr/obs/ so
+            # the final dir always has exactly one mp4 per episode
+            # regardless of upscale on/off.
+            shutil.copy2(src, out_mp4)
             report_lines.append(
-                f"OTR_RTXUpscale: BYPASS -- returning source unchanged "
-                f"({src.name})"
+                f"OTR_RTXUpscale: BYPASS -- copied {src.name} to "
+                f"otr/obs/ ({out_mp4.stat().st_size / (1024*1024):.1f} MB)"
             )
-            log.info("[OTR_RTXUpscale] bypass=True; returning %s", src)
-            return (str(src), "\n".join(report_lines))
+            log.info(
+                "[OTR_RTXUpscale] bypass=True; copied %s -> %s",
+                src, out_mp4,
+            )
+            return (str(out_mp4), "\n".join(report_lines))
 
         # Source dims for the report
         try:
@@ -427,19 +433,13 @@ class RTXUpscale:
             report_lines.append(
                 f"OTR_RTXUpscale: source {src.name} "
                 f"{src_w}x{src_h} -> {target_width}x{target_height} "
-                f"({quality})"
+                f"({quality}); writing to otr/obs/{out_mp4.name}"
             )
         except Exception as exc:  # noqa: BLE001
             report_lines.append(
                 f"OTR_RTXUpscale: ffprobe of source failed ({exc}); "
                 "continuing"
             )
-
-        # Output path: <ep>_1080p.mp4 in the same dir as source
-        suffix = (out_suffix or "_1080p").strip()
-        if not suffix.startswith("_"):
-            suffix = "_" + suffix
-        out_mp4 = src.with_name(f"{src.stem}{suffix}.mp4")
 
         # Silent intermediate goes to a tempdir, gets removed after mux
         tmp_dir = Path(tempfile.mkdtemp(prefix="otr_rtx_upscale_"))

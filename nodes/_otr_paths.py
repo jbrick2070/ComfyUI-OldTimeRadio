@@ -181,20 +181,46 @@ def otr_videos_dir(episode_id: str) -> Path:
     return comfy_output_dir() / "otr" / "videos" / episode_id
 
 
+def otr_obs_dir() -> Path:
+    """OBS-watched final-deliverable dir: ``<output>/otr/obs/``.
+
+    Holds EXACTLY ONE mp4 per episode -- the final user-facing
+    deliverable named ``<episode_id>.mp4`` (no resolution suffix,
+    no per-episode subfolder). OBS's directory_sorter watches this
+    dir and queues each finished episode in turn.
+
+    When OTR_RTXUpscale runs, the 1080p upscaled mp4 lands here.
+    When OTR_RTXUpscale is bypassed, the 832x480 composite is copied
+    here instead -- so this dir always has exactly one mp4 per
+    episode regardless of upscale on/off.
+
+    The 832x480 composite intermediate VideoComposite writes lives
+    at ``<output>/otr/episodes/<episode_id>.mp4`` (intermediate dir;
+    see ``episodes_for_obs_dir``) so OBS never sees the pre-upscale
+    version and the intermediate stays available for debug /
+    re-upscale without re-rendering.
+
+    Added 2026-05-02 EVENING per Jeffrey directive: one mp4 per
+    episode in the OBS folder, only the final upscaled.
+    """
+    return comfy_output_dir() / "otr" / "obs"
+
+
 def episodes_for_obs_dir(episode_id: str = "") -> Path:
-    """Final-episode deliverable dir -- FLAT layout.
+    """VideoComposite intermediate-mp4 dir -- FLAT layout.
 
     Path: ``<output>/otr/episodes/`` (no per-episode subfolder).
 
-    Holds ONLY the user-facing final mp4(s):
-      - ``<episode_id>.mp4``        -- VideoComposite 832x480 output
-      - ``<episode_id>_1080p.mp4``  -- OTR_RTXUpscale 1080p upscale
+    Holds the 832x480 native composite mp4 written by VideoComposite
+    as ``<episode_id>.mp4`` (one per episode). This is the
+    INTERMEDIATE -- the downstream OTR_RTXUpscale stage reads from
+    here and writes the final 1080p upscaled mp4 to the OBS-watched
+    dir at ``<output>/otr/obs/<episode_id>.mp4`` (see ``otr_obs_dir``).
 
-    OBS's directory_sorter reads this single flat directory sorted by
-    mtime / filename and queues each finished episode in turn. The
-    piece-level per-line clips stay under
-    ``<output>/otr/videos/<episode_id>/`` (see ``otr_videos_dir``) so
-    OBS never sees them.
+    Despite the historical name ``episodes_for_obs_dir``, this dir
+    is NOT what OBS watches anymore -- that role moved to ``otr/obs/``
+    on 2026-05-02 EVENING. Function name kept for back-compat with
+    existing imports; canonical OBS-watched dir is now ``otr_obs_dir``.
 
     The ``episode_id`` argument is accepted for back-compat with older
     callers but is intentionally ignored -- the layout is FLAT, every
@@ -202,15 +228,16 @@ def episodes_for_obs_dir(episode_id: str = "") -> Path:
     in the FILENAME, not the path.
 
     History (canonical change-log for this path):
-      - Originally lived at ``<output>/episodes_for_obs/<episode_id>/``,
-        a sibling of ``otr/`` (BUG-LOCAL-084 era).
-      - 2026-05-02 EVENING (Jeffrey directive 1): consolidate under the
-        ``otr/`` umbrella -> ``<output>/otr/episodes/<episode_id>/``.
-      - 2026-05-02 EVENING (Jeffrey directive 2): flatten -- the
-        per-episode subfolder layer was redundant since each episode
-        already has a unique ``<episode_id>``-prefixed filename. OBS
-        now points at ``output/otr/episodes/`` (no descend) and gets
-        a flat list of finished mp4s.
+      - Originally ``<output>/episodes_for_obs/<episode_id>/``,
+        sibling of ``otr/`` (BUG-LOCAL-084 era).
+      - 2026-05-02 EVENING (Jeffrey directive 1): consolidate under
+        ``otr/`` -> ``<output>/otr/episodes/<episode_id>/``.
+      - 2026-05-02 EVENING (Jeffrey directive 2): flatten ->
+        ``<output>/otr/episodes/`` (no per-episode subfolder).
+      - 2026-05-02 EVENING (Jeffrey directive 3): split intermediate
+        from final. This dir keeps the VideoComposite intermediate;
+        new ``otr_obs_dir()`` holds the single final upscaled mp4
+        per episode.
     """
     del episode_id  # accepted for back-compat; FLAT layout ignores it
     return comfy_output_dir() / "otr" / "episodes"
