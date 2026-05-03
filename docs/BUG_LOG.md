@@ -183,3 +183,32 @@ The Sprint 3 mega-sprint code (LTX wiring + RTX VSR upscale + consult fixes) is 
 - BatchHumoRender Phase A (text encoding 4+1) + Phase B (Whisper) + Phase C (4 lines): clean. Peak VRAM 14.2 GB GPU dedicated. Per-clip ~10:00-10:20 wallclock at 6 sampler steps × ~97s/step. 4 character lines correctly routed to HuMo; 2 announcer lines correctly skipped (BUG-129b).
 - LowVRAMCheckpointLoader -> BatchLTXRender: dependency edge fired correctly (sequencing intent SHIPPED), then BUG-LOCAL-011 raised inside `_load_ledger`. Fix landed in this commit; re-queue to verify the rest of the S3.x acceptance bullets.
 
+### Round-robin consult on BUG-LOCAL-011 fix -- 2026-05-02 EVENING
+
+`docs/2026-05-02-bug-local-011-fix-review__01_chatgpt.md` (gpt-5.5, 97s), `__02_gemini.md` (gemini-3.1-pro-preview-customtools, 35s), `__03_nvidia.md` (nvidia/llama-3.3-nemotron-super-49b-v1.5, 93s).
+
+**Three-way convergence (verdict: tighten before next live run):**
+
+- Tier 1 (.mp4 -> .json exact stem swap) and Tier 2 (collapsed-underscore variant) are both correct and necessary.
+- **Tier 3 fuzzy directory scan must be killed for LTX.** Non-deterministic (depends on directory contents + mtimes + wall-clock); could plausibly bind to a wrong neighbour ledger if exact match fails to load. Burning ~1 hour rendering against bad metadata is the failure mode 2/3 consultants flagged as the real risk.
+- **Restore `_OTRL.load_ledger_safe()` for path loads** (consistent `[OTR_Ledger]` log prefix; future-proof against any hardening added there).
+- **Fail loud on file-load errors.** If exact (Tier 1) or collapsed (Tier 2) ledger candidate file EXISTS but fails to parse / read (PermissionError from Windows file-locking, JSONDecodeError from a partial write), raise instead of falling through. Silent fall-through to a wrong neighbour was Gemini's strongest framing.
+- **Document `humo_clips_dir` widget as a sequencing-only DAG edge.** Add tooltip + inline comment + `del humo_clips_dir` so a future maintainer doesn't remove it as dead code (which would let the LTX checkpoint load race HuMo's 16.5 GB MODEL teardown and OOM on 16 GB).
+
+**Disagreement caught (consultants vs reality):**
+
+- Gemini + NVIDIA flagged `log` and `time` as missing imports -> false alarms. `log = logging.getLogger("OTR.batch_ltx_render")` is at line 81; `import time` at line 51.
+- Gemini + NVIDIA assumed `_OTRL.load_ledger_safe` does schema migration -> false alarm. It just wraps `json.loads` with three exception handlers (FileNotFound / JSONDecodeError / generic Exception), all logging WARNING and returning None. So restoring it gains consistent log-prefix and centralised error handling, NOT schema migration.
+
+**Hardening pass applied in commit (next):**
+
+1. Replaced raw `json.load()` calls with a local `_read(p)` helper that delegates to `_OTRL.load_ledger_safe(p)` when importable; raises RuntimeError when the loader returns None on an existing file.
+2. Deleted Tier 3 fuzzy scan code path. Resolver now returns `(None, None)` after Tier 1 + Tier 2 miss, with a WARNING log line that explicitly notes Tier 3 was removed by the 2026-05-02 round-robin.
+3. `humo_clips_dir` INPUT_TYPES tooltip rewritten to flag the widget as a DAG sequencing edge (NOT data); execute() body explicitly `del humo_clips_dir` with a comment explaining the "remove this and LTX OOMs" failure mode.
+
+Resolver test (offline, against the live-run cached ledger) confirms all 4 branches still resolve correctly: .mp4 stem-swap, explicit .json path, inline JSON, empty input auto-pick.
+
+**Companion artifact: `workflows/otr_ltx_smoke.json`** -- a 5-node fast-smoke harness (LowVRAMCheckpointLoader -> OTR_BatchLTXRender -> OTR_VideoComposite -> OTR_RTXUpscale + Note) that consumes the cached ledger.json + procgen mp4 + 4 HuMo character clips from the live run. ledger_json widgets on both BatchLTXRender + VideoComposite are the .mp4 PATH so the smoke truly repros the BUG-LOCAL-011 crash surface (i.e. exercises the .mp4 -> _ledger.json stem-swap chain). Wallclock target ~10 min vs ~60 min for full pipeline. Re-aim at a different episode by swapping the PROCGEN_MP4 + HUMO_VIDEOS_DIR widget values; both must come from the same episode_id so LTX writes into the dir HuMo wrote into.
+
+
+

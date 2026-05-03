@@ -423,11 +423,17 @@ class BatchLTXRender:
                     "default": "",
                     "multiline": False,
                     "tooltip": (
-                        "Optional sequencing edge from BatchHumoRender.clips_dir. "
-                        "When wired, ComfyUI waits for HuMo to finish writing its "
-                        "per-line .mp4 files before LTX starts loading -- so HuMo "
-                        "fully unloads before LTX claims VRAM. Pure DAG dependency; "
-                        "the value is not used by execute()."
+                        "DAG SEQUENCING EDGE -- not data. Wire this to "
+                        "BatchHumoRender.clips_dir (or .report) so ComfyUI "
+                        "waits for HuMo to finish writing its per-line .mp4 "
+                        "files before LTX starts loading. HuMo's strict "
+                        "teardown then releases the 16.5 GB MODEL before "
+                        "LTX claims VRAM. The value is intentionally NOT "
+                        "used by execute() -- if you remove this input "
+                        "thinking it's dead code, ComfyUI may schedule "
+                        "LTX too early and OOM. Round-robin consult "
+                        "2026-05-02 endorsed this pattern as acceptable "
+                        "ComfyUI sequencing."
                     ),
                 }),
             },
@@ -435,6 +441,12 @@ class BatchLTXRender:
 
     def execute(self, model, clip, vae, ledger_json, seed=1, ffmpeg="ffmpeg",
                 humo_clips_dir=""):
+        # NOTE: ``humo_clips_dir`` is intentionally consumed but unused.
+        # See INPUT_TYPES tooltip -- it is a pure DAG sequencing edge so
+        # ComfyUI schedules this node after BatchHumoRender finishes its
+        # render + teardown. Do NOT remove it; doing so will let the LTX
+        # checkpoint load race HuMo's 16.5 GB MODEL and OOM on 16 GB.
+        del humo_clips_dir  # explicit: value ignored, edge is the contract
         t_start = time.time()
         report_lines: list[str] = []
 
@@ -765,7 +777,7 @@ class BatchLTXRender:
     @staticmethod
     def _load_ledger(arg: str) -> tuple[dict | None, Path | None]:
         """Accept either:
-          - inline JSON string (starts with '{') -- returns (dict, None)
+          - inline JSON string (starts with '{' or '[') -- returns (dict, None)
           - path to *_ledger.json -- returns (dict, Path)
           - path to *.mp4 (audio episode); ledger inferred via
             suffix swap (.mp4 -> _ledger.json), since that's the
@@ -779,12 +791,53 @@ class BatchLTXRender:
         Returns (ledger_dict_or_None, ledger_path_or_None). Mirrors the
         contract of BatchHumoRender._load_ledger_with_path so the two
         sister nodes resolve the same ledger from the same SignalLostVideo
-        STRING output. BUG-LOCAL-011 (2026-05-02): originally this
-        method only handled exact .json paths and failed when wired to
-        SignalLostVideo's .mp4 output -- ported the multi-tier stem
-        fallback from batch_humo_render.py.
+        STRING output.
+
+        Resolution policy (post-2026-05-02 round-robin hardening on
+        BUG-LOCAL-011):
+          1. Use ``_otr_ledger.load_ledger_safe(path)`` for path loads
+             so the read goes through the canonical loader (consistent
+             ``[OTR_Ledger]`` log prefix; future-proof against any
+             hardening added there).
+          2. Tier 3 fuzzy directory scan from BatchHumoRender is
+             intentionally NOT ported. Round-robin (gpt-5.5 + gemini-3.1
+             + nemotron-49b) converged on rejecting it for LTX:
+             non-deterministic, could plausibly bind to a wrong neighbour
+             ledger, and silent fallback would burn ~1 hour rendering
+             against bad metadata.
+          3. If a Tier 1 or Tier 2 candidate file EXISTS but fails to
+             parse / read, raise loud so the run halts immediately
+             rather than fall through. Windows file-locking
+             ``PermissionError`` falling silently to Tier 2/3 was the
+             specific concern Gemini flagged; we honour it by failing
+             fast.
         """
         import json as _json
+        try:
+            from . import _otr_ledger as _OTRL  # type: ignore
+        except Exception:  # noqa: BLE001
+            _OTRL = None  # type: ignore
+
+        def _read(p: Path) -> dict:
+            """Load a JSON file via _OTRL when available; raise on failure.
+
+            ``_OTRL.load_ledger_safe`` returns None on any error; we
+            convert that to a RuntimeError so an existing-but-unreadable
+            ledger does NOT silently fall through to a fuzzy / wrong
+            candidate. Direct ``json.load`` is the fallback when
+            ``_otr_ledger`` is unimportable (test contexts).
+            """
+            if _OTRL is not None:
+                led = _OTRL.load_ledger_safe(p)
+                if led is None:
+                    raise RuntimeError(
+                        f"BatchLTXRender: _OTRL.load_ledger_safe returned "
+                        f"None for {p} (file exists; check WARNING log "
+                        f"line above for the underlying parse / OS error)"
+                    )
+                return led
+            with open(p, "r", encoding="utf-8") as f:
+                return _json.load(f)
 
         s = (arg or "").strip()
 
@@ -805,15 +858,7 @@ class BatchLTXRender:
                 )
                 return None, None
             p = max(cands, key=lambda x: x.stat().st_mtime)
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return _json.load(f), p
-            except Exception as exc:  # noqa: BLE001
-                log.warning(
-                    "[BatchLTXRender] auto-pick ledger %s failed to load: %s",
-                    p, exc,
-                )
-                return None, None
+            return _read(p), p
 
         # Layer 1: inline JSON object.
         if s.startswith("{") or s.startswith("["):
@@ -832,28 +877,20 @@ class BatchLTXRender:
             return None, None
 
         # Layer 2a: .mp4 path -> swap suffix to _ledger.json
-        # (SignalLostVideo / EpisodeAssembler convention). Same multi-tier
-        # fallback chain as BatchHumoRender (BUG-LOCAL-118 hardening):
-        #   (1) exact match,
-        #   (2) collapsed-underscore variant,
-        #   (3) directory scan for newest <1h old fuzzy match.
+        # (SignalLostVideo / EpisodeAssembler convention). Two-tier
+        # resolution per round-robin verdict:
+        #   Tier 1 -- exact stem match.
+        #   Tier 2 -- collapsed-underscore variant (BUG-LOCAL-118 carry-over).
+        # If either candidate file exists but fails to load, _read
+        # raises -- intentional fail-loud, no fuzzy fallback.
         if p.suffix.lower() == ".mp4":
             audio_dir = p.parent
             stem = p.stem
 
-            # Tier 1: direct match.
             ledger_p = audio_dir / f"{stem}_ledger.json"
             if ledger_p.exists():
-                try:
-                    with open(ledger_p, "r", encoding="utf-8") as f:
-                        return _json.load(f), ledger_p
-                except Exception as exc:  # noqa: BLE001
-                    log.warning(
-                        "[BatchLTXRender] tier-1 ledger %s failed to "
-                        "load: %s", ledger_p, exc,
-                    )
+                return _read(ledger_p), ledger_p
 
-            # Tier 2: underscore-collapse variant.
             collapsed = stem
             while "__" in collapsed:
                 collapsed = collapsed.replace("__", "_")
@@ -866,55 +903,12 @@ class BatchLTXRender:
                         "loaded matching ledger %r instead.",
                         stem, cand.name,
                     )
-                    try:
-                        with open(cand, "r", encoding="utf-8") as f:
-                            return _json.load(f), cand
-                    except Exception as exc:  # noqa: BLE001
-                        log.warning(
-                            "[BatchLTXRender] tier-2 ledger %s failed to "
-                            "load: %s", cand, exc,
-                        )
-
-            # Tier 3: directory scan for fuzzy-match ledger <1h old.
-            try:
-                cands = list(audio_dir.glob("*_ledger.json"))
-                cands.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-                stem_norm = collapsed
-                for cand in cands[:10]:
-                    cand_eid = cand.stem
-                    if cand_eid.endswith("_ledger"):
-                        cand_eid = cand_eid[: -len("_ledger")]
-                    cand_norm = cand_eid
-                    while "__" in cand_norm:
-                        cand_norm = cand_norm.replace("__", "_")
-                    if (cand_norm == stem_norm
-                            or cand_norm in stem_norm
-                            or stem_norm in cand_norm):
-                        age_s = time.time() - cand.stat().st_mtime
-                        if age_s > 3600:
-                            continue
-                        log.warning(
-                            "[BatchLTXRender] BUG-LOCAL-118 fuzzy fallback: "
-                            "binding to %r (age %.0fs) for .mp4 stem %r.",
-                            cand.name, age_s, stem,
-                        )
-                        try:
-                            with open(cand, "r", encoding="utf-8") as f:
-                                return _json.load(f), cand
-                        except Exception as exc:  # noqa: BLE001
-                            log.warning(
-                                "[BatchLTXRender] tier-3 ledger %s failed "
-                                "to load: %s", cand, exc,
-                            )
-            except Exception as scan_exc:  # noqa: BLE001
-                log.warning(
-                    "[BatchLTXRender] BUG-LOCAL-118 directory-scan "
-                    "fallback failed (%s) - falling through.", scan_exc,
-                )
+                    return _read(cand), cand
 
             log.warning(
                 "[BatchLTXRender] derived ledger from .mp4 not found: "
-                "%s (tried direct, collapsed-underscore, fuzzy scan)",
+                "%s (tried Tier 1 exact + Tier 2 collapsed-underscore; "
+                "Tier 3 fuzzy scan removed by 2026-05-02 round-robin)",
                 ledger_p,
             )
             return None, None
@@ -922,15 +916,7 @@ class BatchLTXRender:
         # Layer 2b: plain _ledger.json path.
         if not p.is_file():
             return None, None
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return _json.load(f), p
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[BatchLTXRender] ledger path %s failed to load: %s",
-                p, exc,
-            )
-            return None, None
+        return _read(p), p
 
 
 __all__ = ["BatchLTXRender"]
