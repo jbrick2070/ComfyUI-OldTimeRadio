@@ -210,5 +210,18 @@ Resolver test (offline, against the live-run cached ledger) confirms all 4 branc
 
 **Companion artifact: `workflows/otr_ltx_smoke.json`** -- a 5-node fast-smoke harness (LowVRAMCheckpointLoader -> OTR_BatchLTXRender -> OTR_VideoComposite -> OTR_RTXUpscale + Note) that consumes the cached ledger.json + procgen mp4 + 4 HuMo character clips from the live run. ledger_json widgets on both BatchLTXRender + VideoComposite are the .mp4 PATH so the smoke truly repros the BUG-LOCAL-011 crash surface (i.e. exercises the .mp4 -> _ledger.json stem-swap chain). Wallclock target ~10 min vs ~60 min for full pipeline. Re-aim at a different episode by swapping the PROCGEN_MP4 + HUMO_VIDEOS_DIR widget values; both must come from the same episode_id so LTX writes into the dir HuMo wrote into.
 
+### BUG-LOCAL-012 [PENDING-ROOT-CAUSE]: ComfyUI frontend Zod validation rejected `workflows/otr_ltx_smoke.json` at load time
+
+- **Date:** 2026-05-02 EVENING | **Phase:** S3 fast smoke harness | **Bible candidate:** yes (broadly applicable to anyone hand-building ComfyUI workflow JSONs)
+- **Symptom:** Jeffrey loaded `workflows/otr_ltx_smoke.json` (commit `f60d2e4` / `4df4e72`) into ComfyUI Desktop and the frontend rejected the workflow with a Zod validation error before any node could execute. Raw `json.loads` round-trips cleanly; this is a frontend-side schema validation failure, not a JSON syntax error.
+- **Cause (hypothesised pending error-text capture):** The smoke JSON was hand-built by `outputs/_build_ltx_smoke.py` rather than exported by the ComfyUI UI. Three candidate divergences from the canonical shape, identified by structural diff against `workflows/otr_scifi_16gb_full.json` + `Nvidia_RTX_Nodes_ComfyUI/example_workflows/rtx_video_upscale.json` (both load cleanly):
+  1. **`_meta` field on every node.** Mine has `_meta: {title: ...}`; canonical workflows use a top-level `title` field on the node. Some Zod schemas reject unknown fields strictly.
+  2. **`shape: 7` on optional inputs.** Mine puts `shape: 7` on `dependencies` + `humo_clips_dir`; neither known-good workflow uses this. LiteGraph shape values 1-7 are valid in the LiteGraph runtime, but the Vue frontend's Zod schema may not list `shape` as an allowed input field.
+  3. **Missing `slot_index` on outputs.** Production has `{name, type, links, slot_index}` on every output; mine omits `slot_index`. Vue frontend may require it to track slot-position semantics.
+- **Fix:** apply all 3 candidate corrections in `outputs/_build_ltx_smoke.py` and re-emit `workflows/otr_ltx_smoke.json`. Drop `_meta` -> rename to `title`. Drop `shape` from inputs entirely. Add `slot_index: <i>` to every output. Land an offline regression check (`tests/test_workflow_zod_shape.py`) that asserts these shape invariants on every JSON under `workflows/` so this class of bug is caught by the test suite before it reaches the UI.
+- **Verify:** Jeffrey reloads `workflows/otr_ltx_smoke.json` in ComfyUI Desktop; no Zod error; nodes appear on canvas; Queue Prompt accepts the workflow.
+- **Why prior consults missed it:** all three rounds reviewed the ComfyUI execution semantics (object_info, link types, DAG ordering, .mp4 path stem-swap, audio passthrough). None reviewed the frontend's Zod schema, which is a separate validation layer between drag-and-drop UI load and the backend's `/prompt` endpoint. The CLI `submit_prompt` path bypasses Zod entirely (it goes straight to `/prompt` with the API-converted workflow), which is why my offline JSON tests + the `queue_smoke.py` script + the `_test_ledger_resolver.py` all passed -- they exercise different code paths than the UI loader.
+- **Tags:** zod, comfyui-frontend, workflow-json-shape, hand-built-workflow, bible-candidate
+
 
 
