@@ -3,6 +3,25 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-018 [FIXED]: Ledger schema bump l3-2026-05-02 + meta.paths block
+- **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after end-of-stack soak)
+- **Symptom:** No active bug — additive schema enhancement. The QA pass (`docs/2026-05-02-rtx-upscale-qa-pass.md` Phase E) prescribed adding a `meta.paths` block to the production ledger so downstream nodes can look up canonical episode dirs without reconstructing them from `episode_id`. Slug-reconstruction was the root cause of the BUG-LOCAL-014/015/017 cluster — Phases A/B/C/D fixed the live instances; Phase E removes the temptation entirely by stamping the absolute, on-disk-truth paths into the ledger at every save.
+- **Cause:** N/A — preventive change.
+- **Fix:**
+  - `nodes/_otr_ledger.py`: bump `CURRENT_SCHEMA_VERSION` from `l3-2026-04-28` to `l3-2026-05-02`. Add `_build_meta_paths(ledger_path, episode_id)` helper that detects layout (per-episode-workspace under `output/otr/episodes/<ep>/audio/<ep>_ledger.json` vs legacy flat under `output/audio/<ep>_ledger.json`) and stamps an appropriate `meta.paths` block. `save_ledger_safe` now calls it on every write. The block is **resolved fresh on every save** from the actual on-disk path, so it self-corrects after `Ledger.rename_episode` (Phase B) — no caller has to update it.
+  - `nodes/production_ledger.py`: `Ledger.save()` also stamps `meta.paths` (via the same `_otr_ledger._build_meta_paths` helper) so the path data is consistent regardless of which write path produced the ledger. Hardcoded fallback `SCHEMA_VERSION` updated to match. Best-effort try/except wraps the meta stamp — a stamping failure must NEVER break the actual ledger write.
+  - `docs/ledger_schema.md`: created. Documents the schema (top-level fields + meta block + meta.paths block + per-episode vs legacy-flat layout shapes), the lineage table, the reader contract (`dict.get(...)` not direct subscript), and the rules for downstream nodes.
+- **Verify:**
+  - AST + Phase E invariant guards (schema string `l3-2026-05-02`, `_build_meta_paths` present, both layouts detected, dual-write stamping in both files) — green.
+  - **New `tests/test_meta_paths.py` — 13 passed.** Covers: per-episode layout detection + all 6 dirs stamped + obs_final stamped when obs/ exists + ledger_path absolute; legacy flat layout detection + no fabricated subdirs + minimal paths only; `save_ledger_safe` stamps meta.paths AND preserves pre-existing meta keys; old ledger without meta.paths loads cleanly via `dict.get(...)` (back-compat regression); `Ledger.save()` stamps meta.paths too; **after `rename_episode`, the next save's meta.paths self-corrects to the new dir** (the killer property — proves stale references can't accumulate).
+  - Three CLAUDE.md regression suites + all phase-A-through-D tests: **234 passed / 1 skipped / 2 xfailed in 106.37s** (Bug Bible 23 + dropdown_guardrails+core 155 + ledger_rename 10 + filename_pattern_audit 3 + cache_key_mutations 30 + meta_paths 13).
+  - **Real-run acceptance (pending):** end-of-stack soak. New ledgers should carry `meta.paths`; old ledgers (if any survive in `output/audio/`) still load via `dict.get` defaults.
+- **Tags:** schema, additive, meta-paths, back-compat, qa-pass-2026-05-02
+- **Consult sources:** `docs/2026-05-02-rtx-upscale-qa-pass.md` (Phase E section). No round-robin needed — additive only, no behavior change for existing readers (all already use `meta.get(...)`).
+- **Reader contract enforced:** see `docs/ledger_schema.md` "Reader contract" section. `meta.paths` MUST be accessed via `led.get("meta", {}).get("paths", {}).get(field)`, never `led["meta"]["paths"][field]`.
+
+---
+
 ### BUG-LOCAL-017 [FIXED]: MusicGen + AudioGen cache miss every run — `_cache_key` returned a fresh timestamped path
 - **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after end-of-stack soak)
 - **Symptom:** Two files (`nodes/musicgen_theme.py`, `nodes/batch_audiogen_generator.py`) had identical structural bugs in their cache logic. `_cache_key()` returned a filename with the *current* millisecond timestamp baked in (`<role>_<sha8>_<ts_ms>.wav`). The call site immediately checked `os.path.exists(cache_path)` against that exact path — which never existed because the timestamp was "now". Result: cache miss every single run, ~22s of wasted MusicGen rendering per episode + N seconds of wasted AudioGen rendering per SFX cue, AND a Rule C7 violation because each run wrote a different timestamped filename, and FFmpeg embeds input WAV filenames in MP4 metadata streams → final mp4 bytes drifted between identical-input runs.

@@ -41,10 +41,24 @@ log = logging.getLogger("OTR")
 # Constants
 # ---------------------------------------------------------------------------
 
-CURRENT_SCHEMA_VERSION = "l3-2026-04-28"
+CURRENT_SCHEMA_VERSION = "l3-2026-05-02"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
-date suffix so the lineage is greppable."""
+date suffix so the lineage is greppable.
+
+Lineage:
+  l1-2026-04-24 -- baseline (cast, scenes, shots, lines, sfx, music, clips)
+  l2-2026-04-25 -- adds beats[] hierarchy
+  l3-2026-04-28 -- diagnostic expansion (meta.phase_ms, audio_gates,
+                   text_for_tts, bark_render_ms, warmup_pad_ms,
+                   transitions, radio_bookend_path)
+  l3-2026-05-02 -- ADDITIVE: meta.paths block resolved at write time so
+                   downstream nodes can look up canonical episode dirs
+                   without reconstructing them from episode_id (Phase E,
+                   BUG-LOCAL-018). All readers must continue to use
+                   meta.get(...) with default-None to stay back-compat
+                   with l3-2026-04-28 ledgers.
+"""
 
 GATE_HASH_BYTES = 1024
 """How many leading bytes of a master audio waveform to feed into
@@ -77,13 +91,86 @@ def load_ledger_safe(path: Path) -> Optional[dict]:
         return None
 
 
-def save_ledger_safe(path: Path, ledger: dict) -> bool:
-    """Write a ledger dict back to disk with schema_version stamped.
+def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
+    """Resolve the canonical absolute paths for this episode's per-dir
+    workspace, derived from the on-disk ledger location.
 
-    Always sets ``ledger["schema_version"]`` and
-    ``ledger.setdefault("meta", {})["schema_version"]`` to
-    ``CURRENT_SCHEMA_VERSION`` so any node that touches the ledger
-    keeps the version field current.
+    Layout (post 2026-05-02 EVENING reorg):
+        output/otr/
+          obs/
+            <episode_id>.mp4
+          episodes/
+            <episode_id>/
+              audio/<episode_id>_ledger.json
+              stills/
+              portraits/
+              videos/
+              composited/
+
+    Detects layout by checking if the ledger sits two levels under a
+    directory literally named "episodes". When detected, returns a fully
+    populated paths block with absolute paths for every per-episode
+    subdir + the OBS final mp4. When not detected (legacy flat layout
+    or test fixtures with arbitrary parents), returns a minimal block
+    with just episode_root and audio_dir resolved from the ledger
+    location -- no fabricated subdirs.
+
+    BUG-LOCAL-018 (Phase E, 2026-05-02): adding this block lets
+    downstream nodes look up canonical paths via
+    ``ledger["meta"]["paths"]["audio_dir"]`` instead of reconstructing
+    them from episode_id (which would re-introduce the slug-mismatch
+    risk Phase C closed). All readers must use ``.get(...)`` with
+    default-None for back-compat with older ledgers that lack this
+    block.
+    """
+    ledger_path = Path(ledger_path).resolve()
+    audio_dir = ledger_path.parent
+    ep_dir = audio_dir.parent
+
+    paths: dict = {
+        "ledger_path": str(ledger_path),
+        "episode_root": str(ep_dir),
+        "audio_dir": str(audio_dir),
+    }
+
+    # Per-episode workspace layout detection: ep_dir's parent must be
+    # named "episodes" (case-insensitive on Windows but stored as-is).
+    parent_of_ep = ep_dir.parent
+    if parent_of_ep.name.lower() == "episodes":
+        paths["stills_dir"] = str(ep_dir / "stills")
+        paths["portraits_dir"] = str(ep_dir / "portraits")
+        paths["videos_dir"] = str(ep_dir / "videos")
+        paths["composited_dir"] = str(ep_dir / "composited")
+        # OBS final lives at output/otr/obs/<ep>.mp4 -- a sibling of
+        # episodes/, NOT a child. Only stamp it if the grandparent of
+        # ep_dir has a sibling named "obs"; otherwise omit (we don't
+        # fabricate a path that may not exist).
+        otr_root = parent_of_ep.parent
+        obs_root = otr_root / "obs"
+        if otr_root.name.lower() == "otr":
+            paths["obs_final"] = str(obs_root / f"{episode_id}.mp4")
+            paths["obs_dir"] = str(obs_root)
+        paths["layout"] = "per-episode-workspace"
+    else:
+        paths["layout"] = "legacy-flat"
+
+    return paths
+
+
+def save_ledger_safe(path: Path, ledger: dict) -> bool:
+    """Write a ledger dict back to disk with schema_version + meta.paths
+    stamped.
+
+    Always sets:
+      - ``ledger["schema_version"]``
+      - ``ledger["meta"]["schema_version"]``
+      - ``ledger["meta"]["paths"]``  (BUG-LOCAL-018, Phase E)
+
+    The ``meta.paths`` block is resolved fresh on every save from the
+    actual on-disk ``path`` argument. This makes it self-correcting --
+    if the per-episode dir was renamed mid-pipeline (Phase B
+    rename_episode), the next ledger save reflects the new location
+    without any caller having to update it explicitly.
 
     Returns True on success, False on failure (always logs WARNING).
     """
@@ -91,6 +178,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
         ledger["schema_version"] = CURRENT_SCHEMA_VERSION
         meta = ledger.setdefault("meta", {})
         meta["schema_version"] = CURRENT_SCHEMA_VERSION
+        episode_id = ledger.get("episode_id") or ""
+        meta["paths"] = _build_meta_paths(Path(path), str(episode_id))
         Path(path).write_text(
             json.dumps(ledger, indent=2, ensure_ascii=False),
             encoding="utf-8",

@@ -220,7 +220,7 @@ class Ledger:
         SCHEMA_VERSION = _OTRL_FOR_SCHEMA.CURRENT_SCHEMA_VERSION
         del _OTRL_FOR_SCHEMA
     except Exception:  # pragma: no cover -- defensive fallback
-        SCHEMA_VERSION = "l3-2026-04-28"
+        SCHEMA_VERSION = "l3-2026-05-02"
 
     def __init__(self, episode_id: str, out_dir: str):
         self.episode_id = episode_id
@@ -711,6 +711,26 @@ class Ledger:
             # on-disk version. Per-row merge is keyed by line_id /
             # cue_id so audio-node row updates survive.
             merged = self._merge_with_disk(dict(self.data), path)
+
+            # BUG-LOCAL-018 (Phase E, 2026-05-02): stamp meta.paths block
+            # so downstream nodes can look up canonical episode dirs
+            # without reconstructing them from episode_id. Resolved
+            # fresh on every save from the actual on-disk path -- so if
+            # rename_episode (Phase B) moved the per-episode dir between
+            # saves, this picks up the new location automatically.
+            try:
+                from pathlib import Path as _Path
+                from . import _otr_ledger as _OTRL_PATHS  # type: ignore
+                _meta = merged.setdefault("meta", {})
+                _meta["paths"] = _OTRL_PATHS._build_meta_paths(
+                    _Path(path), str(self.episode_id)
+                )
+                _meta["schema_version"] = _OTRL_PATHS.CURRENT_SCHEMA_VERSION
+                merged["schema_version"] = _OTRL_PATHS.CURRENT_SCHEMA_VERSION
+            except Exception as exc:  # noqa: BLE001
+                # Best-effort: a meta-stamping failure must NEVER break
+                # the actual ledger write.
+                log.warning("[Ledger] meta.paths stamp failed: %s", exc)
 
             # Atomic write: temp file + replace
             tmp = path + ".tmp"
