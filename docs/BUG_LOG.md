@@ -3,6 +3,22 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-016 [FIXED]: Filename pattern audit — slug-reconstruction regression guard
+- **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after end-of-stack soak)
+- **Symptom:** No active bug — this is a regression guard. The QA pass (`docs/2026-05-02-rtx-upscale-qa-pass.md` Phase C) prescribed an audit of all `nodes/` files for the dangerous anti-pattern: code constructing `f"{ep_id}_..."` to *find* or *delete* a file on disk. The actual on-disk filenames for cache files (musicgen, audiogen wavs) follow the format `<role>_<sha>_<ts>.wav` — produced by the writer, indexed by sha. Slug-reconstruction-for-discovery breaks every time the producer's naming convention diverges from the slug.
+- **Cause:** Phase A and Phase B already absorbed the live instances of this anti-pattern (rtx_upscale spacesaver and production_ledger sidecar rename now use `audio_dir.glob(...)`). What remained was the risk of *future* drift — someone reintroducing slug reconstruction in a discovery path without realizing the cache filenames don't match the slug.
+- **Fix:** Audit complete (0 substantive code changes). The remaining `f"{ep_id}.mp4"` and similar usages in the codebase are all canonical writer/reader pairs sharing a contract by construction (RTXUpscale OBS-existence guard ↔ VideoComposite mp4 writer; Ledger class authoring `<ep>_ledger.json`). New regression test `tests/test_filename_pattern_audit.py` codifies the rule:
+  - **`test_no_audio_cache_slug_reconstruction`** — static-analyzes all `nodes/*.py` for banned patterns: `audio_dir / f"opening_{ep_id}.wav"`, `audio_dir / f"sfx_{ep_id}_..."`, etc. Will fail loudly on any future drift.
+  - **`test_destructive_paths_use_glob_not_reconstruction`** — positive assertion that the rtx_upscale spacesaver (Phase A) and ledger sidecar rename (Phase B) still use glob discovery; if a refactor accidentally replaces `audio_dir.glob("*_treatment.txt")` with slug reconstruction, this test catches it.
+  - **`test_allowlist_entries_still_present`** — every entry in the test's ALLOWLIST (legit canonical writer/reader pairs) must still resolve to a real source line. Stale entries surface for pruning instead of silently shielding future drift.
+- **Verify:**
+  - 3/3 audit tests pass in 1.60s.
+  - Combined regression: **191 passed / 1 skipped / 2 xfailed in 98.00s** (Bug Bible 23 + dropdown_guardrails+core 155 + ledger_rename 10 + filename_pattern_audit 3).
+- **Tags:** audit, regression-guard, slug-reconstruction, qa-pass-2026-05-02, no-active-bug
+- **Consult sources:** `docs/2026-05-02-rtx-upscale-qa-pass.md` (Phase C section, table of canonical writers/lookups). No round-robin needed — mechanical audit, no determinism implications.
+
+---
+
 ### BUG-LOCAL-015 [FIXED]: production_ledger treatment rename gap + os.replace silent split state
 - **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after real two-episode soak run with Phase A)
 - **Symptom:** Two adjacent bugs in `Ledger.rename_episode` (`nodes/production_ledger.py`):
