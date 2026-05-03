@@ -3,7 +3,7 @@
 **Branch:** `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
 **Date:** 2026-05-02
-**Status:** Phase A diff drafted; Phases B–E pending
+**Status:** Phases A–E shipped 2026-05-02. End-of-stack soak pending. Bible promotion for BUG-LOCAL-014/015/016/017/018 awaits soak.
 **Scope:** Findings 1–7 from the `rtx_upscale.py` review. Non-Sprint-1 hygiene track. Becomes load-bearing the moment two episodes are ever in flight (soak runs, Sprint 3 acceptance, any successor to `supersoaker`).
 
 ---
