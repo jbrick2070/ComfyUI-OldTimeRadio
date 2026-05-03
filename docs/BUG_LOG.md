@@ -210,6 +210,30 @@ Resolver test (offline, against the live-run cached ledger) confirms all 4 branc
 
 **Companion artifact: `workflows/otr_ltx_smoke.json`** -- a 5-node fast-smoke harness (LowVRAMCheckpointLoader -> OTR_BatchLTXRender -> OTR_VideoComposite -> OTR_RTXUpscale + Note) that consumes the cached ledger.json + procgen mp4 + 4 HuMo character clips from the live run. ledger_json widgets on both BatchLTXRender + VideoComposite are the .mp4 PATH so the smoke truly repros the BUG-LOCAL-011 crash surface (i.e. exercises the .mp4 -> _ledger.json stem-swap chain). Wallclock target ~10 min vs ~60 min for full pipeline. Re-aim at a different episode by swapping the PROCGEN_MP4 + HUMO_VIDEOS_DIR widget values; both must come from the same episode_id so LTX writes into the dir HuMo wrote into.
 
+### Path consolidation (Jeffrey directive, 2026-05-02 EVENING after first end-to-end smoke landed)
+
+- **Date:** 2026-05-02 EVENING | **Phase:** post-smoke cleanup | **Bible candidate:** no (project-specific layout)
+- **Change:** Final episode mp4 deliverables moved from `<output>/episodes_for_obs/<ep>/` (sibling of otr/) to `<output>/otr/episodes/<ep>/` (nested INSIDE otr/). Every project output now lives under one tidy `otr/` umbrella:
+  - `otr/audio/<ep>.mp4` -- procgen mp4 + ledger.json
+  - `otr/stills/` -- FLUX bookends + cast environments
+  - `otr/portraits/` -- PASS1 character portraits
+  - `otr/videos/<ep>/<line_id>.mp4` -- per-line HuMo + LTX clip pieces
+  - **NEW: `otr/episodes/<ep>/<ep>.mp4` and `<ep>_1080p.mp4` -- final user-facing deliverables ONLY**
+- **Why:** OBS's directory_sorter still gets a clean root with only finished episodes (now `output/otr/episodes/`), but the entire project workspace has one nested root instead of two siblings (`otr/` + `episodes_for_obs/`). Easier mental model + easier to back up + easier to scrub.
+- **Files touched:**
+  - `nodes/_otr_paths.py::episodes_for_obs_dir` -- function name kept for back-compat with existing imports; return value changed to `comfy_output_dir() / "otr" / "episodes" / episode_id`.
+  - `nodes/video_composite.py` -- comment block updated.
+  - `scripts/render_episode_concat.py` -- comment + default `out_dir` expression updated.
+  - `tests/test_render_episode_concat_discovery.py` -- pinned source-string assertion updated to require `"otr" / "episodes" / episode_id`.
+- **OBS pointer change:** if you have OBS / external tooling configured to watch `output/episodes_for_obs/`, repoint it to `output/otr/episodes/`.
+
+### Cleanup: torch.from_numpy non-writable warning in OTR_RTXUpscale (2026-05-02 EVENING)
+
+- **Date:** 2026-05-02 EVENING | **Phase:** post-smoke cleanup | **Bible candidate:** no (cosmetic)
+- **Symptom:** First successful smoke surfaced `UserWarning: The given NumPy array is not writable, and PyTorch...` at `rtx_upscale.py:216`.
+- **Cause:** `np.frombuffer(chunk_bytes, dtype=np.uint8)` returns a view over an immutable bytes buffer; `torch.from_numpy` warns when handed a non-writable ndarray.
+- **Fix:** Added `.copy()` after `np.frombuffer()` so torch gets a writable buffer. Also confirms a clean ownership boundary between the ffmpeg-stdout-bytes and the cuda transfer.
+
 ### BUG-LOCAL-013 [FIXED]: LTX 2B v0.9 bundled checkpoint has no CLIP/T5 -- LowVRAMCheckpointLoader returns CLIP=None -> NoneType.tokenize crash
 
 - **Date:** 2026-05-02 EVENING (T+~30 min after smoke load) | **Phase:** S3 fast-smoke first execution | **Bible candidate:** yes

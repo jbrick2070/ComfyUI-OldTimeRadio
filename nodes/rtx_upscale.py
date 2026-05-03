@@ -207,7 +207,12 @@ def _chunked_upscale(
                 buffer = buffer[whole_frames * src_frame_bytes:]
 
                 # Reshape to [N, H, W, 3] uint8.
-                arr = np.frombuffer(chunk_bytes, dtype=np.uint8)
+                # np.frombuffer returns a non-writable array (it's a view
+                # over the immutable bytes buffer). torch.from_numpy on a
+                # non-writable ndarray emits UserWarning. Copy to silence
+                # the warning AND to give torch a writable buffer it can
+                # safely transfer to CUDA.
+                arr = np.frombuffer(chunk_bytes, dtype=np.uint8).copy()
                 arr = arr.reshape((whole_frames, src_h, src_w, 3))
 
                 # Per-frame upscale via nvvfx (matches the upstream

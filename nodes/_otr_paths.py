@@ -182,13 +182,26 @@ def otr_videos_dir(episode_id: str) -> Path:
 
 
 def episodes_for_obs_dir(episode_id: str) -> Path:
-    """OBS broadcast tree, sibling of ``otr/`` (BUG-LOCAL-084).
+    """Final-episode deliverable dir, nested INSIDE the otr/ tree.
 
-    Final composited episode mp4 + .vtt sidecar live here so OBS's
-    directory_sorter can point at ``output/episodes_for_obs/`` and
-    only see finished episodes -- never the per-line HuMo clip pieces.
+    Path: ``<output>/otr/episodes/<episode_id>/``
+
+    Holds ONLY the user-facing final mp4(s) -- the composited 832x480
+    output from VideoComposite and the upscaled 1080p output from
+    OTR_RTXUpscale. The piece-level per-line clips stay under
+    ``<output>/otr/videos/<episode_id>/`` (see ``otr_videos_dir``).
+
+    History (kept here as the canonical change-log for this path):
+      - Originally lived at ``<output>/episodes_for_obs/<episode_id>/``,
+        a sibling of ``otr/`` (BUG-LOCAL-084 era), so OBS's
+        directory_sorter could point at one root and only see finished
+        episodes.
+      - 2026-05-02 EVENING (Jeffrey directive after first end-to-end
+        smoke succeeded): consolidate every project output under the
+        ``otr/`` umbrella so the workspace has one tidy root. OBS
+        config should now point at ``output/otr/episodes/`` instead.
     """
-    return comfy_output_dir() / "episodes_for_obs" / episode_id
+    return comfy_output_dir() / "otr" / "episodes" / episode_id
 
 
 def director_raw_dump_dir() -> Path:

@@ -1302,11 +1302,15 @@ class VideoComposite:
         episode_id = ledger.get("episode_id", "episode")
 
         # ---- Resolve output_dir (broadcast tree, OBS-safe) ----
-        # output_dir = ComfyUI/output/episodes_for_obs/<episode_id>/
-        # Sibling of output/otr/ (NOT a child) so OBS's directory_sorter
-        # can point at output/episodes_for_obs/ and only see finished
-        # episodes -- never the per-line HuMo clip pieces under
-        # output/otr/videos/<ep_id>/.
+        # output_dir = ComfyUI/output/otr/episodes/<episode_id>/
+        # Nested INSIDE the otr/ tree (path consolidation 2026-05-02
+        # EVENING). OBS's directory_sorter points at
+        # output/otr/episodes/ and sees only finished episodes -- the
+        # per-line HuMo + LTX clip pieces stay at
+        # output/otr/videos/<ep_id>/. Originally lived at
+        # output/episodes_for_obs/<id>/ as a sibling of otr/
+        # (BUG-LOCAL-084 era); moved under otr/ so the entire project
+        # output tree has one tidy root.
         out_dir = episodes_for_obs_dir(episode_id)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / f"{episode_id}.mp4"
