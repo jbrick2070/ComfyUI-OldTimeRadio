@@ -841,16 +841,22 @@ class BatchHumoRender:
                 "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 20.0, "step": 0.1}),
                 "sampler_name": (samplers, {"default": "uni_pc"}),
                 "scheduler": (schedulers, {"default": "simple"}),
-                # 2026-05-03 EVENING (BUG-LOCAL-030, Jeffrey final spec):
-                # render at 1280x720 LANDSCAPE @ 25 FPS (highest official
-                # trained HuMo resolution per Jeffrey's research). Composite
-                # then crops a 512x832 vertical center pillar from the
-                # scaled-up frame. Higher source detail than the prior
-                # 480x832 portrait default; ~2.3x more pixels per frame.
-                # If VRAM gets tight on 16 GB, fall back to 832x480 (Jeffrey
-                # documented fallback).
-                "width": ("INT", {"default": 1280, "min": 256, "max": 1280, "step": 8}),
-                "height": ("INT", {"default": 720, "min": 256, "max": 1280, "step": 8}),
+                # 2026-05-03 EVENING (BUG-LOCAL-030 revised spec):
+                # render at 480x832 PORTRAIT @ 25 FPS -- the canonical
+                # Wan2.1-HuMo-14B trained dim per ROADMAP "Stable shape:
+                # length=97 (3.88 s @ 25 fps), 480x832, batch=1". An
+                # earlier revision attempted 1280x720 landscape for face
+                # detail but Jeffrey reverted to native ("humo native
+                # portrait render then native scaled to 1472x832 with
+                # black pillaboxes") -- staying inside the trained range
+                # avoids OOD lipsync drift + ~2.3x VRAM overhead.
+                # VideoComposite pillarboxes to 1472x832 canvas with
+                # ~496px black bars per side; the post-RTXUpscale procgen
+                # blend (Phase B) fills those bars with audio-reactive
+                # CRT scanlines so the visible black surround becomes
+                # part of the SIGNAL LOST visual signature.
+                "width": ("INT", {"default": 480, "min": 256, "max": 1280, "step": 8}),
+                "height": ("INT", {"default": 832, "min": 256, "max": 1280, "step": 8}),
             },
             "optional": {
                 # BUG-LOCAL-086: dependency-only gate input. Wire any

@@ -645,9 +645,20 @@ def _layered_per_clip_silent(
             str(out_path),
         ]
     else:
+        # BUG-LOCAL-030 revised spec (2026-05-03 EVENING): scale-FIT
+        # (preserve aspect ratio, no crop) + pad with black to canvas
+        # dims. Per Jeffrey: "humo native portrait render then native
+        # scaled to 1472x832 (black pillaboxes)" -- HuMo content stays
+        # at native quality, surrounding void is BLACK BARS, and the
+        # post-RTXUpscale procgen blend (Phase B) fills those bars
+        # with audio-reactive CRT scanlines. LTX native landscape
+        # (832x480) gets scale-fit too: scale to height=832 = 1442x832,
+        # pad to 1472x832 = ~15px black per side (effectively full
+        # canvas with hairline bars).
         vf = (
-            f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
-            f"crop={canvas_w}:{canvas_h},fps={canvas_fps}"
+            f"scale=-2:{canvas_h}:force_original_aspect_ratio=decrease,"
+            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"fps={canvas_fps}"
         )
         if extend_tail_s > 0.0:
             vf = f"{vf},tpad=stop_mode=clone:stop_duration={extend_tail_s:.3f}"
@@ -891,34 +902,31 @@ def _render_master_mix_per_clip_mux_mode(
     seg_dir = out_mp4.parent / "_per_clip_mux_segments"
     seg_dir.mkdir(parents=True, exist_ok=True)
 
-    # BUG-LOCAL-030 (2026-05-03 EVENING): resolve the universal HuMo
-    # backdrop ONCE per episode. ``out_mp4`` lives at
-    # ``<ep>/composited/<ep>.mp4`` so ``out_mp4.parent.parent`` is the
-    # per-episode workspace root. The resolver picks the freshest FLUX
-    # env still, then radio bookend, then None (caller falls back to
-    # plain canvas-fill on black for the layered helper).
-    episode_dir = out_mp4.parent.parent
-    background_png = _resolve_episode_background(episode_dir)
-    if background_png is not None:
-        log.info(
-            "[VideoComposite/per_clip_mux] BUG-030 layered composite: "
-            "HuMo character backdrop = %s",
-            background_png.name,
-        )
-        report.append(
-            f"per_clip_mux: layered backdrop = {background_png.name}"
-        )
-    else:
-        log.warning(
-            "[VideoComposite/per_clip_mux] BUG-030 layered composite: "
-            "no FLUX env still or radio bookend found in %s/stills -- "
-            "HuMo character clips will fall back to plain canvas-fill "
-            "(no layered backdrop)",
-            episode_dir,
-        )
-        report.append(
-            "per_clip_mux: layered backdrop = NONE (HuMo will canvas-fill)"
-        )
+    # BUG-LOCAL-030 revised spec (2026-05-03 EVENING): NO env-still
+    # backdrop in this Phase. Per Jeffrey's revised wording -- "humo
+    # native portrait render then native scaled to 1472x832 (black
+    # pillaboxes)" -- HuMo character clips render with BLACK bars on
+    # each side, NOT layered onto a FLUX env still. The post-RTXUpscale
+    # procgen blend (Phase B, separate commit) fills those black bars
+    # with audio-reactive CRT scanlines so the visible black surround
+    # becomes part of the SIGNAL LOST visual signature instead of
+    # boring void.
+    #
+    # The ``_resolve_episode_background`` helper + ``_layered_per_clip_silent``
+    # layered branch are kept in the codebase (with their own tests) for
+    # future use cases where a static backdrop layer IS desired -- but
+    # the current Phase A renderer always passes ``background_png=None``
+    # so the layered helper falls into its scale-fit + pad-with-black
+    # branch.
+    background_png = None
+    log.info(
+        "[VideoComposite/per_clip_mux] BUG-030 simple-pillarbox mode: "
+        "HuMo + LTX clips scale-fit into 1472x832 with black pillarbox "
+        "bars; procgen visual fill is Phase B (post-RTXUpscale blend)"
+    )
+    report.append(
+        "per_clip_mux: simple-pillarbox mode (HuMo native + black bars)"
+    )
 
     pillarboxed: list[Path] = []
     pb_failures = 0

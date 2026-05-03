@@ -135,7 +135,12 @@ def test_character_clip_with_background_uses_filter_complex(tmp_path):
     assert cmd[map_idx + 1] == "[v]"
 
 
-def test_announcer_clip_uses_simple_scale_crop(tmp_path):
+def test_announcer_clip_uses_scale_fit_pad_with_black(tmp_path):
+    """BUG-LOCAL-030 revised spec: non-character clips (LTX) get
+    scale-fit + pad-with-black, NOT scale-cover + crop. This preserves
+    the source's aspect ratio (no content lost to crop) and pads the
+    canvas void with black -- which the post-RTXUpscale procgen blend
+    (Phase B) fills with audio-reactive CRT scanlines."""
     VC = _import_vc()
     clip = tmp_path / "l001.mp4"
     clip.write_bytes(b"clip")
@@ -150,19 +155,24 @@ def test_announcer_clip_uses_simple_scale_crop(tmp_path):
             out_path=out, ffmpeg="ffmpeg",
         )
     cmd = captured["cmd"]
-    # Single-source fill path uses -vf, NOT -filter_complex
     assert "-vf" in cmd, f"non-character path uses -vf; got {cmd}"
     assert "-filter_complex" not in cmd, "non-character must not use -filter_complex"
     vf_idx = cmd.index("-vf")
     vf = cmd[vf_idx + 1]
-    assert "scale=1472:832:force_original_aspect_ratio=increase" in vf, vf
-    assert "crop=1472:832" in vf, vf
+    assert "scale=-2:832:force_original_aspect_ratio=decrease" in vf, vf
+    assert "pad=1472:832:" in vf, vf
+    assert "color=black" in vf, vf
+    # Crop is NOT used in revised simple-pillarbox path.
+    assert "crop=" not in vf, f"revised path must NOT crop; got {vf}"
     assert "-an" in cmd
 
 
-def test_character_with_no_background_falls_back_to_simple_fill(tmp_path):
-    """If a character clip has no backdrop available, gracefully degrade
-    to the simple canvas-fill so the timeline still renders."""
+def test_character_with_no_background_uses_pad_with_black_pillarbox(tmp_path):
+    """BUG-LOCAL-030 revised spec: HuMo character clip with no backdrop
+    available scale-fits into the canvas with BLACK pillarbox bars on
+    each side (the canonical Phase A behavior per Jeffrey's wording).
+    HuMo native 480x832 -> scale to height 832 (no scale, native) ->
+    pad to 1472x832 with ~496px black per side."""
     VC = _import_vc()
     clip = tmp_path / "l003.mp4"
     clip.write_bytes(b"clip")
@@ -178,9 +188,14 @@ def test_character_with_no_background_falls_back_to_simple_fill(tmp_path):
         )
     cmd = captured["cmd"]
     assert "-filter_complex" not in cmd, (
-        "character + no bg must fall back to simple -vf fill"
+        "character + no bg must fall back to simple -vf scale-fit-pad"
     )
     assert "-vf" in cmd
+    vf = cmd[cmd.index("-vf") + 1]
+    assert "scale=-2:832:force_original_aspect_ratio=decrease" in vf
+    assert "pad=1472:832:" in vf
+    assert "color=black" in vf
+    assert "crop=" not in vf
 
 
 def test_extend_tail_appended_to_layered_chain(tmp_path):
@@ -241,28 +256,35 @@ def test_video_composite_input_types_have_new_defaults():
     assert opt["humo_pillar_width"][1]["default"] == 512
 
 
-def test_humo_render_widget_defaults_are_landscape():
-    """BatchHumoRender INPUT_TYPES width=1280, height=720 per BUG-030 spec."""
+def test_humo_render_widget_defaults_are_native_portrait():
+    """BUG-LOCAL-030 revised spec: HuMo stays at native 480x832 portrait
+    (the trained Wan2.1-HuMo-14B dim per ROADMAP). An earlier draft of
+    the spec attempted 1280x720 landscape; Jeffrey reverted to native
+    in the revised spec ("humo native portrait render then native
+    scaled to 1472x832 with black pillaboxes")."""
     src = (_REPO_ROOT / "nodes" / "batch_humo_render.py").read_text(encoding="utf-8")
     import re
     w = re.search(r'"width":\s*\("INT",\s*\{"default":\s*(\d+)', src)
     h = re.search(r'"height":\s*\("INT",\s*\{"default":\s*(\d+)', src)
-    assert w and w.group(1) == "1280", f"expected width=1280, got {w.group(1) if w else None}"
-    assert h and h.group(1) == "720", f"expected height=720, got {h.group(1) if h else None}"
+    assert w and w.group(1) == "480", f"expected width=480, got {w.group(1) if w else None}"
+    assert h and h.group(1) == "832", f"expected height=832, got {h.group(1) if h else None}"
 
 
 def test_ltx_render_constants_match_spec():
-    """LTX_WIDTH=1216, LTX_HEIGHT=704, LTX_FPS=25 per BUG-030 spec.
+    """BUG-LOCAL-030 revised spec: LTX stays at native 832x480 landscape
+    (LTX_FPS=25). An earlier draft attempted 1216x704 for higher detail;
+    Jeffrey reverted to native ("ltx native landscape render downscaled
+    to 1472x832").
 
-    Reads via file parse instead of `import nodes.batch_ltx_render` because
-    that module pulls in `folder_paths` (a ComfyUI-runtime-only module not
-    available in the bare pytest environment).
+    Reads via file parse instead of ``import nodes.batch_ltx_render``
+    because that module pulls in ``folder_paths`` (a ComfyUI-runtime-only
+    module not available in the bare pytest environment).
     """
     import re
     src = (_REPO_ROOT / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
     w = re.search(r'^LTX_WIDTH\s*=\s*(\d+)', src, re.MULTILINE)
     h = re.search(r'^LTX_HEIGHT\s*=\s*(\d+)', src, re.MULTILINE)
     f = re.search(r'^LTX_FPS\s*=\s*(\d+)', src, re.MULTILINE)
-    assert w and w.group(1) == "1216", f"expected LTX_WIDTH=1216, got {w.group(1) if w else None}"
-    assert h and h.group(1) == "704", f"expected LTX_HEIGHT=704, got {h.group(1) if h else None}"
+    assert w and w.group(1) == "832", f"expected LTX_WIDTH=832, got {w.group(1) if w else None}"
+    assert h and h.group(1) == "480", f"expected LTX_HEIGHT=480, got {h.group(1) if h else None}"
     assert f and f.group(1) == "25", f"expected LTX_FPS=25, got {f.group(1) if f else None}"

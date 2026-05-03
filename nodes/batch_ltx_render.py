@@ -113,14 +113,17 @@ LTX_TEMPORAL_OVERLAP = 8
 # 480p native -- LTX 2B optimal resolution. Width chosen to match
 # HuMo's 832 (so VideoComposite pillarbox math is identical for both
 # clip sources).
-# 2026-05-03 EVENING (BUG-LOCAL-030, Jeffrey final spec): bumped LTX render
-# from 832x480 to 1216x704 (preferred higher-detail per Jeffrey's research --
-# divisible by 32, Comfy-friendly, native to newer LTX-2.x distilled models).
-# Reliable fallback 1024x576; safest classic fallback 768x512. After Phase A
-# layered composite, LTX scaled-cropped to fill 1472x832 background --
-# 1216x704 -> ~1.21x scale up, much milder than the prior 1.73x from 832x480.
-LTX_WIDTH = 1216
-LTX_HEIGHT = 704
+# 2026-05-03 EVENING (BUG-LOCAL-030 revised spec): kept LTX at native
+# 832x480 landscape per Jeffrey's revised wording ("ltx native landscape
+# render downscaled to 1472x832"). An earlier revision bumped to
+# 1216x704 for higher pre-upscale detail, but Jeffrey reverted to
+# "native" twice -- safer trained-distribution default. VideoComposite
+# pillarboxes to the 1472x832 canvas: 832x480 -> scale to height 832 =
+# 1442x832 -> pad to 1472x832 with ~15px black per side. Final
+# RTXUpscale 1472x832 -> 1920x1080 then post-upscale procgen blend
+# (Phase B) for the SIGNAL LOST CRT signature.
+LTX_WIDTH = 832
+LTX_HEIGHT = 480
 
 # Distilled sigma schedule from Jeffrey's ComfyUI-Goofer, proven on
 # RTX 5080 Blackwell. 8 sampling steps, last sigma 0.0 = full denoise.
