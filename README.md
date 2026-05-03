@@ -264,6 +264,64 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 
 ---
 
+## Output Layout
+
+Every project output nests under one tidy `output/otr/` umbrella. Final user-facing deliverables sit in `otr/episodes/`; intermediate work files (audio, stills, portraits, per-line clip pieces, QA dumps) live in their own subfolders next to it. Resolved by `nodes/_otr_paths.py` so every node writes through one set of helpers.
+
+```
+ComfyUI/
+└── output/                                # ComfyUI base output dir
+    └── otr/                               # ALL OldTimeRadio outputs nested here
+        │
+        ├── episodes/                      # ★ FINAL DELIVERABLES (point OBS here)
+        │   └── <episode_id>/
+        │       ├── <episode_id>.mp4              # 832x480 composited
+        │       └── <episode_id>_1080p.mp4        # RTX VSR upscaled
+        │
+        ├── audio/                         # Procgen mp4 + ledger + audio cache
+        │   ├── <episode_id>.mp4                  # SignalLostVideo procgen base
+        │   ├── <episode_id>_ledger.json          # Production ledger (l3 schema)
+        │   ├── pending_*_ledger.json             # In-flight ledger (LLM phase)
+        │   ├── musicgen_cue_<sha>.wav            # MusicGen cache (theme stems)
+        │   ├── audiogen_<sha>.wav                # AudioGen cache (SFX stems)
+        │   └── director_dump_<ts>.txt            # LLMDirector raw dumps (BUG-090)
+        │
+        ├── stills/                        # FLUX environment + radio bookends
+        │   ├── full_env_NNNNN_.png               # Cast environment portraits
+        │   └── radio_bookend_<episode_id>.png    # 832x480 radio still (LTX I2V ref)
+        │
+        ├── portraits/                     # PASS1 character portraits
+        │   └── <character_name>.png
+        │
+        ├── videos/                        # ✂ PER-LINE PIECES (not final episodes)
+        │   └── <episode_id>/
+        │       ├── l002.mp4                      # HuMo character clip
+        │       ├── l003.mp4                      # HuMo character clip
+        │       ├── music_opening_001.mp4         # LTX music piece
+        │       ├── l001.mp4                      # LTX announcer piece
+        │       └── ...                           # one .mp4 per ledger.lines[]
+        │
+        ├── script_gates/                  # OTR_LLMScriptCritic dumps
+        │   └── script_critic_<ts>_<model>.md
+        │
+        ├── qa_frames/                     # QA frame samples (manual review)
+        ├── qa_waveforms/                  # QA waveform PNGs
+        └── vram_tests/                    # VRAMContextTest output (created on demand)
+```
+
+**Key invariants:**
+
+- **`otr/episodes/<ep>/`** holds ONLY the user-facing deliverables. Point OBS / external streaming tools here.
+- **`otr/videos/<ep>/`** holds the per-line clip *pieces* (HuMo character clips + LTX announcer / music / sfx clips). VideoComposite reads these and assembles the final `otr/episodes/<ep>/<ep>.mp4`.
+- **`otr/audio/<ep>_ledger.json`** is the canonical production ledger. Every node reads from + writes back to this single file.
+- **Path consolidation history:** through 2026-05-02 the final episode mp4 lived at `output/episodes_for_obs/<ep>/` (sibling of `otr/`). Moved under `otr/` after the first end-to-end Sprint 3 smoke landed clean.
+
+**Sibling directories created by other ComfyUI work** (NOT touched by OTR):
+- `output/old_time_radio/` — pre-BUG-079 legacy OTR audio (kept readable for back-compat ledger discovery)
+- `output/hyradio*/`, `output/hyworld_renders/`, `output/visual_renders/` — other custom-node packs
+
+---
+
 ## Node Reference
 
 NodeWhat It Does**1. LLM Story Writer**Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. **v1.5 Story Editor** critiques the outline before writing and generates per-act briefs that guide each act's dialogue. Open-Close expansion generates 3 competing 7-line micro-spines and picks the best. Arc Enhancer polishes opening/closing using act summaries + critique findings for start-to-end coherence. 12 dramatic story arc templates.**2. LLM Director**Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails.**3. Voice Maker Machine**Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated.**🎙️ Kokoro Announcer**Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends.**🎺 MusicGen Theme**Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations.**🔊 SFX Maker Machine (AudioGen**)Generates high-fidelity Foley sound effects from Director prompts using `facebook/audiogen-medium`, natively cached to save VRAM.**🔊 SFX Maker Machine (Procedural**)Zero-VRAM fallback generator for 4GB Obsidian users, synthesizing clean procedural effects without loading heavy audio models.**4. Scene Builder**Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in script order.**5. Make It Sound Awesome**Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization.**6. Glue Everything Together**Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration.**7. Make the Final Video**Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats.**v2.0 — Visual Drama Engine\[ALPHA — on** `v2.0-alpha` **branch\]8. Character Forge** `[v2.0]`Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes.**9. Scene Painter** `[v2.0]`Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation.**10. Visual Compositor** `[v2.0]`Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required.**11. Production Bus** `[v2.0]`FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track.
