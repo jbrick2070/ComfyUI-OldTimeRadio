@@ -92,8 +92,18 @@ def test_blend_cmd_uses_audio_passthrough(node, tmp_path):
     assert "all_opacity=0.500" in fc
 
 
-def test_blend_cmd_uses_shortest(node, tmp_path):
-    """-shortest prevents the procgen looping forever past source EOF."""
+def test_blend_cmd_does_NOT_use_shortest_for_c7_safety(node, tmp_path):
+    """BUG-LOCAL-030 C7 hardening (post-round-robin Gemini catch):
+    ``-shortest`` MUST NOT appear in the blend cmd. ffmpeg ``-shortest``
+    on an A/V mux stops writing audio when the shortest input ends --
+    if procgen is even 40ms shorter than source (likely from 24fps vs
+    25fps quantization), trailing audio gets truncated and Rule C7
+    byte-identity silently breaks.
+
+    Without ``-shortest``, framesync holds the last procgen frame as
+    the overlay continues; audio passes through via ``-c:a copy`` from
+    source until source EOF. Audio reaches full duration. C7 holds.
+    """
     src = tmp_path / "src.mp4"; src.write_bytes(b"x")
     pgn = tmp_path / "pgn.mp4"; pgn.write_bytes(b"x")
     captured, fake_run = _capture_run()
@@ -101,7 +111,18 @@ def test_blend_cmd_uses_shortest(node, tmp_path):
 
     with mock.patch.object(M.subprocess, "run", side_effect=fake_run):
         node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
-    assert "-shortest" in captured["cmd"]
+    cmd = captured["cmd"]
+    assert "-shortest" not in cmd, (
+        f"-shortest must NOT be present in PostUpscaleProcgenBlend cmd "
+        f"(C7 audio truncation risk per BUG-LOCAL-030 round-robin); got {cmd}"
+    )
+    # Audio MUST still be -c:a copy (passthrough, no re-encode).
+    assert "-c:a" in cmd
+    assert cmd[cmd.index("-c:a") + 1] == "copy"
+    # Source audio MUST still be mapped (-map "0:a?").
+    map_idx = [i for i, x in enumerate(cmd) if x == "-map"]
+    map_args = [cmd[i + 1] for i in map_idx]
+    assert "0:a?" in map_args, f"audio must still be mapped from source; got maps={map_args}"
 
 
 def test_bypass_mode_copies_source_to_output(node, tmp_path):

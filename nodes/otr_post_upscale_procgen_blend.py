@@ -83,6 +83,19 @@ def _build_blend_cmd(
         f"[0:v][pgn]blend=all_mode={blend_mode}:"
         f"all_opacity={blend_opacity:.3f}[v]"
     )
+    # BUG-LOCAL-030 C7 hardening (2026-05-03 EVENING, post-round-robin
+    # Gemini catch): NO ``-shortest`` flag here. ffmpeg ``-shortest`` on
+    # an A/V mux stops writing the audio stream as soon as the SHORTEST
+    # input ends -- which means if procgen is even 40ms shorter than
+    # source (likely from 24fps procgen vs 25fps source frame
+    # quantization on the same master_mix duration), the trailing audio
+    # gets truncated and Rule C7 byte-identity is silently broken.
+    #
+    # Without ``-shortest``, ffmpeg framesync defaults to holding the
+    # last procgen frame as the overlay continues; audio passes through
+    # via ``-c:a copy`` from source until source EOF. Result: visual
+    # may have a 40ms tail of held procgen frame (imperceptible);
+    # audio reaches the full source duration; C7 holds.
     return [
         ffmpeg, "-y", "-loglevel", "error",
         "-i", str(source_mp4),
@@ -92,7 +105,6 @@ def _build_blend_cmd(
         "-map", "0:a?",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
         "-c:a", "copy",
-        "-shortest",
         str(out_mp4),
     ]
 
