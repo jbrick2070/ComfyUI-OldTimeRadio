@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 57,
-  "last_link_id": 94,
+  "last_node_id": 58,
+  "last_link_id": 96,
   "nodes": [
     {
       "id": 1,
@@ -470,7 +470,8 @@
             79,
             80,
             82,
-            90
+            90,
+            96
           ],
           "slot_index": 0
         }
@@ -1741,7 +1742,10 @@
         {
           "name": "upscaled_mp4_path",
           "type": "STRING",
-          "links": []
+          "links": [
+            95
+          ],
+          "slot_index": 0
         },
         {
           "name": "report",
@@ -1802,6 +1806,70 @@
         "ltxv",
         "default"
       ]
+    },
+    {
+      "id": 58,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        4900,
+        1100
+      ],
+      "size": [
+        420,
+        260
+      ],
+      "flags": {},
+      "order": 9300,
+      "mode": 0,
+      "title": "Post-Upscale Procgen Blend (final 1080p)",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 95,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 96,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "lighten",
+        0.5,
+        "ffmpeg",
+        false,
+        "_procgen_blended"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
     }
   ],
   "links": [
@@ -2212,6 +2280,22 @@
       55,
       1,
       "CLIP"
+    ],
+    [
+      95,
+      56,
+      0,
+      58,
+      0,
+      "STRING"
+    ],
+    [
+      96,
+      12,
+      0,
+      58,
+      1,
+      "STRING"
     ]
   ],
   "groups": [],
