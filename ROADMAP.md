@@ -1,8 +1,62 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-02
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `03dfbfa` | **Last refactored:** 2026-05-03
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
+
+---
+
+## Status snapshot — 2026-05-03 (post BUG-026 hotfix)
+
+**Code work for the v2.0-alpha cycle is complete.** All 17 BUG-LOCAL entries below are `[FIXED]` in code and pushed to `origin/v2.0-alpha`. The remaining work is **a single real-run acceptance soak** — every fix has a code-side verification (AST, regression suites, targeted tests all green at 1150/8/1) but needs a clean end-to-end run on Jeffrey's RTX 5080 to confirm the live behavior.
+
+**Committed and pushed (in chronological order):**
+
+| Bug | Phase | Commit | What it fixed |
+|---|---|---|---|
+| 003 | Sprint 1 | (pre-QA-pass mega-commit) | `scripts/run_comfyui.cmd` reads HF_HOME from HKCU\Environment |
+| 004 | Sprint 1 | (same) | LLM script-writer OOM — `_flush_vram_keep_llm()` + `MAX_PARSE_RETRIES=2` |
+| 005 | Sprint 1 | (same) | 30-word preset CHARACTER:/SCENE: enforcement + ULTRA_SMOKE strict-VOICE parse |
+| 006 | Sprint 1 | (same) | `tests/conftest.py` CUDA mask; later promoted from `[PARTIAL]` to `[FIXED]` after re-verification |
+| 014 | A | `d2c2df8` | Spacesaver wrong-episode wipe via global mtime ledger scan |
+| 015 | B | `29295c9` | production_ledger treatment rename gap + os.replace silent split state |
+| 016 | C | `3e1d995` | Filename pattern audit — slug-reconstruction regression guard |
+| 017 | D | `e43695d` | MusicGen + AudioGen cache miss every run — `_cache_key` returned fresh ts |
+| 018 | E | `7c84ee8` | Ledger schema bump l3-2026-05-02 + meta.paths block |
+| 019 | (cleanup) | `ca85a01` | Sprint 1 full-suite acceptance — pre-existing test rot fixed |
+| 020 | G | `1fabd5c` | video_engine.py procgen mp4 written to legacy `output/otr/audio/` (SOAK BLOCKER from 2026-05-02 23:00 run) |
+| 021 | G | `1fabd5c` | Audio-side nodes used global mtime walker (latent BUG-LOCAL-014 wrong-episode shape in 7 sites) |
+| 022 | G | `1fabd5c` | BatchHumoRender stem-swap broken when `safe_title[:40]` truncates the title |
+| 023 | H | `5075b9e` | ANNOUNCER portrait wasted FLUX context + skewed scene composition |
+| 024 | H | `5075b9e` | Radio bookend FLUX prompt fell back to generic when style missing OR ledger stale |
+| 025 | H | `5075b9e` | LTX role prompts ignore story style + scene context (every episode looked the same) |
+| **026** | **G/H hotfix** | **`03dfbfa`** | **DIRECTOR_PROMPT.format crash from Phase H unescaped curly braces (caused soak crash 23:46)** |
+
+**Cumulative regression test count:** 1150 passed / 8 skipped / 1 xfailed in 131s (full `tests/` directory + Bug Bible regression).
+
+**Promotion to Bug Bible:** All 17 entries are Bible candidates. Promotion happens after the next real-run soak confirms behavior end-to-end.
+
+### What still needs Jeffrey's hands
+
+1. **Restart ComfyUI Desktop** so the `03dfbfa` code is loaded (custom node `.py` files are cached in `sys.modules`; mid-process changes don't hot-reload).
+2. **Re-queue with a richer episode title** than "Test" — give the LLM hook for character dialogue. The "Cold Circuit" run earlier today produced 7 lines + 3 chars cleanly. "Test" + scifi + short(3) reproducibly fails.
+3. **Tail the run** and confirm the Phase G/H signatures appear (see "Real-run acceptance signatures" section at the bottom of this file).
+4. **On a green soak,** promote all 17 BUG-LOCAL entries to the Bug Bible together.
+
+### Known remaining suspects (NOT blocking the soak — Phase H+ candidates)
+
+- `nodes/scene_sequencer.py:147` `DEFAULT_OUT = output/otr/audio` legacy default. Only matters if it's ever the actual write target.
+- `nodes/batch_humo_render.py:1773` uses `otr_legacy_audio_dir()` in the auto-pick fallback. Only fires when `ledger_json` input is empty.
+- `nodes/batch_ltx_render.py:300/846` use `otr_stills_dir()` / `otr_audio_dir()` with NO episode_id (returns legacy dirs).
+- `nodes/video_composite.py:282` legacy audio dir scan.
+- `nodes/story_orchestrator.py:6276` hardcoded `output/otr/audio/` path.
+- `nodes/post_audio_video_pipeline.py:126` empty-input fallback uses mtime walker (intentional for headless mode).
+
+These are documented in the Phase G consult (`docs/2026-05-03-phase-g-path-reorg-blast-radius__01_chatgpt.md` Section 3) and queued for a future pass.
+
+---
+
+## Original P0/P1/P2 sections below are NOW HISTORICAL — Sprint 1 is DONE
 
 **Canonical narrative hierarchy** — every ledger, workflow, and doc in this repo follows this:
 
