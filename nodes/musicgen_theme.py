@@ -80,7 +80,32 @@ CACHE_SUBDIR = "musicgen_cache"
 
 
 def _cache_dir() -> str:
-    """Return models/musicgen_cache, creating it if needed."""
+    """Per-episode MusicGen output dir.
+
+    Walks the in-flight ledger via ``find_most_recent_ledger`` to find the
+    current episode's ``otr/episodes/<ep>/audio/`` dir, then writes
+    MusicGen wavs alongside the ledger. Falls back to legacy
+    ``models/musicgen_cache/`` when no in-flight ledger is found (testing
+    or first-of-pipeline contexts).
+
+    Per Jeffrey directive 2026-05-02 EVENING: every per-episode asset
+    including MusicGen output lives in the per-episode workspace under
+    ``otr/episodes/<episode_id>/audio/``. SignalLostVideo's rename pass
+    moves the entire per-episode dir from ``pending_<ts>/`` to
+    ``<canonical_episode_id>/`` so the wavs travel with the rename.
+    """
+    try:
+        ledger_path = _OTRL_PATHS.find_most_recent_ledger(
+            [otr_episodes_root(), otr_legacy_audio_dir()]
+        )
+        if ledger_path is not None:
+            base = str(ledger_path.parent)
+            os.makedirs(base, exist_ok=True)
+            return base
+    except Exception as exc:
+        log.warning("[MusicGenTheme] per-episode cache_dir lookup failed: %s", exc)
+
+    # Legacy fallback: shared models/musicgen_cache/.
     try:
         import folder_paths
         base = os.path.join(folder_paths.models_dir, CACHE_SUBDIR)

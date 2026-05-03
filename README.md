@@ -280,10 +280,14 @@ ComfyUI/
         │
         └── episodes/                             # PER-EPISODE WORKSPACES
             └── <episode_id>/                     # everything for THIS episode lives here
-                ├── audio/                                # procgen + ledger + audio caches
+                ├── audio/                                # ledger + ALL audio assets
                 │   ├── <episode_id>.mp4                      # SignalLostVideo procgen base
                 │   ├── <episode_id>_ledger.json              # Production ledger (l3 schema)
                 │   ├── pending_*_ledger.json                 # In-flight (LLM phase, pre-rename)
+                │   ├── opening_<sha8>_<ts>.wav               # MusicGen opening theme
+                │   ├── closing_<sha8>_<ts>.wav               # MusicGen closing theme
+                │   ├── interstitial_<sha8>_<ts>.wav          # MusicGen interstitial
+                │   ├── sfx_<prompt>_<sha8>_<ts>.wav          # AudioGen SFX cues
                 │   └── director_dump_<ts>.txt                # LLMDirector raw dumps (BUG-090)
                 │
                 ├── stills/                               # FLUX environment + radio bookend
@@ -308,7 +312,7 @@ ComfyUI/
 - **`otr/episodes/<episode_id>/`** is the per-episode working folder. Everything for that one episode (audio, stills, portraits, per-line clip pieces, composite intermediate) lives in subfolders under it. Delete one episode's folder = delete that whole episode's working set.
 - **`otr/episodes/<episode_id>/audio/<episode_id>_ledger.json`** is the canonical production ledger. The auto-pick walker (in `_otr_ledger.find_most_recent_ledger`) walks `otr/episodes/*/audio/*_ledger.json` for cross-episode discovery.
 - **`otr/episodes/<episode_id>/composited/<episode_id>.mp4`** is the 832x480 intermediate VideoComposite writes. RTXUpscale reads it and writes the final to `otr/obs/<episode_id>.mp4`.
-- **MusicGen + AudioGen caches** still live at `models/musicgen_cache/` and `models/sfx_cache/` (NOT under `otr/`). Filenames now carry a `_<timestamp_ms>` suffix so two runs never collide on the same cache file. Cross-episode cache reuse is gone by design — each render produces a fresh, uniquely-named file.
+- **MusicGen + AudioGen output wavs** now land directly inside the per-episode audio dir (`otr/episodes/<ep>/audio/`) alongside the ledger. SignalLostVideo's rename pass moves the entire per-episode dir from `pending_<ts>/` to `<canonical_episode_id>/` once the title is finalized — the wavs travel with the rename. Filenames carry `_<timestamp_ms>` suffix so two runs never collide. Legacy `models/musicgen_cache/` and `models/sfx_cache/` are kept as defensive fallbacks if no in-flight ledger is found, but new runs land everything per-episode.
 - **Sibling utility dirs** under `otr/` for cross-episode artifacts: `script_gates/`, `qa_frames/`, `qa_waveforms/`, `vram_tests/`.
 
 **Path layout history (2026-05-02 EVENING — three rapid iterations after first end-to-end smoke landed):**

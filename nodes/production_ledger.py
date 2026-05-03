@@ -70,16 +70,24 @@ _GIT_HEAD_CACHE: Optional[str] = None
 # Module helpers
 # ---------------------------------------------------------------------------
 
-def _default_out_dir() -> str:
-    # 2026-04-26 PM BUG-LOCAL-067: moved from output/old_time_radio/ to
-    # output/otr/audio/ so every OTR artifact (audio episodes, ledgers,
-    # treatments, FLUX stills, HuMo videos, 1080p deliveries) nests under
-    # the single output/otr/ super-folder. Legacy output/old_time_radio/
-    # is left in place for already-rendered episodes; scripts fall back
-    # to reading both locations.
+def _default_out_dir(episode_id: Optional[str] = None) -> str:
+    """Per-episode audio dir for the ledger + Bark/MusicGen/AudioGen caches.
+
+    Path: ``<output>/otr/episodes/<episode_id>/audio/``.
+
+    History:
+      - 2026-04-26 PM BUG-LOCAL-067: moved from ``output/old_time_radio/``
+        to ``output/otr/audio/``.
+      - 2026-05-02 EVENING (Jeffrey directive: one-stop-shop): moved into
+        per-episode workspace ``output/otr/episodes/<ep>/audio/``. SignalLostVideo
+        finalizes the canonical episode_id; until then the dir is named
+        ``output/otr/episodes/pending_<ts>/audio/`` and gets renamed by
+        ``Ledger.rename_episode`` once the title is finalized.
+    """
+    ep = episode_id or ("pending_" + time.strftime("%Y%m%d_%H%M%S"))
     return os.path.join(
         os.path.expanduser("~"),
-        "Documents", "ComfyUI", "output", "otr", "audio",
+        "Documents", "ComfyUI", "output", "otr", "episodes", ep, "audio",
     )
 
 
@@ -155,14 +163,17 @@ def new_ledger(episode_id: Optional[str] = None,
                out_dir: Optional[str] = None) -> "Ledger":
     """Start a fresh ledger. Call at the beginning of a pipeline run.
 
-    If episode_id is None, a placeholder `pending_<timestamp>` id is used;
+    If episode_id is None, a placeholder ``pending_<timestamp>`` id is used;
     rename later via ledger.rename_episode(new_id) once the real filename
     is known (usually at SignalLostVideo stage).
+
+    The ledger lives at ``<output>/otr/episodes/<episode_id>/audio/<episode_id>_ledger.json``;
+    Bark / MusicGen / AudioGen caches sit alongside it in the same dir.
     """
     global _CURRENT
     with _LEDGER_LOCK:
         ep = episode_id or ("pending_" + time.strftime("%Y%m%d_%H%M%S"))
-        _CURRENT = Ledger(ep, out_dir or _default_out_dir())
+        _CURRENT = Ledger(ep, out_dir or _default_out_dir(ep))
         return _CURRENT
 
 
@@ -172,10 +183,8 @@ def get_ledger() -> "Ledger":
     global _CURRENT
     with _LEDGER_LOCK:
         if _CURRENT is None:
-            _CURRENT = Ledger(
-                "pending_" + time.strftime("%Y%m%d_%H%M%S"),
-                _default_out_dir(),
-            )
+            ep = "pending_" + time.strftime("%Y%m%d_%H%M%S")
+            _CURRENT = Ledger(ep, _default_out_dir(ep))
         return _CURRENT
 
 
@@ -244,7 +253,8 @@ class Ledger:
     # -- identity ------------------------------------------------------
 
     def rename_episode(self, new_id: str) -> None:
-        """Rename the episode id and atomically move the on-disk file.
+        """Rename the episode id and atomically move BOTH the parent
+        per-episode dir AND the ledger file inside.
 
         BUG-LOCAL-108 (2026-04-29 morning): the prior implementation
         only changed the in-memory ``self.episode_id``. The on-disk
@@ -254,20 +264,69 @@ class Ledger:
         added fields to the pending file in between, that work
         landed on the orphan and was never picked up by downstream
         readers (BatchHumoRender, VideoComposite). Net effect: lines[]
-        positions, audio_gates, text_for_tts all silently lost,
-        BatchHumoRender fell back to BUG-094 estimator and rendered
-        HuMo against wrong audio slices (deep_earth_echoes /
-        solar_flare_spark 2026-04-28/29).
+        positions, audio_gates, text_for_tts all silently lost.
+        Fix v1: also ``os.replace`` the file so there's one ledger
+        on disk per run.
 
-        Fix: also ``os.replace`` (atomic on Windows, POSIX) the file
-        so there's exactly ONE ledger file per run on disk.
+        Per-episode workspace extension (2026-05-02 EVENING, Jeffrey
+        directive: one-stop-shop): the per-episode dir
+        ``otr/episodes/pending_<ts>/`` ALSO gets renamed to
+        ``otr/episodes/<new_id>/`` so EVERY per-episode asset (Bark
+        wavs, MusicGen wavs, AudioGen wavs, ledger, director dumps)
+        moves together with the rename. After the parent dir move,
+        ``self.out_dir`` is updated to the new audio path so the next
+        ``self.save()`` writes to ``<new_id>/audio/<new_id>_ledger.json``.
         """
         old = self.episode_id
         if old == new_id:
             return
-        old_path = self.path
+
+        old_audio_dir = self.out_dir   # otr/episodes/pending_<ts>/audio
+        old_ep_dir = os.path.dirname(old_audio_dir)  # otr/episodes/pending_<ts>
+        new_ep_dir = os.path.join(os.path.dirname(old_ep_dir), new_id)
+        new_audio_dir = os.path.join(new_ep_dir, os.path.basename(old_audio_dir))
+
+        # Step 1: move the per-episode parent dir if it exists and the
+        # destination isn't already there (defensive: a manual cleanup
+        # could have created the new_ep_dir; in that case fall through
+        # to the file-only rename below).
+        moved_dir = False
+        if (os.path.exists(old_ep_dir)
+                and not os.path.exists(new_ep_dir)
+                and old_ep_dir != new_ep_dir):
+            try:
+                os.replace(old_ep_dir, new_ep_dir)
+                moved_dir = True
+                log.info(
+                    "[Ledger] per-episode dir moved %s -> %s",
+                    os.path.basename(old_ep_dir),
+                    os.path.basename(new_ep_dir),
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[Ledger] per-episode dir move failed (%s -> %s): %s; "
+                    "falling back to file-only rename",
+                    old_ep_dir, new_ep_dir, exc,
+                )
+
+        # Step 2: update in-memory state (episode_id + out_dir to point
+        # at the new per-episode audio dir).
         self.episode_id = new_id
         self.data["episode_id"] = new_id
+        if moved_dir:
+            self.out_dir = new_audio_dir
+
+        # Step 3: rename the ledger file inside the (now-moved) audio dir.
+        # If the parent dir move succeeded, the file is already at
+        # ``<new_audio_dir>/<old_basename>``; we just rename it to the
+        # new canonical filename. If the parent dir move failed, both
+        # old_path and new_path point at the legacy flat layout.
+        if moved_dir:
+            old_path = os.path.join(new_audio_dir,
+                                    f"{_slugify(old, limit=120)}_ledger.json")
+        else:
+            old_path = os.path.join(old_audio_dir,
+                                    f"{_slugify(old, limit=120)}_ledger.json")
         new_path = self.path
         if old_path != new_path and os.path.exists(old_path):
             try:
@@ -282,7 +341,8 @@ class Ledger:
                     "[Ledger] BUG-108 file move failed (%s -> %s): %s",
                     old_path, new_path, exc,
                 )
-        log.info("[Ledger] renamed %s -> %s", old, new_id)
+        log.info("[Ledger] renamed %s -> %s (dir_moved=%s)",
+                 old, new_id, moved_dir)
 
     @property
     def path(self) -> str:
