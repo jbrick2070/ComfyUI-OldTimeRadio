@@ -3,6 +3,24 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+---
+
+## Workflow tip — ask Claude for a live risk artifact after a fix
+
+When Claude has shipped a non-trivial fix and you want a quick gut-check on residual risk WITHOUT triggering more code changes, you can ask: "round-robin the shipped code and give me a live artifact with your % chance of fix needed." Claude will:
+
+1. Write a code-review-shaped consult question (not a prevention-plan question — the framing matters).
+2. Run `scripts/_consult_round_robin.py` against the shipped code (ChatGPT + Gemini + NVIDIA Nemotron).
+3. Read the transcripts under `docs/<date>-<topic>__01_chatgpt.md` etc.
+4. Render an inline artifact card-grid with one card per fix element. Each card shows: one-line description + per-element follow-up-fix probability % + ChatGPT verdict badge + Gemini verdict badge + one-line reasoning. Color-coded by risk tier (green <15%, amber 15-30%, red 30%+).
+5. Below the cards: "what to watch in next soak" callout + "where they disagreed" section + sources footer.
+
+**Proven pattern (2026-05-03 EVENING for BUG-027 + BUG-028):** transcripts at `docs/2026-05-03-bug-027-028-shipped-code-review__*.md`, commit `832d134`. ChatGPT (108.6s, 21 KB) + Gemini (34.2s, 4.5 KB) converged; NVIDIA round failed silently but 2-of-3 was sufficient signal. The artifact made residual risk landscape immediately legible — load-bearing weak spot ("BUG-028 Site 3: humo wildcard glob, 40%") jumped out at first glance instead of being buried in 25 KB of model prose.
+
+**Skip when:** fix is trivial (one-line typo, mechanical edit), or you've already moved on. **Use when:** tough decision area (LLM prompt templates, audio C7, VRAM determinism, save paths, anything with multi-site write+read alignment) and you want peace of mind without round-tripping through more text walls. Round-robin alone is text-heavy; the artifact is the part that makes it visually decision-ready.
+
+---
+
 ### BUG-LOCAL-028 [FIXED]: FLUX env stills + radio bookend save to legacy flat dirs — VideoComposite finds no scenery; final video black
 - **Date:** 2026-05-03 | **Phase:** acceptance (post-026 hotfix soak) | **Bible candidate:** YES (directly causes "black video" failure mode)
 - **Symptom (from `dir /s C:\...\output\otr\` for episode `signal_lost_astronomers_finally_solve_the_gammacas_x_20260503_002536`):**
