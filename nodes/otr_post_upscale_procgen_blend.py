@@ -191,17 +191,17 @@ class PostUpscaleProcgenBlend:
             log.warning("[PostUpscaleProcgenBlend] %s", msg)
             return ("", msg)
 
-        out = src.with_name(f"{src.stem}{out_suffix}{src.suffix}")
+        output_path = src.with_name(f"{src.stem}{out_suffix}{src.suffix}")
 
         if bypass:
             try:
-                shutil.copy2(src, out)
+                shutil.copy2(src, output_path)
                 msg = (
                     f"PostUpscaleProcgenBlend: bypass=True, copied "
-                    f"{src.name} -> {out.name}"
+                    f"{src.name} -> {output_path.name}"
                 )
                 log.info("[PostUpscaleProcgenBlend] %s", msg)
-                return (str(out), msg)
+                return (str(output_path), msg)
             except Exception as exc:  # noqa: BLE001
                 msg = f"PostUpscaleProcgenBlend: bypass copy failed: {exc}"
                 log.warning("[PostUpscaleProcgenBlend] %s", msg)
@@ -212,14 +212,14 @@ class PostUpscaleProcgenBlend:
             # output (same behavior as bypass) so the pipeline still
             # produces a deliverable.
             try:
-                shutil.copy2(src, out)
+                shutil.copy2(src, output_path)
                 msg = (
                     f"PostUpscaleProcgenBlend: procgen mp4 missing "
                     f"({procgen_mp4_path!r}); skipped blend, copied "
-                    f"source -> output ({src.name} -> {out.name})"
+                    f"source -> output ({src.name} -> {output_path.name})"
                 )
                 log.warning("[PostUpscaleProcgenBlend] %s", msg)
-                return (str(out), msg)
+                return (str(output_path), msg)
             except Exception as exc:  # noqa: BLE001
                 msg = (
                     f"PostUpscaleProcgenBlend: procgen missing AND copy "
@@ -229,7 +229,7 @@ class PostUpscaleProcgenBlend:
                 return ("", msg)
 
         cmd = _build_blend_cmd(
-            source_mp4=src, procgen_mp4=pgn, out_mp4=out,
+            source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,
             blend_mode=blend_mode, blend_opacity=float(blend_opacity),
             ffmpeg=ffmpeg,
         )
@@ -244,17 +244,17 @@ class PostUpscaleProcgenBlend:
             )
             log.warning("[PostUpscaleProcgenBlend] %s", msg)
             try:
-                shutil.copy2(src, out)
-                return (str(out), msg + f"; copied source -> {out.name}")
+                shutil.copy2(src, output_path)
+                return (str(output_path), msg + f"; copied source -> {output_path.name}")
             except Exception as copy_exc:  # noqa: BLE001
                 return ("", msg + f"; copy fallback also failed: {copy_exc}")
 
         report_lines.append(
             f"PostUpscaleProcgenBlend: blended {src.name} + {pgn.name} -> "
-            f"{out.name} (mode={blend_mode}, opacity={blend_opacity:.3f})"
+            f"{output_path.name} (mode={blend_mode}, opacity={blend_opacity:.3f})"
         )
         log.info("[PostUpscaleProcgenBlend] %s", report_lines[-1])
-        return (str(out), "\n".join(report_lines))
+        return (str(output_path), "\n".join(report_lines))
 
 
 __all__ = ["PostUpscaleProcgenBlend"]

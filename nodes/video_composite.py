@@ -627,10 +627,15 @@ def _layered_per_clip_silent(
             f"[0:v]scale=-2:{humo_pillar_h}:force_original_aspect_ratio=decrease,"
             f"crop={humo_pillar_w}:{humo_pillar_h},fps={canvas_fps}[pillar]"
         )
-        overlay_chain = "[bg][pillar]overlay=x=(W-w)/2:y=0[v]"
+        # BUG-LOCAL-030 hardening: even-snap overlay X for yuv420p chroma
+        # alignment (same Gemini round-robin catch as the simple-pillarbox
+        # pad fix). Pillar 512 in canvas 1472 gives 480 (already even),
+        # but a future widget tweak (e.g. humo_pillar_width=510) would
+        # otherwise crash. Defensive.
+        overlay_chain = "[bg][pillar]overlay=x=trunc((W-w)/4)*2:y=0[v]"
         if extend_tail_s > 0.0:
             overlay_chain = (
-                "[bg][pillar]overlay=x=(W-w)/2:y=0,"
+                "[bg][pillar]overlay=x=trunc((W-w)/4)*2:y=0,"
                 f"tpad=stop_mode=clone:stop_duration={extend_tail_s:.3f}[v]"
             )
         filter_complex = f"{bg_chain};{pillar_chain};{overlay_chain}"
@@ -655,9 +660,20 @@ def _layered_per_clip_silent(
         # (832x480) gets scale-fit too: scale to height=832 = 1442x832,
         # pad to 1472x832 = ~15px black per side (effectively full
         # canvas with hairline bars).
+        #
+        # BUG-LOCAL-030 hardening (2026-05-03 EVENING, post-round-robin
+        # Gemini catch): pad offsets MUST be EVEN for yuv420p chroma
+        # alignment. The naive `(ow-iw)/2` produces 15 for LTX (odd!)
+        # which fails on older ffmpeg builds with "x and y must be even
+        # in yuv420p" and may produce subtle chroma asymmetry on newer
+        # builds that auto-snap with warning. The `trunc((ow-iw)/4)*2`
+        # form forces the offset to the largest even integer <=
+        # (ow-iw)/2 (15 -> 14, 496 -> 496, 0 -> 0). Slightly off-center
+        # by at most 1 pixel for asymmetric pads -- imperceptible.
         vf = (
             f"scale=-2:{canvas_h}:force_original_aspect_ratio=decrease,"
-            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"pad={canvas_w}:{canvas_h}:"
+            f"trunc((ow-iw)/4)*2:trunc((oh-ih)/4)*2:color=black,"
             f"fps={canvas_fps}"
         )
         if extend_tail_s > 0.0:

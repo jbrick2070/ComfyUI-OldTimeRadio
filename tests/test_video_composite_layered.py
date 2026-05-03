@@ -123,7 +123,13 @@ def test_character_clip_with_background_uses_filter_complex(tmp_path):
     assert "scale=1472:832" in fc, f"backdrop must scale-cover canvas: {fc}"
     assert "crop=1472:832" in fc, f"backdrop must crop to canvas: {fc}"
     assert "crop=512:832" in fc, f"pillar must center-crop to 512x832: {fc}"
-    assert "overlay=x=(W-w)/2:y=0" in fc, f"pillar must center-overlay: {fc}"
+    # BUG-LOCAL-030 hardening: overlay X is even-snapped via
+    # trunc((W-w)/4)*2 instead of the naive (W-w)/2 (yuv420p chroma
+    # alignment). For pillar 512 in canvas 1472 the result is 480 same
+    # as before but the formula is defensive against odd-pillar widths.
+    assert "overlay=x=trunc((W-w)/4)*2:y=0" in fc, (
+        f"pillar overlay X must be even-snapped via trunc((W-w)/4)*2; got {fc}"
+    )
     # Background loop input is present
     assert str(bg) in cmd, f"background image must be a -i input: {cmd}"
     assert "-loop" in cmd
@@ -165,6 +171,21 @@ def test_announcer_clip_uses_scale_fit_pad_with_black(tmp_path):
     # Crop is NOT used in revised simple-pillarbox path.
     assert "crop=" not in vf, f"revised path must NOT crop; got {vf}"
     assert "-an" in cmd
+    # BUG-LOCAL-030 hardening (post-round-robin Gemini catch): pad
+    # offsets MUST be even-snapped for yuv420p chroma alignment.
+    # Naive (ow-iw)/2 produces 15 for LTX 832x480 -> scaled 1442x832
+    # -> pad to 1472x832, which fails on older ffmpeg.
+    assert "trunc((ow-iw)/4)*2" in vf, (
+        f"pad x offset must be even-snapped via trunc((ow-iw)/4)*2 "
+        f"(yuv420p chroma alignment); got {vf}"
+    )
+    assert "trunc((oh-ih)/4)*2" in vf, (
+        f"pad y offset must be even-snapped; got {vf}"
+    )
+    # The naive form must NOT be present anymore.
+    assert "(ow-iw)/2:(oh-ih)/2" not in vf, (
+        f"naive pad offsets present -- yuv420p crash risk; got {vf}"
+    )
 
 
 def test_character_with_no_background_uses_pad_with_black_pillarbox(tmp_path):
@@ -196,6 +217,82 @@ def test_character_with_no_background_uses_pad_with_black_pillarbox(tmp_path):
     assert "pad=1472:832:" in vf
     assert "color=black" in vf
     assert "crop=" not in vf
+    # BUG-LOCAL-030 hardening: even-snap offsets here too.
+    assert "trunc((ow-iw)/4)*2" in vf
+    assert "trunc((oh-ih)/4)*2" in vf
+
+
+def test_pad_offset_math_produces_even_for_ltx_dim_mismatch():
+    """BUG-LOCAL-030 hardening sanity check: the trunc((ow-iw)/4)*2
+    formula MUST produce an even integer for the LTX scaled dim
+    (1442 wide in 1472 canvas -> naive=15, even-snap=14).
+
+    This is a pure-Python reproduction of the ffmpeg expression so we
+    can lock in the math without booting ffmpeg.
+    """
+    import math
+
+    def even_snap_pad(ow, iw):
+        # ffmpeg expression: trunc((ow-iw)/4)*2
+        return math.trunc((ow - iw) / 4) * 2
+
+    # LTX 1442 in 1472 canvas: naive 15 (odd), even-snap 14 (safe)
+    assert even_snap_pad(1472, 1442) == 14
+    assert even_snap_pad(1472, 1442) % 2 == 0
+
+    # HuMo 480 in 1472 canvas: naive 496 (even), even-snap 496 (same)
+    assert even_snap_pad(1472, 480) == 496
+    assert even_snap_pad(1472, 480) % 2 == 0
+
+    # Edge: equal dims -> 0 (even, no padding needed)
+    assert even_snap_pad(1472, 1472) == 0
+
+    # Edge: 1px gap -> 0 (rounds down; safe)
+    assert even_snap_pad(1472, 1471) == 0
+
+    # Edge: 2px gap -> 0 (would naively be 1 odd, even-snap drops to 0
+    # leaving 2px black on one side; harmless, no encoder crash)
+    assert even_snap_pad(1472, 1470) == 0
+
+    # Edge: 3px gap -> 0 (naive 1.5 rounded to 1 odd; even-snap 0 safe)
+    assert even_snap_pad(1472, 1469) == 0
+
+    # Edge: 4px gap -> 2 (even, balanced)
+    assert even_snap_pad(1472, 1468) == 2
+
+    # Edge: random portrait fitting test
+    # HuMo 480x832 in 1472x832: x=496 (even), y=0 (even)
+    assert even_snap_pad(1472, 480) == 496
+    assert even_snap_pad(832, 832) == 0
+
+
+def test_overlay_offset_in_layered_branch_is_even_snapped(tmp_path):
+    """BUG-LOCAL-030 hardening: when the layered (HuMo pillar) path
+    fires, the overlay X position must also be even-snapped. Pillar
+    512 in canvas 1472 already gives 480 (even) but a future widget
+    tweak (e.g. humo_pillar_width=510) would otherwise risk crash."""
+    VC = _import_vc()
+    clip = tmp_path / "l003.mp4"; clip.write_bytes(b"clip")
+    bg = tmp_path / "bg.png"; bg.write_bytes(b"bg")
+    out = tmp_path / "pb_l003.mp4"
+    captured, fake_run = _capture_cmd()
+    with mock.patch.object(VC.subprocess, "run", side_effect=fake_run):
+        VC._layered_per_clip_silent(
+            clip=clip, speaker_role="character",
+            canvas_w=1472, canvas_h=832, canvas_fps=25,
+            humo_pillar_w=512, humo_pillar_h=832,
+            background_png=bg,
+            out_path=out, ffmpeg="ffmpeg",
+        )
+    cmd = captured["cmd"]
+    fc = cmd[cmd.index("-filter_complex") + 1]
+    assert "overlay=x=trunc((W-w)/4)*2:y=0" in fc, (
+        f"overlay X must be even-snapped via trunc((W-w)/4)*2; got {fc}"
+    )
+    assert "overlay=x=(W-w)/2:y=0" not in fc, (
+        f"naive overlay X present -- yuv420p crash risk for odd-pillar widths; "
+        f"got {fc}"
+    )
 
 
 def test_extend_tail_appended_to_layered_chain(tmp_path):
@@ -219,6 +316,10 @@ def test_extend_tail_appended_to_layered_chain(tmp_path):
     fc = cmd[cmd.index("-filter_complex") + 1]
     assert "tpad=stop_mode=clone:stop_duration=0.500" in fc, (
         f"tail-pad must be appended to overlay chain in layered mode: {fc}"
+    )
+    # Even-snapped overlay must still be present alongside the tail-pad.
+    assert "overlay=x=trunc((W-w)/4)*2:y=0" in fc, (
+        f"layered branch with extend_tail_s must keep even-snapped overlay X; got {fc}"
     )
 
 
