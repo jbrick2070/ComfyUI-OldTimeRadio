@@ -1,0 +1,350 @@
+{
+  "id": "otr-ltx-smoke",
+  "revision": 1,
+  "last_node_id": 99,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LowVRAMCheckpointLoader",
+      "pos": [
+        200,
+        200
+      ],
+      "size": [
+        400,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dependencies",
+          "type": "*",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-ltxvideo",
+        "Node name for S&R": "LowVRAMCheckpointLoader"
+      },
+      "widgets_values": [
+        "ltx-video-2b-v0.9.safetensors"
+      ],
+      "_meta": {
+        "title": "LTX 2B Loader (LowVRAM)"
+      }
+    },
+    {
+      "id": 2,
+      "type": "OTR_BatchLTXRender",
+      "pos": [
+        650,
+        200
+      ],
+      "size": [
+        440,
+        260
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 3
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "widget": {
+            "name": "ledger_json"
+          },
+          "link": null
+        },
+        {
+          "name": "humo_clips_dir",
+          "type": "STRING",
+          "shape": 7,
+          "widget": {
+            "name": "humo_clips_dir"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "clip_count",
+          "type": "INT",
+          "links": []
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_BatchLTXRender"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555_ledger.json",
+        1,
+        "fixed",
+        "ffmpeg",
+        ""
+      ],
+      "_meta": {
+        "title": "OTR_BatchLTXRender (pre-baked ledger)"
+      }
+    },
+    {
+      "id": 3,
+      "type": "OTR_VideoComposite",
+      "pos": [
+        1150,
+        200
+      ],
+      "size": [
+        440,
+        320
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "procgen_video_path",
+          "type": "STRING",
+          "widget": {
+            "name": "procgen_video_path"
+          },
+          "link": null
+        },
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "widget": {
+            "name": "clips_dir"
+          },
+          "link": 4
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "widget": {
+            "name": "ledger_json"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_VideoComposite"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555.mp4",
+        "",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555_ledger.json",
+        "lighten",
+        0.0,
+        832,
+        480,
+        25,
+        480,
+        7.0,
+        "ffmpeg",
+        false,
+        "master_mix_per_clip_mux",
+        true
+      ],
+      "_meta": {
+        "title": "OTR_VideoComposite (832x480 native)"
+      }
+    },
+    {
+      "id": 4,
+      "type": "OTR_RTXUpscale",
+      "pos": [
+        1650,
+        200
+      ],
+      "size": [
+        400,
+        240
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "widget": {
+            "name": "source_mp4_path"
+          },
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "upscaled_mp4_path",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-oldtimeradio",
+        "Node name for S&R": "OTR_RTXUpscale"
+      },
+      "widgets_values": [
+        "",
+        false,
+        1920,
+        1080,
+        "ULTRA",
+        64,
+        "ffmpeg",
+        "_1080p"
+      ],
+      "_meta": {
+        "title": "OTR_RTXUpscale (1080p)"
+      }
+    },
+    {
+      "id": 99,
+      "type": "Note",
+      "pos": [
+        200,
+        600
+      ],
+      "size": [
+        1450,
+        220
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": ""
+      },
+      "widgets_values": [
+        "OTR LTX-only smoke -- pre-baked upstream artifacts\n\nBuilt 2026-05-02 by Sprint 3 mega-sprint hot-fix session.\nBypasses the 50-min LLM/audio/FLUX/HuMo cascade by feeding the\nLTX render the ledger from the prior failed-at-LTX run, plus\nthe procgen mp4 + 4 HuMo character clips that survived (l002,\nl003, l004, l005) under output\\otr\\videos\\<episode_id>\\.\n\nWallclock estimate: ~10 min. Full pipeline ~60 min.\n\nEpisode_id: signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555\nLedger:    C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555_ledger.json\nProcgen:   C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\audio\\signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555.mp4\n\nTo use against a different episode: swap the LEDGER_PATH +\nPROCGEN_MP4 widget values on nodes 2 + 3. Both must come from\nthe same episode_id so LTX writes into the dir HuMo wrote into."
+      ],
+      "_meta": {
+        "title": "README"
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      1,
+      1,
+      2,
+      1,
+      "CLIP"
+    ],
+    [
+      3,
+      1,
+      2,
+      2,
+      2,
+      "VAE"
+    ],
+    [
+      4,
+      2,
+      0,
+      3,
+      1,
+      "STRING"
+    ],
+    [
+      5,
+      3,
+      0,
+      4,
+      0,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
