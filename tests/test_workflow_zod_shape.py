@@ -77,6 +77,29 @@ class TestWorkflowZodShape:
             f'present: {sorted(wf.keys())}'
         )
 
+    def test_root_id_is_uuid(self, wf_path: Path) -> None:
+        """ComfyUI frontend Zod requires `id` to be a valid UUID string.
+        Hand-built workflows that use a freeform slug get rejected with
+        `Invalid uuid at "id"` (BUG-LOCAL-012, observed 2026-05-02)."""
+        import re
+        wf = self._wf(wf_path)
+        wf_id = wf.get('id')
+        if wf_id is None:
+            # `id` is allowed to be missing entirely (some older workflows).
+            return
+        assert isinstance(wf_id, str), (
+            f'{wf_path.name}: id is not a string ({type(wf_id).__name__})'
+        )
+        uuid_re = re.compile(
+            r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+            r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        )
+        assert uuid_re.match(wf_id), (
+            f'{wf_path.name}: id={wf_id!r} is not a valid UUID; '
+            'ComfyUI Zod will reject this workflow with '
+            '`Invalid uuid at "id"` on UI load'
+        )
+
     # NOTE: We do NOT enforce "no `_meta` on nodes" or "every output has
     # slot_index" because the production workflow has both shapes and
     # ComfyUI accepts it. Either Zod is lenient on those, or the field

@@ -1,6 +1,6 @@
 {
-  "id": "otr-ltx-smoke",
-  "revision": 2,
+  "id": "a4d1c7e2-5b6f-4f3a-9e0c-7b3a5d8e2f10",
+  "revision": 3,
   "last_node_id": 99,
   "last_link_id": 5,
   "nodes": [
@@ -38,9 +38,7 @@
         {
           "name": "CLIP",
           "type": "CLIP",
-          "links": [
-            2
-          ],
+          "links": [],
           "slot_index": 1
         },
         {
@@ -58,6 +56,41 @@
       },
       "widgets_values": [
         "ltx-video-2b-v0.9.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [
+        200,
+        360
+      ],
+      "size": [
+        400,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "title": "T5 text encoder (LTX)",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "t5xxl_fp16.safetensors",
+        "ltxv",
+        "default"
       ]
     },
     {
@@ -308,8 +341,8 @@
     ],
     [
       2,
-      1,
-      1,
+      5,
+      0,
       2,
       1,
       "CLIP"
