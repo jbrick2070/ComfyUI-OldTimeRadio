@@ -254,29 +254,44 @@ class Ledger:
 
     def rename_episode(self, new_id: str) -> None:
         """Rename the episode id and atomically move BOTH the parent
-        per-episode dir AND the ledger file inside.
+        per-episode dir AND the ledger + treatment files inside.
 
-        BUG-LOCAL-108 (2026-04-29 morning): the prior implementation
-        only changed the in-memory ``self.episode_id``. The on-disk
-        ``pending_<ts>_ledger.json`` was left orphaned, while the
-        next ``save()`` wrote a fresh file at the canonical path. If
-        any other writer (audio nodes' schema-l3 helpers, etc.) had
-        added fields to the pending file in between, that work
-        landed on the orphan and was never picked up by downstream
-        readers (BatchHumoRender, VideoComposite). Net effect: lines[]
-        positions, audio_gates, text_for_tts all silently lost.
-        Fix v1: also ``os.replace`` the file so there's one ledger
-        on disk per run.
+        Invariant (BUG-LOCAL-015, Phase B 2026-05-02): rename_episode
+        either completes with canonical episode dir + canonical ledger
+        + canonical treatment, OR raises BEFORE mutating in-memory
+        episode state. No silent split state. No "fallback to file-only
+        rename" — that path was the root cause of confusing downstream
+        crashes when the dir-move silently failed and the in-memory
+        episode_id was advanced anyway.
 
-        Per-episode workspace extension (2026-05-02 EVENING, Jeffrey
-        directive: one-stop-shop): the per-episode dir
-        ``otr/episodes/pending_<ts>/`` ALSO gets renamed to
-        ``otr/episodes/<new_id>/`` so EVERY per-episode asset (Bark
-        wavs, MusicGen wavs, AudioGen wavs, ledger, director dumps)
-        moves together with the rename. After the parent dir move,
-        ``self.out_dir`` is updated to the new audio path so the next
-        ``self.save()`` writes to ``<new_id>/audio/<new_id>_ledger.json``.
+        State matrix:
+          old exists, new missing  -> retry os.replace 3x; hard-fail after
+          old exists, new exists   -> hard-fail conflict (NEVER merge)
+          old missing, new exists  -> accept as already moved (idempotent)
+          old missing, new missing -> hard-fail (nothing to rename)
+          old == new (case-insensitive normcase) -> no-op
+
+        Order of operations after dir is in final position:
+          1) Move dir (with retry)
+          2) Update in-memory state (episode_id, out_dir)
+          3) Rename ledger file to canonical name
+          4) Rename treatment + sidecar (<old>_*.txt -> <new>_*.txt)
+
+        Steps 3 + 4 log warnings on individual file failures but do not
+        raise; the dir-move success has already established the
+        invariant that downstream nodes need.
+
+        BUG-LOCAL-108 history (2026-04-29 morning): prior implementation
+        only changed in-memory ``self.episode_id``. On-disk
+        ``pending_<ts>_ledger.json`` was left orphaned, next ``save()``
+        wrote a fresh file at the canonical path. Fields written by
+        audio nodes' schema-l3 helpers between LLMScriptWriter and
+        SignalLostVideo landed on the orphan and were silently lost.
+        Phase B (BUG-LOCAL-015) replaces that file-only-rename fallback
+        with a hard-fail + retry; treatment files are also renamed.
         """
+        import time as _time
+
         old = self.episode_id
         if old == new_id:
             return
@@ -286,61 +301,155 @@ class Ledger:
         new_ep_dir = os.path.join(os.path.dirname(old_ep_dir), new_id)
         new_audio_dir = os.path.join(new_ep_dir, os.path.basename(old_audio_dir))
 
-        # Step 1: move the per-episode parent dir if it exists and the
-        # destination isn't already there (defensive: a manual cleanup
-        # could have created the new_ep_dir; in that case fall through
-        # to the file-only rename below).
-        moved_dir = False
-        if (os.path.exists(old_ep_dir)
-                and not os.path.exists(new_ep_dir)
-                and old_ep_dir != new_ep_dir):
-            try:
-                os.replace(old_ep_dir, new_ep_dir)
-                moved_dir = True
-                log.info(
-                    "[Ledger] per-episode dir moved %s -> %s",
-                    os.path.basename(old_ep_dir),
-                    os.path.basename(new_ep_dir),
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning(
-                    "[Ledger] per-episode dir move failed (%s -> %s): %s; "
-                    "falling back to file-only rename",
-                    old_ep_dir, new_ep_dir, exc,
-                )
+        # Case-insensitive same-path check (Windows). If old and new
+        # ep_dirs resolve to the same on-disk path, treat as no-op.
+        if (os.path.normcase(os.path.abspath(old_ep_dir))
+                == os.path.normcase(os.path.abspath(new_ep_dir))):
+            log.info("[Ledger] rename_episode: %s -> %s same dir, no-op",
+                     old, new_id)
+            self.episode_id = new_id
+            self.data["episode_id"] = new_id
+            return
 
-        # Step 2: update in-memory state (episode_id + out_dir to point
-        # at the new per-episode audio dir).
+        old_exists = os.path.isdir(old_ep_dir)
+        new_exists = os.path.isdir(new_ep_dir)
+        moved_dir = False
+
+        if old_exists and new_exists:
+            # CRITICAL: on Windows, os.replace ALWAYS fails when dest
+            # dir exists, even if empty (Gemini consult correction
+            # 2026-05-02). Refuse to merge or overwrite -- this is a
+            # partial-state crash recovery case that needs human eyes.
+            raise RuntimeError(
+                f"[Ledger] rename_episode: both source and destination "
+                f"episode directories exist ({old_ep_dir} -> {new_ep_dir}). "
+                f"This is a partial-state from a previous crash or manual "
+                f"copy. In-memory state NOT updated. Resolve by manually "
+                f"merging or deleting one side, then re-queue."
+            )
+        if not old_exists and not new_exists:
+            raise RuntimeError(
+                f"[Ledger] rename_episode: neither source nor destination "
+                f"episode directory exists ({old_ep_dir} -> {new_ep_dir}). "
+                f"In-memory state NOT updated. Did the LLMScriptWriter "
+                f"node fail to create the pending workspace?"
+            )
+        if old_exists and not new_exists:
+            # Step 1: move the per-episode parent dir, with retry.
+            # Defender / Search Indexer / human-held locks (Notepad,
+            # VLC) all manifest as OSError here. 3 attempts at 0.5s
+            # spacing (~1.5s total wall) catches the common transient
+            # cases without making the failure feel hung.
+            last_exc: Optional[BaseException] = None
+            for attempt in range(3):
+                try:
+                    os.replace(old_ep_dir, new_ep_dir)
+                    moved_dir = True
+                    last_exc = None
+                    log.info(
+                        "[Ledger] per-episode dir moved %s -> %s "
+                        "(attempt %d)",
+                        os.path.basename(old_ep_dir),
+                        os.path.basename(new_ep_dir),
+                        attempt + 1,
+                    )
+                    break
+                except OSError as exc:
+                    last_exc = exc
+                    log.warning(
+                        "[Ledger] per-episode dir move attempt %d/3 "
+                        "failed (%s -> %s): %s",
+                        attempt + 1, old_ep_dir, new_ep_dir, exc,
+                    )
+                    if attempt < 2:
+                        _time.sleep(0.5)
+            if not moved_dir and last_exc is not None:
+                raise RuntimeError(
+                    f"[Ledger] rename_episode: per-episode dir move "
+                    f"failed after 3 attempts ({old_ep_dir} -> "
+                    f"{new_ep_dir}): {last_exc}. In-memory state NOT "
+                    f"updated. Common causes on Windows: a file inside "
+                    f"the source dir is open in Notepad / VLC / Explorer "
+                    f"preview / your editor; close it and re-queue. If "
+                    f"the lock persists, check Defender / Search Indexer "
+                    f"or wait a few seconds before re-queueing."
+                )
+        elif not old_exists and new_exists:
+            # Idempotent recovery: a previous run already moved the dir
+            # but crashed before updating in-memory state. Accept the
+            # final-dir layout and continue.
+            log.info(
+                "[Ledger] rename_episode: source missing, destination "
+                "exists -- accepting as already-moved (%s)",
+                new_ep_dir,
+            )
+            moved_dir = True
+
+        # Step 2: update in-memory state. Only past this point if dir
+        # is in its final on-disk position (or was already there).
         self.episode_id = new_id
         self.data["episode_id"] = new_id
-        if moved_dir:
-            self.out_dir = new_audio_dir
+        self.out_dir = new_audio_dir
 
-        # Step 3: rename the ledger file inside the (now-moved) audio dir.
-        # If the parent dir move succeeded, the file is already at
-        # ``<new_audio_dir>/<old_basename>``; we just rename it to the
-        # new canonical filename. If the parent dir move failed, both
-        # old_path and new_path point at the legacy flat layout.
-        if moved_dir:
-            old_path = os.path.join(new_audio_dir,
-                                    f"{_slugify(old, limit=120)}_ledger.json")
-        else:
-            old_path = os.path.join(old_audio_dir,
-                                    f"{_slugify(old, limit=120)}_ledger.json")
-        new_path = self.path
-        if old_path != new_path and os.path.exists(old_path):
+        # Step 3: rename the ledger file inside the (now-moved) audio dir
+        # to the new canonical filename. Best-effort: warn on failure
+        # but do not raise (the dir invariant is already satisfied; the
+        # next save() will write to self.path which uses new_id).
+        old_ledger_path = os.path.join(
+            new_audio_dir, f"{_slugify(old, limit=120)}_ledger.json"
+        )
+        new_ledger_path = self.path
+        if (old_ledger_path != new_ledger_path
+                and os.path.exists(old_ledger_path)):
             try:
-                os.replace(old_path, new_path)
+                os.replace(old_ledger_path, new_ledger_path)
                 log.info(
-                    "[Ledger] file moved %s -> %s",
-                    os.path.basename(old_path),
-                    os.path.basename(new_path),
+                    "[Ledger] ledger file moved %s -> %s",
+                    os.path.basename(old_ledger_path),
+                    os.path.basename(new_ledger_path),
                 )
-            except Exception as exc:  # noqa: BLE001
+            except OSError as exc:
                 log.warning(
-                    "[Ledger] BUG-108 file move failed (%s -> %s): %s",
-                    old_path, new_path, exc,
+                    "[Ledger] ledger file rename failed (%s -> %s): %s; "
+                    "next save() will reconcile",
+                    old_ledger_path, new_ledger_path, exc,
                 )
+
+        # Step 4: rename treatment + any other owned txt sidecars from
+        # <old>_*.txt to <new>_*.txt. Uses the SAME _slugify(..., limit=120)
+        # as the ledger filename to keep prefixes consistent. Per consult
+        # 2026-05-02 (all 3 reviewers): use the precise old-id prefix
+        # glob, NOT a broad pending_* glob, to avoid catching unrelated
+        # files. Best-effort: warn on individual failures.
+        old_prefix = f"{_slugify(old, limit=120)}_"
+        new_prefix = f"{_slugify(new_id, limit=120)}_"
+        try:
+            from pathlib import Path as _Path
+            sidecar_dir = _Path(new_audio_dir)
+            if sidecar_dir.exists():
+                for tx in sidecar_dir.glob(f"{old_prefix}*.txt"):
+                    suffix = tx.name[len(old_prefix):]
+                    canon = sidecar_dir / f"{new_prefix}{suffix}"
+                    if tx == canon:
+                        continue
+                    try:
+                        os.replace(str(tx), str(canon))
+                        log.info(
+                            "[Ledger] sidecar moved %s -> %s",
+                            tx.name, canon.name,
+                        )
+                    except OSError as exc:
+                        log.warning(
+                            "[Ledger] sidecar rename failed (%s -> %s): %s",
+                            tx, canon, exc,
+                        )
+        except Exception as exc:  # noqa: BLE001
+            # Sidecar walk itself failed -- log but don't raise.
+            log.warning(
+                "[Ledger] sidecar rename walk failed in %s: %s",
+                new_audio_dir, exc,
+            )
+
         log.info("[Ledger] renamed %s -> %s (dir_moved=%s)",
                  old, new_id, moved_dir)
 

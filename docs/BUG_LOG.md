@@ -3,6 +3,29 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-015 [FIXED]: production_ledger treatment rename gap + os.replace silent split state
+- **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after real two-episode soak run with Phase A)
+- **Symptom:** Two adjacent bugs in `Ledger.rename_episode` (`nodes/production_ledger.py`):
+  1. **Treatment file rename gap (Finding 2 from QA pass).** The function moved the per-episode dir and renamed `pending_<ts>_ledger.json` → `<new_id>_ledger.json` but did NOT rename `pending_<ts>_treatment.txt` → `<new_id>_treatment.txt`. The treatment file (written early by `OTR_LLMScriptWriter` before the title is finalized) sat in the new dir with the old prefix. Phase A's spacesaver kept it via a defensive `glob("*_treatment.txt")`, but that defensive measure was a workaround.
+  2. **`os.replace` fallback silent split state (Finding 3 from QA pass).** When the dir-move `os.replace(old_ep_dir, new_ep_dir)` failed (Windows Defender lock, indexer holding a handle, partial dir from a prior crash, **or destination dir already existing — `os.replace` ALWAYS fails on Windows when destination dir exists, even empty**), the code logged a warning and continued. It updated `self.episode_id` and `self.data["episode_id"]` to the new id but left `self.out_dir` pointing at the old path. The next `self.save()` wrote a finalized-id ledger into the OLD dir while every downstream node (BatchHumoRender, VideoComposite, RTXUpscale) built paths from the new id. Net effect: confusing "file not found" cascades far away from the rename failure.
+- **Cause:** Single function trying to advance in-memory state regardless of on-disk success. Missing state-matrix handling for: both dirs exist; both missing; old missing + new exists. No retry on transient Windows locks. Treatment files outside the rename loop. Filename-construction slug not consistent between ledger and treatment paths.
+- **Fix:** Rewrite `Ledger.rename_episode` around a strict invariant: **either complete with canonical episode dir + canonical ledger + canonical treatment, OR raise BEFORE mutating in-memory episode state.** Specifics:
+  - Case-insensitive `os.path.normcase` same-path early-return (no-op for case-only changes on Windows).
+  - State matrix: `(old_exists, new_exists)` resolved into one of {happy retry path, conflict raise, idempotent recovery, both-missing raise} BEFORE any mutation.
+  - 3 × 0.5s inline retry on `os.replace(old_ep_dir, new_ep_dir)` with attempt-aware logging. After the third failure: `RuntimeError` with message that explicitly tells the user to check for files open in Notepad / VLC / Explorer preview / editors (per Gemini consult — system locks clear in ms but human-held locks need user intervention).
+  - In-memory state (`episode_id`, `data["episode_id"]`, `out_dir`) only advances AFTER dir is in final on-disk position.
+  - Ledger file rename (best-effort warn-only, dir invariant already satisfied).
+  - Treatment + sidecar rename: glob `<old_slug>_*.txt` (NOT `pending_*` — narrower, no risk of catching unrelated files), rename each to `<new_slug>_*.txt`. Uses the same `_slugify(..., limit=120)` as the ledger path. Per-file warn-only on failure.
+- **Verify:**
+  - AST + 9 invariant guards (hard-fail message, retry sleep, conflict check, both-missing check, sidecar glob, slug consistency, normcase, etc.) — green
+  - **New targeted suite `tests/test_ledger_rename.py` — 10 passed in 1.78s.** Covers: happy path renames dir+ledger+all sidecars; same-id no-op; conflict raises; both-missing raises; idempotent recovery (old missing + new exists); dir-move retries 2/3 then succeeds; dir-move fails 3/3 → RuntimeError + state unchanged; error message mentions human-held locks; treatment failure does not raise; sidecar glob uses old-id prefix not pending wildcard.
+  - Three CLAUDE.md regression suites: Bug Bible (23 passed / 1 skipped / 2 xfailed), `tests/test_dropdown_guardrails.py` + `tests/test_core.py` (155 passed). Total **178 passed / 1 skipped / 2 xfailed in 101.62s**.
+  - **Real-run acceptance (pending):** kill mid-rename (Ctrl-C between treatment write and rename), restart, confirm clean recovery and no orphan `<old>_*.txt` after the next successful run. Two-episode-in-flight soak covers Phase A + B together.
+- **Tags:** ledger, rename, atomicity, windows-replace, retry, slug-consistency, qa-pass-2026-05-02
+- **Consult sources:** `docs/2026-05-02-phase-b-rename-consult__01_chatgpt.md` (gpt-5.5, 150.8s), `docs/2026-05-02-phase-b-rename-consult__02_gemini.md` (gemini-3.1-pro-preview-customtools, 31.9s — caught the critical "Windows os.replace always fails on existing dest dir, even empty"), `docs/2026-05-02-phase-b-rename-consult__03_nvidia.md` (llama-3.3-nemotron-super-49b-v1.5, 66.7s)
+
+---
+
 ### BUG-LOCAL-014 [FIXED]: Spacesaver wrong-episode wipe via global mtime ledger scan
 - **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after real two-episode run)
 - **Symptom:** `_spacesaver_cleanup_if_flagged` in `nodes/rtx_upscale.py` discovered the ledger to read the `meta.perfect_run_spacesaver` flag from by calling `_otr_ledger.find_most_recent_ledger([otr_episodes_root(), otr_legacy_audio_dir()])`. That walker returns the newest `*_ledger.json` by mtime across the **entire** `otr/episodes/` tree. If Episode A is mid-RTXUpscale when Episode B is queued and writes its pending ledger, A's spacesaver pass would discover B's ledger, derive `ep_dir = ledger.parent.parent` (B's tree), and wipe B's `stills/`, `portraits/`, `videos/`, `composited/` while B was still rendering.
