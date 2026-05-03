@@ -201,3 +201,45 @@ Backward-compat: readers tolerate missing fields via `meta.get(key, default)`. V
 - `ROADMAP.md` — canonical going-forward plan; Sprint 1 priority
 - `docs/BUG_LOG.md` — live bug tracking; new `BUG-LOCAL-NNN` entry per phase
 - `CLAUDE.md` — project rules, regression contract, git pattern
+
+---
+
+## Shipped — appendix (2026-05-02 EVENING)
+
+Stack landed autonomously per Jeffrey's mode change after Phase A. All five phases pushed to `origin/v2.0-alpha`, lockstep verified.
+
+| Phase | Commit | BUG_LOG | New tests | Live regression | Consult |
+|---|---|---|---|---|---|
+| A — spacesaver wrong-episode + OBS guard | `d2c2df8` | BUG-LOCAL-014 | (covered by audit + regression suites) | 178 / 1 / 2 | round-A consult landed earlier in QA pass |
+| B — production_ledger rename invariant | `29295c9` | BUG-LOCAL-015 | `tests/test_ledger_rename.py` (10) | 178 / 1 / 2 | `docs/2026-05-02-phase-b-rename-consult__*` |
+| C — filename pattern audit guard | `3e1d995` | BUG-LOCAL-016 | `tests/test_filename_pattern_audit.py` (3) | 191 / 1 / 2 | none — mechanical audit |
+| D — musicgen + audiogen cache key | `e43695d` | BUG-LOCAL-017 | `tests/test_cache_key_mutations.py` (30) | 221 / 1 / 2 | `docs/2026-05-02-phase-d-cache-key-consult__*` |
+| E — schema bump + meta.paths block | `7c84ee8` | BUG-LOCAL-018 | `tests/test_meta_paths.py` (13) | 234 / 1 / 2 | none — additive only |
+
+**Cumulative:** 5 commits, 56 new tests, 234 passing tests in the live regression suite, 5 BUG_LOG entries (`[FIXED]`, all "Bible candidate: yes (after end-of-stack soak)"), 5 consult bundles checked in under `docs/`, 1 schema doc (`docs/ledger_schema.md`), schema version bumped `l3-2026-04-28` → `l3-2026-05-02`.
+
+**Deferred to soak:** Bible promotion for 014–018 waits on the two-episode-in-flight acceptance run. Bisect surface if soak fails: B → C → D → E (in suspect order; A is oldest and most-tested).
+
+**What stood out:**
+
+- **Phase C** found 0 substantive code changes — A and B had already absorbed the dangerous slug-reconstruction pattern. Codified the rule as a regression guard so future drift can't reintroduce it.
+- **Phase D** consult earned its keep twice. Gemini caught the atomic-write requirement (`.tmp` + `os.replace` to prevent corrupt cache hits if killed mid-write). Mutation tests then caught two real bugs the consult missed: `soundfile` can't infer WAV format from `.tmp` extension (needed explicit `format='WAV'`), and a test premise bug putting `*` in a Windows filename (illegal). Both fixed before commit.
+- **Phase E** was as predicted — additive, all readers already use `meta.get()`, no behavior change. 13 tests green first try.
+
+The consult → mutation-test → ship loop worked as designed: consult surfaces what solo work misses; tests surface what the consult misses; the shipped commit is cleaner than any single layer would have produced.
+
+---
+
+## End-of-stack acceptance gate
+
+Single two-episode soak. Queue Episode A in ComfyUI Desktop, queue Episode B before A reaches RTXUpscale, let both finish, paste console output. Per-phase grep targets:
+
+| Phase | What to look for |
+|---|---|
+| A | `[OTR_RTXUpscale] spacesaver:` lines pointing at A's `ep_dir` for A's run, B's for B's. OBS-existence guard fires if either `obs/<ep>.mp4` is missing. |
+| B | `[Ledger] per-episode dir moved ... (attempt 1)` once per episode. No orphan `<old>_*.txt` in any episode dir. No `[Ledger] meta.paths stamp failed` warnings. |
+| C | No `f"{ep_id}_..."` paths in any logged disk-touching line. |
+| D | `[MusicGenTheme] CACHE HIT` on second run with canonical `.wav` (no `_<ts>` suffix). Same for AudioGen. |
+| E | New ledgers carry `meta.paths.layout: per-episode-workspace`. `meta.paths.audio_dir` matches actual on-disk location after rename. Old ledgers (if any) load via `dict.get` defaults without KeyError. |
+
+Once green, BUG-LOCAL-014/015/016/017/018 promote to the Bible together.
