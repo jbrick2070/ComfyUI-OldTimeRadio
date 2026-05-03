@@ -478,6 +478,22 @@ class RTXUpscale:
             except Exception:  # noqa: BLE001
                 pass
 
+        # ----------------------------------------------------------------
+        # Spacesaver cleanup: read the ledger's perfect_run_spacesaver
+        # flag (stamped by OTR_LLMScriptWriter at workflow start). When
+        # ON, wipe every per-episode intermediate file under
+        # otr/episodes/<episode_id>/ EXCEPT the ledger json + the
+        # treatment txt. The final upscaled mp4 already lives at
+        # otr/obs/<ep>.mp4 (or out_mp4 for bypass), unaffected.
+        # ----------------------------------------------------------------
+        try:
+            _spacesaver_cleanup_if_flagged(src=src, log_lines=report_lines)
+        except Exception as exc:  # noqa: BLE001
+            report_lines.append(
+                f"  spacesaver cleanup failed (non-fatal): {exc}"
+            )
+            log.warning("[OTR_RTXUpscale] spacesaver cleanup failed: %s", exc)
+
         total_ms = int((time.time() - t_start) * 1000)
         report_lines.append(
             f"OTR_RTXUpscale: complete in {total_ms} ms -> {out_mp4}"
@@ -487,6 +503,142 @@ class RTXUpscale:
             total_ms, src.name, out_mp4.name,
         )
         return (str(out_mp4), "\n".join(report_lines))
+
+
+def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
+    """If the ledger's `meta.perfect_run_spacesaver` flag is True, wipe
+    every per-episode intermediate file under otr/episodes/<ep>/ EXCEPT
+    the ledger json + the treatment txt. No-op when the flag is False.
+
+    The ledger is found by walking up from the composite intermediate's
+    path (`src` = the VideoComposite mp4 = otr/episodes/<ep>/composited/<ep>.mp4
+    or, in legacy/bypass scenarios, the source mp4 path itself). We
+    derive the per-episode root as the grandparent of the composite, OR
+    the parent of the source if the source is already in the audio dir.
+
+    Keep list (NOT deleted):
+      - otr/episodes/<ep>/audio/<ep>_ledger.json
+      - otr/episodes/<ep>/audio/<ep>_treatment.txt
+
+    Wipe list (everything else under otr/episodes/<ep>/):
+      - audio/<ep>.mp4 (procgen base)
+      - audio/*.wav (Bark / MusicGen / AudioGen wavs)
+      - audio/director_dump_*.txt
+      - audio/pending_*_ledger.json (any orphan pending files)
+      - stills/                       (FLUX environments + radio bookend)
+      - portraits/                    (PASS1 character portraits)
+      - videos/                       (per-line piece clips)
+      - composited/                   (832x480 intermediate)
+    """
+    # Find the ledger -- the walker handles both per-episode and legacy
+    # flat layouts. If no ledger, no flag to read; skip cleanup.
+    # Sibling-absolute imports (rtx_upscale lives at nodes/, gets its
+    # parent dir prepended to sys.path at module load time).
+    try:
+        import _otr_ledger as _OTRL  # type: ignore
+        from _otr_paths import otr_episodes_root, otr_legacy_audio_dir
+        ledger_path = _OTRL.find_most_recent_ledger(
+            [otr_episodes_root(), otr_legacy_audio_dir()]
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.debug(
+            "[OTR_RTXUpscale] spacesaver: ledger lookup failed (%s); skipping",
+            exc,
+        )
+        return
+    if ledger_path is None:
+        log.debug("[OTR_RTXUpscale] spacesaver: no ledger found; skipping")
+        return
+
+    import json as _json
+    try:
+        led = _json.loads(Path(ledger_path).read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_RTXUpscale] spacesaver: ledger parse failed (%s); skipping",
+            exc,
+        )
+        return
+    meta = led.get("meta") or {}
+    flag = bool(meta.get("perfect_run_spacesaver"))
+    if not flag:
+        log.debug("[OTR_RTXUpscale] spacesaver flag OFF; no cleanup")
+        return
+
+    # Per-episode root = ledger_path.parent.parent (since ledger lives
+    # at otr/episodes/<ep>/audio/<ep>_ledger.json).
+    audio_dir = Path(ledger_path).parent
+    ep_dir = audio_dir.parent
+    ep_id = led.get("episode_id") or ep_dir.name
+
+    # Sanity guard: refuse to wipe if ep_dir doesn't look like a
+    # per-episode dir under otr/episodes/. Prevents accidental wipe of
+    # the wrong tree if the resolver got confused.
+    parts_lower = [p.lower() for p in ep_dir.parts]
+    if "episodes" not in parts_lower or "otr" not in parts_lower:
+        log.warning(
+            "[OTR_RTXUpscale] spacesaver: refusing to wipe %s (not under "
+            "otr/episodes/); skipping for safety",
+            ep_dir,
+        )
+        return
+
+    keep_files = {
+        audio_dir / f"{ep_id}_ledger.json",
+        audio_dir / f"{ep_id}_treatment.txt",
+    }
+    deleted_files = 0
+    deleted_bytes = 0
+    deleted_dirs = 0
+
+    # Walk audio/: keep only the ledger + treatment.
+    if audio_dir.exists():
+        for child in audio_dir.iterdir():
+            if child in keep_files:
+                continue
+            try:
+                if child.is_file():
+                    deleted_bytes += child.stat().st_size
+                    child.unlink()
+                    deleted_files += 1
+                elif child.is_dir():
+                    import shutil as _shutil
+                    deleted_bytes += sum(
+                        f.stat().st_size for f in child.rglob('*') if f.is_file()
+                    )
+                    _shutil.rmtree(child, ignore_errors=True)
+                    deleted_dirs += 1
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_RTXUpscale] spacesaver: delete %s failed: %s",
+                    child, exc,
+                )
+
+    # Wipe sibling subdirs entirely: stills/, portraits/, videos/, composited/.
+    for sub_name in ("stills", "portraits", "videos", "composited"):
+        sub = ep_dir / sub_name
+        if not sub.exists():
+            continue
+        try:
+            import shutil as _shutil
+            deleted_bytes += sum(
+                f.stat().st_size for f in sub.rglob('*') if f.is_file()
+            )
+            _shutil.rmtree(sub, ignore_errors=True)
+            deleted_dirs += 1
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[OTR_RTXUpscale] spacesaver: rmtree %s failed: %s",
+                sub, exc,
+            )
+
+    mb = deleted_bytes / (1024 * 1024)
+    msg = (
+        f"  spacesaver: wiped {deleted_files} file(s) + {deleted_dirs} dir(s) "
+        f"({mb:.1f} MB freed) under {ep_dir.name}/ (kept ledger + treatment)"
+    )
+    log_lines.append(msg)
+    log.info("[OTR_RTXUpscale] %s", msg.lstrip())
 
 
 __all__ = ["RTXUpscale"]

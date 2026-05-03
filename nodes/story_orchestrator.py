@@ -4170,6 +4170,24 @@ class LLMScriptWriter:
                     "default": "Standard",
                     "tooltip": "Master switch for multi-pass generation. Obsidian is for 4GB hardware only; it is unstable and disables all iterative passes."
                 }),
+                "perfect_run_spacesaver": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "When ON: at the end of the workflow, wipe every intermediate "
+                        "file under output/otr/episodes/<episode_id>/ -- stills, "
+                        "portraits, per-line video pieces, the 832x480 composite "
+                        "intermediate, MusicGen wavs, AudioGen wavs, Bark wavs, "
+                        "the procgen mp4. KEEP only: the final upscaled mp4 in "
+                        "output/otr/obs/<episode_id>.mp4, the production ledger "
+                        "(<episode_id>_ledger.json), and the treatment text "
+                        "(<episode_id>_treatment.txt). Useful for unattended "
+                        "long-running batches where you want one tidy deliverable "
+                        "per episode instead of ~1 GB of working files. DEFAULT OFF "
+                        "so you can re-upscale, A/B compare, or audit a run later. "
+                        "Stamped into ledger.meta.perfect_run_spacesaver and read "
+                        "by OTR_RTXUpscale at the end of the workflow."
+                    ),
+                }),
                 # v1.4 Theme C - optional series bible. Socket input only, no widget.
                 # BUG-LOCAL-027: project_state MUST remain the last entry in optional.
                 # Socket-only inputs at the tail cannot shift widget slots even if the
@@ -4343,7 +4361,8 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                      creativity="balanced",
                      arc_enhancer=True,
                      project_state=None,
-                     optimization_profile="Standard"):
+                     optimization_profile="Standard",
+                     perfect_run_spacesaver=False):
         force_lemmy = False # internal alias for clarity below (removed from widget to match INPUT_TYPES)
 
         # 2026-04-30 STYLE OVERRIDE: when style_custom is non-empty,
@@ -4432,7 +4451,14 @@ FIRSTNAME LASTNAME: role or personality in one short phrase"""
                     "self_critique":        bool(self_critique),
                     "open_close":           bool(open_close),
                     "custom_premise_set":   bool(custom_premise),
+                    "perfect_run_spacesaver": bool(perfect_run_spacesaver),
                 }
+                # Stamp the spacesaver flag at the meta TOP level too --
+                # OTR_RTXUpscale reads it at the end of the workflow to
+                # decide whether to wipe per-episode intermediates after
+                # the final mp4 lands in otr/obs/. Top-level (not nested
+                # under gen_params_initial) so the read is one indirection.
+                _early_led.data.setdefault("meta", {})["perfect_run_spacesaver"] = bool(perfect_run_spacesaver)
                 _early_led.save()
             except Exception:  # noqa: BLE001 -- snapshot is observability, never blocks
                 pass
