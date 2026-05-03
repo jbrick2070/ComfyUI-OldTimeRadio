@@ -841,8 +841,16 @@ class BatchHumoRender:
                 "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 20.0, "step": 0.1}),
                 "sampler_name": (samplers, {"default": "uni_pc"}),
                 "scheduler": (schedulers, {"default": "simple"}),
-                "width": ("INT", {"default": 480, "min": 256, "max": 1280, "step": 8}),
-                "height": ("INT", {"default": 832, "min": 256, "max": 1280, "step": 8}),
+                # 2026-05-03 EVENING (BUG-LOCAL-030, Jeffrey final spec):
+                # render at 1280x720 LANDSCAPE @ 25 FPS (highest official
+                # trained HuMo resolution per Jeffrey's research). Composite
+                # then crops a 512x832 vertical center pillar from the
+                # scaled-up frame. Higher source detail than the prior
+                # 480x832 portrait default; ~2.3x more pixels per frame.
+                # If VRAM gets tight on 16 GB, fall back to 832x480 (Jeffrey
+                # documented fallback).
+                "width": ("INT", {"default": 1280, "min": 256, "max": 1280, "step": 8}),
+                "height": ("INT", {"default": 720, "min": 256, "max": 1280, "step": 8}),
             },
             "optional": {
                 # BUG-LOCAL-086: dependency-only gate input. Wire any

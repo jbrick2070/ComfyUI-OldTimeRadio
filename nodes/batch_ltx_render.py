@@ -113,8 +113,14 @@ LTX_TEMPORAL_OVERLAP = 8
 # 480p native -- LTX 2B optimal resolution. Width chosen to match
 # HuMo's 832 (so VideoComposite pillarbox math is identical for both
 # clip sources).
-LTX_WIDTH = 832
-LTX_HEIGHT = 480
+# 2026-05-03 EVENING (BUG-LOCAL-030, Jeffrey final spec): bumped LTX render
+# from 832x480 to 1216x704 (preferred higher-detail per Jeffrey's research --
+# divisible by 32, Comfy-friendly, native to newer LTX-2.x distilled models).
+# Reliable fallback 1024x576; safest classic fallback 768x512. After Phase A
+# layered composite, LTX scaled-cropped to fill 1472x832 background --
+# 1216x704 -> ~1.21x scale up, much milder than the prior 1.73x from 832x480.
+LTX_WIDTH = 1216
+LTX_HEIGHT = 704
 
 # Distilled sigma schedule from Jeffrey's ComfyUI-Goofer, proven on
 # RTX 5080 Blackwell. 8 sampling steps, last sigma 0.0 = full denoise.

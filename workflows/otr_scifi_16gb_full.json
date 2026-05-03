@@ -1411,8 +1411,8 @@
         1.0,
         "uni_pc",
         "simple",
-        480,
-        832,
+        1280,
+        720,
         200
       ],
       "color": "#1E3A5F",
@@ -1432,7 +1432,7 @@
       "flags": {},
       "order": 29,
       "mode": 0,
-      "title": "Video Composite (native 832x480 + additive proc gen, upscale later)",
+      "title": "Video Composite (landscape 1472x832 layered, HuMo 512px pillar)",
       "inputs": [
         {
           "name": "procgen_video_path",
@@ -1486,10 +1486,11 @@
         "",
         "lighten",
         0.0,
+        1472,
         832,
-        480,
         25,
-        480,
+        832,
+        512,
         7.0,
         "ffmpeg",
         false,

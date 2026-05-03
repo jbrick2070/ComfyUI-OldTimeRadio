@@ -657,17 +657,22 @@ class TestTailPad:
         self, populated_ledger, populated_clips_dir, fake_procgen, tmp_path
     ):
         """Verify _render_master_mix_per_clip_mux_mode passes
-        extend_tail_s>0 for ONLY the last clip in the timeline."""
+        extend_tail_s>0 for ONLY the last clip in the timeline.
+
+        BUG-LOCAL-030 (2026-05-03 EVENING) refactor: the renderer now
+        calls ``_layered_per_clip_silent`` instead of
+        ``_pillarbox_humo_silent``. Patch updated accordingly.
+        """
         out = tmp_path / "out.mp4"
-        # Capture extend_tail_s per pillarbox call by name.
+        # Capture extend_tail_s per layered-pillarbox call by name.
         per_clip_tail = {}
 
-        original_pb = VC._pillarbox_humo_silent
+        original_lp = VC._layered_per_clip_silent
 
-        def _spy_pb(**kwargs):
+        def _spy_lp(**kwargs):
             line_id = Path(kwargs["clip"]).stem
             per_clip_tail[line_id] = kwargs.get("extend_tail_s", 0.0)
-            return original_pb(**kwargs)
+            return original_lp(**kwargs)
 
         def _record_run(cmd, **_kw):
             if str(cmd[-1]).endswith(".mp4"):
@@ -678,7 +683,7 @@ class TestTailPad:
             )
 
         with patch("subprocess.run", side_effect=_record_run), \
-             patch.object(VC, "_pillarbox_humo_silent", side_effect=_spy_pb):
+             patch.object(VC, "_layered_per_clip_silent", side_effect=_spy_lp):
             VC._render_master_mix_per_clip_mux_mode(
                 ledger=populated_ledger,
                 clips_dir=populated_clips_dir,
@@ -722,9 +727,11 @@ class TestTailPad:
         # (line_id, extend_tail_s) tuples in call order
         pb_calls: list[tuple[str, float]] = []
 
-        original_pb = VC._pillarbox_humo_silent
+        # BUG-LOCAL-030 (2026-05-03 EVENING) refactor: renderer now uses
+        # _layered_per_clip_silent. Patch updated accordingly.
+        original_lp = VC._layered_per_clip_silent
 
-        def _spy_pb(**kwargs):
+        def _spy_lp(**kwargs):
             line_id = Path(kwargs["clip"]).stem
             tail = float(kwargs.get("extend_tail_s", 0.0))
             pb_calls.append((line_id, tail))
@@ -750,7 +757,7 @@ class TestTailPad:
             )
 
         with patch("subprocess.run", side_effect=_record_run), \
-             patch.object(VC, "_pillarbox_humo_silent", side_effect=_spy_pb):
+             patch.object(VC, "_layered_per_clip_silent", side_effect=_spy_lp):
             VC._render_master_mix_per_clip_mux_mode(
                 ledger=populated_ledger,
                 clips_dir=populated_clips_dir,

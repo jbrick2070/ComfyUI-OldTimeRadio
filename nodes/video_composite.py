@@ -43,12 +43,16 @@ Inputs:
                                 on top: addition / screen / lighten
                                 / overlay / normal.
     blend_opacity       FLOAT   0.0 - 1.0, default 0.5.
-    canvas_width        INT     Default 1920.
-    canvas_height       INT     Default 1080.
+    canvas_width        INT     Default 1480 (16:9 with canvas_height
+                                = HuMo native height).
+    canvas_height       INT     Default 832 (HuMo native height,
+                                BUG-LOCAL-030 fix 2026-05-03).
     canvas_fps          INT     Default 25.
-    humo_target_height  INT     HuMo lanczos-fit height. Default
-                                1080. Width derives from HuMo's
-                                native 480:832 aspect (= 624).
+    humo_target_height  INT     HuMo lanczos-fit height. Default 832
+                                (HuMo native, no scale). Width derives
+                                from HuMo's native 480:832 aspect
+                                (= 480, fits in 1480 canvas with
+                                ~500px black bars per side).
 
 Outputs:
     final_mp4_path  STRING  Path to the rendered composite.
@@ -71,7 +75,7 @@ import subprocess
 import sys as _sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 # Path-helper bootstrap (see ``batch_humo_render.py`` for full
 # rationale). ``_otr_paths`` lives as a sibling module; this prepend
@@ -534,6 +538,132 @@ def _resolve_bookend_image(
     return fallback
 
 
+def _resolve_episode_background(episode_dir: Path) -> Optional[Path]:
+    """BUG-LOCAL-030 (2026-05-03 EVENING): pick a background image for the
+    layered HuMo character composite.
+
+    Priority:
+      1. Freshest FLUX env still at ``<ep>/stills/full_env_*.png``
+         (BUG-LOCAL-028 per-episode workspace layout).
+      2. Radio bookend at ``<ep>/stills/radio_bookend_*.png`` (universal
+         broadcast unit identity, always present per BUG-028 fix).
+      3. None -- caller falls back to plain canvas-fill on black.
+
+    Phase A uses the freshest env still as the universal HuMo backdrop
+    (one background per episode). Phase B follow-up could add per-scene
+    env still selection via ``ledger.lines[].shot_id`` -> scenes mapping.
+    """
+    stills = episode_dir / "stills"
+    if not stills.is_dir():
+        return None
+    env_pngs = sorted(
+        stills.glob("full_env_*.png"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if env_pngs:
+        return env_pngs[0]
+    radio_bookends = sorted(
+        stills.glob("radio_bookend_*.png"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if radio_bookends:
+        return radio_bookends[0]
+    return None
+
+
+def _layered_per_clip_silent(
+    clip: Path,
+    speaker_role: str,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    humo_pillar_w: int,
+    humo_pillar_h: int,
+    background_png: Optional[Path],
+    out_path: Path,
+    ffmpeg: str,
+    extend_tail_s: float = 0.0,
+) -> Path:
+    """BUG-LOCAL-030 layered per-clip composite (1472x832 canvas, 2026-05-03
+    EVENING Jeffrey final spec).
+
+    Two render paths chosen by ``speaker_role``:
+
+    - ``speaker_role == "character"`` AND ``background_png`` exists:
+        LAYERED composite. Background = ``background_png`` scaled-cropped
+        to fill the canvas. Pillar = HuMo clip scaled to canvas height
+        (preserving aspect), center-cropped to ``humo_pillar_w x
+        humo_pillar_h``. Pillar overlaid centered on background. Output
+        = full canvas with character lipsync on a stable scene backdrop.
+
+    - any other ``speaker_role`` (announcer / sfx / music_*) OR
+      ``background_png`` is None:
+        SINGLE-SOURCE fill. Clip scaled-cropped to fill the canvas. This
+        handles LTX clips (1216x704 -> 1472x832 fill, ~1.21x scale up
+        with thin side bars per the BUG-030 math) and the no-background
+        fallback for HuMo when no env still exists yet.
+
+    Drops audio entirely (-an) in both paths -- master mix audio attaches
+    at the final mux step downstream so C7 byte-identity holds.
+
+    ``extend_tail_s``: BUG-LOCAL-128 tail-pad (preserves trailing audio
+    against ``-shortest`` truncation in the final mux). Appended to the
+    end of either filter chain via ``tpad=stop_mode=clone``.
+    """
+    is_layered = (
+        speaker_role == "character"
+        and background_png is not None
+        and background_png.exists()
+    )
+
+    if is_layered:
+        bg_chain = (
+            f"[1:v]scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
+            f"crop={canvas_w}:{canvas_h},fps={canvas_fps}[bg]"
+        )
+        pillar_chain = (
+            f"[0:v]scale=-2:{humo_pillar_h}:force_original_aspect_ratio=decrease,"
+            f"crop={humo_pillar_w}:{humo_pillar_h},fps={canvas_fps}[pillar]"
+        )
+        overlay_chain = "[bg][pillar]overlay=x=(W-w)/2:y=0[v]"
+        if extend_tail_s > 0.0:
+            overlay_chain = (
+                "[bg][pillar]overlay=x=(W-w)/2:y=0,"
+                f"tpad=stop_mode=clone:stop_duration={extend_tail_s:.3f}[v]"
+            )
+        filter_complex = f"{bg_chain};{pillar_chain};{overlay_chain}"
+        cmd = [
+            ffmpeg, "-y", "-loglevel", "error",
+            "-i", str(clip),
+            "-loop", "1", "-framerate", str(canvas_fps), "-i", str(background_png),
+            "-filter_complex", filter_complex,
+            "-map", "[v]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+            "-an",
+            str(out_path),
+        ]
+    else:
+        vf = (
+            f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
+            f"crop={canvas_w}:{canvas_h},fps={canvas_fps}"
+        )
+        if extend_tail_s > 0.0:
+            vf = f"{vf},tpad=stop_mode=clone:stop_duration={extend_tail_s:.3f}"
+        cmd = [
+            ffmpeg, "-y", "-loglevel", "error",
+            "-i", str(clip),
+            "-vf", vf,
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+            "-an",
+            str(out_path),
+        ]
+
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out_path
+
+
 def _pillarbox_humo_silent(
     clip: Path,
     canvas_w: int,
@@ -602,6 +732,7 @@ def _render_master_mix_per_clip_mux_mode(
     fallback_clip_length: float,
     ffmpeg: str,
     ffprobe: str,
+    humo_pillar_w: int = 512,
 ) -> tuple[Path, list[str]]:
     """C7-byte-perfect mode (Step 6 of ROADMAP P0, 2026-04-30 lock).
 
@@ -759,15 +890,49 @@ def _render_master_mix_per_clip_mux_mode(
     _TAIL_PAD_S = 0.5
     seg_dir = out_mp4.parent / "_per_clip_mux_segments"
     seg_dir.mkdir(parents=True, exist_ok=True)
+
+    # BUG-LOCAL-030 (2026-05-03 EVENING): resolve the universal HuMo
+    # backdrop ONCE per episode. ``out_mp4`` lives at
+    # ``<ep>/composited/<ep>.mp4`` so ``out_mp4.parent.parent`` is the
+    # per-episode workspace root. The resolver picks the freshest FLUX
+    # env still, then radio bookend, then None (caller falls back to
+    # plain canvas-fill on black for the layered helper).
+    episode_dir = out_mp4.parent.parent
+    background_png = _resolve_episode_background(episode_dir)
+    if background_png is not None:
+        log.info(
+            "[VideoComposite/per_clip_mux] BUG-030 layered composite: "
+            "HuMo character backdrop = %s",
+            background_png.name,
+        )
+        report.append(
+            f"per_clip_mux: layered backdrop = {background_png.name}"
+        )
+    else:
+        log.warning(
+            "[VideoComposite/per_clip_mux] BUG-030 layered composite: "
+            "no FLUX env still or radio bookend found in %s/stills -- "
+            "HuMo character clips will fall back to plain canvas-fill "
+            "(no layered backdrop)",
+            episode_dir,
+        )
+        report.append(
+            "per_clip_mux: layered backdrop = NONE (HuMo will canvas-fill)"
+        )
+
     pillarboxed: list[Path] = []
     pb_failures = 0
     for entry in timeline:
         seg_out = seg_dir / f"pb_{entry['line_id']}.mp4"
         try:
-            _pillarbox_humo_silent(
+            _layered_per_clip_silent(
                 clip=entry["clip_path"],
+                speaker_role=entry.get("speaker_role", ""),
                 canvas_w=canvas_w, canvas_h=canvas_h,
-                canvas_fps=canvas_fps, humo_target_h=humo_target_h,
+                canvas_fps=canvas_fps,
+                humo_pillar_w=humo_pillar_w,
+                humo_pillar_h=humo_target_h,
+                background_png=background_png,
                 out_path=seg_out, ffmpeg=ffmpeg,
                 extend_tail_s=0.0,
             )
@@ -820,10 +985,17 @@ def _render_master_mix_per_clip_mux_mode(
         )
     else:
         try:
-            _pillarbox_humo_silent(
+            # BUG-LOCAL-030: re-pillarbox via the same layered helper so
+            # the tail-pad call produces a frame consistent with the
+            # rest of the timeline (LTX fill or HuMo pillar+backdrop).
+            _layered_per_clip_silent(
                 clip=surviving_entry["clip_path"],
+                speaker_role=surviving_entry.get("speaker_role", ""),
                 canvas_w=canvas_w, canvas_h=canvas_h,
-                canvas_fps=canvas_fps, humo_target_h=humo_target_h,
+                canvas_fps=canvas_fps,
+                humo_pillar_w=humo_pillar_w,
+                humo_pillar_h=humo_target_h,
+                background_png=background_png,
                 out_path=surviving_last, ffmpeg=ffmpeg,
                 extend_tail_s=_TAIL_PAD_S,
             )
@@ -1108,18 +1280,55 @@ class VideoComposite:
                 "blend_opacity": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05,
                 }),
-                # 2026-05-01 EVENING (Jeffrey): downscale to NATIVE
-                # render dims so the iteration cycle is fast. HuMo and
-                # LTX both render at 832x480 natively; pre-this change
-                # we pillarboxed up to 1920x1080 (slow per-frame
-                # encode) before final mux. New default: same canvas
-                # as native render, no upscale until a separate
-                # upscaler stage (RTX VSR) is added later.
-                "canvas_width": ("INT", {"default": 832, "min": 256, "max": 3840, "step": 8}),
-                "canvas_height": ("INT", {"default": 480, "min": 256, "max": 2160, "step": 8}),
+                # 2026-05-03 EVENING (BUG-LOCAL-030, Jeffrey final spec):
+                # LANDSCAPE LAYERED COMPOSITE at 1472x832.
+                #
+                # Per the 2026-05-03 EVENING soak, the prior 832x480 canvas
+                # plus pillarbox-each-clip-individually approach produced
+                # "all black short videos" -- HuMo's native 480x832 portrait
+                # output became a ~276x480 center strip with 67%% black bars
+                # when pillarboxed into the landscape canvas, and LTX clips
+                # alternated alone with no procgen background visible
+                # because per-clip-mux mode bypasses the procgen visual
+                # layer entirely.
+                #
+                # Jeffrey's final spec (echoed into BUG_LOG entry):
+                #   * HuMo native render: 1280x720 @ 25 FPS (highest trained
+                #     resolution -- best face/lipsync detail). Composited
+                #     as 512x832 vertical center pillar.
+                #   * LTX native render: 1216x704 @ 25 FPS (preferred
+                #     higher-detail; divisible by 32, Comfy-friendly).
+                #     Composited as full-frame background layer.
+                #   * Composite canvas: 1472x832 (16:9, divisible by 32).
+                #   * Final RTXUpscale 1472x832 -> 1920x1080.
+                #   * Procgen visual stays at blend_opacity=0 in this
+                #     composite (Phase A); Phase B follow-up adds procgen
+                #     1920x1080 native render + post-RTXUpscale blend so
+                #     the CRT signature stays crisp at delivery res
+                #     instead of being upscaled along with everything.
+                #
+                # The layered compose math: HuMo character clips get the
+                # FLUX env still as backdrop scaled-cropped to fill 1472x832
+                # PLUS HuMo cropped to 512x832 pillar overlaid centered;
+                # LTX non-character clips fill the full canvas alone.
+                # See ``_layered_per_clip_silent`` for the ffmpeg chain.
+                "canvas_width": ("INT", {"default": 1472, "min": 256, "max": 3840, "step": 8}),
+                "canvas_height": ("INT", {"default": 832, "min": 256, "max": 2160, "step": 8}),
                 "canvas_fps": ("INT", {"default": 25, "min": 12, "max": 60}),
                 "humo_target_height": ("INT", {
-                    "default": 480, "min": 256, "max": 2160, "step": 8,
+                    "default": 832, "min": 256, "max": 2160, "step": 8,
+                }),
+                # BUG-LOCAL-030 (2026-05-03 EVENING, Jeffrey final spec):
+                # HuMo center pillar width inside the layered composite.
+                # HuMo source 1280x720 -> scale to humo_target_height (832)
+                # tall = 1480x832 -> center-crop to humo_pillar_width x
+                # humo_target_height. Default 512 keeps the speaker's
+                # face/upper body in frame while leaving room on both
+                # sides for the FLUX env still backdrop. Tunable per
+                # workflow if a different aspect is wanted (e.g. 640
+                # for a wider speaker pillar, 384 for a tighter face).
+                "humo_pillar_width": ("INT", {
+                    "default": 512, "min": 128, "max": 1920, "step": 8,
                 }),
                 "fallback_clip_length": ("FLOAT", {
                     "default": 7.0, "min": 1.0, "max": 9.0, "step": 0.04,
@@ -1263,10 +1472,11 @@ class VideoComposite:
         ledger_json: str,
         blend_mode: str = "lighten",
         blend_opacity: float = 0.0,
-        canvas_width: int = 1920,
-        canvas_height: int = 1080,
+        canvas_width: int = 1472,
+        canvas_height: int = 832,
         canvas_fps: int = 25,
-        humo_target_height: int = 1080,
+        humo_target_height: int = 832,
+        humo_pillar_width: int = 512,
         fallback_clip_length: float = 7.0,
         ffmpeg: str = "ffmpeg",
         cleanup_clips_after_assembly: bool = False,
@@ -1360,6 +1570,7 @@ class VideoComposite:
                     canvas_h=canvas_height,
                     canvas_fps=canvas_fps,
                     humo_target_h=humo_target_height,
+                    humo_pillar_w=humo_pillar_width,
                     fallback_clip_length=fallback_clip_length,
                     ffmpeg=ffmpeg,
                     ffprobe=ffprobe,
