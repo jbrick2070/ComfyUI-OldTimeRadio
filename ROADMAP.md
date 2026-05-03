@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `<this commit>` | **Last refactored:** 2026-05-03 EVENING
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `f1467a2` | **Last refactored:** 2026-05-03 EVENING
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -31,8 +31,8 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 | 024 | H | `5075b9e` | Radio bookend FLUX prompt fell back to generic when style missing OR ledger stale |
 | 025 | H | `5075b9e` | LTX role prompts ignore story style + scene context (every episode looked the same) |
 | 026 | G/H hotfix | `03dfbfa` | DIRECTOR_PROMPT.format crash from Phase H unescaped curly braces (caused soak crash 23:46) |
-| **027** | **soak fix** | **`<this commit>`** | **Critique/revision pass strips all CHARACTER dialogue (parser regex didn't accept `[N] CHARNAME:` format + acceptance gate had no total-collapse check + revision LLM under temp=0.95 would happily produce SCENE/ENV/SFX-only output). 3-part fix: regex + total-collapse hard gate + ABSOLUTE REQUIREMENT prompt clause.** |
-| **028** | **soak fix** | **`<this commit>`** | **FLUX env stills + radio bookend save to legacy flat dirs (`_legacy_stills/` + flat `otr/stills/` shared global counter) instead of per-episode workspace — VideoComposite + BatchHumo + BatchLTX all looked in the wrong places after Phase B reorg. 4-site write+read alignment fix.** |
+| **027** | **soak fix** | **`f1467a2`** | **Critique/revision pass strips all CHARACTER dialogue (parser regex didn't accept `[N] CHARNAME:` format + acceptance gate had no total-collapse check + revision LLM under temp=0.95 would happily produce SCENE/ENV/SFX-only output). 3-part fix: regex + total-collapse hard gate + ABSOLUTE REQUIREMENT prompt clause.** |
+| **028** | **soak fix** | **`f1467a2`** | **FLUX env stills + radio bookend save to legacy flat dirs (`_legacy_stills/` + flat `otr/stills/` shared global counter) instead of per-episode workspace — VideoComposite + BatchHumo + BatchLTX all looked in the wrong places after Phase B reorg. 4-site write+read alignment fix.** |
 
 **Cumulative regression test count (post-027/028):** 155 passed in 3.27s (targeted set: production_ledger + radio_still_resolver + filename_pattern_audit + cache_key_mutations + meta_paths + ledger_rename + critique_dialogue_preservation + save_to_episode_workspace + prompt_format_safety) PLUS Bug Bible regression 24 passed / 1 skipped / 1 xfailed in 1.24s. Full `tests/` directory NOT re-run (BUG-LOCAL-006 dropdown_guardrails hang resurfaced under live ComfyUI; pre-existing, not caused by these fixes; documented as known regression in cohabit mode).
 
