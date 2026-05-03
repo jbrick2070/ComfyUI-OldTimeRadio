@@ -3,6 +3,28 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-017 [FIXED]: MusicGen + AudioGen cache miss every run — `_cache_key` returned a fresh timestamped path
+- **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after end-of-stack soak)
+- **Symptom:** Two files (`nodes/musicgen_theme.py`, `nodes/batch_audiogen_generator.py`) had identical structural bugs in their cache logic. `_cache_key()` returned a filename with the *current* millisecond timestamp baked in (`<role>_<sha8>_<ts_ms>.wav`). The call site immediately checked `os.path.exists(cache_path)` against that exact path — which never existed because the timestamp was "now". Result: cache miss every single run, ~22s of wasted MusicGen rendering per episode + N seconds of wasted AudioGen rendering per SFX cue, AND a Rule C7 violation because each run wrote a different timestamped filename, and FFmpeg embeds input WAV filenames in MP4 metadata streams → final mp4 bytes drifted between identical-input runs.
+- **Cause:** Single function (`_cache_key`) tried to do two incompatible jobs: produce a deterministic identity for cache lookup AND a unique filename for write. The docstring explicitly described the timestamp as "guaranteed unique across episodes" but that defeated the entire cache.
+- **Fix:** Split lookup identity from write filename in both files:
+  - **`_cache_prefix(...)`** — deterministic identity prefix (`<role>_<sha8>` for MusicGen, `sfx_<safe_name>_<sha8>` for AudioGen). No timestamp.
+  - **`_cache_filename_for_write(...)`** — canonical write filename (`<prefix>.wav`). No timestamp. Same inputs always land at the same filename → byte-identical mp4 metadata across runs (Rule C7 holds even on clean-cache runs).
+  - **`_cache_key(...)`** — back-compat alias, returns the canonical write filename.
+  - **`_find_cached(cache_dir, prefix)`** — two-level lookup: canonical `<prefix>.wav` first, fallback to legacy `<prefix>_<ts>.wav` files for back-compat with existing on-disk caches. Uses `iterdir() + startswith()` (per Phase D Gemini consult — `Path.glob()` chokes on `[` in filenames). Sorts legacy matches by parsed filename timestamp (not mtime; mtime is unstable across copy/restore).
+  - **`_save_wav` made atomic** — writes through sibling `.tmp` then `os.replace()` (Phase D Gemini consult: prevents corrupted cache hits if process is killed mid-write). Explicit `format="WAV"` because soundfile can't infer format from `.tmp` extension. Cleanup of orphan `.tmp` on failure.
+- **Verify:**
+  - AST + 7 invariant guards per file (function presence, atomic write, iterdir-not-glob, etc.) — green.
+  - **New mutation suite `tests/test_cache_key_mutations.py` — 30 passed in 2.87s.** 5 MusicGen mutations + 5 AudioGen mutations + 12 lookup tests (canonical-wins, legacy-fallback, newest-timestamp-wins, no-cross-prefix-match, glob-metachar-tolerance) + 2 atomic-write tests + 2 cache_key back-compat tests + 4 atomic-failure tests. Confirms: every identity dimension produces fresh sha; the cosmetic AudioGen `safe_name` is NOT used as identity (full-prompt change beyond first 20 chars still produces fresh sha); `Path.glob` would have failed on `[`-containing prefix but `iterdir+startswith` works.
+  - Three CLAUDE.md regression suites: **221 passed / 1 skipped / 2 xfailed in 110.36s** (Bug Bible 23 + dropdown_guardrails+core 155 + ledger_rename 10 + filename_pattern_audit 3 + cache_key_mutations 30).
+  - Existing on-disk timestamped cache files transparently start hitting after deploy (legacy fallback path).
+  - **Real-run acceptance (pending):** two consecutive identical-input runs should produce one file per `(role, sha)` pair; second run should log `CACHE HIT` with the canonical `.wav` name. End-of-stack soak covers this together with Phases A, B, C.
+- **Tags:** cache, c7-byte-identity, ffmpeg-metadata, atomic-write, qa-pass-2026-05-02
+- **Consult sources:** `docs/2026-05-02-phase-d-cache-key-consult__01_chatgpt.md` (gpt-5.5, 108.1s — proposed strong-form deterministic write), `docs/2026-05-02-phase-d-cache-key-consult__02_gemini.md` (gemini-3.1-pro-preview-customtools, 32.0s — caught atomic-write requirement and `Path.glob` bracket bug), `docs/2026-05-02-phase-d-cache-key-consult__03_nvidia.md` (llama-3.3-nemotron-49b, 127.0s — confirmed all decisions). All three converged unanimously: drop timestamp on writes, two-level lookup, iterdir+startswith, atomic write, defer model_name digest expansion.
+- **Deferred to v2 cache-key migration (separate scope):** add `model_name`, `sample_rate`, `decode_mode`, `guidance_scale` to the digest payload. Today these are effectively constants per-file but if the user starts varying them at runtime, cache identity will be wrong until v2 lands.
+
+---
+
 ### BUG-LOCAL-016 [FIXED]: Filename pattern audit — slug-reconstruction regression guard
 - **Date:** 2026-05-02 | **Phase:** 0 (cleanup hygiene) | **Bible candidate:** yes (after end-of-stack soak)
 - **Symptom:** No active bug — this is a regression guard. The QA pass (`docs/2026-05-02-rtx-upscale-qa-pass.md` Phase C) prescribed an audit of all `nodes/` files for the dangerous anti-pattern: code constructing `f"{ep_id}_..."` to *find* or *delete* a file on disk. The actual on-disk filenames for cache files (musicgen, audiogen wavs) follow the format `<role>_<sha>_<ts>.wav` — produced by the writer, indexed by sha. Slug-reconstruction-for-discovery breaks every time the producer's naming convention diverges from the slug.

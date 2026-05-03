@@ -116,27 +116,104 @@ def _cache_dir() -> str:
     return base
 
 
-def _cache_key(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
-    """Per-render cache filename, guaranteed unique across episodes.
+def _cache_prefix(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
+    """Deterministic cache identity prefix.
 
-    Format: ``<cue_id>_<sha8>_<timestamp_ms>.wav``
+    Format: ``<cue_id>_<sha8>``
       - ``cue_id`` -- human-readable cue (opening / closing / interstitial)
-      - ``sha8`` -- 8 hex chars of SHA256(cue_id|duration|prompt|seed),
-        kept for forensic traceability of which prompt produced which file
-      - ``timestamp_ms`` -- millisecond launch timestamp so filenames are
-        ALWAYS unique per render (Jeffrey directive 2026-05-02 EVENING:
-        every output asset gets a unique identifier so two episodes can
-        never collide on the same cache file). Trade-off: no cross-episode
-        cache reuse -- every MusicGen call renders fresh. Acceptable
-        because OTR prompts vary per news_seed + style anyway, so
-        cross-episode hits were rare in practice. Net cost ~22s of music
-        rendering per episode that we'd otherwise have skipped via cache.
+      - ``sha8`` -- 8 hex chars of SHA256(cue_id|duration|prompt|seed)
+
+    BUG-LOCAL-017 (Phase D, 2026-05-02): the prior implementation appended
+    ``_<timestamp_ms>`` to this prefix and returned a full filename. That
+    forced a fresh filename on every call, which guaranteed a cache MISS
+    every run (the lookup checked exactly the just-computed path). Net
+    cost: ~22s wasted MusicGen renders per episode AND a Rule C7 violation
+    because FFmpeg embeds input WAV filenames in MP4 metadata streams,
+    so the final mp4 bytes drifted between identical-input runs.
+
+    Fix: split lookup identity (this function, deterministic prefix) from
+    write filename (``_cache_filename_for_write``, canonical
+    ``<prefix>.wav``). Lookup uses ``_find_cached`` which checks the
+    canonical filename first, then falls back to legacy timestamped
+    files for back-compat.
     """
-    import time as _time
     payload = f"{cue_id}|{duration_sec}|{prompt}|{episode_seed}".encode("utf-8")
     digest = hashlib.sha256(payload).hexdigest()[:8]
-    ts_ms = int(_time.time() * 1000)
-    return f"{cue_id}_{digest}_{ts_ms}.wav"
+    return f"{cue_id}_{digest}"
+
+
+def _cache_filename_for_write(cue_id: str, prompt: str, duration_sec: int,
+                              episode_seed: str) -> str:
+    """Canonical filename for a fresh cache write. Deterministic -- no
+    timestamp. C7-safe: same inputs always land at the same filename so
+    downstream FFmpeg metadata stays byte-identical run-to-run."""
+    return f"{_cache_prefix(cue_id, prompt, duration_sec, episode_seed)}.wav"
+
+
+def _cache_key(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
+    """Backward-compatible wrapper -- returns the canonical write filename.
+    Kept so any external import of ``_cache_key`` from this module still
+    resolves. New code should call ``_cache_filename_for_write`` (write)
+    or ``_cache_prefix`` + ``_find_cached`` (lookup) directly."""
+    return _cache_filename_for_write(cue_id, prompt, duration_sec, episode_seed)
+
+
+def _find_cached(cache_dir: str, prefix: str) -> str | None:
+    """Find a cached WAV for ``prefix``. Two-level lookup:
+      1. Canonical: ``<prefix>.wav`` (preferred, written by current code)
+      2. Legacy:    ``<prefix>_<ts>.wav`` (back-compat with files written
+         by the pre-Phase-D timestamped implementation)
+
+    Returns the absolute path on hit, None on miss. Never raises.
+
+    Per Phase D consult (Gemini): use ``iterdir() + startswith`` rather
+    than ``Path.glob()`` because prompts can contain glob metacharacters
+    like ``[`` and ``*`` which break glob patterns. Sort legacy matches
+    by parsed filename timestamp (not mtime) so selection is stable
+    across copy/restore/touch operations.
+    """
+    from pathlib import Path
+
+    base = Path(cache_dir)
+    canonical = base / f"{prefix}.wav"
+    if canonical.is_file():
+        return str(canonical)
+
+    if not base.exists():
+        return None
+
+    legacy_prefix = prefix + "_"
+    matches: list[Path] = []
+    try:
+        for path in base.iterdir():
+            name = path.name
+            if (path.is_file()
+                    and name.startswith(legacy_prefix)
+                    and name.lower().endswith(".wav")):
+                matches.append(path)
+    except OSError as exc:
+        log.warning("[MusicGenTheme] cache_dir iterdir failed: %s", exc)
+        return None
+
+    if not matches:
+        return None
+    if len(matches) > 1:
+        log.warning(
+            "[MusicGenTheme] multiple legacy cache files for prefix %s; "
+            "using newest filename timestamp",
+            prefix,
+        )
+
+    def _legacy_sort_key(path: Path):
+        # name = "<prefix>_<ts_ms>.wav" -- strip prefix and .wav, parse int
+        suffix = path.name[len(legacy_prefix):-4]
+        try:
+            return (1, int(suffix), path.name)
+        except ValueError:
+            return (0, 0, path.name)
+
+    matches.sort(key=_legacy_sort_key, reverse=True)
+    return str(matches[0])
 
 
 def _load_cached_wav(path: str) -> torch.Tensor | None:
@@ -156,11 +233,27 @@ def _load_cached_wav(path: str) -> torch.Tensor | None:
 
 
 def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
+    """Atomic WAV write: write to a sibling ``.tmp`` then ``os.replace``
+    into the canonical path. Prevents corrupted cache hits if the
+    process is killed mid-write (Phase D consult, Gemini's catch).
+
+    Note: explicit ``format='WAV'`` is required because soundfile cannot
+    infer the audio format from the ``.tmp`` extension.
+    """
+    tmp_path = path + ".tmp"
     try:
         import soundfile as sf
-        sf.write(path, waveform, sample_rate, subtype="FLOAT")
+        sf.write(tmp_path, waveform, sample_rate,
+                 subtype="FLOAT", format="WAV")
+        os.replace(tmp_path, path)
     except Exception as exc:
         log.warning("[MusicGenTheme] Failed to write cache %s: %s", path, exc)
+        # Best-effort cleanup of tmp on failure
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 def _resolve_cue(cue_id: str, music_plan: list) -> tuple[str, int]:
@@ -256,22 +349,45 @@ class MusicGenTheme:
         # First pass: try to load all three from cache. Only load the model if
         # at least one cue is missing. This keeps re-runs of the same episode
         # instant and VRAM-free.
+        #
+        # BUG-LOCAL-017 (Phase D): lookup uses the deterministic prefix via
+        # ``_find_cached`` which checks canonical ``<prefix>.wav`` first
+        # then falls back to legacy ``<prefix>_<ts>.wav`` files. Write
+        # path uses the canonical (no-timestamp) filename so re-runs
+        # produce byte-identical mp4 metadata (Rule C7).
         results: dict[str, dict] = {}
         to_generate: list[str] = []
         for cue_id, cue in cues.items():
-            cache_path = os.path.join(
-                cache_dir,
-                _cache_key(cue_id, cue["prompt"], cue["duration_sec"], episode_seed),
+            prefix = _cache_prefix(
+                cue_id, cue["prompt"], cue["duration_sec"], episode_seed
             )
-            cue["cache_path"] = cache_path
-            cached = _load_cached_wav(cache_path)
-            if cached is not None:
-                tensor, sr = cached
-                results[cue_id] = {"waveform": tensor, "sample_rate": sr}
-                render_log.append(f"  [{cue_id}] CACHE HIT ({os.path.basename(cache_path)})")
-            else:
-                to_generate.append(cue_id)
-                render_log.append(f"  [{cue_id}] MISS - will generate ({cue['duration_sec']}s)")
+            hit_path = _find_cached(cache_dir, prefix)
+            if hit_path is not None:
+                cached = _load_cached_wav(hit_path)
+                if cached is not None:
+                    cue["cache_path"] = hit_path
+                    tensor, sr = cached
+                    results[cue_id] = {"waveform": tensor, "sample_rate": sr}
+                    render_log.append(
+                        f"  [{cue_id}] CACHE HIT ({os.path.basename(hit_path)})"
+                    )
+                    continue
+                # Load failed (corrupt/unreadable) -- fall through to
+                # generate, write to canonical path which will overwrite
+                # the bad file via atomic _save_wav.
+                render_log.append(
+                    f"  [{cue_id}] CACHE FOUND BUT UNREADABLE ({os.path.basename(hit_path)}); regenerating"
+                )
+            cue["cache_path"] = os.path.join(
+                cache_dir,
+                _cache_filename_for_write(
+                    cue_id, cue["prompt"], cue["duration_sec"], episode_seed
+                ),
+            )
+            to_generate.append(cue_id)
+            render_log.append(
+                f"  [{cue_id}] MISS - will generate ({cue['duration_sec']}s)"
+            )
 
         if to_generate:
             try:
