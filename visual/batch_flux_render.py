@@ -629,6 +629,7 @@ class BatchFluxRender:
                 _sys.path.insert(0, str(_NODES_DIR))
             import _otr_paths as _OTRP  # type: ignore
             import _otr_ledger as _OTRL  # type: ignore
+            import production_ledger as _PROD_LEDGER  # type: ignore
         except Exception as exc:
             log.warning(
                 "[BatchFluxRender] radio still: helper import failed (%s)",
@@ -636,11 +637,45 @@ class BatchFluxRender:
             )
             return
 
-        # Locate ledger first so we can both (a) build the dynamic
-        # prompt and (b) stamp paths after render -- single load.
-        ledger_p = _OTRL.find_most_recent_ledger(
-            [_OTRP.otr_audio_dir(), _OTRP.otr_legacy_audio_dir()]
-        )
+        # BUG-LOCAL-021 (Phase G, 2026-05-03): use the in-flight Ledger
+        # singleton to identify the current episode, NOT the global
+        # mtime walker. Prior to this fix, `find_most_recent_ledger`
+        # picked whichever `*_ledger.json` had the newest mtime under
+        # `otr/episodes/` -- that could be a leftover from a prior
+        # episode, causing the radio bookend to be stamped to the
+        # WRONG ledger (proven in soak run 2026-05-02 where a May 2
+        # run stamped to an April 26 episode_id).
+        #
+        # Same bug shape as BUG-LOCAL-014 (spacesaver wrong-episode
+        # wipe). Phase A fixed it for rtx_upscale; this site was
+        # missed. The singleton's `path` property advances correctly
+        # through Ledger.rename_episode (Phase B), so it tracks the
+        # in-flight episode by construction. ComfyUI sequential queue
+        # + LLMScriptWriter's IS_CHANGED=time.time() prevent the
+        # singleton from ever going stale across queued runs.
+        try:
+            _led_singleton = _PROD_LEDGER.get_ledger()
+            ledger_p = Path(_led_singleton.path)
+            if not ledger_p.exists():
+                # Fall back to mtime walker as last resort -- shouldn't
+                # happen in normal pipeline order but defends against
+                # standalone test invocations of this node.
+                log.warning(
+                    "[BatchFluxRender] radio still: singleton path %s does "
+                    "not exist on disk; falling back to mtime walker",
+                    ledger_p,
+                )
+                ledger_p = _OTRL.find_most_recent_ledger(
+                    [_OTRP.otr_episodes_root(), _OTRP.otr_legacy_audio_dir()]
+                )
+        except Exception as _exc:
+            log.warning(
+                "[BatchFluxRender] radio still: singleton lookup failed (%s); "
+                "falling back to mtime walker", _exc,
+            )
+            ledger_p = _OTRL.find_most_recent_ledger(
+                [_OTRP.otr_episodes_root(), _OTRP.otr_legacy_audio_dir()]
+            )
         led = None
         episode_id = "episode"
         if ledger_p is not None:

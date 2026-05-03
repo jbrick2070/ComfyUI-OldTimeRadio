@@ -700,9 +700,9 @@ class BatchBarkGenerator:
             # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
             # via the centralized helper so both layouts (legacy flat +
             # per-episode tree) are searched.
-            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
-                [otr_episodes_root(), otr_legacy_audio_dir()]
-            )
+            # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
+            # walker. See _otr_ledger.in_flight_ledger_path docstring.
+            ledger_path = _OTRL_PATHS.in_flight_ledger_path()
             if ledger_path is not None:
                 led = _json.loads(ledger_path.read_text(encoding="utf-8"))
                 ledger_lines = led.get("lines") or []

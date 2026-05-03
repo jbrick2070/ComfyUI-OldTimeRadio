@@ -1804,7 +1804,58 @@ class BatchHumoRender:
             audio_dir = p.parent
             stem = p.stem
 
-            # 1. Direct match
+            # 0. Layout-aware lookup (BUG-LOCAL-022, Phase G).
+            # Per-episode workspace: mp4 is at
+            # `output/otr/episodes/<ep>/audio/<file>.mp4`. The ledger
+            # is canonically at `output/otr/episodes/<ep>/audio/<ep>_ledger.json`
+            # where <ep> is the EPISODE DIR NAME, not the mp4 stem.
+            # This decouples ledger discovery from the mp4 filename, which
+            # may be truncated by `safe_title[:40]` in video_engine.py
+            # (consult flagged stem swap is mathematically broken when
+            # truncation drops characters from the title).
+            #
+            # Detection: audio_dir.parent.parent.name == "episodes". If
+            # so, the parent dir IS the episode_id. Try exact ledger
+            # filename first; if absent, glob for any *_ledger.json in
+            # this audio_dir and pick the non-pending one.
+            try:
+                if (audio_dir.name == "audio"
+                        and audio_dir.parent.parent.name == "episodes"):
+                    ep_dir_name = audio_dir.parent.name
+                    layout_ledger = audio_dir / f"{ep_dir_name}_ledger.json"
+                    if layout_ledger.exists():
+                        log.info(
+                            "[BatchHumoRender] Phase G layout-aware ledger "
+                            "lookup: %s (decoupled from mp4 stem %r)",
+                            layout_ledger.name, stem,
+                        )
+                        with open(layout_ledger, "r", encoding="utf-8") as f:
+                            return json.load(f), layout_ledger
+                    # Glob fallback within the same audio dir: the
+                    # canonical name didn't match the dir name (slug
+                    # rule mismatch?), but any non-pending *_ledger.json
+                    # in this dir IS this episode's ledger by
+                    # construction.
+                    for cand in audio_dir.glob("*_ledger.json"):
+                        if cand.name.startswith("pending_"):
+                            continue
+                        log.info(
+                            "[BatchHumoRender] Phase G layout-aware glob "
+                            "lookup: %s (ep_dir=%s, mp4 stem %r)",
+                            cand.name, ep_dir_name, stem,
+                        )
+                        with open(cand, "r", encoding="utf-8") as f:
+                            return json.load(f), cand
+            except Exception as exc_layout:  # noqa: BLE001
+                log.debug(
+                    "[BatchHumoRender] Phase G layout-aware lookup raised "
+                    "(%s); falling through to legacy stem-swap tiers",
+                    exc_layout,
+                )
+
+            # 1. Direct stem match (legacy, kept for back-compat with
+            # mp4s that were written into the legacy flat layout AND
+            # for the case where mp4 stem == ep_id exactly).
             ledger_p = audio_dir / f"{stem}_ledger.json"
             if ledger_p.exists():
                 with open(ledger_p, "r", encoding="utf-8") as f:

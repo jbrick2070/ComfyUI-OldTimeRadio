@@ -194,6 +194,63 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
 # Auto-discover most recent ledger in the canonical audio dir
 # ---------------------------------------------------------------------------
 
+def in_flight_ledger_path() -> Optional[Path]:
+    """Return the in-flight Ledger singleton's on-disk path.
+
+    BUG-LOCAL-021 (Phase G, 2026-05-03): replaces ``find_most_recent_ledger``
+    for in-flight write-back paths. The mtime walker can return a stale
+    leftover ledger across queue boundaries (proven by the FLUX radio
+    bookend stamping to a 6-day-old episode on the 2026-05-02 soak). The
+    in-flight singleton's ``path`` property advances correctly through
+    ``Ledger.rename_episode`` (Phase B), so it tracks the active episode
+    by construction.
+
+    ComfyUI sequential queue + ``LLMScriptWriter.IS_CHANGED = time.time()``
+    prevent the singleton from going stale across queued runs. Falls back
+    to ``find_most_recent_ledger`` for headless/standalone scenarios where
+    no LLMScriptWriter has run in this process.
+
+    Returns the path on success, None on miss. Never raises.
+    """
+    try:
+        # Late import: production_ledger imports _otr_ledger at class-init
+        # for the SCHEMA_VERSION; doing the reverse import at module load
+        # would cycle. Late-binding inside the function is safe.
+        try:
+            from . import production_ledger as _PL  # type: ignore
+        except ImportError:
+            import production_ledger as _PL  # type: ignore
+        led = _PL.get_ledger()
+        p = Path(led.path)
+        if p.exists():
+            return p
+        # Singleton's path doesn't exist on disk (rare: rename failed
+        # silently, or singleton initialized but never .save()'d). Fall
+        # through to legacy walker.
+        log.debug(
+            "[OTR_Ledger] in_flight singleton path %s not on disk; "
+            "falling back to mtime walker", p,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] in_flight singleton lookup failed (%s); "
+            "falling back to mtime walker", exc,
+        )
+    # Last-resort fallback: legacy mtime walker. Standalone/test paths
+    # without an active singleton can still find a ledger this way.
+    try:
+        try:
+            from . import _otr_paths as _P
+        except ImportError:
+            import _otr_paths as _P  # type: ignore
+        return find_most_recent_ledger(
+            [_P.otr_episodes_root(), _P.otr_legacy_audio_dir()]
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[OTR_Ledger] fallback mtime walker failed: %s", exc)
+        return None
+
+
 def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     """Search the supplied dirs for ``*_ledger.json`` and return the
     newest by mtime. Returns None if no candidates found.
@@ -408,6 +465,7 @@ __all__ = [
     "load_ledger_safe",
     "save_ledger_safe",
     "find_most_recent_ledger",
+    "in_flight_ledger_path",
     "patch_line_fields",
     "patch_clip_fields",
     "audio_gate_record",

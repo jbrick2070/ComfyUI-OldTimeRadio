@@ -55,9 +55,9 @@ def _cache_dir() -> str:
     ``<canonical_episode_id>/`` so the wavs travel with the rename.
     """
     try:
-        ledger_path = _OTRL_PATHS.find_most_recent_ledger(
-            [otr_episodes_root(), otr_legacy_audio_dir()]
-        )
+        # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
+        # walker. See full rationale in _otr_ledger.in_flight_ledger_path.
+        ledger_path = _OTRL_PATHS.in_flight_ledger_path()
         if ledger_path is not None:
             base = str(ledger_path.parent)
             os.makedirs(base, exist_ok=True)

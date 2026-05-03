@@ -1438,12 +1438,38 @@ class SignalLostVideoRenderer:
             wf.writeframes(pcm_out.tobytes())
 
         # -- 4. Determine output path ---------------------------------
-        # 2026-04-26 PM BUG-LOCAL-067: nest under output/otr/audio/ so
-        # every OTR artifact lives under the single output/otr/ root.
-        out_dir = os.path.join(
-            os.path.expanduser("~"), "Documents", "ComfyUI",
-            "output", "otr", "audio"
-        )
+        # BUG-LOCAL-020 (Phase G, 2026-05-03): write the procgen mp4
+        # INTO the per-episode pending workspace so it travels with
+        # `Ledger.rename_episode` when the title is finalized below.
+        # Prior to this fix, the mp4 landed at the legacy flat
+        # `output/otr/audio/` which is OUTSIDE the per-episode tree --
+        # rename couldn't move it, BatchHumoRender's stem-swap looked
+        # for the ledger in the legacy dir, didn't find it (ledger had
+        # already been moved into the per-episode workspace by Phase B),
+        # and crashed with `derived ledger from .mp4 not found`.
+        #
+        # Strategy: read out_dir from the in-flight Ledger singleton
+        # (which is `episodes/pending_<ts>/audio/` at this point).
+        # After `Ledger.rename_episode(ep_id)` below moves that parent
+        # dir to `episodes/<ep_id>/`, the mp4 moves with it. We then
+        # recompute the final on-disk path before returning so the
+        # downstream graph receives the post-rename location.
+        try:
+            from .production_ledger import get_ledger as _get_ledger
+            _early_led = _get_ledger()
+            out_dir = str(_early_led.out_dir)
+        except Exception as _exc:  # noqa: BLE001
+            # Fall back to legacy if the ledger is somehow unavailable
+            # (test harness, headless invocation). This preserves the
+            # pre-Phase-G behavior in those edge cases.
+            log.warning(
+                "[Video] ledger singleton unavailable for out_dir (%s); "
+                "falling back to legacy output/otr/audio/", _exc,
+            )
+            out_dir = os.path.join(
+                os.path.expanduser("~"), "Documents", "ComfyUI",
+                "output", "otr", "audio"
+            )
         os.makedirs(out_dir, exist_ok=True)
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
@@ -1519,6 +1545,35 @@ class SignalLostVideoRenderer:
             # Strip the ".mp4" extension and use the stem as the ledger id.
             ep_id = os.path.splitext(os.path.basename(out_path))[0]
             led.rename_episode(ep_id)
+            # BUG-LOCAL-020 (Phase G): the rename moved our parent dir
+            # from `episodes/pending_<ts>/audio/` to `episodes/<ep_id>/audio/`.
+            # The mp4 we wrote at `out_path` no longer exists at that
+            # path string -- it's at `<new_audio_dir>/<basename>`.
+            # Recompute and verify so downstream graph receives the
+            # post-rename location, not the stale pending path.
+            try:
+                _final_out_path = os.path.join(led.out_dir, os.path.basename(out_path))
+                if os.path.exists(_final_out_path):
+                    if _final_out_path != out_path:
+                        log.info(
+                            "[Video] post-rename mp4 path: %s -> %s",
+                            out_path, _final_out_path,
+                        )
+                    out_path = _final_out_path
+                else:
+                    # rename_episode failed silently or fell back to
+                    # the legacy out_dir; original out_path may still
+                    # be valid. Log and continue with original.
+                    log.warning(
+                        "[Video] post-rename recompute: expected %s does "
+                        "not exist; keeping pre-rename path %s",
+                        _final_out_path, out_path,
+                    )
+            except Exception as _exc_recompute:  # noqa: BLE001
+                log.warning(
+                    "[Video] post-rename path recompute failed: %s",
+                    _exc_recompute,
+                )
             led.set_final_paths(
                 audio_path=None,           # standalone WAV not saved yet (L2)
                 video_path=out_path,
@@ -1528,11 +1583,26 @@ class SignalLostVideoRenderer:
         except Exception as _e:  # noqa: BLE001
             log.warning("[Ledger] SignalLostVideo finalize failed: %s", _e)
 
+        # Build the ComfyUI 'gifs' subfolder hint from the actual
+        # post-rename location. ComfyUI expects subfolder relative to
+        # `output/`, so strip the leading `output/` prefix from the
+        # absolute path's parent. Falls back to `otr/audio` if the
+        # path doesn't have an `output/` segment (legacy / test).
+        try:
+            _abs_parent = os.path.abspath(os.path.dirname(out_path))
+            _abs_parent_norm = _abs_parent.replace("\\", "/")
+            if "/output/" in _abs_parent_norm:
+                _subfolder = _abs_parent_norm.split("/output/", 1)[1]
+            else:
+                _subfolder = "otr/audio"
+        except Exception:  # noqa: BLE001
+            _subfolder = "otr/audio"
+
         # Return using the standard ComfyUI 'gifs' key so the canvas
         # spawns an HTML5 video player widget automatically.
         return {
             "ui": {"gifs": [{"filename": os.path.basename(out_path),
-                             "subfolder": "otr/audio",
+                             "subfolder": _subfolder,
                              "type": "output"}]},
             "result": (out_path,),
         }

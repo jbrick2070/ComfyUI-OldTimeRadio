@@ -433,9 +433,9 @@ class AudioEnhance:
             from . import _otr_ledger as _OTRL  # type: ignore
             from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
-            _ledger_p = _OTRL.find_most_recent_ledger(
-                [otr_episodes_root(), otr_legacy_audio_dir()]
-            )
+            # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
+            # walker. See _otr_ledger.in_flight_ledger_path docstring.
+            _ledger_p = _OTRL.in_flight_ledger_path()
             if _ledger_p is not None:
                 _led = _OTRL.load_ledger_safe(_ledger_p)
                 if _led is not None:
