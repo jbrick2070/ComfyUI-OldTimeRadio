@@ -165,3 +165,21 @@ The Sprint 3 mega-sprint code (LTX wiring + RTX VSR upscale + consult fixes) is 
 
 **Sprint 3 acceptance is BLOCKED on BUG-LOCAL-010**, NOT on a Sprint 3 wiring failure. The video-wiring code never executed because the smoke can't get past the LLM phase. Once BUG-LOCAL-010 is fixed in a follow-up bisect, re-queue the same workflow JSON and the S3.x acceptance bullets (ledger source_kind=ltx rows, ffprobe 832x480 pre-upscale + 1920x1080 post-upscale, audio byte-identity via stream MD5, peak VRAM < 14.5/15.5 GB) become directly observable.
 
+### BUG-LOCAL-011 [FIXED]: BatchLTXRender raised on first live run -- _load_ledger missing the .mp4 -> _ledger.json stem-fallback that sister nodes have
+
+- **Date:** 2026-05-02 EVENING | **Phase:** S3 live test | **Bible candidate:** yes
+- **Symptom:** Live run on Jeffrey's ComfyUI Desktop with Gemma-4 E2B (which dodges BUG-LOCAL-010) progressed cleanly through the LLM ladder, audio cascade, FLUX bookend, and all 4 HuMo character clips. At HuMo teardown the dependency edge correctly fired LowVRAMCheckpointLoader -> BatchLTXRender, but BatchLTXRender raised: `RuntimeError: BatchLTXRender: ledger could not be loaded from inline JSON or path` at `batch_ltx_render.py:446`. Wallclock to failure: 00:58:53 (LLM ~10 min, audio ~3 min, FLUX ~3 min, HuMo ~40 min, then LTX failed immediately).
+- **Cause:** `OTR_SignalLostVideo.0` (the STRING input feeding `BatchLTXRender.ledger_json` via link 90) emits the **mp4 path**, not the `_ledger.json` path. `BatchHumoRender._load_ledger_with_path` and `OTR_VideoComposite._load_ledger_with_path` both have a multi-tier stem-fallback that swaps `.mp4` -> `_ledger.json` with collapsed-underscore + fuzzy-match tiers (BUG-LOCAL-118 hardening). My BatchLTXRender's `_load_ledger` skipped that fallback -- it called `load_ledger_safe(.mp4)` directly, got `None`, returned `(None, None)`, raised. Round-robin consult flagged "ledger / clips_dir union" but missed this inner discrepancy because the node *interface* matches HuMo (both take a STRING called `ledger_json`); only the *internal resolver* differs.
+- **Fix:** Replaced `BatchLTXRender._load_ledger` with a port of `BatchHumoRender._load_ledger_with_path`. Same multi-tier behaviour: (1) empty input -> auto-pick newest non-pending under audio dirs; (2) inline JSON -> parse; (3) `.mp4` path -> direct stem swap, then collapsed-underscore variant, then fuzzy directory-scan with <1h freshness gate; (4) `.json` path -> direct load. Same `(dict_or_None, Path_or_None)` return contract so the existing call site at `:425` is unchanged.
+- **Verify:** Re-queue the same workflow JSON. Expect log lines `[BatchLTXRender] episode=signal_lost_..._...` and `radio_bookend: radio_bookend_<ep>.png` (the loader resolved the .mp4 -> _ledger.json swap and read radio_bookend_path from `ledger.meta`). Pre-fix repro: queue a workflow that wires SignalLostVideo.0 directly into BatchLTXRender.ledger_json with no manual ledger path; expect the fix to make this path-shape work end-to-end.
+- **Tags:** ltx, ledger, stem-fallback, signallost-mp4, sister-node-divergence, bible-candidate
+
+### Sprint 3 live-run progress observed on workflow JSON 7c4dfd4 (Gemma-4 E2B path)
+
+- LLM phase (Gemma-4 E2B + E4B): clean. ~10 min. Peak VRAM ~14 GB. Output: parseable script with TITLE + SCENE + 6 [VOICE: ...] lines + 1 SFX + MUSIC closing.
+- Audio cascade (Bark + Kokoro + MusicGen + AudioGen + AudioEnhance + EpisodeAssembler): clean. ~3 min. Episode duration 113s = 1.88 min.
+- SignalLostVideo procgen: clean. mp4 saved 52.2 MB / 113s / 2712 frames in ~14s.
+- BatchFluxRender (5 cast portraits + radio bookend): clean. **S3.2 acceptance VERIFIED**: radio bookend rendered at 1248x720 then Lanczos-downscaled to 832x480.
+- BatchHumoRender Phase A (text encoding 4+1) + Phase B (Whisper) + Phase C (4 lines): clean. Peak VRAM 14.2 GB GPU dedicated. Per-clip ~10:00-10:20 wallclock at 6 sampler steps × ~97s/step. 4 character lines correctly routed to HuMo; 2 announcer lines correctly skipped (BUG-129b).
+- LowVRAMCheckpointLoader -> BatchLTXRender: dependency edge fired correctly (sequencing intent SHIPPED), then BUG-LOCAL-011 raised inside `_load_ledger`. Fix landed in this commit; re-queue to verify the rest of the S3.x acceptance bullets.
+

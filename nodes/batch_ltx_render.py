@@ -764,48 +764,172 @@ class BatchLTXRender:
 
     @staticmethod
     def _load_ledger(arg: str) -> tuple[dict | None, Path | None]:
-        """Accept inline JSON OR a path to *_ledger.json. Empty arg
-        triggers auto-pick of the most recent ledger under
-        otr_audio_dir / otr_legacy_audio_dir."""
+        """Accept either:
+          - inline JSON string (starts with '{') -- returns (dict, None)
+          - path to *_ledger.json -- returns (dict, Path)
+          - path to *.mp4 (audio episode); ledger inferred via
+            suffix swap (.mp4 -> _ledger.json), since that's the
+            convention OTR_SignalLostVideo / EpisodeAssembler write.
+            Lets us wire BatchLTXRender's ledger_json input directly
+            from SignalLostVideo.video_path -- no separate ledger
+            output node required.
+          - empty -> auto-pick newest non-pending in the canonical
+            audio dirs (BUG-LOCAL-076 fallback chain).
+
+        Returns (ledger_dict_or_None, ledger_path_or_None). Mirrors the
+        contract of BatchHumoRender._load_ledger_with_path so the two
+        sister nodes resolve the same ledger from the same SignalLostVideo
+        STRING output. BUG-LOCAL-011 (2026-05-02): originally this
+        method only handled exact .json paths and failed when wired to
+        SignalLostVideo's .mp4 output -- ported the multi-tier stem
+        fallback from batch_humo_render.py.
+        """
         import json as _json
-        try:
-            from . import _otr_ledger as _OTRL  # type: ignore
-        except Exception:
-            _OTRL = None  # type: ignore
 
-        if not arg or not isinstance(arg, str) or not arg.strip():
-            # Auto-pick most recent.
-            if _OTRL is not None:
-                p = _OTRL.find_most_recent_ledger(
-                    [otr_audio_dir(), otr_legacy_audio_dir()]
+        s = (arg or "").strip()
+
+        # Layer 0: empty input -> auto-pick newest non-pending ledger.
+        if not s:
+            audio_dirs = [otr_audio_dir(), otr_legacy_audio_dir()]
+            cands = []
+            for d in audio_dirs:
+                if d.exists():
+                    cands.extend(
+                        p for p in d.glob("*_ledger.json")
+                        if not p.name.startswith("pending_")
+                    )
+            if not cands:
+                log.warning(
+                    "[BatchLTXRender] ledger_json empty and auto-pick "
+                    "found no ledger in audio dirs"
                 )
-                if p is not None:
-                    led = _OTRL.load_ledger_safe(p)
-                    if led is not None:
-                        return led, p
-            return None, None
+                return None, None
+            p = max(cands, key=lambda x: x.stat().st_mtime)
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return _json.load(f), p
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchLTXRender] auto-pick ledger %s failed to load: %s",
+                    p, exc,
+                )
+                return None, None
 
-        s = arg.strip()
-        # Path?
+        # Layer 1: inline JSON object.
         if s.startswith("{") or s.startswith("["):
             try:
                 return _json.loads(s), None
-            except _json.JSONDecodeError:
+            except _json.JSONDecodeError as exc:
+                log.warning(
+                    "[BatchLTXRender] inline JSON parse failed: %s", exc,
+                )
                 return None, None
-        # Path string.
+
+        # Layer 2: filesystem path -- could be .mp4 or _ledger.json.
         try:
             p = Path(s)
         except Exception:  # noqa: BLE001
             return None, None
+
+        # Layer 2a: .mp4 path -> swap suffix to _ledger.json
+        # (SignalLostVideo / EpisodeAssembler convention). Same multi-tier
+        # fallback chain as BatchHumoRender (BUG-LOCAL-118 hardening):
+        #   (1) exact match,
+        #   (2) collapsed-underscore variant,
+        #   (3) directory scan for newest <1h old fuzzy match.
+        if p.suffix.lower() == ".mp4":
+            audio_dir = p.parent
+            stem = p.stem
+
+            # Tier 1: direct match.
+            ledger_p = audio_dir / f"{stem}_ledger.json"
+            if ledger_p.exists():
+                try:
+                    with open(ledger_p, "r", encoding="utf-8") as f:
+                        return _json.load(f), ledger_p
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "[BatchLTXRender] tier-1 ledger %s failed to "
+                        "load: %s", ledger_p, exc,
+                    )
+
+            # Tier 2: underscore-collapse variant.
+            collapsed = stem
+            while "__" in collapsed:
+                collapsed = collapsed.replace("__", "_")
+            if collapsed != stem:
+                cand = audio_dir / f"{collapsed}_ledger.json"
+                if cand.exists():
+                    log.warning(
+                        "[BatchLTXRender] BUG-LOCAL-118 underscore-mismatch "
+                        "fallback: .mp4 stem %r had double underscores; "
+                        "loaded matching ledger %r instead.",
+                        stem, cand.name,
+                    )
+                    try:
+                        with open(cand, "r", encoding="utf-8") as f:
+                            return _json.load(f), cand
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning(
+                            "[BatchLTXRender] tier-2 ledger %s failed to "
+                            "load: %s", cand, exc,
+                        )
+
+            # Tier 3: directory scan for fuzzy-match ledger <1h old.
+            try:
+                cands = list(audio_dir.glob("*_ledger.json"))
+                cands.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                stem_norm = collapsed
+                for cand in cands[:10]:
+                    cand_eid = cand.stem
+                    if cand_eid.endswith("_ledger"):
+                        cand_eid = cand_eid[: -len("_ledger")]
+                    cand_norm = cand_eid
+                    while "__" in cand_norm:
+                        cand_norm = cand_norm.replace("__", "_")
+                    if (cand_norm == stem_norm
+                            or cand_norm in stem_norm
+                            or stem_norm in cand_norm):
+                        age_s = time.time() - cand.stat().st_mtime
+                        if age_s > 3600:
+                            continue
+                        log.warning(
+                            "[BatchLTXRender] BUG-LOCAL-118 fuzzy fallback: "
+                            "binding to %r (age %.0fs) for .mp4 stem %r.",
+                            cand.name, age_s, stem,
+                        )
+                        try:
+                            with open(cand, "r", encoding="utf-8") as f:
+                                return _json.load(f), cand
+                        except Exception as exc:  # noqa: BLE001
+                            log.warning(
+                                "[BatchLTXRender] tier-3 ledger %s failed "
+                                "to load: %s", cand, exc,
+                            )
+            except Exception as scan_exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchLTXRender] BUG-LOCAL-118 directory-scan "
+                    "fallback failed (%s) - falling through.", scan_exc,
+                )
+
+            log.warning(
+                "[BatchLTXRender] derived ledger from .mp4 not found: "
+                "%s (tried direct, collapsed-underscore, fuzzy scan)",
+                ledger_p,
+            )
+            return None, None
+
+        # Layer 2b: plain _ledger.json path.
         if not p.is_file():
             return None, None
-        if _OTRL is not None:
-            led = _OTRL.load_ledger_safe(p)
-            return led, p
         try:
             with open(p, "r", encoding="utf-8") as f:
                 return _json.load(f), p
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[BatchLTXRender] ledger path %s failed to load: %s",
+                p, exc,
+            )
             return None, None
 
 
