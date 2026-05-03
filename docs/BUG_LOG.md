@@ -3,6 +3,49 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-025 [FIXED]: LTX role prompts ignore story style + scene context (every episode looked the same)
+- **Date:** 2026-05-03 | **Phase:** H (story-arc enrichment for visual layer) | **Bible candidate:** yes (after end-of-stack soak)
+- **Symptom:** `nodes/batch_ltx_render.py::_PROMPT_BY_ROLE` is a hardcoded dict mapping `{announcer, music_open, music_close, music_inter, sfx}` → fixed motion prompts ("Vintage 1940s radio broadcast set, glowing tuning dial pulses gently, copper vacuum tubes warm amber glow..."). Every episode renders the SAME LTX motion regardless of the story's style or scene atmosphere. Jeffrey: *"be sure story arc or better shot/scene arc is being fed into FLUX and LTX as well to match the short."*
+- **Cause:** Original `_PROMPT_BY_ROLE` design treated LTX as a generic radio-animator with no story awareness. Acceptable when the radio bookend (the i2v reference image) carries all visual identity — but downstream review confirmed the motion prompt itself influences mood (dial sweep speed, tube glow rhythm, dolly direction).
+- **Fix:** New `_build_ltx_role_prompt(role, line, ledger)` helper enriches each role base prompt with two ledger-derived layers:
+  1. **Per-line scene context.** Lookup chain: `line.shot_id` → `ledger.shots[*].scene_id` → `ledger.scenes[*].env / .description`. Truncated to 60 chars, appended as `, scene context: <env>`. Each LTX clip now matches the SCENE it accompanies (early scenes get tense env, late scenes get resolved env).
+  2. **Episode style suffix.** Read from `ledger.meta.gen_params_initial.style` (or `.gen_params.style`) — same singleton-fed source Phase G fixed for radio bookend. Appended as `, <style> broadcast tone`.
+  Bounded so the role's motion intent isn't drowned. Per-line lookup means one episode's announcer LTX clips can vary across scenes if those scenes have different `env` text.
+- **Verify:** AST + full pytest (1150 / 8 / 1 in 131.62s) green. **Real-run acceptance (pending):** the `[BatchLTXRender]` log lines should now show enriched prompts; two episodes with different styles should produce visibly different LTX motion intent.
+- **Tags:** ltx, story-arc, scene-context, style-aware, qa-pass-2026-05-03
+
+---
+
+### BUG-LOCAL-024 [FIXED]: Radio bookend FLUX prompt fell back to generic when style missing OR ledger stale
+- **Date:** 2026-05-03 | **Phase:** H (story-arc enrichment for visual layer) | **Bible candidate:** yes
+- **Symptom:** Soak run on 2026-05-02 logged `[BatchFluxRender] radio still prompt source=fallback (no style)` — radio rendered as generic "sci-fi retrofuturistic radio broadcast unit" despite user setting style="space opera epic" in the widget. Compounded with BUG-LOCAL-021 (FLUX read a stale April 26 ledger via the broken `find_most_recent_ledger` walker), the radio NEVER reflected the actual episode story.
+- **Cause:** `_build_dynamic_radio_prompt` in `visual/batch_flux_render.py` only looked at two fields (`gen_params_initial.style` + `gen_params.style`) before falling to a single hardcoded fallback. No fallback chain through `style_custom`, scene environment, or episode title.
+- **Fix:** Six-tier resolution with per-tier branch logging:
+  1. `gen_params_initial.style` (primary widget value)
+  2. `gen_params.style` (back-compat)
+  3. `gen_params_initial.style_custom` (free-text override)
+  4. First scene's `env` / `description` (scene-driven mood)
+  5. `episode_id` slug (strip "signal_lost_" prefix + trailing timestamp, replace underscores)
+  6. Hardcoded `_RADIO_FALLBACK_PROMPT` (true last resort)
+  Plus: scene-context hint (`set in <first_scene_env>`) appended whenever distinct from descriptor, so style + scene combine. New log line `[BatchFluxRender] radio prompt: branch=<which> -> <preview>` tells the runtime tail which tier fired. Bounded length: descriptor capped at 80 chars, scene_hint at 60 chars.
+- **Verify:** AST + full pytest green. **Real-run acceptance (pending):** with Phase G singleton lookup feeding the CURRENT ledger, the radio prompt should now log `branch=gen_params_initial.style` and the radio should render as "space opera epic radio broadcast unit, set in derelict orbital lab, ..."
+- **Tags:** flux, radio-bookend, story-arc, fallback-chain, qa-pass-2026-05-03
+
+---
+
+### BUG-LOCAL-023 [FIXED]: ANNOUNCER portrait wasted FLUX context + skewed scene composition
+- **Date:** 2026-05-03 | **Phase:** H (story-arc enrichment for visual layer) | **Bible candidate:** yes
+- **Symptom:** Jeffrey caught mid-soak: `LLMDirector` generates a `portrait_prompt` for ANNOUNCER under `visual_plan.characters`, then `OTR_VideoPlan.compose_shot_prompt` concatenates ALL character portraits into every scene's PASS3 visual prompt. The announcer is never on screen as a person (BUG-LOCAL-129b: routed to Kokoro voice + radio bookend visual; HuMo skips them). Including their portrait wastes FLUX prompt budget AND skews scene composition by forcing every shot to fit an extra character (50yo silver-haired woman in flight gear).
+- **Cause:** Visual_plan.characters was generated for every speaker without a "appears on screen?" filter. PASS3 compose treats the dict as canonical.
+- **Fix (belt-and-suspenders, two layers):**
+  1. **LLMDirector prompt rule** in `nodes/story_orchestrator.py` (VISUAL PLAN RULES section): explicit instruction "EXCLUDE narrator/announcer roles from visual_plan.characters. The ANNOUNCER (and any voice that only narrates without appearing on screen) must NOT be included under visual_plan.characters{}. Their voice mapping still belongs in voice_assignments{}; only visual_plan.characters skips them." Catches it at the source.
+  2. **`OTR_VideoPlan` filter** in `nodes/otr_video_plan.py:438`: new `NON_VISUAL_ROLES = {"ANNOUNCER", "NARRATOR"}` set; before composing portraits, partition `chars_dict.keys()` into `all_char_names` (visible roles) and `_skipped_non_visual` (logged as info). Catches future LLM regressions where layer 1 fails. Honors explicit `focus_character` requests for non-visual roles (lets a debugging workflow request the announcer portrait specifically).
+  Audio is unaffected: `voice_assignments.notes` is a SEPARATE field that audio nodes (Bark/Kokoro) consume; `portrait_prompt` doesn't feed audio at all.
+- **Verify:** AST + full pytest (1150 / 8 / 1 in 131.62s) green. **Real-run acceptance (pending):** scene visual prompts in `[BatchFluxRender] shot N/M:` log lines should NOT lead with "Female, 50s, gravelly voice..." when there's an ANNOUNCER in the cast; should see `OTR_VideoPlan: skipped non-visual role(s) from portrait composition: ANNOUNCER` log line.
+- **Tags:** flux, announcer, visual-plan, scene-composition, qa-pass-2026-05-03
+
+---
+
 ### BUG-LOCAL-022 [FIXED]: BatchHumoRender stem-swap is mathematically broken when safe_title[:40] truncates the title
 - **Date:** 2026-05-03 | **Phase:** G (path-reorg blast radius) | **Bible candidate:** yes (after end-of-stack soak)
 - **Symptom:** `BatchHumoRender._load_ledger_with_path` (line 1791-1865 pre-Phase-G) takes a `.mp4` path input from `SignalLostVideoRenderer` and derives the ledger via stem swap (`<file>.mp4` → `<file>_ledger.json`). When `video_engine.py:1450` truncates the procgen mp4 filename via `safe_title = "...".replace(...)[:40]`, the resulting mp4 stem may NOT equal the canonical `episode_id`. Stem swap looks for a ledger that doesn't exist. Combined with BUG-LOCAL-020 (mp4 in legacy dir), the failure mode is "derived ledger from .mp4 not found". Even after BUG-LOCAL-020 fix puts the mp4 in the per-episode dir, stem swap can still fail if title truncation drops characters.

@@ -437,11 +437,42 @@ def build_shot_plan(
     # name (not "(all)"), emitting only that character's portrait.
     visual_plan = director.get("visual_plan") or {}
     chars_dict = visual_plan.get("characters") or {}
-    all_char_names = [
+
+    # BUG-LOCAL-023 (Phase H, 2026-05-03): EXCLUDE non-visual roles
+    # from portrait composition. ANNOUNCER (and any narrator-style
+    # role that only voices over without appearing on screen) is
+    # always represented by the static radio bookend image (per
+    # BUG-LOCAL-129b: VideoComposite static-radio fill, BatchHumoRender
+    # skip). Including their portrait_prompt in scene visuals wastes
+    # FLUX context AND skews composition by forcing every shot to
+    # accommodate an extra character. Belt-and-suspenders: the
+    # LLMDirector prompt also instructs the LLM to skip these roles
+    # in its visual_plan.characters output (story_orchestrator.py
+    # VISUAL PLAN RULES), but a future LLM regression could re-include
+    # them, so the filter here catches that case too.
+    NON_VISUAL_ROLES = {"ANNOUNCER", "NARRATOR"}
+    raw_char_names = [
         n for n in chars_dict.keys() if isinstance(n, str) and n.strip()
     ]
+    all_char_names = [
+        n for n in raw_char_names
+        if n.strip().upper() not in NON_VISUAL_ROLES
+    ]
+    _skipped_non_visual = [
+        n for n in raw_char_names if n.strip().upper() in NON_VISUAL_ROLES
+    ]
+    if _skipped_non_visual:
+        log.info(
+            "OTR_VideoPlan: skipped non-visual role(s) from portrait "
+            "composition: %s (radio bookend handles their visuals)",
+            ", ".join(_skipped_non_visual),
+        )
     focus_is_limit = bool(focus_character) and focus_character != "(all)"
     if focus_is_limit:
+        # Honor explicit focus_character even if it's a non-visual role
+        # (lets a user manually request an "ANNOUNCER" portrait for
+        # debugging or special workflows). The filter only applies to
+        # the all-characters compose path.
         target_char_names = [focus_character]
     else:
         target_char_names = all_char_names if all_char_names else [focus_character]

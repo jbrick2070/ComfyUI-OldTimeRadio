@@ -9661,8 +9661,9 @@ The script follows these tokens:
 - Keep prompts under 35 words each.
 
 === [VISUAL PLAN RULES (v2.0 PREVIEW)] ===
-- The character `portrait_prompt` must describe the physical appearance of EVERY character in the cast. Include age, gender, clothing, and one distinct facial feature (scars, glasses, hairstyle). Focus on a consistent cinematic style.
-- The scene `visual_prompt` must describe the physical environment of EVERY scene in the script. Focus on lighting, weather, textures, and architecture. 
+- The character `portrait_prompt` must describe the physical appearance of every character in the cast that APPEARS ON SCREEN. Include age, gender, clothing, and one distinct facial feature (scars, glasses, hairstyle). Focus on a consistent cinematic style.
+- **EXCLUDE narrator/announcer roles from visual_plan.characters.** The ANNOUNCER (and any voice that only narrates without appearing on screen) must NOT be included under `visual_plan.characters{}`. Those roles are visualized as a static vintage radio prop, never as a person — including a portrait_prompt for them wastes FLUX context and skews scene composition by forcing the diffusion model to fit an extra character into every shot. Their voice mapping still belongs in `voice_assignments{}` exactly as before; only `visual_plan.characters` skips them.
+- The scene `visual_prompt` must describe the physical environment of EVERY scene in the script. Focus on lighting, weather, textures, and architecture.
 - All prompts must be optimized for High-Fidelity Diffusion models (Flux/SDXL). Use descriptive, atmospheric language.
 - Keep portrait prompts under 30 words and scene prompts under 40 words.
 

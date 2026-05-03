@@ -73,31 +73,50 @@ _RADIO_PROMPT_SUFFIX = (
 def _build_dynamic_radio_prompt(led):
     """Build a radio still FLUX prompt from story context.
 
-    Post 2026-04-30 consolidation: ``style`` is the single
-    free-text tonal/genre knob.  Whatever the user types in the
-    Story Writer's style widget is used VERBATIM as the
-    radio's leading aesthetic descriptor; the SIGNAL LOST universal
-    suffix is appended to anchor broadcast-distress identity.
+    BUG-LOCAL-024 (Phase H, 2026-05-03): the radio is the visual
+    anchor for the announcer, music cues, and SFX — every audio
+    second that isn't a HuMo lip-sync clip falls back to this
+    image. Jeffrey: "we always need flux to look at the story
+    and render that radio for the music, announcer and sfx."
 
-    Field resolution order on the ledger (handles both the canonical
-    phase-0 stamp and the spine-ledger forward-compat schema):
-      1. ``ledger.meta.gen_params_initial.style``
-      2. ``ledger.meta.gen_params.style``
+    Resolution order, each field tried until one yields a non-empty
+    descriptor (logged at INFO so the runtime tail shows which
+    branch fired):
+      1. ``ledger.meta.gen_params_initial.style``     (primary; the
+         widget the user picked, e.g. "noir mystery")
+      2. ``ledger.meta.gen_params.style``             (back-compat
+         for ledgers that used the spine-ledger schema)
+      3. ``ledger.meta.gen_params_initial.style_custom``  (free-text
+         override the user typed when style="custom")
+      4. First scene's environment hint from
+         ``ledger.scenes[0].env`` or ``ledger.scenes[0].description``
+         — gives the radio a setting-aware tone even when style
+         is empty
+      5. ``ledger.episode_id`` (slug) — last resort before the
+         hardcoded fallback, so the radio at least reflects the
+         episode title vibe instead of a generic sci-fi prop
+      6. ``_RADIO_FALLBACK_PROMPT`` — true last resort
 
-    Falls back to ``_RADIO_FALLBACK_PROMPT`` only when ``led`` is
-    None or no style string can be extracted.  Hostile-input
-    safe: any wrong type lands on the safe default.
+    A scene-context hint (first scene's env/description, truncated)
+    is APPENDED to the resolved descriptor whenever it's available
+    AND distinct from the resolved descriptor itself, so the radio
+    composition picks up specific episode atmosphere on top of the
+    general style. Bounded length: scene-context hint capped at 60
+    chars, total prompt body capped before the universal suffix.
 
-    Examples (style text -> built prompt):
-      "noir mystery"
-        -> "noir mystery radio broadcast unit, 35mm film grain, ..."
-      "neon-drenched cyber-noir, rain-streaked plexi housing"
-        -> "neon-drenched cyber-noir, rain-streaked plexi housing
-            radio broadcast unit, 35mm film grain, ..."
-      "rust-belt post-apocalyptic"
-        -> "rust-belt post-apocalyptic radio broadcast unit, ..."
+    Hostile-input safe: any wrong type lands on the safe default.
+
+    Examples:
+      style="noir mystery", first_scene_env="rain-slicked alley"
+        -> "noir mystery radio broadcast unit, set in rain-slicked
+            alley, 35mm film grain, ..."
+      style empty, first_scene_env="cramped cargo bay vibrating"
+        -> "cramped cargo bay vibrating radio broadcast unit, ..."
+      everything empty
+        -> _RADIO_FALLBACK_PROMPT
     """
-    if not led:
+    if not led or not isinstance(led, dict):
+        log.info("[BatchFluxRender] radio prompt: led missing -> fallback")
         return _RADIO_FALLBACK_PROMPT
     meta = led.get("meta") if isinstance(led, dict) else None
     if not isinstance(meta, dict):
@@ -107,11 +126,80 @@ def _build_dynamic_radio_prompt(led):
         gp = meta.get("gen_params")
     if not isinstance(gp, dict):
         gp = {}
-    raw = gp.get("style")
-    style = raw.strip() if isinstance(raw, str) else ""
-    if not style:
+
+    def _safe_str(x):
+        return x.strip() if isinstance(x, str) else ""
+
+    # Tier 1-3: style from widget
+    descriptor = _safe_str(gp.get("style"))
+    branch = "gen_params_initial.style"
+    if not descriptor:
+        descriptor = _safe_str(gp.get("style_custom"))
+        if descriptor:
+            branch = "gen_params_initial.style_custom"
+
+    # Tier 4: first scene env / description
+    first_scene_env = ""
+    scenes = led.get("scenes") if isinstance(led, dict) else None
+    if isinstance(scenes, list) and scenes:
+        first = scenes[0] if isinstance(scenes[0], dict) else {}
+        first_scene_env = (
+            _safe_str(first.get("env"))
+            or _safe_str(first.get("description"))
+        )
+    if not descriptor and first_scene_env:
+        descriptor = first_scene_env
+        branch = "first_scene_env"
+
+    # Tier 5: episode_id slug (last resort before hardcoded fallback)
+    if not descriptor:
+        ep_id = _safe_str(led.get("episode_id"))
+        if ep_id and not ep_id.startswith("pending_"):
+            # Strip the "signal_lost_" prefix and trailing timestamp
+            # for a more natural descriptor
+            slug = ep_id
+            if slug.startswith("signal_lost_"):
+                slug = slug[len("signal_lost_"):]
+            # Strip trailing _<8digits>_<6digits> timestamp if present
+            import re as _re
+            slug = _re.sub(r"_\d{8}_\d{6}$", "", slug)
+            slug = slug.replace("_", " ").strip()
+            if slug:
+                descriptor = slug
+                branch = "episode_id_slug"
+
+    # Tier 6: hardcoded fallback
+    if not descriptor:
+        log.info("[BatchFluxRender] radio prompt: all tiers empty -> "
+                 "hardcoded fallback")
         return _RADIO_FALLBACK_PROMPT
-    return f"{style} radio broadcast unit, {_RADIO_PROMPT_SUFFIX}"
+
+    # Bounded scene-context hint, only when distinct from descriptor
+    scene_hint = ""
+    if (first_scene_env
+            and first_scene_env != descriptor
+            and branch != "first_scene_env"):
+        scene_hint = first_scene_env[:60].strip().rstrip(",")
+
+    # Cap descriptor to keep total prompt body reasonable. FLUX prompts
+    # past ~200 tokens lose composition focus; 80 chars is a sane bound.
+    descriptor_capped = descriptor[:80].strip().rstrip(",")
+
+    if scene_hint:
+        body = f"{descriptor_capped} radio broadcast unit, set in {scene_hint}"
+        log.info(
+            "[BatchFluxRender] radio prompt: branch=%s + scene_hint=%r "
+            "-> %s ...",
+            branch, scene_hint[:40], body[:60],
+        )
+    else:
+        body = f"{descriptor_capped} radio broadcast unit"
+        log.info(
+            "[BatchFluxRender] radio prompt: branch=%s -> %s ...",
+            branch, body[:60],
+        )
+
+    return f"{body}, {_RADIO_PROMPT_SUFFIX}"
 
 
 def _lazy_nodes():

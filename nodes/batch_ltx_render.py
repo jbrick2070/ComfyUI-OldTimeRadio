@@ -175,6 +175,70 @@ _PROMPT_BY_ROLE = {
     ),
 }
 
+# BUG-LOCAL-025 (Phase H, 2026-05-03): _PROMPT_BY_ROLE alone produces
+# the SAME LTX motion prompt for every episode regardless of story
+# style or scene context. Jeffrey: "be sure story arc or better
+# shot/scene arc is being fed into FLUX and LTX as well to match the
+# short." This builder enriches each role base prompt with:
+#   - the line's scene_env (lookup via line.shot_id -> shot.scene_id
+#     -> scene.env / scene.description)
+#   - the episode's style from gen_params_initial.style
+# Result: each LTX clip matches the show's tone AND the specific scene
+# it accompanies. Bounded length: scene_env capped at 60 chars to
+# avoid overwhelming the role's motion intent (LTX is i2v -- the
+# image carries visual identity; the prompt mostly drives motion).
+def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
+    base = _PROMPT_BY_ROLE.get(role, _PROMPT_BY_ROLE["sfx"])
+
+    # Scene context from line.shot_id -> shot.scene_id -> scene.env/description
+    scene_env = ""
+    if isinstance(line, dict) and isinstance(ledger, dict):
+        shot_id = line.get("shot_id")
+        if shot_id:
+            shots = ledger.get("shots") or []
+            scene_id = next(
+                (s.get("scene_id") for s in shots
+                 if isinstance(s, dict) and s.get("shot_id") == shot_id),
+                None,
+            )
+            if scene_id:
+                scenes = ledger.get("scenes") or []
+                scene_obj = next(
+                    (sc for sc in scenes
+                     if isinstance(sc, dict) and sc.get("scene_id") == scene_id),
+                    None,
+                )
+                if isinstance(scene_obj, dict):
+                    raw_env = (
+                        scene_obj.get("env")
+                        or scene_obj.get("description")
+                        or ""
+                    )
+                    if isinstance(raw_env, str):
+                        scene_env = raw_env.strip()[:60].rstrip(",").strip()
+
+    # Style from gen_params_initial / gen_params (post-Phase-G ledger
+    # discovery means this reads the CURRENT episode's style, not a
+    # stale leftover).
+    style = ""
+    if isinstance(ledger, dict):
+        meta = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
+        gp = meta.get("gen_params_initial")
+        if not isinstance(gp, dict):
+            gp = meta.get("gen_params")
+        if isinstance(gp, dict):
+            raw = gp.get("style")
+            if isinstance(raw, str):
+                style = raw.strip()
+
+    parts = [base]
+    if scene_env:
+        parts.append(f"scene context: {scene_env}")
+    if style:
+        parts.append(f"{style} broadcast tone")
+    return ", ".join(parts)
+
+
 # Negative prompt: aggressively suppress face hallucination. LTX is
 # generic motion (not face-locked like HuMo), so without this it might
 # wander off the radio still and try to add a person.
@@ -513,9 +577,11 @@ class BatchLTXRender:
             if not isinstance(dur_s, (int, float)) or float(dur_s) <= 0.0:
                 continue
             ltx_length = ltx_length_for_dur(float(dur_s))
-            prompt_text = _PROMPT_BY_ROLE.get(
-                speaker_role, _PROMPT_BY_ROLE["sfx"]
-            )
+            # BUG-LOCAL-025 (Phase H): enrich per-role base with line's
+            # scene context + episode style instead of using the bare
+            # hardcoded role prompt. Same role across two episodes
+            # now produces visibly different motion intent.
+            prompt_text = _build_ltx_role_prompt(speaker_role, ln, ledger)
             plan.append({
                 "line_id": line_id,
                 "speaker_role": speaker_role,
