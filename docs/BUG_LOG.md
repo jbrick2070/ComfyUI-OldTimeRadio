@@ -3,6 +3,23 @@
 Active bug log for the v2.0 build. Every bug gets logged the moment it is found.
 Entries are never deleted.
 
+### BUG-LOCAL-026 [FIXED]: Phase H regression — unescaped curly braces in DIRECTOR_PROMPT crashed `.format()` mid-pipeline
+- **Date:** 2026-05-03 | **Phase:** G/H hotfix | **Bible candidate:** YES (classic `.format()` footgun)
+- **Symptom:** Live soak crash on 2026-05-02 23:46. Episode "Exponential Tremor Echoes" (style="a claude cowork test session", target_words=80) ran cleanly through ScriptWriter (3-outline OpenClose evaluator, critique pass, revision pass, ScriptCritic verdict REVISE with 7 issues, revision applied). Crashed at LLMDirector.direct (`nodes/story_orchestrator.py:9951`):
+  ```
+  IndexError: Replacement index 0 out of range for positional args tuple
+  ```
+  ~10 minutes of LLM compute lost.
+- **Cause:** Phase H BUG-LOCAL-023 added an EXCLUDE-ANNOUNCER clause to `DIRECTOR_PROMPT`. The added prose contained literal `visual_plan.characters{}` and `voice_assignments{}` — two unescaped `{}` empty-brace pairs. The surrounding template uses `str.format()` with kwargs (`script_text`, `voice_mapping_rules`); Python's `.format()` interpreted `{}` as a positional arg slot reference, looked up `args[0]`, found nothing, raised `IndexError`. **Cardinal mistake — adding prose with literal braces to a `.format()` template without escaping.**
+- **Fix:** Removed the literal `{}` symbols from the EXCLUDE-ANNOUNCER prose. Kept the semantic content ("EXCLUDE narrator/announcer roles from the visual plan characters object", etc.) — readable to the LLM, no longer breaks `.format()`. Either `{{ ... }}` escaping OR removing the braces from prose is valid; chose removal for prose-readability.
+- **Verify:**
+  - Standalone `_director_prompt_test.py` smoke: `DIRECTOR_PROMPT.format(script_text=..., voice_mapping_rules=...)` returns 5501 chars, no exception.
+  - **Permanent regression test** `tests/test_prompt_format_safety.py` — extracts `DIRECTOR_PROMPT` constant via regex, calls `.format()` with the production kwargs, asserts no `IndexError`/`KeyError`/`ValueError`. **Passed in 1.74s.** Future Phase-N additions to the prompt that re-introduce unescaped braces will fail this test before they reach a live run.
+- **Tags:** phase-h-regression, str-format, prompt-template, hotfix, bible-candidate
+- **Lesson learned for future autonomous mode:** when editing any constant that's later passed to `.format()`, run `_director_prompt_test.py`-style format smoke as part of the AST guard pass. Don't ship template edits without confirming `.format()` survives.
+
+---
+
 ### BUG-LOCAL-025 [FIXED]: LTX role prompts ignore story style + scene context (every episode looked the same)
 - **Date:** 2026-05-03 | **Phase:** H (story-arc enrichment for visual layer) | **Bible candidate:** yes (after end-of-stack soak)
 - **Symptom:** `nodes/batch_ltx_render.py::_PROMPT_BY_ROLE` is a hardcoded dict mapping `{announcer, music_open, music_close, music_inter, sfx}` → fixed motion prompts ("Vintage 1940s radio broadcast set, glowing tuning dial pulses gently, copper vacuum tubes warm amber glow..."). Every episode renders the SAME LTX motion regardless of the story's style or scene atmosphere. Jeffrey: *"be sure story arc or better shot/scene arc is being fed into FLUX and LTX as well to match the short."*
