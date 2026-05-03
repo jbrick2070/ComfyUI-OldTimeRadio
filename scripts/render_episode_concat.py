@@ -27,8 +27,8 @@ Audio source:
   --audio-wav  the SceneSequencer master WAV directly
 
 Outputs (BUG-LOCAL-084 -- broadcast tree, sibling of output/otr/):
-  output/otr/episodes/<episode_id>/<episode_id>.mp4
-  output/otr/episodes/<episode_id>/<episode_id>.vtt   (subtitle sidecar)
+  output/otr/episodes/<episode_id>.mp4
+  output/otr/episodes/<episode_id>.vtt   (subtitle sidecar)
 
 Usage:
   python scripts/render_episode_concat.py \\
@@ -81,7 +81,7 @@ def parse_args() -> argparse.Namespace:
                        help="Path to the master WAV directly")
     p.add_argument("--out-dir", type=Path, default=None,
                    help="Where to write final mp4 + .vtt. Defaults to "
-                        "<comfy-output-dir>/otr/episodes/<episode_id>/ "
+                        "<comfy-output-dir>/otr/episodes/ "
                         "(canonical post BUG-LOCAL-084 -- sibling of otr/, "
                         "OBS-streaming-safe).")
     p.add_argument("--ffmpeg", default="ffmpeg",
@@ -377,17 +377,16 @@ def main() -> int:
 
     led = load_ledger(args.ledger)
     episode_id = led.get("episode_id") or args.ledger.parent.name
-    # Final episode mp4 lives at output/otr/episodes/<id>/ -- nested
-    # INSIDE the otr/ tree (path consolidation 2026-05-02 EVENING).
-    # Keeps OBS's directory_sorter pointed at one tidy root that has
-    # only finished episodes, while per-line clip pieces stay under
-    # output/otr/videos/ and audio/stills/portraits stay under their
-    # respective otr/ subdirs. Originally lived at
-    # output/episodes_for_obs/<id>/ as a sibling of otr/
-    # (BUG-LOCAL-075 -> BUG-LOCAL-084 era); moved under otr/ once
-    # the first end-to-end Sprint 3 smoke landed cleanly.
+    # Final episode mp4 lives at output/otr/episodes/<episode_id>.mp4
+    # -- FLAT layout (no per-episode subfolder). OBS's directory_sorter
+    # reads this single dir sorted by mtime / filename and queues each
+    # finished episode in turn. Per-line clip pieces stay separated at
+    # output/otr/videos/<episode_id>/ so OBS never sees them.
+    # History: output/episodes_for_obs/<id>/  (BUG-LOCAL-084 era,
+    # sibling of otr/) -> output/otr/episodes/<id>/  (nested under otr/,
+    # earlier on 2026-05-02) -> output/otr/episodes/  (flat, current).
     out_dir = args.out_dir or (
-        args.comfy_output_dir / "otr" / "episodes" / episode_id
+        args.comfy_output_dir / "otr" / "episodes"
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 

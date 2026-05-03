@@ -53,7 +53,7 @@ NEW: OTR_BatchHumoRender
 NEW: OTR_VideoComposite
   Single ffmpeg invocation. Pillarboxes HuMo clips at 624x1080 center in 1920x1080 canvas,
   additive-blends SignalLostVideo proc gen on top at 50% opacity, mux audio from proc gen.
-  Output: output/otr/episodes/<ep_id>/<ep_id>.mp4 — final 1080p deliverable
+  Output: output/otr/episodes/<ep_id>.mp4 — final 1080p deliverable
 ```
 
 ### Why in-graph (not subprocess)?
@@ -68,7 +68,7 @@ The CLI scripts (`scripts/render_humo_batch.py`, `scripts/render_episode_concat.
 2. Drag `workflows/otr_scifi_16gb_full.json` into ComfyUI
 3. Queue prompt
 4. Wait ~3-4 hours for a 5-min episode (audio + FLUX stills are minutes; HuMo per-line is ~265s × N lines)
-5. Final mp4 lands at `output/otr/episodes/<episode_id>/<episode_id>.mp4`
+5. Final mp4 lands at `output/otr/episodes/<episode_id>.mp4`
 
 ### Launching ComfyUI Desktop on Windows (BUG-LOCAL-003 fix)
 
@@ -273,10 +273,11 @@ ComfyUI/
 └── output/                                # ComfyUI base output dir
     └── otr/                               # ALL OldTimeRadio outputs nested here
         │
-        ├── episodes/                      # ★ FINAL DELIVERABLES (point OBS here)
-        │   └── <episode_id>/
-        │       ├── <episode_id>.mp4              # 832x480 composited
-        │       └── <episode_id>_1080p.mp4        # RTX VSR upscaled
+        ├── episodes/                      # ★ FINAL DELIVERABLES (point OBS here, FLAT)
+        │   ├── <episode_id>.mp4                  # 832x480 composited
+        │   ├── <episode_id>_1080p.mp4            # RTX VSR upscaled
+        │   ├── <other_episode>.mp4               # next finished episode (no subfolder)
+        │   └── ...                               # OBS sorts by mtime / filename
         │
         ├── audio/                         # Procgen mp4 + ledger + audio cache
         │   ├── <episode_id>.mp4                  # SignalLostVideo procgen base
@@ -311,8 +312,8 @@ ComfyUI/
 
 **Key invariants:**
 
-- **`otr/episodes/<ep>/`** holds ONLY the user-facing deliverables. Point OBS / external streaming tools here.
-- **`otr/videos/<ep>/`** holds the per-line clip *pieces* (HuMo character clips + LTX announcer / music / sfx clips). VideoComposite reads these and assembles the final `otr/episodes/<ep>/<ep>.mp4`.
+- **`otr/episodes/`** holds ONLY the user-facing final mp4s -- FLAT, no per-episode subfolder. Each episode lands as `<episode_id>.mp4` and `<episode_id>_1080p.mp4`. Point OBS / external streaming tools at this dir; sorts naturally by mtime / filename.
+- **`otr/videos/<ep>/`** holds the per-line clip *pieces* (HuMo character clips + LTX announcer / music / sfx clips). VideoComposite reads these and assembles the final `otr/episodes/<ep>.mp4`.
 - **`otr/audio/<ep>_ledger.json`** is the canonical production ledger. Every node reads from + writes back to this single file.
 - **Path consolidation history:** through 2026-05-02 the final episode mp4 lived at `output/episodes_for_obs/<ep>/` (sibling of `otr/`). Moved under `otr/` after the first end-to-end Sprint 3 smoke landed clean.
 

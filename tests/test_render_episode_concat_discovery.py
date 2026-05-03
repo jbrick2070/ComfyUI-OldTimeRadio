@@ -117,18 +117,22 @@ def test_find_humo_clip_no_episode_dir_returns_none(tmp_path: Path) -> None:
 
 
 def test_default_out_dir_is_in_broadcast_tree(tmp_path: Path) -> None:
-    """The concat default output dir must live nested INSIDE output/otr/
-    at output/otr/episodes/<id>/ -- so OBS's directory_sorter has one
-    tidy root that surfaces only finished episodes, while the per-line
-    clip pieces stay under output/otr/videos/<id>/.
+    """The concat default output dir must be the FLAT canonical episodes
+    folder ``output/otr/episodes/`` -- no per-episode subfolder. OBS's
+    directory_sorter reads this single dir sorted by mtime / filename
+    and queues each finished ``<episode_id>.mp4`` in turn. Per-line
+    clip pieces stay separated under ``output/otr/videos/<id>/`` so
+    OBS never sees them.
 
-    History: originally lived at output/episodes_for_obs/<id>/ as a
-    sibling of output/otr/ (BUG-LOCAL-084 era). Consolidated under
-    otr/episodes/ on 2026-05-02 EVENING after the first end-to-end
-    Sprint 3 smoke landed cleanly -- Jeffrey directive: every project
-    output nested inside the otr/ umbrella.
+    History: ``output/episodes_for_obs/<id>/`` (BUG-LOCAL-084 era,
+    sibling of otr/) -> ``output/otr/episodes/<id>/`` (nested under
+    otr/, earlier on 2026-05-02 EVENING) -> ``output/otr/episodes/``
+    (flat, current -- Jeffrey directive: per-episode subfolder was
+    redundant since each episode already has a unique
+    ``<episode_id>``-prefixed filename).
 
     Pin by source-string check on the active default expression."""
     src = (SCRIPTS_DIR / "render_episode_concat.py").read_text(encoding="utf-8")
-    assert '"otr" / "episodes" / episode_id' in src, \
-        "default out_dir no longer composes output/otr/episodes/<id>"
+    assert '"otr" / "episodes"' in src and '"otr" / "episodes" / episode_id' not in src, \
+        ('default out_dir must be FLAT output/otr/episodes/ '
+         '(no per-episode subfolder)')

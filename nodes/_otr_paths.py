@@ -181,27 +181,39 @@ def otr_videos_dir(episode_id: str) -> Path:
     return comfy_output_dir() / "otr" / "videos" / episode_id
 
 
-def episodes_for_obs_dir(episode_id: str) -> Path:
-    """Final-episode deliverable dir, nested INSIDE the otr/ tree.
+def episodes_for_obs_dir(episode_id: str = "") -> Path:
+    """Final-episode deliverable dir -- FLAT layout.
 
-    Path: ``<output>/otr/episodes/<episode_id>/``
+    Path: ``<output>/otr/episodes/`` (no per-episode subfolder).
 
-    Holds ONLY the user-facing final mp4(s) -- the composited 832x480
-    output from VideoComposite and the upscaled 1080p output from
-    OTR_RTXUpscale. The piece-level per-line clips stay under
-    ``<output>/otr/videos/<episode_id>/`` (see ``otr_videos_dir``).
+    Holds ONLY the user-facing final mp4(s):
+      - ``<episode_id>.mp4``        -- VideoComposite 832x480 output
+      - ``<episode_id>_1080p.mp4``  -- OTR_RTXUpscale 1080p upscale
 
-    History (kept here as the canonical change-log for this path):
+    OBS's directory_sorter reads this single flat directory sorted by
+    mtime / filename and queues each finished episode in turn. The
+    piece-level per-line clips stay under
+    ``<output>/otr/videos/<episode_id>/`` (see ``otr_videos_dir``) so
+    OBS never sees them.
+
+    The ``episode_id`` argument is accepted for back-compat with older
+    callers but is intentionally ignored -- the layout is FLAT, every
+    episode lands in the same parent dir keyed by its ``<episode_id>``
+    in the FILENAME, not the path.
+
+    History (canonical change-log for this path):
       - Originally lived at ``<output>/episodes_for_obs/<episode_id>/``,
-        a sibling of ``otr/`` (BUG-LOCAL-084 era), so OBS's
-        directory_sorter could point at one root and only see finished
-        episodes.
-      - 2026-05-02 EVENING (Jeffrey directive after first end-to-end
-        smoke succeeded): consolidate every project output under the
-        ``otr/`` umbrella so the workspace has one tidy root. OBS
-        config should now point at ``output/otr/episodes/`` instead.
+        a sibling of ``otr/`` (BUG-LOCAL-084 era).
+      - 2026-05-02 EVENING (Jeffrey directive 1): consolidate under the
+        ``otr/`` umbrella -> ``<output>/otr/episodes/<episode_id>/``.
+      - 2026-05-02 EVENING (Jeffrey directive 2): flatten -- the
+        per-episode subfolder layer was redundant since each episode
+        already has a unique ``<episode_id>``-prefixed filename. OBS
+        now points at ``output/otr/episodes/`` (no descend) and gets
+        a flat list of finished mp4s.
     """
-    return comfy_output_dir() / "otr" / "episodes" / episode_id
+    del episode_id  # accepted for back-compat; FLAT layout ignores it
+    return comfy_output_dir() / "otr" / "episodes"
 
 
 def director_raw_dump_dir() -> Path:
