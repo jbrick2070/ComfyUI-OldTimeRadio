@@ -53,15 +53,25 @@ from typing import Any
 import numpy as np
 import torch  # type: ignore
 
-# Make the repo root importable so we can pull `nodes/_otr_paths` etc.
-_HERE = Path(__file__).resolve().parent
-if str(_HERE.parent) not in sys.path:
-    sys.path.insert(0, str(_HERE.parent))
-
-from nodes import _otr_paths as _OTRP  # type: ignore
-from nodes import _otr_ledger as _OTRL  # type: ignore
-
 log = logging.getLogger("OTR")
+
+
+def _lazy_otr_imports():
+    """Mirror the lazy-import pattern used by the sibling
+    ``batch_flux_render.py``. ComfyUI loads custom node modules from
+    inside ``custom_nodes/<pkg>/`` with a different sys.path setup
+    than a standalone Python invocation, so top-level ``from nodes
+    import ...`` fails at module-load time. Doing it lazily inside
+    a helper -- and inserting ``nodes/`` directly onto sys.path so
+    we ``import _otr_paths`` (no ``nodes.`` prefix) -- matches what
+    the working sibling does (see batch_flux_render.py:786-792).
+    """
+    _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
+    if str(_NODES_DIR) not in sys.path:
+        sys.path.insert(0, str(_NODES_DIR))
+    import _otr_paths as _OTRP  # type: ignore
+    import _otr_ledger as _OTRL  # type: ignore
+    return _OTRP, _OTRL
 
 # Default render dims: FLUX-native square portrait. 1024x1024 is the
 # canonical FLUX training resolution; produces the cleanest headshots
@@ -279,6 +289,7 @@ class BatchFluxPortraitRender:
             return (empty, "\n".join(report_lines))
 
         # ---- Resolve output dir ----
+        _OTRP, _OTRL = _lazy_otr_imports()
         portraits_dir = _OTRP.otr_portraits_dir(episode_id)
         portraits_dir.mkdir(parents=True, exist_ok=True)
 
@@ -389,6 +400,7 @@ class BatchFluxPortraitRender:
 
     def _load_ledger(self, ledger_json: str) -> tuple[dict | None, Path | None]:
         """Load ledger from inline JSON OR filesystem path OR auto-pick."""
+        _OTRP, _OTRL = _lazy_otr_imports()
         s = (ledger_json or "").strip()
         if not s:
             try:

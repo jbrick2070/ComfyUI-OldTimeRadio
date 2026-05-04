@@ -610,6 +610,101 @@ Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_P
 
 ---
 
+## v2.1 candidates
+
+### Per-shot / per-scene face variation via PuLID-FLUX
+
+**Status:** queued 2026-05-03 EVENING. **Defer to v2.1** — landed AFTER v2.0 ships clean.
+
+**Context:** v2.0 ships with the BUG-LOCAL-078 portrait pass (`OTR_BatchFluxPortraitRender`). Each character gets ONE canonical portrait per episode — fully dynamic, fresh on every run, no stored stock characters, no cross-episode face library. HuMo references that single portrait for every line of that character's dialogue. Within-episode consistency goes from ~5/10 (env-still tier-4 fallback) to ~9/10 (single canonical portrait). For an anthology series with fresh cast every episode, single-portrait-per-character is the correct architecture. **v2.1 should NOT change that default.**
+
+**What v2.1 ADDS** (opt-in, not default):
+
+Per-shot or per-scene FACE VARIATION for the same character — same identity, different STATE. The character is recognizably the same person across the whole episode (single PuLID identity reference), but each shot/scene can render that face in a different STATE that reflects the story:
+
+- Scene 1: clean, composed (just entered the scenario)
+- Scene 3: sweat, dirt, dilated pupils (mid-crisis)
+- Scene 5: bloodied, exhausted, scarred (post-climax)
+- Scene 6: composed but visibly changed (denouement)
+
+PuLID-FLUX is the canonical solution: it extracts the FACE IDENTITY from a reference image and re-renders it under a new prompt. So the workflow is:
+
+```
+ROUND 1 (text-only FLUX): render the character's seed portrait from
+        ledger.cast[i].appearance text. This becomes the IDENTITY ANCHOR.
+        Same as v2.0's portrait pass. Save to portraits/<char>_seed.png.
+
+ROUND 2..N (PuLID-FLUX, per shot or per scene):
+        For each ledger.scenes[i] OR ledger.shots[i] entry, render a
+        new face image using:
+          - PuLID identity reference  =  portraits/<char>_seed.png
+          - prompt                    =  v2.0's portrait composition base
+                                          + scene/shot-specific state
+                                          modifier (sweat, blood, etc)
+        Save to portraits/<char>_scene{N}.png.
+
+        State modifier sources, in priority order:
+          (a) ledger.scenes[i].character_state[char_id] (if LLMDirector
+              populates it -- new ledger field for v2.1)
+          (b) ledger.shots[i].mood + character_position_in_arc
+          (c) ledger.lines[i].traits (per-line emotion tag)
+          (d) Default ladder by scene index: scene_1=clean,
+              mid_scene=mid, last_scene=worn
+
+HuMo's portrait_path lookup (v2.1 update):
+        Currently picks ledger.cast[i].portrait_path (single canonical).
+        v2.1 adds tier 0: ledger.scenes[scene_id].cast_portraits[char_id]
+        if populated, falls back to tier 1 (cast canonical) otherwise.
+```
+
+**What this BUYS** (per-shot variation locked to single identity):
+- Story-driven visual evolution. The character ages / accumulates damage /
+  emotionally shifts as the episode progresses, but it's recognizably them.
+- Higher emotional payoff in the final montage. Scene 1 vs scene 5 of the
+  same character looks DIFFERENT (right) instead of IDENTICAL (wrong, but
+  what v2.0 ships).
+- Anthology format unchanged. No persistent face library. Each episode
+  builds its own seed + variations from scratch and discards them at the
+  next run.
+
+**What this COSTS:**
+- PuLID-FLUX install: `ComfyUI-PuLID-Flux-Enhanced` custom node + ~1-2 GB
+  PuLID model weights + ~250 MB InsightFace `antelopev2` face detection.
+- VRAM: ~3 GB extra on top of FLUX dev fp8 (~12 GB). Total ~15 GB. Tight
+  but fits the 16 GB ceiling.
+- Render time: 2x portrait time per character per scene/shot variant.
+  For a 5-scene episode with 3 characters: 3 seed portraits + 15 scene
+  variants = 18 FLUX renders, ~3-5 minutes added per episode (vs v2.0's
+  ~30-60 sec for the seed pass alone).
+- Code: extend `OTR_BatchFluxPortraitRender` with a v2 mode that loops
+  scenes after the seed pass; new ledger field `cast_portraits` per scene
+  populated by LLMDirector; HuMo's `_find_portrait` updated to prefer
+  per-scene over canonical when present. Estimated ~4-6 hours of code +
+  test work.
+
+**Acceptance criteria for v2.1 ship:**
+1. Single full episode renders with per-scene face variation enabled.
+2. Visible state shift across scenes (verified by ffprobe + manual frame
+   inspection — scene 1 portrait vs scene 5 portrait should be the SAME
+   FACE but DIFFERENT STATE).
+3. C7 audio byte-identity holds (visual changes don't touch the audio path).
+4. Performance budget: <5 minutes added per episode at 5 scenes / 3
+   characters.
+5. Toggle defaults to OFF so v2.0 single-portrait behavior is the default.
+   Users opt in by flipping a widget.
+
+**Deferred from this lane (separate v2.x work, NOT in v2.1 scope):**
+- Cross-episode face registry (recurring characters, stored library) —
+  conflicts with anthology design philosophy; revisit only if OTR pivots
+  to a serialized format.
+- Face-locking on HuMo's OUTPUT video (not just the portrait input) —
+  much harder, requires video-level identity injection. HuMo's intrinsic
+  per-frame variation is acceptable for now.
+- Multiple portrait ANGLES per character (frontal + 3/4 + side) — would
+  require HuMo upgrade to consume multiple references. Out of scope.
+
+---
+
 ## Discarded — do not revisit
 
 - Flash Attention 2/3 on sm_120
