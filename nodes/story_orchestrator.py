@@ -2147,13 +2147,51 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
 
             from transformers import AutoTokenizer, AutoModelForCausalLM
 
-            cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+            # BUG-LOCAL-085 fix (2026-05-04 MORNING): resolve HF_HOME from
+            # HKCU\Environment so cache_dir is correct even when ComfyUI
+            # Desktop's process didn't inherit User-scope env vars (Electron
+            # parent process quirk). Then resolve the model's snapshot dir
+            # explicitly and pass it to from_pretrained as a path -- this
+            # bypasses transformers' Hub-resolution layer that mis-handles
+            # Windows symlinks under local_files_only=True for sharded
+            # safetensors models, which silently fell back to fp16 and
+            # OOM'd at 24 GiB on the 16 GiB GPU.
+            try:
+                from . import _otr_hf_env as _OTR_HF
+                _hf_home_resolved = _OTR_HF.ensure_hf_home()
+                _runtime_log(f"[StoryOrchestrator] HF_HOME resolved -> {_hf_home_resolved}")
+            except Exception as _hf_err:
+                _runtime_log(f"[StoryOrchestrator] HF_HOME helper unavailable ({_hf_err}); using os.environ fallback")
+                _OTR_HF = None
+                _hf_home_resolved = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+
+            cache_dir_path = os.path.join(_hf_home_resolved, "hub")
+
+            # Try to resolve snapshot path (preferred for sharded models on
+            # Windows). Falls through to model_id if not cached locally.
+            snapshot_path = None
+            if _OTR_HF is not None:
+                try:
+                    snapshot_path = _OTR_HF.resolve_snapshot_dir(model_id, hf_home=_hf_home_resolved)
+                except Exception as _snap_err:
+                    _runtime_log(f"[StoryOrchestrator] snapshot resolve failed ({_snap_err}); using model_id fallback")
+            load_target = snapshot_path or model_id
+            if snapshot_path:
+                _runtime_log(f"[StoryOrchestrator] Loading from canonical snapshot: {snapshot_path}")
+            else:
+                _runtime_log(f"[StoryOrchestrator] Snapshot not found in cache; falling back to model_id with cache_dir")
+
             try:
                 # v1.4 Hardening: Explicitly trust_remote_code=False for flagship security
-                tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True, trust_remote_code=False, cache_dir=cache_dir_path)
+                tokenizer = AutoTokenizer.from_pretrained(
+                    load_target,
+                    local_files_only=(snapshot_path is None),  # local_files_only only for model_id path
+                    trust_remote_code=False,
+                    cache_dir=cache_dir_path,
+                )
                 _runtime_log("LLM tokenizer loaded from cache (no HTTP checks)")
             except Exception as local_err:
-                _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for tokenizer ({local_err}), attempting Hub fallback...")
+                _runtime_log(f"[StoryOrchestrator] tokenizer load failed ({local_err}), attempting Hub fallback...")
                 tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False, cache_dir=cache_dir_path)
 
             common_kwargs = dict(
@@ -2187,7 +2225,8 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
                 try:
                     from transformers import AutoConfig
                     _cfg_kwargs = {"trust_remote_code": False, "cache_dir": cache_dir_path}
-                    model_config = AutoConfig.from_pretrained(model_id, **_cfg_kwargs)
+                    # BUG-LOCAL-085: prefer snapshot path for AutoConfig too
+                    model_config = AutoConfig.from_pretrained(load_target, **_cfg_kwargs)
                     # v1.5 CLEAN: Constrain 128k models to 2k window during spine phase
                     if hasattr(model_config, "max_position_embeddings") and model_config.max_position_embeddings > _cap:
                         _runtime_log(f"[StoryOrchestrator] Hardening: Capping 128k context to {_cap} (Saves ~6GB VRAM)")
@@ -2195,13 +2234,20 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
                 except Exception as _cfg_err:
                     log.warning("[StoryOrchestrator] Config hardening failed: %s", _cfg_err)
 
+                # BUG-LOCAL-085: load from snapshot path when available
+                # (bypasses transformers' Hub-resolution layer); fall back
+                # to model_id only if snapshot resolution failed.
                 model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
-                    local_files_only=True,
+                    load_target,
+                    local_files_only=(snapshot_path is None),
                     config=model_config,
                     **common_kwargs,
                 )
-                _runtime_log("LLM model loaded from cache (no HTTP checks)")
+                _runtime_log(
+                    f"LLM model loaded from "
+                    f"{'canonical snapshot' if snapshot_path else 'model_id with cache_dir'} "
+                    f"(no HTTP checks)"
+                )
             except (OSError, ValueError) as local_err:
                 _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for model ({local_err}), attempting Hub fallback...")
                 try:
