@@ -33,6 +33,8 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 | 026 | G/H hotfix | `03dfbfa` | DIRECTOR_PROMPT.format crash from Phase H unescaped curly braces (caused soak crash 23:46) |
 | **027** | **soak fix** | **`f1467a2`** | **Critique/revision pass strips all CHARACTER dialogue (parser regex didn't accept `[N] CHARNAME:` format + acceptance gate had no total-collapse check + revision LLM under temp=0.95 would happily produce SCENE/ENV/SFX-only output). 3-part fix: regex + total-collapse hard gate + ABSOLUTE REQUIREMENT prompt clause.** |
 | **028** | **soak fix** | **`f1467a2`** | **FLUX env stills + radio bookend save to legacy flat dirs (`_legacy_stills/` + flat `otr/stills/` shared global counter) instead of per-episode workspace — VideoComposite + BatchHumo + BatchLTX all looked in the wrong places after Phase B reorg. 4-site write+read alignment fix.** |
+| **078** | **portraits** | **(BUG_LOG)** | **Per-cast portrait pass (`OTR_BatchFluxPortraitRender`) — renders one clean head-and-shoulders FLUX portrait per cast member to `<ep>/portraits/<char_id>_portrait.png`, stamps `cast[i].portrait_path` into the ledger so HuMo's tier-1 lookup hits instead of falling through to env-still tier-4 stopgap.** |
+| **081** | **workflow-wiring** | **`413ef3a`** | **Portrait node never executed in workflow — Node 59 `ledger_json` socket was wired to Node 12 `video_path` (a `.mp4` filesystem path) so `_load_ledger` raised `RuntimeError`; AND the Node 12 dependency forced portraits to run AT THE END of the workflow, after HuMo had already needed them. Fix (workflow JSON only): drop link 100, set `ledger_json` widget to empty for in-flight auto-pickup, re-route link 45 from `(23 → 24)` to `(59 → 24)` so chain is FLUX env stills → Portraits → UnloadAll → HuMo. Portraits confirmed live in run `signal_lost_skindeep_microneedle_..._222516` — `c01/c02/c03_portrait.png` all rendered.** |
 
 **Cumulative regression test count (post-027/028):** 155 passed in 3.27s (targeted set: production_ledger + radio_still_resolver + filename_pattern_audit + cache_key_mutations + meta_paths + ledger_rename + critique_dialogue_preservation + save_to_episode_workspace + prompt_format_safety) PLUS Bug Bible regression 24 passed / 1 skipped / 1 xfailed in 1.24s. Full `tests/` directory NOT re-run (BUG-LOCAL-006 dropdown_guardrails hang resurfaced under live ComfyUI; pre-existing, not caused by these fixes; documented as known regression in cohabit mode).
 
@@ -376,6 +378,16 @@ Blocked on video-stack maturity. Design begins once stack empirics exist from th
 ---
 
 ## v2.0 release blockers
+
+### B0 — Portrait pass polish (post BUG-LOCAL-081 verification)
+
+**Status:** queued 2026-05-03 LATE EVENING. Discovered live in run `signal_lost_skindeep_microneedle_..._222516` after BUG-081's wiring fix landed and portraits actually rendered for the first time. Two cosmetic-but-real issues:
+
+**B0.1 — Portraits duplicated into `stills/` as `full_env_NNNNN_.png`.** When I re-routed link 45 from `(Node 23 → Node 24 UnloadAll)` to `(Node 59 → Node 24 UnloadAll)`, the downstream `OTR_SaveToEpisodeWorkspace` (Node 25) inherited the new IMAGE source. It now writes the portrait_batch tensors out as `stills/full_env_00001-3_.png` thinking they're env stills. Real portraits are still correctly at `portraits/c0X_portrait.png`, so HuMo's tier-1 lookup is unaffected, but it's ~6 MB of duplicate data per episode with misleading filenames. **Fix options:** (a) detect the source node in SaveToEpisodeWorkspace and route portrait_batch tensors to `portraits/` instead of `stills/`, OR (b) leave SaveToEpisodeWorkspace wired only to genuine env-still sources and let the portrait node manage its own saves (it already does — `<ep>/portraits/<char_id>_portrait.png`). Option (b) is cleaner: just unwire link 46 from UnloadAll → Node 25 when env stills are skipped.
+
+**B0.2 — `skip_announcer=True` widget never fires.** Cast field `cast[i].speaker_role` is empty in the ledger (`role=` for all entries — confirmed via PowerShell on the 222516 run). The portrait node's announcer-skip logic has nothing to match against, so it renders a portrait for ANNOUNCER (c01) too. Cost: ~10s extra FLUX time + one unused 1024x1024 PNG per episode. **Fix:** either (a) populate `speaker_role` field on cast at LLMDirector time (canonical fix; benefits any future role-aware logic), OR (b) fall back to `name.upper() == "ANNOUNCER"` substring match in the portrait node when `speaker_role` is empty (cheap defensive fix). Probably both — populate the field upstream AND keep the substring fallback as defense-in-depth.
+
+**Why release blocker:** v2.0 ships when the per-episode workspace is clean. Phantom env stills + unused announcer portrait are both visible to anyone who opens the workspace folder, and both make the JSON layout harder to reason about during debugging. Cheap to fix once HuMo soak completes.
 
 ### B1 — Generic / relative paths (no Windows-hardcoded absolutes)
 
