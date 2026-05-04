@@ -21,6 +21,26 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-030-AUDIT-COMPLETION [FIXED]: Per-line audio render metadata not stamped to ledger across 4 audio engines (forensic gap)
+- **Date:** 2026-05-03 EVENING (post-final_video_path stamp) | **Phase:** acceptance hardening | **Bible candidate:** YES (forensic provenance)
+- **Symptom (from artifacts-grid audit, no soak failure — preventative gap closure):** ledger only knew which engine produced what audio for a single field (Bark’s `bark_render_ms`). Other engines: KokoroAnnouncer wrote ZERO ledger fields; MusicGenTheme stamped `wav_path + dur_s` only; BatchAudioGen stamped `wav_path + dur_s` only. Cannot answer “which engine + voice + render time + sample hash produced this row?” without re-reading the wav from disk + cross-referencing logs.
+- **Cause:** historical organic growth — Bark got the BUG-LOCAL-101 forensic block, the other three audio engines never got the same treatment. No common helper existed to stamp the canonical `tts_engine / voice_preset / render_ms / generated_dur_s / audio_sample_hash` bundle.
+- **Fix (single commit, 4 nodes + 2 helpers + 1 test file):**
+  - `nodes/_otr_ledger.py`: two new public helpers — `compute_audio_sample_hash(arr_or_bytes, n_bytes=1024) -> str` (8-char SHA256 hex of leading bytes; tripwires sample-rate / channel / pad drift; best-effort ""-on-failure), and `stamp_per_line_audio_meta(ledger, line_id, *, tts_engine, voice_preset="", render_ms=0, generated_dur_s=0.0, audio_sample_hash="") -> bool` (wraps `patch_line_fields`, skips empty/zero values so partial bundles don’t clobber pre-existing fields).
+  - `nodes/batch_bark_generator.py`: extends existing per-line stash + write-back. New row fields `tts_engine="bark"`, `voice_preset` (from `preset` in scope), `render_ms` (mirrors `bark_render_ms`), `generated_dur_s` (mirrors `bark_wav_dur_s`), `audio_sample_hash` (computed from per-line `audio_np`).
+  - `nodes/musicgen_theme.py`: tracks per-cue `_render_ms` around the `model.generate()` call + per-cue `_audio_sample_hash`. Existing `wav_path + dur_s` write-back extended with `tts_engine="musicgen"`, `render_ms`, `generated_dur_s`, `audio_sample_hash` on each `ledger.music[]` row. Generation prompt was already populated by LLMDirector, so this closes the loop on the render-result side.
+  - `nodes/batch_audiogen_generator.py`: same pattern — per-sfx `_render_ms` + `_audio_sample_hash` stash, write-back extended with `tts_engine="audiogen"`, `render_ms`, `generated_dur_s`, `audio_sample_hash` on each `ledger.sfx[]` row.
+  - `nodes/kokoro_announcer.py` (was ZERO ledger touches before this commit): per-line `_render_ms` + `_audio_sample_hash` tracked in a `per_line_meta[]` parallel list. New post-loop write-back uses `_OTRL.in_flight_ledger_path()` singleton (same Phase G discovery as BatchBark) + text-match against `ledger.lines[]` (same first-unmatched-wins strategy as BUG-LOCAL-096). Stamps `tts_engine="kokoro"`, `voice_preset=<chosen voice_id>`, `render_ms`, `generated_dur_s`, `audio_sample_hash` on every matching row. Best-effort: any I/O failure is logged, never raised.
+- **Verify:**
+  - AST parse on all 5 touched node files: green.
+  - **New `tests/test_per_line_audio_meta.py` (10 tests, all passing):** `compute_audio_sample_hash` determinism / divergence / numpy-array support / empty-on-unhashable / leading-bytes-only contract; `stamp_per_line_audio_meta` full-bundle stamp / skip-empty / unknown-line returns False / partial bundle (engine + render_ms + hash only) / never-raises on bad ledger.
+  - Cumulative regression: **200 passed, 1 skipped in 116.85s** (`test_dropdown_guardrails + test_core + test_audio_byte_identical + test_per_line_audio_meta + test_meta_paths + test_post_upscale_procgen_blend`). Bug Bible regression: 24 passed / 1 skipped / 1 xfailed in 1.38s.
+  - **Real-run acceptance (pending):** queue an episode after restart. Expect the per-episode `<ep>_ledger.json` to show on every dialogue row `"tts_engine": "bark"|"kokoro"`, `"voice_preset": "<preset>"`, `"render_ms": <int>`, `"generated_dur_s": <float>`, `"audio_sample_hash": "<8hex>"`; on every `music[]` row `"tts_engine": "musicgen"` + render fields; on every `sfx[]` row `"tts_engine": "audiogen"` + render fields. C7 byte-identity unaffected (audio bytes themselves are NOT modified — this is metadata-only).
+- **Tags:** ledger-schema, forensic-metadata, bark, kokoro, musicgen, audiogen, audit-completion, post-bug-030
+- **Related:** BUG-LOCAL-030 (parent — final_video_path stamp closed the video forensic gap; this closes the audio forensic gap with the same audit-completion theme); BUG-LOCAL-018 (l3-2026-05-02 schema bump that established `meta.paths` precedent for additive ledger fields). Helpers added in this fix are usable by any future audio engine.
+
+---
+
 ### BUG-LOCAL-030 [FIXED]: All-black final video — HuMo portrait squeezed into landscape canvas + per-clip-mux mode bypasses procgen visual layer
 - **Date:** 2026-05-03 EVENING | **Phase:** acceptance (post-029 follow-up surfaced by 14:08 soak) | **Bible candidate:** YES (architecture pivot)
 - **Symptom (from soak `signal_lost_static_echo_20260503_140824`, ffprobe of per-line clips):**

@@ -434,6 +434,11 @@ class MusicGenTheme:
 
                     inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
 
+                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                    # track per-cue render wall-clock so the ledger can
+                    # stamp ledger.music[].render_ms.
+                    import time as _mg_time
+                    _mg_t0 = _mg_time.time()
                     with torch.no_grad():
                         audio_values = model.generate(
                             **inputs,
@@ -441,6 +446,7 @@ class MusicGenTheme:
                             do_sample=True,
                             guidance_scale=guidance_scale,
                         )
+                    _mg_render_ms = int((_mg_time.time() - _mg_t0) * 1000)
 
                     # audio_values shape: (batch=1, channels=1, samples)
                     audio_np = audio_values[0, 0].detach().cpu().float().numpy()
@@ -451,13 +457,26 @@ class MusicGenTheme:
                     _save_wav(cue["cache_path"], audio_np, MUSICGEN_SAMPLE_RATE)
 
                     tensor = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
+                    # BUG-LOCAL-030 audit-completion: stash render_ms +
+                    # audio_sample_hash on the cue dict so the ledger
+                    # write-back loop below can pick them up alongside
+                    # the existing wav_path + dur_s stamps.
+                    cue["_render_ms"] = int(_mg_render_ms)
+                    try:
+                        from . import _otr_ledger as _OTRL_HASH  # type: ignore
+                        cue["_audio_sample_hash"] = (
+                            _OTRL_HASH.compute_audio_sample_hash(audio_np)
+                        )
+                    except Exception:
+                        cue["_audio_sample_hash"] = ""
                     results[cue_id] = {
                         "waveform": tensor,
                         "sample_rate": MUSICGEN_SAMPLE_RATE,
                     }
                     render_log.append(
                         f"  [{cue_id}] GENERATED {len(audio_np) / MUSICGEN_SAMPLE_RATE:.1f}s "
-                        f"-> {os.path.basename(cue['cache_path'])}"
+                        f"-> {os.path.basename(cue['cache_path'])} "
+                        f"(render_ms={_mg_render_ms})"
                     )
             finally:
                 # Always unload to return VRAM to Bark, even if generation failed.
@@ -521,6 +540,21 @@ class MusicGenTheme:
                             row["wav_path"] = str(cache_path)
                         if dur is not None:
                             row["dur_s"] = dur
+                        # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                        # stamp tts_engine + render_ms + generated_dur_s +
+                        # audio_sample_hash on the music row. The
+                        # generation_prompt is already populated by
+                        # LLMDirector; this closes the loop on the
+                        # render-result side.
+                        row["tts_engine"] = "musicgen"
+                        if cue_dict.get("_render_ms"):
+                            row["render_ms"] = int(cue_dict["_render_ms"])
+                        if dur is not None:
+                            row["generated_dur_s"] = float(dur)
+                        if cue_dict.get("_audio_sample_hash"):
+                            row["audio_sample_hash"] = str(
+                                cue_dict["_audio_sample_hash"]
+                            )
                         updated += 1
                 if updated:
                     ledger_path.write_text(

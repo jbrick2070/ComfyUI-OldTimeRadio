@@ -615,6 +615,19 @@ class BatchBarkGenerator:
                     item["_bark_wav_dur_s"] = float(dur)
                     item["_bark_render_ms"] = int(_bark_render_ms)
                     item["_text_for_tts"] = str(_text_for_tts)
+                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                    # stash voice_preset + per-line audio_sample_hash so
+                    # the ledger write-back loop can stamp the new
+                    # forensic fields (tts_engine, voice_preset,
+                    # render_ms, generated_dur_s, audio_sample_hash).
+                    item["_voice_preset"] = str(preset or "")
+                    try:
+                        from . import _otr_ledger as _OTRL_HASH  # type: ignore
+                        item["_audio_sample_hash"] = (
+                            _OTRL_HASH.compute_audio_sample_hash(audio_np)
+                        )
+                    except Exception:
+                        item["_audio_sample_hash"] = ""
                     results[idx] = (audio_np, sr)
                     batch_log.append(f"  [{idx}] {character_name}: {line[:45]}... ({dur:.1f}s)")
                     generated += 1
@@ -752,6 +765,21 @@ class BatchBarkGenerator:
                         row["bark_render_ms"] = int(item["_bark_render_ms"])
                     if "_text_for_tts" in item:
                         row["text_for_tts"] = str(item["_text_for_tts"])
+                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                    # stamp the new per-line forensic fields on the same
+                    # row. Done inline here (not via stamp_per_line_audio_meta)
+                    # because we already have the row reference and the loop
+                    # text-matches; the helper is used by KokoroAnnouncer
+                    # which has no such convenient row handle.
+                    row["tts_engine"] = "bark"
+                    if item.get("_voice_preset"):
+                        row["voice_preset"] = str(item["_voice_preset"])
+                    if item.get("_bark_render_ms"):
+                        row["render_ms"] = int(item["_bark_render_ms"])
+                    if item.get("_bark_wav_dur_s"):
+                        row["generated_dur_s"] = float(item["_bark_wav_dur_s"])
+                    if item.get("_audio_sample_hash"):
+                        row["audio_sample_hash"] = str(item["_audio_sample_hash"])
                     cumulative_start += dur
                     updated += 1
                 if updated:

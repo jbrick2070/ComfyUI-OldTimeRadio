@@ -334,6 +334,96 @@ def patch_clip_fields(
 
 
 # ---------------------------------------------------------------------------
+# Per-line audio render metadata (BUG-LOCAL-030 audit-completion, 2026-05-03 EVENING)
+# ---------------------------------------------------------------------------
+#
+# Adds explicit forensic provenance for every per-line audio render
+# (Bark / Kokoro / MusicGen / AudioGen) to the ledger. Closes the audit
+# gap surfaced by the artifacts-grid review: previously only Bark
+# stamped per-line metadata (text_for_tts + bark_render_ms); the other
+# three TTS/audio engines either stamped nothing per-line (Kokoro) or
+# stamped only the render-result wav path (MusicGen, AudioGen).
+#
+# Five new per-line fields any audio node can stamp:
+#   - tts_engine       : "bark" | "kokoro" | "musicgen" | "audiogen"
+#   - voice_preset     : the voice/instrument slot used
+#   - render_ms        : wall-clock generation time
+#   - generated_dur_s  : actual generated audio duration (vs scheduled dur_s)
+#   - audio_sample_hash: SHA8 of leading audio bytes — forensic byte-identity
+#
+# audio_sample_hash is the killer field: lets a future C7 audit confirm
+# "same input → same audio bytes" without keeping the bytes themselves.
+
+def compute_audio_sample_hash(
+    waveform_bytes_or_array,
+    n_bytes: int = 1024,
+) -> str:
+    """Compute an 8-char SHA256 hex hash of the leading ``n_bytes`` of
+    audio bytes. Tripwires any change to the audio payload, sample rate
+    handling, or padding behavior.
+
+    Accepts:
+      - ``bytes`` directly (already-extracted leading slice)
+      - numpy ndarray (calls ``.tobytes()`` and slices)
+      - torch.Tensor (calls ``.detach().cpu().numpy().tobytes()`` and slices)
+
+    Returns a lowercase 8-char hex string. Returns ``""`` on any
+    extraction failure (best-effort; never raises).
+    """
+    import hashlib
+    try:
+        if isinstance(waveform_bytes_or_array, (bytes, bytearray)):
+            buf = bytes(waveform_bytes_or_array)
+        else:
+            # numpy or torch — duck-type via .tobytes() / .detach().cpu().numpy()
+            arr = waveform_bytes_or_array
+            if hasattr(arr, "detach"):
+                arr = arr.detach().cpu().numpy()
+            if hasattr(arr, "tobytes"):
+                buf = arr.tobytes()
+            else:
+                return ""
+        head = buf[:int(n_bytes)]
+        return hashlib.sha256(head).hexdigest()[:8]
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def stamp_per_line_audio_meta(
+    ledger: dict,
+    line_id: str,
+    *,
+    tts_engine: str,
+    voice_preset: str = "",
+    render_ms: int = 0,
+    generated_dur_s: float = 0.0,
+    audio_sample_hash: str = "",
+) -> bool:
+    """Stamp per-line audio render metadata. Wraps ``patch_line_fields``.
+
+    Skips empty/zero values so callers can pass a partial bundle without
+    overwriting fields they didn't compute (e.g. MusicGen has no
+    voice_preset; just leave it ``""`` and that field stays unset).
+
+    Returns True if a row was updated, False if no matching line_id.
+    Never raises.
+    """
+    fields: dict = {"tts_engine": str(tts_engine)}
+    if voice_preset:
+        fields["voice_preset"] = str(voice_preset)
+    if int(render_ms) > 0:
+        fields["render_ms"] = int(render_ms)
+    if float(generated_dur_s) > 0:
+        fields["generated_dur_s"] = float(generated_dur_s)
+    if audio_sample_hash:
+        fields["audio_sample_hash"] = str(audio_sample_hash)
+    try:
+        return patch_line_fields(ledger, line_id, fields)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Audio gate integrity hashing (CLAUDE.md C7)
 # ---------------------------------------------------------------------------
 

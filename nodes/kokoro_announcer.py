@@ -133,7 +133,7 @@ class KokoroAnnouncer:
                 "script_json": ("STRING", {
                     "multiline": True,
                     "default": "[]",
-                    "tooltip": "Parsed script JSON from Gemma4ScriptWriter",
+                    "tooltip": "Parsed script JSON from LLMScriptWriter",
                 }),
             },
             "optional": {
@@ -154,6 +154,7 @@ class KokoroAnnouncer:
 
     def render(self, script_json, episode_seed="", voice_override="random", speed=0.95):
         import json
+        import time as _kk_time
 
         script = json.loads(script_json) if isinstance(script_json, str) else script_json
         announcer_items = _extract_announcer_lines(script)
@@ -201,9 +202,16 @@ class KokoroAnnouncer:
         clips = []
         render_log = [f"=== Kokoro Announcer ({voice_id}, speed={speed}) ==="]
 
+        # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING): track
+        # per-line render metadata so we can stamp the new forensic
+        # ledger fields after the loop. Parallel arrays keyed by
+        # announcer position; matched to ledger.lines[] by text below.
+        per_line_meta: list[dict] = []
+
         for item in announcer_items:
             idx = item["script_idx"]
             line = item["line"]
+            _kk_t0 = _kk_time.time()
             try:
                 generator = pipeline(
                     line,
@@ -227,7 +235,23 @@ class KokoroAnnouncer:
                 clip_np = clip_np / peak * 0.9  # peak-normalize to -1 dBFS
                 clips.append(clip_np)
                 dur = len(clip_np) / KOKORO_SAMPLE_RATE
-                render_log.append(f"  [{idx}] ANNOUNCER ({dur:.1f}s): {line[:55]}")
+                _kk_render_ms = int((_kk_time.time() - _kk_t0) * 1000)
+                # Compute hash + stash render_ms for ledger stamping.
+                _kk_hash = ""
+                try:
+                    from . import _otr_ledger as _OTRL_HASH  # type: ignore
+                    _kk_hash = _OTRL_HASH.compute_audio_sample_hash(clip_np)
+                except Exception:
+                    _kk_hash = ""
+                per_line_meta.append({
+                    "text": str(line).strip(),
+                    "render_ms": int(_kk_render_ms),
+                    "generated_dur_s": float(dur),
+                    "audio_sample_hash": _kk_hash,
+                })
+                render_log.append(
+                    f"  [{idx}] ANNOUNCER ({dur:.1f}s, render_ms={_kk_render_ms}): {line[:55]}"
+                )
             except Exception as exc:
                 log.warning("[KokoroAnnouncer] Line %d failed: %s", idx, exc)
                 render_log.append(f"  [{idx}] ANNOUNCER FAILED: {exc}")
@@ -235,6 +259,12 @@ class KokoroAnnouncer:
                 word_count = max(1, len(line.split()))
                 est_samples = int(KOKORO_SAMPLE_RATE * word_count / 2.5)
                 clips.append(np.zeros(est_samples, dtype=np.float32))
+                per_line_meta.append({
+                    "text": str(line).strip(),
+                    "render_ms": 0,
+                    "generated_dur_s": float(est_samples) / KOKORO_SAMPLE_RATE,
+                    "audio_sample_hash": "",
+                })
 
         # Assemble into batched AUDIO tensor (B, C, T) with zero-padding.
         max_len = max(len(c) for c in clips)
@@ -257,7 +287,67 @@ class KokoroAnnouncer:
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            
+
+        # ---- BUG-LOCAL-030 audit-completion (2026-05-03 EVENING) ----
+        # Stamp per-line announcer audio render metadata into the
+        # in-flight ledger. Closes the audit gap surfaced by the
+        # artifacts-grid review: KokoroAnnouncer previously had ZERO
+        # ledger writes. Now stamps tts_engine="kokoro" + voice_preset
+        # + render_ms + generated_dur_s + audio_sample_hash on every
+        # matching ledger.lines[] row.
+        #
+        # Match strategy: text-match (same as BatchBark BUG-LOCAL-096
+        # write-back), with first-unmatched-wins for duplicate texts.
+        # Best-effort: any I/O failure is logged but never raised.
+        try:
+            import json as _json
+            from pathlib import Path as _Path  # noqa: F401
+            from . import _otr_ledger as _OTRL  # type: ignore
+            ledger_path = _OTRL.in_flight_ledger_path()
+            if ledger_path is not None:
+                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
+                ledger_lines = led.get("lines") or []
+                # Build text -> [unused indices] map
+                text_to_idx: dict[str, list[int]] = {}
+                for li, ln in enumerate(ledger_lines):
+                    t = (ln.get("text") or "").strip()
+                    if not t:
+                        continue
+                    text_to_idx.setdefault(t, []).append(li)
+                updated = 0
+                for meta in per_line_meta:
+                    candidates = text_to_idx.get(meta["text"]) or []
+                    if not candidates:
+                        continue
+                    ledger_idx = candidates.pop(0)
+                    row = ledger_lines[ledger_idx]
+                    row["tts_engine"] = "kokoro"
+                    row["voice_preset"] = str(voice_id)
+                    if int(meta.get("render_ms", 0)) > 0:
+                        row["render_ms"] = int(meta["render_ms"])
+                    if float(meta.get("generated_dur_s", 0.0)) > 0:
+                        row["generated_dur_s"] = float(meta["generated_dur_s"])
+                    if meta.get("audio_sample_hash"):
+                        row["audio_sample_hash"] = str(meta["audio_sample_hash"])
+                    updated += 1
+                if updated:
+                    _OTRL.save_ledger_safe(ledger_path, led)
+                    render_log.append(
+                        f"ledger updated: {updated} announcer line(s) -> "
+                        f"{ledger_path.name}"
+                    )
+                    log.info(
+                        "[KokoroAnnouncer] BUG-030 ledger updated: %d announcer "
+                        "line(s) stamped in %s",
+                        updated, ledger_path.name,
+                    )
+        except Exception as _kk_exc:
+            log.warning(
+                "[KokoroAnnouncer] BUG-030 ledger write-back failed: %s",
+                _kk_exc,
+            )
+            render_log.append(f"ledger write-back failed: {_kk_exc}")
+
         log_text = "\n".join(render_log)
         return (audio_out, log_text, voice_id)
 

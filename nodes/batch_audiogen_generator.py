@@ -384,6 +384,11 @@ class BatchAudioGenGenerator:
                             text=[prompt], padding=True, return_tensors="pt"
                         ).to(device)
 
+                        # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                        # track per-sfx render wall-clock so the ledger
+                        # write-back can stamp ledger.sfx[].render_ms.
+                        import time as _ag_time
+                        _ag_t0 = _ag_time.time()
                         with torch.no_grad():
                             audio_values = model.generate(
                                 **inputs,
@@ -391,6 +396,9 @@ class BatchAudioGenGenerator:
                                 do_sample=True,
                                 guidance_scale=guidance_scale,
                             )
+                        item["_render_ms"] = int(
+                            (_ag_time.time() - _ag_t0) * 1000
+                        )
 
                         # BUG-LOCAL-116 fix 2026-04-30: robust shape
                         # extraction. AudioGen's transformers output shape
@@ -449,9 +457,21 @@ class BatchAudioGenGenerator:
 
                         _save_wav(item["cache_path"], audio_np, AUDIOGEN_SAMPLE_RATE)
                         final_clips[idx] = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
+                        # BUG-LOCAL-030 audit-completion: stash hash for
+                        # ledger write-back. compute_audio_sample_hash
+                        # is best-effort (returns "" on extraction
+                        # failure) so this never raises.
+                        try:
+                            from . import _otr_ledger as _OTRL_HASH  # type: ignore
+                            item["_audio_sample_hash"] = (
+                                _OTRL_HASH.compute_audio_sample_hash(audio_np)
+                            )
+                        except Exception:
+                            item["_audio_sample_hash"] = ""
                         batch_log.append(
                             f"    [{idx}] saved {audio_np.size} samples "
-                            f"({audio_np.size / AUDIOGEN_SAMPLE_RATE:.2f}s)"
+                            f"({audio_np.size / AUDIOGEN_SAMPLE_RATE:.2f}s) "
+                            f"render_ms={item.get('_render_ms', 0)}"
                         )
                         
                 finally:
@@ -531,6 +551,23 @@ class BatchAudioGenGenerator:
                         row["wav_path"] = str(cache_path)
                     if dur is not None:
                         row["dur_s"] = dur
+                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                    # stamp tts_engine + render_ms + generated_dur_s +
+                    # audio_sample_hash on the sfx row. The
+                    # generation_prompt is already populated by
+                    # LLMDirector; this closes the loop on the
+                    # render-result side. AudioGen is the SFX engine —
+                    # tts_engine name reuses the field for symmetry
+                    # with bark / kokoro / musicgen.
+                    row["tts_engine"] = "audiogen"
+                    if item.get("_render_ms"):
+                        row["render_ms"] = int(item["_render_ms"])
+                    if dur is not None:
+                        row["generated_dur_s"] = float(dur)
+                    if item.get("_audio_sample_hash"):
+                        row["audio_sample_hash"] = str(
+                            item["_audio_sample_hash"]
+                        )
                     updated += 1
                 if updated:
                     ledger_path.write_text(
