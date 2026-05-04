@@ -21,7 +21,28 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
-### BUG-LOCAL-090 [FIXED]: news_history.json grows unbounded -- 5-day TTL added so headlines recycle
+### BUG-LOCAL-090 [FIXED]: news_history.json grows unbounded -- 5-day TTL + state-dir relocation
+**Update 2026-05-04 (commit follow-up):** the file was also moved out of the source repo into the per-machine state tier.
+
+#### Part 2 — relocation to ``<output>/otr/state/`` (2026-05-04 follow-up)
+
+The TTL fix kept the file at ``<repo>/config/news_history.json`` -- repo-local, which is wrong tier. Per-machine runtime state should live under the ComfyUI output tree where every other persistent OTR artifact (episodes/, obs/) lives. Hand-rolled paths under ``__file__/../../config/`` also tripped Bug Bible BUG-01.02 (output nodes should use ``folder_paths``).
+
+- **NEW `nodes/_otr_paths.py::otr_state_dir()`** -- returns ``<output>/otr/state/``. Per-machine state tier; per-episode state continues to live at ``otr/episodes/<ep_id>/``.
+- **`_NEWS_HISTORY_PATH`** now resolves to ``<output>/otr/state/news_history.json`` via ``otr_state_dir()``. Falls through to ``~/.otr_state/news_history.json`` defensively if ``otr_state_dir()`` is unavailable at import time (e.g. tests that monkey-patch).
+- **`_NEWS_HISTORY_LEGACY_PATH`** retained pointing at the old ``<repo>/config/news_history.json`` for migration carry-forward.
+- **`_load_news_history()`** -- reads new path first; if empty/missing, falls back to legacy path so the user's existing dedup window carries forward on the first post-fix run.
+- **`_record_news_usage()`** -- writes only to the new path. On the first save, if the new path is empty, seeds from legacy entries so they're not silently lost. After that single save, legacy is dead-but-harmless.
+- **NEW helper `_read_news_history_file(path)`** -- shared JSON-parse-with-fallback; used by both load and record so the migration semantics stay in lockstep.
+- **`.gitignore`** -- added ``config/news_history.json`` so the legacy file never accidentally enters git history while it's still on disk for migration purposes.
+- **NEW tests (3 added; total 10):**
+  - `test_legacy_path_fallback_when_new_missing` -- legacy entries surface on first run after migration
+  - `test_new_path_takes_precedence_over_legacy` -- when both files exist, new wins
+  - `test_record_seeds_new_path_from_legacy_on_first_save` -- first save preserves legacy entries
+  - `test_file_missing_returns_empty` + `test_corrupted_json_returns_empty` updated to monkey-patch BOTH paths so the real on-disk legacy file doesn't bleed into the test.
+- **Verify (Part 2):** AST clean (565407 bytes, 39563 nodes). News history TTL suite -> 10 passed in 1.78s. Bug Bible OTR-scoped -> 22 passed / 1 pre-existing baseline failure / 1 skipped / 2 xfailed.
+
+#### Part 1 — original 5-day TTL fix (2026-05-04 EVENING)
 - **Date:** 2026-05-04 EVENING | **Phase:** soak hygiene (NewsFetcher) | **Bible candidate:** YES (best-effort dedup with TTL)
 - **Symptom (live runs 2026-05-04 14:10 + earlier):** `[NewsFetcher] Filtered 43 previously-used candidate(s) via news_history (0 remaining of 43)` followed by `[NewsFetcher] All 43 candidate(s) filtered out by history -- restoring unfiltered pool so the writer still gets a real article`. Every fresh run hit 100% prior-use rate. Fallback restored the unfiltered pool so generation continued, but the dedup intent (avoid back-to-back same-headline runs) was effectively dead because the history was set-membership-only with no expiration -- a once-used URL was blocked forever. Rolling cap was 200 entries, but with 8 RSS feeds returning ~5-6 stories each (~43 unique URLs/day) the entire daily pool gets blocked within ~5 days of normal use.
 - **Cause:** `nodes/story_orchestrator.py::_load_news_history()` returned `{entry["url"] for entry in data if entry.get("url")}` -- a flat set of every URL ever recorded. `_record_news_usage()` writes timestamps but `_load_news_history()` ignored them. No TTL filter, so a headline used 30 days ago still blocked the candidate pool today.

@@ -1268,9 +1268,23 @@ def _fetch_full_article(url, timeout=20):
 
 
 # 2026-04-29: News-history persistence path. Stores recently-used article
-# URLs so the curator skips them on the next run. Lives next to
-# config/episode_cast.txt under the OTR repo.
-_NEWS_HISTORY_PATH = os.path.join(
+# URLs so the curator skips them on the next run.
+#
+# BUG-LOCAL-090 (2026-05-04 EVENING): moved from <repo>/config/news_history.json
+# to <output>/otr/state/news_history.json. The repo is code; this is
+# per-machine runtime state. Living under output/ aligns with where every
+# other persistent OTR state lives (episodes/, obs/, etc.) and keeps the
+# repo working tree clean. The legacy path is read-only -- on first run
+# after migration the loader picks up legacy entries, the next save writes
+# only to the new path, and from then on legacy is dead but harmless.
+try:
+    from . import _otr_paths as _OTR_PATHS  # type: ignore
+    _NEWS_HISTORY_PATH = str(_OTR_PATHS.otr_state_dir() / "news_history.json")
+except Exception:  # noqa: BLE001 -- defensive at import time
+    _NEWS_HISTORY_PATH = os.path.join(
+        os.path.expanduser("~"), ".otr_state", "news_history.json",
+    )
+_NEWS_HISTORY_LEGACY_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "config", "news_history.json",
 )
@@ -1283,6 +1297,20 @@ _NEWS_HISTORY_MAX_ENTRIES = 200  # rolling window; oldest entries drop off
 _NEWS_HISTORY_FILTER_DAYS = 5
 
 
+def _read_news_history_file(path: str) -> list:
+    """Read and JSON-parse the news_history file at ``path``. Returns
+    the raw list (or empty list on any error). Used by both the new
+    canonical path and the BUG-LOCAL-090 legacy migration fallback."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    except Exception:  # noqa: BLE001 -- best-effort
+        return []
+
+
 def _load_news_history() -> set[str]:
     """Return set of recently-used article URLs (within
     ``_NEWS_HISTORY_FILTER_DAYS`` days).
@@ -1292,16 +1320,21 @@ def _load_news_history() -> set[str]:
     on disk (for audit) but excluded from the active filter set so a
     headline can recycle into the pool after enough time has passed.
 
+    BUG-LOCAL-090 migration: the canonical path is
+    ``<output>/otr/state/news_history.json``. If the new path is missing
+    or empty, fall back to the legacy ``<repo>/config/news_history.json``
+    so a user's existing history carries forward on the first post-fix
+    run. The next save writes only to the new path, after which legacy
+    becomes stale-but-harmless.
+
     Failures return an empty set -- the dedup is best-effort, never
     blocks.
     """
-    try:
-        with open(_NEWS_HISTORY_PATH, encoding="utf-8") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return set()
-    except Exception:  # noqa: BLE001 -- best-effort
-        return set()
+    data = _read_news_history_file(_NEWS_HISTORY_PATH)
+    if not data:
+        # First-run fallback: pick up legacy entries from the
+        # pre-BUG-090 path so the user keeps their dedup window.
+        data = _read_news_history_file(_NEWS_HISTORY_LEGACY_PATH)
 
     cutoff = datetime.now() - timedelta(days=_NEWS_HISTORY_FILTER_DAYS)
     fresh: set[str] = set()
@@ -1326,17 +1359,21 @@ def _record_news_usage(url: str, headline: str, style: str = "") -> None:
 
     Cap at _NEWS_HISTORY_MAX_ENTRIES rolling. Older entries drop off so the
     file never grows unbounded but recent picks are remembered.
+
+    BUG-LOCAL-090 migration: writes go to the new canonical path
+    (``<output>/otr/state/news_history.json``). On first save after
+    migration, if the new path is empty/missing but legacy entries
+    exist, the legacy list is loaded as the seed so the user's dedup
+    window carries forward.
     """
     if not url:
         return
     try:
-        try:
-            with open(_NEWS_HISTORY_PATH, encoding="utf-8") as f:
-                data = json.load(f)
-            if not isinstance(data, list):
-                data = []
-        except (FileNotFoundError, json.JSONDecodeError):
-            data = []
+        # Read existing entries from new path; fall back to legacy if
+        # new is empty/missing (one-time migration carry-forward).
+        data = _read_news_history_file(_NEWS_HISTORY_PATH)
+        if not data:
+            data = _read_news_history_file(_NEWS_HISTORY_LEGACY_PATH)
         data.append({
             "url":          str(url),
             "headline":     str(headline)[:240],

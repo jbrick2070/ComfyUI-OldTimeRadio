@@ -251,6 +251,21 @@ def otr_composited_dir(episode_id: str) -> Path:
     return otr_episodes_root() / episode_id / "composited"
 
 
+def otr_state_dir() -> Path:
+    """Per-machine OTR runtime-state dir: ``<output>/otr/state/``.
+
+    BUG-LOCAL-090 (2026-05-04): added so persistent runtime state
+    (news_history.json, future per-machine cursors) lives under the
+    user's ComfyUI output tree -- the natural per-machine state tier --
+    instead of polluting the source repo's ``config/`` folder. State
+    that's per-episode goes under ``otr/episodes/<episode_id>/``;
+    state that's per-machine and not tied to any episode goes here.
+
+    Caller is responsible for ``mkdir(parents=True, exist_ok=True)``.
+    """
+    return comfy_output_dir() / "otr" / "state"
+
+
 def otr_obs_dir() -> Path:
     """OBS-watched final-deliverable dir: ``<output>/otr/obs/``.
 

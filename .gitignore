@@ -143,3 +143,10 @@ workflows/*.json.bak
 !scripts/_consult_nvidia.py
 !scripts/_consult_round_robin.py
 
+# --- 2026-05-04 BUG-LOCAL-090: news_history.json moved to
+# <output>/otr/state/ ---
+# The legacy <repo>/config/news_history.json is read-only-fallback for
+# migration carry-forward. Pin it as ignored so the per-machine state
+# never accidentally enters git history.
+config/news_history.json
+
