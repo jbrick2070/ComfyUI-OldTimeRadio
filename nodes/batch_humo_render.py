@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import sys as _sys
 import time
@@ -202,7 +203,19 @@ def _resolve_radio_still_path(ledger):
 
 HUMO_FPS = 25
 HUMO_MIN_FRAMES = 33   # smaller frame counts have hung this hardware
-HUMO_MAX_FRAMES = 177  # last empirically verified value on RTX 5080 Laptop 16GB
+# BUG-LOCAL-086 (2026-05-04): bumped from 177 (~7.08s) to 353 (~14.12s) to
+# cover normal character dialogue (Bark lines run 7-14s on the RTX 5080 stack).
+# Lines that still exceed this cap (one-person plays, long monologues) fall
+# into the chunking path below. If 353 OOMs at 1472x832 + Wan 2.1 14B on the
+# 16 GB Blackwell, drop this back to 257 (10.28s) or 177 (7.08s) -- the
+# chunking dispatch handles whatever the cap is.
+HUMO_MAX_FRAMES = 353
+# BUG-LOCAL-086: when an audio line exceeds HUMO_MAX_FRAMES, split it into
+# consecutive chunks of this many frames each, render each chunk against the
+# same portrait, then ffmpeg-concat into a single per-line mp4. 177 frames
+# (7.08s) per chunk is the historically-stable HuMo render size; matches the
+# pre-bump HUMO_MAX_FRAMES for safety.
+HUMO_CHUNK_FRAMES = 177
 
 # ByteDance Chinese negative prompt -- empirically the best HuMo neg
 # on the official template.
@@ -248,6 +261,22 @@ def humo_length_for_dur(dur_s: float, *, fps: int = HUMO_FPS) -> int:
         frames = HUMO_MIN_FRAMES
     if frames > HUMO_MAX_FRAMES:
         frames = HUMO_MAX_FRAMES
+    return frames
+
+
+def humo_length_for_dur_uncapped(dur_s: float, *, fps: int = HUMO_FPS) -> int:
+    """Same as humo_length_for_dur but without the HUMO_MAX_FRAMES cap.
+
+    BUG-LOCAL-086: used by the chunking dispatch to decide whether a
+    line's audio duration exceeds the per-clip frame ceiling. If the
+    uncapped value > HUMO_MAX_FRAMES, the line is split into multiple
+    chunks before rendering.
+    """
+    target = max(1, round(float(dur_s) * fps))
+    n = (target - 1 + 3) // 4
+    frames = 4 * n + 1
+    if frames < HUMO_MIN_FRAMES:
+        frames = HUMO_MIN_FRAMES
     return frames
 
 
@@ -804,6 +833,82 @@ def _save_clip_via_ffmpeg(
             pass
 
 
+def _concat_clips_via_ffmpeg(
+    chunk_paths: list[Path],
+    out_path: Path,
+) -> Path:
+    """BUG-LOCAL-086: concat per-chunk HuMo mp4 files into a single
+    per-line mp4 via ffmpeg's concat demuxer.
+
+    Used by the chunking dispatch when an audio line exceeds
+    HUMO_MAX_FRAMES. Each chunk is rendered independently against the
+    same portrait, written via _save_clip_via_ffmpeg (so all chunks
+    share codec / pix_fmt / sample rate), then this helper stitches
+    them into the final ``<line_id>.mp4`` that VideoComposite expects.
+
+    Concat demuxer with ``-c copy`` requires identical encoding across
+    inputs -- guaranteed because every chunk goes through the same
+    _save_clip_via_ffmpeg call with the same fps + audio sample rate.
+
+    Args:
+        chunk_paths: ordered list of per-chunk mp4 paths (chunk 1 first).
+        out_path: final per-line mp4 path.
+
+    Returns:
+        ``out_path`` on success.
+
+    Raises:
+        RuntimeError on ffmpeg failure or empty input list.
+    """
+    import os
+    import subprocess
+    import tempfile
+
+    if not chunk_paths:
+        raise RuntimeError("_concat_clips_via_ffmpeg: empty chunk list")
+    if len(chunk_paths) == 1:
+        # Single chunk: caller should have written directly to out_path.
+        # Defensive copy if not already at the right location.
+        if Path(chunk_paths[0]) == Path(out_path):
+            return out_path
+        import shutil
+        shutil.copy2(str(chunk_paths[0]), str(out_path))
+        return out_path
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Concat demuxer takes a list file: each line ``file '<absolute_path>'``.
+    # Single quotes inside paths must be escaped as ``'\''`` per the
+    # ffmpeg concat demuxer spec.
+    list_fd, list_path = tempfile.mkstemp(prefix="humo_concat_", suffix=".txt")
+    try:
+        with os.fdopen(list_fd, "w", encoding="utf-8") as f:
+            for p in chunk_paths:
+                abs_p = str(Path(p).resolve()).replace("'", "'\\''")
+                f.write(f"file '{abs_p}'\n")
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", list_path,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            str(out_path),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg concat failed (rc={proc.returncode}): "
+                f"{(proc.stderr or '').strip()[:500]}"
+            )
+        return out_path
+    finally:
+        try:
+            os.unlink(list_path)
+        except OSError:
+            pass
+
+
 def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
     """Build a HuMo positive prompt from the ledger line + cast desc."""
     speaker_desc = ""
@@ -955,11 +1060,18 @@ class BatchHumoRender:
                 "clip_length": ("FLOAT", {
                     "default": 7.0,
                     "min": 1.32,
-                    "max": 7.08,
+                    "max": 14.12,
                     "step": 0.04,
                     "tooltip": (
-                        "Per-clip duration in seconds. Default 7.0 -> "
-                        "175 frames -> 177 (Wan 2.1 4n+1 = 7.08s)."
+                        "Max per-CHUNK duration in seconds. Lines whose "
+                        "audio exceeds this are split into N consecutive "
+                        "chunks (BUG-LOCAL-086) and rendered against the "
+                        "same portrait, then ffmpeg-concat into the final "
+                        "per-line mp4. Default 7.0 -> 175 frames -> 177 "
+                        "(Wan 2.1 4n+1 = 7.08s, historically stable on "
+                        "16 GiB Blackwell). Bump up to 14.12 (353 frames) "
+                        "if VRAM holds, to single-pass typical Bark "
+                        "dialogue lines."
                     ),
                 }),
                 "max_clips": ("INT", {
@@ -1383,29 +1495,54 @@ class BatchHumoRender:
             start_s = float(start_s)
             dur_s = float(dur_s)
 
-            # Cap to clip_length
-            dur_s = min(dur_s, float(clip_length))
             # BUG-LOCAL-102: extend humo_length to cover the leading
             # silence pad so HuMo has frames to render BOTH the
             # warm-up freeze AND the dialogue. The pad frames are
             # trimmed off the on-disk clip below so timeline math
             # stays in terms of dur_s.
             pad_s = warmup_pad_ms / 1000.0
-            # BUG-LOCAL-105 (deep_earth_echoes 2026-04-28 ledger
-            # showed mp4_dur_s ~0.12s short of dur_s on every 7.0s
-            # line): when (dur_s + pad_s) pushes humo_length_for_dur
-            # past HUMO_MAX_FRAMES, the cap silently steals frames
-            # off the END of the clip, leaving the last ~120 ms of
-            # audio playing without HuMo lip-sync. Clamp dur_s here
-            # so dur_s + pad_s never exceeds the cap; the clamp loses
-            # at most ~120 ms of room tone at the line's tail (the
-            # SceneSequencer trim_trailing_silence preserves a tiny
-            # decay pad upstream, so what we drop is tone, not words
-            # -- per Gemini consult 2026-04-29).
-            _cap_dur_s = float(HUMO_MAX_FRAMES) / float(HUMO_FPS)
-            if (dur_s + pad_s) > _cap_dur_s:
-                dur_s = max(0.04, _cap_dur_s - pad_s)
-            humo_length = humo_length_for_dur(dur_s + pad_s)
+
+            # BUG-LOCAL-086 (2026-05-04): chunking dispatch.
+            # `clip_length` is the max single-pass duration (workflow
+            # widget, default 7.0s). Lines whose audio exceeds it are
+            # split into N consecutive chunks of <= clip_length each,
+            # rendered independently against the same portrait, then
+            # ffmpeg-concat into the final per-line mp4. This replaces
+            # the old BUG-LOCAL-105 silent-clamp which truncated long
+            # lines to the cap, leaving the back half of the audio
+            # playing against a frozen last frame. The cap from
+            # BUG-LOCAL-105 still applies to each individual chunk
+            # (humo_length_for_dur clamps at HUMO_MAX_FRAMES) so VRAM
+            # behaviour per chunk matches the historically-stable
+            # single-pass path.
+            chunk_max_dur_s = max(0.04, float(clip_length) - pad_s)
+            if (float(dur_s) + pad_s) <= float(clip_length):
+                # Single-chunk path (most lines, current behaviour)
+                chunk_specs = [{"start_offset_s": 0.0, "dur_s": float(dur_s)}]
+            else:
+                # Multi-chunk path: split evenly so every chunk has the
+                # same render budget. Even split avoids a tiny tail
+                # chunk that would render with poor model context.
+                n_chunks = max(2, math.ceil(float(dur_s) / chunk_max_dur_s))
+                chunk_dur_s = float(dur_s) / n_chunks
+                chunk_specs = [
+                    {"start_offset_s": i * chunk_dur_s, "dur_s": chunk_dur_s}
+                    for i in range(n_chunks)
+                ]
+                log.info(
+                    "[BatchHumoRender] BUG-LOCAL-086: line %s dur_s=%.2fs "
+                    "> clip_length=%.2fs -- splitting into %d chunks of "
+                    "%.2fs each",
+                    line_id, float(dur_s), float(clip_length),
+                    n_chunks, chunk_dur_s,
+                )
+
+            # All chunks share the same dur (even split) so a single
+            # humo_length covers each render call. Capped helper keeps
+            # the BUG-LOCAL-105 safety net in place per chunk.
+            humo_length = humo_length_for_dur(
+                chunk_specs[0]["dur_s"] + pad_s
+            )
 
             # I2V ref-image selection (post-BUG-LOCAL-129 routing,
             # 2026-05-01):
@@ -1500,16 +1637,36 @@ class BatchHumoRender:
                 report_lines.append(f"  {line_id}: SKIP portrait load failed: {exc}")
                 continue
 
-            line_audio = _slice_audio_tensor(audio, start_s, dur_s)
-            # BUG-LOCAL-102: pad the line's audio with leading silence
+            # BUG-LOCAL-102: pad each chunk's audio with leading silence
             # so HuMo's first few frames (motion-onset freeze) happen
-            # during silence, not during the first phoneme. The pad is
-            # at the slice's own sample rate.
+            # during silence, not during the first phoneme of the chunk.
+            # BUG-LOCAL-086: when the line is multi-chunk every chunk
+            # gets its own pad so the motion-onset freeze burns down at
+            # each chunk boundary, NOT carried over -- otherwise the
+            # second chunk's first 3-6 frames would be a stale lipsync
+            # against the previous chunk's last phoneme, visible as a
+            # micro-jolt at the join. The pad is trimmed off each chunk
+            # before concat so the final line mp4 has zero artificial
+            # silence inserted.
+            _line_audio_full = _slice_audio_tensor(audio, start_s, float(dur_s))
+            _line_sr = int(_line_audio_full.get("sample_rate", 0)) or 0
             pad_samples = (
-                int(warmup_pad_ms * int(line_audio.get("sample_rate", 0)) / 1000)
+                int(warmup_pad_ms * _line_sr / 1000)
                 if warmup_pad_ms > 0 else 0
             )
-            line_audio = _pad_audio_silence_lead(line_audio, pad_samples)
+            chunks_data: list[dict] = []
+            for spec in chunk_specs:
+                chunk_audio = _slice_audio_tensor(
+                    audio,
+                    start_s + float(spec["start_offset_s"]),
+                    float(spec["dur_s"]),
+                )
+                chunk_audio = _pad_audio_silence_lead(chunk_audio, pad_samples)
+                chunks_data.append({
+                    "audio": chunk_audio,
+                    "start_offset_s": float(spec["start_offset_s"]),
+                    "dur_s": float(spec["dur_s"]),
+                })
             pos_text = _build_pos_prompt(speaker, ln, cast)
 
             # BUG-LOCAL-088: log which still each line consumed + source
@@ -1538,7 +1695,12 @@ class BatchHumoRender:
                 "speaker_role": speaker_role,
                 "start_s": start_s, "dur_s": dur_s, "humo_length": humo_length,
                 "pos_text": pos_text, "ref_image": ref_image,
-                "audio": line_audio, "ref_png_name": ref_png.name,
+                # BUG-LOCAL-086: per-chunk audio + offset metadata. List
+                # of {audio, start_offset_s, dur_s}. Single-chunk lines
+                # have len(chunks)==1 (the common path); long lines
+                # have len(chunks) > 1 and the render loop concats.
+                "chunks": chunks_data,
+                "ref_png_name": ref_png.name,
                 "ref_source": ref_source,
                 # BUG-LOCAL-102: how many leading samples / frames the
                 # save step must trim back off so the on-disk clip is
@@ -1578,19 +1740,25 @@ class BatchHumoRender:
                 entry["positive"] = None
 
         # ---- 8. Phase B: encode all per-line audio up front ----
+        # BUG-LOCAL-086: encode every chunk's audio separately so each
+        # gets its own audio_emb keyed to its time window. Single-chunk
+        # lines have one encode (matches pre-086 behaviour); multi-chunk
+        # lines have N encodes, one per chunk.
+        _total_audio_segments = sum(len(e["chunks"]) for e in plan)
         log.info("[BatchHumoRender] Phase B: encoding %d audio segments via Whisper",
-                 len(plan))
+                 _total_audio_segments)
         for entry in plan:
-            try:
-                entry["audio_emb"] = _call(
-                    audio_enc_node,
-                    audio_encoder=audio_encoder,
-                    audio=entry["audio"],
-                )[0]
-            except Exception as exc:
-                log.warning("[BatchHumoRender] %s: audio encode failed: %s",
-                            entry["line_id"], exc)
-                entry["audio_emb"] = None
+            for chunk in entry["chunks"]:
+                try:
+                    chunk["audio_emb"] = _call(
+                        audio_enc_node,
+                        audio_encoder=audio_encoder,
+                        audio=chunk["audio"],
+                    )[0]
+                except Exception as exc:
+                    log.warning("[BatchHumoRender] %s: audio encode failed: %s",
+                                entry["line_id"], exc)
+                    chunk["audio_emb"] = None
 
         # ---- 8.5. VRAM cleanup between Phase B and Phase C ----
         # BUG-LOCAL-081: at 30+ lines, Phase B reloaded Whisper for
@@ -1708,122 +1876,175 @@ class BatchHumoRender:
                 )
                 continue
 
-            if entry.get("positive") is None or entry.get("audio_emb") is None:
-                report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase")
+            # BUG-LOCAL-086: skip lines with missing prompt OR any chunk
+            # that failed audio encoding. Partial rendering of a line
+            # would produce a clip with gaps at the chunk boundary.
+            if entry.get("positive") is None:
+                report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase (positive)")
+                continue
+            _chunks = entry.get("chunks") or []
+            if not _chunks:
+                report_lines.append(f"  {line_id}: SKIP no chunks built")
+                continue
+            if any(c.get("audio_emb") is None for c in _chunks):
+                report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase (chunk audio)")
                 continue
 
             shot_t0 = time.time()
-            shot_seed = (seed + entry["idx"] * 1009) & 0x7FFFFFFFFFFFFFFF
             try:
-                # WanHuMoImageToVideo returns (positive_with_humo_inputs,
-                # negative_with_humo_inputs, latent). Use kwargs matching
-                # the API-format prompt's input names (BUG-LOCAL-080 fix).
-                humo_out = _call(
-                    humo_node,
-                    width=width,
-                    height=height,
-                    length=entry["humo_length"],
-                    batch_size=1,
-                    positive=entry["positive"],
-                    negative=negative,
-                    vae=vae,
-                    audio_encoder_output=entry["audio_emb"],
-                    ref_image=entry["ref_image"],
-                )
-                humo_pos, humo_neg, humo_latent = humo_out[:3]
-
-                samples = _call(
-                    sampler,
-                    model=model,
-                    seed=shot_seed,
-                    steps=steps,
-                    cfg=cfg,
-                    sampler_name=sampler_name,
-                    scheduler=scheduler,
-                    positive=humo_pos,
-                    negative=humo_neg,
-                    latent_image=humo_latent,
-                    denoise=1.0,
-                )[0]
-
-                images_out = _call(vae_decoder, samples=samples, vae=vae)[0]
-
-                # BUG-LOCAL-102: trim the leading warmup window. HuMo
-                # rendered N extra frames against the silence we
-                # padded onto the audio so the model's intrinsic
-                # motion-onset freeze (~3-6 frames) burned down before
-                # the first dialogue phoneme. Drop those leading frames
-                # from the decoded image tensor and the matching
-                # leading silence from the audio so the on-disk clip
-                # starts at the first articulated motion / first
-                # dialogue word. Timeline placement (clips[].start_s)
-                # therefore stays in terms of the original dur_s.
+                n_chunks = len(_chunks)
                 pad_frames = int(entry.get("warmup_pad_frames", 0) or 0)
                 pad_samples_save = int(entry.get("warmup_pad_samples", 0) or 0)
-                if pad_frames > 0 and isinstance(images_out, torch.Tensor):
-                    if images_out.shape[0] > pad_frames:
-                        images_out = images_out[pad_frames:].contiguous()
-                    else:
-                        log.warning(
-                            "[BatchHumoRender] BUG-102: line %s has %d frames "
-                            "but pad_frames=%d -- skipping trim (degraded)",
-                            line_id, images_out.shape[0], pad_frames,
-                        )
-                audio_for_save = (
-                    _trim_audio_lead(entry["audio"], pad_samples_save)
-                    if pad_samples_save > 0 else entry["audio"]
-                )
+                chunk_mp4_paths: list[Path] = []
+                _total_mp4_frames = 0
 
-                # BUG-LOCAL-083: ComfyUI v0.20.1's SaveVideo (and the
-                # paired CreateVideo) is a V3-style node that expects
-                # `cls.hidden` to be populated by the executor with
-                # `extra_pnginfo` + `prompt` metadata. Direct-calling
-                # those nodes from inside another node's execute()
-                # leaves `cls.hidden = None` and crashes at line 100
-                # of comfy_extras/nodes_video.py.
-                #
-                # Workaround: skip CreateVideo + SaveVideo entirely.
-                # Write the clip mp4 directly via ffmpeg from the
-                # decoded image tensor + per-line audio tensor. Same
-                # output (a .mp4 with audio embedded) without the
-                # broken executor-coupling. Output filename is
-                # canonical `<line_id>.mp4` so concat finds it.
+                for chunk_idx, chunk in enumerate(_chunks):
+                    # Per-chunk shot_seed: same line gets a stable base
+                    # seed (so re-runs reproduce) but each chunk picks a
+                    # different stride so chunks 1+2 don't render with an
+                    # identical seed (would produce quasi-identical motion
+                    # fragments and a visible "stutter back to start" at
+                    # the chunk boundary).
+                    shot_seed = (
+                        seed
+                        + entry["idx"] * 1009
+                        + chunk_idx * 7919
+                    ) & 0x7FFFFFFFFFFFFFFF
+
+                    # WanHuMoImageToVideo returns (positive_with_humo_inputs,
+                    # negative_with_humo_inputs, latent). Use kwargs matching
+                    # the API-format prompt's input names (BUG-LOCAL-080 fix).
+                    humo_out = _call(
+                        humo_node,
+                        width=width,
+                        height=height,
+                        length=entry["humo_length"],
+                        batch_size=1,
+                        positive=entry["positive"],
+                        negative=negative,
+                        vae=vae,
+                        audio_encoder_output=chunk["audio_emb"],
+                        ref_image=entry["ref_image"],
+                    )
+                    humo_pos, humo_neg, humo_latent = humo_out[:3]
+
+                    samples = _call(
+                        sampler,
+                        model=model,
+                        seed=shot_seed,
+                        steps=steps,
+                        cfg=cfg,
+                        sampler_name=sampler_name,
+                        scheduler=scheduler,
+                        positive=humo_pos,
+                        negative=humo_neg,
+                        latent_image=humo_latent,
+                        denoise=1.0,
+                    )[0]
+
+                    images_out = _call(vae_decoder, samples=samples, vae=vae)[0]
+
+                    # BUG-LOCAL-102: trim the leading warmup window. HuMo
+                    # rendered N extra frames against the silence we
+                    # padded onto the audio so the model's intrinsic
+                    # motion-onset freeze (~3-6 frames) burned down before
+                    # the first dialogue phoneme. Drop those leading frames
+                    # from the decoded image tensor and the matching
+                    # leading silence from the audio so the on-disk chunk
+                    # starts at the first articulated motion / first
+                    # dialogue word. Each chunk gets its own pad+trim so
+                    # the motion-onset freeze burns down at every chunk
+                    # boundary, not just the line's first chunk.
+                    if pad_frames > 0 and isinstance(images_out, torch.Tensor):
+                        if images_out.shape[0] > pad_frames:
+                            images_out = images_out[pad_frames:].contiguous()
+                        else:
+                            log.warning(
+                                "[BatchHumoRender] BUG-102: line %s chunk %d has %d frames "
+                                "but pad_frames=%d -- skipping trim (degraded)",
+                                line_id, chunk_idx + 1, images_out.shape[0], pad_frames,
+                            )
+                    audio_for_save = (
+                        _trim_audio_lead(chunk["audio"], pad_samples_save)
+                        if pad_samples_save > 0 else chunk["audio"]
+                    )
+
+                    # BUG-LOCAL-083: ComfyUI v0.20.1's SaveVideo (and the
+                    # paired CreateVideo) is a V3-style node that expects
+                    # `cls.hidden` to be populated by the executor with
+                    # `extra_pnginfo` + `prompt` metadata. Direct-calling
+                    # those nodes from inside another node's execute()
+                    # leaves `cls.hidden = None` and crashes at line 100
+                    # of comfy_extras/nodes_video.py.
+                    #
+                    # Workaround: skip CreateVideo + SaveVideo entirely.
+                    # Write each chunk mp4 directly via ffmpeg from the
+                    # decoded image tensor + per-chunk audio tensor.
+                    #
+                    # BUG-LOCAL-086 destination policy:
+                    #   single-chunk -> write directly to <line_id>.mp4
+                    #                   (canonical, matches pre-086 path)
+                    #   multi-chunk  -> write to <line_id>__chunk{NN}.mp4
+                    #                   then ffmpeg-concat into
+                    #                   <line_id>.mp4 after the loop.
+                    if n_chunks == 1:
+                        _chunk_dest = clips_dir_path / f"{line_id}.mp4"
+                    else:
+                        _chunk_dest = clips_dir_path / (
+                            f"{line_id}__chunk{chunk_idx + 1:02d}.mp4"
+                        )
+                    _save_clip_via_ffmpeg(
+                        images=images_out,
+                        audio_dict=audio_for_save,
+                        out_path=_chunk_dest,
+                        fps=25,
+                    )
+                    chunk_mp4_paths.append(_chunk_dest)
+                    _total_mp4_frames += (
+                        int(images_out.shape[0])
+                        if isinstance(images_out, torch.Tensor)
+                            and images_out.dim() >= 1
+                        else (int(entry["humo_length"]) - int(pad_frames))
+                    )
+
+                # BUG-LOCAL-086: concat per-chunk mp4s into the canonical
+                # per-line mp4 if multi-chunk. Each chunk shares codec /
+                # pix_fmt / sample rate (same _save_clip_via_ffmpeg call)
+                # so the concat demuxer with -c copy is safe.
                 clip_mp4_path = clips_dir_path / f"{line_id}.mp4"
-                _save_clip_via_ffmpeg(
-                    images=images_out,
-                    audio_dict=audio_for_save,
-                    out_path=clip_mp4_path,
-                    fps=25,
-                )
+                if n_chunks > 1:
+                    _concat_clips_via_ffmpeg(chunk_mp4_paths, clip_mp4_path)
+                    # Cleanup per-chunk part files now that concat
+                    # succeeded. Concat failures raise above and we
+                    # never reach here, so partial cleanup is impossible.
+                    for _cp in chunk_mp4_paths:
+                        try:
+                            _cp.unlink()
+                        except OSError:
+                            pass
 
                 # Capture timing + post-trim measurements BEFORE
                 # building the ledger record so all diagnostic fields
                 # are populated in one place.
                 shot_ms = int((time.time() - shot_t0) * 1000)
 
-                # Schema l3 (2026-04-28) diagnostic fields:
-                # mp4_frames is the post-trim image-tensor frame count
-                # (= what the saved mp4 actually contains).
-                # mp4_dur_s = mp4_frames / HUMO_FPS (target on-disk dur).
-                # audio_fed_to_humo_dur_s = padded audio duration the
-                # model actually saw (= line dur + warmup pad).
+                # Schema l3 (2026-04-28) diagnostic fields, BUG-086 sums:
+                # mp4_frames is the SUM across chunks (= total frames in
+                # the concatenated on-disk mp4). audio_fed_to_humo_dur_s
+                # is the FULL line dur + N pads (one per chunk) so the
+                # post-mortem can spot drift = (audio_fed - mp4_dur).
                 _pad_s_for_meta = float(warmup_pad_ms) / 1000.0
-                _mp4_frames = (
-                    int(images_out.shape[0])
-                    if isinstance(images_out, torch.Tensor)
-                       and images_out.dim() >= 1
-                    else int(entry["humo_length"]) - int(pad_frames)
+                _mp4_dur_s = float(_total_mp4_frames) / float(HUMO_FPS)
+                _audio_fed_dur_s = (
+                    float(entry["dur_s"])
+                    + (_pad_s_for_meta * n_chunks)
                 )
-                _mp4_dur_s = float(_mp4_frames) / float(HUMO_FPS)
-                _audio_fed_dur_s = float(entry["dur_s"]) + _pad_s_for_meta
 
-                # BUG-LOCAL-089: record this clip in the per-run
-                # ledger.clips[] array. Includes line_id, char_id,
-                # mp4_path, start_s, dur_s, source-tier, ref_png so
-                # concat (VideoComposite) can resolve every clip via
-                # ledger lookup instead of glob heuristics. Schema l3
-                # added humo_render_ms / mp4_frames / mp4_dur_s /
-                # audio_fed_to_humo_dur_s for sync diagnosis.
+                # BUG-LOCAL-089 + 086: single ledger record per line
+                # regardless of chunk count. Downstream (VideoComposite)
+                # sees one mp4 per line at <line_id>.mp4. n_chunks added
+                # for traceability so ledger inspection shows whether
+                # the line was chunked or single-pass.
                 clip_records.append({
                     "line_id": line_id,
                     "char_id": (lines[entry["idx"]].get("char_id") or "").strip() or None,
@@ -1840,9 +2061,14 @@ class BatchHumoRender:
                     "warmup_pad_ms": int(warmup_pad_ms),
                     # Schema l3 diagnostic fields (sync regression bait):
                     "humo_render_ms": int(shot_ms),
-                    "mp4_frames": int(_mp4_frames),
+                    "mp4_frames": int(_total_mp4_frames),
                     "mp4_dur_s": float(_mp4_dur_s),
                     "audio_fed_to_humo_dur_s": float(_audio_fed_dur_s),
+                    # BUG-LOCAL-086 traceability: how many chunks got
+                    # rendered + concatenated for this line. 1 = single
+                    # pass (pre-086 behaviour), >1 = chunked because the
+                    # line's audio dur exceeded clip_length.
+                    "n_chunks": int(n_chunks),
                     # BUG-LOCAL-106: stamp the timeline-space of
                     # start_s so EpisodeAssembler's shift stays
                     # idempotent. Whatever lines[].start_s_space
@@ -1859,11 +2085,23 @@ class BatchHumoRender:
                         or "master_mix"
                     ),
                 })
-                report_lines.append(
-                    f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
-                    f"(length={entry['humo_length']} ref={entry['ref_png_name']})"
-                )
-                log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
+                if n_chunks > 1:
+                    report_lines.append(
+                        f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
+                        f"({n_chunks} chunks, length={entry['humo_length']} "
+                        f"per chunk, ref={entry['ref_png_name']})"
+                    )
+                    log.info(
+                        "[BatchHumoRender] %s done in %d ms (%d chunks, "
+                        "BUG-LOCAL-086 chunked + concat)",
+                        line_id, shot_ms, n_chunks,
+                    )
+                else:
+                    report_lines.append(
+                        f"  {line_id} ({entry['speaker']}): {shot_ms} ms "
+                        f"(length={entry['humo_length']} ref={entry['ref_png_name']})"
+                    )
+                    log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
                 rendered += 1
 
                 # 2026-04-29: per-clip incremental ledger save. Each HuMo

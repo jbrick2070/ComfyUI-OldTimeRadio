@@ -21,6 +21,42 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-086 [FIXED]: HuMo per-line clips frozen on last frame for half the audio (177-frame hard cap + silent clamp)
+- **Date:** 2026-05-04 EVENING | **Phase:** acceptance soak (BUG-085 follow-up) | **Bible candidate:** YES (HuMo render budget + audio-video sync)
+- **Symptom (live full re-render `signal_lost_for_nasas_tess_stellar_eclipses_..._110640`):** First episode-length run since BUG-085 fix completed cleanly through ScriptWriter / Bark / FLUX portraits / HuMo. ScriptWriter shipped a 177-word, 9-line script (3 cast: ANNOUNCER, JAKE, MAYA + a hallucinated CORE VOICE). HuMo rendered 7 character clips at ~10:20 each. Final composite played correctly through the announcer LTX scenes and the 7-second JAKE lines, but on every MAYA line + every JAKE line >7s the character video froze on the last rendered frame while audio kept playing. Three Media Player screenshots from Jeffrey at 0:33 / 1:01 / 1:05 all show portraits with motionless lips while the corresponding Bark audio is mid-sentence. 5 of 7 character clips affected (l003, l005, l006, l007, l008 = MAYA 13.99s, MAYA 11.31s, JAKE 12.99s, MAYA 13.99s, CORE VOICE 10.42s) — all clips with `dur_s > 7s`.
+- **Cause (multi-layer):**
+  1. `nodes/batch_humo_render.py::HUMO_MAX_FRAMES = 177` was the "last empirically verified value on RTX 5080 Laptop 16GB" — meaning untested above. 177 frames @ 25fps = 7.08s ceiling on per-clip render duration.
+  2. `humo_length_for_dur(dur_s)` capped its return at HUMO_MAX_FRAMES, then BUG-LOCAL-105 (deep_earth_echoes 2026-04-28) added an explicit `dur_s` clamp so audio_dur_fed_to_humo never exceeded the cap. Together these meant: any character line longer than 7.08s had its tail audio silently clamped off, then HuMo only received the first 7.08s of audio, decoded a 6.88s mp4 (after warmup pad trim), and stopped. The remaining seconds of audio played against a frozen portrait in the composite.
+  3. The `clip_length` workflow widget had `max=7.08`, hard-locking the user out of the higher ceiling even if VRAM allowed.
+- **Fix (`nodes/batch_humo_render.py`, ~250 LOC across 7 sites):**
+  - **Constant bumps** — `HUMO_MAX_FRAMES = 353` (4·88+1 = 353 frames @ 25fps = 14.12s, covers 14s Bark dialogue in a single pass). New `HUMO_CHUNK_FRAMES = 177` for the chunking fallback.
+  - **NEW `humo_length_for_dur_uncapped(dur_s)`** — same 4n+1 snap as the capped helper but without the HUMO_MAX_FRAMES ceiling. Used by the chunking dispatch to decide whether to split a line.
+  - **NEW `_concat_clips_via_ffmpeg(chunk_paths, out_path)`** — ffmpeg concat-demuxer wrapper with `-c copy` for stitching per-chunk mp4s into the canonical `<line_id>.mp4`. Safe because every chunk goes through `_save_clip_via_ffmpeg` with identical fps + sample rate.
+  - **Plan-build refactor (BUG-LOCAL-086 chunking dispatch)** — replaces the BUG-LOCAL-105 silent-clamp at lines 1490-1512 with: if `(dur_s + pad_s) <= clip_length` → single-chunk path (current behaviour); else → split into `n_chunks = ceil(dur_s / chunk_max_dur_s)` evenly. Each chunk gets its own audio slice + warmup pad. Plan entries now carry `chunks: list[{audio, start_offset_s, dur_s}]` instead of a single `audio` dict.
+  - **Phase B refactor** — Whisper audio encoding now iterates `entry["chunks"]`, encoding one `audio_emb` per chunk. Single-chunk lines unchanged in behaviour; multi-chunk lines pay N × Whisper cost (cheap; <1s per chunk).
+  - **Phase C render-loop refactor** — per-line render now iterates chunks, dispatches HuMo once per chunk with that chunk's `audio_emb` and the same portrait `ref_image`, saves each chunk to either `<line_id>.mp4` (single-chunk) or `<line_id>__chunk{NN}.mp4` (multi-chunk), then ffmpeg-concats multi-chunk parts into `<line_id>.mp4` and deletes the part files. Per-chunk shot_seed = `seed + idx*1009 + chunk_idx*7919` so chunks 1+2 of the same line don't render with identical seed (would produce visible "stutter back to start" at the chunk boundary). Single ledger record per line regardless of chunk count; `mp4_frames` / `mp4_dur_s` / `humo_render_ms` are sums across chunks; `audio_fed_to_humo_dur_s` accounts for N pads (one per chunk). New `n_chunks` field added to ledger clip records for traceability.
+  - **Widget bump** — `clip_length` max raised from 7.08 to 14.12 (default unchanged at 7.0). Power users can opt into single-pass for typical Bark dialogue. Lines longer than `clip_length` still chunk regardless.
+- **Test updates (`tests/test_batch_humo_render.py`):**
+  - Updated `test_humo_length_for_dur` parametrize cases for the new cap (8s → 201, 9s → 225, 14.12s → 353, 16s+ → 353 capped).
+  - Updated `test_humo_constants` (HUMO_MAX_FRAMES = 353; new HUMO_CHUNK_FRAMES = 177 assertion).
+  - Updated `test_clip_length_max_respects_humo_ceiling` (max = 14.12).
+  - NEW `test_humo_length_for_dur_uncapped_skips_cap` — pins that the chunking-dispatch helper bypasses the cap (30s → 753, capped helper would return 353).
+  - Existing `test_humo_length_for_dur_always_returns_4n_plus_1` extended to include 14s in the parametrize set.
+- **Known caveats / what we're not pretending:**
+  - `HUMO_MAX_FRAMES = 353` at 16 GiB Blackwell is **untested in a live run**. If the next soak OOMs at single-pass for a 14s clip, drop the constant back to 257 (10.28s) or 177 (7.08s) — the chunking dispatch handles whatever the cap is. Tracked as BUG-LOCAL-086a if it surfaces.
+  - Per-chunk shot_seed stride (7919) is a guess at preventing same-frame regression at chunk joins. If the seam is visible in test, bump the stride or carry over the last chunk's final-frame latent as a continuity hint (BUG-LOCAL-086b future).
+  - Whisper feeding silence into a chunk could still produce no-lip-motion (Jeffrey's bottom-left screenshot showed this at the l002→l003 boundary). Not in BUG-086 scope; logged as BUG-LOCAL-090 candidate (Bark line lead-in silence handling).
+- **Verify:**
+  - AST parse clean on `nodes/batch_humo_render.py` (110206 bytes, 8846 nodes).
+  - `tests/test_batch_humo_render.py` + `tests/test_humo_warmup_pad.py` + `tests/test_dropdown_guardrails.py` → 107 passed in 108.91s.
+  - `tests/test_core.py` → 108 passed in 4.46s.
+  - Bug Bible regression scoped to OTR pack → 22 passed / 1 pre-existing failure (otr_save_copy.py, batch_flux_portrait_render.py missing folder_paths; unrelated to BUG-086) / 1 skipped / 2 xfailed.
+  - Live: next soak should show `[BatchHumoRender] BUG-LOCAL-086: line lXXX dur_s=YY > clip_length=7.0s -- splitting into N chunks of Z.ZZs each` for any line >7s, and `[BatchHumoRender] lXXX done in M ms (N chunks, BUG-LOCAL-086 chunked + concat)`. Composite mp4 should show lipsync continuing through the FULL audio duration of every character line; no frozen-tail artefacts.
+- **Tags:** humo, vram-ceiling, audio-video-sync, chunking, ffmpeg-concat, wan-2.1, blackwell, BUG-LOCAL-105-supersession
+- **Related:** BUG-LOCAL-105 (silent-clamp predecessor; chunking dispatch replaces the clamp but the capped `humo_length_for_dur` still defends each individual chunk, preserving 105's safety property per chunk). BUG-LOCAL-102 (warmup pad — applied per chunk in 086, not just first chunk). BUG-LOCAL-094 (per-line timing estimate; unchanged). Pending: BUG-LOCAL-087 (title lost between ScriptWriter and SignalLostVideo), BUG-LOCAL-088 (CORE VOICE hallucinated cast member), BUG-LOCAL-089 (Director phase produces unparseable output on Gemma-4-E2B). All three observed in the same `signal_lost_for_nasas_tess_..._110640` run that surfaced 086.
+
+---
+
 ### BUG-LOCAL-085 [FIXED]: NF4 silently failing because HF_HOME not in ComfyUI process env
 - **Date:** 2026-05-04 MORNING | **Phase:** acceptance (BUG-LOCAL-084 follow-up) | **Bible candidate:** YES (Windows/Electron env-inheritance footgun)
 - **Symptom (live full re-render attempt 2026-05-03 23:47, post BUG-084):** ComfyUI restarted clean, BUG-084 fixes loaded, full workflow queued. ScriptWriter started Mistral-Nemo load. Crashed at SDPA prefill with `torch.OutOfMemoryError: Currently allocated 24.00 GiB / Device limit 15.92 GiB`. 24 GiB matches Mistral-Nemo 12B at fp16 exactly — meaning NF4 quantization did not actually apply despite the runtime log printing `[StoryOrchestrator] Enabling 4-bit quantization (NF4)`.

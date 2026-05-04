@@ -52,11 +52,17 @@ def m():
 @pytest.mark.parametrize("dur_s, expected_frames", [
     (3.88, 97),    # canonical 3.88s sweet spot (length=97)
     (7.00, 177),   # 175 -> ceil-snapped to 177 (4n+1)
-    (7.08, 177),   # ceiling exactly
+    (7.08, 177),   # ceiling exactly (old cap, still 4n+1 snap)
     (1.00, 33),    # below MIN -> floored
     (0.10, 33),    # way below MIN -> still floored
-    (8.00, 177),   # over ceiling -> capped
-    (9.00, 177),   # well over ceiling -> capped
+    # BUG-LOCAL-086 (2026-05-04): cap raised from 177 -> 353. The
+    # 4n+1 snap now governs the result up to 14.12s; only past
+    # HUMO_MAX_FRAMES does the cap kick in.
+    (8.00, 201),   # 200 -> 201 (4n+1, no longer capped at 177)
+    (9.00, 225),   # 225 (4n+1, was capped to 177 pre-086)
+    (14.12, 353),  # cap exactly (353 frames @ 25fps)
+    (16.00, 353),  # over the new cap -> still capped at 353
+    (20.00, 353),  # well over -> chunking dispatch will fire upstream
     (2.00, 53),    # 50 -> 53 (4n+1)
     (5.00, 125),   # 125 -> 125 (already 4n+1)
 ])
@@ -66,16 +72,36 @@ def test_humo_length_for_dur(m, dur_s, expected_frames):
 
 def test_humo_length_for_dur_always_returns_4n_plus_1(m):
     """Wan 2.1 VAE temporal compression requires 4n+1 frame counts."""
-    for dur in [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0]:
+    for dur in [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 14.0]:
         f = m.humo_length_for_dur(dur)
         assert (f - 1) % 4 == 0, f"dur={dur}s -> frames={f} not 4n+1"
 
 
+def test_humo_length_for_dur_uncapped_skips_cap(m):
+    """BUG-LOCAL-086: chunking dispatch uses the uncapped helper to
+    decide whether a line needs splitting. Result must NOT be clamped
+    to HUMO_MAX_FRAMES."""
+    # 30s line -> 750 frames target -> 4n+1 snap = 753 frames.
+    # Capped helper would return 353; uncapped must return 753.
+    capped = m.humo_length_for_dur(30.0)
+    uncapped = m.humo_length_for_dur_uncapped(30.0)
+    assert capped == 353  # cap kicked in
+    assert uncapped == 753  # cap bypassed
+    assert (uncapped - 1) % 4 == 0  # still 4n+1
+
+
 def test_humo_constants(m):
-    """Hardcoded constants pin the empirical envelope."""
+    """Hardcoded constants pin the empirical envelope.
+
+    BUG-LOCAL-086 (2026-05-04): HUMO_MAX_FRAMES bumped from 177 to 353
+    to cover normal Bark dialogue (7-14s) in a single HuMo pass.
+    HUMO_CHUNK_FRAMES added at the historically-stable 177 for the
+    chunking fallback when a line still exceeds the new cap.
+    """
     assert m.HUMO_FPS == 25
     assert m.HUMO_MIN_FRAMES == 33
-    assert m.HUMO_MAX_FRAMES == 177
+    assert m.HUMO_MAX_FRAMES == 353
+    assert m.HUMO_CHUNK_FRAMES == 177
 
 
 # ---------------------------------------------------------------------------
@@ -276,5 +302,10 @@ def test_clip_length_default_is_seven(m) -> None:
 
 
 def test_clip_length_max_respects_humo_ceiling(m) -> None:
+    """BUG-LOCAL-086 (2026-05-04): clip_length max bumped from 7.08 to
+    14.12 to match the new HUMO_MAX_FRAMES=353 cap. Power users can
+    opt into single-pass renders for typical Bark dialogue lines.
+    Default stays 7.0 for VRAM safety; lines exceeding clip_length get
+    chunked automatically."""
     inp = m.BatchHumoRender.INPUT_TYPES()
-    assert inp["required"]["clip_length"][1]["max"] == pytest.approx(7.08, abs=0.01)
+    assert inp["required"]["clip_length"][1]["max"] == pytest.approx(14.12, abs=0.01)
