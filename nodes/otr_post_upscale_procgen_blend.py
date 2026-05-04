@@ -175,11 +175,21 @@ def _build_blend_cmd(
     # via ``-c:a copy`` from source until source EOF. Result: visual
     # may have a 40ms tail of held procgen frame (imperceptible);
     # audio reaches the full source duration; C7 holds.
+    # BUG-LOCAL-030 long-form hardening (2026-05-03 EVENING, post
+    # round-robin risk-#10 review): cap thread fanout + raise mux queue
+    # so a long-form (>5 min) episode does not spike DRAM via
+    # thread x framebuffer multiplication and does not error out with
+    # "Too many packets buffered for output stream" on the blend pass.
+    # ChatGPT + Gemini both flagged this; Gemini's exact recommendation.
     return [
         ffmpeg, "-y", "-loglevel", "error",
         "-i", str(source_mp4),
         "-i", str(procgen_mp4),
         "-filter_complex", filter_complex,
+        "-filter_complex_threads", "2",
+        "-filter_threads", "2",
+        "-threads", "4",
+        "-max_muxing_queue_size", "1024",
         "-map", "[v]",
         "-map", "0:a?",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
@@ -318,6 +328,28 @@ class PostUpscaleProcgenBlend:
                 )
                 log.warning("[PostUpscaleProcgenBlend] %s", msg)
                 return ("", msg)
+
+        # BUG-LOCAL-030 long-form hardening (2026-05-03 EVENING, post
+        # round-robin risk-#10 review): phase barrier handoff from
+        # RTXUpscale. Reclaim DRAM/VRAM that PyTorch may still be
+        # holding from upscaling, then check the canary before kicking
+        # off filter_complex blend (which buffers frames from BOTH
+        # input mp4s). DRAM canary degrades open -- if we can't verify
+        # we still attempt the blend; only an actively low reading
+        # produces a warning in the report.
+        try:
+            from . import _otr_memory as _OTRM  # type: ignore
+            _OTRM.phase_gc("PostUpscaleProcgenBlend entry")
+            _ok, _reason = _OTRM.dram_canary(label="PostUpscaleProcgenBlend entry")
+            if not _ok:
+                report_lines.append(
+                    f"PostUpscaleProcgenBlend: DRAM canary WARNING -- {_reason}"
+                )
+        except Exception as _exc:  # noqa: BLE001
+            log.warning(
+                "[PostUpscaleProcgenBlend] memory hygiene helper "
+                "unavailable (%s); proceeding", _exc,
+            )
 
         cmd = _build_blend_cmd(
             source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,

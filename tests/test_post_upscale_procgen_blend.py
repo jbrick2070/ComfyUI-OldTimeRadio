@@ -146,6 +146,36 @@ def test_blend_cmd_does_NOT_use_shortest_for_c7_safety(node, tmp_path):
     assert "0:a?" in map_args, f"audio must still be mapped from source; got maps={map_args}"
 
 
+def test_blend_cmd_includes_longform_hardening_flags(node, tmp_path):
+    """BUG-LOCAL-030 long-form hardening (post round-robin risk-#10):
+    the blend cmd MUST include ``-max_muxing_queue_size 1024`` (guards
+    against "Too many packets buffered" on long-form blends) AND thread
+    caps (``-filter_complex_threads 2``, ``-filter_threads 2``,
+    ``-threads 4``) so a 5+ min episode does not spike DRAM via
+    thread x framebuffer multiplication. Per Gemini round-robin.
+    """
+    src = tmp_path / "src.mp4"; src.write_bytes(b"x")
+    pgn = tmp_path / "pgn.mp4"; pgn.write_bytes(b"x")
+    captured, fake_run = _capture_run()
+    from nodes import otr_post_upscale_procgen_blend as M
+
+    with mock.patch.object(M.subprocess, "run", side_effect=fake_run), \
+         mock.patch.object(M, "_stamp_ledger_final_video_path",
+                           return_value=(False, "stubbed for cmd-shape test")):
+        node.blend(source_mp4_path=str(src), procgen_mp4_path=str(pgn))
+    cmd = captured.get("ffmpeg") or captured["cmd"]
+    assert "-max_muxing_queue_size" in cmd, (
+        f"-max_muxing_queue_size MUST be present for long-form safety; got {cmd}"
+    )
+    assert cmd[cmd.index("-max_muxing_queue_size") + 1] == "1024"
+    assert "-filter_complex_threads" in cmd
+    assert cmd[cmd.index("-filter_complex_threads") + 1] == "2"
+    assert "-filter_threads" in cmd
+    assert cmd[cmd.index("-filter_threads") + 1] == "2"
+    assert "-threads" in cmd
+    assert cmd[cmd.index("-threads") + 1] == "4"
+
+
 def test_bypass_mode_copies_source_to_output(node, tmp_path):
     """bypass=True must skip ffmpeg entirely and copy source -> out."""
     src = tmp_path / "src.mp4"

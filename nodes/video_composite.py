@@ -797,6 +797,26 @@ def _render_master_mix_per_clip_mux_mode(
     report: list[str] = []
     t0 = time.time()
 
+    # BUG-LOCAL-030 long-form hardening (2026-05-03 EVENING, post
+    # round-robin risk-#10 review): phase barrier handoff from upstream
+    # generation (BatchHumo / BatchLTX / Bark / MusicGen / AudioGen).
+    # PyTorch is lazy about returning RAM/VRAM after heavy generation;
+    # nudge it before the composite phase starts piping ~100 ffmpeg
+    # subprocesses. DRAM canary is best-effort -- if it trips we LOG
+    # the warning into the report but continue (composite is mostly
+    # ffmpeg subprocess work; in-process Python heap is small).
+    try:
+        from . import _otr_memory as _OTRM  # type: ignore
+        _OTRM.phase_gc("VideoComposite/per_clip_mux entry")
+        _ok, _reason = _OTRM.dram_canary(label="VideoComposite/per_clip_mux entry")
+        if not _ok:
+            report.append(f"per_clip_mux: DRAM canary WARNING -- {_reason}")
+    except Exception as _exc:
+        log.warning(
+            "[VideoComposite/per_clip_mux] memory hygiene helper "
+            "unavailable (%s); proceeding", _exc,
+        )
+
     # 1. Build timeline from ledger.lines[] (Step 4b/4c populated
     # speaker_role + start_s + dur_s for ALL audio events: dialogue,
     # announcer, sfx, music_open, music_close).  Walk lines instead
@@ -1063,6 +1083,30 @@ def _render_master_mix_per_clip_mux_mode(
     report.append(
         f"per_clip_mux: concat OK -> silent_combined {silent_combined.name}"
     )
+
+    # BUG-LOCAL-030 long-form hardening (2026-05-03 EVENING, post
+    # round-robin risk-#10 review): immediately reclaim the per-clip
+    # pillarbox intermediates now that silent_combined.mp4 holds the
+    # full assembled timeline. On a long-form episode (>5 min, ~100
+    # per-line clips x ~5-15 MB each) this saves 0.5-1.5 GB of
+    # transient disk before the final mux + RTXUpscale phases. Best-
+    # effort: any unlink failure is logged, never raised; spacesaver
+    # still owns the final cleanup of seg_dir if these stragglers
+    # survive.
+    _cleaned = 0
+    for _pb in pillarboxed:
+        try:
+            _pb.unlink(missing_ok=True)
+            _cleaned += 1
+        except Exception as _exc:
+            log.warning(
+                "[VideoComposite/per_clip_mux] intermediate cleanup "
+                "%s failed: %s", _pb.name, _exc,
+            )
+    if _cleaned:
+        report.append(
+            f"per_clip_mux: reclaimed {_cleaned} pillarbox intermediate(s)"
+        )
 
     # 4. Mux silent_combined video + procgen master-mix audio with
     # -c copy throughout.  This is the C7-critical step: audio
