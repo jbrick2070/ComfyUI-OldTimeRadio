@@ -1,8 +1,8 @@
 {
   "id": "fafde274-aa46-4e1d-9165-a89eb69afd26",
   "revision": 0,
-  "last_node_id": 58,
-  "last_link_id": 2,
+  "last_node_id": 60,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 52,
@@ -16,40 +16,15 @@
       "color": "#1E3A5F",
       "title": "Video Composite (smoke -- concat per-line clips)",
       "inputs": [
-        {
-          "name": "procgen_video_path",
-          "type": "STRING",
-          "widget": {"name": "procgen_video_path"}
-        },
-        {
-          "name": "clips_dir",
-          "type": "STRING",
-          "widget": {"name": "clips_dir"}
-        },
-        {
-          "name": "ledger_json",
-          "type": "STRING",
-          "widget": {"name": "ledger_json"}
-        }
+        {"name": "procgen_video_path", "type": "STRING", "widget": {"name": "procgen_video_path"}},
+        {"name": "clips_dir",          "type": "STRING", "widget": {"name": "clips_dir"}},
+        {"name": "ledger_json",        "type": "STRING", "widget": {"name": "ledger_json"}}
       ],
       "outputs": [
-        {
-          "name": "final_mp4_path",
-          "type": "STRING",
-          "links": [1],
-          "slot_index": 0,
-          "shape": 3
-        },
-        {
-          "name": "report",
-          "type": "STRING",
-          "links": null,
-          "shape": 3
-        }
+        {"name": "final_mp4_path", "type": "STRING", "links": [1], "slot_index": 0, "shape": 3},
+        {"name": "report",         "type": "STRING", "links": null, "shape": 3}
       ],
-      "properties": {
-        "Node name for S&R": "OTR_VideoComposite"
-      },
+      "properties": {"Node name for S&R": "OTR_VideoComposite"},
       "widgets_values": [
         "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
         "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/videos",
@@ -69,85 +44,78 @@
       ]
     },
     {
-      "id": 56,
-      "type": "OTR_RTXUpscale",
-      "pos": [900, 200],
-      "size": [520, 280],
+      "id": 59,
+      "type": "OTR_SaveCopy",
+      "pos": [880, 200],
+      "size": [380, 130],
       "flags": {},
       "order": 1,
       "mode": 0,
-      "title": "RTX VSR Upscale (smoke -- BUG-031 fix verification)",
+      "title": "QA tee #1 -- preserve composite output",
       "inputs": [
-        {
-          "name": "source_mp4_path",
-          "type": "STRING",
-          "link": 1,
-          "widget": {"name": "source_mp4_path"}
-        }
+        {"name": "video_path", "type": "STRING", "link": 1, "widget": {"name": "video_path"}}
       ],
       "outputs": [
-        {
-          "name": "upscaled_mp4_path",
-          "type": "STRING",
-          "links": [2],
-          "slot_index": 0
-        },
-        {
-          "name": "report",
-          "type": "STRING",
-          "links": null
-        }
+        {"name": "video_path", "type": "STRING", "links": [3], "slot_index": 0}
       ],
-      "properties": {
-        "Node name for S&R": "OTR_RTXUpscale"
-      },
-      "widgets_values": [
-        "",
-        false,
-        1920,
-        1080,
-        "ULTRA",
-        64,
-        "ffmpeg"
-      ]
+      "properties": {"Node name for S&R": "OTR_SaveCopy"},
+      "widgets_values": ["", "_smoke_composite"]
+    },
+    {
+      "id": 56,
+      "type": "OTR_RTXUpscale",
+      "pos": [1320, 200],
+      "size": [520, 280],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "RTX VSR Upscale (smoke -- BUG-031 fix verification)",
+      "inputs": [
+        {"name": "source_mp4_path", "type": "STRING", "link": 3, "widget": {"name": "source_mp4_path"}}
+      ],
+      "outputs": [
+        {"name": "upscaled_mp4_path", "type": "STRING", "links": [2], "slot_index": 0},
+        {"name": "report",            "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "OTR_RTXUpscale"},
+      "widgets_values": ["", false, 1920, 1080, "ULTRA", 64, "ffmpeg"]
+    },
+    {
+      "id": 60,
+      "type": "OTR_SaveCopy",
+      "pos": [1900, 200],
+      "size": [380, 130],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "QA tee #2 -- preserve upscale output",
+      "inputs": [
+        {"name": "video_path", "type": "STRING", "link": 2, "widget": {"name": "video_path"}}
+      ],
+      "outputs": [
+        {"name": "video_path", "type": "STRING", "links": [4], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "OTR_SaveCopy"},
+      "widgets_values": ["", "_smoke_upscale"]
     },
     {
       "id": 58,
       "type": "OTR_PostUpscaleProcgenBlend",
-      "pos": [1500, 200],
+      "pos": [2340, 200],
       "size": [560, 320],
       "flags": {},
-      "order": 2,
+      "order": 4,
       "mode": 0,
-      "title": "Post-Upscale Procgen Blend (smoke)",
+      "title": "Post-Upscale Procgen Blend (smoke -- writes _smoke_blended)",
       "inputs": [
-        {
-          "name": "source_mp4_path",
-          "type": "STRING",
-          "link": 2,
-          "widget": {"name": "source_mp4_path"}
-        },
-        {
-          "name": "procgen_mp4_path",
-          "type": "STRING",
-          "widget": {"name": "procgen_mp4_path"}
-        }
+        {"name": "source_mp4_path",  "type": "STRING", "link": 4, "widget": {"name": "source_mp4_path"}},
+        {"name": "procgen_mp4_path", "type": "STRING", "widget": {"name": "procgen_mp4_path"}}
       ],
       "outputs": [
-        {
-          "name": "final_mp4_path",
-          "type": "STRING",
-          "links": null
-        },
-        {
-          "name": "report",
-          "type": "STRING",
-          "links": null
-        }
+        {"name": "final_mp4_path", "type": "STRING", "links": null},
+        {"name": "report",         "type": "STRING", "links": null}
       ],
-      "properties": {
-        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
-      },
+      "properties": {"Node name for S&R": "OTR_PostUpscaleProcgenBlend"},
       "widgets_values": [
         "",
         "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
@@ -160,21 +128,20 @@
     }
   ],
   "links": [
-    [1, 52, 0, 56, 0, "STRING"],
-    [2, 56, 0, 58, 0, "STRING"]
+    [1, 52, 0, 59, 0, "STRING"],
+    [3, 59, 0, 56, 0, "STRING"],
+    [2, 56, 0, 60, 0, "STRING"],
+    [4, 60, 0, 58, 0, "STRING"]
   ],
   "groups": [],
   "config": {},
   "extra": {
-    "ds": {
-      "scale": 0.85,
-      "offset": [0, 0]
-    },
+    "ds": {"scale": 0.7, "offset": [0, 0]},
     "info": {
-      "name": "OTR Downstream Smoke Workflow (Composite + Upscale + Blend)",
-      "description": "BUG-LOCAL-031 verification harness, NOW with VideoComposite upstream so the per-line HuMo + LTX clip mixing step is exercised too. Three nodes: VideoComposite reads the per-line lXXX.mp4 clips from videos/ + ledger.json + procgen mp4 -> RTXUpscale -> PostUpscaleProcgenBlend. Skips Story / Director / Bark / Kokoro / MusicGen / AudioGen / FLUX / HuMo / LTX (all already on disk from the prior run). Total runtime ~3 min (composite ~30 sec + upscale ~70 sec + blend ~30 sec). Hardcoded paths point at the signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957 episode; edit the three widget paths on Node 52 + the procgen path on Node 58 to retarget. Output of Node 58 lands in output/otr/obs/ with the _smoke_blended suffix so it does not clobber your canonical OBS deliverables.",
-      "version": "2.0",
-      "purpose": "smoke-test-composite-upscale-blend"
+      "name": "OTR Downstream Smoke Workflow (Composite + Upscale + Blend with per-stage save tees)",
+      "description": "BUG-LOCAL-031 verification harness with explicit per-stage on-disk save tees. Five-node chain: VideoComposite -> SaveCopy(_smoke_composite) -> RTXUpscale -> SaveCopy(_smoke_upscale) -> PostUpscaleProcgenBlend(_smoke_blended). SaveCopy is a TEE: it copies the upstream mp4 to a sibling file with the suffix, then passes the ORIGINAL upstream path through unchanged so the next node operates on the canonical filename. After a run completes you get FIVE playable mp4s on disk: (1) composited/<ep>.mp4 (canonical composite output -- clobbered each smoke run), (2) composited/<ep>_smoke_composite.mp4 (preserved tee #1), (3) obs/<ep>.mp4 (canonical upscale output -- clobbered each smoke run), (4) obs/<ep>_smoke_upscale.mp4 (preserved tee #2), (5) obs/<ep>_smoke_blended.mp4 (final blend, suffix-protected). Each smoke run overwrites items #1, #3, #5 but #2 and #4 are stage-specific archives you can play side-by-side for QA. Skips Story / Director / Bark / Kokoro / MusicGen / AudioGen / FLUX / HuMo / LTX (all assets reused from prior run). Total runtime ~3 min. Edit Node 52 paths + Node 58 procgen path to retarget a different episode.",
+      "version": "3.0",
+      "purpose": "smoke-test-with-per-stage-save-tees"
     }
   },
   "version": 0.4
