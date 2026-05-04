@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import gc
 import logging
+import math
 import sys as _sys
 import time
 from pathlib import Path
@@ -61,10 +62,19 @@ if str(_NODES_DIR) not in _sys.path:
 
 # folder_paths is the ComfyUI canonical path resolver. The OTR helpers
 # (otr_videos_dir, otr_stills_dir, etc.) wrap folder_paths internally for
-# the broadcast tree under output/otr/, but importing folder_paths here
+# the broadcast tree under output/otr/, but referencing folder_paths here
 # explicitly satisfies the Bug Bible BUG-01.02 contract that every
 # OUTPUT_NODE file references the canonical resolver.
-import folder_paths  # noqa: F401,E402
+#
+# 2026-05-04 BUG-LOCAL-091 follow-up: wrapped in try/except so headless
+# pytest collection doesn't blow up (folder_paths is provided by the
+# ComfyUI runtime; pytest doesn't have it in scope). The runtime path
+# inside execute() goes through _otr_paths helpers which already have
+# their own folder_paths fallback chain.
+try:
+    import folder_paths  # noqa: F401,E402
+except ImportError:
+    folder_paths = None  # type: ignore[assignment]
 
 from _otr_paths import (  # noqa: E402
     otr_audio_dir,
@@ -90,17 +100,22 @@ log = logging.getLogger("OTR.batch_ltx_render")
 # this as a stutter-prevention requirement.
 LTX_FPS = 25
 
-# 8n+1 frame count rule for LTX VAE temporal compression. 177 =
-# 8*22+1 = ~7.08 s @ 25 fps. This intentionally matches HuMo's
-# HUMO_MAX_FRAMES=177 cap (HuMo uses 4n+1; 177 is also 4n+1=4*44+1)
-# so the chunking math in scene_sequencer.py stays the same for both
-# renderers -- no per-renderer math branching needed.
-# Per Jeffrey 2026-05-01 EVENING ("to make it easy you can keep LTX
-# to the same clip duration max as HuMo"). LTX could go to 257
-# native (proven in ComfyUI-Goofer with VAEDecodeTiled), but keeping
-# 177 here simplifies the timing contract.
-LTX_MAX_FRAMES = 177
+# 8n+1 frame count rule for LTX VAE temporal compression.
+# BUG-LOCAL-091 (2026-05-04 EVENING): bumped from 177 (~7.08s) to 353
+# (~14.12s) to match the post-BUG-086 HuMo cap. Lines exceeding the
+# user-configurable per-chunk ceiling (the new ``clip_length`` widget,
+# default 7.0s) fall into the chunking dispatch below. ComfyUI-Goofer
+# proved 257 native is fine; 353 is untested-but-likely-fine because
+# VAEDecodeTiled handles temporal chunking at the VAE level.
+# 353 = 8*44+1 satisfies LTX's 8n+1 constraint.
+LTX_MAX_FRAMES = 353
 LTX_MIN_FRAMES = 9    # 8*1+1, smallest valid LTX render
+# BUG-LOCAL-091 (2026-05-04 EVENING): when a non-character audio line
+# exceeds the per-chunk ceiling, split it into consecutive LTX chunks of
+# this many frames each, then ffmpeg-concat into a single per-line mp4.
+# 177 frames (7.08s) per chunk matches the historically-stable LTX render
+# size and the pre-bump LTX_MAX_FRAMES.
+LTX_CHUNK_FRAMES = 177
 
 # VAEDecodeTiled parameters (from ``ComfyUI-Goofer`` line 472-476).
 # These have been empirically verified on RTX 5080 Blackwell --
@@ -267,10 +282,11 @@ def ltx_length_for_dur(dur_s: float, *, fps: int = LTX_FPS) -> int:
 
     LTX VAE temporal compression requires length = 8n + 1 (vs HuMo's
     4n + 1). Floored at LTX_MIN_FRAMES, capped at LTX_MAX_FRAMES.
-    LTX_MAX_FRAMES = 257 = ~10.28 s @ 25 fps -- covers full music_open
-    (~10 s) and music_close (~8 s) cues natively. For lines longer
-    than 10.28 s (e.g. a long announcer monologue), VideoComposite
-    downstream can ping-pong-loop or freeze-frame extend.
+
+    Post BUG-LOCAL-091 (2026-05-04): LTX_MAX_FRAMES = 353 = ~14.12 s
+    @ 25 fps. Long announcer lines that exceed the per-chunk widget
+    cap go through the chunking dispatch in execute() rather than
+    relying on the legacy clamp.
     """
     target = max(1, round(float(dur_s) * fps))
     n = (target - 1 + 7) // 8
@@ -280,6 +296,80 @@ def ltx_length_for_dur(dur_s: float, *, fps: int = LTX_FPS) -> int:
     if frames > LTX_MAX_FRAMES:
         frames = LTX_MAX_FRAMES
     return frames
+
+
+def ltx_length_for_dur_uncapped(dur_s: float, *, fps: int = LTX_FPS) -> int:
+    """Same as ``ltx_length_for_dur`` but without the LTX_MAX_FRAMES cap.
+
+    BUG-LOCAL-091: used by the chunking dispatch to decide whether a
+    line's audio duration exceeds the per-chunk ceiling. If the
+    uncapped value > the user-configured chunk cap, the line is split
+    into multiple chunks before rendering.
+    """
+    target = max(1, round(float(dur_s) * fps))
+    n = (target - 1 + 7) // 8
+    frames = 8 * n + 1
+    if frames < LTX_MIN_FRAMES:
+        frames = LTX_MIN_FRAMES
+    return frames
+
+
+def _concat_clips_via_ffmpeg(
+    chunk_paths: list,
+    out_path: Path,
+    ffmpeg: str = "ffmpeg",
+) -> Path:
+    """BUG-LOCAL-091: concat per-chunk LTX mp4 files into a single
+    per-line mp4 via ffmpeg's concat demuxer.
+
+    Same pattern as the BUG-LOCAL-086 helper in batch_humo_render.py;
+    duplicated here rather than imported to keep the LTX render path
+    self-contained. Each chunk goes through ``_save_video_mp4`` with the
+    same fps + codec, so concat with ``-c copy`` is safe.
+
+    Single-chunk case is a defensive copy if not already at out_path.
+    """
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not chunk_paths:
+        raise RuntimeError("_concat_clips_via_ffmpeg: empty chunk list")
+    if len(chunk_paths) == 1:
+        if Path(chunk_paths[0]) == Path(out_path):
+            return out_path
+        shutil.copy2(str(chunk_paths[0]), str(out_path))
+        return out_path
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    list_fd, list_path = tempfile.mkstemp(prefix="ltx_concat_", suffix=".txt")
+    try:
+        with os.fdopen(list_fd, "w", encoding="utf-8") as f:
+            for p in chunk_paths:
+                abs_p = str(Path(p).resolve()).replace("'", "'\\''")
+                f.write(f"file '{abs_p}'\n")
+        cmd = [
+            ffmpeg, "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", list_path,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            str(out_path),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg concat failed (rc={proc.returncode}): "
+                f"{(proc.stderr or '').strip()[:500]}"
+            )
+        return out_path
+    finally:
+        try:
+            os.unlink(list_path)
+        except OSError:
+            pass
 
 
 _NODE_CACHE: dict[str, Any] = {}
@@ -497,6 +587,23 @@ class BatchLTXRender:
                 }),
             },
             "optional": {
+                "clip_length": ("FLOAT", {
+                    "default": 7.0,
+                    "min": 1.32,
+                    "max": 14.12,
+                    "step": 0.04,
+                    "tooltip": (
+                        "Max per-CHUNK duration in seconds (BUG-LOCAL-091, "
+                        "matches BatchHumoRender behaviour). Lines whose "
+                        "audio exceeds this are split into N consecutive "
+                        "chunks rendered against the radio bookend, then "
+                        "ffmpeg-concat into the final per-line mp4. Default "
+                        "7.0 -> 175 frames -> 177 (LTX 8n+1 = 7.08s, the "
+                        "historically-stable LTX render size). Bump up to "
+                        "14.12 (353 frames) if VRAM holds, to single-pass "
+                        "typical announcer monologues."
+                    ),
+                }),
                 "ffmpeg": ("STRING", {
                     "default": "ffmpeg",
                     "tooltip": "ffmpeg binary path or PATH-resolvable name",
@@ -521,7 +628,8 @@ class BatchLTXRender:
             },
         }
 
-    def execute(self, model, clip, vae, ledger_json, seed=1, ffmpeg="ffmpeg",
+    def execute(self, model, clip, vae, ledger_json, seed=1,
+                clip_length=7.0, ffmpeg="ffmpeg",
                 humo_clips_dir=""):
         # NOTE: ``humo_clips_dir`` is intentionally consumed but unused.
         # See INPUT_TYPES tooltip -- it is a pure DAG sequencing edge so
@@ -594,7 +702,31 @@ class BatchLTXRender:
             dur_s = ln.get("dur_s")
             if not isinstance(dur_s, (int, float)) or float(dur_s) <= 0.0:
                 continue
-            ltx_length = ltx_length_for_dur(float(dur_s))
+            dur_s = float(dur_s)
+
+            # BUG-LOCAL-091 (2026-05-04): chunking dispatch. ``clip_length``
+            # is the max single-pass duration (workflow widget, default 7.0s).
+            # Lines whose audio exceeds it are split into N consecutive
+            # chunks of <= clip_length each, rendered independently against
+            # the radio bookend, then ffmpeg-concat into the final per-line
+            # mp4. Pre-091 the cap silently truncated the back half of any
+            # >7s line, leaving the radio scene frozen while the announcer
+            # audio kept playing.
+            chunk_max_dur_s = max(0.04, float(clip_length))
+            if dur_s <= chunk_max_dur_s:
+                chunk_specs = [{"dur_s": dur_s}]
+            else:
+                n_chunks = max(2, math.ceil(dur_s / chunk_max_dur_s))
+                chunk_dur_s = dur_s / n_chunks
+                chunk_specs = [{"dur_s": chunk_dur_s} for _ in range(n_chunks)]
+                log.info(
+                    "[BatchLTXRender] BUG-LOCAL-091: line %s dur_s=%.2fs > "
+                    "clip_length=%.2fs -- splitting into %d chunks of "
+                    "%.2fs each",
+                    line_id, dur_s, float(clip_length),
+                    n_chunks, chunk_dur_s,
+                )
+            ltx_length = ltx_length_for_dur(chunk_specs[0]["dur_s"])
             # BUG-LOCAL-025 (Phase H): enrich per-role base with line's
             # scene context + episode style instead of using the bare
             # hardcoded role prompt. Same role across two episodes
@@ -603,8 +735,9 @@ class BatchLTXRender:
             plan.append({
                 "line_id": line_id,
                 "speaker_role": speaker_role,
-                "dur_s": float(dur_s),
+                "dur_s": dur_s,
                 "ltx_length": ltx_length,
+                "chunks": chunk_specs,
                 "prompt_text": prompt_text,
             })
 
@@ -654,9 +787,9 @@ class BatchLTXRender:
         with torch.inference_mode():
             for idx, entry in enumerate(plan):
                 line_id = entry["line_id"]
-                ltx_length = entry["ltx_length"]
                 prompt_text = entry["prompt_text"]
-                shot_seed = (seed + idx * 1009) & 0x7FFFFFFFFFFFFFFF
+                chunks = entry.get("chunks") or [{"dur_s": entry["dur_s"]}]
+                n_chunks = len(chunks)
                 shot_t0 = time.time()
 
                 # Anti-clobber (consult 2026-05-02 ChatGPT + Gemini):
@@ -692,98 +825,156 @@ class BatchLTXRender:
                         frame_rate=LTX_FPS,
                     )
 
-                    # Empty video latent at the requested length.
-                    empty_latent = _call(
-                        "EmptyLTXVLatentVideo",
-                        width=LTX_WIDTH, height=LTX_HEIGHT,
-                        length=ltx_length, batch_size=1,
-                    )[0]
+                    # BUG-LOCAL-091: per-chunk render loop. Single-chunk
+                    # path (n_chunks==1) renders one pass and writes
+                    # directly to <line_id>.mp4 -- matches pre-091 layout.
+                    # Multi-chunk renders each chunk to a part file then
+                    # ffmpeg-concats. All chunks share the same prompt +
+                    # ref_image (radio bookend) so the visual snap at the
+                    # chunk boundary is the radio scene resetting; the
+                    # alternative (carry last frame to next chunk) is a
+                    # future upgrade documented as BUG-LOCAL-091a.
+                    chunk_mp4_paths: list = []
+                    for chunk_idx, chunk in enumerate(chunks):
+                        chunk_dur_s = float(chunk["dur_s"])
+                        chunk_ltx_length = ltx_length_for_dur(chunk_dur_s)
 
-                    # BUG-LOCAL-032 fix (2026-05-03 EVENING): use
-                    # ONLY the start frame as i2v conditioning. The
-                    # prior code ALSO fed the radio still as an end
-                    # frame (frame_idx=-1) for seamless-loop intent,
-                    # but two strong anchors (start strength 0.75 +
-                    # end strength 0.6) clamped LTX into a near-static
-                    # ping-pong: motion would happen briefly in the
-                    # middle then snap back to the identical
-                    # composition. User reported "ltx looks like a
-                    # still" -- confirmed via comparison with
-                    # ComfyUI-Goofer + comfyui-data-media-machine
-                    # which both use ONLY the start frame and produce
-                    # genuinely moving video. Trade-off: clips no
-                    # longer seamlessly loop back to the radio still
-                    # at end. For OTR's announcer/music/sfx use case
-                    # this is fine -- the next per-line clip begins
-                    # with its own content anyway, so the lost loop
-                    # behavior costs nothing visible.
-                    #
-                    # If a future workflow needs the loop-back
-                    # behavior again, restore the second LTXVAddGuide
-                    # but at MUCH lower strength (~0.2-0.3) so it's
-                    # a soft hint, not a motion-killer.
-                    cond_pos, cond_neg, latent = _call(
-                        "LTXVAddGuide",
-                        positive=cond_pos,
-                        negative=cond_neg,
-                        vae=vae,
-                        latent=empty_latent,
-                        image=ref_image,
-                        frame_idx=0,
-                        strength=LTX_I2V_STRENGTH,
-                    )
+                        # Per-chunk shot_seed: stride-shifted so chunks
+                        # 1+2 of the same line don't render with identical
+                        # seed (would look quasi-identical at the join).
+                        shot_seed = (
+                            seed
+                            + idx * 1009
+                            + chunk_idx * 7919
+                        ) & 0x7FFFFFFFFFFFFFFF
 
-                    # Sample with distilled schedule
-                    noise = _call("RandomNoise", noise_seed=shot_seed)[0]
-                    guider = _call(
-                        "CFGGuider",
-                        model=model,
-                        positive=cond_pos,
-                        negative=cond_neg,
-                        cfg=LTX_CFG,
-                    )[0]
-                    samples_out, _denoised = _call(
-                        "SamplerCustomAdvanced",
-                        noise=noise, guider=guider,
-                        sampler=sampler_obj, sigmas=sigmas,
-                        latent_image=latent,
-                    )
+                        # Empty video latent at the chunk's requested length.
+                        empty_latent = _call(
+                            "EmptyLTXVLatentVideo",
+                            width=LTX_WIDTH, height=LTX_HEIGHT,
+                            length=chunk_ltx_length, batch_size=1,
+                        )[0]
 
-                    # VAEDecodeTiled per Goofer's proven pattern --
-                    # required for safe decoding at higher frame counts
-                    # on this Blackwell hardware. Parameters from
-                    # ComfyUI-Goofer line 472-476 (empirically verified).
-                    frames = _call(
-                        "VAEDecodeTiled",
-                        samples=samples_out, vae=vae,
-                        tile_size=LTX_TILE_SIZE,
-                        overlap=LTX_TILE_OVERLAP,
-                        temporal_size=LTX_TEMPORAL_SIZE,
-                        temporal_overlap=LTX_TEMPORAL_OVERLAP,
-                    )[0]
+                        # BUG-LOCAL-032 fix (2026-05-03 EVENING): use
+                        # ONLY the start frame as i2v conditioning. The
+                        # prior code ALSO fed the radio still as an end
+                        # frame (frame_idx=-1) for seamless-loop intent,
+                        # but two strong anchors (start strength 0.75 +
+                        # end strength 0.6) clamped LTX into a near-static
+                        # ping-pong: motion would happen briefly in the
+                        # middle then snap back to the identical
+                        # composition. User reported "ltx looks like a
+                        # still" -- confirmed via comparison with
+                        # ComfyUI-Goofer + comfyui-data-media-machine
+                        # which both use ONLY the start frame and produce
+                        # genuinely moving video. Trade-off: clips no
+                        # longer seamlessly loop back to the radio still
+                        # at end. For OTR's announcer/music/sfx use case
+                        # this is fine -- the next per-line clip begins
+                        # with its own content anyway, so the lost loop
+                        # behavior costs nothing visible.
+                        cp_chunk, cn_chunk, latent_chunk = _call(
+                            "LTXVAddGuide",
+                            positive=cond_pos,
+                            negative=cond_neg,
+                            vae=vae,
+                            latent=empty_latent,
+                            image=ref_image,
+                            frame_idx=0,
+                            strength=LTX_I2V_STRENGTH,
+                        )
 
-                    # Save mp4 (silent, libx264 yuv420p, fixed timebase
-                    # to match HuMo clips for VideoComposite concat).
+                        # Sample with distilled schedule
+                        noise = _call("RandomNoise", noise_seed=shot_seed)[0]
+                        guider = _call(
+                            "CFGGuider",
+                            model=model,
+                            positive=cp_chunk,
+                            negative=cn_chunk,
+                            cfg=LTX_CFG,
+                        )[0]
+                        samples_out, _denoised = _call(
+                            "SamplerCustomAdvanced",
+                            noise=noise, guider=guider,
+                            sampler=sampler_obj, sigmas=sigmas,
+                            latent_image=latent_chunk,
+                        )
+
+                        # VAEDecodeTiled per Goofer's proven pattern --
+                        # required for safe decoding at higher frame counts
+                        # on this Blackwell hardware.
+                        frames = _call(
+                            "VAEDecodeTiled",
+                            samples=samples_out, vae=vae,
+                            tile_size=LTX_TILE_SIZE,
+                            overlap=LTX_TILE_OVERLAP,
+                            temporal_size=LTX_TEMPORAL_SIZE,
+                            temporal_overlap=LTX_TEMPORAL_OVERLAP,
+                        )[0]
+
+                        # Per-chunk destination. Single-chunk writes to
+                        # canonical <line_id>.mp4; multi-chunk writes to
+                        # per-chunk part files for the concat below.
+                        if n_chunks == 1:
+                            chunk_dest = clips_dir / f"{line_id}.mp4"
+                        else:
+                            chunk_dest = clips_dir / (
+                                f"{line_id}__chunk{chunk_idx + 1:02d}.mp4"
+                            )
+                        _save_video_mp4(
+                            images=frames,
+                            out_path=chunk_dest,
+                            fps=LTX_FPS,
+                            ffmpeg=ffmpeg,
+                        )
+                        chunk_mp4_paths.append(chunk_dest)
+
+                    # BUG-LOCAL-091: concat per-chunk part files into the
+                    # canonical per-line mp4 if multi-chunk. Same codec /
+                    # sample rate / fps across all chunks (same
+                    # _save_video_mp4 invocation), so concat-demuxer with
+                    # -c copy is safe.
                     out_path = clips_dir / f"{line_id}.mp4"
-                    _save_video_mp4(
-                        images=frames,
-                        out_path=out_path,
-                        fps=LTX_FPS,
-                        ffmpeg=ffmpeg,
-                    )
+                    if n_chunks > 1:
+                        _concat_clips_via_ffmpeg(
+                            chunk_mp4_paths, out_path, ffmpeg=ffmpeg,
+                        )
+                        for _cp in chunk_mp4_paths:
+                            try:
+                                _cp.unlink()
+                            except OSError:
+                                pass
+                    # Use the per-line ltx_length for log/report -- it's
+                    # the per-chunk frame count which the user expects to
+                    # see for sizing context.
+                    ltx_length = entry["ltx_length"]
 
                     shot_ms = int((time.time() - shot_t0) * 1000)
-                    log.info(
-                        "[BatchLTXRender] %s done: role=%s length=%d "
-                        "dur_s=%.3f -> %s (%d ms)",
-                        line_id, entry["speaker_role"], ltx_length,
-                        entry["dur_s"], out_path.name, shot_ms,
-                    )
-                    report_lines.append(
-                        f"  {line_id} ({entry['speaker_role']}, "
-                        f"{ltx_length}f, {entry['dur_s']:.2f}s): "
-                        f"{shot_ms} ms"
-                    )
+                    if n_chunks > 1:
+                        log.info(
+                            "[BatchLTXRender] %s done: role=%s "
+                            "dur_s=%.3f -> %s (%d ms, %d chunks, "
+                            "BUG-LOCAL-091 chunked + concat)",
+                            line_id, entry["speaker_role"],
+                            entry["dur_s"], out_path.name, shot_ms, n_chunks,
+                        )
+                        report_lines.append(
+                            f"  {line_id} ({entry['speaker_role']}, "
+                            f"{ltx_length}f x {n_chunks} chunks, "
+                            f"{entry['dur_s']:.2f}s): {shot_ms} ms"
+                        )
+                    else:
+                        log.info(
+                            "[BatchLTXRender] %s done: role=%s length=%d "
+                            "dur_s=%.3f -> %s (%d ms)",
+                            line_id, entry["speaker_role"], ltx_length,
+                            entry["dur_s"], out_path.name, shot_ms,
+                        )
+                        report_lines.append(
+                            f"  {line_id} ({entry['speaker_role']}, "
+                            f"{ltx_length}f, {entry['dur_s']:.2f}s): "
+                            f"{shot_ms} ms"
+                        )
 
                     # BUG-LOCAL-084 fix: stamp start_s + REAL on-disk dur_s
                     # so downstream consumers (audit, debug, future composite
@@ -826,6 +1017,11 @@ class BatchLTXRender:
                         "ref_png_name": radio_png.name,
                         "ref_source": "ltx-radio-bookend",
                         "source_kind": "ltx",
+                        # BUG-LOCAL-091 traceability: how many chunks
+                        # were rendered + concatenated for this line.
+                        # 1 = single pass (pre-091 layout); >1 = chunked
+                        # because audio dur exceeded clip_length.
+                        "n_chunks": int(n_chunks),
                     })
 
                 except Exception as exc:

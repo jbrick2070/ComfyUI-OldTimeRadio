@@ -21,6 +21,46 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-091 [FIXED]: LTX clips frozen on last frame -- chunking + 353-frame cap parity with HuMo
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-086 LTX parity | **Bible candidate:** YES (audio/video timeline alignment, BUG-086 sister fix)
+- **Symptom:** BatchLTXRender used a hardcoded ``LTX_MAX_FRAMES = 177`` (~7.08 s @ 25 fps), and ``ltx_length_for_dur`` silently capped at that value. Any non-character audio line longer than 7.08 s (typical announcer monologue: 10-15 s, music intro/outro: 8-12 s) had its tail truncated; the LTX render produced a 7-second clip while the audio kept playing, leaving the radio scene frozen on its last frame for the back half of the line. Same root cause as BUG-LOCAL-086 but for the non-character render path. Docstring at line 270 even documented it: *"For lines longer than 10.28 s, VideoComposite downstream can ping-pong-loop or freeze-frame extend"* -- the workaround was the bug.
+- **Cause (multi-layer):**
+  1. ``LTX_MAX_FRAMES = 177`` constant matched HuMo's pre-086 cap (intentionally, for "timing contract simplicity" per a 2026-05-01 Jeffrey directive). When BUG-086 raised HUMO_MAX_FRAMES to 353, LTX was left behind.
+  2. ``ltx_length_for_dur`` clamped at the cap, silently dropping the tail frames. No widget existed to override.
+  3. Comment claimed cap should be 257 (10.28 s native, proven in ComfyUI-Goofer with VAEDecodeTiled) but the constant was 177 -- comment/value drift since the original LTX setup.
+- **Fix (`nodes/batch_ltx_render.py`, ~150 LOC across 6 sites):**
+  - **Constant bumps** -- ``LTX_MAX_FRAMES = 353`` (8*44+1 = 14.12 s @ 25 fps, matches the post-086 HuMo cap). New ``LTX_CHUNK_FRAMES = 177`` for the chunking fallback when a line still exceeds the user-configurable cap.
+  - **NEW `ltx_length_for_dur_uncapped(dur_s)`** -- 8n+1 frame snap without the LTX_MAX_FRAMES ceiling. Used by the chunking dispatch.
+  - **NEW `_concat_clips_via_ffmpeg(chunk_paths, out_path, ffmpeg)`** -- ffmpeg concat-demuxer wrapper with `-c copy`. Mirrors the BUG-086 helper in batch_humo_render.py; duplicated rather than imported to keep the LTX render path self-contained.
+  - **NEW `clip_length` widget** in `INPUT_TYPES.optional` -- FLOAT, default 7.0, max 14.12, step 0.04. Same UX as BatchHumoRender's BUG-086 widget. Tooltip points to BUG-LOCAL-091.
+  - **`execute()` signature** now accepts `clip_length=7.0` keyword arg.
+  - **Plan-build refactor** -- per-line entry now carries `chunks: list[{dur_s}]`. Lines whose `dur_s <= clip_length` get a single-chunk plan (current behaviour, unchanged). Lines exceeding `clip_length` get an N-way even split where N = `ceil(dur_s / clip_length)`. New log line: `BUG-LOCAL-091: line lXXX dur_s=YY > clip_length=ZZ -- splitting into N chunks of W.WWs each`.
+  - **Per-line render loop refactor** -- iterates `entry["chunks"]`, dispatches one LTX render per chunk against the same prompt + radio bookend ref. Per-chunk `shot_seed = seed + idx*1009 + chunk_idx*7919` so chunks 1+2 of the same line don't render with identical seed (would produce visible "stutter back to start" at the join). Single-chunk lines write directly to `<line_id>.mp4`. Multi-chunk lines write to `<line_id>__chunk{NN}.mp4` part files then `_concat_clips_via_ffmpeg` stitches them and the part files are unlinked.
+  - **Ledger record** -- single entry per line (not per chunk) with new `n_chunks` field for traceability. Downstream (VideoComposite) sees one mp4 per line at `<line_id>.mp4`, regardless of chunk count.
+  - **`import folder_paths` made try/except** so headless pytest collection works (folder_paths is provided by the ComfyUI runtime; pytest doesn't have it). Runtime still uses it via the `_otr_paths` helpers which already have their own folder_paths fallback chain. Comment kept so Bug Bible BUG-01.02 string-content check still finds the reference.
+- **NEW tests (`tests/test_batch_ltx_render.py`, 19 tests):**
+  - `test_ltx_constants` -- pin LTX_FPS=25, LTX_MIN_FRAMES=9, LTX_MAX_FRAMES=353, LTX_CHUNK_FRAMES=177
+  - `test_ltx_length_for_dur` -- parametrize 8 cases including 14.12s -> 353 (cap exactly), 16s+ -> 353 (capped)
+  - `test_ltx_length_for_dur_always_returns_8n_plus_1` -- 9 dur values
+  - `test_ltx_length_for_dur_uncapped_skips_cap` -- 30s -> 753 uncapped, 353 capped
+  - `test_clip_length_widget_present` / `test_clip_length_default_is_seven` / `test_clip_length_max_respects_humo_ceiling`
+  - `test_execute_signature_accepts_clip_length` -- inspect `execute()` signature
+  - `test_concat_helper_*` -- 4 tests for the ffmpeg concat wrapper (empty list rejected, single-chunk copies, single-chunk no-op when path matches)
+- **Known caveats / what we're not pretending:**
+  - Per-chunk seed stride (7919) is a guess at preventing same-frame regression at chunk joins. If the seam is visible in test, future BUG-LOCAL-091a should carry over the last frame's latent as a continuity hint instead of relying on stride randomness.
+  - LTX_MAX_FRAMES=353 at 16 GiB Blackwell is **untested in a live run**. ComfyUI-Goofer proved 257 fine; 353 is extrapolated. If the next LTX render OOMs on a 14s clip, drop the constant back to 257 (10.28s) -- the chunking dispatch handles whatever the cap is.
+  - LTX chunks share the same start frame (radio bookend) so multi-chunk renders have a "snap back" at the boundary. For OTR's stylized 1940s radio scene this is acceptable; if needed, future upgrade carries last-frame latent across chunks (BUG-LOCAL-091a).
+- **Verify:**
+  - AST parse clean on `nodes/batch_ltx_render.py` (53704 bytes, 3982 nodes).
+  - `tests/test_batch_ltx_render.py` -> 19 passed in 1.77s.
+  - `tests/test_batch_ltx_render.py + test_batch_humo_render.py + test_news_history_ttl.py` -> 68 passed in 2.99s.
+  - Bug Bible regression OTR-scoped -> 22 passed / 1 pre-existing baseline failure / 1 skipped / 2 xfailed.
+  - Live: next LTX render with a >7s announcer line should log `BUG-LOCAL-091: line lXXX dur_s=YY > clip_length=7.0s -- splitting into N chunks` and finish with `(N chunks, BUG-LOCAL-091 chunked + concat)`.
+- **Tags:** ltx, vram-ceiling, audio-video-sync, chunking, ffmpeg-concat, BUG-086-parity
+- **Related:** BUG-LOCAL-086 (HuMo equivalent that this fix mirrors). BUG-LOCAL-105 (silent-clamp predecessor; chunking dispatch replaces the LTX side of that pattern but the capped `ltx_length_for_dur` still defends each individual chunk per chunk).
+
+---
+
 ### BUG-LOCAL-090 [FIXED]: news_history.json grows unbounded -- 5-day TTL + state-dir relocation
 **Update 2026-05-04 (commit follow-up):** the file was also moved out of the source repo into the per-machine state tier.
 
