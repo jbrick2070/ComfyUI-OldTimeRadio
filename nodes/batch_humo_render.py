@@ -396,6 +396,92 @@ def _png_to_tensor(png_path: Path):
     return tensor
 
 
+def _rescue_orphan_line_char_ids(lines: list, cast: list) -> tuple[int, int, list]:
+    """Detect lines whose ``char_id`` doesn't match any ``cast[]`` entry,
+    and fuzzy-rescue them by speaker-name match.
+
+    Mutates ``lines`` in place: orphan lines whose speaker name fuzzy-
+    matches an existing cast member get their ``char_id`` rewritten to
+    the matched cast member's char_id. Lines with no rescue path are
+    left as-is and will fall through to the BUG-LOCAL-129a static-radio
+    fallback in VideoComposite (no drift, just visual mismatch).
+
+    Returns ``(rescued_count, unrescued_count, log_messages)``.
+
+    Match strategy (in order):
+      1. Exact uppercase name match (``MANFRED`` == ``MANFRED``)
+      2. Substring match either direction (``MANFRED DIALLO`` contains
+         ``MANFRED`` -> rescue) with length-ratio score >= 0.5
+    """
+    cast_by_id = {(c.get("char_id") or "").strip(): c for c in cast}
+    cast_names = {
+        (c.get("name") or "").strip().upper(): (c.get("char_id") or "").strip()
+        for c in cast if c.get("name") and c.get("char_id")
+    }
+
+    log_msgs: list = []
+    rescued = 0
+    unrescued = 0
+    for ln in lines:
+        cid = (ln.get("char_id") or "").strip()
+        if cid and cid in cast_by_id:
+            continue  # OK, char_id resolves
+        # ORPHAN
+        speaker_name = (
+            ln.get("speaker") or ln.get("name") or ln.get("character_name") or ""
+        ).strip().upper()
+        line_id = ln.get("line_id") or "?"
+        if not speaker_name:
+            log_msgs.append(
+                f"ORPHAN_LINE_CHAR_ID line={line_id} char_id={cid!r} -- "
+                f"no speaker name available, cannot fuzzy-rescue; "
+                f"BUG-129a static-radio will fire"
+            )
+            unrescued += 1
+            continue
+        # Exact name match
+        if speaker_name in cast_names:
+            new_cid = cast_names[speaker_name]
+            log_msgs.append(
+                f"RESCUED_ORPHAN line={line_id} char_id={cid!r} "
+                f"speaker={speaker_name!r} -> char_id={new_cid!r} "
+                f"(exact name match)"
+            )
+            ln["char_id"] = new_cid
+            rescued += 1
+            continue
+        # Fuzzy substring + length-ratio match
+        best_cid = None
+        best_score = 0.0
+        best_name = ""
+        for cast_name, cast_cid in cast_names.items():
+            if speaker_name in cast_name or cast_name in speaker_name:
+                ratio = (
+                    min(len(speaker_name), len(cast_name))
+                    / max(len(speaker_name), len(cast_name))
+                )
+                if ratio > best_score:
+                    best_score = ratio
+                    best_cid = cast_cid
+                    best_name = cast_name
+        if best_cid and best_score >= 0.5:
+            log_msgs.append(
+                f"RESCUED_ORPHAN line={line_id} char_id={cid!r} "
+                f"speaker={speaker_name!r} -> char_id={best_cid!r} "
+                f"(fuzzy match {best_score:.2f}: {best_name!r})"
+            )
+            ln["char_id"] = best_cid
+            rescued += 1
+        else:
+            log_msgs.append(
+                f"ORPHAN_LINE_CHAR_ID line={line_id} char_id={cid!r} "
+                f"speaker={speaker_name!r} -- no fuzzy match in cast "
+                f"{list(cast_names.keys())}; BUG-129a static-radio will fire"
+            )
+            unrescued += 1
+    return rescued, unrescued, log_msgs
+
+
 def _audio_slice_rms_db(audio_dict: dict, start_s: float, dur_s: float) -> float:
     """Compute the RMS amplitude (in dBFS) of an audio slice from a
     ComfyUI AUDIO dict. Returns ``float("-inf")`` if the slice is
@@ -1023,6 +1109,39 @@ class BatchHumoRender:
         ledger, ledger_path = self._load_ledger_with_path(ledger_json)
         cast = ledger.get("cast") or []
         lines = ledger.get("lines") or []
+
+        # BUG-LOCAL-079 (2026-05-03 EVENING): orphan char_id detection +
+        # fuzzy rescue. If LLMDirector emits a cast member name like
+        # "MANFRED" but a line is attributed to "MANFRED DIALLO" (or
+        # the fuzzy consolidator BUG-098 misses a merge), the line's
+        # char_id may NOT be in cast[]. Without this rescue:
+        #   - HuMo can't find a portrait -> falls through to env-still
+        #     tier 4 (now disabled by skip_env_stills) -> falls to
+        #     tier 5 (any env still) -> may silently use the wrong face
+        #   - WORST CASE: HuMo skips the line entirely -> no per-line
+        #     mp4 -> VideoComposite BUG-129a fires static-radio
+        #     fallback -> audio still aligned (no drift) but visual is
+        #     a static radio image instead of the speaking character
+        # The rescue here repoints orphan lines to the closest cast
+        # member name match BEFORE HuMo dispatches, so the right
+        # portrait is used. Fuzzy match strategy: exact uppercase,
+        # then substring + length-ratio >= 0.5.
+        try:
+            _resc, _unresc, _resc_msgs = _rescue_orphan_line_char_ids(lines, cast)
+            if _resc or _unresc:
+                log.warning(
+                    "[BatchHumoRender] BUG-079 orphan char_id pass: "
+                    "rescued=%d unrescued=%d (out of %d lines, %d cast)",
+                    _resc, _unresc, len(lines), len(cast),
+                )
+                for _m in _resc_msgs:
+                    log.warning("[BatchHumoRender] %s", _m)
+        except Exception as _resc_exc:
+            log.warning(
+                "[BatchHumoRender] BUG-079 orphan rescue helper failed: %s "
+                "(non-fatal; lines pass through unchanged)", _resc_exc,
+            )
+
         episode_id = ledger.get("episode_id", "episode")
         cid_to_name = {
             (c.get("char_id") or ""): (c.get("name") or "")
