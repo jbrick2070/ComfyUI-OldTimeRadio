@@ -288,6 +288,57 @@ class BatchFluxPortraitRender:
             empty = torch.zeros((1, height, width, 3), dtype=torch.float32)
             return (empty, "\n".join(report_lines))
 
+        # BUG-LOCAL-094 (2026-05-04 EVENING): build a per-char_id flag
+        # of "has at least one character-role line" by walking
+        # ledger.lines[]. Cast entries themselves don't carry
+        # speaker_role -- it lives per-line -- so the pre-094 check
+        # (``c.get("speaker_role") or c.get("role")``) always returned
+        # an empty string and the skip_announcer guard never fired.
+        # Result: ANNOUNCER cast members got a wasted ~30s FLUX
+        # portrait that HuMo never used (announcer beats route to LTX
+        # via BUG-129b). Same for any future cast member whose lines
+        # are entirely music/sfx.
+        #
+        # Detection: walk lines[], group by char_id, check if any line
+        # has speaker_role == "character". If a cast member has at
+        # least one character line, render the portrait. If not, skip.
+        # Falls back to "render anyway" when lines block is missing
+        # (degraded ledger; safer to render than to skip silently).
+        try:
+            from nodes._otr_speaker_role import (  # type: ignore
+                resolve_speaker_role,
+                SPEAKER_ROLE_CHARACTER,
+            )
+        except ImportError:
+            try:
+                from _otr_speaker_role import (  # type: ignore
+                    resolve_speaker_role,
+                    SPEAKER_ROLE_CHARACTER,
+                )
+            except ImportError:
+                resolve_speaker_role = None
+                SPEAKER_ROLE_CHARACTER = "character"  # fallback
+        char_id_has_character_line: dict[str, bool] = {}
+        ledger_lines = led.get("lines") or []
+        if resolve_speaker_role is not None:
+            for ln in ledger_lines:
+                cid = (ln.get("char_id") or "").strip()
+                if not cid:
+                    continue
+                role = resolve_speaker_role(ln)
+                if role == SPEAKER_ROLE_CHARACTER:
+                    char_id_has_character_line[cid] = True
+                else:
+                    # Default to False only if not already seen as
+                    # character; preserve True if any prior line had it.
+                    char_id_has_character_line.setdefault(cid, False)
+        if char_id_has_character_line:
+            report_lines.append(
+                f"  BUG-094 cast filter: {sum(char_id_has_character_line.values())}"
+                f"/{len(char_id_has_character_line)} cast member(s) have "
+                f">=1 character-role line"
+            )
+
         # ---- Resolve output dir ----
         _OTRP, _OTRL = _lazy_otr_imports()
         portraits_dir = _OTRP.otr_portraits_dir(episode_id)
@@ -307,10 +358,41 @@ class BatchFluxPortraitRender:
                 c.get("char_id") or c.get("name") or f"c{i+1:02d}"
             )
             speaker = (c.get("name") or c.get("speaker") or char_id).strip()
-            role = (c.get("speaker_role") or c.get("role") or "").lower()
-            if skip_announcer and role == "announcer":
+            # BUG-LOCAL-094 (2026-05-04 EVENING): two-tier skip.
+            # Tier 1 (line-driven): if we have line-block visibility
+            # AND skip_announcer is on AND this char_id has zero
+            # character-role lines, skip. This is the canonical check.
+            # Tier 2 (legacy name-match fallback): if the lines block
+            # was empty/missing AND skip_announcer is on AND the cast
+            # name is the literal "ANNOUNCER", skip. Pre-094 the only
+            # check was `c.get("speaker_role") or c.get("role")` which
+            # always returned empty (cast dict doesn't carry role) so
+            # the guard never fired and ANNOUNCER got a wasted ~30s
+            # FLUX portrait that HuMo never used.
+            cast_char_id_for_filter = (c.get("char_id") or "").strip()
+            line_visible = bool(char_id_has_character_line)
+            if (
+                skip_announcer
+                and line_visible
+                and cast_char_id_for_filter
+                and not char_id_has_character_line.get(
+                    cast_char_id_for_filter, True
+                )
+            ):
                 report_lines.append(
-                    f"  cast[{i}] {speaker} ({char_id}) role=announcer; "
+                    f"  cast[{i}] {speaker} ({char_id}) "
+                    f"all lines non-character; skip per skip_announcer=True "
+                    f"(BUG-LOCAL-094)"
+                )
+                continue
+            if (
+                skip_announcer
+                and not line_visible
+                and speaker.upper().strip() == "ANNOUNCER"
+            ):
+                report_lines.append(
+                    f"  cast[{i}] {speaker} ({char_id}) "
+                    f"name=ANNOUNCER (legacy fallback, no lines block); "
                     f"skip per skip_announcer=True"
                 )
                 continue

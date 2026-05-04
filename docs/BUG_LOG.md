@@ -21,6 +21,34 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-094 [FIXED]: skip_announcer guard never fired -- wasted ~30s FLUX per announcer cast member
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-093 cleanup | **Bible candidate:** YES (cast filter + skip dispatch)
+- **Symptom:** every recent run rendered a portrait for the ANNOUNCER cast member even though announcer beats route to LTX (BUG-129b) and the portrait is never used. ~30s of FLUX wall time wasted per portrait. Visible in the runtime log as e.g. `[OTR_BatchFluxPortraitRender] c01 -> c01_portrait.png (29.7s)` for `c01: ANNOUNCER`.
+- **Cause:** `OTR_BatchFluxPortraitRender` had a `skip_announcer` widget (default True) and an in-loop check `role = (c.get("speaker_role") or c.get("role") or "").lower(); if skip_announcer and role == "announcer": continue`. But the ledger cast block doesn't carry `speaker_role` -- it lives per-line in `ledger.lines[]`. The cast dict shape is `{char_id, name, description, gender, voice_preset, line_count, word_count, portrait_path}` -- no role field. So `c.get("speaker_role") or c.get("role")` always returned an empty string, the `if` never fired, and every cast member got a portrait regardless of role.
+- **Fix (`visual/batch_flux_portrait_render.py`, ~80 LOC):**
+  - **NEW: walk `ledger.lines[]` to build `char_id_has_character_line: dict[str, bool]`**. For each line, call `resolve_speaker_role(ln)` (canonical helper from `_otr_speaker_role`). If any line for a char_id has `speaker_role == "character"`, mark True. Cast members with all-non-character lines (announcer, music_*, sfx) end up False.
+  - **Two-tier skip dispatch in the cast loop**:
+    1. **Tier 1 (line-driven, canonical)**: if `skip_announcer` is on AND `lines[]` was non-empty AND this `char_id` has zero character lines -> skip with log `cast[i] NAME (cid) all lines non-character; skip per skip_announcer=True (BUG-LOCAL-094)`.
+    2. **Tier 2 (legacy name-match fallback)**: if `skip_announcer` is on AND `lines[]` was empty/missing AND `cast.name == "ANNOUNCER"` (case-insensitive) -> skip with log `cast[i] NAME (cid) name=ANNOUNCER (legacy fallback, no lines block); skip per skip_announcer=True`. Covers degraded ledgers from earlier schema versions.
+  - **Diagnostic log line**: `BUG-094 cast filter: M/N cast member(s) have >=1 character-role line` so the post-mortem can verify the filter ran.
+  - **Lazy import of `_otr_speaker_role`**: tries `from nodes._otr_speaker_role` first, falls through to `from _otr_speaker_role` (sibling-on-sys.path pattern), then to a string fallback `SPEAKER_ROLE_CHARACTER = "character"` if the helper is unavailable. Defensive at module load.
+  - **Falls back to "render anyway"** when `lines[]` is missing/empty AND name doesn't match "ANNOUNCER" -- safer to render an unused portrait than to skip silently.
+- **NEW tests (`tests/test_portrait_render_skip_announcer.py`, 5 tests):**
+  - `test_skip_announcer_widget_default_true` -- pin the widget default.
+  - `test_dispatch_uses_lines_block_not_cast_speaker_role` -- assert source contains `char_id_has_character_line` and `resolve_speaker_role`.
+  - `test_dispatch_has_legacy_name_match_fallback` -- assert legacy `speaker.upper().strip() == "ANNOUNCER"` fallback is present.
+  - `test_no_pre094_speaker_role_check_remaining` -- regex regression guard against re-introducing the broken `c.get("speaker_role") or c.get("role")` predicate.
+  - `test_skip_logs_bug_094_reference` -- pin `BUG-LOCAL-094` is referenced in skip-path logs for audit traceability.
+- **Verify:**
+  - AST parse clean (21063 bytes, 1815 nodes).
+  - test_portrait_render_skip_announcer + test_batch_humo_render + test_batch_ltx_render + test_news_history_ttl -> 76 passed in 3.07s (was 71; +5 BUG-094 guards).
+  - Bug Bible OTR-scoped -> 22 passed / 1 pre-existing baseline failure / 1 skipped / 2 xfailed (same baseline; the BUG-01.02 failure on `batch_flux_portrait_render.py` for missing `folder_paths` predates 094 and is outside this fix's scope).
+  - Live: next soak should log `cast filter: 2/3 cast member(s) have >=1 character-role line` followed by `cast[1] ANNOUNCER (c02) all lines non-character; skip per skip_announcer=True (BUG-LOCAL-094)`. ANNOUNCER's portrait is NOT rendered. Total FLUX portrait time drops by ~30s (one slot saved).
+- **Tags:** flux-portraits, cast-filter, skip-dispatch, BUG-129b-followup, wall-time-savings
+- **Related:** BUG-LOCAL-078 (per-cast portrait pass that BUG-094 filters); BUG-LOCAL-129b (announcer routing to LTX which is why the portrait is unused); BUG-LOCAL-088 (cast-still binding which BUG-093 removed -- this same line-driven walk pattern could have replaced 088 too if we wanted to keep the binding alive for non-character coverage). One portrait per character is preserved (each c0X writes a single c0X_portrait.png; the skip_announcer filter just removes the unused entries entirely).
+
+---
+
 ### BUG-LOCAL-093 [FIXED]: HuMo portrait stopgaps removed -- wrong-face is worse than no-face
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-092 hardening | **Bible candidate:** YES (failure-mode policy)
 - **Symptom:** even after BUG-092 inverted the dispatch order, two stopgaps remained that could still produce wrong faces:
