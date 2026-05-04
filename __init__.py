@@ -122,6 +122,13 @@ _NODE_MODULES = {
     "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
     "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
+    # BUG-LOCAL-078 fix (2026-05-03 EVENING). Per-cast portrait render.
+    # Generates one clean head-and-shoulders FLUX portrait for each
+    # cast member, saves to per-episode portraits/<char_id>_portrait.png,
+    # stamps cast[i].portrait_path into the ledger so HuMo's tier 1
+    # portrait lookup hits instead of falling through to the env-still
+    # tier 4 stopgap.
+    "OTR_BatchFluxPortraitRender": (".visual.batch_flux_portrait_render", "BatchFluxPortraitRender", " Batch FLUX Portrait Render (per-cast)"),
     # v2.0 MIT-original video-chain nodes (replace VideoHelperSuite-GPL deps)
     "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
     # v2.0 read-only Director/script adapter for multi-pass FLUX rendering
