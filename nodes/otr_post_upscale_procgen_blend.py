@@ -156,11 +156,25 @@ def _build_blend_cmd(
     # scale is a no-op; if it's still at the legacy 832x480, this
     # upscales it (loses crispness, hence the recommendation to render
     # procgen at 1920x1080 native).
+    # BUG-LOCAL-031 FIX (2026-05-03 EVENING): add filter-level
+    # ``shortest=1`` to the blend filter. This clamps the VIDEO output
+    # to the shorter of the two video inputs (the source mp4 from
+    # RTXUpscale, ~50s) instead of running to the longer procgen
+    # input (~94-114s). Audio is mapped separately via ``-map 0:a?
+    # -c:a copy`` so the audio stream is untouched -- C7 byte-identity
+    # holds.
+    #
+    # NOTE: this is the FILTER-LEVEL ``shortest=1`` (inside the blend
+    # filter), NOT the muxer-level ``-shortest`` flag. The muxer flag
+    # would cut audio when the shortest STREAM ends, which IS the C7
+    # risk that drove us to drop ``-shortest`` earlier. The filter
+    # flag only affects what the video filter emits; the muxer copies
+    # the full audio stream untouched.
     filter_complex = (
         f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
         f"crop=iw:ih,setpts=PTS-STARTPTS[pgn];"
         f"[0:v][pgn]blend=all_mode={blend_mode}:"
-        f"all_opacity={blend_opacity:.3f}[v]"
+        f"all_opacity={blend_opacity:.3f}:shortest=1[v]"
     )
     # BUG-LOCAL-030 C7 hardening (2026-05-03 EVENING, post-round-robin
     # Gemini catch): NO ``-shortest`` flag here. ffmpeg ``-shortest`` on

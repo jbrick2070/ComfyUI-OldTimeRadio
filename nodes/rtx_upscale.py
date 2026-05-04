@@ -101,12 +101,35 @@ def _chunked_upscale(
     chunk_frames: int,
     ffmpeg: str,
     ffprobe: str,
+    diagnostic_dump_dir: Path | None = None,
 ) -> tuple[int, float]:
     """Decode src frames in chunks via ffmpeg, run RTX VSR per chunk,
     encode to silent libx264 yuv420p mp4. Returns (total_frames_out, fps).
 
     Avoids holding all frames in RAM. Pipes raw RGB24 in/out of ffmpeg
     so RTX VSR sees a torch tensor that's already in CPU memory.
+
+    BUG-LOCAL-031 diagnostic instrumentation (2026-05-03 EVENING):
+    when ``diagnostic_dump_dir`` is set, every chunk dumps three PNGs
+    + a stats line:
+
+      * ``chunkNNNN_a_input_uint8.png``   -- first frame BEFORE nvvfx
+      * ``chunkNNNN_b_nvvfx_float.png``   -- first frame AFTER ``sr.run`` (auto-scaled)
+      * ``chunkNNNN_c_post_clamp_byte.png`` -- first frame as it lands in encode pipe
+      * ``chunk_stats.txt`` -- per-chunk min/max/mean of the post-nvvfx tensor
+
+    Reading the stats file alone is enough to localize the bug:
+      * If post-nvvfx max <= 1.0 -> nvvfx returns 0..1 floats and the
+        unconditional ``clamp(0, 255).byte()`` truncates everything to 0
+        (range mismatch fix: multiply by 255 before clamp).
+      * If post-nvvfx max > 1 but <= 255 -> range was correct; bug is
+        elsewhere (encode pipe, dim mismatch, etc).
+      * If post-nvvfx max == 0 across all chunks -> nvvfx returned an
+        all-zero tensor (likely Blackwell sm_120 incompat: file an
+        upstream bug, do NOT silently fall back).
+
+    Production paths leave ``diagnostic_dump_dir=None`` so this is
+    pure instrumentation, never modifies behavior on a normal render.
     """
     import numpy as np  # type: ignore
     import torch  # type: ignore
@@ -166,6 +189,28 @@ def _chunked_upscale(
     src_frame_bytes = src_w * src_h * 3
     total_frames_out = 0
 
+    # BUG-LOCAL-031 diagnostic dump setup (no-op when disabled).
+    _diag_dir: Path | None = None
+    _diag_stats_lines: list[str] = []
+    if diagnostic_dump_dir is not None:
+        _diag_dir = Path(diagnostic_dump_dir)
+        _diag_dir.mkdir(parents=True, exist_ok=True)
+        _diag_stats_lines.append(
+            "# BUG-LOCAL-031 RTXUpscale diagnostic dump\n"
+            f"# source: {src_mp4}\n"
+            f"# source dims: {src_w}x{src_h} fps={src_fps:.3f}\n"
+            f"# target dims: {target_w}x{target_h} quality={quality}\n"
+            f"# chunk_frames={chunk_frames}\n"
+            f"# columns: chunk_idx | n_frames | "
+            "in_uint8(min,max,mean) | "
+            "post_nvvfx_float(min,max,mean) | "
+            "post_clamp_byte(min,max,mean)\n"
+        )
+        log.info(
+            "[OTR_RTXUpscale] DIAGNOSTIC DUMP enabled -> %s",
+            _diag_dir,
+        )
+
     # Windows pipe deadlock fix (consult 2026-05-02 Gemini): the OS pipe
     # buffer on Windows is ~64 KB. ffmpeg writes to stderr verbosely under
     # `-loglevel error` only when something is wrong, but a long-running
@@ -220,9 +265,29 @@ def _chunked_upscale(
                 # Per-frame upscale via nvvfx (matches the upstream
                 # RTXVideoSuperResolution.execute() loop pattern).
                 # Keep the work in fp32 on CUDA, return uint8 on CPU.
+                #
+                # BUG-LOCAL-031 FIX (2026-05-03 EVENING): nvvfx expects
+                # input in 0.0..1.0 float range (matches the ComfyUI
+                # IMAGE convention used by the upstream
+                # `Nvidia_RTX_Nodes_ComfyUI/RTXVideoSuperResolution`
+                # reference node). The previous code did ``.float()``
+                # WITHOUT dividing by 255, which kept the values in
+                # 0..255 numerically and fed nvvfx out-of-distribution
+                # input. nvvfx then internally treated those values
+                # like 0..1, saturated them to garbage near 1.0, and
+                # the resulting frames clamped+byte()'d to solid
+                # black/white. Diagnosis confirmed via
+                # rtx_diag/chunk_stats.txt: every chunk reported
+                # nvvfx output min=0.0/max=1.0 with mean values that
+                # did not correlate sensibly with input mean.
+                #
+                # Companion fix: the post-nvvfx output is multiplied
+                # by 255.0 before the byte cast (see _scaled below) to
+                # bring the 0..1 range back into uint8 0..255 for
+                # ffmpeg's rgb24 pipe.
                 gpu_in = torch.from_numpy(arr).cuda().permute(
                     0, 3, 1, 2
-                ).float().contiguous()
+                ).float().contiguous() / 255.0
                 gpu_out = torch.empty(
                     (whole_frames, 3, target_h, target_w),
                     device=gpu_in.device, dtype=gpu_in.dtype,
@@ -235,15 +300,114 @@ def _chunked_upscale(
                         .permute(2, 0, 1)
                         .unsqueeze(0)
                     )
+                # BUG-LOCAL-031 diagnostic: capture nvvfx output stats
+                # BEFORE the clamp/byte conversion. If nvvfx returns
+                # 0..1 floats and we never multiply by 255, this is
+                # where the data dies. The stats line answers in one
+                # number whether we have a range bug, a Blackwell
+                # silent-zero bug, or something else entirely.
+                _post_nvvfx_min = _post_nvvfx_max = _post_nvvfx_mean = 0.0
+                _in_min = _in_max = _in_mean = 0.0
+                if _diag_dir is not None:
+                    try:
+                        _gn = gpu_out.detach()
+                        _post_nvvfx_min = float(_gn.min().item())
+                        _post_nvvfx_max = float(_gn.max().item())
+                        _post_nvvfx_mean = float(_gn.float().mean().item())
+                        _in_min = float(arr.min())
+                        _in_max = float(arr.max())
+                        _in_mean = float(arr.mean())
+                    except Exception:
+                        pass
+
+                # BUG-LOCAL-031 FIX (2026-05-03 EVENING):
+                # nvvfx.VideoSuperRes returns float32 in 0.0..1.0, NOT
+                # 0..255. The previous code did clamp(0, 255).byte()
+                # which is a no-op for 0..1 floats, then byte() truncated
+                # 0.95 -> 0 and 1.0 -> 1, producing essentially black
+                # frames (the source of the BUG-LOCAL-031 black-output
+                # symptom). Diagnosis confirmed via chunk_stats.txt
+                # diagnostic dump: every chunk reported nvvfx max=1.0,
+                # post_clamp max=1, mean dropping from 0.95 to 0.3 to
+                # 0.9 across the timeline -- exactly the 0..1 range
+                # signature.
+                #
+                # Detect the range from the chunk maximum and scale
+                # accordingly. Only chunks above max>1.5 are treated as
+                # already-uint8-range (would happen if a future nvvfx
+                # version changes its output convention -- this is
+                # forward-compatible).
+                _gn_max = float(gpu_out.detach().max().item())
+                if _gn_max <= 1.5:
+                    _scaled = gpu_out * 255.0
+                else:
+                    _scaled = gpu_out
+
                 # Back to NHWC uint8 on CPU for ffmpeg pipe.
                 out_frames = (
-                    gpu_out.clamp(0.0, 255.0)
+                    _scaled.clamp(0.0, 255.0)
                     .byte()
                     .permute(0, 2, 3, 1)
                     .contiguous()
                     .cpu()
                     .numpy()
                 )
+                del _scaled
+
+                # BUG-LOCAL-031 diagnostic: dump three sample frames +
+                # the post-clamp stats. We grab frame[0] of each chunk
+                # so the dump stays small even on long episodes.
+                if _diag_dir is not None and out_frames.shape[0] > 0:
+                    try:
+                        from PIL import Image  # type: ignore
+                        chunk_idx = total_frames_out // max(1, chunk_frames)
+                        # (a) input uint8 -- pre-nvvfx
+                        Image.fromarray(arr[0]).save(
+                            _diag_dir
+                            / f"chunk{chunk_idx:04d}_a_input_uint8.png"
+                        )
+                        # (b) post-nvvfx float -- auto-scale to 0..255
+                        # for visual inspection. Picks the sensible scale
+                        # based on observed max so the PNG is viewable
+                        # whether the model returned 0..1 or 0..255.
+                        _f0 = (
+                            gpu_out[0]
+                            .detach()
+                            .float()
+                            .permute(1, 2, 0)
+                            .cpu()
+                            .numpy()
+                        )
+                        _scale = (
+                            255.0 if _post_nvvfx_max <= 1.5
+                            else 1.0
+                        )
+                        _f0v = (_f0 * _scale).clip(0, 255).astype("uint8")
+                        Image.fromarray(_f0v).save(
+                            _diag_dir
+                            / f"chunk{chunk_idx:04d}_b_nvvfx_float_x{int(_scale)}.png"
+                        )
+                        # (c) post clamp+byte -- exactly what hits ffmpeg
+                        Image.fromarray(out_frames[0]).save(
+                            _diag_dir
+                            / f"chunk{chunk_idx:04d}_c_post_clamp_byte.png"
+                        )
+                        _post_byte_min = int(out_frames.min())
+                        _post_byte_max = int(out_frames.max())
+                        _post_byte_mean = float(out_frames.mean())
+                        _diag_stats_lines.append(
+                            f"chunk{chunk_idx:04d} | "
+                            f"n={whole_frames} | "
+                            f"in_u8(min={_in_min:.0f},max={_in_max:.0f},mean={_in_mean:.1f}) | "
+                            f"nvvfx(min={_post_nvvfx_min:.4f},max={_post_nvvfx_max:.4f},mean={_post_nvvfx_mean:.4f}) | "
+                            f"post_clamp(min={_post_byte_min},max={_post_byte_max},mean={_post_byte_mean:.1f})"
+                        )
+                    except Exception as _diag_exc:
+                        log.warning(
+                            "[OTR_RTXUpscale] diagnostic dump failed: %s",
+                            _diag_exc,
+                        )
+
                 encode_proc.stdin.write(out_frames.tobytes())
                 total_frames_out += whole_frames
 
@@ -268,6 +432,23 @@ def _chunked_upscale(
     if encode_proc.returncode not in (0, None):
         stderr = encode_proc.stderr.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"ffmpeg encode failed: {stderr[:500]}")
+
+    # BUG-LOCAL-031 diagnostic: write the per-chunk stats file.
+    if _diag_dir is not None and _diag_stats_lines:
+        try:
+            (_diag_dir / "chunk_stats.txt").write_text(
+                "\n".join(_diag_stats_lines), encoding="utf-8",
+            )
+            log.info(
+                "[OTR_RTXUpscale] DIAGNOSTIC DUMP wrote %d chunk stats -> %s",
+                len(_diag_stats_lines) - 1,  # -1 for header
+                _diag_dir / "chunk_stats.txt",
+            )
+        except Exception as _exc:
+            log.warning(
+                "[OTR_RTXUpscale] failed to write diagnostic stats: %s",
+                _exc,
+            )
 
     return total_frames_out, src_fps
 
@@ -390,6 +571,7 @@ class RTXUpscale:
         quality: str = "ULTRA",
         chunk_frames: int = DEFAULT_CHUNK_FRAMES,
         ffmpeg: str = "ffmpeg",
+        diagnostic_dump_dir: str = "",
     ):
         t_start = time.time()
         report_lines: list[str] = []
@@ -445,6 +627,9 @@ class RTXUpscale:
         tmp_dir = Path(tempfile.mkdtemp(prefix="otr_rtx_upscale_"))
         silent = tmp_dir / "video_only.mp4"
         try:
+            _diag_path: Path | None = None
+            if diagnostic_dump_dir:
+                _diag_path = Path(diagnostic_dump_dir)
             n_frames, fps = _chunked_upscale(
                 src_mp4=src,
                 silent_out_mp4=silent,
@@ -454,6 +639,7 @@ class RTXUpscale:
                 chunk_frames=chunk_frames,
                 ffmpeg=ffmpeg,
                 ffprobe=ffprobe,
+                diagnostic_dump_dir=_diag_path,
             )
             report_lines.append(
                 f"  RTX VSR: {n_frames} frames @ {fps:.3f} fps "
