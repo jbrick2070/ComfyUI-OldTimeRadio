@@ -785,12 +785,43 @@ class BatchLTXRender:
                         f"{shot_ms} ms"
                     )
 
+                    # BUG-LOCAL-084 fix: stamp start_s + REAL on-disk dur_s
+                    # so downstream consumers (audit, debug, future composite
+                    # paths) have ground truth instead of the audio-target
+                    # placeholder that BUG-LOCAL-033 surfaced.
+                    _start_s_truth = None
+                    _dur_s_truth = float(entry["dur_s"])  # fallback to audio target
+                    try:
+                        # Pull start_s from the matching ledger.lines[] entry
+                        # by line_id. Lines are stamped by SceneSequencer with
+                        # the canonical audio timeline start_s.
+                        _ll = ledger.get("lines") or []
+                        for _line in _ll:
+                            if str(_line.get("line_id") or "") == line_id:
+                                _ss = _line.get("start_s")
+                                if isinstance(_ss, (int, float)):
+                                    _start_s_truth = float(_ss)
+                                break
+                    except Exception:  # noqa: BLE001
+                        pass
+                    try:
+                        # ffprobe the actual rendered file for real dur_s
+                        # (BUG-LOCAL-033: never trust ledger.clips[].dur_s
+                        # for LTX -- it's the AUDIO TARGET, not video real)
+                        from . import _otr_probe as _PROBE  # type: ignore
+                        _real = _PROBE.probe_duration_s(out_path)
+                        if _real and _real > 0.0:
+                            _dur_s_truth = float(_real)
+                    except Exception:  # noqa: BLE001
+                        pass
                     rendered_clips.append({
                         "line_id": line_id,
                         "speaker_role": entry["speaker_role"],
                         "mp4_path": str(out_path),
                         "ltx_length": ltx_length,
-                        "dur_s": entry["dur_s"],
+                        "start_s": _start_s_truth,
+                        "dur_s": _dur_s_truth,
+                        "audio_target_dur_s": float(entry["dur_s"]),
                         "ltx_render_ms": shot_ms,
                         "ref_png_name": radio_png.name,
                         "ref_source": "ltx-radio-bookend",

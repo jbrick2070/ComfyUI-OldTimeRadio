@@ -938,15 +938,131 @@ def _render_master_mix_per_clip_mux_mode(
         )
 
     timeline.sort(key=lambda x: x["start_s"])
+
+    # BUG-LOCAL-084 (2026-05-04 LATE): insert static-radio gap-fill entries
+    # so the per-clip concat covers the FULL master-audio timeline, not just
+    # the dialogue islands.  Without this pass:
+    #   - 0..first_clip.start_s pre-roll music plays with NO video coverage
+    #     (composite starts immediately with first dialogue clip; audio leads
+    #      video by N seconds; cumulative drift makes wrong-mouth-on-wrong-voice)
+    #   - inter-clip silences (~0.1-2s between adjacent lines) play with no
+    #     video coverage; same drift mechanism, smaller magnitude
+    #   - last_clip.end..episode_dur tail music plays with no video coverage;
+    #     -shortest then truncates the trailing audio (breaks C7)
+    # Fix: walk the sorted timeline by start_s and insert a static-radio
+    # segment for any gap > GAP_TOL_S, plus a trailing fill to the end of the
+    # master audio.  Reuses the same _render_static_radio_segment helper that
+    # BUG-LOCAL-129a uses for missing-clip cases.
+    GAP_TOL_S = 0.1  # ignore sub-frame gaps; not worth the segment-overhead
+    if static_radio_png is not None:
+        try:
+            episode_dur = _ffprobe_dur(procgen, ffprobe) or 0.0
+        except Exception:
+            episode_dur = 0.0
+        gapfilled: list[dict] = []
+        cursor = 0.0
+        gap_count = 0
+        gap_total_s = 0.0
+        for entry in timeline:
+            entry_start = float(entry["start_s"])
+            gap_s = entry_start - cursor
+            if gap_s > GAP_TOL_S:
+                gap_id = f"gap_{cursor:08.3f}"
+                gap_out = static_seg_dir / f"static_{gap_id}.mp4"
+                try:
+                    _render_static_radio_segment(
+                        radio_png=static_radio_png,
+                        dur_s=gap_s,
+                        canvas_w=canvas_w,
+                        canvas_h=canvas_h,
+                        canvas_fps=canvas_fps,
+                        out_path=gap_out,
+                        ffmpeg=ffmpeg,
+                    )
+                    gapfilled.append({
+                        "line_id": gap_id,
+                        "start_s": cursor,
+                        "dur_s": gap_s,
+                        "clip_path": gap_out,
+                        "speaker_role": "gap_fill",
+                        "source_kind": "static_gapfill",
+                    })
+                    gap_count += 1
+                    gap_total_s += gap_s
+                except subprocess.CalledProcessError as exc:
+                    stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                    log.warning(
+                        "[VideoComposite/per_clip_mux] BUG-084 gap-fill at "
+                        "cursor=%.3f dur=%.3f FAILED: %s",
+                        cursor, gap_s, stderr[:200],
+                    )
+            gapfilled.append(entry)
+            cursor = entry_start + float(entry["dur_s"])
+        # Trailing tail-fill: from last clip's end to the end of master audio
+        if episode_dur > 0.0:
+            tail_gap = episode_dur - cursor
+            if tail_gap > GAP_TOL_S:
+                tail_id = f"gap_tail_{cursor:08.3f}"
+                tail_out = static_seg_dir / f"static_{tail_id}.mp4"
+                try:
+                    _render_static_radio_segment(
+                        radio_png=static_radio_png,
+                        dur_s=tail_gap,
+                        canvas_w=canvas_w,
+                        canvas_h=canvas_h,
+                        canvas_fps=canvas_fps,
+                        out_path=tail_out,
+                        ffmpeg=ffmpeg,
+                    )
+                    gapfilled.append({
+                        "line_id": tail_id,
+                        "start_s": cursor,
+                        "dur_s": tail_gap,
+                        "clip_path": tail_out,
+                        "speaker_role": "gap_fill",
+                        "source_kind": "static_gapfill",
+                    })
+                    gap_count += 1
+                    gap_total_s += tail_gap
+                    cursor = episode_dur
+                except subprocess.CalledProcessError as exc:
+                    stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                    log.warning(
+                        "[VideoComposite/per_clip_mux] BUG-084 trailing gap-fill "
+                        "FAILED at tail_gap=%.3f: %s",
+                        tail_gap, stderr[:200],
+                    )
+        timeline = gapfilled
+        if gap_count > 0:
+            log.info(
+                "[VideoComposite/per_clip_mux] BUG-084 gap-fill: inserted "
+                "%d static-radio segment(s), total %.3f s of coverage",
+                gap_count, gap_total_s,
+            )
+            report.append(
+                f"per_clip_mux: BUG-LOCAL-084 gap-fill -- "
+                f"{gap_count} static-radio segment(s), "
+                f"+{gap_total_s:.2f}s coverage"
+            )
+    else:
+        log.warning(
+            "[VideoComposite/per_clip_mux] BUG-084: NO static_radio_png "
+            "available; cannot fill timeline gaps. Audio will lead video "
+            "by the cumulative gap duration. Resolve a radio_bookend_*.png "
+            "in stills/ or ledger.meta.paths.radio_bookend_path."
+        )
+
     n_humo = sum(1 for e in timeline if e.get("source_kind") == "humo")
     n_static = sum(1 for e in timeline if e.get("source_kind") == "static_ffmpeg")
+    n_gap = sum(1 for e in timeline if e.get("source_kind") == "static_gapfill")
     report.append(
         f"per_clip_mux: timeline = {len(timeline)} clip(s) "
         f"({sum(1 for e in timeline if e['speaker_role']=='character')} char + "
         f"{sum(1 for e in timeline if e['speaker_role']=='announcer')} announcer + "
         f"{sum(1 for e in timeline if e['speaker_role']=='sfx')} sfx + "
-        f"{sum(1 for e in timeline if e['speaker_role'] in ('music_open','music_close','music_inter'))} music) "
-        f"[{n_humo} humo + {n_static} static]"
+        f"{sum(1 for e in timeline if e['speaker_role'] in ('music_open','music_close','music_inter'))} music + "
+        f"{n_gap} gap_fill) "
+        f"[{n_humo} humo + {n_static} static + {n_gap} gapfill]"
     )
 
     # 2. Pillarbox each HuMo clip to canvas dims and strip audio.
@@ -1226,6 +1342,84 @@ def _render_master_mix_per_clip_mux_mode(
     if _cleaned:
         report.append(
             f"per_clip_mux: reclaimed {_cleaned} pillarbox intermediate(s)"
+        )
+
+    # BUG-LOCAL-084 Fix 4 (2026-05-04 LATE): duration-contract assertion.
+    # silent_combined and procgen audio MUST agree within one canvas frame
+    # (40 ms at 25 fps).  If they disagree by more than the tolerance, log
+    # loudly so the regression is visible, and tail-pad the video side so
+    # the mux's `-shortest` truncates an inaudible video tail rather than
+    # chopping the master audio.  With Fixes 1-3 in place the totals
+    # should match natively; this is belt-and-suspenders for any future
+    # regression.
+    _MUX_TOL_S = 0.04
+    try:
+        _v_dur = _ffprobe_dur(silent_combined, ffprobe) or 0.0
+        _a_dur = _ffprobe_dur(procgen, ffprobe) or 0.0
+        _gap = _a_dur - _v_dur
+        report.append(
+            f"per_clip_mux: duration contract -- "
+            f"video {_v_dur:.3f}s | audio {_a_dur:.3f}s | "
+            f"delta {_gap:+.3f}s (tol={_MUX_TOL_S:.3f}s)"
+        )
+        if abs(_gap) > _MUX_TOL_S:
+            log.warning(
+                "[VideoComposite/per_clip_mux] BUG-084 duration contract "
+                "VIOLATED: video %.3fs vs audio %.3fs (delta %+.3fs, tol %.3fs). "
+                "%s",
+                _v_dur, _a_dur, _gap, _MUX_TOL_S,
+                "Tail-padding video so -shortest truncates inaudible video, "
+                "not audio." if _gap > 0 else
+                "Video LONGER than audio -- -shortest will truncate trailing "
+                "video; audio C7 preserved.",
+            )
+            if _gap > _MUX_TOL_S:
+                # Audio overruns video: tail-pad the silent_combined by gap+
+                # 0.05s safety so the mux -shortest cuts the freeze-frame
+                # video tail instead of the trailing audio.
+                _pad_target = _v_dur + _gap + 0.05
+                _padded = silent_combined.with_name(
+                    silent_combined.stem + "_tailpad.mp4"
+                )
+                _pad_cmd = [
+                    ffmpeg, "-y", "-loglevel", "warning",
+                    "-i", str(silent_combined),
+                    "-vf", f"tpad=stop_mode=clone:stop_duration={_gap + 0.05:.3f}",
+                    "-c:v", "libx264", "-preset", "veryfast",
+                    "-crf", "16", "-pix_fmt", "yuv420p",
+                    "-r", str(canvas_fps),
+                    "-an",
+                    str(_padded),
+                ]
+                try:
+                    subprocess.run(
+                        _pad_cmd, check=True,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    )
+                    silent_combined = _padded
+                    log.info(
+                        "[VideoComposite/per_clip_mux] BUG-084 tail-pad "
+                        "applied: %s now %.3fs (target %.3fs)",
+                        _padded.name, _ffprobe_dur(_padded, ffprobe) or 0.0,
+                        _pad_target,
+                    )
+                    report.append(
+                        f"per_clip_mux: BUG-084 tail-pad +{_gap + 0.05:.3f}s "
+                        f"applied to silent_combined"
+                    )
+                except subprocess.CalledProcessError as exc:
+                    stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                    log.warning(
+                        "[VideoComposite/per_clip_mux] BUG-084 tail-pad "
+                        "failed: %s -- proceeding with -shortest (audio "
+                        "may be truncated by %.3fs)",
+                        stderr[:200], _gap,
+                    )
+    except Exception as _dur_exc:  # noqa: BLE001
+        log.warning(
+            "[VideoComposite/per_clip_mux] BUG-084 duration-contract probe "
+            "FAILED (%s); proceeding without assertion",
+            _dur_exc,
         )
 
     # 4. Mux silent_combined video + procgen master-mix audio with
