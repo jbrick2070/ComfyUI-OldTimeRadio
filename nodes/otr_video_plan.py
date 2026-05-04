@@ -171,14 +171,59 @@ def resolve_character_portrait(
 
     visual_plan = director.get("visual_plan") or {}
     characters = visual_plan.get("characters") or {}
-    entry = characters.get(character_name) or {}
+    # BUG-LOCAL-080 (2026-05-03 EVENING): defensive coercion for
+    # LLMDirector output shape drift. The expected shape is
+    # ``visual_plan.characters[NAME] = {"portrait_prompt": "...", ...}``
+    # but high-temperature LLMDirector occasionally emits one of:
+    #   (a) characters as a top-level LIST instead of dict (rare)
+    #   (b) characters[NAME] = [{"portrait_prompt": "..."}, {"voice":
+    #       "..."}] -- list-of-dicts instead of single merged dict
+    #   (c) characters[NAME] = "portrait prompt string" -- bare string
+    # Without this coercion the line below raises:
+    #   AttributeError: 'list' object has no attribute 'get'
+    # which kills the entire FLUX/Plan phase (~8 min wasted before
+    # crash). Coerce all three variants back to a single dict.
+    if isinstance(characters, list):
+        # (a) characters is a list -- try to find an entry with name match
+        merged_chars = {}
+        for item in characters:
+            if isinstance(item, dict):
+                key = (item.get("name") or item.get("character") or "").strip()
+                if key:
+                    merged_chars[key] = item
+        characters = merged_chars
+    elif not isinstance(characters, dict):
+        characters = {}
+    entry = characters.get(character_name)
+    if isinstance(entry, list):
+        # (b) list-of-dicts -- merge into single dict (later wins)
+        merged_entry: dict = {}
+        for item in entry:
+            if isinstance(item, dict):
+                merged_entry.update(item)
+        entry = merged_entry
+    elif isinstance(entry, str):
+        # (c) bare string -- treat as the portrait_prompt directly
+        entry = {"portrait_prompt": entry}
+    elif not isinstance(entry, dict):
+        entry = {}
     portrait = (entry.get("portrait_prompt") or "").strip()
     if portrait:
         return portrait
 
     # Fallback 2: synthesize from voice_assignments notes
     voice_assignments = director.get("voice_assignments") or {}
-    va_entry = voice_assignments.get(character_name) or {}
+    if not isinstance(voice_assignments, dict):
+        voice_assignments = {}
+    va_entry = voice_assignments.get(character_name)
+    if isinstance(va_entry, list):
+        merged_va: dict = {}
+        for item in va_entry:
+            if isinstance(item, dict):
+                merged_va.update(item)
+        va_entry = merged_va
+    elif not isinstance(va_entry, dict):
+        va_entry = {}
     notes = (va_entry.get("notes") or "").strip()
     if notes:
         return (
