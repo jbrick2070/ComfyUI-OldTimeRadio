@@ -6,11 +6,15 @@ Final-stage video upscaler for the OTR pipeline. Wraps NVIDIA's
 ``RTXVideoSuperResolution`` (from custom_nodes/Nvidia_RTX_Nodes_ComfyUI)
 with a path-in / path-out interface that preserves C7 audio identity:
 
-    final_mp4 (832x480) ---> chunked frame extract via ffmpeg
-                          -> RTX VSR (HW-accelerated, ULTRA quality)
-                          -> silent libx264 yuv420p mp4
-                          -> ffmpeg mux with -c:a copy from source mp4
-                          -> <ep>_1080p.mp4
+    composite mp4 (1472x832) -> chunked frame extract via ffmpeg
+                              -> RTX VSR (HW-accelerated, ULTRA quality)
+                              -> silent libx264 yuv420p mp4
+                              -> ffmpeg mux with -c:a copy from source mp4
+                              -> output/otr/obs/<source filename> (1920x1080)
+    (No filename suffix is appended; the output uses the same basename
+    as the source. A prior version added a ``_1080p`` suffix; that
+    behavior was removed -- if a stale workflow JSON still has an 8th
+    widget value of ``"_1080p"``, ComfyUI silently ignores it.)
 
 The audio stream is NEVER decoded -- ``-c:a copy`` from the source mp4
 to the upscaled mp4 means the audio bytes are bit-identical. Stays
@@ -30,6 +34,7 @@ RGB float32 staging, ~18 MB at 832x480) so a 5 min episode at 25 fps
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import sys as _sys
@@ -630,6 +635,20 @@ class RTXUpscale:
             _diag_path: Path | None = None
             if diagnostic_dump_dir:
                 _diag_path = Path(diagnostic_dump_dir)
+            else:
+                # Live-soak override: set env var OTR_RTX_DIAG_DUMP=1 to
+                # force the diagnostic dump on for ONE render without
+                # editing code or exposing a widget. Lands in
+                # output/otr/obs/rtx_diag/ next to the upscale mp4.
+                # Per fact-check 2026-05-03 EVENING: this avoids the
+                # one-line code edit Step 3 of the go-forward plan
+                # would otherwise require.
+                if os.environ.get("OTR_RTX_DIAG_DUMP", "").strip() in ("1", "true", "TRUE", "yes"):
+                    _diag_path = otr_obs_dir() / "rtx_diag"
+                    log.info(
+                        "[OTR_RTXUpscale] OTR_RTX_DIAG_DUMP=1 detected; "
+                        "diagnostic dump forced ON -> %s", _diag_path,
+                    )
             n_frames, fps = _chunked_upscale(
                 src_mp4=src,
                 silent_out_mp4=silent,
