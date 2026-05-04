@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 58,
-  "last_link_id": 96,
+  "last_node_id": 59,
+  "last_link_id": 101,
   "nodes": [
     {
       "id": 1,
@@ -471,7 +471,8 @@
             80,
             82,
             90,
-            96
+            96,
+            100
           ],
           "slot_index": 0
         }
@@ -847,7 +848,8 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            42
+            42,
+            97
           ],
           "shape": 3,
           "slot_index": 0
@@ -856,7 +858,8 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            43
+            43,
+            98
           ],
           "shape": 3,
           "slot_index": 1
@@ -865,7 +868,8 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            44
+            44,
+            99
           ],
           "shape": 3,
           "slot_index": 2
@@ -923,7 +927,8 @@
           "name": "images",
           "type": "IMAGE",
           "links": [
-            45
+            45,
+            101
           ],
           "shape": 3,
           "slot_index": 0
@@ -956,7 +961,8 @@
         false,
         true,
         "",
-        4242
+        4242,
+        true
       ],
       "color": "#5A2B5A",
       "bgcolor": "#3A1D3A"
@@ -1869,6 +1875,81 @@
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
+    },
+    {
+      "id": 59,
+      "type": "OTR_BatchFluxPortraitRender",
+      "pos": [
+        1700,
+        1500
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 30,
+      "mode": 0,
+      "title": "Batch FLUX Portrait Render (per-cast portraits)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 97
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 98
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 99
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": 100,
+          "widget": {
+            "name": "ledger_json"
+          }
+        },
+        {
+          "name": "flux_done_gate",
+          "type": "IMAGE",
+          "link": 101
+        }
+      ],
+      "outputs": [
+        {
+          "name": "portrait_batch",
+          "type": "IMAGE",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchFluxPortraitRender"
+      },
+      "widgets_values": [
+        "1940s noir radio drama style, cinematic",
+        1024,
+        1024,
+        20,
+        1.0,
+        3.5,
+        "euler",
+        "simple",
+        100,
+        true
+      ]
     }
   ],
   "links": [
@@ -2295,6 +2376,46 @@
       58,
       1,
       "STRING"
+    ],
+    [
+      97,
+      22,
+      0,
+      59,
+      0,
+      "MODEL"
+    ],
+    [
+      98,
+      22,
+      1,
+      59,
+      1,
+      "CLIP"
+    ],
+    [
+      99,
+      22,
+      2,
+      59,
+      2,
+      "VAE"
+    ],
+    [
+      100,
+      12,
+      0,
+      59,
+      3,
+      "STRING"
+    ],
+    [
+      101,
+      23,
+      0,
+      59,
+      4,
+      "IMAGE"
     ]
   ],
   "groups": [],

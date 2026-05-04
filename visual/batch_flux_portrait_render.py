@@ -191,6 +191,18 @@ class BatchFluxPortraitRender:
                         "their portrait)."
                     ),
                 }),
+                "flux_done_gate": ("IMAGE", {
+                    "tooltip": (
+                        "Optional ordering edge. Wire the IMAGE output "
+                        "from OTR_BatchFluxRender here so this portrait "
+                        "node executes AFTER FLUX env stills + radio "
+                        "bookend (and therefore BEFORE OTR_UnloadAll "
+                        "unloads the FLUX checkpoint). Value is "
+                        "ignored; only the dependency edge matters. "
+                        "Mirrors the BUG-LOCAL-086 pattern in "
+                        "OTR_BatchHumoRender."
+                    ),
+                }),
             },
         }
 
@@ -210,7 +222,10 @@ class BatchFluxPortraitRender:
         scheduler: str = "simple",
         seed: int = 100,
         skip_announcer: bool = True,
+        flux_done_gate=None,
     ):
+        # Ordering edge only; consume to silence "unused variable" lints.
+        del flux_done_gate
         from PIL import Image  # type: ignore
         try:
             from nodes import (  # type: ignore  # ComfyUI nodes namespace
