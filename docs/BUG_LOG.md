@@ -21,6 +21,26 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-081 [FIXED]: portrait node wired to wrong source — Node 59 never produced portraits
+- **Date:** 2026-05-03 LATE EVENING | **Phase:** acceptance (BUG-LOCAL-078 follow-up) | **Bible candidate:** YES (workflow-wiring footgun, silent failure)
+- **Symptom (live run `signal_lost_the_creepy_feeling_in_old_buildings_migh_20260503_215919`):** Episode workspace had `audio/`, `stills/`, `videos/` but no `portraits/` subdirectory. Ledger had 3 cast members (c01=ANNOUNCER, c02=JAX, c03=KAI), all with `portrait_path` empty. `otr_runtime.log` had ZERO log lines mentioning `BatchFluxPortraitRender` across the whole 49,154-line / 3.7 MB run. Module import + `INPUT_TYPES` registration both verified clean.
+- **Cause (two distinct workflow-JSON bugs in `workflows/otr_scifi_16gb_full.json`):**
+  1. **Bogus `ledger_json` source.** Link 100 wired Node 12 (`OTR_SignalLostVideo`) `video_path` output (a `.mp4` filesystem path) into Node 59's `ledger_json` input. The portrait node's `_load_ledger` tried `json.loads()` on the `.mp4` path, hit `JSONDecodeError`, fell into `except Exception: return (None, None)`, then `execute()` raised `RuntimeError("cannot load ledger from <path.mp4>")`. The error went to the ComfyUI executor (not OTR logger), so `otr_runtime.log` stayed silent.
+  2. **Wrong execution position in DAG.** Because Node 12 was an upstream dependency of Node 59, ComfyUI scheduled Node 59 to run AT THE END of the workflow — long after HuMo (Node 51) had already executed without portraits and fallen through to tier-4 env-still stopgap. Even if (1) were fixed, (2) alone made the portrait pass useless: HuMo would never see the portraits that hadn't been rendered yet.
+- **Fix (workflow JSON only — no code changes):**
+  - Drop link 100 entirely (`Node 12.video_path → Node 59.ledger_json`); set Node 59's `ledger_json` widget to empty string so `_load_ledger` falls through to `_OTRL.in_flight_ledger_path()` auto-pickup.
+  - Re-route link 45 from `(Node 23 → Node 24)` to `(Node 59 → Node 24)`. New chain: `BatchFluxRender (env stills, 23) → BatchFluxPortraitRender (59) → UnloadAll (24) → BatchHumoRender (51)`. Portraits now render BEFORE HuMo while FLUX is still loaded in VRAM, then UnloadAll dumps FLUX, then HuMo picks up the portraits via the in-flight ledger.
+- **Verify:**
+  - JSON validates: `nodes=32 links=57`, no orphan/dangling refs.
+  - Node 59 inputs: `ledger_json link=null` (auto-pickup), `flux_done_gate link=101` (waits on Node 23). Outputs: `portrait_batch links=[45]` (gates UnloadAll → HuMo).
+  - Widget count went from 10 → 11 (prepended `""` for `ledger_json`).
+  - Portrait module import + `INPUT_TYPES` clean.
+  - Real-run acceptance (pending): next queue should produce `<ep>/portraits/c02_portrait.png` + `c03_portrait.png` (announcer skipped per `skip_announcer=True`), and HuMo's per-line `_find_portrait` should hit tier 1 instead of tier 4 — visible in HuMo log lines as `portrait_path: <path>` instead of `falling back to env still`.
+- **Tags:** workflow-wiring, link-100, link-45, silent-failure, bug-078-followup, portraits, comfyui-dag-ordering, c7-untouched
+- **Related:** BUG-LOCAL-078 (the portrait node itself, shipped EVENING with correct internal logic). The wiring slip happened during workflow JSON edit when Node 59 was added to `otr_scifi_16gb_full.json` — the `ledger_json` socket was wired to the only nearby STRING source on the canvas (Node 12's `video_path`) rather than left empty for auto-pickup, and the portrait node was inserted BELOW Node 12 in the DAG instead of between Node 23 and Node 24. Bible candidate because the silent-failure mode (RuntimeError invisible in OTR log + dependency-chain inversion) is the kind of trap any future graph edit could fall into. Commit `413ef3a` on `v2.0-alpha`.
+
+---
+
 ### BUG-LOCAL-031 [FIXED]: HuMo + LTX visual content destroyed by RTXUpscale (range normalization bug) + duration overrun in PostUpscaleProcgenBlend
 - **Date:** 2026-05-03 EVENING (post-soak diagnosis) | **Phase:** acceptance (BUG-LOCAL-030 wave) | **Bible candidate:** YES (severe, wave-blocker)
 - **Symptom (live soak run `signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957`):**
