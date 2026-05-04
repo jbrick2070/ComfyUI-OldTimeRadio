@@ -139,15 +139,15 @@ LTX_CFG = 1.0
 # for the model to add motion. Goofer's empirically tuned default.
 LTX_I2V_STRENGTH = 0.75
 
-# 2026-05-01 Jeffrey: feed the radio still as BOTH start and end
-# keyframes via LTXVAddGuide so each clip seamlessly loops back to
-# its starting composition. This makes ping-pong / continuous loop
-# in VideoComposite trivially clean (no jarring cut at clip boundary)
-# and matches the OTR aesthetic of "the radio is the visual anchor;
-# motion happens around it, then settles." End-frame strength is
-# slightly lower than start so the model has more freedom in the
-# middle of the clip.
-LTX_END_FRAME_STRENGTH = 0.6
+# 2026-05-01 Jeffrey ORIGINAL INTENT: feed radio still as BOTH start
+# and end keyframes for seamless-loop ping-pong in VideoComposite.
+# RETIRED 2026-05-03 EVENING per BUG-LOCAL-032: two strong anchors
+# (start 0.75 + end 0.6) clamped LTX into near-static ping-pong,
+# producing visibly still output. The end-frame anchor is no longer
+# applied; only the start frame is fed via LTXVAddGuide. Constant
+# kept for back-compat in case a future workflow re-enables the
+# loop behavior at much lower strength (~0.2-0.3).
+LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fix block
 
 # Speaker_role -> LTX prompt template. Builds a per-cue prompt anchored
 # to the radio bookend image so the model knows we want the radio set
@@ -699,17 +699,30 @@ class BatchLTXRender:
                         length=ltx_length, batch_size=1,
                     )[0]
 
-                    # 2026-05-01 EVENING (Jeffrey): feed the radio
-                    # still as BOTH the start (frame_idx=0) AND the
-                    # end (frame_idx=-1) keyframe via LTXVAddGuide.
-                    # This makes each clip seamlessly loop -- whatever
-                    # motion happens in the middle settles back to
-                    # the same composition at the end. Ping-pong /
-                    # continuous looping in VideoComposite gets a
-                    # clean cut. Negative frame_idx is supported
-                    # natively by LTXVAddGuide ("counted from end of
-                    # video", per nodes_lt.py:224).
-                    cond_pos, cond_neg, guided_latent = _call(
+                    # BUG-LOCAL-032 fix (2026-05-03 EVENING): use
+                    # ONLY the start frame as i2v conditioning. The
+                    # prior code ALSO fed the radio still as an end
+                    # frame (frame_idx=-1) for seamless-loop intent,
+                    # but two strong anchors (start strength 0.75 +
+                    # end strength 0.6) clamped LTX into a near-static
+                    # ping-pong: motion would happen briefly in the
+                    # middle then snap back to the identical
+                    # composition. User reported "ltx looks like a
+                    # still" -- confirmed via comparison with
+                    # ComfyUI-Goofer + comfyui-data-media-machine
+                    # which both use ONLY the start frame and produce
+                    # genuinely moving video. Trade-off: clips no
+                    # longer seamlessly loop back to the radio still
+                    # at end. For OTR's announcer/music/sfx use case
+                    # this is fine -- the next per-line clip begins
+                    # with its own content anyway, so the lost loop
+                    # behavior costs nothing visible.
+                    #
+                    # If a future workflow needs the loop-back
+                    # behavior again, restore the second LTXVAddGuide
+                    # but at MUCH lower strength (~0.2-0.3) so it's
+                    # a soft hint, not a motion-killer.
+                    cond_pos, cond_neg, latent = _call(
                         "LTXVAddGuide",
                         positive=cond_pos,
                         negative=cond_neg,
@@ -718,16 +731,6 @@ class BatchLTXRender:
                         image=ref_image,
                         frame_idx=0,
                         strength=LTX_I2V_STRENGTH,
-                    )
-                    cond_pos, cond_neg, latent = _call(
-                        "LTXVAddGuide",
-                        positive=cond_pos,
-                        negative=cond_neg,
-                        vae=vae,
-                        latent=guided_latent,
-                        image=ref_image,
-                        frame_idx=-1,
-                        strength=LTX_END_FRAME_STRENGTH,
                     )
 
                     # Sample with distilled schedule
