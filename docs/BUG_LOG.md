@@ -21,6 +21,24 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-097 [FIXED]: BatchLTXRender widget order broke existing workflows -- clip_length moved to last
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-091 hotfix | **Bible candidate:** YES (widget-position positional-parse hazard)
+- **Symptom (live queue):** `Failed to validate prompt for output 56: OTR_BatchLTXRender 55: Failed to convert an input value to a FLOAT value: clip_length, ffmpeg, could not convert string to float: 'ffmpeg'`. Workflow refused to run; LTX node + downstream (VideoComposite, RTXUpscale, procgen blend) all skipped before any inference started.
+- **Cause:** BUG-LOCAL-091 added `clip_length` (FLOAT) as the FIRST entry in `INPUT_TYPES["optional"]`. ComfyUI parses `widgets_values` positionally -- the saved workflow JSON had 5 values `["", 1, "fixed", "ffmpeg", ""]` matching pre-091 order (ledger_json, seed, seed_mode, ffmpeg, humo_clips_dir). After BUG-091 the optional dict order became (clip_length, ffmpeg, humo_clips_dir), so position [3] in the saved values was now expected to be FLOAT clip_length but contained the literal string `"ffmpeg"`. Validation failed before any node executed.
+- **Fix (`nodes/batch_ltx_render.py`, ~50 LOC reorder):**
+  - Moved `clip_length` to the LAST entry of `INPUT_TYPES["optional"]` (after `ffmpeg` and `humo_clips_dir`). Saved workflow values now line up with their original slots; `clip_length` is a NEW position [5] that old workflow JSONs leave unset, falling through to the FLOAT default of 7.0.
+  - Reordered the `execute()` signature kwargs to match the new optional dict order (`ffmpeg, humo_clips_dir, clip_length=7.0`).
+  - Added a comment block at the new clip_length position explaining the BUG-097 backward-compat reason so a future refactor doesn't innocently move it back to the front.
+- **NEW test (`tests/test_batch_ltx_render.py::test_clip_length_widget_appears_after_existing_optional_widgets`):** asserts `clip_length` is the LAST key in `INPUT_TYPES["optional"]`. A future refactor that re-inserts it earlier in the dict fails this test before workflow validation surfaces the same error in production.
+- **Verify:**
+  - AST parse clean (56043 bytes, 3979 nodes).
+  - test_batch_ltx_render -> 22 passed in 1.64s (was 21; +1 BUG-097 guard).
+  - Live: queue the existing workflow JSON, validation should now pass for the LTX node and the rest of the graph runs.
+- **Tags:** widget-order, comfyui-positional-parse, backward-compat, BUG-091-followup
+- **Related:** BUG-LOCAL-091 (the original chunking change that added the widget); BUG-LOCAL-086 (HuMo equivalent that did NOT have this issue because clip_length was already in INPUT_TYPES pre-086 -- only the max value changed). General lesson: NEW widgets in INPUT_TYPES["optional"] must always go at the END to preserve workflow-JSON backward compat. Bible candidate.
+
+---
+
 ### BUG-LOCAL-096 [FIXED]: procgen overlay blend too weak -- bumped to screen mode at full strength
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-095 LTX fix | **Bible candidate:** YES (default value, not a code defect)
 - **Symptom:** Jeffrey: "the procgen video mix is to weak ... bring out the colors and full lighting of the procgen video in the final concat. Now it looks weak. I want it as bright as the original just overlayed". The blended final mp4 looked washed out -- procgen colors at half intensity, the SIGNAL LOST CRT signature barely visible over the upscale base.

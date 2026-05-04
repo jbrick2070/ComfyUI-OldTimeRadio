@@ -204,6 +204,30 @@ def test_i2v_dispatch_uses_img_to_video_condition_only():
     )
 
 
+def test_clip_length_widget_appears_after_existing_optional_widgets(m):
+    """BUG-LOCAL-097 (2026-05-04 EVENING): clip_length must be the LAST
+    optional widget so existing workflow JSONs (saved before BUG-091
+    introduced the widget) don't shift their saved values into the
+    wrong slots. ComfyUI parses widget_values positionally; inserting
+    a new FLOAT widget BEFORE existing STRING widgets means the saved
+    "ffmpeg" string lands on a FLOAT slot and validation fails with
+    `Failed to convert an input value to a FLOAT value: clip_length,
+    ffmpeg, could not convert string to float: 'ffmpeg'`. Putting the
+    new widget LAST means old workflows fall through to the FLOAT
+    default cleanly.
+    """
+    inp = m.BatchLTXRender.INPUT_TYPES()
+    optional = inp["optional"]
+    keys = list(optional.keys())
+    assert "clip_length" in keys
+    # clip_length must be the last entry in the optional dict.
+    assert keys[-1] == "clip_length", (
+        f"BUG-LOCAL-097: clip_length must be the LAST optional widget "
+        f"to preserve backward-compat with pre-091 workflow JSONs. "
+        f"Got order: {keys}"
+    )
+
+
 def test_required_nodes_list_mentions_img_to_video_condition_only():
     """The error message that fires when a required ComfyUI node is
     missing should list the new canonical i2v node so a fresh-install

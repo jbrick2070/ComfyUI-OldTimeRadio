@@ -590,23 +590,6 @@ class BatchLTXRender:
                 }),
             },
             "optional": {
-                "clip_length": ("FLOAT", {
-                    "default": 7.0,
-                    "min": 1.32,
-                    "max": 14.12,
-                    "step": 0.04,
-                    "tooltip": (
-                        "Max per-CHUNK duration in seconds (BUG-LOCAL-091, "
-                        "matches BatchHumoRender behaviour). Lines whose "
-                        "audio exceeds this are split into N consecutive "
-                        "chunks rendered against the radio bookend, then "
-                        "ffmpeg-concat into the final per-line mp4. Default "
-                        "7.0 -> 175 frames -> 177 (LTX 8n+1 = 7.08s, the "
-                        "historically-stable LTX render size). Bump up to "
-                        "14.12 (353 frames) if VRAM holds, to single-pass "
-                        "typical announcer monologues."
-                    ),
-                }),
                 "ffmpeg": ("STRING", {
                     "default": "ffmpeg",
                     "tooltip": "ffmpeg binary path or PATH-resolvable name",
@@ -628,12 +611,43 @@ class BatchLTXRender:
                         "ComfyUI sequencing."
                     ),
                 }),
+                # BUG-LOCAL-097 (2026-05-04 EVENING): clip_length appended
+                # at the END of optional. BUG-091 originally put it FIRST,
+                # which inserted a new widget at position [3] of
+                # widgets_values and shifted every subsequent saved value
+                # by one slot -- existing workflow JSONs (otr_scifi_16gb_full.json
+                # and any user-saved variants) read "ffmpeg" as FLOAT
+                # clip_length and the workflow validation crashed at
+                # `Failed to convert an input value to a FLOAT value:
+                # clip_length, ffmpeg, could not convert string to float:
+                # 'ffmpeg'` BEFORE the LTX node could even run. Moving
+                # clip_length to the END means new widget appears at
+                # position [5], past the existing 5 saved values, so old
+                # workflows fall through to the FLOAT default (7.0)
+                # cleanly. Backward-compat preserved.
+                "clip_length": ("FLOAT", {
+                    "default": 7.0,
+                    "min": 1.32,
+                    "max": 14.12,
+                    "step": 0.04,
+                    "tooltip": (
+                        "Max per-CHUNK duration in seconds (BUG-LOCAL-091, "
+                        "matches BatchHumoRender behaviour). Lines whose "
+                        "audio exceeds this are split into N consecutive "
+                        "chunks rendered against the radio bookend, then "
+                        "ffmpeg-concat into the final per-line mp4. Default "
+                        "7.0 -> 175 frames -> 177 (LTX 8n+1 = 7.08s, the "
+                        "historically-stable LTX render size). Bump up to "
+                        "14.12 (353 frames) if VRAM holds, to single-pass "
+                        "typical announcer monologues."
+                    ),
+                }),
             },
         }
 
     def execute(self, model, clip, vae, ledger_json, seed=1,
-                clip_length=7.0, ffmpeg="ffmpeg",
-                humo_clips_dir=""):
+                ffmpeg="ffmpeg", humo_clips_dir="",
+                clip_length=7.0):
         # NOTE: ``humo_clips_dir`` is intentionally consumed but unused.
         # See INPUT_TYPES tooltip -- it is a pure DAG sequencing edge so
         # ComfyUI schedules this node after BatchHumoRender finishes its
