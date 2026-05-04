@@ -21,6 +21,28 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-095 [FIXED]: LTX clips visibly static -- LTXVAddGuide is keyframe pinning, not i2v init
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-091 LTX chunking soak | **Bible candidate:** YES (LTX i2v dispatch)
+- **Symptom:** Jeffrey reported "the LTX radio being honest its not animating at all... we thought removing the end frame would do it but i guess not". Even after BUG-LOCAL-032 removed the end-frame guide, LTX clips still rendered visibly static -- the radio scene held a near-frozen pose for the entire clip duration. CFG, sampler, sigmas, dimensions, strength, frame_rate all matched the historically-working ComfyUI-Goofer / comfyui-data-media-machine paths, so the parameters weren't the issue.
+- **Diagnostic process:** side-by-side comparison of OTR's `nodes/batch_ltx_render.py` vs comfyui-data-media-machine's `nodes/dmm_batch_video.py::_apply_i2v_conditioning` (called by `DMMBatchVideoGenerator`). DMM's i2v path produces animated output every run; OTR's doesn't. Sigmas (9-element distilled schedule), CFG=1.0, sampler=euler, fps=25, strength=0.75 were all identical. The ONE difference: the i2v ComfyUI node call.
+- **Cause:** OTR called `LTXVAddGuide` for i2v conditioning. `LTXVAddGuide` is a KEYFRAME PINNING node -- it attaches the image to the positive/negative conditioning as a hard anchor at `frame_idx=0`, clamping the latent at that frame and constraining motion away from it. Even at strength=0.75, frame 0 stays rigidly locked; the model resists evolving away from the start image because the conditioning is telling it "this is what frame 0 must look like". Pre-BUG-032 there were TWO guides (start strength 0.75 + end strength 0.6), explaining the original ping-pong static behaviour. BUG-032 removed the end guide, but the start guide was still pinning. DMM uses the canonical `LTXVImgToVideoConditionOnly` node instead -- it encodes the image into the FIRST FRAMES of the latent and adds a noise mask for strength control. Same starting frame, but the model sees "evolve from this" rather than "stay locked to this".
+- **Fix (`nodes/batch_ltx_render.py`, ~30 LOC):**
+  - **Replaced `_call("LTXVAddGuide", positive, negative, vae, latent, image, frame_idx=0, strength)` with `_call("LTXVImgToVideoConditionOnly", vae, image, latent, strength)`**. Returns a single conditioned LATENT instead of (modified positive, modified negative, latent).
+  - **`CFGGuider` now receives `cond_pos` / `cond_neg` straight from `LTXVConditioning`** (the original conditioning, unchanged). Pre-095 it received the LTXVAddGuide-modified pair, which carried the keyframe anchor.
+  - **Updated required-nodes error message** to reference `LTXVImgToVideoConditionOnly` so fresh-install users know what to look for.
+  - **Updated stale BUG-032 commentary** that referenced the removed `LTXVAddGuide` path.
+- **NEW tests (`tests/test_batch_ltx_render.py`, +2):**
+  - `test_i2v_dispatch_uses_img_to_video_condition_only` -- regex-based source guard that asserts `_call("LTXVImgToVideoConditionOnly", ...)` is present AND `_call("LTXVAddGuide", ...)` is NOT present in the file. A future refactor that re-introduces LTXVAddGuide for i2v fails before reaching a live render.
+  - `test_required_nodes_list_mentions_img_to_video_condition_only` -- pin the error message stays accurate.
+- **Verify:**
+  - AST parse clean (55053 bytes, 3979 nodes).
+  - test_batch_ltx_render + test_batch_humo_render + test_news_history_ttl + test_portrait_render_skip_announcer -> 78 passed in 3.08s (was 76; +2 BUG-095 guards).
+  - Live: next LTX render against the radio bookend should produce visibly animated output -- camera drift, light flicker, atmospheric movement -- matching the DMM repo's behaviour. Static-frame artefact gone.
+- **Tags:** ltx, i2v-dispatch, dmm-comparison, BUG-032-followup, animation, keyframe-vs-i2v
+- **Related:** BUG-LOCAL-032 (removed the end-frame guide; necessary but insufficient because the start guide was still pinning); BUG-LOCAL-091 (LTX chunking; the per-chunk render now uses the corrected i2v path so each chunk gets free motion). LTXVAddGuide is preserved in ComfyUI for genuine keyframe pinning use cases (e.g., a 60-frame clip that must hit a specific pose at frame 30); OTR just doesn't have that need.
+
+---
+
 ### BUG-LOCAL-094 [FIXED]: skip_announcer guard never fired -- wasted ~30s FLUX per announcer cast member
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-093 cleanup | **Bible candidate:** YES (cast filter + skip dispatch)
 - **Symptom:** every recent run rendered a portrait for the ANNOUNCER cast member even though announcer beats route to LTX (BUG-129b) and the portrait is never used. ~30s of FLUX wall time wasted per portrait. Visible in the runtime log as e.g. `[OTR_BatchFluxPortraitRender] c01 -> c01_portrait.png (29.7s)` for `c01: ANNOUNCER`.

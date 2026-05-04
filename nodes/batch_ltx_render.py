@@ -157,11 +157,13 @@ LTX_I2V_STRENGTH = 0.75
 # 2026-05-01 Jeffrey ORIGINAL INTENT: feed radio still as BOTH start
 # and end keyframes for seamless-loop ping-pong in VideoComposite.
 # RETIRED 2026-05-03 EVENING per BUG-LOCAL-032: two strong anchors
-# (start 0.75 + end 0.6) clamped LTX into near-static ping-pong,
-# producing visibly still output. The end-frame anchor is no longer
-# applied; only the start frame is fed via LTXVAddGuide. Constant
-# kept for back-compat in case a future workflow re-enables the
-# loop behavior at much lower strength (~0.2-0.3).
+# clamped LTX into near-static ping-pong.
+# 2026-05-04 EVENING per BUG-LOCAL-095: even the start-frame guide
+# (LTXVAddGuide) was acting as a hard keyframe pin and producing
+# "ltx looks like a still" output. Replaced with the canonical
+# LTXVImgToVideoConditionOnly i2v init which encodes the image into
+# the first frames of the latent + adds a noise mask for free motion.
+# Same proven path comfyui-data-media-machine uses.
 LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fix block
 
 # Speaker_role -> LTX prompt template. Builds a per-cue prompt anchored
@@ -384,9 +386,10 @@ def _node(name: str):
             raise RuntimeError(
                 f"OTR_BatchLTXRender: node '{name}' not found in "
                 f"NODE_CLASS_MAPPINGS. Required nodes: CLIPTextEncode, "
-                f"LTXVImgToVideo, LTXVConditioning, RandomNoise, "
-                f"CFGGuider, KSamplerSelect, SamplerCustomAdvanced, "
-                f"VAEDecode, EmptyLTXVLatentVideo. "
+                f"LTXVImgToVideoConditionOnly (BUG-LOCAL-095), "
+                f"LTXVConditioning, RandomNoise, CFGGuider, "
+                f"KSamplerSelect, SamplerCustomAdvanced, VAEDecodeTiled, "
+                f"EmptyLTXVLatentVideo. "
                 f"Are stock comfy_extras + ComfyUI-LTXVideo installed?"
             )
         _NODE_CACHE[name] = cls
@@ -855,42 +858,54 @@ class BatchLTXRender:
                             length=chunk_ltx_length, batch_size=1,
                         )[0]
 
-                        # BUG-LOCAL-032 fix (2026-05-03 EVENING): use
-                        # ONLY the start frame as i2v conditioning. The
-                        # prior code ALSO fed the radio still as an end
-                        # frame (frame_idx=-1) for seamless-loop intent,
-                        # but two strong anchors (start strength 0.75 +
-                        # end strength 0.6) clamped LTX into a near-static
-                        # ping-pong: motion would happen briefly in the
-                        # middle then snap back to the identical
-                        # composition. User reported "ltx looks like a
-                        # still" -- confirmed via comparison with
-                        # ComfyUI-Goofer + comfyui-data-media-machine
-                        # which both use ONLY the start frame and produce
-                        # genuinely moving video. Trade-off: clips no
-                        # longer seamlessly loop back to the radio still
-                        # at end. For OTR's announcer/music/sfx use case
-                        # this is fine -- the next per-line clip begins
-                        # with its own content anyway, so the lost loop
-                        # behavior costs nothing visible.
-                        cp_chunk, cn_chunk, latent_chunk = _call(
-                            "LTXVAddGuide",
-                            positive=cond_pos,
-                            negative=cond_neg,
+                        # BUG-LOCAL-095 (2026-05-04 EVENING): swapped from
+                        # LTXVAddGuide to LTXVImgToVideoConditionOnly.
+                        #
+                        # LTXVAddGuide is for KEYFRAME PINNING inside an
+                        # existing pipeline -- it attaches the image to
+                        # positive/negative cond as a hard anchor at
+                        # frame_idx and clamps motion away from that
+                        # frame. Even at strength=0.75, frame 0 stays
+                        # rigidly locked. This is what produced the
+                        # "ltx looks like a still" artefact Jeffrey
+                        # reported AFTER BUG-032 removed the end guide
+                        # (the start guide was still pinning).
+                        #
+                        # LTXVImgToVideoConditionOnly is the canonical
+                        # I2V INIT node -- it encodes the image into
+                        # the FIRST FRAMES of the latent and creates a
+                        # noise mask for strength control. The model
+                        # sees "start with this image, then evolve
+                        # freely" rather than "stay anchored to this
+                        # frame". This matches the exact pattern in
+                        # comfyui-data-media-machine's DMMBatchVideoGenerator
+                        # (nodes/dmm_batch_video.py::_apply_i2v_conditioning,
+                        # called via _call("LTXVImgToVideoConditionOnly",
+                        # vae=vae, image=image, latent=latent,
+                        # strength=strength)) which Jeffrey confirms
+                        # produces visibly animated radio still output.
+                        #
+                        # Returns a single conditioned LATENT; the
+                        # cond_pos / cond_neg from LTXVConditioning go
+                        # straight to CFGGuider unchanged.
+                        latent_chunk = _call(
+                            "LTXVImgToVideoConditionOnly",
                             vae=vae,
-                            latent=empty_latent,
                             image=ref_image,
-                            frame_idx=0,
+                            latent=empty_latent,
                             strength=LTX_I2V_STRENGTH,
-                        )
+                        )[0]
 
-                        # Sample with distilled schedule
+                        # Sample with distilled schedule. Cond pos/neg
+                        # come straight from LTXVConditioning (post-BUG-095);
+                        # LTXVImgToVideoConditionOnly only modifies the
+                        # latent, not the conditioning.
                         noise = _call("RandomNoise", noise_seed=shot_seed)[0]
                         guider = _call(
                             "CFGGuider",
                             model=model,
-                            positive=cp_chunk,
-                            negative=cn_chunk,
+                            positive=cond_pos,
+                            negative=cond_neg,
                             cfg=LTX_CFG,
                         )[0]
                         samples_out, _denoised = _call(

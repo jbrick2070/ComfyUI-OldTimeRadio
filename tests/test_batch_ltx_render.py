@@ -161,3 +161,56 @@ def test_concat_helper_single_chunk_noop_at_same_path(m, tmp_path: Path):
     assert result == p
     assert p.exists()
     assert p.read_bytes() == b"fake mp4 content"
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-095: i2v dispatch uses canonical LTXVImgToVideoConditionOnly
+# ---------------------------------------------------------------------------
+
+def test_i2v_dispatch_uses_img_to_video_condition_only():
+    """BUG-LOCAL-095 (2026-05-04 EVENING): the per-chunk LTX dispatch
+    must call LTXVImgToVideoConditionOnly (canonical i2v init that
+    bakes the image into first frames + adds noise mask) NOT
+    LTXVAddGuide (keyframe pinning). The latter clamps frame 0 as a
+    hard anchor and produces visibly static output -- the artefact
+    Jeffrey reported AFTER BUG-032 removed the end-frame guide.
+
+    Source-code regression guard: a future refactor that re-introduces
+    LTXVAddGuide for the i2v path will fail this test before any
+    live render reproduces the static-LTX artefact.
+    """
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    # Must call LTXVImgToVideoConditionOnly with vae+image+latent+strength.
+    assert '"LTXVImgToVideoConditionOnly"' in src, (
+        "BUG-LOCAL-095: dispatch must call LTXVImgToVideoConditionOnly "
+        "(matches comfyui-data-media-machine which produces animated "
+        "i2v output, vs LTXVAddGuide which pins frame 0 as keyframe)"
+    )
+    # Must NOT call LTXVAddGuide as the i2v path (keyframe pinning
+    # behaviour). Comments and docstrings can mention it for history;
+    # the actual node-dispatch call would be `_call("LTXVAddGuide",`
+    # with no quoting variants. Use a regex that matches the call
+    # syntax specifically.
+    pattern = re.compile(r'_call\(\s*["\']LTXVAddGuide["\']')
+    matches = pattern.findall(src)
+    assert not matches, (
+        "BUG-LOCAL-095: LTXVAddGuide must not be used for i2v "
+        "conditioning. It pins frame 0 as a hard keyframe and "
+        "produces static LTX output. Use LTXVImgToVideoConditionOnly "
+        "instead."
+    )
+
+
+def test_required_nodes_list_mentions_img_to_video_condition_only():
+    """The error message that fires when a required ComfyUI node is
+    missing should list the new canonical i2v node so a fresh-install
+    user knows what's needed."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    assert "LTXVImgToVideoConditionOnly" in src, (
+        "Required-nodes error message must reference the BUG-095 node"
+    )
