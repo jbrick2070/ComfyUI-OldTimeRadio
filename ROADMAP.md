@@ -537,6 +537,42 @@ tts_palette:
       role: "<character|announcer|narrator|utility>"
 ```
 
+#### LLM palette expansion — QUEUED 2026-05-03 EVENING (paired with CosyVoice 2 add)
+
+Same shape as the TTS ladder above: NOT replacing the canonical script-writer (Mistral-Nemo 12B), EXPANDING the per-role LLM palette so the writer pool can be voiced for tone (period radio drama, hard-boiled detective, broadcast announcer) instead of one general-purpose model carrying everything. Queued for the same beta cycle as the CosyVoice 2 TTS add — both are voice/character expansion work, both gate on the same C7 + VRAM verification protocol.
+
+**Production add-order ladder:**
+
+| Priority | Model | License | Peak VRAM (est) | C7-deterministic? | Verdict |
+|---|---|---|---|---|---|
+| **1** | **Mistral-Nemo 12B** (current canonical) | Apache-2.0 | ~22.8 GB FP16 / ~7-8 GB int4 | Yes (deterministic with fixed seed + temperature 0) | **KEEP.** Default story-writer per `otr_scifi_16gb_full.json`. Don't replace. |
+| **2** | **destnyrr/talkie-1930-13b-base-gptq-int4** | needs license audit (HF page check) | ~7-8 GB (13B int4 GPTQ) | needs verification | **RESEARCH LANE → ADD NEXT.** Period-styled 1930s broadcast LLM. Pair-add with CosyVoice 2 in the same beta cycle so the OTR voice + writer palette expands together. Compatible VRAM footprint with Mistral-Nemo int4; can co-exist as a switchable writer profile. |
+
+**C7 qualification protocol (apply to any new LLM before merge):**
+1. Same prompt + same seed + temperature 0 + same model revision + same tokenizer revision + same draft length cap.
+2. Run 10 repeated generations across cold start, warm start, and process restarts.
+3. Hash final draft text bytes. If any hashes differ at temperature 0 → engine is NOT qualified for OTR.
+4. **Period-tone smoke pass:** generate 5 short scripts with the writer prompt and a fixed seed; spot-check that the model does NOT slip modern slang, modern brand names, or post-1950 cultural references into a script tagged for the 1940s setting. Failure mode: model that ignores period framing and emits anachronisms gets demoted to RESEARCH LANE pending prompt-engineering work.
+
+**Pin format to lock once each LLM ships:**
+```yaml
+llm_palette:
+  writers:
+    - name: "mistral-nemo-12b" / "talkie-1930-13b-int4"
+      upstream_repo: "<exact HF repo>"
+      model_revision: "<tag/SHA>"
+      tokenizer_revision: "<tag/SHA>"
+      quant_format: "<fp16|int4-gptq|int8|...>"
+      context_cap: "<tokens>"
+      temperature_default: 0.0
+      draft_hash_test: true
+      role: "<canonical|period-broadcast|hardboiled|announcer-narration|...>"
+```
+
+**Wired-in alongside what:** the writer-profile dropdown in `LLMScriptWriter` would gain a new option (`Talkie-1930 (Period Broadcast)`) that loads the int4 GPTQ weights via the same loader path used by Mistral-Nemo. Switch is per-episode at queue time, not per-line. CosyVoice 2 add (TTS priority 3 above) is independent at the audio engine layer; both can ship in the same v2.0-beta cut without touching each other's code paths.
+
+**Defer to v2.0-beta** — same trigger as the TTS expansion. Land BUG-LOCAL-031+ first, then the v2.0-alpha → v2.0-beta cut, then this palette work in beta cycle 1.
+
 ### LLM character normalize pass
 
 Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_PATTERNS` (BUG-091 + BUG-097), (2) fuzzy `_consolidate_similar_cast_rows_with_aliases` (BUG-098). Both deterministic, limited to KNOWN patterns. An LLM-based normalize after fuzzy dedup could catch semantic aliases neither layer sees: `KEVIN VOICEOVER` → `KEVIN STENDAHL`, `(captain)` lowercase → `CAPTAIN`, `DR. AMELIA HARTFIELD` → `AMELIA`.
