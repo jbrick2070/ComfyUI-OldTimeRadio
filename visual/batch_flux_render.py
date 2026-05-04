@@ -430,6 +430,29 @@ class BatchFluxRender:
                         "(unless explicitly changed)."
                     ),
                 }),
+                "skip_env_stills": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "BUG-LOCAL-078 follow-up (2026-05-03 EVENING). "
+                        "When True (default), SKIP the per-shot env-still "
+                        "FLUX pass entirely. Returns a 1x16x16 placeholder "
+                        "IMAGE so downstream OTR_SaveToEpisodeWorkspace "
+                        "doesn't crash. The radio bookend is still "
+                        "rendered in this node (separate code path) "
+                        "regardless of this flag. Env stills are dead "
+                        "code in the active pipeline after the BUG-078 "
+                        "portrait fix: HuMo's tier 1 lookup hits the "
+                        "new portraits/<char_id>_portrait.png so the "
+                        "tier 4 env-still fallback never fires, and "
+                        "VideoComposite's Phase A simple-pillarbox "
+                        "branch hardcodes background_png=None so its "
+                        "layered branch (which would consume env "
+                        "stills) is dormant. Saves ~2-3 minutes of "
+                        "FLUX time per episode. Set False to re-enable "
+                        "the env-still pass if a future Phase C "
+                        "layered backdrop mode revives the consumer."
+                    ),
+                }),
             },
         }
 
@@ -438,7 +461,8 @@ class BatchFluxRender:
                 fallback_prompt=_DEFAULT_FALLBACK, style_suffix=_DEFAULT_STYLE_SUFFIX,
                 freeze_seed=False, fast_batch=True,
                 radio_bookend_prompt="",
-                radio_bookend_seed=4242):
+                radio_bookend_seed=4242,
+                skip_env_stills=True):
         t_start = time.time()
         prompts = _parse_env_prompts(script_json, batch_limit, fallback_prompt, style_suffix)
 
@@ -483,6 +507,55 @@ class BatchFluxRender:
             f"sampler={sampler_name}/{scheduler}, "
             f"mode={'fast_batch' if fast_batch else 'serial'}",
         ]
+
+        # BUG-LOCAL-078 follow-up (2026-05-03 EVENING): if skip_env_stills
+        # is True (default), bypass the per-shot env-still FLUX pass
+        # entirely. The radio bookend is still rendered below (separate
+        # code path); HuMo's per-cast portraits come from the new
+        # OTR_BatchFluxPortraitRender node. Env stills are dead code in
+        # the active pipeline after BUG-078 wires up tier 1 portraits.
+        # Saves ~2-3 minutes of FLUX time per episode. Returns a tiny
+        # placeholder IMAGE so OTR_SaveToEpisodeWorkspace doesn't crash.
+        if skip_env_stills:
+            log.info(
+                "[BatchFluxRender] skip_env_stills=True -- bypassing "
+                "per-shot env-still FLUX pass; rendering radio bookend "
+                "only (BUG-LOCAL-078 follow-up)"
+            )
+            report_lines.append(
+                "skip_env_stills=True; bypassed env-still pass "
+                "(saved ~2-3 min FLUX time)"
+            )
+            try:
+                _RADIO_BOOKEND_W = 1248
+                _RADIO_BOOKEND_H = 720
+                self._render_and_save_radio_bookend(
+                    prompt_text=str(radio_bookend_prompt or ""),
+                    model=model, clip=clip, vae=vae,
+                    text_enc=text_enc, guidance_node=guidance_node,
+                    empty_latent_cls=empty_latent_cls, sampler=sampler,
+                    decoder=decoder, negative=negative,
+                    seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
+                    sampler_name=sampler_name, scheduler=scheduler,
+                    width=_RADIO_BOOKEND_W, height=_RADIO_BOOKEND_H,
+                    guidance=guidance,
+                    report_lines=report_lines,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.exception(
+                    "[BatchFluxRender] radio bookend render failed in "
+                    "skip_env_stills mode: %s", exc,
+                )
+                report_lines.append(
+                    f"  radio bookend FAILED in skip mode: {exc}"
+                )
+            import torch as _torch  # type: ignore
+            placeholder = _torch.zeros((1, 16, 16, 3), dtype=_torch.float32)
+            elapsed_ms = int((time.time() - t_start) * 1000)
+            report_lines.append(
+                f"BatchFluxRender done in {elapsed_ms} ms (skip mode)"
+            )
+            return (placeholder, "\n".join(report_lines))
 
         # FAST BATCH PATH
         if fast_batch and len(prompts) > 1:
