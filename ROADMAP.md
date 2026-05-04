@@ -541,12 +541,21 @@ tts_palette:
 
 Same shape as the TTS ladder above: NOT replacing the canonical script-writer (Mistral-Nemo 12B), EXPANDING the per-role LLM palette so the writer pool can be voiced for tone (period radio drama, hard-boiled detective, broadcast announcer) instead of one general-purpose model carrying everything. Queued for the same beta cycle as the CosyVoice 2 TTS add — both are voice/character expansion work, both gate on the same C7 + VRAM verification protocol.
 
-**Production add-order ladder:**
+**Production add-order ladder (writer lane):**
 
 | Priority | Model | License | Peak VRAM (est) | C7-deterministic? | Verdict |
 |---|---|---|---|---|---|
 | **1** | **Mistral-Nemo 12B** (current canonical) | Apache-2.0 | ~22.8 GB FP16 / ~7-8 GB int4 | Yes (deterministic with fixed seed + temperature 0) | **KEEP.** Default story-writer per `otr_scifi_16gb_full.json`. Don't replace. |
-| **2** | **destnyrr/talkie-1930-13b-base-gptq-int4** | needs license audit (HF page check) | ~7-8 GB (13B int4 GPTQ) | needs verification | **RESEARCH LANE → ADD NEXT.** Period-styled 1930s broadcast LLM. Pair-add with CosyVoice 2 in the same beta cycle so the OTR voice + writer palette expands together. Compatible VRAM footprint with Mistral-Nemo int4; can co-exist as a switchable writer profile. |
+| **2** | **talkie-lm/talkie-1930-13b-it** (instruct variant — supersedes the earlier `destnyrr/talkie-1930-13b-base-gptq-int4` queue entry) | needs license audit | ~7-8 GB (13B int4) | needs verification | **PROMOTE TO NEXT-UP.** Instruct-tuned 1930s broadcast LLM. The instruct variant is what's actively trending on HF; better fit than the raw base for OTR's prompt-engineered writer prompts. Pair-add with CosyVoice 2 in the same beta cycle. |
+| **3** | **Qwen/Qwen3.6-27B** (or `unsloth/Qwen3.6-27B-GGUF` for the pre-quantized GGUF) | Apache-2.0 | ~7 GB int4 GPTQ / ~6 GB GGUF Q4 | needs verification | **TIER-1 ALTERNATIVE.** Qwen3 series has top-tier creative-writing reputation; legitimately could replace Mistral-Nemo as primary writer if A/B test on the same prompt favors it. Unsloth GGUF quant means zero DIY quantization work. |
+
+**Production add-order ladder (utility lane — NEW 2026-05-03 EVENING):**
+
+Separate from the writer palette. Utility LLMs are for tasks where deterministic instruction-following + small footprint + Apache license matter MORE than period prose flavor. Capabilities target: summarization, structured extraction, classification, function-calling, normalization passes.
+
+| Priority | Model | License | Peak VRAM (est) | Use case | Verdict |
+|---|---|---|---|---|---|
+| **1** | **ibm-granite/granite-4.1-8b** | Apache-2.0 (verified 2026-05-03) | ~5 GB int4 / ~16 GB BF16 (8.79B params, 17.5 GB on disk) | Title compression from news_seed (currently the news_seed_fallback path produces 80-char filename slugs like `signal_lost_what_a_decade_of_gene_therapy_research_f_...` — Granite would compress to 4-word punchy title); cast normalize pass (queued LLM cleanup); treatment.txt structured extraction; ledger forensics tool-use | **TIER-1.** IBM's "diverse domains, including business applications" framing is the OPPOSITE of what we want for the writer lane, but the EXACT shape we want for utility tasks. Strong instruction-following + tool-use + function-calling. |
 
 **C7 qualification protocol (apply to any new LLM before merge):**
 1. Same prompt + same seed + temperature 0 + same model revision + same tokenizer revision + same draft length cap.
@@ -558,18 +567,36 @@ Same shape as the TTS ladder above: NOT replacing the canonical script-writer (M
 ```yaml
 llm_palette:
   writers:
-    - name: "mistral-nemo-12b" / "talkie-1930-13b-int4"
+    - name: "mistral-nemo-12b" / "talkie-1930-13b-it" / "qwen3.6-27b-gguf-q4"
       upstream_repo: "<exact HF repo>"
       model_revision: "<tag/SHA>"
       tokenizer_revision: "<tag/SHA>"
-      quant_format: "<fp16|int4-gptq|int8|...>"
+      quant_format: "<fp16|int4-gptq|gguf-q4|int8|...>"
       context_cap: "<tokens>"
       temperature_default: 0.0
       draft_hash_test: true
       role: "<canonical|period-broadcast|hardboiled|announcer-narration|...>"
+  utility:
+    - name: "granite-4.1-8b"
+      upstream_repo: "ibm-granite/granite-4.1-8b"
+      model_revision: "<tag/SHA>"
+      tokenizer_revision: "<tag/SHA>"
+      quant_format: "int4-gptq | int8 | bf16"
+      context_cap: "<tokens>"
+      temperature_default: 0.0
+      draft_hash_test: true
+      role: "<title-compress|cast-normalize|treatment-extract|ledger-forensics|...>"
 ```
 
-**Wired-in alongside what:** the writer-profile dropdown in `LLMScriptWriter` would gain a new option (`Talkie-1930 (Period Broadcast)`) that loads the int4 GPTQ weights via the same loader path used by Mistral-Nemo. Switch is per-episode at queue time, not per-line. CosyVoice 2 add (TTS priority 3 above) is independent at the audio engine layer; both can ship in the same v2.0-beta cut without touching each other's code paths.
+**Wired-in alongside what:** the writer-profile dropdown in `LLMScriptWriter` would gain new options (`Talkie-1930-it (Period Broadcast)`, `Qwen3.6-27B (Creative Alternative)`) that load via the same loader path used by Mistral-Nemo. Switch is per-episode at queue time, not per-line. The utility lane (Granite 4.1 8B) wires into a NEW node `LLMUtilityRunner` (or extends an existing utility hook) for the small structured-output tasks that don't need a full writer; it co-loads alongside the writer profile because their VRAM footprints (5 GB + 7-8 GB int4) sum to ~13 GB, comfortably under the 14.5 GB ceiling. CosyVoice 2 add (TTS priority 3 above) is independent at the audio engine layer; all three (writer-add, utility-add, TTS-add) can ship in the same v2.0-beta cut without touching each other's code paths.
+
+**Rejected from this round (size or alignment mismatch):**
+- **Anything 100B+** (DeepSeek-V4-Pro 862B, MiMo-V2.5 311B, Kimi-K2.6 1.1T, Mistral-Medium-128B, Ling-1T) — exceeds 16 GB VRAM even at int4
+- **Multimodal `Image-Text-to-Text`** variants (Qwen image families, Gemma-4 31B-it has IMG variants) — wrong tool for text-only OTR writing
+- **`text-to-image` / `text-to-video`** (SeeSee21, SulphurAI) — wrong domain entirely
+- **`HauhauCS/Qwen3.6-27B-Uncensored-...-Aggressive`** — explicitly conflicts with OTR's safe-for-work / no-profanity content standard
+- **`google/gemma-4-31B-it`** + **`nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning`** — both interesting Tier-2 candidates but deferred until after the Tier-1 writer A/B (Mistral-Nemo vs Talkie-1930-it vs Qwen3.6-27B) lands a winner. Re-evaluate then.
+- **`ibm-granite/granite-4.1-30b`** — bigger Granite sibling loses the small-footprint advantage that makes the 8B compelling for the utility lane.
 
 **Defer to v2.0-beta** — same trigger as the TTS expansion. Land BUG-LOCAL-031+ first, then the v2.0-alpha → v2.0-beta cut, then this palette work in beta cycle 1.
 
