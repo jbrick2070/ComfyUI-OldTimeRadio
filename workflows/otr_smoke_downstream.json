@@ -1,0 +1,128 @@
+{
+  "id": "otr-smoke-downstream",
+  "revision": 0,
+  "last_node_id": 58,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 56,
+      "type": "OTR_RTXUpscale",
+      "pos": [200, 200],
+      "size": [520, 280],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "widget": {"name": "source_mp4_path"}
+        }
+      ],
+      "outputs": [
+        {
+          "name": "upscaled_mp4_path",
+          "type": "STRING",
+          "links": [1],
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_RTXUpscale"
+      },
+      "widgets_values": [
+        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/composited/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
+        false,
+        1920,
+        1080,
+        "ULTRA",
+        64,
+        "ffmpeg"
+      ],
+      "_meta": {
+        "title": "RTX VSR Upscale (smoke - reuses existing composite)"
+      }
+    },
+    {
+      "id": 58,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [800, 200],
+      "size": [560, 320],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 1,
+          "widget": {"name": "source_mp4_path"}
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "widget": {"name": "procgen_mp4_path"}
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "",
+        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
+        "lighten",
+        0.5,
+        "ffmpeg",
+        false,
+        "_smoke_blended"
+      ],
+      "_meta": {
+        "title": "Post-Upscale Procgen Blend (smoke)"
+      }
+    }
+  ],
+  "links": [
+    [1, 56, 0, 58, 0, "STRING"]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "OTR BUG-LOCAL-031 SMOKE -- downstream chain only (reuses existing composite + procgen)",
+      "bounding": [180, 130, 1200, 420],
+      "color": "#3f789e",
+      "font_size": 18,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [0, 0]
+    },
+    "info": {
+      "name": "OTR Downstream Smoke Workflow",
+      "description": "BUG-LOCAL-031 verification harness. Two nodes only: RTXUpscale + PostUpscaleProcgenBlend. Hardcoded paths to the most recent completed-run assets so you can drag-and-drop this into ComfyUI Desktop and queue without re-rendering ANY upstream content (Story / Director / Bark / Kokoro / MusicGen / AudioGen / FLUX / HuMo / LTX all skipped). Total runtime ~70 seconds. Edit the two widget paths if you want to point at a different episode. Output lands in output/otr/obs/ with the _smoke_blended suffix so it does not clobber your canonical OBS deliverables.",
+      "version": "1.0",
+      "purpose": "smoke-test-downstream-only"
+    }
+  },
+  "version": 0.4
+}
