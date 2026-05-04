@@ -21,6 +21,33 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-090 [FIXED]: news_history.json grows unbounded -- 5-day TTL added so headlines recycle
+- **Date:** 2026-05-04 EVENING | **Phase:** soak hygiene (NewsFetcher) | **Bible candidate:** YES (best-effort dedup with TTL)
+- **Symptom (live runs 2026-05-04 14:10 + earlier):** `[NewsFetcher] Filtered 43 previously-used candidate(s) via news_history (0 remaining of 43)` followed by `[NewsFetcher] All 43 candidate(s) filtered out by history -- restoring unfiltered pool so the writer still gets a real article`. Every fresh run hit 100% prior-use rate. Fallback restored the unfiltered pool so generation continued, but the dedup intent (avoid back-to-back same-headline runs) was effectively dead because the history was set-membership-only with no expiration -- a once-used URL was blocked forever. Rolling cap was 200 entries, but with 8 RSS feeds returning ~5-6 stories each (~43 unique URLs/day) the entire daily pool gets blocked within ~5 days of normal use.
+- **Cause:** `nodes/story_orchestrator.py::_load_news_history()` returned `{entry["url"] for entry in data if entry.get("url")}` -- a flat set of every URL ever recorded. `_record_news_usage()` writes timestamps but `_load_news_history()` ignored them. No TTL filter, so a headline used 30 days ago still blocked the candidate pool today.
+- **Fix (`nodes/story_orchestrator.py`):**
+  - **NEW constant `_NEWS_HISTORY_FILTER_DAYS = 5`** -- only URLs used within the last 5 days are kept in the active filter set. Older entries stay on disk for audit (so the file remains a usage log) but no longer block the pool.
+  - **`_load_news_history()` refactored** to parse `entry["timestamp"]` via `datetime.fromisoformat()` and only include entries whose timestamp is `>= now - timedelta(days=5)`. Entries with missing or malformed timestamps default to fresh (safer to filter once than to surface a same-day repeat). File-not-found, JSON-parse errors, and any other I/O failure still return an empty set (best-effort, never blocks generation).
+  - **`from datetime import datetime, timedelta`** -- existing import extended for the cutoff math.
+- **NEW tests (`tests/test_news_history_ttl.py`, 7 tests):**
+  - `test_ttl_constant_is_five_days` -- pins the window so a silent revert is caught.
+  - `test_load_filters_old_entries` -- 5-entry fixture spanning today/2d/4d/6d/10d ago; asserts only the first three survive.
+  - `test_missing_timestamp_treated_as_fresh` -- missing field, empty string, malformed string all fail-to-fresh.
+  - `test_missing_url_skipped` -- URL-less entries dropped silently.
+  - `test_file_missing_returns_empty` -- first-run case.
+  - `test_corrupted_json_returns_empty` -- invalid JSON file is not an error.
+  - `test_entries_at_exactly_ttl_boundary` -- entry +1s inside the window is fresh, -1s outside is stale.
+- **Verify:**
+  - AST parse clean on `nodes/story_orchestrator.py` (563374 bytes, 39512 nodes).
+  - `tests/test_news_history_ttl.py` -> 7 passed in 1.72s.
+  - `tests/test_core.py + test_critique_dialogue_preservation.py + test_dropdown_guardrails.py + test_news_history_ttl.py` -> 183 passed in 101.89s (full coverage including modules that import story_orchestrator).
+  - Bug Bible regression OTR-scoped -> 22 passed / 1 pre-existing baseline failure / 1 skipped / 2 xfailed.
+  - Live: next NewsFetcher run with a 5+ day-old `news_history.json` should report a non-zero remaining pool count (e.g. `Filtered 23 previously-used candidate(s) via news_history (20 remaining of 43)` instead of the prior `0 remaining`).
+- **Tags:** news-history, ttl, dedup, NewsFetcher, story-orchestrator
+- **Related:** Same `signal_lost_for_nasas_tess_..._110640` soak that surfaced BUG-086. Independent issue but observed via the same console paste. The `config/news_history.json` file on disk is preserved as-is -- the TTL is read-time, not write-time, so existing entries past the window simply stop participating in the filter.
+
+---
+
 ### BUG-LOCAL-086 [FIXED]: HuMo per-line clips frozen on last frame for half the audio (177-frame hard cap + silent clamp)
 - **Date:** 2026-05-04 EVENING | **Phase:** acceptance soak (BUG-085 follow-up) | **Bible candidate:** YES (HuMo render budget + audio-video sync)
 - **Symptom (live full re-render `signal_lost_for_nasas_tess_stellar_eclipses_..._110640`):** First episode-length run since BUG-085 fix completed cleanly through ScriptWriter / Bark / FLUX portraits / HuMo. ScriptWriter shipped a 177-word, 9-line script (3 cast: ANNOUNCER, JAKE, MAYA + a hallucinated CORE VOICE). HuMo rendered 7 character clips at ~10:20 each. Final composite played correctly through the announcer LTX scenes and the 7-second JAKE lines, but on every MAYA line + every JAKE line >7s the character video froze on the last rendered frame while audio kept playing. Three Media Player screenshots from Jeffrey at 0:33 / 1:01 / 1:05 all show portraits with motionless lips while the corresponding Bark audio is mid-sentence. 5 of 7 character clips affected (l003, l005, l006, l007, l008 = MAYA 13.99s, MAYA 11.31s, JAKE 12.99s, MAYA 13.99s, CORE VOICE 10.42s) — all clips with `dur_s > 7s`.

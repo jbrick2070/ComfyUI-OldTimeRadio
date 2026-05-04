@@ -37,7 +37,7 @@ import socket
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Project State (v1.4 Theme C) - series bible for cross-episode consistency.
 # Read-only during generation. See nodes/project_state.py for the write path.
@@ -1275,24 +1275,50 @@ _NEWS_HISTORY_PATH = os.path.join(
     "config", "news_history.json",
 )
 _NEWS_HISTORY_MAX_ENTRIES = 200  # rolling window; oldest entries drop off
+# 2026-05-04 (BUG-LOCAL-090): only block URLs used within this many days.
+# Older entries are kept on disk for audit but no longer filter the pool,
+# so a 5-day-old headline is fair game again. Without this, RSS feeds that
+# rotate slowly (43-headline pool with 200-entry history) get filtered to
+# zero and the fallback has to restore the unfiltered pool every run.
+_NEWS_HISTORY_FILTER_DAYS = 5
 
 
 def _load_news_history() -> set[str]:
-    """Return set of previously-used article URLs.
+    """Return set of recently-used article URLs (within
+    ``_NEWS_HISTORY_FILTER_DAYS`` days).
 
     Used to filter the candidate pool so back-to-back runs don't pick the
-    same RSS feed top story (e.g., the Orion Flywheel article that hit
-    twice today). Failures return an empty set -- the dedup is
-    best-effort, never blocks.
+    same RSS feed top story. Entries older than the TTL window are kept
+    on disk (for audit) but excluded from the active filter set so a
+    headline can recycle into the pool after enough time has passed.
+
+    Failures return an empty set -- the dedup is best-effort, never
+    blocks.
     """
     try:
         with open(_NEWS_HISTORY_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        return {entry["url"] for entry in data if entry.get("url")}
-    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError):
+    except (FileNotFoundError, json.JSONDecodeError):
         return set()
     except Exception:  # noqa: BLE001 -- best-effort
         return set()
+
+    cutoff = datetime.now() - timedelta(days=_NEWS_HISTORY_FILTER_DAYS)
+    fresh: set[str] = set()
+    for entry in data or []:
+        url = (entry or {}).get("url")
+        if not url:
+            continue
+        ts = (entry or {}).get("timestamp") or ""
+        try:
+            entry_dt = datetime.fromisoformat(ts) if ts else None
+        except (TypeError, ValueError):
+            entry_dt = None
+        # Missing or unparseable timestamps -> treat as fresh (safer to
+        # filter them once than to surface a same-day repeat).
+        if entry_dt is None or entry_dt >= cutoff:
+            fresh.add(url)
+    return fresh
 
 
 def _record_news_usage(url: str, headline: str, style: str = "") -> None:
