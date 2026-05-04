@@ -21,6 +21,67 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-085 [FIXED]: NF4 silently failing because HF_HOME not in ComfyUI process env
+- **Date:** 2026-05-04 MORNING | **Phase:** acceptance (BUG-LOCAL-084 follow-up) | **Bible candidate:** YES (Windows/Electron env-inheritance footgun)
+- **Symptom (live full re-render attempt 2026-05-03 23:47, post BUG-084):** ComfyUI restarted clean, BUG-084 fixes loaded, full workflow queued. ScriptWriter started Mistral-Nemo load. Crashed at SDPA prefill with `torch.OutOfMemoryError: Currently allocated 24.00 GiB / Device limit 15.92 GiB`. 24 GiB matches Mistral-Nemo 12B at fp16 exactly — meaning NF4 quantization did not actually apply despite the runtime log printing `[StoryOrchestrator] Enabling 4-bit quantization (NF4)`.
+- **Cause (multi-layer):**
+  1. ComfyUI Desktop's Electron parent process did not inherit `HF_HOME` from `HKCU\Environment`. PowerShell confirmed: `HF_HOME (User) = C:\ComfyUI-Models\huggingface`, `HF_HOME (Process) = (empty)`. Per-user env vars are inherited by processes started from Explorer but not always by Electron-spawned children.
+  2. `nodes/story_orchestrator.py::_load_llm` resolved cache via `os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))` → fell through to `~/.cache/huggingface` because env var was missing.
+  3. With `cache_dir` wrong AND `local_files_only=True` AND Mistral-Nemo's sharded-safetensors layout on Windows, transformers' Hub-resolution layer misresolved the model location. Instead of erroring out, it silently fell back to a partial-fp16 load path. `quantization_config=BitsAndBytesConfig(load_in_4bit=True, ...)` was passed but never applied.
+  4. fp16 12B Mistral-Nemo = 24 GiB → device_map={"": 0} forced 100% GPU → OOM when KV cache built during prefill of the first generate() call.
+- **Verified in isolation (`scripts/check_nf4_load.py`):** When the snapshot directory path (`C:\ComfyUI-Models\huggingface\hub\models--mistralai--Mistral-Nemo-Instruct-2407\snapshots\<sha>\`) is passed directly to the loader, the model loads at **7.79 GiB allocated**, **280/281 Linear modules quantized to 4-bit NF4**, generation works ("Once upon a time, there was a little girl named Lily"). Confirms the bug is the Hub-resolution path, not the quantization config.
+- **Fix:**
+  - **NEW `nodes/_otr_hf_env.py`** — `ensure_hf_home()` reads `HF_HOME` from `HKCU\Environment` via `winreg`, exports it to `os.environ['HF_HOME']` and `os.environ['HF_HUB_CACHE']` so downstream HF tooling picks it up automatically. `resolve_snapshot_dir(model_id, hf_home=None)` returns the absolute snapshot directory path under the canonical cache (`<hf_home>/hub/models--<org>--<name>/snapshots/<sha>/`). Both functions idempotent + cache-safe.
+  - **`nodes/story_orchestrator.py::_load_llm`** — calls `ensure_hf_home()` at start; calls `resolve_snapshot_dir(model_id)` to get the canonical snapshot path; passes the snapshot path (not the `model_id`) to `AutoConfig`, `AutoTokenizer`, and `AutoModelForCausalLM` loaders. Bypasses transformers' Hub-resolution layer entirely. Falls through to the legacy `model_id` + `cache_dir` path only if snapshot resolution returns None (model not cached).
+- **Disk cleanup landed alongside (not committed; outside repo):**
+  - Deleted 14.23 GB of `.incomplete` partial Mistral-Nemo blobs at `C:\Users\jeffr\Documents\ComfyUI\models\huggingface\hub\` (stray duplicate cache from before HF_HOME migration; never read by ComfyUI).
+  - Aligned `C:\Users\jeffr\AppData\Local\Programs\ComfyUI\resources\ComfyUI\extra_model_paths.yaml` (install-dir copy) with the Roaming canonical so any process reading either YAML resolves to `C:\ComfyUI-Models` paths consistently.
+- **Verify:**
+  - Standalone load check: `python scripts/check_nf4_load.py` reports `PASS: NF4 working (7.79 GiB; expected ~6 GiB)` with all 280 Linear modules quantized.
+  - In ComfyUI: next full run should log `[StoryOrchestrator] HF_HOME resolved -> C:\ComfyUI-Models\huggingface` followed by `[OTR_HF_ENV] snapshot resolved mistralai/Mistral-Nemo-Instruct-2407 -> <abs_snapshot_path>` followed by `LLM model loaded from canonical snapshot (no HTTP checks)`. ScriptWriter VRAM should peak at ~7-8 GB instead of crashing at 24 GB.
+  - AST parse clean on both files; Bug Bible regression 22 passed / 1 pre-existing failure / 1 skipped / 2 xfailed.
+- **Tags:** hf-cache, electron-env-inheritance, nf4, bitsandbytes, hub-resolution, sharded-safetensors, windows-symlinks, vram-ceiling, ScriptWriter
+- **Related:** BUG-LOCAL-084 (composite gap-fill + duration contract — shipped 7f2d03f, not yet verified in a full live run because BUG-085 blocked it). BUG-085 fix is required before BUG-084 can be exercised end-to-end via the full workflow. Smoke harness path is unaffected (no LLM load). Commit `56cf493` on `v2.0-alpha`.
+
+---
+
+### BUG-LOCAL-084 [FIXED]: composite missed gap-fill + LTX ledger stamp incomplete
+- **Date:** 2026-05-04 LATE NIGHT | **Phase:** acceptance (BUG-LOCAL-031 Track 1 follow-up) | **Bible candidate:** YES (audio/video timeline alignment)
+- **Symptom (live composite output `signal_lost_skindeep_microneedle_..._222516.mp4`):** Visual sync broken end-to-end. At video time 0:12 viewer sees apprentice face with no lip movement (audio is l001 LTX announcer, should be radio scene). At video time 0:27 viewer sees foreman face with lips moving (audio is l002 apprentice voice). Cumulative drift ~10s by end of episode; final mp4 was ~35s short of master audio (`-shortest` truncated trailing audio).
+- **Cause:** VideoComposite per_clip_mux concatenated the 6 per-line clips back-to-back at t=0 with no gap-fill. Audio (master mix from procgen.mp4) starts l001 at 9.5s, has 0.6s gaps between adjacent lines, ends at 87.2s vs procgen 94.75s. Without gap-fill segments the video is structurally shorter than the audio, audio leads video by the cumulative gap duration, and `-shortest` chops the tail.
+- **Fix (4 sites in 2 files):**
+  - **Fix 1 (`batch_ltx_render.py`):** stamp `start_s` on each `ledger.clips[]` entry from matching `ledger.lines[]` by line_id; ffprobe rendered file for real `dur_s` instead of audio target (BUG-LOCAL-033 lie); preserve audio target as `audio_target_dur_s` for audit.
+  - **Fix 2 (`video_composite.py`):** confirmed already wired from BUG-031 Track 1 — per-clip ffprobe + duration_gap_s + extend_tail_s/truncate_to_s pass-through into `_layered_per_clip_silent`.
+  - **Fix 3 (`video_composite.py`):** NEW gap-fill pass after `timeline.sort()`. Walks sorted timeline, for any gap > 0.1s inserts static-radio segment of exact gap length using existing `_render_static_radio_segment` helper. Trailing tail-fill from last clip end to ffprobe(procgen) episode_dur. Logs `BUG-084 gap-fill: inserted N segments, total Xs coverage`.
+  - **Fix 4 (`video_composite.py`):** NEW duration-contract assertion before final mux. ffprobe `silent_combined` and procgen, compare within 40ms tol. If audio overruns video, tail-pad silent_combined with `tpad clone-frame` so `-shortest` truncates inaudible video, not audio. Belt-and-suspenders.
+- **Verify:** AST parse clean both files; Bug Bible regression 22 passed (1 pre-existing failure unchanged). End-to-end live verification BLOCKED on BUG-LOCAL-085 (NF4 OOM); smoke workflow exercises BUG-084 but was also blocked overnight by BUG-082 + BUG-083 fixes that landed earlier.
+- **Tags:** composite, gap-fill, duration-contract, c7-audio-byte-identity, bug-031-followup, ledger-clips-stamp
+- **Related:** BUG-LOCAL-031 (RTXUpscale range + PostBlend duration). Commit `7f2d03f` on `v2.0-alpha`.
+
+---
+
+### BUG-LOCAL-083 [FIXED]: probe_duration_s kwarg mismatch (ffmpeg vs ffprobe)
+- **Date:** 2026-05-03 LATE NIGHT | **Phase:** smoke harness | **Bible candidate:** YES (kwarg signature drift)
+- **Symptom:** Smoke workflow crashed at VideoComposite per_clip_mux with `RuntimeError: strict_c7=True and master_mix_per_clip_mux failed. Reason: probe_duration_s() got an unexpected keyword argument 'ffmpeg'`. Caught by smoke harness on first run after BUG-082 landed.
+- **Cause:** Two call sites in `video_composite.py` (BUG-031 Track 1 per-clip duration matching, lines 1033 and 1135) passed `ffmpeg=ffprobe` to `_otr_probe.probe_duration_s()`. The function signature is `def probe_duration_s(path, *, ffprobe="ffprobe")` — the kwarg is named `ffprobe`, not `ffmpeg`. TypeError caught by the strict_c7 master_mix_per_clip_mux exception handler, which then refused to fall back to humo_concat (correctly — 3x AAC re-encodes break C7).
+- **Fix:** rename kwarg `ffmpeg` → `ffprobe` to match the actual function signature at both call sites.
+- **Verify:** AST parse clean; smoke harness composite stage now completes in 4.4s with `tail-pad 0.500s (BUG-128) + 3.040s sync (BUG-031) on surviving last clip l006`.
+- **Tags:** kwarg-signature, smoke-harness, bug-031-followup
+- **Related:** Commit `e601ee8` on `v2.0-alpha`.
+
+---
+
+### BUG-LOCAL-082 [FIXED]: VideoComposite missing BUG-118 underscore-mismatch fallback
+- **Date:** 2026-05-03 LATE NIGHT | **Phase:** acceptance | **Bible candidate:** YES (writer/reader filename convention drift)
+- **Symptom:** Live full run died at 23:10:25 with `RuntimeError: VideoComposite: derived ledger from .mp4 not found: ...drug__20260503_222516_ledger.json` (note double underscore). LTX completed cleanly just before this; composite was the only stage that crashed.
+- **Cause:** SignalLostVideo writes the procgen .mp4 with a double underscore before the timestamp (`signal_lost_..._drug__20260503_222516.mp4`); the ledger writer uses single underscore (`signal_lost_..._drug_20260503_222516_ledger.json`). VideoComposite's `_load_ledger_with_path` derived the ledger filename via naive `replace('.mp4', '_ledger.json')` → got `...drug__20260503_222516_ledger.json` (double underscore) which doesn't exist on disk. BatchLTXRender already had this fallback in place; VideoComposite was the orphan.
+- **Fix:** ported the BUG-LOCAL-118 underscore-collapse fallback from BatchLTXRender to VideoComposite. When the primary derivation misses AND `__` appears in the stem, also try the single-underscore variant before raising.
+- **Verify:** AST parse clean; smoke harness with broken-cache episode loads ledger correctly via fallback path with log `BUG-LOCAL-118 underscore-mismatch fallback`.
+- **Tags:** writer-reader-drift, filename-convention, mp4-stem, bug-118-port
+- **Related:** Commit `b34d272` on `v2.0-alpha`.
+
+---
+
 ### BUG-LOCAL-081 [FIXED]: portrait node wired to wrong source — Node 59 never produced portraits
 - **Date:** 2026-05-03 LATE EVENING | **Phase:** acceptance (BUG-LOCAL-078 follow-up) | **Bible candidate:** YES (workflow-wiring footgun, silent failure)
 - **Symptom (live run `signal_lost_the_creepy_feeling_in_old_buildings_migh_20260503_215919`):** Episode workspace had `audio/`, `stills/`, `videos/` but no `portraits/` subdirectory. Ledger had 3 cast members (c01=ANNOUNCER, c02=JAX, c03=KAI), all with `portrait_path` empty. `otr_runtime.log` had ZERO log lines mentioning `BatchFluxPortraitRender` across the whole 49,154-line / 3.7 MB run. Module import + `INPUT_TYPES` registration both verified clean.
