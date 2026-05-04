@@ -64,9 +64,25 @@ def test_returns_two_strings(node):
     assert node.OUTPUT_NODE is True
 
 
-def test_default_blend_opacity_is_05(node):
+def test_default_blend_opacity_is_full_strength(node):
+    """BUG-LOCAL-096 (2026-05-04 EVENING): default opacity bumped from
+    0.5 to 1.0 so the procgen overlay shows at full intensity by
+    default. Pre-096 default produced a "weak" mix that washed out
+    procgen colors. Pin the new default so a silent revert is caught.
+    """
     spec = node.INPUT_TYPES()
-    assert spec["optional"]["blend_opacity"][1]["default"] == 0.5
+    assert spec["optional"]["blend_opacity"][1]["default"] == 1.0
+
+
+def test_default_blend_mode_is_screen(node):
+    """BUG-LOCAL-096 (2026-05-04 EVENING): default blend_mode bumped
+    from "lighten" to "screen" -- the canonical bright-additive
+    overlay (result = 1 - (1-A)(1-B), always brighter than either
+    layer). Preserves the upscale visible underneath while bringing
+    procgen colors at full strength. Classic film-projector look.
+    """
+    spec = node.INPUT_TYPES()
+    assert spec["optional"]["blend_mode"][1]["default"] == "screen"
 
 
 def test_blend_cmd_uses_audio_passthrough(node, tmp_path):

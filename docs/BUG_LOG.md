@@ -21,6 +21,32 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-096 [FIXED]: procgen overlay blend too weak -- bumped to screen mode at full strength
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-095 LTX fix | **Bible candidate:** YES (default value, not a code defect)
+- **Symptom:** Jeffrey: "the procgen video mix is to weak ... bring out the colors and full lighting of the procgen video in the final concat. Now it looks weak. I want it as bright as the original just overlayed". The blended final mp4 looked washed out -- procgen colors at half intensity, the SIGNAL LOST CRT signature barely visible over the upscale base.
+- **Cause (defaults, not a code defect):**
+  - `_DEFAULT_BLEND_MODE = "lighten"` -- per-pixel `max(A, B)`. Wherever procgen pixel is darker than upscale, you see upscale. Sharp-edged but dim-region procgen content disappears.
+  - `_DEFAULT_BLEND_OPACITY = 0.5` (default tooltip even called it "moderate sheen"). At 0.5 the filter mixes 50% blended result with 50% original source, so even bright procgen pixels get faded to half intensity.
+  - Combined effect: procgen layer visible only where it's BOTH brighter than upscale AND has its strength halved. Net: weak, washed-out look that doesn't honor the procgen's intended brightness.
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~10 LOC):**
+  - **`_DEFAULT_BLEND_MODE = "screen"`** (was `"lighten"`) -- canonical bright-additive overlay. Result = `1 - (1-A)(1-B)`, always brighter than either input layer. Two black inputs = black; two white inputs = white; mixed = lifted. Classic film-projector / double-exposure aesthetic that preserves the upscale visible underneath while bringing procgen colors at full strength.
+  - **NEW constant `_DEFAULT_BLEND_OPACITY = 1.0`** (was inline `0.5`). At 1.0 the filter emits the full blended result without mixing back to the original.
+  - Function signature default `blend_opacity: float = _DEFAULT_BLEND_OPACITY` (was hardcoded `0.5`) so the in-process default and the widget default stay in lockstep automatically.
+  - Tooltip rewritten to explain that 1.0 = full blend strength, drop to 0.5 for "moderate sheen" if the user wants the old behaviour.
+  - **Workflow JSON `workflows/otr_scifi_16gb_full.json`** -- saved widget values updated from `["lighten", 0.5]` to `["screen", 1.0]` so existing workflow loads pick up the new defaults without manual canvas adjustment.
+- **NEW + UPDATED tests (`tests/test_post_upscale_procgen_blend.py`):**
+  - Renamed `test_default_blend_opacity_is_05` to `test_default_blend_opacity_is_full_strength`; assertion changed to `1.0`.
+  - NEW `test_default_blend_mode_is_screen` -- pin the new mode.
+- **Verify:**
+  - AST parse clean (19627 bytes, 1132 nodes).
+  - `tests/test_post_upscale_procgen_blend.py` -> 17 passed in 3.23s.
+  - 5-suite combined sweep -> 95 passed in 3.27s.
+  - Live: next final mp4 should show procgen colors at full intensity, classic bright-overlay look. Upscale (HuMo + LTX) still visible underneath because `screen` is additive, not replacement.
+- **Tags:** procgen-blend, post-upscale, defaults, ffmpeg-blend-filter, brightness, signal-lost-aesthetic
+- **Related:** BUG-LOCAL-030 Phase B (the original blend pipeline that BUG-096 retunes the defaults of). The C7 audio passthrough (`-c:a copy`, no `-shortest`) is unchanged -- audio path stays byte-identical to v1.5 baseline regardless of visual blend params. Per-user override: drop `blend_opacity` to 0.5-0.7 if the new screen-1.0 default is too bright for a specific episode.
+
+---
+
 ### BUG-LOCAL-095 [FIXED]: LTX clips visibly static -- LTXVAddGuide is keyframe pinning, not i2v init
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-091 LTX chunking soak | **Bible candidate:** YES (LTX i2v dispatch)
 - **Symptom:** Jeffrey reported "the LTX radio being honest its not animating at all... we thought removing the end frame would do it but i guess not". Even after BUG-LOCAL-032 removed the end-frame guide, LTX clips still rendered visibly static -- the radio scene held a near-frozen pose for the entire clip duration. CFG, sampler, sigmas, dimensions, strength, frame_rate all matched the historically-working ComfyUI-Goofer / comfyui-data-media-machine paths, so the parameters weren't the issue.

@@ -47,7 +47,15 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_BLEND_MODE = "lighten"
+# BUG-LOCAL-096 (2026-05-04 EVENING): default bumped from "lighten"
+# at 0.5 to "screen" at 1.0. Jeffrey: "the procgen video mix is too
+# weak ... I want it as bright as the original just overlayed".
+# `screen` at 1.0 is the canonical bright-overlay mode -- result =
+# 1 - (1-A)(1-B), always brighter than either layer, classic
+# double-exposure / film projector aesthetic. Preserves the upscale
+# visible underneath while bringing procgen colors at full intensity.
+_DEFAULT_BLEND_MODE = "screen"
+_DEFAULT_BLEND_OPACITY = 1.0
 _BLEND_MODE_CHOICES = ["lighten", "screen", "addition", "overlay", "normal"]
 
 
@@ -244,12 +252,17 @@ class PostUpscaleProcgenBlend:
             "optional": {
                 "blend_mode": (_BLEND_MODE_CHOICES, {"default": _DEFAULT_BLEND_MODE}),
                 "blend_opacity": ("FLOAT", {
-                    "default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05,
+                    "default": _DEFAULT_BLEND_OPACITY,
+                    "min": 0.0, "max": 1.0, "step": 0.05,
                     "tooltip": (
                         "Procgen overlay opacity. 0.0 = procgen invisible "
-                        "(equivalent to bypass). 1.0 = procgen fully "
-                        "replaces source where the blend mode says so. "
-                        "0.5 default is a moderate sheen."
+                        "(equivalent to bypass). 1.0 = procgen contributes "
+                        "at full strength via the selected blend mode. "
+                        "Default 1.0 + 'screen' mode (BUG-LOCAL-096) gives "
+                        "the canonical bright-additive overlay -- procgen "
+                        "colors at full intensity, upscale still visible "
+                        "underneath. Drop to 0.5 for a moderate sheen "
+                        "instead of full strength."
                     ),
                 }),
                 "ffmpeg": ("STRING", {
@@ -289,7 +302,7 @@ class PostUpscaleProcgenBlend:
         source_mp4_path: str,
         procgen_mp4_path: str,
         blend_mode: str = _DEFAULT_BLEND_MODE,
-        blend_opacity: float = 0.5,
+        blend_opacity: float = _DEFAULT_BLEND_OPACITY,
         ffmpeg: str = "ffmpeg",
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",

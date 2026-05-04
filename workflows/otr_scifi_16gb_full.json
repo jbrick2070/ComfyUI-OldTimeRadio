@@ -1865,8 +1865,8 @@
       "widgets_values": [
         "",
         "",
-        "lighten",
-        0.5,
+        "screen",
+        1.0,
         "ffmpeg",
         false,
         "_procgen_blended"
