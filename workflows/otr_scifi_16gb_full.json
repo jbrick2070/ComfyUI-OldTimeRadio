@@ -471,8 +471,7 @@
             80,
             82,
             90,
-            96,
-            100
+            96
           ],
           "slot_index": 0
         }
@@ -927,7 +926,6 @@
           "name": "images",
           "type": "IMAGE",
           "links": [
-            45,
             101
           ],
           "shape": 3,
@@ -1910,7 +1908,7 @@
         {
           "name": "ledger_json",
           "type": "STRING",
-          "link": 100,
+          "link": null,
           "widget": {
             "name": "ledger_json"
           }
@@ -1925,8 +1923,11 @@
         {
           "name": "portrait_batch",
           "type": "IMAGE",
-          "links": null,
-          "shape": 3
+          "links": [
+            45
+          ],
+          "shape": 3,
+          "slot_index": 0
         },
         {
           "name": "report",
@@ -1939,6 +1940,7 @@
         "Node name for S&R": "OTR_BatchFluxPortraitRender"
       },
       "widgets_values": [
+        "",
         "1940s noir radio drama style, cinematic",
         1024,
         1024,
@@ -2163,7 +2165,7 @@
     ],
     [
       45,
-      23,
+      59,
       0,
       24,
       0,
@@ -2400,14 +2402,6 @@
       59,
       2,
       "VAE"
-    ],
-    [
-      100,
-      12,
-      0,
-      59,
-      3,
-      "STRING"
     ],
     [
       101,
