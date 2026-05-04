@@ -163,16 +163,7 @@
     [1, 52, 0, 56, 0, "STRING"],
     [2, 56, 0, 58, 0, "STRING"]
   ],
-  "groups": [
-    {
-      "id": 1,
-      "title": "OTR BUG-LOCAL-031 SMOKE -- Composite + Upscale + Blend (reuses HuMo/LTX/audio/procgen from last run)",
-      "bounding": [180, 130, 1900, 600],
-      "color": "#3f789e",
-      "font_size": 18,
-      "flags": {}
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {
     "ds": {
