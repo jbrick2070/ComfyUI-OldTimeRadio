@@ -2196,6 +2196,15 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
             elif needs_4bit:
                 try:
                     from transformers import BitsAndBytesConfig
+                    # BUG-LOCAL-098 (2026-05-04 EVENING, post round-robin
+                    # consult): instantiate BitsAndBytesConfig FRESH per
+                    # _load_llm() call. Do NOT cache the instance at module
+                    # scope. transformers mutates internal flags on the
+                    # config during from_pretrained (Gemini round-robin
+                    # catch); a reused instance can silently skip
+                    # quantization on the second call -> fp16 fallback ->
+                    # OOM at 24 GiB on 16 GiB GPU. Keep this construction
+                    # in-function so the contract holds across reloads.
                     quant_config = BitsAndBytesConfig(
                         load_in_4bit=True,
                         bnb_4bit_compute_dtype=torch.bfloat16,
@@ -2297,6 +2306,14 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
                 except Exception as _cfg_err:
                     log.warning("[StoryOrchestrator] Config hardening failed: %s", _cfg_err)
 
+                # BUG-LOCAL-098 (2026-05-04 EVENING): measure VRAM before
+                # the load so the post-load tripwire below has a true
+                # delta to compare against the NF4 expected ceiling.
+                _bug098_vram_before_gib = (
+                    torch.cuda.memory_allocated() / (1024 ** 3)
+                    if torch.cuda.is_available() else 0.0
+                )
+
                 # BUG-LOCAL-085: load from snapshot path when available
                 # (bypasses transformers' Hub-resolution layer); fall back
                 # to model_id only if snapshot resolution failed.
@@ -2311,6 +2328,102 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
                     f"{'canonical snapshot' if snapshot_path else 'model_id with cache_dir'} "
                     f"(no HTTP checks)"
                 )
+
+                # BUG-LOCAL-098 (2026-05-04 EVENING, post round-robin):
+                # Tripwire. If NF4 quantization was requested but did not
+                # actually materialize (bitsandbytes module-level state
+                # short-circuit on second-load after _unload_llm), fail
+                # loud BEFORE the first inference cascades into a 24+ GiB
+                # OOM. Both LLM consultants (gpt-5.5 + gemini-3.1-pro) agreed
+                # this assertion is mandatory regardless of whether the
+                # underlying reload bug is fixed yet.
+                #
+                # Detection (3 signals):
+                #   1. Count of bitsandbytes Linear4bit modules. NF4 model
+                #      has ~280-380 of these for a 12B model; fp16 model
+                #      has zero.
+                #   2. ``model.is_loaded_in_4bit`` attribute (HF stamps
+                #      this on successful 4-bit load; absent or False on
+                #      silent fp16 fallback).
+                #   3. CUDA allocation delta. Mistral-Nemo NF4 should be
+                #      ~7-8 GiB; fp16 is ~24 GiB. Threshold of 11.0 GiB
+                #      catches the fp16 case with ~3 GiB headroom.
+                #
+                # Bypass: if quant_config is None we requested fp16
+                # explicitly (e.g., a 2B model that fits without
+                # quantization). The tripwire only fires when the user
+                # asked for quantization and it silently dropped.
+                if quant_config is not None and torch.cuda.is_available():
+                    _bug098_vram_after_gib = torch.cuda.memory_allocated() / (1024 ** 3)
+                    _bug098_delta_gib = (
+                        _bug098_vram_after_gib - _bug098_vram_before_gib
+                    )
+                    _bug098_linear4bit_count = 0
+                    try:
+                        for _m in model.modules():
+                            _cls_name = type(_m).__name__
+                            _mod_name = type(_m).__module__ or ""
+                            if (_cls_name == "Linear4bit"
+                                    and _mod_name.startswith("bitsandbytes")):
+                                _bug098_linear4bit_count += 1
+                    except Exception:  # noqa: BLE001 -- diagnostic-only walk
+                        _bug098_linear4bit_count = -1
+                    _bug098_is_loaded_in_4bit = bool(
+                        getattr(model, "is_loaded_in_4bit", False)
+                    )
+                    _bug098_max_gib = 11.0  # 12B NF4 ceiling with slack
+                    _bug098_module_signal = (
+                        _bug098_linear4bit_count > 0
+                        or _bug098_is_loaded_in_4bit
+                    )
+                    _bug098_vram_signal = (
+                        _bug098_delta_gib >= 0.0
+                        and _bug098_delta_gib <= _bug098_max_gib
+                    )
+                    _runtime_log(
+                        f"[BUG-098 tripwire] post-load: "
+                        f"linear4bit_count={_bug098_linear4bit_count} "
+                        f"is_loaded_in_4bit={_bug098_is_loaded_in_4bit} "
+                        f"vram_delta={_bug098_delta_gib:.2f}GiB "
+                        f"(ceiling={_bug098_max_gib:.2f}GiB)"
+                    )
+                    if not _bug098_module_signal or not _bug098_vram_signal:
+                        # Free the broken model before raising so the
+                        # exception path doesn't leave 24 GiB stuck on
+                        # the GPU.
+                        try:
+                            model.cpu()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        try:
+                            del model
+                        except Exception:  # noqa: BLE001
+                            pass
+                        try:
+                            import gc as _bug098_gc
+                            _bug098_gc.collect()
+                            torch.cuda.empty_cache()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        raise RuntimeError(
+                            f"BUG-LOCAL-098: NF4 quantized load did not "
+                            f"materialize for {model_id!r}. "
+                            f"linear4bit_count={_bug098_linear4bit_count} "
+                            f"(expected >0), "
+                            f"is_loaded_in_4bit={_bug098_is_loaded_in_4bit} "
+                            f"(expected True), "
+                            f"vram_delta={_bug098_delta_gib:.2f}GiB "
+                            f"(expected <={_bug098_max_gib:.2f}GiB). "
+                            f"This is the bitsandbytes second-load silent "
+                            f"fp16 fallback. Workaround: restart ComfyUI "
+                            f"Desktop and re-queue. The first load per "
+                            f"process is reliable; subsequent reloads "
+                            f"after _unload_llm are not. Tracked as "
+                            f"BUG-LOCAL-098; proper fix pending an "
+                            f"isolated-test-harness validation of the "
+                            f"`.cuda()` rehydrate path or LLM-subprocess "
+                            f"isolation."
+                        )
             except (OSError, ValueError) as local_err:
                 _runtime_log(f"[StoryOrchestrator] local_files_only=True failed for model ({local_err}), attempting Hub fallback...")
                 try:
@@ -2941,6 +3054,21 @@ def _unload_llm():
             import comfy.model_management
             comfy.model_management.soft_empty_cache()
         except Exception:
+            pass
+
+        # BUG-LOCAL-098 (2026-05-04 EVENING, Gemini round-robin
+        # suggestion): clear accelerate's device-dispatch cache so the
+        # next _load_llm gets a fresh hook table. Accelerate has been
+        # observed to retain device maps / hooks across model lifetimes
+        # which can confuse bitsandbytes' second-load quantization
+        # path. Defensive; no-op if accelerate isn't installed or the
+        # API name has shifted.
+        try:
+            from accelerate import clear_device_cache as _bug098_clear_dev
+            _bug098_clear_dev()
+        except (ImportError, AttributeError):
+            pass
+        except Exception:  # noqa: BLE001 -- never let cleanup raise
             pass
 
         # Step 5: telemetry - prove it worked.

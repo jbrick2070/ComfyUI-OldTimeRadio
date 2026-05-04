@@ -21,6 +21,26 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-098 [PARTIAL FIX SHIPPED -- tripwire + accelerate clear; rehydrate path deferred to test harness]: NF4 silently fails on second `_load_llm` after `_unload_llm`
+- **Round-robin transcripts:** `docs/2026-05-04-bug-098-nf4-second-load__01_chatgpt.md` (gpt-5.5, 128.6s), `docs/2026-05-04-bug-098-nf4-second-load__02_gemini.md` (gemini-3.1-pro-preview-customtools, 60.7s), synthesis at `docs/2026-05-04-bug-098-nf4-second-load__04_synthesis.md`.
+- **Convergent recommendations both LLMs accepted (shipped tonight):**
+  1. **Path 3 -- post-load NF4 tripwire**: after `from_pretrained()`, count `bitsandbytes.Linear4bit` modules, check `model.is_loaded_in_4bit`, measure CUDA allocation delta against an 11.0 GiB ceiling. If quantization was requested but did not materialize, log diagnostics + clean up the broken model + raise a clear `RuntimeError` referencing BUG-LOCAL-098 with a "restart ComfyUI Desktop" workaround. This converts the silent OOM cascade into a single loud failure with actionable next-step guidance.
+  2. **`accelerate.clear_device_cache()` in `_unload_llm`** (Gemini specific suggestion): clear accelerate's device-dispatch cache between loads. Defensive; no-op when accelerate is absent or the API has shifted.
+  3. **Fresh-config comment pin**: explicit comment block above the existing `BitsAndBytesConfig(...)` instantiation noting that the construction MUST stay in-function (not module-cached) -- transformers mutates the config during `from_pretrained` and a reused instance can silently skip quantization. Verified the existing code already constructs it fresh; the comment prevents a future "optimization" from regressing this.
+- **Divergent recommendations deferred (test harness needed first):**
+  - **Path 2 -- `model.cuda()` rehydrate of the cached CPU-parked model**: ChatGPT recommends with strong guards; Gemini rejects citing `Linear4bit` `quant_state`/`absmax` corruption risk on naive device move. Need an isolated 3-iteration `load NF4 + 1-token inference + unload` test harness to validate `.cuda()` works on the specific stack (torch 2.10 nightly + Blackwell sm_120 + bitsandbytes for CUDA 13.0) before shipping. Tomorrow.
+  - **Path 4 -- LLM subprocess isolation**: ChatGPT's fallback if Path 2 fails. Heavier change; defer until Path 2 is ruled out.
+- **Cannot ship Gemini's other suggestion**: dropping `model.cpu()` from `_unload_llm`. That code is BUG-LOCAL-073 hardening for abandoned `_run_with_timeout` worker threads -- without it the second load sees 31+ GiB. Removing it re-breaks BUG-073.
+- **Workaround for live runs (unchanged from initial diagnosis):** restart ComfyUI Desktop between full runs. The first load per process is NF4-correct. Post-098 the run will now FAIL FAST on the broken second-load path with a clear error message instead of cascading into multiple 24 GiB loads.
+- **Verify (tonight's partial fix):**
+  - AST parse clean (572579 bytes, 39863 nodes).
+  - test_core + test_critique_dialogue_preservation + test_news_history_ttl -> 139 passed in 4.42s. No existing tests broken by the tripwire / accelerate-clear additions.
+  - Live: next run with the second-load NF4 failure should now log `[BUG-098 tripwire] post-load: linear4bit_count=0 is_loaded_in_4bit=False vram_delta=24.XX GiB (ceiling=11.00GiB)` followed by `RuntimeError: BUG-LOCAL-098: NF4 quantized load did not materialize for ...`. Clean failure, no OOM cascade.
+- **Tags:** llm-cache, bitsandbytes, nf4, vram, oom, round-robin-shipped, BUG-085-related, tripwire
+- **Related:** BUG-LOCAL-085 (the HF_HOME fix that resolved FIRST-load NF4 silent-failure; this is the SECOND-load equivalent). BUG-LOCAL-073 (`_unload_llm()` synchronize-before-cpu hardening that we cannot remove). Round-robin process: ChatGPT vs Gemini disagreement was material on Path 2 (rehydrate); convergence on Path 3 (tripwire) drove tonight's ship. Tomorrow's harness work tracked as BUG-LOCAL-098a.
+
+---
+
 ### BUG-LOCAL-098 [DIAGNOSED, FIX PENDING]: NF4 silently fails to apply on second `_load_llm` call after `_unload_llm`
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-097 hotfix soak | **Bible candidate:** YES (bitsandbytes/transformers state hazard)
 - **Symptom (live queue 16:31:57 PT):** Mistral-Nemo loaded successfully on first attempt, ran 3 inferences (news ranking + body re-rank + 800-token story plan) at NF4 (~7-8 GiB allocated, 22 it/s weight loading speed which is the cost of bnb quantizing each weight). Then `_unload_llm()` fired clean (`VRAM allocated=0.02 GiB reserved=0.10 GiB`). The NEXT `_load_llm()` for OpenClose's first spine claimed `Enabling 4-bit quantization (NF4)` in the log, but weight loading hit **33 it/s** (faster = no quantization) and the resulting model occupied **24.54 GiB of VRAM** -- fp16 size for 12B Mistral-Nemo. First inference OOM'd at SDPA prefill. Fallback `_load_llm()` calls accumulated more 24 GiB models until the run died at 25.77 GiB allocated / 4.24 GiB requested / 15.92 GiB device limit.
