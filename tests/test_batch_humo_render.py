@@ -182,6 +182,44 @@ def test_find_portrait_returns_none_when_nothing_on_disk(tmp_path: Path, m) -> N
 
 
 # ---------------------------------------------------------------------------
+# BUG-LOCAL-092 ref-image dispatch priority
+# ---------------------------------------------------------------------------
+
+def test_ref_dispatch_prefers_find_portrait_over_cast_still_map() -> None:
+    """BUG-LOCAL-092 (2026-05-04 EVENING): the per-line ref-image
+    dispatch in execute() must call ``_find_portrait`` BEFORE the
+    ``cast_still_map`` lookup. Pre-092 the order was inverted, so HuMo
+    lipsynced against FLUX environment stills (full_env_*.png) instead
+    of the BUG-078 character portraits (c0X_portrait.png), producing
+    wrong-actor faces in episode
+    signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107.
+
+    This is a source-code regression guard: a future refactor that
+    re-inverts the priority will fail this test before any live render
+    surfaces the artefact again.
+    """
+    src = NODE_PATH.read_text(encoding="utf-8")
+    # Find the dispatch block (the else: branch that runs for character /
+    # announcer roles, NOT the radio-still defense-in-depth branch above).
+    fp_idx = src.find('ref_source = "find_portrait"')
+    fc_idx = src.find('ref_source = "find_composite"')
+    cs_idx = src.find('ref_source = "ledger-cast-fresh"')
+    assert fp_idx > 0, "find_portrait dispatch not found in source"
+    assert fc_idx > 0, "find_composite dispatch not found in source"
+    assert cs_idx > 0, "cast_still_map (ledger-cast-fresh) dispatch not found in source"
+    # Priority order: find_portrait first, find_composite second,
+    # cast_still_map last.
+    assert fp_idx < fc_idx, (
+        "find_portrait must run BEFORE find_composite "
+        "(BUG-LOCAL-092 dispatch order)"
+    )
+    assert fc_idx < cs_idx, (
+        "find_composite must run BEFORE cast_still_map "
+        "(BUG-LOCAL-092 dispatch order)"
+    )
+
+
+# ---------------------------------------------------------------------------
 # _find_composite
 # ---------------------------------------------------------------------------
 

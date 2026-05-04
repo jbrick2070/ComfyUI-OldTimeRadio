@@ -21,6 +21,47 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-092 [FIXED]: HuMo lipsync against FLUX env stills instead of character portraits
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-091 soak | **Bible candidate:** YES (ref-image dispatch priority)
+- **Symptom (live composite from `signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107`):** Three artefacts visible in viewer screenshots:
+  1. At 0:42 / 0:47 -- different male actors visible during what should be character lipsync, with weird "lip sync to environment" effect (HuMo trying to articulate an environment image into facial motion).
+  2. At 0:32 vs 1:35 -- two clips that should be the SAME character (both AFFIRMATIVE SIR per the ledger lines block, char_id=c01) rendered with totally different faces.
+  3. Inconsistent identity across multi-line same-character runs.
+- **Cause:** ledger.clips[] entries showed `ref_png_name: "full_env_00001_.png"` and `ref_source: "ledger-cast-fresh"` for every character clip. HuMo was lipsyncing against the FLUX environment still (the radio scene), not the character portrait. Tracking the dispatch in `execute()`:
+  ```python
+  # batch_humo_render.py lines 1607-1621 (pre-fix)
+  if char_id and char_id in cast_still_map:        # <- runs FIRST
+      ref_png = cast_still_map[char_id]
+      ref_source = "ledger-cast-fresh"
+  if not ref_png:
+      ref_png = _find_composite(...)
+  if not ref_png:
+      ref_png = _find_portrait(...)                # <- runs LAST
+  ```
+  The cast_still_map is populated by `_resolve_cast_stills_from_ledger()` which globs `full_env_*.png` (FLUX environment stills, not portraits). It assigns those to char_ids by mtime-descending cast index. Pre-BUG-078 this was a stopgap when no character portraits existed. Post-BUG-078 the per-cast portrait pass writes `<episode>/portraits/c0X_portrait.png` and stamps `cast[i].portrait_path` -- but the dispatch was checking cast_still_map FIRST, so the FLUX env still always won and the proper portrait was never reached.
+  Why two clips of the same character look different despite the binding being deterministic: each char_id IS bound to a single env still for the whole run, but env stills don't carry character identity. APPRENTICE (male, dry, 50s) bound to a `full_env` that happens to contain a woman = HuMo articulates the woman's face. Different env stills for different char_ids = different "actors" on screen. And HuMo's per-chunk seed stride drifts the rendered identity further across chunks of the same line.
+- **Fix (`nodes/batch_humo_render.py` lines 1607-1640, ~30 LOC):** invert the dispatch order so `_find_portrait` runs FIRST. `_find_portrait` tier 1 is `cast[i].portrait_path` (the BUG-078 portrait), with tier 4-5 falling through to `full_env_*` only when no portrait file exists. cast_still_map remains as defense-in-depth for episodes where the portrait pass didn't run.
+  ```python
+  # New order:
+  ref_png = _find_portrait(speaker, cast, portraits_dir_path)   # tier 1: cast.portrait_path
+  if ref_png: ref_source = "find_portrait"
+  if not ref_png:
+      ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
+      if ref_png: ref_source = "find_composite"
+  if not ref_png and char_id and char_id in cast_still_map:
+      ref_png = cast_still_map[char_id]
+      ref_source = "ledger-cast-fresh"
+  ```
+- **NEW test (`tests/test_batch_humo_render.py::test_ref_dispatch_prefers_find_portrait_over_cast_still_map`):** source-code regression guard that locks the dispatch order. If a future refactor re-inverts the priority, this test fails before any live render surfaces the wrong-face artefact again. Asserts that the `'ref_source = "find_portrait"'`, `'ref_source = "find_composite"'`, and `'ref_source = "ledger-cast-fresh"'` string literals appear in source code in that order.
+- **Verify:**
+  - AST parse clean (111636 bytes, 8845 nodes).
+  - test_batch_humo_render + test_batch_ltx_render + test_news_history_ttl -> 69 passed in 2.89s.
+  - Live: next soak ledger.clips[] should show `ref_png_name: "c0X_portrait.png"` (NOT `full_env_NNNNN_.png`) and `ref_source: "find_portrait"` (NOT `"ledger-cast-fresh"`) for every character clip. Same character across multiple lines should render with the SAME face.
+- **Tags:** humo, ref-image-dispatch, portrait-priority, bug-078-followup, audio-video-sync
+- **Related:** BUG-LOCAL-078 (per-cast portrait pass that BUG-092 lets win); BUG-LOCAL-088 (cast-still binding which is now defense-in-depth instead of primary); BUG-LOCAL-086 (chunking; same per-chunk seed stride means within-line identity drift may still be visible after BUG-092 -- if so, BUG-LOCAL-092a would carry latent state across chunks).
+
+---
+
 ### BUG-LOCAL-091 [FIXED]: LTX clips frozen on last frame -- chunking + 353-frame cap parity with HuMo
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-086 LTX parity | **Bible candidate:** YES (audio/video timeline alignment, BUG-086 sister fix)
 - **Symptom:** BatchLTXRender used a hardcoded ``LTX_MAX_FRAMES = 177`` (~7.08 s @ 25 fps), and ``ltx_length_for_dur`` silently capped at that value. Any non-character audio line longer than 7.08 s (typical announcer monologue: 10-15 s, music intro/outro: 8-12 s) had its tail truncated; the LTX render produced a 7-second clip while the audio kept playing, leaving the radio scene frozen on its last frame for the back half of the line. Same root cause as BUG-LOCAL-086 but for the non-character render path. Docstring at line 270 even documented it: *"For lines longer than 10.28 s, VideoComposite downstream can ping-pong-loop or freeze-frame extend"* -- the workaround was the bug.

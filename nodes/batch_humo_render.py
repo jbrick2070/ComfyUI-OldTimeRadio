@@ -1604,21 +1604,43 @@ class BatchHumoRender:
                     line_id, speaker_role,
                 )
             else:
-                # Character / announcer -> portrait chain:
-                #   1. ledger-driven cast_still_map (this-episode FLUX)
-                #   2. _find_composite (per-shot pass3 composite)
-                #   3. _find_portrait (legacy tiers; mtime-sorted post BUG-087)
-                if char_id and char_id in cast_still_map:
-                    ref_png = cast_still_map[char_id]
-                    ref_source = "ledger-cast-fresh"
+                # Character / announcer -> portrait chain.
+                #
+                # BUG-LOCAL-092 (2026-05-04 EVENING): order inverted so
+                # ``_find_portrait`` runs FIRST. _find_portrait's tier 1
+                # is ``cast[i].portrait_path``, which BUG-LOCAL-078's
+                # OTR_BatchFluxPortraitRender stamps with the canonical
+                # ``portraits/c0X_portrait.png`` files. Pre-092 the
+                # cast_still_map (which globs ``full_env_*.png`` FLUX
+                # ENVIRONMENT stills, not character portraits) was tried
+                # first and always won, so HuMo lipsynced against the
+                # radio scene image and the on-screen face was whoever
+                # happened to be in that environment still -- producing
+                # the "wrong actor" artifact in episode
+                # signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107
+                # at 0:32 / 0:42 / 0:47 / 1:35. Same character rendered
+                # against different env stills across lines = inconsistent
+                # face. Inverting the order makes the BUG-078 portrait
+                # the winner whenever it exists; cast_still_map remains
+                # as defense-in-depth for episodes where the portrait
+                # pass didn't run.
+                #
+                # New priority:
+                #   1. _find_portrait (tier 1 = cast[].portrait_path,
+                #      falls through to full_env_* if portraits missing)
+                #   2. _find_composite (per-shot pass3 composite override)
+                #   3. cast_still_map (legacy ledger-cast-fresh binding,
+                #      identical effect to _find_portrait tier 4-5)
+                ref_png = _find_portrait(speaker, cast, portraits_dir_path)
+                if ref_png:
+                    ref_source = "find_portrait"
                 if not ref_png:
                     ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
                     if ref_png:
                         ref_source = "find_composite"
-                if not ref_png:
-                    ref_png = _find_portrait(speaker, cast, portraits_dir_path)
-                    if ref_png:
-                        ref_source = "find_portrait"
+                if not ref_png and char_id and char_id in cast_still_map:
+                    ref_png = cast_still_map[char_id]
+                    ref_source = "ledger-cast-fresh"
 
             if not ref_png:
                 report_lines.append(
