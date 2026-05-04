@@ -1,34 +1,32 @@
 {
-  "id": "fafde274-aa46-4e1d-9165-a89eb69afd26",
+  "id": "8a2c1d5e-9c4f-4b21-bf17-6d3c4a8f1e02",
   "revision": 0,
-  "last_node_id": 60,
-  "last_link_id": 4,
+  "last_node_id": 3,
+  "last_link_id": 2,
   "nodes": [
     {
-      "id": 52,
+      "id": 1,
       "type": "OTR_VideoComposite",
       "pos": [200, 200],
-      "size": [620, 460],
+      "size": [540, 420],
       "flags": {},
       "order": 0,
       "mode": 0,
-      "bgcolor": "#13253F",
-      "color": "#1E3A5F",
-      "title": "Video Composite (smoke -- concat per-line clips)",
+      "title": "Video Composite (smoke -- re-runs from per-line clips)",
       "inputs": [
-        {"name": "procgen_video_path", "type": "STRING", "widget": {"name": "procgen_video_path"}},
-        {"name": "clips_dir",          "type": "STRING", "widget": {"name": "clips_dir"}},
-        {"name": "ledger_json",        "type": "STRING", "widget": {"name": "ledger_json"}}
+        {"name": "procgen_video_path", "type": "STRING", "link": null, "widget": {"name": "procgen_video_path"}},
+        {"name": "clips_dir", "type": "STRING", "link": null, "widget": {"name": "clips_dir"}},
+        {"name": "ledger_json", "type": "STRING", "link": null, "widget": {"name": "ledger_json"}}
       ],
       "outputs": [
-        {"name": "final_mp4_path", "type": "STRING", "links": [1], "slot_index": 0, "shape": 3},
-        {"name": "report",         "type": "STRING", "links": null, "shape": 3}
+        {"name": "final_mp4_path", "type": "STRING", "links": [1], "shape": 3, "slot_index": 0},
+        {"name": "report", "type": "STRING", "links": null, "shape": 3, "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "OTR_VideoComposite"},
       "widgets_values": [
-        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
-        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/videos",
-        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957_ledger.json",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516\\audio\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516\\videos",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516\\audio\\signal_lost_skindeep_microneedle_sensor_tracks_drug_20260503_222516_ledger.json",
         "lighten",
         0.0,
         1472,
@@ -41,108 +39,66 @@
         false,
         "master_mix_per_clip_mux",
         true
-      ]
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
     },
     {
-      "id": 59,
-      "type": "OTR_SaveCopy",
-      "pos": [880, 200],
-      "size": [380, 130],
+      "id": 2,
+      "type": "OTR_RTXUpscale",
+      "pos": [820, 200],
+      "size": [420, 260],
       "flags": {},
       "order": 1,
       "mode": 0,
-      "title": "QA tee #1 -- preserve composite output",
+      "title": "RTX VSR Upscale (1080p) -- smoke",
       "inputs": [
-        {"name": "video_path", "type": "STRING", "link": 1, "widget": {"name": "video_path"}}
-      ],
-      "outputs": [
-        {"name": "video_path", "type": "STRING", "links": [3], "slot_index": 0}
-      ],
-      "properties": {"Node name for S&R": "OTR_SaveCopy"},
-      "widgets_values": ["", "_smoke_composite"]
-    },
-    {
-      "id": 56,
-      "type": "OTR_RTXUpscale",
-      "pos": [1320, 200],
-      "size": [520, 280],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "title": "RTX VSR Upscale (smoke -- BUG-031 fix verification)",
-      "inputs": [
-        {"name": "source_mp4_path", "type": "STRING", "link": 3, "widget": {"name": "source_mp4_path"}}
+        {"name": "source_mp4_path", "type": "STRING", "link": 1, "widget": {"name": "source_mp4_path"}}
       ],
       "outputs": [
         {"name": "upscaled_mp4_path", "type": "STRING", "links": [2], "slot_index": 0},
-        {"name": "report",            "type": "STRING", "links": null}
+        {"name": "report", "type": "STRING", "links": []}
       ],
-      "properties": {"Node name for S&R": "OTR_RTXUpscale"},
+      "properties": {"cnr_id": "comfyui-oldtimeradio", "Node name for S&R": "OTR_RTXUpscale"},
       "widgets_values": ["", false, 1920, 1080, "ULTRA", 64, "ffmpeg"]
     },
     {
-      "id": 60,
-      "type": "OTR_SaveCopy",
-      "pos": [1900, 200],
-      "size": [380, 130],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "title": "QA tee #2 -- preserve upscale output",
-      "inputs": [
-        {"name": "video_path", "type": "STRING", "link": 2, "widget": {"name": "video_path"}}
-      ],
-      "outputs": [
-        {"name": "video_path", "type": "STRING", "links": [4], "slot_index": 0}
-      ],
-      "properties": {"Node name for S&R": "OTR_SaveCopy"},
-      "widgets_values": ["", "_smoke_upscale"]
-    },
-    {
-      "id": 58,
+      "id": 3,
       "type": "OTR_PostUpscaleProcgenBlend",
-      "pos": [2340, 200],
-      "size": [560, 320],
+      "pos": [1320, 200],
+      "size": [460, 300],
       "flags": {},
-      "order": 4,
+      "order": 2,
       "mode": 0,
-      "title": "Post-Upscale Procgen Blend (smoke -- writes _smoke_blended)",
+      "title": "Post-Upscale Procgen Blend (smoke)",
       "inputs": [
-        {"name": "source_mp4_path",  "type": "STRING", "link": 4, "widget": {"name": "source_mp4_path"}},
-        {"name": "procgen_mp4_path", "type": "STRING", "widget": {"name": "procgen_mp4_path"}}
+        {"name": "source_mp4_path", "type": "STRING", "link": 2, "widget": {"name": "source_mp4_path"}},
+        {"name": "procgen_mp4_path", "type": "STRING", "link": null, "widget": {"name": "procgen_mp4_path"}}
       ],
       "outputs": [
-        {"name": "final_mp4_path", "type": "STRING", "links": null},
-        {"name": "report",         "type": "STRING", "links": null}
+        {"name": "final_mp4_path", "type": "STRING", "links": [], "shape": 3, "slot_index": 0},
+        {"name": "report", "type": "STRING", "links": [], "shape": 3, "slot_index": 1}
       ],
       "properties": {"Node name for S&R": "OTR_PostUpscaleProcgenBlend"},
       "widgets_values": [
         "",
-        "C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957/audio/signal_lost_what_a_decade_of_gene_therapy_research_f_20260503_173957.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516\\audio\\signal_lost_skindeep_microneedle_sensor_tracks_drug__20260503_222516.mp4",
         "lighten",
         0.5,
         "ffmpeg",
         false,
-        "_smoke_blended"
-      ]
+        "_smoke_procgen_blended"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
     }
   ],
   "links": [
-    [1, 52, 0, 59, 0, "STRING"],
-    [3, 59, 0, 56, 0, "STRING"],
-    [2, 56, 0, 60, 0, "STRING"],
-    [4, 60, 0, 58, 0, "STRING"]
+    [1, 1, 0, 2, 0, "STRING"],
+    [2, 2, 0, 3, 0, "STRING"]
   ],
   "groups": [],
   "config": {},
-  "extra": {
-    "ds": {"scale": 0.7, "offset": [0, 0]},
-    "info": {
-      "name": "OTR Downstream Smoke Workflow (Composite + Upscale + Blend with per-stage save tees)",
-      "description": "BUG-LOCAL-031 verification harness with explicit per-stage on-disk save tees. Five-node chain: VideoComposite -> SaveCopy(_smoke_composite) -> RTXUpscale -> SaveCopy(_smoke_upscale) -> PostUpscaleProcgenBlend(_smoke_blended). SaveCopy is a TEE: it copies the upstream mp4 to a sibling file with the suffix, then passes the ORIGINAL upstream path through unchanged so the next node operates on the canonical filename. After a run completes you get FIVE playable mp4s on disk: (1) composited/<ep>.mp4 (canonical composite output -- clobbered each smoke run), (2) composited/<ep>_smoke_composite.mp4 (preserved tee #1), (3) obs/<ep>.mp4 (canonical upscale output -- clobbered each smoke run), (4) obs/<ep>_smoke_upscale.mp4 (preserved tee #2), (5) obs/<ep>_smoke_blended.mp4 (final blend, suffix-protected). Each smoke run overwrites items #1, #3, #5 but #2 and #4 are stage-specific archives you can play side-by-side for QA. Skips Story / Director / Bark / Kokoro / MusicGen / AudioGen / FLUX / HuMo / LTX (all assets reused from prior run). Total runtime ~3 min. Edit Node 52 paths + Node 58 procgen path to retarget a different episode.",
-      "version": "3.0",
-      "purpose": "smoke-test-with-per-stage-save-tees"
-    }
-  },
+  "extra": {"ds": {"scale": 1.0, "offset": [0, 0]}},
   "version": 0.4
 }

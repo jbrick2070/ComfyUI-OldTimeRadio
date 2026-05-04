@@ -308,8 +308,30 @@ def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
         if ledger_p.exists():
             with open(ledger_p, "r", encoding="utf-8") as f:
                 return json.load(f), ledger_p
+        # BUG-LOCAL-118 underscore-mismatch fallback: SignalLostVideo
+        # writes the procgen .mp4 with a DOUBLE underscore before the
+        # timestamp (`<title>__<ts>.mp4`) but the ledger is written
+        # with a SINGLE underscore (`<title>_<ts>_ledger.json`). The
+        # naive stem-swap above derives `<title>__<ts>_ledger.json` and
+        # misses. Same fallback BatchLTXRender uses (logs at LTX entry
+        # in comfyui_8000.log). Try collapsing the trailing double
+        # underscore in the stem to a single underscore and re-look.
+        stem = p.stem
+        if "__" in stem:
+            collapsed = stem.replace("__", "_")
+            alt_ledger_p = ledger_p.parent / f"{collapsed}_ledger.json"
+            if alt_ledger_p.exists():
+                log.warning(
+                    "[VideoComposite] BUG-LOCAL-118 underscore-mismatch "
+                    "fallback: .mp4 stem %r had double underscores; "
+                    "loaded matching ledger %r instead.",
+                    stem, alt_ledger_p.name,
+                )
+                with open(alt_ledger_p, "r", encoding="utf-8") as f:
+                    return json.load(f), alt_ledger_p
         raise RuntimeError(
-            f"VideoComposite: derived ledger from .mp4 not found: {ledger_p}"
+            f"VideoComposite: derived ledger from .mp4 not found: {ledger_p} "
+            f"(also tried single-underscore variant)"
         )
 
     if not p.exists():
