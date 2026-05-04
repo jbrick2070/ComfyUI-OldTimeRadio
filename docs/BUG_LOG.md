@@ -21,6 +21,32 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-093 [FIXED]: HuMo portrait stopgaps removed -- wrong-face is worse than no-face
+- **Date:** 2026-05-04 EVENING | **Phase:** post BUG-092 hardening | **Bible candidate:** YES (failure-mode policy)
+- **Symptom:** even after BUG-092 inverted the dispatch order, two stopgaps remained that could still produce wrong faces:
+  1. `cast_still_map` -- defense-in-depth fallback that bound `char_id` to `full_env_*.png` FLUX environment stills.
+  2. `_find_portrait` tiers 4-5 -- internal fallback to `full_env_*.png` when no character portrait was found.
+  Both fired only when BUG-LOCAL-078's per-cast portrait pass had failed AND the dispatch couldn't find a real portrait, but the failure mode was visibly wrong: HuMo would lipsync against an environment scene that happened to contain an unrelated person. Better to skip the line and let VideoComposite cover it with static-radio fill (BUG-129a, same handling as music/sfx) than render a wrong actor.
+- **Cause (policy / not a code defect):** these were pragmatic stopgaps from before BUG-LOCAL-078 added the per-cast portrait pass. Now that BUG-078 reliably writes `c0X_portrait.png` and stamps `cast[].portrait_path`, the stopgaps mask real upstream bugs (a portrait-pass failure goes silent and produces wrong-face output instead of a loud SKIP that gets fixed).
+- **Fix (`nodes/batch_humo_render.py`, ~80 LOC removed):**
+  - **`_find_portrait` simplified to 3 tiers** (was 5): keeps cast.portrait_path, indexed pass1 portraits, any pass1 portrait. Removed tier 4 (`full_env_*` indexed by cast position) and tier 5 (any `full_env_*`). When no real portrait is found, returns None.
+  - **`cast_still_map` dispatch removed from `execute()`**: the `_resolve_cast_stills_from_ledger()` call + log-line block (~40 LOC) gone. `cast_still_map` reduced to an empty dict so the downstream dispatch reads cleanly without restructuring (cheap defense-in-depth pin in case a future refactor re-adds binding logic).
+  - **Dispatch priority** is now strictly `_find_portrait` -> `_find_composite` -> None. The third branch (`if not ref_png and char_id and char_id in cast_still_map`) was deleted entirely.
+  - When `ref_png` is None, the existing SKIP path fires: log `WARNING line lXXX speaker=... role=...: no portrait AND no radio still`, append `SKIP no portrait` to the report, and `continue` to next line. VideoComposite's BUG-129a static-fill covers the time slot with the radio bookend image -- visible "missing-portrait" gap that's loud enough to surface upstream bugs without ruining the episode.
+- **NEW tests (`tests/test_batch_humo_render.py`, +2):**
+  - `test_find_portrait_returns_none_when_only_env_stills_exist` -- writes `full_env_00001_.png` + `full_env_00002_.png` to a tmp dir, calls `_find_portrait("EDNA", cast, tmp_path)`, asserts None. Pre-093 this would have returned the env still.
+  - `test_ref_dispatch_no_env_still_fallback` -- source-code regression guard; asserts no live assignment of `ref_source = "ledger-cast-fresh"` exists in `batch_humo_render.py`. Comments / docstrings can mention the term for history; the actual code path is gone.
+  - Renamed `test_ref_dispatch_prefers_find_portrait_over_cast_still_map` to `test_ref_dispatch_runs_find_portrait_before_find_composite` and updated assertions to reflect the simplified two-tier dispatch.
+- **Verify:**
+  - AST parse clean (108611 bytes, 8508 nodes -- ~3KB / 337 nodes smaller than pre-093).
+  - test_batch_humo_render + test_batch_ltx_render + test_news_history_ttl -> 71 passed in 3.12s (was 69; +2 BUG-093 guards).
+  - Bug Bible OTR-scoped -> 22 passed / 1 pre-existing baseline failure / 1 skipped / 2 xfailed (same baseline).
+  - Live: a future episode where BUG-078 fails to render a portrait will now log `[BatchHumoRender] line lXXX speaker=... role=...: no portrait AND no radio still` and SKIP that line. VideoComposite covers it with static radio. The bug becomes visible (a character beat plays as static radio) instead of silent (HuMo renders a wrong face). Same handling as music/sfx.
+- **Tags:** humo, ref-image-dispatch, portrait-priority, stopgap-removal, failure-mode-policy
+- **Related:** BUG-LOCAL-078 (per-cast portrait pass that becomes a hard requirement post-093); BUG-LOCAL-088 (cast-still binding which is now fully removed); BUG-LOCAL-092 (priority inversion that this entry hardens further by removing the fallbacks entirely); BUG-LOCAL-129a (VideoComposite static-radio fill that covers skipped lines).
+
+---
+
 ### BUG-LOCAL-092 [FIXED]: HuMo lipsync against FLUX env stills instead of character portraits
 - **Date:** 2026-05-04 EVENING | **Phase:** post BUG-091 soak | **Bible candidate:** YES (ref-image dispatch priority)
 - **Symptom (live composite from `signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107`):** Three artefacts visible in viewer screenshots:

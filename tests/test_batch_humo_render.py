@@ -181,41 +181,80 @@ def test_find_portrait_returns_none_when_nothing_on_disk(tmp_path: Path, m) -> N
     assert found is None
 
 
+def test_find_portrait_returns_none_when_only_env_stills_exist(tmp_path: Path, m) -> None:
+    """BUG-LOCAL-093: env-still tiers were removed from the helper.
+    A directory containing ONLY ``full_env_*.png`` images (the FLUX
+    environment scenes, not character portraits) must NOT satisfy a
+    portrait lookup. Pre-093 this test would have returned the env
+    still and HuMo would have lipsynced against it -- producing the
+    wrong-face artefact in
+    signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107.
+    Now the helper returns None and the caller skips the line, letting
+    VideoComposite fill with static radio (BUG-129a)."""
+    (tmp_path / "otr").mkdir()
+    (tmp_path / "otr" / "stills").mkdir()
+    (tmp_path / "otr" / "stills" / "full_env_00001_.png").write_bytes(b"\x89PNG")
+    (tmp_path / "otr" / "stills" / "full_env_00002_.png").write_bytes(b"\x89PNG")
+    cast = [{"char_id": "c01", "name": "EDNA"}]
+    found = m._find_portrait("EDNA", cast, tmp_path)
+    assert found is None, (
+        "BUG-LOCAL-093: _find_portrait must NOT fall back to "
+        "full_env_*.png env stills"
+    )
+
+
 # ---------------------------------------------------------------------------
 # BUG-LOCAL-092 ref-image dispatch priority
 # ---------------------------------------------------------------------------
 
-def test_ref_dispatch_prefers_find_portrait_over_cast_still_map() -> None:
-    """BUG-LOCAL-092 (2026-05-04 EVENING): the per-line ref-image
-    dispatch in execute() must call ``_find_portrait`` BEFORE the
-    ``cast_still_map`` lookup. Pre-092 the order was inverted, so HuMo
-    lipsynced against FLUX environment stills (full_env_*.png) instead
-    of the BUG-078 character portraits (c0X_portrait.png), producing
-    wrong-actor faces in episode
-    signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107.
+def test_ref_dispatch_runs_find_portrait_before_find_composite() -> None:
+    """BUG-LOCAL-093 (2026-05-04 EVENING): with the stopgaps removed,
+    the dispatch is strictly portrait-only. ``_find_portrait`` runs
+    first (tier 1 = cast[i].portrait_path = the BUG-078 per-cast
+    portrait), then ``_find_composite`` for per-shot pass3 overrides.
+    No env-still fallback. If neither returns a path, the line is
+    skipped and VideoComposite static-radio fills the gap.
 
-    This is a source-code regression guard: a future refactor that
-    re-inverts the priority will fail this test before any live render
-    surfaces the artefact again.
+    This guards the dispatch order at source-code level so a future
+    refactor that re-inverts the priority fails before reaching a
+    live render.
     """
     src = NODE_PATH.read_text(encoding="utf-8")
-    # Find the dispatch block (the else: branch that runs for character /
-    # announcer roles, NOT the radio-still defense-in-depth branch above).
     fp_idx = src.find('ref_source = "find_portrait"')
     fc_idx = src.find('ref_source = "find_composite"')
-    cs_idx = src.find('ref_source = "ledger-cast-fresh"')
     assert fp_idx > 0, "find_portrait dispatch not found in source"
     assert fc_idx > 0, "find_composite dispatch not found in source"
-    assert cs_idx > 0, "cast_still_map (ledger-cast-fresh) dispatch not found in source"
-    # Priority order: find_portrait first, find_composite second,
-    # cast_still_map last.
     assert fp_idx < fc_idx, (
         "find_portrait must run BEFORE find_composite "
-        "(BUG-LOCAL-092 dispatch order)"
+        "(BUG-LOCAL-093 dispatch order)"
     )
-    assert fc_idx < cs_idx, (
-        "find_composite must run BEFORE cast_still_map "
-        "(BUG-LOCAL-092 dispatch order)"
+
+
+def test_ref_dispatch_no_env_still_fallback() -> None:
+    """BUG-LOCAL-093: the cast_still_map / ledger-cast-fresh fallback
+    that used FLUX env stills as character refs is gone. Source must
+    not contain the live ref_source assignment that pre-093 produced
+    the wrong-face artefact. cast_still_map itself is now an empty
+    dict that exists only so the downstream dispatch reads cleanly --
+    a future refactor that re-introduces a non-empty binding to env
+    stills will fail this test.
+    """
+    src = NODE_PATH.read_text(encoding="utf-8")
+    # The ref_source = "ledger-cast-fresh" assignment was the live
+    # dispatch line. It must no longer appear as a code path. Comments
+    # / docstrings can mention it for history; we look for the actual
+    # assignment with a leading whitespace + assignment shape.
+    import re
+    pattern = re.compile(
+        r'^\s*ref_source\s*=\s*"ledger-cast-fresh"',
+        re.MULTILINE,
+    )
+    matches = pattern.findall(src)
+    assert not matches, (
+        "BUG-LOCAL-093: dispatch must not assign ref_source = "
+        "'ledger-cast-fresh' anymore. Use the BUG-078 per-cast portrait "
+        "via _find_portrait, or skip the line. Wrong-face is worse than "
+        "no-face."
     )
 
 

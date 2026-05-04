@@ -293,31 +293,34 @@ def _find_portrait(
 ) -> Path | None:
     """Find a portrait image for a speaker.
 
-    Strategy (extends render_humo_batch.find_portrait_for_speaker
-    with a final FLUX env-still fallback so the workflow runs even
-    when no per-cast PASS1 portraits have been pre-rendered):
+    BUG-LOCAL-093 (2026-05-04 EVENING): the FLUX env-still fallback
+    tiers (formerly tiers 4-5) were REMOVED. They produced visibly
+    wrong faces when triggered -- HuMo would lipsync against an
+    environment scene that happened to contain a different person --
+    and were a workaround from before BUG-LOCAL-078's per-cast
+    portrait pass existed. With BUG-078 reliably writing
+    ``portraits/c0X_portrait.png`` and stamping ``cast[i].portrait_path``,
+    real character portraits are always available; if a portrait is
+    missing, the correct behavior is to SKIP that line and let
+    VideoComposite cover it with the BUG-129a static-radio fill --
+    same as music/sfx -- rather than synthesize a wrong face.
 
-      1. cast[].portrait_path if populated and exists
+    Strategy:
+
+      1. cast[].portrait_path if populated and exists (BUG-078 canonical)
       2. otr_humo_pass1_portrait_*.png by index in cast list
+         (legacy pass1 naming, kept for old episodes that pre-date BUG-078)
       3. any otr_humo_pass1_portrait_*.png
-      4. **NEW**: full_env_*.png by index in cast list (uses FLUX
-         environment stills as face stand-ins — visually wrong per
-         line but the workflow runs end-to-end without a separate
-         portrait-render pass; BUG-LOCAL-078 stopgap)
-      5. any full_env_*.png
-      6. None
+      4. None -- caller skips the line; VideoComposite fills with static radio
 
     BUG-LOCAL-087 ordering: every glob result is sorted by mtime
     descending (newest first). Without this, a freshly-rendered
-    full_env_00059_.png would lose to a days-old full_env_00001_.png
-    under default alphabetic sort -- meaning HuMo would always pick
-    the OLDEST visual reference even when FLUX just rendered fresh
-    per-episode stills (BUG-086). Sorting by mtime ensures the
-    newest stills line up with cast position 0 first.
+    pass1_portrait_00059_.png would lose to a days-old pass1_portrait_00001_.png
+    under default alphabetic sort.
     """
     speaker_norm = (speaker or "").upper().strip()
 
-    # 1. Direct path from ledger cast entry
+    # 1. Direct path from ledger cast entry (BUG-LOCAL-078 canonical)
     for c in cast:
         if (c.get("name") or "").upper().strip() == speaker_norm:
             p = c.get("portrait_path")
@@ -326,7 +329,7 @@ def _find_portrait(
 
     cast_names = [(c.get("name") or "").upper().strip() for c in cast]
 
-    # 2. PASS1 humo portraits indexed by cast position (canonical naming)
+    # 2. PASS1 humo portraits indexed by cast position (legacy pre-BUG-078 naming)
     if speaker_norm in cast_names:
         idx = cast_names.index(speaker_norm)
         candidates = sorted(
@@ -348,43 +351,10 @@ def _find_portrait(
     if candidates:
         return candidates[0]
 
-    # 4. FLUX env-stills indexed by cast position (BUG-078 stopgap).
-    #    These are typically full_env_NNNNN_.png from BatchFluxRender's
-    #    environment-token output. Visually wrong per-line (each cast
-    #    member maps to a random env still) but produces a runnable
-    #    end-to-end pipeline. Replace with proper PASS1 portraits when
-    #    a portrait render path is wired into the workflow.
-    #    BUG-LOCAL-087: sort by mtime descending so the newest stills
-    #    (this episode's FLUX output) come first -- cast index 0 maps
-    #    to the freshest still.
-    #    BUG-LOCAL-028 (2026-05-03): added per-episode workspace glob
-    #    `otr/episodes/*/stills/full_env_*.png` alongside the legacy
-    #    flat-dir patterns. After BUG-028 fix, OTR_SaveToEpisodeWorkspace
-    #    writes new env stills to the per-episode subdir; without this
-    #    glob, downstream HuMo would fall back to stale prior-episode
-    #    stills (or find nothing) and char_id->still binding would fail.
-    if speaker_norm in cast_names:
-        idx = cast_names.index(speaker_norm)
-        candidates = sorted(
-            list(portraits_dir.glob("otr/episodes/*/stills/full_env_*.png"))
-            + list(portraits_dir.glob("otr/stills/full_env_*.png"))
-            + list(portraits_dir.glob("otr_stills/full_env_*.png")),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if candidates:
-            return candidates[idx % len(candidates)]
-
-    # 5. Any FLUX env still (last resort) -- newest first
-    candidates = sorted(
-        list(portraits_dir.glob("otr/episodes/*/stills/full_env_*.png"))
-        + list(portraits_dir.glob("otr/stills/full_env_*.png"))
-        + list(portraits_dir.glob("otr_stills/full_env_*.png")),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    if candidates:
-        return candidates[0]
+    # 4. None. BUG-LOCAL-093 removed the env-still fallback that used
+    #    to live here -- producing a wrong face is worse than skipping
+    #    the line. Caller logs SKIP and VideoComposite fills with
+    #    static radio per BUG-129a.
 
     return None
 
@@ -1342,44 +1312,20 @@ class BatchHumoRender:
             log.debug("[BatchHumoRender] pre-pin skipped: %s", exc)
 
         # ---- 5.5. BUG-LOCAL-088: ledger-driven cast->still binding ----
-        # Build a per-cast-member still resolver using the LEDGER as
-        # the source of truth for "this episode". After BUG-086 the
-        # FLUX env stills are guaranteed to land before HuMo starts;
-        # after BUG-087 they sort newest-first; this step adds the
-        # explicit freshness floor so STALE stills from prior runs
-        # are never selected even when fresh-count < cast-count.
-        cast_still_map, fresh_candidates = _resolve_cast_stills_from_ledger(
-            cast=cast,
-            portraits_dir=portraits_dir_path,
-            ledger_mtime=ledger_mtime,
-        )
-        log.info(
-            "[BatchHumoRender] cast-still binding: %d/%d cast members "
-            "matched to fresh stills (%d fresh stills available)",
-            len(cast_still_map), len(cast), len(fresh_candidates),
-        )
-        if cast and not fresh_candidates:
-            log.warning(
-                "[BatchHumoRender] no fresh stills found above ledger "
-                "mtime cutoff -- portrait selection will fall back to "
-                "global glob (stale stills possible)"
-            )
-        elif len(cast_still_map) < sum(1 for c in cast if c.get("line_count", 0) > 0):
-            log.warning(
-                "[BatchHumoRender] only %d fresh stills for %d voiced "
-                "cast members; trailing cast positions will fall back "
-                "to legacy _find_portrait tiers",
-                len(fresh_candidates),
-                sum(1 for c in cast if c.get("line_count", 0) > 0),
-            )
-        for c in cast:
-            cid = c.get("char_id") or ""
-            cname = c.get("name") or ""
-            if cid in cast_still_map:
-                log.info(
-                    "[BatchHumoRender]   cast %s (%s) -> %s (FRESH)",
-                    cid, cname, cast_still_map[cid].name,
-                )
+        # BUG-LOCAL-093 (2026-05-04 EVENING): cast_still_map binding
+        # REMOVED. It globbed FLUX env stills (full_env_*.png) and used
+        # them as character ref images, which produced visibly wrong
+        # faces (HuMo lipsynced against a random environment scene that
+        # happened to contain a different person). Pre-BUG-078 it was a
+        # stopgap; post-BUG-078 the per-cast portrait pass writes
+        # canonical c0X_portrait.png files and stamps cast[].portrait_path,
+        # which _find_portrait tier 1 reads. The dispatch below relies
+        # exclusively on _find_portrait + _find_composite; if neither
+        # returns a portrait the line is SKIPPED and VideoComposite
+        # covers it with static-radio fill (BUG-129a) -- same handling
+        # as music/sfx. Wrong-face is worse than no-face.
+        cast_still_map: dict = {}  # kept as empty defense-in-depth so the
+                                   # downstream dispatch reads cleanly
 
         # ---- 6. Build per-line plan (no GPU work yet) ----
         if max_clips and max_clips > 0:
@@ -1606,31 +1552,23 @@ class BatchHumoRender:
             else:
                 # Character / announcer -> portrait chain.
                 #
-                # BUG-LOCAL-092 (2026-05-04 EVENING): order inverted so
-                # ``_find_portrait`` runs FIRST. _find_portrait's tier 1
-                # is ``cast[i].portrait_path``, which BUG-LOCAL-078's
-                # OTR_BatchFluxPortraitRender stamps with the canonical
-                # ``portraits/c0X_portrait.png`` files. Pre-092 the
-                # cast_still_map (which globs ``full_env_*.png`` FLUX
-                # ENVIRONMENT stills, not character portraits) was tried
-                # first and always won, so HuMo lipsynced against the
-                # radio scene image and the on-screen face was whoever
-                # happened to be in that environment still -- producing
-                # the "wrong actor" artifact in episode
-                # signal_lost_scientists_map_how_down_syndrome_reshape_20260504_142107
-                # at 0:32 / 0:42 / 0:47 / 1:35. Same character rendered
-                # against different env stills across lines = inconsistent
-                # face. Inverting the order makes the BUG-078 portrait
-                # the winner whenever it exists; cast_still_map remains
-                # as defense-in-depth for episodes where the portrait
-                # pass didn't run.
+                # BUG-LOCAL-093 (2026-05-04 EVENING): stopgaps removed.
+                # Dispatch is now strictly portrait-only. If neither
+                # _find_portrait nor _find_composite returns a path,
+                # the line is skipped and VideoComposite covers it with
+                # static-radio fill (BUG-129a) -- same handling as
+                # music/sfx. Pre-093 the dispatch fell through to the
+                # cast_still_map (globbed full_env_*.png FLUX env
+                # stills) which produced visibly wrong faces because
+                # HuMo lipsynced against environment scenes that
+                # happened to contain unrelated people. Wrong-face is
+                # worse than no-face; better to surface "missing
+                # portrait" loudly via the SKIP path so it gets fixed.
                 #
-                # New priority:
-                #   1. _find_portrait (tier 1 = cast[].portrait_path,
-                #      falls through to full_env_* if portraits missing)
+                # Priority:
+                #   1. _find_portrait (tier 1 = cast[i].portrait_path
+                #      from BUG-LOCAL-078's per-cast portrait pass)
                 #   2. _find_composite (per-shot pass3 composite override)
-                #   3. cast_still_map (legacy ledger-cast-fresh binding,
-                #      identical effect to _find_portrait tier 4-5)
                 ref_png = _find_portrait(speaker, cast, portraits_dir_path)
                 if ref_png:
                     ref_source = "find_portrait"
@@ -1638,9 +1576,6 @@ class BatchHumoRender:
                     ref_png = _find_composite(shot_id, speaker, portraits_dir_path)
                     if ref_png:
                         ref_source = "find_composite"
-                if not ref_png and char_id and char_id in cast_still_map:
-                    ref_png = cast_still_map[char_id]
-                    ref_source = "ledger-cast-fresh"
 
             if not ref_png:
                 report_lines.append(
