@@ -612,20 +612,6 @@ Currently cast cleanup is two layers: (1) regex blocklist `_SFX_CAST_BLOCKLIST_P
 
 ## v2.1 candidates
 
-### Episode title actually reflects content (Director picks up upstream-resolved title)
-
-**Status:** queued 2026-05-03 LATE EVENING. Observed live in run `signal_lost_..._20260503_221829` — `LLMDirector`'s production_plan_json contained `"episode_title": "Untitled Old Time Radio Series (episode 1)"` even though `LLMScriptWriter` had already resolved a real title and prepended a `{"type":"title"}` token to `script_lines`.
-
-**Cause:** `DIRECTOR_PROMPT.format()` only passes `script_text` and `voice_mapping_rules` (story_orchestrator.py:10092). The Director LLM has no idea what title was already resolved upstream, so when its prompt schema asks for `"episode_title": "..."`, it defaults to a generic placeholder ("Untitled Old Time Radio Series (episode 1)") rather than reading the real title or composing a content-aware one.
-
-**Fix:** Thread the upstream-resolved title into the Director's context. Two paths, pick one:
-1. **Lightweight** — read the in-flight ledger inside `LLMDirector.direct()` (`_OTRL.in_flight_ledger_path()`), pull `meta.news_seed.headline` + the `script_lines[0].value` title token, and inject both into the prompt as known context: `"The show is called 'Signal Lost'. This episode was seeded by news headline X. Compose a punchy 2-4 word episode_title that reflects the actual story you're seeing. Use it in episode_title."`
-2. **Explicit** — add `episode_title` as an optional Director input (forceInput), wire it from `LLMScriptWriter` so the title flows down via the graph edge instead of via on-disk side-channel.
-
-Lightweight wins for v2.1 — no graph edits, no new sockets, single-file change. Verify by grep'ing `production_plan_json` after run for `"episode_title": "..."` and confirming it's NOT a generic stub.
-
-**Why v2.1 not v2.0:** title doesn't drive the final `.mp4` filename — `OTR_SignalLostVideo` resolves filename independently from script_json title token (with news_seed_fallback). So this is a polish-the-Director's-output fix, not a release-blocker. But it pollutes ledger.production_plan_json in a way that's annoying for downstream consumers + makes the JSON harder to reason about during debugging.
-
 ### Configurable show name (replace hardcoded "Signal Lost")
 
 **Status:** queued 2026-05-03 LATE EVENING. Real-shippability blocker — anyone wanting to fork OTR for their own show ("Twilight Zone", "Lights Out", "The Hitchhiker") currently has to grep + sed across the codebase.
