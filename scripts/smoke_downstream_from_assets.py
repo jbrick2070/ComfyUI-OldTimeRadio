@@ -120,14 +120,22 @@ def gather_assets(ep_dir: Path) -> dict | None:
     """
     audio_dir = ep_dir / "audio"
     composited_dir = ep_dir / "composited"
+    videos_dir = ep_dir / "videos"
 
-    # Composite mp4 (input to RTXUpscale)
+    # Composite mp4 (existing -- input to RTXUpscale OR overwritten by re-run)
     composite_candidates = list(composited_dir.glob(f"{ep_dir.name}*.mp4"))
     composite_mp4 = composite_candidates[0] if composite_candidates else None
 
-    # Procgen mp4 (input to PostUpscaleProcgenBlend)
+    # Procgen mp4 (input to PostUpscaleProcgenBlend AND VideoComposite re-run)
     procgen_candidates = list(audio_dir.glob(f"{ep_dir.name}*.mp4"))
     procgen_mp4 = procgen_candidates[0] if procgen_candidates else None
+
+    # Per-line video clips (input to VideoComposite re-run)
+    per_line_clips = sorted(videos_dir.glob("l*.mp4")) if videos_dir.exists() else []
+
+    # Ledger (input to VideoComposite re-run)
+    ledger_candidates = list(audio_dir.glob(f"{ep_dir.name}*_ledger.json"))
+    ledger_path = ledger_candidates[0] if ledger_candidates else None
 
     missing = []
     if composite_mp4 is None or not composite_mp4.exists():
@@ -148,6 +156,9 @@ def gather_assets(ep_dir: Path) -> dict | None:
         "ep_dir": ep_dir,
         "composite_mp4": composite_mp4,
         "procgen_mp4": procgen_mp4,
+        "videos_dir": videos_dir,
+        "per_line_clips": per_line_clips,
+        "ledger_path": ledger_path,
     }
 
 
@@ -243,6 +254,65 @@ def report_stage(
 # ---------------------------------------------------------------------------
 # Stage runners (call the actual nodes via direct Python import)
 # ---------------------------------------------------------------------------
+
+def run_video_composite(
+    procgen_mp4: Path,
+    videos_dir: Path,
+    ledger_path: Path,
+    out_mp4: Path,
+    r: StageReport,
+) -> bool:
+    """Invoke OTR_VideoComposite.execute on pre-rendered per-line clips.
+
+    Exercises the BUG-LOCAL-031 Track 1 per-clip duration matching
+    fix in `_layered_per_clip_silent`. Output goes to the canonical
+    composited/<ep>.mp4 path (clobbered by each smoke run).
+    """
+    r.section("STAGE 0 -- VideoComposite (re-runs the BUG-031 sync fix)")
+    try:
+        from nodes.video_composite import VideoComposite  # type: ignore
+    except Exception as exc:
+        r.add(f"FAIL: cannot import VideoComposite: {exc}")
+        return False
+    node = VideoComposite()
+    try:
+        # Defaults match the canonical workflow JSON Node 52 widgets.
+        result_path, report = node.execute(
+            procgen_video_path=str(procgen_mp4),
+            clips_dir=str(videos_dir),
+            ledger_json=str(ledger_path),
+            blend_mode="lighten",
+            blend_opacity=0.0,
+            canvas_width=1472,
+            canvas_height=832,
+            canvas_fps=25,
+            humo_target_height=832,
+            humo_pillar_width=512,
+            fallback_clip_length=7.0,
+            ffmpeg="ffmpeg",
+            cleanup_clips_after_assembly=False,
+            audio_source="master_mix_per_clip_mux",
+            strict_c7=True,
+        )
+    except Exception as exc:
+        r.add(f"FAIL: VideoComposite.execute raised: {exc}")
+        return False
+    if not result_path:
+        r.add(f"FAIL: VideoComposite returned empty path. report:\n{report}")
+        return False
+    src = Path(result_path)
+    if not src.exists():
+        r.add(f"FAIL: VideoComposite returned non-existent path: {src}")
+        return False
+    # Move into smoke dir so we don't clobber the canonical composite,
+    # then ALSO leave a copy at canonical for downstream nodes to use.
+    import shutil as _sh
+    if src.resolve() != out_mp4.resolve():
+        _sh.copy2(src, out_mp4)
+    r.add(f"OK: composite at {out_mp4}")
+    r.add(f"--- node report (truncated) ---\n{report[:1200]}")
+    return True
+
 
 def run_rtx_upscale(
     composite_mp4: Path,

@@ -396,6 +396,52 @@ def _png_to_tensor(png_path: Path):
     return tensor
 
 
+def _audio_slice_rms_db(audio_dict: dict, start_s: float, dur_s: float) -> float:
+    """Compute the RMS amplitude (in dBFS) of an audio slice from a
+    ComfyUI AUDIO dict. Returns ``float("-inf")`` if the slice is
+    digitally silent (all zeros) or if the slice cannot be computed.
+
+    Used by BUG-LOCAL-031 audio-silent-skip gate: BatchHumoRender peeks
+    at the per-line audio slice BEFORE invoking HuMo. If the slice's
+    RMS is below the configured speech threshold (default -28 dBFS),
+    HuMo is skipped for that line and downstream
+    ``OTR_VideoComposite`` falls back to the static radio bookend
+    segment automatically (BUG-LOCAL-129a path).
+
+    This catches the failure mode where Bark generated valid speech
+    audio for a line but it got dropped / misaligned somewhere in
+    the SceneSequencer / AudioEnhance / master-mix pipeline, leaving
+    the master mix's slot for that line filled with ambient or
+    silence. Without this gate HuMo wastes ~14 minutes lipsyncing a
+    talking head to a silent track.
+    """
+    import math
+    try:
+        import torch  # type: ignore
+    except Exception:
+        return float("-inf")
+    waveform = audio_dict.get("waveform")
+    sr = int(audio_dict.get("sample_rate") or 0)
+    if waveform is None or sr <= 0:
+        return float("-inf")
+    start_sample = max(0, int(float(start_s) * sr))
+    end_sample = max(start_sample + 1, int((float(start_s) + float(dur_s)) * sr))
+    try:
+        sliced = waveform[..., start_sample:end_sample]
+        if sliced.numel() == 0:
+            return float("-inf")
+        # mean-square -> RMS in linear; convert to dBFS (20*log10(rms))
+        ms = float((sliced.float() ** 2).mean().item())
+        if ms <= 0.0:
+            return float("-inf")
+        rms = math.sqrt(ms)
+        if rms <= 1e-12:
+            return float("-inf")
+        return 20.0 * math.log10(rms)
+    except Exception:
+        return float("-inf")
+
+
 def _slice_audio_tensor(audio_dict: dict, start_s: float, dur_s: float) -> dict:
     """Slice an AUDIO dict by start_s and dur_s. The AUDIO type in
     ComfyUI is ``{"waveform": Tensor[B, C, samples], "sample_rate":
@@ -900,6 +946,30 @@ class BatchHumoRender:
                         "disable (reverts to pre-BUG-102 behavior)."
                     ),
                 }),
+                "min_speech_rms_db": ("FLOAT", {
+                    "default": -28.0,
+                    "min": -90.0,
+                    "max": 0.0,
+                    "step": 0.5,
+                    "tooltip": (
+                        "BUG-LOCAL-031 audio-silent-skip gate. Per-line "
+                        "audio slice RMS threshold in dBFS. If the slice's "
+                        "RMS for a character line falls below this value, "
+                        "BatchHumoRender SKIPS the HuMo render for that "
+                        "line (saves ~14 min of GPU time). Downstream "
+                        "OTR_VideoComposite then auto-falls-back to the "
+                        "static radio-bookend segment for that line "
+                        "(BUG-LOCAL-129a path). Catches the failure mode "
+                        "where Bark generated valid speech but it got "
+                        "dropped/misaligned in SceneSequencer / "
+                        "AudioEnhance / master-mix routing, leaving the "
+                        "slot silent. Default -28 dBFS is conservative: "
+                        "normal Bark speech reads ~-20 to -22 dBFS, "
+                        "background ambient ~-35 dBFS or quieter. Set to "
+                        "-90 to disable the gate entirely (every "
+                        "character line goes to HuMo regardless of audio)."
+                    ),
+                }),
                 "resume_from_ledger": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
@@ -936,6 +1006,7 @@ class BatchHumoRender:
         height: int,
         flux_done_gate=None,  # BUG-LOCAL-086: dependency gate, value ignored
         humo_warmup_pad_ms: int = 200,  # BUG-LOCAL-102: see INPUT_TYPES tooltip
+        min_speech_rms_db: float = -28.0,  # BUG-LOCAL-031 audio-silent-skip gate (helper present but loop wiring deferred -- see investigation note)
         resume_from_ledger: bool = True,  # 2026-04-29: see INPUT_TYPES tooltip
     ):
         t_start = time.time()

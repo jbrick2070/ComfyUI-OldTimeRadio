@@ -585,6 +585,7 @@ def _layered_per_clip_silent(
     out_path: Path,
     ffmpeg: str,
     extend_tail_s: float = 0.0,
+    truncate_to_s: Optional[float] = None,
 ) -> Path:
     """BUG-LOCAL-030 layered per-clip composite (1472x832 canvas, 2026-05-03
     EVENING Jeffrey final spec).
@@ -647,8 +648,14 @@ def _layered_per_clip_silent(
             "-map", "[v]",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
             "-an",
-            str(out_path),
         ]
+        # BUG-LOCAL-031 Track 1 (per-clip duration matching): if the
+        # video clip is LONGER than the audio target, truncate via -t.
+        # Pad-extend cases are handled by the `extend_tail_s` path
+        # above (tpad inside the filter chain).
+        if truncate_to_s is not None and truncate_to_s > 0.0:
+            cmd.extend(["-t", f"{float(truncate_to_s):.3f}"])
+        cmd.append(str(out_path))
     else:
         # BUG-LOCAL-030 revised spec (2026-05-03 EVENING): scale-FIT
         # (preserve aspect ratio, no crop) + pad with black to canvas
@@ -684,8 +691,11 @@ def _layered_per_clip_silent(
             "-vf", vf,
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
             "-an",
-            str(out_path),
         ]
+        # BUG-LOCAL-031 Track 1: truncate path (see comment in layered branch).
+        if truncate_to_s is not None and truncate_to_s > 0.0:
+            cmd.extend(["-t", f"{float(truncate_to_s):.3f}"])
+        cmd.append(str(out_path))
 
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return out_path
@@ -964,10 +974,61 @@ def _render_master_mix_per_clip_mux_mode(
         "per_clip_mux: simple-pillarbox mode (HuMo native + black bars)"
     )
 
+    # BUG-LOCAL-031 Track 1 (per-clip duration matching, 2026-05-03 EVENING):
+    # Audio per line varies (Bark / Kokoro emit 8-14 s per dialogue line).
+    # Video per clip is FIXED to HuMo's max-frame cap (~6.88 s for character
+    # lines) and LTX's actual output (~7.72 s for announcer lines, even
+    # though ledger.clips[].dur_s lies and reports the LINE'S audio dur
+    # for LTX -- BUG-LOCAL-033). The naive concat thus drifts the video
+    # ahead of the audio by ~26 s over a 50 s episode (proven via
+    # ffprobe drift audit 2026-05-03 EVENING).
+    #
+    # Fix: ffprobe each clip's ACTUAL on-disk dur, compare to the audio
+    # target from ledger.lines[].dur_s (which IS correct), and per-clip:
+    #   gap > +tol -> tpad freeze-extend by gap seconds (clone last frame)
+    #   gap < -tol -> -t truncate to audio_target seconds
+    #   |gap| <= tol -> no-op
+    # The LAST clip's BUG-LOCAL-128 tail-pad (+0.5s for -shortest safety)
+    # is layered on top of the duration-match extension below in step 2b.
+    #
+    # Rule (BUG-LOCAL-033): metadata describes intent, ffprobe describes
+    # reality. NEVER trust ledger.clips[].dur_s; always probe.
+    try:
+        from . import _otr_probe as _PROBE  # type: ignore
+    except Exception:
+        _PROBE = None  # type: ignore
+
     pillarboxed: list[Path] = []
     pb_failures = 0
+    sync_ext_total = 0.0
+    sync_trunc_total = 0.0
     for entry in timeline:
         seg_out = seg_dir / f"pb_{entry['line_id']}.mp4"
+        # Per-clip duration match: probe the SOURCE clip on disk and
+        # compute the gap vs the audio target.
+        _audio_target = float(entry.get("dur_s") or 0.0)
+        _video_actual = (
+            _PROBE.probe_duration_s(entry["clip_path"], ffmpeg=ffprobe)
+            if _PROBE is not None else 0.0
+        )
+        _extend_s = 0.0
+        _truncate_s: float | None = None
+        if _PROBE is not None and _video_actual > 0.0 and _audio_target > 0.0:
+            _gap, _action = _PROBE.duration_gap_s(_audio_target, _video_actual)
+            if _action == "extend":
+                _extend_s = _gap
+                sync_ext_total += _gap
+                report.append(
+                    f"  sync {entry['line_id']}: video {_video_actual:.3f}s -> "
+                    f"audio {_audio_target:.3f}s (extend +{_gap:.3f}s)"
+                )
+            elif _action == "truncate":
+                _truncate_s = _audio_target
+                sync_trunc_total += -_gap
+                report.append(
+                    f"  sync {entry['line_id']}: video {_video_actual:.3f}s -> "
+                    f"audio {_audio_target:.3f}s (truncate -{-_gap:.3f}s)"
+                )
         try:
             _layered_per_clip_silent(
                 clip=entry["clip_path"],
@@ -978,7 +1039,8 @@ def _render_master_mix_per_clip_mux_mode(
                 humo_pillar_h=humo_target_h,
                 background_png=background_png,
                 out_path=seg_out, ffmpeg=ffmpeg,
-                extend_tail_s=0.0,
+                extend_tail_s=_extend_s,
+                truncate_to_s=_truncate_s,
             )
             pillarboxed.append(seg_out)
         except subprocess.CalledProcessError as exc:
@@ -991,6 +1053,12 @@ def _render_master_mix_per_clip_mux_mode(
                 f"  pillarbox {entry['line_id']}: FAILED ({stderr[:120]})"
             )
             pb_failures += 1
+    if sync_ext_total > 0 or sync_trunc_total > 0:
+        report.append(
+            f"per_clip_mux: BUG-LOCAL-031 sync corrections applied -- "
+            f"total extend +{sync_ext_total:.2f}s, total truncate "
+            f"-{sync_trunc_total:.2f}s"
+        )
 
     if not pillarboxed:
         raise RuntimeError(
@@ -1032,6 +1100,34 @@ def _render_master_mix_per_clip_mux_mode(
             # BUG-LOCAL-030: re-pillarbox via the same layered helper so
             # the tail-pad call produces a frame consistent with the
             # rest of the timeline (LTX fill or HuMo pillar+backdrop).
+            #
+            # BUG-LOCAL-031 Track 1 (2026-05-03 EVENING): re-probe and
+            # re-compute the sync extension for the surviving last clip
+            # so this re-pillarbox call applies BOTH the per-clip
+            # duration match AND the BUG-LOCAL-128 tail-pad. Without
+            # this, the re-pillarbox would clobber the sync extension
+            # already applied in the first loop above, leaving the
+            # final clip un-padded vs its audio target.
+            _surv_audio_target = float(surviving_entry.get("dur_s") or 0.0)
+            _surv_video_actual = (
+                _PROBE.probe_duration_s(surviving_entry["clip_path"], ffmpeg=ffprobe)
+                if _PROBE is not None else 0.0
+            )
+            _surv_sync_extend = 0.0
+            _surv_truncate: float | None = None
+            if (
+                _PROBE is not None
+                and _surv_video_actual > 0.0
+                and _surv_audio_target > 0.0
+            ):
+                _gap, _action = _PROBE.duration_gap_s(
+                    _surv_audio_target, _surv_video_actual,
+                )
+                if _action == "extend":
+                    _surv_sync_extend = _gap
+                elif _action == "truncate":
+                    _surv_truncate = _surv_audio_target
+            _combined_extend = _surv_sync_extend + _TAIL_PAD_S
             _layered_per_clip_silent(
                 clip=surviving_entry["clip_path"],
                 speaker_role=surviving_entry.get("speaker_role", ""),
@@ -1041,16 +1137,18 @@ def _render_master_mix_per_clip_mux_mode(
                 humo_pillar_h=humo_target_h,
                 background_png=background_png,
                 out_path=surviving_last, ffmpeg=ffmpeg,
-                extend_tail_s=_TAIL_PAD_S,
+                extend_tail_s=_combined_extend,
+                truncate_to_s=_surv_truncate,
             )
             report.append(
                 f"  tail-pad: +{_TAIL_PAD_S:.3f}s on {surviving_line_id} "
-                f"(BUG-LOCAL-128 fix)"
+                f"(BUG-128) on top of +{_surv_sync_extend:.3f}s sync "
+                f"extension (BUG-031) -- combined +{_combined_extend:.3f}s"
             )
             log.info(
-                "[VideoComposite/per_clip_mux] tail-pad +%.3fs on actual "
-                "surviving last clip %s (BUG-LOCAL-128 fix)",
-                _TAIL_PAD_S, surviving_line_id,
+                "[VideoComposite/per_clip_mux] tail-pad %.3fs (BUG-128) + "
+                "%.3fs sync (BUG-031) on surviving last clip %s",
+                _TAIL_PAD_S, _surv_sync_extend, surviving_line_id,
             )
         except subprocess.CalledProcessError as exc:
             stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
