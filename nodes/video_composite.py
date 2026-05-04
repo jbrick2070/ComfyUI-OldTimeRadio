@@ -1030,7 +1030,7 @@ def _render_master_mix_per_clip_mux_mode(
         # compute the gap vs the audio target.
         _audio_target = float(entry.get("dur_s") or 0.0)
         _video_actual = (
-            _PROBE.probe_duration_s(entry["clip_path"], ffmpeg=ffprobe)
+            _PROBE.probe_duration_s(entry["clip_path"], ffprobe=ffprobe)
             if _PROBE is not None else 0.0
         )
         _extend_s = 0.0
@@ -1132,7 +1132,7 @@ def _render_master_mix_per_clip_mux_mode(
             # final clip un-padded vs its audio target.
             _surv_audio_target = float(surviving_entry.get("dur_s") or 0.0)
             _surv_video_actual = (
-                _PROBE.probe_duration_s(surviving_entry["clip_path"], ffmpeg=ffprobe)
+                _PROBE.probe_duration_s(surviving_entry["clip_path"], ffprobe=ffprobe)
                 if _PROBE is not None else 0.0
             )
             _surv_sync_extend = 0.0
