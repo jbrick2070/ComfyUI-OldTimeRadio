@@ -1865,7 +1865,7 @@
       "widgets_values": [
         "",
         "",
-        "screen",
+        "lighten",
         1.0,
         "ffmpeg",
         false,

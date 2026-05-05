@@ -48,13 +48,17 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 # BUG-LOCAL-096 (2026-05-04 EVENING): default bumped from "lighten"
-# at 0.5 to "screen" at 1.0. Jeffrey: "the procgen video mix is too
-# weak ... I want it as bright as the original just overlayed".
-# `screen` at 1.0 is the canonical bright-overlay mode -- result =
-# 1 - (1-A)(1-B), always brighter than either layer, classic
-# double-exposure / film projector aesthetic. Preserves the upscale
-# visible underneath while bringing procgen colors at full intensity.
-_DEFAULT_BLEND_MODE = "screen"
+# at 0.5 to "screen" at 1.0 to bring procgen colors at full intensity.
+# BUG-LOCAL-099 (2026-05-04 LATE EVENING): "screen" produced a global
+# magenta tint when procgen has uniform color regions -- the radio room
+# walls, porthole, and TV all came out pink because screen adds color
+# values everywhere. Switched to "lighten" at 1.0 -- pixel-wise
+# max(upscale, procgen). Bright procgen elements (SIGNAL LOST text,
+# scanlines, waveform) show through at full intensity; mid-tone
+# procgen content (ambient color cast) defers to the upscale wherever
+# the upscale is brighter. Keeps the brightness Jeffrey asked for in
+# BUG-096 without the color-cast side effect.
+_DEFAULT_BLEND_MODE = "lighten"
 _DEFAULT_BLEND_OPACITY = 1.0
 _BLEND_MODE_CHOICES = ["lighten", "screen", "addition", "overlay", "normal"]
 

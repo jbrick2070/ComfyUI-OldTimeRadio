@@ -21,6 +21,26 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-099 [FIXED]: procgen overlay produced global magenta tint -- "screen" -> "lighten" at full strength
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-096 hotfix | **Bible candidate:** YES (defaults tuning)
+- **Symptom:** screenshot from live composite at 0:00:03 (`Echo in Stasis` episode) showed the entire frame magenta/pink. Radio room walls, porthole, TV screen, control panel -- everything tinted. The post-BUG-096 default of `screen` blend at 1.0 opacity was adding procgen's color values to every pixel, producing a global magenta cast in regions where procgen had uniform mid-tone color (the SIGNAL LOST scene background).
+- **Cause:** `screen` mode formula = `1 - (1 - A) * (1 - B)`. When B (procgen) has a uniform color value > 0 across the frame, the result is uniformly lifted toward that color across the entire frame. The 1940s SIGNAL LOST procgen aesthetic includes pink/magenta scanline color in mid-tone regions, which screen mode then propagates everywhere it adds. BUG-096 traded "weak overlay" for "tinted overlay".
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~6 LOC):**
+  - **`_DEFAULT_BLEND_MODE = "lighten"`** (was `"screen"`). `lighten` mode = pixel-wise `max(upscale, procgen)`. Bright procgen elements (white SIGNAL LOST text, scanlines, waveform graphics) show through at full intensity because they're brighter than the underlying frame. Mid-tone procgen regions (the magenta ambient cast) defer to the upscale wherever the upscale is brighter, eliminating the global tint. Keeps the brightness intent of BUG-096 without the color-cast side effect.
+  - **`_DEFAULT_BLEND_OPACITY = 1.0`** (unchanged from BUG-096) -- still full strength.
+  - **Workflow JSON `workflows/otr_scifi_16gb_full.json`** -- saved widget values updated from `["screen", 1.0]` to `["lighten", 1.0]` so existing workflow loads pick up the new defaults without canvas adjustment.
+- **Test update (`tests/test_post_upscale_procgen_blend.py`):**
+  - Renamed `test_default_blend_mode_is_screen` -> `test_default_blend_mode_is_lighten`. Assertion follows the constant.
+  - `test_default_blend_opacity_is_full_strength` unchanged (still 1.0).
+- **Verify:**
+  - `tests/test_post_upscale_procgen_blend.py` -> 17 passed in 4.74s.
+  - Live: next composite should show procgen's bright graphics overlaid on the upscale's HuMo/LTX content without a global color cast. Radio scene retains its native sepia/grey/orange palette except where procgen scanlines/text are explicitly bright.
+- **Per-episode override:** the widget remains user-tunable. If a future episode wants the magenta-soaked screen effect intentionally (e.g. a "transmission breaking up" beat), set `blend_mode = "screen"` and `blend_opacity = 1.0` on that run's canvas. Default stays `lighten 1.0` for the SIGNAL LOST baseline aesthetic.
+- **Tags:** procgen-blend, post-upscale, defaults, ffmpeg-blend-filter, color-cast, signal-lost-aesthetic, BUG-096-followup
+- **Related:** BUG-LOCAL-096 (the brightness-bump fix that BUG-099 retunes; together they converge on "bright procgen elements visible at full strength, no global color tint"). BUG-LOCAL-030 Phase B (the original blend pipeline). The C7 audio passthrough remains unchanged across BUG-096 + BUG-099.
+
+---
+
 ### BUG-LOCAL-098 [PARTIAL FIX SHIPPED -- tripwire + accelerate clear; rehydrate path deferred to test harness]: NF4 silently fails on second `_load_llm` after `_unload_llm`
 - **Round-robin transcripts:** `docs/2026-05-04-bug-098-nf4-second-load__01_chatgpt.md` (gpt-5.5, 128.6s), `docs/2026-05-04-bug-098-nf4-second-load__02_gemini.md` (gemini-3.1-pro-preview-customtools, 60.7s), synthesis at `docs/2026-05-04-bug-098-nf4-second-load__04_synthesis.md`.
 - **Convergent recommendations both LLMs accepted (shipped tonight):**

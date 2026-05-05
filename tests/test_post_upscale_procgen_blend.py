@@ -74,15 +74,17 @@ def test_default_blend_opacity_is_full_strength(node):
     assert spec["optional"]["blend_opacity"][1]["default"] == 1.0
 
 
-def test_default_blend_mode_is_screen(node):
-    """BUG-LOCAL-096 (2026-05-04 EVENING): default blend_mode bumped
-    from "lighten" to "screen" -- the canonical bright-additive
-    overlay (result = 1 - (1-A)(1-B), always brighter than either
-    layer). Preserves the upscale visible underneath while bringing
-    procgen colors at full strength. Classic film-projector look.
+def test_default_blend_mode_is_lighten(node):
+    """BUG-LOCAL-099 (2026-05-04 LATE EVENING): default blend_mode
+    settled on "lighten" at full strength after BUG-096's "screen"
+    default produced a global magenta tint on uniform-color procgen
+    frames. "lighten" is pixel-wise max(upscale, procgen) -- bright
+    procgen elements show through, dim regions defer to upscale.
+    Keeps the brightness intent of BUG-096 without the color-cast
+    side effect.
     """
     spec = node.INPUT_TYPES()
-    assert spec["optional"]["blend_mode"][1]["default"] == "screen"
+    assert spec["optional"]["blend_mode"][1]["default"] == "lighten"
 
 
 def test_blend_cmd_uses_audio_passthrough(node, tmp_path):
