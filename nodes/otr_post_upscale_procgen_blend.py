@@ -239,29 +239,49 @@ def _build_blend_cmd(
         )
     else:
         crush_step = ""
-    # BUG-LOCAL-104 green-only overlay: when enabled, zero out the procgen
-    # R and B channels via colorchannelmixer BEFORE the blend. Only the
-    # procgen G channel survives, which means brighter-than-source blends
-    # (lighten/screen/addition) only ever lift the source G channel where
-    # procgen has green wireframe pixels. Source R and B pass through
-    # untouched so the source scene's color (warm room, magenta porthole,
-    # whatever) is preserved verbatim. The visible result is a pure
-    # phosphor-green CRT overlay sitting on top of any source content,
-    # which is the v1.7 SIGNAL LOST CRT signature Jeffrey wants restored.
+    # BUG-LOCAL-104 green-only overlay + BUG-LOCAL-105 RGB planar pin:
+    # when enabled, zero the procgen R and B channels via colorchannelmixer
+    # BEFORE the blend so only the procgen G channel survives. THEN pin
+    # both inputs to gbrp (planar RGB) before blend and back to yuv420p
+    # after, so the per-channel `blend` math runs in RGB instead of YUV.
+    # Without the format pin, ffmpeg auto-converts to yuv420p to match
+    # libx264's pix_fmt and the blend filter ends up running 'lighten'
+    # on Y/U/V planes -- which produces color-shifting garbage that
+    # swallows the 1%-sparse green wireframe entirely. With the pin,
+    # 'lighten/screen/addition' run as honest per-RGB-channel ops and
+    # the green CRT overlays cleanly on top of any source color.
+    #
+    # Filter chain when green_only_overlay=True:
+    #   [1:v] scale -> crop -> setpts -> lutrgb (crush) ->
+    #         colorchannelmixer (zero R+B) -> format=gbrp [pgn]
+    #   [0:v] format=gbrp [main]
+    #   [main][pgn] blend=mode:opacity:shortest -> format=yuv420p [v]
+    #
+    # Filter chain when green_only_overlay=False (legacy path):
+    #   [1:v] scale -> crop -> setpts -> lutrgb (crush) [pgn]
+    #   [0:v][pgn] blend=mode:opacity:shortest [v]
     if green_only_overlay:
         green_only_step = (
             ",colorchannelmixer="
             "rr=0:rg=0:rb=0:"
             "gr=0:gg=1:gb=0:"
             "br=0:bg=0:bb=0"
+            ",format=gbrp"
         )
+        main_format_step = "[0:v]format=gbrp[main];"
+        main_input_label = "[main]"
+        post_blend_format = ",format=yuv420p"
     else:
         green_only_step = ""
+        main_format_step = ""
+        main_input_label = "[0:v]"
+        post_blend_format = ""
     filter_complex = (
         f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
         f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}{green_only_step}[pgn];"
-        f"[0:v][pgn]blend=all_mode={blend_mode}:"
-        f"all_opacity={blend_opacity:.3f}:shortest=1[v]"
+        f"{main_format_step}"
+        f"{main_input_label}[pgn]blend=all_mode={blend_mode}:"
+        f"all_opacity={blend_opacity:.3f}:shortest=1{post_blend_format}[v]"
     )
     # BUG-LOCAL-030 C7 hardening (2026-05-03 EVENING, post-round-robin
     # Gemini catch): NO ``-shortest`` flag here. ffmpeg ``-shortest`` on
@@ -367,22 +387,6 @@ class PostUpscaleProcgenBlend:
                         "in the same dir as ``source_mp4_path``."
                     ),
                 }),
-                "green_only_overlay": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "BUG-LOCAL-104: when True, zero the procgen R and "
-                        "B channels (colorchannelmixer) BEFORE the blend so "
-                        "only the procgen G channel ever contributes. Source "
-                        "R/B pass through untouched (no color lift); source "
-                        "G gets boosted only where the procgen has green "
-                        "wireframe pixels. Result: pure phosphor-green v1.7 "
-                        "CRT overlay sitting on top of whatever the source "
-                        "scene already looks like. Use this when the source "
-                        "(HuMo+LTX upscale) has its own scene color and you "
-                        "want the green CRT to be visible on top regardless. "
-                        "Pair with blend_mode='lighten' or 'addition'."
-                    ),
-                }),
                 "shadow_crush_threshold": ("INT", {
                     "default": _DEFAULT_SHADOW_CRUSH,
                     "min": 0, "max": 50, "step": 1,
@@ -399,6 +403,35 @@ class PostUpscaleProcgenBlend:
                         "verify the un-crushed pink/cast symptom or to A/B "
                         "test a procgen render with hardened prompt that "
                         "already produces true black."
+                    ),
+                }),
+                # BUG-LOCAL-104 / BUG-LOCAL-105: this widget MUST stay LAST
+                # in the optional dict. ComfyUI parses widgets_values
+                # positionally; inserting a new BOOLEAN earlier in the dict
+                # caused saved workflows to read their old position-N INT
+                # value into this slot (bool(18) -> True), accidentally
+                # enabling the green-only path while ALSO shifting the
+                # crush threshold to its default. Always append new
+                # widgets at the end (BUG-LOCAL-097 rule restated).
+                "green_only_overlay": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "BUG-LOCAL-104/105: when True, zero the procgen R "
+                        "and B channels (colorchannelmixer) BEFORE the "
+                        "blend so only the procgen G channel ever "
+                        "contributes. Filter chain also pins both inputs "
+                        "to gbrp planar RGB before blend and back to "
+                        "yuv420p after, so the per-channel math runs in "
+                        "RGB instead of YUV (where 'lighten' on Y/U/V "
+                        "creates color-shifting garbage that swallows a "
+                        "1%-sparse green wireframe). Source R/B pass "
+                        "through untouched (no color lift); source G gets "
+                        "boosted only where the procgen has green "
+                        "wireframe pixels. Pair with blend_mode='screen' "
+                        "or 'addition' -- 'lighten' will turn the "
+                        "wireframe pure white over fully-saturated "
+                        "magenta source pixels because max(255,0,255) vs "
+                        "(0,255,0) collapses to (255,255,255)."
                     ),
                 }),
             },
@@ -419,8 +452,8 @@ class PostUpscaleProcgenBlend:
         ffmpeg: str = "ffmpeg",
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",
-        green_only_overlay: bool = False,
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
+        green_only_overlay: bool = False,
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None

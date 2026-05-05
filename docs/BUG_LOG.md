@@ -21,6 +21,51 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-105 [FIXED]: green_only_overlay was firing but invisible -- triple-trap: widget position drift + YUV blend swallow + lighten-collapse-to-white
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-104 verification | **Bible candidate:** YES (each of the three traps is a generalizable lesson)
+- **Symptom:** BUG-104 shipped a `green_only_overlay` BOOLEAN widget. Test workflow regenerated with `green_only=True` baked in, queued, 8 outputs landed -- Jeffrey reported "they all look the same." External round-robin consult identified three compounding bugs that together made the fix invisible.
+- **Trap 1 -- widget position drift (re-broke BUG-097 rule):**
+  - I inserted `green_only_overlay` (BOOLEAN) BETWEEN `out_suffix` (STRING) and `shadow_crush_threshold` (INT) in the optional dict.
+  - ComfyUI parses `widgets_values` positionally. A workflow saved BEFORE BUG-104 had position-8 = `shadow_crush_threshold` (INT, default 18). After BUG-104, position-8 became `green_only_overlay` (BOOLEAN). The saved INT 18 was read as `bool(18) = True`.
+  - Net: green-only WAS firing on saved workflows -- but `shadow_crush_threshold` then defaulted to its INPUT_TYPES default (also 18) so the visible filter chain was actually correct. The bug here is robustness: had the new widget been inserted ahead of a STRING widget, validation would have crashed. **Fix: append new optional widgets at the END of the dict, never insert in the middle.** Same lesson as BUG-097. Restated explicitly in a comment at the widget definition site.
+- **Trap 2 -- ffmpeg blend ran in YUV, not RGB (the actual visible cause):**
+  - libx264 wants `yuv420p`. When `ffmpeg -filter_complex` produces output for libx264, ffmpeg auto-converts the filter graph internals to YUV unless explicitly pinned otherwise.
+  - The `blend=all_mode=lighten` filter then ran `lighten` per-plane on Y, U, V. Lighten on Y is "pick brighter luma"; lighten on U/V is "pick the higher chroma offset", which is meaningless mathematically. Result: the green wireframe's RGB intent got mangled into Y/U/V splatter that compressed away to nothing visible.
+  - **Fix:** explicitly pin both inputs to `format=gbrp` (planar RGB) before the blend, then `format=yuv420p` after. ffmpeg now runs the per-RGB-channel math the colorchannelmixer was designed for. Filter chain when `green_only_overlay=True`:
+    ```
+    [1:v] scale -> crop -> setpts -> lutrgb (crush) ->
+          colorchannelmixer (zero R+B) -> format=gbrp [pgn]
+    [0:v] format=gbrp [main]
+    [main][pgn] blend=mode:opacity:shortest -> format=yuv420p [v]
+    ```
+  - Legacy path (`green_only_overlay=False`) is untouched -- no format pin, blend reads `[0:v]` direct -- to preserve byte-identity for any saved workflow that was relying on the old behavior.
+- **Trap 3 -- lighten on saturated magenta + green = white (math correction):**
+  - I had been recommending `blend_mode=lighten` for the green-only case. That math collapses incorrectly:
+    - Source pixel (saturated magenta): `(255, 0, 255)`
+    - Procgen-after-mixer (pure green):  `(0, 255, 0)`
+    - lighten = max-per-channel:         `(255, 255, 255)` -- pure white, not green!
+  - Wherever the source has fully-saturated magenta or warm content, the wireframe goes white. Looks like glare, not phosphor.
+  - **Fix:** widget tooltip and BUG_LOG explicitly recommend pairing `green_only_overlay=True` with `blend_mode='screen'` or `'addition'`:
+    - screen formula `out = A + B - A*B` produces e.g. `(0.7, 1.0, 0.3)` for warm-source + green = visible green-shifted highlight.
+    - addition `out = A + B` (clamped) produces a more aggressive green-bias.
+    - Both preserve phosphor hue better than lighten in the saturated-source case. Lighten remains AVAILABLE in the dropdown, just not recommended for this combo.
+- **Companion: rebuilt `workflows/blend_test.json` as an A/B grid** -- top 4 nodes (blue-tinted) have `green_only=True` with modes screen/addition/lighten/overlay; bottom 4 (red-tinted) have `green_only=False` with the same 4 modes. Queue once, get 8 outputs with the BUG-105 fix vs without, side-by-side.
+- **Verify:**
+  - AST parse clean.
+  - INPUT_TYPES check: optional keys are `[blend_mode, blend_opacity, ffmpeg, bypass, out_suffix, shadow_crush_threshold, green_only_overlay]` -- green_only_overlay LAST.
+  - `_build_blend_cmd(green_only=True, mode=screen)` filter contains `format=gbrp[pgn]`, `[0:v]format=gbrp[main]`, `[main][pgn]blend=...:shortest=1,format=yuv420p[v]`. `colorchannelmixer` zeros R+B. `lutrgb` crush still present.
+  - `_build_blend_cmd(green_only=False, mode=lighten)` filter contains NO `format=gbrp`, NO `format=yuv420p`, blend reads `[0:v]` direct -- legacy path preserved.
+  - test_post_upscale_procgen_blend -> 17 passed in 3.07s.
+- **Tags:** procgen-blend, ffmpeg-yuv-vs-rgb, format-pinning, widget-position-drift, blend-math-correction, BUG-104-verification, round-robin-payoff
+- **Round-robin credit:** the three traps were caught by an external second-AI consult (problem statement provided in chat 2026-05-04 LATE EVENING). The YUV trap (#2) was the ACTUAL visible cause; the widget drift (#1) was a robustness issue that happened to land on a non-fatal value in the test case; the lighten/white collapse (#3) was a documentation / recommendation correction. Without the consult, would have shipped the green-only flag with all three traps unfixed.
+- **Related:**
+  - BUG-LOCAL-097 (widget position drift first lesson; broke saved workflow validation).
+  - BUG-LOCAL-104 (green_only_overlay introduction -- was correct code-wise but invisible due to YUV trap).
+  - BUG-LOCAL-103 (shadow crush, runs first in the procgen filter chain).
+- **Followup not blocking:** if x264 compression eats the 1%-sparse green wireframe even with the format pin, add an optional `green_halation` widget (FLOAT 0-3, default 0) that inserts `boxblur=N:1` after `colorchannelmixer` to thicken the wireframe before encode. Flagged by the round-robin AI as a likely next iteration.
+
+---
+
 ### BUG-LOCAL-104 [FIXED]: green_only_overlay -- isolate procgen G channel before blend so v1.7 phosphor-green CRT is visible regardless of source scene color
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-103 followup | **Bible candidate:** YES (channel-isolated overlay pattern)
 - **Symptom:** even with BUG-103 shadow crush at 18, the 8-mode test workflow against echo_in_stasis produced thumbnails that all looked magenta/pink. The procgen file was confirmed to be the correct v1.7 green-CRT render (file hash 20DA132B... 50.0 MB, dark max RGB (57, 95, 51) green-dominant, 99% pure black, sparse green wireframe content). The SOURCE file (file hash 50F5E10E... 15.4 MB, OBS upscale of HuMo+LTX master mix) had its own scene content with magenta porthole + warm room. lighten/screen/addition blend modes preserve source where source > procgen, and the sparse green wireframe lost the brightness contest against bright source pixels. Result: green CRT was technically in the output but visually drowned out -- the v1.7 SIGNAL LOST signature was effectively invisible.
