@@ -1989,13 +1989,28 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
     # tradeoff that needs scientific measurement before being raised.
     # See docs/2026-04-29-vram-context-test.md for the measurement
     # framework that informs future increases.
+    # BUG-LOCAL-101 (2026-05-04 LATE EVENING): Mistral-Nemo cap dropped
+    # from 16384 to 8192 because the 310-word run at 16384 OOM'd during
+    # SDPA prefill of the main script generation. Trace: model loaded
+    # at NF4 = 7.74 GiB (BUG-098 tripwire confirmed), then prefill on a
+    # ~6-8k token prompt (winning spine + cast roster + news body +
+    # format spec) requested a 4.15 GiB attention buffer for one
+    # layer's QKV scaled-dot-product, pushing total allocation to 25.41
+    # GiB on a 16 GiB device. The prefill attention buffer scales with
+    # seq_len^2 * n_heads, and at 16384 cap + long prompt, one layer
+    # alone can hit 4+ GiB. Halving the cap to 8192 cuts the per-layer
+    # attention budget by 4x in the worst case (the N^2 component) and
+    # halves KV cache reservation. v1.7's known-good cap was 6144;
+    # 8192 is a middle ground that preserves enough prompt headroom for
+    # a 310-word episode with full OpenClose context. If 8192 still
+    # OOMs on a longer-target run, drop to 6144 next.
     _MODEL_CONTEXT_CAPS = {
-        "mistralai/Mistral-Nemo-Instruct-2407":              16384,
+        "mistralai/Mistral-Nemo-Instruct-2407":               8192,
         "google/gemma-4-E2B-it":                             16384,
         "google/gemma-4-E4B-it":                             16384,
-        "Qwen/Qwen2.5-14B-Instruct":                         12288,
-        "Nitral-AI/Captain-Eris_Violet-V0.420-12B":          12288,
-        "inflatebot/MN-12B-Mag-Mell-R1":                     12288,
+        "Qwen/Qwen2.5-14B-Instruct":                          8192,
+        "Nitral-AI/Captain-Eris_Violet-V0.420-12B":           8192,
+        "inflatebot/MN-12B-Mag-Mell-R1":                      8192,
         "google/gemma-2-2b-it":                               8192,
         "google/gemma-2-9b-it":                               8192,
     }

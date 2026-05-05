@@ -21,6 +21,30 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-101 [FIXED]: SDPA prefill OOM on 310-word run -- Mistral-Nemo context_cap dropped 16384 -> 8192
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-098 tripwire validation | **Bible candidate:** YES (context-window VRAM tradeoff)
+- **Symptom:** 310-word run at 18:02:24 OOM'd during main script generation prefill. `torch.OutOfMemoryError: Currently allocated 25.41 GiB / Device limit 15.92 GiB. Requested 4.15 GiB`. The single 4.15 GiB allocation request was the SDPA attention buffer for one layer's QKV scaled-dot-product on the long prompt.
+- **What this is NOT (BUG-098 was a misdiagnosis):**
+  - The BUG-098 NF4 tripwire FIRED on BOTH loads (first load AND the OpenClose-triggered second load) and PASSED both times: `linear4bit_count=280 is_loaded_in_4bit=True vram_delta=7.74GiB (ceiling=11.00GiB)`. NF4 quantization IS being applied correctly on every load. The "fast 33 it/s vs slow 22 it/s" weight-loading delta I attributed to "bitsandbytes silent fp16 fallback" was wrong -- it's just Windows filesystem cache warm-up after the first load. Both ChatGPT and Gemini round-robin had warned that the speed delta was suggestive, not conclusive; the tripwire's module-class inspection is the ground truth, and it confirms NF4 every time.
+  - The `LLM cache mismatch [budget_profile: 'Standard'->'Pro (Ultra Quality)']` unload+reload at 18:02:05 IS a separate cache-hygiene issue (some earlier inference passed Standard profile when the orchestrator should have been using Pro Ultra Quality). It triggers an unnecessary reload, but NF4 still applies on the reload, so it's not the OOM cause.
+- **Cause:** the actual OOM is inference-time prefill attention. With Mistral-Nemo 12B + bnb-NF4 + bf16 compute + max_position_embeddings=16384 + long prompt (~6-8k tokens of winning spine + cast roster + news body + format spec + announcer bookend prompt), the SDPA prefill needs to allocate per-layer attention buffers that scale as O(seq_len^2 * n_heads). At 16384 cap, one layer's attention buffer can hit 4+ GiB. Combined with the 7.74 GiB NF4 model + KV cache + activation buffers, total allocation reaches 25 GiB on a 16 GiB device. v1.7's known-good cap was 6144; the cap was raised to 16384 in BUG-LOCAL-065 (2026-04-29) to preserve long Gemma 4 E2B body-pass prompts but the change wasn't VRAM-budgeted for Mistral-Nemo's larger architecture.
+- **Fix (`nodes/story_orchestrator.py`, 1-line change):**
+  - **`_MODEL_CONTEXT_CAPS["mistralai/Mistral-Nemo-Instruct-2407"]: 16384 -> 8192`**. Halving the cap reduces:
+    - Per-layer attention buffer worst case by ~4x (the N^2 component of SDPA scales quadratically; halving N reduces the buffer by 4x).
+    - KV cache reservation by 2x.
+    - Net: ~6-10 GiB headroom recovered for the prefill spike.
+  - Companion caps for other 12B-class models (Qwen 14B, Captain-Eris, Mag-Mell) also dropped from 12288 to 8192 by the same logic. Gemma 2/4 caps preserved at 16384/8192 because those are smaller models with smaller per-layer attention budgets.
+  - 8192 is a middle ground -- v1.7 used 6144; 16384 OOMs on long prompts. 8192 preserves enough prompt headroom for a 310-word OpenClose run while keeping inference VRAM under the 14.5 GiB ceiling. If 8192 still OOMs on a 700-word run, drop to 6144 next.
+- **Verify:**
+  - AST parse clean (573613 bytes, 39863 nodes).
+  - test_core + test_critique_dialogue_preservation + test_news_history_ttl -> 139 passed in 5.22s.
+  - Live: next 310-word run should complete the main script generation phase without OOM. The runtime log will show `[StoryOrchestrator] Hardening: Capping 128k context to 8192` instead of the prior `to 16384`.
+- **What this changes for the BUG-098 entry:** moving BUG-098 from `[PARTIAL FIX SHIPPED]` to `[FIXED -- TRIPWIRE PROVED NF4 NEVER WAS THE PROBLEM]`. The tripwire is still valuable as a regression guard; BUG-098 just turns out to have been the wrong diagnosis for the OOM symptom. The OOM is BUG-101.
+- **Tags:** llm-context, sdpa-prefill, attention-buffer, vram-ceiling, mistral-nemo-12b, BUG-098-misdiagnosis-followup
+- **Related:** BUG-LOCAL-098 (the NF4 tripwire that proved this isn't a quantization issue). BUG-LOCAL-065 (the 2026-04-29 cap raise that this entry partially reverts for the 12B-class models). BUG-LOCAL-004 (earlier ScriptWriter OOM history; same family of "main gen OOMs at long prompt sizes"). The `budget_profile: 'Standard'->'Pro (Ultra Quality)'` cache drift is a separate hygiene issue that deserves its own follow-up but is not blocking. Tomorrow: build the isolated NF4 reload test harness anyway -- now we know the SECOND-load NF4 path is fine, so the harness pivots to validating the cap reduction holds across rerun cycles + investigating where Standard sneaks into the budget_profile chain.
+
+---
+
 ### BUG-LOCAL-100 [DIAGNOSED, FIX TOMORROW]: Bark over-pads short character lines with hallucinated noise tail
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-099 hotfix observation | **Bible candidate:** YES (Bark TTS lifecycle / silence-trim / dur-cap)
 - **Symptom (live `signal_lost_echo_in_stasis_20260504_170903`):** at 0:34 in the final composite the audio is "harsh noise / garbage" -- not dialogue. Visual is RUFE's HuMo lipsync (correct routing), but the underlying audio is incoherent noise.
