@@ -53,6 +53,13 @@ from typing import Any
 import numpy as np
 import torch  # type: ignore
 
+# folder_paths is the ComfyUI canonical path resolver. The portrait
+# write site uses _OTRP.otr_portraits_dir(episode_id) which composes
+# folder_paths.get_output_directory() under the hood, so this top-level
+# import documents the Bug Bible BUG-01.02 contract that every
+# OUTPUT_NODE module references the canonical resolver.
+import folder_paths  # noqa: F401
+
 log = logging.getLogger("OTR")
 
 

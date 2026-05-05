@@ -37,6 +37,13 @@ import logging
 import shutil
 from pathlib import Path
 
+# folder_paths is the ComfyUI canonical path resolver. This node copies
+# from a caller-supplied source path to a sibling file, so it doesn't
+# need to resolve the output_dir itself -- but the import documents the
+# Bug Bible BUG-01.02 contract that every OUTPUT_NODE module references
+# the canonical resolver, even when the node operates on caller paths.
+import folder_paths  # noqa: F401
+
 log = logging.getLogger("OTR")
 
 

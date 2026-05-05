@@ -1125,13 +1125,14 @@ The TTL fix kept the file at ``<repo>/config/news_history.json`` -- repo-local, 
 - **Verify:** After fix, `python -m pytest tests/` runs to completion, no collection errors, all hangs resolved, backend_dispatch failures triaged (fixed or marked xfail with reason).
 - **Tags:** test-infra, pre-existing, otr_v2-orphans, claude-md-staleness
 
-### BUG-LOCAL-002: `scripts/soak_operator.py` widget indices stale (drift since episode_title + num_characters added)
+### BUG-LOCAL-002 [FIXED]: `scripts/soak_operator.py` widget indices stale (drift since episode_title + num_characters added)
 - **Date:** 2026-05-02 | **Phase:** 0 (smoke harness) | **Bible candidate:** yes
 - **Symptom:** `scripts/soak_operator.py` declares `WV_GENRE=1`, `WV_TARGET_WORDS=2`, `WV_CREATIVITY=11`, `WV_OPT_PROFILE=13`. Reading `nodes/story_orchestrator.py::OTR_LLMScriptWriter.INPUT_TYPES` shows the actual widget order is now: `[0]episode_title, [1]target_words, [2]num_characters, [3]model_id, [4]cleanup_model_id, [5]custom_premise, [6]include_act_breaks, [7]self_critique, [8]open_close, [9]target_length, [10]style, [11]style_custom, [12]creativity, [13]arc_enhancer, [14]optimization_profile`.
 - **Cause:** `episode_title` and `num_characters` widgets were added to the script-writer node, plus `style_custom` and `arc_enhancer` were inserted. soak_operator constants were never updated. Anything calling `supersoaker.py::patch_workflow` writes to the wrong slots: `creativity` write lands on `style_custom` (string field, broken), `optimization_profile` write lands on `arc_enhancer` (boolean field, broken), `target_words` write lands on `num_characters`, and `WV_GENRE=1` writes target_words.
-- **Fix:** **Pending — do NOT fix mid-test per ground rules.** Correct constants: `WV_TARGET_WORDS=1, WV_NUM_CHARACTERS=2, WV_SELF_CRITIQUE=7, WV_TARGET_LENGTH=9, WV_STYLE=10, WV_CREATIVITY=12, WV_ARC_ENHANCER=13, WV_OPT_PROFILE=14`. Drop `WV_GENRE` (the widget no longer exists; "genre" was effectively replaced by `style`). Update `supersoaker.py::patch_workflow` cfg keys accordingly. Add a smoke assertion that reads node 1's widget names from `/object_info` and aborts if order doesn't match constants.
-- **Verify:** After fix, run supersoaker P0 → confirm log shows correct `target_words`, `target_length`, `creativity`, `optimization_profile` values; ledger reflects what was patched.
-- **Tags:** widget-drift, soak-harness, supersoaker, bible-candidate
+- **Fix (shipped 2026-05-02):** the entire WV_*-positional approach was retired. `scripts/soak_operator.py` is now a 100-line legacy shim that only retains the read-only `scan_treatment` helper kept for the test import. `scripts/supersoaker.py` was deleted. Canonical surface for talking to the ComfyUI HTTP API is now `scripts/otr_api.py`, which patches widgets BY NAME using the live `/object_info` schemas — eliminating the entire class of widget-position-drift bugs by construction. Confirmed in code 2026-05-05; BUG_LOG entry tag updated accordingly.
+- **Verify:** `head -25 scripts/soak_operator.py` reads "LEGACY SHIM (BUG-LOCAL-002 fix, 2026-05-02)"; the WV_* constants are gone; `scripts/otr_api.py` exists as the name-based patcher.
+- **Followup (separate, low priority — Jeffrey 2026-05-05):** build ONE good stable randomizer-soaker on top of `scripts/otr_api.py` for the current canonical workflow. Touches only validated widget options, never the dangerous ones. After higher-priority bug fixes ship.
+- **Tags:** widget-drift, soak-harness, supersoaker, bible-candidate, fixed-via-rewrite
 
 ### BUG-LOCAL-003: ComfyUI Desktop launch does not inherit user-scope `HF_HOME`
 - **Date:** 2026-05-02 | **Phase:** 0 (smoke harness) | **Bible candidate:** yes
@@ -1206,17 +1207,19 @@ Post-fix regression: `python -m pytest tests/ --ignore=tests/test_dropdown_guard
 - **Promote-to-Bible-only-if:** a future LTX line (3B, 5B, 13B) ships with split UNet/T5/VAE artifacts AND we re-validate that LowVRAMCheckpointLoader's dependency edge keeps the C2 sequencing guarantee under 14.5 GB. Until then this stays as a documented OTR-local deviation.
 - **Tags:** ltx, loader, c2-deviation, sequencing, deps-edge
 
-### BUG-LOCAL-008 [DOCUMENTED]: LTX CFG=1.0 mathematically erases the negative prompt
+### BUG-LOCAL-008 [FIXED]: LTX CFG=1.0 mathematically erases the negative prompt
 
-- **Date:** 2026-05-02 | **Phase:** S3.1 (LTX wiring) | **Bible candidate:** yes
+- **Date:** 2026-05-02 (logged) / 2026-05-05 (fix verified + reinforced) | **Phase:** S3.1 (LTX wiring) | **Bible candidate:** yes
 - **Symptom:** Round-robin Gemini caught: standard CFG math is `output = uncond + CFG * (cond - uncond)`. At CFG=1.0 this simplifies to `output = cond` -- the negative prompt is 100% unused. ROADMAP locks `LTX_CFG = 1.0` for the distilled sigma schedule. So the negative prompt in `_LTX_NEGATIVE` ("person, human, face, woman, man, hands, fingers, body, ...") is mathematically discarded by the sampler. Faces / people may still appear in LTX clips because the prompt suppression we *thought* was active isn't.
 - **Cause:** Distilled LTX (`LTX_DISTILLED_SIGMAS` from Goofer) is tuned for CFG=1.0 because higher CFG with low-step distillation produces overcooked / artifacted output. The negative prompt was carried over from non-distilled LTX patterns where CFG≥1.5 made the negative effective.
-- **Fix (deferred):** Two options for next sprint, both empirical:
-  1. Raise CFG to 1.3-2.0 and re-tune sigma schedule (changes motion characteristics; needs A/B smoke).
-  2. Remove the negative prompt encode entirely (saves T5 forward pass; output unchanged at CFG=1.0).
-  Until then: tighten POSITIVE prompts in `_PROMPT_BY_ROLE` to avoid human-implying terms ("announcer at microphone" → "vintage microphone on desk"), since the positive branch is the only one the sampler sees at CFG=1.0.
-- **Verify:** ffprobe + visual review of LTX clips after smoke. If `_PROMPT_BY_ROLE` text contains "announcer / radio host / broadcaster" terms AND faces appear in the rendered output, this bug is the cause.
-- **Tags:** ltx, cfg, prompt-policy, distilled-sigma
+- **Fix (shipped 2026-05-05):**
+  - **Already-shipped baseline (commit `d57535a`):** `_PROMPT_BY_ROLE` was created with `"no people in frame"` as an explicit positive cue in every role (announcer / music_open / music_close / music_inter / sfx). No human-implying nouns ("announcer at microphone", "radio host", "broadcaster") in the body of any role. So the positive-only suppression strategy was effectively in place since the file's first commit; this BUG_LOG entry's "Fix (deferred)" plan to "tighten POSITIVE prompts" was already complete in code when the bug was logged 2026-05-02.
+  - **Reinforcement (this commit):** added `"unattended equipment, empty studio"` to every role's positive prompt as a belt-and-suspenders bias, matching the positive-only suppression strategy CFG=1.0 mathematics requires. CFG/sigma schedule itself untouched (locked architecture).
+- **Verify:**
+  - sirens_print 2026-05-05 LTX announcer clip @ 0:03 and TV broadcast wide @ 0:15 -- no unwanted faces / people in either; only the radio set + TV broadcast equipment animating as intended.
+  - dark_transponder 2026-05-05 LTX announcer beats -- same, clean equipment-only renders.
+- **Future option (deferred):** if a future LTX line ships with non-distilled sigma support, raising CFG to 1.3-2.0 and re-enabling the negative prompt would let us suppress humans via the negative branch the way most other diffusion models do. Until then, positive-only suppression is the canonical pattern.
+- **Tags:** ltx, cfg, prompt-policy, distilled-sigma, positive-only-suppression
 
 ### BUG-LOCAL-009 [DEFERRED]: Per-stage VRAM logging across HuMo→LTX→VC→RTX boundary
 

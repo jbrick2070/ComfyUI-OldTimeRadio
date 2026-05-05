@@ -169,35 +169,48 @@ LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fi
 # Speaker_role -> LTX prompt template. Builds a per-cue prompt anchored
 # to the radio bookend image so the model knows we want the radio set
 # animating, not random scenes.
+#
+# BUG-LOCAL-008 (2026-05-02 / verified 2026-05-05): LTX 2B v0.9 distilled
+# runs at CFG=1.0, which mathematically erases the negative prompt
+# (output = uncond + CFG*(cond-uncond) reduces to output = cond when
+# CFG=1.0). The negative prompt encode in this node is therefore inert;
+# all human-suppression must come through POSITIVE prompts. Each role
+# prompt below carries belt-and-suspenders positive cues to bias toward
+# unattended-equipment shots: explicit "no people in frame", "unattended
+# studio", "equipment only", and no human-implying nouns ("announcer at
+# microphone", "radio host", "broadcaster") in the body.
 _PROMPT_BY_ROLE = {
     "announcer": (
         "Vintage 1940s radio broadcast set, glowing tuning dial pulses "
         "gently, copper vacuum tubes warm amber glow, brass speaker "
         "grille vibrates subtly with the music, dim studio lighting, "
-        "slow dolly forward, no people in frame, cinematic 35mm film grain"
+        "slow dolly forward, unattended equipment, empty studio, no "
+        "people in frame, cinematic 35mm film grain"
     ),
     "music_open": (
         "Vintage 1940s radio at the start of a broadcast, dial sweeping "
         "across frequency band, oscilloscope-style display animating, "
         "warm amber tube glow brightening, slow camera dolly forward, "
-        "no people in frame, cinematic mood, 35mm film grain"
+        "unattended equipment, empty studio, no people in frame, "
+        "cinematic mood, 35mm film grain"
     ),
     "music_close": (
         "Vintage 1940s radio at the end of a broadcast, dial settling, "
         "tube glow dimming gently, scope display fading, slow camera "
-        "pull back, dim studio lighting, no people in frame, "
-        "cinematic 35mm film grain"
+        "pull back, dim studio lighting, unattended equipment, empty "
+        "studio, no people in frame, cinematic 35mm film grain"
     ),
     "music_inter": (
         "Vintage 1940s radio playing instrumental music, dial steady, "
         "oscilloscope-style display animating to the rhythm, copper "
-        "tubes glow warm, gentle camera drift, no people in frame, "
-        "cinematic 35mm film grain"
+        "tubes glow warm, gentle camera drift, unattended equipment, "
+        "empty studio, no people in frame, cinematic 35mm film grain"
     ),
     "sfx": (
         "Vintage 1940s radio reacting to a sound effect, tube glow "
         "flickers, scope display spikes briefly, dial trembles, dim "
-        "studio lighting, no people in frame, cinematic 35mm film grain"
+        "studio lighting, unattended equipment, empty studio, no "
+        "people in frame, cinematic 35mm film grain"
     ),
 }
 
