@@ -21,6 +21,46 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-106 [FIXED]: ship `screen` + `green_only=True` as production default after BUG-105 A/B confirmed `screen_GREEN_crush18` was visibly correct
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-105 A/B verification | **Bible candidate:** YES (default visual signature for procgen overlay)
+- **Symptom:** post BUG-105 fix, A/B test workflow rendered 8 outputs (4 with green_only_overlay=True, 4 without). Jeffrey reviewed and signed off on `signal_lost_echo_in_stasis_20260504_170903_BLEND_TEST_screen_GREEN_crush18.mp4` as "perfect" -- that combo is now the canonical procgen blend signature for v2.0. Default needs to flip from BUG-099's `lighten` + green_only_off to `screen` + green_only_on.
+- **Why screen, not lighten or addition:**
+  - `lighten = max(A, B)` per channel collapses to white over fully-saturated source pixels. With green_only_overlay zeroing procgen R+B, max((255,0,255), (0,255,0)) = (255,255,255). The wireframe goes white-on-magenta -- looks like glare, not phosphor.
+  - `addition = A + B` (clamped) is too aggressive in mid-tones; pushes green to clipping over moderately bright source content, washes out wireframe edges.
+  - `screen = A + B - A*B` is multiplicative-additive: preserves source R and B exactly when procgen R and B are 0 (since the `- A*B` term goes to 0 too), and lifts source G by `A_g + B_g - A_g*B_g` -- visible green CRT phosphor that scales with source brightness rather than collapsing or clipping.
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~10 LOC):**
+  - `_DEFAULT_BLEND_MODE` flipped from `"lighten"` to `"screen"`.
+  - New `_DEFAULT_GREEN_ONLY = True` constant added.
+  - `green_only_overlay` widget default flipped from `False` to `_DEFAULT_GREEN_ONLY`.
+  - `blend()` method signature: `green_only_overlay: bool = _DEFAULT_GREEN_ONLY`.
+- **Companion -- canonical workflow `workflows/otr_scifi_16gb_full.json`:**
+  - OTR_PostUpscaleProcgenBlend node id=58 widgets_values padded from 7 entries to 9, with the new defaults baked in:
+    ```
+    [0] ''                        # source_mp4_path (wired via link)
+    [1] ''                        # procgen_mp4_path (wired via link)
+    [2] 'screen'                  # blend_mode (BUG-106)
+    [3] 1.0                       # blend_opacity
+    [4] 'ffmpeg'
+    [5] False                     # bypass
+    [6] '_procgen_blended'        # out_suffix
+    [7] 18                        # shadow_crush_threshold (BUG-103)
+    [8] True                      # green_only_overlay (BUG-106)
+    ```
+  - This means: production runs from this point forward emit the v1.7 SIGNAL LOST phosphor-green CRT signature on top of HuMo+LTX scene renders by default. No widget-tuning needed in ComfyUI; just queue the canonical workflow.
+- **Updated test:** `test_default_blend_mode_is_lighten` -> `test_default_blend_mode_is_screen_with_green_only`. Asserts both new defaults so a silent revert is caught at unit-test time.
+- **Verify:**
+  - AST parse clean.
+  - test_post_upscale_procgen_blend -> 17 passed in 3.16s (test_default_blend_mode renamed and now asserts both screen + green_only).
+- **Tags:** procgen-blend, default-flip, screen-mode, green-only, v17-signal-lost-restoration, BUG-105-followup, jeffrey-signoff
+- **Provenance:** Jeffrey approved the visual on `signal_lost_echo_in_stasis_20260504_170903_BLEND_TEST_screen_GREEN_crush18.mp4` direct quote: "this was one was perfect". Visual sign-off captured here so the design history shows WHICH combo was chosen and on which source.
+- **Related:**
+  - BUG-LOCAL-099 (previous default `lighten` -- now superseded for the green_only=True path).
+  - BUG-LOCAL-105 (the triple-trap that made BUG-104 invisible -- without that fix, BUG-106 couldn't have shipped).
+  - BUG-LOCAL-103 (shadow crush at threshold 18 still applies in the chain before colorchannelmixer).
+- **Followup:** the canonical workflow change is for `otr_scifi_16gb_full.json`. If other saved workflows exist that wire OTR_PostUpscaleProcgenBlend (e.g. older BUG-099 era variants), they'll continue to work -- the widget defaults backfill on load -- but won't get the new defaults until they're re-saved or the user manually toggles the widgets. Document this in the next workflow audit pass.
+
+---
+
 ### BUG-LOCAL-105 [FIXED]: green_only_overlay was firing but invisible -- triple-trap: widget position drift + YUV blend swallow + lighten-collapse-to-white
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-104 verification | **Bible candidate:** YES (each of the three traps is a generalizable lesson)
 - **Symptom:** BUG-104 shipped a `green_only_overlay` BOOLEAN widget. Test workflow regenerated with `green_only=True` baked in, queued, 8 outputs landed -- Jeffrey reported "they all look the same." External round-robin consult identified three compounding bugs that together made the fix invisible.

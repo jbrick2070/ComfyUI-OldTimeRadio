@@ -74,17 +74,25 @@ def test_default_blend_opacity_is_full_strength(node):
     assert spec["optional"]["blend_opacity"][1]["default"] == 1.0
 
 
-def test_default_blend_mode_is_lighten(node):
-    """BUG-LOCAL-099 (2026-05-04 LATE EVENING): default blend_mode
-    settled on "lighten" at full strength after BUG-096's "screen"
-    default produced a global magenta tint on uniform-color procgen
-    frames. "lighten" is pixel-wise max(upscale, procgen) -- bright
-    procgen elements show through, dim regions defer to upscale.
-    Keeps the brightness intent of BUG-096 without the color-cast
-    side effect.
+def test_default_blend_mode_is_screen_with_green_only(node):
+    """BUG-LOCAL-106 (2026-05-04 LATE EVENING): default flipped from
+    "lighten" + green_only=False to "screen" + green_only=True after
+    BUG-105 A/B confirmed `screen_GREEN_crush18` was the visibly
+    correct combo on echo_in_stasis source. screen + green_only_overlay
+    pairs cleanly because:
+      - green_only_overlay zeros procgen R and B before the blend
+      - screen formula `out = A + B - A*B` preserves source R and B
+        (B contribution from procgen is 0 -> source channel passes
+        through) and lifts source G exactly where the green CRT
+        wireframe lives.
+    Pre-106 "lighten" default collapsed to white over fully-saturated
+    source pixels (max((255,0,255),(0,255,0)) == (255,255,255)) --
+    looked like glare, not phosphor. Pin the new default so a silent
+    revert is caught.
     """
     spec = node.INPUT_TYPES()
-    assert spec["optional"]["blend_mode"][1]["default"] == "lighten"
+    assert spec["optional"]["blend_mode"][1]["default"] == "screen"
+    assert spec["optional"]["green_only_overlay"][1]["default"] is True
 
 
 def test_blend_cmd_uses_audio_passthrough(node, tmp_path):

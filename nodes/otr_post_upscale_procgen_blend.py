@@ -58,8 +58,20 @@ log = logging.getLogger(__name__)
 # procgen content (ambient color cast) defers to the upscale wherever
 # the upscale is brighter. Keeps the brightness Jeffrey asked for in
 # BUG-096 without the color-cast side effect.
-_DEFAULT_BLEND_MODE = "lighten"
+# BUG-LOCAL-106 (2026-05-04 LATE EVENING): production default flipped
+# from "lighten" + green_only=False to "screen" + green_only=True after
+# BUG-105 A/B confirmed `screen_GREEN_crush18` was the visibly correct
+# combo on echo_in_stasis source. The `screen` formula
+# (out = A + B - A*B) preserves source color in R and B (since procgen
+# R and B are zeroed by green_only_overlay) and lifts source G exactly
+# where the green CRT wireframe lives -- visible v1.7 SIGNAL LOST
+# phosphor on top of any HuMo+LTX scene render. Pre-106 default
+# (lighten) collapses to white over fully-saturated source pixels
+# (max(255,0,255), (0,255,0)) = (255,255,255) -- looks like glare,
+# not phosphor. screen avoids that math collapse.
+_DEFAULT_BLEND_MODE = "screen"
 _DEFAULT_BLEND_OPACITY = 1.0
+_DEFAULT_GREEN_ONLY = True
 # BUG-LOCAL-103 (2026-05-04 LATE EVENING): pre-blend shadow crush.
 # Pixel inspection of a procgen mp4 dark region (signal_lost_echo_in_stasis
 # 0:22, 99% of frame is luminance < 32) showed the "black" background is
@@ -414,9 +426,9 @@ class PostUpscaleProcgenBlend:
                 # crush threshold to its default. Always append new
                 # widgets at the end (BUG-LOCAL-097 rule restated).
                 "green_only_overlay": ("BOOLEAN", {
-                    "default": False,
+                    "default": _DEFAULT_GREEN_ONLY,
                     "tooltip": (
-                        "BUG-LOCAL-104/105: when True, zero the procgen R "
+                        "BUG-LOCAL-104/105/106: when True, zero the procgen R "
                         "and B channels (colorchannelmixer) BEFORE the "
                         "blend so only the procgen G channel ever "
                         "contributes. Filter chain also pins both inputs "
@@ -453,7 +465,7 @@ class PostUpscaleProcgenBlend:
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
-        green_only_overlay: bool = False,
+        green_only_overlay: bool = _DEFAULT_GREEN_ONLY,
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None

@@ -1865,11 +1865,13 @@
       "widgets_values": [
         "",
         "",
-        "lighten",
+        "screen",
         1.0,
         "ffmpeg",
         false,
-        "_procgen_blended"
+        "_procgen_blended",
+        18,
+        true
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
