@@ -21,6 +21,32 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-100 [DIAGNOSED, FIX TOMORROW]: Bark over-pads short character lines with hallucinated noise tail
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-099 hotfix observation | **Bible candidate:** YES (Bark TTS lifecycle / silence-trim / dur-cap)
+- **Symptom (live `signal_lost_echo_in_stasis_20260504_170903`):** at 0:34 in the final composite the audio is "harsh noise / garbage" -- not dialogue. Visual is RUFE's HuMo lipsync (correct routing), but the underlying audio is incoherent noise.
+- **Diagnosis from ledger:**
+  - `lines[2]` (l003): `text="Golly, it! THE STOWAGE TUBE COLLAPSED."`, `word_count=6`, `dur_s=14.4`, `bark_wav_dur_s=14.4`, `bark_render_ms=28070`. The text is a ~6-word phrase that should take ~2.4s at normal speech rate (2-3 words/sec). Bark generated 14.4s of audio anyway, then OTR placed the whole 14.4s wav into the master mix at start_s=21.08s. The first ~3s is real speech; the trailing ~11s is Bark hallucinating tail noise to fill the requested duration.
+  - Episode-wide degenerate output: `total_episode_dur_s=43.08`, `total_word_count=23` for a 100-word target. The script writer collapsed the script into 3 short lines, then each line's audio was over-padded the same way.
+- **Likely cause (one of three; needs investigation):**
+  1. **`max_length` param on Bark generation is set per-LINE based on line `dur_s` instead of word_count.** When the LLM stamps `dur_s=14.4` on a 6-word line, Bark gets asked for 14.4s and obediently produces noise to fill.
+  2. **No VAD / silence-trim post-Bark.** Even if Bark over-generates, a trim pass at the speech-end boundary would cut the noise tail before placement.
+  3. **Speaker preset `v2/en_speaker_1` has known long-tail hallucination on short prompts.** Some Bark voices end better than others; en_speaker_1 historically tends to ramble. Switching default character voice to a cleaner preset (en_speaker_3, en_speaker_9) could mitigate.
+- **What this is NOT:**
+  - Not a pipeline placement bug -- the HuMo + LTX + composite ledger is correct; the audio overlap with RUFE's lipsync IS the right routing.
+  - Not the same as BUG-LOCAL-027 (critique pass wiping dialogue) -- the LLM produced dialogue, just degenerate-short.
+  - Not a Bark loader / VRAM issue -- Bark ran for 28s and produced a wav, just one with hallucinated tail.
+- **Fix candidates (pick after harness tomorrow):**
+  - **A) Word-count-derived duration cap before Bark.** `target_dur_s = max(min_dur, word_count / 2.2)`. Pass this as Bark's max_length. Cuts the over-pad at the source.
+  - **B) Post-Bark silence/VAD trim.** Run silero-vad or a simple energy threshold trim on the Bark wav before placement. Cuts the hallucinated tail.
+  - **C) Drop trailing low-energy region.** Simpler than VAD: scan the wav from the end and drop any segment below -40dBFS until real speech is found. Adds ~50ms post-process per line.
+  - **D) Cap LLM-allocated `dur_s` on the line.** Make ScriptWriter clamp `dur_s = min(stated_dur, words / 2.0)` so the contract Bark sees is sane.
+- **Recommendation:** A + B together. A prevents over-generation; B cleans up edge cases where Bark still pads. C is a fallback if VAD library fails to install on the Blackwell stack.
+- **Workaround for tonight:** none. Bark's output is what it is for this run. Restart + re-queue picks a different headline + script and may produce healthier dur_s allocations.
+- **Tags:** bark-tts, vad, silence-trim, dur-mismatch, audio-quality, BUG-027-adjacent
+- **Related:** BUG-LOCAL-027 (critique pass wiping dialogue -- different cause, similar surface symptom of "not enough actual dialogue"). Mistral-Nemo + creativity=maximum chaos + 100-word target combo may amplify this; might also help to clamp creativity for ultra-short presets.
+
+---
+
 ### BUG-LOCAL-099 [FIXED]: procgen overlay produced global magenta tint -- "screen" -> "lighten" at full strength
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-096 hotfix | **Bible candidate:** YES (defaults tuning)
 - **Symptom:** screenshot from live composite at 0:00:03 (`Echo in Stasis` episode) showed the entire frame magenta/pink. Radio room walls, porthole, TV screen, control panel -- everything tinted. The post-BUG-096 default of `screen` blend at 1.0 opacity was adding procgen's color values to every pixel, producing a global magenta cast in regions where procgen had uniform mid-tone color (the SIGNAL LOST scene background).
