@@ -60,7 +60,45 @@ log = logging.getLogger(__name__)
 # BUG-096 without the color-cast side effect.
 _DEFAULT_BLEND_MODE = "lighten"
 _DEFAULT_BLEND_OPACITY = 1.0
-_BLEND_MODE_CHOICES = ["lighten", "screen", "addition", "overlay", "normal"]
+# BUG-LOCAL-103 (2026-05-04 LATE EVENING): pre-blend shadow crush.
+# Pixel inspection of a procgen mp4 dark region (signal_lost_echo_in_stasis
+# 0:22, 99% of frame is luminance < 32) showed the "black" background is
+# NOT true #000000 -- mean RGB was (4.86, 4.54, 10.06) with a clear blue
+# cast (B is 2x R/G), and only 0.014% of pixels are actually #000. Any
+# brighter-than-source blend (lighten, screen, addition, dodge) lifts the
+# source dark areas toward this blue tint, producing a magenta/pink wash
+# in highlights -- the BUG-099 symptom Jeffrey was chasing. Fix: clamp
+# any procgen RGB channel below threshold to 0 BEFORE blend, normalizing
+# the "near black" noise floor to true black so blend modes have nothing
+# to leak. Threshold 18 = covers the 5-10 noise floor with margin while
+# preserving the 95-max green flecks of legit motion content. 0 disables.
+_DEFAULT_SHADOW_CRUSH = 18
+# BUG-LOCAL-102 (2026-05-04 LATE EVENING): expanded the dropdown to include
+# the popular ffmpeg blend filter modes so the BUG-099 tuning workflow can
+# A/B test all useful options without code edits. Pre-102 the dropdown only
+# accepted 5 modes (lighten, screen, addition, overlay, normal); the test
+# workflow Jeffrey wanted with 8 modes had 5 of them rejected as invalid
+# dropdown values (red text on the canvas). All 16 modes below are valid
+# ffmpeg blend=all_mode= values per ffmpeg filter docs. Sorted by usefulness
+# for OTR's overlay-on-upscale aesthetic, brightest-first then darken-tier.
+_BLEND_MODE_CHOICES = [
+    "lighten",       # default; max(A, B) per pixel
+    "screen",        # 1 - (1-A)(1-B); always brighter
+    "addition",      # A + B (clamped); brightest possible
+    "overlay",       # multiply darks + screen lights
+    "hardlight",     # like overlay but B-driven
+    "softlight",     # gentler overlay
+    "dodge",         # extreme bright lift
+    "vividlight",    # combined dodge/burn around 0.5
+    "linearlight",   # linear-dodge / linear-burn around 0.5
+    "pinlight",      # darken or lighten depending on B
+    "multiply",      # A * B; darkens
+    "darken",        # min(A, B) per pixel
+    "burn",          # darken inverse of dodge
+    "difference",    # |A - B|; high contrast
+    "exclusion",     # softer difference
+    "normal",        # just opacity over upscale (B over A)
+]
 
 
 def _stamp_ledger_final_video_path(
@@ -149,6 +187,7 @@ def _build_blend_cmd(
     blend_mode: str,
     blend_opacity: float,
     ffmpeg: str,
+    shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
 ) -> list[str]:
     """Build the ffmpeg command for procgen-over-source blend.
 
@@ -182,9 +221,26 @@ def _build_blend_cmd(
     # risk that drove us to drop ``-shortest`` earlier. The filter
     # flag only affects what the video filter emits; the muxer copies
     # the full audio stream untouched.
+    # BUG-LOCAL-103 shadow crush: if threshold > 0, insert a lutrgb step
+    # AFTER the scale/crop and BEFORE the blend. The lutrgb expression
+    # multiplies each channel by 0 when val < threshold, else passes val
+    # through unchanged -- forcing near-black procgen pixels to true 0
+    # so brighter-than-source blend modes don't lift source darks toward
+    # the procgen noise floor. Commas inside the gte() expression are
+    # escaped with backslashes per ffmpeg filter-arg quoting rules.
+    crush = max(0, int(shadow_crush_threshold))
+    if crush > 0:
+        crush_step = (
+            f",lutrgb="
+            f"r=val*gte(val\\,{crush}):"
+            f"g=val*gte(val\\,{crush}):"
+            f"b=val*gte(val\\,{crush})"
+        )
+    else:
+        crush_step = ""
     filter_complex = (
         f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
-        f"crop=iw:ih,setpts=PTS-STARTPTS[pgn];"
+        f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}[pgn];"
         f"[0:v][pgn]blend=all_mode={blend_mode}:"
         f"all_opacity={blend_opacity:.3f}:shortest=1[v]"
     )
@@ -292,6 +348,24 @@ class PostUpscaleProcgenBlend:
                         "in the same dir as ``source_mp4_path``."
                     ),
                 }),
+                "shadow_crush_threshold": ("INT", {
+                    "default": _DEFAULT_SHADOW_CRUSH,
+                    "min": 0, "max": 50, "step": 1,
+                    "tooltip": (
+                        "BUG-LOCAL-103: pre-blend shadow crush. Any procgen "
+                        "RGB channel value below this threshold is forced to "
+                        "0 BEFORE the blend, normalizing near-black noise "
+                        "(e.g. (5,5,10) blue-tinted procgen black) to true "
+                        "#000000 so brighter blends (lighten/screen/addition) "
+                        "don't lift source darks toward the procgen tint. "
+                        "Default 18 covers a (5-10) noise floor with margin "
+                        "while preserving real motion content (procgen "
+                        "highlights up to ~95). 0 disables -- use that to "
+                        "verify the un-crushed pink/cast symptom or to A/B "
+                        "test a procgen render with hardened prompt that "
+                        "already produces true black."
+                    ),
+                }),
             },
         }
 
@@ -310,6 +384,7 @@ class PostUpscaleProcgenBlend:
         ffmpeg: str = "ffmpeg",
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",
+        shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
     ):
         report_lines: list[str] = []
         src = Path(source_mp4_path).resolve() if source_mp4_path else None
@@ -386,6 +461,7 @@ class PostUpscaleProcgenBlend:
             source_mp4=src, procgen_mp4=pgn, out_mp4=output_path,
             blend_mode=blend_mode, blend_opacity=float(blend_opacity),
             ffmpeg=ffmpeg,
+            shadow_crush_threshold=int(shadow_crush_threshold),
         )
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -405,7 +481,8 @@ class PostUpscaleProcgenBlend:
 
         report_lines.append(
             f"PostUpscaleProcgenBlend: blended {src.name} + {pgn.name} -> "
-            f"{output_path.name} (mode={blend_mode}, opacity={blend_opacity:.3f})"
+            f"{output_path.name} (mode={blend_mode}, opacity={blend_opacity:.3f}, "
+            f"shadow_crush={int(shadow_crush_threshold)})"
         )
         log.info("[PostUpscaleProcgenBlend] %s", report_lines[-1])
 

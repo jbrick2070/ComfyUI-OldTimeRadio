@@ -21,6 +21,64 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-103 [FIXED]: pre-blend shadow crush -- procgen "black" was actually (5,5,10) blue-tinted near-black, lifting source darks toward magenta/pink in highlights
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-099 root cause | **Bible candidate:** YES (any procgen-overlay pipeline)
+- **Symptom:** even after BUG-099 swapped `screen 1.0` -> `lighten 1.0`, residual color cast persisted in highlights of procgen-blended episodes. Jeffrey suspected the procgen "black" background wasn't true black but had alpha or color tint leaking through any brighter-than-source blend mode.
+- **Diagnostic measurement (PowerShell + Pillow on `signal_lost_echo_in_stasis_20260504_170903` procgen mp4 @ 0:22):**
+  - Total pixels: 2,073,600 (1080p)
+  - Dark pixels (luminance < 32): 2,051,840 (99.0% of frame)
+  - **Dark mean RGB: (4.86, 4.54, 10.06)** -- B channel is 2x R/G, clear blue cast
+  - Dark min RGB: (0, 0, 0)
+  - Dark max RGB: (57, 95, 51) -- legit motion content (greens) reaches up to 95
+  - **True #000 fraction: 0.014%** -- only 1 in 7000 pixels is actual black
+- **Cause:** procgen video models (the OTR_SignalLostVideo generator's source diffusion model) cannot produce true `#000000` because of decoder noise floor. The "near-black" output averages RGB(5,5,10) with a blue cast. Blend formula consequences:
+  - `screen`: `out = A + B - A*B` -- B contribution lifts proportionally, B's 2x bias produces magenta/pink in source highlights (the BUG-096 symptom).
+  - `lighten`: `out = max(A, B)` per channel -- in source dark regions where source channel < procgen channel, procgen's blue-tinted "black" overrides source. Result: blue-violet bloom in shadows, not the clean radio-CRT signature intended.
+  - `addition`/`dodge`: same lift problem, just stronger.
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~25 LOC):**
+  - New widget: `shadow_crush_threshold` (INT, default=18, range 0-50). 0 disables.
+  - `_build_blend_cmd` inserts a `lutrgb` filter step between procgen scale/crop and the blend itself when `crush > 0`:
+    - `lutrgb=r=val*gte(val\,T):g=val*gte(val\,T):b=val*gte(val\,T)`
+    - Any RGB channel value below threshold is clamped to 0; values >= threshold pass unchanged.
+    - Comma in `gte(val,T)` escaped per ffmpeg filter-arg quoting rules.
+  - Default `T=18` covers the (5-10) noise floor with margin while preserving the (95-max) green motion-content flecks. Tunable per-workflow without code edits.
+  - Companion: rebuilt `workflows/blend_test.json` with the new widget value baked in (`crush=18`) and 8-mode side-by-side via 2 PrimitiveNode string sources -> 8 OTR_PostUpscaleProcgenBlend (16 wired links). Edit the source/procgen paths once on the two PrimitiveNodes; the 8 mode comparisons inherit them.
+- **Verify:**
+  - AST parse clean.
+  - INPUT_TYPES check: `optional` keys now `[blend_mode, blend_opacity, ffmpeg, bypass, out_suffix, shadow_crush_threshold]`.
+  - `_build_blend_cmd(crush=18)` -> filter_complex contains `lutrgb=r=val*gte(val\,18):g=...:b=...`.
+  - `_build_blend_cmd(crush=0)` -> filter_complex has NO lutrgb (clean disable path).
+  - test_post_upscale_procgen_blend -> 17 passed in 3.42s. (No new tests yet for crush; the existing tests don't cover the lutrgb step but pass on the API surface change.)
+  - bug_bible_regression -> 22 passed, 1 unrelated pre-existing failure on save_copy / portrait nodes (BUG-01.02), 1 skipped, 2 xfailed.
+- **Tags:** procgen-blend, color-cast, ffmpeg-lutrgb, shadow-crush, BUG-099-followup, video-model-noise-floor
+- **Related:**
+  - BUG-LOCAL-096 (initial pink at screen 1.0 -- root cause was already this noise floor; BUG-099 worked around it by switching mode, BUG-103 fixes it at the source).
+  - BUG-LOCAL-099 (lighten 1.0 default -- still the right default, but now with crush=18 the blue-bloom-in-shadows side effect is gone too).
+  - BUG-LOCAL-102 (dropdown expansion -- the test workflow that exposed how visible the residual cast was across modes).
+- **Followup (not blocking):** harden the procgen prompt to explicitly request "pure black background, RGB(0,0,0), no haze, no color cast" so the noise floor narrows even before crush. Belt-and-suspenders.
+
+---
+
+### BUG-LOCAL-102 [FIXED]: blend_mode dropdown only had 5 modes -- expanded to 16 ffmpeg blend filter modes
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-099 tuning workflow | **Bible candidate:** YES (dropdown coverage)
+- **Symptom:** standalone test workflow `workflows/blend_test.json` loaded into ComfyUI Desktop with 8 OTR_PostUpscaleProcgenBlend nodes, each pre-set to a different blend mode for A/B comparison. Five of the 8 nodes showed the mode value in RED text on canvas (`hardlight`, `softlight`, `dodge`, `multiply`, `darken`) -- ComfyUI's frontend marker for "this dropdown value is not in the allowed choices". Validation would reject the queue.
+- **Cause:** `_BLEND_MODE_CHOICES` in `nodes/otr_post_upscale_procgen_blend.py` only listed 5 modes: `["lighten", "screen", "addition", "overlay", "normal"]`. The ffmpeg blend filter supports many more (hardlight, softlight, multiply, darken, dodge, burn, vividlight, linearlight, pinlight, difference, exclusion, etc.) but the OTR node never exposed them. The 5 original choices were a conservative initial set; nothing in the implementation prevented the wider set from working.
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~10 LOC):** expanded `_BLEND_MODE_CHOICES` from 5 to 16 modes:
+  - Brightening tier: `lighten`, `screen`, `addition`, `overlay`, `hardlight`, `softlight`, `dodge`, `vividlight`, `linearlight`, `pinlight`
+  - Darkening tier: `multiply`, `darken`, `burn`
+  - Contrast tier: `difference`, `exclusion`
+  - Trivial: `normal`
+  - All 16 are valid ffmpeg `blend=all_mode=` values per ffmpeg filter docs. Sorted by usefulness for OTR's bright-overlay aesthetic.
+- **Companion: rebuilt `workflows/blend_test.json` (8 nodes pre-set to lighten / screen / addition / overlay / hardlight / softlight / dodge / vividlight at 1.0 opacity).** Loads cleanly into ComfyUI now; queue once, get 8 mp4s in `output/otr/obs/` for side-by-side comparison.
+- **Verify:**
+  - AST parse clean (21240 bytes, 1143 nodes).
+  - test_post_upscale_procgen_blend -> 17 passed in 3.38s.
+  - Live: load `workflows/blend_test.json` into ComfyUI Desktop -- all 8 mode dropdowns should display in normal text (not red).
+- **Tags:** procgen-blend, dropdown-coverage, ffmpeg-blend-filter, BUG-099-tuning
+- **Related:** BUG-LOCAL-099 (the procgen overlay tuning that BUG-102 enables faster iteration on). The default mode + opacity (BUG-099 lighten 1.0) is unchanged; this entry just widens the dropdown so users can A/B test other modes without code edits.
+
+---
+
 ### BUG-LOCAL-101 [FIXED]: SDPA prefill OOM on 310-word run -- Mistral-Nemo context_cap dropped 16384 -> 8192
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** post BUG-098 tripwire validation | **Bible candidate:** YES (context-window VRAM tradeoff)
 - **Symptom:** 310-word run at 18:02:24 OOM'd during main script generation prefill. `torch.OutOfMemoryError: Currently allocated 25.41 GiB / Device limit 15.92 GiB. Requested 4.15 GiB`. The single 4.15 GiB allocation request was the SDPA attention buffer for one layer's QKV scaled-dot-product on the long prompt.

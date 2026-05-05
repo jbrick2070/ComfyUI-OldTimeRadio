@@ -1,0 +1,760 @@
+{
+  "id": "blend-test-2026-05-04",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 16,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        100,
+        480
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "Blend test: lighten @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 1,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 9,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "lighten",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_lighten_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 2,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        800,
+        480
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "Blend test: screen @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 2,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 10,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "screen",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_screen_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 3,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        100,
+        800
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "title": "Blend test: addition @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 3,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 11,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "addition",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_addition_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 4,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        800,
+        800
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "Blend test: overlay @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 4,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 12,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "overlay",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_overlay_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 5,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        100,
+        1120
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "title": "Blend test: hardlight @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 5,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 13,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "hardlight",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_hardlight_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 6,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        800,
+        1120
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "title": "Blend test: softlight @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 6,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 14,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "softlight",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_softlight_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 7,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        100,
+        1440
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "title": "Blend test: dodge @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 7,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 15,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "dodge",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_dodge_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 8,
+      "type": "OTR_PostUpscaleProcgenBlend",
+      "pos": [
+        800,
+        1440
+      ],
+      "size": [
+        420,
+        290
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "title": "Blend test: vividlight @ 1.0  crush=18",
+      "inputs": [
+        {
+          "name": "source_mp4_path",
+          "type": "STRING",
+          "link": 8,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        },
+        {
+          "name": "procgen_mp4_path",
+          "type": "STRING",
+          "link": 16,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "final_mp4_path",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4",
+        "vividlight",
+        1.0,
+        "ffmpeg",
+        false,
+        "_BLEND_TEST_vividlight_crush18",
+        18
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 9,
+      "type": "PrimitiveNode",
+      "pos": [
+        120,
+        80
+      ],
+      "size": [
+        720,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "title": "SOURCE mp4 path (upscale)",
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "shape": 3,
+          "slot_index": 0,
+          "widget": {
+            "name": "source_mp4_path"
+          }
+        }
+      ],
+      "properties": {
+        "Run widget replace on values": false
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\signal_lost_echo_in_stasis_20260504_170903.mp4"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 10,
+      "type": "PrimitiveNode",
+      "pos": [
+        900,
+        80
+      ],
+      "size": [
+        720,
+        130
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "PROCGEN mp4 path (background)",
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16
+          ],
+          "shape": 3,
+          "slot_index": 0,
+          "widget": {
+            "name": "procgen_mp4_path"
+          }
+        }
+      ],
+      "properties": {
+        "Run widget replace on values": false
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_echo_in_stasis_20260504_170903\\audio\\signal_lost_echo_in_stasis_20260504_170903.mp4"
+      ],
+      "color": "#234",
+      "bgcolor": "#356"
+    }
+  ],
+  "links": [
+    [
+      1,
+      9,
+      0,
+      1,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      9,
+      0,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      3,
+      9,
+      0,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      4,
+      9,
+      0,
+      4,
+      0,
+      "STRING"
+    ],
+    [
+      5,
+      9,
+      0,
+      5,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      9,
+      0,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      7,
+      9,
+      0,
+      7,
+      0,
+      "STRING"
+    ],
+    [
+      8,
+      9,
+      0,
+      8,
+      0,
+      "STRING"
+    ],
+    [
+      9,
+      10,
+      0,
+      1,
+      1,
+      "STRING"
+    ],
+    [
+      10,
+      10,
+      0,
+      2,
+      1,
+      "STRING"
+    ],
+    [
+      11,
+      10,
+      0,
+      3,
+      1,
+      "STRING"
+    ],
+    [
+      12,
+      10,
+      0,
+      4,
+      1,
+      "STRING"
+    ],
+    [
+      13,
+      10,
+      0,
+      5,
+      1,
+      "STRING"
+    ],
+    [
+      14,
+      10,
+      0,
+      6,
+      1,
+      "STRING"
+    ],
+    [
+      15,
+      10,
+      0,
+      7,
+      1,
+      "STRING"
+    ],
+    [
+      16,
+      10,
+      0,
+      8,
+      1,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.5,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}
