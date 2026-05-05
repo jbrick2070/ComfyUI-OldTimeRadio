@@ -21,6 +21,33 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-104 [FIXED]: green_only_overlay -- isolate procgen G channel before blend so v1.7 phosphor-green CRT is visible regardless of source scene color
+- **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-103 followup | **Bible candidate:** YES (channel-isolated overlay pattern)
+- **Symptom:** even with BUG-103 shadow crush at 18, the 8-mode test workflow against echo_in_stasis produced thumbnails that all looked magenta/pink. The procgen file was confirmed to be the correct v1.7 green-CRT render (file hash 20DA132B... 50.0 MB, dark max RGB (57, 95, 51) green-dominant, 99% pure black, sparse green wireframe content). The SOURCE file (file hash 50F5E10E... 15.4 MB, OBS upscale of HuMo+LTX master mix) had its own scene content with magenta porthole + warm room. lighten/screen/addition blend modes preserve source where source > procgen, and the sparse green wireframe lost the brightness contest against bright source pixels. Result: green CRT was technically in the output but visually drowned out -- the v1.7 SIGNAL LOST signature was effectively invisible.
+- **Cause:** RGB blend modes (lighten, screen, etc.) operate per-channel on RAW R/G/B values from each input. When procgen has bright green wireframe pixels at, say, (5, 200, 5), and source has magenta room lighting at (180, 80, 180), `lighten` produces max-per-channel = (180, 200, 180) -- the green CRT shows as a slight green-tinted highlight in an otherwise still-magenta scene. The G channel won, but R and B from source dominate the visible color. To make green CRT pop, only the G channel should ever contribute from procgen.
+- **Fix (`nodes/otr_post_upscale_procgen_blend.py`, ~25 LOC):**
+  - New widget: `green_only_overlay` (BOOLEAN, default False).
+  - When True, `_build_blend_cmd` inserts `colorchannelmixer=rr=0:rg=0:rb=0:gr=0:gg=1:gb=0:br=0:bg=0:bb=0` AFTER the BUG-103 shadow crush and BEFORE the blend. This zeros procgen R and B (any procgen R or B contribution becomes 0); preserves procgen G as-is. Blend math then becomes:
+    - lighten: out_R = max(src_R, 0) = src_R; out_G = max(src_G, pgn_G); out_B = max(src_B, 0) = src_B
+    - screen: out_R = src_R + 0 - src_R*0 = src_R; out_G = src_G + pgn_G - src_G*pgn_G; out_B = src_B
+    - addition: out_R = src_R; out_G = src_G + pgn_G; out_B = src_B
+  - Net effect: source R and B pass through untouched (no color shift on the scene); source G gets boosted exactly where the green CRT wireframe lives. Visible result is pure phosphor-green CRT lines/text/EQ overlaid on whatever scene the source contains, regardless of source color.
+  - Companion: rebuilt `workflows/blend_test.json` with `green_only_overlay=True` baked into all 8 modes (suffix: `_BLEND_TEST_<mode>_greenonly_crush18`).
+- **Verify:**
+  - AST parse clean.
+  - INPUT_TYPES check: `optional` keys now include `green_only_overlay` and `shadow_crush_threshold`.
+  - `_build_blend_cmd(green_only=True)` -> filter contains `colorchannelmixer=rr=0:rg=0:rb=0:gr=0:gg=1:gb=0:br=0:bg=0:bb=0`.
+  - `_build_blend_cmd(green_only=False)` -> filter has NO colorchannelmixer (clean disable path).
+  - test_post_upscale_procgen_blend -> 17 passed in 3.49s.
+- **Tags:** procgen-blend, channel-isolation, ffmpeg-colorchannelmixer, BUG-103-followup, v17-signal-lost-restoration
+- **Related:**
+  - BUG-LOCAL-099 (lighten 1.0 default for procgen blend -- still the right default for the BLEND mode itself; BUG-104 is the channel filter applied BEFORE the blend).
+  - BUG-LOCAL-103 (shadow crush -- runs first in the procgen filter chain; green_only_overlay runs AFTER the crush).
+  - BUG-LOCAL-102 (dropdown expansion -- now any of the 16 modes can be tested with green_only_overlay=True).
+- **Followup:** the long-term goal Jeffrey stated is "all the LTX and HuMo will have the green bits overlay" -- green_only_overlay should likely become the v2.0 default once a green-CRT visual is confirmed against the upcoming HuMo+LTX scene-rendered episodes. Default is currently False to avoid silently changing behavior on any saved workflow.
+
+---
+
 ### BUG-LOCAL-103 [FIXED]: pre-blend shadow crush -- procgen "black" was actually (5,5,10) blue-tinted near-black, lifting source darks toward magenta/pink in highlights
 - **Date:** 2026-05-04 LATE EVENING | **Phase:** BUG-099 root cause | **Bible candidate:** YES (any procgen-overlay pipeline)
 - **Symptom:** even after BUG-099 swapped `screen 1.0` -> `lighten 1.0`, residual color cast persisted in highlights of procgen-blended episodes. Jeffrey suspected the procgen "black" background wasn't true black but had alpha or color tint leaking through any brighter-than-source blend mode.

@@ -188,6 +188,7 @@ def _build_blend_cmd(
     blend_opacity: float,
     ffmpeg: str,
     shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
+    green_only_overlay: bool = False,
 ) -> list[str]:
     """Build the ffmpeg command for procgen-over-source blend.
 
@@ -238,9 +239,27 @@ def _build_blend_cmd(
         )
     else:
         crush_step = ""
+    # BUG-LOCAL-104 green-only overlay: when enabled, zero out the procgen
+    # R and B channels via colorchannelmixer BEFORE the blend. Only the
+    # procgen G channel survives, which means brighter-than-source blends
+    # (lighten/screen/addition) only ever lift the source G channel where
+    # procgen has green wireframe pixels. Source R and B pass through
+    # untouched so the source scene's color (warm room, magenta porthole,
+    # whatever) is preserved verbatim. The visible result is a pure
+    # phosphor-green CRT overlay sitting on top of any source content,
+    # which is the v1.7 SIGNAL LOST CRT signature Jeffrey wants restored.
+    if green_only_overlay:
+        green_only_step = (
+            ",colorchannelmixer="
+            "rr=0:rg=0:rb=0:"
+            "gr=0:gg=1:gb=0:"
+            "br=0:bg=0:bb=0"
+        )
+    else:
+        green_only_step = ""
     filter_complex = (
         f"[1:v]scale=-2:ih:force_original_aspect_ratio=decrease,"
-        f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}[pgn];"
+        f"crop=iw:ih,setpts=PTS-STARTPTS{crush_step}{green_only_step}[pgn];"
         f"[0:v][pgn]blend=all_mode={blend_mode}:"
         f"all_opacity={blend_opacity:.3f}:shortest=1[v]"
     )
@@ -348,6 +367,22 @@ class PostUpscaleProcgenBlend:
                         "in the same dir as ``source_mp4_path``."
                     ),
                 }),
+                "green_only_overlay": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "BUG-LOCAL-104: when True, zero the procgen R and "
+                        "B channels (colorchannelmixer) BEFORE the blend so "
+                        "only the procgen G channel ever contributes. Source "
+                        "R/B pass through untouched (no color lift); source "
+                        "G gets boosted only where the procgen has green "
+                        "wireframe pixels. Result: pure phosphor-green v1.7 "
+                        "CRT overlay sitting on top of whatever the source "
+                        "scene already looks like. Use this when the source "
+                        "(HuMo+LTX upscale) has its own scene color and you "
+                        "want the green CRT to be visible on top regardless. "
+                        "Pair with blend_mode='lighten' or 'addition'."
+                    ),
+                }),
                 "shadow_crush_threshold": ("INT", {
                     "default": _DEFAULT_SHADOW_CRUSH,
                     "min": 0, "max": 50, "step": 1,
@@ -384,6 +419,7 @@ class PostUpscaleProcgenBlend:
         ffmpeg: str = "ffmpeg",
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",
+        green_only_overlay: bool = False,
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
     ):
         report_lines: list[str] = []
@@ -462,6 +498,7 @@ class PostUpscaleProcgenBlend:
             blend_mode=blend_mode, blend_opacity=float(blend_opacity),
             ffmpeg=ffmpeg,
             shadow_crush_threshold=int(shadow_crush_threshold),
+            green_only_overlay=bool(green_only_overlay),
         )
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -482,7 +519,8 @@ class PostUpscaleProcgenBlend:
         report_lines.append(
             f"PostUpscaleProcgenBlend: blended {src.name} + {pgn.name} -> "
             f"{output_path.name} (mode={blend_mode}, opacity={blend_opacity:.3f}, "
-            f"shadow_crush={int(shadow_crush_threshold)})"
+            f"shadow_crush={int(shadow_crush_threshold)}, "
+            f"green_only={bool(green_only_overlay)})"
         )
         log.info("[PostUpscaleProcgenBlend] %s", report_lines[-1])
 

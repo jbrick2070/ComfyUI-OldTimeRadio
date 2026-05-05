@@ -13,12 +13,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
-      "title": "Blend test: lighten @ 1.0  crush=18",
+      "title": "Blend test: lighten @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -63,7 +63,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_lighten_crush18",
+        "_BLEND_TEST_lighten_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -78,12 +79,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
-      "title": "Blend test: screen @ 1.0  crush=18",
+      "title": "Blend test: screen @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -128,7 +129,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_screen_crush18",
+        "_BLEND_TEST_screen_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -143,12 +145,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 4,
       "mode": 0,
-      "title": "Blend test: addition @ 1.0  crush=18",
+      "title": "Blend test: addition @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -193,7 +195,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_addition_crush18",
+        "_BLEND_TEST_addition_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -208,12 +211,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 5,
       "mode": 0,
-      "title": "Blend test: overlay @ 1.0  crush=18",
+      "title": "Blend test: overlay @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -258,7 +261,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_overlay_crush18",
+        "_BLEND_TEST_overlay_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -273,12 +277,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 6,
       "mode": 0,
-      "title": "Blend test: hardlight @ 1.0  crush=18",
+      "title": "Blend test: hardlight @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -323,7 +327,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_hardlight_crush18",
+        "_BLEND_TEST_hardlight_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -338,12 +343,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 7,
       "mode": 0,
-      "title": "Blend test: softlight @ 1.0  crush=18",
+      "title": "Blend test: softlight @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -388,7 +393,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_softlight_crush18",
+        "_BLEND_TEST_softlight_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -403,12 +409,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 8,
       "mode": 0,
-      "title": "Blend test: dodge @ 1.0  crush=18",
+      "title": "Blend test: dodge @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -453,7 +459,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_dodge_crush18",
+        "_BLEND_TEST_dodge_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -468,12 +475,12 @@
       ],
       "size": [
         420,
-        290
+        320
       ],
       "flags": {},
       "order": 9,
       "mode": 0,
-      "title": "Blend test: vividlight @ 1.0  crush=18",
+      "title": "Blend test: vividlight @ 1.0  green_only  crush=18",
       "inputs": [
         {
           "name": "source_mp4_path",
@@ -518,7 +525,8 @@
         1.0,
         "ffmpeg",
         false,
-        "_BLEND_TEST_vividlight_crush18",
+        "_BLEND_TEST_vividlight_greenonly_crush18",
+        true,
         18
       ],
       "color": "#1E3A5F",
@@ -583,7 +591,7 @@
       "flags": {},
       "order": 1,
       "mode": 0,
-      "title": "PROCGEN mp4 path (background)",
+      "title": "PROCGEN mp4 path (green CRT)",
       "outputs": [
         {
           "name": "STRING",
