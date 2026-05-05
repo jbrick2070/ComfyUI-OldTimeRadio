@@ -16,6 +16,18 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 
+@pytest.fixture(autouse=True)
+def _isolate_obs_dir(monkeypatch, tmp_path):
+    """Pin OTR_OUTPUT_DIR so otr_obs_dir() resolves under tmp_path.
+
+    BUG-LOCAL-108 path cleanup (2026-05-05): the blend node now writes
+    its output into otr_obs_dir() rather than next to the source. Without
+    this fixture every blend test would write into Jeffrey's real
+    ComfyUI output tree.
+    """
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+
+
 @pytest.fixture
 def node():
     from nodes.otr_post_upscale_procgen_blend import PostUpscaleProcgenBlend

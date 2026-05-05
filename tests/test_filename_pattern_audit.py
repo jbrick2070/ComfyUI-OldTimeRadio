@@ -73,11 +73,13 @@ BANNED_PATTERNS = [
 # convention. Format: (file relative to repo root, line snippet substring).
 # When extending this allowlist, add a comment explaining the contract.
 ALLOWLIST = [
-    # OBS final mp4 -- the writer (RTXUpscale.execute) lands the file at
-    # otr/obs/<episode_id>.mp4, the spacesaver-existence guard reads
-    # back at the same path. Both use raw episode_id; they share the
-    # contract by construction.
-    ("nodes/rtx_upscale.py", 'obs" / f"{ep_id}.mp4"'),
+    # OBS final mp4 -- post BUG-LOCAL-108 (2026-05-05) the writer is
+    # OTR_PostUpscaleProcgenBlend (writes ``<ep>_procgen_blended.mp4``
+    # via otr_obs_dir() / f"{src.stem}{out_suffix}{src.suffix}", no slug
+    # reconstruction). RTXUpscale only retains an EXISTENCE GUARD against
+    # the same canonical path -- predictor, not writer. Single-source
+    # contract still holds; allowlist entry covers the guard string.
+    ("nodes/rtx_upscale.py", 'obs" / f"{ep_id}_procgen_blended.mp4"'),
     # Composited mp4 -- VideoComposite writes otr/episodes/<ep>/composited/
     # <episode_id>.mp4 by canonical convention. RTXUpscale picks it up
     # via the src socket, not by reconstruction.

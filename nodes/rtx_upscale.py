@@ -10,7 +10,7 @@ with a path-in / path-out interface that preserves C7 audio identity:
                               -> RTX VSR (HW-accelerated, ULTRA quality)
                               -> silent libx264 yuv420p mp4
                               -> ffmpeg mux with -c:a copy from source mp4
-                              -> output/otr/obs/<source filename> (1920x1080)
+                              -> output/otr/episodes/<ep>/upscaled/<source filename> (1920x1080)
     (No filename suffix is appended; the output uses the same basename
     as the source. A prior version added a ``_1080p`` suffix; that
     behavior was removed -- if a stale workflow JSON still has an 8th
@@ -55,7 +55,7 @@ if str(_NODES_DIR) not in _sys.path:
 # references the canonical resolver.
 import folder_paths  # noqa: F401,E402
 
-from _otr_paths import otr_obs_dir  # noqa: E402
+from _otr_paths import otr_obs_dir, otr_upscaled_dir  # noqa: E402
 
 log = logging.getLogger("OTR.rtx_upscale")
 
@@ -593,20 +593,26 @@ class RTXUpscale:
         if not (shutil.which(ffmpeg) or Path(ffmpeg).exists()):
             return ("", f"error: ffmpeg not found at {ffmpeg!r}")
 
-        # Final mp4 always lands in otr_obs_dir() under the source's
-        # filename (one mp4 per episode in the OBS-watched flat dir).
-        out_dir = otr_obs_dir()
+        # 1080p upscale lands in the per-episode upscaled/ dir as an
+        # INTERMEDIATE -- the broadcast obs/ dir holds only the final
+        # post-blend deliverable (Jeffrey directive 2026-05-05; pre-blend
+        # files in obs/ broke the "exactly one mp4 per episode" contract).
+        # source filename is "<episode_id>.mp4" out of VideoComposite, so
+        # src.stem == episode_id.
+        episode_id = src.stem
+        out_dir = otr_upscaled_dir(episode_id)
         out_dir.mkdir(parents=True, exist_ok=True)
         out_mp4 = out_dir / src.name
 
         if bypass:
-            # Bypass: copy the composite intermediate into otr/obs/ so
-            # the final dir always has exactly one mp4 per episode
-            # regardless of upscale on/off.
+            # Bypass: copy the composite intermediate into the upscaled/
+            # per-episode dir so the chain still produces an upscaled-
+            # stage artifact for the downstream procgen blend node to
+            # read, regardless of upscale on/off.
             shutil.copy2(src, out_mp4)
             report_lines.append(
                 f"OTR_RTXUpscale: BYPASS -- copied {src.name} to "
-                f"otr/obs/ ({out_mp4.stat().st_size / (1024*1024):.1f} MB)"
+                f"upscaled/ ({out_mp4.stat().st_size / (1024*1024):.1f} MB)"
             )
             log.info(
                 "[OTR_RTXUpscale] bypass=True; copied %s -> %s",
@@ -620,7 +626,8 @@ class RTXUpscale:
             report_lines.append(
                 f"OTR_RTXUpscale: source {src.name} "
                 f"{src_w}x{src_h} -> {target_width}x{target_height} "
-                f"({quality}); writing to otr/obs/{out_mp4.name}"
+                f"({quality}); writing to "
+                f"otr/episodes/{episode_id}/upscaled/{out_mp4.name}"
             )
         except Exception as exc:  # noqa: BLE001
             report_lines.append(
@@ -689,7 +696,9 @@ class RTXUpscale:
         # ON, wipe every per-episode intermediate file under
         # otr/episodes/<episode_id>/ EXCEPT the ledger json + the
         # treatment txt. The final upscaled mp4 already lives at
-        # otr/obs/<ep>.mp4 (or out_mp4 for bypass), unaffected.
+        # otr/episodes/<ep>/upscaled/<ep>.mp4 (or out_mp4 for bypass),
+        # unaffected. The final post-blend mp4 in otr/obs/ is also
+        # written by a downstream node, not touched here.
         # ----------------------------------------------------------------
         try:
             _spacesaver_cleanup_if_flagged(src=src, log_lines=report_lines)
@@ -814,18 +823,21 @@ def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
 
     # OBS-existence precondition: spacesaver MUST NOT wipe intermediates
     # if the final deliverable hasn't landed on disk yet. The OBS final
-    # lives at otr/obs/<ep>.mp4 -- a sibling of episodes/, NOT a child --
-    # so the depth-1 guard above can't reach it. This is a separate
-    # safety net for the run-order contract:
-    #   _chunked_upscale -> _mux_audio_passthrough -> out_mp4 written
-    #   -> _spacesaver_cleanup_if_flagged
-    # If anything ever reorders that, this guard catches it before
-    # destructive action.
-    obs_final = ep_dir.parent.parent / "obs" / f"{ep_id}.mp4"
+    # is now ``<ep>_procgen_blended.mp4`` (BUG-LOCAL-108 path cleanup
+    # 2026-05-05); written by OTR_PostUpscaleProcgenBlend which runs
+    # AFTER RTXUpscale. While this cleanup is invoked from RTXUpscale
+    # the procgen blend hasn't happened yet, so this guard will fail-
+    # closed and spacesaver becomes a silent no-op until the call site
+    # is moved to OTR_PostUpscaleProcgenBlend (planned followup).
+    # Keeping the path string accurate so when the move lands the
+    # guard already points at the right artifact.
+    obs_final = ep_dir.parent.parent / "obs" / f"{ep_id}_procgen_blended.mp4"
     if not obs_final.exists():
         log.warning(
             "[OTR_RTXUpscale] spacesaver: OBS deliverable %s not on disk; "
-            "refusing cleanup until final lands",
+            "refusing cleanup until final lands (expected -- spacesaver "
+            "now lives in the wrong stage; will no-op until call site "
+            "moves to PostUpscaleProcgenBlend)",
             obs_final,
         )
         return
@@ -863,8 +875,11 @@ def _spacesaver_cleanup_if_flagged(*, src: Path, log_lines: list[str]) -> None:
                     child, exc,
                 )
 
-    # Wipe sibling subdirs entirely: stills/, portraits/, videos/, composited/.
-    for sub_name in ("stills", "portraits", "videos", "composited"):
+    # Wipe sibling subdirs entirely: stills/, portraits/, videos/,
+    # composited/, upscaled/. ``upscaled/`` added 2026-05-05 (BUG-LOCAL-108)
+    # alongside the obs/ contract cleanup -- it's an intermediate too
+    # once the final blend is in obs/.
+    for sub_name in ("stills", "portraits", "videos", "composited", "upscaled"):
         sub = ep_dir / sub_name
         if not sub.exists():
             continue

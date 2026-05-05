@@ -41,9 +41,21 @@ the procgen visual is unwanted (e.g. clean uplift for an external editor).
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+# Ensure sibling node modules (e.g. _otr_paths) resolve when this file is
+# loaded by ComfyUI's custom-node loader. Mirrors the pattern used in
+# rtx_upscale.py so otr_obs_dir() is reachable as the canonical write
+# target for the broadcast-ready blended mp4.
+_NODES_DIR = os.path.dirname(os.path.abspath(__file__))
+if _NODES_DIR not in sys.path:
+    sys.path.insert(0, _NODES_DIR)
+
+from _otr_paths import otr_obs_dir  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -479,7 +491,14 @@ class PostUpscaleProcgenBlend:
             log.warning("[PostUpscaleProcgenBlend] %s", msg)
             return ("", msg)
 
-        output_path = src.with_name(f"{src.stem}{out_suffix}{src.suffix}")
+        # Final blended mp4 always lands in otr_obs_dir() -- the
+        # broadcast folder. Source comes from per-episode upscaled/
+        # (BUG-LOCAL-108 path-cleanup 2026-05-05); writing the blend
+        # alongside the source would put it back in upscaled/ and break
+        # the "exactly one mp4 per episode in obs/" contract.
+        obs_dir = otr_obs_dir()
+        obs_dir.mkdir(parents=True, exist_ok=True)
+        output_path = obs_dir / f"{src.stem}{out_suffix}{src.suffix}"
 
         if bypass:
             try:

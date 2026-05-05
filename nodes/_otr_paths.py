@@ -245,10 +245,32 @@ def otr_composited_dir(episode_id: str) -> Path:
 
     Holds the 832x480 composited mp4 written by VideoComposite as
     ``<episode_id>.mp4``. Downstream OTR_RTXUpscale reads from here
-    and writes the final to ``<output>/otr/obs/<episode_id>.mp4``
-    (see ``otr_obs_dir``).
+    and writes its 1080p output to ``otr_upscaled_dir(episode_id)``
+    (a sibling per-episode dir; pre-2026-05-05 the upscale lived in
+    ``otr/obs/`` directly but that broke the "one mp4 per episode"
+    contract once OTR_PostUpscaleProcgenBlend started writing the
+    real final there too).
     """
     return otr_episodes_root() / episode_id / "composited"
+
+
+def otr_upscaled_dir(episode_id: str) -> Path:
+    """Per-episode 1080p upscaled-but-pre-blend dir:
+    ``<output>/otr/episodes/<episode_id>/upscaled/``.
+
+    Holds the 1920x1080 mp4 written by OTR_RTXUpscale as
+    ``<episode_id>.mp4``. Downstream OTR_PostUpscaleProcgenBlend reads
+    from here and writes the final blended deliverable to
+    ``otr_obs_dir()/<episode_id>_procgen_blended.mp4``.
+
+    Added 2026-05-05 (Jeffrey directive): obs/ is the broadcast folder
+    and must hold exactly ONE mp4 per episode -- the post-blend
+    deliverable. Pre-blend intermediates (832x480 native composite,
+    1080p upscale) live under per-episode subdirs so the broadcast
+    library stays clean. Mirror of ``otr_composited_dir`` but for the
+    upscale stage of the chain.
+    """
+    return otr_episodes_root() / episode_id / "upscaled"
 
 
 def otr_state_dir() -> Path:
@@ -270,23 +292,27 @@ def otr_obs_dir() -> Path:
     """OBS-watched final-deliverable dir: ``<output>/otr/obs/``.
 
     Holds EXACTLY ONE mp4 per episode -- the final user-facing
-    deliverable named ``<episode_id>.mp4`` (no resolution suffix,
-    no per-episode subfolder). OBS's directory_sorter watches this
-    dir and queues each finished episode in turn.
+    deliverable. As of 2026-05-05 the canonical filename is
+    ``<episode_id>_procgen_blended.mp4`` (post BUG-LOCAL-106
+    + Jeffrey "broadcast folder" directive). OBS's directory_sorter
+    watches this dir and queues each finished episode in turn.
 
-    When OTR_RTXUpscale runs, the 1080p upscaled mp4 lands here.
-    When OTR_RTXUpscale is bypassed, the 832x480 composite is copied
-    here instead -- so this dir always has exactly one mp4 per
-    episode regardless of upscale on/off.
+    Render chain (one final mp4 per episode lands here):
 
-    The 832x480 composite intermediate VideoComposite writes lives
-    at ``<output>/otr/episodes/<episode_id>.mp4`` (intermediate dir;
-    see ``episodes_for_obs_dir``) so OBS never sees the pre-upscale
-    version and the intermediate stays available for debug /
-    re-upscale without re-rendering.
+      1. VideoComposite -> otr/episodes/<ep>/composited/<ep>.mp4
+         (832x480 native composite intermediate)
+      2. OTR_RTXUpscale -> otr/episodes/<ep>/upscaled/<ep>.mp4
+         (1920x1080 upscale intermediate -- see otr_upscaled_dir)
+      3. OTR_PostUpscaleProcgenBlend -> otr/obs/<ep>_procgen_blended.mp4
+         (final broadcast cut with green-CRT overlay -- this dir)
 
-    Added 2026-05-02 EVENING per Jeffrey directive: one mp4 per
-    episode in the OBS folder, only the final upscaled.
+    Pre-2026-05-05, OTR_RTXUpscale wrote step 2's output directly
+    into otr/obs/ which was correct when that node was the final
+    stage. After OTR_PostUpscaleProcgenBlend joined the chain (BUG-099
+    onward) two mp4s ended up in obs/ per episode, breaking the
+    "broadcast folder" contract. Step 2's output now lands in
+    ``otr_upscaled_dir(episode_id)`` instead -- intermediates live
+    under their episode, only the broadcast cut lives here.
     """
     return comfy_output_dir() / "otr" / "obs"
 
@@ -503,6 +529,10 @@ __all__ = [
     "otr_stills_dir",
     "otr_portraits_dir",
     "otr_videos_dir",
+    "otr_composited_dir",
+    "otr_upscaled_dir",
+    "otr_obs_dir",
+    "otr_state_dir",
     "episodes_for_obs_dir",
     "director_raw_dump_dir",
     "resolve_hf_model_path",
