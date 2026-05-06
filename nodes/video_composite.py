@@ -1700,18 +1700,6 @@ class VideoComposite:
                 "humo_target_height": ("INT", {
                     "default": 832, "min": 256, "max": 2160, "step": 8,
                 }),
-                # BUG-LOCAL-030 (2026-05-03 EVENING, Jeffrey final spec):
-                # HuMo center pillar width inside the layered composite.
-                # HuMo source 1280x720 -> scale to humo_target_height (832)
-                # tall = 1480x832 -> center-crop to humo_pillar_width x
-                # humo_target_height. Default 512 keeps the speaker's
-                # face/upper body in frame while leaving room on both
-                # sides for the FLUX env still backdrop. Tunable per
-                # workflow if a different aspect is wanted (e.g. 640
-                # for a wider speaker pillar, 384 for a tighter face).
-                "humo_pillar_width": ("INT", {
-                    "default": 512, "min": 128, "max": 1920, "step": 8,
-                }),
                 "fallback_clip_length": ("FLOAT", {
                     "default": 7.0, "min": 1.0, "max": 9.0, "step": 0.04,
                 }),
@@ -1779,6 +1767,31 @@ class VideoComposite:
                         "rather have ANY mp4 land than an exception.  "
                         "Production runs should leave this ON."
                     ),
+                }),
+                # BUG-LOCAL-113 (2026-05-06): humo_pillar_width MOVED to
+                # the end of the optional dict to stop breaking saved
+                # workflows (BUG-097 lesson re-applied). When this widget
+                # was inserted between humo_target_height and
+                # fallback_clip_length on 2026-05-03, every saved workflow
+                # JSON's positional widget values shifted by one slot,
+                # producing the ComfyUI validation errors:
+                #   "fallback_clip_length: could not convert 'ffmpeg' to FLOAT"
+                #   "Value 7 smaller than min of 128"  (humo_pillar_width slot)
+                #   "audio_source: 'True' not in [...]"  (cleanup BOOL spilling in)
+                # Appending here keeps the widget functional + tunable and
+                # lets saved workflows backfill it with the default cleanly.
+                #
+                # BUG-LOCAL-030 (2026-05-03 EVENING, Jeffrey final spec):
+                # HuMo center pillar width inside the layered composite.
+                # HuMo source 1280x720 -> scale to humo_target_height (832)
+                # tall = 1480x832 -> center-crop to humo_pillar_width x
+                # humo_target_height. Default 512 keeps the speaker's
+                # face/upper body in frame while leaving room on both
+                # sides for the FLUX env still backdrop. Tunable per
+                # workflow if a different aspect is wanted (e.g. 640
+                # for a wider speaker pillar, 384 for a tighter face).
+                "humo_pillar_width": ("INT", {
+                    "default": 512, "min": 128, "max": 1920, "step": 8,
                 }),
             },
         }

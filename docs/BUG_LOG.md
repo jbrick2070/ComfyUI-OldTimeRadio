@@ -21,6 +21,40 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-113 [FIXED]: OTR_VideoComposite saved workflows broke at queue time -- humo_pillar_width inserted in middle of optional dict shifted all subsequent positional values
+- **Date:** 2026-05-06 LATE MORNING | **Phase:** post-BUG-112 ship, attempting to load canonical workflow | **Bible candidate:** YES (re-application of BUG-097 lesson)
+- **Symptom:** Loading any OTR workflow JSON saved before 2026-05-03 EVENING failed validation at queue time with the following stack:
+  ```
+  Failed to convert an input value to a FLOAT value
+    fallback_clip_length, ffmpeg, could not convert string to float: 'ffmpeg'
+    Value 7 smaller than min of 128
+    humo_pillar_width, Value not in list
+    audio_source: 'True' not in ['master_mix_per_clip_mux', 'humo_concat', 'master_mix']
+  ```
+- **Cause:** `nodes/video_composite.py::OTR_VideoComposite.INPUT_TYPES` had `humo_pillar_width` (INT, min=128) INSERTED at slot 7, between `humo_target_height` (slot 6) and `fallback_clip_length` (slot 7-old) on 2026-05-03 EVENING per BUG-LOCAL-030 layered-composite spec. Saved workflow JSONs store widget values POSITIONALLY in `widgets_values[]`. After the insertion, every saved positional value at slot >=7 shifted down by one slot:
+  - saved `fallback_clip_length=7.0` (was slot 7) -> now slot 7 = `humo_pillar_width` (INT min 128) -> "Value 7 smaller than min of 128"
+  - saved `ffmpeg="ffmpeg"` (was slot 8) -> now slot 8 = `fallback_clip_length` (FLOAT) -> "could not convert 'ffmpeg' to FLOAT"
+  - saved `cleanup_clips_after_assembly=True` (was slot 10) -> now slot 10 = `audio_source` (enum) -> "'True' not in [...]"
+  This is the SAME class of bug as BUG-LOCAL-097 (LTX widget order). The standing rule is: NEVER insert new optional widgets in the middle of an INPUT_TYPES dict; always APPEND to the end so saved workflows backfill defaults cleanly.
+- **Fix (`nodes/video_composite.py`, ~30 LOC of comment + relocation):**
+  - Moved `humo_pillar_width` from its mid-dict position (between `humo_target_height` and `fallback_clip_length`) to the END of the optional dict (after `strict_c7`).
+  - Kept the docstring + behavior unchanged. Default still 512, min 128, max 1920.
+  - Saved workflows that pre-date the original 2026-05-03 EVENING insertion now load cleanly: positions 0-10 match the pre-2026-05-03 layout exactly, and `humo_pillar_width` (now slot 11) backfills to its default 512.
+- **Verify:**
+  - AST parse clean.
+  - INPUT_TYPES check: `optional` keys end with `humo_pillar_width` at position 11.
+  - Function signature `_execute_body` already accepts `humo_pillar_width: int = 512` -- positional change has no effect on the kwarg API.
+  - Manual reproduction of the failure mode: loading the canonical workflow that produced the four-error stack should now load cleanly.
+- **Tags:** widget-position-drift, comfyui-workflow-validation, append-not-insert, bug-097-followup, video-composite, jeffrey-canonical-workflow
+- **Provenance:** discovered when Jeffrey loaded the canonical workflow after restarting ComfyUI to pick up BUG-LOCAL-112 prompt rewrite, ran into the four validation errors at queue time. Errors confirmed widget-shift pattern by computing offsets between saved positional layout and current INPUT_TYPES order.
+- **Related:**
+  - BUG-LOCAL-097 (LTX widget order -- clip_length moved to last; same lesson, same shape).
+  - BUG-LOCAL-104 (green_only_overlay BOOLEAN widget inserted mid-dict -- same trap).
+  - BUG-LOCAL-002 (soak_operator widget indices stale -- positional drift made downstream test harness write to wrong slots).
+- **Followup not in this commit:** audit every OTR node's INPUT_TYPES in this repo for widgets inserted mid-dict between Jan 2026 and now. Move any mid-dict additions to the end. Standing rule -- "always append, never insert" -- is in CLAUDE.md but multiple drift incidents in 2026 suggest the rule is being broken silently. A unit test that locks the optional dict order would catch this at CI time instead of at user-load time.
+
+---
+
 ### BUG-LOCAL-112 [FIXED]: LTX clips rendering mostly-static -- prompt dilution + OOD clip length + i2v anchor produced "beautiful still images" instead of moving radio shots
 - **Date:** 2026-05-06 MORNING | **Phase:** post-BUG-110 visual QA | **Bible candidate:** YES (LTX prompt design / motion-vs-aesthetic separation)
 - **Symptom:** quantitative motion analysis (mean absolute pixel difference between consecutive frames within a single LTX clip) on the 2026-05-06 morning soak runs showed effectively static output:
