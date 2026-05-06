@@ -21,6 +21,54 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-112 [FIXED]: LTX clips rendering mostly-static -- prompt dilution + OOD clip length + i2v anchor produced "beautiful still images" instead of moving radio shots
+- **Date:** 2026-05-06 MORNING | **Phase:** post-BUG-110 visual QA | **Bible candidate:** YES (LTX prompt design / motion-vs-aesthetic separation)
+- **Symptom:** quantitative motion analysis (mean absolute pixel difference between consecutive frames within a single LTX clip) on the 2026-05-06 morning soak runs showed effectively static output:
+  ```
+  stellar_echoes l001 (5.16s):  35.95 -> 3.32 -> 3.21 -> 3.38   (one scene-cut spike, then static)
+  stellar_divide l001 (6.76s):   2.36 -> 15.53 -> 9.80 -> 32.78 (only "good" one - noise-seed luck)
+  deserted_space_habitat_spinning l001 (2.28s): 2.04 -> 4.31 -> 5.86 -> 5.92 (subtle/static)
+  cramped_spaceship_cockpit_humming l001 (5.16s): 1.86 -> 2.05 -> 7.01 -> 32.29 (STATIC + scene cut)
+  ```
+  Real motion (a dolly forward, a dial sweep) produces sustained 15-30 MAD. Three of four clips were essentially still images. Jeffrey: "ltx is not showing any radio movement or action."
+- **Cause:** Round-robin (ChatGPT gpt-5.5 + Gemini gemini-3.1-pro-preview-customtools + NVIDIA llama-3.3-nemotron-super-49b-v1.5; transcripts at `docs/2026-05-06-bug-112-ltx-static-motion__*.md`) all converged on H1 (prompt dilution) being dominant.
+  - The prior `_PROMPT_BY_ROLE` templates were ~450 chars of static set-dressing language ("obsidian console", "purple lighting", "vintage 1940s broadcast set", "35mm film grain") with motion verbs buried in the middle and "no people / unattended equipment" negation language at the end.
+  - BUG-LOCAL-110's `_build_ltx_role_prompt` further prepended the per-episode `ltx_style_brief` (200-300 chars) plus appended `scene_env` and `style` -- pushing the final LTX prompt to 600-800 chars.
+  - T5-XXL (LTX's text encoder) handles 512 tokens, ~2000 chars -- so truncation is NOT the issue. ATTENTION DILUTION is. The model interpreted the prompt as "render a beautiful static set" rather than "make a continuous moving shot."
+  - Gemini's load-bearing insight: LTX-Video v0.9 was natively trained on **121 frames (4.84s @ 25fps)**. Our typical announcer beat is 5-7s = 125-169 frames -- OOD on length. The classic OOD failure mode for diffusion video is to FREEZE INTO A STATIC IMAGE to prevent temporal collapse. Diluted prompt + OOD length = perfect recipe for static output.
+  - "no people in frame" / "unattended equipment" in POSITIVE prompt was a separate hazard: T5 doesn't reliably negate; the token "people" still activates people concepts. CFG=1.0 makes the negative branch mathematically inert (BUG-LOCAL-008) so positive negation was the only suppression strategy in play, and it was actively harmful.
+- **Fix (`nodes/batch_ltx_render.py`, ~110 LOC of rewrite + comment):**
+  - **`_PROMPT_BY_ROLE` rewritten:** all 5 role templates dropped from ~450 chars to 161-188 chars each. Lead with "Continuous shot, same console throughout." (suppresses scene-cut spikes that show as MAD spikes >30). Front-load LOCAL motion verbs (dial sweeps, tubes pulse, grille trembles, dust drifts). End with CAMERA motion (slow dolly forward / pull back / orbit). NO negation language. NO static set-dressing nouns -- those flow through the FLUX bookend init image via i2v, not the LTX prompt.
+  - **`_build_ltx_role_prompt` simplified:** returns ONLY the role template verbatim. No more brief prepending, scene_env append, or style tone append. The brief is still stamped to `ledger.meta.ltx_style_brief` by OTR_LLMScriptWriter (BUG-LOCAL-110 Layer 2) -- it's just deferred to BUG-LOCAL-111 (FLUX bookend integration, future commit) where it'll drive visual identity at the i2v anchor stage instead of competing with motion at the LTX stage.
+  - `line` and `ledger` arguments retained for API stability (callers pass them) but documented as intentionally unused.
+- **Round-robin disagreements (Gemini + NVIDIA right, ChatGPT wrong):**
+  - ChatGPT bluffed about T5-XXL token limits ("700 chars approaches the encoder's effective limit"). Gemini corrected: 512-token window, 700 chars is ~150-180 tokens, well under. Issue is attention dilution, not truncation.
+  - ChatGPT suggested "81 frames for 4n+1 compatibility." Gemini corrected: LTX uses **8n+1** temporal compression. OTR's existing `ltx_length_for_dur` already produces 8n+1 valid integers (57, 121, 129, 169 -- all 8n+1). Math was already right.
+  - ChatGPT recommended dropping `LTX_I2V_STRENGTH` 0.75 -> 0.60. Gemini and NVIDIA both objected: DMM ships 0.75 and gets motion; lowering it would cause visual drift without guaranteed motion gain. Kept 0.75.
+- **What we explicitly did NOT change (round-robin scope discipline):**
+  - `LTX_CFG = 1.0` -- distilled-sigma path requires it
+  - `LTX_I2V_STRENGTH = 0.75` -- DMM uses this and gets motion
+  - `LTX_DISTILLED_SIGMAS` -- same as DMM, proven schedule
+  - `KSamplerSelect("euler")` -- not chasing euler_ancestral or other samplers
+  - `LTX_FPS = 25` -- changing fps changes duration math everywhere
+  - `ltx_length_for_dur(dur_s)` -- not capping clip length tonight (would break Rule C7 audio sync without a chunking architecture)
+- **Verify:**
+  - AST parse clean.
+  - `_PROMPT_BY_ROLE` lengths: announcer=179, music_open=188, music_close=161, music_inter=174, sfx=180 (all under 200, all motion-centric).
+  - `_build_ltx_role_prompt` returns the role template verbatim; brief / scene_env / style correctly suppressed in unit-spot-check.
+  - Test suite: 56 passed, 1 skipped, 2 xfailed (post_upscale_procgen_blend + filename_pattern_audit + meta_paths + bug bible regression) -- no regressions.
+  - **Real-world verification pending:** next LTX render needs to show MAD between consecutive frames sustained at 15-30 instead of clustered at 2-6. Sample a fresh announcer clip after the next run.
+- **Tags:** ltx-prompt-design, motion-vs-aesthetic, attention-dilution, ood-clip-length, t5-encoder-negation-trap, round-robin-verified, bug-008-followup, bug-095-followup, bug-110-followup
+- **Provenance:** discovered when Jeffrey reviewed `cramped_spaceship_cockpit_humming` and reported "ltx is not showing any radio movement or action." Quantitative MAD analysis on 4 episodes confirmed. Round-robin transcripts: `docs/2026-05-06-bug-112-ltx-static-motion__*.md`.
+- **Related:**
+  - BUG-LOCAL-008 (CFG=1.0 erases negative -- this fix accepts that and works around with positive-only motion language).
+  - BUG-LOCAL-095 (LTXVAddGuide -> LTXVImgToVideoConditionOnly -- the i2v anchor is what we're now relying on for visual identity).
+  - BUG-LOCAL-032 (drop LTX end-frame anchor -- complementary to the prompt simplification).
+  - BUG-LOCAL-110 (the brief generator that's now waiting for BUG-LOCAL-111 to consume it on the FLUX side).
+  - BUG-LOCAL-111 (planned: integrate brief into FLUX radio_bookend prompt so the still itself reflects per-episode setting; LTX inherits via i2v).
+
+---
+
 ### BUG-LOCAL-110 [FIXED]: episode title not propagating end-to-end -- ledger had no title field, on-disk filename used news-headline slug instead of LLM-resolved title, doubled-underscore slug cosmetic
 - **Date:** 2026-05-05 LATE EVENING / 2026-05-06 MIDNIGHT | **Phase:** post-LTX-style-brief sprint | **Bible candidate:** YES (multi-layer canonical-id propagation pattern)
 - **Symptom:** Recent ledgers all showed `title: None` despite the script writer correctly computing a `_resolved_title` via the BUG-LOCAL-035 fallback chain (user widget -> LLM "TITLE:" line -> derived from environment -> timestamp). Final on-disk filenames looked like `signal_lost_scientists_connect_time_crystal_to_real__20260505_222015_procgen_blended.mp4` -- built from the news-headline slug rather than the resolved title, with a cosmetic doubled underscore between `_real` and `_20260505`.

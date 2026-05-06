@@ -166,158 +166,112 @@ LTX_I2V_STRENGTH = 0.75
 # Same proven path comfyui-data-media-machine uses.
 LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fix block
 
-# Speaker_role -> LTX prompt template. Builds a per-cue prompt anchored
-# to the radio bookend image so the model knows we want the radio set
-# animating, not random scenes.
+# Speaker_role -> LTX prompt template.
 #
-# BUG-LOCAL-008 (2026-05-02 / verified 2026-05-05): LTX 2B v0.9 distilled
-# runs at CFG=1.0, which mathematically erases the negative prompt
-# (output = uncond + CFG*(cond-uncond) reduces to output = cond when
-# CFG=1.0). The negative prompt encode in this node is therefore inert;
-# all human-suppression must come through POSITIVE prompts. Each role
-# prompt below carries belt-and-suspenders positive cues to bias toward
-# unattended-equipment shots: explicit "no people in frame", "unattended
-# studio", "equipment only", and no human-implying nouns ("announcer at
-# microphone", "radio host", "broadcaster") in the body.
+# BUG-LOCAL-112 rewrite (2026-05-06, round-robin verified):
+# round-robin (ChatGPT gpt-5.5 + Gemini gemini-3.1-pro-preview-customtools +
+# NVIDIA llama-3.3-nemotron-super-49b-v1.5) all converged on the dominant
+# cause of static LTX output being PROMPT DILUTION. The prior 700-char
+# templates buried motion verbs in the middle of static set-dressing
+# language ("obsidian console", "purple lighting", "35mm film grain")
+# plus negation language ("no people in frame", "unattended equipment").
+# T5-XXL doesn't truncate at 700 chars (its window is 512 tokens, plenty
+# of room) but it DOES dilute attention -- the model interprets the
+# prompt as "render a beautiful static set" rather than "make a
+# continuous moving shot."
+#
+# Gemini's load-bearing insight: LTX-Video v0.9 was natively trained
+# on 121 frames (4.84s @ 25fps). Our typical announcer beat is 5-7s =
+# 125-169 frames, OOD on length. The classic OOD failure mode for
+# diffusion video is to FREEZE INTO A STATIC IMAGE to prevent temporal
+# collapse. So a diluted prompt + OOD length is the perfect recipe for
+# the static output we measured.
+#
+# New design (each template < 160 chars):
+#   - Lead with "Continuous shot." to establish the temporal frame.
+#   - Front-load LOCAL motion verbs (dial sweeps, tubes pulse, grille
+#     trembles, dust drifts) -- the i2v anchor already provides visual
+#     identity, so the prompt doesn't need to redescribe the room.
+#   - End with CAMERA motion (dolly forward / pull back / orbit) so
+#     the model has both local and global motion cues.
+#   - "Same console throughout" suppresses scene-cut spikes (we measured
+#     32-35 MAD spikes which look like cuts, not motion).
+#   - NO negation language ("no people", "unattended"). Text encoders
+#     handle negation unreliably; the token "people" still activates
+#     people concepts. The i2v anchor (radio_bookend FLUX still) is
+#     already empty of people, so we don't need to re-state it here.
+#   - NO static set-dressing nouns ("obsidian", "brass", "amber",
+#     "vintage 1940s") -- those flow through the FLUX bookend init image,
+#     not the LTX motion prompt.
+#
+# BUG-LOCAL-008 status (CFG=1.0 erases negative): unchanged. The
+# negative branch is still mathematically inert and still discarded.
+# The new templates simply don't try to compensate via positive negation.
 _PROMPT_BY_ROLE = {
     "announcer": (
-        "Vintage 1940s radio broadcast set, tuning dial needle sweeping "
-        "rhythmically across the frequency band, copper vacuum tubes "
-        "pulsing with warm amber filament light, brass speaker grille "
-        "vibrating visibly with the broadcast, dust motes drifting "
-        "through volumetric studio beams, breathing handheld dolly "
-        "forward with subtle camera shake, dim studio lighting with "
-        "warm glow halos, unattended equipment, empty studio, no people "
-        "in frame, cinematic 35mm film grain"
+        "Continuous shot, same console throughout. Tuning dial needle "
+        "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
+        "trembles. Dust motes drift. Slow handheld dolly forward."
     ),
     "music_open": (
-        "Vintage 1940s radio igniting at the start of a broadcast, "
-        "dial whip-panning across the frequency band, oscilloscope "
-        "trace surging into a bright waveform, vacuum tube filaments "
-        "ramping from cold dark amber to white-hot incandescence, "
-        "brass speaker grille vibrating aggressively as music kicks in, "
-        "dynamic dolly push forward through volumetric light shafts, "
-        "smoke wisps rising from tube vents, unattended equipment, "
-        "empty studio, no people in frame, cinematic mood, 35mm film grain"
+        "Continuous shot, same console throughout. Dial whip-pans across "
+        "frequencies. Tube filaments ignite from cold to white-hot. "
+        "Speaker grille vibrates aggressively. Dynamic dolly push forward."
     ),
     "music_close": (
-        "Vintage 1940s radio winding down at the end of a broadcast, "
-        "tuning dial needle settling, vacuum tube filaments cooling "
-        "from white through orange through deep amber, residual smoke "
-        "trailing from cooling tubes, oscilloscope trace fading to "
-        "flatline, slow continuous pull-back through the dispersing "
-        "haze, dim studio lighting with cooling color temperature, "
-        "unattended equipment, empty studio, no people in frame, "
-        "cinematic 35mm film grain"
+        "Continuous shot, same console throughout. Dial settles. Tube "
+        "filaments cool from white through deep amber. Smoke trails "
+        "from cooling tubes. Slow dolly pull back."
     ),
     "music_inter": (
-        "Vintage 1940s radio playing instrumental music, dial steady "
-        "but glowing, oscilloscope display dancing to the rhythm with "
-        "visible waveform peaks, VU meter needles bouncing in time "
-        "with the bass, copper vacuum tubes pulsing warm amber in "
-        "sync with the beat, rhythmic micro-dolly bobbing with the "
-        "music, slow orbit around the speaker grille, dust particles "
-        "swirling through volumetric beams, unattended equipment, "
-        "empty studio, no people in frame, cinematic 35mm film grain"
+        "Continuous shot, same console throughout. Dial steady, glowing. "
+        "Oscilloscope dances to the rhythm. VU meters bounce. Tubes "
+        "pulse with the bass. Slow orbit around the speaker."
     ),
     "sfx": (
-        "Vintage 1940s radio reacting to a sudden sound effect, snap "
-        "zoom onto the tuning dial as the needle spikes hard, vacuum "
-        "tube filaments surging bright with electric arcs jumping "
-        "between tube terminals, oscilloscope trace exploding into "
-        "a sharp spike, brass speaker grille rattling violently with "
-        "static, dust shaken loose from the chassis, quick whip-pan "
-        "to the trembling dial, dim studio lighting with sudden bright "
-        "flashes, unattended equipment, empty studio, no people in "
-        "frame, cinematic 35mm film grain"
+        "Continuous shot, same console throughout. Snap zoom on the "
+        "dial as needle spikes hard. Tubes surge with electric arcs. "
+        "Speaker grille rattles violently. Quick whip-pan to the dial."
     ),
 }
 
-# BUG-LOCAL-025 (Phase H, 2026-05-03): _PROMPT_BY_ROLE alone produces
-# the SAME LTX motion prompt for every episode regardless of story
-# style or scene context. Jeffrey: "be sure story arc or better
-# shot/scene arc is being fed into FLUX and LTX as well to match the
-# short." This builder enriches each role base prompt with:
-#   - ledger.meta.ltx_style_brief: per-episode sci-fi setting brief
-#     generated by OTR_LLMScriptWriter (Jeffrey directive 2026-05-05).
-#     Prepended to the role template so each episode's LTX clips look
-#     setting-appropriate (lunar base, deep-space, seabase, etc.)
-#     instead of always looking like a vintage 1940s tube radio.
-#   - the line's scene_env (lookup via line.shot_id -> shot.scene_id
-#     -> scene.env / scene.description)
-#   - the episode's style from gen_params_initial.style
-# Result: each LTX clip matches the episode's setting AND the specific
-# scene it accompanies. Bounded length: ltx_style_brief capped at 300
-# chars upstream, scene_env capped at 60 chars here, to keep the role
-# template the dominant signal (LTX is i2v -- the image carries visual
-# identity; the prompt mostly drives motion + atmosphere).
+# BUG-LOCAL-112 (2026-05-06, round-robin verified): the LTX prompt
+# is now BRUTALLY MOTION-CENTRIC. The prior builder (BUG-LOCAL-025
+# Phase H 2026-05-03) prepended the per-episode style brief, the role
+# template, the scene_env, and the style tone in one comma-joined
+# string -- producing a 600-800 char prompt that diluted the motion
+# verbs into a tableau of static set-dressing. The model interpreted
+# this as "render a beautiful static set" rather than "make a
+# continuous moving shot," and quantitative MAD analysis on four
+# 2026-05-06 runs confirmed the output was mostly-static (1.86-5.92
+# MAD between consecutive frames -- effectively still images with
+# occasional scene-cut spikes).
+#
+# The fix is to feed LTX ONLY the motion-centric role template. Visual
+# identity is already provided by the FLUX radio_bookend still via
+# LTXVImgToVideoConditionOnly (the i2v anchor) -- repeating the
+# aesthetic in the LTX prompt is wasted bandwidth that throttles motion.
+#
+# What still happens to the deferred context:
+#   - ledger.meta.ltx_style_brief: still stamped by OTR_LLMScriptWriter,
+#     used by BUG-LOCAL-111 (FLUX bookend integration, future commit)
+#     so the bookend still itself reflects the per-episode setting.
+#   - line scene_env / episode style: not consumed by LTX anymore;
+#     they remain available in the ledger for future per-line FLUX
+#     anchoring or post-process color grading work. Removing them
+#     here is reversible -- if motion lands clean and we want to
+#     re-introduce minimal context, we can append a <40-char tail.
 def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
-    base = _PROMPT_BY_ROLE.get(role, _PROMPT_BY_ROLE["sfx"])
+    """Return the per-role LTX motion prompt verbatim.
 
-    # Per-episode sci-fi setting brief (Jeffrey directive 2026-05-05).
-    # Read from ledger.meta.ltx_style_brief; falls back to empty string
-    # which produces the legacy single-vintage-radio aesthetic. Hard-cap
-    # mirror of the 300-char clamp upstream so a misbehaving brief
-    # cannot dominate the role template.
-    ltx_style_brief = ""
-    if isinstance(ledger, dict):
-        meta = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
-        raw_brief = meta.get("ltx_style_brief")
-        if isinstance(raw_brief, str):
-            ltx_style_brief = raw_brief.strip()[:300]
-
-    # Scene context from line.shot_id -> shot.scene_id -> scene.env/description
-    scene_env = ""
-    if isinstance(line, dict) and isinstance(ledger, dict):
-        shot_id = line.get("shot_id")
-        if shot_id:
-            shots = ledger.get("shots") or []
-            scene_id = next(
-                (s.get("scene_id") for s in shots
-                 if isinstance(s, dict) and s.get("shot_id") == shot_id),
-                None,
-            )
-            if scene_id:
-                scenes = ledger.get("scenes") or []
-                scene_obj = next(
-                    (sc for sc in scenes
-                     if isinstance(sc, dict) and sc.get("scene_id") == scene_id),
-                    None,
-                )
-                if isinstance(scene_obj, dict):
-                    raw_env = (
-                        scene_obj.get("env")
-                        or scene_obj.get("description")
-                        or ""
-                    )
-                    if isinstance(raw_env, str):
-                        scene_env = raw_env.strip()[:60].rstrip(",").strip()
-
-    # Style from gen_params_initial / gen_params (post-Phase-G ledger
-    # discovery means this reads the CURRENT episode's style, not a
-    # stale leftover).
-    style = ""
-    if isinstance(ledger, dict):
-        meta = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
-        gp = meta.get("gen_params_initial")
-        if not isinstance(gp, dict):
-            gp = meta.get("gen_params")
-        if isinstance(gp, dict):
-            raw = gp.get("style")
-            if isinstance(raw, str):
-                style = raw.strip()
-
-    parts = []
-    if ltx_style_brief:
-        # Strip trailing punctuation so the comma-join doesn't produce
-        # awkward ".," at the brief/role boundary.
-        parts.append(ltx_style_brief.rstrip(".,;: ").strip())
-    parts.append(base)
-    if scene_env:
-        parts.append(f"scene context: {scene_env}")
-    if style:
-        parts.append(f"{style} broadcast tone")
-    return ", ".join(parts)
+    Intentionally minimal -- see BUG-LOCAL-112 comment block above.
+    The ``line`` and ``ledger`` arguments are accepted for API stability
+    with the prior signature (callers pass them) but are deliberately
+    unused by this implementation. Re-introducing per-episode context
+    is a one-line append change if motion measurement on the next run
+    shows the brutally-short prompt is too generic.
+    """
+    return _PROMPT_BY_ROLE.get(role, _PROMPT_BY_ROLE["sfx"])
 
 
 # Negative prompt: aggressively suppress face hallucination. LTX is
