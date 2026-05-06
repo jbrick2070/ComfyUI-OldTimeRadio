@@ -36,32 +36,50 @@ import json
 import os
 from pathlib import Path
 
-# BUG-LOCAL-112 motion prompts (mirror nodes/batch_ltx_render._PROMPT_BY_ROLE).
+# BUG-LOCAL-115 motion prompts (2026-05-06).
+#
+# The previous BUG-LOCAL-112 prompts assumed a vintage 1940s radio set
+# in the source still (vacuum tubes, brass speaker grille, tuning dial
+# needle). But the FLUX radio_bookend is now generated with the BUG-110
+# sci-fi style brief, so the actual stills are spaceship cockpits /
+# orbital control rooms / cybernetic nexuses that have NONE of those
+# elements. LTX 2B v0.9 cannot animate a "tuning dial needle" if there
+# is no tuning dial visible in the source -- the model freezes rather
+# than hallucinate missing objects mid-clip.
+#
+# These prompts describe motion that is plausibly VISIBLE in any sci-fi
+# control-room still: camera motion + lighting flicker + atmospheric
+# drift + console activity. No object-specific motion verbs.
 PROMPTS = {
     "announcer": (
-        "Continuous shot, same console throughout. Tuning dial needle "
-        "sweeps rhythmically. Vacuum tubes pulse. Brass speaker grille "
-        "trembles. Dust motes drift. Slow handheld dolly forward."
+        "Continuous video shot, same room throughout. Slow handheld "
+        "camera dolly forward through the console. Console lights "
+        "flicker rhythmically. Atmospheric haze drifts. Subtle camera "
+        "shake. Volumetric beams of light pulse softly."
     ),
     "music_open": (
-        "Continuous shot, same console throughout. Dial whip-pans across "
-        "frequencies. Tube filaments ignite from cold to white-hot. "
-        "Speaker grille vibrates aggressively. Dynamic dolly push forward."
+        "Continuous video shot, same room throughout. Dynamic dolly "
+        "push forward through the console. Console lights brightening "
+        "and pulsing aggressively. Smoke wisps rise. Camera moving with "
+        "purpose. Steam venting through the cabin."
     ),
     "music_close": (
-        "Continuous shot, same console throughout. Dial settles. Tube "
-        "filaments cool from white through deep amber. Smoke trails "
-        "from cooling tubes. Slow dolly pull back."
+        "Continuous video shot, same room throughout. Slow dolly pull "
+        "back. Console lights dimming and cooling. Residual haze "
+        "settling. Camera drifting backward through the cabin. Soft "
+        "ambient glow fading."
     ),
     "music_inter": (
-        "Continuous shot, same console throughout. Dial steady, glowing. "
-        "Oscilloscope dances to the rhythm. VU meters bounce. Tubes "
-        "pulse with the bass. Slow orbit around the speaker."
+        "Continuous video shot, same room throughout. Slow orbit around "
+        "the console. Console panels pulse rhythmically. Atmospheric "
+        "particles dance through volumetric beams. Camera bobbing "
+        "rhythmically. Light flickering with the rhythm."
     ),
     "sfx": (
-        "Continuous shot, same console throughout. Snap zoom on the "
-        "dial as needle spikes hard. Tubes surge with electric arcs. "
-        "Speaker grille rattles violently. Quick whip-pan to the dial."
+        "Continuous video shot, same room throughout. Snap zoom toward "
+        "the console as lights surge bright. Electric arcs flicker "
+        "across panels. Camera shakes hard. Steam bursts from vents. "
+        "Quick whip-pan to the bright reaction."
     ),
 }
 
@@ -200,17 +218,30 @@ def _make_output(name: str, type_: str, slot_index: int) -> dict:
     return {"name": name, "type": type_, "links": [], "slot_index": slot_index}
 
 
-def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
+def build(
+    role: str,
+    prompt_override: str | None,
+    n_stills: int,
+    *,
+    strength_sweep: bool = False,
+) -> dict:
     """Build a minimal LTX render workflow:
         radio still --> LTX --> preview video
 
-    n_stills = 1 (default) gives the simplest possible chain: one
-    LoadImage, one render, one SaveAnimatedWEBP preview. n_stills > 1
-    repeats the per-still chain so multiple radio_bookends share the
-    expensive loaders while each gets its own preview.
+    Default: n_stills = 1 -> simplest chain: one LoadImage, one render,
+    one SaveAnimatedWEBP preview. n_stills > 1 repeats the per-still
+    chain (same prompt, unique seed per still).
+
+    strength_sweep=True (BUG-LOCAL-115 escalation): render the SAME
+    still at four i2v_strength values [0.75, 0.50, 0.25, 0.05] in one
+    workflow. Use to bisect the strength knob if the simple smoke shows
+    static output -- 0.05 is near-pure-t2v, 0.75 is current production.
+    A clear motion gradient between rows confirms the strength was
+    locking the model; flat (all static) means the bug is elsewhere
+    (sampler / sigmas / model / image-type).
     """
     prompt = prompt_override or PROMPTS[role]
-    stills = find_recent_radio_bookends(n_stills)
+    stills = find_recent_radio_bookends(1 if strength_sweep else n_stills)
     if not stills:
         raise SystemExit(
             "No radio_bookend_*.png found under output/otr/episodes/. "
@@ -219,7 +250,12 @@ def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
 
     # Copy stills into input/ so LoadImage can find them
     basenames = [copy_to_input(s) for s in stills]
-    rows = [(b, LTX_I2V_STRENGTH) for b in basenames]
+    if strength_sweep:
+        # Reuse the most-recent still for every row; vary i2v_strength only.
+        sweep = [0.75, 0.50, 0.25, 0.05]
+        rows = [(basenames[0], s) for s in sweep]
+    else:
+        rows = [(b, LTX_I2V_STRENGTH) for b in basenames]
 
     wb = WorkflowBuilder()
 
@@ -418,15 +454,18 @@ def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
 
         # SaveAnimatedWEBP -- auto-plays inline in ComfyUI's node UI.
         # Stock core node, MIT-safe.
+        # Filename prefix encodes the i2v_strength so sweep outputs are
+        # distinguishable on disk.
+        _strength_tag = f"s{int(_row_strength * 100):03d}"
         n_save = wb.add_node(
             "SaveAnimatedWEBP",
             pos=(PER_X0 + PER_DX * 4, row_y),
             size=(320, 240),
-            title=f"PREVIEW (still {i+1})",
+            title=f"PREVIEW {i+1} (strength={_row_strength})",
             inputs=[_make_input("images", "IMAGE")],
             outputs=[],
             widgets_values=[
-                f"ltx_motion_smoke_{i+1}",
+                f"ltx_motion_smoke_{_strength_tag}_{i+1}",
                 LTX_FPS,
                 False,         # lossless
                 85,            # quality
@@ -491,11 +530,18 @@ def main() -> int:
                         help="Number of most-recent radio_bookend stills to batch "
                              "(default 1 = simplest possible: one still -> LTX -> "
                              "preview)")
+    parser.add_argument("--strength-sweep", action="store_true",
+                        help="BUG-115 escalation: render the SAME still at four "
+                             "i2v_strength values [0.75, 0.50, 0.25, 0.05] so you "
+                             "see the motion gradient in one queue. Bypasses --stills.")
     parser.add_argument("--out", type=str, default=None,
                         help="Output JSON path (default: workflows/ltx_motion_batch.json)")
     args = parser.parse_args()
 
-    workflow = build(args.role, args.prompt, args.stills)
+    workflow = build(
+        args.role, args.prompt, args.stills,
+        strength_sweep=args.strength_sweep,
+    )
 
     out_path = args.out or os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
