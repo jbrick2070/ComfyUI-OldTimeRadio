@@ -3373,6 +3373,83 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
+_LTX_STYLE_BRIEF_PROMPT = """You are writing a single-sentence VISUAL STYLE BRIEF for the BROADCAST EQUIPMENT shown on screen during a sci-fi radio drama. Describe ONLY the equipment / room aesthetic appropriate to this story's setting. NO people, NO characters, NO action -- just the look of the radio broadcasting equipment and the room it sits in.
+
+Story style: {style}
+Story snippet: {story_snippet}
+
+Output ONE sentence (20-40 words) describing the radio broadcast equipment and its room. The sentence should:
+- Match the story's sci-fi setting (e.g. lunar base, deep-space vessel, seabase, mars colony, orbital station)
+- Reuse vintage-radio elements (vacuum tubes, dial, brass speaker grille, oscilloscope) but skinned for the setting
+- Include lighting and atmosphere cues (e.g. "cold blue emergency lighting", "bioluminescent algae glow", "magnetic dust drifting")
+- NOT mention people, hands, faces, voices, or anyone speaking
+- Be ONE sentence with no preamble
+
+Examples of good answers:
+- Lunar mining base radio bay, copper vacuum tubes retrofitted into a magnetic-tape console, cold blue emergency lighting, low-G dust drifting through volumetric beams.
+- Deep-space science vessel comms console, holographic dial readouts, recycled atmosphere haze, brass speaker grille mounted into a curved bulkhead.
+- Kelp-farm seabase broadcasting room, bioluminescent algae glow on the dial face, tidal hum through the speaker, condensation beading on the brass casing.
+
+Visual brief:"""
+
+
+def _generate_ltx_style_brief(style, story_snippet, model_id, optimization_profile):
+    """Generate a per-episode LTX style brief that flavors the radio
+    broadcast set to match the story's sci-fi setting.
+
+    Returns a cleaned single-sentence string (max ~300 chars) suitable
+    for prepending to ``_PROMPT_BY_ROLE`` templates in ``batch_ltx_render``.
+    Returns empty string on any failure -- caller treats empty as
+    "fall back to the role template alone".
+
+    Cost: one short LLM call (~80 tokens output) on the already-loaded
+    Mistral-Nemo. Adds ~5-10s to the LLM phase per episode. Non-fatal
+    on any error.
+
+    BUG-LOCAL-008 alignment: prompt explicitly forbids people / hands /
+    faces in the brief, since the brief gets passed to LTX which (at
+    CFG=1.0) only honors positive prompt content.
+    """
+    prompt = _LTX_STYLE_BRIEF_PROMPT.format(
+        style=(style or "sci-fi").strip()[:80],
+        story_snippet=(story_snippet or "").strip()[:500],
+    )
+    try:
+        raw = _generate_with_llm(
+            prompt,
+            model_id=model_id,
+            max_new_tokens=80,
+            temperature=0.7,
+            top_p=0.9,
+            optimization_profile=optimization_profile,
+            live_ledger=False,
+        )
+    except Exception as exc:  # noqa: BLE001 -- non-fatal; caller falls back
+        log.warning("[LTXStyleBrief] generation failed: %s", exc)
+        return ""
+
+    if not raw:
+        return ""
+
+    # Cleanup: drop any leading "Visual brief:" / quotes / blank lines,
+    # take the first line, hard-cap length.
+    text = raw.strip()
+    for prefix in ("Visual brief:", "VISUAL BRIEF:", "Brief:", "BRIEF:"):
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+    text = text.strip().split("\n")[0].strip()
+    text = text.strip('"').strip("'").strip()
+    # Strip trailing example-list bullets if model echoed them
+    if text.startswith("- "):
+        text = text[2:].strip()
+    # Hard cap so it can't overwhelm the role-template prompt
+    if len(text) > 300:
+        text = text[:300].rsplit(".", 1)[0].strip()
+        if text and not text.endswith("."):
+            text = text + "."
+    return text
+
+
 def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
                           max_new_tokens=4096, temperature=0.8, top_p=0.92,
                           optimization_profile="Standard",
@@ -6626,6 +6703,39 @@ TITLE: <your chosen title>
                     )
             except Exception as _vc_err:  # noqa: BLE001
                 log.warning("[ScriptWriter] voice consistency check failed: %s", _vc_err)
+
+            # ----------------------------------------------------------------
+            # LTX style brief (Jeffrey directive 2026-05-05): generate ONE
+            # per-episode visual style brief that flavors the radio
+            # broadcast set to match the story's sci-fi setting. Stamped
+            # to ledger.meta.ltx_style_brief; nodes/batch_ltx_render
+            # prepends this to every per-line LTX prompt so each episode's
+            # LTX clips feel setting-appropriate instead of all looking
+            # like the same vintage 1940s vacuum-tube set. Non-fatal on
+            # failure -- the role templates work fine standalone.
+            try:
+                _story_snippet = (
+                    (news_block or "").strip()[:400]
+                    or script_text[:400]
+                )
+                _ltx_brief = _generate_ltx_style_brief(
+                    style=style,
+                    story_snippet=_story_snippet,
+                    model_id=model_id,
+                    optimization_profile=optimization_profile,
+                )
+                if _ltx_brief:
+                    led.data.setdefault("meta", {})["ltx_style_brief"] = _ltx_brief
+                    _runtime_log(
+                        f"LTX_STYLE_BRIEF: {_ltx_brief[:120]}"
+                        + ("..." if len(_ltx_brief) > 120 else "")
+                    )
+            except Exception as _brief_err:  # noqa: BLE001
+                log.warning(
+                    "[ScriptWriter] LTX style brief generation failed "
+                    "(non-fatal): %s", _brief_err,
+                )
+
             led.save()
         except Exception as _e:  # noqa: BLE001
             log.warning("[Ledger] ScriptWriter-stage snapshot failed: %s", _e)
