@@ -762,7 +762,19 @@ class LLMScriptCritic:
             # to something different from model_id on the writer node.
             cm = rubric_params.get("cleanup_model_id")
             wm = rubric_params.get("model_id")
-            if cm and str(cm).lower() not in ("auto", "(auto)", ""):
+            # BUG-LOCAL-109 (2026-05-05): the canonical "auto" sentinel
+            # is "auto (use story model)" (matches the widget label in
+            # OTR_LLMScriptWriter.INPUT_TYPES). Detect ANY value that
+            # starts with "auto" (case-insensitive, after strip), not
+            # just the bare strings "auto" / "(auto)" / "". Mirrors the
+            # resolver in story_orchestrator.py line ~4839. Without this
+            # check, the critic loaded the literal string "auto (use
+            # story model)" -> stripped on space to "auto" -> failed
+            # at AutoTokenizer.from_pretrained("auto") on every "auto"
+            # run, silently bypassing the critique gate.
+            cm_str = (str(cm).strip().lower() if cm is not None else "")
+            cm_is_auto_sentinel = (not cm_str) or cm_str.startswith("auto")
+            if cm and not cm_is_auto_sentinel:
                 inherited_model = str(cm)
                 inherited_source = "ledger.cleanup_model_id"
             elif wm:

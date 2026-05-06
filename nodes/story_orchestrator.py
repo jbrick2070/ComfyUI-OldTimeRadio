@@ -2141,8 +2141,26 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
 
             is_gemma = "gemma" in model_id.lower()
 
+            # BUG-LOCAL-109 (2026-05-05) defensive guard: the canonical
+            # "auto" sentinel ("auto (use story model)") must be resolved
+            # to the actual story model_id by the caller BEFORE _load_llm
+            # is reached. If something slips a literal "auto*" through
+            # (stale workflow JSON, broken caller, missed resolver), fail
+            # loudly here with an actionable error -- otherwise HuggingFace
+            # tries to resolve a repo named "auto" and emits a 404 buried
+            # under five layers of stack trace that nobody reads.
+            _mid_lower = (str(model_id) or "").strip().lower()
+            if not _mid_lower or _mid_lower.startswith("auto"):
+                raise RuntimeError(
+                    f"_load_llm: refusing to load model_id={model_id!r} -- "
+                    "the 'auto (use story model)' sentinel must be resolved "
+                    "by the caller before _load_llm is reached. Pass the "
+                    "explicit story model_id (e.g. mistralai/Mistral-Nemo-"
+                    "Instruct-2407) instead. See BUG-LOCAL-109."
+                )
+
             try:
-                # v1.4 FIX: Revert to AutoTokenizer. AutoProcessor was causing 
+                # v1.4 FIX: Revert to AutoTokenizer. AutoProcessor was causing
                 # decode offsets to fail on non-multimodal 2B models.
                 tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
             except OSError as local_err:

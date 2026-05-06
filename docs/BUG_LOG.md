@@ -21,6 +21,39 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-109 [FIXED]: ScriptCritic silently bypassed every run with cleanup_model_id="auto (use story model)"
+- **Date:** 2026-05-05 LATE EVENING | **Phase:** post-LTX-style-brief soak (signal_lost_scientists_connect_time_crystal_to_real_20260505_222015) | **Bible candidate:** YES (sentinel-resolution pattern)
+- **Symptom:** Live tail of a Pro-quality run showed:
+  ```
+  [ScriptCritic] inherited from ledger.cleanup_model_id: model=auto (use story model) ...
+  [ScriptCritic] running critic model=auto (use story model) len=3800 timeout=90s
+  ...
+  Failed to load Tokenizer 'auto'. Is it downloaded? Hub error: auto is not a local folder
+  and is not a valid model identifier listed on 'https://huggingface.co/models'
+  ...
+  [ScriptCritic] critic call failed (...) - SKIPPED
+  [ScriptCritic] stamped script_gates[] entry: verdict=PASS score=None
+  ```
+  Run continued (non-fatal) but the critique gate was silently bypassed. Every "auto (use story model)" run -- which is the default widget value -- was running WITHOUT the structural critique pass that catches missing ANNOUNCER closings, BUG-027 dialogue-erased revisions, and similar gate failures. The verdict=PASS score=None ledger entry made it look like the gate ran cleanly when in fact it was skipped entirely.
+- **Cause:** Two-layer bug.
+  1. `nodes/script_critic.py` line 765 checked `cm.lower() not in ("auto", "(auto)", "")` -- only matches the BARE strings "auto" / "(auto)" / "". The widget's canonical sentinel is "auto (use story model)" (with parenthesized hint, matching the dropdown label). That's not in the tuple, so the check thought it was a real model ID. Then line 815 stripped on space -> "auto" -> `AutoTokenizer.from_pretrained("auto")` -> HF 404 -> exception caught -> silent skip.
+  2. `nodes/story_orchestrator.py::_load_llm` had no defensive guard against receiving a literal "auto*" model_id. If anything else ever bypassed the resolver (stale workflow JSON, broken caller, future regression), the same buried-404 trace would fire with no actionable error.
+- **Fix:**
+  - **`nodes/script_critic.py` (~10 LOC):** replaced the equality-against-tuple check with `str(cm).strip().lower().startswith("auto")` -- mirrors the resolver in `story_orchestrator.py` line 4839. Now ANY value starting with "auto" (case-insensitive, after strip) is treated as the sentinel and falls back to ledger.model_id (the writer's main model). Includes the empty-string + None case in one expression.
+  - **`nodes/story_orchestrator.py::_load_llm` (~12 LOC defensive guard):** added an explicit check at the top of the function body that raises `RuntimeError` if `model_id` is empty OR starts with "auto". Error message names BUG-LOCAL-109 and tells the caller exactly how to fix it (resolve the sentinel before calling `_load_llm`). Belt-and-suspenders against future drift.
+- **Verify:**
+  - AST parse clean on both files.
+  - Bug Bible regression: 103 passed, 1 skipped, 2 xfailed, 0 failed.
+  - On the next run with `cleanup_model_id="auto (use story model)"`, ScriptCritic should log `inherited from ledger.model_id (cleanup was auto): model=mistralai/Mistral-Nemo-Instruct-2407` instead of `model=auto (use story model)`, then proceed to a real critic call.
+- **Tags:** sentinel-resolution, scriptcritic, silent-skip, gate-bypass, defensive-guard, bug-009-adjacent
+- **Provenance:** discovered via Jeffrey-pasted live tail 2026-05-05 LATE EVENING. The "auto" sentinel widget label was added in the BUG-068 follow-up two-LLM split (2026-04-26) and the script_critic resolver was updated to look for it but only for the BARE "auto" form -- the widget label drifted to include "(use story model)" hint without updating the resolver tuple.
+- **Related:**
+  - BUG-LOCAL-068 (two-LLM split that introduced the cleanup_model_id widget).
+  - BUG-LOCAL-027 (critique pass dialogue wipe -- this gate was supposed to catch that family).
+  - BUG-LOCAL-097 (widget position drift caused by inserting widgets without updating downstream consumers).
+
+---
+
 ### BUG-LOCAL-108 [FIXED]: obs/ broadcast folder held two mp4s per episode (pre-blend upscale + post-blend final) -- enforce "one final mp4 per episode" contract
 - **Date:** 2026-05-05 MORNING | **Phase:** post-BUG-106 dark_transponder QA | **Bible candidate:** YES (architectural rule for output paths)
 - **Symptom:** after the dark_transponder soak run completed cleanly, `output/otr/obs/` contained both `signal_lost_dark_transponder_20260505_084250.mp4` (9 MB pre-blend RTXUpscale output) and `signal_lost_dark_transponder_20260505_084250_procgen_blended.mp4` (18.7 MB post-blend final). Same shape in earlier runs (crystalline_whispers had 2 files, echo_in_stasis had 1 source + 8 BLEND_TEST variants). Jeffrey: "obs should only have one final output file its my broadcast folder so any pre upscaled files should be in the v episode specific video folder." Path module's `otr_obs_dir()` docstring already documented the "exactly one mp4 per episode" contract; the code was breaking it because both `OTR_RTXUpscale` and `OTR_PostUpscaleProcgenBlend` wrote into obs/.
