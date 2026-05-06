@@ -175,7 +175,11 @@ class WorkflowBuilder:
 
     def to_json(self) -> dict:
         return {
-            "id": "ltx-motion-batch-2026-05-06",
+            # ComfyUI's frontend Zod schema requires a valid UUID at "id".
+            # A slug like "ltx-motion-batch-2026-05-06" gets rejected at
+            # workflow-load time with "Invalid uuid at id" (BUG-LOCAL-114).
+            # Pinned UUIDv4 so the JSON is diff-friendly across rebuilds.
+            "id": "1e7ec912-1b40-4c0d-9a5b-6c0d5e7a9b3e",
             "revision": 1,
             "last_node_id": self._next_node_id - 1,
             "last_link_id": self._next_link_id - 1,

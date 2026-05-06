@@ -21,6 +21,23 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-114 [FIXED]: ltx_motion_batch workflow JSON rejected by ComfyUI Zod validator -- "id" field was a slug, not a UUID
+- **Date:** 2026-05-06 LATE MORNING | **Phase:** BUG-112 verification harness | **Bible candidate:** YES (workflow-JSON authoring rule)
+- **Symptom:** Loading `workflows/ltx_motion_batch.json` in ComfyUI's UI rendered the graph (60% loaded) but blocked submission with: `Invalid workflow against zod schema: Validation error: Invalid uuid at "id"`.
+- **Cause:** `scripts/build_ltx_motion_workflow.py::WorkflowBuilder.to_json` set `"id": "ltx-motion-batch-2026-05-06"` -- a human-readable slug, not a UUID. ComfyUI's frontend uses Zod schema validation that requires the workflow `id` to match the standard UUIDv4 format (8-4-4-4-12 hex). The existing `workflows/otr_ltx_smoke.json` uses a valid UUID (`a4d1c7e2-5b6f-4f3a-9e0c-7b3a5d8e2f10`); I missed that constraint when authoring the new workflow.
+- **Fix (`scripts/build_ltx_motion_workflow.py`, ~5 LOC):** pinned a valid UUIDv4 at the builder's `id` field: `1e7ec912-1b40-4c0d-9a5b-6c0d5e7a9b3e`. Diff-friendly across re-builds. Comment cites BUG-LOCAL-114 so the next person who copies this builder for a new workflow doesn't re-introduce the slug mistake.
+- **Verify:**
+  - Regex match against UUIDv4 pattern: PASS.
+  - Workflow JSON file size + node/link counts unchanged.
+  - Workflow loads in ComfyUI without the Zod error.
+- **Tags:** comfyui-frontend, zod-validation, uuid, workflow-authoring, bug-112-followup
+- **Provenance:** discovered when Jeffrey loaded the freshly-built `ltx_motion_batch.json` and the UI surfaced the Zod error in an Alert. Graph rendered fine; submit button was the choke point.
+- **Related:**
+  - BUG-LOCAL-012 (FIXED): "ComfyUI frontend Zod validation rejected workflows/otr_ltx_smoke.json at load time" -- same Zod constraint family, different schema field.
+- **Authoring rule for future workflow JSONs:** any `"id"` field that ComfyUI's UI parses MUST be a valid UUIDv4. If hand-authoring, copy a UUID from an existing-working workflow JSON. If generating, use `uuid.uuid4()` or pin a known-good UUID literal in the builder.
+
+---
+
 ### BUG-LOCAL-113 [FIXED]: OTR_VideoComposite saved workflows broke at queue time -- humo_pillar_width inserted in middle of optional dict shifted all subsequent positional values
 - **Date:** 2026-05-06 LATE MORNING | **Phase:** post-BUG-112 ship, attempting to load canonical workflow | **Bible candidate:** YES (re-application of BUG-097 lesson)
 - **Symptom:** Loading any OTR workflow JSON saved before 2026-05-03 EVENING failed validation at queue time with the following stack:
