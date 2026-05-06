@@ -1,0 +1,1014 @@
+{
+  "id": "1f9e8d72-2c51-4b3a-8f7d-9e5a6b1c2d3e",
+  "revision": 1,
+  "last_node_id": 20,
+  "last_link_id": 22,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LowVRAMCheckpointLoader",
+      "pos": [
+        40,
+        100
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "dependencies",
+          "type": "*",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [],
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            6,
+            21
+          ],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LowVRAMCheckpointLoader"
+      },
+      "widgets_values": [
+        "ltx-video-2b-v0.9.safetensors"
+      ],
+      "title": "LTX 2B Loader"
+    },
+    {
+      "id": 2,
+      "type": "CLIPLoader",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "t5xxl_fp16.safetensors",
+        "ltxv",
+        "default"
+      ],
+      "title": "T5-XXL Text Encoder"
+    },
+    {
+      "id": 3,
+      "type": "LTXVAudioVAELoader",
+      "pos": [
+        40,
+        500
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVAudioVAELoader"
+      },
+      "widgets_values": [
+        "ltx-video-2b-v0.9.safetensors"
+      ],
+      "title": "Audio VAE (BUG-116 - AV-joint pipeline)"
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "pos": [
+        40,
+        640
+      ],
+      "size": [
+        320,
+        280
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "radio_bookend_signal_lost_cramped_spaceship_cockpit_humming_20260506_085313.png",
+        "image"
+      ],
+      "title": "radio_bookend.png"
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        420,
+        100
+      ],
+      "size": [
+        420,
+        160
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "Continuous video shot, same room throughout. Slow handheld camera dolly forward through the console. Console lights flicker rhythmically. Atmospheric haze drifts. Subtle camera shake."
+      ],
+      "title": "POSITIVE prompt"
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        420,
+        320
+      ],
+      "size": [
+        420,
+        100
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "NEGATIVE prompt (inert at CFG=1.0)"
+    },
+    {
+      "id": 7,
+      "type": "LTXVConditioning",
+      "pos": [
+        900,
+        100
+      ],
+      "size": [
+        280,
+        90
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 3
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            13
+          ],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVConditioning"
+      },
+      "widgets_values": [
+        25
+      ],
+      "title": "LTXV Conditioning"
+    },
+    {
+      "id": 8,
+      "type": "KSamplerSelect",
+      "pos": [
+        900,
+        230
+      ],
+      "size": [
+        280,
+        60
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            16
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ],
+      "title": "Sampler (euler)"
+    },
+    {
+      "id": 9,
+      "type": "ManualSigmas",
+      "pos": [
+        900,
+        320
+      ],
+      "size": [
+        280,
+        80
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            17
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ManualSigmas"
+      },
+      "widgets_values": [
+        "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+      ],
+      "title": "Sigmas (distilled 8-step)"
+    },
+    {
+      "id": 10,
+      "type": "EmptyLTXVLatentVideo",
+      "pos": [
+        900,
+        420
+      ],
+      "size": [
+        280,
+        110
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLTXVLatentVideo"
+      },
+      "widgets_values": [
+        832,
+        480,
+        121,
+        1
+      ],
+      "title": "Empty Video Latent (832x480, 121f)"
+    },
+    {
+      "id": 11,
+      "type": "LTXVEmptyLatentAudio",
+      "pos": [
+        900,
+        560
+      ],
+      "size": [
+        280,
+        110
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio_vae",
+          "type": "VAE",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVEmptyLatentAudio"
+      },
+      "widgets_values": [
+        121,
+        25,
+        1
+      ],
+      "title": "Empty Audio Latent (BUG-116)"
+    },
+    {
+      "id": 12,
+      "type": "LTXVImgToVideoConditionOnly",
+      "pos": [
+        1240,
+        100
+      ],
+      "size": [
+        280,
+        110
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 6
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVImgToVideoConditionOnly"
+      },
+      "widgets_values": [
+        0.75
+      ],
+      "title": "i2v init (strength=0.75)"
+    },
+    {
+      "id": 13,
+      "type": "LTXVConcatAVLatent",
+      "pos": [
+        1240,
+        260
+      ],
+      "size": [
+        280,
+        90
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video_latent",
+          "type": "LATENT",
+          "link": 9
+        },
+        {
+          "name": "audio_latent",
+          "type": "LATENT",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            18
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVConcatAVLatent"
+      },
+      "widgets_values": [],
+      "title": "Concat AV Latent (BUG-116 -- the missing piece)"
+    },
+    {
+      "id": 14,
+      "type": "CFGGuider",
+      "pos": [
+        1240,
+        380
+      ],
+      "size": [
+        280,
+        90
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 11
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 12
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CFGGuider"
+      },
+      "widgets_values": [
+        1.0
+      ],
+      "title": "CFG Guider (cfg=1.0)"
+    },
+    {
+      "id": 15,
+      "type": "RandomNoise",
+      "pos": [
+        1240,
+        500
+      ],
+      "size": [
+        280,
+        80
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        42,
+        "fixed"
+      ],
+      "title": "Noise seed=42"
+    },
+    {
+      "id": 16,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1580,
+        100
+      ],
+      "size": [
+        280,
+        200
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 14
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 15
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 16
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 17
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            19
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": [],
+      "title": "Sample (AV-joint)"
+    },
+    {
+      "id": 17,
+      "type": "LTXVSeparateAVLatent",
+      "pos": [
+        1580,
+        330
+      ],
+      "size": [
+        280,
+        90
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "av_latent",
+          "type": "LATENT",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_latent",
+          "type": "LATENT",
+          "links": [
+            20
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "audio_latent",
+          "type": "LATENT",
+          "links": [],
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LTXVSeparateAVLatent"
+      },
+      "widgets_values": [],
+      "title": "Separate AV (BUG-116)"
+    },
+    {
+      "id": 18,
+      "type": "VAEDecode",
+      "pos": [
+        1900,
+        100
+      ],
+      "size": [
+        220,
+        70
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 20
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "title": "VAE Decode (video)"
+    },
+    {
+      "id": 19,
+      "type": "SaveAnimatedWEBP",
+      "pos": [
+        2160,
+        100
+      ],
+      "size": [
+        360,
+        280
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveAnimatedWEBP"
+      },
+      "widgets_values": [
+        "ltx_avjoint_smoke",
+        25,
+        false,
+        85,
+        "default"
+      ],
+      "title": "PREVIEW (auto-plays)"
+    },
+    {
+      "id": 20,
+      "type": "Note",
+      "pos": [
+        40,
+        960
+      ],
+      "size": [
+        820,
+        240
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note"
+      },
+      "widgets_values": [
+        "BUG-LOCAL-116 hypothesis: LTX 2B v0.9 is trained on AV-joint\nlatents. Sampling on a video-only latent (what our prior smoke\nand production pipeline did) puts the model OOD -> freeze.\n\nDMM's batch_video.py samples on LTXVConcatAVLatent(video, audio)\nand splits via LTXVSeparateAVLatent. Same base model, same\nsigmas, same sampler -- but the latent SHAPE matches what the\nmodel expects. That's the missing piece.\n\nIf this workflow produces motion: hypothesis confirmed, fix\nis to update OTR's batch_ltx_render.py to use the AV-joint\npipeline. If still static: the bug is not the latent shape;\nnext escalation is the LightX2V LoRA + euler_ancestral_cfg_pp.\n"
+      ],
+      "title": "README -- BUG-LOCAL-116 AV-joint smoke"
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      2,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      5,
+      0,
+      7,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      6,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      3,
+      0,
+      11,
+      0,
+      "VAE"
+    ],
+    [
+      6,
+      1,
+      2,
+      12,
+      0,
+      "VAE"
+    ],
+    [
+      7,
+      4,
+      0,
+      12,
+      1,
+      "IMAGE"
+    ],
+    [
+      8,
+      10,
+      0,
+      12,
+      2,
+      "LATENT"
+    ],
+    [
+      9,
+      12,
+      0,
+      13,
+      0,
+      "LATENT"
+    ],
+    [
+      10,
+      11,
+      0,
+      13,
+      1,
+      "LATENT"
+    ],
+    [
+      11,
+      1,
+      0,
+      14,
+      0,
+      "MODEL"
+    ],
+    [
+      12,
+      7,
+      0,
+      14,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      13,
+      7,
+      1,
+      14,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      15,
+      0,
+      16,
+      0,
+      "NOISE"
+    ],
+    [
+      15,
+      14,
+      0,
+      16,
+      1,
+      "GUIDER"
+    ],
+    [
+      16,
+      8,
+      0,
+      16,
+      2,
+      "SAMPLER"
+    ],
+    [
+      17,
+      9,
+      0,
+      16,
+      3,
+      "SIGMAS"
+    ],
+    [
+      18,
+      13,
+      0,
+      16,
+      4,
+      "LATENT"
+    ],
+    [
+      19,
+      16,
+      0,
+      17,
+      0,
+      "LATENT"
+    ],
+    [
+      20,
+      17,
+      0,
+      18,
+      0,
+      "LATENT"
+    ],
+    [
+      21,
+      1,
+      2,
+      18,
+      1,
+      "VAE"
+    ],
+    [
+      22,
+      18,
+      0,
+      19,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}
