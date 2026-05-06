@@ -201,6 +201,14 @@ def _make_output(name: str, type_: str, slot_index: int) -> dict:
 
 
 def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
+    """Build a minimal LTX render workflow:
+        radio still --> LTX --> preview video
+
+    n_stills = 1 (default) gives the simplest possible chain: one
+    LoadImage, one render, one SaveAnimatedWEBP preview. n_stills > 1
+    repeats the per-still chain so multiple radio_bookends share the
+    expensive loaders while each gets its own preview.
+    """
     prompt = prompt_override or PROMPTS[role]
     stills = find_recent_radio_bookends(n_stills)
     if not stills:
@@ -211,6 +219,7 @@ def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
 
     # Copy stills into input/ so LoadImage can find them
     basenames = [copy_to_input(s) for s in stills]
+    rows = [(b, LTX_I2V_STRENGTH) for b in basenames]
 
     wb = WorkflowBuilder()
 
@@ -329,7 +338,7 @@ def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
     PER_DX = 360
     PER_DY = 320
 
-    for i, basename in enumerate(basenames):
+    for i, (basename, _row_strength) in enumerate(rows):
         row_y = Y0 + i * PER_DY
         title_suffix = basename.replace("radio_bookend_signal_lost_", "").replace(".png", "")
         if len(title_suffix) > 32:
@@ -353,14 +362,14 @@ def build(role: str, prompt_override: str | None, n_stills: int) -> dict:
             "LTXVImgToVideoConditionOnly",
             pos=(PER_X0 + PER_DX, row_y),
             size=(280, 110),
-            title=f"i2v init (strength={LTX_I2V_STRENGTH})",
+            title=f"i2v init (strength={_row_strength})",
             inputs=[
                 _make_input("vae", "VAE"),
                 _make_input("image", "IMAGE"),
                 _make_input("latent", "LATENT"),
             ],
             outputs=[_make_output("LATENT", "LATENT", 0)],
-            widgets_values=[LTX_I2V_STRENGTH],
+            widgets_values=[_row_strength],
         )
 
         # RandomNoise (different seed per still so we don't get identical clips)
@@ -478,8 +487,10 @@ def main() -> int:
     parser.add_argument("--role", choices=list(PROMPTS.keys()), default="announcer")
     parser.add_argument("--prompt", type=str, default=None,
                         help="Override the role-derived prompt with a custom string")
-    parser.add_argument("--stills", type=int, default=4,
-                        help="Number of most-recent radio_bookend stills to batch (default 4)")
+    parser.add_argument("--stills", type=int, default=1,
+                        help="Number of most-recent radio_bookend stills to batch "
+                             "(default 1 = simplest possible: one still -> LTX -> "
+                             "preview)")
     parser.add_argument("--out", type=str, default=None,
                         help="Output JSON path (default: workflows/ltx_motion_batch.json)")
     args = parser.parse_args()
