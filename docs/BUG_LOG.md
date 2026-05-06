@@ -21,6 +21,41 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-110 [FIXED]: episode title not propagating end-to-end -- ledger had no title field, on-disk filename used news-headline slug instead of LLM-resolved title, doubled-underscore slug cosmetic
+- **Date:** 2026-05-05 LATE EVENING / 2026-05-06 MIDNIGHT | **Phase:** post-LTX-style-brief sprint | **Bible candidate:** YES (multi-layer canonical-id propagation pattern)
+- **Symptom:** Recent ledgers all showed `title: None` despite the script writer correctly computing a `_resolved_title` via the BUG-LOCAL-035 fallback chain (user widget -> LLM "TITLE:" line -> derived from environment -> timestamp). Final on-disk filenames looked like `signal_lost_scientists_connect_time_crystal_to_real__20260505_222015_procgen_blended.mp4` -- built from the news-headline slug rather than the resolved title, with a cosmetic doubled underscore between `_real` and `_20260505`.
+- **Cause:** Three-layer breakage.
+  1. **Layer 1 -- slug doubled underscore:** `nodes/video_engine.py:1482` strips punctuation (kept: alnum + "_" + " ") then `replace(" ", "_")`. A title like `"Signal Lost - The Crystal!"` strips `-` and `!` to produce `"Signal Lost  The Crystal"` (note the DOUBLE SPACE between "Lost" and "The") which then becomes `"signal_lost__the_crystal"`. Round-robin Gemini caught this; ChatGPT initially attributed it to trailing-underscore source text (incorrect).
+  2. **Layer 2 -- ledger schema gap:** `_resolved_title` was prepended to `script_lines[0]` as a `{"type": "title", "value": ...}` token but was NEVER written to `ledger.title` or `ledger.meta.title`. So the ledger appeared title-less to all downstream readers.
+  3. **Layer 3 -- video_engine read site:** `nodes/video_engine.py` constructed the on-disk filename from the inbound `episode_title` parameter, which was the user's empty widget value (workflow link carried "" through). It never looked at the ledger for the resolved title, so the filename fell back to whatever slug the workflow produced upstream (the news headline).
+- **Fix (round-robin verified -- transcripts at `docs/2026-05-05-bug-110-title-flow__*.md`, ChatGPT gpt-5.5 + Gemini gemini-3.1-pro-preview-customtools + NVIDIA llama-3.3-nemotron-super-49b-v1.5 all signed off on shipping Layer 1+2+3 with hardenings):**
+  - **Layer 1 (`nodes/video_engine.py`):** added `import re as _re` at the top. Slug pipeline now: drop punctuation -> collapse whitespace runs FIRST (Gemini's correction) -> underscore-ize -> truncate -> collapse underscore runs and strip ends (catches truncation landing on `_`) -> empty-string fallback to `"untitled"`.
+  - **Layer 2 (`nodes/story_orchestrator.py`):** stamps `led.data["title"] = _resolved_title` at the top level of the ledger and `led.data.setdefault("meta", {})["title_source"] = _title_source` for forensics ("user", "llm", "derived", "timestamp_fallback"). Stamped right before the final `led.save()` in the same try-block where `meta.ltx_style_brief` lives. Round-robin all three converged on top-level `title` (not `meta.title`) being correct because title is a first-class identity field alongside `episode_id`, `commit`, `total_episode_dur_s`.
+  - **Layer 3 (`nodes/video_engine.py`):** before slug construction, reads `_early_led.data.get("title")` (the ledger singleton already imported earlier in the function for `out_dir` resolution) and prefers it over the inbound `episode_title` parameter when non-empty. Logs a forensic line when the substitution happens. Falls back gracefully on any exception. Comment marks this as a transitional v2.0-alpha bridge; v2.1 cleanup is to wire an explicit title socket (ROADMAP.md L374).
+- **Round-robin disagreements (Gemini + NVIDIA right, ChatGPT wrong):**
+  - Gemini caught the space-collapse-first slug bug ChatGPT initially attributed to trailing-underscore source text. Adopted Gemini's order: `re.sub(r"\s+", " ", ...)` BEFORE `replace(" ", "_")`.
+  - Gemini + NVIDIA flagged ComfyUI graph-caching risk on Layer 3 (singleton might be stale if orchestrator gets cached and skipped). Honest assessment: orchestrator inputs change every run (timestamps, news_seed) so caching almost never hits in practice; failure mode if it does is "filename uses stale title" -- debuggable, non-catastrophic. Shipped simple read with try/except fallback to inbound; no episode_id guard. If we ever see leakage in the wild, promotes to guarded read.
+- **Verify:**
+  - AST parse clean on both files.
+  - Bug Bible regression: 103 passed, 1 skipped, 2 xfailed, 0 failed.
+  - Slug logic unit-spot-check (manual REPL):
+    - `"The Signal__From   Beyond!!!"` -> `"the_signal_from_beyond"` (collapsed runs, ended cleanly)
+    - `"!!!"` -> `"untitled"` (empty-string fallback)
+    - `"Signal Lost - The Crystal!"` -> `"signal_lost_the_crystal"` (no double underscore from the double space)
+- **What this DOES NOT fix (deferred per round-robin scope discipline):**
+  - `episode_id` / per-episode folder naming (still uses news-headline slug for the dir name; only the final mp4 filename uses the resolved title). Folder rename happens via `Ledger.rename_episode(ep_id)` AFTER video_engine writes the mp4, and `ep_id` is derived from the mp4 basename so the folder NOW matches the resolved title too -- partial side-effect win.
+  - `"Signal Lost"` hardcoded prefix in the filename (separate v2.1 `show_name`-configurable cleanup; ROADMAP.md L644).
+  - LLMDirector hardcoded `"episode_title": "Signal Lost"` in its JSON output (separate prompt-template work).
+- **Tags:** title-propagation, slug-cleanup, ledger-schema, transitional-bridge, comfyui-singleton, round-robin-verified, bug-035-followup, bug-038-followup
+- **Provenance:** discovered during the in-flight `signal_lost_scientists_connect_time_crystal_to_real__20260505_222015` run; ledger had `title: None` on inspection. Round-robin transcripts and synthesis: `docs/2026-05-05-bug-110-title-flow__*.md`.
+- **Related:**
+  - BUG-LOCAL-035 (TITLE_STUCK fix that introduced `_resolved_title` fallback chain).
+  - BUG-LOCAL-022 (BatchHumoRender stem-swap broken when `safe_title[:40]` truncates).
+  - BUG-LOCAL-097 (widget position drift; pattern of "fix the widget but not the consumer").
+  - ROADMAP.md L374 (v2.1 socket cleanup), L636-644 (show_name configurable cleanup).
+
+---
+
 ### BUG-LOCAL-109 [FIXED]: ScriptCritic silently bypassed every run with cleanup_model_id="auto (use story model)"
 - **Date:** 2026-05-05 LATE EVENING | **Phase:** post-LTX-style-brief soak (signal_lost_scientists_connect_time_crystal_to_real_20260505_222015) | **Bible candidate:** YES (sentinel-resolution pattern)
 - **Symptom:** Live tail of a Pro-quality run showed:

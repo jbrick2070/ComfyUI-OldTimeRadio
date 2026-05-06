@@ -6723,6 +6723,32 @@ TITLE: <your chosen title>
                 log.warning("[ScriptWriter] voice consistency check failed: %s", _vc_err)
 
             # ----------------------------------------------------------------
+            # BUG-LOCAL-110 Layer 2 (2026-05-05, round-robin verified):
+            # stamp the canonical resolved title at the TOP LEVEL of the
+            # ledger (alongside episode_id, commit, total_episode_dur_s)
+            # so video_engine and other consumers can read a clean
+            # `ledger.title` instead of trying to walk script_lines looking
+            # for the "type": "title" token. Also stamp meta.title_source
+            # for forensics ("user", "llm", "derived", "timestamp_fallback").
+            # _resolved_title and _title_source are computed earlier in
+            # this method via the BUG-LOCAL-035 fallback chain.
+            try:
+                _rt = str(_resolved_title or "").strip()
+                _ts_src = str(_title_source or "unknown").strip() or "unknown"
+                if _rt:
+                    led.data["title"] = _rt
+                    led.data.setdefault("meta", {})["title_source"] = _ts_src
+                    _runtime_log(
+                        f"BUG-110: stamped ledger.title={_rt!r} "
+                        f"(source={_ts_src})"
+                    )
+            except Exception as _title_stamp_err:  # noqa: BLE001
+                log.warning(
+                    "[ScriptWriter] BUG-110 ledger.title stamp failed "
+                    "(non-fatal): %s", _title_stamp_err,
+                )
+
+            # ----------------------------------------------------------------
             # LTX style brief (Jeffrey directive 2026-05-05): generate ONE
             # per-episode visual style brief that flavors the radio
             # broadcast set to match the story's sci-fi setting. Stamped

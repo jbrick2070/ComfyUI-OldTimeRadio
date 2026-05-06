@@ -25,6 +25,7 @@ import json
 import logging
 import math
 import os
+import re as _re
 import shutil
 import subprocess
 import sys
@@ -1479,8 +1480,60 @@ class SignalLostVideoRenderer:
         os.makedirs(out_dir, exist_ok=True)
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
-        safe_title = "".join(c if c.isalnum() or c in "_ " else "" for c in episode_title)
-        safe_title = safe_title.strip().replace(" ", "_").lower()[:40]
+
+        # BUG-LOCAL-110 Layer 3 (2026-05-05, round-robin verified): prefer
+        # the canonical resolved title stamped by story_orchestrator into
+        # the production ledger. The inbound `episode_title` parameter is
+        # often empty (user widget unfilled) or stale (workflow link
+        # carries the user's empty value through). Reading from the
+        # ledger gives us the BUG-035 fallback chain result (LLM TITLE ->
+        # derived from environment -> timestamp). The orchestrator
+        # singleton is already imported above (`_early_led`) so we reuse
+        # it -- same in-process ledger, no extra disk I/O.
+        # Transitional v2.0-alpha bridge; v2.1 cleanup is to wire an
+        # explicit title socket on OTR_SignalLostVideo (ROADMAP.md L374).
+        try:
+            _ledger_title = str(_early_led.data.get("title") or "").strip()
+            if _ledger_title:
+                if not episode_title or not str(episode_title).strip():
+                    log.info(
+                        "[Video][BUG-110] inbound episode_title was empty; "
+                        "using ledger.title=%r", _ledger_title,
+                    )
+                elif _ledger_title != str(episode_title).strip():
+                    log.info(
+                        "[Video][BUG-110] preferring ledger.title=%r over "
+                        "inbound episode_title=%r", _ledger_title, episode_title,
+                    )
+                episode_title = _ledger_title
+        except Exception as _title_exc:  # noqa: BLE001 -- ledger read is best-effort
+            log.warning(
+                "[Video][BUG-110] could not read ledger.title; falling back "
+                "to inbound episode_title (%s)", _title_exc,
+            )
+
+        # BUG-LOCAL-110 Layer 1 (2026-05-05, round-robin verified): slug
+        # cleanup. Pipeline:
+        #   1. drop punctuation (alnum + "_" + " " kept)
+        #   2. collapse runs of whitespace to a single space FIRST -- this
+        #      prevents titles like "Signal Lost - The Crystal!" from
+        #      becoming "signal_lost__the_crystal" (the strip-of-punct
+        #      leaves a double space between "Lost" and "The" which then
+        #      becomes a double underscore on `replace(" ", "_")`).
+        #      Round-robin (Gemini + NVIDIA) caught this; ChatGPT missed it.
+        #   3. underscore-ize, lowercase, truncate to 40
+        #   4. collapse any remaining underscore runs and strip both ends
+        #      again (truncation can leave a trailing "_" if char 40 was
+        #      a separator)
+        #   5. fall back to "untitled" if the result is empty so we never
+        #      emit `signal_lost__<ts>.mp4` (double underscore).
+        safe_title = "".join(
+            c if c.isalnum() or c in "_ " else ""
+            for c in str(episode_title or "")
+        )
+        safe_title = _re.sub(r"\s+", " ", safe_title).strip()
+        safe_title = safe_title.replace(" ", "_").lower()[:40]
+        safe_title = _re.sub(r"_+", "_", safe_title).strip("_") or "untitled"
         out_path = os.path.join(out_dir, f"signal_lost_{safe_title}_{ts}.mp4")
 
         # -- 5. Build frame generator ---------------------------------
