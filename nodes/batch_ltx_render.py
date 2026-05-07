@@ -1020,6 +1020,18 @@ class BatchLTXRender:
         clips_dir.mkdir(parents=True, exist_ok=True)
         rendered_clips: list[dict] = []
 
+        # BUG-LOCAL-117b 2026-05-07: render-cache to dedupe identical-input
+        # chunks within an episode. Per Jeffrey: "if the inputs are the same
+        # we need to change that." Most common case: a music_open beat split
+        # into 2 chunks (BUG-LOCAL-091) renders chunk 1 + chunk 2 with same
+        # role (music_open) + same anchor (radio_bookend) + same prompt
+        # (_PROMPT_BY_ROLE) + same ltx_length. Truly identical inputs ->
+        # truly identical output. Cache hit copies the canonical mp4 to
+        # the per-line/chunk filename instead of rendering again.
+        # Saves ~40-50% wall time on a typical episode (cargo_hold smoke =
+        # 5 chunks -> 3 unique renders).
+        render_cache: dict[tuple, Path] = {}
+
         try:
             import comfy.model_management as mm  # type: ignore
             mm.load_models_gpu([model])
@@ -1080,6 +1092,57 @@ class BatchLTXRender:
                     for chunk_idx, chunk in enumerate(chunks):
                         chunk_dur_s = float(chunk["dur_s"])
                         chunk_ltx_length = ltx_length_for_dur(chunk_dur_s)
+
+                        # BUG-LOCAL-117b 2026-05-07: cache key per identical
+                        # input set. Same role -> same prompt (via
+                        # _PROMPT_BY_ROLE). Same anchor (radio_bookend per
+                        # episode). Same ltx_length -> same output.
+                        # Engine + sampler are also part of the cache because
+                        # if the user reruns with a different sampler we want
+                        # FRESH renders, not stale cached ones.
+                        if engine == "v2_3":
+                            _cache_sampler_id = "v2_3_clownsampler_res_2s"
+                        else:
+                            _cache_sampler_id = f"v0_9_{v0_9_sampler_resolved}"
+                        cache_key = (
+                            entry["speaker_role"],
+                            int(chunk_ltx_length),
+                            _cache_sampler_id,
+                        )
+
+                        # Per-chunk destination resolved upfront (used by
+                        # both the cache-hit copy path and the live-render
+                        # path, plus the n_chunks==1 single-line path).
+                        if n_chunks == 1:
+                            chunk_dest = clips_dir / f"{line_id}.mp4"
+                        else:
+                            chunk_dest = clips_dir / (
+                                f"{line_id}__chunk{chunk_idx + 1:02d}.mp4"
+                            )
+
+                        # Cache hit: identical inputs already rendered for
+                        # an earlier line/chunk in this episode. Copy the
+                        # canonical mp4 to chunk_dest. Eliminates a full
+                        # 5-8 min sample+decode pass per duplicate.
+                        if cache_key in render_cache:
+                            import shutil as _shutil
+                            _src = render_cache[cache_key]
+                            try:
+                                _shutil.copy2(str(_src), str(chunk_dest))
+                                log.info(
+                                    "[BatchLTXRender] cache HIT for %s: "
+                                    "copied %s -> %s (key=%s)",
+                                    line_id, _src.name, chunk_dest.name,
+                                    cache_key,
+                                )
+                                chunk_mp4_paths.append(chunk_dest)
+                                continue  # skip render -- chunk_dest is satisfied
+                            except Exception as _copy_exc:
+                                log.warning(
+                                    "[BatchLTXRender] cache copy failed for %s "
+                                    "(%s); falling through to fresh render: %s",
+                                    line_id, cache_key, _copy_exc,
+                                )
 
                         # Per-chunk shot_seed: stride-shifted so chunks
                         # 1+2 of the same line don't render with identical
@@ -1275,15 +1338,9 @@ class BatchLTXRender:
                                 temporal_overlap=LTX_TEMPORAL_OVERLAP,
                             )[0]
 
-                        # Per-chunk destination. Single-chunk writes to
-                        # canonical <line_id>.mp4; multi-chunk writes to
-                        # per-chunk part files for the concat below.
-                        if n_chunks == 1:
-                            chunk_dest = clips_dir / f"{line_id}.mp4"
-                        else:
-                            chunk_dest = clips_dir / (
-                                f"{line_id}__chunk{chunk_idx + 1:02d}.mp4"
-                            )
+                        # chunk_dest already resolved above (used by both
+                        # cache-hit and live-render paths -- see BUG-LOCAL-117b
+                        # cache key block ~80 lines up).
                         _save_video_mp4(
                             images=frames,
                             out_path=chunk_dest,
@@ -1291,6 +1348,17 @@ class BatchLTXRender:
                             ffmpeg=ffmpeg,
                         )
                         chunk_mp4_paths.append(chunk_dest)
+
+                        # BUG-LOCAL-117b register the freshly rendered mp4
+                        # as the canonical for this cache key. Subsequent
+                        # chunks/lines with identical (role, length, sampler)
+                        # will copy from this path instead of re-rendering.
+                        render_cache[cache_key] = chunk_dest
+                        log.info(
+                            "[BatchLTXRender] cache STORE %s as canonical "
+                            "for key=%s",
+                            chunk_dest.name, cache_key,
+                        )
 
                         # BUG-LOCAL-117 per-chunk GC. Round-robin verdict
                         # 2026-05-06 (Gemini): at 14.5 GB peak on a 16 GB
