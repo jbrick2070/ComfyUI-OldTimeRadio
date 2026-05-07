@@ -767,6 +767,42 @@ HuMo's portrait_path lookup (v2.1 update):
 
 ---
 
+## Pre-ship v2.0 — ecosystem review checklist
+
+Quick scan before tagging v2.0-alpha → v2.0. Verify each upstream
+release either (a) doesn't break OTR's pinned versions or (b) is
+worth pulling in for the v2.0 release notes. Added 2026-05-07.
+
+### ComfyUI Core & Frontend
+- v1.44.18 (2026-05-06) and v1.44.17 (2026-05-05) — review changelog
+  for anything affecting the LTX 2.3 path, MultimodalGuider, RES4LYF
+  compatibility, or Blackwell/CUDA 13 attention paths.
+- Releases: https://github.com/Comfy-Org/ComfyUI_frontend/releases
+- Changelog: https://docs.comfy.org/changelog
+
+### ComfyUI-GGUF — native GGUF weight loading
+- v1.1.10 (2026-01-12), with continuous repo commits.
+- Repo: https://github.com/city96/ComfyUI-GGUF
+- Why care: opens a smaller-VRAM path for LTX 2.3 (the GGUF
+  Q5_K_M quants of the 22B-distilled exist on HF). Could become
+  the "32 GB RAM" budget option below the current v0_9 default
+  if GGUF + euler_cfg_pp produces equivalent motion at ~half the
+  weight footprint vs the BF16 fused 46 GB.
+
+### ComfyUI-Ollama nodes — LLM integration / agent tooling
+- Continuous Q1/Q2 2026 updates, including DeepSeek-R1 and Qwen
+  3.5 architecture support.
+- Describer / agent variant: https://github.com/alisson-anjos/ComfyUI-Ollama-Describer
+- Native workflows: https://github.com/slyt/comfyui-ollama-nodes
+- Why care: OTR currently uses transformers + Mistral-Nemo for
+  story / critic / brief LLMs. Ollama would give an HTTP-server
+  pattern with model swap by name (no per-call load), DeepSeek-R1
+  for the critic role, and Qwen 3.5 for shorter beat-level
+  rewrites. Worth a benchmark spike before v2.0 ships in case
+  one of them obsoletes the current LLM stack.
+
+---
+
 ## Daily operating cadence
 
 - First thing: read this file, `CLAUDE.md`, `docs/BUG_LOG.md` header, `git log --oneline -5` on current branch.
