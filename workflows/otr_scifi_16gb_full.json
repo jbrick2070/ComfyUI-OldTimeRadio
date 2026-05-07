@@ -1676,7 +1676,9 @@
       "widgets_values": [
         "ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
         0.5
-      ]
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
     },
     {
       "id": 61,
@@ -1718,7 +1720,9 @@
       "widgets_values": [
         "ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
         0.2
-      ]
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
     },
     {
       "id": 55,
