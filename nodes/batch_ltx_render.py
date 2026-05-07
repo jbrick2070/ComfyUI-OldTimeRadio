@@ -186,6 +186,32 @@ LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fi
 #        and `set OTR_LTX_ENGINE=v0_9` before launching ComfyUI.
 OTR_LTX_ENGINE_DEFAULT = "v2_3"
 
+# BUG-LOCAL-117a Phase 1 (2026-05-07): A/B/C/D sampler bake-off via env var.
+# Applies only when engine=v0_9 (the lightweight single-stage path that
+# doesn't need RES4LYF / MultimodalGuider / AV-stub). Lets us test each
+# sampler in turn without rebuilds:
+#   euler                       -- LTX 2.0 era plain euler (sanity reference)
+#   euler_cfg_pp                -- Lightricks LTX 2.3 single-stage tuned default
+#   res_multistep               -- DPM-Solver++ multistep (RES family cousin)
+#   res_multistep_cfg_pp        -- Same with cfg_pp projection (likely best non-RES4LYF)
+#   res_multistep_ancestral     -- Ancestral noise variant
+#   res_multistep_ancestral_cfg_pp
+# Per Jeffrey's research (2026-05-07): at 8 distilled steps, multistep's
+# forward-pass advantage over euler vanishes (both = 8 evals); the only
+# differentiator is higher-order accuracy from the history term, which has
+# barely any room to express itself at 8 steps. So Phase 1 result may be
+# near-neutral. That's still a valid finding -- it tells us to ship
+# euler_cfg_pp and stop optimizing the sampler axis.
+LTX_V0_9_SAMPLER_NAMES_VALID = (
+    "euler",
+    "euler_cfg_pp",
+    "res_multistep",
+    "res_multistep_cfg_pp",
+    "res_multistep_ancestral",
+    "res_multistep_ancestral_cfg_pp",
+)
+LTX_V0_9_SAMPLER_NAME_DEFAULT = "euler_cfg_pp"
+
 # v2.3 GuiderParameters for VIDEO modality. Values mirror the stock
 # Lightricks LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json widget
 # (line 1043-1052 of that file). Round-robin (Gemini + NVIDIA) flagged
@@ -735,6 +761,22 @@ class BatchLTXRender:
             )
             engine = OTR_LTX_ENGINE_DEFAULT
 
+        # BUG-LOCAL-117a Phase 1: resolve sampler for v0_9 path from env var.
+        # Validate against allowlist; fall back to default with a warning if
+        # the user typo'd. Logged into the banner so the running config is
+        # always visible at queue time.
+        v0_9_sampler_name = os.environ.get(
+            "OTR_LTX_V0_9_SAMPLER_NAME", LTX_V0_9_SAMPLER_NAME_DEFAULT
+        ).strip().lower()
+        if v0_9_sampler_name not in LTX_V0_9_SAMPLER_NAMES_VALID:
+            log.warning(
+                "[BatchLTXRender] BUG-LOCAL-117a: unknown OTR_LTX_V0_9_SAMPLER_NAME=%r; "
+                "valid values: %s. Falling back to default %r",
+                v0_9_sampler_name, LTX_V0_9_SAMPLER_NAMES_VALID,
+                LTX_V0_9_SAMPLER_NAME_DEFAULT,
+            )
+            v0_9_sampler_name = LTX_V0_9_SAMPLER_NAME_DEFAULT
+
         log.info("=" * 64)
         log.info("[BatchLTXRender] BUG-LOCAL-117 engine=%s", engine)
         if engine == "v2_3":
@@ -748,12 +790,13 @@ class BatchLTXRender:
             log.info("[BatchLTXRender]   decode:   LTXVTiledVAEDecode (LTX-specific tiled)")
             log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, float32, CPU)")
         else:
-            log.info("[BatchLTXRender]   model:    LTX 2B v0.9 (LEGACY ROLLBACK PATH)")
-            log.info("[BatchLTXRender]   encoder:  CLIPLoader t5xxl_fp16 ltxv")
-            log.info("[BatchLTXRender]   sampler:  KSamplerSelect(\"euler\")")
-            log.info("[BatchLTXRender]   guider:   CFGGuider (cfg=1.0)")
+            log.info("[BatchLTXRender]   model:    LTX checkpoint (model widget) -- could be 2B v0.9 OR 2.3 dev")
+            log.info("[BatchLTXRender]   encoder:  CLIP from input -- could be t5xxl OR Gemma via separate loader")
+            log.info("[BatchLTXRender]   sampler:  KSamplerSelect(%r)  <-- OTR_LTX_V0_9_SAMPLER_NAME",
+                     v0_9_sampler_name)
+            log.info("[BatchLTXRender]   guider:   CFGGuider (cfg=%.1f)", LTX_CFG)
             log.info("[BatchLTXRender]   decode:   VAEDecodeTiled")
-            log.info("[BatchLTXRender]   NOTE:     workflow JSON must be reverted to pre-bug-117 state")
+            log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, 8 sampling steps)")
         log.info("=" * 64)
         report_lines.append(
             f"BatchLTXRender: engine={engine}"
@@ -904,20 +947,41 @@ class BatchLTXRender:
         # ----------------------------------------------------------------
         import torch  # type: ignore
 
-        # BUG-LOCAL-117a 2026-05-07: was plain "euler" (LTX 2.0 era default).
-        # Lightricks' LTX 2.3 single-stage workflow tunes around "euler_cfg_pp"
-        # which implements classifier-free guidance perpendicular projection --
-        # better CFG curve interaction with the 22B model than plain euler.
-        # Community testing confirms cfg_pp variants outperform plain euler on
-        # 2.3 distilled. Plain euler retained as fallback below if cfg_pp errors.
-        try:
-            sampler_obj = _call("KSamplerSelect", sampler_name="euler_cfg_pp")[0]
-        except Exception:
-            log.warning(
-                "[BatchLTXRender] euler_cfg_pp unavailable; falling back to "
-                "plain euler -- update ComfyUI core if you want LTX 2.3 tuning"
+        # BUG-LOCAL-117a Phase 1: pre-bake the v0_9 sampler from the
+        # env-resolved name (default euler_cfg_pp). If the requested sampler
+        # isn't registered with KSamplerSelect (e.g. ComfyUI core too old
+        # for cfg_pp variants, or RES4LYF disabled), fall back through:
+        # res_multistep_cfg_pp -> euler_cfg_pp -> euler.
+        sampler_obj = None
+        v0_9_sampler_resolved = v0_9_sampler_name
+        for _candidate in (
+            v0_9_sampler_name,
+            "euler_cfg_pp",
+            "euler",
+        ):
+            try:
+                sampler_obj = _call("KSamplerSelect", sampler_name=_candidate)[0]
+                v0_9_sampler_resolved = _candidate
+                if _candidate != v0_9_sampler_name:
+                    log.warning(
+                        "[BatchLTXRender] %r unavailable; using %r instead",
+                        v0_9_sampler_name, _candidate,
+                    )
+                break
+            except Exception as _exc:
+                log.warning(
+                    "[BatchLTXRender] KSamplerSelect(%r) failed: %s",
+                    _candidate, _exc,
+                )
+        if sampler_obj is None:
+            raise RuntimeError(
+                "BatchLTXRender: KSamplerSelect could not resolve any sampler "
+                "from the fallback chain. ComfyUI core may be broken."
             )
-            sampler_obj = _call("KSamplerSelect", sampler_name="euler")[0]
+        log.info(
+            "[BatchLTXRender] v0_9 sampler resolved: %r (requested %r)",
+            v0_9_sampler_resolved, v0_9_sampler_name,
+        )
         sigmas = torch.tensor(LTX_DISTILLED_SIGMAS, dtype=torch.float32)
 
         neg_tokens = clip.tokenize(_LTX_NEGATIVE)
@@ -1345,6 +1409,14 @@ class BatchLTXRender:
                             _dur_s_truth = float(_real)
                     except Exception:  # noqa: BLE001
                         pass
+                    # BUG-LOCAL-117a Phase 1: stamp engine + sampler so the
+                    # ledger lets afternoon-Jeffrey match a clip to the exact
+                    # sampler chain that rendered it. Crucial for the A/B/C
+                    # bake-off across multiple env-var settings.
+                    if engine == "v2_3":
+                        _eng_label = "v2_3_clownsampler_res_2s"
+                    else:
+                        _eng_label = f"v0_9_{v0_9_sampler_resolved}"
                     rendered_clips.append({
                         "line_id": line_id,
                         "speaker_role": entry["speaker_role"],
@@ -1357,6 +1429,13 @@ class BatchLTXRender:
                         "ref_png_name": radio_png.name,
                         "ref_source": "ltx-radio-bookend",
                         "source_kind": "ltx",
+                        "ltx_engine": engine,
+                        "ltx_engine_label": _eng_label,
+                        "ltx_sampler_name": (
+                            "exponential/res_2s"
+                            if engine == "v2_3"
+                            else v0_9_sampler_resolved
+                        ),
                         # BUG-LOCAL-091 traceability: how many chunks
                         # were rendered + concatenated for this line.
                         # 1 = single pass (pre-091 layout); >1 = chunked
