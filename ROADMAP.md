@@ -801,6 +801,19 @@ worth pulling in for the v2.0 release notes. Added 2026-05-07.
   rewrites. Worth a benchmark spike before v2.0 ships in case
   one of them obsoletes the current LLM stack.
 
+### Google Gemma 2026 Developer Challenge
+- Launched 2026-05-06.
+- Link: https://dev.to/challenges/google-gemma-2026-05-06
+- Why care: OTR's LTX 2.3 path uses Gemma 3 12B (FP4 mixed) as
+  its text encoder, and the legacy story/critic LLM was Gemma-4
+  before the Mistral-Nemo migration. If the challenge surfaces
+  Gemma-tuned techniques or new finetunes (e.g. better motion
+  prompt adherence, period-specific tonal control for the
+  1940s OTR aesthetic), worth folding into either the prompt
+  pipeline or the LTX encoder layer. Submission window may also
+  be a forcing function to publish OTR's Gemma usage pattern as
+  a contest entry — free marketing for the project.
+
 ---
 
 ## Daily operating cadence
