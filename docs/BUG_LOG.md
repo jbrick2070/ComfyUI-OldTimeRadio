@@ -21,6 +21,27 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-117 [FIXED]: LTX 2B v0.9 cannot produce motion regardless of prompt rewrites -- BUG-LOCAL-112 root cause was model-class limitation, not prompt design
+- **Date:** 2026-05-06 EVENING | **Phase:** BUG-112 followup / LTX 2.3 migration | **Bible candidate:** YES (when prompt fixes hit a wall, suspect the model)
+- **Symptom:** After BUG-LOCAL-112's ~110 LOC prompt rewrite shipped (motion-centric short prompts, brief/scene_env/style suppressed, role templates dropped to ~180 chars), strength sweeps at i2v_strength [0.75, 0.50, 0.25, 0.05] all still produced effectively static clips on `ltx-video-2b-v0.9.safetensors`. The 0.25 sweep showed slight motion; everything else froze. Quantitative MAD analysis confirmed.
+- **Cause:** LTX 2B v0.9 (the 8.73 GB checkpoint we had) has insufficient model capacity for motion synthesis when forced to follow an i2v anchor at production strength. The static-image failure mode is the model's training-distribution-out-of-bounds collapse, not a prompt or sampler problem. Fixing it required upgrading the model class entirely.
+- **Fix:** Migrated to `Lightricks/LTX-2.3` 22B-dev BF16 fused checkpoint (42.98 GB) + `ltx-2.3-22b-distilled-lora-384-1.1.safetensors` (7.08 GB) at `loras/ltxv/ltx2/`. Stock workflow: `custom_nodes/ComfyUI-LTXVideo/example_workflows/2.3/LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json`. Required RES4LYF custom node pack from `https://github.com/ClownsharkBatwing/RES4LYF` for `ClownSampler_Beta` + `MultimodalGuider` + `GuiderParameters` + `ManualSigmas`. Sampler config `rk_type: res_2s` (Runge-Kutta 2nd-order Singlestep, exponential integrator).
+- **Verify (2026-05-06 EVENING):**
+  - T2V smoke: stock workflow with default tea-ceremony prompt produced visible motion at 768x432x41f x 15 steps. Wall time ~12.5 min on RTX 5080 16 GB.
+  - I2V smoke: same workflow with `bypass_i2v=false` + `radio_bookend.png` loaded into `LoadImage` produced "perfect subtle zoom in" on the radio still. First frame matched the anchor; subsequent 40 frames showed coherent camera motion. Jeffrey verbatim confirmation.
+- **Disk economics:**
+  - LTX 2.3 dev fused 46 GB BF16 (Path B chosen over Kijai split FP8 23 GB which required workflow surgery to use UNETLoader + separate VAE/text-encoder loaders).
+  - Schnell + SD 3.5 Large + HunyuanWorld-Mirror cache + Kijai partial XET blob recycled simultaneously: 42 GB recovered, net cost of upgrade ~4 GB.
+- **Tags:** ltx-2.3, model-capacity-not-prompt-design, res4lyf, clown-sampler, runge-kutta-2s, i2v-anchor-works, bug-112-resolution
+- **Provenance:** Path B disk-pull approved by Jeffrey after Path A (Kijai split FP8) revealed it would require restructuring the official workflow to swap CheckpointLoaderSimple to UNETLoader + add separate LTXVAudioVAELoader/VAELoader chains. Path B traded 46 GB download for zero workflow surgery.
+- **Related:**
+  - BUG-LOCAL-112 (the motion problem the prompt rewrite tried to fix; root cause was model capacity, not prompt; rewrite still useful as defensive coding for short prompts but not load-bearing).
+  - BUG-LOCAL-008 (CFG=1.0 erases negative -- still applies on 2.3, prompts must remain positive-only).
+  - BUG-LOCAL-095 (LTXVImgToVideoConditionOnly i2v anchor pattern -- same node, now actually produces motion against it).
+  - Future: cut over `nodes/batch_ltx_render.py` + `workflows/otr_scifi_16gb_full.json` from 2B v0.9 to 2.3 dev so production episodes get motion. Until then keep 2B v0.9 file on disk.
+
+---
+
 ### BUG-LOCAL-114 [FIXED]: ltx_motion_batch workflow JSON rejected by ComfyUI Zod validator -- "id" field was a slug, not a UUID
 - **Date:** 2026-05-06 LATE MORNING | **Phase:** BUG-112 verification harness | **Bible candidate:** YES (workflow-JSON authoring rule)
 - **Symptom:** Loading `workflows/ltx_motion_batch.json` in ComfyUI's UI rendered the graph (60% loaded) but blocked submission with: `Invalid workflow against zod schema: Validation error: Invalid uuid at "id"`.
