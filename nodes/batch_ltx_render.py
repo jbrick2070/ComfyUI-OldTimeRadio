@@ -1225,19 +1225,29 @@ class BatchLTXRender:
                                 "LTXVSeparateAVLatent",
                                 av_latent=samples_out,
                             )
-                            # LTXVTiledVAEDecode is the LTX-specific decoder
-                            # that ships with ComfyUI-LTXVideo. Stock 2.3
-                            # workflow uses it instead of stock VAEDecodeTiled.
-                            # Tile size widgets are the same OTR-Goofer-proven
-                            # values; the LTX wrapper just adds LTX-aware
-                            # temporal padding.
+                            # BUG-LOCAL-117a HOTFIX 2026-05-07 LATE MORNING:
+                            # LTXVTiledVAEDecode has TOTALLY different API
+                            # than stock VAEDecodeTiled (which is what the
+                            # v0_9 path uses). Stock 2.3 workflow line 1542
+                            # widgets show:
+                            #   latents (input, NOT 'samples')
+                            #   horizontal_tiles=2, vertical_tiles=2
+                            #   overlap=6
+                            #   last_frame_fix=False
+                            #   working_device="auto", working_dtype="auto"
+                            # This kept failing with TypeError 'unexpected
+                            # keyword argument samples' across all 5 clips
+                            # AFTER they completed sampling cleanly.
                             frames = _call(
                                 "LTXVTiledVAEDecode",
-                                samples=video_samples, vae=vae,
-                                tile_size=LTX_TILE_SIZE,
-                                overlap=LTX_TILE_OVERLAP,
-                                temporal_size=LTX_TEMPORAL_SIZE,
-                                temporal_overlap=LTX_TEMPORAL_OVERLAP,
+                                vae=vae,
+                                latents=video_samples,
+                                horizontal_tiles=2,
+                                vertical_tiles=2,
+                                overlap=6,
+                                last_frame_fix=False,
+                                working_device="auto",
+                                working_dtype="auto",
                             )[0]
                         else:
                             # v0.9 legacy path -- proven on LTX 2B v0.9 since
