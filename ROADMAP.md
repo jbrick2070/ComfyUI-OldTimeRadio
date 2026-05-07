@@ -6,6 +6,24 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
+## Status snapshot — 2026-05-07 PM (BUG-117 family wrap)
+
+**LTX 2.3 production stack now produces seamless 22s radio loops with half the GPU wall time per chunk.**
+
+Today's ships (full details in `docs/BUG_LOG.md`):
+
+- **BUG-LOCAL-117e** — music chunk cap raised from 7s to 22s (`scene_sequencer.py` `_MUSIC_MAX_CHUNK_DUR_S`) + `BatchLTXRender.clip_length` widget default 7.0 -> 22.0. Empirically validated against the 25s @ 832x480 mega-duration smoke (RTX 5080 16 GB + 64 GB RAM, no temporal collapse, no identity drift). Workflow `otr_scifi_16gb_full.json` updated.
+- **BUG-LOCAL-117d** — ffmpeg boomerang post-process. Each non-character chunk now renders HALF the audio-target duration; ffmpeg `[a]` + `[b].reverse.trim(start_frame=1).concat` doubles back to full duration. Result: end-of-clip-N == start-of-clip-N+1 == radio_bookend -> seamless concat in VideoComposite + sample wall time halved. Default ON (`OTR_LTX_LOOP_VIA_REVERSE`).
+
+**Next FULL episode test is unblocked for:**
+- 22s continuous radio segments (was 7s chunks ffmpeg-stitched)
+- Seamless radio_bookend -> motion -> radio_bookend loops at every chunk boundary
+- ~50% sample wall time reduction on every non-character clip
+
+**Tests:** `tests/test_batch_ltx_render.py` updated — pinned `LTX_MAX_FRAMES=705`, `clip_length default=22.0`, `clip_length max=28.16`; 5 new BUG-LOCAL-117d tests pinned (default-on, truthy set, helper exists, missing-input raises, filter-graph source pin). Full OTR test pass: 1124 passed (3 unrelated pre-existing failures: 2 torch-required + 1 video_composite canvas default mismatch — all pre-existing, none introduced by today's edits).
+
+---
+
 ## Status snapshot — 2026-05-03 EVENING (post BUG-027 + BUG-028 soak fixes)
 
 **Code work for the v2.0-alpha cycle is now 19 entries deep.** All 19 BUG-LOCAL entries below are `[FIXED]` in code and pushed to `origin/v2.0-alpha`. The 2026-05-03 EVENING soak surfaced two new failure modes (BUG-027 dialogue wipe + BUG-028 FLUX legacy save paths); both were fixed in the same autonomous session per direct user directive ("yes ofrget rop8u7hnd robins just fix fix fix"). Round-robin consult was SKIPPED for both fixes per the same directive — extra verification in lieu (AST + format-safety + targeted regression + Bug Bible regression all green pre-commit). The remaining work is **a single real-run acceptance soak** to confirm the live behavior on Jeffrey's RTX 5080.

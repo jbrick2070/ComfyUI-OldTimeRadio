@@ -260,9 +260,16 @@ LTX_END_ANCHOR_STRENGTH_DEFAULT = 0.0
 # extra GPU time (ffmpeg is CPU-bound and dwarfed by sample wall time).
 #
 # Values:
-#   "off" (default)  -- no boomerang, current behavior
-#   "on"             -- all non-character chunks boomeranged (music + announcer + sfx)
-LTX_LOOP_VIA_REVERSE_DEFAULT = "off"
+#   "on"  (default 2026-05-07 PM) -- non-character chunks boomeranged
+#                                    (music_*, announcer, sfx). Sample
+#                                    wall time HALVES because we render
+#                                    half-duration; output reads as the
+#                                    full audio target after boomerang.
+#   "off"                         -- pre-117d behavior (full-duration
+#                                    render, no post-process, may show
+#                                    visible chunk-boundary snap).
+LTX_LOOP_VIA_REVERSE_DEFAULT = "on"
+LTX_LOOP_VIA_REVERSE_TRUTHY = ("on", "1", "true", "yes")
 
 # v2.3 GuiderParameters for VIDEO modality. Values mirror the stock
 # Lightricks LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json widget
@@ -514,6 +521,96 @@ def _concat_clips_via_ffmpeg(
             os.unlink(list_path)
         except OSError:
             pass
+
+
+def _make_boomerang_via_ffmpeg(
+    mp4_path: Path,
+    ffmpeg: str = "ffmpeg",
+) -> Path:
+    """BUG-LOCAL-117d: in-place forward+reverse boomerang of an LTX clip.
+
+    Strategy: split the input video into two streams, reverse one,
+    drop the first frame of the reversed stream (which is the duplicate
+    midpoint frame), then concat back. The output reads as a smooth
+    oscillation that starts at frame 0 (radio_bookend), reaches peak
+    motion at the midpoint, and returns to frame 0 by the end -- so
+    end-of-clip-N == start-of-clip-N+1 -> seamless concat in
+    VideoComposite. Pairs with the half-duration render strategy in
+    execute(): chunk_ltx_length is computed off chunk_dur_s/2 so the
+    boomerang doubles back to the full audio-timeline duration.
+
+    Output frame count = 2 * input_frames - 1 (midpoint dropped).
+    Both 8n+1 (LTX VAE valid) and (16n+1) outputs are also 8m+1.
+
+    Note: ffmpeg's reverse filter loads the entire stream into RAM.
+    For 832x480 @ 25fps clips up to ~14s (350 frames) the RAM cost is
+    well under 1 GB -- a non-issue on the OTR build.
+    """
+    import os
+    import subprocess
+    import tempfile
+
+    src = Path(mp4_path)
+    if not src.is_file():
+        raise FileNotFoundError(
+            f"_make_boomerang_via_ffmpeg: input mp4 not found: {src}"
+        )
+
+    fd, tmp_path = tempfile.mkstemp(
+        prefix="ltx_boomerang_", suffix=".mp4", dir=str(src.parent),
+    )
+    os.close(fd)
+    tmp = Path(tmp_path)
+
+    cmd = [
+        ffmpeg, "-y",
+        "-i", str(src),
+        "-filter_complex",
+        # Split video into two streams [a] and [b].
+        # Reverse [b], trim its first frame (the duplicate midpoint),
+        # reset PTS so concat aligns. Then concat [a] (forward) +
+        # [r] (reversed-minus-midpoint) -> [out].
+        "[0:v]split[a][b];"
+        "[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];"
+        "[a][r]concat=n=2:v=1:a=0[out]",
+        "-map", "[out]",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "fast",
+        "-crf", "18",
+        "-movflags", "+faststart",
+        "-an",  # explicit: no audio (LTX clips are silent)
+        str(tmp),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"ffmpeg boomerang failed (rc={proc.returncode}): "
+            f"{(proc.stderr or '').strip()[:500]}"
+        )
+
+    if not tmp.is_file() or tmp.stat().st_size < 256:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise RuntimeError(
+            f"ffmpeg boomerang produced empty/missing output for {src}"
+        )
+
+    # In-place swap: replace the half-duration source with the
+    # full-duration boomerang. Path stays the same so chunk_dest /
+    # cache_key invariants hold.
+    try:
+        src.unlink()
+    except OSError:
+        pass
+    tmp.replace(src)
+    return src
 
 
 _NODE_CACHE: dict[str, Any] = {}
@@ -768,23 +865,24 @@ class BatchLTXRender:
                 # workflows fall through to the FLOAT default (7.0)
                 # cleanly. Backward-compat preserved.
                 "clip_length": ("FLOAT", {
-                    "default": 7.0,
+                    "default": 22.0,
                     "min": 1.32,
                     "max": 28.16,
                     "step": 0.04,
                     "tooltip": (
-                        "Max per-CHUNK duration in seconds (BUG-LOCAL-091, "
-                        "matches BatchHumoRender behaviour). Lines whose "
-                        "audio exceeds this are split into N consecutive "
-                        "chunks rendered against the radio bookend, then "
-                        "ffmpeg-concat into the final per-line mp4. Default "
-                        "7.0 -> 175 frames -> 177 (LTX 8n+1 = 7.08s, the "
-                        "historically-stable LTX render size). Cap raised "
-                        "to 28.16s (705 frames, 8*88+1) on 2026-05-07 for "
-                        "the LTX 2.3 long-clip curiosity test. Coherence "
-                        "at extreme lengths is unverified -- watch for "
-                        "temporal repetition or static collapse if you "
-                        "push past ~15s. VRAM is the practical first wall."
+                        "Max per-CHUNK duration in seconds (BUG-LOCAL-091). "
+                        "Lines whose audio exceeds this are split into N "
+                        "consecutive chunks rendered against the radio "
+                        "bookend, then ffmpeg-concat into the final per-line "
+                        "mp4. Default 22.0s (BUG-LOCAL-117e): empirical "
+                        "mega-test 2026-05-07 PM rendered 25s @ 832x480 "
+                        "cleanly on 5080 16 GB + 64 GB RAM. 22s leaves a 3s "
+                        "safety headroom. Combined with BUG-LOCAL-117d "
+                        "boomerang (default ON) the actual sample window is "
+                        "11s -- well within the 14.5 GB VRAM ceiling. Cap "
+                        "28.16s (705 frames, 8*88+1) is the absolute hardware "
+                        "ceiling. Coherence past 25s is unverified; watch "
+                        "for temporal repetition if you push toward 28s."
                     ),
                 }),
             },
@@ -792,7 +890,7 @@ class BatchLTXRender:
 
     def execute(self, model, clip, vae, ledger_json, seed=1,
                 ffmpeg="ffmpeg", humo_clips_dir="",
-                clip_length=7.0):
+                clip_length=22.0):
         # NOTE: ``humo_clips_dir`` is intentionally consumed but unused.
         # See INPUT_TYPES tooltip -- it is a pure DAG sequencing edge so
         # ComfyUI schedules this node after BatchHumoRender finishes its
@@ -829,6 +927,18 @@ class BatchLTXRender:
         except (TypeError, ValueError):
             end_anchor_strength = LTX_END_ANCHOR_STRENGTH_DEFAULT
         end_anchor_strength = max(0.0, min(1.0, end_anchor_strength))
+
+        # BUG-LOCAL-117d: ffmpeg boomerang post-process. Default ON
+        # 2026-05-07 PM so non-character chunks render half-duration
+        # and the post-process doubles them back to full audio target,
+        # producing a perfect radio-still -> motion -> radio-still loop
+        # without stacked-anchor glitching. Halves sample wall time too.
+        # Set OTR_LTX_LOOP_VIA_REVERSE=off for the legacy full-duration
+        # render path (e.g. for A/B comparison or smoke debugging).
+        loop_via_reverse_raw = os.environ.get(
+            "OTR_LTX_LOOP_VIA_REVERSE", LTX_LOOP_VIA_REVERSE_DEFAULT
+        ).strip().lower()
+        loop_via_reverse = loop_via_reverse_raw in LTX_LOOP_VIA_REVERSE_TRUTHY
 
         # BUG-LOCAL-117a Phase 1: resolve sampler for v0_9 path from env var.
         # Validate against allowlist; fall back to default with a warning if
@@ -876,6 +986,12 @@ class BatchLTXRender:
                      end_anchor_strength)
         else:
             log.info("[BatchLTXRender]   loop:     end-anchor OFF (set OTR_LTX_END_ANCHOR_STRENGTH=0.7 to test rigid pin)")
+        if loop_via_reverse:
+            log.info("[BatchLTXRender]   boomerang: ON (BUG-LOCAL-117d) -- "
+                     "render HALF chunk_dur_s, ffmpeg-reverse-and-concat "
+                     "doubles back to full audio target")
+        else:
+            log.info("[BatchLTXRender]   boomerang: OFF (set OTR_LTX_LOOP_VIA_REVERSE=on for seamless loops + half wall time)")
         log.info("=" * 64)
         report_lines.append(
             f"BatchLTXRender: engine={engine}"
@@ -1170,7 +1286,20 @@ class BatchLTXRender:
                     chunk_mp4_paths: list = []
                     for chunk_idx, chunk in enumerate(chunks):
                         chunk_dur_s = float(chunk["dur_s"])
-                        chunk_ltx_length = ltx_length_for_dur(chunk_dur_s)
+                        # BUG-LOCAL-117d: when boomerang is ON, render
+                        # HALF the audio-timeline duration. The ffmpeg
+                        # post-process below mirrors+concats the clip
+                        # back to chunk_dur_s. This halves sample wall
+                        # time AND makes loop endpoints exactly the
+                        # radio_bookend (frame 0 == frame N) so the
+                        # chunk-boundary snap disappears. ltx_length_for_dur
+                        # rounds up to the nearest 8n+1, so the post-process
+                        # output (2*half - 1) is also 8n+1 valid.
+                        if loop_via_reverse:
+                            chunk_render_dur_s = chunk_dur_s / 2.0
+                        else:
+                            chunk_render_dur_s = chunk_dur_s
+                        chunk_ltx_length = ltx_length_for_dur(chunk_render_dur_s)
 
                         # BUG-LOCAL-117b 2026-05-07: cache key per identical
                         # input set. Same role -> same prompt (via
@@ -1183,13 +1312,19 @@ class BatchLTXRender:
                             _cache_sampler_id = "v2_3_clownsampler_res_2s"
                         else:
                             _cache_sampler_id = f"v0_9_{v0_9_sampler_resolved}"
-                        # Include end_anchor in key so toggling it doesn't
-                        # serve stale cached renders.
+                        # Include end_anchor + boomerang in key so toggling
+                        # either one doesn't serve stale cached renders.
+                        # The boomerang flag matters because cache stores
+                        # the POST-boomerang full-duration mp4 -- a cache
+                        # built with boomerang=on is not safe to serve
+                        # to a later run with boomerang=off (the file is
+                        # already mirrored).
                         cache_key = (
                             entry["speaker_role"],
                             int(chunk_ltx_length),
                             _cache_sampler_id,
                             round(end_anchor_strength, 3),
+                            "boomerang" if loop_via_reverse else "linear",
                         )
 
                         # Per-chunk destination resolved upfront (used by
@@ -1471,12 +1606,46 @@ class BatchLTXRender:
                             fps=LTX_FPS,
                             ffmpeg=ffmpeg,
                         )
+
+                        # BUG-LOCAL-117d: in-place ffmpeg boomerang. The
+                        # chunk was rendered at HALF duration (see the
+                        # chunk_render_dur_s branch above) so the
+                        # post-process doubles it back to chunk_dur_s with
+                        # frame 0 == final frame == radio_bookend. Done
+                        # BEFORE register-cache so the cache stores the
+                        # full-duration mp4 (any later cache hit copies
+                        # the already-boomeranged file straight to disk
+                        # without re-running ffmpeg).
+                        if loop_via_reverse:
+                            try:
+                                _make_boomerang_via_ffmpeg(
+                                    chunk_dest, ffmpeg=ffmpeg,
+                                )
+                                log.info(
+                                    "[BatchLTXRender] BUG-LOCAL-117d "
+                                    "boomerang OK: %s (target dur=%.2fs, "
+                                    "rendered half=%.2fs, "
+                                    "ffmpeg-doubled to full)",
+                                    chunk_dest.name,
+                                    chunk_dur_s, chunk_render_dur_s,
+                                )
+                            except Exception as _bm_exc:
+                                log.warning(
+                                    "[BatchLTXRender] BUG-LOCAL-117d "
+                                    "boomerang FAILED for %s: %s -- "
+                                    "leaving half-duration clip on disk "
+                                    "(VideoComposite will still mux it; "
+                                    "audio will play over a shorter visual)",
+                                    chunk_dest.name, _bm_exc,
+                                )
+
                         chunk_mp4_paths.append(chunk_dest)
 
                         # BUG-LOCAL-117b register the freshly rendered mp4
                         # as the canonical for this cache key. Subsequent
-                        # chunks/lines with identical (role, length, sampler)
-                        # will copy from this path instead of re-rendering.
+                        # chunks/lines with identical (role, length, sampler,
+                        # boomerang) will copy from this path instead of
+                        # re-rendering.
                         render_cache[cache_key] = chunk_dest
                         log.info(
                             "[BatchLTXRender] cache STORE %s as canonical "
@@ -1643,6 +1812,12 @@ class BatchLTXRender:
                         # 1 = single pass (pre-091 layout); >1 = chunked
                         # because audio dur exceeded clip_length.
                         "n_chunks": int(n_chunks),
+                        # BUG-LOCAL-117d traceability: was this clip's
+                        # frames produced via boomerang post-process?
+                        # Tracking lets the audit + future debug
+                        # tooling tell at a glance whether seamless
+                        # loops were active.
+                        "ltx_loop_via_reverse": bool(loop_via_reverse),
                     })
 
                 except Exception as exc:

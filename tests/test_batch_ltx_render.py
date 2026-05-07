@@ -1,11 +1,14 @@
 """Regression tests for OTR_BatchLTXRender (in-graph LTX batch).
 
 Pins:
-  - LTX constants (LTX_MAX_FRAMES = 353 post BUG-LOCAL-091, LTX_CHUNK_FRAMES = 177)
+  - LTX constants (LTX_MAX_FRAMES = 705 post BUG-LOCAL-117e mega-duration,
+    LTX_CHUNK_FRAMES = 177)
   - ltx_length_for_dur 8n+1 frame snap with floor + ceiling
   - ltx_length_for_dur_uncapped bypasses the cap (used by chunking dispatch)
-  - clip_length widget (BUG-LOCAL-091): default 7.0, max 14.12
+  - clip_length widget (BUG-LOCAL-117e): default 22.0, max 28.16
   - _concat_clips_via_ffmpeg helper exists with the expected signature
+  - _make_boomerang_via_ffmpeg helper exists (BUG-LOCAL-117d)
+  - LTX_LOOP_VIA_REVERSE_DEFAULT == "on" (BUG-LOCAL-117d default-on)
 
 Doesn't exercise the actual LTX rendering loop -- that requires
 ComfyUI's runtime + GPU. End-to-end loop is integration-tested by
@@ -42,13 +45,14 @@ def m():
 # ---------------------------------------------------------------------------
 
 def test_ltx_constants(m):
-    """BUG-LOCAL-091: LTX_MAX_FRAMES bumped from 177 to 353 to cover
-    typical announcer/music beats in a single pass. LTX_CHUNK_FRAMES
-    pinned at the historically-stable 177 for the chunking fallback.
+    """BUG-LOCAL-117e (2026-05-07 PM): LTX_MAX_FRAMES bumped from 353
+    to 705 (8*88+1 = ~28.20s @ 25fps) after the mega-duration smoke
+    rendered 25s @ 832x480 cleanly on RTX 5080 16 GB + 64 GB RAM.
+    LTX_CHUNK_FRAMES still pinned at 177 for the historical fallback.
     """
     assert m.LTX_FPS == 25
     assert m.LTX_MIN_FRAMES == 9
-    assert m.LTX_MAX_FRAMES == 353
+    assert m.LTX_MAX_FRAMES == 705
     assert m.LTX_CHUNK_FRAMES == 177
 
 
@@ -58,13 +62,15 @@ def test_ltx_constants(m):
 
 @pytest.mark.parametrize("dur_s, expected_frames", [
     (3.84, 97),    # 96 -> 97 (8n+1)
-    (7.00, 177),   # 175 -> 177 (8*22+1 = 177, was the OLD cap)
+    (7.00, 177),   # 175 -> 177 (8*22+1 = 177, the historical chunk size)
     (1.00, 25),    # 25 (8*3+1)
     (0.10, 9),     # below MIN -> floored
     (10.28, 257),  # 257 frames @ 25fps (8*32+1 = 257)
-    (14.12, 353),  # cap exactly (8*44+1 = 353)
-    (16.00, 353),  # over cap -> capped
-    (20.00, 353),  # well over cap -> still capped (chunking handles it)
+    (14.12, 353),  # 8*44+1 = 353 (was the OLD cap pre-117e)
+    (16.00, 401),  # 16*25=400 -> 8*50+1 = 401 (no longer capped)
+    (20.00, 505),  # 20*25=500 -> 8*63+1 = 505 (no longer capped)
+    (28.16, 705),  # cap exactly (8*88+1 = 705, BUG-LOCAL-117e)
+    (30.00, 705),  # over the new cap -> still capped at 705
 ])
 def test_ltx_length_for_dur(m, dur_s, expected_frames):
     assert m.ltx_length_for_dur(dur_s) == expected_frames
@@ -80,11 +86,15 @@ def test_ltx_length_for_dur_always_returns_8n_plus_1(m):
 def test_ltx_length_for_dur_uncapped_skips_cap(m):
     """BUG-LOCAL-091: chunking dispatch uses the uncapped helper to
     decide whether a line needs splitting. Result must NOT be clamped
-    to LTX_MAX_FRAMES."""
-    capped = m.ltx_length_for_dur(30.0)
-    uncapped = m.ltx_length_for_dur_uncapped(30.0)
-    assert capped == 353
-    assert uncapped == 753  # 30s @ 25fps = 750 -> 8*94+1 = 753
+    to LTX_MAX_FRAMES.
+
+    BUG-LOCAL-117e: LTX_MAX_FRAMES = 705 (was 353). Use a duration well
+    past the new cap so the cap-vs-uncap split is unambiguous.
+    """
+    capped = m.ltx_length_for_dur(40.0)
+    uncapped = m.ltx_length_for_dur_uncapped(40.0)
+    assert capped == 705
+    assert uncapped == 1001  # 40s @ 25fps = 1000 -> 8*125+1 = 1001
     assert (uncapped - 1) % 8 == 0
 
 
@@ -99,31 +109,34 @@ def test_clip_length_widget_present(m):
     assert "clip_length" in inp.get("optional", {})
 
 
-def test_clip_length_default_is_seven(m):
-    """7.0s default matches BatchHumoRender + the historically-stable
-    LTX_CHUNK_FRAMES=177 single-chunk size."""
+def test_clip_length_default_is_22(m):
+    """BUG-LOCAL-117e (2026-05-07 PM): clip_length default bumped from
+    7.0s to 22.0s after the mega-duration smoke validated 25s @ 832x480
+    on RTX 5080 16 GB + 64 GB RAM. 22s leaves 3s headroom under the 25s
+    observed envelope and pairs with BUG-LOCAL-117d boomerang (which
+    halves the actual sample window to ~11s)."""
     inp = m.BatchLTXRender.INPUT_TYPES()
     spec = inp["optional"]["clip_length"][1]
-    assert spec["default"] == 7.0
+    assert spec["default"] == 22.0
 
 
-def test_clip_length_max_respects_humo_ceiling(m):
-    """Max bumped to 14.12 to match the new LTX_MAX_FRAMES=353 cap +
-    BatchHumoRender's clip_length max for symmetry."""
+def test_clip_length_max_is_28_16s(m):
+    """Max bumped to 28.16s (8*88+1 = 705 frames) on 2026-05-07 to match
+    the new LTX_MAX_FRAMES=705 absolute hardware ceiling. BUG-LOCAL-117e."""
     inp = m.BatchLTXRender.INPUT_TYPES()
     spec = inp["optional"]["clip_length"][1]
-    assert spec["max"] == pytest.approx(14.12, abs=0.01)
+    assert spec["max"] == pytest.approx(28.16, abs=0.01)
 
 
 def test_execute_signature_accepts_clip_length(m):
     """``execute`` must accept clip_length as a keyword argument so the
-    widget value is plumbed through. Defaults to 7.0 (single-pass at the
-    historical chunk size)."""
+    widget value is plumbed through. Default 22.0 post-BUG-LOCAL-117e
+    (was 7.0 pre-117e)."""
     import inspect
     sig = inspect.signature(m.BatchLTXRender.execute)
     assert "clip_length" in sig.parameters
     default = sig.parameters["clip_length"].default
-    assert default == 7.0
+    assert default == 22.0
 
 
 # ---------------------------------------------------------------------------
@@ -237,4 +250,69 @@ def test_required_nodes_list_mentions_img_to_video_condition_only():
            / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
     assert "LTXVImgToVideoConditionOnly" in src, (
         "Required-nodes error message must reference the BUG-095 node"
+    )
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-117d: ffmpeg boomerang post-process
+# ---------------------------------------------------------------------------
+
+def test_boomerang_default_is_on(m):
+    """BUG-LOCAL-117d (2026-05-07 PM): boomerang default flipped to ON
+    so the next FULL test renders seamless radio_bookend -> motion ->
+    radio_bookend loops without stacked-anchor glitching. Set
+    OTR_LTX_LOOP_VIA_REVERSE=off to revert."""
+    assert m.LTX_LOOP_VIA_REVERSE_DEFAULT == "on"
+
+
+def test_boomerang_truthy_values_pinned(m):
+    """The truthy set must include 'on', '1', 'true', 'yes' so users
+    can flip the env var with whichever convention they prefer."""
+    assert "on" in m.LTX_LOOP_VIA_REVERSE_TRUTHY
+    assert "1" in m.LTX_LOOP_VIA_REVERSE_TRUTHY
+    assert "true" in m.LTX_LOOP_VIA_REVERSE_TRUTHY
+
+
+def test_boomerang_helper_exists(m):
+    """BUG-LOCAL-117d: in-place ffmpeg boomerang helper must exist with
+    the expected signature ``(mp4_path, ffmpeg='ffmpeg') -> Path``."""
+    fn = getattr(m, "_make_boomerang_via_ffmpeg", None)
+    assert callable(fn), (
+        "BUG-LOCAL-117d: _make_boomerang_via_ffmpeg helper missing"
+    )
+    import inspect
+    sig = inspect.signature(fn)
+    assert "mp4_path" in sig.parameters
+    assert "ffmpeg" in sig.parameters
+    assert sig.parameters["ffmpeg"].default == "ffmpeg"
+
+
+def test_boomerang_helper_rejects_missing_input(m, tmp_path: Path):
+    """Missing input file must raise FileNotFoundError so the chunk
+    loop's try/except can log + leave the half-duration clip intact
+    (instead of crashing the whole episode)."""
+    with pytest.raises(FileNotFoundError):
+        m._make_boomerang_via_ffmpeg(tmp_path / "does_not_exist.mp4")
+
+
+def test_boomerang_filter_uses_split_reverse_concat():
+    """Source-code regression guard: the boomerang helper must use
+    ffmpeg's split/reverse/concat filter graph (not a naive concat
+    demuxer). The ``trim=start_frame=1`` step drops the duplicate
+    midpoint frame so the loop reads as a smooth oscillation."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    assert "[0:v]split[a][b]" in src, (
+        "BUG-LOCAL-117d: boomerang must split video into two streams"
+    )
+    assert "[b]reverse" in src, (
+        "BUG-LOCAL-117d: boomerang must reverse the second stream"
+    )
+    assert "trim=start_frame=1" in src, (
+        "BUG-LOCAL-117d: boomerang must drop the duplicate midpoint "
+        "frame to avoid a one-frame stutter at the loop apex"
+    )
+    assert "concat=n=2:v=1:a=0" in src, (
+        "BUG-LOCAL-117d: boomerang must concat forward + reversed"
     )

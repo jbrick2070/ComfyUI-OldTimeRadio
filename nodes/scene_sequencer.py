@@ -1416,11 +1416,11 @@ class EpisodeAssembler:
                         # has the per-cue ledger entries to walk.
                         #
                         # 2026-04-30 round-robin hardening:
-                        #   (a) Chunk music tracks > HUMO_MAX_CLIP_DUR_S
+                        #   (a) Chunk music tracks > _MUSIC_MAX_CHUNK_DUR_S
                         #       into multiple sequential entries so
-                        #       BatchHumoRender's 7s cap doesn't leave
-                        #       silent_combined.mp4 shorter than the
-                        #       master mix audio (which would let
+                        #       BatchLTXRender's per-chunk cap doesn't
+                        #       leave silent_combined.mp4 shorter than
+                        #       the master mix audio (which would let
                         #       VideoComposite's -shortest truncate
                         #       audio at the end of the episode).
                         #   (b) Stamp ``mirrored_from = "music"`` so a
@@ -1432,18 +1432,27 @@ class EpisodeAssembler:
                         #       the timeline in chronological order
                         #       regardless of mirror sequence.
 
-                        # HuMo's verified 16 GB ceiling is 177 frames @
-                        # 25 fps = 7.08 s per clip.  Round to 7.0 s for
-                        # margin so we never feed BatchHumoRender a
-                        # boundary case.  Mirrors HUMO_MAX_FRAMES /
-                        # HUMO_FPS in nodes/batch_humo_render.py.
-                        # 2026-05-01 EVENING (Jeffrey): post-BUG-129b
-                        # music cues go to LTX, not HuMo. LTX is capped
-                        # at the same 177-frame / 7s value to keep the
-                        # chunking math identical for both renderers
-                        # ("to make it easy"). See
-                        # nodes/batch_ltx_render.py LTX_MAX_FRAMES=177.
-                        _HUMO_MAX_CLIP_DUR_S = 7.0
+                        # 2026-05-07 PM (BUG-LOCAL-117e): bumped from 7.0s
+                        # to 22.0s. Empirical mega-duration test on
+                        # 2026-05-07 PM rendered a 25s @ 832x480 LTX clip
+                        # cleanly on RTX 5080 16 GB + 64 GB RAM with no
+                        # temporal collapse and no identity drift (i2v
+                        # anchor + radio mechanical-scene content). 22s
+                        # leaves a 3s safety headroom under the 25s
+                        # observed ceiling, while letting opening +
+                        # closing themes flow as a single continuous
+                        # radio scene instead of being chopped into
+                        # 5s/7s chunklets that needed concat-stitching.
+                        # Combined with BUG-LOCAL-117d (ffmpeg boomerang)
+                        # the rendered clip is half-duration -> 11s, a
+                        # safe sample window with comfortable headroom.
+                        # Post-BUG-129b: music cues route to LTX (not
+                        # HuMo), so this cap is gated by LTX coherence,
+                        # not HuMo's 177-frame ceiling. See
+                        # batch_ltx_render.py LTX_MAX_FRAMES=705 (28.16s
+                        # absolute hardware ceiling) and the clip_length
+                        # widget default (also 22.0s for parity).
+                        _MUSIC_MAX_CHUNK_DUR_S = 22.0
 
                         _lines_for_music = _led.get("lines") or []
 
@@ -1499,15 +1508,15 @@ class EpisodeAssembler:
                                 or f"{_cue or 'interstitial'} music"
                             )
 
-                            # (a) Chunk math: how many ≤7s chunks does
-                            # this cue need?  ceil(full_dur / max).
+                            # (a) Chunk math: how many ≤_MUSIC_MAX_CHUNK_DUR_S
+                            # chunks does this cue need?  ceil(full_dur / max).
                             # Chunk durations are equal so the boundaries
                             # land cleanly without remainder fragments.
                             _chunk_count = max(
                                 1,
                                 int(
-                                    (_full_dur + _HUMO_MAX_CLIP_DUR_S - 1e-6)
-                                    // _HUMO_MAX_CLIP_DUR_S
+                                    (_full_dur + _MUSIC_MAX_CHUNK_DUR_S - 1e-6)
+                                    // _MUSIC_MAX_CHUNK_DUR_S
                                 ),
                             )
                             _chunk_dur = _full_dur / float(_chunk_count)
@@ -1581,14 +1590,14 @@ class EpisodeAssembler:
                                 "[EpisodeAssembler] music mirror: "
                                 "appended=%d, chunked_cues=%d, "
                                 "stale_removed=%d, total_lines=%d "
-                                "(post-BUG-129b: music_*/sfx covered "
-                                "by VideoComposite static-radio fill, "
-                                "chunks fit the %.1fs HuMo cap as a "
-                                "future-proofing for any HuMo-eligible "
-                                "music role)",
+                                "(post-BUG-117e: music chunks <= %.1fs "
+                                "to fit the LTX 22B 25s safe envelope; "
+                                "BUG-LOCAL-117d boomerang doubles the "
+                                "rendered half-clip back to full audio "
+                                "duration)",
                                 _appended_music, _chunked_cues,
                                 _removed, len(_lines_for_music),
-                                _HUMO_MAX_CLIP_DUR_S,
+                                _MUSIC_MAX_CHUNK_DUR_S,
                             )
 
                     # BUG-LOCAL-107: append crossfade boundaries to

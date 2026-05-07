@@ -21,6 +21,93 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-117e [FIXED]: Allow up to 25s of continuous radio per beat (mega-duration cap raise)
+
+- **Date:** 2026-05-07 PM | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Music cues (opening/closing themes) were getting chunked into 5s/7s
+  segments at the synthesis step (`scene_sequencer.py` mirror block, local
+  `_HUMO_MAX_CLIP_DUR_S = 7.0`), then those chunks fed BatchLTXRender's
+  per-line render with the same 7.0s `clip_length` widget default. Result:
+  a 10s music_opening cue was rendered as two 5s LTX clips ffmpeg-concat'd
+  into one mp4. Visible chunk-boundary snap because the radio scene
+  reset between halves.
+- **Cause:** Two different constants were both pinned at 7s for
+  historical/HuMo-symmetry reasons. Post-BUG-129b music routes to LTX
+  (not HuMo), and the 2026-05-07 PM mega-duration empirical test proved
+  LTX 2.3 22B-dev BF16 + distilled LoRA renders a 25s @ 832x480 clip
+  cleanly on RTX 5080 16 GB + 64 GB RAM with no temporal collapse and no
+  identity drift (i2v anchor + radio mechanical-scene content). The 7s
+  cap was a pre-117e safety value, not a load-bearing limit.
+- **Fix:**
+  - `nodes/scene_sequencer.py`: rename `_HUMO_MAX_CLIP_DUR_S` -> `_MUSIC_MAX_CHUNK_DUR_S`,
+    bump from 7.0 to 22.0. Music cues up to 22s now flow as a single
+    continuous radio scene instead of being chopped.
+  - `nodes/batch_ltx_render.py`: `clip_length` widget default 7.0 -> 22.0;
+    `LTX_MAX_FRAMES` already at 705 (BUG-117c earlier today).
+    `execute()` signature default also bumped.
+  - `workflows/otr_scifi_16gb_full.json`: explicit `widgets_values` entry
+    for clip_length=22.0 (was falling through to default).
+  - `workflows/ltx_2_3_downstream_smoke.json`: clip_length 7.0 -> 22.0.
+  - `tests/test_batch_ltx_render.py`: pinned new constants
+    (`LTX_MAX_FRAMES==705`, `clip_length default==22.0`, `max==28.16`).
+- **Verify:** `pytest tests/test_batch_ltx_render.py -v` passes the new
+  constant pins. End-to-end: queue `otr_scifi_16gb_full.json`, watch the
+  banner log line `clip_length=22.0`, confirm cargo_hold opening_theme
+  runs as a single LTX render rather than two concatenated chunks.
+- **Tags:** ltx, chunking, audio-timing, bug-117 family
+- **Related:** BUG-LOCAL-091 (chunking dispatch -- still fires, just at
+  the new 22s cap), BUG-LOCAL-117d (boomerang -- pairs with this so the
+  actual sample window is 11s).
+
+---
+
+### BUG-LOCAL-117d [FIXED]: ffmpeg boomerang post-process for seamless radio loops (default ON)
+
+- **Date:** 2026-05-07 PM | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Multi-chunk LTX renders showed a visible snap at chunk
+  boundaries because each chunk started at the radio_bookend (i2v anchor
+  at frame 0) but ended wherever the model wandered. concat-demuxer
+  stitched them with a hard cut at the transition. BUG-LOCAL-117c tried
+  end-anchor pinning via `LTXVImgToVideoInplaceKJ` at strength 0.4-0.7 to
+  force the loop closed; result at 0.7 was glitching middle frames
+  (model couldn't reconcile two strong constraints in 8 distilled
+  steps, same architectural ceiling as BUG-LOCAL-032 on the older 2B
+  model).
+- **Cause:** Stacked anchors inside the diffusion graph hit a
+  capacity ceiling. Bypass the in-graph constraint entirely by doing
+  the loop closure as a post-process.
+- **Fix:** Render HALF the chunk's audio-target duration, then ffmpeg
+  reverse-and-concat to double back to full duration. Output starts at
+  radio_bookend (frame 0), reaches peak motion at the midpoint, then
+  plays the same frames backwards to land back at radio_bookend.
+  end-of-clip-N == start-of-clip-N+1 == radio_bookend -> seamless concat
+  in VideoComposite. No GPU cost (ffmpeg is CPU-bound, dwarfed by sample
+  wall time). Free side benefit: sample wall time HALVES because we
+  render half-duration.
+  - New helper `_make_boomerang_via_ffmpeg(mp4_path, ffmpeg='ffmpeg')`
+    using filter graph `[0:v]split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1:a=0[out]`.
+    The `trim=start_frame=1` step drops the duplicate midpoint frame so
+    the loop reads as smooth oscillation rather than one-frame freeze.
+  - Env var `OTR_LTX_LOOP_VIA_REVERSE` defaults to `"on"`. Set to `off`
+    for legacy full-duration single-pass renders (e.g. for A/B compare).
+  - Cache key extended with `"boomerang"|"linear"` flag so toggling the
+    env var doesn't serve stale cached renders.
+  - Per-clip ledger record stamps `ltx_loop_via_reverse: bool` for audit.
+- **Verify:** banner log shows `boomerang: ON ...`. After execute, each
+  rendered chunk's `ltx_render_ms` is roughly half of the pre-117d
+  baseline at the same audio target. Visual: chunk boundaries should
+  be invisible because both ends are radio_bookend.
+- **Tests:** `tests/test_batch_ltx_render.py` adds 5 boomerang tests:
+  default-on pin, truthy-set pin, helper-exists, missing-input-raises,
+  filter-graph source pin.
+- **Tags:** ltx, ffmpeg, post-process, loop-closure, bug-117 family
+- **Related:** BUG-LOCAL-117c (in-graph end-anchor approach, abandoned --
+  this is the replacement), BUG-LOCAL-032 (architectural ceiling for
+  stacked anchors on the older 2B model), BUG-LOCAL-117e (raised cap
+  pairs with boomerang so render is 11s for a 22s audio target).
+
+---
+
 ### BUG-LOCAL-117a [FIXED]: LTX 2.3 + RES4LYF integration into BatchLTXRender + workflow JSON cutover (default = v0_9 + euler_cfg_pp per A/B verdict)
 
 - **Date:** 2026-05-06 LATE NIGHT | **Phase:** post-BUG-117 production cutover | **Bible candidate:** YES (dual-engine env-var pattern, MultimodalGuider DiT requirement)

@@ -1800,7 +1800,8 @@
         1,
         "fixed",
         "ffmpeg",
-        ""
+        "",
+        22.0
       ],
       "_meta": {
         "title": "Batch LTX Render (radio)"
