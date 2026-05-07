@@ -910,6 +910,32 @@ class BatchLTXRender:
         neg_tokens = clip.tokenize(_LTX_NEGATIVE)
         base_negative = clip.encode_from_tokens_scheduled(neg_tokens)
 
+        # BUG-LOCAL-117a HOTFIX 2026-05-07: audio VAE for the v2_3 AV-joint
+        # path. MultimodalGuider expects packed (video+audio) latents, so we
+        # synthesize a zero-filled audio stub via LTXVEmptyLatentAudio (which
+        # needs the audio_vae for shape inference) per chunk. The audio VAE
+        # is loaded once here so the per-chunk loop just reads it. Memory
+        # cost is small relative to the 22B transformer; the audio_vae model
+        # adds < 0.5 GB.
+        ltx_audio_vae = None
+        if engine == "v2_3":
+            try:
+                ltx_audio_vae = _call(
+                    "LTXVAudioVAELoader",
+                    ckpt_name="ltx-2.3-22b-dev.safetensors",
+                )[0]
+                log.info(
+                    "[BatchLTXRender] v2_3: loaded audio_vae from "
+                    "ltx-2.3-22b-dev.safetensors for AV-joint stub"
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "BatchLTXRender: OTR_LTX_ENGINE=v2_3 requires the audio "
+                    "VAE from ltx-2.3-22b-dev.safetensors but loading via "
+                    f"LTXVAudioVAELoader failed: {exc}. Verify the file is at "
+                    "C:\\\\ComfyUI-Models\\\\checkpoints\\\\ltx-2.3-22b-dev.safetensors."
+                )
+
         # ----------------------------------------------------------------
         # 4. Per-line render loop
         # ----------------------------------------------------------------
@@ -1042,11 +1068,44 @@ class BatchLTXRender:
                         # shape mismatch.
                         noise = _call("RandomNoise", noise_seed=shot_seed)[0]
                         if engine == "v2_3":
-                            # v2.3: ClownSampler_Beta with seeds passed via
-                            # the ClownSampler widget itself (NOT RandomNoise --
-                            # ClownSampler manages its own internal seeding for
-                            # res_2s sampling, but we still pass RandomNoise to
-                            # SamplerCustomAdvanced as the noise source).
+                            # BUG-LOCAL-117a HOTFIX 2026-05-07 MORNING:
+                            # First production run hit
+                            #   ValueError: not enough values to unpack
+                            #   (expected 2, got 1)
+                            # in multimodal_guider.unpack_latents:94. Cause:
+                            # MultimodalGuider is designed for AV-joint
+                            # pipelines that pack video+audio latents via
+                            # LTXVConcatAVLatent BEFORE sampling, then
+                            # LTXVSeparateAVLatent AFTER. The packed shape
+                            # is what unpack_latents() expects.
+                            #
+                            # Per Jeffrey 2026-05-07 ~9:15 AM: keep
+                            # MultimodalGuider's STG quality, feed it an
+                            # AV-packed latent with a tiny zero-filled audio
+                            # stub. Memory cost: empty audio latent tensor
+                            # (~few KB) plus the audio_vae model patch
+                            # cached at execute() top.
+                            #
+                            # Round-robin diagnosis (which path is right):
+                            # - ChatGPT: "mirror stock workflow as closely as
+                            #   possible" -- this branch implements that.
+                            # - Gemini: said CFGGuider would crash with DiT
+                            #   tensor shape mismatch -- WRONG diagnosis but
+                            #   correct to discourage simplification; the
+                            #   actual requirement is AV-packed latents, not
+                            #   DiT conditioning shape.
+                            audio_latent = _call(
+                                "LTXVEmptyLatentAudio",
+                                frames_number=int(chunk_ltx_length),
+                                frame_rate=int(LTX_FPS),
+                                batch_size=1,
+                                audio_vae=ltx_audio_vae,
+                            )[0]
+                            av_latent = _call(
+                                "LTXVConcatAVLatent",
+                                video_latent=latent_chunk,
+                                audio_latent=audio_latent,
+                            )[0]
                             video_params = _call(
                                 "GuiderParameters",
                                 modality="VIDEO",
@@ -1073,11 +1132,21 @@ class BatchLTXRender:
                                 seed=int(shot_seed) & 0x7FFFFFFFFFFFFFFF,
                                 bongmath=LTX_V2_3_CLOWN_BONGMATH,
                             )[0]
+                            # Sample with AV-packed latent so MultimodalGuider's
+                            # unpack_latents() splits cleanly into (vx, ax).
                             samples_out, _denoised = _call(
                                 "SamplerCustomAdvanced",
                                 noise=noise, guider=guider,
                                 sampler=v23_sampler, sigmas=sigmas,
-                                latent_image=latent_chunk,
+                                latent_image=av_latent,
+                            )
+                            # Peel the packed sample apart and discard the
+                            # audio side -- OTR is video-only, master mix
+                            # comes from the audio path C7-byte-identical
+                            # via VideoComposite at final mux time.
+                            video_samples, _audio_samples_discard = _call(
+                                "LTXVSeparateAVLatent",
+                                av_latent=samples_out,
                             )
                             # LTXVTiledVAEDecode is the LTX-specific decoder
                             # that ships with ComfyUI-LTXVideo. Stock 2.3
@@ -1087,7 +1156,7 @@ class BatchLTXRender:
                             # temporal padding.
                             frames = _call(
                                 "LTXVTiledVAEDecode",
-                                samples=samples_out, vae=vae,
+                                samples=video_samples, vae=vae,
                                 tile_size=LTX_TILE_SIZE,
                                 overlap=LTX_TILE_OVERLAP,
                                 temporal_size=LTX_TEMPORAL_SIZE,
@@ -1150,8 +1219,33 @@ class BatchLTXRender:
                             del noise
                             del guider
                             if engine == "v2_3":
-                                del video_params
-                                del v23_sampler
+                                # AV-joint chain extras to release. Each in
+                                # its own try because locals() mutation
+                                # doesn't actually delete CPython locals.
+                                try:
+                                    del v23_sampler
+                                except (NameError, UnboundLocalError):
+                                    pass
+                                try:
+                                    del video_params
+                                except (NameError, UnboundLocalError):
+                                    pass
+                                try:
+                                    del audio_latent
+                                except (NameError, UnboundLocalError):
+                                    pass
+                                try:
+                                    del av_latent
+                                except (NameError, UnboundLocalError):
+                                    pass
+                                try:
+                                    del video_samples
+                                except (NameError, UnboundLocalError):
+                                    pass
+                                try:
+                                    del _audio_samples_discard
+                                except (NameError, UnboundLocalError):
+                                    pass
                         except (NameError, UnboundLocalError):
                             pass
                         gc.collect()
