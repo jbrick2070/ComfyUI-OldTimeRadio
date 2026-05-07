@@ -219,6 +219,24 @@ LTX_V0_9_SAMPLER_NAMES_VALID = (
 )
 LTX_V0_9_SAMPLER_NAME_DEFAULT = "euler_cfg_pp"
 
+# BUG-LOCAL-117c (Jeffrey 2026-05-07 12:50): seamless loop / chunk-boundary
+# smoothing via end-frame anchor. Each LTX clip currently starts at the
+# radio_bookend (LTXVImgToVideoConditionOnly start anchor at strength 0.75)
+# but ends wherever the model takes it -- when chunks concat in
+# VideoComposite, the end-of-clip-N -> start-of-clip-N+1 transition can show
+# a visible snap because both ends land in different visual states.
+#
+# Adding LTXVAddGuide at frame_idx=-1 with a soft strength (e.g. 0.4) tells
+# the model to land back near the radio_bookend at the END of each clip too.
+# Result: end-of-clip-N == start-of-clip-N+1 == radio_bookend -> seamless.
+#
+# BUG-LOCAL-032 retired this for LTX 2B v0.9 because two strong anchors
+# clamped that under-powered model into static ping-pong. LTX 2.3 has way
+# more motion capacity (proven by 2026-05-07 smoke), so the trap may not
+# apply. Default off (0.0) so existing users see no behavior change.
+# Recommended starting value: 0.4 (lighter than start's 0.75).
+LTX_END_ANCHOR_STRENGTH_DEFAULT = 0.0
+
 # v2.3 GuiderParameters for VIDEO modality. Values mirror the stock
 # Lightricks LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json widget
 # (line 1043-1052 of that file). Round-robin (Gemini + NVIDIA) flagged
@@ -768,6 +786,20 @@ class BatchLTXRender:
             )
             engine = OTR_LTX_ENGINE_DEFAULT
 
+        # BUG-LOCAL-117c: end-frame anchor strength for seamless loops.
+        # Default 0.0 = off (no behavior change). Set to 0.4 to test
+        # chunk-boundary smoothing.
+        try:
+            end_anchor_strength = float(
+                os.environ.get(
+                    "OTR_LTX_END_ANCHOR_STRENGTH",
+                    str(LTX_END_ANCHOR_STRENGTH_DEFAULT),
+                )
+            )
+        except (TypeError, ValueError):
+            end_anchor_strength = LTX_END_ANCHOR_STRENGTH_DEFAULT
+        end_anchor_strength = max(0.0, min(1.0, end_anchor_strength))
+
         # BUG-LOCAL-117a Phase 1: resolve sampler for v0_9 path from env var.
         # Validate against allowlist; fall back to default with a warning if
         # the user typo'd. Logged into the banner so the running config is
@@ -808,6 +840,11 @@ class BatchLTXRender:
             log.info("[BatchLTXRender]   decode:   VAEDecodeTiled")
             log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, 8 sampling steps)")
             log.info("[BatchLTXRender]   note:     ~1.5-2.5 min/clip; visually indistinguishable from v2_3 on OTR content")
+        if end_anchor_strength > 0.0:
+            log.info("[BatchLTXRender]   loop:     END-ANCHOR ON at strength=%.2f (LTXVAddGuide frame_idx=-1)",
+                     end_anchor_strength)
+        else:
+            log.info("[BatchLTXRender]   loop:     end-anchor OFF (set OTR_LTX_END_ANCHOR_STRENGTH=0.4 to enable)")
         log.info("=" * 64)
         report_lines.append(
             f"BatchLTXRender: engine={engine}"
@@ -1115,10 +1152,13 @@ class BatchLTXRender:
                             _cache_sampler_id = "v2_3_clownsampler_res_2s"
                         else:
                             _cache_sampler_id = f"v0_9_{v0_9_sampler_resolved}"
+                        # Include end_anchor in key so toggling it doesn't
+                        # serve stale cached renders.
                         cache_key = (
                             entry["speaker_role"],
                             int(chunk_ltx_length),
                             _cache_sampler_id,
+                            round(end_anchor_strength, 3),
                         )
 
                         # Per-chunk destination resolved upfront (used by
@@ -1209,6 +1249,41 @@ class BatchLTXRender:
                             strength=LTX_I2V_STRENGTH,
                         )[0]
 
+                        # BUG-LOCAL-117c: optional end-frame anchor for
+                        # seamless loops. When end_anchor_strength > 0,
+                        # LTXVAddGuide pins the LAST frame of the latent
+                        # back to radio_bookend (frame_idx=-1 = end of
+                        # video). Result: end-of-clip-N matches start-of-
+                        # clip-N+1 in VideoComposite -> no chunk-boundary
+                        # snap. Cond and latent both get rewritten by
+                        # AddGuide, so the local cond_pos/cond_neg/latent
+                        # vars are reassigned for the sampler call below.
+                        cur_cond_pos = cond_pos
+                        cur_cond_neg = cond_neg
+                        cur_latent = latent_chunk
+                        if end_anchor_strength > 0.0:
+                            try:
+                                _aug = _call(
+                                    "LTXVAddGuide",
+                                    positive=cond_pos,
+                                    negative=cond_neg,
+                                    vae=vae,
+                                    latent=latent_chunk,
+                                    image=ref_image,
+                                    frame_idx=-1,
+                                    strength=end_anchor_strength,
+                                )
+                                cur_cond_pos = _aug[0]
+                                cur_cond_neg = _aug[1]
+                                cur_latent = _aug[2]
+                            except Exception as _aug_exc:
+                                log.warning(
+                                    "[BatchLTXRender] LTXVAddGuide(end-anchor) "
+                                    "failed for %s chunk %d: %s -- proceeding "
+                                    "without end anchor for this chunk",
+                                    line_id, chunk_idx + 1, _aug_exc,
+                                )
+
                         # BUG-LOCAL-117: engine-specific sample + decode chain.
                         # v0_9 path = legacy euler + CFGGuider + VAEDecodeTiled.
                         # v2_3 path = RES4LYF ClownSampler_Beta + MultimodalGuider
@@ -1254,7 +1329,7 @@ class BatchLTXRender:
                             )[0]
                             av_latent = _call(
                                 "LTXVConcatAVLatent",
-                                video_latent=latent_chunk,
+                                video_latent=cur_latent,
                                 audio_latent=audio_latent,
                             )[0]
                             video_params = _call(
@@ -1271,8 +1346,8 @@ class BatchLTXRender:
                             guider = _call(
                                 "MultimodalGuider",
                                 model=model,
-                                positive=cond_pos,
-                                negative=cond_neg,
+                                positive=cur_cond_pos,
+                                negative=cur_cond_neg,
                                 parameters=video_params,
                                 skip_blocks=LTX_V2_3_SKIP_BLOCKS,
                             )[0]
@@ -1330,15 +1405,15 @@ class BatchLTXRender:
                             guider = _call(
                                 "CFGGuider",
                                 model=model,
-                                positive=cond_pos,
-                                negative=cond_neg,
+                                positive=cur_cond_pos,
+                                negative=cur_cond_neg,
                                 cfg=LTX_CFG,
                             )[0]
                             samples_out, _denoised = _call(
                                 "SamplerCustomAdvanced",
                                 noise=noise, guider=guider,
                                 sampler=sampler_obj, sigmas=sigmas,
-                                latent_image=latent_chunk,
+                                latent_image=cur_latent,
                             )
                             frames = _call(
                                 "VAEDecodeTiled",
