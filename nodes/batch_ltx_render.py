@@ -108,8 +108,15 @@ LTX_FPS = 25
 # default 7.0s) fall into the chunking dispatch below. ComfyUI-Goofer
 # proved 257 native is fine; 353 is untested-but-likely-fine because
 # VAEDecodeTiled handles temporal chunking at the VAE level.
-# 353 = 8*44+1 satisfies LTX's 8n+1 constraint.
-LTX_MAX_FRAMES = 353
+#
+# 2026-05-07 PM: bumped to 705 (8*88+1 = ~28.20s @ 25fps) for the
+# "how long can LTX 2.3 go" curiosity test. The distilled-1.1 LoRA
+# may temporal-collapse or repeat at this length, OR may handle it
+# fine since it's a 22B model with much more capacity than the 2B
+# v0.9 BUG-091 era. VAEDecodeTiled's temporal chunking should still
+# protect against decode-side OOM. Sample-side memory is the concern;
+# watch VRAM during long chunk renders.
+LTX_MAX_FRAMES = 705  # was 353; 705 = 8*88+1 = ~28.20s at 25fps
 LTX_MIN_FRAMES = 9    # 8*1+1, smallest valid LTX render
 # BUG-LOCAL-091 (2026-05-04 EVENING): when a non-character audio line
 # exceeds the per-chunk ceiling, split it into consecutive LTX chunks of
@@ -236,6 +243,26 @@ LTX_V0_9_SAMPLER_NAME_DEFAULT = "euler_cfg_pp"
 # apply. Default off (0.0) so existing users see no behavior change.
 # Recommended starting value: 0.4 (lighter than start's 0.75).
 LTX_END_ANCHOR_STRENGTH_DEFAULT = 0.0
+
+# BUG-LOCAL-117d (Jeffrey 2026-05-07 PM): boomerang loop via ffmpeg
+# reverse-and-concat. Empirical finding (BUG-LOCAL-117c InplaceKJ test
+# at strength 0.7): forcing both endpoints with stacked anchors makes
+# the model glitch in the middle (couldn't reconcile two strong
+# constraints in 8 distilled steps). The post-process boomerang
+# bypasses the architectural ceiling entirely.
+#
+# Strategy: render HALF the chunk's target duration so the post-process
+# reverse-and-concat doubles back to the full audio-timeline duration.
+# The boomeranged clip starts at radio_bookend, zooms in to peak motion
+# at the midpoint, then plays the same frames in reverse to land back
+# at radio_bookend. End-of-clip-N == start-of-clip-N+1 == radio_bookend
+# -> seamless chunk concat in VideoComposite. Free perfect loops, no
+# extra GPU time (ffmpeg is CPU-bound and dwarfed by sample wall time).
+#
+# Values:
+#   "off" (default)  -- no boomerang, current behavior
+#   "on"             -- all non-character chunks boomeranged (music + announcer + sfx)
+LTX_LOOP_VIA_REVERSE_DEFAULT = "off"
 
 # v2.3 GuiderParameters for VIDEO modality. Values mirror the stock
 # Lightricks LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json widget
@@ -743,7 +770,7 @@ class BatchLTXRender:
                 "clip_length": ("FLOAT", {
                     "default": 7.0,
                     "min": 1.32,
-                    "max": 14.12,
+                    "max": 28.16,
                     "step": 0.04,
                     "tooltip": (
                         "Max per-CHUNK duration in seconds (BUG-LOCAL-091, "
@@ -752,9 +779,12 @@ class BatchLTXRender:
                         "chunks rendered against the radio bookend, then "
                         "ffmpeg-concat into the final per-line mp4. Default "
                         "7.0 -> 175 frames -> 177 (LTX 8n+1 = 7.08s, the "
-                        "historically-stable LTX render size). Bump up to "
-                        "14.12 (353 frames) if VRAM holds, to single-pass "
-                        "typical announcer monologues."
+                        "historically-stable LTX render size). Cap raised "
+                        "to 28.16s (705 frames, 8*88+1) on 2026-05-07 for "
+                        "the LTX 2.3 long-clip curiosity test. Coherence "
+                        "at extreme lengths is unverified -- watch for "
+                        "temporal repetition or static collapse if you "
+                        "push past ~15s. VRAM is the practical first wall."
                     ),
                 }),
             },
