@@ -21,7 +21,7 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
-### BUG-LOCAL-117a [SHIPPED, REGRESSION PENDING]: LTX 2.3 + RES4LYF integration into BatchLTXRender + workflow JSON cutover
+### BUG-LOCAL-117a [FIXED]: LTX 2.3 + RES4LYF integration into BatchLTXRender + workflow JSON cutover (default = v0_9 + euler_cfg_pp per A/B verdict)
 
 - **Date:** 2026-05-06 LATE NIGHT | **Phase:** post-BUG-117 production cutover | **Bible candidate:** YES (dual-engine env-var pattern, MultimodalGuider DiT requirement)
 - **Symptom:** post-BUG-117 the production episode pipeline (`otr_scifi_16gb_full.json` + `nodes/batch_ltx_render.py`) was still wired to LTX 2B v0.9 + euler + CFGGuider chain that produced static frames. Smoke proved LTX 2.3 + ClownSampler_Beta + MultimodalGuider produces "perfect subtle zoom in" smooth motion; need to plumb that into OTR production while preserving v0.9 as rollback.
@@ -49,7 +49,14 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
   - Test suite: 185 passed, 2 skipped, 2 xfailed across `tests/test_core.py` + `tests/test_dropdown_guardrails.py` + `tests/test_audio_byte_identical.py` + `bug_bible_regression.py`.
   - **Real-world regression: PENDING.** See `docs/2026-05-06-handoff-bug-117a-regression.md` for the morning-after sirens_print test plan, expected wall time, what to watch in console + Task Manager, and rollback procedure. NOT marked [FIXED] until that runs green.
 - **Tags:** ltx-2.3, res4lyf, multimodal-guider-required, env-var-engine-selector, dual-engine, dit-conditioning, round-robin-verified, bug-117-followup, c7-audio-untouched
-- **Provenance:** Jeffrey: "code it all im sleeping" 2026-05-06 ~22:30. Round-robin transcripts under `docs/2026-05-06-bug-117-ltx23-res4lyf-migration__*`. Synthesis writeup at `__04_synthesis.md`. Pre-cutover git tag: `pre-bug-117a-cutover`.
+- **A/B verdict 2026-05-07 LATE MORNING (cargo_hold smoke, 5 chunks, identical anchor):**
+  - v2_3 (RES4LYF res_2s + MultimodalGuider + AV-stub): 36.85 min total, 6-8 min/clip, 64 GB RAM at 100% (swap thrashing)
+  - v0_9 (euler_cfg_pp + CFGGuider): 8.3 min total, 1.5-2.5 min/clip, comfortable on 32 GB RAM
+  - Jeffrey eyes-on after watching both: "no difference in the latest vids"
+  - Verdict: v0_9 + euler_cfg_pp is visually equivalent to v2_3 + res_2s on OTR's mechanical-radio content. The community's res_2s warnings (over-cooked detail, slow-motion) were on portrait/skin content at 1080p+ which doesn't apply.
+  - DEFAULT FLIPPED: `OTR_LTX_ENGINE_DEFAULT = "v0_9"` (was "v2_3"). v2_3 retained as opt-in for users with 64 GB+ RAM who want the marginal extra detail.
+- **Render cache (BUG-LOCAL-117b):** identical-input chunks (e.g. music_open_001 + music_open_002 from same beat split into 2 chunks) now copy-from-canonical instead of re-rendering. Cargo_hold smoke: 5 chunks -> 3 unique renders, ~40% wall-time saving stacks on top of the engine choice.
+- **Provenance:** Jeffrey: "code it all im sleeping" 2026-05-06 ~22:30. Round-robin transcripts under `docs/2026-05-06-bug-117-ltx23-res4lyf-migration__*`. Synthesis writeup at `__04_synthesis.md`. Pre-cutover git tag: `pre-bug-117a-cutover`. A/B verdict 2026-05-07 11:35 with eyes-on smoke comparison.
 - **Related:**
   - BUG-LOCAL-117 (the model class diagnosis -- this is the integration that ships the fix into OTR production).
   - BUG-LOCAL-097 (widget drift -- env-var engine selector specifically chosen to avoid widget-array reordering).

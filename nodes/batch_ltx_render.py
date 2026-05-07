@@ -184,7 +184,14 @@ LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fi
 #        VAEDecodeTiled. Kept as fallback for emergency rollback.
 #        Rollback path: git checkout pre-bug-117-cutover workflows/otr_scifi_16gb_full.json
 #        and `set OTR_LTX_ENGINE=v0_9` before launching ComfyUI.
-OTR_LTX_ENGINE_DEFAULT = "v2_3"
+# BUG-LOCAL-117a A/B verdict 2026-05-07 LATE MORNING (Jeffrey eyes-on):
+# v0_9 + euler_cfg_pp on cargo_hold smoke = visually indistinguishable
+# from v2_3 + ClownSampler res_2s on the same content. v0_9 ships in
+# 8.3 min for 5 clips vs v2_3's 36.85 min (4.4x faster) and runs
+# comfortably on 32 GB RAM where v2_3 thrashes 64 GB to 100%.
+# DEFAULT = v0_9. v2_3 retained as opt-in "quality" engine for users
+# who want crisper detail and have 64 GB+ RAM headroom.
+OTR_LTX_ENGINE_DEFAULT = "v0_9"
 
 # BUG-LOCAL-117a Phase 1 (2026-05-07): A/B/C/D sampler bake-off via env var.
 # Applies only when engine=v0_9 (the lightweight single-stage path that
@@ -780,6 +787,7 @@ class BatchLTXRender:
         log.info("=" * 64)
         log.info("[BatchLTXRender] BUG-LOCAL-117 engine=%s", engine)
         if engine == "v2_3":
+            log.info("[BatchLTXRender]   role:     QUALITY OPT-IN (requires 64 GB system RAM)")
             log.info("[BatchLTXRender]   model:    LTX 2.3 22B-dev BF16 + distilled LoRA x2 (0.5, 0.2)")
             log.info("[BatchLTXRender]   encoder:  LTXAVTextEncoderLoader -> Gemma FP4 mixed")
             log.info("[BatchLTXRender]   sampler:  ClownSampler_Beta (%s, eta=%.2f, bongmath=%s)",
@@ -789,14 +797,17 @@ class BatchLTXRender:
                      LTX_V2_3_VIDEO_CFG, LTX_V2_3_VIDEO_STG)
             log.info("[BatchLTXRender]   decode:   LTXVTiledVAEDecode (LTX-specific tiled)")
             log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, float32, CPU)")
+            log.info("[BatchLTXRender]   note:     ~6-8 min/clip; expect swap thrashing on <64 GB RAM systems")
         else:
-            log.info("[BatchLTXRender]   model:    LTX checkpoint (model widget) -- could be 2B v0.9 OR 2.3 dev")
-            log.info("[BatchLTXRender]   encoder:  CLIP from input -- could be t5xxl OR Gemma via separate loader")
+            log.info("[BatchLTXRender]   role:     SAFE DEFAULT (works on 16 GB VRAM + 32 GB RAM)")
+            log.info("[BatchLTXRender]   model:    LTX checkpoint (model widget) -- 2.3 dev recommended; 2B v0.9 still loads")
+            log.info("[BatchLTXRender]   encoder:  CLIP from input -- Gemma (LTXAVTextEncoderLoader) recommended; t5xxl tolerated")
             log.info("[BatchLTXRender]   sampler:  KSamplerSelect(%r)  <-- OTR_LTX_V0_9_SAMPLER_NAME",
                      v0_9_sampler_name)
             log.info("[BatchLTXRender]   guider:   CFGGuider (cfg=%.1f)", LTX_CFG)
             log.info("[BatchLTXRender]   decode:   VAEDecodeTiled")
             log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, 8 sampling steps)")
+            log.info("[BatchLTXRender]   note:     ~1.5-2.5 min/clip; visually indistinguishable from v2_3 on OTR content")
         log.info("=" * 64)
         report_lines.append(
             f"BatchLTXRender: engine={engine}"
