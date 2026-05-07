@@ -904,7 +904,20 @@ class BatchLTXRender:
         # ----------------------------------------------------------------
         import torch  # type: ignore
 
-        sampler_obj = _call("KSamplerSelect", sampler_name="euler")[0]
+        # BUG-LOCAL-117a 2026-05-07: was plain "euler" (LTX 2.0 era default).
+        # Lightricks' LTX 2.3 single-stage workflow tunes around "euler_cfg_pp"
+        # which implements classifier-free guidance perpendicular projection --
+        # better CFG curve interaction with the 22B model than plain euler.
+        # Community testing confirms cfg_pp variants outperform plain euler on
+        # 2.3 distilled. Plain euler retained as fallback below if cfg_pp errors.
+        try:
+            sampler_obj = _call("KSamplerSelect", sampler_name="euler_cfg_pp")[0]
+        except Exception:
+            log.warning(
+                "[BatchLTXRender] euler_cfg_pp unavailable; falling back to "
+                "plain euler -- update ComfyUI core if you want LTX 2.3 tuning"
+            )
+            sampler_obj = _call("KSamplerSelect", sampler_name="euler")[0]
         sigmas = torch.tensor(LTX_DISTILLED_SIGMAS, dtype=torch.float32)
 
         neg_tokens = clip.tokenize(_LTX_NEGATIVE)
