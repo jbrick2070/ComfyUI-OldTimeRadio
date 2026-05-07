@@ -596,6 +596,15 @@ class TestWorkflowJSONFull:
             "ModelSamplingSD3", "PathchSageAttentionKJ",
             # LTX loader chain (Sprint 3)
             "LowVRAMCheckpointLoader",
+            # LTX 2.3 loader chain (BUG-LOCAL-117 cutover 2026-05-06):
+            # Gemma encoder loader from ComfyUI-LTXVideo replaces the prior
+            # CLIPLoader+t5xxl chain. Required by OTR_BatchLTXRender when
+            # OTR_LTX_ENGINE=v2_3 (default). RES4LYF nodes (ClownSampler_Beta,
+            # MultimodalGuider, GuiderParameters, LTXVTiledVAEDecode) are
+            # called inside batch_ltx_render.py via _call() and never appear
+            # in the workflow JSON node list, so they don't need to be in
+            # this whitelist.
+            "LTXAVTextEncoderLoader",
         }
         for n in wf["nodes"]:
             assert n["type"].startswith("OTR_") or n["type"] in known

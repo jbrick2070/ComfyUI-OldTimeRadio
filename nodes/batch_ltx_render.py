@@ -48,6 +48,7 @@ from __future__ import annotations
 import gc
 import logging
 import math
+import os
 import sys as _sys
 import time
 from pathlib import Path
@@ -165,6 +166,60 @@ LTX_I2V_STRENGTH = 0.75
 # the first frames of the latent + adds a noise mask for free motion.
 # Same proven path comfyui-data-media-machine uses.
 LTX_END_FRAME_STRENGTH = 0.6  # DEPRECATED -- see batch_ltx_render.py BUG-032 fix block
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-117: LTX 2.3 + RES4LYF engine config
+# ---------------------------------------------------------------------------
+# Engine selector via env var (NOT widget -- widget drift is recurring OTR
+# bug source per BUG-LOCAL-097/113). Round-robin verdict 2026-05-06 (transcripts
+# at docs/2026-05-06-bug-117-ltx23-res4lyf-migration__*.md): use env var,
+# loud startup log, fail-fast dep check on engine=v2_3.
+#
+# v2_3:  LTX 2.3 22B-dev BF16 + distilled LoRA (in workflow JSON) + Gemma
+#        encoder (LTXAVTextEncoderLoader in workflow JSON) + RES4LYF
+#        ClownSampler_Beta + MultimodalGuider + GuiderParameters +
+#        LTXVTiledVAEDecode. Produces "subtle zoom in" smooth motion on
+#        radio_bookend smoke 2026-05-06.
+# v0_9:  Legacy LTX 2B v0.9 + CLIPLoader/t5xxl + euler + CFGGuider +
+#        VAEDecodeTiled. Kept as fallback for emergency rollback.
+#        Rollback path: git checkout pre-bug-117-cutover workflows/otr_scifi_16gb_full.json
+#        and `set OTR_LTX_ENGINE=v0_9` before launching ComfyUI.
+OTR_LTX_ENGINE_DEFAULT = "v2_3"
+
+# v2.3 GuiderParameters for VIDEO modality. Values mirror the stock
+# Lightricks LTX-2.3_T2V_I2V_Single_Stage_Distilled_Full.json widget
+# (line 1043-1052 of that file). Round-robin (Gemini + NVIDIA) flagged
+# MultimodalGuider as STRUCTURALLY required for LTX 2.3 DiT -- substituting
+# CFGGuider would crash with tensor shape mismatch.
+LTX_V2_3_VIDEO_CFG = 3.0
+LTX_V2_3_VIDEO_STG = 1.0
+LTX_V2_3_VIDEO_PERTURB_ATTN = True
+LTX_V2_3_VIDEO_RESCALE = 0.9
+LTX_V2_3_VIDEO_MODALITY_SCALE = 3.0
+LTX_V2_3_VIDEO_SKIP_STEP = 0
+LTX_V2_3_VIDEO_CROSS_ATTN = True
+
+# MultimodalGuider widget: skip_blocks string parsed as comma-separated
+# transformer block indices. Stock workflow uses "28" -- empirically tuned
+# by Lightricks for LTX 2.3.
+LTX_V2_3_SKIP_BLOCKS = "28"
+
+# ClownSampler_Beta widgets. Stock workflow uses eta=0.25,
+# sampler_name="exponential/res_2s", bongmath=true. The seed is
+# overridden per-chunk in the render loop (shot_seed math from batch
+# loop iteration, line index, chunk index).
+LTX_V2_3_CLOWN_ETA = 0.25
+LTX_V2_3_CLOWN_SAMPLER_NAME = "exponential/res_2s"
+LTX_V2_3_CLOWN_BONGMATH = True
+
+# RES4LYF + LTX 2.3 v2.3 required nodes -- fail-fast dep check fires here
+# at execute() entry when engine=v2_3.
+LTX_V2_3_REQUIRED_NODES = (
+    "ClownSampler_Beta",       # RES4LYF beta/samplers.py
+    "MultimodalGuider",        # ComfyUI-LTXVideo guiders/multimodal_guider.py
+    "GuiderParameters",        # ComfyUI-LTXVideo guiders/parameters.py
+    "LTXVTiledVAEDecode",      # ComfyUI-LTXVideo
+)
 
 # Speaker_role -> LTX prompt template.
 #
@@ -667,6 +722,64 @@ class BatchLTXRender:
         report_lines: list[str] = []
 
         # ----------------------------------------------------------------
+        # BUG-LOCAL-117: engine selector + dep check + loud banner
+        # ----------------------------------------------------------------
+        engine = os.environ.get(
+            "OTR_LTX_ENGINE", OTR_LTX_ENGINE_DEFAULT
+        ).strip().lower()
+        if engine not in ("v0_9", "v2_3"):
+            log.warning(
+                "[BatchLTXRender] BUG-LOCAL-117: unknown OTR_LTX_ENGINE=%r; "
+                "falling back to default %r",
+                engine, OTR_LTX_ENGINE_DEFAULT,
+            )
+            engine = OTR_LTX_ENGINE_DEFAULT
+
+        log.info("=" * 64)
+        log.info("[BatchLTXRender] BUG-LOCAL-117 engine=%s", engine)
+        if engine == "v2_3":
+            log.info("[BatchLTXRender]   model:    LTX 2.3 22B-dev BF16 + distilled LoRA x2 (0.5, 0.2)")
+            log.info("[BatchLTXRender]   encoder:  LTXAVTextEncoderLoader -> Gemma FP4 mixed")
+            log.info("[BatchLTXRender]   sampler:  ClownSampler_Beta (%s, eta=%.2f, bongmath=%s)",
+                     LTX_V2_3_CLOWN_SAMPLER_NAME, LTX_V2_3_CLOWN_ETA,
+                     LTX_V2_3_CLOWN_BONGMATH)
+            log.info("[BatchLTXRender]   guider:   MultimodalGuider + GuiderParameters (VIDEO cfg=%.1f stg=%.1f)",
+                     LTX_V2_3_VIDEO_CFG, LTX_V2_3_VIDEO_STG)
+            log.info("[BatchLTXRender]   decode:   LTXVTiledVAEDecode (LTX-specific tiled)")
+            log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, float32, CPU)")
+        else:
+            log.info("[BatchLTXRender]   model:    LTX 2B v0.9 (LEGACY ROLLBACK PATH)")
+            log.info("[BatchLTXRender]   encoder:  CLIPLoader t5xxl_fp16 ltxv")
+            log.info("[BatchLTXRender]   sampler:  KSamplerSelect(\"euler\")")
+            log.info("[BatchLTXRender]   guider:   CFGGuider (cfg=1.0)")
+            log.info("[BatchLTXRender]   decode:   VAEDecodeTiled")
+            log.info("[BatchLTXRender]   NOTE:     workflow JSON must be reverted to pre-bug-117 state")
+        log.info("=" * 64)
+        report_lines.append(
+            f"BatchLTXRender: engine={engine}"
+        )
+
+        # Fail-fast dep check on v2_3 -- if RES4LYF or LTXVideo nodes
+        # missing, refuse to start so we never silently fall through.
+        if engine == "v2_3":
+            try:
+                from nodes import NODE_CLASS_MAPPINGS  # noqa: late import
+            except ImportError:
+                NODE_CLASS_MAPPINGS = {}  # type: ignore[assignment]
+            missing = [
+                name for name in LTX_V2_3_REQUIRED_NODES
+                if name not in NODE_CLASS_MAPPINGS
+            ]
+            if missing:
+                raise RuntimeError(
+                    "BatchLTXRender: OTR_LTX_ENGINE=v2_3 requires custom node "
+                    f"pack(s) but these node classes are missing: {missing}. "
+                    "Install RES4LYF (https://github.com/ClownsharkBatwing/RES4LYF) "
+                    "into custom_nodes/ and ensure ComfyUI-LTXVideo is updated. "
+                    "Or set OTR_LTX_ENGINE=v0_9 for legacy rollback."
+                )
+
+        # ----------------------------------------------------------------
         # 1. Load the ledger + resolve the radio bookend png
         # ----------------------------------------------------------------
         ledger, ledger_path = self._load_ledger(ledger_json)
@@ -919,36 +1032,92 @@ class BatchLTXRender:
                             strength=LTX_I2V_STRENGTH,
                         )[0]
 
-                        # Sample with distilled schedule. Cond pos/neg
-                        # come straight from LTXVConditioning (post-BUG-095);
-                        # LTXVImgToVideoConditionOnly only modifies the
-                        # latent, not the conditioning.
+                        # BUG-LOCAL-117: engine-specific sample + decode chain.
+                        # v0_9 path = legacy euler + CFGGuider + VAEDecodeTiled.
+                        # v2_3 path = RES4LYF ClownSampler_Beta + MultimodalGuider
+                        # + GuiderParameters + LTXVTiledVAEDecode. Round-robin
+                        # 2026-05-06 (Gemini + NVIDIA both) flagged
+                        # MultimodalGuider as STRUCTURALLY required for LTX 2.3
+                        # DiT -- substituting CFGGuider would crash with tensor
+                        # shape mismatch.
                         noise = _call("RandomNoise", noise_seed=shot_seed)[0]
-                        guider = _call(
-                            "CFGGuider",
-                            model=model,
-                            positive=cond_pos,
-                            negative=cond_neg,
-                            cfg=LTX_CFG,
-                        )[0]
-                        samples_out, _denoised = _call(
-                            "SamplerCustomAdvanced",
-                            noise=noise, guider=guider,
-                            sampler=sampler_obj, sigmas=sigmas,
-                            latent_image=latent_chunk,
-                        )
-
-                        # VAEDecodeTiled per Goofer's proven pattern --
-                        # required for safe decoding at higher frame counts
-                        # on this Blackwell hardware.
-                        frames = _call(
-                            "VAEDecodeTiled",
-                            samples=samples_out, vae=vae,
-                            tile_size=LTX_TILE_SIZE,
-                            overlap=LTX_TILE_OVERLAP,
-                            temporal_size=LTX_TEMPORAL_SIZE,
-                            temporal_overlap=LTX_TEMPORAL_OVERLAP,
-                        )[0]
+                        if engine == "v2_3":
+                            # v2.3: ClownSampler_Beta with seeds passed via
+                            # the ClownSampler widget itself (NOT RandomNoise --
+                            # ClownSampler manages its own internal seeding for
+                            # res_2s sampling, but we still pass RandomNoise to
+                            # SamplerCustomAdvanced as the noise source).
+                            video_params = _call(
+                                "GuiderParameters",
+                                modality="VIDEO",
+                                cfg=LTX_V2_3_VIDEO_CFG,
+                                stg=LTX_V2_3_VIDEO_STG,
+                                perturb_attn=LTX_V2_3_VIDEO_PERTURB_ATTN,
+                                rescale=LTX_V2_3_VIDEO_RESCALE,
+                                modality_scale=LTX_V2_3_VIDEO_MODALITY_SCALE,
+                                skip_step=LTX_V2_3_VIDEO_SKIP_STEP,
+                                cross_attn=LTX_V2_3_VIDEO_CROSS_ATTN,
+                            )[0]
+                            guider = _call(
+                                "MultimodalGuider",
+                                model=model,
+                                positive=cond_pos,
+                                negative=cond_neg,
+                                parameters=video_params,
+                                skip_blocks=LTX_V2_3_SKIP_BLOCKS,
+                            )[0]
+                            v23_sampler = _call(
+                                "ClownSampler_Beta",
+                                eta=LTX_V2_3_CLOWN_ETA,
+                                sampler_name=LTX_V2_3_CLOWN_SAMPLER_NAME,
+                                seed=int(shot_seed) & 0x7FFFFFFFFFFFFFFF,
+                                bongmath=LTX_V2_3_CLOWN_BONGMATH,
+                            )[0]
+                            samples_out, _denoised = _call(
+                                "SamplerCustomAdvanced",
+                                noise=noise, guider=guider,
+                                sampler=v23_sampler, sigmas=sigmas,
+                                latent_image=latent_chunk,
+                            )
+                            # LTXVTiledVAEDecode is the LTX-specific decoder
+                            # that ships with ComfyUI-LTXVideo. Stock 2.3
+                            # workflow uses it instead of stock VAEDecodeTiled.
+                            # Tile size widgets are the same OTR-Goofer-proven
+                            # values; the LTX wrapper just adds LTX-aware
+                            # temporal padding.
+                            frames = _call(
+                                "LTXVTiledVAEDecode",
+                                samples=samples_out, vae=vae,
+                                tile_size=LTX_TILE_SIZE,
+                                overlap=LTX_TILE_OVERLAP,
+                                temporal_size=LTX_TEMPORAL_SIZE,
+                                temporal_overlap=LTX_TEMPORAL_OVERLAP,
+                            )[0]
+                        else:
+                            # v0.9 legacy path -- proven on LTX 2B v0.9 since
+                            # the original BatchLTXRender ship. Kept verbatim
+                            # for emergency rollback (set OTR_LTX_ENGINE=v0_9).
+                            guider = _call(
+                                "CFGGuider",
+                                model=model,
+                                positive=cond_pos,
+                                negative=cond_neg,
+                                cfg=LTX_CFG,
+                            )[0]
+                            samples_out, _denoised = _call(
+                                "SamplerCustomAdvanced",
+                                noise=noise, guider=guider,
+                                sampler=sampler_obj, sigmas=sigmas,
+                                latent_image=latent_chunk,
+                            )
+                            frames = _call(
+                                "VAEDecodeTiled",
+                                samples=samples_out, vae=vae,
+                                tile_size=LTX_TILE_SIZE,
+                                overlap=LTX_TILE_OVERLAP,
+                                temporal_size=LTX_TEMPORAL_SIZE,
+                                temporal_overlap=LTX_TEMPORAL_OVERLAP,
+                            )[0]
 
                         # Per-chunk destination. Single-chunk writes to
                         # canonical <line_id>.mp4; multi-chunk writes to
@@ -966,6 +1135,32 @@ class BatchLTXRender:
                             ffmpeg=ffmpeg,
                         )
                         chunk_mp4_paths.append(chunk_dest)
+
+                        # BUG-LOCAL-117 per-chunk GC. Round-robin verdict
+                        # 2026-05-06 (Gemini): at 14.5 GB peak on a 16 GB
+                        # card, Python's lazy GC will OOM on chunk 3+ if
+                        # we let prior latent + decoded image refs linger.
+                        # Cheap insurance.
+                        try:
+                            del frames
+                            del samples_out
+                            del _denoised
+                            del latent_chunk
+                            del empty_latent
+                            del noise
+                            del guider
+                            if engine == "v2_3":
+                                del video_params
+                                del v23_sampler
+                        except (NameError, UnboundLocalError):
+                            pass
+                        gc.collect()
+                        try:
+                            import torch as _t  # type: ignore
+                            if _t.cuda.is_available():
+                                _t.cuda.empty_cache()
+                        except Exception:  # noqa: BLE001
+                            pass
 
                     # BUG-LOCAL-091: concat per-chunk part files into the
                     # canonical per-line mp4 if multi-chunk. Same codec /

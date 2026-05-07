@@ -21,6 +21,42 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-117a [SHIPPED, REGRESSION PENDING]: LTX 2.3 + RES4LYF integration into BatchLTXRender + workflow JSON cutover
+
+- **Date:** 2026-05-06 LATE NIGHT | **Phase:** post-BUG-117 production cutover | **Bible candidate:** YES (dual-engine env-var pattern, MultimodalGuider DiT requirement)
+- **Symptom:** post-BUG-117 the production episode pipeline (`otr_scifi_16gb_full.json` + `nodes/batch_ltx_render.py`) was still wired to LTX 2B v0.9 + euler + CFGGuider chain that produced static frames. Smoke proved LTX 2.3 + ClownSampler_Beta + MultimodalGuider produces "perfect subtle zoom in" smooth motion; need to plumb that into OTR production while preserving v0.9 as rollback.
+- **Cause / decisions (round-robin transcripts at `docs/2026-05-06-bug-117-ltx23-res4lyf-migration__*`):**
+  - Round-robin verdict: ChatGPT + Gemini + NVIDIA all agreed on env-var engine selector + explicit float32 sigma cast + Gemma encoder requirement + per-line GC.
+  - Critical correction (Gemini + NVIDIA against ChatGPT): `MultimodalGuider` is structurally required for LTX 2.3 DiT, not a video-only optional. Substituting `CFGGuider` would crash with tensor shape mismatch. Original Claude lean was wrong here.
+  - Workflow JSON count: external models recommended two parallel JSONs for rollback; Jeffrey's standing rule (`feedback_minimum_json_files.md`) wins -- single JSON, git tag pre-cutover commit, rollback is `git checkout <tag>`.
+- **Fix:**
+  - **`workflows/otr_scifi_16gb_full.json` cutover:**
+    - Node #54 widget: `ltx-video-2b-v0.9.safetensors` -> `ltx-2.3-22b-dev.safetensors`.
+    - Inserted node #60 (`LoraLoaderModelOnly`, ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors @ strength 0.5) and node #61 (same LoRA @ 0.2). Re-routed link 87 (was #54.MODEL -> #55.model) through #60 then #61, with new links 102 (#60->#61) and 103 (#61->#55).
+    - Node #57 type swap: `CLIPLoader` -> `LTXAVTextEncoderLoader`. Widgets `[t5xxl_fp16.safetensors, ltxv, default]` -> `[gemma_3_12B_it_fp4_mixed.safetensors, ltx-2.3-22b-dev.safetensors, default]`. Output type stays `CLIP` so node #55 input link 94 unchanged.
+  - **`nodes/batch_ltx_render.py` dual-engine refactor (~194 LOC added):**
+    - `OTR_LTX_ENGINE` env var (default `v2_3`, valid `v0_9` for emergency rollback). Loud startup banner logs engine + model + encoder + sampler + guider + decode + sigma constants.
+    - Fail-fast dep check on engine=v2_3 against `["ClownSampler_Beta", "MultimodalGuider", "GuiderParameters", "LTXVTiledVAEDecode"]`. Refuses to start if any missing; clear error message points at RES4LYF install.
+    - Engine-branch inside the per-chunk render loop:
+      - **v0_9 path:** legacy `CFGGuider(cfg=1.0)` + `KSamplerSelect("euler")` (pre-baked, shared) + `SamplerCustomAdvanced` + `VAEDecodeTiled`. Verbatim from pre-cutover state for byte-identity.
+      - **v2_3 path:** `GuiderParameters(modality="VIDEO", cfg=3.0, stg=1.0, perturb_attn=True, rescale=0.9, modality_scale=3.0, skip_step=0, cross_attn=True)` (mirrors stock workflow VIDEO modality widgets exactly) + `MultimodalGuider(model, positive, negative, parameters, skip_blocks="28")` + `ClownSampler_Beta(eta=0.25, sampler_name="exponential/res_2s", seed=shot_seed, bongmath=True)` + `SamplerCustomAdvanced` + `LTXVTiledVAEDecode` (LTX-specific decoder, same OTR-Goofer-proven tile params).
+    - Per-chunk GC: `del frames; del samples_out; del _denoised; del latent_chunk; del empty_latent; del noise; del guider; (v2_3-extras del); gc.collect(); torch.cuda.empty_cache()`. Round-robin (Gemini) flagged Python lazy GC would OOM at chunk 3+ on a 14.5 GB peak / 16 GB ceiling without aggressive cleanup.
+    - Sigmas: existing `LTX_DISTILLED_SIGMAS` constant unchanged. Confirmed via stock workflow inspection that the 9-value distilled schedule is identical between v0.9 and 2.3 distilled. `torch.tensor(LTX_DISTILLED_SIGMAS, dtype=torch.float32)` cast already explicit (Gemini caught: ComfyUI overrides default dtype, mandatory not optional).
+  - **`tests/test_core.py`:** added `LTXAVTextEncoderLoader` to the workflow node-type whitelist (test_node_types_otr_or_known). RES4LYF nodes called via `_call()` from Python don't appear in JSON node list so they don't need whitelist entries.
+- **Verify (this commit):**
+  - AST parse of `nodes/batch_ltx_render.py` clean (1469 LOC, +194 from pre-cutover 1275).
+  - JSON parse of `workflows/otr_scifi_16gb_full.json` clean (34 nodes, 59 links, last_node_id=61, last_link_id=103).
+  - Test suite: 185 passed, 2 skipped, 2 xfailed across `tests/test_core.py` + `tests/test_dropdown_guardrails.py` + `tests/test_audio_byte_identical.py` + `bug_bible_regression.py`.
+  - **Real-world regression: PENDING.** See `docs/2026-05-06-handoff-bug-117a-regression.md` for the morning-after sirens_print test plan, expected wall time, what to watch in console + Task Manager, and rollback procedure. NOT marked [FIXED] until that runs green.
+- **Tags:** ltx-2.3, res4lyf, multimodal-guider-required, env-var-engine-selector, dual-engine, dit-conditioning, round-robin-verified, bug-117-followup, c7-audio-untouched
+- **Provenance:** Jeffrey: "code it all im sleeping" 2026-05-06 ~22:30. Round-robin transcripts under `docs/2026-05-06-bug-117-ltx23-res4lyf-migration__*`. Synthesis writeup at `__04_synthesis.md`. Pre-cutover git tag: `pre-bug-117a-cutover`.
+- **Related:**
+  - BUG-LOCAL-117 (the model class diagnosis -- this is the integration that ships the fix into OTR production).
+  - BUG-LOCAL-097 (widget drift -- env-var engine selector specifically chosen to avoid widget-array reordering).
+  - BUG-LOCAL-008 (CFG=1.0 erases negative -- v2_3 path uses cfg=3.0 in GuiderParameters so negative IS active again, but only at the multimodal guider level not via stock CFGGuider).
+
+---
+
 ### BUG-LOCAL-117 [FIXED]: LTX 2B v0.9 cannot produce motion regardless of prompt rewrites -- BUG-LOCAL-112 root cause was model-class limitation, not prompt design
 - **Date:** 2026-05-06 EVENING | **Phase:** BUG-112 followup / LTX 2.3 migration | **Bible candidate:** YES (when prompt fixes hit a wall, suspect the model)
 - **Symptom:** After BUG-LOCAL-112's ~110 LOC prompt rewrite shipped (motion-centric short prompts, brief/scene_env/style suppressed, role templates dropped to ~180 chars), strength sweeps at i2v_strength [0.75, 0.50, 0.25, 0.05] all still produced effectively static clips on `ltx-video-2b-v0.9.safetensors`. The 0.25 sweep showed slight motion; everything else froze. Quantitative MAD analysis confirmed.

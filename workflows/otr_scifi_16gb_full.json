@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 59,
-  "last_link_id": 101,
+  "last_node_id": 61,
+  "last_link_id": 103,
   "nodes": [
     {
       "id": 1,
@@ -1630,11 +1630,95 @@
         "Node name for S&R": "LowVRAMCheckpointLoader"
       },
       "widgets_values": [
-        "ltx-video-2b-v0.9.safetensors"
+        "ltx-2.3-22b-dev.safetensors"
       ],
       "_meta": {
-        "title": "LowVRAM Loader (LTX 2B v0.9)"
+        "title": "Loader (LTX 2.3 22B-dev BF16)"
       }
+    },
+    {
+      "id": 60,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        3700,
+        1700
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 9075,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 87
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            102
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core"
+      },
+      "title": "LTX 2.3 distilled LoRA @ 0.5",
+      "widgets_values": [
+        "ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+        0.5
+      ]
+    },
+    {
+      "id": 61,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        3700,
+        1810
+      ],
+      "size": [
+        400,
+        82
+      ],
+      "flags": {},
+      "order": 9080,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 102
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            103
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly",
+        "cnr_id": "comfy-core"
+      },
+      "title": "LTX 2.3 distilled LoRA @ 0.2",
+      "widgets_values": [
+        "ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+        0.2
+      ]
     },
     {
       "id": 55,
@@ -1654,7 +1738,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 87
+          "link": 103
         },
         {
           "name": "clip",
@@ -1776,7 +1860,7 @@
     },
     {
       "id": 57,
-      "type": "CLIPLoader",
+      "type": "LTXAVTextEncoderLoader",
       "pos": [
         3500,
         1850
@@ -1788,7 +1872,7 @@
       "flags": {},
       "order": 9050,
       "mode": 0,
-      "title": "T5 text encoder (LTX)",
+      "title": "Gemma encoder (LTX 2.3)",
       "inputs": [],
       "outputs": [
         {
@@ -1802,11 +1886,11 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CLIPLoader"
+        "Node name for S&R": "LTXAVTextEncoderLoader"
       },
       "widgets_values": [
-        "t5xxl_fp16.safetensors",
-        "ltxv",
+        "gemma_3_12B_it_fp4_mixed.safetensors",
+        "ltx-2.3-22b-dev.safetensors",
         "default"
       ]
     },
@@ -2312,6 +2396,22 @@
     [
       87,
       54,
+      0,
+      60,
+      0,
+      "MODEL"
+    ],
+    [
+      102,
+      60,
+      0,
+      61,
+      0,
+      "MODEL"
+    ],
+    [
+      103,
+      61,
       0,
       55,
       0,
