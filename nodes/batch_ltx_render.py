@@ -841,10 +841,11 @@ class BatchLTXRender:
             log.info("[BatchLTXRender]   sigmas:   LTX_DISTILLED_SIGMAS (9 vals, 8 sampling steps)")
             log.info("[BatchLTXRender]   note:     ~1.5-2.5 min/clip; visually indistinguishable from v2_3 on OTR content")
         if end_anchor_strength > 0.0:
-            log.info("[BatchLTXRender]   loop:     END-ANCHOR ON at strength=%.2f (LTXVAddGuide frame_idx=-1)",
+            log.info("[BatchLTXRender]   loop:     END-ANCHOR ON at strength=%.2f "
+                     "(LTXVImgToVideoInplaceKJ rigid latent-replace, frame -1)",
                      end_anchor_strength)
         else:
-            log.info("[BatchLTXRender]   loop:     end-anchor OFF (set OTR_LTX_END_ANCHOR_STRENGTH=0.4 to enable)")
+            log.info("[BatchLTXRender]   loop:     end-anchor OFF (set OTR_LTX_END_ANCHOR_STRENGTH=0.7 to test rigid pin)")
         log.info("=" * 64)
         report_lines.append(
             f"BatchLTXRender: engine={engine}"
@@ -1251,36 +1252,43 @@ class BatchLTXRender:
 
                         # BUG-LOCAL-117c: optional end-frame anchor for
                         # seamless loops. When end_anchor_strength > 0,
-                        # LTXVAddGuide pins the LAST frame of the latent
-                        # back to radio_bookend (frame_idx=-1 = end of
-                        # video). Result: end-of-clip-N matches start-of-
-                        # clip-N+1 in VideoComposite -> no chunk-boundary
-                        # snap. Cond and latent both get rewritten by
-                        # AddGuide, so the local cond_pos/cond_neg/latent
-                        # vars are reassigned for the sampler call below.
+                        # use LTXVImgToVideoInplaceKJ (Kijai) for RIGID
+                        # latent replacement at frame_idx=-1.
+                        #
+                        # 2026-05-07 PM: switched FROM LTXVAddGuide TO
+                        # LTXVImgToVideoInplaceKJ per research finding.
+                        # AddGuide is the SOFT/conditioning variant (looser,
+                        # driftier). InplaceKJ does direct latent replace
+                        # (rigid). The community FLF workflows use Inplace
+                        # for actually-strict endpoints. Even at strength
+                        # 0.7, AddGuide didn't visibly close the loop on
+                        # OTR's radio scenes.
+                        #
+                        # InplaceKJ returns ONLY a modified latent (no cond
+                        # changes), so cur_cond_pos/cur_cond_neg stay tied
+                        # to the original LTXVConditioning output.
                         cur_cond_pos = cond_pos
                         cur_cond_neg = cond_neg
                         cur_latent = latent_chunk
                         if end_anchor_strength > 0.0:
                             try:
                                 _aug = _call(
-                                    "LTXVAddGuide",
-                                    positive=cond_pos,
-                                    negative=cond_neg,
+                                    "LTXVImgToVideoInplaceKJ",
                                     vae=vae,
                                     latent=latent_chunk,
-                                    image=ref_image,
-                                    frame_idx=-1,
-                                    strength=end_anchor_strength,
+                                    num_images={
+                                        "image_1": ref_image,
+                                        "index_1": -1,
+                                        "strength_1": end_anchor_strength,
+                                    },
                                 )
-                                cur_cond_pos = _aug[0]
-                                cur_cond_neg = _aug[1]
-                                cur_latent = _aug[2]
+                                cur_latent = _aug[0]
                             except Exception as _aug_exc:
                                 log.warning(
-                                    "[BatchLTXRender] LTXVAddGuide(end-anchor) "
-                                    "failed for %s chunk %d: %s -- proceeding "
-                                    "without end anchor for this chunk",
+                                    "[BatchLTXRender] LTXVImgToVideoInplaceKJ "
+                                    "(end-anchor) failed for %s chunk %d: %s "
+                                    "-- proceeding without end anchor for "
+                                    "this chunk",
                                     line_id, chunk_idx + 1, _aug_exc,
                                 )
 
