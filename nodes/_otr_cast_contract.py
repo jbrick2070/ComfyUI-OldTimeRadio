@@ -113,25 +113,62 @@ class CastContract:
 LOCKED_FILENAME = "cast_contract.locked.json"
 
 
-def lock_to_episode(contract: CastContract, episode_dir: Path) -> Path:
-    """§2: Freeze contract into the episode workspace. Immutable.
+class CastContractMismatch(RuntimeError):
+    """Raised by ``lock_to_episode`` when an existing locked contract
+    has a *different* ``cast_contract_version`` than the contract being
+    locked. The blind ``.exists()`` refusal would also break ComfyUI
+    rerun / crash-recovery flows; with the version compare we only fail
+    when the two contracts genuinely disagree.
+    """
 
-    Writes <episode_dir>/cast_contract.locked.json. Refuses to overwrite an
-    existing locked file (raises RuntimeError) -- once locked, the episode's
-    contract is final. Stamps version if the contract doesn't already have
-    one.
+
+def lock_to_episode(contract: CastContract, episode_dir: Path) -> Path:
+    """§2: Freeze contract into the episode workspace.
+
+    Writes ``<episode_dir>/cast_contract.locked.json``. The lock is
+    *content-addressed* immutable, not file-presence immutable:
+
+    - If no locked file exists yet: write it.
+    - If a locked file exists AND its ``cast_contract_version`` matches
+      the in-memory contract's version (after stamping if needed):
+      pass through silently. ComfyUI re-queues, partial regenerations,
+      and crash-recovery flows all hit this path and just confirm the
+      existing lock.
+    - If a locked file exists AND the versions differ: raise
+      ``CastContractMismatch`` -- the episode's identity has drifted,
+      that's a real failure to surface.
+
+    Stamps version on the in-memory contract if it doesn't already have
+    one. Round-robin code-review-driven fix (BUG-LOCAL-122,
+    Element 2 of the 2026-05-08 review).
     """
     episode_dir = Path(episode_dir)
     if not episode_dir.is_dir():
         raise FileNotFoundError(f"episode dir does not exist: {episode_dir}")
-    locked_path = episode_dir / LOCKED_FILENAME
-    if locked_path.exists():
-        raise RuntimeError(
-            f"cast contract already locked at {locked_path}; "
-            "refusing to overwrite (immutable per §2)"
-        )
     if not contract.version:
         contract.stamp_version()
+    locked_path = episode_dir / LOCKED_FILENAME
+    if locked_path.exists():
+        try:
+            existing = json.loads(locked_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            # A corrupt locked file is a real fault -- surface it loudly,
+            # do NOT silently overwrite.
+            raise RuntimeError(
+                f"existing locked contract at {locked_path} is unreadable "
+                f"({exc.__class__.__name__}: {exc}); refusing to overwrite"
+            ) from exc
+        existing_version = (existing or {}).get("version", "")
+        if existing_version == contract.version:
+            # Identical contract already locked -- treat as a confirmed
+            # rerun, return the existing path without rewriting.
+            return locked_path
+        raise CastContractMismatch(
+            f"cast contract already locked at {locked_path} with "
+            f"version {existing_version!r}; in-memory contract has "
+            f"version {contract.version!r}. Episode identity has drifted; "
+            "investigate before forcing a re-lock."
+        )
     locked_path.write_text(
         json.dumps(contract.to_dict(), indent=2, sort_keys=True),
         encoding="utf-8",

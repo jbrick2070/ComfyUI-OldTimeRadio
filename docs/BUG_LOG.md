@@ -5,6 +5,58 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-122 [FIXED]: lock_to_episode blind-refusal breaks ComfyUI rerun / crash recovery (caught by 2026-05-08 round-robin Element 2)
+
+- **Date:** 2026-05-08 early-AM | **Phase:** 0+ | **Bible candidate:** yes
+- **Symptom:** Original `lock_to_episode` raised `RuntimeError` whenever
+  `cast_contract.locked.json` already existed in the episode dir,
+  regardless of whether the in-memory contract matched it. ComfyUI
+  re-queues the same prompt on rerun, partial regenerations point at
+  the same `episode_dir`, and crash-recovery flows all hit this path
+  -- in every case the run hard-failed before any production work
+  resumed. ChatGPT (Element 2: 40% red) and Gemini both flagged this
+  as the load-bearing weak spot in the Element 2 review.
+- **Cause:** Refusal logic was content-blind -- a pure `.exists()`
+  check rather than a contract-version compare. The whole point of the
+  sha-8 version stamp from §1 was to *enable* this kind of
+  content-addressed comparison; the lock helper just wasn't using it.
+- **Fix:** Read-and-compare-version path. New `CastContractMismatch`
+  exception class (subclass of `RuntimeError` so existing callers that
+  catch RuntimeError still work). Logic:
+  1. Always stamp version on the in-memory contract first.
+  2. If locked file does not exist -> write it, return path.
+  3. If locked file exists and parses to a contract whose
+     `version` field equals the in-memory contract's version ->
+     pass through (return existing path, no rewrite, no raise).
+  4. If locked file exists and version differs -> raise
+     `CastContractMismatch` with both versions in the message.
+  5. If locked file exists and is unreadable / corrupt JSON ->
+     raise `RuntimeError` with the underlying exception (do NOT
+     silently overwrite a corrupt file -- that's a real fault to
+     surface).
+- **Verify:**
+  - `python -m pytest tests/test_cast_contract.py -v` -> 11/11 PASSED
+    (was 9; replaced
+    `test_lock_to_episode_writes_file_and_refuses_overwrite` with
+    `test_lock_to_episode_writes_file_and_idempotent_on_same_version`,
+    added
+    `test_lock_to_episode_raises_on_version_mismatch` and
+    `test_lock_to_episode_raises_on_corrupt_existing`).
+  - Full cast contract suite: 52/52 PASSED.
+  - LTX regression: 33/33 PASSED unchanged.
+- **Tags:** phase-0+, cast-contract, lock-to-episode, comfyui-rerun,
+  content-addressed, round-robin-catch
+- **Related:** BUG-LOCAL-120 parent Phase 0+ work; BUG-LOCAL-121
+  sibling round-robin catch in the same code-review pass; round-robin
+  transcripts at
+  `docs/2026-05-08-cast-contract-shipped-code-review__01_chatgpt.md`
+  and `__02_gemini.md`.
+- **Bible candidacy:** yes -- the lesson is *content-blind refusal
+  defeats the value of content-addressed versioning*. Whenever a
+  helper has a sha / hash / version stamp on the data structure AND a
+  "refuse to overwrite" guard, the guard MUST compare the stamps, not
+  just file presence. Otherwise the version field is decorative.
+
 ### BUG-LOCAL-121 [FIXED]: build_contract_from_director_plan KeyError on padded voice_assignments keys (caught by 2026-05-08 round-robin)
 
 - **Date:** 2026-05-08 early-AM | **Phase:** 0+ | **Bible candidate:** yes

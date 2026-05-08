@@ -8,6 +8,7 @@ import pytest
 from nodes._otr_cast_contract import (
     LOCKED_FILENAME,
     CastContract,
+    CastContractMismatch,
     CharacterEntry,
     load_locked,
     lock_to_episode,
@@ -69,7 +70,10 @@ def test_to_dict_from_dict_roundtrip():
     assert b.characters[0].aliases == ["MONTGOMERY"]
 
 
-def test_lock_to_episode_writes_file_and_refuses_overwrite(tmp_path: Path):
+def test_lock_to_episode_writes_file_and_idempotent_on_same_version(tmp_path: Path):
+    """First call writes; second call with identical contract passes
+    through silently (BUG-LOCAL-122 read-and-compare-version upgrade).
+    """
     episode_dir = tmp_path / "ep_test"
     episode_dir.mkdir()
     contract = CastContract(
@@ -78,7 +82,35 @@ def test_lock_to_episode_writes_file_and_refuses_overwrite(tmp_path: Path):
     locked_path = lock_to_episode(contract, episode_dir)
     assert locked_path == episode_dir / LOCKED_FILENAME
     assert locked_path.is_file()
-    with pytest.raises(RuntimeError, match="already locked"):
+    # Second call with same contract -- pass through, NOT raise.
+    locked_path_again = lock_to_episode(contract, episode_dir)
+    assert locked_path_again == locked_path
+
+
+def test_lock_to_episode_raises_on_version_mismatch(tmp_path: Path):
+    """Different contract on the same episode dir is a real failure."""
+    episode_dir = tmp_path / "ep_test"
+    episode_dir.mkdir()
+    contract_a = CastContract(
+        characters=[CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")]
+    )
+    contract_b = CastContract(
+        characters=[CharacterEntry("c01", "AEGEUS", [], "bark:v2/en_speaker_5")]
+    )
+    lock_to_episode(contract_a, episode_dir)
+    with pytest.raises(CastContractMismatch, match="drifted"):
+        lock_to_episode(contract_b, episode_dir)
+
+
+def test_lock_to_episode_raises_on_corrupt_existing(tmp_path: Path):
+    """A corrupt locked file is a hard fault, not a silent overwrite."""
+    episode_dir = tmp_path / "ep_test"
+    episode_dir.mkdir()
+    (episode_dir / LOCKED_FILENAME).write_text("{not json", encoding="utf-8")
+    contract = CastContract(
+        characters=[CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")]
+    )
+    with pytest.raises(RuntimeError, match="unreadable"):
         lock_to_episode(contract, episode_dir)
 
 
