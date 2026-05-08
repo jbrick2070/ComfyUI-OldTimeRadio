@@ -5,6 +5,97 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-130 [FIXED]: Node 25 (OTR_SaveToEpisodeWorkspace) wired to UnloadAll passthrough instead of BatchFluxRender env stills (caught by 2026-05-08 JSON QA round-robin)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Node 25 (`OTR_SaveToEpisodeWorkspace`,
+  `widgets_values=["stills","full_env"]`) was supposed to write
+  the BatchFluxRender environment-stills batch to disk under
+  `stills/full_env_*.png`. Instead, it received its IMAGE input
+  from Node 24 (`OTR_UnloadAll`), which is a passthrough whose
+  IMAGE was the portrait_batch from Node 59 (`OTR_PortraitRender`).
+  Net effect: every "environment still" file written to disk was
+  actually a portrait tensor, and the real env stills produced by
+  Node 23 had no on-disk save path.
+- **Cause:** Link routing in `workflows/otr_scifi_16gb_full.json`:
+  - Node 23 (BatchFluxRender) outputs[0].links = [101]
+    (only fed Node 59 PortraitRender, never Node 25)
+  - Node 24 (UnloadAll) outputs[0].links = [46, 83]
+    (link 46 fed Node 25; link 83 correctly fed Node 51 HuMo)
+  - Node 25 inputs[0].link = 46 (the wrong source)
+- **Fix:** JSON-only link patch (no Python change):
+  - Add new link 104: Node 23 → Node 25 (IMAGE)
+  - Remove link 46: Node 24 → Node 25
+  - Update Node 23 outputs[0].links: [101] -> [101, 104]
+  - Update Node 24 outputs[0].links: [46, 83] -> [83]
+  - Update Node 25 inputs[0].link: 46 -> 104
+  - Bump last_link_id: 103 -> 104
+- **Verify:** ComfyUI loads the workflow without dangling-link
+  warnings. Manual node-25 inspection in canvas shows
+  `images <- Node 23` after reload. Run 1 of the staged validation
+  produces `stills/full_env_*.png` files on disk that match the
+  Node 23 environment renders, NOT portraits.
+- **Tags:** workflow-json, link-routing, save-to-disk, portrait-vs-env
+- **Bible candidacy:** yes -- the lesson is *passthrough nodes
+  carry their input forward, not their type*. `OTR_UnloadAll`'s
+  IMAGE output is whatever IMAGE its caller fed in, NOT a
+  topologically-correct branch of the graph. Whenever a save-to-
+  disk node sits downstream of a passthrough, verify the IMAGE
+  source by walking the link graph back to its true producer.
+
+### BUG-LOCAL-129 [FIXED]: BatchLTXRender silently routes to v0_9 sampler chain when production JSON loads v2.3 checkpoint (caught by 2026-05-08 JSON QA round-robin)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `OTR_LTX_ENGINE_DEFAULT = "v0_9"` in
+  `nodes/batch_ltx_render.py`, but the production workflow loads
+  `ltx-2.3-22b-dev.safetensors` (v2.3 family) + the Gemma 3 12B
+  encoder (v2.3-path-only). With the env var unset, the node
+  routes to the v0_9 sampler chain (CFGGuider + euler_cfg_pp +
+  VAEDecodeTiled) and hands packed v2.3 latents to a v0_9-shape
+  decoder. Result: tensor shape mismatch crash deep in the sampler
+  call OR garbage output that looks like noise.
+- **Cause:** Two separate failure modes overlapping:
+  1. The default engine ('v0_9') is the smoke-test fast path; the
+     production JSON expects 'v2_3'. The mismatch is silent because
+     the env var is the only signal connecting them.
+  2. The existing fail-fast dep check at line 1009 is asymmetric --
+     it validates RES4LYF/LTXVideo deps when engine='v2_3' but does
+     NOT validate the loaded checkpoint family when engine='v0_9'.
+- **Fix:** Two-part defense in `nodes/batch_ltx_render.py`:
+  1. **Loud env-var-unset warning at engine resolve.** When
+     `OTR_LTX_ENGINE` is not set in the environment, log a
+     prominent WARNING explaining the production workflow is rigged
+     for v2.3 and pointing the user at the env var fix. Doesn't
+     change behavior; makes the silent failure mode visible.
+  2. **Symmetric defensive guard.** Check `_otr_ckpt_name`
+     (a forward-compat attribute that future loaders can stamp)
+     against the resolved engine. Raise RuntimeError on mismatch
+     in EITHER direction (v0_9 with 22B checkpoint OR v2_3 with
+     2B v0.9 checkpoint). Today this is forward-compat -- stock
+     CheckpointLoaderSimple doesn't stamp the name, so the guard
+     is a no-op and falls back to the warning. When a future
+     LowVRAMCheckpointLoader stamps it, the guard activates
+     automatically.
+  3. **Operational fix (NOT in this commit):** Jeffrey sets
+     `OTR_LTX_ENGINE=v2_3` in his launch environment (HKCU\\Environment
+     for Windows User scope, or in a launcher .cmd if he uses one).
+     Required before the next 6-line validation soak.
+- **Verify:** AST parse clean. Existing LTX regression 33/33 still
+  passes (the new guard only raises when `_otr_ckpt_name` is
+  actually stamped; in the test environment it isn't, so the
+  guard's `try` block exits via the broad-except fall-through).
+  Live verification deferred to the validation soak with the
+  env var set.
+- **Tags:** ltx, engine-selector, env-var, checkpoint-mismatch,
+  defensive-guard
+- **Bible candidacy:** yes -- the lesson is *engine selectors
+  controlled by env vars are silent by default; production
+  workflows that depend on a non-default value need a loud
+  reminder + a defensive guard, OR the default needs to flip*.
+  The "fail-fast on missing dep" pattern in the same file
+  (line 1009) was already half the answer; this commit completes
+  the symmetry.
+
 ### BUG-LOCAL-128 [FIXED]: HuMo soak cap counter conflates resumed + fresh; cap fires after 1 fresh render on resume (caught by 2026-05-08 external round-robin synthesis Item A)
 
 - **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes

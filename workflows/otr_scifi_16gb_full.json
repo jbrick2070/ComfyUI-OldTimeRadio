@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 61,
-  "last_link_id": 103,
+  "last_link_id": 104,
   "nodes": [
     {
       "id": 1,
@@ -926,7 +926,8 @@
           "name": "images",
           "type": "IMAGE",
           "links": [
-            101
+            101,
+            104
           ],
           "shape": 3,
           "slot_index": 0
@@ -992,7 +993,6 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            46,
             83
           ],
           "shape": 3,
@@ -1027,7 +1027,7 @@
         {
           "name": "images",
           "type": "IMAGE",
-          "link": 46
+          "link": 104
         }
       ],
       "outputs": [],
@@ -2267,14 +2267,6 @@
       "IMAGE"
     ],
     [
-      46,
-      24,
-      0,
-      25,
-      0,
-      "IMAGE"
-    ],
-    [
       47,
       12,
       0,
@@ -2520,6 +2512,14 @@
       0,
       59,
       4,
+      "IMAGE"
+    ],
+    [
+      104,
+      23,
+      0,
+      25,
+      0,
       "IMAGE"
     ]
   ],

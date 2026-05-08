@@ -910,9 +910,16 @@ class BatchLTXRender:
         # ----------------------------------------------------------------
         # BUG-LOCAL-117: engine selector + dep check + loud banner
         # ----------------------------------------------------------------
-        engine = os.environ.get(
-            "OTR_LTX_ENGINE", OTR_LTX_ENGINE_DEFAULT
-        ).strip().lower()
+        # 2026-05-08 round-robin Item 3.2 catch: the production
+        # workflow JSON loads `ltx-2.3-22b-dev.safetensors` + the
+        # Gemma 3 12B encoder, both v2.3-path artifacts. But this
+        # node defaults to v0_9 (the smoke-test path) when the env
+        # var is unset. The two paths have different sampler chains,
+        # different VAE wiring, and different latent shapes -- silent
+        # mismatch produces garbage output OR a deep-stack tensor
+        # shape error, not a clean failure.
+        env_engine_raw = os.environ.get("OTR_LTX_ENGINE")
+        engine = (env_engine_raw or OTR_LTX_ENGINE_DEFAULT).strip().lower()
         if engine not in ("v0_9", "v2_3"):
             log.warning(
                 "[BatchLTXRender] BUG-LOCAL-117: unknown OTR_LTX_ENGINE=%r; "
@@ -920,6 +927,69 @@ class BatchLTXRender:
                 engine, OTR_LTX_ENGINE_DEFAULT,
             )
             engine = OTR_LTX_ENGINE_DEFAULT
+        if env_engine_raw is None:
+            # Highly visible warning so the operational env-var
+            # fix gets a reminder at every soak. Without this, a
+            # user running production for the first time gets the
+            # silent v0_9-vs-v2.3 mismatch with no signal.
+            log.warning(
+                "[BatchLTXRender] BUG-LOCAL-117 / 2026-05-08 round-robin: "
+                "OTR_LTX_ENGINE env var is UNSET; defaulting to %r. "
+                "The production workflow JSON is rigged for v2.3 (22B "
+                "checkpoint + Gemma encoder). If the loaded checkpoint "
+                "is the LTX 2.3 22B file, set OTR_LTX_ENGINE=v2_3 in "
+                "your launch environment OR Windows User env vars "
+                "(HKCU\\Environment) before queueing. Smoke-test runs "
+                "on the LTX 2B v0.9 checkpoint can leave it unset.",
+                OTR_LTX_ENGINE_DEFAULT,
+            )
+
+        # 2026-05-08 round-robin Item 3.2 defensive guard: if a future
+        # checkpoint loader stamps `_otr_ckpt_name` on the model
+        # object, fail FAST when the resolved engine doesn't match the
+        # checkpoint family. Today this is forward-compat -- the stock
+        # CheckpointLoaderSimple doesn't stamp this attribute, so the
+        # guard is a no-op and degrades to the env-var warning above.
+        # Wired so a later `LowVRAMCheckpointLoader` patch can add the
+        # stamp and have this guard activate without further changes.
+        try:
+            ckpt_name = getattr(model, "_otr_ckpt_name", "") or ""
+            ckpt_lower = str(ckpt_name).lower()
+            if engine == "v0_9" and ckpt_lower:
+                if "ltx-2.3" in ckpt_lower or "22b" in ckpt_lower:
+                    raise RuntimeError(
+                        f"BatchLTXRender engine/checkpoint mismatch: "
+                        f"OTR_LTX_ENGINE=v0_9 (default if unset) but a "
+                        f"v2.3-family checkpoint was loaded "
+                        f"({ckpt_name!r}). Either set "
+                        f"OTR_LTX_ENGINE=v2_3 in the launch environment "
+                        f"OR swap Node 54's checkpoint widget back to "
+                        f"the LTX 2B v0.9 file. The two engines have "
+                        f"incompatible sampler / VAE / latent-shape "
+                        f"contracts; running them mismatched produces "
+                        f"garbage output or a tensor shape crash."
+                    )
+            if engine == "v2_3" and ckpt_lower:
+                if (
+                    "ltx-2-0.9.safetensors" in ckpt_lower
+                    or ckpt_lower.endswith("/ltx-video-2b-v0.9.safetensors")
+                    or "ltx-video-2b-v0.9" in ckpt_lower
+                ):
+                    raise RuntimeError(
+                        f"BatchLTXRender engine/checkpoint mismatch: "
+                        f"OTR_LTX_ENGINE=v2_3 but the LTX 2B v0.9 "
+                        f"checkpoint was loaded ({ckpt_name!r}). "
+                        f"Either unset OTR_LTX_ENGINE OR swap Node 54 "
+                        f"to the v2.3 22B file."
+                    )
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001 -- guard is defensive only
+            # Any failure inside the guard (missing attribute, model
+            # is a non-standard wrapper, etc.) means the guard can't
+            # validate -- fall through silently rather than escalating
+            # the recovery into a fault.
+            pass
 
         # BUG-LOCAL-117c: end-frame anchor strength for seamless loops.
         # Default 0.0 = off (no behavior change). Set to 0.4 to test
