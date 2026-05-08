@@ -5,7 +5,7 @@ Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-126 [OPEN]: HuMo soak terminates mid-episode with `Fatal Python error: Aborted` after recovered OOM cycles fragment the CUDA pool
+### BUG-LOCAL-126 [FIXED-PENDING-LIVE-VERIFY]: HuMo soak terminates mid-episode with `Fatal Python error: Aborted` after recovered OOM cycles fragment the CUDA pool
 
 - **Date:** 2026-05-08 morning (post-mortem of the
   `signal_lost_signal_from_the_red_dust_20260507_221546` run)
@@ -44,20 +44,65 @@ Entries are never deleted.
   path that handled the earlier caught OOMs. The abort came from
   inside the C extensions (PyTorch's CUDA allocator), so no Python
   try/except could intercept it.
-- **Fix:** PENDING. Per `feedback_no_vram_dragons`, this is NOT a
-  weight-streaming or quantization-chasing problem. Likely paths:
-  1. Hard-reset the CUDA context after every caught HuMo OOM
-     (`torch.cuda.empty_cache()` is insufficient; need
-     `torch.cuda.synchronize() + ipc_collect() + manual reload of
-     the diffusion patches`).
-  2. Cap soak length at N HuMo lines per ComfyUI process and
-     restart between batches.
-  3. Investigate whether SageAttention vs SDPA path on Blackwell
-     leaks during the caught-OOM unwind (BUG-LOCAL-050 chained-
-     teardown pattern is a related precedent).
-  Round-robin on the actual fix when Jeffrey is ready.
-- **Verify (when fix lands):** Soak that produces ≥3 caught HuMo
-  OOMs consecutively without aborting the ComfyUI process.
+- **Fix (commit pending; live-verify on next soak):** Implemented the
+  alarm-plumbing carve-out per Jeffrey's directive ("if things are
+  crashing the workflow we do kinda have to chase it" -- 2026-05-08
+  morning). Two parts in `nodes/batch_humo_render.py`:
+
+  1. **Hard CUDA reset after caught OOM.** Module-top helpers
+     `_is_oom_exception(exc)` and `_hard_reset_cuda_context()` plus
+     a new `cuda_hard_reset_on_oom` BOOLEAN INPUT_TYPES widget
+     (default ON). On a caught OOM in the per-line render loop, the
+     except path calls the helper which runs:
+     `mm.unload_all_models() -> gc.collect() ->
+     mm.soft_empty_cache(force=True) -> torch.cuda.synchronize() ->
+     torch.cuda.empty_cache() -> torch.cuda.ipc_collect()`. Every
+     step is best-effort; missing API on an older torch / Comfy
+     combo is logged as a partial (NOT a re-raise -- recovery code
+     can't escalate the fault).
+
+  2. **Per-process HuMo soak cap.** New
+     `humo_max_lines_per_process` INT INPUT_TYPES widget
+     (default 0 = disabled). When > 0, after each successful HuMo
+     line the loop checks `rendered >= cap`; if reached, persists
+     the ledger via the existing per-clip incremental save path,
+     then raises `HumoSoakCapReached(lines_completed, cap)` -- a
+     structured `RuntimeError` subclass that distinguishes
+     soft-stop-by-design from random fault. Pairs with
+     `resume_from_ledger=True` so a follow-up ComfyUI run picks
+     up where the cap fired. Empirical recommendation in the
+     widget tooltip: 6-8 on the RTX 5080 16 GB while the underlying
+     allocator drift is investigated; the overnight 2026-05-07 soak
+     survived 9 lines before fatal-aborting.
+
+  Plus alarm visibility: added `"Fatal Python error: Aborted"` to
+  `scripts/audit_otr_full_run.py` `FAIL_PATTERNS` so the watcher /
+  auditor surfaces this hard-abort signal instead of reporting
+  PASS on a quiet-but-aborted dir.
+
+- **Verify (unit):**
+  - `python -m pytest tests/test_humo_oom_recovery.py -v` -> 9/9
+    PASSED. Tests cover: `_is_oom_exception` matches both
+    `torch.OutOfMemoryError` and the legacy `RuntimeError("...out
+    of memory...")` form (case-insensitive); `HumoSoakCapReached`
+    carries `lines_completed` and `cap` attributes and is a
+    `RuntimeError` subclass; `_hard_reset_cuda_context()` does
+    not raise even when torch / mm aren't available; the audit
+    script's FAIL_PATTERNS includes the
+    `"Fatal Python error: Aborted"` literal.
+  - LTX regression: 33/33 unchanged.
+  - Full Phase 0+ suite: 113/113 unchanged.
+
+- **Verify (live, pending):** Next FULL acceptance soak with
+  `humo_max_lines_per_process=6` and `cuda_hard_reset_on_oom=True`.
+  Expected: either (a) soak runs 6 lines clean and raises
+  HumoSoakCapReached, ledger persisted; or (b) a caught OOM
+  triggers the hard-reset and the next line renders. Either path
+  is success. Failure mode to watch: a third
+  `Fatal Python error: Aborted` despite the reset being run --
+  that escalates the fix to BUG-LOCAL-050-style chained-teardown
+  investigation (Wan2.1-14B + Whisper + umt5_xxl model patches not
+  releasing PCIe state on unload).
 - **Tags:** vram, humo, cuda-abort, soak-termination, pool-
   fragmentation, BUG-050-relative, fatal-python-error
 - **Related:** BUG-LOCAL-050 (chained backend teardown -- same

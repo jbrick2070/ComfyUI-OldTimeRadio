@@ -58,6 +58,13 @@ FAIL_PATTERNS = (
     # Per-clip exception path inside BatchLTXRender; catches everything
     # the boomerang grep misses.
     re.compile(r"\[BatchLTXRender\] \w+ failed:"),
+    # BUG-LOCAL-126 (2026-05-08): C-level CUDA abort during HuMo sampling
+    # after recovered OOMs fragment the allocator pool. Process dies with
+    # `Fatal Python error: Aborted` and no Python try/except can catch it.
+    # The watcher / auditor must surface this signal; otherwise an
+    # incomplete soak (9 of 56 lines on the overnight run) gets reported
+    # as PASS just because the dir went quiet.
+    "Fatal Python error: Aborted",
 )
 
 

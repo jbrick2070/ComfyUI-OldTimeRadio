@@ -79,6 +79,151 @@ log = logging.getLogger("OTR.batch_humo_render")
 _MIN_RADIO_STILL_BYTES = 256  # smaller than this is almost certainly truncated
 
 
+# BUG-LOCAL-126 (2026-05-08): the overnight FULL acceptance soak crashed
+# with `Fatal Python error: Aborted` after two prior CAUGHT HuMo OOMs.
+# The PyTorch CUDA allocator pool drifted to ~24.5 GiB on a 15.92 GiB
+# device after the recovery cycles -- pool fragmentation accumulating
+# faster than `empty_cache()` could reclaim. The two helpers below are
+# the alarm-plumbing fix (per `feedback_no_vram_dragons`'s carve-out --
+# this is a soak-survival fault, not a chase-the-dragon optimization).
+
+
+def _is_oom_exception(exc: BaseException) -> bool:
+    """True if ``exc`` is a CUDA out-of-memory error in any of its
+    common Pythonic forms.
+
+    PyTorch raises ``torch.OutOfMemoryError`` (subclass of
+    ``RuntimeError``) on modern versions; older / forked builds still
+    raise plain ``RuntimeError`` with ``"out of memory"`` in the
+    message. Both forms are observed in OTR's overnight log.
+    """
+    try:
+        import torch  # type: ignore
+        oom_cls = getattr(torch, "OutOfMemoryError", None) or getattr(
+            getattr(torch, "cuda", None), "OutOfMemoryError", None
+        )
+    except Exception:  # noqa: BLE001
+        oom_cls = None
+    if oom_cls is not None and isinstance(exc, oom_cls):
+        return True
+    if isinstance(exc, RuntimeError):
+        msg = str(exc).lower()
+        if "out of memory" in msg or "outofmemoryerror" in msg:
+            return True
+    return False
+
+
+def _hard_reset_cuda_context() -> None:
+    """Aggressive CUDA cleanup after a CAUGHT OOM.
+
+    `torch.cuda.empty_cache()` alone leaves PyTorch's allocator-block
+    metadata in a degraded state across recovery cycles; the live
+    overnight soak observed this as the pool drifting from ~14 GiB
+    in-use to ~24 GiB allocated on a 15.92 GiB device. The order
+    below mirrors BUG-LOCAL-050's chained-backend teardown pattern
+    (release_pipe + remove_all_hooks + empty_cache + ipc_collect)
+    plus a ComfyUI-specific `unload_all_models()` call so the
+    Wan2.1-14B + Whisper + umt5_xxl patches get evicted from VRAM,
+    not just unreferenced from Python.
+
+    Best-effort: every step is wrapped so a missing API on an older
+    torch/Comfy combo doesn't escalate the recovery into a second
+    crash. Logs at INFO (success) / WARNING (any step skipped) so
+    BUG-126 telemetry is greppable.
+    """
+    import gc
+
+    steps_run: list[str] = []
+    steps_failed: list[str] = []
+
+    try:
+        import comfy.model_management as mm  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"import comfy.model_management ({exc})")
+        mm = None  # type: ignore[assignment]
+
+    try:
+        import torch  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"import torch ({exc})")
+        log.warning("[BatchHumoRender] cuda hard-reset SKIPPED: %s", "; ".join(steps_failed))
+        return
+
+    if mm is not None:
+        try:
+            mm.unload_all_models()
+            steps_run.append("unload_all_models")
+        except Exception as exc:  # noqa: BLE001
+            steps_failed.append(f"unload_all_models ({exc})")
+
+    try:
+        gc.collect()
+        steps_run.append("gc.collect")
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"gc.collect ({exc})")
+
+    if mm is not None:
+        try:
+            mm.soft_empty_cache(force=True)
+            steps_run.append("mm.soft_empty_cache")
+        except Exception as exc:  # noqa: BLE001
+            steps_failed.append(f"mm.soft_empty_cache ({exc})")
+
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            steps_run.append("torch.cuda.synchronize")
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"torch.cuda.synchronize ({exc})")
+
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            steps_run.append("torch.cuda.empty_cache")
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"torch.cuda.empty_cache ({exc})")
+
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.ipc_collect()
+            steps_run.append("torch.cuda.ipc_collect")
+    except Exception as exc:  # noqa: BLE001
+        steps_failed.append(f"torch.cuda.ipc_collect ({exc})")
+
+    if steps_failed:
+        log.warning(
+            "[BatchHumoRender] cuda hard-reset partial: ran=%s; failed=%s",
+            steps_run, steps_failed,
+        )
+    else:
+        log.info(
+            "[BatchHumoRender] BUG-LOCAL-126 cuda hard-reset OK: %s",
+            ", ".join(steps_run),
+        )
+
+
+class HumoSoakCapReached(RuntimeError):
+    """Raised by the soak loop when ``humo_max_lines_per_process`` is
+    set and that many HuMo lines have rendered successfully in the
+    current ComfyUI process.
+
+    Catching this in a workflow / orchestrator lets the caller
+    cleanly stop, persist the ledger, and queue a follow-up run
+    that picks up via ``resume_from_ledger=True``. The structured
+    type makes it distinguishable from generic RuntimeError so a
+    higher-level loop knows the run is incomplete-by-design rather
+    than incomplete-by-fault.
+    """
+
+    def __init__(self, lines_completed: int, cap: int):
+        self.lines_completed = lines_completed
+        self.cap = cap
+        super().__init__(
+            f"HuMo soak cap reached: rendered {lines_completed} of cap {cap}; "
+            "queue a follow-up run with resume_from_ledger=True to continue."
+        )
+
+
 def _is_valid_image_file(p: Path) -> bool:
     """``p`` exists, is a file, and has plausible byte size for a PNG.
 
@@ -1155,6 +1300,41 @@ class BatchHumoRender:
                         "would have a stale pad)."
                     ),
                 }),
+                "humo_max_lines_per_process": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 200,
+                    "tooltip": (
+                        "BUG-LOCAL-126 soak cap. If > 0, halt the HuMo "
+                        "render loop after this many lines complete in "
+                        "the current ComfyUI process and raise "
+                        "HumoSoakCapReached. Pairs with "
+                        "resume_from_ledger=True so a follow-up run picks "
+                        "up where this one stopped. Set to 0 to disable "
+                        "the cap. Empirical floor on the RTX 5080 16 GB: "
+                        "the overnight 2026-05-07 soak survived 9 lines "
+                        "before the CUDA pool fragmented to a fatal "
+                        "abort; 6-8 is a safe per-process budget for "
+                        "now while the underlying allocator drift is "
+                        "investigated."
+                    ),
+                }),
+                "cuda_hard_reset_on_oom": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "BUG-LOCAL-126 alarm-plumbing. After a caught "
+                        "HuMo OOM, run a hard CUDA reset "
+                        "(unload_all_models + gc.collect + "
+                        "soft_empty_cache + cuda.synchronize + "
+                        "empty_cache + ipc_collect) before the next "
+                        "line. Without this, two OOM cycles caused the "
+                        "PyTorch pool to drift from ~14 GiB in-use to "
+                        "~24 GiB allocated on a 15.92 GiB device, then "
+                        "fatal-abort the third sample. Leave ON unless "
+                        "you have a specific reason to keep allocator "
+                        "state across an OOM."
+                    ),
+                }),
             },
         }
 
@@ -1176,6 +1356,8 @@ class BatchHumoRender:
         humo_warmup_pad_ms: int = 200,  # BUG-LOCAL-102: see INPUT_TYPES tooltip
         min_speech_rms_db: float = -28.0,  # BUG-LOCAL-031 audio-silent-skip gate (helper present but loop wiring deferred -- see investigation note)
         resume_from_ledger: bool = True,  # 2026-04-29: see INPUT_TYPES tooltip
+        humo_max_lines_per_process: int = 0,  # BUG-LOCAL-126 soak cap; 0 = disabled
+        cuda_hard_reset_on_oom: bool = True,  # BUG-LOCAL-126 alarm-plumbing
     ):
         t_start = time.time()
         # BUG-LOCAL-086: flux_done_gate is intentionally not consumed.
@@ -2061,6 +2243,38 @@ class BatchHumoRender:
                     log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
                 rendered += 1
 
+                # BUG-LOCAL-126 soak cap. Save the ledger first so the
+                # follow-up resume picks up cleanly, then raise the
+                # structured signal. Cap == 0 disables this branch.
+                if humo_max_lines_per_process > 0 and rendered >= humo_max_lines_per_process:
+                    if ledger_path is not None:
+                        try:
+                            try:
+                                from . import _otr_ledger as _OTRL_CAP  # type: ignore
+                            except ImportError:
+                                _NODES_DIR_CAP = Path(__file__).resolve().parent
+                                if str(_NODES_DIR_CAP) not in _sys.path:
+                                    _sys.path.insert(0, str(_NODES_DIR_CAP))
+                                import _otr_ledger as _OTRL_CAP  # type: ignore
+                            ledger["clips"] = list(clip_records)
+                            _OTRL_CAP.save_ledger_safe(ledger_path, ledger)
+                        except Exception as _cap_save_exc:  # noqa: BLE001
+                            log.warning(
+                                "[BatchHumoRender] BUG-LOCAL-126 cap-reached "
+                                "ledger save failed (non-fatal): %s",
+                                _cap_save_exc,
+                            )
+                    log.warning(
+                        "[BatchHumoRender] BUG-LOCAL-126 soak cap reached "
+                        "(%d of cap %d); ledger persisted; "
+                        "queue follow-up with resume_from_ledger=True",
+                        rendered, humo_max_lines_per_process,
+                    )
+                    raise HumoSoakCapReached(
+                        lines_completed=rendered,
+                        cap=humo_max_lines_per_process,
+                    )
+
                 # 2026-04-29: per-clip incremental ledger save. Each HuMo
                 # clip takes ~9-10 min on Blackwell; without per-clip
                 # persistence a crash on clip 20 of 33 wipes ~3 hours of
@@ -2088,9 +2302,25 @@ class BatchHumoRender:
                             "(non-fatal, render continues): %s",
                             _inc_exc,
                         )
+            except HumoSoakCapReached:
+                # Pass through: the cap raise is structured by design
+                # so the orchestrator can distinguish soft-stop from
+                # fault. Don't swallow it here.
+                raise
             except Exception as exc:
                 log.exception("[BatchHumoRender] line %s failed: %s", line_id, exc)
                 report_lines.append(f"  {line_id}: FAILED ({exc})")
+                # BUG-LOCAL-126: hard-reset the CUDA context after a
+                # caught OOM so the allocator pool doesn't fragment
+                # into a fatal abort on the NEXT sample. Cheap on
+                # non-OOM paths (skipped) so always-on is fine.
+                if cuda_hard_reset_on_oom and _is_oom_exception(exc):
+                    log.warning(
+                        "[BatchHumoRender] line %s hit OOM; running "
+                        "BUG-LOCAL-126 cuda hard-reset before next line",
+                        line_id,
+                    )
+                    _hard_reset_cuda_context()
 
         total_ms = int((time.time() - t_start) * 1000)
         report_lines.append(
