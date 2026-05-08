@@ -114,22 +114,45 @@ def _is_oom_exception(exc: BaseException) -> bool:
 
 
 def _hard_reset_cuda_context() -> None:
-    """Aggressive CUDA cleanup after a CAUGHT OOM.
+    """Soft CUDA cleanup chain after a CAUGHT OOM.
 
-    `torch.cuda.empty_cache()` alone leaves PyTorch's allocator-block
-    metadata in a degraded state across recovery cycles; the live
-    overnight soak observed this as the pool drifting from ~14 GiB
-    in-use to ~24 GiB allocated on a 15.92 GiB device. The order
-    below mirrors BUG-LOCAL-050's chained-backend teardown pattern
-    (release_pipe + remove_all_hooks + empty_cache + ipc_collect)
-    plus a ComfyUI-specific `unload_all_models()` call so the
-    Wan2.1-14B + Whisper + umt5_xxl patches get evicted from VRAM,
-    not just unreferenced from Python.
+    NOTE: the name says "hard reset" but this is a *soft* cleanup
+    chain, not a true CUDA context destroy/recreate (which would
+    require `cudaDeviceReset` and a full re-init of every torch
+    handle, including model weights -- not feasible mid-run).
+    The 2026-05-08 round-robin code review correctly flagged the
+    naming as overstated; kept the name to avoid churn across
+    BUG_LOG / log strings, but the docstring is the source of
+    truth.
+
+    What this DOES do: chains
+        mm.unload_all_models()
+        gc.collect()
+        mm.soft_empty_cache(force=True)
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()  -- no-op on Windows; harmless
+    in that order, so the model patches release VRAM FIRST and
+    the allocator's free-block coalesce runs against actually-free
+    pages. Mirrors BUG-LOCAL-050's chained-backend teardown pattern.
+
+    What this does NOT do: drop the PyTorch CUDA context, force
+    the kernel to release VA mappings, or reset the GPU driver.
+    If the underlying allocator drift is caused by retained
+    references that live beyond the model patcher (custom node
+    globals, tracebacks, weakly-rooted modules), this chain runs
+    OK but VRAM stays high. The 2026-05-08 round-robin Element 2
+    flagged this honestly.
 
     Best-effort: every step is wrapped so a missing API on an older
     torch/Comfy combo doesn't escalate the recovery into a second
     crash. Logs at INFO (success) / WARNING (any step skipped) so
     BUG-126 telemetry is greppable.
+
+    MUST be called from OUTSIDE the active `except` block per the
+    Element 3 traceback-retention catch -- otherwise the failed
+    frame's f_locals are still pinned by `exc.__traceback__` and
+    gc.collect can't clear them.
     """
     import gc
 
@@ -2310,17 +2333,34 @@ class BatchHumoRender:
             except Exception as exc:
                 log.exception("[BatchHumoRender] line %s failed: %s", line_id, exc)
                 report_lines.append(f"  {line_id}: FAILED ({exc})")
-                # BUG-LOCAL-126: hard-reset the CUDA context after a
-                # caught OOM so the allocator pool doesn't fragment
-                # into a fatal abort on the NEXT sample. Cheap on
-                # non-OOM paths (skipped) so always-on is fine.
-                if cuda_hard_reset_on_oom and _is_oom_exception(exc):
-                    log.warning(
-                        "[BatchHumoRender] line %s hit OOM; running "
-                        "BUG-LOCAL-126 cuda hard-reset before next line",
-                        line_id,
-                    )
-                    _hard_reset_cuda_context()
+                # BUG-LOCAL-126 round-robin catch (2026-05-08): set a
+                # flag here, but DEFER the actual cleanup until AFTER
+                # the except block exits. Reason: inside the except
+                # block, `exc.__traceback__` keeps the failed frame's
+                # f_locals alive (humo_pos, humo_neg, humo_latent,
+                # samples, etc.). gc.collect() sees them as live
+                # roots, so empty_cache() can't reclaim. Once the
+                # except block exits Python auto-deletes `exc` and
+                # the traceback chain becomes collectable.
+                _needs_oom_cleanup = (
+                    cuda_hard_reset_on_oom and _is_oom_exception(exc)
+                )
+                _failed_line_id = line_id
+            else:
+                _needs_oom_cleanup = False
+                _failed_line_id = None
+
+            # Run the cleanup OUT OF the except block so the active
+            # exception's traceback (and its frame locals) is released
+            # first. Without this, the chain runs while the failed
+            # line's tensors are still live -> no memory recovered.
+            if _needs_oom_cleanup:
+                log.warning(
+                    "[BatchHumoRender] line %s hit OOM; running "
+                    "BUG-LOCAL-126 cuda cleanup chain before next line",
+                    _failed_line_id,
+                )
+                _hard_reset_cuda_context()
 
         total_ms = int((time.time() - t_start) * 1000)
         report_lines.append(

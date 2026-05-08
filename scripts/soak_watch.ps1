@@ -2,9 +2,17 @@
 #
 # Polls the OTR FULL acceptance soak's episode dir; when it goes quiet
 # (no new files for QUIET_MINUTES) runs audit_otr_full_run.py against
-# the most recent comfyui_8000.log entries, then writes a summary to
+# the most recent ComfyUI log, then writes a summary to
 # `outputs/soak_status.txt` so Jeffrey can read the verdict first thing
 # in the morning.
+#
+# 2026-05-08 round-robin Element 5 fix: the log path is now resolved
+# dynamically. ComfyUI Desktop App writes to %APPDATA%\ComfyUI\logs\
+# not the legacy C:\Users\jeffr\Documents\ComfyUI\comfyui_<port>.log
+# location. The watcher checks the Desktop path FIRST, then falls
+# back to the legacy path so manual-launch users still work. Without
+# this fix the watcher's audit ran without a log argument, so the
+# `Fatal Python error: Aborted` FAIL_PATTERN never matched.
 #
 # Idempotent: safe to launch as a Scheduled Task or just run from a
 # PowerShell window. Loops until the audit fires once OR the user
@@ -35,7 +43,28 @@ $ErrorActionPreference = 'Continue'
 $RepoRoot = 'C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio'
 $Python   = 'C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe'
 $AuditScript = Join-Path $RepoRoot 'scripts\audit_otr_full_run.py'
-$ComfyLog = 'C:\Users\jeffr\Documents\ComfyUI\comfyui_8000.log'
+
+# Resolve the active ComfyUI log dynamically. Desktop App (the actual
+# 2026-05-08 install) writes to %APPDATA%\ComfyUI\logs\comfyui.log;
+# manual-launch users still drop comfyui_<port>.log under the OTR
+# Documents tree. Pick whichever exists AND was most recently
+# written to.
+$LogCandidates = @(
+    (Join-Path $env:APPDATA 'ComfyUI\logs\comfyui.log'),
+    'C:\Users\jeffr\Documents\ComfyUI\comfyui_8000.log',
+    'C:\Users\jeffr\Documents\ComfyUI\comfyui_8188.log'
+)
+$ComfyLog = $null
+$LogMtime = [DateTime]::MinValue
+foreach ($cand in $LogCandidates) {
+    if (Test-Path $cand) {
+        $info = Get-Item $cand
+        if ($info.LastWriteTime -gt $LogMtime) {
+            $ComfyLog = $cand
+            $LogMtime = $info.LastWriteTime
+        }
+    }
+}
 
 # Ensure outputs dir exists for the status file.
 $statusDir = Split-Path -Parent $StatusOut
@@ -111,8 +140,10 @@ if (-not (Test-Path $AuditScript)) {
     Write-Status "ERROR: audit script not found at $AuditScript"
     exit 3
 }
-if (-not (Test-Path $ComfyLog)) {
-    Write-Status "WARN: comfy log not found at $ComfyLog -- audit will inspect episode dir only"
+if ($null -eq $ComfyLog) {
+    Write-Status ("WARN: no ComfyUI log found at any candidate path: " + ($LogCandidates -join ', ') + " -- audit will inspect episode dir only")
+} else {
+    Write-Status "comfy log resolved to $ComfyLog (mtime $LogMtime)"
 }
 
 $auditOut = Join-Path $statusDir 'soak_audit.txt'
@@ -123,7 +154,7 @@ $auditOut = Join-Path $statusDir 'soak_audit.txt'
 # Push-Location into the repo so the audit script's relative imports work.
 Push-Location $RepoRoot
 try {
-    if (Test-Path $ComfyLog) {
+    if ($null -ne $ComfyLog -and (Test-Path $ComfyLog)) {
         & $Python $AuditScript $ComfyLog *>> $auditOut
     } else {
         & $Python $AuditScript *>> $auditOut
