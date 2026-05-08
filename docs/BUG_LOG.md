@@ -5,6 +5,109 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-133 [FIXED]: Stage 1 post-run patches -- BUG-031 silent-skip wired, image-save-size gate added, soft-cap mode added (caught by 2026-05-08 Stage 1 post-run synthesis)
+
+- **Date:** 2026-05-08 mid-day | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Stage 1 smoke run
+  (`signal_lost_space_station_control_room_20260508_120907`)
+  validated the BUG-LOCAL-128 cap counter split, but the run also
+  exposed three real upstream/downstream gaps that prevented
+  end-to-end validation:
+  1. Bark generated 0.1s of post_bark audio TOTAL across 11
+     character lines (verified via `meta.audio_gates[0].dur_s=0.1`,
+     `sample_count=2400`, `sample_rate=24000`). Per-line ledger
+     entries showed `dur_s=0.004166s` (1 frame at 240fps),
+     `bark_wav_path=''`, `render_ms=None`. Bark was producing
+     near-empty placeholder WAVs every line.
+  2. HuMo dutifully lipsynced 6 fresh clips against the silent
+     character slots (`humo_render_ms=~75000ms` per clip,
+     `mp4_dur_s=1.12s`, files 1.6KB on disk -- garbage outputs).
+     The existing BUG-LOCAL-031 silent-skip gate helper
+     (`_audio_slice_rms_db`) was DEFINED but never wired into the
+     per-line loop ("helper present but loop wiring deferred"
+     comment at execute() line 1473).
+  3. `stills/full_env_00001_.png` saved as 74 BYTES (PNG header
+     only, no IDAT chunk) because `OTR_BatchFluxRender` yielded
+     an empty IMAGE tensor for that branch. The Director's
+     `scenes`/`shots` arrays were populated (scenes=1, shots=5)
+     so this is NOT an empty-Director issue -- some other FLUX
+     execution path produced empty output. `OTR_SaveToEpisodeWorkspace`
+     wrote the empty PNG silently with no validation.
+  4. The cap firing on `HumoSoakCapReached` raised an exception,
+     which terminated the workflow and prevented LTX / Composite /
+     Upscale / PostProcgenBlend from running on the 6 partial
+     clips. End-to-end DAG validation impossible while cap is in
+     effect.
+- **Cause:** Three independent gaps that compounded:
+  1. BUG-LOCAL-031 design existed but the runtime check was never
+     wired into the HuMo per-line loop -- graceful-degradation to
+     static-radio-fill (BUG-LOCAL-129a) couldn't fire because
+     nothing was checking RMS against the threshold.
+  2. `OTR_SaveToEpisodeWorkspace` had no post-write validation,
+     so a 74-byte PNG was as valid as a 700KB one from the
+     node's perspective.
+  3. The Step 4 cap-as-exception design was correct for the
+     production overnight pattern (where the watcher re-queues)
+     but invalid for end-to-end smoke validation (where the
+     downstream DAG must run on partial output).
+- **Fix:** Three patches in one commit per the Stage 1 post-run
+  synthesis section 3 (Steps 2, 3, 4):
+  - **Step 2 / `nodes/batch_humo_render.py`:** wired the existing
+    `_audio_slice_rms_db` helper into the per-line loop right
+    after the existing missing-prompt / missing-chunks skips. A
+    line whose audio slice RMS falls below `min_speech_rms_db`
+    (default `-28.0` dBFS) gets:
+      * `report_lines.append(...SILENT_SKIP...)`
+      * `lines[].render_method = 'static_radio_fill'` stamped via
+        `_otr_ledger.stamp_line_render_method`
+      * `continue` -- HuMo is skipped; downstream
+        `OTR_VideoComposite` paints the static radio bookend for
+        that time slot per BUG-LOCAL-129a.
+    Set `min_speech_rms_db = -90` to disable the gate entirely.
+  - **Step 3 / `nodes/otr_save_to_episode_workspace.py`:** added
+    a 4096-byte post-save validation gate. Any saved PNG under
+    that threshold gets unlinked and a `BAD_IMAGE_SAVE`
+    `RuntimeError` raised with diagnostic info: filename, byte
+    count, input tensor `shape / dtype / min / max`. One log
+    line tells you whether the upstream produced empty data or
+    the save logic mishandled it.
+  - **Step 4 / `nodes/batch_humo_render.py`:** added
+    `stop_workflow_on_soak_cap` BOOLEAN widget (default `True`).
+    When `True`, cap fires raise `HumoSoakCapReached` (existing
+    behavior). When `False`, cap fires save the ledger + soak_cap
+    stamp, log `SOAK_CAP_REACHED`, and `break` out of the per-
+    line loop so downstream DAG (LTX, Composite, Upscale,
+    PostProcgenBlend) still executes on partial output. Used by
+    end-to-end smoke validation; not safe in production resume
+    mode until LTX grows its own resume-from-ledger scan.
+  - **Workflow JSON** (`otr_scifi_16gb_full.json` Node 51):
+    extended `widgets_values` to 18 entries (added `False` for
+    `stop_workflow_on_soak_cap`). Set Stage 1 cap to `3`. After
+    Stage 1 validates end-to-end, flip the boolean back to `True`
+    and bump cap to `6` for Stage 2 / production.
+- **Verify:** AST clean, LTX regression unchanged. Stage 1 re-run
+  with `cap=3, stop_workflow_on_soak_cap=False, min_speech_rms_db
+  =-28.0` will tell us:
+  * Bark fix path: silent-skip catches dead audio -> static-radio
+    fallback fires -> Composite still produces a usable frame
+    sequence
+  * FLUX env still fix path: 74-byte PNG either no longer happens
+    OR `BAD_IMAGE_SAVE` raises with shape/dtype/min/max so we know
+    where to look upstream
+  * Cap fix path: cap=3 fires, ledger persisted, downstream DAG
+    runs on 3 fresh clips, full pipeline completes
+- **Tags:** silent-skip, BUG-031, image-save-validation, soft-cap,
+  end-to-end-validation, stage-1-followup, multiple-fix-classes
+- **Bible candidacy:** yes -- three lessons:
+  * "helper present but loop wiring deferred" is a real cost; if
+    the wiring is small AND the helper has a graceful-degradation
+    target, ship the wiring on first attempt
+  * any save-to-disk node MUST validate the post-write file size
+    against a threshold informed by what real output looks like
+  * exception-as-control-flow for "soft stop" cap signals breaks
+    the rest of the DAG; structured exit + flag is the production
+    pattern
+
 ### BUG-LOCAL-132 [FIXED]: Node 55 widget array missing the control_after_generate slot for the seed widget (BUG-131 reverted by 2026-05-08 CAG-correction round-robin)
 
 - **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes

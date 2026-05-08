@@ -1451,6 +1451,29 @@ class BatchHumoRender:
                         "state across an OOM."
                     ),
                 }),
+                "stop_workflow_on_soak_cap": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "Round-robin Step 4 (post-Stage 1, 2026-05-08). "
+                        "If ON (default, production overnight pattern): "
+                        "raise HumoSoakCapReached when the per-process "
+                        "cap fires; the workflow halts and the watcher "
+                        "re-queues. If OFF (validation/smoke pattern): "
+                        "save the ledger + soak_cap stamp, log a "
+                        "SOAK_CAP_REACHED report line, and break out of "
+                        "the loop so the rest of the DAG (LTX, "
+                        "Composite, Upscale, PostProcgenBlend) still "
+                        "runs on whatever fresh clips were rendered. "
+                        "End-to-end smoke validation requires this OFF "
+                        "with cap=3 to verify the downstream chain "
+                        "without burning a full episode of HuMo time. "
+                        "Unsafe in production resume mode until LTX "
+                        "grows its own resume-from-ledger scan -- "
+                        "currently re-running with this OFF on the same "
+                        "ledger would re-render LTX on previously-done "
+                        "clips."
+                    ),
+                }),
             },
         }
 
@@ -1474,6 +1497,7 @@ class BatchHumoRender:
         resume_from_ledger: bool = True,  # 2026-04-29: see INPUT_TYPES tooltip
         humo_max_lines_per_process: int = 0,  # BUG-LOCAL-126 soak cap; 0 = disabled
         cuda_hard_reset_on_oom: bool = True,  # BUG-LOCAL-126 alarm-plumbing
+        stop_workflow_on_soak_cap: bool = True,  # 2026-05-08 Step 4: hard raise vs soft break
     ):
         t_start = time.time()
         # BUG-LOCAL-086: flux_done_gate is intentionally not consumed.
@@ -2180,6 +2204,66 @@ class BatchHumoRender:
                 report_lines.append(f"  {line_id}: SKIP encode failed in earlier phase (chunk audio)")
                 continue
 
+            # BUG-LOCAL-031 silent-skip gate (loop wiring landed
+            # 2026-05-08, post-Stage-1 synthesis). The 2026-05-08 morning
+            # Stage 1 run produced 0.1s of post_bark audio TOTAL across
+            # 11 character lines and HuMo dutifully lipsynced 6 fresh
+            # clips against silent slots before the cap fired. The gate
+            # below catches that failure mode by checking the per-line
+            # audio slice's RMS against ``min_speech_rms_db`` (default
+            # -28 dBFS). A line below threshold gets:
+            #   - render_method = "static_radio_fill" stamped to ledger
+            #   - skipped from HuMo render
+            #   - downstream OTR_VideoComposite falls back to the static
+            #     radio bookend for that time slot via BUG-LOCAL-129a
+            # This is graceful-degradation per the original BUG-031
+            # design intent (helper_present_loop_wiring_deferred at
+            # line 1473 pre-fix). Set min_speech_rms_db = -90 to
+            # disable the gate entirely (every line goes to HuMo).
+            try:
+                _line_start_s = float(entry.get("start_s") or 0.0)
+                _line_dur_s = float(entry.get("dur_s") or 0.0)
+                _line_rms_db = _audio_slice_rms_db(
+                    audio, _line_start_s, _line_dur_s,
+                )
+            except Exception as _rms_exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchHumoRender] %s: RMS check failed (%s); "
+                    "letting line through to HuMo",
+                    line_id, _rms_exc,
+                )
+                _line_rms_db = 0.0  # neutral; pass through
+            if _line_rms_db < float(min_speech_rms_db):
+                log.warning(
+                    "[BatchHumoRender] %s: BUG-LOCAL-031 silent-skip "
+                    "(rms=%.2f dBFS < threshold=%.2f); marking "
+                    "render_method=static_radio_fill, "
+                    "OTR_VideoComposite will paint static radio bookend",
+                    line_id, _line_rms_db, float(min_speech_rms_db),
+                )
+                report_lines.append(
+                    f"  {line_id}: SILENT_SKIP (rms={_line_rms_db:.2f} "
+                    f"< {float(min_speech_rms_db):.2f} dBFS)"
+                )
+                # Stamp render_method so the ledger reflects the
+                # graceful-degradation decision; post-mortem can
+                # then explain why HuMo was skipped without grepping
+                # the log.
+                try:
+                    try:
+                        from . import _otr_ledger as _OTRL_SS  # type: ignore
+                    except ImportError:
+                        import _otr_ledger as _OTRL_SS  # type: ignore
+                    _OTRL_SS.stamp_line_render_method(
+                        ledger, line_id, "static_radio_fill",
+                    )
+                except Exception as _ss_exc:  # noqa: BLE001
+                    log.warning(
+                        "[BatchHumoRender] %s: render_method stamp "
+                        "failed (non-fatal): %s", line_id, _ss_exc,
+                    )
+                continue
+
             shot_t0 = time.time()
             try:
                 n_chunks = len(_chunks)
@@ -2452,18 +2536,41 @@ class BatchHumoRender:
                             "ledger save failed (non-fatal): %s",
                             _cap_save_exc,
                         )
+                    if stop_workflow_on_soak_cap:
+                        log.warning(
+                            "[BatchHumoRender] BUG-LOCAL-126 soak cap reached "
+                            "(%d fresh of cap %d; %d total clips on disk); "
+                            "ledger persisted; raising HumoSoakCapReached "
+                            "(stop_workflow_on_soak_cap=True). Queue follow-up "
+                            "with resume_from_ledger=True.",
+                            fresh_rendered_this_process, humo_max_lines_per_process,
+                            total_clips_output,
+                        )
+                        raise HumoSoakCapReached(
+                            lines_completed=fresh_rendered_this_process,
+                            cap=humo_max_lines_per_process,
+                        )
+                    # Soft-cap path (Step 4, 2026-05-08): break out of
+                    # the per-line loop without raising so downstream
+                    # nodes (LTX, Composite, Upscale, PostProcgen)
+                    # still execute on whatever was rendered. Used by
+                    # end-to-end smoke validation; not safe for
+                    # production resume mode until LTX grows its own
+                    # resume-from-ledger scan.
                     log.warning(
                         "[BatchHumoRender] BUG-LOCAL-126 soak cap reached "
                         "(%d fresh of cap %d; %d total clips on disk); "
-                        "ledger persisted; "
-                        "queue follow-up with resume_from_ledger=True",
+                        "ledger persisted; SOFT_CAP mode -- breaking "
+                        "out of HuMo loop to let downstream DAG run.",
                         fresh_rendered_this_process, humo_max_lines_per_process,
                         total_clips_output,
                     )
-                    raise HumoSoakCapReached(
-                        lines_completed=fresh_rendered_this_process,
-                        cap=humo_max_lines_per_process,
+                    report_lines.append(
+                        f"  SOAK_CAP_REACHED: {fresh_rendered_this_process} "
+                        f"fresh / cap {humo_max_lines_per_process}; "
+                        f"downstream will run on partial output"
                     )
+                    break  # exit per-line for-loop; fall through to phase 10 ledger writeback
 
                 # 2026-04-29: per-clip incremental ledger save. Each HuMo
                 # clip takes ~9-10 min on Blackwell; without per-clip

@@ -198,7 +198,63 @@ class SaveToEpisodeWorkspace:
                 fname = f"{filename_pattern}_{next_idx:05d}_.png"
                 out_path = target_dir / fname
                 pil_img.save(out_path)
-                log.info("[SaveToEpisodeWorkspace] saved: %s", out_path)
+                # Round-robin Step 3 (post-Stage 1, 2026-05-08): catch
+                # the empty-tensor failure mode early. The 2026-05-08
+                # morning Stage 1 run wrote a 74-byte PNG (header
+                # chunks only, no IDAT) for stills/full_env_00001_.png
+                # because the upstream FLUX node yielded an empty
+                # IMAGE tensor. Without this gate the empty save was
+                # invisible until VideoComposite tried to use the
+                # still and the 74-byte file silently produced a
+                # black/garbage frame. The 4096-byte threshold catches
+                # any plausibly-empty PNG (a real 1024x1024 FLUX still
+                # is hundreds of KB to MB) while still letting tiny
+                # legitimate test fixtures through.
+                _MIN_VALID_PNG_BYTES = 4096
+                try:
+                    saved_bytes = int(out_path.stat().st_size)
+                except OSError:
+                    saved_bytes = 0
+                if saved_bytes < _MIN_VALID_PNG_BYTES:
+                    # Build a diagnostic about the input tensor so the
+                    # caller knows whether the upstream produced empty
+                    # data or this save logic mishandled it. shape /
+                    # dtype / min / max in one line, no second run
+                    # needed.
+                    try:
+                        import torch  # type: ignore
+                        if isinstance(img, torch.Tensor):
+                            tshape = tuple(img.shape)
+                            tdtype = str(img.dtype)
+                            tmin = float(img.min().item()) if img.numel() else float("nan")
+                            tmax = float(img.max().item()) if img.numel() else float("nan")
+                        else:
+                            tshape = getattr(img, "shape", "n/a")
+                            tdtype = str(getattr(img, "dtype", type(img)))
+                            tmin = tmax = float("nan")
+                    except Exception:  # noqa: BLE001
+                        tshape = "n/a"
+                        tdtype = "n/a"
+                        tmin = tmax = float("nan")
+                    # Unlink the bad PNG so a stale 74-byte file
+                    # doesn't pollute the episode dir or get picked up
+                    # by downstream consumers. RuntimeError surfaces
+                    # the diagnostic so the workflow halts loudly
+                    # instead of silently producing garbage video.
+                    try:
+                        out_path.unlink()
+                    except OSError:
+                        pass
+                    raise RuntimeError(
+                        f"BAD_IMAGE_SAVE: {fname} wrote {saved_bytes} "
+                        f"bytes (under {_MIN_VALID_PNG_BYTES}-byte gate); "
+                        f"input tensor shape={tshape} dtype={tdtype} "
+                        f"min={tmin:.4f} max={tmax:.4f}. Likely upstream "
+                        f"produced empty IMAGE -- check the previous "
+                        f"node's output tensor before re-queueing."
+                    )
+                log.info("[SaveToEpisodeWorkspace] saved: %s (%d bytes)",
+                         out_path, saved_bytes)
                 # Build a UI entry so ComfyUI shows the thumbnail. The
                 # ``subfolder`` field must be relative to the ComfyUI
                 # output dir (``comfy_output_dir()``) for the preview

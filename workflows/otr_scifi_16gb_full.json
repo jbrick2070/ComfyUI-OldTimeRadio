@@ -1421,8 +1421,9 @@
         200,
         -28.0,
         true,
-        6,
-        true
+        3,
+        true,
+        false
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"
