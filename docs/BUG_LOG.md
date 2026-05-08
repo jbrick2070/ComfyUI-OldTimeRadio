@@ -5,6 +5,57 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-121 [FIXED]: build_contract_from_director_plan KeyError on padded voice_assignments keys (caught by 2026-05-08 round-robin)
+
+- **Date:** 2026-05-08 early-AM | **Phase:** 0+ | **Bible candidate:** yes
+- **Symptom:** `build_contract_from_director_plan()` would raise
+  `KeyError` if any key in `director_plan["voice_assignments"]` had
+  surrounding whitespace. Example failing input:
+  `{"voice_assignments": {"  MONTY  ": "v2/en_speaker_3"}}` -- the
+  generator expression stripped the key to `"MONTY"`, then
+  `assignments["MONTY"]` raised because the original dict still keyed
+  by `"  MONTY  "`. Pure stdlib helper -- no torch, no VRAM.
+- **Cause:** The clean-key derivation and the value-lookup were
+  decoupled. `sorted_names` came from a stripped-key generator;
+  `assignments[name]` indexed the ORIGINAL dict with the stripped
+  name. ChatGPT's gpt-5.5 round of the round-robin caught this on the
+  first pass; Gemini's gemini-3.1-pro-preview-customtools confirmed
+  the trap and recommended the same `clean_assignments` rebuild fix.
+- **Fix:** Rebuild `clean_assignments: dict[str, object]` once -- key
+  is the stripped name, value is the original raw value. Use
+  `setdefault` so a collision (`"MONTY"` + `"  MONTY  "` after
+  stripping) deterministically keeps the FIRST occurrence rather than
+  silently overwriting. Then iterate `sorted(clean_assignments.keys(),
+  key=str.upper)` and look up via `clean_assignments[name]`.
+- **Verify (commit pending):**
+  - `python -m pytest tests/test_cast_contract_helpers.py -v` -> 22/22
+    PASSED including two new regression tests:
+    `test_build_contract_handles_padded_keys_without_keyerror` (mixed
+    whitespace + tab/newline padded keys), and
+    `test_build_contract_padded_collision_first_wins` (exercises the
+    setdefault collision rule).
+  - Full cast contract suite: 50/50 PASSED (unchanged behavior on the
+    other 48 tests).
+  - LTX regression: 33/33 PASSED unchanged.
+- **Tags:** phase-0+, cast-contract, helpers, keyerror, padded-keys,
+  round-robin-catch
+- **Related:** BUG-LOCAL-120 (the parent Phase 0+ Cast Contract work --
+  this fix lands on the same `dfe26e6` Phase B helper that just
+  shipped).
+- **Round-robin transcript:**
+  `docs/2026-05-08-cast-contract-shipped-code-review__01_chatgpt.md`
+  (Element 4, fix probability 55%, RED -- the highest non-Element-2
+  risk score in the review). Gemini transcript at
+  `__02_gemini.md`. Synthesis at `__04_synthesis.md`.
+- **Bible candidacy:** yes -- the lesson is the *clean-derivation /
+  raw-lookup decoupling antipattern*. Whenever a helper normalizes a
+  collection of keys (strip / lower / case-fold) and then iterates the
+  normalized set, every downstream lookup MUST go through the
+  normalized lookup map -- not the original collection. Generic enough
+  to land in the Bible as a recurring class.
+
+---
+
 ## Workflow tip — ask Claude for a live risk artifact after a fix
 
 When Claude has shipped a non-trivial fix and you want a quick gut-check on residual risk WITHOUT triggering more code changes, you can ask: "round-robin the shipped code and give me a live artifact with your % chance of fix needed." Claude will:

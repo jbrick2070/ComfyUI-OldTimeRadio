@@ -202,15 +202,25 @@ def build_contract_from_director_plan(director_plan: dict) -> CastContract:
             f"{type(assignments).__name__}"
         )
 
-    sorted_names = sorted(
-        (str(name).strip() for name in assignments.keys() if str(name).strip()),
-        key=str.upper,
-    )
+    # Normalize keys ONCE and rebuild a clean lookup. Indexing the original
+    # dict with a stripped key would KeyError on padded inputs like
+    # ``{" MONTY ": ...}`` -- caught by 2026-05-08 round-robin code review.
+    clean_assignments: dict[str, object] = {}
+    for raw_name, raw_value in assignments.items():
+        stripped = str(raw_name).strip()
+        if not stripped:
+            continue
+        # First occurrence wins on collisions ("MONTY" + "  MONTY  " ->
+        # the first one keeps its value); the alternative would be silently
+        # overwriting, which is worse.
+        clean_assignments.setdefault(stripped, raw_value)
+
+    sorted_names = sorted(clean_assignments.keys(), key=str.upper)
 
     characters: list[CharacterEntry] = []
     for idx, name in enumerate(sorted_names, start=1):
         cid = f"c{idx:02d}"
-        voice_spec = _coerce_voice_spec(assignments[name])
+        voice_spec = _coerce_voice_spec(clean_assignments[name])
         characters.append(
             CharacterEntry(
                 character_id=cid,

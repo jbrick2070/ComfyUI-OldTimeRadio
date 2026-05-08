@@ -101,6 +101,39 @@ def test_build_contract_skips_blank_keys():
     assert contract.characters[0].canonical_name == "MONTY"
 
 
+def test_build_contract_handles_padded_keys_without_keyerror():
+    """Regression: 2026-05-08 round-robin caught that stripping keys then
+    indexing the original dict raised KeyError on padded inputs. Helper
+    must now route through the cleaned lookup map.
+    """
+    plan = {
+        "voice_assignments": {
+            "  MONTY  ": "v2/en_speaker_3",
+            "\tAEGEUS\n": "v2/en_speaker_5",
+        }
+    }
+    contract = build_contract_from_director_plan(plan)
+    assert [c.canonical_name for c in contract.characters] == ["AEGEUS", "MONTY"]
+    by_name = {c.canonical_name: c for c in contract.characters}
+    assert by_name["MONTY"].voice_spec == "bark:v2/en_speaker_3"
+    assert by_name["AEGEUS"].voice_spec == "bark:v2/en_speaker_5"
+
+
+def test_build_contract_padded_collision_first_wins():
+    """If a plan has both 'MONTY' and '  MONTY  ', the first one wins
+    deterministically (no silent overwrite, no crash).
+    """
+    plan = {
+        "voice_assignments": {
+            "MONTY": "v2/en_speaker_3",
+            "  MONTY  ": "v2/en_speaker_9",  # collision after strip
+        }
+    }
+    contract = build_contract_from_director_plan(plan)
+    assert len(contract.characters) == 1
+    assert contract.characters[0].voice_spec == "bark:v2/en_speaker_3"
+
+
 def test_build_contract_version_stable_under_insertion_order():
     plan_a = {
         "voice_assignments": {
