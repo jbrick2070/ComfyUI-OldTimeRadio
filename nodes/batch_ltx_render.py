@@ -578,6 +578,13 @@ def _make_boomerang_via_ffmpeg(
         "-pix_fmt", "yuv420p",
         "-preset", "fast",
         "-crf", "18",
+        # BUG-LOCAL-117d hardening 2026-05-07: match the timebase
+        # _save_video_mp4 stamps (12800) so concat-demuxer with -c copy
+        # in _concat_clips_via_ffmpeg and VideoComposite's per-clip
+        # silent encodes share an identical timestamp grid. Without
+        # this, ffmpeg picks per-encode (typically 16k or 90k) and
+        # concat-demuxer emits "Non-monotonous DTS" at the seam.
+        "-video_track_timescale", "12800",
         "-movflags", "+faststart",
         "-an",  # explicit: no audio (LTX clips are silent)
         str(tmp),
@@ -1250,16 +1257,73 @@ class BatchLTXRender:
                 # invisible until final composite. Skip pre-existing files.
                 pre_existing = clips_dir / f"{line_id}.mp4"
                 if pre_existing.exists() and pre_existing.stat().st_size > 0:
-                    log.warning(
-                        "[BatchLTXRender] %s: skip -- existing clip on disk "
-                        "(%s, %d bytes). Refusing to overwrite.",
-                        line_id, pre_existing.name, pre_existing.stat().st_size,
+                    # BUG-LOCAL-117f 2026-05-07: duration-aware anti-clobber.
+                    # The pre-117d skip-if-exists check left half-duration
+                    # boomerang-failed clips on disk through reruns. Now we
+                    # ffprobe and compare to the audio-target duration; if
+                    # the on-disk clip is materially short, delete it and
+                    # fall through to a fresh render. Tolerance is 0.25s
+                    # which exceeds VideoComposite's BUG-031 sync tolerance
+                    # so we never re-render a clip the composite would have
+                    # accepted as-is.
+                    _expected_dur_s = float(entry["dur_s"])
+                    _actual_dur_s = 0.0
+                    try:
+                        from . import _otr_probe as _PROBE  # type: ignore
+                        _probed = _PROBE.probe_duration_s(pre_existing)
+                        if _probed and _probed > 0.0:
+                            _actual_dur_s = float(_probed)
+                    except Exception as _probe_exc:  # noqa: BLE001
+                        log.warning(
+                            "[BatchLTXRender] %s: ffprobe on pre_existing "
+                            "failed (%s); falling back to size-only skip",
+                            line_id, _probe_exc,
+                        )
+
+                    _stale = (
+                        _actual_dur_s > 0.0
+                        and _actual_dur_s < _expected_dur_s - 0.25
                     )
-                    report_lines.append(
-                        f"  {line_id} ({entry['speaker_role']}): "
-                        f"SKIP existing {pre_existing.name}"
-                    )
-                    continue
+                    if _stale:
+                        log.warning(
+                            "[BatchLTXRender] %s: pre_existing %s is stale "
+                            "(actual=%.2fs, expected=%.2fs, gap=%.2fs). "
+                            "Deleting and re-rendering.",
+                            line_id, pre_existing.name,
+                            _actual_dur_s, _expected_dur_s,
+                            _expected_dur_s - _actual_dur_s,
+                        )
+                        try:
+                            pre_existing.unlink()
+                        except OSError as _del_exc:
+                            log.error(
+                                "[BatchLTXRender] %s: cannot unlink stale "
+                                "%s (%s). Refusing to overwrite -- skipping.",
+                                line_id, pre_existing.name, _del_exc,
+                            )
+                            report_lines.append(
+                                f"  {line_id} ({entry['speaker_role']}): "
+                                f"STALE-LOCKED {pre_existing.name}"
+                            )
+                            continue
+                        report_lines.append(
+                            f"  {line_id} ({entry['speaker_role']}): "
+                            f"RE-RENDER (stale {_actual_dur_s:.2f}s "
+                            f"-> expected {_expected_dur_s:.2f}s)"
+                        )
+                        # Fall through to render path below (no continue).
+                    else:
+                        log.warning(
+                            "[BatchLTXRender] %s: skip -- existing clip on disk "
+                            "(%s, %d bytes, dur=%.2fs). Refusing to overwrite.",
+                            line_id, pre_existing.name,
+                            pre_existing.stat().st_size, _actual_dur_s,
+                        )
+                        report_lines.append(
+                            f"  {line_id} ({entry['speaker_role']}): "
+                            f"SKIP existing {pre_existing.name}"
+                        )
+                        continue
 
                 try:
                     pos_tokens = clip.tokenize(prompt_text)

@@ -488,6 +488,10 @@ def _make_gap_segment(
         ),
         "-t", f"{dur:.4f}",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        # BUG-LOCAL-117d hardening 2026-05-07: lock timebase to 12800
+        # so concat-demuxer with -c copy doesn't emit "Non-monotonous DTS"
+        # at seams between this gap segment and surrounding clips.
+        "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-shortest",
         str(out_path),
@@ -519,6 +523,10 @@ def _normalize_humo_segment(
             f"fps={canvas_fps}"
         ),
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        # BUG-LOCAL-117d hardening 2026-05-07: lock timebase to 12800
+        # so concat-demuxer with -c copy doesn't emit "Non-monotonous DTS"
+        # at seams between this normalized HuMo segment and surrounding clips.
+        "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
         # KEY: keep HuMo's native audio for perfect lip-sync.
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         str(out_path),
@@ -669,6 +677,11 @@ def _layered_per_clip_silent(
             "-filter_complex", filter_complex,
             "-map", "[v]",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+            # BUG-LOCAL-117d hardening 2026-05-07: lock timebase to match
+            # _save_video_mp4 + boomerang + static fill so concat-demuxer
+            # with -c copy in step 3 (silent_combined.mp4) doesn't drift
+            # across seams.
+            "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
             "-an",
         ]
         # BUG-LOCAL-031 Track 1 (per-clip duration matching): if the
@@ -712,6 +725,8 @@ def _layered_per_clip_silent(
             "-i", str(clip),
             "-vf", vf,
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+            # BUG-LOCAL-117d hardening 2026-05-07: timebase contract.
+            "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
             "-an",
         ]
         # BUG-LOCAL-031 Track 1: truncate path (see comment in layered branch).
@@ -771,6 +786,9 @@ def _pillarbox_humo_silent(
         "-i", str(clip),
         "-vf", vf,
         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "fast",
+        # BUG-LOCAL-117d hardening 2026-05-07: timebase contract so
+        # concat-demuxer with -c copy doesn't drift at HuMo<->LTX seams.
+        "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
         "-an",  # KEY: strip audio.  Master mix attaches at mux step.
         str(out_path),
     ]

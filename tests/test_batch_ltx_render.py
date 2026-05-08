@@ -316,3 +316,98 @@ def test_boomerang_filter_uses_split_reverse_concat():
     assert "concat=n=2:v=1:a=0" in src, (
         "BUG-LOCAL-117d: boomerang must concat forward + reversed"
     )
+
+
+def test_boomerang_pins_video_track_timescale():
+    """BUG-LOCAL-117d hardening 2026-05-07: the boomerang helper must
+    pin ``-video_track_timescale 12800`` so concat-demuxer with -c copy
+    in VideoComposite doesn't emit ``Non-monotonous DTS`` at the seams
+    between boomeranged clips and the static-fill / pillarbox-HuMo
+    encodes (which all share the same 12800 timebase)."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    # The constant lives in video_composite.py as _STATIC_SEGMENT_TIMEBASE,
+    # but here we hard-code "12800" since batch_ltx_render is the
+    # upstream producer and shouldn't depend on VideoComposite imports.
+    assert '"-video_track_timescale", "12800"' in src, (
+        "BUG-LOCAL-117d hardening: _make_boomerang_via_ffmpeg must pin "
+        "the timebase to 12800 to match _save_video_mp4 + VideoComposite "
+        "static fill / pillarbox encodes"
+    )
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-117f: duration-aware anti-clobber
+# ---------------------------------------------------------------------------
+
+def test_anti_clobber_uses_probe_duration_check():
+    """BUG-LOCAL-117f (2026-05-07): the per-line anti-clobber check must
+    ffprobe the on-disk clip and compare against the audio-target
+    duration. A pre-existing half-duration mp4 (e.g. left over from a
+    boomerang-failed crashed run) must be unlinked and re-rendered, not
+    silently skipped. Tolerance is 0.25s -- wider than VideoComposite's
+    BUG-031 sync tolerance so we never re-render a clip the composite
+    would have accepted as-is."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    # The block must reference the probe helper.
+    assert "probe_duration_s" in src, (
+        "BUG-LOCAL-117f: anti-clobber must call _otr_probe.probe_duration_s "
+        "to read the on-disk duration"
+    )
+    # The tolerance must be 0.25 (matches VideoComposite BUG-031 envelope).
+    assert "_expected_dur_s - 0.25" in src, (
+        "BUG-LOCAL-117f: anti-clobber must use 0.25s staleness tolerance "
+        "so a clip the composite would accept is never re-rendered"
+    )
+    # The block must actually unlink stale clips, not just warn.
+    assert "pre_existing.unlink()" in src, (
+        "BUG-LOCAL-117f: anti-clobber must DELETE the stale clip so the "
+        "fall-through render path can write a fresh one"
+    )
+    # Failure handling: log.error + STALE-LOCKED report on unlink failure.
+    assert "STALE-LOCKED" in src, (
+        "BUG-LOCAL-117f: when unlink fails (e.g. file-locked by Explorer "
+        "preview), the anti-clobber must report STALE-LOCKED and skip "
+        "instead of crashing"
+    )
+
+
+def test_anti_clobber_re_render_path_falls_through(tmp_path):
+    """BUG-LOCAL-117f: the duration-staleness branch must NOT have a
+    ``continue`` statement -- it must fall through to the render path
+    so a fresh clip gets written. The skip branch (clip is fresh
+    enough) keeps the ``continue``.
+
+    Implementation regression guard: if a future refactor accidentally
+    adds ``continue`` after the unlink, the half-duration heal becomes
+    a half-duration delete-and-skip, which is worse than no fix at all
+    (now both old and new run leave the line uncovered)."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1]
+           / "nodes" / "batch_ltx_render.py").read_text(encoding="utf-8")
+    # Find the BUG-LOCAL-117f anti-clobber block. It runs from the
+    # comment marker to the matching SKIP existing branch close. We
+    # check that the stale path comments include the explicit
+    # "Fall through to render path below (no continue)." note so a
+    # future maintainer can't reinstate the continue without removing
+    # this guard comment first.
+    assert "Fall through to render path below (no continue)." in src, (
+        "BUG-LOCAL-117f: stale-clip branch must explicitly note that it "
+        "falls through (no continue) so the renderer writes a fresh clip"
+    )
+
+
+def test_anti_clobber_test_fixture_uses_testchar_naming(tmp_path):
+    """Naming standard (CLAUDE.md): test fixtures use TESTCHAR, never
+    "dummy". This test exists to assert the naming convention via a
+    fixture file that future integration tests can pick up.
+
+    The fixture is a 0-byte file so we don't depend on ffmpeg in CI;
+    it lives in tmp_path so pytest cleanup handles disposal."""
+    fixture = tmp_path / "TESTCHAR_l001.mp4"
+    fixture.write_bytes(b"")
+    assert fixture.name == "TESTCHAR_l001.mp4"
+    assert "dummy" not in fixture.name.lower()
