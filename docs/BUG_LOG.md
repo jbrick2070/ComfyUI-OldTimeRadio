@@ -21,7 +21,7 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
-### BUG-LOCAL-120 [IN PROGRESS]: Phase 0+ Cast Contract Extensions §1+§2+§3 — initial skeleton + tests
+### BUG-LOCAL-120 [IN PROGRESS]: Phase 0+ Cast Contract Extensions §1+§2+§3 — skeletons + helpers landed; orchestrator integration deferred
 
 - **Date:** 2026-05-07 LATE | **Phase:** 0+ | **Bible candidate:** yes (post-soak)
 - **Symptom:** Same root cause as the character drift observed in the 2026-05-07 PM
@@ -34,7 +34,8 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
   routing). Documented in the ROADMAP "Phase 0+ candidates" -> "Cast Contract
   Extensions" section as a 5-part design (§1 versioning + §2 lock + §3 canon
   + §4 adversarial classification + §5 plateau-bounded repair).
-- **Fix:** Initial three modules + tests, scope §1+§2+§3 only:
+- **Fix (commit `b8c26f4` -- predecessor baseline, 2026-05-07 LATE):**
+  Three skeleton modules + 28 unit tests, scope §1+§2+§3 only:
   - `nodes/_otr_cast_contract.py` — `CharacterEntry`, `CastContract`,
     content-addressed sha-8 versioning (`stamp_version`), alias-aware
     `lookup`, `lock_to_episode` (immutable per §2),
@@ -45,36 +46,80 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
   - `nodes/_otr_canon.py` — `CharacterCanonEntry`, `render_canon_markdown`
     (omits empty fields for terser prompt), `write_canon` /
     `load_canon` round-trip via `character_canon.md`.
-  - `tests/test_cast_contract.py` (9 tests) — alias matching, lookup,
-    version determinism across order, lock immutability, round-trip,
-    load-when-missing returns None.
-  - `tests/test_voice_resolver.py` (12 tests) — bark/kokoro/xtts spec parsing,
-    case normalization, multi-colon presets, error paths, frozen dataclass.
-  - `tests/test_canon.py` (7 tests) — render/omit, ordered multi-entry,
-    write+read round-trip, empty-when-missing.
-- **Verify:** `python -m pytest tests/test_cast_contract.py tests/test_voice_resolver.py tests/test_canon.py -v`
-  shows 28/28 PASSED. `python -m pytest tests/test_batch_ltx_render.py -q`
-  shows 23/23 unchanged (no regression). AST clean across all six new files.
+  - `tests/test_cast_contract.py` (9 tests), `tests/test_voice_resolver.py`
+    (12 tests), `tests/test_canon.py` (7 tests) -- 28 total green.
+- **Fix (commit `dfe26e6` -- Phase B helpers, 2026-05-08 early-AM autonomous
+  session):** Two pure-stdlib §1 helpers added to
+  `nodes/_otr_cast_contract.py`, plus a 20-test suite at
+  `tests/test_cast_contract_helpers.py`:
+  - `build_contract_from_director_plan(director_plan) -> CastContract` --
+    reads `voice_assignments`, sorts canonical names alphabetically,
+    assigns stable `c01`/`c02`/... ids in that order, defaults voice
+    spec engine prefix to `bark:` when omitted, accepts both
+    `"engine:preset"` string form and `{"engine": ..., "preset": ...}`
+    dict form, stamps the sha-8 version before return. Empty/None plan
+    returns an empty versioned contract (caller decides whether that's
+    a hard failure).
+  - `detect_aliases(script, contract) -> dict[str, str]` -- pure
+    heuristic alias detector. Scans uppercase dialogue tags via
+    `_extract_dialogue_tags` (filters structural headers SCENE / ACT /
+    FADE / INT / EXT / NARRATOR), skips tags already in canonical or
+    alias list, then checks for >=4-character shared prefix in either
+    direction (truncation MONTGOMERY -> MONTY *and* expansion MONT ->
+    MONTY). First-match-wins on prefix collisions; §4 is the canonical
+    disambiguator. Returns first-seen-order dict so merge logs are
+    deterministic. No mutation of contract; no LLM call.
+- **Verify (commit `dfe26e6`):**
+  - `python -m pytest tests/test_cast_contract.py tests/test_voice_resolver.py tests/test_canon.py tests/test_cast_contract_helpers.py -q`
+    -> 48/48 PASSED (28 baseline + 20 helpers).
+  - `python -m pytest tests/test_batch_ltx_render.py -q` -> 33/33 PASSED
+    (handoff brief stated 23/23; the suite has grown to 33 -- still
+    unchanged by Phase 0+ work, no regression).
+  - AST clean across `nodes/_otr_cast_contract.py`,
+    `nodes/_otr_voice_resolver.py`, `nodes/_otr_canon.py`,
+    `tests/test_cast_contract_helpers.py`.
 - **Tags:** phase-0+, cast-contract, character-drift, autonovel-pattern,
-  skeleton, deferred-integration
+  skeleton, helpers, deferred-integration
 - **Related:** ROADMAP.md "Phase 0+ candidates" sections; the autonovel
   reference (`https://github.com/NousResearch/autonovel`) for source patterns
   (state.json versioning, characters/canon split). BUG-LOCAL-118 (workflow
   widget order — sibling Phase 0 fix that proves the pipeline plumbing).
-- **Next steps (deferred to follow-up session per in-flight FULL acceptance run discipline):**
-  - Build helpers: `build_contract_from_director_plan`, `detect_aliases`
-  - `story_orchestrator.py` integration at lines 6423 (§1 hook), ~640 (§2 hook),
-    920 (§3 canon as `_check_voice_consistency` rubric input)
-  - `production_ledger.py` merge guard requiring matching `cast_contract_version`
-  - §4 (adversarial classification) + §5 (plateau-bounded repair) in a later session
-  - Voice Backend Abstraction is a separate Phase 0+ candidate; sequenced AFTER
-    Cast Contract proves out
+- **Next steps (deferred to follow-up session -- story_orchestrator.py
+  integration was *not* attempted this session because the FULL acceptance
+  soak `signal_lost_signal_from_the_red_dust_20260507_221546` was still
+  in flight at session start, mid-LTX render with newest file written
+  ~14 min before phase-check; per the standing rule we do not edit
+  story_orchestrator.py / production_ledger.py / scene_sequencer.py /
+  batch_bark_generator.py / batch_humo_render.py / video_composite.py
+  while a soak is rendering):**
+  - `story_orchestrator.py` integration at lines 6423 (§1 hook: build
+    `CastContract` from Director plan post-`_parse_script`, stamp version
+    into ledger), ~640 (§2 hook: `lock_to_episode(contract, episode_dir)`
+    after `_bark_health_check_for_cast`), 920 (§3 hook: feed canon into
+    `_check_voice_consistency` as rubric input).
+  - `production_ledger.py` merge guard requiring matching
+    `cast_contract_version`.
+  - §4 (adversarial classification of orphan tags into 5 buckets:
+    TYPO_OF_EXISTING / ALIAS_OF_EXISTING / GENUINELY_NEW /
+    NARRATIVE_LEAK / DISCARD) -- this is where the helper
+    `detect_aliases` becomes the cheap fast-path; the adversarial
+    LLM classifier handles only the residual (genuinely ambiguous)
+    cases.
+  - §5 (plateau-bounded repair loop: 3 attempts max, raise
+    `CastContractUnreparable` if no progress between iterations).
+  - Voice Backend Abstraction is a separate Phase 0+ candidate; sequenced
+    AFTER Cast Contract proves out end-to-end.
 - **Bible candidacy:** yes -- the lesson is that *implicit cast rosters embedded
   in Director plan dicts cannot survive multi-LLM-pass scripts*. A versioned,
   episode-locked, canonical contract is the substrate every downstream node
   (ScriptCritic, BatchBark, KokoroAnnouncer, BatchHumoRender) should read from
-  rather than guessing from dialogue tag strings. Promote when integration
-  is verified end-to-end.
+  rather than guessing from dialogue tag strings. The Phase B helpers
+  (`build_contract_from_director_plan` + `detect_aliases`) close the
+  "translate the implicit Director-plan dict into a versioned contract,
+  then reconcile the LLM's drifted dialogue tags against it" loop without
+  any LLM calls -- that's what makes §4 viable as a *fallback* rather
+  than the primary classifier. Promote when story_orchestrator integration
+  is verified end-to-end on a real soak.
 
 ### BUG-LOCAL-119 [FIXED]: audit_otr_full_run.py FAIL_PATTERNS includes two strings that false-positive on every healthy run
 
