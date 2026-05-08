@@ -38,6 +38,7 @@ KNOWN_ENGINES: set[str] = {"bark", "kokoro", "cosyvoice", "xtts", "piper"}
 
 
 _REGISTRY: dict[str, Callable[[], VoiceBackend]] = {}
+_DEFAULTS_REGISTERED = False
 
 
 def register(engine: str, factory: Callable[[], VoiceBackend]) -> None:
@@ -57,9 +58,17 @@ def register(engine: str, factory: Callable[[], VoiceBackend]) -> None:
 def get_factory(engine: str) -> Callable[[], VoiceBackend]:
     """Return the registered factory for ``engine``.
 
+    Auto-fires the bundled-driver self-registration on the FIRST call
+    so callers using just `from nodes._voice_backends import
+    get_factory` (without separately importing each driver module)
+    still see the stock bark/kokoro registrations. Round-robin
+    Element 4 catch (2026-05-08).
+
     Raises ``KeyError`` with a helpful message listing the currently
-    registered engines if the requested one isn't there.
+    registered engines if the requested one still isn't there after
+    auto-init.
     """
+    _ensure_defaults_registered()
     e = (engine or "").strip().lower()
     if e not in _REGISTRY:
         registered = sorted(_REGISTRY.keys())
@@ -71,7 +80,12 @@ def get_factory(engine: str) -> Callable[[], VoiceBackend]:
 
 
 def available_engines() -> list[str]:
-    """Return the sorted list of engine names registered right now."""
+    """Return the sorted list of engine names registered right now.
+
+    Like ``get_factory``, fires the lazy default-driver registration
+    so a caller using only the package surface sees the stock list.
+    """
+    _ensure_defaults_registered()
     return sorted(_REGISTRY.keys())
 
 
@@ -97,6 +111,34 @@ def _register_default_drivers() -> None:
     from nodes._voice_backends import kokoro as _kokoro  # noqa: F401
 
 
+def _ensure_defaults_registered() -> None:
+    """Fire ``_register_default_drivers()`` exactly once per process.
+
+    Used by ``get_factory`` and ``available_engines`` to guarantee
+    that a caller using just the package surface (without separately
+    importing each driver module) still sees the stock bark/kokoro
+    registrations. Idempotent: runs the registration on first call
+    and returns immediately on subsequent calls.
+
+    Safe even if a future driver fails to import: the flag is set
+    BEFORE the imports run, so a failed driver doesn't trap us in an
+    infinite re-register loop. Caller is responsible for noticing
+    the missing engine via the empty registry list.
+    """
+    global _DEFAULTS_REGISTERED
+    if _DEFAULTS_REGISTERED:
+        return
+    _DEFAULTS_REGISTERED = True
+    try:
+        _register_default_drivers()
+    except Exception:  # noqa: BLE001
+        # Surface the underlying ImportError to the caller via the
+        # empty-registry KeyError; do NOT crash here, because some
+        # callers want the registry shape even when a driver's
+        # heavyweight deps aren't installed yet.
+        pass
+
+
 __all__ = [
     "VoiceBackend",
     "KNOWN_ENGINES",
@@ -105,4 +147,5 @@ __all__ = [
     "available_engines",
     "unregister",
     "_register_default_drivers",
+    "_ensure_defaults_registered",
 ]

@@ -5,6 +5,116 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-125 [FIXED]: _voice_backends registry empty on first lookup if drivers not separately imported (caught by 2026-05-08 morning round-robin Element 4)
+
+- **Date:** 2026-05-08 morning | **Phase:** 0+ | **Bible candidate:** yes
+- **Symptom:** First call to `get_factory("bark")` from a process that
+  imported only `from nodes._voice_backends import get_factory`
+  (without separately importing `nodes._voice_backends.bark` etc.)
+  raises `KeyError: voice backend 'bark' not registered (currently
+  registered: [])`. `OTR_VoiceRender.render()` would have hit this on
+  every fresh ComfyUI startup once registered.
+- **Cause:** Bundled drivers self-register at module import time via
+  `register("bark", BarkBackend)` at module scope. The package
+  `__init__.py` did NOT auto-trigger that import; it provided a
+  `_register_default_drivers()` helper but never called it. So the
+  registry stayed empty until a caller separately imported each
+  driver module.
+- **Fix:** Added `_ensure_defaults_registered()` -- once-per-process
+  guard that fires `_register_default_drivers()` on first call.
+  `get_factory()` and `available_engines()` both call it before
+  returning. Catches ImportError silently so a missing optional driver
+  doesn't crash the registry-shape introspection path; surfaces the
+  empty-registry message via the standard KeyError instead.
+- **Verify:**
+  - `python -m pytest tests/test_voice_backends.py -v` -> 19/19 PASSED
+    (added `test_get_factory_lazy_initializes_default_drivers` and
+    `test_available_engines_lazy_initializes_default_drivers`,
+    each using a fresh-process simulator that clears `sys.modules`
+    AND the package's cached submodule attributes).
+- **Tags:** phase-0+, voice-backends, registry, lazy-init,
+  round-robin-catch
+- **Bible candidacy:** yes -- the lesson is that *self-registering
+  driver modules need an explicit trigger from the registry's own
+  getters*. A `_register_default_drivers()` function that exists but
+  is never called is decorative.
+
+### BUG-LOCAL-124 [FIXED]: lock_to_episode non-atomic write_text bricks episode dir on crash (caught by 2026-05-08 morning round-robin Element 1)
+
+- **Date:** 2026-05-08 morning | **Phase:** 0+ | **Bible candidate:** yes
+- **Symptom:** ComfyUI process killed (manual kill, OOM, power loss)
+  during `locked_path.write_text(...)` would leave a 0-byte or
+  truncated `cast_contract.locked.json` on disk. The next run's
+  read-and-compare-version path (BUG-LOCAL-122) hits the
+  `json.JSONDecodeError` branch and raises a fatal `RuntimeError`,
+  permanently bricking that episode dir until manually deleted.
+- **Cause:** `Path.write_text()` is NOT atomic. Python writes incrementally
+  to the target inode; an interrupt mid-write leaves whatever was
+  flushed so far on disk. The BUG-LOCAL-122 read-and-compare-version
+  fix correctly refused to overwrite a corrupt locked file (data-
+  loss prevention), which made this fragility load-bearing.
+- **Fix:** Switched to `tempfile.mkstemp()` in the same dir + write
+  + `os.fsync()` + `os.replace()`. Atomic rename guarantees the
+  final lockfile is either fully present or absent. Cleanup path
+  unlinks the temp file if anything in the write/replace sequence
+  raises so we don't leave debris like
+  `.cast_contract.lock.abc123.tmp`.
+- **Verify:**
+  - `python -m pytest tests/test_cast_contract.py -v` -> 13/13 PASSED
+    (added `test_lock_to_episode_writes_atomically_no_temp_debris`
+    and `test_lock_to_episode_truncated_existing_raises_unreadable`).
+- **Tags:** phase-0+, cast-contract, lock-to-episode, atomic-write,
+  os-replace, round-robin-catch
+- **Related:** BUG-LOCAL-122 (the read-and-compare-version path that
+  this atomic write protects).
+- **Bible candidacy:** yes -- the lesson is *any helper that writes
+  state another node will read back must use atomic file replacement*,
+  not `Path.write_text()`. The pairing of "refuse to overwrite corrupt"
+  + "non-atomic write" is the actual brick: either alone is survivable.
+
+### BUG-LOCAL-123 [FIXED]: repair_orphans plateau crashes when classifier returns DISCARD/NARRATIVE_LEAK/GENUINELY_NEW (caught by 2026-05-08 morning round-robin Element 3)
+
+- **Date:** 2026-05-08 morning | **Phase:** 0+ | **Bible candidate:** yes
+- **Symptom:** A classifier that correctly buckets an orphan as
+  DISCARD (stage-direction noise like `FOOTSTEPS:`),
+  NARRATIVE_LEAK (description leaked into a tag like
+  `THE LIGHTHOUSE:`), or GENUINELY_NEW (a new character the cast
+  doesn't have) would crash the repair loop with
+  `CastContractUnreparable` on iteration 2. The 5-bucket Enum was
+  designed for exactly these dispositions but the loop's plateau
+  detector treated them as failure.
+- **Cause:** `apply_classifications` only mutates the contract for
+  TYPO_OF_EXISTING / ALIAS_OF_EXISTING. The other 3 buckets are no-
+  ops by design (caller handles reroll / demote / drop outside the
+  loop). But the loop recomputed `residual_orphans` purely from
+  contract lookup -- so the un-mutated orphans stayed in the
+  residual, equaled the previous iteration's residual, and triggered
+  the plateau raise. The classifier's correct decision was being
+  treated as no-progress.
+- **Fix:** Track a `decided_residuals: set[str]` of orphans the
+  classifier explicitly bucketed as DISCARD / NARRATIVE_LEAK /
+  GENUINELY_NEW, and subtract that from the residual on every
+  iteration. Now a classifier that decides "this orphan is not an
+  alias" correctly resolves the orphan instead of stalling the loop.
+- **Verify:**
+  - `python -m pytest tests/test_cast_repair.py -v` -> 22/22 PASSED
+    (replaced
+    `test_repair_orphans_invokes_classifier_for_residual` to assert
+    the classifier-decided GENUINELY_NEW path returns RepairOutcome
+    cleanly, added 3 new tests:
+    `test_repair_orphans_discard_bucket_does_not_plateau`,
+    `test_repair_orphans_narrative_leak_bucket_does_not_plateau`,
+    `test_repair_orphans_mixed_buckets_in_one_pass`).
+  - Plateau path tested via
+    `test_repair_orphans_plateau_raises_when_classifier_returns_alias_with_unknown_id`
+    -- only mutating-bucket-but-can't-apply triggers genuine plateau.
+- **Tags:** phase-0+, cast-contract, repair-loop, plateau-detection,
+  round-robin-catch
+- **Bible candidacy:** yes -- the lesson is *plateau detection on
+  raw residuals conflates "can't progress" with "explicitly
+  decided"*. Any iterative resolver with a multi-bucket disposition
+  must distinguish "still unknown" from "decided non-mutating".
+
 ### BUG-LOCAL-122 [FIXED]: lock_to_episode blind-refusal breaks ComfyUI rerun / crash recovery (caught by 2026-05-08 round-robin Element 2)
 
 - **Date:** 2026-05-08 early-AM | **Phase:** 0+ | **Bible candidate:** yes

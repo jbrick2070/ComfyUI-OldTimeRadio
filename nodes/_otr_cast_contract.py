@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -169,10 +171,31 @@ def lock_to_episode(contract: CastContract, episode_dir: Path) -> Path:
             f"version {contract.version!r}. Episode identity has drifted; "
             "investigate before forcing a re-lock."
         )
-    locked_path.write_text(
-        json.dumps(contract.to_dict(), indent=2, sort_keys=True),
-        encoding="utf-8",
+    # Atomic write -- write to a temp file in the same directory, then
+    # os.replace into final position. Without this, a crash mid-write
+    # leaves a 0-byte / truncated JSON file that the read-and-compare
+    # path on the next run interprets as "unreadable" and refuses to
+    # recover from, bricking the episode dir. Round-robin Element 1
+    # catch (2026-05-08).
+    payload = json.dumps(contract.to_dict(), indent=2, sort_keys=True)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        prefix=".cast_contract.lock.",
+        suffix=".tmp",
+        dir=str(episode_dir),
     )
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, locked_path)
+    except Exception:
+        # Clean up the partial temp file so we don't leave debris.
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     return locked_path
 
 

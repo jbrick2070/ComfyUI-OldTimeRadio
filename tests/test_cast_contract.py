@@ -114,6 +114,46 @@ def test_lock_to_episode_raises_on_corrupt_existing(tmp_path: Path):
         lock_to_episode(contract, episode_dir)
 
 
+def test_lock_to_episode_writes_atomically_no_temp_debris(tmp_path: Path):
+    """Round-robin Element 1 catch (2026-05-08): write must use a
+    temp file + os.replace so an interrupted write doesn't leave a
+    truncated lockfile that bricks the episode dir on rerun.
+
+    Verifies the *post-write* directory state contains the lockfile
+    and NO `.cast_contract.lock.*.tmp` debris.
+    """
+    episode_dir = tmp_path / "ep_atomic"
+    episode_dir.mkdir()
+    contract = CastContract(
+        characters=[CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")]
+    )
+    lock_to_episode(contract, episode_dir)
+    files = sorted(p.name for p in episode_dir.iterdir())
+    # Exactly the lockfile, no temp debris.
+    assert files == [LOCKED_FILENAME]
+    # Lockfile is well-formed JSON (would have been broken under the
+    # pre-fix non-atomic write_text path if interrupted).
+    import json as _json
+    payload = _json.loads((episode_dir / LOCKED_FILENAME).read_text(encoding="utf-8"))
+    assert payload["version"].startswith("sha:")
+
+
+def test_lock_to_episode_truncated_existing_raises_unreadable(tmp_path: Path):
+    """Simulates the failure mode the atomic-write fix prevents:
+    pre-existing 0-byte / truncated lockfile on disk. The
+    read-and-compare path must surface that as `unreadable` rather
+    than silently overwriting.
+    """
+    episode_dir = tmp_path / "ep_truncated"
+    episode_dir.mkdir()
+    (episode_dir / LOCKED_FILENAME).write_text("", encoding="utf-8")  # 0-byte
+    contract = CastContract(
+        characters=[CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")]
+    )
+    with pytest.raises(RuntimeError, match="unreadable"):
+        lock_to_episode(contract, episode_dir)
+
+
 def test_load_locked_round_trip(tmp_path: Path):
     episode_dir = tmp_path / "ep_test"
     episode_dir.mkdir()

@@ -116,6 +116,88 @@ def test_default_drivers_self_register_when_loaded():
     assert "kokoro" in engines
 
 
+def _simulate_fresh_process_voice_state():
+    """Helper: reset the voice-backends package to the state it would
+    have on a fresh process import. Clears the registry, the
+    once-per-process flag, flushes the bundled-driver modules from
+    `sys.modules`, AND removes the package's cached submodule
+    attributes so `from nodes._voice_backends import bark` actually
+    re-executes the bark module body and re-fires its
+    module-scope `register(...)` call. Returns a `restore` callable.
+    """
+    import sys
+    import nodes._voice_backends as voice_pkg
+
+    saved_flag = voice_pkg._DEFAULTS_REGISTERED
+    saved_registry = dict(voice_pkg._REGISTRY)
+    saved_modules: dict[str, object] = {}
+    saved_attrs: dict[str, object] = {}
+
+    for short_name, mod_name in (
+        ("bark", "nodes._voice_backends.bark"),
+        ("kokoro", "nodes._voice_backends.kokoro"),
+    ):
+        if mod_name in sys.modules:
+            saved_modules[mod_name] = sys.modules.pop(mod_name)
+        # Python caches submodules as attributes on their package;
+        # `from nodes._voice_backends import bark` looks at this
+        # attribute first and short-circuits the module body. Pop it.
+        if hasattr(voice_pkg, short_name):
+            saved_attrs[short_name] = getattr(voice_pkg, short_name)
+            delattr(voice_pkg, short_name)
+
+    voice_pkg._DEFAULTS_REGISTERED = False
+    voice_pkg._REGISTRY.clear()
+
+    def _restore():
+        voice_pkg._REGISTRY.clear()
+        voice_pkg._REGISTRY.update(saved_registry)
+        voice_pkg._DEFAULTS_REGISTERED = saved_flag
+        for k, v in saved_modules.items():
+            sys.modules[k] = v
+        for short_name, value in saved_attrs.items():
+            setattr(voice_pkg, short_name, value)
+
+    return _restore
+
+
+def test_get_factory_lazy_initializes_default_drivers():
+    """Round-robin Element 4 catch (2026-05-08): a caller that uses
+    just `from nodes._voice_backends import get_factory` on a fresh
+    process MUST still get the bundled drivers because `get_factory`
+    lazy-fires `_register_default_drivers()` on first call.
+    """
+    import nodes._voice_backends as voice_pkg
+
+    restore = _simulate_fresh_process_voice_state()
+    try:
+        # Sanity: registry empty before the call.
+        assert voice_pkg._REGISTRY == {}
+        # Single get_factory call should re-register the defaults.
+        factory = voice_pkg.get_factory("bark")
+        assert factory is not None
+        assert "bark" in voice_pkg._REGISTRY
+        assert "kokoro" in voice_pkg._REGISTRY
+    finally:
+        restore()
+
+
+def test_available_engines_lazy_initializes_default_drivers():
+    """Same as get_factory: available_engines() must fire the lazy
+    init so callers using only the package surface see the stock
+    list."""
+    import nodes._voice_backends as voice_pkg
+
+    restore = _simulate_fresh_process_voice_state()
+    try:
+        assert voice_pkg._REGISTRY == {}
+        engines = voice_pkg.available_engines()
+        assert "bark" in engines
+        assert "kokoro" in engines
+    finally:
+        restore()
+
+
 def test_bark_stub_raises_not_migrated_on_load():
     from nodes._voice_backends.bark import BarkBackend, BarkBackendNotMigrated
 

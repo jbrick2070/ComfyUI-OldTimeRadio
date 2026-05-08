@@ -231,31 +231,99 @@ def test_repair_orphans_invokes_classifier_for_residual():
         seen.append(tag)
         return classify_orphans_stub(tag, c, s)
 
-    with pytest.raises(CastContractUnreparable) as exc:
-        repair_orphans(script, contract, classifier=tracking_classifier)
-    assert "ZORG" in exc.value.orphans
+    # Round-robin Element 3 catch (2026-05-08): a classifier that
+    # decides GENUINELY_NEW has resolved its orphan, NOT failed to
+    # repair. The loop exits cleanly with RepairOutcome; the
+    # downstream caller acts on the GENUINELY_NEW classification
+    # (hard fail / reroll cast) outside this module.
+    outcome = repair_orphans(script, contract, classifier=tracking_classifier)
+    assert isinstance(outcome, RepairOutcome)
     assert seen == ["ZORG"]
+    # No alias was added (classifier said GENUINELY_NEW), but the loop
+    # didn't crash either -- ZORG is now in `decided_residuals` so the
+    # next iteration found nothing left to do.
+    assert outcome.aliases_added == 0
 
 
-def test_repair_orphans_plateau_raises_after_no_progress():
-    """If the classifier keeps returning GENUINELY_NEW, the orphan set
-    stays put -> plateau detection fires on iteration 2."""
+def test_repair_orphans_plateau_raises_when_classifier_returns_alias_with_unknown_id():
+    """The plateau path is only reachable when the classifier returns
+    a *mutating* bucket (TYPO / ALIAS) but apply_classifications
+    refuses to apply it -- e.g. target_character_id points at a
+    character that doesn't exist in the contract. Then the orphan
+    stays in residual on the next iteration and plateau fires.
+    """
     contract = _baseline_contract()
     script = "ZORG: persistent stranger.\n"
 
-    iter_count = {"n": 0}
-
-    def stuck_classifier(tag, c, s):  # noqa: ARG001
-        iter_count["n"] += 1
-        return classify_orphans_stub(tag, c, s)
+    def alias_to_nowhere_classifier(tag, c, s):  # noqa: ARG001
+        return ClassificationResult(
+            orphan_tag=tag,
+            bucket=OrphanClass.ALIAS_OF_EXISTING,
+            target_character_id="c99",  # not in contract -> apply skips
+            rationale="test classifier returns alias to non-existent c99",
+        )
 
     with pytest.raises(CastContractUnreparable) as exc:
-        repair_orphans(script, contract, classifier=stuck_classifier)
-    # Iter 1 calls classifier once, then iter 2 sees the same residual
-    # and raises BEFORE another classifier call -- so iter_count["n"]
-    # should be exactly 1.
-    assert iter_count["n"] == 1
-    assert exc.value.iterations == 1
+        repair_orphans(script, contract, classifier=alias_to_nowhere_classifier)
+    assert "ZORG" in exc.value.orphans
+
+
+def test_repair_orphans_discard_bucket_does_not_plateau():
+    """A classifier that correctly buckets noise as DISCARD must NOT
+    crash the loop. Round-robin Element 3 regression."""
+    contract = _baseline_contract()
+    script = "FOOTSTEPS: stage direction leak.\n"
+
+    def discard_classifier(tag, c, s):  # noqa: ARG001
+        return ClassificationResult(
+            orphan_tag=tag,
+            bucket=OrphanClass.DISCARD,
+            rationale="not a character; stage direction noise",
+        )
+
+    outcome = repair_orphans(script, contract, classifier=discard_classifier)
+    assert isinstance(outcome, RepairOutcome)
+    assert outcome.aliases_added == 0
+
+
+def test_repair_orphans_narrative_leak_bucket_does_not_plateau():
+    """Same as DISCARD: NARRATIVE_LEAK is a valid disposition; loop
+    must treat the orphan as resolved and exit cleanly."""
+    contract = _baseline_contract()
+    script = "THE LIGHTHOUSE: a description leaked into a tag.\n"
+
+    def leak_classifier(tag, c, s):  # noqa: ARG001
+        return ClassificationResult(
+            orphan_tag=tag,
+            bucket=OrphanClass.NARRATIVE_LEAK,
+            rationale="should be demoted to narration",
+        )
+
+    outcome = repair_orphans(script, contract, classifier=leak_classifier)
+    assert isinstance(outcome, RepairOutcome)
+    assert outcome.aliases_added == 0
+
+
+def test_repair_orphans_mixed_buckets_in_one_pass():
+    """Multiple orphans, each classified differently in the same
+    iteration, all dispose correctly without plateau."""
+    contract = _baseline_contract()
+    script = (
+        "FOOTSTEPS: stage noise.\n"
+        "ZORG: a new character.\n"
+        "THE LIGHTHOUSE: narration leak.\n"
+    )
+
+    def discriminating_classifier(tag, c, s):  # noqa: ARG001
+        if tag == "FOOTSTEPS":
+            return ClassificationResult(tag, OrphanClass.DISCARD)
+        if tag == "ZORG":
+            return ClassificationResult(tag, OrphanClass.GENUINELY_NEW)
+        return ClassificationResult(tag, OrphanClass.NARRATIVE_LEAK)
+
+    outcome = repair_orphans(script, contract, classifier=discriminating_classifier)
+    assert isinstance(outcome, RepairOutcome)
+    assert outcome.classifications_seen == 3
 
 
 def test_repair_orphans_classifier_bucket_alias_resolves_in_loop():
@@ -284,12 +352,26 @@ def test_repair_orphans_classifier_bucket_alias_resolves_in_loop():
 
 def test_repair_orphans_respects_max_iterations_cap():
     """Pass ``max_iterations=1`` and the loop must give up after exactly
-    one classifier pass even if convergence hasn't been ruled out."""
+    one classifier pass when residual orphans remain undecided.
+
+    To reach the cap path, we need a classifier that returns a
+    *mutating* bucket (TYPO/ALIAS) but apply_classifications refuses
+    to apply it -- otherwise the round-robin Element 3 fix marks the
+    orphan as decided and the loop exits cleanly.
+    """
     contract = _baseline_contract()
     script = "ZORG: stranger.\nQUARK: another stranger.\n"
 
+    def alias_to_unknown_id(tag, c, s):  # noqa: ARG001
+        return ClassificationResult(
+            orphan_tag=tag,
+            bucket=OrphanClass.ALIAS_OF_EXISTING,
+            target_character_id="c99",  # not in contract -> apply skips
+            rationale="test classifier alias to non-existent",
+        )
+
     with pytest.raises(CastContractUnreparable) as exc:
-        repair_orphans(script, contract, max_iterations=1)
+        repair_orphans(script, contract, classifier=alias_to_unknown_id, max_iterations=1)
     assert exc.value.iterations == 1
 
 

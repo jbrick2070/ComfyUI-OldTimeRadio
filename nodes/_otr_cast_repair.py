@@ -238,35 +238,56 @@ def repair_orphans(
     aliases_added_total = len(cheap_applied)
     classifications_seen_total = len(cheap_results)
 
+    # Tags the classifier has explicitly disposed of in a non-mutating
+    # bucket (DISCARD / NARRATIVE_LEAK / GENUINELY_NEW). Without this set,
+    # any orphan the classifier correctly classifies as not-an-alias
+    # would re-appear in residual_orphans on the next iteration, equal
+    # the previous residual, and crash the loop with
+    # CastContractUnreparable -- which is wrong: the classifier did its
+    # job and the loop should treat those orphans as *resolved* (just
+    # not via alias addition). 2026-05-08 round-robin Element 3 catch.
+    decided_residuals: set[str] = set()
+
     prev_residual: Optional[set[str]] = None
     for iteration in range(1, max_iterations + 1):
-        # Recompute residual: tags in script that are STILL not lookup-able.
-        residual_orphans = _residual_orphans(script, contract)
-        if not residual_orphans:
+        # Recompute residual: tags in script that are STILL not lookup-able
+        # AND not yet explicitly decided by the classifier.
+        live_residual = _residual_orphans(script, contract) - decided_residuals
+        if not live_residual:
             return RepairOutcome(
-                iterations=iteration - 1,  # cheap pass alone resolved everything
+                iterations=iteration - 1,  # everything resolved before this iter
                 classifications_seen=classifications_seen_total,
                 aliases_added=aliases_added_total,
                 final_orphans=[],
             )
 
-        if prev_residual is not None and residual_orphans == prev_residual:
+        if prev_residual is not None and live_residual == prev_residual:
             raise CastContractUnreparable(
-                orphans=list(residual_orphans),
+                orphans=list(live_residual),
                 iterations=iteration - 1,
             )
-        prev_residual = set(residual_orphans)
+        prev_residual = set(live_residual)
 
-        # Send each residual to the classifier, collect results.
+        # Send each live residual to the classifier, collect results.
         results = [
-            classifier(tag, contract, script) for tag in residual_orphans
+            classifier(tag, contract, script) for tag in live_residual
         ]
         classifications_seen_total += len(results)
         _, applied = apply_classifications(contract, results)
         aliases_added_total += len(applied)
 
+        # Mark every orphan the classifier put in a non-mutating bucket
+        # as decided so the next iteration doesn't re-classify them.
+        for r in results:
+            if r.bucket in (
+                OrphanClass.DISCARD,
+                OrphanClass.NARRATIVE_LEAK,
+                OrphanClass.GENUINELY_NEW,
+            ):
+                decided_residuals.add(r.orphan_tag)
+
     # Hit the iteration cap without converging.
-    final = _residual_orphans(script, contract)
+    final = _residual_orphans(script, contract) - decided_residuals
     if not final:
         return RepairOutcome(
             iterations=max_iterations,
