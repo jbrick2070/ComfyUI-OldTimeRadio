@@ -5,6 +5,67 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-135 [FIXED]: Music / SFX / gap segments freeze the radio set with 47.8 s of static-radio fill instead of looping a motion clip (caught by 2026-05-08 13:39 clean run, design call by Jeffrey)
+
+- **Date:** 2026-05-08 late afternoon | **Phase:** 6 | **Bible candidate:** yes
+- **Symptom:** The `signal_lost_lunar_dawn_20260508_133930` clean run
+  reported `BUG-084 gap-fill: inserted 3 static-radio segment(s),
+  total 47.794 s of coverage` — meaning the announcer LTX clip
+  (5.6 s) and one HuMo character clip (4.9 s) were the only moving
+  imagery in a 58.3 s episode; the remaining 47.8 s (music_open,
+  music_close, interstitial slot, inter-clip gaps) was painted as
+  the radio bookend PNG held perfectly still. Pre-2026-05-04
+  runs (e.g. `signal_lost_boosting_one_protein_helps_the_brain_fig_20260502_170555`)
+  rendered LTX motion clips for music_opening_001/002 and
+  music_closing_001/002 via a `lines[]` mirror; that mirror's
+  appended rows are not landing in the post-rename ledger snapshot
+  this build, so `BatchLTXRender`'s plan loop sees only the
+  `announcer` line and the per-music-cue LTX path silently
+  evaporates.
+- **Cause:** Two stacked issues. (a) The music mirror's `lines[]`
+  appends are getting clobbered before `BatchLTXRender` reads the
+  ledger (likely a save-race between `EpisodeAssembler.lines[]
+  +=2` and `SignalLostVideo`'s post-rename re-save with a stale
+  in-memory ledger). (b) Even if (a) were fixed, the static-radio
+  helper (`_render_static_radio_segment`, BUG-LOCAL-129a) is the
+  only fallback wired into `VideoComposite` for gap_fill segments,
+  so any non-LTX-covered span lands as a frozen frame instead of
+  inheriting the broadcast-set motion that the announcer LTX
+  already produced for free.
+- **Fix:** Sidesteps (a) entirely by attacking (b) at the
+  `VideoComposite` consumer side. New helper
+  `_render_loop_motion_segment` ffmpeg-`-stream_loop`'s an existing
+  motion clip to fit any requested duration, with the same
+  invariants as the static helper (frame-exact via `-frames:v`,
+  locked timebase 12800, libx264 yuv420p crf=18 preset=fast,
+  `-an` so master mix attaches once in the final mux). New
+  resolver `_resolve_loop_motion_for_fill` picks a loop source
+  in this order: pre-baked
+  `<episode_dir>/loop/loop_radio_motion.mp4` (reserved for a
+  future Phase 1 producer), then the first ledger
+  `clips[]` entry with `source_kind='ltx'` whose mp4 lives on
+  disk (typically the announcer clip — zero extra render cost
+  since it already exists), then any `clips_dir/l*.mp4` as a
+  catch-all. All three `VideoComposite` fill sites — missing-clip
+  fallback, BUG-084 inter-clip gap-fill, BUG-084 trailing
+  tail-fill — now try motion-loop first and fall through to
+  BUG-LOCAL-129a static-radio on any failure (resolver miss,
+  ffmpeg subprocess error, etc.). Reporting upgraded to log the
+  loop-vs-static split per run so the regression is observable
+  from the next clean-run audit.
+- **Verify:** AST clean,
+  `python -m pytest tests/test_batch_ltx_render.py -q` 33/33
+  passing, Bug Bible regression 23/23 passing. Next live run
+  should report `BUG-084 gap-fill: inserted N segment(s) total
+  X.XX s (loop=N static=0)` where today's run reported
+  `(loop=0 static=3)`. Visual check: the radio bookend should
+  show subtle motion across the full episode instead of three
+  freeze segments.
+- **Tags:** ltx, video-composite, gap-fill, ffmpeg, static-fill,
+  motion-loop, BUG-084, BUG-129a
+
+---
+
 ### BUG-LOCAL-134 [FIXED]: BAD_IMAGE_SAVE gate false-fires on BatchFluxRender skip_env_stills sentinel placeholder (caught by 2026-05-08 13:07 clean run)
 
 - **Date:** 2026-05-08 mid-day | **Phase:** 5 | **Bible candidate:** yes
