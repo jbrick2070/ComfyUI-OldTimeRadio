@@ -87,6 +87,39 @@ Open a new session with the failing log section + the audit script's report. The
 
 ## Phase 0+ candidates (post-v2.0-alpha)
 
+### Status snapshot — 2026-05-08 OVERNIGHT autonomous sprint
+
+**Pushed to `origin/v2.0-alpha` overnight (head: `4eeda0e`):**
+
+| Commit | What landed |
+|---|---|
+| `b8c26f4` | Predecessor baseline -- §1+§2+§3 skeletons + audit calibration + BUG-118 widget fix |
+| `dfe26e6` | §1 helpers: `build_contract_from_director_plan` + `detect_aliases` |
+| `c10bf16` | BUG-LOCAL-120 update |
+| `8e07a1a` | BUG-LOCAL-121 (round-robin Element 4): KeyError on padded `voice_assignments` keys |
+| `f7a06e1` | BUG-LOCAL-122 (round-robin Element 2): `lock_to_episode` read-and-compare-version with `CastContractMismatch` |
+| `eba1f5e` | §4+§5 skeleton: `nodes/_otr_cast_repair.py` -- `OrphanClass` 5-bucket enum + `apply_classifications` + plateau-bounded `repair_orphans` + `CastContractUnreparable` |
+| `dfa9b07` | Voice Backend Abstraction skeleton (NEW FILES ONLY): `nodes/_voice_backends/{__init__,_protocol,bark,kokoro}.py` registry/protocol + bark/kokoro stubs + `nodes/voice_render.py` `OTR_VoiceRender` (UNREGISTERED) |
+| `6b05fd0` | Old-timey LLM module: `nodes/_otr_period_prompts.py` 1940s system prompt + 3 period exemplars + `render_prompt` |
+| `4eeda0e` | `scripts/soak_watch.ps1` polls episode dir + auto-audits when soak quiets |
+
+**Test floor:** 106/106 cast-contract suite + 33/33 LTX regression + AST clean.
+
+**What did NOT land overnight (waiting on FULL acceptance soak finish):**
+
+- Story orchestrator hooks at L6423 / L~640 / L920 (locked file)
+- `production_ledger.py` `cast_contract_version` merge guard (locked file)
+- Migration of Bark / Kokoro logic into `_voice_backends/{bark,kokoro}.py` (touches `batch_bark_generator.py` + `kokoro_announcer.py`, both locked)
+- Registration of `OTR_VoiceRender` in `__init__.py`
+- LLM wire-up for `repair_orphans` (the `Classifier` callable; today it's a deterministic stub)
+- Period-prompt integration into the existing LLM call site
+
+These are all "edit-locked-file" tasks. They can land in a single follow-up session once the soak is verifiably done -- the new helpers + 106-test green baseline are the substrate that follow-up session will build on.
+
+**Round-robin code review:** transcripts at `docs/2026-05-08-cast-contract-shipped-code-review__01_chatgpt.md` (gpt-5.5, 80.2s) + `__02_gemini.md` (gemini-3.1-pro-preview-customtools, 65.4s) + `__04_synthesis.md`. Two real bugs caught (BUG-121 padded-key KeyError + BUG-122 lock blind-refusal) and both fixed in the same autonomous loop.
+
+---
+
 ### Cast Contract Extensions
 
 **Extends:** existing "Character Identity as a Data Contract" RFC.
