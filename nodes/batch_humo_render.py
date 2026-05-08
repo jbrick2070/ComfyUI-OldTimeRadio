@@ -113,6 +113,14 @@ def _is_oom_exception(exc: BaseException) -> bool:
     return False
 
 
+# Module-level reference for ledger telemetry. Set by execute() so
+# the helper can stamp `meta.cuda_hard_reset_count` from the same
+# process state. Not threaded through args because the helper is
+# called via try/except in code paths where threading kwargs would
+# add noise to recovery code.
+_CURRENT_LEDGER_REF: dict | None = None
+
+
 def _hard_reset_cuda_context() -> None:
     """Soft CUDA cleanup chain after a CAUGHT OOM.
 
@@ -223,6 +231,25 @@ def _hard_reset_cuda_context() -> None:
             "[BatchHumoRender] BUG-LOCAL-126 cuda hard-reset OK: %s",
             ", ".join(steps_run),
         )
+
+    # l3-2026-05-08 telemetry: bump meta.cuda_hard_reset_count so the
+    # ledger durably records that the cleanup chain fired in this
+    # process, even if the ComfyUI log later rotates or vanishes.
+    if _CURRENT_LEDGER_REF is not None:
+        try:
+            from . import _otr_ledger as _OTRL_HR  # type: ignore
+        except ImportError:
+            try:
+                import _otr_ledger as _OTRL_HR  # type: ignore
+            except Exception:  # noqa: BLE001
+                _OTRL_HR = None  # type: ignore[assignment]
+        if _OTRL_HR is not None:
+            try:
+                _OTRL_HR.bump_meta_cuda_hard_reset_count(_CURRENT_LEDGER_REF)
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchHumoRender] cuda_hard_reset_count bump failed: %s", exc,
+                )
 
 
 class HumoSoakCapReached(RuntimeError):
@@ -1394,6 +1421,25 @@ class BatchHumoRender:
 
         # ---- 1. Parse ledger ----
         ledger, ledger_path = self._load_ledger_with_path(ledger_json)
+
+        # l3-2026-05-08 telemetry: expose this process's ledger to
+        # `_hard_reset_cuda_context` so cuda_hard_reset_count bumps
+        # without threading the ledger ref through every helper. Also
+        # append a process_runs[] entry so multi-batch resume sequence
+        # is provable from any single ledger.
+        global _CURRENT_LEDGER_REF
+        _CURRENT_LEDGER_REF = ledger
+        try:
+            try:
+                from . import _otr_ledger as _OTRL_PR  # type: ignore
+            except ImportError:
+                import _otr_ledger as _OTRL_PR  # type: ignore
+            _OTRL_PR.append_meta_process_run(ledger)
+        except Exception as _pr_exc:  # noqa: BLE001
+            log.warning(
+                "[BatchHumoRender] process_runs append failed (non-fatal): %s",
+                _pr_exc,
+            )
         cast = ledger.get("cast") or []
         lines = ledger.get("lines") or []
 
@@ -2266,27 +2312,58 @@ class BatchHumoRender:
                     log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
                 rendered += 1
 
+                # l3-2026-05-08 telemetry: stamp lines[].render_method
+                # so an audit can distinguish humo_native success from
+                # static-radio fallback. Done HERE (post-success) so
+                # only actually-rendered HuMo lines carry the tag.
+                try:
+                    try:
+                        from . import _otr_ledger as _OTRL_RM  # type: ignore
+                    except ImportError:
+                        import _otr_ledger as _OTRL_RM  # type: ignore
+                    _OTRL_RM.stamp_line_render_method(
+                        ledger, line_id, "humo_native",
+                    )
+                except Exception as _rm_exc:  # noqa: BLE001
+                    log.warning(
+                        "[BatchHumoRender] render_method stamp "
+                        "failed (non-fatal): %s", _rm_exc,
+                    )
+
                 # BUG-LOCAL-126 soak cap. Save the ledger first so the
                 # follow-up resume picks up cleanly, then raise the
                 # structured signal. Cap == 0 disables this branch.
                 if humo_max_lines_per_process > 0 and rendered >= humo_max_lines_per_process:
-                    if ledger_path is not None:
+                    try:
                         try:
-                            try:
-                                from . import _otr_ledger as _OTRL_CAP  # type: ignore
-                            except ImportError:
-                                _NODES_DIR_CAP = Path(__file__).resolve().parent
-                                if str(_NODES_DIR_CAP) not in _sys.path:
-                                    _sys.path.insert(0, str(_NODES_DIR_CAP))
-                                import _otr_ledger as _OTRL_CAP  # type: ignore
+                            from . import _otr_ledger as _OTRL_CAP  # type: ignore
+                        except ImportError:
+                            _NODES_DIR_CAP = Path(__file__).resolve().parent
+                            if str(_NODES_DIR_CAP) not in _sys.path:
+                                _sys.path.insert(0, str(_NODES_DIR_CAP))
+                            import _otr_ledger as _OTRL_CAP  # type: ignore
+                        # l3-2026-05-08 telemetry: stamp meta.soak_cap
+                        # BEFORE the ledger save so the persisted state
+                        # records the cap-hit fact, not just the line
+                        # count. Lets the follow-up run distinguish
+                        # "cap fired cleanly" from "process crashed
+                        # mid-render and the next batch should ramp
+                        # backoff before retrying".
+                        _OTRL_CAP.stamp_meta_soak_cap(
+                            ledger,
+                            cap=humo_max_lines_per_process,
+                            lines_completed_when_hit=rendered,
+                            hit=True,
+                        )
+                        if ledger_path is not None:
                             ledger["clips"] = list(clip_records)
                             _OTRL_CAP.save_ledger_safe(ledger_path, ledger)
-                        except Exception as _cap_save_exc:  # noqa: BLE001
-                            log.warning(
-                                "[BatchHumoRender] BUG-LOCAL-126 cap-reached "
-                                "ledger save failed (non-fatal): %s",
-                                _cap_save_exc,
-                            )
+                    except Exception as _cap_save_exc:  # noqa: BLE001
+                        log.warning(
+                            "[BatchHumoRender] BUG-LOCAL-126 cap-reached "
+                            "ledger save failed (non-fatal): %s",
+                            _cap_save_exc,
+                        )
                     log.warning(
                         "[BatchHumoRender] BUG-LOCAL-126 soak cap reached "
                         "(%d of cap %d); ledger persisted; "
@@ -2346,6 +2423,21 @@ class BatchHumoRender:
                     cuda_hard_reset_on_oom and _is_oom_exception(exc)
                 )
                 _failed_line_id = line_id
+                # l3-2026-05-08 telemetry: bump per-line OOM recovery
+                # counter so post-mortem can answer "which lines
+                # consumed the recovery cycles?" without grepping log.
+                if _needs_oom_cleanup:
+                    try:
+                        try:
+                            from . import _otr_ledger as _OTRL_OOM  # type: ignore
+                        except ImportError:
+                            import _otr_ledger as _OTRL_OOM  # type: ignore
+                        _OTRL_OOM.bump_line_oom_recovery_count(ledger, line_id)
+                    except Exception as _oom_te:  # noqa: BLE001
+                        log.warning(
+                            "[BatchHumoRender] oom_recovery_count bump "
+                            "failed: %s", _oom_te,
+                        )
             else:
                 _needs_oom_cleanup = False
                 _failed_line_id = None

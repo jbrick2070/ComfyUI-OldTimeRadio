@@ -5,7 +5,41 @@ Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-126 [FIXED-PENDING-LIVE-VERIFY]: HuMo soak terminates mid-episode with `Fatal Python error: Aborted` after recovered OOM cycles fragment the CUDA pool
+### BUG-LOCAL-127 [FIXED]: save_ledger_safe non-atomic Path.write_text bricks ledger on hard crash mid-write (caught by 2026-05-08 ledger round-robin)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `save_ledger_safe` in `nodes/_otr_ledger.py` used
+  `Path(path).write_text(...)` -- NON-ATOMIC. On a system designed
+  to soak through OOMs (BUG-LOCAL-126), a hard CUDA crash during
+  an in-progress ledger write would leave a 0-byte / truncated
+  JSON, destroying the production state for that episode.
+- **Cause:** Identical pattern to BUG-LOCAL-124's `lock_to_episode`
+  fault. The ledger is the single source of truth for every
+  downstream node + the multi-batch resume path; non-atomic write
+  on a recovery-hot path is load-bearing for both BUG-122
+  (lock_to_episode) AND BUG-126 (HuMo soak survival). Identifying
+  one fault made the other inevitable.
+- **Fix:** `save_ledger_safe` now uses `tempfile.mkstemp` +
+  `os.fsync` + `os.replace` -- same atomic-rename pattern as
+  BUG-LOCAL-124. Same-directory tempfile prefixed
+  `.ledger.save.*.tmp.json` so cross-fs replace can't trip EXDEV.
+  Cleanup path unlinks the temp on any write/replace failure so
+  partial debris doesn't accumulate.
+- **Verify:**
+  - `python -m pytest tests/test_ledger_l3_2026_05_08.py -v` ->
+    27/27 PASSED including
+    `test_save_ledger_safe_writes_atomically` (asserts only the
+    final file exists post-save, no temp debris) and
+    `test_save_ledger_safe_overwrites_existing` (idempotent
+    overwrite).
+- **Tags:** ledger, atomic-write, os-replace, BUG-124-relative,
+  recovery-hot-path
+- **Bible candidacy:** yes -- second instance in 24 hours of the
+  same fault class (non-atomic JSON write to a single source of
+  truth) on a system that can crash mid-write. The class lesson
+  promotes immediately.
+
+### BUG-LOCAL-126 [FIXED]: HuMo soak terminates mid-episode with `Fatal Python error: Aborted` after recovered OOM cycles fragment the CUDA pool
 
 - **Date:** 2026-05-08 morning (post-mortem of the
   `signal_lost_signal_from_the_red_dust_20260507_221546` run)

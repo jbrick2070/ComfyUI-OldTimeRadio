@@ -250,22 +250,32 @@ def find_latest_comfyui_log(log_dir: Path = DEFAULT_USER_LOG_DIR) -> Path | None
     return candidates[0]
 
 
-def audit_log(log_path: Path) -> list[str]:
+def audit_log(log_path: Path) -> tuple[list[str], list[str]]:
+    """Audit a comfyui log against ``FAIL_PATTERNS``.
+
+    Returns ``(fails, patterns_hit)`` -- ``fails`` is the human-
+    readable failure messages, ``patterns_hit`` is the canonical
+    pattern strings that matched (used by l3-2026-05-08 to stamp
+    ``meta.audit_verdict.fail_patterns_hit`` in the ledger).
+    """
     fails: list[str] = []
+    patterns_hit: list[str] = []
     if not log_path.is_file():
-        return [f"WARN: log file not found at {log_path}"]
+        return [f"WARN: log file not found at {log_path}"], []
     text = log_path.read_text(encoding="utf-8", errors="replace")
     for pattern in FAIL_PATTERNS:
         if isinstance(pattern, str):
             if pattern in text:
                 fails.append(f"FAIL: log contains '{pattern}'")
+                patterns_hit.append(pattern)
         else:
             m = pattern.search(text)
             if m:
                 fails.append(f"FAIL: log contains '{m.group(0)}'")
+                patterns_hit.append(pattern.pattern)
     if not fails:
         print(f"OK: log clean of failure strings ({log_path.name})")
-    return fails
+    return fails, patterns_hit
 
 
 def main() -> int:
@@ -300,11 +310,61 @@ def main() -> int:
                   f"{DEFAULT_USER_LOG_DIR}; skipping log audit")
 
     all_fails: list[str] = []
+    log_patterns_hit: list[str] = []
     clip_fails, ltx_n, short_n = audit_clips(episode_dir, ledger)
     all_fails += clip_fails
     all_fails += audit_finals(episode_dir)
     if log_path is not None:
-        all_fails += audit_log(log_path)
+        log_fails, log_patterns_hit = audit_log(log_path)
+        all_fails += log_fails
+
+    # l3-2026-05-08: stamp the verdict back into the ledger so the
+    # audit answer survives in the single source of truth, not just
+    # in stdout / outputs/soak_status.txt. Best-effort; failures
+    # never escalate the audit run itself.
+    pass_ = not all_fails
+    try:
+        # Late import: this script is launched standalone; the OTR
+        # nodes package may not be on sys.path. Bootstrap it.
+        repo_root = Path(__file__).resolve().parent.parent
+        nodes_dir = repo_root / "nodes"
+        if str(nodes_dir) not in sys.path:
+            sys.path.insert(0, str(nodes_dir))
+        import _otr_ledger as _OTRL_AUDIT  # type: ignore
+
+        # Find the canonical ledger path: look for the
+        # *_ledger.json file under the episode dir.
+        ledger_path: Path | None = None
+        for cand in (
+            episode_dir / "ledger.json",
+            episode_dir / "metadata" / "ledger.json",
+        ):
+            if cand.is_file():
+                ledger_path = cand
+                break
+        if ledger_path is None:
+            # Fall back: most recent *_ledger.json under audio/ or root.
+            for sub in (episode_dir / "audio", episode_dir):
+                if sub.is_dir():
+                    cands = sorted(
+                        sub.glob("*_ledger.json"),
+                        key=lambda p: p.stat().st_mtime,
+                        reverse=True,
+                    )
+                    if cands:
+                        ledger_path = cands[0]
+                        break
+        if ledger_path is not None:
+            _OTRL_AUDIT.stamp_meta_audit_verdict(
+                ledger,
+                pass_=pass_,
+                fail_patterns_hit=log_patterns_hit,
+            )
+            _OTRL_AUDIT.save_ledger_safe(ledger_path, ledger)
+            print(f"OK: stamped meta.audit_verdict to {ledger_path.name}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"WARN: meta.audit_verdict stamp failed (non-fatal): {exc}",
+              file=sys.stderr)
 
     print()
     if all_fails:

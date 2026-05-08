@@ -28,10 +28,14 @@ Consumers should accept either location for back-compat with l2 ledgers.
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import logging
+import os
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -41,7 +45,7 @@ log = logging.getLogger("OTR")
 # Constants
 # ---------------------------------------------------------------------------
 
-CURRENT_SCHEMA_VERSION = "l3-2026-05-02"
+CURRENT_SCHEMA_VERSION = "l3-2026-05-08"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
 date suffix so the lineage is greppable.
@@ -58,6 +62,45 @@ Lineage:
                    BUG-LOCAL-018). All readers must continue to use
                    meta.get(...) with default-None to stay back-compat
                    with l3-2026-04-28 ledgers.
+  l3-2026-05-08 -- ADDITIVE: BUG-126 telemetry + Cast Contract pre-wiring
+                   per round-robin synthesis (ChatGPT gpt-5.5 +
+                   Gemini gemini-3.1-pro-preview-customtools, transcripts
+                   at docs/2026-05-08-ledger-schema-additions__*.md).
+                   New fields:
+                     lines[].oom_recovery_count       (int, default 0)
+                     lines[].render_method            (str, default "unknown")
+                                                       -- one of: humo_native,
+                                                          ltx_native,
+                                                          static_radio_fill,
+                                                          kokoro_announcer_only,
+                                                          unknown
+                     lines[].cast_contract_version    (str | None)
+                     clips[].humo_oom_recovered       (bool, default False)
+                     clips[].humo_oom_recovered_at_chunk (int | None)
+                     cast[].voice_spec                (str | None,
+                                                       canonical "engine:preset")
+                     cast_contract_version            (top-level, str | None)
+                     cast_contract                    (top-level, dict | None,
+                                                       mirrors CastContract.to_dict)
+                     meta.cuda_hard_reset_count       (int, default 0)
+                     meta.soak_cap                    (dict)
+                     meta.process_runs[]              (append-only list of
+                                                       {pid, started_at})
+                     meta.audit_verdict               (dict, set by
+                                                       audit_otr_full_run.py)
+                   Plus: save_ledger_safe is now ATOMIC via tempfile +
+                   os.replace (BUG-LOCAL-127 catch from same round-robin).
+                   Soft-deprecated (still written by older producers, do
+                   not retire until l4): beats[], total_beats,
+                   lines[].boundary, lines[].shot_id, lines[].beat_id,
+                   shots[].png_path/start_s/dur_s, lines[].bark_wav_path
+                   (use lines[].tts_wav_path going forward, both written
+                   during the transition).
+
+Reader pattern for all l3-2026-05-08 fields: ALWAYS use
+``dict.get(field, default)`` with the documented default. Older
+ledgers will return the default, newer ledgers return the stamped
+value. No KeyError on either side.
 """
 
 GATE_HASH_BYTES = 1024
@@ -159,7 +202,7 @@ def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
 
 def save_ledger_safe(path: Path, ledger: dict) -> bool:
     """Write a ledger dict back to disk with schema_version + meta.paths
-    stamped.
+    stamped. ATOMIC via tempfile + ``os.replace`` (BUG-LOCAL-127).
 
     Always sets:
       - ``ledger["schema_version"]``
@@ -172,7 +215,17 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
     rename_episode), the next ledger save reflects the new location
     without any caller having to update it explicitly.
 
+    Atomic write rationale (BUG-LOCAL-127, caught by 2026-05-08
+    round-robin): the ledger is the single source of truth for
+    every downstream node + the multi-batch resume path. A hard
+    CUDA crash during an in-progress write would leave a 0-byte /
+    truncated JSON, destroying the production state for that
+    episode. Mitigates by writing to ``<path>.tmp.<random>`` in
+    the same directory then ``os.replace`` -- atomic on Windows
+    NTFS and POSIX.
+
     Returns True on success, False on failure (always logs WARNING).
+    Cleanup: any partial temp file is unlinked on failure.
     """
     try:
         ledger["schema_version"] = CURRENT_SCHEMA_VERSION
@@ -180,10 +233,37 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
         meta["schema_version"] = CURRENT_SCHEMA_VERSION
         episode_id = ledger.get("episode_id") or ""
         meta["paths"] = _build_meta_paths(Path(path), str(episode_id))
-        Path(path).write_text(
-            json.dumps(ledger, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        payload = json.dumps(ledger, indent=2, ensure_ascii=False)
+        target = Path(path)
+        # tempfile.mkstemp in the SAME dir as the target so os.replace
+        # is a same-filesystem atomic rename (cross-fs replace can
+        # fail with EXDEV on POSIX; on NTFS it's still atomic but
+        # slower). Prefix is hidden + descriptive for forensic value.
+        tmp_dir = str(target.parent) if target.parent.exists() else None
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            prefix=".ledger.save.",
+            suffix=".tmp.json",
+            dir=tmp_dir,
         )
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+                fh.flush()
+                try:
+                    os.fsync(fh.fileno())
+                except OSError:
+                    # fsync can fail on some Windows file systems
+                    # (network drives, filesystems without flush
+                    # support). Non-fatal; the write itself flushed.
+                    pass
+            os.replace(tmp_name, target)
+        except Exception:
+            # Clean up the partial temp so we don't leave debris.
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
         return True
     except Exception as exc:
         log.warning("[OTR_Ledger] ledger save failed (%s): %s", path, exc)
@@ -549,9 +629,329 @@ def append_transition(
         log.warning("[OTR_Ledger] append_transition failed: %s", exc)
 
 
+# ---------------------------------------------------------------------------
+# l3-2026-05-08: BUG-126 telemetry helpers
+# ---------------------------------------------------------------------------
+#
+# All helpers below are best-effort and never raise. Callers (HuMo
+# loop, audit script, etc.) MUST be able to call these from
+# recovery paths without escalating the fault.
+
+
+VALID_RENDER_METHODS = (
+    "humo_native",
+    "ltx_native",
+    "static_radio_fill",
+    "kokoro_announcer_only",
+    "unknown",
+)
+
+
+def _find_line(ledger: dict, line_id: str) -> Optional[dict]:
+    """Locate a line dict by ``line_id`` inside ``ledger["lines"]``.
+
+    Returns the dict (mutating-friendly reference) or None. Used
+    internally by the per-line stamp helpers so callers don't have
+    to thread the index.
+    """
+    if not isinstance(ledger, dict) or not line_id:
+        return None
+    lines = ledger.get("lines") or []
+    for line in lines:
+        if isinstance(line, dict) and str(line.get("line_id") or "") == str(line_id):
+            return line
+    return None
+
+
+def bump_line_oom_recovery_count(ledger: dict, line_id: str) -> int:
+    """Increment ``lines[i].oom_recovery_count`` for the named line.
+
+    Returns the new count, or 0 on miss. Caller logs at WARNING if
+    the count is climbing -- BUG-126 telemetry; high count means
+    the cleanup chain isn't actually relieving allocator pressure.
+    """
+    try:
+        line = _find_line(ledger, line_id)
+        if line is None:
+            return 0
+        cur = int(line.get("oom_recovery_count") or 0)
+        new = cur + 1
+        line["oom_recovery_count"] = new
+        return new
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] bump_line_oom_recovery_count(%s) failed: %s",
+            line_id, exc,
+        )
+        return 0
+
+
+def stamp_line_render_method(ledger: dict, line_id: str, method: str) -> None:
+    """Stamp ``lines[i].render_method``. Warns (does NOT raise) if
+    ``method`` is not in ``VALID_RENDER_METHODS``; unknown values
+    still pass through so a future producer adding a new method
+    (e.g. ``cosyvoice_native``) doesn't crash older readers.
+    """
+    try:
+        if method not in VALID_RENDER_METHODS:
+            log.warning(
+                "[OTR_Ledger] stamp_line_render_method(%s, %r): "
+                "value not in VALID_RENDER_METHODS=%s; stamping anyway",
+                line_id, method, VALID_RENDER_METHODS,
+            )
+        line = _find_line(ledger, line_id)
+        if line is None:
+            return
+        line["render_method"] = str(method)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_line_render_method(%s) failed: %s",
+            line_id, exc,
+        )
+
+
+def stamp_clip_humo_oom_recovered(
+    clip_record: dict,
+    recovered_at_chunk: Optional[int] = None,
+) -> None:
+    """Mark a clip record as having survived a caught HuMo OOM.
+
+    Mutates ``clip_record`` in place (caller appends it to
+    ``ledger["clips"]`` afterwards). Idempotent -- calling twice
+    keeps the same flag, only updates ``humo_oom_recovered_at_chunk``
+    if previously None.
+    """
+    try:
+        if not isinstance(clip_record, dict):
+            return
+        clip_record["humo_oom_recovered"] = True
+        if recovered_at_chunk is not None and clip_record.get(
+            "humo_oom_recovered_at_chunk"
+        ) is None:
+            clip_record["humo_oom_recovered_at_chunk"] = int(recovered_at_chunk)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_clip_humo_oom_recovered failed: %s", exc,
+        )
+
+
+def bump_meta_cuda_hard_reset_count(ledger: dict) -> int:
+    """Increment ``meta.cuda_hard_reset_count``. Direct telemetry for
+    whether the BUG-LOCAL-126 cleanup chain has fired. Returns the
+    new count, or 0 on miss.
+    """
+    try:
+        meta = ledger.setdefault("meta", {})
+        cur = int(meta.get("cuda_hard_reset_count") or 0)
+        new = cur + 1
+        meta["cuda_hard_reset_count"] = new
+        return new
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] bump_meta_cuda_hard_reset_count failed: %s", exc,
+        )
+        return 0
+
+
+def stamp_meta_soak_cap(
+    ledger: dict,
+    cap: int,
+    lines_completed_when_hit: int,
+    hit: bool = True,
+) -> None:
+    """Stamp ``meta.soak_cap`` on the HumoSoakCapReached path.
+
+    Schema: ``{cap: int, lines_completed_when_hit: int, hit: bool}``.
+    Default for absent field per round-robin: ``{hit: false,
+    cap: null, lines_completed_when_hit: null}`` so a reader can
+    distinguish "no cap configured" from "cap configured but not
+    yet hit".
+    """
+    try:
+        meta = ledger.setdefault("meta", {})
+        meta["soak_cap"] = {
+            "cap": int(cap) if cap is not None else None,
+            "lines_completed_when_hit": (
+                int(lines_completed_when_hit)
+                if lines_completed_when_hit is not None
+                else None
+            ),
+            "hit": bool(hit),
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_meta_soak_cap failed: %s", exc,
+        )
+
+
+def append_meta_process_run(
+    ledger: dict,
+    pid: Optional[int] = None,
+    started_at: Optional[str] = None,
+) -> None:
+    """Append a process-run entry to ``meta.process_runs[]``.
+
+    Round-robin Element 10 catch (Gemini): a scalar ``meta.process_id``
+    would be overwritten on every resume, destroying the chain. The
+    append-only list preserves the multi-batch sequence so any single
+    ledger proves the order of restarts.
+
+    Defaults: ``pid`` from ``os.getpid()``, ``started_at`` from
+    ``datetime.utcnow().isoformat()``. Caller can pass values
+    explicitly when stamping a known cross-process state.
+    """
+    try:
+        if pid is None:
+            pid = os.getpid()
+        if started_at is None:
+            started_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        meta = ledger.setdefault("meta", {})
+        runs = meta.setdefault("process_runs", [])
+        # Avoid duplicate stamps when a node calls this twice in the
+        # same run; latest entry wins on the timestamp tiebreak.
+        if runs and runs[-1].get("pid") == int(pid):
+            runs[-1]["started_at"] = str(started_at)
+            return
+        runs.append({"pid": int(pid), "started_at": str(started_at)})
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] append_meta_process_run failed: %s", exc,
+        )
+
+
+def stamp_meta_audit_verdict(
+    ledger: dict,
+    pass_: bool,
+    fail_patterns_hit: Optional[list[str]] = None,
+    ts: Optional[str] = None,
+) -> None:
+    """Stamp ``meta.audit_verdict`` after ``audit_otr_full_run.py``
+    finishes. Schema: ``{pass: bool, ts: str, fail_patterns_hit: list[str]}``.
+
+    Writers should run this LAST, after every other ledger field
+    has been stamped, so the audit reflects the final state of the
+    run. Re-running the audit on a previously-audited ledger
+    overwrites this block (idempotent).
+    """
+    try:
+        if ts is None:
+            ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        meta = ledger.setdefault("meta", {})
+        meta["audit_verdict"] = {
+            "pass": bool(pass_),
+            "ts": str(ts),
+            "fail_patterns_hit": list(fail_patterns_hit or []),
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_meta_audit_verdict failed: %s", exc,
+        )
+
+
+# ---------------------------------------------------------------------------
+# l3-2026-05-08: Cast Contract pre-wiring helpers (Phase 0+ §1+§2+§3)
+# ---------------------------------------------------------------------------
+#
+# These helpers EXIST now so the ledger schema is aligned with the
+# cast contract module. The orchestrator hooks at L6423/L640/L920
+# in story_orchestrator.py call them once those wires land.
+#
+# IMPORTANT (round-robin C7 caution): the cast_contract version sha
+# is computed by `nodes/_otr_cast_contract.CastContract.stamp_version`
+# from the canonical roster ONLY. It MUST NOT include any of the
+# l3-2026-05-08 telemetry fields (process_runs, audit_verdict,
+# cuda_hard_reset_count, soak_cap, etc.). Otherwise content addressing
+# breaks across otherwise-identical resumes.
+
+
+def stamp_cast_contract_version(ledger: dict, version: Optional[str]) -> None:
+    """Stamp top-level ``cast_contract_version``. Pass ``None`` to
+    keep the field absent (back-compat with l3-2026-05-02 readers).
+    """
+    try:
+        if version is None:
+            return
+        ledger["cast_contract_version"] = str(version)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_cast_contract_version failed: %s", exc,
+        )
+
+
+def stamp_cast_contract(ledger: dict, contract_dict: Optional[dict]) -> None:
+    """Stamp top-level ``cast_contract`` (the locked-roster JSON dump
+    from ``CastContract.to_dict``). Mirrors the contract's exact
+    shape: ``{version: "sha:...", characters: [...]}``.
+    """
+    try:
+        if contract_dict is None:
+            return
+        if not isinstance(contract_dict, dict):
+            log.warning(
+                "[OTR_Ledger] stamp_cast_contract: contract_dict not a dict (%r)",
+                type(contract_dict).__name__,
+            )
+            return
+        ledger["cast_contract"] = dict(contract_dict)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_cast_contract failed: %s", exc,
+        )
+
+
+def stamp_line_cast_contract_version(
+    ledger: dict,
+    line_id: str,
+    version: Optional[str],
+) -> None:
+    """Stamp ``lines[i].cast_contract_version`` for the named line.
+    Lets ``production_ledger`` reject mixed-version merges in O(1).
+    Pass ``None`` to keep absent.
+    """
+    try:
+        if version is None:
+            return
+        line = _find_line(ledger, line_id)
+        if line is None:
+            return
+        line["cast_contract_version"] = str(version)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_line_cast_contract_version(%s) failed: %s",
+            line_id, exc,
+        )
+
+
+def stamp_cast_voice_spec(
+    ledger: dict,
+    char_id: str,
+    voice_spec: Optional[str],
+) -> None:
+    """Stamp ``cast[i].voice_spec`` (canonical ``"engine:preset"``)
+    for the named character. Adds the new field WITHOUT removing
+    the legacy ``cast[i].voice_preset`` -- both written during the
+    cast-contract transition window per round-robin synthesis.
+    """
+    try:
+        if voice_spec is None:
+            return
+        cast = ledger.get("cast") or []
+        for member in cast:
+            if not isinstance(member, dict):
+                continue
+            if str(member.get("char_id") or "") == str(char_id):
+                member["voice_spec"] = str(voice_spec)
+                return
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Ledger] stamp_cast_voice_spec(%s) failed: %s", char_id, exc,
+        )
+
+
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "GATE_HASH_BYTES",
+    "VALID_RENDER_METHODS",
     "load_ledger_safe",
     "save_ledger_safe",
     "find_most_recent_ledger",
@@ -564,4 +964,17 @@ __all__ = [
     "set_meta",
     "record_phase_ms",
     "append_transition",
+    # l3-2026-05-08 BUG-126 telemetry
+    "bump_line_oom_recovery_count",
+    "stamp_line_render_method",
+    "stamp_clip_humo_oom_recovered",
+    "bump_meta_cuda_hard_reset_count",
+    "stamp_meta_soak_cap",
+    "append_meta_process_run",
+    "stamp_meta_audit_verdict",
+    # l3-2026-05-08 Cast Contract pre-wiring
+    "stamp_cast_contract_version",
+    "stamp_cast_contract",
+    "stamp_line_cast_contract_version",
+    "stamp_cast_voice_spec",
 ]
