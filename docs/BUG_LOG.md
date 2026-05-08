@@ -5,6 +5,53 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-131 [FIXED]: Node 55 (OTR_BatchLTXRender) widget drift -- stale "fixed" value blocks workflow validation (caught by 2026-05-08 final-revision QA round-robin)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `workflows/otr_scifi_16gb_full.json` Node 55
+  (`OTR_BatchLTXRender`) had 6 `widgets_values` entries against an
+  `INPUT_TYPES` schema that expected 5 widget-renderable inputs.
+  Saved layout: `["", 1, "fixed", "ffmpeg", "", 22.0]`. Effective
+  position-mapped binding was:
+  ```
+  slot  expects             gets     consequence
+  [0]   ledger_json         ""       link 90 overrides; harmless
+  [1]   seed                1        correct
+  [2]   ffmpeg              "fixed"  invokes binary "fixed" -> runtime crash
+  [3]   humo_clips_dir      "ffmpeg" link 91 overrides; harmless
+  [4]   clip_length         ""       empty STRING in FLOAT field
+                                     -> ComfyUI validation crash
+  [5]   (overflow)          22.0     ignored
+  ```
+  Even if validation passed (e.g. ComfyUI defaulted `clip_length`
+  to 7.0 on empty), the production runs would have produced
+  7-second LTX chunks instead of the intended 22-second chunks.
+- **Cause:** Same fault class as BUG-LOCAL-097 and BUG-LOCAL-118:
+  `INPUT_TYPES` had a `seed_mode` widget at position [2] in a
+  prior version, and after that widget was removed every saved
+  value shifted left by one slot. ComfyUI position-maps
+  `widgets_values[]` -> `INPUT_TYPES`, no name lookup, so
+  removing a widget without sweeping every committed workflow
+  JSON rotates every saved value past that point.
+- **Fix:** JSON-only patch in `workflows/otr_scifi_16gb_full.json`,
+  Node 55 `widgets_values` rewritten as 5 entries:
+  `["", 1, "ffmpeg", "", 22.0]` (drop the leftover `"fixed"`).
+- **Verify:** Workflow re-parses; Node 55 widget count = 5 matches
+  the live `INPUT_TYPES` (3 link-only inputs + 5 widget inputs:
+  ledger_json STRING, seed INT, ffmpeg STRING, humo_clips_dir
+  STRING, clip_length FLOAT). Manual smoke: ComfyUI's `validate`
+  on the workflow no longer crashes at the FLOAT-empty-string
+  conversion site.
+- **Tags:** workflow-json, widget-drift, position-mapping,
+  schema-vs-savefile, BUG-097-relative, BUG-118-relative,
+  validation-crash
+- **Bible candidacy:** yes -- THIRD instance of this fault class
+  in the same repo (BUG-097, BUG-118, BUG-131). The class promotes
+  immediately and the next pre-soak checklist should explicitly
+  include "for every committed workflow JSON, sweep
+  `widgets_values[]` length against the current
+  `INPUT_TYPES` of the referenced node class."
+
 ### BUG-LOCAL-130 [FIXED]: Node 25 (OTR_SaveToEpisodeWorkspace) wired to UnloadAll passthrough instead of BatchFluxRender env stills (caught by 2026-05-08 JSON QA round-robin)
 
 - **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
