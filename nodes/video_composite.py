@@ -181,6 +181,125 @@ def _resolve_radio_still_for_static(ledger: dict | None) -> Path | None:
     return None
 
 
+def _render_loop_motion_segment(
+    *,
+    loop_mp4: Path,
+    dur_s: float,
+    canvas_w: int,
+    canvas_h: int,
+    canvas_fps: int,
+    out_path: Path,
+    ffmpeg: str,
+) -> Path:
+    """BUG-LOCAL-135 (2026-05-08): generate a motion-loop video segment
+    by ffmpeg ``-stream_loop``'ing an existing LTX motion clip to fill
+    the requested duration.  Replaces ``_render_static_radio_segment``
+    for music / sfx / gap fills so the radio set retains subtle motion
+    (vacuum-tube glow, dust motes, dial flicker) across the entire
+    episode instead of dead-frozen frames in 47+ seconds of coverage
+    that the static helper used to paint.
+
+    Implementation invariants (parity with _render_static_radio_segment
+    so concat-demuxer + ``-c copy`` accepts the segment):
+      - ``-stream_loop -1 -i <loop_mp4>`` -- repeat input forever; the
+        ``-frames:v`` cap below is what trims it to the requested dur.
+      - ``-frames:v <int(round(dur_s * canvas_fps))>`` -- exact frame
+        count, NOT ``-t``. Round-to-frame so seam drift is bounded
+        +/- 0.5 frame at each gap, not accumulating.
+      - ``-r <canvas_fps>`` -- output fps locked to canvas fps.
+      - ``-video_track_timescale 12800`` -- match HuMo / static helper
+        container timebase for clean concat.
+      - ``-an`` -- strip the source clip's audio (master mix attaches
+        in the final mux step, same as static-fill path; no double-mux
+        of an LTX clip's own dialogue/announcer audio).
+      - scale + pad to canvas_w x canvas_h (parity with static helper).
+    """
+    frame_count = max(1, int(round(float(dur_s) * float(canvas_fps))))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    vf = (
+        f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease,"
+        f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color=black,"
+        f"format=yuv420p"
+    )
+    cmd = [
+        ffmpeg, "-y", "-loglevel", "error",
+        "-stream_loop", "-1",
+        "-i", str(loop_mp4),
+        "-vf", vf,
+        "-r", str(int(canvas_fps)),
+        "-frames:v", str(frame_count),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-crf", "18", "-preset", "fast",
+        "-video_track_timescale", _STATIC_SEGMENT_TIMEBASE,
+        "-an",
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return out_path
+
+
+def _resolve_loop_motion_for_fill(
+    ledger: dict,
+    clips_dir: Path,
+    episode_dir: Path,
+) -> "Path | None":
+    """BUG-LOCAL-135 (2026-05-08): resolve the canonical motion loop
+    used for music / sfx / gap fills.  Returns the first usable motion
+    mp4 we can ffmpeg-loop, or ``None`` to fall back to the static-radio
+    fill helper (BUG-LOCAL-129a).
+
+    Lookup order (cheapest first, no extra render cost):
+      1. ``<episode_dir>/loop/loop_radio_motion.mp4`` -- canonical
+         pre-baked broadcast-set loop. Reserved for a future Phase 1
+         producer that may render a generic 5s loop separately; not
+         required for this pass.
+      2. First ``clips[]`` entry with ``source_kind=ltx`` whose mp4
+         lives on disk -- typically the announcer line.  The motion
+         prompt is broadcast-set-flavoured (per
+         ``_build_ltx_role_prompt``) so it works as a generic loop;
+         reuses an existing render at zero extra wall time.
+      3. Any per-line mp4 in ``clips_dir`` -- catch-all so the path
+         still survives if the ledger ``clips[]`` array got partially
+         clobbered by a save-race (the kind seen on 2026-05-08 where
+         the music mirror's appended lines were lost).
+
+    Empty-file guard: requires > 4 KiB so a 0-byte stub doesn't get
+    promoted to "loop" and crash the ffmpeg subprocess.
+    """
+    canonical = episode_dir / "loop" / "loop_radio_motion.mp4"
+    try:
+        if canonical.is_file() and canonical.stat().st_size > 4096:
+            return canonical
+    except OSError:
+        pass
+
+    clips = ledger.get("clips")
+    if isinstance(clips, list):
+        for c in clips:
+            if not isinstance(c, dict):
+                continue
+            if c.get("source_kind") != "ltx":
+                continue
+            mp4 = c.get("mp4_path")
+            if not mp4:
+                continue
+            try:
+                p = Path(str(mp4))
+                if p.is_file() and p.stat().st_size > 4096:
+                    return p
+            except (OSError, ValueError):
+                continue
+
+    if clips_dir.is_dir():
+        for p in sorted(clips_dir.glob("l*.mp4")):
+            try:
+                if p.stat().st_size > 4096:
+                    return p
+            except OSError:
+                continue
+    return None
+
+
 def _render_static_radio_segment(
     *,
     radio_png: Path,
@@ -882,6 +1001,39 @@ def _render_master_mix_per_clip_mux_mode(
     ledger_lines = ledger.get("lines") or []
     static_radio_png = _resolve_radio_still_for_static(ledger)
     static_seg_dir = out_mp4.parent / "_per_clip_mux_segments"
+    # BUG-LOCAL-135 (2026-05-08): resolve a canonical motion loop for
+    # music / sfx / gap fills so the radio set keeps subtle motion
+    # across the full episode instead of N seconds of dead-frozen
+    # frames. Lookup is read-only; if it returns None every fill site
+    # below falls through to BUG-LOCAL-129a static-radio behavior with
+    # zero behavioral change. clips_dir is the per-episode HuMo output
+    # dir (BatchHumoRender); episode_dir is its parent.
+    try:
+        loop_motion_mp4 = _resolve_loop_motion_for_fill(
+            ledger=ledger,
+            clips_dir=clips_dir,
+            episode_dir=clips_dir.parent,
+        )
+    except Exception as exc:
+        log.warning(
+            "[VideoComposite/per_clip_mux] BUG-135 loop resolver raised; "
+            "falling back to static-only fill: %s",
+            exc,
+        )
+        loop_motion_mp4 = None
+    if loop_motion_mp4 is not None:
+        log.info(
+            "[VideoComposite/per_clip_mux] BUG-135 motion-loop fill ENABLED: "
+            "loop=%s (music/sfx/gap segments will ffmpeg-loop this clip "
+            "instead of painting BUG-129a static-radio frames)",
+            loop_motion_mp4.name,
+        )
+    else:
+        log.info(
+            "[VideoComposite/per_clip_mux] BUG-135 motion-loop fill UNAVAILABLE "
+            "(no LTX clip on disk yet); using BUG-129a static-radio fill "
+            "for this run"
+        )
     timeline: list[dict] = []
     for ln in ledger_lines:
         line_id = str(ln.get("line_id") or "")
@@ -905,47 +1057,75 @@ def _render_master_mix_per_clip_mux_mode(
                 "source_kind": "humo",
             })
             continue
-        # Missing HuMo clip. Try static-radio fallback (BUG-129a).
-        if static_radio_png is None:
-            log.info(
-                "[VideoComposite/per_clip_mux] skip %s: clip not on disk "
-                "and no radio still available "
-                "(speaker_role=%s start_s=%.3f dur_s=%.3f)",
-                line_id, speaker_role, float(start_s), float(dur_s),
-            )
-            continue
-        try:
-            static_out = static_seg_dir / f"static_{line_id}.mp4"
-            _render_static_radio_segment(
-                radio_png=static_radio_png,
-                dur_s=float(dur_s),
-                canvas_w=canvas_w,
-                canvas_h=canvas_h,
-                canvas_fps=canvas_fps,
-                out_path=static_out,
-                ffmpeg=ffmpeg,
-            )
-        except subprocess.CalledProcessError as exc:
-            stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
-            log.warning(
-                "[VideoComposite/per_clip_mux] static-radio fallback for "
-                "%s FAILED, skipping line: %s",
-                line_id, stderr[:200],
-            )
-            continue
+        # Missing HuMo clip. Prefer BUG-LOCAL-135 motion-loop fill;
+        # fall back to BUG-LOCAL-129a static-radio fill on resolver
+        # miss or ffmpeg failure.
+        fill_source_kind = None  # "loop_ffmpeg" or "static_ffmpeg"
+        fill_out: "Path | None" = None
+        if loop_motion_mp4 is not None:
+            try:
+                loop_out = static_seg_dir / f"loop_{line_id}.mp4"
+                _render_loop_motion_segment(
+                    loop_mp4=loop_motion_mp4,
+                    dur_s=float(dur_s),
+                    canvas_w=canvas_w,
+                    canvas_h=canvas_h,
+                    canvas_fps=canvas_fps,
+                    out_path=loop_out,
+                    ffmpeg=ffmpeg,
+                )
+                fill_out = loop_out
+                fill_source_kind = "loop_ffmpeg"
+            except subprocess.CalledProcessError as exc:
+                stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                log.warning(
+                    "[VideoComposite/per_clip_mux] BUG-135 motion-loop fill "
+                    "for %s FAILED, falling through to static-radio: %s",
+                    line_id, stderr[:200],
+                )
+        if fill_out is None:
+            if static_radio_png is None:
+                log.info(
+                    "[VideoComposite/per_clip_mux] skip %s: clip not on disk "
+                    "and no radio still available "
+                    "(speaker_role=%s start_s=%.3f dur_s=%.3f)",
+                    line_id, speaker_role, float(start_s), float(dur_s),
+                )
+                continue
+            try:
+                static_out = static_seg_dir / f"static_{line_id}.mp4"
+                _render_static_radio_segment(
+                    radio_png=static_radio_png,
+                    dur_s=float(dur_s),
+                    canvas_w=canvas_w,
+                    canvas_h=canvas_h,
+                    canvas_fps=canvas_fps,
+                    out_path=static_out,
+                    ffmpeg=ffmpeg,
+                )
+                fill_out = static_out
+                fill_source_kind = "static_ffmpeg"
+            except subprocess.CalledProcessError as exc:
+                stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                log.warning(
+                    "[VideoComposite/per_clip_mux] static-radio fallback for "
+                    "%s FAILED, skipping line: %s",
+                    line_id, stderr[:200],
+                )
+                continue
         log.info(
-            "[VideoComposite/per_clip_mux] static-radio fill for %s "
+            "[VideoComposite/per_clip_mux] %s fill for %s "
             "(speaker_role=%s start_s=%.3f dur_s=%.3f) -> %s",
-            line_id, speaker_role,
-            float(start_s), float(dur_s), static_out.name,
+            fill_source_kind, line_id, speaker_role,
+            float(start_s), float(dur_s), fill_out.name,
         )
         timeline.append({
             "line_id": line_id,
             "start_s": float(start_s),
             "dur_s": float(dur_s),
-            "clip_path": static_out,
+            "clip_path": fill_out,
             "speaker_role": speaker_role,
-            "source_kind": "static_ffmpeg",
+            "source_kind": fill_source_kind,
         })
 
     if not timeline:
@@ -972,7 +1152,57 @@ def _render_master_mix_per_clip_mux_mode(
     # master audio.  Reuses the same _render_static_radio_segment helper that
     # BUG-LOCAL-129a uses for missing-clip cases.
     GAP_TOL_S = 0.1  # ignore sub-frame gaps; not worth the segment-overhead
-    if static_radio_png is not None:
+
+    def _render_gap_segment(
+        *, dur_s: float, out_path: Path,
+    ) -> "tuple[Path | None, str | None]":
+        """BUG-LOCAL-135 (2026-05-08): inner helper for BUG-084 gap-fill.
+        Tries motion-loop fill first; falls back to static-radio fill;
+        returns (path, source_kind) on success or (None, None) on
+        complete failure. Caller decides whether to log/skip.
+        """
+        if loop_motion_mp4 is not None:
+            try:
+                _render_loop_motion_segment(
+                    loop_mp4=loop_motion_mp4,
+                    dur_s=dur_s,
+                    canvas_w=canvas_w,
+                    canvas_h=canvas_h,
+                    canvas_fps=canvas_fps,
+                    out_path=out_path,
+                    ffmpeg=ffmpeg,
+                )
+                return out_path, "loop_gapfill"
+            except subprocess.CalledProcessError as exc:
+                stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+                log.warning(
+                    "[VideoComposite/per_clip_mux] BUG-135 motion-loop gap-fill "
+                    "dur=%.3f FAILED, falling through to static: %s",
+                    dur_s, stderr[:200],
+                )
+        if static_radio_png is None:
+            return None, None
+        try:
+            _render_static_radio_segment(
+                radio_png=static_radio_png,
+                dur_s=dur_s,
+                canvas_w=canvas_w,
+                canvas_h=canvas_h,
+                canvas_fps=canvas_fps,
+                out_path=out_path,
+                ffmpeg=ffmpeg,
+            )
+            return out_path, "static_gapfill"
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+            log.warning(
+                "[VideoComposite/per_clip_mux] BUG-084 static gap-fill "
+                "dur=%.3f FAILED: %s",
+                dur_s, stderr[:200],
+            )
+            return None, None
+
+    if (loop_motion_mp4 is not None) or (static_radio_png is not None):
         try:
             episode_dur = _ffprobe_dur(procgen, ffprobe) or 0.0
         except Exception:
@@ -981,39 +1211,39 @@ def _render_master_mix_per_clip_mux_mode(
         cursor = 0.0
         gap_count = 0
         gap_total_s = 0.0
+        loop_count = 0
+        static_count = 0
         for entry in timeline:
             entry_start = float(entry["start_s"])
             gap_s = entry_start - cursor
             if gap_s > GAP_TOL_S:
                 gap_id = f"gap_{cursor:08.3f}"
-                gap_out = static_seg_dir / f"static_{gap_id}.mp4"
-                try:
-                    _render_static_radio_segment(
-                        radio_png=static_radio_png,
-                        dur_s=gap_s,
-                        canvas_w=canvas_w,
-                        canvas_h=canvas_h,
-                        canvas_fps=canvas_fps,
-                        out_path=gap_out,
-                        ffmpeg=ffmpeg,
-                    )
+                # Pick filename prefix per fill kind so the segment
+                # provenance is visible from disk later (loop_*.mp4
+                # vs static_*.mp4 in _per_clip_mux_segments/).
+                loop_path = static_seg_dir / f"loop_{gap_id}.mp4"
+                static_path = static_seg_dir / f"static_{gap_id}.mp4"
+                # Try loop first (writes loop_*.mp4); if that fails the
+                # helper retries static (writes static_*.mp4 itself).
+                fill_path, fill_kind = _render_gap_segment(
+                    dur_s=gap_s,
+                    out_path=loop_path if loop_motion_mp4 is not None else static_path,
+                )
+                if fill_path is not None:
                     gapfilled.append({
                         "line_id": gap_id,
                         "start_s": cursor,
                         "dur_s": gap_s,
-                        "clip_path": gap_out,
+                        "clip_path": fill_path,
                         "speaker_role": "gap_fill",
-                        "source_kind": "static_gapfill",
+                        "source_kind": fill_kind,
                     })
                     gap_count += 1
                     gap_total_s += gap_s
-                except subprocess.CalledProcessError as exc:
-                    stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
-                    log.warning(
-                        "[VideoComposite/per_clip_mux] BUG-084 gap-fill at "
-                        "cursor=%.3f dur=%.3f FAILED: %s",
-                        cursor, gap_s, stderr[:200],
-                    )
+                    if fill_kind == "loop_gapfill":
+                        loop_count += 1
+                    else:
+                        static_count += 1
             gapfilled.append(entry)
             cursor = entry_start + float(entry["dur_s"])
         # Trailing tail-fill: from last clip's end to the end of master audio
@@ -1021,46 +1251,39 @@ def _render_master_mix_per_clip_mux_mode(
             tail_gap = episode_dur - cursor
             if tail_gap > GAP_TOL_S:
                 tail_id = f"gap_tail_{cursor:08.3f}"
-                tail_out = static_seg_dir / f"static_{tail_id}.mp4"
-                try:
-                    _render_static_radio_segment(
-                        radio_png=static_radio_png,
-                        dur_s=tail_gap,
-                        canvas_w=canvas_w,
-                        canvas_h=canvas_h,
-                        canvas_fps=canvas_fps,
-                        out_path=tail_out,
-                        ffmpeg=ffmpeg,
-                    )
+                loop_tail_path = static_seg_dir / f"loop_{tail_id}.mp4"
+                static_tail_path = static_seg_dir / f"static_{tail_id}.mp4"
+                fill_path, fill_kind = _render_gap_segment(
+                    dur_s=tail_gap,
+                    out_path=loop_tail_path if loop_motion_mp4 is not None else static_tail_path,
+                )
+                if fill_path is not None:
                     gapfilled.append({
                         "line_id": tail_id,
                         "start_s": cursor,
                         "dur_s": tail_gap,
-                        "clip_path": tail_out,
+                        "clip_path": fill_path,
                         "speaker_role": "gap_fill",
-                        "source_kind": "static_gapfill",
+                        "source_kind": fill_kind,
                     })
                     gap_count += 1
                     gap_total_s += tail_gap
                     cursor = episode_dur
-                except subprocess.CalledProcessError as exc:
-                    stderr = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
-                    log.warning(
-                        "[VideoComposite/per_clip_mux] BUG-084 trailing gap-fill "
-                        "FAILED at tail_gap=%.3f: %s",
-                        tail_gap, stderr[:200],
-                    )
+                    if fill_kind == "loop_gapfill":
+                        loop_count += 1
+                    else:
+                        static_count += 1
         timeline = gapfilled
         if gap_count > 0:
             log.info(
                 "[VideoComposite/per_clip_mux] BUG-084 gap-fill: inserted "
-                "%d static-radio segment(s), total %.3f s of coverage",
-                gap_count, gap_total_s,
+                "%d segment(s) total %.3f s (loop=%d static=%d)",
+                gap_count, gap_total_s, loop_count, static_count,
             )
             report.append(
                 f"per_clip_mux: BUG-LOCAL-084 gap-fill -- "
-                f"{gap_count} static-radio segment(s), "
-                f"+{gap_total_s:.2f}s coverage"
+                f"{gap_count} segment(s), +{gap_total_s:.2f}s coverage "
+                f"(loop={loop_count} static={static_count})"
             )
     else:
         log.warning(
