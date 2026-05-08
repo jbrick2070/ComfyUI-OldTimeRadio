@@ -5,6 +5,72 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-126 [OPEN]: HuMo soak terminates mid-episode with `Fatal Python error: Aborted` after recovered OOM cycles fragment the CUDA pool
+
+- **Date:** 2026-05-08 morning (post-mortem of the
+  `signal_lost_signal_from_the_red_dust_20260507_221546` run)
+  | **Phase:** 5 | **Bible candidate:** yes (when fix lands)
+- **Symptom:** Overnight FULL acceptance soak rendered 9 of 56
+  planned lines (l002-l009) over 2h 14min wall time, then ComfyUI
+  process aborted at 00:29:11 with `Fatal Python error: Aborted`
+  five seconds after the previous line (l009) finished cleanly. No
+  `[BatchHumoRender] line lXXX failed` message before the crash --
+  this was a C-level abort (SIGABRT-equivalent on Windows), not a
+  caught Python exception. Lines l010-l056 never rendered. Final
+  composite + RTXUpscale + procgen blend never ran.
+- **Cause (preliminary):** Cumulative CUDA pool fragmentation. The
+  log shows the pipeline survived TWO caught HuMo OOMs earlier in
+  the run:
+  - `[2026-05-07 22:45:20] [BatchHumoRender] line l002 failed:
+    Allocation on device 0 would exceed allowed memory. Currently
+    allocated: 24.50 GiB, Device limit: 15.92 GiB`
+  - `[2026-05-07 23:52:56] [BatchHumoRender] line l004 failed:
+    Allocation on device 0 would exceed allowed memory. Currently
+    allocated: 24.50 GiB, Device limit: 15.92 GiB`
+  Both caught OOMs left HuMo with chunk01 saved but chunk02 lost.
+  The pipeline kept going (l003, l005, l007, l008, l009 all
+  succeeded -- l006 likely fell through to static-radio fill per
+  BUG-LOCAL-129a). After ~2 hours of repeated HuMo
+  load/unload/sample/recover cycles, the next sample call
+  (presumably starting l010) triggered a fatal-level CUDA abort
+  instead of a clean OOM exception. The "24.50 GiB allocated on a
+  15.92 GiB device" line in the OOM messages indicates PyTorch's
+  pool drifted way above the real device limit -- consistent with
+  pool fragmentation rather than legitimate working-set growth.
+- **Stack trace:** Final crash at
+  `comfy/samplers.py:325 _calc_cond_batch ->
+  uni_pc.py:868 sample_unipc -> nodes.py:1556 common_ksampler ->
+  batch_humo_render.py:1888 execute`. Same KSampler/UniPC code
+  path that handled the earlier caught OOMs. The abort came from
+  inside the C extensions (PyTorch's CUDA allocator), so no Python
+  try/except could intercept it.
+- **Fix:** PENDING. Per `feedback_no_vram_dragons`, this is NOT a
+  weight-streaming or quantization-chasing problem. Likely paths:
+  1. Hard-reset the CUDA context after every caught HuMo OOM
+     (`torch.cuda.empty_cache()` is insufficient; need
+     `torch.cuda.synchronize() + ipc_collect() + manual reload of
+     the diffusion patches`).
+  2. Cap soak length at N HuMo lines per ComfyUI process and
+     restart between batches.
+  3. Investigate whether SageAttention vs SDPA path on Blackwell
+     leaks during the caught-OOM unwind (BUG-LOCAL-050 chained-
+     teardown pattern is a related precedent).
+  Round-robin on the actual fix when Jeffrey is ready.
+- **Verify (when fix lands):** Soak that produces ≥3 caught HuMo
+  OOMs consecutively without aborting the ComfyUI process.
+- **Tags:** vram, humo, cuda-abort, soak-termination, pool-
+  fragmentation, BUG-050-relative, fatal-python-error
+- **Related:** BUG-LOCAL-050 (chained backend teardown -- same
+  family of cumulative-state fault); BUG-LOCAL-086 (HuMo chunked
+  + concat -- the chunking that saved chunk01 from each caught
+  OOM); BUG-LOCAL-129a (static-radio fill -- the path that probably
+  filled l006).
+- **Bible candidacy:** yes (when fixed) -- the lesson is that
+  *recovered CUDA OOMs leave the allocator pool in a degraded
+  state that catches up downstream*. A defensible diffusion-
+  pipeline soak design must either prevent OOM entirely or hard-
+  reset the CUDA context between recovered OOMs.
+
 ### BUG-LOCAL-125 [FIXED]: _voice_backends registry empty on first lookup if drivers not separately imported (caught by 2026-05-08 morning round-robin Element 4)
 
 - **Date:** 2026-05-08 morning | **Phase:** 0+ | **Bible candidate:** yes
