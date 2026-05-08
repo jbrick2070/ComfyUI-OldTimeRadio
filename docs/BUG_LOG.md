@@ -5,7 +5,87 @@ Entries are never deleted.
 
 ---
 
-### BUG-LOCAL-131 [FIXED]: Node 55 (OTR_BatchLTXRender) widget drift -- stale "fixed" value blocks workflow validation (caught by 2026-05-08 final-revision QA round-robin)
+### BUG-LOCAL-132 [FIXED]: Node 55 widget array missing the control_after_generate slot for the seed widget (BUG-131 reverted by 2026-05-08 CAG-correction round-robin)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** After the BUG-LOCAL-131 trim shipped (commit
+  `052724d`), Node 55's widgets_values length dropped to 5,
+  which (correctly counted against backend `INPUT_TYPES`) was
+  one short of what ComfyUI's frontend expects. The frontend
+  auto-injects a `control_after_generate` (CAG) widget into
+  `widgets_values` immediately after every `seed: INT` input,
+  but that widget does NOT appear in the Python class's
+  `INPUT_TYPES`. Backend has 5 widget fields; frontend renders
+  6 widgets; widgets_values must therefore be length 6.
+  After BUG-131's trim, the 5-entry array
+  `['', 1, 'ffmpeg', '', 22.0]` position-mapped as:
+  ```
+  slot  widget                  value         consequence
+  [0]   ledger_json             ''            link 90 overrides; harmless
+  [1]   seed                    1             correct
+  [2]   control_after_generate  'ffmpeg'      invalid CAG token; frontend
+                                              probably defaults to 'fixed'
+  [3]   ffmpeg                  ''            EMPTY ffmpeg path -> encode
+                                              crash on first invoke
+  [4]   humo_clips_dir          22.0          wrong type; link 91 overrides
+  [5]   clip_length             (missing)     defaults to 7.0; we wanted 22.0
+  ```
+  Two real consequences in the post-trim state: (a) ffmpeg path
+  is empty so LTX render would crash at first encode; (b)
+  clip_length silently falls to FLOAT default 7.0, producing
+  7-second LTX clips instead of the intended 22-second clips.
+- **Cause:** BUG-LOCAL-131's diagnosis was incomplete. The
+  reviewer correctly verified that the backend `INPUT_TYPES` has
+  5 widget-renderable fields (no `seed_mode`), but missed that
+  ComfyUI's frontend auto-inserts the CAG widget for the seed
+  input. The original 6-entry array was correct; trimming was the
+  fault.
+
+  Equivalent verification done by post-mortem analysis: Nodes 51
+  and 23 (also have `seed: INT` inputs) similarly carry an extra
+  entry past `INPUT_TYPES` count for their CAG widget. The 2026-
+  05-07 overnight soak that rendered 9 HuMo clips before fatal
+  abort ran the same 13-entry Node 51 widgets_values with
+  `'randomize'` at slot 5 -- if the reviewer's "validation crash
+  on bad cast" theory were correct, that soak would have failed
+  at queue time. Empirical evidence: those 9 clips proved the
+  array IS correctly position-mapped with CAG accounted for.
+- **Fix:** JSON-only revert. Restore Node 55's widgets_values to
+  6 entries by inserting `'fixed'` (CAG default) at slot 2:
+  `['', 1, 'fixed', 'ffmpeg', '', 22.0]`. This is the literal
+  pre-BUG-131 state.
+- **Verify:** Workflow re-parses; Node 55 widget count = 6
+  matches backend `INPUT_TYPES` (5) + CAG (1). Manual canvas
+  inspection in ComfyUI shows: seed=1, CAG dropdown reads
+  "fixed", ffmpeg="ffmpeg", humo_clips_dir="" (link-only),
+  clip_length=22.0.
+- **Tags:** workflow-json, widget-drift-CORRECTION,
+  control_after_generate, frontend-vs-backend-schema,
+  reversal-of-BUG-131
+- **Bible candidacy:** yes -- the lesson is *ComfyUI's
+  `widgets_values` is NOT 1:1 with backend `INPUT_TYPES`. Any
+  node with a `seed: INT` input gets a frontend-injected
+  `control_after_generate` widget that must be accounted for in
+  position-mapped audits.* The .pyc disassembly verifying
+  `INPUT_TYPES` is necessary but insufficient -- it tests the
+  Python class, not the frontend serialization contract. The
+  diagnostic for "widget count off by exactly one with a seed
+  widget" is "CAG slot present? if missing, add it; if extra,
+  the extra IS the CAG and is correct."
+
+### BUG-LOCAL-131 [REVERTED]: Node 55 (OTR_BatchLTXRender) widget drift -- BUG-131 trim was incorrect, see BUG-132
+
+- **Date:** 2026-05-08 morning (reverted same day) | **Phase:** 5
+- **Status:** Trim shipped in commit `052724d` was REVERTED by
+  BUG-LOCAL-132's restore patch. The original 6-entry
+  widgets_values WAS correct -- the `'fixed'` value at slot 2 is
+  the legitimate CAG widget for the seed input, not stale
+  `seed_mode` debris.
+- **Lesson:** Position-mapping audits against backend
+  `INPUT_TYPES` alone miss the frontend's auto-injected CAG
+  widget. See BUG-LOCAL-132 for the full corrected analysis.
+- **Tags:** widget-drift, false-positive, CAG-widget,
+  reverted-by-BUG-132
 
 - **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
 - **Symptom:** `workflows/otr_scifi_16gb_full.json` Node 55
