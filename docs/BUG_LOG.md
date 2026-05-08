@@ -21,6 +21,178 @@ When Claude has shipped a non-trivial fix and you want a quick gut-check on resi
 
 ---
 
+### BUG-LOCAL-120 [IN PROGRESS]: Phase 0+ Cast Contract Extensions §1+§2+§3 — initial skeleton + tests
+
+- **Date:** 2026-05-07 LATE | **Phase:** 0+ | **Bible candidate:** yes (post-soak)
+- **Symptom:** Same root cause as the character drift observed in the 2026-05-07 PM
+  runs (Run 2 + Run 3): `MONTY` / `MONTGOMERY` name leak in dialogue tags +
+  silent `AEGEUS` -> `MONTY` voice preset pooling at BatchBark group time +
+  no canonical roster the ScriptWriter prompt could be held to.
+- **Cause:** Cast roster lives implicitly in the Director plan's
+  `voice_assignments` dict; no first-class data contract; no version stamping;
+  no per-episode lock; no character canon (identity layer separate from
+  routing). Documented in the ROADMAP "Phase 0+ candidates" -> "Cast Contract
+  Extensions" section as a 5-part design (§1 versioning + §2 lock + §3 canon
+  + §4 adversarial classification + §5 plateau-bounded repair).
+- **Fix:** Initial three modules + tests, scope §1+§2+§3 only:
+  - `nodes/_otr_cast_contract.py` — `CharacterEntry`, `CastContract`,
+    content-addressed sha-8 versioning (`stamp_version`), alias-aware
+    `lookup`, `lock_to_episode` (immutable per §2),
+    `load_locked`. Module is stdlib-only (no torch/VRAM coupling).
+  - `nodes/_otr_voice_resolver.py` — `VoiceSpec` (frozen dataclass),
+    `parse_voice_spec("engine:preset")` with forward-compat unknown-engine
+    pass-through. `KNOWN_ENGINES = {bark, kokoro, cosyvoice, xtts, piper}`.
+  - `nodes/_otr_canon.py` — `CharacterCanonEntry`, `render_canon_markdown`
+    (omits empty fields for terser prompt), `write_canon` /
+    `load_canon` round-trip via `character_canon.md`.
+  - `tests/test_cast_contract.py` (9 tests) — alias matching, lookup,
+    version determinism across order, lock immutability, round-trip,
+    load-when-missing returns None.
+  - `tests/test_voice_resolver.py` (12 tests) — bark/kokoro/xtts spec parsing,
+    case normalization, multi-colon presets, error paths, frozen dataclass.
+  - `tests/test_canon.py` (7 tests) — render/omit, ordered multi-entry,
+    write+read round-trip, empty-when-missing.
+- **Verify:** `python -m pytest tests/test_cast_contract.py tests/test_voice_resolver.py tests/test_canon.py -v`
+  shows 28/28 PASSED. `python -m pytest tests/test_batch_ltx_render.py -q`
+  shows 23/23 unchanged (no regression). AST clean across all six new files.
+- **Tags:** phase-0+, cast-contract, character-drift, autonovel-pattern,
+  skeleton, deferred-integration
+- **Related:** ROADMAP.md "Phase 0+ candidates" sections; the autonovel
+  reference (`https://github.com/NousResearch/autonovel`) for source patterns
+  (state.json versioning, characters/canon split). BUG-LOCAL-118 (workflow
+  widget order — sibling Phase 0 fix that proves the pipeline plumbing).
+- **Next steps (deferred to follow-up session per in-flight FULL acceptance run discipline):**
+  - Build helpers: `build_contract_from_director_plan`, `detect_aliases`
+  - `story_orchestrator.py` integration at lines 6423 (§1 hook), ~640 (§2 hook),
+    920 (§3 canon as `_check_voice_consistency` rubric input)
+  - `production_ledger.py` merge guard requiring matching `cast_contract_version`
+  - §4 (adversarial classification) + §5 (plateau-bounded repair) in a later session
+  - Voice Backend Abstraction is a separate Phase 0+ candidate; sequenced AFTER
+    Cast Contract proves out
+- **Bible candidacy:** yes -- the lesson is that *implicit cast rosters embedded
+  in Director plan dicts cannot survive multi-LLM-pass scripts*. A versioned,
+  episode-locked, canonical contract is the substrate every downstream node
+  (ScriptCritic, BatchBark, KokoroAnnouncer, BatchHumoRender) should read from
+  rather than guessing from dialogue tag strings. Promote when integration
+  is verified end-to-end.
+
+### BUG-LOCAL-119 [FIXED]: audit_otr_full_run.py FAIL_PATTERNS includes two strings that false-positive on every healthy run
+
+- **Date:** 2026-05-07 PM | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Run 2 of Jeffrey's 2026-05-07 PM soak
+  (`signal_lost_silent_countdown_20260507_193951`) completed end-to-end with
+  the final composite + RTXUpscale + procgen blend all written to disk and
+  audio C7 byte-identity preserved -- but two log strings in
+  `scripts/audit_otr_full_run.py` `FAIL_PATTERNS` would have flagged the run
+  as FAILED:
+  1. `"strict_c7=True"` -- printed in the VideoComposite banner of EVERY
+     healthy run (it's a config-flag indicator, not a failure signal):
+     `[VideoComposite] audio_source=master_mix_per_clip_mux ... strict_c7=True`.
+     The actual strict_c7 raise path produces a Python exception, not this
+     string; including the string-form was a category error.
+  2. `"duration contract VIOLATED"` -- `nodes/video_composite.py` line 1383
+     warns this string in BOTH directions of the contract check. The
+     benign direction (video LONGER than audio, e.g. Run 2's
+     `delta -0.539s`) tags the same line with `audio C7 preserved` and
+     only causes -shortest to clip trailing video; nothing breaks. The
+     breaking direction (audio overruns video) attempts a tail-pad
+     fallback and on tail-pad failure logs `audio may be truncated` --
+     which is already a separate (correct) hard-fail pattern. So matching
+     `"duration contract VIOLATED"` as a flat string conflates benign with
+     breaking.
+- **Cause:** Audit-script pattern-list authored without checking that the
+  matched strings only appear in failure paths. `strict_c7=True` is a
+  literal banner string from the production happy path; `duration contract
+  VIOLATED` is a bidirectional check log line whose breaking direction has
+  its own dedicated signal.
+- **Fix:** Edited `scripts/audit_otr_full_run.py` `FAIL_PATTERNS` tuple:
+  - Removed `"strict_c7=True"` (banner literal, not a failure).
+  - Replaced `"duration contract VIOLATED"` with the regex
+    `re.compile(r"duration contract VIOLATED(?!.*audio C7 preserved)")` --
+    negative-lookahead on the same line excludes the benign-direction
+    instance while still catching breaking-direction instances. Python
+    regex `.` doesn't match newlines by default so the lookahead is
+    correctly per-line.
+  - Kept `"audio may be truncated"` as the canonical breaking signal for
+    the tail-pad-failed path.
+  - Added a triage block of comments above `FAIL_PATTERNS` documenting
+    each surviving entry's intent.
+- **Verify:** With the audit script under `python -B exec(open(...).read())`
+  to bypass importlib caching, four-case smoke confirms:
+  - benign duration contract VIOLATED line -> PASS (audit clean)
+  - breaking direction (no `audio C7 preserved` on same line) -> FAIL caught
+  - healthy banner with `strict_c7=True` -> PASS (audit clean)
+  - synthetic `audio may be truncated by 1.500s` -> FAIL caught
+- **Tags:** audit-script, fail-patterns, duration-contract, false-positive,
+  c7-byte-identity, regex-lookahead
+- **Related:** BUG-LOCAL-084 (the duration-contract check itself, working
+  as designed). BUG-LOCAL-128 (tail-pad +0.500s, occasionally pushes
+  benign-direction delta over the 0.040s tolerance).
+- **Bible candidacy:** yes -- the lesson is *audit/health-check pattern
+  lists must be authored against actual production happy-path log corpus*,
+  not against intuited failure messages. Including a string that prints in
+  the success banner would have caused every FULL run to FAIL the audit
+  pre-fix, masking real failures.
+
+### BUG-LOCAL-118 [FIXED]: otr_scifi_16gb_full.json widgets_values stale after BUG-113 humo_pillar_width move (live-run validation failure)
+
+- **Date:** 2026-05-07 PM | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Mid-run (Jeffrey's manual FULL acceptance soak), `comfyui_8000.log`
+  showed three validation errors at `got prompt` time, repeating on every queue:
+  ```
+  Failed to validate prompt for output 58:
+  * OTR_VideoComposite 52:
+    - Value not in list: audio_source: 'False' not in ['master_mix_per_clip_mux', 'humo_concat', 'master_mix']
+    - Value 512.0 bigger than max of 9.0: fallback_clip_length
+    - Value 1 smaller than min of 128: humo_pillar_width
+  Output will be ignored
+  ```
+  VideoComposite (and downstream output nodes 56, 58) were excluded from
+  the execution plan; the rest of the pipeline (story -> Bark -> procgen
+  -> FLUX -> LTX -> HuMo -> upscale) ran but no final composite was
+  produced.
+- **Cause:** BUG-LOCAL-113 (2026-05-06) MOVED `humo_pillar_width` from
+  between `humo_target_height` and `fallback_clip_length` to the END of
+  the optional dict in `OTR_VideoComposite.INPUT_TYPES` (so that saved
+  workflows would backfill the new slot with the default cleanly). The
+  fix on the node side was correct, but `workflows/otr_scifi_16gb_full.json`
+  still had the OLD positional order in `widgets_values[]`, so on this
+  workflow's first use after the schema change, ComfyUI mapped saved
+  values to the new slots and produced three off-by-one errors: 512
+  (old humo_pillar_width default) landed in the fallback_clip_length
+  slot (capped at 9.0); the cleanup BOOL (false) landed in the
+  audio_source slot (string enum); the strict_c7 BOOL (true) landed in
+  the humo_pillar_width slot (INT min 128, true converts to 1).
+- **Fix:** Edited `workflows/otr_scifi_16gb_full.json` node 52
+  `widgets_values[]` in place. Old order
+  `[..., 832, 512, 7.0, "ffmpeg", false, "master_mix_per_clip_mux", true]`
+  rotated to the new order
+  `[..., 832, 7.0, "ffmpeg", false, "master_mix_per_clip_mux", true, 512]`.
+  No code change required -- BUG-113's INPUT_TYPES move is correct;
+  only the saved workflow needed to catch up.
+- **Verify:** `python -c "import json; n = [x for x in json.load(open('workflows/otr_scifi_16gb_full.json'))['nodes'] if x['type']=='OTR_VideoComposite'][0]; print(n['widgets_values'])"`
+  prints `['', '', '', 'lighten', 0.0, 1472, 832, 25, 832, 7.0, 'ffmpeg', False, 'master_mix_per_clip_mux', True, 512]`.
+- **Confirmed live (2026-05-07 19:42 run 2):** After the JSON edit was
+  saved and Jeffrey re-queued via ComfyUI Desktop, `comfyui_8000.log`
+  line 1910 shows
+  `[VideoComposite] audio_source=master_mix_per_clip_mux -- C7 byte-perfect
+  path ... strict_c7=True` -- VideoComposite validated and executed
+  cleanly. Run 2 episode `signal_lost_silent_countdown_20260507_193951`
+  completed end-to-end with `composited/<ep>.mp4`, RTXUpscale to
+  1920x1080, and PostUpscaleProcgenBlend final all written. No further
+  validation errors logged for OTR_VideoComposite.
+- **Tags:** workflow-json, widget-drift, video-composite, schema-vs-savefile,
+  bug-113-followup, validation-fail
+- **Related:** BUG-LOCAL-113 (the schema move that needed this saved-file
+  catch-up); BUG-LOCAL-097 (earlier widget-drift class); BUG-LOCAL-129a
+  (static-radio fill that depends on VideoComposite executing).
+- **Bible candidacy:** yes -- recurring class. The lesson is that any
+  INPUT_TYPES re-order requires a parallel sweep of every committed
+  workflow JSON's positional widgets_values[]. ComfyUI does not name-map
+  saved widgets; it position-maps them. A regression test that loads
+  every committed workflow JSON and runs ComfyUI's validate() against
+  the current node registry would have caught this at commit time.
+
 ### BUG-LOCAL-117e [FIXED]: Allow up to 25s of continuous radio per beat (mega-duration cap raise)
 
 - **Date:** 2026-05-07 PM | **Phase:** 5 | **Bible candidate:** yes

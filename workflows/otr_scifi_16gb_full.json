@@ -1495,12 +1495,12 @@
         832,
         25,
         832,
-        512,
         7.0,
         "ffmpeg",
         false,
         "master_mix_per_clip_mux",
-        true
+        true,
+        512
       ],
       "color": "#1E3A5F",
       "bgcolor": "#13253F"

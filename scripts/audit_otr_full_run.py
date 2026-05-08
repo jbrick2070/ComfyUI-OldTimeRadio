@@ -6,8 +6,12 @@ and reports every S3.x acceptance bullet plus boomerang/timebase health.
 Usage (PowerShell, with the OTR venv active):
     & C:\\Users\\jeffr\\Documents\\ComfyUI\\.venv\\Scripts\\python.exe `
         scripts\\audit_otr_full_run.py `
-        --episode "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\<ep_id>" `
-        --log "C:\\Users\\jeffr\\Documents\\ComfyUI\\user\\comfyui.log"
+        --episode "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\<ep_id>"
+
+The --log argument is optional. When omitted the script auto-discovers
+the most recently modified comfyui_<port>.log file under
+C:\\Users\\jeffr\\Documents\\ComfyUI\\user\\ (rotated *.prev*.log files
+are ignored).
 
 Exit codes:
     0 - all acceptance bullets pass
@@ -24,12 +28,31 @@ import subprocess
 import sys
 from pathlib import Path
 
+DEFAULT_USER_LOG_DIR = Path(r"C:\Users\jeffr\Documents\ComfyUI\user")
+
 DUR_TOLERANCE_S = 0.25
+# FAIL_PATTERNS triage notes (2026-05-07 PM, BUG-LOCAL-119 calibration):
+# - "Non-monotonous DTS" -- timebase contract failure (Patch A/B) at silent_combined concat.
+# - "boomerang FAILED" -- BUG-LOCAL-117d post-process crashed.
+# - duration contract VIOLATED is bidirectional in the source (video_composite.py L1383).
+#   The benign direction (video LONGER than audio) tags the same line with
+#   "audio C7 preserved" and only causes -shortest to clip trailing video.
+#   The breaking direction (audio overruns video) attempts a tail-pad fallback,
+#   and on tail-pad failure logs "audio may be truncated" (already a hard fail
+#   below). So we use a negative-lookahead to only fail on instances that do
+#   NOT have C7 preserved on the same line.
+# - "audio may be truncated" -- BUG-084 tail-pad fallback fired and FAILED;
+#   audio is genuinely cut.
+# - "[BatchLTXRender] <line_id> failed:" -- per-clip render exception; catches
+#   anything the boomerang grep misses.
+# Removed (false positives on healthy runs):
+# - "strict_c7=True" -- prints in the VideoComposite banner of EVERY healthy
+#   run (it's a config flag indicator, not a failure signal). The actual
+#   strict_c7 raise path produces a Python exception, not this string.
 FAIL_PATTERNS = (
     "Non-monotonous DTS",
     "boomerang FAILED",
-    "duration contract VIOLATED",
-    "strict_c7=True",
+    re.compile(r"duration contract VIOLATED(?!.*audio C7 preserved)"),
     "derived ledger from .mp4 not found",
     "audio may be truncated",
     # Per-clip exception path inside BatchLTXRender; catches everything
@@ -200,6 +223,26 @@ def audit_finals(episode_dir: Path) -> list[str]:
     return fails
 
 
+def find_latest_comfyui_log(log_dir: Path = DEFAULT_USER_LOG_DIR) -> Path | None:
+    """Return the most recently modified active comfyui_<port>.log.
+
+    ComfyUI Desktop writes one log per port (8000, 8001, ...) and rotates
+    the previous two runs into *.prev.log + *.prev2.log. We want the
+    active one only, picked by mtime so we always grab the run Jeffrey
+    just executed.
+    """
+    if not log_dir.is_dir():
+        return None
+    candidates = [
+        p for p in log_dir.glob("comfyui_*.log")
+        if not (p.name.endswith(".prev.log") or p.name.endswith(".prev2.log"))
+    ]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
 def audit_log(log_path: Path) -> list[str]:
     fails: list[str] = []
     if not log_path.is_file():
@@ -239,12 +282,22 @@ def main() -> int:
     print(f"OTR FULL run audit: {episode_dir}")
     print("=" * 64)
 
+    log_path: Path | None = args.log
+    if log_path is None:
+        log_path = find_latest_comfyui_log()
+        if log_path is not None:
+            print(f"OK: auto-discovered log {log_path.name} "
+                  f"(mtime-newest active comfyui_*.log)")
+        else:
+            print(f"WARN: no comfyui_<port>.log found in "
+                  f"{DEFAULT_USER_LOG_DIR}; skipping log audit")
+
     all_fails: list[str] = []
     clip_fails, ltx_n, short_n = audit_clips(episode_dir, ledger)
     all_fails += clip_fails
     all_fails += audit_finals(episode_dir)
-    if args.log:
-        all_fails += audit_log(args.log)
+    if log_path is not None:
+        all_fails += audit_log(log_path)
 
     print()
     if all_fails:

@@ -26,6 +26,8 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 These are the only items between now and a green v2.0 cut. Every one is a **runtime-only** check; nothing remaining is code work.
 
+**Quick start:** `.\scripts\prep_full_run.ps1` runs steps 2-3 as a single read-only report (env vars + active log + newest pending episode + videos/ contents + composited/ status + C: free space). Pass `-Wipe` to actually delete stale clips. Pass `-Episode <ep_id>` to target a specific folder.
+
 1. **Restart ComfyUI Desktop.** All four touched modules (`batch_ltx_render.py`, `scene_sequencer.py`, `video_composite.py`, plus the test file) are cached in `sys.modules` of the running ComfyUI process. They will not hot-reload. Confirm by checking the ComfyUI version banner regenerates on the splash.
 2. **Verify env vars are set in HKCU\Environment.** ComfyUI Desktop inherits User-scope env vars at process launch only — not Machine, not session. Run from PowerShell:
    ```
@@ -46,14 +48,15 @@ These are the only items between now and a green v2.0 cut. Every one is a **runt
    - `STALE-LOCKED` (anti-clobber wanted to heal a half-duration clip but couldn't unlink — means a Windows process is holding the file open)
    - `derived ledger from .mp4 not found` (BUG-082 regression)
    - `audio may be truncated` (BUG-084 tail-pad fallback fired; episode is fine but flag for follow-up)
-6. **Run the audit script after the run completes.**
+6. **Run the audit script after the run completes.** `--log` is optional; when omitted the script auto-discovers the most-recently-modified active `comfyui_<port>.log` under `C:\Users\jeffr\Documents\ComfyUI\user\` (rotated `.prev*.log` files are ignored).
    ```
    & C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
        scripts\audit_otr_full_run.py `
-       --episode "C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\<ep_id>" `
-       --log "C:\Users\jeffr\Documents\ComfyUI\user\comfyui.log"
+       --episode "C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\<ep_id>"
    ```
-   Exit code `0` = all S3.x acceptance bullets pass. Exit `1` = full report printed; copy and paste into next session.
+   To pin a specific log instead, pass `--log "C:\Users\jeffr\Documents\ComfyUI\user\comfyui_8000.log"`. Exit code `0` = all S3.x acceptance bullets pass. Exit `1` = full report printed; copy and paste into next session.
+
+   **Live tail during the run:** `.\scripts\tail_otr_run.ps1` from the repo root auto-discovers the active port log and color-codes load-bearing lines green, STOP signals red, pipeline markers cyan. Pass `-Port 8001` to pin a port, or `-Tail 50` for last-N-lines context before live tail begins.
 7. **Acceptance bullets that count as "GREEN":**
    - All non-character `ledger.lines[]` entries have `clip_meta.source_kind == "ltx"` (no `static` fallbacks except for cues with no audio).
    - Every `videos/<line_id>.mp4` duration is within 0.25s of `ledger.lines[].dur_s`.
@@ -79,6 +82,153 @@ Open a new session with the failing log section + the audit script's report. The
 2. Promote BUG-LOCAL-117a/117b/117c/117d/117e/117f entries to the Bible (sister repo `comfyui-custom-node-survival-guide` -> add to `BUG_BIBLE.yaml`, add regression tests to `tests/bug_bible_regression.py`, run three-file contract test).
 3. README pass — document `OTR_LTX_ENGINE` and `OTR_LTX_LOOP_VIA_REVERSE` env vars + 22s clip_length default.
 4. Then move to the v2.0 ecosystem review queued in this file (ComfyUI Core, ComfyUI-GGUF, ComfyUI-Ollama, Gemma 2026 Challenge — see "v2.0 pre-ship ecosystem review" section below if it exists, otherwise create).
+
+---
+
+## Phase 0+ candidates (post-v2.0-alpha)
+
+### Cast Contract Extensions
+
+**Extends:** existing "Character Identity as a Data Contract" RFC.
+**Source patterns:** [NousResearch/autonovel](https://github.com/NousResearch/autonovel) — `state.json` versioning, `characters/canon` split, `adversarial_edit.py`, plateau revision loop.
+
+**Verdict on existing RFC:** ~80% correct. Keep all of it. Five gaps below.
+
+- Data-contract thesis: confirmed (autonovel = `audiobook_voices.json`)
+- Insertion point at `story_orchestrator.py:6423`: correct
+- Anti-brick-by-brick: correct
+- Already have alias plumbing: `_consolidate_similar_cast_rows_with_aliases` line 440
+
+**Five additions (leverage order):**
+
+1. **Propagation debt — stamp version everywhere.** Every dialogue line carries `cast_contract_version: "sha:a3f9c2e1"` plus `character_id`. `production_ledger.py` rejects merges where version mismatches. Pattern: autonovel `state.json`.
+
+2. **Lock contract per episode.** After `_bark_health_check_for_cast` (~line 640), freeze to `episodes/<ep_id>/cast_contract.locked.json`. Immutable for episode lifetime. Kills SceneSequencer ↔ BatchBark drift.
+
+3. **Character canon layer.** Per-episode `character_canon.md`:
+   ```markdown
+   ## c02 — AEGEUS
+   - Voice: v2/en_speaker_5
+   - Tics: clipped, no contractions, marine metaphors
+   - Forbidden: military slang (c01's register)
+   - Phrase pattern: "[Noun] is [verb-ing] back through [place]"
+   ```
+   Inject into ScriptWriter prompt. Feed to existing `_check_voice_consistency` (line 920) as rubric. Hard contract = routing; canon = identity.
+
+4. **Adversarial classification before repair.** Tiny LLM classifies orphan tags into 5 buckets:
+
+   | Class | Action |
+   |---|---|
+   | `TYPO_OF_EXISTING` | Auto-canonicalize |
+   | `ALIAS_OF_EXISTING` | Add to alias map, bump version |
+   | `GENUINELY_NEW` | Hard fail, reroll cast |
+   | `NARRATIVE_LEAK` | Demote to narration, HuMo bypass |
+   | `DISCARD` | Drop |
+
+   Pattern: autonovel `adversarial_edit.py`.
+
+5. **Plateau-bounded repair loop.**
+   ```python
+   prev = None
+   for _ in range(3):
+       orphans = validate(script, contract)["unknown"]
+       if not orphans: break
+       if orphans == prev: raise CastContractUnreparable(orphans)
+       script = repair_orphans(script, orphans, contract)
+       prev = orphans
+   ```
+   Two-pass identity → escalate. No third LLM call.
+
+**Rejected from autonovel (not OTR-fit):** voice fingerprinting (GPU cost vs rare failure mode), Opus dual-persona review (novel-scale, wrong size for radio episode), reader panel (same).
+
+**File touches:**
+
+*New:*
+- `nodes/_otr_cast_contract.py` *(existing RFC)*
+- `nodes/_otr_voice_resolver.py` *(existing RFC)*
+- `nodes/_otr_cast_repair.py` *(§4, §5)*
+- `nodes/_otr_canon.py` *(§3)*
+
+*Edit:*
+- `nodes/story_orchestrator.py` L6423 — gate after `_parse_script` *(existing RFC)*
+- `nodes/story_orchestrator.py` L~640 — lock contract to disk *(§2)*
+- `nodes/story_orchestrator.py` L920 — canon as consistency rubric *(§3)*
+- `nodes/production_ledger.py` — version field + merge guard *(§1)*
+- `nodes/scene_sequencer.py`, `nodes/batch_bark_generator.py` — strip dup resolvers *(existing RFC)*
+
+**Acceptance criteria (delta only):**
+
+- [ ] Every dialogue line carries `cast_contract_version` + `character_id`
+- [ ] `cast_contract.locked.json` byte-identical from BatchBark start → episode end
+- [ ] `character_canon.md` injected into ScriptWriter, used by `_check_voice_consistency`
+- [ ] Orphans classified into 5 categories before any repair LLM call
+- [ ] Repair loop terminates on plateau, raises structured error, no third call
+
+**Open questions:**
+
+1. Version: content-addressed sha vs monotonic v1/v2? → leaning sha
+2. `NARRATIVE_LEAK` → ANNOUNCER role, or new narrator role?
+3. Canon prompt slot: system / fewshot / cast-roster append?
+
+---
+
+### Voice Model Agnostic Nodes (Voice Backend Abstraction)
+
+**Pairs with:** Cast Contract Extensions §3 — character canon entries carry fully-qualified voice specs (`bark:v2/en_speaker_5`, `cosyvoice:robotic_calm`, `kokoro:bm_fable`) once both pieces ship.
+**Source patterns:** existing TTS upgrade backlog at `project_tts_upgrade_candidates_2026-04-23.md` (CosyVoice 2/3 Apache-2.0 first pick); applies `feedback_use_community_nodes_not_custom` (wrap community nodes, don't vendor model code) and `feedback_otr_stays_mit` (license bar per backend).
+
+**Problem:** `OTR_BatchBark` is hard-bound to Bark, `OTR_KokoroAnnouncer` is hard-bound to Kokoro. Adding a new TTS engine (CosyVoice, XTTS, Piper, Fish Speech, Qwen3-TTS) means a new node class + workflow JSON edits + parallel BatchBark-equivalent batching code. Per-character voice-model assignment is impossible: AEGEUS can't get a synthetic-timbre engine while MONTY uses warmth-tuned Bark.
+
+**Five additions (leverage order):**
+
+1. **Single canonical node — `OTR_VoiceRender`.** Widgets: `voice_model` enum (bark / kokoro / cosyvoice / xtts / piper), `voice_preset` STRING (model-specific), `text` input, standard knobs (temperature, hallucination guard) routed only when the backend supports them.
+
+2. **`nodes/_voice_backends/` driver module.** One file per engine implementing a small interface: `load(preset)`, `generate(text, **kw) -> wav`, `unload()`. Initial drivers wrap existing Bark + Kokoro impls; subsequent drivers wrap community ComfyUI TTS nodes (verify each license against MIT bar before adopting).
+
+3. **Voice spec format in cast contract.** Cast canon entries become `Voice: bark:v2/en_speaker_5` rather than implicit engine binding. `nodes/_otr_voice_resolver.py` (already in Cast Contract RFC file list) parses to `(engine, preset)` pairs.
+
+4. **Per-character routing.** A single batch node walks the dialogue ledger, looks up each line's `character_id` in `cast_contract.locked.json`, routes to the resolved backend. Eliminates the "No Director mapping for MONTGOMERY → pool fallback" path observed 2026-05-07 in `signal_lost_silent_countdown` run.
+
+5. **Back-compat shims.** `OTR_BatchBark` and `OTR_KokoroAnnouncer` stay registered as thin wrappers that delegate to `OTR_VoiceRender` with `voice_model` pre-pinned. Existing workflow JSONs validate and run unchanged.
+
+**Rejected (defer or out of scope):** voice cloning / fingerprinting (GPU cost, not OTR-fit at radio-episode scale); in-engine streaming (current batch model fits 30-second-cue scope).
+
+**Migration path (non-destructive):**
+
+1. Add `_voice_backends/bark.py` + `kokoro.py` wrapping current code (no behavior change, just relocation).
+2. Add `nodes/voice_render.py` registering `OTR_VoiceRender`. Register in `__init__.py`.
+3. Existing `BatchBark` + `KokoroAnnouncer` become thin shims OR stay full impls during transition (decide per stability of new path).
+4. Workflow JSONs unchanged short term; new workflows opt into `OTR_VoiceRender` directly.
+5. Add `cosyvoice.py` once Bark + Kokoro path is proven — first real cross-engine episode validates the contract end-to-end.
+
+**File touches:**
+
+*New:*
+- `nodes/voice_render.py` (registers `OTR_VoiceRender`)
+- `nodes/_voice_backends/__init__.py` (driver registry)
+- `nodes/_voice_backends/bark.py` (wraps current Bark impl from `batch_bark_generator.py`)
+- `nodes/_voice_backends/kokoro.py` (wraps current Kokoro impl from `kokoro_announcer.py`)
+- Future drivers: `cosyvoice.py`, `xtts.py`, `piper.py` (added as adopted)
+
+*Edit:*
+- `nodes/batch_bark_generator.py` — relocate impl into backend driver; remaining file becomes shim
+- `nodes/kokoro_announcer.py` — same
+- `nodes/_otr_voice_resolver.py` (from Cast Contract RFC) — parse `engine:preset` voice specs
+- `__init__.py` — register `OTR_VoiceRender`
+
+**Acceptance criteria:**
+
+- [ ] `OTR_VoiceRender` registered, accepts `voice_model` enum across at least Bark + Kokoro
+- [ ] Cast contract `Voice:` entries use `engine:preset` form, parsed by `_otr_voice_resolver.py`
+- [ ] Per-character routing verified in a single episode: AEGEUS uses one engine, MONTY uses another, both render correctly
+- [ ] Existing `OTR_BatchBark` workflows still validate and run (back-compat)
+- [ ] At least one TTS upgrade candidate (CosyVoice 2/3 preferred) has a working backend driver
+
+**Open questions:**
+
+1. Single batch-aware node vs. one-line-at-a-time? → leaning one-line for v1 (simpler contract), batch optimization in follow-up
+2. Voice preset namespace: flat `engine:preset` strings vs. structured dict? → leaning flat (workflow widget compat)
+3. Where does VoiceHealth lazy-check live? Central or per-engine? → leaning per-engine (each backend has different validation needs)
 
 ---
 
