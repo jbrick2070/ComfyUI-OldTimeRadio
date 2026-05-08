@@ -1,3 +1,0 @@
-# Round C -- FAILED
-
-nvidia/llama-3.3-nemotron-super-49b-v1.5 -> TimeoutError: The read operation timed out
