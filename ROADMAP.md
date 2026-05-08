@@ -1,26 +1,84 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `f1467a2` | **Last refactored:** 2026-05-03 EVENING
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `5d7e887` | **Last refactored:** 2026-05-07 PM
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
 ---
 
-## Status snapshot — 2026-05-07 PM (BUG-117 family wrap)
+## CURRENT WORK — pre-FULL acceptance soak (handoff-ready as of 2026-05-07 PM)
 
-**LTX 2.3 production stack now produces seamless 22s radio loops with half the GPU wall time per chunk.**
+**State:** code complete on `v2.0-alpha`, 0 known faultlines blocking. Awaits a single acceptance FULL run on the RTX 5080.
 
-Today's ships (full details in `docs/BUG_LOG.md`):
+### What landed today (commits 4198d72 + 5d7e887)
 
-- **BUG-LOCAL-117e** — music chunk cap raised from 7s to 22s (`scene_sequencer.py` `_MUSIC_MAX_CHUNK_DUR_S`) + `BatchLTXRender.clip_length` widget default 7.0 -> 22.0. Empirically validated against the 25s @ 832x480 mega-duration smoke (RTX 5080 16 GB + 64 GB RAM, no temporal collapse, no identity drift). Workflow `otr_scifi_16gb_full.json` updated.
-- **BUG-LOCAL-117d** — ffmpeg boomerang post-process. Each non-character chunk now renders HALF the audio-target duration; ffmpeg `[a]` + `[b].reverse.trim(start_frame=1).concat` doubles back to full duration. Result: end-of-clip-N == start-of-clip-N+1 == radio_bookend -> seamless concat in VideoComposite + sample wall time halved. Default ON (`OTR_LTX_LOOP_VIA_REVERSE`).
+| ID | What | Where |
+|---|---|---|
+| **BUG-LOCAL-117d** | ffmpeg boomerang post-process (default ON via `OTR_LTX_LOOP_VIA_REVERSE`) — each non-character chunk renders HALF audio-target dur, then `[a]` + `[b].reverse.trim(start_frame=1).concat` doubles back. Sample wall time halved; chunk-boundary snap eliminated (both ends are radio_bookend). | `nodes/batch_ltx_render.py` `_make_boomerang_via_ffmpeg` |
+| **BUG-LOCAL-117e** | Music chunk cap 7s -> 22s (validated against 25s @ 832×480 mega-test). `LTX_MAX_FRAMES` 353 -> 705. `clip_length` widget default 7.0 -> 22.0. | `nodes/scene_sequencer.py` `_MUSIC_MAX_CHUNK_DUR_S`, `nodes/batch_ltx_render.py`, `workflows/otr_scifi_16gb_full.json` |
+| **BUG-LOCAL-117f** | Duration-aware anti-clobber. ffprobes `<line_id>.mp4`; if actual < expected − 0.25s, unlink + re-render. Heals half-duration clips left by crashed runs. `STALE-LOCKED` report path on unlink failure. | `nodes/batch_ltx_render.py` execute() pre_existing block |
+| **117d hardening (Patch A)** | Boomerang pins `-video_track_timescale 12800`. | `nodes/batch_ltx_render.py` `_make_boomerang_via_ffmpeg` |
+| **117d hardening (Patch B)** | All 5 silent-encode sites in VideoComposite pin `_STATIC_SEGMENT_TIMEBASE` (`_layered_per_clip_silent` layered + scale-fit, `_pillarbox_humo_silent`, `_make_gap_segment`, `_normalize_humo_segment`). Uniform timebase across HuMo+LTX+gap-fill+boomerang -> no `Non-monotonous DTS` at any seam. | `nodes/video_composite.py` |
+| **Audit script (Patch D)** | `scripts/audit_otr_full_run.py` — post-run acceptance audit. ffprobes each `videos/*.mp4` vs `ledger.lines[].dur_s`, greps comfyui.log for failure patterns, exit 0 = all bullets pass. | `scripts/audit_otr_full_run.py` |
+| **Tests** | 33/33 in `tests/test_batch_ltx_render.py` pass on Windows venv. New pins: `LTX_MAX_FRAMES==705`, `clip_length default==22.0`, `clip_length max==28.16`, boomerang default-on + truthy set + helper-exists + missing-input-raises + filter-graph + timebase, anti-clobber probe-call + 0.25s tolerance + unlink + STALE-LOCKED + fall-through guard + TESTCHAR fixture name. | `tests/test_batch_ltx_render.py` |
 
-**Next FULL episode test is unblocked for:**
-- 22s continuous radio segments (was 7s chunks ffmpeg-stitched)
-- Seamless radio_bookend -> motion -> radio_bookend loops at every chunk boundary
-- ~50% sample wall time reduction on every non-character clip
+### What's left to test — pre-FULL handoff checklist
 
-**Tests:** `tests/test_batch_ltx_render.py` updated — pinned `LTX_MAX_FRAMES=705`, `clip_length default=22.0`, `clip_length max=28.16`; 5 new BUG-LOCAL-117d tests pinned (default-on, truthy set, helper exists, missing-input raises, filter-graph source pin). Full OTR test pass: 1124 passed (3 unrelated pre-existing failures: 2 torch-required + 1 video_composite canvas default mismatch — all pre-existing, none introduced by today's edits).
+These are the only items between now and a green v2.0 cut. Every one is a **runtime-only** check; nothing remaining is code work.
+
+1. **Restart ComfyUI Desktop.** All four touched modules (`batch_ltx_render.py`, `scene_sequencer.py`, `video_composite.py`, plus the test file) are cached in `sys.modules` of the running ComfyUI process. They will not hot-reload. Confirm by checking the ComfyUI version banner regenerates on the splash.
+2. **Verify env vars are set in HKCU\Environment.** ComfyUI Desktop inherits User-scope env vars at process launch only — not Machine, not session. Run from PowerShell:
+   ```
+   [Environment]::GetEnvironmentVariable("OTR_LTX_ENGINE","User")
+   [Environment]::GetEnvironmentVariable("OTR_LTX_LOOP_VIA_REVERSE","User")
+   ```
+   Expected: `v2_3` (or unset to fall through to `v0_9` default), and `on` (or unset — same default).
+3. **Wipe stale clips for the target episode.** Even with BUG-LOCAL-117f duration-aware healing, a sampler/LoRA-strength change between runs leaves valid-duration but stale-content clips that the duration check can't catch. `Remove-Item` `output\otr\episodes\<ep_id>\videos\*.mp4` before queueing.
+4. **Queue `otr_scifi_16gb_full.json`.** Watch banner at run start for these load-bearing lines:
+   - `[BatchLTXRender] BUG-LOCAL-117 engine=v2_3` (or `v0_9` — confirms env var picked up)
+   - `[BatchLTXRender]   boomerang: ON (BUG-LOCAL-117d) -- render HALF chunk_dur_s, ffmpeg-reverse-and-concat doubles back to full audio target`
+   - `[EpisodeAssembler] music mirror: appended=N, chunked_cues=M ... post-BUG-117e: music chunks <= 22.0s`
+5. **Watch the log for these failure strings.** Any one of these is a STOP signal — paste the surrounding context into the next session and we triage:
+   - `Non-monotonous DTS` (Patch A/B failed; means a silent encode site missed the timebase pin)
+   - `boomerang FAILED` (post-process crashed; chunk has half-duration content under full-duration audio)
+   - `duration contract VIOLATED` (VideoComposite final-mux duration check; audio overran video)
+   - `[BatchLTXRender] <line_id> failed:` (per-clip exception inside the LTX loop)
+   - `STALE-LOCKED` (anti-clobber wanted to heal a half-duration clip but couldn't unlink — means a Windows process is holding the file open)
+   - `derived ledger from .mp4 not found` (BUG-082 regression)
+   - `audio may be truncated` (BUG-084 tail-pad fallback fired; episode is fine but flag for follow-up)
+6. **Run the audit script after the run completes.**
+   ```
+   & C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe `
+       scripts\audit_otr_full_run.py `
+       --episode "C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\<ep_id>" `
+       --log "C:\Users\jeffr\Documents\ComfyUI\user\comfyui.log"
+   ```
+   Exit code `0` = all S3.x acceptance bullets pass. Exit `1` = full report printed; copy and paste into next session.
+7. **Acceptance bullets that count as "GREEN":**
+   - All non-character `ledger.lines[]` entries have `clip_meta.source_kind == "ltx"` (no `static` fallbacks except for cues with no audio).
+   - Every `videos/<line_id>.mp4` duration is within 0.25s of `ledger.lines[].dur_s`.
+   - Pre-upscale episode mp4 dims = (832, 480); post-upscale dims = (1920, 1080).
+   - 0 occurrences of any failure string from step 5 in `comfyui.log`.
+   - `silent_combined.mp4` concat completed without `-c copy` rejection or `Non-monotonous DTS` warnings.
+
+### If any acceptance bullet fails
+
+Open a new session with the failing log section + the audit script's report. The likely fixes by symptom:
+
+| Symptom | Likely fix |
+|---|---|
+| `Non-monotonous DTS` at silent_combined concat | A silent-encode site missed a timebase pin — grep `video_composite.py` for `libx264.*yuv420p` not followed by `_STATIC_SEGMENT_TIMEBASE` |
+| `boomerang FAILED` | Look at the ffmpeg stderr in the warning; usually means input mp4 was 0-byte (render crashed before _save_video_mp4 finished) |
+| Duration drift > 0.25s | BUG-LOCAL-091 chunking math edge case OR BUG-LOCAL-117f anti-clobber kept a stale clip — wipe `videos/*.mp4` and re-run |
+| First-run `STALE-LOCKED` | Probably a Windows Explorer preview holding the file open. Close any video preview pane and re-run. |
+| Engine=v0_9 in banner when you expected v2_3 | Env var not set, OR ComfyUI Desktop was launched before the env var was set. Restart ComfyUI Desktop from a fresh PowerShell after setting the var. |
+
+### After GREEN
+
+1. Cut tag `v2.0-alpha` -> `v2.0-rc1` on Jeffrey's machine via Desktop Commander cmd shell (per CLAUDE.md, only Jeffrey tags releases).
+2. Promote BUG-LOCAL-117a/117b/117c/117d/117e/117f entries to the Bible (sister repo `comfyui-custom-node-survival-guide` -> add to `BUG_BIBLE.yaml`, add regression tests to `tests/bug_bible_regression.py`, run three-file contract test).
+3. README pass — document `OTR_LTX_ENGINE` and `OTR_LTX_LOOP_VIA_REVERSE` env vars + 22s clip_length default.
+4. Then move to the v2.0 ecosystem review queued in this file (ComfyUI Core, ComfyUI-GGUF, ComfyUI-Ollama, Gemma 2026 Challenge — see "v2.0 pre-ship ecosystem review" section below if it exists, otherwise create).
 
 ---
 
