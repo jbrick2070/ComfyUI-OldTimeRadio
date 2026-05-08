@@ -50,6 +50,30 @@ def test_version_stamp_deterministic_across_insertion_order():
     assert a.version.startswith("sha:")
 
 
+def test_version_stamp_is_64_bit_sha_16_chars():
+    """Round-robin Item E (2026-05-08): bumped from 8 hex chars
+    (32 bits) to 16 hex chars (64 bits, ~280 trillion possibilities)
+    to push collision probability past any realistic episode count."""
+    contract = CastContract(
+        characters=[CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")]
+    )
+    contract.stamp_version()
+    # Format: "sha:<16 lowercase hex chars>" = 4 + 16 = 20 chars total.
+    assert contract.version.startswith("sha:")
+    hex_part = contract.version[4:]
+    assert len(hex_part) == 16
+    assert all(c in "0123456789abcdef" for c in hex_part)
+
+
+def test_cast_contract_mismatch_is_exception_not_runtime_error():
+    """Round-robin Item G (2026-05-08): inheritance bumped from
+    RuntimeError to plain Exception so a downstream
+    `except RuntimeError` doesn't silently swallow the structured
+    drift signal."""
+    assert issubclass(CastContractMismatch, Exception)
+    assert not issubclass(CastContractMismatch, RuntimeError)
+
+
 def test_version_stamp_changes_with_alias_addition():
     e1 = CharacterEntry("c01", "MONTY", [], "bark:v2/en_speaker_3")
     e2 = CharacterEntry("c01", "MONTY", ["MONTGOMERY"], "bark:v2/en_speaker_3")

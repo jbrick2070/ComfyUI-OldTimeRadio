@@ -70,6 +70,12 @@ class CastContract:
 
         Order-independent: characters sorted by character_id, aliases sorted
         alphabetically before hashing.
+
+        Hash width: 16 hex chars = 64 bits (~280 trillion possibilities).
+        Bumped from 8 hex per 2026-05-08 external round-robin synthesis
+        Item E -- 32-bit space had non-trivial birthday-paradox collision
+        probability past a few thousand episodes, and 64 bits is still
+        cheap to compare as a string.
         """
         normalized = sorted(
             (
@@ -84,7 +90,7 @@ class CastContract:
             key=lambda d: d["character_id"],
         )
         blob = json.dumps(normalized, separators=(",", ":"), sort_keys=True)
-        sha = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:8]
+        sha = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
         self.version = f"sha:{sha}"
         return self.version
 
@@ -115,12 +121,18 @@ class CastContract:
 LOCKED_FILENAME = "cast_contract.locked.json"
 
 
-class CastContractMismatch(RuntimeError):
+class CastContractMismatch(Exception):
     """Raised by ``lock_to_episode`` when an existing locked contract
     has a *different* ``cast_contract_version`` than the contract being
     locked. The blind ``.exists()`` refusal would also break ComfyUI
     rerun / crash-recovery flows; with the version compare we only fail
     when the two contracts genuinely disagree.
+
+    Inherits from ``Exception`` (NOT ``RuntimeError``) per 2026-05-08
+    external round-robin synthesis Item G: a downstream
+    ``except RuntimeError`` clause must NOT silently swallow this
+    structured drift signal. Callers that genuinely want to handle
+    cast-drift should catch ``CastContractMismatch`` by name.
     """
 
 
@@ -353,10 +365,21 @@ def detect_aliases(script: str, contract: CastContract) -> dict[str, str]:
     each alias (and re-stamp the version) or escalate to §4 adversarial
     classification for ambiguous tags.
 
-    Pure heuristic only -- no LLM call. False positives are possible
-    when two canonical names share a long prefix (e.g. MARLA / MARLON);
-    in that case the FIRST canonical match in iteration order wins, and
-    §4 is the canonical place to disambiguate.
+    Pure heuristic only -- no LLM call.
+
+    **Ambiguity handling (2026-05-08 external round-robin synthesis
+    Item F):** when TWO OR MORE canonicals share the prefix with the
+    orphan tag, the function refuses to pick one and OMITS that tag
+    from the returned dict. The orphan stays in the residual set so
+    §5's repair loop escalates it to the §4 adversarial LLM
+    classifier when that path is wired. Pre-fix behavior was first-
+    match-wins, which silently mis-routed entire episodes worth of
+    dialogue to the wrong canonical (the alias becomes registered,
+    §5 marks it decided, and the §4 LLM never sees it).
+
+    Single unambiguous prefix match -> applied as alias.
+    Zero matches -> no entry (orphan stays unresolved).
+    Two or more matches -> NO entry; escalate to §4 via residual.
     """
     if not isinstance(contract, CastContract):
         raise TypeError("contract must be a CastContract")
@@ -364,20 +387,24 @@ def detect_aliases(script: str, contract: CastContract) -> dict[str, str]:
     if not script:
         return aliases_found
 
+    n = ALIAS_PREFIX_LEN
     for tag in _extract_dialogue_tags(script):
         # Already known? Skip.
         if contract.lookup(tag) is not None:
             continue
         tag_u = tag.upper()
+        if len(tag_u) < n:
+            continue
+        # Collect ALL prefix-matching canonicals (round-robin Item F).
+        matches: list[str] = []
         for character in contract.characters:
             cn = character.canonical_name.upper()
-            if not cn:
+            if not cn or len(cn) < n:
                 continue
-            # Either direction: tag startswith cn[:N] or cn startswith tag[:N]
-            n = ALIAS_PREFIX_LEN
-            if len(tag_u) >= n and len(cn) >= n and (
-                tag_u[:n] == cn[:n]
-            ):
-                aliases_found[tag] = character.character_id
-                break
+            if tag_u[:n] == cn[:n]:
+                matches.append(character.character_id)
+        if len(matches) == 1:
+            aliases_found[tag] = matches[0]
+        # Zero or 2+ matches -> orphan stays in residual; §4 / §5
+        # owns disambiguation.
     return aliases_found

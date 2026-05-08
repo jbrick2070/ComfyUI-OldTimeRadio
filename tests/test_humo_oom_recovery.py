@@ -123,11 +123,60 @@ def test_humo_soak_cap_reached_carries_attrs():
     assert "8 of cap 8" in str(exc)
 
 
-def test_humo_soak_cap_reached_is_runtime_error_subclass():
+def test_humo_soak_cap_reached_is_exception_not_runtime_error():
+    """Round-robin Item G (2026-05-08): inheritance bumped from
+    RuntimeError to plain Exception so a downstream
+    `except RuntimeError` doesn't silently swallow the
+    soft-stop signal."""
     mod = _import_batch_humo_module()
     if mod is None or not hasattr(mod, "HumoSoakCapReached"):
         pytest.skip("batch_humo_render didn't load in test venv")
-    assert issubclass(mod.HumoSoakCapReached, RuntimeError)
+    assert issubclass(mod.HumoSoakCapReached, Exception)
+    assert not issubclass(mod.HumoSoakCapReached, RuntimeError)
+
+
+def test_is_oom_walks_cause_chain():
+    """Round-robin Item D (2026-05-08): a wrapping exception that
+    chains the OOM via `raise X from oom` still returns True."""
+    mod = _import_batch_humo_module()
+    if mod is None or not hasattr(mod, "_is_oom_exception"):
+        pytest.skip("batch_humo_render didn't load in test venv")
+    inner = RuntimeError("CUDA out of memory. Tried to allocate ...")
+    try:
+        try:
+            raise inner
+        except RuntimeError as exc:
+            raise ValueError("comfy wrapped the error") from exc
+    except ValueError as wrapped:
+        assert mod._is_oom_exception(wrapped) is True
+
+
+def test_is_oom_walks_context_chain():
+    """Same as above but via `__context__` (implicit chain when an
+    exception is raised inside an except block without `from`)."""
+    mod = _import_batch_humo_module()
+    if mod is None or not hasattr(mod, "_is_oom_exception"):
+        pytest.skip("batch_humo_render didn't load in test venv")
+    try:
+        try:
+            raise RuntimeError("out of memory")
+        except RuntimeError:
+            raise ValueError("rewrap")
+    except ValueError as wrapped:
+        assert mod._is_oom_exception(wrapped) is True
+
+
+def test_is_oom_handles_cyclic_chain():
+    """Pathological cycle in the exception chain must not infinite-
+    loop. Round-robin Item D edge case."""
+    mod = _import_batch_humo_module()
+    if mod is None or not hasattr(mod, "_is_oom_exception"):
+        pytest.skip("batch_humo_render didn't load in test venv")
+    a = ValueError("a")
+    b = ValueError("b")
+    a.__cause__ = b
+    b.__cause__ = a  # cycle
+    assert mod._is_oom_exception(a) is False  # neither is OOM, no infinite loop
 
 
 # ---------- _hard_reset_cuda_context degrades cleanly ------------

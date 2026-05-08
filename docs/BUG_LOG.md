@@ -5,6 +5,42 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-128 [FIXED]: HuMo soak cap counter conflates resumed + fresh; cap fires after 1 fresh render on resume (caught by 2026-05-08 external round-robin synthesis Item A)
+
+- **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Single `rendered` counter in `batch_humo_render.py`
+  was incremented on BOTH the resume branch and the fresh-render
+  branch. The cap check (`rendered >= humo_max_lines_per_process`)
+  fired off the combined value. A resume run that found 6
+  existing clips on disk would start the loop with `rendered == 6`
+  and trigger the cap after **one** fresh render -- the opposite
+  of the intended "render six fresh clips per process" behavior.
+- **Cause:** Counter accounting ambiguity. The `rendered` name
+  was load-bearing for both the cap check (which wanted "fresh
+  work this process") and the report/return value (which wanted
+  "total clips on disk including resumed").
+- **Fix:** Split into two counters per round-robin synthesis Item A:
+  - `total_clips_output` -- resumed + fresh; used for report
+    line, completion log, and the node's INT return value
+  - `fresh_rendered_this_process` -- fresh HuMo work only; used
+    for the cap check, `HumoSoakCapReached.lines_completed`, and
+    `meta.soak_cap.lines_completed_when_hit`
+  Resume branch now bumps only `total_clips_output`. Fresh-render
+  branch bumps both.
+- **Verify:** All existing tests still pass; cap behavior is
+  empirically validated by Run 1 (fresh start, expect 6 fresh
+  clips + cap raise) + Run 2 (immediate resume, expect 6 resumed
+  + 6 more fresh + cap raise -- diagnostic for whether the fix
+  landed correctly).
+- **Tags:** counter-bug, soak-cap, resume-from-ledger, off-by-N,
+  external-round-robin
+- **Bible candidacy:** yes -- the lesson is *one counter cannot
+  serve two semantics*. Whenever a helper has both "total work
+  done" and "incremental work this iteration" meanings layered on
+  the same name, the bookkeeping is fragile to the resume / retry
+  case. The two-counter pattern + fresh-only-for-cap pairing is
+  generic.
+
 ### BUG-LOCAL-127 [FIXED]: save_ledger_safe non-atomic Path.write_text bricks ledger on hard crash mid-write (caught by 2026-05-08 ledger round-robin)
 
 - **Date:** 2026-05-08 morning | **Phase:** 5 | **Bible candidate:** yes

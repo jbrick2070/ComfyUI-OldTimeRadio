@@ -88,8 +88,8 @@ _MIN_RADIO_STILL_BYTES = 256  # smaller than this is almost certainly truncated
 # this is a soak-survival fault, not a chase-the-dragon optimization).
 
 
-def _is_oom_exception(exc: BaseException) -> bool:
-    """True if ``exc`` is a CUDA out-of-memory error in any of its
+def _single_exception_is_oom(exc: BaseException) -> bool:
+    """True if a SINGLE exception object is a CUDA OOM in any of the
     common Pythonic forms.
 
     PyTorch raises ``torch.OutOfMemoryError`` (subclass of
@@ -110,6 +110,37 @@ def _is_oom_exception(exc: BaseException) -> bool:
         msg = str(exc).lower()
         if "out of memory" in msg or "outofmemoryerror" in msg:
             return True
+    return False
+
+
+def _is_oom_exception(exc: BaseException) -> bool:
+    """True if ``exc`` -- OR any exception in its ``__cause__`` /
+    ``__context__`` chain -- is a CUDA OOM.
+
+    Round-robin Item D catch (2026-05-08): ComfyUI / wrapping code
+    can re-raise a higher-level exception whose top-level message
+    lacks "out of memory" while still chaining the original OOM
+    via ``raise X from oom_err`` (sets ``__cause__``) or implicit
+    ``__context__``. Walk the chain so the recovery path doesn't
+    miss those wrapped cases. The ``seen`` set guards against
+    pathological cycles in the chain.
+    """
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    while stack:
+        cur = stack.pop()
+        cur_id = id(cur)
+        if cur_id in seen:
+            continue
+        seen.add(cur_id)
+        if _single_exception_is_oom(cur):
+            return True
+        cause = getattr(cur, "__cause__", None)
+        if cause is not None and isinstance(cause, BaseException):
+            stack.append(cause)
+        ctx = getattr(cur, "__context__", None)
+        if ctx is not None and isinstance(ctx, BaseException):
+            stack.append(ctx)
     return False
 
 
@@ -180,6 +211,20 @@ def _hard_reset_cuda_context() -> None:
         log.warning("[BatchHumoRender] cuda hard-reset SKIPPED: %s", "; ".join(steps_failed))
         return
 
+    # Round-robin Item H telemetry: capture before / after allocator
+    # state so post-mortem can answer "did the cleanup chain actually
+    # reclaim VRAM, or did it just run cleanly while the pool stayed
+    # fragmented?" -- the single most load-bearing question per the
+    # synthesis doc. Best-effort; failure here doesn't block cleanup.
+    before_allocated_gib = float("nan")
+    before_reserved_gib = float("nan")
+    try:
+        if torch.cuda.is_available():
+            before_allocated_gib = torch.cuda.memory_allocated() / (1024 ** 3)
+            before_reserved_gib = torch.cuda.memory_reserved() / (1024 ** 3)
+    except Exception:  # noqa: BLE001
+        pass
+
     if mm is not None:
         try:
             mm.unload_all_models()
@@ -221,15 +266,33 @@ def _hard_reset_cuda_context() -> None:
     except Exception as exc:  # noqa: BLE001
         steps_failed.append(f"torch.cuda.ipc_collect ({exc})")
 
+    # Round-robin Item H: capture after-state and log the reclaim
+    # delta. This single line is what tells us whether the cleanup
+    # chain is doing real work or just running in place.
+    after_allocated_gib = float("nan")
+    after_reserved_gib = float("nan")
+    try:
+        if torch.cuda.is_available():
+            after_allocated_gib = torch.cuda.memory_allocated() / (1024 ** 3)
+            after_reserved_gib = torch.cuda.memory_reserved() / (1024 ** 3)
+    except Exception:  # noqa: BLE001
+        pass
+
     if steps_failed:
         log.warning(
-            "[BatchHumoRender] cuda hard-reset partial: ran=%s; failed=%s",
+            "[BatchHumoRender] cuda hard-reset partial: ran=%s; failed=%s; "
+            "allocated %.2f -> %.2f GiB, reserved %.2f -> %.2f GiB",
             steps_run, steps_failed,
+            before_allocated_gib, after_allocated_gib,
+            before_reserved_gib, after_reserved_gib,
         )
     else:
         log.info(
-            "[BatchHumoRender] BUG-LOCAL-126 cuda hard-reset OK: %s",
+            "[BatchHumoRender] BUG-LOCAL-126 cuda hard-reset OK: %s; "
+            "allocated %.2f -> %.2f GiB, reserved %.2f -> %.2f GiB",
             ", ".join(steps_run),
+            before_allocated_gib, after_allocated_gib,
+            before_reserved_gib, after_reserved_gib,
         )
 
     # l3-2026-05-08 telemetry: bump meta.cuda_hard_reset_count so the
@@ -252,17 +315,20 @@ def _hard_reset_cuda_context() -> None:
                 )
 
 
-class HumoSoakCapReached(RuntimeError):
+class HumoSoakCapReached(Exception):
     """Raised by the soak loop when ``humo_max_lines_per_process`` is
-    set and that many HuMo lines have rendered successfully in the
-    current ComfyUI process.
+    set and that many FRESH HuMo lines (excluding resumed clips)
+    have rendered successfully in the current ComfyUI process.
 
     Catching this in a workflow / orchestrator lets the caller
     cleanly stop, persist the ledger, and queue a follow-up run
-    that picks up via ``resume_from_ledger=True``. The structured
-    type makes it distinguishable from generic RuntimeError so a
-    higher-level loop knows the run is incomplete-by-design rather
-    than incomplete-by-fault.
+    that picks up via ``resume_from_ledger=True``.
+
+    Inherits from ``Exception`` (NOT ``RuntimeError``) per 2026-05-08
+    external round-robin synthesis Item G: a downstream
+    ``except RuntimeError`` clause must NOT silently swallow this
+    structured soft-stop signal. Callers that genuinely want to
+    handle the cap should catch ``HumoSoakCapReached`` by name.
     """
 
     def __init__(self, lines_completed: int, cap: int):
@@ -2028,7 +2094,21 @@ class BatchHumoRender:
         log.info("[BatchHumoRender] Phase C: HuMo render loop, %d lines",
                  sum(1 for e in plan if e.get("positive") is not None
                      and e.get("audio_emb") is not None))
-        rendered = 0
+        # Round-robin Item A counter split (2026-05-08 synthesis):
+        # BEFORE this fix a single `rendered` counted both resumed and
+        # fresh clips, and the cap fired off the combined value. A
+        # resumed run that found 6 existing clips would hit the cap
+        # after ONE fresh render -- the fix did the opposite of what
+        # was intended. Now:
+        #   total_clips_output    -- resumed + fresh; used for return
+        #                            value + report (preserves the
+        #                            existing /N/ in the report line)
+        #   fresh_rendered_this_process -- fresh HuMo work only;
+        #                                  used for the cap check and
+        #                                  for HumoSoakCapReached's
+        #                                  lines_completed field
+        total_clips_output = 0
+        fresh_rendered_this_process = 0
         # BUG-LOCAL-089: track per-line clip records for ledger write-back.
         # The `clips[]` ledger field lets downstream tools (concat,
         # post-mortem, OBS scheduler) find every rendered clip by
@@ -2073,7 +2153,9 @@ class BatchHumoRender:
             if line_id in existing_clips_by_line_id:
                 _reused = existing_clips_by_line_id[line_id]
                 clip_records.append(_reused)
-                rendered += 1
+                # Resume branch: bump total only, NOT the cap counter
+                # (round-robin Item A).
+                total_clips_output += 1
                 report_lines.append(
                     f"  {line_id} ({entry.get('speaker')}): RESUMED "
                     f"(reused {_reused.get('mp4_path')})"
@@ -2310,7 +2392,9 @@ class BatchHumoRender:
                         f"(length={entry['humo_length']} ref={entry['ref_png_name']})"
                     )
                     log.info("[BatchHumoRender] %s done in %d ms", line_id, shot_ms)
-                rendered += 1
+                # Fresh-render branch: bump BOTH counters (round-robin Item A).
+                total_clips_output += 1
+                fresh_rendered_this_process += 1
 
                 # l3-2026-05-08 telemetry: stamp lines[].render_method
                 # so an audit can distinguish humo_native success from
@@ -2333,7 +2417,11 @@ class BatchHumoRender:
                 # BUG-LOCAL-126 soak cap. Save the ledger first so the
                 # follow-up resume picks up cleanly, then raise the
                 # structured signal. Cap == 0 disables this branch.
-                if humo_max_lines_per_process > 0 and rendered >= humo_max_lines_per_process:
+                # Counter split (round-robin Item A): cap fires off
+                # FRESH renders only -- a resume run that found 6
+                # existing clips on disk doesn't immediately stop
+                # after one fresh render.
+                if humo_max_lines_per_process > 0 and fresh_rendered_this_process >= humo_max_lines_per_process:
                     try:
                         try:
                             from . import _otr_ledger as _OTRL_CAP  # type: ignore
@@ -2352,7 +2440,7 @@ class BatchHumoRender:
                         _OTRL_CAP.stamp_meta_soak_cap(
                             ledger,
                             cap=humo_max_lines_per_process,
-                            lines_completed_when_hit=rendered,
+                            lines_completed_when_hit=fresh_rendered_this_process,
                             hit=True,
                         )
                         if ledger_path is not None:
@@ -2366,12 +2454,14 @@ class BatchHumoRender:
                         )
                     log.warning(
                         "[BatchHumoRender] BUG-LOCAL-126 soak cap reached "
-                        "(%d of cap %d); ledger persisted; "
+                        "(%d fresh of cap %d; %d total clips on disk); "
+                        "ledger persisted; "
                         "queue follow-up with resume_from_ledger=True",
-                        rendered, humo_max_lines_per_process,
+                        fresh_rendered_this_process, humo_max_lines_per_process,
+                        total_clips_output,
                     )
                     raise HumoSoakCapReached(
-                        lines_completed=rendered,
+                        lines_completed=fresh_rendered_this_process,
                         cap=humo_max_lines_per_process,
                     )
 
@@ -2453,13 +2543,41 @@ class BatchHumoRender:
                     _failed_line_id,
                 )
                 _hard_reset_cuda_context()
+                # Round-robin Item C: persist the ledger IMMEDIATELY
+                # after the cleanup chain so a subsequent C-level
+                # abort (the BUG-126 failure mode) still leaves
+                # cuda_hard_reset_count + oom_recovery_count durably
+                # on disk. Without this, the post-mortem can't
+                # answer "did the cleanup chain even fire?" if the
+                # next sample fatal-aborts before the per-clip
+                # ledger save runs.
+                if ledger_path is not None:
+                    try:
+                        try:
+                            from . import _otr_ledger as _OTRL_OOM_SAVE  # type: ignore
+                        except ImportError:
+                            import _otr_ledger as _OTRL_OOM_SAVE  # type: ignore
+                        ledger["clips"] = list(clip_records)
+                        _OTRL_OOM_SAVE.save_ledger_safe(ledger_path, ledger)
+                    except Exception as _save_exc:  # noqa: BLE001
+                        log.warning(
+                            "[BatchHumoRender] post-OOM ledger save "
+                            "failed (non-fatal): %s", _save_exc,
+                        )
 
         total_ms = int((time.time() - t_start) * 1000)
         report_lines.append(
-            f"Total: {rendered}/{len(plan)} clip(s) in {total_ms} ms"
+            f"Total: {total_clips_output}/{len(plan)} clip(s) in {total_ms} ms "
+            f"({fresh_rendered_this_process} fresh, "
+            f"{total_clips_output - fresh_rendered_this_process} resumed)"
         )
-        log.info("[BatchHumoRender] complete: %d/%d clips in %d ms",
-                 rendered, len(plan), total_ms)
+        log.info(
+            "[BatchHumoRender] complete: %d/%d clips in %d ms "
+            "(%d fresh, %d resumed)",
+            total_clips_output, len(plan), total_ms,
+            fresh_rendered_this_process,
+            total_clips_output - fresh_rendered_this_process,
+        )
 
         # ---- 10. BUG-LOCAL-089: write clips[] back to the ledger ----
         # Persist the per-clip records so VideoComposite + post-mortem
@@ -2511,7 +2629,7 @@ class BatchHumoRender:
                 "skipping clips[] write-back"
             )
 
-        return (str(clips_dir_path), rendered, "\n".join(report_lines))
+        return (str(clips_dir_path), total_clips_output, "\n".join(report_lines))
 
     @staticmethod
     def _load_ledger(ledger_arg: str) -> dict:

@@ -217,8 +217,12 @@ def test_detect_aliases_ignores_structural_headers():
     assert aliases == {}
 
 
-def test_detect_aliases_first_match_wins_when_two_canonicals_share_prefix():
-    """MARLA + MARLON both share 'MARL' prefix; MARLENE picks the first listed."""
+def test_detect_aliases_refuses_on_prefix_collision():
+    """Round-robin Item F (2026-05-08): when two canonicals share
+    the prefix with an orphan, the heuristic MUST refuse to pick
+    one and leave the orphan in residual for §4 LLM disambiguation.
+    Pre-fix behavior was first-match-wins, which silently mis-routed
+    entire episodes worth of dialogue to the wrong canonical."""
     contract = CastContract(
         characters=[
             CharacterEntry("c01", "MARLA", [], "bark:v2/en_speaker_2"),
@@ -226,8 +230,36 @@ def test_detect_aliases_first_match_wins_when_two_canonicals_share_prefix():
         ]
     )
     aliases = detect_aliases("MARLENE: ambiguous.\n", contract)
-    # First match in iteration order -> c01. §4 is the canonical disambiguator.
-    assert aliases == {"MARLENE": "c01"}
+    # No alias picked -- orphan stays in residual, escalates to §4.
+    assert aliases == {}
+
+
+def test_detect_aliases_three_way_collision_also_refuses():
+    """Generalization: any N >= 2 collision refuses."""
+    contract = CastContract(
+        characters=[
+            CharacterEntry("c01", "MARLA", [], "bark:v2/en_speaker_2"),
+            CharacterEntry("c02", "MARLON", [], "bark:v2/en_speaker_4"),
+            CharacterEntry("c03", "MARLOWE", [], "bark:v2/en_speaker_6"),
+        ]
+    )
+    aliases = detect_aliases("MARLENE: even more ambiguous.\n", contract)
+    assert aliases == {}
+
+
+def test_detect_aliases_unambiguous_single_match_still_applies():
+    """The collision-refusal must NOT regress the single-match case
+    -- MONTGOMERY -> MONTY when MONTY is the only prefix-matching
+    canonical still works."""
+    contract = CastContract(
+        characters=[
+            CharacterEntry("c01", "AEGEUS", [], "bark:v2/en_speaker_5"),
+            CharacterEntry("c02", "MONTY", [], "bark:v2/en_speaker_3"),
+            CharacterEntry("c03", "SAILOR", [], "bark:v2/en_speaker_9"),
+        ]
+    )
+    aliases = detect_aliases("MONTGOMERY: long form.\n", contract)
+    assert aliases == {"MONTGOMERY": "c02"}
 
 
 def test_detect_aliases_empty_script_returns_empty():
