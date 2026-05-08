@@ -1,0 +1,462 @@
+{
+  "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
+  "revision": 0,
+  "last_node_id": 100,
+  "last_link_id": 200,
+  "nodes": [
+    {
+      "id": 45,
+      "type": "UNETLoader",
+      "pos": [
+        2200,
+        200
+      ],
+      "size": [
+        420,
+        100
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "title": "Load HuMo 14B fp8 e4m3fn scaled (Kijai)",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            72
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors",
+        "default"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 46,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        2200,
+        340
+      ],
+      "size": [
+        420,
+        80
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "title": "lightx2v 4-step distill",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 72
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            73
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+        1.0
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 47,
+      "type": "ModelSamplingSD3",
+      "pos": [
+        2200,
+        460
+      ],
+      "size": [
+        420,
+        60
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "title": "ModelSamplingSD3 shift=8",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 73
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            74
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingSD3"
+      },
+      "widgets_values": [
+        8.0
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 48,
+      "type": "CLIPLoader",
+      "pos": [
+        2200,
+        560
+      ],
+      "size": [
+        420,
+        80
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "title": "Load umt5_xxl text encoder",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            75
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "default"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 49,
+      "type": "VAELoader",
+      "pos": [
+        2200,
+        680
+      ],
+      "size": [
+        420,
+        60
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "title": "Load wan_2.1 VAE",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            76
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "wan_2.1_vae.safetensors"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 50,
+      "type": "AudioEncoderLoader",
+      "pos": [
+        2200,
+        780
+      ],
+      "size": [
+        420,
+        60
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "title": "Load Whisper Large v3",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO_ENCODER",
+          "type": "AUDIO_ENCODER",
+          "links": [
+            77
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AudioEncoderLoader"
+      },
+      "widgets_values": [
+        "whisper_large_v3_fp16.safetensors"
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 51,
+      "type": "OTR_BatchHumoRender",
+      "pos": [
+        2660,
+        200
+      ],
+      "size": [
+        480,
+        460
+      ],
+      "flags": {},
+      "order": 28,
+      "mode": 0,
+      "title": "Batch HuMo Render (in-graph batch)",
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 74
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 75
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 76
+        },
+        {
+          "name": "audio_encoder",
+          "type": "AUDIO_ENCODER",
+          "link": 77
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 200
+        },
+        {
+          "name": "ledger_json",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "ledger_json"
+          }
+        },
+        {
+          "name": "portraits_dir",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "portraits_dir"
+          }
+        },
+        {
+          "name": "flux_done_gate",
+          "type": "IMAGE",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clips_dir",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip_count",
+          "type": "INT",
+          "links": null,
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_BatchHumoRender"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_lunar_dawn_20260508_133930\\audio\\signal_lost_lunar_dawn_20260508_133930_ledger.json",
+        "",
+        7.0,
+        0,
+        7,
+        "randomize",
+        6,
+        1.0,
+        "uni_pc",
+        "simple",
+        480,
+        832,
+        200,
+        -28.0,
+        true,
+        3,
+        true,
+        false
+      ],
+      "color": "#1E3A5F",
+      "bgcolor": "#13253F"
+    },
+    {
+      "id": 100,
+      "type": "LoadAudio",
+      "pos": [
+        -200,
+        1200
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            200
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Load lunar_dawn master audio (pre-baked)",
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_lunar_dawn_20260508_133930\\audio\\signal_lost_lunar_dawn_20260508_133930.mp4",
+        "Stop"
+      ]
+    }
+  ],
+  "links": [
+    [
+      72,
+      45,
+      0,
+      46,
+      0,
+      "MODEL"
+    ],
+    [
+      73,
+      46,
+      0,
+      47,
+      0,
+      "MODEL"
+    ],
+    [
+      74,
+      47,
+      0,
+      51,
+      0,
+      "MODEL"
+    ],
+    [
+      75,
+      48,
+      0,
+      51,
+      1,
+      "CLIP"
+    ],
+    [
+      76,
+      49,
+      0,
+      51,
+      2,
+      "VAE"
+    ],
+    [
+      77,
+      50,
+      0,
+      51,
+      3,
+      "AUDIO_ENCODER"
+    ],
+    [
+      200,
+      100,
+      0,
+      51,
+      4,
+      "AUDIO"
+    ]
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "info": {
+      "name": "Old-Time Radio Sci-Fi Anthology",
+      "author": "Jeffrey Brick",
+      "description": "Full pipeline: LLM scripts + Bark TTS + Spatial Audio + CRT Video. v2.0 Visual Drama Engine placeholders included.",
+      "version": "1.5.0"
+    }
+  },
+  "version": 0.4
+}
