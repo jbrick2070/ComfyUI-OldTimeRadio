@@ -150,3 +150,11 @@ workflows/*.json.bak
 # never accidentally enters git history.
 config/news_history.json
 
+# --- 2026-05-08 stale-debris hygiene ---
+# Catchalls that slipped past the existing patterns during 2026-05-08
+# autonomous cleanup. .function_calls is an AI-tool exhaust file;
+# outputs_scratch/ is a Cowork-side scratchpad mirror.
+.function_calls
+outputs_scratch/
+outputs_scratch_*/
+
