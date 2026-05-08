@@ -194,6 +194,51 @@ class SaveToEpisodeWorkspace:
 
         for img in iterator:
             try:
+                # Round-robin Step 3 follow-up (post 13:07 clean run, 2026-05-08):
+                # Recognize the benign all-zero placeholder tensor that
+                # ``OTR_BatchFluxRender`` emits when ``skip_env_stills=True``
+                # (BUG-LOCAL-078 follow-up). Saving it produces the
+                # 74-byte PNG that the gate below would otherwise raise on,
+                # but in this case the empty image is INTENTIONAL --
+                # nothing to save. Skip silently with a debug log so the
+                # runtime trace stays useful, but don't pollute disk
+                # with empty PNGs and don't false-fire the gate.
+                # Sentinel predicate: any tensor 64x64 or smaller with
+                # all zeros is treated as an upstream skip-stub. Real
+                # FLUX/LTX renders are >=512x512; a tiny zero tensor
+                # only appears as a deliberate empty marker (e.g.
+                # BatchFluxRender's (16,16,3) placeholder when
+                # skip_env_stills=True). This avoids accidentally
+                # swallowing a legitimately-black large render while
+                # still catching the known sentinel.
+                _is_zero_marker = False
+                try:
+                    import torch  # type: ignore
+                    if isinstance(img, torch.Tensor) and img.numel() > 0:
+                        # Last two dims for (..., H, W, C) or (..., H, W).
+                        shp = tuple(img.shape)
+                        if len(shp) >= 2:
+                            _h, _w = shp[-3], shp[-2] if len(shp) >= 3 else (shp[-2], shp[-1])
+                        else:
+                            _h = _w = max(shp) if shp else 0
+                        if _h <= 64 and _w <= 64:
+                            _tmin = float(img.min().item())
+                            _tmax = float(img.max().item())
+                            if _tmin == 0.0 and _tmax == 0.0:
+                                _is_zero_marker = True
+                except Exception:  # noqa: BLE001
+                    pass
+                if _is_zero_marker:
+                    log.info(
+                        "[SaveToEpisodeWorkspace] skipping all-zero "
+                        "marker tensor (shape=%s); upstream node "
+                        "produced an intentional empty placeholder, "
+                        "no PNG written",
+                        tuple(getattr(img, "shape", ())),
+                    )
+                    next_idx += 1
+                    continue
+
                 pil_img = _tensor_to_pil(img)
                 fname = f"{filename_pattern}_{next_idx:05d}_.png"
                 out_path = target_dir / fname

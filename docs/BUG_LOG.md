@@ -5,6 +5,53 @@ Entries are never deleted.
 
 ---
 
+### BUG-LOCAL-134 [FIXED]: BAD_IMAGE_SAVE gate false-fires on BatchFluxRender skip_env_stills sentinel placeholder (caught by 2026-05-08 13:07 clean run)
+
+- **Date:** 2026-05-08 mid-day | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** The 13:07 clean run
+  (`signal_lost_stellar_whispers_20260508_130733`) hit the
+  BUG-LOCAL-133 image-save-size gate with this signature:
+  ```
+  [SaveToEpisodeWorkspace] save failed for image 1:
+    BAD_IMAGE_SAVE: full_env_00001_.png wrote 74 bytes
+    (under 4096-byte gate); input tensor shape=(16, 16, 3)
+    dtype=torch.float32 min=0.0000 max=0.0000.
+  ```
+  The shape `(16, 16, 3)` and `min == max == 0.0` is the
+  intentional placeholder tensor that
+  `OTR_BatchFluxRender` emits on its IMAGE output when
+  `skip_env_stills=True` (BUG-LOCAL-078 follow-up). The gate
+  caught a legitimate "nothing to save" signal as an upstream
+  fault. Run continued past the raise (existing per-image
+  try/except in `OTR_SaveToEpisodeWorkspace` logged + continued)
+  but the noise made the audit harder to read.
+- **Cause:** BUG-LOCAL-133's image-save-size gate was correct in
+  shape but didn't account for the deliberate empty-marker
+  pattern that one upstream branch uses. The 4096-byte threshold
+  catches both real upstream failures AND benign sentinels --
+  ambiguous signal.
+- **Fix:** Added a sentinel-recognition predicate BEFORE the
+  size gate. If the input tensor has its spatial dims <=64 AND
+  is all zeros, treat it as a known skip-stub:
+  log info, advance the index, do NOT write a PNG, do NOT
+  raise. The 64-pixel ceiling is generous (real FLUX/LTX
+  renders are >=512px) so a legitimately-black large render
+  still hits the size gate as designed.
+- **Verify:** AST clean, LTX regression unchanged. Next run
+  with `skip_env_stills=True` should produce no
+  `BAD_IMAGE_SAVE` log line for `full_env_*.png`; the
+  SaveToEpisodeWorkspace step logs an
+  `[SaveToEpisodeWorkspace] skipping all-zero marker tensor
+  (shape=(16, 16, 3))` info line instead.
+- **Tags:** image-save-validation, sentinel-pattern, skip-stub,
+  BUG-133-followup, false-positive
+- **Bible candidacy:** yes -- the lesson is *size gates over
+  raw bytes are coarse-grained; pair them with a shape-aware
+  sentinel predicate when an upstream branch deliberately emits
+  empty markers*. Two predicates compose cleanly: shape-based
+  recognition catches known stubs; size-based catches actual
+  upstream failures.
+
 ### BUG-LOCAL-133 [FIXED]: Stage 1 post-run patches -- BUG-031 silent-skip wired, image-save-size gate added, soft-cap mode added (caught by 2026-05-08 Stage 1 post-run synthesis)
 
 - **Date:** 2026-05-08 mid-day | **Phase:** 5 | **Bible candidate:** yes
