@@ -5,6 +5,54 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-08: "HuMo hangs on 2nd/3rd clip in full episode runs" was the soak cap firing as designed; cap=3 was too tight for production scripts
+
+- **Date:** 2026-05-08 evening | **Phase:** 5 | **Bible candidate:** yes
+  (cap-tuning advisory rather than code bug, but worth a Bible entry
+  so the diagnosis isn't redone every time someone sees HuMo halt
+  mid-script)
+- **Symptom:** Multiple full-episode runs reported HuMo "hanging" or
+  "failing on the 2nd/3rd HuMo clip." Smoke runs of the same code
+  worked. The full-run logs ended with no traceback, no fatal abort,
+  no OOM -- the workflow simply stopped advancing past HuMo even
+  though the script declared 6+ character lines.
+- **Cause:** Workflow widget `humo_max_lines_per_process` was set to
+  `3` (BUG-LOCAL-126 defensive backstop after the 2026-05-07
+  overnight allocator-drift fatal abort). When a script generated
+  more than 3 character lines, BatchHumoRender hit the cap and
+  exited via the `HumoSoakCapReached` raise (default
+  `stop_workflow_on_soak_cap=True`). The workflow halted with no
+  error trace because the raise is the designed soft-stop signal,
+  not a crash. From the operator's perspective, this looked
+  identical to "HuMo broke."
+- **Verification:** 2026-05-08 4-HuMo smoke (commit `9c6353d`,
+  `workflows/otr_humo_4x_smoke.json`) ran four character-line clones
+  of `l002` (synthetic ledger
+  `output/otr/episodes/signal_lost_lunar_dawn_20260508_133930/audio/synthetic_4humo_ledger.json`).
+  Result: clip 1 done in 377 s, clip 2 in 374 s, clip 3 in 369 s --
+  three consecutive HuMo renders back-to-back with **zero OOM, zero
+  allocator drift, zero hang**. The 4th clip didn't run because the
+  cap fired exactly as designed (`3 fresh of cap 3; SOFT_CAP mode`).
+  The "hang" was the cap, not HuMo. Allocator drift only manifests
+  AFTER a caught OOM cycle; healthy successive renders don't drift.
+- **Fix:** Bump `humo_max_lines_per_process` from `3` to `0`
+  (unlimited) in all four workflow JSONs (commit `02a5749`):
+    - `otr_scifi_16gb_full.json` (production)
+    - `otr_humo_smoke.json` (E2E smoke)
+    - `otr_humo_only_smoke.json` (strict HuMo isolation)
+    - `otr_humo_4x_smoke.json` (4-HuMo reproducer)
+  `cuda_hard_reset_on_oom` stays `True` so the BUG-126 cleanup chain
+  still fires if a real OOM happens; we just don't artificially halt
+  after N successful clips.
+- **Future watch:** If a real allocator drift returns (the original
+  2026-05-07 9-clip overnight fatal abort), the cap can be re-set to
+  6-8 (the empirically safe per-process budget per the BUG-126
+  tooltip). The 4-HuMo smoke is the regression detector.
+- **Tags:** humo, soak-cap, BUG-126, widget-config, false-positive,
+  allocator-drift
+
+---
+
 ### BUG-LOCAL-135 [FIXED]: Music / SFX / gap segments freeze the radio set with 47.8 s of static-radio fill instead of looping a motion clip (caught by 2026-05-08 13:39 clean run, design call by Jeffrey)
 
 - **Date:** 2026-05-08 late afternoon | **Phase:** 6 | **Bible candidate:** yes
