@@ -343,7 +343,7 @@
         -28.0,
         true,
         3,
-        true,
+        false,
         false
       ],
       "color": "#1E3A5F",
