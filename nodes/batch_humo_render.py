@@ -1641,16 +1641,36 @@ class BatchHumoRender:
         humo_node = refs["WanHuMoImageToVideo"]()
         audio_enc_node = refs["AudioEncoderEncode"]()
 
-        # ---- 5. Pin model on GPU ----
-        try:
-            import comfy.model_management as mm  # type: ignore
-            try:
-                mm.load_models_gpu([model], force_full_load=True)
-            except TypeError:
-                mm.load_models_gpu([model])
-            log.info("[BatchHumoRender] pinned MODEL via load_models_gpu")
-        except Exception as exc:
-            log.debug("[BatchHumoRender] pre-pin skipped: %s", exc)
+        # ---- 5. (REMOVED 2026-05-08) HuMo pre-pin was upside-down ----
+        # Pre-2026-05-08: this block called
+        #   mm.load_models_gpu([model], force_full_load=True)
+        # to "pin" HuMo on GPU before Phase A/B encoders ran. The pin
+        # was structurally broken on 16 GB devices: HuMo stages at
+        # 16,531 MB; Phase A then needs umt5 (6.4 GB); Phase B needs
+        # Whisper (1.2 GB); together they cannot coexist with the
+        # pinned HuMo on a 16 GB total. Under encoder pressure
+        # ComfyUI's dynamic VRAM offloader silently violated the pin,
+        # but the weights remained referenced -- which fragmented the
+        # cudaMallocAsync pool by Phase C entry. On large episodes
+        # (60+ chunks) Phase C HuMo then ran at ~88x slowdown
+        # (5,284 s/it vs healthy 60 s/it), because the offloader fell
+        # into perpetual swap-to-CPU through PCIe instead of running
+        # contiguously in GDDR.
+        #
+        # The "Model WAN21_HuMo prepared for dynamic VRAM loading.
+        # 16531MB Staged" log line at Phase C entry confirmed the pin
+        # did not survive: HuMo had to be re-staged anyway when
+        # WanHuMoImageToVideo actually ran.
+        #
+        # Phase C's WanHuMoImageToVideo invocation goes through
+        # load_models_gpu itself when it needs HuMo, so the pin was
+        # also redundant. Removing it lets Phase A/B encoders own GPU
+        # cleanly; the inter-phase reset (section 8.5) then drains
+        # the pool before Phase C stages HuMo on a defragmented
+        # allocator.
+        #
+        # Round-robin synthesis 2026-05-08 path-forward Fix 1.
+        # ----------------------------------------------------------
 
         # ---- 5.5. BUG-LOCAL-088: ledger-driven cast->still binding ----
         # BUG-LOCAL-093 (2026-05-04 EVENING): cast_still_map binding
