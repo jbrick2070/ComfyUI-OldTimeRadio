@@ -2120,8 +2120,29 @@ class BatchHumoRender:
             for entry in plan:
                 if entry.get("positive") is not None:
                     entry["positive"] = _to_cpu(entry["positive"])
+                # Legacy fallback. ``entry["audio_emb"]`` was the
+                # pre-BUG-086 location for audio embeddings (per-line,
+                # not per-chunk). The current Phase B writes them to
+                # ``chunk["audio_emb"]`` instead (line ~2071), so this
+                # branch is a no-op on current code paths. Kept in case
+                # a future refactor restores the per-line layout.
                 if entry.get("audio_emb") is not None:
                     entry["audio_emb"] = _to_cpu(entry["audio_emb"])
+                # Round-robin v3 (2026-05-08, Fix 1.5): the BUG-086
+                # split moved audio embeddings onto chunks but the
+                # cleanup walk above wasn't updated. Result: every
+                # ``chunk["audio_emb"]`` tensor stayed GPU-resident
+                # through the inter-phase boundary -- 90 chunks on a
+                # 60-line script meant 0.9-4.5 GiB of stale GPU
+                # references, which the subsequent
+                # ``unload_all_models() + soft_empty_cache()`` could
+                # not reclaim because Python still held references via
+                # plan[*]["chunks"][*]["audio_emb"]. Now: walk every
+                # chunk's audio_emb to CPU before the inter-phase
+                # reset so the allocator pool can actually drain.
+                for chunk in entry.get("chunks") or []:
+                    if chunk.get("audio_emb") is not None:
+                        chunk["audio_emb"] = _to_cpu(chunk["audio_emb"])
             log.info("[BatchHumoRender] Phase A/B tensors moved to CPU")
         except Exception as exc:
             log.warning("[BatchHumoRender] CPU offload failed: %s", exc)
@@ -2135,9 +2156,28 @@ class BatchHumoRender:
             log.warning("[BatchHumoRender] inter-phase VRAM cleanup failed: %s", exc)
 
         # ---- 9. Phase C: HuMo render loop (model stays warm) ----
-        log.info("[BatchHumoRender] Phase C: HuMo render loop, %d lines",
-                 sum(1 for e in plan if e.get("positive") is not None
-                     and e.get("audio_emb") is not None))
+        # Round-robin v3 (2026-05-08, Fix 1.5): the pre-fix
+        # ``e.get("audio_emb") is not None`` check always evaluated
+        # False on current schema (audio embeddings live on chunks,
+        # not entries -- BUG-086). That made this log line always
+        # report "0 lines" regardless of the actual plan size. The
+        # render loop itself at line ~2223 correctly checks
+        # ``c.get("audio_emb") for c in _chunks``, which is why
+        # rendering worked at all -- only the count log was wrong.
+        # Now: a per-entry "ready" predicate that requires
+        # ``positive`` plus at least one chunk plus ``audio_emb`` on
+        # every chunk. Matches the render loop's gate semantics.
+        def _entry_ready_for_humo(e):
+            chunks = e.get("chunks") or []
+            return (
+                e.get("positive") is not None
+                and bool(chunks)
+                and all(c.get("audio_emb") is not None for c in chunks)
+            )
+        log.info(
+            "[BatchHumoRender] Phase C: HuMo render loop, %d lines",
+            sum(1 for e in plan if _entry_ready_for_humo(e)),
+        )
         # Round-robin Item A counter split (2026-05-08 synthesis):
         # BEFORE this fix a single `rendered` counted both resumed and
         # fresh clips, and the cap fired off the combined value. A
