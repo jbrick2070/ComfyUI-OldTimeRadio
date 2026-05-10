@@ -5,6 +5,30 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: downstream visual chain audited clean — no L3 rewrites needed (sprint follow-up to ledger-consumer-rewrite eec4718)
+
+- **Date:** 2026-05-10 | **Phase:** 3 | **Bible candidate:** no (recon-verdict, not code change)
+- **Symptom:** Sprint plan called for "full-rigor downstream review and fix" of every visual / post-process / cast / utility node downstream of the L3 ledger writer. Concern: any node still parsing the legacy parser-list `script_json` shape (`[{"type":"environment", ...}, {"type":"dialogue", ...}]`) or reading legacy field names (`character_name`, `voice_traits`, list-index access on `lines[]`, regex on `[VOICE: NAME]`) would crash on L3 input from the new `OTR_LedgerScriptWriter`.
+- **Diagnosis:** Recon pass over every active downstream node:
+  - `visual/batch_flux_render.py` (radio bookend + dead env stills)
+  - `visual/batch_flux_portrait_render.py` (per-cast portraits)
+  - `nodes/batch_humo_render.py` (character lip-sync)
+  - `nodes/batch_ltx_render.py` (non-character motion)
+  - `nodes/video_composite.py` (1080p mux + gap fill)
+  - `nodes/rtx_upscale.py` (post-upscale)
+  - `nodes/otr_post_upscale_procgen_blend.py` (procgen overlay)
+  - `nodes/otr_save_to_episode_workspace.py`, `nodes/otr_save_copy.py`, `nodes/otr_video_concat.py`, `nodes/otr_video_plan.py`, `nodes/otr_shot_duration_calculator.py`
+  - `nodes/_otr_cast_repair.py`, `nodes/_otr_voice_resolver.py`, `nodes/_voice_backends/*.py`, `nodes/voice_render.py`, `nodes/_otr_period_prompts.py`
+  - `nodes/post_audio_video_pipeline.py` (RETIRED — backward-compat registration only)
+  - All LLM prompt construction sites: `_otr_outline.py`, `_otr_line_composer.py`, `_otr_period_prompts.py`, `script_critic.py`, `story_orchestrator.py`, `_otr_legacy_writer.py`
+- **Method:** Grep for danger patterns (`payload.get("tokens")`, `for x in payload`, `[VOICE: NAME]` regex, `item.get("type") == "dialogue"`, list-index access on `ledger.lines[]`, legacy field names). Direct read of every prompt construction site. Cross-check against L3 schema in `_otr_ledger.py` (CURRENT_SCHEMA_VERSION = "l3-2026-05-08").
+- **Finding:** Every active downstream node already uses L3-native field names exclusively (`line_id`, `char_id`, `speaker_role`, `start_s`, `dur_s`, `text`, `word_count`, `shot_id`, `cast[].char_id`, `cast[].name`, `cast[].voice_preset`, `cast[].portrait_path`, `meta.gen_params_initial.style`, `meta.radio_bookend_path`, `episode_id`), reads ledger from disk via `_OTRL.in_flight_ledger_path()` / `production_ledger.get_ledger()` singleton + `load_ledger_safe`, and degrades gracefully with `.get(...)` defaults on missing fields. The only legacy-parser-list parsing site (`visual/batch_flux_render.py:_parse_env_prompts`) is dead code: bypassed by default widget `skip_env_stills=True`, and even if enabled would degrade to fallback prompts (no crash) on L3 dict input. Confirmed ROADMAP line 67 prediction.
+- **Fix:** None needed. Verdict: **AUDITED CLEAN, no rewrites needed.** Documented in ROADMAP.md "Visual chain recon — AUDITED CLEAN, 2026-05-10" subsection.
+- **Verify:** Bug Bible regression 23/1/2/0 baseline held throughout. New helper API tests `tests/test_otr_ledger_consumers.py` 48/48 PASS. Dry-run gate suite (5 gates: AST parse, node types registered, widget count vs INPUT_TYPES, link socket bounds, link types non-empty) ALL PASS.
+- **Tags:** l3-ledger, recon, audit-clean, sprint-followup
+
+---
+
 ### NON-BUG-2026-05-08: "HuMo hangs on 2nd/3rd clip in full episode runs" was the soak cap firing as designed; cap=3 was too tight for production scripts
 
 - **Date:** 2026-05-08 evening | **Phase:** 5 | **Bible candidate:** yes

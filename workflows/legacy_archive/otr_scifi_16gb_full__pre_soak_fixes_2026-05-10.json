@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 61,
-  "last_link_id": 105,
+  "last_link_id": 104,
   "nodes": [
     {
       "id": 1,
@@ -17,10 +17,10 @@
       ],
       "title": "1. Story Writer (LPL v2.0)",
       "properties": {
-        "Node name for S&R": "OTR_LedgerScriptWriter"
+        "Node name for S&R": "OTR_LLMScriptWriter"
       },
       "widgets_values": [
-        "Astronomers observe a pulsar's radio bursts forming a non-random pattern. The signal's information density rules out a natural source but no civilization is known in that direction.",
+        "Astronomers observe a pulsar's radio bursts forming a non-random pattern. The signal's information density rules out a natural source but no civilization is known in that direction. (PLACEHOLDER — replace before soak.)",
         "tense claustrophobic",
         140,
         2,
@@ -132,7 +132,7 @@
         }
       ],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -219,7 +219,7 @@
         }
       ],
       "flags": {},
-      "order": 6,
+      "order": 2,
       "mode": 0,
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
@@ -266,7 +266,7 @@
         }
       ],
       "flags": {},
-      "order": 7,
+      "order": 3,
       "mode": 0,
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
@@ -333,7 +333,7 @@
         }
       ],
       "flags": {},
-      "order": 9,
+      "order": 6,
       "mode": 0,
       "color": "#4A2B4D",
       "bgcolor": "#301C32"
@@ -393,7 +393,7 @@
         }
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "color": "#234035",
       "bgcolor": "#162821"
@@ -415,8 +415,8 @@
       },
       "widgets_values": [
         "[]",
-        "[]",
         "{}",
+        "[]",
         24,
         "1920x1080",
         ""
@@ -436,14 +436,6 @@
           }
         },
         {
-          "name": "news_used",
-          "type": "STRING",
-          "link": 18,
-          "widget": {
-            "name": "news_used"
-          }
-        },
-        {
           "name": "production_plan_json",
           "type": "STRING",
           "link": 17,
@@ -452,9 +444,12 @@
           }
         },
         {
-          "name": "closing_audio",
-          "type": "AUDIO",
-          "link": 105
+          "name": "news_used",
+          "type": "STRING",
+          "link": 18,
+          "widget": {
+            "name": "news_used"
+          }
         }
       ],
       "outputs": [
@@ -490,7 +485,7 @@
         130
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
@@ -549,7 +544,7 @@
         160
       ],
       "flags": {},
-      "order": 8,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
@@ -574,8 +569,7 @@
           "name": "closing_audio",
           "type": "AUDIO",
           "links": [
-            23,
-            105
+            23
           ],
           "slot_index": 1
         },
@@ -663,7 +657,7 @@
         }
       ],
       "flags": {},
-      "order": 5,
+      "order": 2,
       "mode": 0,
       "color": "#234035",
       "bgcolor": "#162821"
@@ -680,7 +674,7 @@
         400
       ],
       "flags": {},
-      "order": 11,
+      "order": 0,
       "mode": 0,
       "title": "Video Plan (wired from Director)",
       "inputs": [
@@ -744,7 +738,7 @@
         "Node name for S&R": "OTR_VideoPlan"
       },
       "widgets_values": [
-        "{}",
+        "{\n  \"episode_title\": \"The Saturn Broadcast\",\n  \"voice_assignments\": {\n    \"LEMMY\": {\n      \"voice_preset\": \"v2/en_speaker_8\",\n      \"notes\": \"Male, 50s, gravelly, weathered, confident\"\n    },\n    \"KENJI CROSS\": {\n      \"voice_preset\": \"v2/en_speaker_3\",\n      \"notes\": \"Male, 30s, urgent, clipped military cadence\"\n    },\n    \"ANNOUNCER\": {\n      \"voice_preset\": \"v2/en_speaker_4\",\n      \"notes\": \"Female, 40s, warm authoritative broadcast voice\"\n    }\n  },\n  \"sfx_plan\": [\n    {\n      \"cue_id\": \"sfx_001\",\n      \"type\": \"sfx\",\n      \"description\": \"low frequency console hum\",\n      \"generation_prompt\": \"deep industrial drone of old analog electronics, subtle electromagnetic hum, distant air handler, mono\"\n    },\n    {\n      \"cue_id\": \"sfx_002\",\n      \"type\": \"sfx\",\n      \"description\": \"red alert klaxon, distant\",\n      \"generation_prompt\": \"muffled alarm klaxon pulsing through thick bulkhead doors, distant urgent warning, rhythmic low-frequency whoop\"\n    }\n  ],\n  \"music_plan\": [\n    {\n      \"cue_id\": \"opening\",\n      \"duration_sec\": 12,\n      \"generation_prompt\": \"1940s old time radio sci-fi opening, brass fanfare with theremin lead, upright bass, AM radio character, confident and mysterious\"\n    },\n    {\n      \"cue_id\": \"closing\",\n      \"duration_sec\": 8,\n      \"generation_prompt\": \"1940s old time radio sci-fi closing sting, brass and strings resolving, tube warmth, fades to silence\"\n    },\n    {\n      \"cue_id\": \"interstitial\",\n      \"duration_sec\": 4,\n      \"generation_prompt\": \"short act-break stinger, single brass hit with cymbal swell, tube warmth, mono\"\n    }\n  ],\n  \"pacing\": {\n    \"beat_pause_ms\": 100\n  },\n  \"visual_plan\": {\n    \"characters\": {\n      \"LEMMY\": {\n        \"portrait_prompt\": \"Cinematic portrait of a weathered male spacer in his 50s, long dark hair streaked with grey, deep facial scars along the jawline, prominent muttonchop sideburns, worn leather flight jacket over a patched grey jumpsuit, dangling silver pendant, piercing eyes, ambient red alert lighting on his face, high fidelity 35mm film grain\"\n      },\n      \"KENJI CROSS\": {\n        \"portrait_prompt\": \"Cinematic portrait of a disciplined male officer in his 30s, close-cropped black hair, sharp cheekbones, clean-shaven, pressed charcoal military uniform with silver rank insignia on the collar, alert posture, cold blue console light on his face, high fidelity 35mm film grain\"\n      },\n      \"ANNOUNCER\": {\n        \"portrait_prompt\": \"Cinematic portrait of a poised broadcast announcer in her 40s, hair pulled back, vintage headset with boom microphone, warm amber studio lamp lighting, soft focus 1940s radio studio aesthetic, 35mm film grain\"\n      }\n    },\n    \"scenes\": [\n      {\n        \"scene_id\": \"scene_1\",\n        \"shot_description\": \"LEMMY at the comms console, a signal is coming in from Saturn\",\n        \"visual_prompt\": \"Cinematic wide shot of dim cramped starship comms bay, red alert pulse slowly pulsing overhead, blue holographic console glow, banks of 1980s-style analog readouts, industrial grey riveted panels, atmospheric volumetric haze\"\n      },\n      {\n        \"scene_id\": \"scene_2\",\n        \"shot_description\": \"LEMMY and KENJI CROSS argue in the corridor about whether to respond\",\n        \"visual_prompt\": \"Cinematic medium shot of narrow starship corridor lit by flickering emergency strip lighting, long perspective lines of bulkhead ribs, condensation streaks on metal walls, amber warning stripes on the floor, volumetric haze, cold steel atmosphere\"\n      },\n      {\n        \"scene_id\": \"scene_3\",\n        \"shot_description\": \"LEMMY alone in the captain's ready room, making the call\",\n        \"visual_prompt\": \"Cinematic close shot of captain's ready room, dim desk lamp casting a warm pool of light on a cluttered metal desk covered in maps and data tablets, large porthole window showing distant Saturn and its rings, warm amber lamp light contrasted against cold blue starlight, cinematic 35mm film aesthetic\"\n      }\n    ]\n  }\n}\n",
         "(all)",
         4,
         "hard_sci_fi",
@@ -766,7 +760,7 @@
         260
       ],
       "flags": {},
-      "order": 13,
+      "order": 1,
       "mode": 0,
       "title": "Shot Duration Calc (stub 8s each)",
       "inputs": [
@@ -835,7 +829,7 @@
         100
       ],
       "flags": {},
-      "order": 12,
+      "order": 2,
       "mode": 0,
       "title": "Load FLUX.1-dev-fp8 (video branch)",
       "inputs": [],
@@ -890,7 +884,7 @@
         540
       ],
       "flags": {},
-      "order": 15,
+      "order": 3,
       "mode": 0,
       "title": "Batch FLUX Render (full pipeline)",
       "inputs": [
@@ -975,7 +969,7 @@
         100
       ],
       "flags": {},
-      "order": 17,
+      "order": 4,
       "mode": 0,
       "title": "Unload All (video branch)",
       "inputs": [
@@ -1017,7 +1011,7 @@
         280
       ],
       "flags": {},
-      "order": 33,
+      "order": 5,
       "mode": 0,
       "title": "Save FLUX environment stills (per-episode workspace)",
       "inputs": [
@@ -1073,7 +1067,7 @@
         }
       ],
       "flags": {},
-      "order": 14,
+      "order": 21,
       "mode": 0
     },
     {
@@ -1088,7 +1082,7 @@
         100
       ],
       "flags": {},
-      "order": 18,
+      "order": 22,
       "mode": 0,
       "title": "Load HuMo 14B fp8 e4m3fn scaled (Kijai)",
       "inputs": [],
@@ -1125,7 +1119,7 @@
         80
       ],
       "flags": {},
-      "order": 19,
+      "order": 23,
       "mode": 0,
       "title": "lightx2v 4-step distill",
       "inputs": [
@@ -1168,7 +1162,7 @@
         60
       ],
       "flags": {},
-      "order": 20,
+      "order": 24,
       "mode": 0,
       "title": "ModelSamplingSD3 shift=8",
       "inputs": [
@@ -1210,7 +1204,7 @@
         80
       ],
       "flags": {},
-      "order": 21,
+      "order": 25,
       "mode": 0,
       "title": "Load umt5_xxl text encoder",
       "inputs": [],
@@ -1248,7 +1242,7 @@
         60
       ],
       "flags": {},
-      "order": 22,
+      "order": 26,
       "mode": 0,
       "title": "Load wan_2.1 VAE",
       "inputs": [],
@@ -1284,7 +1278,7 @@
         60
       ],
       "flags": {},
-      "order": 23,
+      "order": 27,
       "mode": 0,
       "title": "Load Whisper Large v3",
       "inputs": [],
@@ -1320,7 +1314,7 @@
         460
       ],
       "flags": {},
-      "order": 24,
+      "order": 28,
       "mode": 0,
       "title": "Batch HuMo Render (in-graph batch)",
       "inputs": [
@@ -1437,7 +1431,7 @@
         360
       ],
       "flags": {},
-      "order": 30,
+      "order": 29,
       "mode": 0,
       "title": "Video Composite (landscape 1472x832 layered, HuMo 512px pillar)",
       "inputs": [
@@ -1519,7 +1513,7 @@
         280
       ],
       "flags": {},
-      "order": 1,
+      "order": 53,
       "mode": 0,
       "inputs": [
         {
@@ -1596,7 +1590,7 @@
         100
       ],
       "flags": {},
-      "order": 25,
+      "order": 9000,
       "mode": 0,
       "inputs": [
         {
@@ -1650,7 +1644,7 @@
         82
       ],
       "flags": {},
-      "order": 27,
+      "order": 9075,
       "mode": 0,
       "inputs": [
         {
@@ -1694,7 +1688,7 @@
         82
       ],
       "flags": {},
-      "order": 28,
+      "order": 9080,
       "mode": 0,
       "inputs": [
         {
@@ -1738,7 +1732,7 @@
         240
       ],
       "flags": {},
-      "order": 29,
+      "order": 9100,
       "mode": 0,
       "inputs": [
         {
@@ -1821,7 +1815,7 @@
         220
       ],
       "flags": {},
-      "order": 31,
+      "order": 9200,
       "mode": 0,
       "inputs": [
         {
@@ -1877,7 +1871,7 @@
         100
       ],
       "flags": {},
-      "order": 26,
+      "order": 9050,
       "mode": 0,
       "title": "Gemma encoder (LTX 2.3)",
       "inputs": [],
@@ -1913,7 +1907,7 @@
         260
       ],
       "flags": {},
-      "order": 32,
+      "order": 9300,
       "mode": 0,
       "title": "Post-Upscale Procgen Blend (final 1080p)",
       "inputs": [
@@ -1979,7 +1973,7 @@
         400
       ],
       "flags": {},
-      "order": 16,
+      "order": 30,
       "mode": 0,
       "title": "Batch FLUX Portrait Render (per-cast portraits)",
       "inputs": [
@@ -2133,7 +2127,7 @@
       2,
       0,
       12,
-      3,
+      2,
       "STRING"
     ],
     [
@@ -2141,7 +2135,7 @@
       1,
       2,
       12,
-      2,
+      3,
       "STRING"
     ],
     [
@@ -2519,14 +2513,6 @@
       25,
       0,
       "IMAGE"
-    ],
-    [
-      105,
-      14,
-      1,
-      12,
-      4,
-      "AUDIO"
     ]
   ],
   "groups": [],

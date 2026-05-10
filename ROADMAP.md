@@ -280,6 +280,72 @@ Until that lands, Video's title chain primary slot (`led.meta.episode_title`) re
 
 Together: Video's title chain primary slot resolves cleanly under the new writer flow. Until then, chain falls through to widget or TIMESTAMP_LASTRESORT under new-writer flow.
 
+### Visual chain recon — AUDITED CLEAN, 2026-05-10
+
+Recon pass over every active downstream visual + post-process + cast/portrait + utility node, validating ROADMAP's prediction (line 67) that "video files all read ledger from disk (not wire `script_json`), so they should 'just work' with the L3 format." Run as STEP 0 of the post-consumer-7 continuation sprint. **No rewrites needed.** Every node already uses L3-native field names (`line_id`, `char_id`, `speaker_role`, `start_s`, `dur_s`, `text`, `word_count`, `shot_id`, `cast[].char_id`, `cast[].name`, `cast[].voice_preset`, `cast[].portrait_path`, `meta.gen_params_initial.style`, `meta.radio_bookend_path`, `episode_id`), reads ledger from disk via `_OTRL.in_flight_ledger_path()` / `production_ledger.get_ledger()` singleton + `load_ledger_safe`, and degrades gracefully with `.get(...)` defaults on missing fields.
+
+| File | Verdict | Rationale |
+|---|---|---|
+| `visual/batch_flux_render.py` | AUDITED CLEAN | DEAD path `_parse_env_prompts(script_json)` looks for legacy `[{"type":"environment", "description":...}]`; on L3 dict input falls back to `[fallback]` (no crash). Default widget `skip_env_stills=True` bypasses entirely. LIVE radio bookend pass reads ledger via singleton + `load_ledger_safe`, uses `meta.gen_params_initial.style` (L3-correct) with `meta.gen_params.style` back-compat. `led.get("scenes")` tier-4 fallback is L3-orphaned but degrades safely (no `scenes` array in L3 → returns []). Stamps top-level `radio_bookend_path` + `meta.radio_bookend_path` — no per-line writes. |
+| `visual/batch_flux_portrait_render.py` | AUDITED CLEAN | Reads ledger via `_OTRL.in_flight_ledger_path()` + `load_ledger_safe`. Walks `cast[]` for `char_id`, `name`, `voice_preset`, `portrait_path`. BUG-094 cast filter uses `iter_lines` semantically by walking `lines[]` and grouping by `char_id` + `resolve_speaker_role(ln)`. All L3-native. |
+| `nodes/batch_humo_render.py` | AUDITED CLEAN | Reads ledger via `_load_ledger_with_path`. Uses L3-native fields exclusively. Orphan-rescue speaker fallback chain `ln.get("speaker") or ln.get("name") or ln.get("character_name")` (`L691`) only fires when `char_id` misses `cast[]`; on clean L3 data it's dormant. The fallback is intentionally defensive against future writer drift. |
+| `nodes/batch_ltx_render.py` | AUDITED CLEAN | Reads ledger via `_OTRL.load_ledger_safe`. Uses `line_id`, `speaker_role`, `dur_s`. `_build_ltx_role_prompt(role, line, ledger)` returns a static prompt by role (no field interpolation). |
+| `nodes/video_composite.py` | AUDITED CLEAN | Reads ledger via `_load_ledger_with_path`. Uses `line_id`, `speaker_role` (default "character" on missing), `start_s`, `dur_s`. BUG-LOCAL-129a static-radio fill + BUG-135 motion-loop fill paths intact. |
+| `nodes/rtx_upscale.py` | AUDITED CLEAN | Path-in/path-out wrapper. Only ledger read is for spacesaver cleanup: reads `meta.perfect_run_spacesaver` flag + `episode_id`. Both top-level/meta — fully L3 compatible. |
+| `nodes/otr_post_upscale_procgen_blend.py` | AUDITED CLEAN | Path-in/path-out wrapper. Uses `_OTRL.in_flight_ledger_path()` for episode_id discovery. No `lines[]` reads. |
+| `nodes/otr_save_to_episode_workspace.py` | AUDITED CLEAN | IMAGE save sink. Uses `_OTRL.in_flight_ledger_path()` + `episode_id` only. No `lines[]` reads. |
+| `nodes/otr_video_plan.py` + `otr_shot_duration_calculator.py` | AUDITED CLEAN | Pre-FLUX adapters. Take `production_plan_json` (Director output) and emit shot/compose plans. Don't touch `script_json`/ledger directly. |
+| `nodes/otr_save_copy.py` + `otr_video_concat.py` | AUDITED CLEAN | Pure path-in/path-out helpers. No ledger reads. |
+| `nodes/post_audio_video_pipeline.py` | RETIRED | Per `__init__.py` comment: "RETIRED in favour of in-graph batch nodes". NOT in `workflows/otr_scifi_16gb_full.json`. Backward-compat-only registration. Audit moot. |
+| `nodes/_otr_cast_repair.py` | AUDITED CLEAN | Helper module (no INPUT_TYPES). Used by writer; orphan classification + plateau-bounded repair. No legacy parser-list assumptions. |
+| `nodes/_otr_voice_resolver.py` | AUDITED CLEAN | Helper module (no INPUT_TYPES). `VoiceSpec` dataclass for engine:preset parsing. Field-agnostic. |
+| `nodes/voice_render.py` | NOT REGISTERED | `OTR_VoiceRender` class exists with `RETURN_TYPES = ("AUDIO",)` but is NOT in `__init__.py:_NODE_MODULES`. Not in active workflow. |
+| `nodes/_voice_backends/{bark,kokoro}.py` | AUDITED CLEAN | Voice backend driver implementations. Take `VoiceSpec` + raw text. No direct ledger interaction. |
+| `nodes/_otr_period_prompts.py` | AUDITED CLEAN | Period exemplar dataclass + `render_prompt(user_instruction, ...)`. Field-agnostic; doesn't read ledger. |
+
+The recon collapses STEPS 1-8 of the planned post-consumer-7 sprint into a single recon-verdict deliverable. The remaining work — helper API tests (SHIPPED 48/48 PASS), B4 prompt audit (SHIPPED, see below), workflow JSON edit, dry-run gates, final report — proceeds against this AUDITED CLEAN baseline.
+
+### Helper API tests — SHIPPED 2026-05-10 (48/48 PASS)
+
+`tests/test_otr_ledger_consumers.py` — 48 tests across six classes mirroring the helper module API:
+
+- `TestLoadLedger` (5) — dict input → dict; legacy list → ValueError with "OTR_LedgerScriptWriter" in message; non-dict-non-list root → ValueError; invalid JSON propagates; empty dict input returns empty dict.
+- `TestIterLines` (9) — no filter yields every line in original order; role-filter narrows the walk; empty role set yields nothing; lines with missing/unknown roles skipped under filter, yielded under no-filter; missing `lines` key + None value both yield empty.
+- `TestCastLookup` (8) — known char_id resolves; second char_id resolves (no short-circuit); unknown / empty / None char_id → `{}`; missing `cast` key → `{}`; non-dict cast entries skipped safely; int char_id coerces to string.
+- `TestSpeakerName` (7) — character line → cast name; announcer/sfx → "UNKNOWN" (role tag != cast member); missing/None/empty line → "UNKNOWN"; cast entry missing `name` → "UNKNOWN".
+- `TestVoicePreset` (6) — known char_id → preset; announcer/unknown → None; cast entry missing `voice_preset` → None.
+- `TestProductionPlanOrEmpty` (9) — valid dict plan returns plan; "" / None / "{}" / invalid JSON / list root / non-dict roots all → `{}` (graceful Pattern 5 demotion).
+- `TestComposition` (3) — full Pattern 2 walk shape (`load_ledger → iter_lines → speaker_name → voice_preset`) for character + announcer roles; legacy list short-circuits at `load_ledger`.
+
+Bug Bible regression: 23/1/2/0 baseline confirmed pre-test; held post-test.
+
+### LLM prompt audit — 2026-05-10
+
+B4 audit (per release-blocker B4 in this file): contract-verification pass over every LLM prompt construction site that interpolates ledger fields, performed AFTER the consumer-rewrite sprint shipped + visual chain recon completed. Goal: confirm no prompt site reads stale field names that would silently render with wrong data on L3 input.
+
+Methodology: grep across `nodes/` for `_build_*prompt`, `def *prompt`, prompt f-strings interpolating `led.` / `ledger.` / `cast` / `line` / `speaker`. Each site read end-to-end, fields inventoried against the L3 schema, verdict assigned.
+
+| Prompt site | File:line | Inputs (interpolated) | Verdict | Notes |
+|---|---|---|---|---|
+| `_build_user_prompt` (outline) | `_otr_outline.py:253` | `req.news_seed`, `req.style_hint`, `req.cast_size`, `req.target_seconds`, `req.target_words` | **CLEAN** | Decoupled from ledger via `OutlineRequest` dataclass. Writer (`OTR_LedgerScriptWriter._validate_inputs`) builds the request from widget args + `gen_params_initial`, never reads `lines[]`/`cast[]`. Locked file (Phase 3 LPL writer); audit-only. |
+| `_REPAIR_PROMPT_TEMPLATE` (outline) | `_otr_outline.py:265` | `prev_response`, `validation_error` | **CLEAN** | Pure JSON-schema-validation feedback loop. No ledger fields. Locked file. |
+| `_build_user_prompt` (line composer) | `_otr_line_composer.py:175` | `req.canon_header`, `req.last_lines`, `req.speaker`, `req.intent`, `req.mood`, `req.target_words` | **CLEAN** | Decoupled via `LineRequest` dataclass. Writer feeds `req.speaker` from cast `name`, `req.intent`/`req.mood` from beat fields. No raw `lines[]` reads. Locked file. |
+| `_format_last_lines` (line composer) | `_otr_line_composer.py:168` | `(spk, txt)` tuples | **CLEAN** | Caller passes already-resolved `(speaker_name, text)` pairs. Field-agnostic. Locked file. |
+| `_SYSTEM_PROMPT` (line composer) | `_otr_line_composer.py:139` | (none — static string) | **CLEAN** | Static system prompt. No interpolation. |
+| `OTR_PERIOD_SYSTEM_PROMPT` + `render_prompt` | `_otr_period_prompts.py:186` | `user_instruction`, `exemplars` (`PeriodExemplar` dataclass list) | **CLEAN** | Static system prompt + few-shot block prepended to caller's `user_instruction`. No ledger reads. |
+| `_build_critic_prompt` | `script_critic.py:306` | `script_text`, `style`, `anti_slop` | **CLEAN** | `style` resolved from `meta.gen_params_initial.style` (L3-correct) at L843-852 with cleanup_model_id / model_id chain. `anti_slop` from `OTR-ANTI-SLOP.md` filtered by `_coerce_params(meta.gen_params_initial)`. Both flow from L3-correct meta block. |
+| `_build_revision_prompt` | `script_critic.py:541` | `script`, `issues` (list[str]), `style` | **CLEAN** | Same `style` resolution as `_build_critic_prompt`. Issues list comes from critic's parsed structured response. No raw `lines[]` interpolation. |
+| `_anti_slop` rubric template (critic) | `OTR-ANTI-SLOP.md` via `_filter_rubric` | `target_length`, `target_words`, `num_characters`, `style`, `scene_count`, `scene_word_budget` (all from `meta.gen_params_initial`) | **CLEAN** | Gate evaluator (`_evaluate_gate`) reads `meta.gen_params_initial` (L3-correct) via `_coerce_params`. Missing fields fail-open (rule still ships) — safe direction. |
+| `_build_director_json_repair_prompt` | `story_orchestrator.py:4570` | `raw_output`, `script_text` | **CLEAN** | Director JSON repair feedback. No ledger field reads. Director is unwired in v2 ledger flow per Pattern 5; this prompt fires only when Director is actively wired. |
+| `_build_normalize_prompt` (legacy normalize) | `_otr_legacy_writer.py:4330` | `script_text`, `is_segment` | **DEAD CODE** | Legacy writer FORMAT_NORM phase. Field-agnostic prompt (text formatting only). Active only when `OTR_LLMScriptWriter` (legacy node) runs; new `OTR_LedgerScriptWriter` (v2) does NOT call this. Will be deleted post-soak per ROADMAP sprint exit criterion 7. |
+| `_radio_bookend_prompt` widget override (FLUX) | `visual/batch_flux_render.py:406` | (user widget — verbatim) | **CLEAN** | Widget passes through verbatim when non-empty. No ledger interpolation. |
+| `_build_dynamic_radio_prompt` (FLUX) | `visual/batch_flux_render.py:73` | `meta.gen_params_initial.style`, `meta.gen_params.style` (back-compat), `meta.gen_params_initial.style_custom`, `scenes[0].env`/`description` (L3-orphaned), `episode_id` slug, `_RADIO_FALLBACK_PROMPT` | **CLEAN** | Six-tier fallback chain. Tier 4 (`scenes[0]`) is L3-orphaned (no `scenes` array in L3) but degrades safely to next tier. Tier 1 (`meta.gen_params_initial.style`) is the live L3 path. |
+| `_PROMPT_BY_ROLE` (LTX `_build_ltx_role_prompt`) | `nodes/batch_ltx_render.py:404` | `role` (`speaker_role` value) | **CLEAN** | Returns a static prompt indexed by role. No `line` / `ledger` field interpolation despite the signature carrying them (preserved for future per-line overrides per BUG-LOCAL-112 comment block). |
+| `_normalize_target_length`/`_evaluate_gate` (critic rubric gates) | `script_critic.py:102, 125` | `target_length`, `target_words`, `num_characters`, `style`, `scene_count`, `scene_word_budget` | **CLEAN** | All from `meta.gen_params_initial` via `_coerce_params`. Sandboxed eval (`__builtins__={}`). Fail-open on parse failure — safe. |
+| MusicGen `cue_entry["generation_prompt"]` | `story_orchestrator.py:5566`, `musicgen_theme.py:266` | `entry.get("generation_prompt")` from Director's music_plan | **CLEAN** | Director-emitted prompts; consumed by MusicGen. No ledger field interpolation; the prompt is verbatim user/Director text. Field-agnostic on the consumer side. |
+
+**Audit summary:** **15 CLEAN / 1 DEAD CODE / 0 NEEDS UPDATE.** No prompt site reads stale field names that would silently render with wrong data on L3 input. The single DEAD CODE entry (`_build_normalize_prompt`) is on the legacy writer path; it's already documented for deletion post-soak per ROADMAP sprint exit criterion 7. **No prompt rewrites needed.** Audit verdict locked into Bug Bible 23/1/2/0 regression baseline.
+
 ---
 
 ## PRIOR WORK — pre-FULL acceptance soak (handoff-ready as of 2026-05-07 PM)

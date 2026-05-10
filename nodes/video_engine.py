@@ -1248,7 +1248,7 @@ class SignalLostVideoRenderer:
         return _time.time()
 
     def render_video(self, audio, script_json, news_used,
-                     production_plan_json="{}", fps=24, resolution="832x480",
+                     production_plan_json="{}", fps=24, resolution="1920x1080",
                      episode_title="", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
