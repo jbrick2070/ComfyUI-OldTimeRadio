@@ -486,22 +486,27 @@ def _canon_update(
     return False
 
 
-def _stamp_ledger_gate(
+def _append_script_gate(
+    led: dict,
     model_id: str,
     score: Optional[int],
     verdict: str,
     issues: list[str],
     elapsed_s: float,
     skipped_reason: Optional[str] = None,
-) -> None:
-    """Stamp ledger.script_gates[] with the critic's findings.
+) -> dict:
+    """Append a critic-gate entry to ``led["script_gates"]``.
 
-    Best-effort; a failure here logs a warning but doesn't break the
-    node. Mirrors the audio_gates[] pattern in the rest of OTR.
+    Pure dict mutator -- no I/O, no singleton, never raises. The caller
+    holds ``led`` (parsed from the ``script_json`` wire input via
+    ``_otr_ledger_consumers.load_ledger``) and is responsible for the
+    final ``save_ledger_safe`` once all stamps are applied.
+
+    Returns the appended entry so the caller can also reference it from
+    the markdown report. On any unexpected failure, logs at WARNING and
+    returns an empty dict (best-effort).
     """
     try:
-        from .production_ledger import get_ledger
-        led = get_ledger()
         gate_entry = {
             "kind":          "script_critic",
             "model_id":      model_id,
@@ -513,14 +518,24 @@ def _stamp_ledger_gate(
         }
         if skipped_reason:
             gate_entry["skipped_reason"] = skipped_reason
-        led.data.setdefault("script_gates", []).append(gate_entry)
-        led.save()
+        if not isinstance(led, dict):
+            log.warning(
+                "[ScriptCritic] _append_script_gate: led is not a dict (%r); "
+                "stamp dropped",
+                type(led).__name__,
+            )
+            return {}
+        led.setdefault("script_gates", []).append(gate_entry)
         log.info(
-            "[ScriptCritic] stamped script_gates[] entry: verdict=%s score=%s",
+            "[ScriptCritic] appended script_gates[] entry: verdict=%s score=%s",
             verdict, score,
         )
+        return gate_entry
     except Exception as exc:  # noqa: BLE001
-        log.warning("[ScriptCritic] ledger stamp failed (non-fatal): %s", exc)
+        log.warning(
+            "[ScriptCritic] _append_script_gate failed (non-fatal): %s", exc,
+        )
+        return {}
 
 
 def _build_revision_prompt(
@@ -586,23 +601,30 @@ def _extract_revised_script(raw: str) -> str:
     return text.strip()
 
 
-def _stamp_revision_to_ledger(
+def _append_script_revision(
+    led: dict,
     before_chars: int,
     after_chars: int,
     elapsed_s: float,
     verdict_before: str,
     issues_addressed: int,
     model_id: str,
-) -> None:
-    """Append a revision record to ledger.script_revisions[].
+) -> dict:
+    """Append a revision record to ``led["script_revisions"]``.
 
-    Best-effort: a failure here logs a warning but does not abort
-    the run. Mirrors the audio_gates[] / script_gates[] pattern.
+    Pure dict mutator -- mirrors ``_append_script_gate``. Caller is
+    responsible for the final ``save_ledger_safe`` once all stamps are
+    applied. Returns the appended entry; ``{}`` on best-effort failure.
     """
     try:
-        from .production_ledger import get_ledger
-        led = get_ledger()
-        led.data.setdefault("script_revisions", []).append({
+        if not isinstance(led, dict):
+            log.warning(
+                "[ScriptCritic] _append_script_revision: led is not a dict "
+                "(%r); stamp dropped",
+                type(led).__name__,
+            )
+            return {}
+        revision_entry = {
             "model_id":          model_id,
             "verdict_before":    verdict_before,
             "issues_addressed":  issues_addressed,
@@ -611,18 +633,29 @@ def _stamp_revision_to_ledger(
             "delta_chars":       after_chars - before_chars,
             "elapsed_s":         round(elapsed_s, 2),
             "stamped_at":        time.strftime("%Y-%m-%dT%H:%M:%S"),
-        })
-        led.save()
+        }
+        led.setdefault("script_revisions", []).append(revision_entry)
         log.info(
-            "[ScriptCritic] stamped script_revisions[] entry "
+            "[ScriptCritic] appended script_revisions[] entry "
             "(%d -> %d chars, %.1fs)",
             before_chars, after_chars, elapsed_s,
         )
+        return revision_entry
     except Exception as exc:  # noqa: BLE001
         log.warning(
-            "[ScriptCritic] revision ledger stamp failed (non-fatal): %s",
+            "[ScriptCritic] _append_script_revision failed (non-fatal): %s",
             exc,
         )
+        return {}
+
+
+# Local text-metrics shim removed 2026-05-10: superseded by the canonical
+# ``_otr_ledger.patch_line_text(ledger, line_id, text)`` helper, which
+# atomically updates ``text`` + ``char_count`` + ``word_count`` on the
+# matching ``ledger.lines[]`` row using the same regex production_ledger
+# uses at initial set_lines() stamp time. The critic's REVISE path now
+# calls ``patch_line_text`` directly via the line_id carried in the
+# iter_lines walk (see L1200+).
 
 
 class LLMScriptCritic:
@@ -723,8 +756,11 @@ class LLMScriptCritic:
         block_on_reject: bool = False,
         timeout_sec: int = 90,
     ):
-        # Late imports so the node loads cleanly even if the orchestrator
-        # module has heavy dependencies missing in some environments.
+        # ------------------------------------------------------------------
+        # Late imports
+        # ------------------------------------------------------------------
+        # story_orchestrator pulls in heavy LLM deps; defer to call time so
+        # the node module loads cleanly in environments without those.
         try:
             from . import story_orchestrator as _SO
         except ImportError:
@@ -735,85 +771,206 @@ class LLMScriptCritic:
                 sys.path.insert(0, str(_NODES_DIR))
             import story_orchestrator as _SO  # type: ignore
 
+        # Read-side helper (parses the script_json wire input as a ledger
+        # dict). Write-side helper (in-flight ledger path + atomic save).
+        from . import _otr_ledger_consumers as _OTRLC
+        from . import _otr_ledger as _OTRL
+
         t0 = time.time()
         script = script or ""
 
-        # Pull rubric params + inherited model/style from the ledger's
-        # gen_params_initial. The writer stamps these at workflow entry
-        # (BUG-72), so they're the ground truth for what the user
-        # selected on the LLMScriptWriter widgets. We do NOT expose
-        # critic_model_id or style as critic-node widgets -- one
-        # place to configure them keeps the UI clean and prevents drift.
+        # ------------------------------------------------------------------
+        # Parse the input ledger from the script_json wire
+        # ------------------------------------------------------------------
+        # The new contract: script_json IS the ledger. All gate /
+        # revision / meta stamps mutate this dict in place; one final
+        # save_ledger_safe at the end persists the merged view.
+        #
+        # Loud-fail policy: if a stale workflow wires the legacy
+        # parser-list shape into the critic, load_ledger raises
+        # ValueError. The critic preserves its "never a blocker" rule
+        # by catching that, logging the named error, stamping a
+        # skipped_reason on disk via the in-flight ledger, and
+        # passing through. Surfaces the bad wiring in logs + ledger
+        # without halting the run.
+        led: Optional[dict] = None
+        legacy_input_detected = False
+        try:
+            led = _OTRLC.load_ledger(script_json) if script_json else None
+        except ValueError as legacy_exc:
+            legacy_input_detected = True
+            log.warning(
+                "[ScriptCritic] %s -- critic falls through to PASS "
+                "passthrough; rewire the upstream writer to "
+                "OTR_LedgerScriptWriter to enable verdict stamping.",
+                legacy_exc,
+            )
+        except Exception as parse_exc:  # noqa: BLE001
+            log.warning(
+                "[ScriptCritic] failed to parse script_json as ledger "
+                "(%s) -- proceeding with empty ledger view; verdict will "
+                "be advisory only.",
+                parse_exc,
+            )
+            led = None
+
+        # ------------------------------------------------------------------
+        # Resolve rubric params + inherited model / style / profile
+        # ------------------------------------------------------------------
+        # Source of truth: led["meta"]["gen_params_initial"] from the
+        # wire input. The legacy singleton path is the fallback only
+        # when the wire ledger is missing (e.g. legacy_input_detected).
         rubric_params: dict = {}
         inherited_style = "hard sci fi"
         inherited_model = "google/gemma-4-E4B-it"  # last-resort fallback
         inherited_profile = "Standard"
         inherited_source = "fallback (no ledger params)"
         try:
-            from .production_ledger import get_ledger
-            led_data = get_ledger().data
-            rubric_params = dict(led_data.get("meta", {}).get("gen_params_initial", {}))
+            if led is not None:
+                rubric_params = dict(
+                    (led.get("meta") or {}).get("gen_params_initial") or {}
+                )
+                inherited_source = "wire ledger meta.gen_params_initial"
+            else:
+                from .production_ledger import get_ledger
+                _singleton_data = get_ledger().data
+                rubric_params = dict(
+                    (_singleton_data.get("meta") or {}).get("gen_params_initial") or {}
+                )
+                inherited_source = "singleton meta.gen_params_initial (legacy fallback)"
             if rubric_params.get("style"):
                 inherited_style = str(rubric_params["style"])
-            # Critic uses the writer's CLEANUP model when available so
-            # the same widget that controls the writer's structural
-            # cleanup pass also controls the critic. If the user wants
-            # a separate-model critic gate, they set cleanup_model_id
-            # to something different from model_id on the writer node.
             cm = rubric_params.get("cleanup_model_id")
             wm = rubric_params.get("model_id")
-            # BUG-LOCAL-109 (2026-05-05): the canonical "auto" sentinel
-            # is "auto (use story model)" (matches the widget label in
-            # OTR_LLMScriptWriter.INPUT_TYPES). Detect ANY value that
-            # starts with "auto" (case-insensitive, after strip), not
-            # just the bare strings "auto" / "(auto)" / "". Mirrors the
-            # resolver in story_orchestrator.py line ~4839. Without this
-            # check, the critic loaded the literal string "auto (use
-            # story model)" -> stripped on space to "auto" -> failed
-            # at AutoTokenizer.from_pretrained("auto") on every "auto"
-            # run, silently bypassing the critique gate.
             cm_str = (str(cm).strip().lower() if cm is not None else "")
             cm_is_auto_sentinel = (not cm_str) or cm_str.startswith("auto")
             if cm and not cm_is_auto_sentinel:
                 inherited_model = str(cm)
-                inherited_source = "ledger.cleanup_model_id"
+                inherited_source = inherited_source + " (cleanup_model_id)"
             elif wm:
                 inherited_model = str(wm)
-                inherited_source = "ledger.model_id (cleanup was auto)"
-            # optimization_profile inherits straight from the writer's
-            # widget (Pro / Standard / Obsidian). Critic uses the same
-            # 4-bit NF4 vs full-precision setting the rest of the run
-            # already chose.
+                inherited_source = inherited_source + " (model_id; cleanup was auto)"
             ip = rubric_params.get("optimization_profile")
             if ip:
                 inherited_profile = str(ip)
         except Exception as exc:  # noqa: BLE001
             log.warning(
-                "[ScriptCritic] failed to read gen_params_initial from "
-                "ledger (%s) - falling back to defaults", exc,
+                "[ScriptCritic] failed to read gen_params_initial (%s) -- "
+                "falling back to defaults",
+                exc,
             )
 
         critic_model_id = inherited_model
         style = inherited_style
         optimization_profile = inherited_profile
 
+        # ------------------------------------------------------------------
+        # Helper: persist led + emit script_json consistent with led state
+        # ------------------------------------------------------------------
+        # Saves led to the in-flight on-disk ledger via save_ledger_safe
+        # (atomic via tempfile + os.replace). Returns the JSON string for
+        # the script_json output socket. When led is None (legacy input
+        # path), passes script_json through verbatim and skips the disk
+        # save -- nothing to merge.
+        def _persist_and_emit(led_dict: Optional[dict], fallback_json: str) -> str:
+            if led_dict is None:
+                return fallback_json
+            try:
+                _path = _OTRL.in_flight_ledger_path()
+                if _path is not None:
+                    _OTRL.save_ledger_safe(_path, led_dict)
+            except Exception as save_exc:  # noqa: BLE001
+                log.warning(
+                    "[ScriptCritic] in-flight ledger save failed (%s) -- "
+                    "wire output still emitted with merged view",
+                    save_exc,
+                )
+            try:
+                return json.dumps(led_dict, indent=2, ensure_ascii=False)
+            except Exception as dump_exc:  # noqa: BLE001
+                log.warning(
+                    "[ScriptCritic] json.dumps(led) failed (%s) -- "
+                    "falling back to wire input on the script_json socket",
+                    dump_exc,
+                )
+                return fallback_json
+
+        # ------------------------------------------------------------------
+        # Skipped paths: empty script / legacy-list input / parse fail
+        # ------------------------------------------------------------------
         if not script.strip():
-            log.warning("[ScriptCritic] empty script - SKIPPED")
-            _stamp_ledger_gate(
-                model_id=critic_model_id,
-                score=None,
-                verdict="PASS",
-                issues=[],
-                elapsed_s=time.time() - t0,
-                skipped_reason="empty_script",
+            log.warning("[ScriptCritic] empty script -- SKIPPED")
+            elapsed = time.time() - t0
+            if led is not None:
+                _append_script_gate(
+                    led=led,
+                    model_id=critic_model_id,
+                    score=None,
+                    verdict="PASS",
+                    issues=[],
+                    elapsed_s=elapsed,
+                    skipped_reason="empty_script",
+                )
+                _OTRL.set_meta(led, "critic_verdict", "PASS")
+                _OTRL.set_meta(led, "critic_skipped_reason", "empty_script")
+            out_json = _persist_and_emit(led, script_json)
+            return (
+                script,
+                out_json,
+                "## Script Critic\n\nSKIPPED: empty script.\n",
+                "PASS",
             )
-            return (script, script_json, "## Script Critic\n\nSKIPPED: empty script.\n", "PASS")
+
+        if legacy_input_detected:
+            elapsed = time.time() - t0
+            # No led on the wire to mutate; best-effort: stamp the
+            # in-flight on-disk ledger directly so the audit captures
+            # this run.
+            try:
+                _path = _OTRL.in_flight_ledger_path()
+                if _path is not None:
+                    _disk_led = _OTRL.load_ledger_safe(_path) or {}
+                    _append_script_gate(
+                        led=_disk_led,
+                        model_id=critic_model_id,
+                        score=None,
+                        verdict="PASS",
+                        issues=[],
+                        elapsed_s=elapsed,
+                        skipped_reason=(
+                            "legacy_parser_list_input -- rewire to "
+                            "OTR_LedgerScriptWriter"
+                        ),
+                    )
+                    _OTRL.set_meta(_disk_led, "critic_verdict", "PASS")
+                    _OTRL.set_meta(
+                        _disk_led, "critic_skipped_reason",
+                        "legacy_parser_list_input",
+                    )
+                    _OTRL.save_ledger_safe(_path, _disk_led)
+            except Exception as _disk_exc:  # noqa: BLE001
+                log.warning(
+                    "[ScriptCritic] legacy-input on-disk audit stamp failed "
+                    "(%s) -- run continues",
+                    _disk_exc,
+                )
+            return (
+                script,
+                script_json,
+                "## Script Critic\n\nSKIPPED: legacy parser-list "
+                "script_json detected. Rewire upstream to "
+                "OTR_LedgerScriptWriter for verdict stamping.\n",
+                "PASS",
+            )
 
         log.info(
             "[ScriptCritic] inherited from %s: model=%s style=%s profile=%s",
             inherited_source, critic_model_id, style, optimization_profile,
         )
 
+        # ------------------------------------------------------------------
+        # Critic LLM call
+        # ------------------------------------------------------------------
         anti_slop = _load_anti_slop_rubric(rubric_params)
         prompt = _build_critic_prompt(script, style, anti_slop)
 
@@ -845,23 +1002,31 @@ class LLMScriptCritic:
         except Exception as exc:
             elapsed = time.time() - t0
             log.warning(
-                "[ScriptCritic] critic call failed (%s) - SKIPPED",
+                "[ScriptCritic] critic call failed (%s) -- SKIPPED",
                 exc,
             )
-            _stamp_ledger_gate(
-                model_id=critic_model_id,
-                score=None,
-                verdict="PASS",
-                issues=[],
-                elapsed_s=elapsed,
-                skipped_reason=f"{type(exc).__name__}: {exc}"[:200],
-            )
+            if led is not None:
+                _append_script_gate(
+                    led=led,
+                    model_id=critic_model_id,
+                    score=None,
+                    verdict="PASS",
+                    issues=[],
+                    elapsed_s=elapsed,
+                    skipped_reason=f"{type(exc).__name__}: {exc}"[:200],
+                )
+                _OTRL.set_meta(led, "critic_verdict", "PASS")
+                _OTRL.set_meta(
+                    led, "critic_skipped_reason",
+                    f"{type(exc).__name__}: {exc}"[:200],
+                )
+            out_json = _persist_and_emit(led, script_json)
             report = (
                 f"## Script Critic\n\n"
                 f"SKIPPED ({type(exc).__name__}): script passes through "
                 f"unchanged. Run continues.\n"
             )
-            return (script, script_json, report, "PASS")
+            return (script, out_json, report, "PASS")
 
         elapsed = time.time() - t0
         parsed = _parse_critic_response(str(response or ""))
@@ -876,15 +1041,23 @@ class LLMScriptCritic:
         for issue in issues:
             log.info("[ScriptCritic]   - %s", issue)
 
-        _stamp_ledger_gate(
-            model_id=critic_model_id,
-            score=score,
-            verdict=verdict,
-            issues=issues,
-            elapsed_s=elapsed,
-        )
+        # Stamp the gate entry on the wire ledger.
+        if led is not None:
+            _append_script_gate(
+                led=led,
+                model_id=critic_model_id,
+                score=score,
+                verdict=verdict,
+                issues=issues,
+                elapsed_s=elapsed,
+            )
+            _OTRL.set_meta(led, "critic_verdict", verdict)
+            if score is not None:
+                _OTRL.set_meta(led, "critic_score", int(score))
 
-        # Build markdown report.
+        # ------------------------------------------------------------------
+        # Build markdown report (and stamp it onto led.meta)
+        # ------------------------------------------------------------------
         report_lines = [
             "## Script Critic",
             "",
@@ -921,32 +1094,36 @@ class LLMScriptCritic:
             )
 
         # Authoritative-mode block_on_reject. Off by default; flip to
-        # ON once we trust the calibration.
+        # ON once we trust the calibration. Save merged led BEFORE
+        # raising so the on-disk audit captures the REJECT verdict.
         if block_on_reject and verdict == "REJECT":
+            if led is not None:
+                _OTRL.set_meta(led, "critic_report", report)
+            _persist_and_emit(led, script_json)
             raise RuntimeError(
                 f"[ScriptCritic] REJECT verdict (score={score}). "
                 f"block_on_reject=True -- stopping workflow. "
                 f"Top issues: {issues[:3]}"
             )
 
-        # Revision pass: if revise_on_findings is True and the critic
-        # flagged the script (REVISE or REJECT), run a second LLM call
-        # to rewrite the script in light of the findings, then re-parse
-        # to keep script_json synchronised. Default OFF -- when OFF,
-        # both outputs pass through unchanged regardless of verdict.
+        # ------------------------------------------------------------------
+        # Revision pass (REVISE / REJECT + revise_on_findings + issues)
+        # ------------------------------------------------------------------
+        # Mutates led["lines"][i]["text"] in place by walking the wire
+        # ledger's character + announcer lines in parallel with the
+        # parsed dialogue items from rev_text. The legacy parser is used
+        # ONLY as a text-extraction utility -- its list shape is dropped;
+        # the wire and on-disk ledger stay structured throughout.
         revised_script = script
-        revised_json = script_json
         revision_applied = False
         if revise_on_findings and verdict in ("REVISE", "REJECT") and issues:
             log.info(
-                "[ScriptCritic] revise_on_findings=ON, verdict=%s, %d issues -> "
-                "running revision LLM call",
+                "[ScriptCritic] revise_on_findings=ON, verdict=%s, %d issues "
+                "-> running revision LLM call",
                 verdict, len(issues),
             )
             try:
-                rev_prompt = _build_revision_prompt(
-                    script, issues, style,
-                )
+                rev_prompt = _build_revision_prompt(script, issues, style)
 
                 def _do_revision_call():
                     return _SO._generate_with_llm(
@@ -966,99 +1143,96 @@ class LLMScriptCritic:
                 )
                 rev_elapsed = time.time() - rev_t0
                 rev_text = _extract_revised_script(str(rev_response or ""))
-                if rev_text and len(rev_text.strip()) >= max(100, int(len(script) * 0.3)):
-                    # Re-parse via the writer's parser to produce a
-                    # synchronised script_json. Transient instance --
-                    # _parse_script only reads class-level constants
-                    # (_GENDER_WORDS), no real writer state.
+
+                if rev_text and len(rev_text.strip()) >= max(
+                    100, int(len(script) * 0.3)
+                ):
                     revised_script = rev_text
-                    parsed_lines = None
+                    parsed_lines: Optional[list] = None
                     try:
                         from .story_orchestrator import LLMScriptWriter as _LW
+                        # Transient instance; _parse_script reads only
+                        # class-level constants (_GENDER_WORDS).
                         parsed_lines = _LW()._parse_script(rev_text)
-                        revised_json = json.dumps(parsed_lines, indent=2)
                     except Exception as parse_exc:  # noqa: BLE001
                         log.warning(
-                            "[ScriptCritic] re-parse failed (%s) - keeping "
-                            "revised text but original script_json. "
-                            "Audio chain will use unrevised dialogue.",
+                            "[ScriptCritic] legacy parser unavailable for "
+                            "rev_text extraction (%s) -- ledger.lines text "
+                            "will not be updated; revised script still "
+                            "emitted on the script socket.",
                             parse_exc,
                         )
-                        revised_json = script_json
+                        parsed_lines = None
+
+                    # Walk parsed dialogue items in parallel with the
+                    # ledger's character + announcer lines and mutate
+                    # text in place. Replaces the legacy BUG-LOCAL-117
+                    # singleton-side patch with a wire-ledger mutation
+                    # that flows through to disk via save_ledger_safe.
+                    updated_lines = 0
+                    if led is not None and parsed_lines:
+                        revised_dialogue = [
+                            p for p in parsed_lines
+                            if isinstance(p, dict) and p.get("type") == "dialogue"
+                        ]
+                        ridx = 0
+                        for ln in _OTRLC.iter_lines(
+                            led, roles={"character", "announcer"},
+                        ):
+                            if ridx >= len(revised_dialogue):
+                                break
+                            new_text = (
+                                revised_dialogue[ridx].get("line") or ""
+                            ).strip()
+                            if new_text:
+                                # Atomic text + char_count + word_count
+                                # update via the canonical helper.
+                                # patch_line_text re-walks led["lines"]
+                                # to find the row by line_id; perf is
+                                # negligible at episode scale (<100
+                                # lines) and the API contract is the
+                                # canonical mutation site.
+                                _line_id = ln.get("line_id")
+                                if _line_id and _OTRL.patch_line_text(
+                                    led, _line_id, new_text,
+                                ):
+                                    updated_lines += 1
+                            ridx += 1
+                        if updated_lines:
+                            log.info(
+                                "[ScriptCritic] BUG-LOCAL-117 fix (ledger-pure): "
+                                "updated %d ledger.lines[].text + recomputed "
+                                "char_count/word_count from revised script -- "
+                                "mutation flows to disk via save_ledger_safe "
+                                "at end of execute().",
+                                updated_lines,
+                            )
+
                     revision_applied = True
                     log.info(
-                        "[ScriptCritic] revision applied (%.1fs): "
-                        "%d -> %d chars",
+                        "[ScriptCritic] revision applied (%.1fs): %d -> %d chars",
                         rev_elapsed, len(script), len(revised_script),
                     )
 
-                    # BUG-LOCAL-117 fix 2026-04-30: when the reviser
-                    # rewrites the script, ledger.lines[] (stamped by
-                    # the writer with the ORIGINAL text) becomes stale.
-                    # Downstream SceneSequencer text-matches dialogue
-                    # against ledger.lines[].text to write start_s/dur_s
-                    # back -- with stale text, no matches, ALL line
-                    # timings end up null. Cascade hits qa_waveforms.py
-                    # and any tooling reading ledger.lines[] timing.
-                    # Fix: replace ledger.lines[] dialogue text with
-                    # the revised parsed_lines so SceneSequencer's
-                    # text-match succeeds. Other ledger.lines[] fields
-                    # (line_id, char_id, traits) stay untouched -- only
-                    # the .text field is updated, by parallel index.
-                    try:
-                        from .production_ledger import get_ledger as _get_led
-                        _led = _get_led()
-                        _ledger_lines = _led.data.get("lines") or []
-                        if parsed_lines and _ledger_lines:
-                            _revised_dialogue = [
-                                p for p in parsed_lines
-                                if isinstance(p, dict) and p.get("type") == "dialogue"
-                            ]
-                            _updated = 0
-                            _ridx = 0
-                            for _ln in _ledger_lines:
-                                if _ridx >= len(_revised_dialogue):
-                                    break
-                                _new = _revised_dialogue[_ridx]
-                                _new_text = (_new.get("line") or "").strip()
-                                if _new_text:
-                                    _ln["text"] = _new_text
-                                    _updated += 1
-                                _ridx += 1
-                            if _updated:
-                                _led.save()
-                                log.info(
-                                    "[ScriptCritic] BUG-LOCAL-117 fix: "
-                                    "updated %d ledger.lines[].text from "
-                                    "revised script so SceneSequencer "
-                                    "text-match writes start_s/dur_s "
-                                    "back correctly.",
-                                    _updated,
-                                )
-                    except Exception as _ll_exc:  # noqa: BLE001
-                        log.warning(
-                            "[ScriptCritic] BUG-117 ledger.lines text "
-                            "update failed (non-fatal): %s",
-                            _ll_exc,
+                    if led is not None:
+                        _append_script_revision(
+                            led=led,
+                            before_chars=len(script),
+                            after_chars=len(revised_script),
+                            elapsed_s=rev_elapsed,
+                            verdict_before=verdict,
+                            issues_addressed=len(issues),
+                            model_id=critic_model_id,
                         )
-
-                    _stamp_revision_to_ledger(
-                        before_chars=len(script),
-                        after_chars=len(revised_script),
-                        elapsed_s=rev_elapsed,
-                        verdict_before=verdict,
-                        issues_addressed=len(issues),
-                        model_id=critic_model_id,
-                    )
                 else:
                     log.warning(
-                        "[ScriptCritic] revision response too short or "
-                        "empty (got %d chars) - keeping original script",
+                        "[ScriptCritic] revision response too short or empty "
+                        "(got %d chars) -- keeping original script",
                         len(rev_text) if rev_text else 0,
                     )
             except Exception as rev_exc:  # noqa: BLE001
                 log.warning(
-                    "[ScriptCritic] revision call failed (%s) - keeping "
+                    "[ScriptCritic] revision call failed (%s) -- keeping "
                     "original script (run continues)",
                     rev_exc,
                 )
@@ -1074,7 +1248,14 @@ class LLMScriptCritic:
                 f"- **issues addressed**: {len(issues)}\n"
             )
 
-        return (revised_script, revised_json, report, verdict)
+        # ------------------------------------------------------------------
+        # Final stamp: meta.critic_report + persist + emit script_json
+        # ------------------------------------------------------------------
+        if led is not None:
+            _OTRL.set_meta(led, "critic_report", report)
+
+        out_json = _persist_and_emit(led, script_json)
+        return (revised_script, out_json, report, verdict)
 
 
 __all__ = ["LLMScriptCritic"]

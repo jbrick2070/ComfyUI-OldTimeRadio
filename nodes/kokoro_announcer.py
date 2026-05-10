@@ -96,20 +96,32 @@ def _pick_announcer_voice(episode_seed: str, voice_override: str) -> str:
     return rng.choice(ANNOUNCER_VOICE_POOL)
 
 
-def _extract_announcer_lines(script) -> list:
-    """Pull every ANNOUNCER dialogue line out of the Canonical 1.0 script.
+def _extract_announcer_lines(led: dict) -> list:
+    """Pull every announcer line out of the v2 ledger.
 
-    Returns a list of dicts: {script_idx, line}. Order matches script order
-    so SceneSequencer can consume them sequentially.
+    Walks ``ledger["lines"]`` filtered to ``speaker_role == "announcer"``
+    via ``_otr_ledger_consumers.iter_lines``. Returns a list of dicts:
+    ``{script_idx, line_id, line, traits}``. Order matches ledger line
+    order so SceneSequencer can consume them sequentially.
+
+    The legacy parser-list shape (``[{type: "dialogue", character_name:
+    "ANNOUNCER", line: "..."}]``) is no longer accepted here -- the
+    caller in ``render()`` calls ``load_ledger`` first, which raises
+    ValueError on the legacy shape (see Pattern 1: loud-fail at the
+    consumer boundary).
     """
+    from . import _otr_ledger_consumers as _OTRLC
     out = []
-    for i, item in enumerate(script):
-        if item.get("type") != "dialogue":
+    for i, line in enumerate(_OTRLC.iter_lines(led, roles={"announcer"})):
+        text = (line.get("text") or "").strip()
+        if not text:
             continue
-        name = (item.get("character_name") or "").strip().upper()
-        line = (item.get("line") or "").strip()
-        if name == "ANNOUNCER" and line:
-            out.append({"script_idx": i, "line": line})
+        out.append({
+            "script_idx": i,
+            "line_id":    line.get("line_id"),
+            "line":       text,
+            "traits":     (line.get("traits") or ""),
+        })
     return out
 
 
@@ -153,11 +165,16 @@ class KokoroAnnouncer:
         }
 
     def render(self, script_json, episode_seed="", voice_override="random", speed=0.95):
-        import json
         import time as _kk_time
 
-        script = json.loads(script_json) if isinstance(script_json, str) else script_json
-        announcer_items = _extract_announcer_lines(script)
+        # Read-side: parse the wire input as a v2 ledger dict.
+        # load_ledger raises ValueError on the legacy parser-list shape;
+        # Kokoro is in the "fail loud" group (Pattern 1) -- bad wiring
+        # halts the run early instead of silently producing no announcer
+        # audio.
+        from . import _otr_ledger_consumers as _OTRLC
+        led = _OTRLC.load_ledger(script_json)
+        announcer_items = _extract_announcer_lines(led)
 
         if not announcer_items:
             log.info("[KokoroAnnouncer] No ANNOUNCER lines in script")
@@ -204,13 +221,15 @@ class KokoroAnnouncer:
 
         # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING): track
         # per-line render metadata so we can stamp the new forensic
-        # ledger fields after the loop. Parallel arrays keyed by
-        # announcer position; matched to ledger.lines[] by text below.
+        # ledger fields after the loop. line_id is carried from
+        # _extract_announcer_lines so the write-back below can patch
+        # by line_id (Pattern 4) instead of fragile text-match.
         per_line_meta: list[dict] = []
 
         for item in announcer_items:
             idx = item["script_idx"]
             line = item["line"]
+            line_id = item.get("line_id")
             _kk_t0 = _kk_time.time()
             try:
                 generator = pipeline(
@@ -244,7 +263,7 @@ class KokoroAnnouncer:
                 except Exception:
                     _kk_hash = ""
                 per_line_meta.append({
-                    "text": str(line).strip(),
+                    "line_id": line_id,
                     "render_ms": int(_kk_render_ms),
                     "generated_dur_s": float(dur),
                     "audio_sample_hash": _kk_hash,
@@ -260,7 +279,7 @@ class KokoroAnnouncer:
                 est_samples = int(KOKORO_SAMPLE_RATE * word_count / 2.5)
                 clips.append(np.zeros(est_samples, dtype=np.float32))
                 per_line_meta.append({
-                    "text": str(line).strip(),
+                    "line_id": line_id,
                     "render_ms": 0,
                     "generated_dur_s": float(est_samples) / KOKORO_SAMPLE_RATE,
                     "audio_sample_hash": "",
@@ -293,54 +312,67 @@ class KokoroAnnouncer:
         # in-flight ledger. Closes the audit gap surfaced by the
         # artifacts-grid review: KokoroAnnouncer previously had ZERO
         # ledger writes. Now stamps tts_engine="kokoro" + voice_preset
-        # + render_ms + generated_dur_s + audio_sample_hash on every
-        # matching ledger.lines[] row.
+        # + render_ms + generated_dur_s + audio_sample_hash + dur_s +
+        # start_s on every announcer ledger.lines[] row.
         #
-        # Match strategy: text-match (same as BatchBark BUG-LOCAL-096
-        # write-back), with first-unmatched-wins for duplicate texts.
+        # Stamp strategy (v2 ledger): patch by line["line_id"] via
+        # _otr_ledger.patch_line_fields(). Replaces the old
+        # text-match-then-stamp block (fragile when two announcer
+        # lines shared identical short text). per_line_meta carries
+        # line_id from the iter_lines walk in _extract_announcer_lines.
+        # start_s is cumulative across the announcer set only --
+        # SceneSequencer overwrites with the assembled-timeline value
+        # downstream; this is a forensic stamp.
         # Best-effort: any I/O failure is logged but never raised.
         try:
-            import json as _json
-            from pathlib import Path as _Path  # noqa: F401
             from . import _otr_ledger as _OTRL  # type: ignore
             ledger_path = _OTRL.in_flight_ledger_path()
             if ledger_path is not None:
-                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                ledger_lines = led.get("lines") or []
-                # Build text -> [unused indices] map
-                text_to_idx: dict[str, list[int]] = {}
-                for li, ln in enumerate(ledger_lines):
-                    t = (ln.get("text") or "").strip()
-                    if not t:
-                        continue
-                    text_to_idx.setdefault(t, []).append(li)
-                updated = 0
-                for meta in per_line_meta:
-                    candidates = text_to_idx.get(meta["text"]) or []
-                    if not candidates:
-                        continue
-                    ledger_idx = candidates.pop(0)
-                    row = ledger_lines[ledger_idx]
-                    row["tts_engine"] = "kokoro"
-                    row["voice_preset"] = str(voice_id)
-                    if int(meta.get("render_ms", 0)) > 0:
-                        row["render_ms"] = int(meta["render_ms"])
-                    if float(meta.get("generated_dur_s", 0.0)) > 0:
-                        row["generated_dur_s"] = float(meta["generated_dur_s"])
-                    if meta.get("audio_sample_hash"):
-                        row["audio_sample_hash"] = str(meta["audio_sample_hash"])
-                    updated += 1
-                if updated:
-                    _OTRL.save_ledger_safe(ledger_path, led)
-                    render_log.append(
-                        f"ledger updated: {updated} announcer line(s) -> "
-                        f"{ledger_path.name}"
+                led_disk = _OTRL.load_ledger_safe(ledger_path)
+                if led_disk is None:
+                    log.warning(
+                        "[KokoroAnnouncer] in-flight ledger load failed at "
+                        "%s; skipping ledger write-back",
+                        ledger_path,
                     )
-                    log.info(
-                        "[KokoroAnnouncer] BUG-030 ledger updated: %d announcer "
-                        "line(s) stamped in %s",
-                        updated, ledger_path.name,
-                    )
+                else:
+                    cumulative_start = 0.0
+                    updated = 0
+                    for meta in per_line_meta:
+                        line_id = meta.get("line_id")
+                        if not line_id:
+                            continue
+                        dur = float(meta.get("generated_dur_s") or 0.0)
+                        fields: dict = {
+                            "tts_engine":  "kokoro",
+                            "voice_preset": str(voice_id),
+                            "dur_s":        dur,
+                            "start_s":      cumulative_start,
+                        }
+                        if int(meta.get("render_ms", 0)) > 0:
+                            fields["render_ms"] = int(meta["render_ms"])
+                        if dur > 0:
+                            fields["generated_dur_s"] = dur
+                        if meta.get("audio_sample_hash"):
+                            fields["audio_sample_hash"] = str(
+                                meta["audio_sample_hash"]
+                            )
+                        if _OTRL.patch_line_fields(led_disk, line_id, fields):
+                            cumulative_start += dur
+                            updated += 1
+                    if updated:
+                        _OTRL.save_ledger_safe(ledger_path, led_disk)
+                        render_log.append(
+                            f"ledger updated (line_id stamping): "
+                            f"{updated} announcer line(s) -> "
+                            f"{ledger_path.name}"
+                        )
+                        log.info(
+                            "[KokoroAnnouncer] BUG-030 ledger updated "
+                            "(line_id stamping): %d announcer line(s) "
+                            "stamped in %s",
+                            updated, ledger_path.name,
+                        )
         except Exception as _kk_exc:
             log.warning(
                 "[KokoroAnnouncer] BUG-030 ledger write-back failed: %s",

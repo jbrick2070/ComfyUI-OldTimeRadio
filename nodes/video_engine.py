@@ -596,21 +596,26 @@ def _get_latest_telemetry():
         
     return peak_gb, speed, model
 
-def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
-                    news_used, duration_s, W, H):
-    """Return a clean data dict for *_TelemetryHUDRenderer*."""
-    import time as _t
-    try:
-        script = (json.loads(script_json_str)
-                  if isinstance(script_json_str, str) else (script_json_str or []))
-        plan   = (json.loads(production_plan_json_str)
-                  if isinstance(production_plan_json_str, str) else (production_plan_json_str or {}))
-        if not isinstance(script, list):
-            script = []
-    except Exception:
-        script, plan = [], {}
+def _parse_hud_data(episode_title, led, plan, news_used, duration_s, W, H):
+    """Return a clean data dict for *_TelemetryHUDRenderer*.
 
-    # Voice assignments - same normalisation as _write_story_treatment
+    v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
+    dict) and ``plan`` (production plan dict, possibly empty). Single
+    parse at top of render_video; no re-parsing here.
+
+    Behavior change vs legacy: scene_break / environment / pause
+    item-types don't exist in the v2 ledger schema, so the multi-scene
+    structure collapses to a single pseudo-scene containing all
+    dialogue + sfx items from led.lines in ledger order. Cast is
+    enriched from led.cast (which has name + voice_preset per entry)
+    so the HUD shows the cast even when production_plan is empty.
+    """
+    import time as _t
+
+    led = led if isinstance(led, dict) else {}
+    plan = plan if isinstance(plan, dict) else {}
+
+    # Voice assignments from production plan (legacy Director output)
     voices = {}
     for k, v in (plan.get("voice_assignments", {}) or {}).items():
         if isinstance(v, dict):
@@ -632,41 +637,63 @@ def _parse_hud_data(episode_title, script_json_str, production_plan_json_str,
     elif _nr:
         news_seeds = [_nr.split("\n")[0][:100]]
 
-    # Cast
-    cast = [{"char": c, "preset": p, "desc": _PRESET_DESC.get(p, "")}
-            for c, p in sorted(voices.items())]
+    # Cast: prefer led.cast (v2 ledger has name + voice_preset per entry)
+    # over production_plan.voice_assignments (legacy Director output).
+    # Fall back to voices dict on cast entries with missing presets.
+    cast = []
+    for entry in (led.get("cast") or []):
+        if not isinstance(entry, dict):
+            continue
+        char = str(entry.get("name") or entry.get("char_id") or "?")
+        preset = str(
+            entry.get("voice_preset") or voices.get(char, "")
+        )
+        cast.append({
+            "char":   char,
+            "preset": preset,
+            "desc":   _PRESET_DESC.get(preset, ""),
+        })
+    # If led.cast was empty (e.g. legacy producer that skipped cast
+    # stamping), fall back to voice_assignments-only cast for back-compat.
+    if not cast:
+        cast = [
+            {"char": c, "preset": p, "desc": _PRESET_DESC.get(p, "")}
+            for c, p in sorted(voices.items())
+        ]
 
-    # Scenes from Canonical 1.0 item stream
-    scenes, cur = [], {"scene_num": "1", "env": "", "items": []}
-    for item in script:
-        t = item.get("type", "")
-        if t == "scene_break":
-            if cur["items"] or cur["env"]:
-                scenes.append(cur)
-            cur = {"scene_num": str(item.get("scene", len(scenes) + 2)),
-                   "env": "", "items": []}
-        elif t == "environment":
-            cur["env"] = str(item.get("description", ""))
-        elif t == "dialogue":
-            char = str(item.get("character_name", item.get("character", "?")))
-            cur["items"].append({
-                "type": "dialogue",
-                "char": char,
-                "text": str(item.get("line", item.get("text", ""))),
-                "preset": voices.get(char, ""),
+    # Scenes: ledger schema has no scene_break / environment markers,
+    # so collapse to a single pseudo-scene. Items walk led.lines in
+    # ledger order, dispatching by speaker_role:
+    #   character / announcer  -> dialogue item
+    #   sfx                    -> sfx item
+    #   music_open/close/inter -> skip (HUD never rendered "music"
+    #                            items even under the legacy schema)
+    items = []
+    # Build a name lookup so character/announcer dialogue items can
+    # resolve their voice preset via the cast block we just built.
+    cast_name_to_preset = {c["char"]: c["preset"] for c in cast}
+    from . import _otr_ledger_consumers as _OTRLC
+    for line in _OTRLC.iter_lines(led):
+        role = line.get("speaker_role") or ""
+        text = (line.get("text") or "").strip()
+        if not text:
+            continue
+        if role in ("character", "announcer"):
+            char = _OTRLC.speaker_name(led, line)
+            items.append({
+                "type":   "dialogue",
+                "char":   char,
+                "text":   text,
+                "preset": cast_name_to_preset.get(char, ""),
             })
-        elif t == "sfx":
-            cur["items"].append({
-                "type": "sfx",
-                "text": str(item.get("description", item.get("text", ""))),
-            })
-        elif t == "pause":
-            cur["items"].append({"type": "pause"})
-    if cur["items"] or cur["env"]:
-        scenes.append(cur)
+        elif role == "sfx":
+            items.append({"type": "sfx", "text": text})
+        # music_* speaker_roles intentionally skipped (no HUD handler).
+
+    scenes = [{"scene_num": "1", "env": "", "items": items}] if items else []
 
     peak_gb, speed, model = _get_latest_telemetry()
-    
+
     return {
         "title":      episode_title,
         # Master style key. Backward-compat reads of legacy "genre" keys
@@ -976,24 +1003,29 @@ _PRESET_DESC = {
 }
 
 
-def _write_story_treatment(out_path, episode_title, script_json_str,
-                            production_plan_json_str, news_used,
+def _write_story_treatment(out_path, episode_title, led, plan, news_used,
                             duration, W, H, fps, size_mb):
     """Save a complete episode treatment alongside the MP4.
 
-    Includes full script in scene order, voice assignments with
-    human-readable descriptions, scene arc, and production stats.
-    Same information as the mission-control log but formatted as a
-    permanent show-bible record.
+    v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
+    dict) and ``plan`` (production plan dict, possibly empty). Single
+    parse at top of render_video.
+
+    Behavior change vs legacy: scene_break / environment / pause
+    item-types don't exist in the v2 ledger schema. The treatment
+    output loses scene-arc summary, scene headers, and environment
+    descriptions in the FULL SCRIPT section. Replaces with a flat
+    list of dialogue + sfx in ledger order. Cast block is enriched
+    from led.cast (which carries name + voice_preset per entry) so
+    voice info appears even when production_plan is empty.
     """
     try:
         import time as _t
         import json as _json
+        from . import _otr_ledger_consumers as _OTRLC
 
-        script = _json.loads(script_json_str) if isinstance(script_json_str, str) else (script_json_str or [])
-        plan   = _json.loads(production_plan_json_str) if isinstance(production_plan_json_str, str) else (production_plan_json_str or {})
-        if not isinstance(script, list):
-            script = []
+        led = led if isinstance(led, dict) else {}
+        plan = plan if isinstance(plan, dict) else {}
 
         # Normalize voice_assignments: values may be dicts like {"voice_preset": "v2/en_speaker_0", ...}
         voices_raw = plan.get("voice_assignments", {})
@@ -1004,6 +1036,21 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
                     voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", str(v)))))
                 else:
                     voices[str(k)] = str(v)
+
+        # Also build a cast-name -> preset lookup from led.cast so we
+        # can surface voice info on dialogue lines even when the
+        # production_plan voice_assignments dict is empty.
+        led_cast_lookup: dict[str, str] = {}
+        for entry in (led.get("cast") or []):
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or "").strip()
+            preset = str(entry.get("voice_preset") or "").strip()
+            if name and preset:
+                led_cast_lookup[name] = preset
+
+        def _preset_for(char_name: str) -> str:
+            return voices.get(char_name) or led_cast_lookup.get(char_name, "")
 
         style  = plan.get("style", plan.get("genre", "sci-fi radio drama"))
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
@@ -1041,102 +1088,65 @@ def _write_story_treatment(out_path, episode_title, script_json_str,
         W_(f"  {news_clean if news_clean else '(no news seed - custom premise used)'}")
         W_()
 
-        # Cast & voices
+        # Cast & voices: prefer led.cast (v2 ledger has name + voice_preset
+        # per entry); fall back to production_plan.voice_assignments.
         W_("CAST & VOICES")
         W_(BAR)
-        if voices:
-            pad_w = max((len(str(k)) for k in voices), default=10)
-            for char in sorted(voices.keys()):
-                preset = voices[char]
+        cast_rows = []
+        for entry in (led.get("cast") or []):
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or entry.get("char_id") or "?")
+            preset = str(
+                entry.get("voice_preset") or voices.get(name, "")
+            )
+            cast_rows.append((name, preset))
+        if not cast_rows and voices:
+            cast_rows = [(c, voices[c]) for c in sorted(voices.keys())]
+        if cast_rows:
+            pad_w = max((len(name) for name, _ in cast_rows), default=10)
+            for name, preset in cast_rows:
                 desc   = _PRESET_DESC.get(preset, preset)
-                W_(f"  {str(char):<{pad_w}}  \u2192  {preset:<24}  {desc}")
+                W_(f"  {name:<{pad_w}}  \u2192  {preset:<24}  {desc}")
         else:
             W_("  (no voice assignments recorded)")
         W_()
 
-        # Scene arc summary - build from scene_break / environment / dialogue items
-        scenes = {}
-        _cur_sc = "1"
-        _cur_env = ""
-        for item in script:
-            t = item.get("type", "")
-            if t == "scene_break":
-                _cur_sc = str(item.get("scene", _cur_sc))
-            elif t == "environment":
-                _cur_env = str(item.get("description", ""))
-            if _cur_sc not in scenes:
-                scenes[_cur_sc] = {"env": _cur_env, "sfx": [], "d": 0}
-            if t == "environment":
-                scenes[_cur_sc]["env"] = _cur_env
-            elif t == "sfx":
-                scenes[_cur_sc]["sfx"].append(str(item.get("description", item.get("text", ""))))
-            elif t == "dialogue":
-                scenes[_cur_sc]["d"] += 1
-
+        # Scene arc / FULL SCRIPT under v2 ledger schema:
+        # the ledger has no scene_break / environment / pause markers,
+        # so we drop the scene-arc summary entirely and emit a flat
+        # list of dialogue + sfx in ledger order. This is a deliberate
+        # simplification (architect-approved 2026-05-09 Surprise #3).
         W_("SCENE ARC")
         W_(BAR)
-        if scenes:
-            for sc_num, sc in sorted(scenes.items()):
-                W_(f"  Scene {sc_num}  \u00b7  {(sc['env'] or '').strip()}")
-                for sfx in sc["sfx"]:
-                    W_(f"    [SFX]  {sfx}")
-                W_(f"    {sc['d']} dialogue lines")
-                W_()
-        else:
-            W_("  (scene data unavailable)")
-            W_()
+        W_("  (single-scene ledger -- v2 schema does not carry scene_break "
+           "/ environment / pause markers; arc summary collapsed to a flat "
+           "dialogue + sfx list below)")
+        W_()
 
-        # Full script in scene order - Canonical 1.0 item types:
-        #   scene_break - {"type":"scene_break","scene":"1"}
-        #   environment - {"type":"environment","description":"..."}
-        #   dialogue    - {"type":"dialogue","character_name":"...","line":"..."}
-        #   sfx         - {"type":"sfx","description":"..."}
-        #   pause       - {"type":"pause","kind":"beat","duration_ms":200}
-        d_count = sum(1 for i in script if i.get("type") == "dialogue")
-        s_count = sum(1 for i in script if i.get("type") == "sfx")
+        d_count = sum(
+            1 for ln in _OTRLC.iter_lines(led, roles={"character", "announcer"})
+        )
+        s_count = sum(1 for ln in _OTRLC.iter_lines(led, roles={"sfx"}))
         W_(f"FULL SCRIPT  ({d_count} dialogue  \u00b7  {s_count} sfx cues)")
         W_(BAR)
-        cur_scene = None
-        cur_env = ""
-        scene_header_written = False
-        for item in script:
-            kind = item.get("type", "")
-            if kind == "scene_break":
-                cur_scene = str(item.get("scene", cur_scene or "1"))
-                scene_header_written = False
-            elif kind == "environment":
-                cur_env = str(item.get("description", "")).strip()
-                if not scene_header_written:
-                    if cur_scene is None:
-                        cur_scene = "1"
-                    W_()
-                    W_(f"  \u2500\u2500 SCENE {cur_scene}  \u00b7  {cur_env}")
-                    W_()
-                    scene_header_written = True
-            elif kind == "dialogue":
-                if not scene_header_written:
-                    if cur_scene is None:
-                        cur_scene = "1"
-                    W_()
-                    W_(f"  \u2500\u2500 SCENE {cur_scene}  \u00b7  {cur_env}")
-                    W_()
-                    scene_header_written = True
-                char   = str(item.get("character_name", item.get("character", "?")))
-                text   = str(item.get("line", item.get("text", ""))).strip()
-                preset = voices.get(char, "")
-                desc   = _PRESET_DESC.get(preset, "")
+        for line in _OTRLC.iter_lines(led):
+            role = line.get("speaker_role") or ""
+            text = (line.get("text") or "").strip()
+            if not text:
+                continue
+            if role in ("character", "announcer"):
+                char = _OTRLC.speaker_name(led, line)
+                preset = _preset_for(char)
                 vtag   = f"  [{preset}]" if preset else ""
                 W_(f"  {char}{vtag}")
                 W_(f"    {text}")
                 W_()
-            elif kind == "sfx":
-                sfx_text = str(item.get("description", item.get("text", ""))).strip()
-                W_(f"  [SFX]  {sfx_text}")
+            elif role == "sfx":
+                W_(f"  [SFX]  {text}")
                 W_()
-            elif kind == "pause":
-                pause_kind = item.get("kind", "beat")
-                W_(f"  [PAUSE/{pause_kind.upper()}]")
-                W_()
+            # music_* roles intentionally skipped from the printed
+            # treatment (consistent with HUD's music skip behavior).
         W_()
 
         # Production
@@ -1188,16 +1198,16 @@ class SignalLostVideoRenderer:
                     "multiline": True, "default": "[]",
                     "tooltip": "Parsed script JSON (pipeline compat)"
                 }),
-                "production_plan_json": ("STRING", {
-                    "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON (pipeline compat)"
-                }),
                 "news_used": ("STRING", {
                     "multiline": True, "default": "[]",
                     "tooltip": "News JSON (pipeline compat)"
                 }),
             },
             "optional": {
+                "production_plan_json": ("STRING", {
+                    "multiline": True, "default": "{}",
+                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully -- voice_assignments / style fall back to defaults)"
+                }),
                 "fps": ("INT", {
                     "default": 24, "min": 12, "max": 60, "step": 1,
                     "tooltip": "Frames per second (24 = cinematic)"
@@ -1237,102 +1247,87 @@ class SignalLostVideoRenderer:
     def IS_CHANGED(cls, **kwargs):
         return _time.time()
 
-    def render_video(self, audio, script_json, production_plan_json,
-                     news_used, fps=24, resolution="832x480",
+    def render_video(self, audio, script_json, news_used,
+                     production_plan_json="{}", fps=24, resolution="832x480",
                      episode_title="", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
 
         # -- 1. Parse inputs & Extract Smart Title -------------------
-        # BUG-LOCAL-035: Title resolution is now primary-source script_json,
-        # fallback widget. Previously the list-format branch did nothing and
-        # every run silently fell through to the widget default
-        # "The Last Frequency", yielding 100% TITLE_STUCK filenames.
-        # Resolution order:
-        #   1. title token in list-format script_json  (canonical path)
-        #   2. top-level 'title' key in dict-format script_json (legacy)
-        #   3. widget episode_title (manual override / last resort)
-        # Any value matching _STUCK_TITLE_DEFAULTS triggers TITLE_RESOLVE_FAIL
-        # so the run fails loud instead of writing a stuck-default filename.
+        # v2 ledger consumer (Pattern 1): parse the wire input as a v2
+        # ledger dict. load_ledger raises ValueError on the legacy
+        # parser-list shape; Video is in the loud-fail group. By the
+        # time Video runs, every prior consumer (Bark/Kokoro/Sequencer
+        # /AudioGen/ProcSFX) has already validated ledger shape, so a
+        # legacy-list at this point is upstream-wiring failure, not a
+        # silent-degrade case.
+        from . import _otr_ledger_consumers as _OTRLC
+        led = _OTRLC.load_ledger(script_json)
+        plan = _OTRLC.production_plan_or_empty(production_plan_json)
+
+        # Title chain (Path B confirmed 2026-05-09):
+        #   1. led["meta"]["episode_title"]   (architect primary; today
+        #      not stamped by OTR_LedgerScriptWriter -- forward-compat
+        #      slot for the post-soak B1+B2 follow-up: post-script
+        #      title generation pass + meta.episode_title stamp)
+        #   2. led["meta"]["title"]           (forward-compat slot)
+        #   3. led["title"]                   (top-level; legacy
+        #      writer stamps it via _otr_legacy_writer.py L2561; new
+        #      writer does NOT stamp it)
+        #   4. widget episode_title           (manual override)
+        #   5. TIMESTAMP_LASTRESORT
+        #
+        # news_used[0].headline and meta.news_seed.headline are
+        # intentionally NOT in this chain -- both surface news/outline
+        # content as titles, neither is what we want on screen. Today's
+        # new-writer flow without the widget falls through to TIMESTAMP
+        # truthfully; the B1+B2 follow-up resolves slot 1.
         _STUCK_TITLE_DEFAULTS = {
             "", "the last frequency", "untitled", "episode",
             "signal lost", "custom episode",
         }
 
-        import json as _json
-        _title_source = "widget"
-        _widget_title = (episode_title or "").strip()
-        _script_title = ""
-        try:
-            _script_data = _json.loads(script_json) if isinstance(script_json, str) else (script_json or [])
-            if isinstance(_script_data, list):
-                # Canonical 1.0: look for a {"type": "title", "value": "..."} token.
-                # LLMScriptWriter.write_script prepends this in v2.0-alpha.
-                for _tok in _script_data:
-                    if isinstance(_tok, dict) and _tok.get("type") == "title":
-                        _cand = (_tok.get("value") or "").strip()
-                        if _cand:
-                            _script_title = _cand
-                            break
-            elif isinstance(_script_data, dict) and "title" in _script_data:
-                _script_title = (_script_data.get("title") or "").strip()
-        except Exception as _te:
-            log.warning("[Video] Title extraction from script_json failed: %s", _te)
+        def _is_clean(s):
+            return bool(s) and s.lower() not in _STUCK_TITLE_DEFAULTS
 
-        # BUG-LOCAL-115 hardening (2026-04-30): third fallback chain.
-        # During overnight soak runs the auto-title-from-spine writer
-        # helper sometimes fails to inject a {"type":"title"} token
-        # into script_json (the LLM's output drops it) AND the
-        # workflow widget is left empty by the user. Both legacy
-        # sources fail and the run dies after ~3 minutes of writer
-        # work. New fallback: pull from ledger.meta.news_seed.headline
-        # (always populated by NewsFetcher) -- if the writer didn't
-        # name the episode, the news article that seeded it is a
-        # reasonable last-resort title.
-        _news_title = ""
-        try:
-            from .production_ledger import get_ledger as _get_ledger
-            _led = _get_ledger().data
-            _news = (_led.get("meta") or {}).get("news_seed") or {}
-            _news_title = (_news.get("headline") or "").strip()
-        except Exception as _ne:  # noqa: BLE001
-            log.debug("[Video] news_seed title fallback unavailable: %s", _ne)
+        _meta = led.get("meta") or {}
+        _meta_episode_title = (_meta.get("episode_title") or "").strip()
+        _meta_title         = (_meta.get("title") or "").strip()
+        _led_title          = (led.get("title") or "").strip()
+        _widget_title       = (episode_title or "").strip()
 
-        if _script_title and _script_title.lower() not in _STUCK_TITLE_DEFAULTS:
-            episode_title = _script_title
-            _title_source = "script_json"
-        elif _widget_title and _widget_title.lower() not in _STUCK_TITLE_DEFAULTS:
+        if _is_clean(_meta_episode_title):
+            episode_title = _meta_episode_title
+            _title_source = "led.meta.episode_title"
+        elif _is_clean(_meta_title):
+            episode_title = _meta_title
+            _title_source = "led.meta.title"
+        elif _is_clean(_led_title):
+            episode_title = _led_title
+            _title_source = "led.title (legacy stamp)"
+        elif _is_clean(_widget_title):
             episode_title = _widget_title
             _title_source = "widget_override"
-        elif _news_title and _news_title.lower() not in _STUCK_TITLE_DEFAULTS:
-            # Trim news headline to a reasonable episode-title length;
-            # prefix with "Signal Lost — " is left to the user via
-            # downstream cosmetic processing.
-            episode_title = _news_title[:80]
-            _title_source = "news_seed_fallback"
-            log.warning(
-                "[Video] TITLE FALLBACK to news_seed: writer omitted "
-                "{\"type\":\"title\"} token AND widget was empty. Using "
-                "ledger.meta.news_seed.headline = %r. "
-                "(BUG-LOCAL-115 -- writer auto-title regression.)",
-                episode_title,
-            )
         else:
             # Final fallback: timestamp-based unique title. Guarantees
             # we never crash the run; passes stuck-check by uniqueness.
             episode_title = f"Signal Lost {_time.strftime('%Y%m%d %H%M%S')}"
             _title_source = "timestamp_lastresort"
             log.warning(
-                "[Video] TITLE LAST-RESORT: script_json='%s', widget='%s', "
-                "news_seed='%s' -- ALL EMPTY/STUCK. Using timestamp "
-                "fallback %r so the run can finish. Investigate the "
-                "writer's auto-title pipeline.",
-                _script_title, _widget_title, _news_title, episode_title,
+                "[Video] TITLE LAST-RESORT: meta.episode_title='%s', "
+                "meta.title='%s', led.title='%s', widget='%s' -- ALL "
+                "EMPTY/STUCK. Using timestamp fallback %r so the run "
+                "can finish. Resolution: ROADMAP B1+B2 follow-up adds "
+                "a post-script title-generation pass that stamps "
+                "led.meta.episode_title cleanly.",
+                _meta_episode_title, _meta_title, _led_title,
+                _widget_title, episode_title,
             )
 
         _runtime_log(
             f"TITLE_TRACE | source={_title_source} | resolved='{episode_title}' "
-            f"| widget='{_widget_title}' | script_json='{_script_title}'"
+            f"| widget='{_widget_title}' | meta.episode_title='{_meta_episode_title}' "
+            f"| meta.title='{_meta_title}' | led.title='{_led_title}'"
         )
 
         waveform = audio["waveform"]
@@ -1358,10 +1353,11 @@ class SignalLostVideoRenderer:
         volume, freqs, waves = _analyze_audio(audio_np, sr, total_frames, fps)
 
         # -- 2b. Build post-roll Telemetry HUD (no VRAM, pure PIL) ----
+        # v2 ledger consumer: pass parsed led + plan dicts (parsed at
+        # the top of render_video). HUD never re-parses script_json.
         try:
-            _hud_data     = _parse_hud_data(episode_title, script_json,
-                                            production_plan_json, news_used,
-                                            duration, W, H)
+            _hud_data     = _parse_hud_data(episode_title, led, plan,
+                                            news_used, duration, W, H)
             _hud_renderer = _TelemetryHUDRenderer(W, H, fps, _hud_data)
             _hud_frames   = _hud_renderer.hud_frames()
         except Exception as _he:
@@ -1481,36 +1477,12 @@ class SignalLostVideoRenderer:
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
 
-        # BUG-LOCAL-110 Layer 3 (2026-05-05, round-robin verified): prefer
-        # the canonical resolved title stamped by story_orchestrator into
-        # the production ledger. The inbound `episode_title` parameter is
-        # often empty (user widget unfilled) or stale (workflow link
-        # carries the user's empty value through). Reading from the
-        # ledger gives us the BUG-035 fallback chain result (LLM TITLE ->
-        # derived from environment -> timestamp). The orchestrator
-        # singleton is already imported above (`_early_led`) so we reuse
-        # it -- same in-process ledger, no extra disk I/O.
-        # Transitional v2.0-alpha bridge; v2.1 cleanup is to wire an
-        # explicit title socket on OTR_SignalLostVideo (ROADMAP.md L374).
-        try:
-            _ledger_title = str(_early_led.data.get("title") or "").strip()
-            if _ledger_title:
-                if not episode_title or not str(episode_title).strip():
-                    log.info(
-                        "[Video][BUG-110] inbound episode_title was empty; "
-                        "using ledger.title=%r", _ledger_title,
-                    )
-                elif _ledger_title != str(episode_title).strip():
-                    log.info(
-                        "[Video][BUG-110] preferring ledger.title=%r over "
-                        "inbound episode_title=%r", _ledger_title, episode_title,
-                    )
-                episode_title = _ledger_title
-        except Exception as _title_exc:  # noqa: BLE001 -- ledger read is best-effort
-            log.warning(
-                "[Video][BUG-110] could not read ledger.title; falling back "
-                "to inbound episode_title (%s)", _title_exc,
-            )
+        # BUG-LOCAL-110 Layer 3 -- SUPERSEDED 2026-05-09 by the v2 ledger
+        # title chain at the top of render_video. The chain probes
+        # led.meta.episode_title -> led.meta.title -> led.title -> widget
+        # -> TIMESTAMP_LASTRESORT against the wire-input ledger, so the
+        # singleton-side preference is no longer needed. Slot 3 of the
+        # chain (`led.title`) covers the legacy writer's stamp.
 
         # BUG-LOCAL-110 Layer 1 (2026-05-05, round-robin verified): slug
         # cleanup. Pipeline:
@@ -1584,26 +1556,31 @@ class SignalLostVideoRenderer:
                  out_path, size_mb, duration + (_hud_frames / fps), total_encode_frames)
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
-        # Write story treatment companion file
+        # Write story treatment companion file. v2 ledger consumer:
+        # pass parsed led + plan dicts (parsed at top of render_video).
         _write_story_treatment(
-            out_path, episode_title, script_json,
-            production_plan_json, news_used,
+            out_path, episode_title, led, plan, news_used,
             duration, W, H, fps, size_mb
         )
 
         # ------------------------------------------------------------------
         # Production Ledger (L1) -- finalize the episode. Rename the ledger
         # from its placeholder "pending_<ts>" to match the MP4 basename,
-        # attach final audio + video paths, and record total episode
-        # duration. This is the last write-only stage of L1; the file now
-        # on disk is the complete episode record.
+        # attach final audio + video paths, record total episode duration,
+        # and stamp meta.procgen_path (Pattern 4 write-back; v2 ledger
+        # consumer 2026-05-09).
         # ------------------------------------------------------------------
+        # Note: `_final_led` here is the production_ledger singleton; the
+        # outer `led` variable still holds the wire-input ledger dict
+        # parsed at the top of render_video. Both refer to the same
+        # on-disk file once rename_episode + save complete.
         try:
             from .production_ledger import get_ledger
-            led = get_ledger()
+            from . import _otr_ledger as _OTRL  # type: ignore
+            _final_led = get_ledger()
             # Strip the ".mp4" extension and use the stem as the ledger id.
             ep_id = os.path.splitext(os.path.basename(out_path))[0]
-            led.rename_episode(ep_id)
+            _final_led.rename_episode(ep_id)
             # BUG-LOCAL-020 (Phase G): the rename moved our parent dir
             # from `episodes/pending_<ts>/audio/` to `episodes/<ep_id>/audio/`.
             # The mp4 we wrote at `out_path` no longer exists at that
@@ -1611,7 +1588,7 @@ class SignalLostVideoRenderer:
             # Recompute and verify so downstream graph receives the
             # post-rename location, not the stale pending path.
             try:
-                _final_out_path = os.path.join(led.out_dir, os.path.basename(out_path))
+                _final_out_path = os.path.join(_final_led.out_dir, os.path.basename(out_path))
                 if os.path.exists(_final_out_path):
                     if _final_out_path != out_path:
                         log.info(
@@ -1633,12 +1610,24 @@ class SignalLostVideoRenderer:
                     "[Video] post-rename path recompute failed: %s",
                     _exc_recompute,
                 )
-            led.set_final_paths(
+            _final_led.set_final_paths(
                 audio_path=None,           # standalone WAV not saved yet (L2)
                 video_path=out_path,
                 total_episode_dur_s=float(duration),
             )
-            led.save()
+            # Pattern 4 stamp (architect spec): meta.procgen_path =
+            # <output mp4 path>. Mirrors the per-line write-back contract
+            # from prior consumers but at meta level (no per-line stamping
+            # for Video). Mutate the singleton's .data dict before save()
+            # so the persisted file carries the stamp.
+            try:
+                _OTRL.set_meta(_final_led.data, "procgen_path", out_path)
+            except Exception as _stamp_exc:  # noqa: BLE001
+                log.warning(
+                    "[Video] meta.procgen_path stamp failed (non-fatal): %s",
+                    _stamp_exc,
+                )
+            _final_led.save()
         except Exception as _e:  # noqa: BLE001
             log.warning("[Ledger] SignalLostVideo finalize failed: %s", _e)
 

@@ -396,6 +396,43 @@ def patch_line_fields(
     return False
 
 
+# Mirror of production_ledger._word_count -- the same regex the writer
+# uses at initial set_lines() stamp time. Naive ``str.split()`` would
+# drift by a few percent on text containing punctuation glue, so any
+# downstream consumer comparing a revised line's word_count against
+# budget plans would see stale numbers. Keep this in sync with
+# production_ledger.py if either side changes.
+_WORD_COUNT_RE = __import__("re").compile(r"[A-Za-z][A-Za-z0-9'\-]*")
+
+
+def patch_line_text(
+    ledger: dict,
+    line_id: str,
+    text: str,
+) -> bool:
+    """Atomic update of ``line["text"]`` + the derived ``char_count``
+    and ``word_count`` fields for the line whose ``line_id`` matches.
+
+    Mandatory at every text-mutation site (e.g. the script-critic
+    REVISE path). Recomputing the metrics in lockstep with text
+    prevents drift from the writer's initial-stamp formula -- naive
+    callers who set ``line["text"]`` without recomputing the counts
+    will leave downstream budget consumers reading stale numbers.
+
+    Returns True if a row was updated, False if no matching line was
+    found. Pure mutator, never raises on shape errors.
+    """
+    if not isinstance(ledger, dict):
+        return False
+    safe_text = text or ""
+    fields = {
+        "text": safe_text,
+        "char_count": len(safe_text),
+        "word_count": len(_WORD_COUNT_RE.findall(safe_text)),
+    }
+    return patch_line_fields(ledger, line_id, fields)
+
+
 def patch_clip_fields(
     ledger: dict,
     line_id: str,
@@ -957,6 +994,7 @@ __all__ = [
     "find_most_recent_ledger",
     "in_flight_ledger_path",
     "patch_line_fields",
+    "patch_line_text",
     "patch_clip_fields",
     "audio_gate_record",
     "append_audio_gate",

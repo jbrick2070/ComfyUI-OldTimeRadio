@@ -91,7 +91,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
-    "OTR_LLMScriptWriter":    (".nodes.story_orchestrator", "LLMScriptWriter", " LLM Story Writer"),
+    "OTR_LedgerScriptWriter": (".nodes.OTR_LedgerScriptWriter", "OTR_LedgerScriptWriter", " LPL Script Writer (v2.0)"),
+    "OTR_LLMScriptWriter":    (".nodes._otr_legacy_writer", "LegacyLLMScriptWriter", " Story Writer (legacy)"),
     "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),

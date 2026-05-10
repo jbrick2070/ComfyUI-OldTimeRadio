@@ -1,12 +1,288 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `5d7e887` | **Last refactored:** 2026-05-07 PM
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `5d7e887` | **Last refactored:** 2026-05-09/10 (LPL sprint in flight)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
+**Format codename:** the new structured-ledger contract is **L3** (matches `schema_version: "l3-2026-05-08"` already on the wire). All consumer rewrites target L3-native reads + L3-native write-back via `patch_line_fields(led, line_id, {...})`. When the schema bumps next, the codename evolves cleanly to L4.
+
 ---
 
-## CURRENT WORK — pre-FULL acceptance soak (handoff-ready as of 2026-05-07 PM)
+## CURRENT WORK — Ledger Consumer Rewrite sprint (shipped green 2026-05-09/10)
+
+**State:** **7 of 7 consumers shipped green.** Patterns doc folded into ROADMAP under "L3 contract — patterns lock-in" below; standalone `docs/2026-05-09-ledger-consumer-rewrite-patterns.md` archived to `docs/ROADMAP_HISTORY.md` and deleted. Bug Bible 23/1/2/0 baseline held across every consumer ship. EpisodeAssembler audited clean (no rewrite needed). No commits, no pushes — working-tree only until soak proves out. Next: video pipeline recon (Flux/HuMo/LTX/VideoComposite, post-consumer #7) + B4 LLM prompt audit + fresh workflow JSON wiring + dry-run gates → STOP, hand to Jeffrey for soak ramp.
+
+### Phase 3 writer extraction — SHIPPED
+
+| What | Where |
+|---|---|
+| `LegacyLLMScriptWriter` extracted to dedicated module | `nodes/_otr_legacy_writer.py` (~6 KLOC, class span 5,877 lines, 28 methods) |
+| `story_orchestrator.py` class span deleted, replaced with PEP 562 lazy `__getattr__` shim | `nodes/story_orchestrator.py` |
+| `OTR_LedgerScriptWriter` registered alongside; old `OTR_LLMScriptWriter` repointed at extracted module with display name `Story Writer (legacy)` | `__init__.py` |
+| 5/5 gates green: schema validation, AST parse, workflow binding (15 saved widgets vs 17 current — trailing-default drift acceptable), Bug Bible regression baseline match, legacy self-test 5/5 | `tests/_phase3_schema_gate.py` + `tests/_phase3_workflow_gate.py` |
+
+### L3 helper module + patterns doc — SHIPPED
+
+| Artifact | Purpose |
+|---|---|
+| `nodes/_otr_ledger_consumers.py` | Read-side helper: `load_ledger`, `iter_lines`, `cast_lookup`, `speaker_name`, `voice_preset`, `production_plan_or_empty`. ~140 LOC including type hints + docstrings. Strict by design — `load_ledger` raises named `ValueError` on legacy parser-list shape. |
+| `nodes/_otr_ledger.py` (existing, no edits) | Write-side surface: `in_flight_ledger_path`, `patch_line_fields`, `save_ledger_safe`, `stamp_per_line_audio_meta`, `audio_gate_record`, `record_phase_ms`, `set_meta`. Unchanged; consumers wire to it for write-back. |
+| `_otr_ledger.patch_line_text(led, line_id, text)` helper | Atomic update of `text` + `char_count` + `word_count` to prevent metric drift on REVISE passes. Mandatory at every text-mutation site. |
+| `tests/fixtures/__init__.py`, `tests/fixtures/ledger_stub.py` | `make_stub_ledger(...)` + `make_legacy_list()` shared fixtures for the 7 per-consumer self-tests. Cast modeled as list-of-dicts to match `production_ledger.set_cast` output. |
+| `docs/2026-05-09-ledger-consumer-rewrite-patterns.md` | ~7 KB, 7 patterns + anti-patterns + cross-consumer status table. The canonical reference for consumers 4-7 (and for any future schema-evolving work). |
+
+### Consumer rewrite progress — 7 of 7 SHIPPED GREEN
+
+| # | Consumer | Status | Self-test | Bug Bible | Notes |
+|---|---|---|---|---|---|
+| 1 | `script_critic.py` | **SHIPPED** | 4/4 PASS | 23/1/2/0 | Meta-stamper pattern. Legacy-list ValueError → PASS passthrough w/ `meta.critic_skipped_reason="legacy_list_input"` (Critic is non-blocking by policy). `meta.critic_verdict` augment alongside append-only `script_gates[]`/`script_revisions[]` history. |
+| 2 | `batch_bark_generator.py` | **SHIPPED** | 4/4 PASS | 23/1/2/0 | Per-line stamper pattern. `roles={"character"}` only — announcer stays on Kokoro bus per file-comment design rationale ("ums and ahs out of bookends"). Duplicate-text canary test confirms line_id-based stamping where text-match would collide. |
+| 3 | `kokoro_announcer.py` | **SHIPPED** | 4/4 PASS | 23/1/2/0 | `roles={"announcer"}` only. Pattern 5 N/A (Kokoro doesn't take `production_plan_json`). Test harness lesson: mock pipelines need `time.sleep(0.005)` so `render_ms = int(elapsed * 1000) > 0`. |
+| 4 | `scene_sequencer.py` | **SHIPPED** | 4/4 PASS | 23/1/2/0 | No role filter on iter; `music_*` lines pass through unstamped (forensic log line). SFX are first-class lines in v2 ledger so the legacy `ledger.sfx[]` parallel-walk degrades to a no-op for v2 producers. line_id stamping for both dialogue and sfx. |
+| 4b | `EpisodeAssembler` (in scene_sequencer.py) | **AUDITED CLEAN — no rewrite needed** | — | 23/1/2/0 | Uses in-flight ledger directly on disk via `load_ledger_safe` + `save_ledger_safe`. No wire `script_json` input. `start_s_space` shift from `"scene_audio"` to `"master_mix"` already structured. Out of consumer-rewrite scope; flagged here for inventory completeness. |
+| 5 | `batch_audiogen_generator.py` | **SHIPPED** | 4/4 PASS | 23/1/2/0 | `roles={"sfx"}`. Cue text = `line["text"]` (no regex). Two-track write-back: legacy `ledger.sfx[]` parallel walk preserved (no-ops on v2 producers); NEW `ledger.lines[]` line_id stamping with `sfx_wav_path` + `sfx_engine="audiogen"` (sfx-specific names disambiguate from dialogue's `tts_engine`/`bark_wav_path` on the same `lines[]` array). Cache-hit path verified. |
+| 6 | `batch_procedural_sfx.py` | **SHIPPED (Option 2)** | 4/4 PASS | 23/1/2/0 | Read+write rewrite. NEW write-back per architect Option 2 decision: wavs persisted to `<episode>/audio/sfx/proc_<sfx_type>_<line_id>.wav`, paths stamped on `ledger.lines[]` per line_id alongside `sfx_engine="procedural"`, `sfx_type`, `dur_s`. Matches AudioGen's contract for ledger audio-file inventory completeness. No cache layer (procedural is cheap + deterministic). Disk-write failure is best-effort — falls through to `sfx_wav_path=None`, AUDIO batch continues. Decision history: shipped Option 2 after Option 1 (read-only port) was reverted per scope flip. |
+| 7 | `video_engine.py` (`SignalLostVideoRenderer`) | **SHIPPED** | 4/4 PASS | 23/1/2/0 | Meta-stamper pattern. Title chain (Path B): `led.meta.episode_title` → `led.meta.title` → `led.title` → widget → TIMESTAMP_LASTRESORT. `news_used` and `meta.news_seed.headline` intentionally NOT in chain (both surface news/outline content, not finished-script titles). HUD + treatment helpers refactored to take parsed `led` dict + `plan` dict. HUD becomes line-count-fidelity (single pseudo-scene); treatment becomes flat list (no `── SCENE` headers — v2 schema has no `scene_break`/`environment`/`pause` markers). `meta.procgen_path` stamp via `set_meta` after render. Title chain primary slot (`meta.episode_title`) not stamped today — see Post-soak follow-ups B1+B2 below. |
+
+### Hard rules (locked, never violated this sprint)
+
+- **Do not edit shipped v2.0 modules:** `_otr_outline.py`, `_otr_canon.py`, `_otr_line_composer.py`, `_otr_model_loader.py`, `OTR_LedgerScriptWriter.py`.
+- **Do not touch:** `_load_llm`, `_unload_llm`, `_LLM_CACHE`, `_MODEL_CONTEXT_CAPS` in `story_orchestrator.py`.
+- **Bug Bible 23/1/2/0 must hold** after each consumer ship.
+- **UTF-8 no BOM.** No commits, no pushes, no branch switches.
+- **Per-consumer scope:** parsing block + stamping block ONLY. INPUT_TYPES untouched except production_plan_json demoted required→optional. No widget renames, no reorderings (saved workflows bind by position). No new optional widgets. Existing field names preserved exactly on stamps.
+
+### Sprint exit criteria
+
+1. All 7 consumers shipped with 4/4 self-tests + Bug Bible 23/1/2/0 holding after each.
+2. `tests/test_otr_ledger_consumers.py` covering the helper API w/ stub ledgers.
+3. **B4 LLM prompt audit pass** (see release blockers below) — gated on items 1-2.
+4. Fresh workflow JSON wired `OTR_LedgerScriptWriter → Critic → fan-out to 6 audio/video consumers → Flux → HuMo → LTX → VideoComposite → RTXUpscale → PostUpscaleProcgenBlend`.
+5. Dry-run gates: workflow instantiation + binding resolution, NO GPU.
+6. **STOP. Hand to Jeffrey for manual soak ramp** (30 → 100 → 200 → 340 words, full pipeline including video review of Flux/LTX/HuMo). Soak is NOT in dev scope.
+7. After soak proves out: delete legacy writer (`_otr_legacy_writer.py`, `__getattr__` shim, `OTR_LLMScriptWriter` registration). Archive saved workflow as `workflows/legacy_archive/`. Re-run Bug Bible.
+
+### Video pipeline recon (read-only confirmation, post-consumer #7)
+
+After all 7 audio/critic consumers ship, recon the 4 video files (`batch_flux_render.py`, `batch_humo_render.py`, `batch_ltx_render.py`, `video_composite.py`). All read ledger from disk (not wire `script_json`), so they should "just work" with the L3 format. Confirm. If recon surfaces text-matching or list-index access on `ledger.lines[]`, write a per-file mini-spec; otherwise mark "AUDITED CLEAN, no rewrite needed" in the patterns doc cross-consumer status table (matches the EpisodeAssembler precedent).
+
+### QA strategy (post-sprint, pre-soak)
+
+Three tiers when consumers + audit complete:
+
+1. **Mechanical (automated):** Hypothesis property-based testing + Pydantic schema validation at consumer boundaries. Catches edge cases the canonical 4-test pattern misses (empty cast, single-line episodes, unicode in text, lines with `start_s` already populated, etc.). Add as new test classes.
+2. **Cross-cutting (AI):** Fresh-context Claude/Opus reads the 7 consumers + writer + patterns doc, gives a code review using the patterns doc as the roadmap. Captures the "obvious in hindsight" bugs nobody on the team can see anymore.
+3. **Subjective (Jeffrey):** Soak ramps 30/100/200/340 words. No tool replaces this for audio drama vibes.
+
+### L3 contract — patterns lock-in
+
+This subsection folds in the 7 patterns + anti-patterns from the standalone `docs/2026-05-09-ledger-consumer-rewrite-patterns.md` (now archived to `docs/ROADMAP_HISTORY.md` and deleted). It's the canonical reference for any future schema-evolving work or new consumer added to the OTR pipeline. **Read this before opening any consumer.**
+
+#### TL;DR — the four-line rewrite
+
+For every consumer, the visible diff is confined to:
+
+1. **Parsing block at the top of the function** — `json.loads(script_json) → list iteration → regex on content` replaced with `iter_lines(load_ledger(script_json), roles={...})` plus structured field reads.
+2. **Stamping block where ledger writes happen** — `text_to_idx` text-matching replaced with `patch_line_fields(led_disk, line["line_id"], {...})`. Same field names as before.
+3. **`production_plan_json` demotion** — required → optional with `default="{}"` in `INPUT_TYPES`, plus a default value on the function signature.
+4. **One `save_ledger_safe` at the end** — single atomic write per consumer call.
+
+Everything else stays bit-for-bit identical. No widget renames, no reorderings, no new optional widgets, no model dropdown changes, no output path changes, no audio-setting changes.
+
+#### Pattern 1 — `load_ledger` placement and posture
+
+```python
+from . import _otr_ledger_consumers as _OTRLC
+led = _OTRLC.load_ledger(script_json)
+plan = _OTRLC.production_plan_or_empty(production_plan_json)
+```
+
+`load_ledger` raises `ValueError` on the legacy parser-list shape. Two postures, picked per consumer's role in the workflow:
+
+- **Loud (Bark, Kokoro, Sequencer, AudioGen, ProcSFX, Video):** let `ValueError` propagate. Bad wiring fails the run early instead of silently producing half-degraded audio mid-soak. Test asserts the raise.
+- **Non-blocking (Critic only):** wrap in `try/except ValueError`, log loud, stamp `meta.critic_skipped_reason`, return passthrough+PASS. Critic's "never a blocker" rule wins for this one node — it's observe-only by design.
+
+#### Pattern 2 — Iterating ledger lines by role
+
+```python
+for line in _OTRLC.iter_lines(led, roles={"character"}):
+    text     = (line.get("text") or "").strip()
+    line_id  = line.get("line_id")
+    name     = _OTRLC.speaker_name(led, line)         # cast lookup, "UNKNOWN" on miss
+    traits   = (line.get("traits") or "")
+    preset   = _OTRLC.voice_preset(led, line)         # cast.voice_preset, None on miss
+```
+
+Field reads are direct dict access — no regex, no `[VOICE: NAME, traits] text` parsing. The structured ledger gives you the speaker, text, and metadata without parsing.
+
+**Role-filter judgment rule.** Architect specs sometimes widen role filters in ways that contradict in-file design comments. **Never widen a role set beyond the consumer's current behavior without checking the in-file rationale.**
+
+Concrete case (Bark): architect spec said `roles={"character","announcer"}`. The file comment in `batch_bark_generator.py` line 493-496 said:
+
+> ANNOUNCER lines are intentionally skipped — they are rendered by the dedicated KokoroAnnouncer node on a separate bus. Keeping them out of the Bark pool eliminates Bark's "ums" and "ahs" from the broadcast-ready opening and closing bookends.
+
+Widening to include announcer would double-render every announcer line (Bark + Kokoro both producing audio for the same `line_id`). Filtered to `{"character"}` only. Architect confirmed.
+
+**Rule:** architect specs reflect intent at the cross-consumer level; file-level comments document why current behavior diverges from the apparent default. When in doubt, the latest scope clarification ("Behavior on those stays bit-for-bit identical") wins. Surface the discrepancy in the STEP 3 report and proceed with bit-for-bit-identical filtering. The architect approves or corrects.
+
+#### Pattern 3 — Voice preset resolution with graceful fallback
+
+```python
+preset_from_cast = _OTRLC.voice_preset(led, line)
+if preset_from_cast and str(preset_from_cast).startswith("v2/"):
+    preset = preset_from_cast
+else:
+    preset = _voice_preset_for_character(name, voice_map, traits)
+```
+
+Prefer cast.voice_preset (v2 cast contract) when present and well-formed; fall back to the consumer's existing deterministic resolver (gender-aware hash for Bark, seeded grab-bag for Kokoro) when missing. The fallback is the existing function — don't replace it, just *prepend* the cast lookup.
+
+`voice_map` comes from `production_plan_or_empty(production_plan_json).get("voice_assignments", {})`. With Director unwired (the v2 default), `voice_map` is `{}` and the existing fallback handles it.
+
+#### Pattern 4 — Write-back contract
+
+Single shape, applied to every consumer that stamps per-line fields:
+
+```python
+ledger_path = _OTRL_PATHS.in_flight_ledger_path()       # _otr_ledger module
+if ledger_path is not None:
+    led_disk = _OTRL_PATHS.load_ledger_safe(ledger_path)
+    if led_disk is not None:
+        for item in dialogue_items:
+            line_id = item.get("line_id")               # carried from iter_lines
+            if not line_id:
+                continue
+            fields = {                                   # same names as before
+                "dur_s": dur,
+                "start_s": cumulative_start,
+                "tts_engine": "bark",
+                # ... preserve every existing stamp field
+            }
+            if _OTRL_PATHS.patch_line_fields(led_disk, line_id, fields):
+                cumulative_start += dur
+                updated += 1
+        if updated:
+            # phase_ms, git_commit, audio_gate stamps still go on led_disk
+            _OTRL_PATHS.save_ledger_safe(ledger_path, led_disk)
+```
+
+Key invariants:
+
+- **Stamp by `line_id`, not by text.** `patch_line_fields` is the existing helper in `_otr_ledger.py`. It walks `ledger["lines"]` and matches on `line_id`, which is unique. Never collides on duplicate text (`"Okay."` × 2 was the failure mode of the old text-match block).
+- **One `save_ledger_safe` at the end.** Atomic via tempfile + `os.replace`. Don't intersperse multiple saves; mutate `led_disk` in place across all per-line patches and meta stamps, then save once.
+- **Preserve every existing stamp field name.** Bark: `bark_wav_dur_s`, `bark_render_ms`, `text_for_tts`, `tts_engine`, `voice_preset`, `render_ms`, `generated_dur_s`, `audio_sample_hash`, `dur_s`, `start_s`. Kokoro: similar plus `kokoro_wav_path` (if applicable). Sequencer: `start_s`, `dur_s`, `boundary`, `start_s_space`. AudioGen: `sfx_wav_path`, `sfx_engine`, `sfx_type`, `dur_s` on `lines[]`; legacy `wav_path`/`tts_engine` preserved on `sfx[]`. ProcSFX: `sfx_wav_path` (may be None on disk-write failure), `sfx_engine="procedural"`, `sfx_type`, `dur_s`. Video: `meta.procgen_path` (no per-line stamps). **Don't introduce new field names or remove existing ones during the rewrite** — that's a separate breaking change and not in scope.
+- **Meta stamps still go on `led_disk`.** `record_phase_ms`, `set_meta(led_disk, "git_commit", ...)`, `audio_gate_record` + `append_audio_gate` — all still apply. Same call sites, same field names.
+
+#### Pattern 4b — Asset replacement contract
+
+When a node produces a new version of an existing asset (upscale pass, denoise pass, re-render with different settings), the new path **REPLACES** the old path on the same `line_id` via `patch_line_fields`. The ledger field always holds the latest version on disk; older versions are not tracked.
+
+**Invariant: duration must match.** If a replacement asset has a different duration than what's on the ledger row, the replacement is wrong (timeline drift). Add a duration-check guard at the replacement site:
+
+```python
+old_dur = line.get("dur_s")
+if old_dur is not None and abs(new_dur_s - old_dur) > 0.05:
+    raise ValueError(
+        f"asset replacement on {line_id} changed duration: "
+        f"{old_dur:.3f}s -> {new_dur_s:.3f}s"
+    )
+patch_line_fields(led, line_id, {field: new_path, "dur_s": new_dur_s})
+```
+
+**Why no `_history` array:** downscaled or older versions are recoverable by re-running the source generator. Audit trail of "what's currently on disk" is the load-bearing question; "what used to be on disk" is not.
+
+**Opt-out:** if a node legitimately needs to change duration on a replacement (voice retake at different pace, etc.), pass `allow_dur_change=True` explicitly. Default is strict — silent timeline drift is a bug, not a feature.
+
+#### Pattern 5 — `production_plan_json` demotion
+
+INPUT_TYPES change:
+
+```python
+"required": {
+    "script_json": (...,),
+    # production_plan_json USED to be here; demote ↓
+},
+"optional": {
+    "production_plan_json": ("STRING", {
+        "multiline": True, "default": "{}",
+        "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully)",
+    }),
+    # ... existing optionals stay where they are, unchanged
+},
+```
+
+Function signature change:
+
+```python
+def generate_batch(self, script_json, production_plan_json="{}", temperature=0.7):
+```
+
+Why both: the `INPUT_TYPES` move makes the socket optional in the ComfyUI graph (saved workflows still bind by name; the slot is preserved). The signature default makes an unwired socket safe. `production_plan_or_empty(plan_json)` handles `""`, `None`, malformed JSON, and non-dict shapes uniformly — one helper, one degradation path.
+
+#### Pattern 6 — Hermetic test fixture for GPU-bearing consumers
+
+The `patched_<x>_env` fixture (canonical example: `tests/test_bark_ledger.py`) does five things:
+
+1. Patches `force_vram_offload` and `_runtime_log` to no-op (module-level).
+2. Patches the inner generator (e.g. `_generate_single_line` for Bark) to return a deterministic numpy buffer + sample rate. Encodes input length into output length so different inputs produce different `dur_s` values — lets tests assert per-line distinct timings.
+3. Patches `_load_<engine>` (e.g. `_load_bark` from `bark_tts`) to return mock model + processor.
+4. Patches `_unload_llm` to no-op (story_orchestrator module).
+5. Patches `_otr_ledger.in_flight_ledger_path` + `load_ledger_safe` + `save_ledger_safe` against a `state` dict so the test can:
+   - Pre-seed the in-flight ledger view (`state["led_disk"] = json.loads(json.dumps(led_in))`).
+   - Assert the merged ledger after the consumer ran (`state["led_disk"]` post-call).
+   - Avoid touching the real disk.
+
+Pre-seeding is **deep-copied** (`json.loads(json.dumps(led_in))`) because `save_ledger_safe` mutates the dict in place. Without the copy, the `state` dict and `led_in` alias the same object and assertions get confused.
+
+**Mock-pipeline lessons learned:**
+
+- **Sub-millisecond mocks lose `render_ms` stamps.** When a consumer measures `render_ms = int(elapsed * 1000)` and stamps it conditionally on `> 0`, a truly instantaneous mock makes the field disappear and confuses test assertions. Add `time.sleep(0.005)` inside the mock pipeline so the integer-millisecond floor clears. (Surfaced during Kokoro #3.)
+- **Don't patch lazy-loaded transformers attributes.** When a consumer does `from transformers import AudiogenForConditionalGeneration` lazily inside a function, patching `transformers.AudiogenForConditionalGeneration` at module level can fail if transformers exposes the class via a lazy `__getattr__` rather than as a top-level attribute (different transformers versions differ). Prefer **pre-seed-the-cache** patterns: write a valid WAV at the canonical cache path, run the consumer, assert via the consumer's own `"CACHE HIT"` / `"MISS"` log line which path executed. Let the unreachable code stay unreachable. (Surfaced during AudioGen #5.)
+
+#### Pattern 7 — Per-consumer test plan (4 cases)
+
+Every audio consumer test file should cover:
+
+1. **`test_<consumer>_iter_<role>_lines_only`** — non-target roles must NOT be stamped. Assert by checking `tts_engine` (or equivalent) is *absent* on filtered-out line_ids.
+2. **`test_<consumer>_stamps_by_line_id_with_duplicate_text`** — two lines with identical `text` but distinct `line_id`. Both stamped. start_s monotonic. The single best test that proves the rewrite is correct (the old text-match block fails this).
+3. **`test_<consumer>_voice_preset_fallback`** (TTS only) or `test_<consumer>_<consumer-specific-default-path>` — missing cast.voice_preset / unwired Director / empty production plan → existing deterministic fallback fires and produces a valid output. ProcSFX adapted this to `test_procsfx_disk_write_failure_graceful` (mock wav writer to raise; verify `sfx_wav_path=None` stamp + AUDIO batch still ships).
+4. **`test_<consumer>_legacy_list_input_raises`** — `pytest.raises(ValueError)`. Message must contain `"legacy parser-list"` or `"OTR_LedgerScriptWriter"` so log triage points at the right wiring. Critic exception: this becomes a passthrough-with-PASS test (Critic is non-blocking).
+
+For non-TTS consumers (Sequencer, ProcSFX), test 3 substitutes a "consumer-specific default behavior with no production plan" check.
+
+#### Anti-patterns (do not do these)
+
+- **Don't catch `ValueError` from `load_ledger` to "be safe"** — except in the Critic. Loud failure is the goal.
+- **Don't use `_otr_ledger.in_flight_ledger_path()` and then mutate the wire-input ledger** in the same consumer. Two ledger views drift. Pick one source of truth per consumer: wire input for Critic (it's an output node), in-flight on-disk for Bark/Kokoro/Sequencer/AudioGen/ProcSFX (they have no ledger output socket). Video uses both — wire input for parse + helpers, singleton for the final `meta.procgen_path` stamp + episode rename.
+- **Don't introduce new ledger field names during the rewrite.** A rewrite is a port, not a schema bump. New fields land in a separate commit with a `BUG_LOG.md` entry. (ProcSFX Option 2 is the **one** documented exception this sprint — adding `sfx_wav_path` was an architect-approved scope expansion, not a stealth schema bump.)
+- **Don't reorder `INPUT_TYPES`.** Saved workflows bind by name in the API but position in the saved JSON. Demotion (required → optional) is OK; reordering within a section is not.
+- **Don't widen role filters past the consumer's current behavior** without checking file-level comments. Bark + Kokoro is the canonical case (announcer goes to Kokoro only).
+- **Don't write multiple `save_ledger_safe` calls in one consumer.** Mutate `led_disk` in place; save once at the end. Multiple saves = race condition + redundant disk writes.
+
+#### Quick reference — files in scope
+
+| Concern | Module | Notes |
+|---|---|---|
+| Read-side helpers | `nodes/_otr_ledger_consumers.py` | `load_ledger`, `iter_lines`, `cast_lookup`, `speaker_name`, `voice_preset`, `production_plan_or_empty` |
+| Write-side helpers | `nodes/_otr_ledger.py` (existing) | `in_flight_ledger_path`, `load_ledger_safe`, `save_ledger_safe`, `patch_line_fields`, `set_meta`, `record_phase_ms`, `audio_gate_record`, `append_audio_gate`, `lookup_git_commit` |
+| Test fixtures | `tests/fixtures/ledger_stub.py` | `make_stub_ledger(*, with_sfx=True, with_music=True, ...)`, `make_legacy_list()` |
+
+### Post-soak follow-ups
+
+#### B1 + B2 — coupled post-script title generation pass
+
+`OTR_LedgerScriptWriter` today generates `outline.title` during the outline-planning phase, BEFORE the script is written. Recon during consumer #7 surfaced this: the title reflects the LLM's *plan*, not the LLM's finished output. Jeffrey's design intent is a dedicated title pass that reads the full finished script and produces a punchy title reflecting the actual completed plot.
+
+Until that lands, Video's title chain primary slot (`led.meta.episode_title`) resolves empty under the new-writer flow, and the chain falls through to widget or TIMESTAMP_LASTRESORT.
+
+- **B1** — Add post-script title-gen pass to `OTR_LedgerScriptWriter`. New LLM call after script is finalized but before save. Inputs: full `script_text` + `outline.premise` (for context). Output: punchy 3-8 word title. Approximate scope: ~50 LOC. Locked file this sprint; do during post-soak deletion sprint when writer is editable again.
+- **B2** — Stamp result at `led["meta"]["episode_title"]`. One-line addition at the title-gen call site. Couples directly to B1.
+
+Together: Video's title chain primary slot resolves cleanly under the new writer flow. Until then, chain falls through to widget or TIMESTAMP_LASTRESORT under new-writer flow.
+
+---
+
+## PRIOR WORK — pre-FULL acceptance soak (handoff-ready as of 2026-05-07 PM)
 
 **State:** code complete on `v2.0-alpha`, 0 known faultlines blocking. Awaits a single acceptance FULL run on the RTX 5080.
 
@@ -706,6 +982,52 @@ Both upscale options run on the WHOLE episode (every clip), exposed as a workflo
 
 **Related:** flip default `optimization_profile` to `Pro (Ultra Quality)` once 16 GB FULL has shipped clean — Jeffrey: *"I almost feel we should default to Pro Ultra"*.
 
+### B3 — v2.0-alpha deferred cosmetic cleanup tail (non-blocking)
+
+**Status:** opened 2026-05-09. Catch-bucket for cosmetic / stylistic items surfaced during the LPL sprint that were deliberately deferred rather than fixed mid-flight. Non-blocking for the FULL acceptance soak; clean these up before the v2.0 cut at Jeffrey's discretion.
+
+**B3.1 — `nodes/_otr_model_loader.py` `make_generate_fn` torch import idiom.** Inside the inner `generate_fn` closure, the `with` statement uses `with __import__("torch").no_grad():` after a preceding `import torch  # noqa: F401`. Both forms work and refer to the same cached `sys.modules["torch"]`, but the `__import__` form is unusual stylistically — the local `torch` name is already bound from the explicit import two lines above and could be used directly: `with torch.no_grad():`. Decision was to preserve the spec verbatim during Phase 1+2 so the diff stayed reviewable. Cleanup: replace the `__import__("torch").no_grad()` call with `torch.no_grad()` and drop the `# noqa: F401` once the local `torch` is actually referenced. Sized: ~2 line edit + re-run self-test (7 tests). **Why non-blocking:** functionally equivalent; only affects readability.
+
+**B3.2 — `_unload_llm` cache-schema asymmetry (story_orchestrator.py line 3019 vs line 3075).** The module-level `_LLM_CACHE` declaration includes `budget_profile` and `VERSION` keys; the re-assignment inside `_unload_llm` drops those two keys. Consumers in `_load_llm` use `.get(...)` so the asymmetry is tolerated, but it always logs a delta on the next reload because the cache reads "missing keys" as drift. Latent issue identified during Task 4 Step 4a recon (2026-05-09). Cleanup: align the post-unload schema with the declaration so the cache-mismatch diagnostics don't fire spurious deltas. **Why non-blocking:** consumers tolerate it; cosmetic log noise only.
+
+**Why this section exists:** the LPL sprint surfaces these mid-flight; logging here keeps them out of the in-flight code review and out of mid-soak edits, while ensuring they don't get lost before v2.0 cut.
+
+---
+
+### B4 — LLM-prompt audit pass (contract verification, post-consumer-green)
+
+**Status:** queued 2026-05-09. Gated behind "all 7 consumers ship green AND the patterns doc is final." The patterns doc (`docs/2026-05-09-ledger-consumer-rewrite-patterns.md`) and L3 helper module (`nodes/_otr_ledger_consumers.py`) are SHIPPED as of 2026-05-09; gate now reduces to "all 7 consumers ship green" (3/7 done, 1 in flight, 3 remaining as of 2026-05-10). Audit-only pass when triggered; no edits in this round. A second pass applies fixes after the audit doc is reviewed.
+
+**Goal:** confirm every hardcoded LLM prompt string in the codebase references the **L3 ledger schema** correctly — field names, role strings, format conventions. No drift between what we tell the LLM to produce and what the consumers expect to read. The patterns doc is the canonical reference; if a prompt and the patterns doc disagree, the patterns doc wins (it is locked from real code that runs).
+
+**Files to grep for prompt strings (system prompts, user prompts, format instructions, rubric text):**
+
+- `nodes/_otr_outline.py` — writer outline prompt
+- `nodes/_otr_line_composer.py` — per-line dialogue prompt
+- `nodes/script_critic.py` — critic system prompt + rubric
+- `nodes/_otr_legacy_writer.py` — the old `SCRIPT_SYSTEM_PROMPT`. Verify it is not load-bearing for the new path; if so, audit it; if dead, document as deprecated.
+- `nodes/story_orchestrator.py` — any module-level prompt constants (`SCRIPT_SYSTEM_PROMPT`, `SCAFFOLDING_PREAMBLE`, etc.)
+- Any `LLMDirector` prompt material if reachable from the new path
+
+**For each prompt found, audit:**
+
+1. Does it reference `[VOICE: NAME, traits]` format? Confirm: `NAME` is the cast member name from `cast[i].name`, NOT `char_id`. `traits` is what the writer derives from `beat.mood`. If the prompt says `[VOICE: c01, ...]` that's wrong — should be `[VOICE: MARLOW, ...]`.
+2. Does it reference `speaker_role` values? Confirm exact strings match `VALID_SPEAKER_ROLES` from `_otr_speaker_role.py`: `character`, `announcer`, `music_open`, `music_close`, `music_inter`, `sfx`. No `narrator`, `voiceover`, `music_intro`, or other near-misses.
+3. Does it reference any ledger field by name? `line_id`, `char_id`, `text`, `traits`, `beat_id`, `shot_id`, `cast`, `lines`, `meta`, `episode_id` — all must match the schema. No abbreviations, no plurals/singulars swap.
+4. Does the format example show the right column order if applicable? e.g. `[VOICE: NAME, traits] dialogue` — not `[VOICE: traits, NAME] dialogue`.
+5. Does the prompt reference any DEAD field names (`script_lines`, `content`, `type`, `scene_break`) that came from the old parser-list contract? If yes, those references are stale — flag for rewrite.
+
+**Output:** a doc at `docs/2026-05-XX-llm-prompt-audit.md` listing each prompt found, with:
+
+- File + line range
+- Current text snippet (key parts)
+- Audit verdict — `CLEAN` / `NEEDS UPDATE` / `DEAD CODE`
+- Recommended fix if any
+
+**Hard rule:** no edits in this pass. Audit only. Review the doc, then a second pass applies fixes.
+
+**Acceptance:** doc exists at the path above, every prompt source file in the list is covered, every prompt has one of the three verdicts assigned, recommended-fix column populated for every `NEEDS UPDATE` row.
+
 ---
 
 ## v2.0-beta candidates
@@ -1022,6 +1344,9 @@ HuMo's portrait_path lookup (v2.1 update):
 - `docs/ROADMAP_HISTORY.md` — historical session logs and shipped-work archive
 - `docs/2026-04-12-otr-v2-visual-sidecar-design.md` — v2 design spec
 - `docs/2026-05-02-v2.0-beta-sprint-qa/` — round-robin QA on Sprint 1/2/3 plan (this session)
+- `docs/2026-05-09-ledger-consumer-rewrite-patterns.md` — **L3 consumer rewrite patterns doc** (canonical reference for the 7-consumer ledger sprint; pattern 1 = `load_ledger` posture, pattern 2 = role filters with judgment rule, pattern 3 = voice fallback, pattern 4 = write-back contract, pattern 5 = `production_plan_json` demotion, pattern 6 = hermetic test fixture, pattern 7 = canonical 4-test plan)
+- `nodes/_otr_ledger_consumers.py` — read-side helper module (L3-strict, raises ValueError on legacy list)
+- `nodes/_otr_ledger.py` — write-side helper module (existing, `patch_line_fields` + `save_ledger_safe` + `set_meta` + new `patch_line_text` for atomic text+metrics updates)
 - Survival guide / Bug Bible: https://github.com/jbrick2070/comfyui-custom-node-survival-guide
 
 ---

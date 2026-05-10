@@ -216,9 +216,12 @@ class BatchAudioGenGenerator:
         return {
             "required": {
                 "script_json": ("STRING", {"multiline": True, "default": "[]"}),
-                "production_plan_json": ("STRING", {"multiline": True, "default": "{}"}),
             },
             "optional": {
+                "production_plan_json": ("STRING", {
+                    "multiline": True, "default": "{}",
+                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully -- sfx_plan falls back to default_duration)",
+                }),
                 "episode_seed": ("STRING", {"default": ""}),
                 # BUG-LOCAL-027: the "3"/"3.0"/3/3.0 entries were scar tissue
                 # from widget-drift hitting this node. With the mapper fix in
@@ -231,7 +234,7 @@ class BatchAudioGenGenerator:
             }
         }
 
-    def generate(self, script_json, production_plan_json, episode_seed="", 
+    def generate(self, script_json, production_plan_json="{}", episode_seed="",
                  model_id="facebook/audiogen-medium", guidance_scale=3.0, default_duration=3.0):
         
         # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
@@ -242,28 +245,41 @@ class BatchAudioGenGenerator:
             model_id = "facebook/audiogen-medium"
             
         batch_log = ["=== Batch AudioGen Generator ==="]
-        
-        try:
-            script = json.loads(script_json)
-            plan = json.loads(production_plan_json)
-        except Exception as exc:
-            log.error("[BatchAudioGen] Parse failed: %s", exc)
-            return ({"waveform": torch.zeros(1, 1, 10), "sample_rate": 32000}, f"Error: {exc}")
+
+        # Read-side: parse the wire input as a v2 ledger dict.
+        # load_ledger raises ValueError on the legacy parser-list shape;
+        # AudioGen is in the loud-fail group (Pattern 1) -- bad wiring
+        # halts the run early. production_plan_json is now optional;
+        # an empty / unwired "{}" degrades to default_duration via the
+        # graceful production_plan_or_empty helper.
+        from . import _otr_ledger_consumers as _OTRLC
+        led = _OTRLC.load_ledger(script_json)
+        plan = _OTRLC.production_plan_or_empty(production_plan_json)
 
         sfx_plan = plan.get("sfx_plan", [])
-        
-        # v1.5: Consume SFX cues directly from the canonical parser output.
-        # The parser emits {"type": "sfx", "description": "..."} items inline
-        # with dialogue. No duplicate regex - single source of truth.
-        sfx_items = [item for item in script if item.get("type") == "sfx"]
-        sfx_tags = [item.get("description", "") for item in sfx_items]
-        
+
+        # Walk ledger sfx lines (Pattern 2: roles={"sfx"}). The cue
+        # text comes DIRECTLY from line["text"] -- no [SFX:] regex,
+        # no parser-list "description" field. line_id is carried
+        # through render_queue so the write-back below can stamp by
+        # line_id (Pattern 4) on ledger.lines[].
+        sfx_items = []
+        for line in _OTRLC.iter_lines(led, roles={"sfx"}):
+            cue = (line.get("text") or "").strip()
+            if not cue:
+                continue
+            sfx_items.append({
+                "line_id": line.get("line_id"),
+                "text":    cue,
+            })
+        sfx_tags = [item["text"] for item in sfx_items]
+
         if not sfx_tags:
-            batch_log.append("No SFX cues found in script_json. Returning silence.")
+            batch_log.append("No SFX cues found in ledger. Returning silence.")
             return ({"waveform": torch.zeros(1, 1, 10), "sample_rate": 32000}, "\n".join(batch_log))
 
-        batch_log.append(f"Found {len(sfx_tags)} SFX cues in script.")
-        
+        batch_log.append(f"Found {len(sfx_tags)} SFX cues in ledger.")
+
         # 2. Match tags to plan prompts
         # BUG-LOCAL-116 fix 2026-04-30: honor Director's sfx_plan[i].dur_s
         # (or .duration_sec / .duration) instead of always using default.
@@ -309,9 +325,10 @@ class BatchAudioGenGenerator:
                 _cache_filename_for_write(prompt, duration, episode_seed),
             )
             render_queue.append({
-                "index": i,
-                "tag": tag,
-                "prompt": prompt,
+                "index":   i,
+                "line_id": sfx_items[i]["line_id"],
+                "tag":     tag,
+                "prompt":  prompt,
                 "duration": duration,
                 "cache_path": cache_path,
                 "had_cache_hit_at_resolve": hit_path is not None,
@@ -519,65 +536,107 @@ class BatchAudioGenGenerator:
             batched_waveform[i, 0, :samples] = clip[0, 0, :samples]
 
         # ---- BUG-LOCAL-095: write SFX wav_paths back to ledger ----
-        # Stamp each SFX cue's cache_path + dur_s into ledger.sfx[].
-        # Maps render_queue position -> ledger.sfx[position] (both
-        # iterate the script in order). Silent skip when no ledger
-        # is on disk yet. Errors logged, never crash.
+        # Two parallel write-back paths:
+        #   1. Legacy ledger.sfx[] parallel-index walk (preserved
+        #      for back-compat producers that still emit a separate
+        #      ledger.sfx[] array; v2 producers leave sfx[] empty
+        #      and this loop no-ops).
+        #   2. NEW v2: per-line stamp on ledger.lines[] for sfx
+        #      rows via patch_line_fields(led, line_id, ...). sfx
+        #      are first-class lines in the v2 ledger -- this
+        #      mirrors Sequencer's new sfx_line_positions pattern
+        #      from consumer #4.
+        # Both paths mutate the same led_disk dict; one save_ledger_safe
+        # at the end (Pattern 4 contract).
         try:
-            import json as _json
-            # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
-            # via the centralized helper so both layouts (legacy flat +
-            # per-episode tree) are searched.
-            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
-                [otr_episodes_root(), otr_legacy_audio_dir()]
-            )
+            ledger_path = _OTRL_PATHS.in_flight_ledger_path()
             if ledger_path is not None:
-                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                sfx_rows = led.get("sfx") or []
-                updated = 0
-                for i, item in enumerate(render_queue):
-                    if i >= len(sfx_rows):
-                        break
-                    row = sfx_rows[i]
-                    cache_path = item.get("cache_path")
-                    clip_t = final_clips[i] if i < len(final_clips) else None
-                    dur = None
-                    if clip_t is not None:
-                        try:
-                            dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
-                        except Exception:
-                            dur = None
-                    if cache_path:
-                        row["wav_path"] = str(cache_path)
-                    if dur is not None:
-                        row["dur_s"] = dur
-                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
-                    # stamp tts_engine + render_ms + generated_dur_s +
-                    # audio_sample_hash on the sfx row. The
-                    # generation_prompt is already populated by
-                    # LLMDirector; this closes the loop on the
-                    # render-result side. AudioGen is the SFX engine —
-                    # tts_engine name reuses the field for symmetry
-                    # with bark / kokoro / musicgen.
-                    row["tts_engine"] = "audiogen"
-                    if item.get("_render_ms"):
-                        row["render_ms"] = int(item["_render_ms"])
-                    if dur is not None:
-                        row["generated_dur_s"] = float(dur)
-                    if item.get("_audio_sample_hash"):
-                        row["audio_sample_hash"] = str(
-                            item["_audio_sample_hash"]
+                led_disk = _OTRL_PATHS.load_ledger_safe(ledger_path)
+                if led_disk is None:
+                    log.warning(
+                        "[BatchAudioGen] in-flight ledger load failed at "
+                        "%s; skipping ledger write-back",
+                        ledger_path,
+                    )
+                else:
+                    # Path 1: legacy ledger.sfx[] (preserved as-is).
+                    sfx_rows = led_disk.get("sfx") or []
+                    updated_sfx_array = 0
+                    for i, item in enumerate(render_queue):
+                        if i >= len(sfx_rows):
+                            break
+                        row = sfx_rows[i]
+                        cache_path = item.get("cache_path")
+                        clip_t = final_clips[i] if i < len(final_clips) else None
+                        dur = None
+                        if clip_t is not None:
+                            try:
+                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
+                            except Exception:
+                                dur = None
+                        if cache_path:
+                            row["wav_path"] = str(cache_path)
+                        if dur is not None:
+                            row["dur_s"] = dur
+                        row["tts_engine"] = "audiogen"
+                        if item.get("_render_ms"):
+                            row["render_ms"] = int(item["_render_ms"])
+                        if dur is not None:
+                            row["generated_dur_s"] = float(dur)
+                        if item.get("_audio_sample_hash"):
+                            row["audio_sample_hash"] = str(
+                                item["_audio_sample_hash"]
+                            )
+                        updated_sfx_array += 1
+
+                    # Path 2: NEW v2 ledger.lines[] sfx rows via line_id.
+                    # Field names: sfx_wav_path, dur_s, sfx_engine="audiogen"
+                    # (sfx-specific names disambiguate from dialogue's
+                    # tts_engine/voice_preset/bark_wav_path on the same
+                    # ledger.lines[] array). Plus the per-line audiogen
+                    # meta fields (render_ms, generated_dur_s,
+                    # audio_sample_hash) under their existing names.
+                    updated_lines = 0
+                    for i, item in enumerate(render_queue):
+                        line_id = item.get("line_id")
+                        if not line_id:
+                            continue
+                        cache_path = item.get("cache_path")
+                        clip_t = final_clips[i] if i < len(final_clips) else None
+                        dur = None
+                        if clip_t is not None:
+                            try:
+                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
+                            except Exception:
+                                dur = None
+                        line_fields: dict = {
+                            "sfx_engine": "audiogen",
+                        }
+                        if cache_path:
+                            line_fields["sfx_wav_path"] = str(cache_path)
+                        if dur is not None:
+                            line_fields["dur_s"] = float(dur)
+                            line_fields["generated_dur_s"] = float(dur)
+                        if item.get("_render_ms"):
+                            line_fields["render_ms"] = int(item["_render_ms"])
+                        if item.get("_audio_sample_hash"):
+                            line_fields["audio_sample_hash"] = str(
+                                item["_audio_sample_hash"]
+                            )
+                        if _OTRL_PATHS.patch_line_fields(
+                            led_disk, line_id, line_fields,
+                        ):
+                            updated_lines += 1
+
+                    if updated_sfx_array or updated_lines:
+                        # Single atomic save (Pattern 4 contract).
+                        _OTRL_PATHS.save_ledger_safe(ledger_path, led_disk)
+                        batch_log.append(
+                            f"BUG-095 ledger updated (line_id stamping): "
+                            f"sfx_array={updated_sfx_array}/{len(render_queue)}, "
+                            f"lines={updated_lines}/{len(render_queue)} -> "
+                            f"{ledger_path.name}"
                         )
-                    updated += 1
-                if updated:
-                    ledger_path.write_text(
-                        _json.dumps(led, indent=2, ensure_ascii=False),
-                        encoding="utf-8",
-                    )
-                    batch_log.append(
-                        f"BUG-095 ledger updated: {updated} sfx wav_path(s) -> "
-                        f"{ledger_path.name}"
-                    )
         except Exception as _exc:
             batch_log.append(f"BUG-095 ledger write-back failed: {_exc}")
 
