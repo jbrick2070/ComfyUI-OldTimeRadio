@@ -20,9 +20,17 @@ Pipeline (unchanged from v2.0 LPL):
          - character / announcer → compose_line (uses creativity temp/top_p)
          - non-voiced            → use beat.sfx_cue / beat.intent verbatim
     7. set_lines + speaker_role post-patch.
-    8. Stamp meta block (gen_params_initial, episode_title,
+    8. Post-composition title regen (Jeffrey 2026-05-10): when the user
+       left episode_title blank, ask the LLM to title the episode from
+       the FINAL assembled dialogue. The prompt sees ONLY the composed
+       dialogue -- not news_seed, not style, not outline metadata.
+       User-typed title still wins; outline.title is the last-resort
+       fallback if the LLM call fails or its output is rejected by the
+       guardrails. canon.title is updated and episode_canon.json is
+       written here (deferred from step 5 specifically for this).
+    9. Stamp meta block (gen_params_initial, episode_title, title_source,
        perfect_run_spacesaver, creativity, optimization_profile).
-    9. Save ledger.
+   10. Save ledger.
 
 Output contract (UNCHANGED from prior v2.0):
     RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
@@ -183,6 +191,28 @@ _LLM_STYLE_FALLBACK = "psychological slow-burn"
 """Hardcoded last-resort if the style-generation LLM call fails or
 returns empty / unusable text. Kept short so the outline+critic
 downstream don't get a degenerate prompt."""
+
+
+# ---------------------------------------------------------------------------
+# Title regeneration (post-composition, news-seed-free per Jeffrey 2026-05-10)
+# ---------------------------------------------------------------------------
+
+_STUCK_TITLE_DEFAULTS = frozenset({
+    "",
+    "the last frequency",
+    "untitled",
+    "episode",
+    "signal lost",
+    "custom episode",
+    "pending",
+    "(pending)",
+})
+"""Reject set for post-composition title regen. Mirrors the legacy
+story_orchestrator._STUCK_TITLE_DEFAULTS set, plus "(pending)" guard
+in case a future canon_header placeholder leaks into the LLM output."""
+
+_TITLE_PREFIX_RE = None  # compiled lazily inside the helper to keep
+                          # this module's import surface stdlib-only.
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +378,141 @@ def _generate_style_via_llm(
         text, len(seed_excerpt),
     )
     return text
+
+
+def _generate_title_from_script(
+    generate_fn,
+    assembled_script: str,
+    *,
+    temperature: float = 0.85,
+) -> str:
+    """Generate a 2-5 word episode title from the FINAL composed dialogue.
+
+    Per Jeffrey 2026-05-10: "title should generate only AFTER the whole
+    story is done via the LLM, nothing with the news seed". So the prompt
+    sees ONLY the assembled dialogue. No news_seed, no style hint, no
+    outline metadata. The intent is a title grounded purely in what the
+    listener will actually hear.
+
+    Returns the cleaned title, or empty string on any failure (LLM raise,
+    stuck-default rejection, overlong leak, smart-quote-only wrappers
+    that strip to nothing). Caller falls back to outline.title on "".
+
+    `generate_fn` matches the (messages, *, temperature, max_new_tokens)
+    contract returned by `_build_truncating_generate_fn`.
+
+    Temperature is clamped to [0.4, 1.0] regardless of caller value to
+    keep title output stable (legacy parity at
+    _otr_legacy_writer.py:2987).
+    """
+    import re
+
+    text = (assembled_script or "").strip()
+    if not text:
+        return ""
+
+    # Cap the dialogue excerpt. Title-generation only needs broad strokes
+    # of the story; full transcripts blow the context budget on long runs.
+    excerpt = text[:3000]
+
+    sys_msg = (
+        "You are titling a single episode of a 1940s sci-fi radio drama. "
+        "You receive the final dialogue transcript and propose an "
+        "evocative 2-5 word episode title."
+    )
+    user_msg = (
+        f"Final episode dialogue:\n{excerpt}\n\n"
+        "Write ONE evocative episode title in 2 to 5 words. The title must:\n"
+        " - draw from a vivid image, key object, character, or thematic "
+        "tension actually present in the dialogue\n"
+        " - feel specific and memorable, not generic\n"
+        " - avoid cliches like \"The Beginning\", \"Final Chapter\", "
+        "\"Untitled\", or \"Episode X\"\n\n"
+        "Output ONLY the title text on a single line. No quotes. No "
+        "preamble. No explanation."
+    )
+
+    clamped_temp = max(0.4, min(1.0, float(temperature)))
+
+    try:
+        raw = generate_fn(
+            [
+                {"role": "system", "content": sys_msg},
+                {"role": "user",   "content": user_msg},
+            ],
+            temperature=clamped_temp,
+            max_new_tokens=24,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_LedgerScriptWriter] title LLM-regen failed (%s); "
+            "caller will fall back to outline.title",
+            exc,
+        )
+        return ""
+
+    if not raw:
+        return ""
+
+    # Take first non-empty line.
+    candidate = ""
+    for ln in raw.strip().splitlines():
+        ln = ln.strip()
+        if ln:
+            candidate = ln
+            break
+    if not candidate:
+        return ""
+
+    # Strip "Title:" / "**Title:**" / "TITLE:" wrappers.
+    candidate = re.sub(
+        r'^\s*(?:\*\*)?\s*(?:TITLE|Title|title)\s*:\s*(?:\*\*)?\s*',
+        '', candidate,
+    )
+
+    # Iteratively strip ASCII + smart quotes, asterisks, whitespace.
+    _wrap_chars = '"“”‘’*\' \t'
+    prev = None
+    while candidate != prev:
+        prev = candidate
+        candidate = candidate.strip(_wrap_chars)
+
+    # Trailing punctuation often leaks from the model.
+    candidate = candidate.rstrip(".,;:!?")
+    candidate = candidate.strip()
+
+    if not candidate:
+        return ""
+
+    # Reject stuck defaults.
+    if candidate.lower() in _STUCK_TITLE_DEFAULTS:
+        log.info(
+            "[OTR_LedgerScriptWriter] title regen rejected stuck default: %r",
+            candidate,
+        )
+        return ""
+
+    # Reject full-sentence leaks. Legacy threshold = 10 words; mirror it.
+    word_count = len(candidate.split())
+    if word_count > 10:
+        log.info(
+            "[OTR_LedgerScriptWriter] title regen rejected overlong (%d "
+            "words): %r",
+            word_count, candidate,
+        )
+        return ""
+
+    # Outline.title schema allows 3-80 chars; enforce upper bound here
+    # too so the regenerated title stays drop-in compatible with the
+    # canon.title field downstream.
+    if len(candidate) > 80:
+        candidate = candidate[:80].rstrip()
+
+    log.info(
+        "[OTR_LedgerScriptWriter] title regen -> %r (from %d-char script)",
+        candidate, len(text),
+    )
+    return candidate
 
 
 def _resolve_creativity(creativity: str) -> tuple[float, float]:
@@ -917,18 +1082,22 @@ class OTR_LedgerScriptWriter:
         audio_dir = Path(led.out_dir)         # otr/episodes/<ep>/audio/
         episode_root = audio_dir.parent       # otr/episodes/<ep>/
 
-        # --- G. Stamp episode_canon at episode root -------------------
+        # --- G. Build episode_canon (write deferred to section J.5) ----
+        # Disk write moved out so the post-composition title regen
+        # (section J.5) can overwrite canon.title before episode_canon.json
+        # ever touches disk. Header rendering still happens here because
+        # the per-line composer (section I) needs canon_header on every
+        # beat.
         canon = _OTRC.episode_canon_from_outline_dict({
             "title":       resolved["episode_title"] or outline.title,
             "premise":     outline.premise,
             "setting":     outline.setting,
             "time_of_day": outline.time_of_day,
         })
-        _OTRC.write_episode_canon(episode_root, canon)
         canon_header = _OTRC.render_episode_canon_header(canon)
         log.info(
-            "[OTR_LedgerScriptWriter] episode_canon stamped at %s",
-            episode_root / _OTRC.EPISODE_CANON_FILENAME,
+            "[OTR_LedgerScriptWriter] episode_canon built (disk write "
+            "deferred to post-composition title regen)"
         )
 
         # --- H. Build cast rows + char_id index ------------------------
@@ -1025,6 +1194,50 @@ class OTR_LedgerScriptWriter:
                 {"speaker_role": r["_speaker_role"]},
             )
 
+        # --- J.5. Post-composition title regen ------------------------
+        # Per Jeffrey 2026-05-10: when the user leaves episode_title
+        # blank, regenerate the title from the FINAL composed dialogue
+        # via the LLM. The prompt does NOT see the news_seed -- the title
+        # is grounded purely in what the listener will hear. User-typed
+        # episode_title still wins; LLM only fires on blank input;
+        # outline.title is the last-resort fallback when the LLM call
+        # fails or its output is rejected by the guardrails.
+        title_source = "outline_fallback"
+        if resolved["episode_title"]:
+            # User typed a value; respect it verbatim.
+            final_title = resolved["episode_title"]
+            title_source = "user"
+        else:
+            assembled_script = "\n\n".join(script_text_parts).strip()
+            regen_title = _generate_title_from_script(
+                generate_fn,
+                assembled_script,
+                temperature=resolved["temperature"],
+            )
+            if regen_title:
+                final_title = regen_title
+                title_source = "llm_post_composition"
+            else:
+                final_title = outline.title
+                title_source = "outline_fallback"
+                log.warning(
+                    "[OTR_LedgerScriptWriter] title regen returned empty; "
+                    "falling back to outline.title=%r",
+                    outline.title,
+                )
+
+        # Update canon with the final title and write to disk. canon.title
+        # is now what downstream video consumers (SignalLostVideo, episode
+        # canon readers) will see.
+        canon.title = final_title
+        _OTRC.write_episode_canon(episode_root, canon)
+        log.info(
+            "[OTR_LedgerScriptWriter] episode_canon written with "
+            "title=%r (source=%s) at %s",
+            final_title, title_source,
+            episode_root / _OTRC.EPISODE_CANON_FILENAME,
+        )
+
         # --- K. Stamp meta block --------------------------------------
         # Mirrors the legacy writer's gen_params_initial stamp so the
         # critic (`script_critic._coerce_params`) can keep reading the
@@ -1050,8 +1263,12 @@ class OTR_LedgerScriptWriter:
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
         }
-        if resolved["episode_title"]:
-            meta["episode_title"] = resolved["episode_title"]
+        # Always stamp the resolved final title (user / LLM regen / outline
+        # fallback). title_source records which branch won so downstream
+        # consumers and BUG_LOG forensics can tell user-typed from
+        # LLM-regenerated runs without inspecting widget state.
+        meta["episode_title"] = final_title
+        meta["title_source"] = title_source
         if resolved["perfect_run_spacesaver"]:
             meta["perfect_run_spacesaver"] = True
 
@@ -1095,10 +1312,10 @@ if __name__ == "__main__":
         cls = OTR_LedgerScriptWriter
         obj = cls()
         assert obj is not None
-        print("[1/7] PASS: class instantiation")
+        print("[1/8] PASS: class instantiation")
     except Exception:
-        failures.append(("1/7 class instantiation", traceback.format_exc()))
-        print("[1/7] FAIL: class instantiation")
+        failures.append(("1/8 class instantiation", traceback.format_exc()))
+        print("[1/8] FAIL: class instantiation")
 
     # 2. INPUT_TYPES schema introspection.
     try:
@@ -1155,10 +1372,10 @@ if __name__ == "__main__":
         assert sc_type == "STRING"
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
-        print("[2/7] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
+        print("[2/8] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
     except Exception:
-        failures.append(("2/7 INPUT_TYPES", traceback.format_exc()))
-        print("[2/7] FAIL: INPUT_TYPES schema")
+        failures.append(("2/8 INPUT_TYPES", traceback.format_exc()))
+        print("[2/8] FAIL: INPUT_TYPES schema")
 
     # 3. Locked output contract.
     try:
@@ -1169,10 +1386,10 @@ if __name__ == "__main__":
         ), f"RETURN_NAMES drift: {cls.RETURN_NAMES}"
         assert cls.FUNCTION == "run"
         assert cls.CATEGORY == "OldTimeRadio"
-        print("[3/7] PASS: output contract")
+        print("[3/8] PASS: output contract")
     except Exception:
-        failures.append(("3/7 output contract", traceback.format_exc()))
-        print("[3/7] FAIL: output contract")
+        failures.append(("3/8 output contract", traceback.format_exc()))
+        print("[3/8] FAIL: output contract")
 
     # 4. _build_truncating_generate_fn returns a callable; top_p override.
     try:
@@ -1181,10 +1398,10 @@ if __name__ == "__main__":
         gen_custom = _build_truncating_generate_fn(fake_cache, top_p=0.99)
         assert callable(gen_default)
         assert callable(gen_custom)
-        print("[4/7] PASS: truncating generate_fn build (default + top_p override)")
+        print("[4/8] PASS: truncating generate_fn build (default + top_p override)")
     except Exception:
-        failures.append(("4/7 generate_fn build", traceback.format_exc()))
-        print("[4/7] FAIL: truncating generate_fn build")
+        failures.append(("4/8 generate_fn build", traceback.format_exc()))
+        print("[4/8] FAIL: truncating generate_fn build")
 
     # 5. _resolve_creativity / 3-way style resolution / _resolve_target_words.
     try:
@@ -1207,10 +1424,10 @@ if __name__ == "__main__":
         assert _resolve_target_words(700, "short (3 acts)") == 700
         assert _resolve_target_words(1400, "epic (10+ acts)") == 1400
 
-        print("[5/7] PASS: resolver helpers (creativity + target_length)")
+        print("[5/8] PASS: resolver helpers (creativity + target_length)")
     except Exception:
-        failures.append(("5/7 resolver helpers", traceback.format_exc()))
-        print("[5/7] FAIL: resolver helpers")
+        failures.append(("5/8 resolver helpers", traceback.format_exc()))
+        print("[5/8] FAIL: resolver helpers")
 
     # 6. _resolve_inputs 3-way style resolution (custom_premise path).
     try:
@@ -1263,10 +1480,10 @@ if __name__ == "__main__":
         assert out["style_pending"] is True
         assert out["style_source"] == "llm_auto"
 
-        print("[6/7] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
+        print("[6/8] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
     except Exception:
-        failures.append(("6/7 _resolve_inputs custom + style 3-way", traceback.format_exc()))
-        print("[6/7] FAIL: _resolve_inputs(custom_premise + style 3-way)")
+        failures.append(("6/8_resolve_inputs custom + style 3-way", traceback.format_exc()))
+        print("[6/8] FAIL: _resolve_inputs(custom_premise + style 3-way)")
 
     # 7. _generate_style_via_llm fallback behavior (no actual LLM call).
     try:
@@ -1298,17 +1515,118 @@ if __name__ == "__main__":
             return "ok"
         assert _generate_style_via_llm(_short, "seed") == _LLM_STYLE_FALLBACK
 
-        print("[7/7] PASS: _generate_style_via_llm (5 paths + fallback chain)")
+        print("[7/8] PASS: _generate_style_via_llm (5 paths + fallback chain)")
     except Exception:
-        failures.append(("7/7 _generate_style_via_llm", traceback.format_exc()))
-        print("[7/7] FAIL: _generate_style_via_llm")
+        failures.append(("7/8_generate_style_via_llm", traceback.format_exc()))
+        print("[7/8] FAIL: _generate_style_via_llm")
+
+    # 8. _generate_title_from_script post-composition title regen.
+    try:
+        SAMPLE_SCRIPT = (
+            "[VOICE: ANNOUNCER, neutral] Tonight, on Tales From Beyond.\n\n"
+            "[VOICE: AEGEUS, tense] The signal -- it's repeating itself.\n\n"
+            "[VOICE: PHOEBE, alarmed] That's impossible. The dish was "
+            "decommissioned six years ago.\n\n"
+            "[SFX: low rumble of static]"
+        )
+
+        # 8a. Empty script -> "" (no LLM call attempted).
+        def _trap(*a, **kw):
+            raise AssertionError("LLM should not be called on empty script")
+        assert _generate_title_from_script(_trap, "") == ""
+        assert _generate_title_from_script(_trap, "   \n  \n") == ""
+
+        # 8b. LLM raises -> "".
+        def _raises(*a, **kw):
+            raise RuntimeError("LLM offline")
+        assert _generate_title_from_script(_raises, SAMPLE_SCRIPT) == ""
+
+        # 8c. Clean 3-word title -> verbatim.
+        def _clean(*a, **kw):
+            return "The Echo Below"
+        assert _generate_title_from_script(_clean, SAMPLE_SCRIPT) == "The Echo Below"
+
+        # 8d. Wrapped "**Title:** \"Pulse\"" -> "Pulse".
+        def _wrapped(*a, **kw):
+            return '**Title:** "Pulse"'
+        assert _generate_title_from_script(_wrapped, SAMPLE_SCRIPT) == "Pulse"
+
+        # 8e. Smart quotes -> stripped.
+        def _smart(*a, **kw):
+            return "“Agri-Crash”"
+        assert _generate_title_from_script(_smart, SAMPLE_SCRIPT) == "Agri-Crash"
+
+        # 8f. Multi-line: only first non-empty line, drop explanation.
+        def _explain(*a, **kw):
+            return "Pulse Out\n\nThis title evokes the magnetic pulse."
+        assert _generate_title_from_script(_explain, SAMPLE_SCRIPT) == "Pulse Out"
+
+        # 8g. Stuck defaults rejected.
+        for stuck in ("Untitled", "Signal Lost", "Episode", "the last frequency"):
+            def _stuck(*a, **kw):
+                return stuck
+            assert _generate_title_from_script(_stuck, SAMPLE_SCRIPT) == "", \
+                f"stuck default {stuck!r} should be rejected"
+
+        # 8h. Full-sentence leak (>10 words) rejected.
+        def _leak(*a, **kw):
+            return (
+                "Here is a title that the model leaked as a complete "
+                "English sentence well over ten words long indeed"
+            )
+        assert _generate_title_from_script(_leak, SAMPLE_SCRIPT) == ""
+
+        # 8i. Empty LLM output -> "".
+        def _empty(*a, **kw):
+            return ""
+        assert _generate_title_from_script(_empty, SAMPLE_SCRIPT) == ""
+
+        # 8j. 80+ char title gets truncated to 80.
+        def _long(*a, **kw):
+            return "X" * 90 + " A Title"
+        result_long = _generate_title_from_script(_long, SAMPLE_SCRIPT)
+        # The full output is "XXX..." (~98 chars, 2 words). Words count
+        # <= 10 so it passes the overlong-sentence gate; length cap then
+        # trims to 80.
+        assert len(result_long) <= 80, f"title truncation failed: len={len(result_long)}"
+
+        # 8k. Trailing punctuation stripped.
+        def _punct(*a, **kw):
+            return "Final Frequency."
+        assert _generate_title_from_script(_punct, SAMPLE_SCRIPT) == "Final Frequency"
+
+        # 8l. News seed must NOT be in the prompt the helper builds.
+        # We capture what generate_fn receives and assert news_seed-like
+        # tokens never appear. This is the Jeffrey 2026-05-10 contract.
+        captured: dict = {}
+        def _capture(messages, **kw):
+            captured["messages"] = messages
+            return "Clean Title"
+        _generate_title_from_script(_capture, SAMPLE_SCRIPT)
+        full_prompt_text = " ".join(
+            m.get("content", "") for m in captured["messages"]
+        )
+        # The sample script DOES appear (that's the whole point); but
+        # nothing news-seed-flavored should leak. Assert the system msg
+        # and user msg do not mention "news", "headline", "article",
+        # "RSS", or the word "seed".
+        for forbidden in ("news", "headline", "article", "RSS", "seed"):
+            assert forbidden.lower() not in full_prompt_text.lower(), (
+                f"title-regen prompt leaked forbidden token {forbidden!r}: "
+                f"{full_prompt_text[:200]}..."
+            )
+
+        print("[8/8] PASS: _generate_title_from_script (12 paths + news-seed-free contract)")
+    except Exception:
+        failures.append(("8/8 _generate_title_from_script", traceback.format_exc()))
+        print("[8/8] FAIL: _generate_title_from_script")
 
     # Summary.
     if not failures:
-        print("\nSELF-TEST PASS: 7/7")
+        print("\nSELF-TEST PASS: 8/8")
         sys.exit(0)
     else:
-        print(f"\nSELF-TEST FAIL: {len(failures)} of 7")
+        print(f"\nSELF-TEST FAIL: {len(failures)} of 8")
         for name, tb in failures:
             print(f"\n--- {name} ---\n{tb}")
         sys.exit(1)
