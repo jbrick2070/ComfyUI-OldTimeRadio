@@ -28,8 +28,17 @@ Pipeline (unchanged from v2.0 LPL):
        fallback if the LLM call fails or its output is rejected by the
        guardrails. canon.title is updated and episode_canon.json is
        written here (deferred from step 5 specifically for this).
+    8b. Spoken-title substitution: the per-line composer ran in step 6
+        with canon_header containing the outline TITLE, so the
+        announcer / character lines may have baked the OLD title into
+        spoken dialogue ("Tonight on: <outline.title>"). When the regen
+        produced a different final title, substitute case-insensitive
+        whole-phrase occurrences of the old title with the new title
+        across ledger.lines[].text AND script_text_parts. Stamps
+        meta.title_substitution for forensics.
     9. Stamp meta block (gen_params_initial, episode_title, title_source,
-       perfect_run_spacesaver, creativity, optimization_profile).
+       title_substitution, perfect_run_spacesaver, creativity,
+       optimization_profile).
    10. Save ledger.
 
 Output contract (UNCHANGED from prior v2.0):
@@ -513,6 +522,42 @@ def _generate_title_from_script(
         candidate, len(text),
     )
     return candidate
+
+
+_TITLE_SUB_MIN_LEN = 4
+"""Minimum length of old title to attempt substitution. Guards against
+false matches on tiny outline titles like "ICE" or "Sun" hitting
+unrelated dialogue words."""
+
+
+def _substitute_title_in_text(
+    text: str,
+    old_title: str,
+    new_title: str,
+) -> tuple[str, int]:
+    """Case-insensitive whole-phrase substitution of ``old_title`` with
+    ``new_title`` in ``text``. Returns ``(new_text, n_subs)``.
+
+    Whole-phrase: anchored with negative-lookbehind / negative-lookahead
+    on word characters so "Pulse" doesn't match "Pulsewave". Min-length
+    guard prevents short common-word titles from spuriously matching.
+    No-ops when old_title == new_title or either is empty.
+    """
+    import re as _re
+
+    if not text or not old_title or not new_title:
+        return (text or "", 0)
+    if old_title == new_title:
+        return (text, 0)
+    if len(old_title) < _TITLE_SUB_MIN_LEN:
+        return (text, 0)
+
+    patt = _re.compile(
+        r"(?<!\w)" + _re.escape(old_title) + r"(?!\w)",
+        flags=_re.IGNORECASE,
+    )
+    new_text, n_subs = patt.subn(new_title, text)
+    return (new_text, n_subs)
 
 
 def _resolve_creativity(creativity: str) -> tuple[float, float]:
@@ -1202,9 +1247,24 @@ class OTR_LedgerScriptWriter:
         # episode_title still wins; LLM only fires on blank input;
         # outline.title is the last-resort fallback when the LLM call
         # fails or its output is rejected by the guardrails.
+        #
+        # Why we capture old_title BEFORE deciding final_title:
+        # the per-line composer's canon_header included the outline title
+        # as the TITLE: field. If a beat's intent was "open the show by
+        # naming the episode" the LLM likely baked the OUTLINE title
+        # verbatim into the announcer/character spoken text. When the
+        # title regen produces a different final title, the audio
+        # consumers (Bark / Kokoro) would otherwise speak the old
+        # placeholder title at the top of the episode. So after regen
+        # we substitute the new title back into any line text that
+        # quoted the old one, before audio rendering runs downstream.
+        old_title_in_lines = (outline.title or "").strip()
+
         title_source = "outline_fallback"
         if resolved["episode_title"]:
-            # User typed a value; respect it verbatim.
+            # User typed a value; respect it verbatim. The composer saw
+            # this same value in canon_header (section G), so no
+            # substitution is needed.
             final_title = resolved["episode_title"]
             title_source = "user"
         else:
@@ -1238,6 +1298,57 @@ class OTR_LedgerScriptWriter:
             episode_root / _OTRC.EPISODE_CANON_FILENAME,
         )
 
+        # --- J.6. Substitute regenerated title into spoken line text --
+        # When the title changed post-composition AND the composer baked
+        # the old (outline) title into any spoken line, swap to the new
+        # title so the announcer / characters actually say the
+        # regenerated title aloud. Helper enforces case-insensitive
+        # whole-phrase match + the _TITLE_SUB_MIN_LEN guard.
+        _title_sub_meta = None
+        if (
+            final_title
+            and old_title_in_lines
+            and final_title != old_title_in_lines
+        ):
+            n_lines_patched = 0
+            n_subs_total = 0
+            for r in line_rows:
+                new_text, n_subs = _substitute_title_in_text(
+                    r["text"], old_title_in_lines, final_title,
+                )
+                if n_subs > 0:
+                    r["text"] = new_text
+                    _OTRL.patch_line_text(
+                        led.data, r["line_id"], new_text,
+                    )
+                    n_lines_patched += 1
+                    n_subs_total += n_subs
+            # Mirror substitutions into script_text_parts so the slot-0
+            # STRING output and the script_text_parts join stay
+            # consistent with the patched ledger.
+            for idx, part in enumerate(script_text_parts):
+                new_part, _ = _substitute_title_in_text(
+                    part, old_title_in_lines, final_title,
+                )
+                script_text_parts[idx] = new_part
+            if n_lines_patched > 0:
+                log.info(
+                    "[OTR_LedgerScriptWriter] title substitution: "
+                    "replaced %d occurrence(s) of %r with %r across "
+                    "%d line(s)",
+                    n_subs_total, old_title_in_lines, final_title,
+                    n_lines_patched,
+                )
+            # Always stamp the meta record when we attempted substitution
+            # (even with 0 matches) so audits can tell "no occurrences
+            # found" from "no regen happened at all".
+            _title_sub_meta = {
+                "old_title":         old_title_in_lines,
+                "new_title":         final_title,
+                "lines_patched":     n_lines_patched,
+                "substitutions":     n_subs_total,
+            }
+
         # --- K. Stamp meta block --------------------------------------
         # Mirrors the legacy writer's gen_params_initial stamp so the
         # critic (`script_critic._coerce_params`) can keep reading the
@@ -1269,6 +1380,8 @@ class OTR_LedgerScriptWriter:
         # LLM-regenerated runs without inspecting widget state.
         meta["episode_title"] = final_title
         meta["title_source"] = title_source
+        if _title_sub_meta is not None:
+            meta["title_substitution"] = _title_sub_meta
         if resolved["perfect_run_spacesaver"]:
             meta["perfect_run_spacesaver"] = True
 
@@ -1312,10 +1425,10 @@ if __name__ == "__main__":
         cls = OTR_LedgerScriptWriter
         obj = cls()
         assert obj is not None
-        print("[1/8] PASS: class instantiation")
+        print("[1/9] PASS: class instantiation")
     except Exception:
-        failures.append(("1/8 class instantiation", traceback.format_exc()))
-        print("[1/8] FAIL: class instantiation")
+        failures.append(("1/9 class instantiation", traceback.format_exc()))
+        print("[1/9] FAIL: class instantiation")
 
     # 2. INPUT_TYPES schema introspection.
     try:
@@ -1372,10 +1485,10 @@ if __name__ == "__main__":
         assert sc_type == "STRING"
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
-        print("[2/8] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
+        print("[2/9] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
     except Exception:
-        failures.append(("2/8 INPUT_TYPES", traceback.format_exc()))
-        print("[2/8] FAIL: INPUT_TYPES schema")
+        failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
+        print("[2/9] FAIL: INPUT_TYPES schema")
 
     # 3. Locked output contract.
     try:
@@ -1386,10 +1499,10 @@ if __name__ == "__main__":
         ), f"RETURN_NAMES drift: {cls.RETURN_NAMES}"
         assert cls.FUNCTION == "run"
         assert cls.CATEGORY == "OldTimeRadio"
-        print("[3/8] PASS: output contract")
+        print("[3/9] PASS: output contract")
     except Exception:
-        failures.append(("3/8 output contract", traceback.format_exc()))
-        print("[3/8] FAIL: output contract")
+        failures.append(("3/9 output contract", traceback.format_exc()))
+        print("[3/9] FAIL: output contract")
 
     # 4. _build_truncating_generate_fn returns a callable; top_p override.
     try:
@@ -1398,10 +1511,10 @@ if __name__ == "__main__":
         gen_custom = _build_truncating_generate_fn(fake_cache, top_p=0.99)
         assert callable(gen_default)
         assert callable(gen_custom)
-        print("[4/8] PASS: truncating generate_fn build (default + top_p override)")
+        print("[4/9] PASS: truncating generate_fn build (default + top_p override)")
     except Exception:
-        failures.append(("4/8 generate_fn build", traceback.format_exc()))
-        print("[4/8] FAIL: truncating generate_fn build")
+        failures.append(("4/9 generate_fn build", traceback.format_exc()))
+        print("[4/9] FAIL: truncating generate_fn build")
 
     # 5. _resolve_creativity / 3-way style resolution / _resolve_target_words.
     try:
@@ -1424,10 +1537,10 @@ if __name__ == "__main__":
         assert _resolve_target_words(700, "short (3 acts)") == 700
         assert _resolve_target_words(1400, "epic (10+ acts)") == 1400
 
-        print("[5/8] PASS: resolver helpers (creativity + target_length)")
+        print("[5/9] PASS: resolver helpers (creativity + target_length)")
     except Exception:
-        failures.append(("5/8 resolver helpers", traceback.format_exc()))
-        print("[5/8] FAIL: resolver helpers")
+        failures.append(("5/9 resolver helpers", traceback.format_exc()))
+        print("[5/9] FAIL: resolver helpers")
 
     # 6. _resolve_inputs 3-way style resolution (custom_premise path).
     try:
@@ -1480,10 +1593,10 @@ if __name__ == "__main__":
         assert out["style_pending"] is True
         assert out["style_source"] == "llm_auto"
 
-        print("[6/8] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
+        print("[6/9] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
     except Exception:
         failures.append(("6/8_resolve_inputs custom + style 3-way", traceback.format_exc()))
-        print("[6/8] FAIL: _resolve_inputs(custom_premise + style 3-way)")
+        print("[6/9] FAIL: _resolve_inputs(custom_premise + style 3-way)")
 
     # 7. _generate_style_via_llm fallback behavior (no actual LLM call).
     try:
@@ -1515,10 +1628,10 @@ if __name__ == "__main__":
             return "ok"
         assert _generate_style_via_llm(_short, "seed") == _LLM_STYLE_FALLBACK
 
-        print("[7/8] PASS: _generate_style_via_llm (5 paths + fallback chain)")
+        print("[7/9] PASS: _generate_style_via_llm (5 paths + fallback chain)")
     except Exception:
-        failures.append(("7/8_generate_style_via_llm", traceback.format_exc()))
-        print("[7/8] FAIL: _generate_style_via_llm")
+        failures.append(("7/9 _generate_style_via_llm", traceback.format_exc()))
+        print("[7/9] FAIL: _generate_style_via_llm")
 
     # 8. _generate_title_from_script post-composition title regen.
     try:
@@ -1616,17 +1729,93 @@ if __name__ == "__main__":
                 f"{full_prompt_text[:200]}..."
             )
 
-        print("[8/8] PASS: _generate_title_from_script (12 paths + news-seed-free contract)")
+        print("[8/9] PASS: _generate_title_from_script (12 paths + news-seed-free contract)")
     except Exception:
-        failures.append(("8/8 _generate_title_from_script", traceback.format_exc()))
-        print("[8/8] FAIL: _generate_title_from_script")
+        failures.append(("8/9 _generate_title_from_script", traceback.format_exc()))
+        print("[8/9] FAIL: _generate_title_from_script")
+
+    # 9. _substitute_title_in_text — spoken-title swap for J.6.
+    try:
+        # 9a. Exact whole-phrase swap.
+        out, n = _substitute_title_in_text(
+            "Tonight on Tales From Beyond: The Echo Below. Listen close.",
+            "The Echo Below", "Pulse Out",
+        )
+        assert out == "Tonight on Tales From Beyond: Pulse Out. Listen close.", out
+        assert n == 1
+
+        # 9b. Case-insensitive match preserves new-title casing.
+        out, n = _substitute_title_in_text(
+            "the echo below is closing.", "The Echo Below", "Pulse Out",
+        )
+        assert out == "Pulse Out is closing.", out
+        assert n == 1
+
+        # 9c. Multiple occurrences in one string.
+        out, n = _substitute_title_in_text(
+            "The Echo Below opens. Stay with us for The Echo Below.",
+            "The Echo Below", "Pulse Out",
+        )
+        assert n == 2
+        assert "The Echo Below" not in out
+
+        # 9d. Whole-phrase boundary: substring inside a longer word stays put.
+        out, n = _substitute_title_in_text(
+            "Pulseware engineering at the Pulse station.",
+            "Pulse", "Surge",
+        )
+        # Min-length guard kicks in here (len("Pulse")=5 >= 4), and the
+        # word-boundary regex must NOT replace "Pulse" inside "Pulseware".
+        assert "Pulseware" in out, f"word-boundary broken: {out!r}"
+        assert "Surge station" in out, f"standalone word missed: {out!r}"
+        assert n == 1
+
+        # 9e. Min-length guard rejects too-short titles.
+        out, n = _substitute_title_in_text(
+            "ICE forms on the dome.", "ICE", "GLASS",
+        )
+        assert n == 0, f"min-length guard failed: out={out!r} n={n}"
+        assert out == "ICE forms on the dome."
+
+        # 9f. Same-title no-op (saves regex compile).
+        out, n = _substitute_title_in_text(
+            "The Echo Below.", "The Echo Below", "The Echo Below",
+        )
+        assert out == "The Echo Below."
+        assert n == 0
+
+        # 9g. Empty inputs return safely.
+        assert _substitute_title_in_text("", "old", "new") == ("", 0)
+        assert _substitute_title_in_text("text", "", "new") == ("text", 0)
+        assert _substitute_title_in_text("text", "old", "") == ("text", 0)
+
+        # 9h. Regex-special chars in old title are escaped.
+        out, n = _substitute_title_in_text(
+            "Tonight: The Frequency (Lost). End.",
+            "The Frequency (Lost)", "Pulse",
+        )
+        assert "Pulse" in out and "(Lost)" not in out, out
+        assert n == 1
+
+        # 9i. No match (title not present) returns text unchanged.
+        out, n = _substitute_title_in_text(
+            "Nothing to see here, move along.",
+            "The Echo Below", "Pulse Out",
+        )
+        assert out == "Nothing to see here, move along."
+        assert n == 0
+
+        print("[9/9] PASS: _substitute_title_in_text (9 paths)")
+    except Exception:
+        failures.append(("9/9 _substitute_title_in_text", traceback.format_exc()))
+        print("[9/9] FAIL: _substitute_title_in_text")
 
     # Summary.
     if not failures:
-        print("\nSELF-TEST PASS: 8/8")
+        print("\nSELF-TEST PASS: 9/9")
         sys.exit(0)
     else:
-        print(f"\nSELF-TEST FAIL: {len(failures)} of 8")
+        print(f"\nSELF-TEST FAIL: {len(failures)} of 9")
         for name, tb in failures:
             print(f"\n--- {name} ---\n{tb}")
         sys.exit(1)
