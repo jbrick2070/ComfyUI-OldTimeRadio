@@ -1,6 +1,7 @@
 """
-fix_cast_descriptions.py -- one-shot cleanup for ledgers where cast.description
-got polluted with a separate period-name prefix from the LLM director.
+fix_cast_descriptions.py -- one-shot cleanup for ledgers where the cast row's
+character_description (renamed from `description` 2026-05-10) got polluted with
+a separate period-name prefix from the LLM director.
 
 Pattern detected:
     "PRIAM SMITHERS - Female, wry, 40s"   ->   "Female, wry, 40s"
@@ -8,7 +9,11 @@ Pattern detected:
     "NORA SATO - Male, intense, 50s"      ->   "Male, intense, 50s"
 
 Leaves alone descriptions that don't match the "<ALLCAPS NAME> - <rest>" pattern,
-and entries where description is null.
+and entries where character_description is null.
+
+Reads either character_description (current) or the legacy description key
+for back-compat with ledgers written before the 2026-05-10 rename. Always
+writes character_description.
 
 Usage:
     python scripts/fix_cast_descriptions.py <ledger_path> [--in-place | --out <path>]
@@ -40,15 +45,26 @@ def clean_description(desc: str | None) -> str | None:
 
 
 def fix_ledger(in_path: Path, out_path: Path) -> tuple[int, list[tuple[str, str, str]]]:
+    """Clean cast.character_description in place.
+
+    Reads either character_description (post-2026-05-10 rename) or the legacy
+    description key for back-compat. Always writes character_description.
+    """
     data = json.loads(in_path.read_text(encoding="utf-8"))
     cast = data.get("cast", []) or []
     changes: list[tuple[str, str, str]] = []
     for row in cast:
         name = row.get("name", "?")
-        old = row.get("description")
+        old = row.get("character_description")
+        if old is None:
+            old = row.get("description")
         new = clean_description(old)
         if new != old:
-            row["description"] = new
+            row["character_description"] = new
+            # If the row only had the legacy key, drop it now that the new
+            # one carries the cleaned value.
+            if "description" in row and "character_description" not in row:
+                row.pop("description", None)
             changes.append((name, str(old), str(new)))
     out_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return len(cast), changes

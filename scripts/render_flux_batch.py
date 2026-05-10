@@ -250,7 +250,13 @@ def build_target_list(
         name = (c.get("name") or "").strip()
         if not name:
             continue
-        desc = (c.get("description") or "").strip()
+        # Cast field renamed 2026-05-10: description -> character_description.
+        # Read new key first; fall back to old key for pre-rename ledgers.
+        desc = (
+            c.get("character_description")
+            or c.get("description")
+            or ""
+        ).strip()
         is_radio = name.upper() == "RADIO"
         if is_radio:
             # Front-and-center grille framing -- the grille IS the mouth
@@ -307,7 +313,12 @@ def build_target_list(
                 continue
             seen_pairs.add(key)
             cast_row = cast_by_name.get(speaker) or {}
-            speaker_desc = (cast_row.get("description") or speaker).strip()
+            # Cast field renamed 2026-05-10: description -> character_description.
+            speaker_desc = (
+                cast_row.get("character_description")
+                or cast_row.get("description")
+                or speaker
+            ).strip()
             char_id = cast_row.get("char_id")
             speaker_slug = slugify(speaker)
             shot_slug = slugify(shot_id, limit=24)

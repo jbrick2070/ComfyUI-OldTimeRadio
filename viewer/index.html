@@ -338,7 +338,7 @@ function renderHeader(led) {
 
 function renderSections(led) {
   let out = '';
-  out += section('Cast',   led.cast,   ['char_id', 'name', 'description', 'gender',
+  out += section('Cast',   led.cast,   ['char_id', 'name', 'character_description', 'gender',
                                           'voice_preset', 'line_count', 'word_count']);
   out += section('Scenes', led.scenes, ['scene_id', 'description', 'env',
                                           'line_count', 'word_count']);
@@ -398,7 +398,7 @@ function renderCell(row, col) {
   if (col === 'visual_prompt' || col === 'generation_prompt') {
     return '<td class="prompt" title="' + esc(v) + '">' + esc(truncate(v, 140)) + '</td>';
   }
-  if (col === 'text' || col === 'description' || col === 'traits' || col === 'env') {
+  if (col === 'text' || col === 'description' || col === 'character_description' || col === 'traits' || col === 'env') {
     return '<td class="desc" title="' + esc(v) + '">' + esc(truncate(v, 180)) + '</td>';
   }
   if (col === 'char_id' || col === 'scene_id' || col === 'shot_id'

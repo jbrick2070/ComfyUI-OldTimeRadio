@@ -467,14 +467,23 @@ class Ledger:
     def set_cast(self, cast_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
         for r in cast_rows or []:
+            # Cast field renamed 2026-05-10: description -> character_description.
+            # Back-compat input shim: still accept the old key on the way IN
+            # so any in-flight ledger or cached cast row from a prior session
+            # normalizes cleanly. Output is always the new key.
+            cdesc = (
+                _safe_str(r.get("character_description"))
+                or _safe_str(r.get("description"))
+                or None
+            )
             rows.append({
-                "char_id":       _safe_str(r.get("char_id")),
-                "name":          _safe_str(r.get("name")),
-                "description":   _safe_str(r.get("description")) or None,
-                "gender":        _safe_str(r.get("gender")) or None,
-                "voice_preset":  _safe_str(r.get("voice_preset")) or None,
-                "line_count":    _safe_int(r.get("line_count")),
-                "word_count":    _safe_int(r.get("word_count")),
+                "char_id":               _safe_str(r.get("char_id")),
+                "name":                  _safe_str(r.get("name")),
+                "character_description": cdesc,
+                "gender":                _safe_str(r.get("gender")) or None,
+                "voice_preset":          _safe_str(r.get("voice_preset")) or None,
+                "line_count":            _safe_int(r.get("line_count")),
+                "word_count":            _safe_int(r.get("word_count")),
             })
         self.data["cast"] = rows
         return self

@@ -758,11 +758,11 @@ def _build_cast_rows(cast_names) -> tuple:
     for i, name in enumerate(cast_names):
         cid = f"c{i + 1:02d}"
         cast_rows.append({
-            "char_id":      cid,
-            "name":         name,
-            "description":  None,
-            "gender":       None,
-            "voice_preset": None,
+            "char_id":              cid,
+            "name":                 name,
+            "character_description": None,
+            "gender":               None,
+            "voice_preset":         None,
             "line_count":   0,
             "word_count":   0,
         })

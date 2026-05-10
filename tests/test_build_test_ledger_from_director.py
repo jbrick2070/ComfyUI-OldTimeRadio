@@ -232,7 +232,15 @@ def test_cast_carries_voice_preset_and_description():
     )
     by_name = {c["name"]: c for c in led["cast"]}
     assert by_name["LEMMY"]["voice_preset"] == "v2/en_speaker_8"
-    assert "weathered" in by_name["LEMMY"]["description"].lower()
+    # Field renamed 2026-05-10: description -> character_description.
+    # Read either key for back-compat with builders that still emit the
+    # old name; the assertion only cares the LEMMY description survived.
+    cdesc = (
+        by_name["LEMMY"].get("character_description")
+        or by_name["LEMMY"].get("description")
+        or ""
+    )
+    assert "weathered" in cdesc.lower()
 
 
 def test_empty_director_yields_empty_ledger():

@@ -317,10 +317,19 @@ def test_slice_audio_tensor_clips_at_zero_for_negative_start(m) -> None:
 # ---------------------------------------------------------------------------
 
 def test_build_pos_prompt_uses_cast_description_when_present(m) -> None:
-    cast = [{"name": "EDNA", "description": "Female, 50s, weary, broadcaster"}]
+    cast = [{"name": "EDNA",
+             "character_description": "Female, 50s, weary, broadcaster"}]
     out = m._build_pos_prompt("EDNA", {}, cast)
     assert "Female, 50s, weary, broadcaster" in out
     assert "35mm" in out  # default suffix appended
+
+
+def test_build_pos_prompt_back_compat_old_description_key(m) -> None:
+    """A pre-2026-05-10 ledger row using the legacy 'description' key still
+    feeds HuMo via the back-compat fallback path in _build_pos_prompt."""
+    cast = [{"name": "EDNA", "description": "Female, 50s, weary, broadcaster"}]
+    out = m._build_pos_prompt("EDNA", {}, cast)
+    assert "Female, 50s, weary, broadcaster" in out
 
 
 def test_build_pos_prompt_falls_back_when_no_description(m) -> None:

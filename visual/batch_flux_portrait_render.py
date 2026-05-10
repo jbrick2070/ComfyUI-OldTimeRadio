@@ -405,6 +405,7 @@ class BatchFluxPortraitRender:
                 continue
             appearance = (
                 c.get("appearance")
+                or c.get("character_description")
                 or c.get("description")
                 or c.get("traits")
                 or ""

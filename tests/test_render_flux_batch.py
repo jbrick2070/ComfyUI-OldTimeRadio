@@ -160,7 +160,8 @@ def test_portrait_prompt_contains_speaker_description():
     targets = build_target_list(_l2_ledger(), style_tail="cinematic")
     alice_portrait = next(t for t in targets
                           if t["kind"] == "portrait" and t["speaker"] == "ALICE")
-    # cast[].description carried into the prompt
+    # cast[].character_description carried into the prompt (renamed
+    # from description 2026-05-10)
     assert "young scientist, dark hair" in alice_portrait["positive_prompt"]
     assert "cinematic" in alice_portrait["positive_prompt"]
 
@@ -458,7 +459,8 @@ def test_target_count_matches_astrotech_design():
     from render_flux_batch import build_target_list
 
     cast_names = ["ANN", "ANNOUNCER", "MEREDITH", "RYAN", "SEAN", "VANCE"]
-    cast = [{"char_id": f"c{i + 1:02d}", "name": n, "description": f"desc_{n}"}
+    cast = [{"char_id": f"c{i + 1:02d}", "name": n,
+             "character_description": f"desc_{n}"}
             for i, n in enumerate(cast_names)]
     scenes = [{"scene_id": "scene_facility", "description": "AstroTech facility"}]
 

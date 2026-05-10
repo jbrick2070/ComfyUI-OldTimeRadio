@@ -794,11 +794,16 @@ def build_clip_plan(
         )
 
         # --- positive prompt ---
-        # Try cast.description, fall back to a generic OTR scene line.
+        # Try cast.character_description (renamed from description 2026-05-10),
+        # fall back to old key, then to a generic OTR scene line.
         speaker_desc = ""
         for c in cast:
             if (c.get("name") or "").upper().strip() == speaker.upper():
-                speaker_desc = (c.get("description") or "").strip()
+                speaker_desc = (
+                    c.get("character_description")
+                    or c.get("description")
+                    or ""
+                ).strip()
                 break
         if not speaker_desc:
             speaker_desc = (
