@@ -10030,6 +10030,96 @@ OPENING:
                     lines.extend(_new_items)
                     log.info(f"[ScriptParser] Screenplay format: recovered {len(_new_items)} dialogue lines from **NAME** patterns")
 
+            # Pass 3: Bare screenplay format (FormatNorm + Mistral 12B + plain
+            # screenplay output). Like Pass 2 but without the `**` bold markdown
+            # requirement. The FormatNorm pass strips the bold wrappers and
+            # emits CHARACTER:\ndialogue\n\n -- which falls through Pass 1 (no
+            # inline colon match because the dialogue is on the next line) and
+            # Pass 2 (no `**` markers). Without this pass, a clean cyberpunk
+            # 100-word run with self_critique=ON would PARSE_FATAL after
+            # FormatNorm normalised the script (2026-05-09 incident).
+            #
+            # Differences from Pass 2:
+            #   - No `**` required around name
+            #   - Colon REQUIRED on the name line (prevents false-match against
+            #     plain prose lines that happen to start with a capital)
+            #   - Allows quotes / apostrophes / periods / hyphens inside the
+            #     name so EDWARD "BEE" BEESLY:, MS. KIRBY:, etc. survive
+            if _recovered < 3:
+                _bare_name_pat = re.compile(
+                    r'^([A-Z][A-Z0-9_ "\'\.\-]{0,40}?)\s*:\s*$'
+                )
+                # Reuse _paren_pat and _structural_prefixes from Pass 2 above
+                raw_lines_3 = text.strip().splitlines()
+                _new_items_3 = []
+                k = 0
+                while k < len(raw_lines_3):
+                    raw_s3 = raw_lines_3[k].strip()
+                    clean_s3 = re.sub(r'^[*_]+|[*_]+$', '', raw_s3).strip()
+                    nm3 = _bare_name_pat.match(clean_s3)
+                    if nm3:
+                        char_name = nm3.group(1).strip().upper()
+                        # Strip any embedded quotes from the canonical name so
+                        # EDWARD "BEE" BEESLY -> EDWARD BEE BEESLY for cast
+                        # matching downstream. Keep dialogue text intact.
+                        char_name = re.sub(r'["\'“”]', '', char_name).strip()
+                        char_name = re.sub(r'\s+', ' ', char_name)
+                        # Skip structural words masquerading as character names
+                        _fw3 = char_name.split()[0] if char_name else ""
+                        if _fw3 in ("ACT", "SCENE", "INT", "EXT", "FADE", "CUT",
+                                    "END", "MUSIC", "SFX", "ENV", "BEAT", "PAUSE",
+                                    "TRANSITION", "CONTINUED", "CONT", "OPENING",
+                                    "CLOSING", "INTERSTITIAL"):
+                            k += 1
+                            continue
+                        # Collect dialogue lines after the name (same as Pass 2)
+                        k += 1
+                        while k < len(raw_lines_3):
+                            next_l3 = raw_lines_3[k].strip()
+                            next_clean3 = re.sub(r'^[*_]+|[*_]+$', '', next_l3).strip()
+                            if _paren_pat.match(next_clean3):
+                                k += 1
+                            else:
+                                break
+                        _dial_parts3 = []
+                        while k < len(raw_lines_3):
+                            dl3 = raw_lines_3[k].strip()
+                            dl_clean3 = re.sub(r'^[*_]+|[*_]+$', '', dl3).strip()
+                            if not dl_clean3:
+                                break
+                            # Stop if next line is another bare-name marker
+                            if _bare_name_pat.match(dl_clean3):
+                                break
+                            if _paren_pat.match(dl_clean3):
+                                k += 1
+                                continue
+                            if any(dl_clean3.upper().startswith(p) for p in _structural_prefixes):
+                                break
+                            _dial_parts3.append(dl_clean3.strip('"“”'))
+                            k += 1
+                        if _dial_parts3:
+                            full_dialogue3 = " ".join(_dial_parts3)
+                            _new_items_3.append({
+                                "type": "dialogue",
+                                "character_name": char_name,
+                                "voice_traits": "unspecified",
+                                "line": full_dialogue3,
+                            })
+                            _recovered += 1
+                    else:
+                        k += 1
+                if _new_items_3:
+                    structural = [ln for ln in lines if ln.get("type") != "direction"]
+                    lines.clear()
+                    lines.extend(structural)
+                    lines.extend(_new_items_3)
+                    log.info(
+                        "[ScriptParser] Bare screenplay format: recovered %d "
+                        "dialogue lines from CHARACTER: NAME patterns "
+                        "(2026-05-09 FormatNorm fix)",
+                        len(_new_items_3),
+                    )
+
             if _recovered > 0:
                 log.info(f"[ScriptParser] Permissive fallback recovered {_recovered} dialogue lines!")
                 dialogue_count = _recovered
