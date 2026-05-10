@@ -1271,9 +1271,9 @@ class SignalLostVideoRenderer:
         #      slot for the post-soak B1+B2 follow-up: post-script
         #      title generation pass + meta.episode_title stamp)
         #   2. led["meta"]["title"]           (forward-compat slot)
-        #   3. led["title"]                   (top-level; legacy
-        #      writer stamps it via _otr_legacy_writer.py L2561; new
-        #      writer does NOT stamp it)
+        #   3. led["title"]                   (top-level; not stamped
+        #      by OTR_LedgerScriptWriter -- pre-LPL legacy slot kept
+        #      in the chain for older ledgers loaded from disk)
         #   4. widget episode_title           (manual override)
         #   5. TIMESTAMP_LASTRESORT
         #

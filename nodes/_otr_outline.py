@@ -182,16 +182,13 @@ class OutlineRequest:
     style_hint: str          # User-selected style, e.g. "psychological slow-burn",
                              # "pulp adventure", "hard sci-fi procedural", "noir thriller"
     cast_size: int           # 1-6 (validated below)
-    target_seconds: int      # 10-600 (validated below)
-    target_words: int        # ~target_seconds * 2.5 (radio is ~150 wpm)
+    target_words: int        # Canonical length unit (validated below). Words are
+                             # the single source of truth for story planning;
+                             # there is no seconds field — see Jeffrey 2026-05-10.
 
     def __post_init__(self) -> None:
         if not (1 <= self.cast_size <= 6):
             raise ValueError(f"cast_size must be 1-6, got {self.cast_size}")
-        if not (10 <= self.target_seconds <= 600):
-            raise ValueError(
-                f"target_seconds must be 10-600, got {self.target_seconds}"
-            )
         if self.target_words < 5:
             raise ValueError(
                 f"target_words must be >= 5, got {self.target_words}"
@@ -256,7 +253,8 @@ def _build_user_prompt(req: OutlineRequest) -> str:
         f"Science story (the factual seed): {req.news_seed}\n"
         f"Style: {req.style_hint}\n"
         f"Cast size: {req.cast_size}\n"
-        f"Target length: {req.target_seconds} seconds (~{req.target_words} words total)\n\n"
+        f"Target total dialogue length: ~{req.target_words} words "
+        f"(sum of per-beat target_words should land near this number).\n\n"
         f"Build a dramatic outline that extrapolates from the science story "
         f"in the chosen style. Return only the JSON outline."
     )
@@ -595,7 +593,7 @@ if __name__ == "__main__":
     print("\n[Test 8] OutlineRequest input validation")
     try:
         OutlineRequest(news_seed="x", style_hint="y", cast_size=10,
-                       target_seconds=60, target_words=150)
+                       target_words=150)
         print("  FAIL: cast_size=10 accepted")
     except ValueError:
         print("  PASS: cast_size=10 rejected")
@@ -605,7 +603,7 @@ if __name__ == "__main__":
     err = OutlineFailedError(
         attempts=[("raw1", "err1"), ("raw2", "err2")],
         request=OutlineRequest(news_seed="x", style_hint="y", cast_size=2,
-                               target_seconds=60, target_words=150),
+                               target_words=150),
     )
     assert len(err.attempts) == 2
     assert err.request.cast_size == 2

@@ -10,8 +10,9 @@ Pipeline (unchanged from v2.0 LPL):
          "auto (LLM generates)" sentinel deferred to a model call
          once the LLM is loaded, see _generate_style_via_llm).
        - target_words from widget, optionally overridden by smoke
-         target_length presets ("30 words", "tiny").
-       - target_seconds derived from target_words / WORDS_PER_SECOND_BUDGET.
+         target_length presets ("30 words", "tiny"). Words are the
+         single canonical length unit for story writing; seconds is
+         only computed post-hoc for the est_minutes output socket.
        - creativity → (temperature, top_p) preset map.
     3. Load LLM via _otr_model_loader.
     4. generate_outline (validated against OutlineSchema).
@@ -48,8 +49,9 @@ Output contract (UNCHANGED from prior v2.0):
 
 Widget surface (2026-05-10 restoration):
     required:
-        target_words      INT   (replaces target_seconds — radio ~140 wpm,
-                                 internally target_seconds = target_words / 2.5)
+        target_words      INT   (canonical length unit; radio ~140 wpm
+                                 conversion is only for the est_minutes
+                                 output, never for story planning)
         num_characters    INT   (replaces cast_size — kept legacy name for UX)
     optional:
         episode_title     STRING       (stamped into ledger.meta.episode_title)
@@ -119,13 +121,11 @@ WORD_BUDGET_RATIO_HI = 1.3
 """Acceptable band for sum(beat.target_words) / target_words. Outside
 this band logs WARNING but does not fail the run."""
 
-WORDS_PER_SECOND_BUDGET = 2.5
-"""Word budget heuristic for outline planning (radio ~150 wpm).
-target_seconds = target_words / WORDS_PER_SECOND_BUDGET."""
-
 WORDS_PER_MINUTE_ESTIMATE = 140
-"""Word-per-minute estimate for est_minutes (slot 3). Mirrors legacy
-at story_orchestrator.py:6584."""
+"""Word-per-minute estimate for the est_minutes output socket only.
+Story planning is words-only; this constant is never used to derive
+a target_seconds input to the LLM. Mirrors legacy at
+story_orchestrator.py:6584."""
 
 
 # ---------------------------------------------------------------------------
@@ -650,7 +650,7 @@ def _fetch_rss_seed_or_die(style: str, model_id: str) -> str:
 
 def _resolve_inputs(
     episode_title: str = "",
-    target_words: int = 700,
+    target_words: int = 350,
     num_characters: int = 2,
     *,
     model_id: str = DEFAULT_MODEL_ID,
@@ -689,7 +689,6 @@ def _resolve_inputs(
       3. LLM-generated (caller fills `resolved["style"]` post-load)
     """
     target_words = _resolve_target_words(target_words, target_length)
-    target_seconds = max(10, min(600, int(round(target_words / WORDS_PER_SECOND_BUDGET))))
     num_characters = max(1, min(6, int(num_characters)))
     temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
@@ -731,7 +730,6 @@ def _resolve_inputs(
         "style_combo":          style_combo,
         "style_custom":         sc,
         "target_words":         target_words,
-        "target_seconds":       target_seconds,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
         "model_id":             str(model_id or DEFAULT_MODEL_ID).strip(),
@@ -826,15 +824,15 @@ class OTR_LedgerScriptWriter:
                     ),
                 }),
                 "target_words": ("INT", {
-                    "default": 700, "min": 30, "max": 10000, "step": 10,
+                    "default": 350, "min": 30, "max": 10000, "step": 10,
                     "tooltip": (
                         "Target spoken dialogue word count at ~140 wpm. "
                         "30 = ultra-smoke pipeline check (~13s, ~3 lines), "
                         "100 = smoke (~45s, ~6 HuMo clips), 200 = quick, "
-                        "350 = ~2.5min, 700 = 5min, 1400 = 10min, "
-                        "2100 = 15min, 3500 = 25min. target_length presets "
-                        "for '30 words (smoke)' / 'tiny (smoke)' override "
-                        "this widget."
+                        "350 = ~2.5min (default), 700 = 5min, "
+                        "1400 = 10min, 2100 = 15min, 3500 = 25min. "
+                        "target_length presets for '30 words (smoke)' / "
+                        "'tiny (smoke)' override this widget."
                     ),
                 }),
                 "num_characters": ("INT", {
@@ -1013,7 +1011,7 @@ class OTR_LedgerScriptWriter:
     def run(
         self,
         episode_title="",
-        target_words=700,
+        target_words=350,
         num_characters=2,
         model_id=DEFAULT_MODEL_ID,
         cleanup_model_id="auto (use story model)",
@@ -1050,13 +1048,13 @@ class OTR_LedgerScriptWriter:
         )
 
         log.info(
-            "[OTR_LedgerScriptWriter] start: model=%r, target_words=%d "
-            "(seconds=%d), num_characters=%d, style_source=%s "
+            "[OTR_LedgerScriptWriter] start: model=%r, target_words=%d, "
+            "num_characters=%d, style_source=%s "
             "(pending=%s, value=%r), creativity=%r (temp=%.2f "
             "top_p=%.2f), seed_source=%s, episode_title=%r, "
             "perfect_run_spacesaver=%s",
             resolved["model_id"], resolved["target_words"],
-            resolved["target_seconds"], resolved["num_characters"],
+            resolved["num_characters"],
             resolved["style_source"], resolved["style_pending"],
             resolved["style"], resolved["creativity"],
             resolved["temperature"], resolved["top_p"],
@@ -1105,7 +1103,6 @@ class OTR_LedgerScriptWriter:
             news_seed=resolved["news_seed"],
             style_hint=resolved["style"],
             cast_size=resolved["num_characters"],
-            target_seconds=resolved["target_seconds"],
             target_words=resolved["target_words"],
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
@@ -1452,10 +1449,12 @@ if __name__ == "__main__":
         et_type, et_meta = spec["required"]["episode_title"]
         assert et_type == "STRING"
         assert et_meta.get("default") == ""
-        # target_words INT clamps
+        # target_words INT clamps + default (locked to 350 per Jeffrey 2026-05-10)
         tw_type, tw_meta = spec["required"]["target_words"]
         assert tw_type == "INT"
         assert tw_meta["min"] == 30 and tw_meta["max"] == 10000
+        assert tw_meta["default"] == 350, \
+            f"target_words default drift: {tw_meta['default']!r} (must be 350)"
         # num_characters INT clamps
         nc_type, nc_meta = spec["required"]["num_characters"]
         assert nc_type == "INT"
@@ -1531,10 +1530,10 @@ if __name__ == "__main__":
         assert (t, p) == (0.85, 0.95)
 
         # 5c. target_length forces target_words for smoke presets.
-        assert _resolve_target_words(700, "30 words (smoke, 1 act)") == 30
-        assert _resolve_target_words(700, "tiny (smoke, 1 act)") == 100
+        assert _resolve_target_words(350, "30 words (smoke, 1 act)") == 30
+        assert _resolve_target_words(350, "tiny (smoke, 1 act)") == 100
         # 5d. Non-smoke presets pass widget value through.
-        assert _resolve_target_words(700, "short (3 acts)") == 700
+        assert _resolve_target_words(350, "short (3 acts)") == 350
         assert _resolve_target_words(1400, "epic (10+ acts)") == 1400
 
         print("[5/9] PASS: resolver helpers (creativity + target_length)")
@@ -1558,7 +1557,8 @@ if __name__ == "__main__":
         assert out["style_source"] == "style_custom"
         assert out["style_pending"] is False
         assert out["target_words"] == 350
-        assert out["target_seconds"] == 140
+        assert "target_seconds" not in out, \
+            f"target_seconds must not appear in resolved dict (words-only contract per Jeffrey 2026-05-10)"
         assert out["temperature"] == 0.85 and out["top_p"] == 0.95
 
         # 6b. Combo (non-auto, non-empty) used verbatim when style_custom blank.

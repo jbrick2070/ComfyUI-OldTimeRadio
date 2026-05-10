@@ -92,7 +92,6 @@ _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
     "OTR_LedgerScriptWriter": (".nodes.OTR_LedgerScriptWriter", "OTR_LedgerScriptWriter", " LPL Script Writer (v2.0)"),
-    "OTR_LLMScriptWriter":    (".nodes._otr_legacy_writer", "LegacyLLMScriptWriter", " Story Writer (legacy)"),
     "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),
@@ -219,17 +218,20 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
 # ─────────────────────────────────────────────────────────────────────────────
 # RENAME ALIASES — keep older workflow JSONs loading after we generalize node IDs
 #
-# The story-writing + directing nodes were originally named after the Gemma
-# model family ("OTR_Gemma4ScriptWriter" / "OTR_Gemma4Director"), but Gemma is
-# only ONE of several LLM choices the dropdown exposes (Mistral-Nemo, Qwen2.5,
-# etc.). The canonical IDs are now OTR_LLMScriptWriter / OTR_LLMDirector.
+# The Director node was originally named after the Gemma model family
+# ("OTR_Gemma4Director"), but Gemma is only ONE of several LLM choices the
+# dropdown exposes (Mistral-Nemo, Qwen2.5, etc.). The canonical ID is now
+# OTR_LLMDirector.
 #
-# Old workflow JSONs that reference the Gemma4 IDs continue to load via these
-# aliases. Safe to remove these entries once all production workflows have been
-# re-saved against the new IDs.
+# Old workflow JSONs that reference the Gemma4 ID continue to load via this
+# alias. Safe to remove this entry once all production workflows have been
+# re-saved against the new ID.
+#
+# 2026-05-10: OTR_Gemma4ScriptWriter -> OTR_LLMScriptWriter alias removed
+# alongside the legacy writer itself (nodes/_otr_legacy_writer.py). v2.0
+# canonical writer is OTR_LedgerScriptWriter (LPL).
 # ─────────────────────────────────────────────────────────────────────────────
 _RENAME_ALIASES = {
-    "OTR_Gemma4ScriptWriter": "OTR_LLMScriptWriter",
     "OTR_Gemma4Director":     "OTR_LLMDirector",
 }
 for _old_id, _new_id in _RENAME_ALIASES.items():

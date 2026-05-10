@@ -46,201 +46,20 @@ requires_torch = pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 # FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="module")
-def parser():
-    from nodes.story_orchestrator import LLMScriptWriter
-    return LLMScriptWriter()
+# 2026-05-10: `parser` fixture removed. The script parser lived on the
+# legacy `LegacyLLMScriptWriter` class, which was deleted in the legacy
+# cleanup commit alongside `nodes/_otr_legacy_writer.py`. The v2.0 LPL
+# writer (OTR_LedgerScriptWriter) does not have a parser surface --
+# beats come pre-structured from the outline LLM. The four parser test
+# classes that used this fixture (TestScriptParserCanonical,
+# TestScriptParserGenderFallback, TestParserV5SFXExtraction,
+# TestParserV3V4Patterns) were removed in the same commit.
 
 
 def _load_workflow(name):
     path = os.path.join(os.path.dirname(__file__), "..", "workflows", name)
     with open(path, encoding='utf-8') as f:
         return json.load(f)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. SCRIPT PARSER — Canonical v1.0 Format
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestScriptParserCanonical:
-    """_parse_script() against Canonical Audio Engine 1.0 token set."""
-
-    def test_voice_tag_extracts_name(self, parser):
-        result = parser._parse_script("[VOICE: HAYES, male, 40s, calm, low energy] Report is clean.")
-        assert len(result) == 1
-        item = result[0]
-        assert item["type"] == "dialogue"
-        assert item["character_name"] == "HAYES"
-        assert "Report is clean." in item["line"]
-
-    def test_voice_tag_name_uppercased(self, parser):
-        result = parser._parse_script("[VOICE: hayes, male, 40s, calm, low energy] Copy that.")
-        assert result[0]["character_name"] == "HAYES"
-
-    def test_voice_tag_preserves_dialogue(self, parser):
-        line = "They found the switch. The fear switch."
-        result = parser._parse_script(f"[VOICE: DR_VOSS, female, 50s, intense, high energy] {line}")
-        assert result[0]["line"] == line
-
-    def test_sfx_tag(self, parser):
-        result = parser._parse_script("[SFX: heavy wrench strike on metal pipe, single resonant clank]\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "sfx"
-        assert "wrench" in result[0]["description"]
-
-    def test_sfx_case_insensitive(self, parser):
-        result = parser._parse_script("[sfx: radio static]\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert result[0]["type"] == "sfx"
-
-    def test_env_tag(self, parser):
-        result = parser._parse_script("[ENV: sterile lab, low electronic hum, pressurized air]\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "environment"
-        assert "sterile lab" in result[0]["description"]
-
-    def test_scene_break(self, parser):
-        result = parser._parse_script("=== SCENE 1 ===\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "scene_break"
-        assert "1" in result[0]["scene"]
-
-    def test_scene_break_final(self, parser):
-        result = parser._parse_script("=== SCENE FINAL ===\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "scene_break"
-        assert "FINAL" in result[0]["scene"]
-
-    def test_beat_tag(self, parser):
-        result = parser._parse_script("(beat)\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "pause"
-        assert result[0]["kind"] == "beat"
-        assert result[0]["duration_ms"] == 200
-
-    def test_beat_case_insensitive(self, parser):
-        result = parser._parse_script("(BEAT)\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert result[0]["type"] == "pause"
-
-    def test_empty_lines_skipped(self, parser):
-        result = parser._parse_script("\n\n[VOICE: HAYES, male, 40s, calm, low] Go.\n\n")
-        assert len(result) == 1
-
-    def test_direction_fallback(self, parser):
-        result = parser._parse_script("Some ambient stage direction text.\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 2
-        assert result[0]["type"] == "direction"
-
-    def test_dashes_separator_skipped(self, parser):
-        result = parser._parse_script("---\n[VOICE: TESTCHAR, male, 30s] ok.")
-        assert len(result) == 1
-
-    def test_pro_qa_announcer_bookends(self, parser):
-        # QA only triggers on scripts with > 5 dialogue lines
-        filler = "\n".join(f"[VOICE: TESTCHAR, male, 50s] Line {i}" for i in range(6))
-        
-        # 1. Missing both
-        script1 = f"{filler}\n[VOICE: LEMMY, male, 50s, calm] Wrench."
-        res1 = parser._parse_script(script1)
-        dialogues1 = [r["character_name"] for r in res1 if r["type"] == "dialogue"]
-        assert dialogues1[0] == "ANNOUNCER"
-        assert dialogues1[-1] == "ANNOUNCER"
-
-        # 2. Missing close
-        script2 = f"[VOICE: ANNOUNCER, male, 50s] Opening.\n{filler}\n[VOICE: LEMMY, male, 50s, calm] Wrench."
-        res2 = parser._parse_script(script2)
-        dialogues2 = [r["character_name"] for r in res2 if r["type"] == "dialogue"]
-        assert dialogues2[0] == "ANNOUNCER"
-        assert dialogues2[-1] == "ANNOUNCER"
-
-        # 3. Perfectly fine - no injection!
-        script3 = f"[VOICE: ANNOUNCER, male, 50s] Opening.\n{filler}\n[VOICE: ANNOUNCER, male, 50s] Closing."
-        res3 = parser._parse_script(script3)
-        dialogues3 = [r["character_name"] for r in res3 if r["type"] == "dialogue"]
-        assert dialogues3[0] == "ANNOUNCER"
-        assert dialogues3[1] == "TESTCHAR" # First filler
-        assert dialogues3[-1] == "ANNOUNCER"
-        assert len(dialogues3) == 8 # 1 Open + 6 Filler + 1 Close
-
-    def test_full_canonical_scene(self, parser):
-        script = """=== SCENE 1 ===
-[ENV: sterile broadcast studio, low hum]
-[SFX: brief news sting]
-[VOICE: ANNOUNCER, male, 50s, authoritative, medium] Tonight on Signal Lost.
-(beat)
-[VOICE: DR_CHEN, female, 40s, calm, low] The compound reduced pressure by 10 mmHg.
-[SFX: data stream hum]
-[VOICE: HAYES, male, 40s, tense, medium] That's unexpected.
-=== SCENE 2 ===
-[ENV: corridor, echoing footsteps]
-[VOICE: DR_CHEN, female, 40s, calm, low] We need to run it again.
-"""
-        result = parser._parse_script(script)
-        types = [r["type"] for r in result]
-        assert "scene_break" in types
-        assert "environment" in types
-        assert "sfx" in types
-        assert "dialogue" in types
-        assert "pause" in types
-        chars = {r["character_name"] for r in result if r["type"] == "dialogue"}
-        assert chars == {"ANNOUNCER", "DR_CHEN", "HAYES"}
-
-    def test_multiple_voice_tags_all_parsed(self, parser):
-        script = "\n".join([
-            "[VOICE: ALPHA, male, 30s, calm, low] First.",
-            "[VOICE: BETA, female, 40s, warm, medium] Second.",
-            "[VOICE: GAMMA, male, 60s, deep, low] Third.",
-        ])
-        result = parser._parse_script(script)
-        assert len(result) == 3
-        names = [r["character_name"] for r in result]
-        assert names == ["ALPHA", "BETA", "GAMMA"]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. SCRIPT PARSER — Gender-Word Fallback (Name Mangling Fix)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestScriptParserGenderFallback:
-    """Malformed [VOICE: male, ...] gets CHAR_A fallback name."""
-
-    def test_male_as_name_gets_fallback(self, parser):
-        result = parser._parse_script("[VOICE: male, 40s, calm, low energy] Test line.")
-        assert result[0]["type"] == "dialogue"
-        assert result[0]["character_name"] == "CHAR_A"
-
-    def test_female_as_name_gets_fallback(self, parser):
-        result = parser._parse_script("[VOICE: female, 30s, warm, medium] Another line.")
-        assert result[0]["character_name"] == "CHAR_A"
-
-    def test_multiple_malformed_tags_increment(self, parser):
-        script = "\n".join([
-            "[VOICE: male, 40s, calm, low] Line one.",
-            "[VOICE: female, 30s, warm, medium] Line two.",
-            "[VOICE: old, 70s, gruff, low] Line three.",
-        ])
-        result = parser._parse_script(script)
-        names = [r["character_name"] for r in result]
-        assert names == ["CHAR_A", "CHAR_B", "CHAR_C"]
-
-    def test_valid_name_unaffected_by_fallback(self, parser):
-        script = "\n".join([
-            "[VOICE: male, 40s, calm, low] Malformed.",
-            "[VOICE: HAYES, male, 40s, calm, low] Correct.",
-        ])
-        result = parser._parse_script(script)
-        assert result[0]["character_name"] == "CHAR_A"
-        assert result[1]["character_name"] == "HAYES"
-
-    def test_young_word_triggers_fallback(self, parser):
-        result = parser._parse_script("[VOICE: young, 20s, nervous, high] Scared.")
-        assert result[0]["character_name"].startswith("CHAR_")
-
-    def test_all_gender_words_in_set(self, parser):
-        required = {
-            "male", "female", "man", "woman", "boy", "girl", "nonbinary",
-            "young", "old", "older", "elderly", "middle", "teen",
-        }
-        assert required.issubset(parser._GENDER_WORDS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -612,7 +431,7 @@ class TestWorkflowJSONFull:
     def test_required_pipeline_nodes(self, wf):
         types = {n["type"] for n in wf["nodes"]}
         required = {
-            "OTR_LLMScriptWriter", "OTR_LLMDirector",
+            "OTR_LedgerScriptWriter", "OTR_LLMDirector",
             "OTR_BatchBarkGenerator", "OTR_SceneSequencer",
             "OTR_EpisodeAssembler",
         }
@@ -766,83 +585,6 @@ class TestVRAMGuardianNode:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 14. PARSER v5 — SFX EXTRACTION TESTS (v1.5 Phase 1)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestParserV5SFXExtraction:
-    """Verify SFX cues are emitted as {"type": "sfx"} items by _parse_script."""
-
-    def test_sfx_has_description_field(self, parser):
-        result = parser._parse_script("[SFX: heavy metal clang]\n[VOICE: TESTCHAR, male, 30s] ok.")
-        sfx_items = [r for r in result if r["type"] == "sfx"]
-        assert len(sfx_items) == 1
-        assert "description" in sfx_items[0]
-        assert "metal clang" in sfx_items[0]["description"]
-
-    def test_multiple_sfx_preserved_in_order(self, parser):
-        script = "\n".join([
-            "[SFX: door slam]",
-            "[VOICE: A, male, 30s] Hello.",
-            "[SFX: glass breaking]",
-            "[VOICE: B, female, 30s] Watch out.",
-            "[SFX: alarm siren]",
-        ])
-        result = parser._parse_script(script)
-        sfx_items = [r for r in result if r["type"] == "sfx"]
-        assert len(sfx_items) == 3
-        assert sfx_items[0]["description"] == "door slam"
-        assert sfx_items[1]["description"] == "glass breaking"
-        assert sfx_items[2]["description"] == "alarm siren"
-
-    def test_sfx_interleaved_with_dialogue(self, parser):
-        """SFX items should appear at the correct positions in the output list."""
-        script = "[VOICE: A, male, 30s] First.\n[SFX: footsteps]\n[VOICE: A, male, 30s] Second."
-        result = parser._parse_script(script)
-        types = [r["type"] for r in result]
-        # Find the sfx position — should be between the two dialogue items
-        sfx_idx = types.index("sfx")
-        dialogue_indices = [i for i, t in enumerate(types) if t == "dialogue"]
-        assert sfx_idx > dialogue_indices[0]
-
-    def test_sfx_with_complex_description(self, parser):
-        result = parser._parse_script(
-            "[SFX: distant thunder rolling behind heavy rain, cinematic]\n"
-            "[VOICE: TESTCHAR, male, 30s] ok."
-        )
-        sfx_items = [r for r in result if r["type"] == "sfx"]
-        assert len(sfx_items) == 1
-        assert "thunder" in sfx_items[0]["description"]
-        assert "rain" in sfx_items[0]["description"]
-
-    def test_sfx_case_insensitive_extraction(self, parser):
-        """All case variants of [SFX:] should produce type=sfx items."""
-        for tag in ["[SFX: beep]", "[sfx: beep]", "[Sfx: beep]"]:
-            result = parser._parse_script(f"{tag}\n[VOICE: TESTCHAR, male, 30s] ok.")
-            sfx_items = [r for r in result if r["type"] == "sfx"]
-            assert len(sfx_items) == 1, f"Failed for tag: {tag}"
-
-    def test_sfx_in_full_scene(self, parser):
-        """SFX cues in a full canonical scene should be preserved."""
-        script = """=== SCENE 1 ===
-[ENV: dark corridor, dripping water]
-[SFX: heavy door creaking open]
-[VOICE: HAYES, male, 40s, tense, medium] Did you hear that?
-(beat)
-[SFX: footsteps echoing]
-[VOICE: DR_CHEN, female, 40s, calm, low] Just the pipes.
-[SFX: distant alarm]
-=== SCENE 2 ===
-[VOICE: ANNOUNCER, male, 50s, calm] And so it continues.
-"""
-        result = parser._parse_script(script)
-        sfx_items = [r for r in result if r["type"] == "sfx"]
-        assert len(sfx_items) == 3
-        assert sfx_items[0]["description"] == "heavy door creaking open"
-        assert sfx_items[1]["description"] == "footsteps echoing"
-        assert sfx_items[2]["description"] == "distant alarm"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # 15. AUDIOGEN CANONICAL SFX CONSUMPTION (v1.5 Phase 1)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -879,62 +621,3 @@ class TestAudioGenCanonicalSFX:
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 16. PARSER V3/V4 PATTERN REGRESSION (v1.5 Phase 1)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestParserV3V4Patterns:
-    """Regression tests for the post-v1.4 parser patterns."""
-
-    def test_v3_next_line_dialogue(self, parser):
-        """v3: [VOICE: NAME, traits] on one line, dialogue on next."""
-        script = "[VOICE: HAYES, male, 40s, tense, medium]\nDid you hear that?"
-        result = parser._parse_script(script)
-        dialogues = [r for r in result if r["type"] == "dialogue"]
-        assert len(dialogues) >= 1
-        assert dialogues[0]["character_name"] == "HAYES"
-        assert "Did you hear that?" in dialogues[0]["line"]
-
-    def test_v4_shorthand_tag(self, parser):
-        """v4: [ANNOUNCER, traits] shorthand without VOICE: prefix."""
-        script = "[ANNOUNCER, male, 50s, calm]\nWelcome to Signal Lost."
-        result = parser._parse_script(script)
-        dialogues = [r for r in result if r["type"] == "dialogue"]
-        assert len(dialogues) >= 1
-        assert dialogues[0]["character_name"] == "ANNOUNCER"
-
-    def test_v3_next_line_skips_empty_lines(self, parser):
-        """v3 lookahead should skip blank lines between tag and dialogue."""
-        script = "[VOICE: CHEN, female, 40s, calm]\n\n\nThe readings are stable."
-        result = parser._parse_script(script)
-        dialogues = [r for r in result if r["type"] == "dialogue"]
-        assert len(dialogues) >= 1
-        assert dialogues[0]["character_name"] == "CHEN"
-
-    def test_stage_direction_blocklist(self, parser):
-        """ACT, SCENE, CONTINUED in v3/v4 position should NOT create dialogue."""
-        for tag in ["[ACT 1]", "[SCENE 3]", "[CONTINUED]"]:
-            script = f"{tag}\nSome text.\n[VOICE: TESTCHAR, male, 30s] ok."
-            result = parser._parse_script(script)
-            dialogues = [r for r in result if r["type"] == "dialogue"]
-            # None of the blocklisted tags should produce dialogue with that name
-            for d in dialogues:
-                assert d["character_name"] not in ("ACT", "SCENE", "CONTINUED"), (
-                    f"Blocklisted tag {tag} created dialogue with name {d['character_name']}"
-                )
-
-    def test_markdown_bold_stripped(self, parser):
-        """Parser should strip **bold** markers from voice tags."""
-        script = "**[VOICE: HAYES, male, 40s, calm, low]** The readings are in."
-        result = parser._parse_script(script)
-        dialogues = [r for r in result if r["type"] == "dialogue"]
-        assert len(dialogues) >= 1
-        assert dialogues[0]["character_name"] == "HAYES"
-
-    def test_v2_no_traits_inline(self, parser):
-        """v2: [VOICE: NAME] dialogue — no traits specified."""
-        result = parser._parse_script("[VOICE: COMMANDER] All units stand down.")
-        dialogues = [r for r in result if r["type"] == "dialogue"]
-        assert len(dialogues) >= 1
-        assert dialogues[0]["character_name"] == "COMMANDER"
-        assert "stand down" in dialogues[0]["line"]

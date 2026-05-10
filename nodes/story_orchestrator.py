@@ -4303,33 +4303,13 @@ F. THE EAR TEST (FINAL WARNING) - Read each line aloud in your head as you write
 
 
 # ---------------------------------------------------------------------------
-# LLMScriptWriter -- extracted to nodes/_otr_legacy_writer.py during Phase 3
-# of the v2.0 LPL sprint. Resolved LAZILY via PEP 562 module-level
-# __getattr__ so the import only fires on first access, not at module load.
-#
-# Why lazy: the root __init__.py registration for OTR_LLMScriptWriter now
-# points directly at .nodes._otr_legacy_writer.LegacyLLMScriptWriter (so
-# the Bug Bible's ghost-node check finds the literal `class
-# LegacyLLMScriptWriter:` in the registered file). Under that load order,
-# ComfyUI loads _otr_legacy_writer FIRST, which imports story_orchestrator,
-# which historically tried to eagerly import the class back from its
-# still-loading sibling here -- triggering a partial-init ImportError that
-# manifested as "attempted relative import with no known parent package"
-# downstream of the fallback chain.
-#
-# Lazy resolution defers the back-import until *after* both modules are
-# fully loaded. Any code that accesses story_orchestrator.LLMScriptWriter
-# (or `from .story_orchestrator import LLMScriptWriter`) still resolves
-# to LegacyLLMScriptWriter -- the external contract is preserved.
+# 2026-05-10: LegacyLLMScriptWriter shim removed alongside
+# nodes/_otr_legacy_writer.py. The v2.0 canonical writer is
+# OTR_LedgerScriptWriter (LPL). Any caller that still does
+# `from .story_orchestrator import LLMScriptWriter` will now raise
+# AttributeError -- intentional, so stale wirings fail loudly instead of
+# silently using a dead code path.
 # ---------------------------------------------------------------------------
-
-def __getattr__(name):
-    if name == "LLMScriptWriter":
-        from ._otr_legacy_writer import LegacyLLMScriptWriter
-        return LegacyLLMScriptWriter
-    raise AttributeError(
-        "module " + repr(__name__) + " has no attribute " + repr(name)
-    )
 
 
 # -----------------------------------------------------------------------------
