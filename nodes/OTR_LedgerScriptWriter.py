@@ -1,51 +1,65 @@
-"""nodes/OTR_LedgerScriptWriter.py
+"""OTR_LedgerScriptWriter — v2.0 LPL writer with legacy-style widget surface restored 2026-05-10.
 
-Integration ComfyUI node for the v2.0 LPL (Local Per-Line Ledger)
-script writer. Replaces the legacy LLMScriptWriter for new
-workflows; legacy stays untouched until Phase 3 wiring lands.
+Pipeline (unchanged from v2.0 LPL):
 
-Pipeline inside the FUNCTION method:
-    1. load_llm via _otr_model_loader        -> cache_entry
-    2. build truncating generate_fn          -> generate_fn
-    3. _otr_outline.generate_outline         -> validated Outline
-    4. word-budget integration check (warn)
-    5. production_ledger.new_ledger          -> pending_<ts> workspace
-    6. _otr_canon.write_episode_canon        -> episode root
-    7. per-beat loop:
-         - voiced roles  -> _otr_line_composer.compose_line
-         - non-voiced    -> use beat.sfx_cue / beat.intent verbatim
-    8. set_cast / set_lines + speaker_role post-patch
-    9. assemble script_text with [VOICE:] / [SFX:] tokens
-   10. assemble news_json (1-element JSON array)
-   11. polish_pass no-op (logs and skips)
-   12. led.save()
-   13. return 4-tuple
+    1. Validate + normalize inputs (legacy widget set restored).
+    2. Resolve effective values:
+       - news_seed = custom_premise verbatim if non-empty,
+         else RSS auto-fetch via story_orchestrator._fetch_science_news.
+       - style = style_custom if non-empty, else style combo (with
+         "auto (LLM generates)" sentinel deferred to a model call
+         once the LLM is loaded, see _generate_style_via_llm).
+       - target_words from widget, optionally overridden by smoke
+         target_length presets ("30 words", "tiny").
+       - target_seconds derived from target_words / WORDS_PER_SECOND_BUDGET.
+       - creativity → (temperature, top_p) preset map.
+    3. Load LLM via _otr_model_loader.
+    4. generate_outline (validated against OutlineSchema).
+    5. new_ledger + episode_canon + set_cast.
+    6. Per-beat loop:
+         - character / announcer → compose_line (uses creativity temp/top_p)
+         - non-voiced            → use beat.sfx_cue / beat.intent verbatim
+    7. set_lines + speaker_role post-patch.
+    8. Stamp meta block (gen_params_initial, episode_title,
+       perfect_run_spacesaver, creativity, optimization_profile).
+    9. Save ledger.
 
-All heavy work is lazy. No model loads at import. No GPU at import.
-
-Output contract (STRICT, mirrors legacy LLMScriptWriter at
-story_orchestrator.py:4310-4311):
+Output contract (UNCHANGED from prior v2.0):
     RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
     RETURN_NAMES = ("script_text", "script_json", "news_used",
                     "estimated_minutes")
 
-Notable v2.0 contract divergences from legacy LLMScriptWriter:
-    - script_json (slot 1) is a JSON dump of the production ledger
-      ``led.data`` dict, NOT the legacy script_lines token tree.
-      The ledger IS the canonical truth in v2.0; downstream
-      consumers in Phase 3 read ledger fields directly.
-    - news_used (slot 2) is built from the user-supplied news_seed
-      packed into a 1-element JSON array matching the legacy
-      article-dict shape (story_orchestrator.py:5141-5283).
+Widget surface (2026-05-10 restoration):
+    required:
+        target_words      INT   (replaces target_seconds — radio ~140 wpm,
+                                 internally target_seconds = target_words / 2.5)
+        num_characters    INT   (replaces cast_size — kept legacy name for UX)
+    optional:
+        episode_title     STRING       (stamped into ledger.meta.episode_title)
+        model_id          combo        (HF model — story LLM)
+        cleanup_model_id  combo        [v2.0 MVP no-op]  — kept for UX parity
+        custom_premise    STRING       (RSS override; empty triggers feed fetch)
+        include_act_breaks BOOLEAN     [v2.0 MVP no-op]  — outline drives structure
+        self_critique     BOOLEAN      [v2.0 MVP no-op]  — script_critic node handles this now
+        target_length     combo        (smoke presets force target_words override)
+        style             combo        (tonal preset)
+        style_custom      STRING       (free-text override; empty falls back to style)
+        creativity        combo        (maps to temperature + top_p preset)
+        arc_enhancer      BOOLEAN      [v2.0 MVP no-op]
+        optimization_profile combo     [v2.0 MVP no-op forward-compat] — plumbed to model loader
+        perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for RTXUpscale spacesaver)
 
-Hard rules followed:
-    - Writes ONLY under otr/episodes/<episode_id>/. Three-bucket
-      file-layout contract.
-    - No edits to any shipped file (_otr_outline, _otr_canon,
-      _otr_line_composer, _otr_model_loader, production_ledger,
-      _otr_ledger, _otr_paths, story_orchestrator).
+Notes:
+    - news_seed RSS fetch lifted from story_orchestrator._fetch_science_news.
+      Feeds, dedup, style-aware re-ranking all reused as-is. Falls back to a
+      deterministic synthetic seed only when feedparser is unavailable or
+      every feed times out.
+    - open_close DROPPED per user 2026-05-10 — the 3-spine evaluator added
+      ~4 extra LLM passes and v2 LPL outline pipeline doesn't need it.
+    - No edits to any other shipped file (_otr_outline, _otr_canon,
+      _otr_line_composer, _otr_model_loader, production_ledger, _otr_ledger).
     - No model loads / GPU at import.
-    - UTF-8 no BOM. Safe-for-work content. No "dummy" naming.
+    - UTF-8 no BOM. Safe-for-work content.
 """
 from __future__ import annotations
 
@@ -89,7 +103,8 @@ WORD_BUDGET_RATIO_HI = 1.3
 this band logs WARNING but does not fail the run."""
 
 WORDS_PER_SECOND_BUDGET = 2.5
-"""Word budget heuristic for outline planning (radio ~150 wpm)."""
+"""Word budget heuristic for outline planning (radio ~150 wpm).
+target_seconds = target_words / WORDS_PER_SECOND_BUDGET."""
 
 WORDS_PER_MINUTE_ESTIMATE = 140
 """Word-per-minute estimate for est_minutes (slot 3). Mirrors legacy
@@ -97,32 +112,123 @@ at story_orchestrator.py:6584."""
 
 
 # ---------------------------------------------------------------------------
-# Truncating generate_fn wrapper (mirrors story_orchestrator.py:3506-3527)
+# Creativity preset maps (lifted verbatim from legacy at
+# _otr_legacy_writer.py:755-768; BUG-014 chaos clamp preserved)
+# ---------------------------------------------------------------------------
+
+_CREATIVITY_TEMP_MAP = {
+    "safe & tight":   0.6,
+    "balanced":       0.85,
+    "wild & rough":   0.92,
+    "maximum chaos":  0.95,  # BUG-014: 1.35 caused total format collapse
+}
+
+_CREATIVITY_TOP_P_MAP = {
+    "safe & tight":   0.9,
+    "balanced":       0.95,
+    "wild & rough":   0.98,
+    "maximum chaos":  0.99,
+}
+
+_CREATIVITY_CHOICES = list(_CREATIVITY_TEMP_MAP.keys())
+
+
+# ---------------------------------------------------------------------------
+# target_length preset map. Only smoke presets force a target_words
+# override; longer presets are UI labels (the outline schema, not act
+# count, drives v2 LPL structure).
+# ---------------------------------------------------------------------------
+
+_TARGET_LENGTH_CHOICES = [
+    "30 words (smoke, 1 act)",
+    "tiny (smoke, 1 act)",
+    "short (3 acts)",
+    "medium (5 acts)",
+    "long (7-8 acts)",
+    "epic (10+ acts)",
+]
+
+_TARGET_LENGTH_FORCE_WORDS = {
+    "30 words (smoke, 1 act)": 30,
+    "tiny (smoke, 1 act)":     100,
+}
+
+
+# ---------------------------------------------------------------------------
+# Style widget surface — three-way (Jeffrey 2026-05-10):
+#   1. Free-text override (`style_custom`) wins when non-empty.
+#   2. `style` combo set to "auto (LLM generates)" -> LLM proposes a
+#      tonal descriptor from the resolved news_seed.
+#   3. Any other combo entry -> used verbatim.
+# Both axes — story (custom_premise/RSS) AND style (combo/auto/custom) —
+# drive story content; the user wants both selectable.
+# ---------------------------------------------------------------------------
+
+_STYLE_AUTO_SENTINEL = "auto (LLM generates)"
+
+_STYLE_CHOICES = [
+    _STYLE_AUTO_SENTINEL,
+    "tense claustrophobic",
+    "space opera epic",
+    "psychological slow-burn",
+    "hard-sci-fi procedural",
+    "noir mystery",
+    "chaotic black-mirror",
+    "pulp adventure",
+    "rust-belt cyber-noir",
+    "paranoid procedural",
+]
+
+_LLM_STYLE_FALLBACK = "psychological slow-burn"
+"""Hardcoded last-resort if the style-generation LLM call fails or
+returns empty / unusable text. Kept short so the outline+critic
+downstream don't get a degenerate prompt."""
+
+
+# ---------------------------------------------------------------------------
+# Model dropdown (matches legacy + cleanup model dropdown)
+# ---------------------------------------------------------------------------
+
+_MODEL_CHOICES = [
+    "mistralai/Mistral-Nemo-Instruct-2407",
+    "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B-it",
+    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
+    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
+]
+
+_CLEANUP_MODEL_CHOICES = ["auto (use story model)"] + _MODEL_CHOICES
+
+_OPTIMIZATION_PROFILE_CHOICES = [
+    "Standard",
+    "Pro (Ultra Quality)",
+    "Obsidian (UNSTABLE/4GB)",
+]
+
+
+# ---------------------------------------------------------------------------
+# Truncating generate_fn wrapper (top_p parametrized 2026-05-10)
 # ---------------------------------------------------------------------------
 
 
-def _build_truncating_generate_fn(cache_entry: dict):
-    """Return a generate_fn (messages, *, temperature, max_new_tokens)
-    that left-truncates oversized prompts before model.generate.
+def _build_truncating_generate_fn(cache_entry: dict, *, top_p: float = 0.92):
+    """Return a generate_fn (messages, *, temperature, max_new_tokens) that
+    left-truncates oversized prompts before model.generate.
+
+    `top_p` is captured in the closure so the creativity widget can
+    override it (legacy parity at _otr_legacy_writer.py:768). The
+    `temperature` arg per call is whatever the line composer / outline
+    passes (compose_line bumps it on retry).
 
     Cap math: max_input_tokens = max(64, context_cap - max_new_tokens).
     Truncation is left-side (drops oldest tokens, preserves most
-    recent context -- matches legacy behavior at
-    story_orchestrator.py:3506-3527).
-
-    Logs at WARNING level when truncation fires; line format mirrors
-    legacy 'PROMPT_GUARD: Truncated X -> Y tokens (context_cap=Z,
-    max_new_tokens=N)'.
-
-    This wrapper rebuilds the body of _otr_model_loader.make_generate_fn
-    rather than wrapping it -- the truncation must happen between
-    tokenization and model.generate, which is mid-body. We keep the
-    loader file untouched (HARD RULE 2) and reimplement the small
-    chat-template adapter here.
+    recent context).
     """
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)
+    active_top_p = float(top_p)
 
     def generate_fn(messages, *, temperature, max_new_tokens):
         import torch  # local import; never load torch at module import
@@ -149,7 +255,7 @@ def _build_truncating_generate_fn(cache_entry: dict):
                 **inputs,
                 do_sample=True,
                 temperature=float(temperature),
-                top_p=0.92,
+                top_p=active_top_p,
                 max_new_tokens=int(max_new_tokens),
                 pad_token_id=tokenizer.eos_token_id,
             )
@@ -166,32 +272,270 @@ def _build_truncating_generate_fn(cache_entry: dict):
 # ---------------------------------------------------------------------------
 
 
-def _normalize_inputs(
+def _generate_style_via_llm(
+    generate_fn,
     news_seed: str,
-    style_hint: str,
-    target_seconds,
-    cast_size,
-) -> tuple:
-    """Validate + normalize the four required user inputs.
+    *,
+    temperature: float = 0.85,
+) -> str:
+    """Ask the loaded LLM to suggest a tonal style based on the news_seed.
 
-    Returns ``(news_seed, style_hint, target_seconds, cast_size,
-    target_words)``. Raises ``RuntimeError`` on empty news_seed.
-    Out-of-range numerics get clamped.
+    Used when the user leaves the `style` widget empty: instead of a
+    hardcoded combo selection, the LLM proposes a 3-6 word phrase that
+    matches the article's content. Per Jeffrey 2026-05-10: "every other
+    style type needs to be generated via LLM not pre-baked in the
+    widget".
 
-    Pulled out as a free helper so the self-test can exercise it
-    without loading a model.
+    Falls back to ``_LLM_STYLE_FALLBACK`` if the LLM is unreachable,
+    returns empty text, or returns something obviously off-spec.
+    Capped at ~60 chars so downstream prompt budgets stay sane.
+
+    `generate_fn` matches the (messages, *, temperature, max_new_tokens)
+    contract returned by ``_build_truncating_generate_fn``.
     """
-    news_seed = (news_seed or "").strip()
-    if not news_seed:
-        raise RuntimeError(
-            "[OTR_LedgerScriptWriter] news_seed is empty. v2.0 has "
-            "no RSS fallback; supply a 1-3 sentence factual seed."
+    seed_excerpt = (news_seed or "").strip()
+    if not seed_excerpt:
+        return _LLM_STYLE_FALLBACK
+    # Cap the excerpt so the prompt doesn't blow the model's context;
+    # a 1-2 sentence summary is plenty of grounding for the style call.
+    excerpt = seed_excerpt[:600]
+    sys_msg = (
+        "You are a 1940s sci-fi radio drama showrunner. Given a real "
+        "science article, you propose a short tonal style descriptor "
+        "for the episode adaptation. Examples of valid output: "
+        "'tense claustrophobic', 'noir mystery', 'pulp adventure', "
+        "'rust-belt cyber-noir', 'paranoid procedural'."
+    )
+    user_msg = (
+        f"Article seed:\n{excerpt}\n\n"
+        f"Reply with ONLY a 3-6 word lowercase tonal style descriptor. "
+        f"No quotes, no commentary, no period at the end."
+    )
+    try:
+        out = generate_fn(
+            [
+                {"role": "system", "content": sys_msg},
+                {"role": "user",   "content": user_msg},
+            ],
+            temperature=float(temperature),
+            max_new_tokens=32,
         )
-    style_hint = (style_hint or "").strip() or "psychological slow-burn"
-    target_seconds = max(10, min(600, int(target_seconds)))
-    cast_size = max(1, min(6, int(cast_size)))
-    target_words = max(5, int(target_seconds * WORDS_PER_SECOND_BUDGET))
-    return news_seed, style_hint, target_seconds, cast_size, target_words
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_LedgerScriptWriter] style LLM-suggest failed (%s); "
+            "falling back to %r",
+            exc, _LLM_STYLE_FALLBACK,
+        )
+        return _LLM_STYLE_FALLBACK
+    text = (out or "").strip().strip('"\'')
+    # Strip the model's usual leading "Style:" / "Suggested:" preamble.
+    for prefix in ("style:", "suggested:", "tone:", "descriptor:"):
+        if text.lower().startswith(prefix):
+            text = text[len(prefix):].strip()
+    # Take only the first line and cap length.
+    text = text.splitlines()[0].strip() if text else ""
+    text = text[:60].rstrip(".,;: ")
+    if not text or len(text) < 3:
+        log.warning(
+            "[OTR_LedgerScriptWriter] style LLM-suggest returned "
+            "empty/short %r; falling back to %r",
+            text, _LLM_STYLE_FALLBACK,
+        )
+        return _LLM_STYLE_FALLBACK
+    log.info(
+        "[OTR_LedgerScriptWriter] style LLM-suggest -> %r (from seed "
+        "len=%d)",
+        text, len(seed_excerpt),
+    )
+    return text
+
+
+def _resolve_creativity(creativity: str) -> tuple[float, float]:
+    """Map a creativity widget value to (temperature, top_p).
+
+    Unknown values default to balanced (0.85 / 0.95). Returns floats.
+    """
+    temp = _CREATIVITY_TEMP_MAP.get(creativity, _CREATIVITY_TEMP_MAP["balanced"])
+    top_p = _CREATIVITY_TOP_P_MAP.get(creativity, _CREATIVITY_TOP_P_MAP["balanced"])
+    return (float(temp), float(top_p))
+
+
+def _resolve_target_words(target_words, target_length: str) -> int:
+    """Apply smoke target_length presets that force a target_words override.
+
+    Non-smoke presets (short/medium/long/epic) are UI labels only — the
+    outline schema, not act count, drives v2 LPL structure.
+    """
+    forced = _TARGET_LENGTH_FORCE_WORDS.get(target_length)
+    if forced is not None:
+        log.info(
+            "[OTR_LedgerScriptWriter] target_length=%r forces target_words=%d "
+            "(widget value %r overridden)",
+            target_length, forced, target_words,
+        )
+        return int(forced)
+    return max(5, int(target_words))
+
+
+def _fetch_rss_seed_or_die(style: str, model_id: str) -> str:
+    """Run the story_orchestrator RSS fetcher and return a news_seed string.
+
+    Lifts the exact path the legacy writer used. `style` is mapped to
+    the closest legacy slug for the LLM re-rank step; if the fetcher
+    returns None (every feed failed) we raise loudly — the legacy
+    writer behaved the same.
+    """
+    try:
+        try:
+            from . import story_orchestrator as _so
+        except ImportError:
+            import story_orchestrator as _so  # type: ignore
+        # Style normalization: re-ranker expects a slug like "hard_sci_fi";
+        # use the closest match or fall back to the canonical default.
+        slug = (style or "").lower().replace(" ", "_").replace("-", "_")
+        if slug not in {"hard_sci_fi", "noir", "psychological_slow_burn",
+                        "space_opera_epic", "tense_claustrophobic",
+                        "chaotic_black_mirror"}:
+            slug = "hard_sci_fi"
+        news = _so._fetch_science_news(
+            max_feeds=10, style=slug, model_id=model_id,
+            optimization_profile="Standard",
+        )
+        if not news:
+            raise RuntimeError(
+                "RSS fetcher returned no articles (all feeds failed or "
+                "all candidates already used)"
+            )
+        # news is a list[dict] like [{headline, summary, full_text, source, link, date}, ...]
+        # The orchestrator returns either a list or a single dict depending
+        # on version. Normalize both shapes.
+        if isinstance(news, dict):
+            article = news
+        elif isinstance(news, list) and news:
+            article = news[0]
+        else:
+            raise RuntimeError(f"unexpected fetcher return shape: {type(news).__name__}")
+        seed_text = " ".join(filter(None, [
+            (article.get("headline") or "").strip(),
+            (article.get("summary") or "").strip(),
+        ]))
+        if not seed_text:
+            seed_text = (article.get("full_text") or "").strip()
+        if not seed_text:
+            raise RuntimeError("fetched article had empty headline/summary/full_text")
+        log.info(
+            "[OTR_LedgerScriptWriter] RSS_FETCH OK: source=%s, len=%d, head=%r",
+            article.get("source") or "?", len(seed_text), seed_text[:80],
+        )
+        return seed_text
+    except Exception as exc:
+        # Loud raise: the writer requires a real seed to function. The
+        # workflow can override via custom_premise if RSS is unavailable.
+        raise RuntimeError(
+            f"[OTR_LedgerScriptWriter] RSS fetch failed: {exc}. "
+            f"Type a non-empty value into the `custom_premise` widget to "
+            f"bypass the RSS pipeline.",
+        ) from exc
+
+
+def _resolve_inputs(
+    target_words,
+    num_characters,
+    *,
+    episode_title: str = "",
+    model_id: str = DEFAULT_MODEL_ID,
+    cleanup_model_id: str = "auto (use story model)",
+    custom_premise: str = "",
+    include_act_breaks: bool = True,
+    self_critique: bool = True,
+    target_length: str = "short (3 acts)",
+    style: str = _STYLE_AUTO_SENTINEL,
+    style_custom: str = "",
+    creativity: str = "balanced",
+    arc_enhancer: bool = True,
+    optimization_profile: str = "Standard",
+    perfect_run_spacesaver: bool = False,
+) -> dict:
+    """Resolve raw widget values into the effective set used by the run.
+
+    Returns a single dict. Logs at INFO for branches that override the
+    widget value (RSS fetch, smoke preset, style_custom override).
+
+    Both story and style follow the same dual-axis pattern (per Jeffrey
+    2026-05-10 "there is the story, and the style — those two drive
+    story content so we need both"):
+
+      - story:   custom_premise verbatim > RSS auto-fetch.
+      - style:   style_custom verbatim > `style` combo verbatim, EXCEPT
+                 when combo == `_STYLE_AUTO_SENTINEL`, in which case
+                 the writer defers to ``_generate_style_via_llm``
+                 once the model is loaded. This helper returns
+                 ``style_pending=True`` on the dict in that case so
+                 the caller knows to call the LLM.
+
+    Resolution order for the final style string:
+      1. style_custom (free-text, takes precedence)
+      2. style combo verbatim if != _STYLE_AUTO_SENTINEL
+      3. LLM-generated (caller fills `resolved["style"]` post-load)
+    """
+    target_words = _resolve_target_words(target_words, target_length)
+    target_seconds = max(10, min(600, int(round(target_words / WORDS_PER_SECOND_BUDGET))))
+    num_characters = max(1, min(6, int(num_characters)))
+    temperature, top_p = _resolve_creativity(creativity)
+    custom = (custom_premise or "").strip()
+
+    sc = (style_custom or "").strip()
+    style_combo = (style or "").strip()
+    if sc:
+        resolved_style = sc
+        style_source = "style_custom"
+        style_pending = False
+    elif style_combo and style_combo != _STYLE_AUTO_SENTINEL:
+        resolved_style = style_combo
+        style_source = "style_combo"
+        style_pending = False
+    else:
+        # auto / empty -> defer to LLM post-load.
+        resolved_style = ""        # caller fills
+        style_source = "llm_auto"
+        style_pending = True
+
+    if custom:
+        news_seed = custom
+        seed_source = "custom_premise"
+    else:
+        # Best-effort RSS re-rank slug. If style is still pending
+        # (auto/LLM), use the hardcoded fallback only for the slug --
+        # the writer's final style still gets LLM-proposed from the
+        # ACTUAL fetched article below.
+        rss_style_slug = resolved_style or _LLM_STYLE_FALLBACK
+        news_seed = _fetch_rss_seed_or_die(rss_style_slug, model_id)
+        seed_source = "rss_fetch"
+
+    return {
+        "news_seed":            news_seed,
+        "seed_source":          seed_source,
+        "style":                resolved_style,
+        "style_source":         style_source,
+        "style_pending":        style_pending,
+        "style_combo":          style_combo,
+        "style_custom":         sc,
+        "target_words":         target_words,
+        "target_seconds":       target_seconds,
+        "num_characters":       num_characters,
+        "episode_title":        (episode_title or "").strip(),
+        "model_id":             str(model_id or DEFAULT_MODEL_ID).strip(),
+        "cleanup_model_id":     str(cleanup_model_id or "auto (use story model)"),
+        "include_act_breaks":   bool(include_act_breaks),
+        "self_critique":        bool(self_critique),
+        "target_length":        str(target_length),
+        "creativity":           str(creativity),
+        "temperature":          float(temperature),
+        "top_p":                float(top_p),
+        "arc_enhancer":         bool(arc_enhancer),
+        "optimization_profile": str(optimization_profile),
+        "perfect_run_spacesaver": bool(perfect_run_spacesaver),
+    }
 
 
 def _build_cast_rows(cast_names) -> tuple:
@@ -218,17 +562,19 @@ def _build_cast_rows(cast_names) -> tuple:
     return cast_rows, char_id_by_name
 
 
-def _build_news_payload(outline, news_seed: str) -> str:
+def _build_news_payload(outline, news_seed: str, seed_source: str) -> str:
     """Build the slot-2 news_used JSON string.
 
     1-element JSON array matching legacy article shape
-    (story_orchestrator.py:5141-5283 + RECON 4(b)).
+    (story_orchestrator.py:5141-5283 + RECON 4(b)). seed_source flags
+    whether the body came from a user-typed custom_premise or from the
+    RSS fetcher.
     """
     news = [{
         "headline":  outline.title,
         "summary":   outline.premise[:500],
         "full_text": news_seed,
-        "source":    "User Seed",
+        "source":    "User Seed" if seed_source == "custom_premise" else "RSS Auto-Fetch",
         "date":      datetime.now().date().isoformat(),
         "link":      "",
     }]
@@ -241,62 +587,51 @@ def _build_news_payload(outline, news_seed: str) -> str:
 
 
 class OTR_LedgerScriptWriter:
-    """v2.0 LPL script writer. ComfyUI integration node.
+    """v2.0 LPL script writer with legacy-style widget surface.
 
     Wires the four shipped LPL modules (_otr_outline, _otr_canon,
     _otr_line_composer, _otr_model_loader) plus production_ledger
-    into the legacy 4-slot output contract.
+    into the legacy 4-slot output contract. Widget set restored 2026-05-10
+    so users get back episode_title / target_words / num_characters /
+    creativity / target_length / style / style_custom / model controls.
     """
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "news_seed": ("STRING", {
-                    "multiline": True,
-                    "default": "",
+                "target_words": ("INT", {
+                    "default": 700, "min": 30, "max": 10000, "step": 10,
                     "tooltip": (
-                        "Real science story or factual seed (1-3 "
-                        "sentences). The outline will extrapolate "
-                        "dramatically from this. Leave blank to fail "
-                        "loudly -- there is no RSS fallback in v2.0."
+                        "Target spoken dialogue word count at ~140 wpm. "
+                        "30 = ultra-smoke pipeline check (~13s, ~3 lines), "
+                        "100 = smoke (~45s, ~6 HuMo clips), 200 = quick, "
+                        "350 = ~2.5min, 700 = 5min, 1400 = 10min, "
+                        "2100 = 15min, 3500 = 25min. target_length presets "
+                        "for '30 words (smoke)' / 'tiny (smoke)' override "
+                        "this widget."
                     ),
                 }),
-                "style_hint": ("STRING", {
-                    "multiline": False,
-                    "default": "psychological slow-burn",
-                    "tooltip": (
-                        "Free-form style descriptor. The local LLM "
-                        "uses its own trained dialogue register; this "
-                        "is just a tonal nudge. Examples: 'pulp "
-                        "adventure', 'noir thriller', 'hard sci-fi "
-                        "procedural', 'rust-belt cyber-noir'."
-                    ),
-                }),
-                "target_seconds": ("INT", {
-                    "default": 90, "min": 10, "max": 600, "step": 5,
-                    "tooltip": (
-                        "Target episode length in seconds. Word "
-                        "budget = target_seconds * 2.5 (radio "
-                        "~150 wpm)."
-                    ),
-                }),
-                "cast_size": ("INT", {
+                "num_characters": ("INT", {
                     "default": 2, "min": 1, "max": 6, "step": 1,
                     "tooltip": (
-                        "Number of speaking characters in the outline."
+                        "Number of speaking characters (plus ANNOUNCER "
+                        "bookends). 1 = monologue/diary mode."
                     ),
                 }),
             },
             "optional": {
-                "model_id": ([
-                    "mistralai/Mistral-Nemo-Instruct-2407",
-                    "google/gemma-4-E2B-it",
-                    "google/gemma-4-E4B-it",
-                    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
-                    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-                    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
-                ], {
+                "episode_title": ("STRING", {
+                    "default": "",
+                    "tooltip": (
+                        "Optional episode title override. Stamped at "
+                        "ledger.meta.episode_title so SignalLostVideo "
+                        "picks it up directly without title-chain "
+                        "fallback. Leave blank to let the outline "
+                        "supply a title."
+                    ),
+                }),
+                "model_id": (_MODEL_CHOICES, {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
                         "Hugging Face model ID. Mistral-Nemo is the "
@@ -305,14 +640,138 @@ class OTR_LedgerScriptWriter:
                         "the loader before HF lookup."
                     ),
                 }),
-                "polish_pass": ("BOOLEAN", {
+                "cleanup_model_id": (_CLEANUP_MODEL_CHOICES, {
+                    "default": "auto (use story model)",
+                    "tooltip": (
+                        "[v2.0 MVP no-op] Legacy two-LLM split widget "
+                        "for cleanup phases. v2 LPL uses one model for "
+                        "outline + line composition; the structured "
+                        "cleanup phases the legacy writer ran are no "
+                        "longer in the pipeline. Kept here for UI parity."
+                    ),
+                }),
+                "custom_premise": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) type a custom story premise here — "
+                        "overrides the RSS news fetch"
+                    ),
+                    "tooltip": (
+                        "Empty (default) -> RSS fetcher pulls a fresh "
+                        "real-world science headline as the episode "
+                        "seed.\n\n"
+                        "Non-empty -> uses your text verbatim as the "
+                        "seed and skips RSS entirely.\n\n"
+                        "Use cases for the override:\n"
+                        "  - test a specific story idea\n"
+                        "  - reproduce a previous run with controlled "
+                        "inputs\n"
+                        "  - work offline / skip RSS when the network "
+                        "is slow."
+                    ),
+                }),
+                "include_act_breaks": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "[v2.0 MVP no-op] Legacy act-break + sponsor-"
+                        "message generation. v2 LPL structure is driven "
+                        "by the outline schema's beat list; act breaks "
+                        "aren't a separate widget-controlled phase."
+                    ),
+                }),
+                "self_critique": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "[v2.0 MVP no-op] Legacy Draft -> Critique -> "
+                        "Revise loop. v2 pipeline does this in a "
+                        "downstream OTR_LLMScriptCritic node instead "
+                        "of inside the writer."
+                    ),
+                }),
+                "target_length": (_TARGET_LENGTH_CHOICES, {
+                    "default": "short (3 acts)",
+                    "tooltip": (
+                        "Length preset. '30 words (smoke)' and 'tiny "
+                        "(smoke)' FORCE target_words=30 / 100 (the "
+                        "widget value is overridden). short / medium / "
+                        "long / epic are UI labels only — v2 LPL "
+                        "structure is driven by outline schema, not "
+                        "act count."
+                    ),
+                }),
+                "style": (_STYLE_CHOICES, {
+                    "default": _STYLE_AUTO_SENTINEL,
+                    "tooltip": (
+                        "Tonal preset for the outline. Three-way "
+                        "resolution:\n"
+                        f"  - '{_STYLE_AUTO_SENTINEL}' (default) -> the "
+                        "LLM proposes a 3-6 word style descriptor "
+                        "from the resolved news_seed during the run. "
+                        "Each episode gets a unique tonal direction "
+                        "matched to its article.\n"
+                        "  - Any other entry in this dropdown -> used "
+                        "verbatim as the style descriptor.\n"
+                        "  - style_custom (next widget, when non-"
+                        "empty) overrides BOTH paths above."
+                    ),
+                }),
+                "style_custom": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) free-form tonal descriptor — "
+                        "overrides the style dropdown above"
+                    ),
+                    "tooltip": (
+                        "Free-form style descriptor. Non-empty value "
+                        "overrides the style combo above AND disables "
+                        "the LLM 'auto' path. Examples: 'rust-belt "
+                        "cyber-noir', 'pulp adventure with comic "
+                        "timing', 'cosmic horror procedural'."
+                    ),
+                }),
+                "creativity": (_CREATIVITY_CHOICES, {
+                    "default": "balanced",
+                    "tooltip": (
+                        "Creativity dial — overrides raw temperature "
+                        "+ top_p with curated presets:\n"
+                        "  safe & tight   -> temp 0.60, top_p 0.90\n"
+                        "  balanced       -> temp 0.85, top_p 0.95\n"
+                        "  wild & rough   -> temp 0.92, top_p 0.98\n"
+                        "  maximum chaos  -> temp 0.95, top_p 0.99\n"
+                        "(BUG-014: temp > 1.0 caused format collapse, "
+                        "so 'maximum chaos' caps at 0.95.)"
+                    ),
+                }),
+                "arc_enhancer": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "[v2.0 MVP no-op] Legacy arc-structure "
+                        "enhancer. v2 LPL outline schema enforces a "
+                        "narrative arc via its beat list directly."
+                    ),
+                }),
+                "optimization_profile": (_OPTIMIZATION_PROFILE_CHOICES, {
+                    "default": "Standard",
+                    "tooltip": (
+                        "[v2.0 MVP forward-compat] Plumbed through to "
+                        "_otr_model_loader for VRAM-tier selection. "
+                        "Today only 'Standard' is fully validated; "
+                        "the other tiers fall back to Standard until "
+                        "the v2 loader's profile branches land."
+                    ),
+                }),
+                "perfect_run_spacesaver": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "v2.0 MVP no-op. The full-ledger continuity-"
-                        "drift rewrite is deferred to v2.1 once the "
-                        "50-run soak proves the per-line path stable. "
-                        "Setting True logs an explicit notice but "
-                        "does not change output."
+                        "Stamps ledger.meta.perfect_run_spacesaver = "
+                        "true so OTR_RTXUpscale's spacesaver cleanup "
+                        "fires after PostUpscaleProcgenBlend produces "
+                        "the final 1080p mp4. Wipes intermediates to "
+                        "free disk space. Leave OFF for any run you "
+                        "want to keep the per-stage mp4 set around for "
+                        "debugging."
                     ),
                 }),
             },
@@ -338,28 +797,59 @@ class OTR_LedgerScriptWriter:
 
     def run(
         self,
-        news_seed,
-        style_hint,
-        target_seconds,
-        cast_size,
+        target_words,
+        num_characters,
+        episode_title="",
         model_id=DEFAULT_MODEL_ID,
-        polish_pass=False,
+        cleanup_model_id="auto (use story model)",
+        custom_premise="",
+        include_act_breaks=True,
+        self_critique=True,
+        target_length="short (3 acts)",
+        style=_STYLE_AUTO_SENTINEL,
+        style_custom="",
+        creativity="balanced",
+        arc_enhancer=True,
+        optimization_profile="Standard",
+        perfect_run_spacesaver=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
-        # --- Validate + normalize inputs ----------------------------
-        news_seed, style_hint, target_seconds, cast_size, target_words = (
-            _normalize_inputs(news_seed, style_hint, target_seconds, cast_size)
+        # --- A. Resolve all widget inputs (RSS fetch happens here) -----
+        resolved = _resolve_inputs(
+            target_words=target_words,
+            num_characters=num_characters,
+            episode_title=episode_title,
+            model_id=model_id,
+            cleanup_model_id=cleanup_model_id,
+            custom_premise=custom_premise,
+            include_act_breaks=include_act_breaks,
+            self_critique=self_critique,
+            target_length=target_length,
+            style=style,
+            style_custom=style_custom,
+            creativity=creativity,
+            arc_enhancer=arc_enhancer,
+            optimization_profile=optimization_profile,
+            perfect_run_spacesaver=perfect_run_spacesaver,
         )
 
         log.info(
-            "[OTR_LedgerScriptWriter] start: model=%r, target_seconds=%d, "
-            "cast_size=%d, target_words=%d, style_hint=%r, polish_pass=%s",
-            model_id, target_seconds, cast_size, target_words,
-            style_hint, polish_pass,
+            "[OTR_LedgerScriptWriter] start: model=%r, target_words=%d "
+            "(seconds=%d), num_characters=%d, style_source=%s "
+            "(pending=%s, value=%r), creativity=%r (temp=%.2f "
+            "top_p=%.2f), seed_source=%s, episode_title=%r, "
+            "perfect_run_spacesaver=%s",
+            resolved["model_id"], resolved["target_words"],
+            resolved["target_seconds"], resolved["num_characters"],
+            resolved["style_source"], resolved["style_pending"],
+            resolved["style"], resolved["creativity"],
+            resolved["temperature"], resolved["top_p"],
+            resolved["seed_source"], resolved["episode_title"],
+            resolved["perfect_run_spacesaver"],
         )
 
-        # --- Late imports (no GPU / no model loads at module import) ---
+        # --- B. Late imports (no GPU / no model loads at module import) ---
         from . import _otr_outline as _OTRO
         from . import _otr_canon as _OTRC
         from . import _otr_line_composer as _OTRLC
@@ -367,53 +857,67 @@ class OTR_LedgerScriptWriter:
         from . import _otr_ledger as _OTRL
         from . import production_ledger as _PL
 
-        # --- A. Load LLM + build truncating generate_fn -------------
+        # --- C. Load LLM + build truncating generate_fn ---------------
         cache_entry = _OTRML.load_llm(
-            model_id, device="cuda", optimization_profile="Standard",
+            resolved["model_id"], device="cuda",
+            optimization_profile=resolved["optimization_profile"],
         )
-        generate_fn = _build_truncating_generate_fn(cache_entry)
+        generate_fn = _build_truncating_generate_fn(
+            cache_entry, top_p=resolved["top_p"],
+        )
 
-        # --- B. Generate validated outline --------------------------
+        # --- C2. Style LLM-suggest path (auto sentinel / empty combo) ---
+        # When the user picked "auto (LLM generates)" or left the combo
+        # blank AND no style_custom override, ask the model to propose
+        # a tonal style descriptor based on the resolved news_seed.
+        # The widget-typed style_custom and the verbatim combo entries
+        # bypass this branch.
+        if resolved["style_pending"]:
+            generated_style = _generate_style_via_llm(
+                generate_fn,
+                resolved["news_seed"],
+                temperature=resolved["temperature"],
+            )
+            resolved["style"] = generated_style
+            log.info(
+                "[OTR_LedgerScriptWriter] style auto-resolved: %r "
+                "(LLM proposal from news_seed, fallback was %r)",
+                generated_style, _LLM_STYLE_FALLBACK,
+            )
+
+        # --- D. Generate validated outline ----------------------------
         outline_req = _OTRO.OutlineRequest(
-            news_seed=news_seed,
-            style_hint=style_hint,
-            cast_size=cast_size,
-            target_seconds=target_seconds,
-            target_words=target_words,
+            news_seed=resolved["news_seed"],
+            style_hint=resolved["style"],
+            cast_size=resolved["num_characters"],
+            target_seconds=resolved["target_seconds"],
+            target_words=resolved["target_words"],
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
 
-        # --- C. Word-budget integration check (WARN, do not fail) ---
+        # --- E. Word-budget integration check (WARN, do not fail) -----
         beat_word_sum = sum(b.target_words for b in outline.beats)
-        ratio = beat_word_sum / max(1, target_words)
+        ratio = beat_word_sum / max(1, resolved["target_words"])
         if not (WORD_BUDGET_RATIO_LO <= ratio <= WORD_BUDGET_RATIO_HI):
             log.warning(
                 "[OTR_LedgerScriptWriter] WORD_BUDGET_DRIFT: outline "
                 "beats sum to %d words, target %d (ratio=%.2f); "
                 "proceeding anyway",
-                beat_word_sum, target_words, ratio,
+                beat_word_sum, resolved["target_words"], ratio,
             )
 
-        # --- D. Create per-episode workspace via new_ledger ---------
-        # new_ledger() with episode_id=None creates a pending_<ts> slug
-        # and the on-disk audio/ dir. Do NOT bypass this two-step
-        # pattern -- SignalLostVideo later calls rename_episode().
+        # --- F. Create per-episode workspace via new_ledger -----------
         led = _PL.new_ledger(episode_id=None)
         episode_id = led.episode_id           # pending_<YYYYMMDD_HHMMSS>
         audio_dir = Path(led.out_dir)         # otr/episodes/<ep>/audio/
         episode_root = audio_dir.parent       # otr/episodes/<ep>/
-        # episode_root was created by Ledger.__init__ via os.makedirs
-        # on out_dir; sibling subdirs (stills/, portraits/, ...) are
-        # created by their respective producer nodes when they run.
 
-        # --- E. Stamp episode_canon at episode root -----------------
+        # --- G. Stamp episode_canon at episode root -------------------
         canon = _OTRC.episode_canon_from_outline_dict({
-            "title":       outline.title,
+            "title":       resolved["episode_title"] or outline.title,
             "premise":     outline.premise,
             "setting":     outline.setting,
             "time_of_day": outline.time_of_day,
-            # sound_palette intentionally omitted (Outline schema
-            # doesn't carry it; canon defaults to []).
         })
         _OTRC.write_episode_canon(episode_root, canon)
         canon_header = _OTRC.render_episode_canon_header(canon)
@@ -422,14 +926,16 @@ class OTR_LedgerScriptWriter:
             episode_root / _OTRC.EPISODE_CANON_FILENAME,
         )
 
-        # --- F. Build cast rows + char_id index ---------------------
+        # --- H. Build cast rows + char_id index ------------------------
         cast_rows, char_id_by_name = _build_cast_rows(outline.cast)
         led.set_cast(cast_rows)
 
-        # --- G. Per-beat loop ---------------------------------------
+        # --- I. Per-beat loop ------------------------------------------
         line_rows: list = []
         script_text_parts: list = []
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
+
+        base_temp = resolved["temperature"]
 
         for beat in outline.beats:
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
@@ -446,7 +952,9 @@ class OTR_LedgerScriptWriter:
                     canon_header=canon_header,
                     last_lines=list(last_lines),
                 )
-                cleaned = _OTRLC.compose_line(generate_fn, line_req)
+                cleaned = _OTRLC.compose_line(
+                    generate_fn, line_req, base_temperature=base_temp,
+                )
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
 
@@ -463,7 +971,9 @@ class OTR_LedgerScriptWriter:
                     canon_header=canon_header,
                     last_lines=list(last_lines),
                 )
-                cleaned = _OTRLC.compose_line(generate_fn, line_req)
+                cleaned = _OTRLC.compose_line(
+                    generate_fn, line_req, base_temperature=base_temp,
+                )
                 cid = "announcer"
                 token = f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
 
@@ -472,18 +982,11 @@ class OTR_LedgerScriptWriter:
                     last_lines.pop(0)
 
             elif beat.speaker_role in NON_VOICED_ROLES:
-                # No LLM call. Use sfx_cue if present, else intent.
                 cleaned = (beat.sfx_cue or beat.intent or "").strip()
                 cid = beat.speaker_role
                 token = f"[SFX: {cleaned}]"
-                # Non-voiced beats do NOT push into last_lines (they
-                # add no spoken context for the next compose call).
 
             else:
-                # Defensive: an unknown role slipped past the schema.
-                # Log and skip; do not raise -- the outline already
-                # validated, so this would be a code drift between
-                # _otr_outline.SpeakerRole and what we handle here.
                 log.warning(
                     "[OTR_LedgerScriptWriter] unknown speaker_role %r "
                     "on beat %s; skipping",
@@ -492,7 +995,6 @@ class OTR_LedgerScriptWriter:
                 continue
 
             line_rows.append({
-                # Legacy schema fields (pass through set_lines):
                 "line_id":       beat.beat_id,
                 "shot_id":       None,
                 "beat_id":       beat.beat_id,
@@ -503,15 +1005,11 @@ class OTR_LedgerScriptWriter:
                 "bark_wav_path": None,
                 "start_s":       None,
                 "dur_s":         None,
-                # Internal-only -- NOT passed to set_lines:
                 "_speaker_role": beat.speaker_role,
             })
             script_text_parts.append(token)
 
-        # --- H. set_lines + post-patch additive speaker_role --------
-        # set_lines normalizes the legacy schema fields. The additive
-        # speaker_role key is stamped per-row via patch_line_fields
-        # immediately after, since set_lines drops unknown keys.
+        # --- J. set_lines + post-patch additive speaker_role ----------
         led.set_lines([
             {k: v for k, v in r.items() if not k.startswith("_")}
             for r in line_rows
@@ -522,22 +1020,43 @@ class OTR_LedgerScriptWriter:
                 {"speaker_role": r["_speaker_role"]},
             )
 
-        # --- I. Assemble return values ------------------------------
+        # --- K. Stamp meta block --------------------------------------
+        # Mirrors the legacy writer's gen_params_initial stamp so the
+        # critic (`script_critic._coerce_params`) can keep reading the
+        # same field names. Also stamps episode_title (forward-compat
+        # title chain slot) and perfect_run_spacesaver.
+        meta = led.data.setdefault("meta", {})
+        meta["gen_params_initial"] = {
+            "target_words":         resolved["target_words"],
+            "num_characters":       resolved["num_characters"],
+            "model_id":              resolved["model_id"],
+            "cleanup_model_id":      resolved["cleanup_model_id"],
+            "style":                 resolved["style"],
+            "style_combo":           resolved["style_combo"],
+            "style_custom":          resolved["style_custom"],
+            "style_source":          resolved["style_source"],
+            "creativity":            resolved["creativity"],
+            "temperature":           resolved["temperature"],
+            "top_p":                 resolved["top_p"],
+            "target_length":         resolved["target_length"],
+            "include_act_breaks":    resolved["include_act_breaks"],
+            "self_critique":         resolved["self_critique"],
+            "arc_enhancer":          resolved["arc_enhancer"],
+            "optimization_profile":  resolved["optimization_profile"],
+            "seed_source":           resolved["seed_source"],
+        }
+        if resolved["episode_title"]:
+            meta["episode_title"] = resolved["episode_title"]
+        if resolved["perfect_run_spacesaver"]:
+            meta["perfect_run_spacesaver"] = True
+
+        # --- L. Assemble return values --------------------------------
         script_text = "\n\n".join(script_text_parts)
-
-        # script_json shape: v2.0 contract divergence from legacy.
-        # Legacy emits json.dumps(script_lines) (token tree consumed
-        # by LLMDirector). v2.0 LPL emits the canonical ledger dict
-        # (kickoff §6.7b: "Validated ledger JSON string"). Phase 3
-        # wiring will need to bridge any remaining consumer drift.
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
+        news_json = _build_news_payload(
+            outline, resolved["news_seed"], resolved["seed_source"],
+        )
 
-        news_json = _build_news_payload(outline, news_seed)
-
-        # est_minutes: float-with-1-decimal, 140 wpm (matches legacy
-        # at story_orchestrator.py:6584). ComfyUI's INT type tag
-        # silently coerces -- RECON 4 confirmed this is the on-wire
-        # contract regardless of the type tag.
         actual_word_count = sum(
             int(r.get("word_count") or 0) for r in led.data["lines"]
         )
@@ -545,15 +1064,7 @@ class OTR_LedgerScriptWriter:
             1, round(actual_word_count / WORDS_PER_MINUTE_ESTIMATE, 1),
         )
 
-        # --- J. Polish pass no-op (MVP) -----------------------------
-        if polish_pass:
-            log.info(
-                "[OTR_LedgerScriptWriter] polish_pass=True received but "
-                "is a no-op for v2.0 MVP; full-ledger rewrite deferred "
-                "to v2.1"
-            )
-
-        # --- K. Save ledger -----------------------------------------
+        # --- M. Save ledger -------------------------------------------
         saved_path = led.save()
         log.info(
             "[OTR_LedgerScriptWriter] DONE: episode_id=%s, lines=%d, "
@@ -561,7 +1072,6 @@ class OTR_LedgerScriptWriter:
             episode_id, len(led.data["lines"]), actual_word_count,
             est_minutes, saved_path,
         )
-
         return (script_text, script_json, news_json, est_minutes)
 
 
@@ -580,44 +1090,64 @@ if __name__ == "__main__":
         cls = OTR_LedgerScriptWriter
         obj = cls()
         assert obj is not None
-        print("[1/5] PASS: class instantiation")
+        print("[1/7] PASS: class instantiation")
     except Exception:
-        failures.append(("1/5 class instantiation", traceback.format_exc()))
-        print("[1/5] FAIL: class instantiation")
+        failures.append(("1/7 class instantiation", traceback.format_exc()))
+        print("[1/7] FAIL: class instantiation")
 
     # 2. INPUT_TYPES schema introspection.
     try:
         spec = cls.INPUT_TYPES()
         assert "required" in spec, "missing required block"
         assert "optional" in spec, "missing optional block"
-        for k in ("news_seed", "style_hint", "target_seconds", "cast_size"):
+        for k in ("target_words", "num_characters"):
             assert k in spec["required"], f"required missing key: {k}"
-        for k in ("model_id", "polish_pass"):
+        for k in ("episode_title", "model_id", "cleanup_model_id",
+                  "custom_premise", "include_act_breaks", "self_critique",
+                  "target_length", "style", "style_custom", "creativity",
+                  "arc_enhancer", "optimization_profile",
+                  "perfect_run_spacesaver"):
             assert k in spec["optional"], f"optional missing key: {k}"
-        # news_seed is multiline STRING
-        ns_type, ns_meta = spec["required"]["news_seed"]
-        assert ns_type == "STRING"
-        assert ns_meta.get("multiline") is True
-        # target_seconds INT clamps
-        ts_type, ts_meta = spec["required"]["target_seconds"]
-        assert ts_type == "INT"
-        assert ts_meta["min"] == 10 and ts_meta["max"] == 600
-        # cast_size INT clamps
-        cs_type, cs_meta = spec["required"]["cast_size"]
-        assert cs_type == "INT"
-        assert cs_meta["min"] == 1 and cs_meta["max"] == 6
-        # model_id dropdown is hardcoded list of 6 entries
-        model_choices, _ = spec["optional"]["model_id"]
-        assert isinstance(model_choices, list) and len(model_choices) == 6
-        assert model_choices[0] == "mistralai/Mistral-Nemo-Instruct-2407"
-        # polish_pass BOOLEAN, default False
-        pp_type, pp_meta = spec["optional"]["polish_pass"]
-        assert pp_type == "BOOLEAN"
-        assert pp_meta["default"] is False
-        print("[2/5] PASS: INPUT_TYPES schema")
+        # open_close MUST be absent (dropped 2026-05-10).
+        assert "open_close" not in spec["required"]
+        assert "open_close" not in spec["optional"]
+        # target_words INT clamps
+        tw_type, tw_meta = spec["required"]["target_words"]
+        assert tw_type == "INT"
+        assert tw_meta["min"] == 30 and tw_meta["max"] == 10000
+        # num_characters INT clamps
+        nc_type, nc_meta = spec["required"]["num_characters"]
+        assert nc_type == "INT"
+        assert nc_meta["min"] == 1 and nc_meta["max"] == 6
+        # custom_premise is multiline STRING with empty default
+        cp_type, cp_meta = spec["optional"]["custom_premise"]
+        assert cp_type == "STRING"
+        assert cp_meta.get("multiline") is True
+        assert cp_meta.get("default") == ""
+        # creativity options match the preset map keys
+        cr_choices, _ = spec["optional"]["creativity"]
+        assert cr_choices == _CREATIVITY_CHOICES, \
+            f"creativity dropdown drift: {cr_choices}"
+        # target_length first two are smoke presets
+        tl_choices, _ = spec["optional"]["target_length"]
+        assert tl_choices[0].startswith("30 words")
+        assert tl_choices[1].startswith("tiny")
+        # style combo: first entry is the LLM-auto sentinel; remaining
+        # entries are the baked-in tonal presets the user can pick.
+        st_choices, st_meta = spec["optional"]["style"]
+        assert isinstance(st_choices, list) and len(st_choices) >= 4
+        assert st_choices[0] == _STYLE_AUTO_SENTINEL, \
+            f"style[0] drift: {st_choices[0]!r}"
+        assert st_meta.get("default") == _STYLE_AUTO_SENTINEL
+        # style_custom is multiline STRING free-text override
+        sc_type, sc_meta = spec["optional"]["style_custom"]
+        assert sc_type == "STRING"
+        assert sc_meta.get("multiline") is True
+        assert sc_meta.get("default") == ""
+        print("[2/7] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
     except Exception:
-        failures.append(("2/5 INPUT_TYPES", traceback.format_exc()))
-        print("[2/5] FAIL: INPUT_TYPES schema")
+        failures.append(("2/7 INPUT_TYPES", traceback.format_exc()))
+        print("[2/7] FAIL: INPUT_TYPES schema")
 
     # 3. Locked output contract.
     try:
@@ -628,79 +1158,146 @@ if __name__ == "__main__":
         ), f"RETURN_NAMES drift: {cls.RETURN_NAMES}"
         assert cls.FUNCTION == "run"
         assert cls.CATEGORY == "OldTimeRadio"
-        print("[3/5] PASS: output contract")
+        print("[3/7] PASS: output contract")
     except Exception:
-        failures.append(("3/5 output contract", traceback.format_exc()))
-        print("[3/5] FAIL: output contract")
+        failures.append(("3/7 output contract", traceback.format_exc()))
+        print("[3/7] FAIL: output contract")
 
-    # 4. _build_truncating_generate_fn returns a callable.
+    # 4. _build_truncating_generate_fn returns a callable; top_p override.
     try:
-        fake_cache = {
-            "model": None,
-            "tokenizer": None,
-            "context_cap": 8192,
-        }
-        gen = _build_truncating_generate_fn(fake_cache)
-        assert callable(gen), "wrapper did not return a callable"
-        # Do NOT call gen() -- that would dereference the None model.
-        print("[4/5] PASS: truncating generate_fn build")
+        fake_cache = {"model": None, "tokenizer": None, "context_cap": 8192}
+        gen_default = _build_truncating_generate_fn(fake_cache)
+        gen_custom = _build_truncating_generate_fn(fake_cache, top_p=0.99)
+        assert callable(gen_default)
+        assert callable(gen_custom)
+        print("[4/7] PASS: truncating generate_fn build (default + top_p override)")
     except Exception:
-        failures.append(("4/5 generate_fn build", traceback.format_exc()))
-        print("[4/5] FAIL: truncating generate_fn build")
+        failures.append(("4/7 generate_fn build", traceback.format_exc()))
+        print("[4/7] FAIL: truncating generate_fn build")
 
-    # 5. Validation paths fire (uses the free helper, no model load).
+    # 5. _resolve_creativity / 3-way style resolution / _resolve_target_words.
     try:
-        # 5a. Empty news_seed raises RuntimeError.
-        raised = False
-        try:
-            _normalize_inputs("", "noir", 90, 2)
-        except RuntimeError:
-            raised = True
-        assert raised, "empty news_seed did not raise RuntimeError"
+        # 5a. creativity presets land on the right (temp, top_p) tuple.
+        for name, (et, ep) in zip(
+            _CREATIVITY_CHOICES,
+            [(0.6, 0.9), (0.85, 0.95), (0.92, 0.98), (0.95, 0.99)],
+        ):
+            t, p = _resolve_creativity(name)
+            assert (t, p) == (et, ep), f"creativity {name} -> ({t},{p}) != ({et},{ep})"
 
-        # 5b. Whitespace-only news_seed also raises.
-        raised = False
-        try:
-            _normalize_inputs("   \n  ", "noir", 90, 2)
-        except RuntimeError:
-            raised = True
-        assert raised, "whitespace news_seed did not raise RuntimeError"
+        # 5b. Unknown creativity falls back to balanced.
+        t, p = _resolve_creativity("???")
+        assert (t, p) == (0.85, 0.95)
 
-        # 5c. target_seconds high clamp (700 -> 600).
-        _, _, ts, _, tw = _normalize_inputs("seed text", "noir", 700, 2)
-        assert ts == 600, f"target_seconds high-clamp failed: {ts}"
-        # target_words derives from clamped target_seconds.
-        assert tw == int(600 * WORDS_PER_SECOND_BUDGET), \
-            f"target_words derive failed: {tw}"
+        # 5c. target_length forces target_words for smoke presets.
+        assert _resolve_target_words(700, "30 words (smoke, 1 act)") == 30
+        assert _resolve_target_words(700, "tiny (smoke, 1 act)") == 100
+        # 5d. Non-smoke presets pass widget value through.
+        assert _resolve_target_words(700, "short (3 acts)") == 700
+        assert _resolve_target_words(1400, "epic (10+ acts)") == 1400
 
-        # 5d. target_seconds low clamp (5 -> 10).
-        _, _, ts, _, _ = _normalize_inputs("seed text", "noir", 5, 2)
-        assert ts == 10, f"target_seconds low-clamp failed: {ts}"
-
-        # 5e. cast_size high clamp (10 -> 6).
-        _, _, _, cs, _ = _normalize_inputs("seed text", "noir", 90, 10)
-        assert cs == 6, f"cast_size high-clamp failed: {cs}"
-
-        # 5f. cast_size low clamp (0 -> 1).
-        _, _, _, cs, _ = _normalize_inputs("seed text", "noir", 90, 0)
-        assert cs == 1, f"cast_size low-clamp failed: {cs}"
-
-        # 5g. style_hint default fallback when blank.
-        _, sh, _, _, _ = _normalize_inputs("seed text", "", 90, 2)
-        assert sh == "psychological slow-burn", \
-            f"style_hint default failed: {sh!r}"
-
-        print("[5/5] PASS: validation + clamping (7 sub-cases)")
+        print("[5/7] PASS: resolver helpers (creativity + target_length)")
     except Exception:
-        failures.append(("5/5 validation", traceback.format_exc()))
-        print("[5/5] FAIL: validation")
+        failures.append(("5/7 resolver helpers", traceback.format_exc()))
+        print("[5/7] FAIL: resolver helpers")
+
+    # 6. _resolve_inputs 3-way style resolution (custom_premise path).
+    try:
+        # 6a. style_custom non-empty wins over combo.
+        out = _resolve_inputs(
+            target_words=350, num_characters=2,
+            custom_premise="A real seed for testing.",
+            style="noir mystery",
+            style_custom="rust-belt cyber-noir",
+            creativity="balanced",
+        )
+        assert out["news_seed"] == "A real seed for testing."
+        assert out["seed_source"] == "custom_premise"
+        assert out["style"] == "rust-belt cyber-noir", out["style"]
+        assert out["style_source"] == "style_custom"
+        assert out["style_pending"] is False
+        assert out["target_words"] == 350
+        assert out["target_seconds"] == 140
+        assert out["temperature"] == 0.85 and out["top_p"] == 0.95
+
+        # 6b. Combo (non-auto, non-empty) used verbatim when style_custom blank.
+        out = _resolve_inputs(
+            target_words=350, num_characters=2,
+            custom_premise="seed",
+            style="noir mystery",
+            style_custom="",
+        )
+        assert out["style"] == "noir mystery"
+        assert out["style_source"] == "style_combo"
+        assert out["style_pending"] is False
+
+        # 6c. Auto sentinel -> style_pending=True, style stays empty.
+        out = _resolve_inputs(
+            target_words=350, num_characters=2,
+            custom_premise="seed",
+            style=_STYLE_AUTO_SENTINEL,
+            style_custom="",
+        )
+        assert out["style"] == ""
+        assert out["style_source"] == "llm_auto"
+        assert out["style_pending"] is True
+
+        # 6d. Empty style combo also routes to LLM auto.
+        out = _resolve_inputs(
+            target_words=350, num_characters=2,
+            custom_premise="seed",
+            style="",
+            style_custom="",
+        )
+        assert out["style_pending"] is True
+        assert out["style_source"] == "llm_auto"
+
+        print("[6/7] PASS: _resolve_inputs (custom_premise + 3-way style resolution)")
+    except Exception:
+        failures.append(("6/7 _resolve_inputs custom + style 3-way", traceback.format_exc()))
+        print("[6/7] FAIL: _resolve_inputs(custom_premise + style 3-way)")
+
+    # 7. _generate_style_via_llm fallback behavior (no actual LLM call).
+    try:
+        # 7a. Empty seed -> hardcoded fallback (no LLM dereference).
+        assert _generate_style_via_llm(lambda *a, **kw: "x", "") == _LLM_STYLE_FALLBACK
+
+        # 7b. LLM raises -> fallback.
+        def _raises(*a, **kw):
+            raise RuntimeError("LLM offline")
+        assert _generate_style_via_llm(_raises, "some seed text") == _LLM_STYLE_FALLBACK
+
+        # 7c. LLM returns clean phrase -> stripped + returned verbatim.
+        def _good(*a, **kw):
+            return "  bleak industrial noir  \n"
+        assert _generate_style_via_llm(_good, "seed") == "bleak industrial noir"
+
+        # 7d. LLM returns labeled preamble -> preamble stripped.
+        def _preamble(*a, **kw):
+            return "Style: claustrophobic procedural"
+        assert _generate_style_via_llm(_preamble, "seed") == "claustrophobic procedural"
+
+        # 7e. LLM returns empty -> fallback.
+        def _empty(*a, **kw):
+            return ""
+        assert _generate_style_via_llm(_empty, "seed") == _LLM_STYLE_FALLBACK
+
+        # 7f. LLM returns too-short -> fallback.
+        def _short(*a, **kw):
+            return "ok"
+        assert _generate_style_via_llm(_short, "seed") == _LLM_STYLE_FALLBACK
+
+        print("[7/7] PASS: _generate_style_via_llm (5 paths + fallback chain)")
+    except Exception:
+        failures.append(("7/7 _generate_style_via_llm", traceback.format_exc()))
+        print("[7/7] FAIL: _generate_style_via_llm")
 
     # Summary.
     if not failures:
-        print("\nSELF-TEST PASS: 5/5")
+        print("\nSELF-TEST PASS: 7/7")
         sys.exit(0)
     else:
-        print(f"\nSELF-TEST FAIL: {len(failures)} of 5")
+        print(f"\nSELF-TEST FAIL: {len(failures)} of 7")
         for name, tb in failures:
             print(f"\n--- {name} ---\n{tb}")
         sys.exit(1)

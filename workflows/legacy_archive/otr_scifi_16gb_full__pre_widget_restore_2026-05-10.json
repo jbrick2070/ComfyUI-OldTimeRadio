@@ -20,20 +20,11 @@
         "Node name for S&R": "OTR_LedgerScriptWriter"
       },
       "widgets_values": [
-        350,
-        2,
-        "",
-        "mistralai/Mistral-Nemo-Instruct-2407",
-        "auto (use story model)",
         "Astronomers observe a pulsar's radio bursts forming a non-random pattern. The signal's information density rules out a natural source but no civilization is known in that direction.",
-        true,
-        true,
-        "short (3 acts)",
-        "psychological slow-burn",
         "tense claustrophobic",
-        "balanced",
-        true,
-        "Standard",
+        140,
+        2,
+        "mistralai/Mistral-Nemo-Instruct-2407",
         false
       ],
       "inputs": [],
