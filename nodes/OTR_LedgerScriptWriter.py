@@ -439,10 +439,10 @@ def _fetch_rss_seed_or_die(style: str, model_id: str) -> str:
 
 
 def _resolve_inputs(
-    target_words,
-    num_characters,
-    *,
     episode_title: str = "",
+    target_words: int = 700,
+    num_characters: int = 2,
+    *,
     model_id: str = DEFAULT_MODEL_ID,
     cleanup_model_id: str = "auto (use story model)",
     custom_premise: str = "",
@@ -598,8 +598,23 @@ class OTR_LedgerScriptWriter:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # Widget order matches the legacy OTR_LLMScriptWriter widget
+        # layout (commit 485874b screenshot), minus open_close per
+        # Jeffrey 2026-05-10. Order is load-bearing — saved workflows
+        # bind by widget index, and the user's mental model maps the
+        # field labels to positions on the node.
         return {
             "required": {
+                "episode_title": ("STRING", {
+                    "default": "",
+                    "tooltip": (
+                        "Optional episode title override. Stamped at "
+                        "ledger.meta.episode_title so SignalLostVideo "
+                        "picks it up directly without title-chain "
+                        "fallback. Leave blank to let the outline "
+                        "supply a title."
+                    ),
+                }),
                 "target_words": ("INT", {
                     "default": 700, "min": 30, "max": 10000, "step": 10,
                     "tooltip": (
@@ -621,16 +636,6 @@ class OTR_LedgerScriptWriter:
                 }),
             },
             "optional": {
-                "episode_title": ("STRING", {
-                    "default": "",
-                    "tooltip": (
-                        "Optional episode title override. Stamped at "
-                        "ledger.meta.episode_title so SignalLostVideo "
-                        "picks it up directly without title-chain "
-                        "fallback. Leave blank to let the outline "
-                        "supply a title."
-                    ),
-                }),
                 "model_id": (_MODEL_CHOICES, {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
@@ -797,9 +802,9 @@ class OTR_LedgerScriptWriter:
 
     def run(
         self,
-        target_words,
-        num_characters,
         episode_title="",
+        target_words=700,
+        num_characters=2,
         model_id=DEFAULT_MODEL_ID,
         cleanup_model_id="auto (use story model)",
         custom_premise="",
@@ -1100,9 +1105,11 @@ if __name__ == "__main__":
         spec = cls.INPUT_TYPES()
         assert "required" in spec, "missing required block"
         assert "optional" in spec, "missing optional block"
-        for k in ("target_words", "num_characters"):
-            assert k in spec["required"], f"required missing key: {k}"
-        for k in ("episode_title", "model_id", "cleanup_model_id",
+        # Required block: legacy widget order — episode_title, target_words, num_characters.
+        req_keys = list(spec["required"].keys())
+        assert req_keys == ["episode_title", "target_words", "num_characters"], \
+            f"required widget order drift: {req_keys}"
+        for k in ("model_id", "cleanup_model_id",
                   "custom_premise", "include_act_breaks", "self_critique",
                   "target_length", "style", "style_custom", "creativity",
                   "arc_enhancer", "optimization_profile",
@@ -1111,6 +1118,10 @@ if __name__ == "__main__":
         # open_close MUST be absent (dropped 2026-05-10).
         assert "open_close" not in spec["required"]
         assert "open_close" not in spec["optional"]
+        # episode_title is a STRING (default empty).
+        et_type, et_meta = spec["required"]["episode_title"]
+        assert et_type == "STRING"
+        assert et_meta.get("default") == ""
         # target_words INT clamps
         tw_type, tw_meta = spec["required"]["target_words"]
         assert tw_type == "INT"
