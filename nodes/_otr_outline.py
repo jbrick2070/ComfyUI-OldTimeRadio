@@ -179,8 +179,11 @@ class OutlineRequest:
     """
 
     news_seed: str           # The real science story / factual seed
-    style_hint: str          # User-selected style, e.g. "psychological slow-burn",
-                             # "pulp adventure", "hard sci-fi procedural", "noir thriller"
+    style: str               # User-selected style, e.g. "psychological slow-burn",
+                             # "pulp adventure", "hard sci-fi procedural", "noir thriller".
+                             # Field renamed from style_hint 2026-05-10 — Jeffrey:
+                             # "no 'hint', it's just style". User-visible widget name
+                             # is 'style', so the dataclass field matches.
     cast_size: int           # 1-6 (validated below)
     target_words: int        # Canonical length unit (validated below). Words are
                              # the single source of truth for story planning;
@@ -251,7 +254,7 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     return (
         f"Plan a science-fiction audio drama outline.\n\n"
         f"Science story (the factual seed): {req.news_seed}\n"
-        f"Style: {req.style_hint}\n"
+        f"Style: {req.style}\n"
         f"Cast size: {req.cast_size}\n"
         f"Target total dialogue length: ~{req.target_words} words "
         f"(sum of per-beat target_words should land near this number).\n\n"
@@ -592,7 +595,7 @@ if __name__ == "__main__":
     # Test 8: OutlineRequest validates inputs.
     print("\n[Test 8] OutlineRequest input validation")
     try:
-        OutlineRequest(news_seed="x", style_hint="y", cast_size=10,
+        OutlineRequest(news_seed="x", style="y", cast_size=10,
                        target_words=150)
         print("  FAIL: cast_size=10 accepted")
     except ValueError:
@@ -602,7 +605,7 @@ if __name__ == "__main__":
     print("\n[Test 9] OutlineFailedError shape")
     err = OutlineFailedError(
         attempts=[("raw1", "err1"), ("raw2", "err2")],
-        request=OutlineRequest(news_seed="x", style_hint="y", cast_size=2,
+        request=OutlineRequest(news_seed="x", style="y", cast_size=2,
                                target_words=150),
     )
     assert len(err.attempts) == 2

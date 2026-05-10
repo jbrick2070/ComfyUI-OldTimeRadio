@@ -1101,7 +1101,7 @@ class OTR_LedgerScriptWriter:
         # --- D. Generate validated outline ----------------------------
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
-            style_hint=resolved["style"],
+            style=resolved["style"],
             cast_size=resolved["num_characters"],
             target_words=resolved["target_words"],
         )
