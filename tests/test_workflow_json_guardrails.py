@@ -48,9 +48,14 @@ WORKFLOWS_DIR = PACK_ROOT / "workflows"
 #
 # Canonical tracked renames:
 #   BUG-011  "Obsidian (Low VRAM/Fast)" -> "Obsidian (UNSTABLE/4GB)"
+#   2026-05-10  "auto (LLM generates)" -> "let the story decide"
+#               (OTR_LedgerScriptWriter style sentinel — clearer label;
+#                pre-rename workflows would silently bind to a missing
+#                dropdown entry and the auto-derive path would never fire)
 # ---------------------------------------------------------------------------
 STALE_DROPDOWN_LITERALS: frozenset[str] = frozenset({
     "Obsidian (Low VRAM/Fast)",
+    "auto (LLM generates)",
 })
 
 
@@ -313,6 +318,72 @@ class TestWorkflowJson:
             f"{workflow_path.name} contains stale dropdown strings "
             "(update the workflow or remove from STALE_DROPDOWN_LITERALS "
             "if the rename was reverted):\n  " + "\n  ".join(offenders)
+        )
+
+
+# ---------------------------------------------------------------------------
+# Saved-default binding: the OTR_LedgerScriptWriter style widget MUST be
+# saved as the auto-derive sentinel so a fresh load runs the LLM-derives-
+# style-from-news path with no user intervention.
+#
+# History (2026-05-10): the sentinel mechanism was authored in commit
+# de34c95 but the saved workflow value drifted away from it through two
+# realignments (7077e54 + the post-fix), leaving the auto path dormant
+# for every production run. This test guards against re-drift.
+#
+# Slot layout (post-control_after_generate fix, 17-slot writer widget):
+#   [11] style  (combo with auto-sentinel as the canonical default)
+#
+# Hardcoded for the canonical workflow + the canonical writer slot. If
+# the writer's INPUT_TYPES order changes, this test must be updated in
+# lockstep with the workflow JSON (Prime Directive 3 — wire every change
+# into the workflow JSON).
+# ---------------------------------------------------------------------------
+
+# Mirror of nodes/OTR_LedgerScriptWriter._STYLE_AUTO_SENTINEL. Hardcoded
+# (not imported) so this test stays free of torch / transformers and
+# can run in any CI environment.
+_WRITER_STYLE_SENTINEL = "let the story decide"
+_WRITER_STYLE_SLOT = 11
+_CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
+
+
+class TestWriterStyleSentinelDefault:
+    def test_writer_style_widget_saved_as_auto_sentinel(self):
+        """The canonical workflow's OTR_LedgerScriptWriter node MUST
+        bind its style widget to the auto-derive sentinel. Any other
+        value silently disables the LLM-derives-style-from-news path
+        and freezes every run to one preset.
+        """
+        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
+        assert wf_path.is_file(), (
+            f"Canonical workflow {_CANONICAL_WORKFLOW!r} is missing "
+            f"from {WORKFLOWS_DIR}"
+        )
+        doc = _load_json(wf_path)
+        writers = [
+            n for n in doc.get("nodes", [])
+            if n.get("type") == "OTR_LedgerScriptWriter"
+        ]
+        assert len(writers) == 1, (
+            f"Expected exactly one OTR_LedgerScriptWriter node in "
+            f"{_CANONICAL_WORKFLOW}; found {len(writers)}"
+        )
+        wv = writers[0].get("widgets_values") or []
+        assert _WRITER_STYLE_SLOT < len(wv), (
+            f"OTR_LedgerScriptWriter widgets_values has only {len(wv)} "
+            f"entries; expected slot {_WRITER_STYLE_SLOT} for the "
+            f"style widget. Widget surface drift — re-check the writer "
+            f"INPUT_TYPES order vs the saved layout."
+        )
+        actual = wv[_WRITER_STYLE_SLOT]
+        assert actual == _WRITER_STYLE_SENTINEL, (
+            f"OTR_LedgerScriptWriter widgets_values[{_WRITER_STYLE_SLOT}] "
+            f"is {actual!r}; expected the auto-derive sentinel "
+            f"{_WRITER_STYLE_SENTINEL!r}. If you intentionally saved a "
+            f"specific preset as the default, update _WRITER_STYLE_SENTINEL "
+            f"in this test in lockstep — but be aware the auto-derive "
+            f"path will not fire on default runs."
         )
 
 

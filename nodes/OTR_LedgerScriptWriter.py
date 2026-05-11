@@ -7,7 +7,7 @@ Pipeline (unchanged from v2.0 LPL):
        - news_seed = custom_premise verbatim if non-empty,
          else RSS auto-fetch via story_orchestrator._fetch_science_news.
        - style = style_custom if non-empty, else style combo (with
-         "auto (LLM generates)" sentinel deferred to a model call
+         "let the story decide" sentinel deferred to a model call
          once the LLM is loaded, see _generate_style_via_llm).
        - target_words from widget, optionally overridden by smoke
          target_length presets ("30 words", "tiny"). Words are the
@@ -174,14 +174,18 @@ _TARGET_LENGTH_FORCE_WORDS = {
 # ---------------------------------------------------------------------------
 # Style widget surface — three-way (Jeffrey 2026-05-10):
 #   1. Free-text override (`style_custom`) wins when non-empty.
-#   2. `style` combo set to "auto (LLM generates)" -> LLM proposes a
-#      tonal descriptor from the resolved news_seed.
+#   2. `style` combo set to "let the story decide" -> LLM analyzes the
+#      news story and proposes a 3-6 word tonal descriptor; that
+#      descriptor flows into both character generation and script
+#      generation. This is the SAVED DEFAULT in
+#      workflows/otr_scifi_16gb_full.json so a fresh load runs the
+#      auto-derive path with no user intervention.
 #   3. Any other combo entry -> used verbatim.
 # Both axes — story (custom_premise/RSS) AND style (combo/auto/custom) —
 # drive story content; the user wants both selectable.
 # ---------------------------------------------------------------------------
 
-_STYLE_AUTO_SENTINEL = "auto (LLM generates)"
+_STYLE_AUTO_SENTINEL = "let the story decide"
 
 _STYLE_CHOICES = [
     _STYLE_AUTO_SENTINEL,
@@ -1160,7 +1164,7 @@ class OTR_LedgerScriptWriter:
         meta["episode_seed"] = int(seed)
 
         # D.2 Style LLM-suggest path (auto sentinel / empty combo).
-        # When the user picked "auto (LLM generates)" or left the combo
+        # When the user picked "let the story decide" or left the combo
         # blank AND no style_custom override, ask the model to propose
         # a tonal style descriptor based on the resolved news_seed.
         # The widget-typed style_custom and the verbatim combo entries
