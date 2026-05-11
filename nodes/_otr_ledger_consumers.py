@@ -70,6 +70,7 @@ def iter_lines(
     ledger: dict,
     *,
     roles: Optional[Set[str]] = None,
+    include_skipped: bool = False,
 ) -> Iterator[dict]:
     """Yield ``ledger['lines']``, optionally filtered by ``speaker_role``.
 
@@ -78,10 +79,36 @@ def iter_lines(
     supplied. With ``roles=None`` (default) every line is yielded
     regardless of ``speaker_role`` -- used by the sequencer, which needs
     the full timeline.
+
+    Post-Phase-3 review (Rec 5, 2026-05-11): also skips any line with
+    ``line.get("skip") == True`` OR an empty ``text`` (the §7 skip-
+    canonical mute pattern from Step 2.5 / Script Doctor skip edits).
+    Both signals together are belt-and-suspenders: setting either
+    alone is sufficient to mute; honoring both here protects against
+    a consumer that handles only one.
+
+    Pass ``include_skipped=True`` to disable the skip filter (used
+    by forensic / audit code paths that want to see what got muted
+    and why).
     """
     for line in ledger.get("lines") or []:
-        if roles is None or line.get("speaker_role") in roles:
-            yield line
+        if roles is not None and line.get("speaker_role") not in roles:
+            continue
+        if not include_skipped:
+            # §7 skip-canonical mute (Rec 5, 2026-05-11). Honor
+            # explicit skip=True (Step 2.5 phantom skip + doctor
+            # skip action), AND empty `text` (belt-and-suspenders
+            # signal stamped alongside skip=True). Either alone
+            # mutes the line; both together are the defense-in-
+            # depth pattern. Downstream TTS / clip-timing consumers
+            # (Bark, Kokoro, SceneSequencer) all flow through this
+            # one helper so the gate lives in one place.
+            if line.get("skip"):
+                continue
+            text = line.get("text") or ""
+            if not text.strip():
+                continue
+        yield line
 
 
 def cast_lookup(ledger: dict, char_id: str) -> dict:

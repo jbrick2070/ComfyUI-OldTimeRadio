@@ -248,6 +248,56 @@ def has_current_ledger() -> bool:
         return len(lines) > 0
 
 
+# Post-Phase-3 review (Fix 3, 2026-05-11) — §6.G word-count stamping.
+# The existing `_recompute_totals` maintains the ROOT-level
+# `total_word_count` which conflates character + announcer (used by
+# the save-log message). Per §6.G the BUDGET-enforcement reader needs
+# a character-only `meta.character_word_count` plus separate
+# announcer + total fields for forensic visibility. Stamped at end
+# of writer's run() and again at end of reviewer's review_ledger()
+# after every commit/restore path. Reversing my D3 critique on
+# 2026-05-11 — the spec field is load-bearing, not "lean docs"
+# decoration.
+
+
+def stamp_word_counts(ledger: "Ledger") -> None:
+    """Stamp the three §6.G word-count totals onto `ledger.data.meta`.
+
+    Skipped lines (lines[k].skip=True per Step 2.5 / Script Doctor
+    skip action) contribute zero to all three counts -- a phantom-
+    muted line is gone from the budget enforcement view.
+
+    Pure Python. Never raises. Stamps:
+      meta.character_word_count -- authoritative for "did we hit
+                                   the target_words character
+                                   dialogue budget?" reads
+      meta.announcer_word_count -- forensic only
+      meta.total_word_count     -- character + announcer; for
+                                   user-facing display
+
+    Existing root-level `data["total_word_count"]` maintained by
+    `_recompute_totals` is unchanged (used by the save log line).
+    """
+    if ledger is None or not hasattr(ledger, "data"):
+        return
+    char_n = 0
+    ann_n = 0
+    for line in ledger.data.get("lines", []) or []:
+        if line.get("skip"):
+            continue
+        text = line.get("text") or ""
+        n = len(text.split()) if text else 0
+        role = line.get("speaker_role", "")
+        if role == "character":
+            char_n += n
+        elif role == "announcer":
+            ann_n += n
+    meta = ledger.data.setdefault("meta", {})
+    meta["character_word_count"] = char_n
+    meta["announcer_word_count"] = ann_n
+    meta["total_word_count"] = char_n + ann_n
+
+
 # ---------------------------------------------------------------------------
 # Ledger
 # ---------------------------------------------------------------------------

@@ -170,27 +170,73 @@ class TestActCountConfigSanity:
 
 def _ok_beat(beat_id: str, speaker: str = "ALICE",
              role: str = "character", words: int = 25,
-             phase: str | None = None) -> dict:
-    return {
+             phase: "str | None" = None) -> dict:
+    """Build a minimal Beat dict.
+
+    Fix 1 (2026-05-11): arc_phase is now `str` with default 'setup',
+    so passing arc_phase=None to pydantic would fail. When `phase`
+    is None we OMIT the arc_phase key entirely so pydantic stamps
+    the schema default. When `phase` is a string, we set it
+    explicitly.
+    """
+    row: dict = {
         "beat_id": beat_id,
         "speaker": speaker,
         "speaker_role": role,
         "intent": "speak about the signal",
         "target_words": words,
         "mood": "tense",
-        "arc_phase": phase,
     }
+    if phase is not None:
+        row["arc_phase"] = phase
+    return row
 
 
 class TestOutlineSchemaChanges:
 
-    def test_beat_accepts_arc_phase_none(self):
-        b = Beat(**_ok_beat("b001"))
-        assert b.arc_phase is None
+    def test_beat_accepts_arc_phase_default_when_omitted(self):
+        """Fix 1 (post-Phase-3 review, 2026-05-11): arc_phase is
+        required-with-default ('setup'). A 12B LLM that omits the
+        field must parse cleanly without rerolling -- the validator
+        catches a misplaced default-'setup' beat via membership /
+        ordering checks downstream."""
+        # Pass `phase=None` so _ok_beat omits the arc_phase key.
+        b = Beat(**_ok_beat("b001", phase=None))
+        assert b.arc_phase == "setup"
 
     def test_beat_accepts_arc_phase_populated(self):
         b = Beat(**_ok_beat("b001", phase="setup"))
         assert b.arc_phase == "setup"
+
+    def test_arc_phase_default_caught_by_5_act_budget_validator(self):
+        """Fix 1 (post-Phase-3 review, 2026-05-11): when a 5-act
+        episode uses arc_phases = (exposition, rising_action, ...),
+        a default 'setup' value leaks into a beat as a placeholder.
+        Validator #5 catches it via the membership check and returns
+        a structured violation -- bounded retry, not infinite reroll."""
+        eb = compute_episode_budget(1000, 5, True, 2)
+        req = OutlineRequest(
+            news_seed="seed", style="noir",
+            character_cast=("ALICE", "BOB"),
+            target_words=1000,
+            budget=eb,
+        )
+        # Build a minimal outline where one voiced beat has the
+        # default-omitted 'setup' value but the budget expects
+        # exposition / rising_action / etc.
+        beats = [
+            _ok_beat("b001", speaker="NARRATOR", role="music_open", words=5),
+            _ok_beat("b002", speaker="ANNOUNCER", role="announcer",
+                     words=25, phase="exposition"),
+            # This beat carries the schema default 'setup' which is
+            # NOT in the 5-act arc_phases tuple.
+            _ok_beat("b003", speaker="ALICE", words=30, phase="setup"),
+            _ok_beat("b004", speaker="NARRATOR", role="music_close", words=5),
+        ]
+        outline = _outline_from_beats(beats)
+        violation = validate_outline_against_budget(outline, req)
+        assert violation is not None
+        assert "arc_phase" in violation or "setup" in violation
 
     def test_outline_accepts_32_beats(self):
         beats = [_ok_beat(f"b{i:03d}") for i in range(1, 33)]

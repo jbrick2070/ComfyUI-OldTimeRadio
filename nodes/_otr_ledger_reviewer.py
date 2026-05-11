@@ -683,8 +683,29 @@ def _render_doctor_user_prompt(
         for line_id, phantom in titled_phantoms:
             parts.append(f"  {line_id}: {phantom!r}")
         parts.append("")
-    parts.append("LEDGER (post-cast-repair, ready for creative edits):")
-    parts.append(_render_lines_for_audit(candidate_ledger.get("lines", []) or []))
+    # Fix 4 (post-Phase-3 review, 2026-05-11): doctor sees ONLY
+    # character-role beats. Announcer / music / sfx beats are locked
+    # structural content; showing them tempts the doctor to invent
+    # edits the apply-time guard would reject anyway. Belt + suspenders:
+    # the prompt filter is suspenders, the apply guard at
+    # apply_doctor_edits is the belt. Together: the doctor can't see,
+    # can't edit, can't reference structural beats.
+    character_lines = [
+        ln for ln in (candidate_ledger.get("lines", []) or [])
+        if ln.get("speaker_role") == "character"
+    ]
+    parts.append(
+        "LEDGER (CHARACTER DIALOGUE BEATS ONLY -- "
+        "post-cast-repair, ready for creative edits):"
+    )
+    parts.append(_render_lines_for_audit(character_lines))
+    parts.append("")
+    parts.append(
+        "You are seeing ONLY character dialogue beats. Announcer "
+        "beats, music beats, and SFX beats are locked structural "
+        "content and are NOT in your input. Do not propose edits "
+        "referencing line_ids outside the list above."
+    )
     parts.append("")
     parts.append(
         f"Propose at most {edit_cap} edits total. Rewrite only when a "
@@ -873,38 +894,49 @@ def apply_phantom_skip_fallback(
     candidate_ledger: dict,
     cast_roster_upper: set[str],
 ) -> int:
-    """Mute any line still carrying a titled phantom after Pass 2.
+    """Mute any line still carrying a phantom after Pass 2.
 
     Returns the number of lines newly marked skip=True. Sets
     `tts_skip_reason` for forensic logging. Per synthesis Step 2.5 +
     M2.
 
-    Wiring-review #14 (2026-05-11): when setting skip=True, ALSO
-    clear `text` to "" (belt-and-suspenders). A muted line therefore
-    has BOTH skip=True AND text=="" — either alone is sufficient to
-    mute the line; both together guarantee that any consumer that
-    fails to honor one signal still emits nothing.
+    Post-Phase-3 review (Fix 2, 2026-05-11): uses the CANONICAL
+    `_otr_line_composer.detect_phantom_names` (three regex passes:
+    titled names, ALL-CAPS tokens, Title-Case bigrams). Previously
+    this used `_TITLED_PHANTOM_RE` only, which would miss CARLA-
+    style ALL-CAPS phantoms or Joe-Smith Title-Case bigrams the
+    composer flagged but Pass 2 didn't address. One detector, one
+    roster, everywhere.
+
+    Wiring-review #14 belt-and-suspenders preserved: when setting
+    skip=True, ALSO clear `text` to "".
     """
+    # Lazy import keeps the module-load surface stdlib + pydantic
+    # only; _otr_line_composer drags in regex compilation at import.
+    from ._otr_line_composer import detect_phantom_names  # type: ignore
+
     n_skipped = 0
+    cast_roster_frozen = frozenset(cast_roster_upper)
     for line in candidate_ledger.get("lines", []) or []:
         if line.get("skip"):
             continue
         text = line.get("text") or ""
         if not text:
             continue
-        for m in _TITLED_PHANTOM_RE.finditer(text):
-            full = m.group(0)
-            if full.upper() in cast_roster_upper:
-                continue
-            line["skip"] = True
-            line["tts_skip_reason"] = f"phantom_titled_name:{full}"
-            # Belt-and-suspenders: every TTS consumer that checks
-            # text==""  emits nothing for this line.
-            line["text"] = ""
-            line["char_count"] = 0
-            line["word_count"] = 0
-            n_skipped += 1
-            break
+        speaker = (
+            line.get("char_id") or line.get("speaker") or ""
+        )
+        phantoms = detect_phantom_names(text, speaker, cast_roster_frozen)
+        if not phantoms:
+            continue
+        line["skip"] = True
+        # Carry the first phantom as the forensic tag; rare for
+        # there to be more than one per line.
+        line["tts_skip_reason"] = f"phantom:{phantoms[0]}"
+        line["text"] = ""
+        line["char_count"] = 0
+        line["word_count"] = 0
+        n_skipped += 1
     return n_skipped
 
 
@@ -917,17 +949,28 @@ def _final_phantom_check(
     candidate_ledger: dict,
     cast_roster_upper: set[str],
 ) -> list[tuple[str, str]]:
-    """Return [(line_id, phantom_token), ...] for any titled phantom
-    still present in NON-skipped lines."""
+    """Return [(line_id, phantom_token), ...] for any phantom still
+    present in NON-skipped lines.
+
+    Post-Phase-3 review (Fix 2, 2026-05-11): uses the canonical
+    `_otr_line_composer.detect_phantom_names` (all three regex
+    passes). One detector, one roster, everywhere.
+    """
+    from ._otr_line_composer import detect_phantom_names  # type: ignore
+
     out: list[tuple[str, str]] = []
+    cast_roster_frozen = frozenset(cast_roster_upper)
     for line in candidate_ledger.get("lines", []) or []:
         if line.get("skip"):
             continue
         text = line.get("text") or ""
-        for m in _TITLED_PHANTOM_RE.finditer(text):
-            tok = m.group(0)
-            if tok.upper() in cast_roster_upper:
-                continue
+        if not text:
+            continue
+        speaker = (
+            line.get("char_id") or line.get("speaker") or ""
+        )
+        phantoms = detect_phantom_names(text, speaker, cast_roster_frozen)
+        for tok in phantoms:
             out.append((line.get("line_id", ""), tok))
     return out
 
@@ -935,6 +978,24 @@ def _final_phantom_check(
 # ---------------------------------------------------------------------------
 # review_ledger -- top-level entrypoint
 # ---------------------------------------------------------------------------
+
+
+def _stamp_word_counts_safe(led) -> None:
+    """Lazy wrapper around production_ledger.stamp_word_counts.
+
+    Lazy import so this module stays loadable without
+    production_ledger present (matches the rest of the module's
+    deferred-import pattern). Best-effort: any failure logs and
+    skips -- a stamping miss must never break the reviewer's
+    commit/restore flow.
+    """
+    try:
+        from . import production_ledger as _PL  # type: ignore
+        _PL.stamp_word_counts(led)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_LedgerReviewer] stamp_word_counts skipped: %s", exc,
+        )
 
 
 def review_ledger(
@@ -1037,6 +1098,10 @@ def review_ledger(
             phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
+        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
+        # commit / restore so meta.character_word_count stays in sync
+        # with whatever is on disk.
+        _stamp_word_counts_safe(led)
         led.save()
         return disp
 
@@ -1063,6 +1128,10 @@ def review_ledger(
             phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
+        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
+        # commit / restore so meta.character_word_count stays in sync
+        # with whatever is on disk.
+        _stamp_word_counts_safe(led)
         led.save()
         return disp
 
@@ -1092,6 +1161,10 @@ def review_ledger(
             phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
+        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
+        # commit / restore so meta.character_word_count stays in sync
+        # with whatever is on disk.
+        _stamp_word_counts_safe(led)
         led.save()
         return disp
 
@@ -1113,6 +1186,10 @@ def review_ledger(
             phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
+        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
+        # commit / restore so meta.character_word_count stays in sync
+        # with whatever is on disk.
+        _stamp_word_counts_safe(led)
         led.save()
         return disp
 
@@ -1153,6 +1230,10 @@ def review_ledger(
             phantom_skip_count=phantom_skip_count,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
+        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
+        # commit / restore so meta.character_word_count stays in sync
+        # with whatever is on disk.
+        _stamp_word_counts_safe(led)
         led.save()
         return disp
 
@@ -1175,5 +1256,9 @@ def review_ledger(
         phantom_skip_count=phantom_skip_count,
     )
     meta_after["reviewer_disposition"] = disp.__dict__
+    # Fix 3 (2026-05-11): §6.G word counts re-stamped on the commit
+    # path too so post-review meta.character_word_count reflects any
+    # rewrites / skips the doctor applied.
+    _stamp_word_counts_safe(led)
     led.save()
     return disp

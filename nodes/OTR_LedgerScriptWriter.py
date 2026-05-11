@@ -1721,16 +1721,26 @@ class OTR_LedgerScriptWriter:
                     len(landed),
                 )
 
-        # --- J. Phase 0 aggregate + final save ------------------------
+        # --- J. Phase 0 aggregate + §6.G word counts + final save ----
         # No set_lines + post-patch pass any more -- every line was
         # stamped progressively inside the composer loop (Phase 2B).
-        # The post-loop work here is just the meta.compose_flag_summary
-        # rollup + a final ledger save (which also flushes any text
-        # the news-wiring overlay mutated above).
+        # The post-loop work here is the meta.compose_flag_summary
+        # rollup, the §6.G word-count stamp (character / announcer /
+        # total -- post-Phase-3 review Fix 3, 2026-05-11), and a
+        # final ledger save (which also flushes any text the
+        # news-wiring overlay mutated above).
         meta["compose_flag_summary"] = _OTRLC.aggregate_compose_flags(led.data)
         log.info(
             "[OTR_LedgerScriptWriter] phase 0 compose_flag_summary: %s",
             meta["compose_flag_summary"] or "(clean)",
+        )
+        _PL.stamp_word_counts(led)
+        log.info(
+            "[OTR_LedgerScriptWriter] §6.G word counts: "
+            "character=%d announcer=%d total=%d",
+            meta.get("character_word_count", 0),
+            meta.get("announcer_word_count", 0),
+            meta.get("total_word_count", 0),
         )
         led.save()
 

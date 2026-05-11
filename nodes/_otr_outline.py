@@ -120,17 +120,26 @@ class Beat(BaseModel):
         max_length=80,
         description="Optional [SFX:] hint for the surrounding line",
     )
-    arc_phase: Optional[str] = Field(
-        default=None,
+    arc_phase: str = Field(
+        default="setup",
         max_length=40,
         description=(
             "Phase 2A (2026-05-11): narrative phase label from "
             "EpisodeBudget.arc_phases (setup / complication / "
-            "resolution / climax / etc.). Optional in the schema so "
-            "back-compat outlines (pre-Phase 2A) still validate; the "
-            "outline LLM prompt requests this field as a required "
-            "addition to every beat once the budget machinery is "
-            "wired into the writer."
+            "resolution / climax / etc.). Required-with-default per "
+            "the post-Phase-3 review pass (Strategy A). A 12B model "
+            "like Mistral-Nemo frequently omits Optional pydantic "
+            "fields; making the field required with a 'setup' "
+            "default guarantees it is always populated, and the "
+            "downstream validator catches any beat whose default "
+            "value is wrong (membership / ordering check) on the "
+            "first attempt instead of relying on the reroll-repair "
+            "loop to coax the LLM into re-emitting the field. "
+            "Back-compat outlines (pre-Phase 2A, no budget) skip "
+            "the membership check entirely; default is harmless. "
+            "Original D1 critique reversed on 2026-05-11 after the "
+            "reviewer correctly observed that the validator-after-"
+            "default path is bounded and converges."
         ),
     )
 
@@ -1427,5 +1436,57 @@ if __name__ == "__main__":
     assert default_req.target_length == "", \
         "12e: target_length default must be empty (back-compat)"
     print("  PASS 12e: defaults are include_act_breaks=True, target_length=''")
+
+    # Test 13: Fix 1 (post-Phase-3 review, 2026-05-11) -- arc_phase
+    # required-with-default. A 12B LLM that omits the field must NOT
+    # trigger an infinite reroll loop. Pydantic should accept the
+    # missing field and stamp `arc_phase='setup'` on the parsed model.
+    print("\n[Test 13] arc_phase Field(default='setup') populates on omission")
+
+    # 13a: omitted arc_phase parses with default value.
+    beat_no_arc_phase = Beat(
+        beat_id="b007",
+        speaker="ALICE",
+        speaker_role="character",
+        intent="speak about the signal",
+        target_words=20,
+        mood="curious",
+        # arc_phase deliberately omitted -- mimics 12B-LLM behavior
+    )
+    assert beat_no_arc_phase.arc_phase == "setup", (
+        f"13a: omitted arc_phase should default to 'setup', "
+        f"got {beat_no_arc_phase.arc_phase!r}"
+    )
+    print("  PASS 13a: omitted arc_phase -> default 'setup'")
+
+    # 13b: explicit arc_phase preserved.
+    beat_with_arc_phase = Beat(
+        beat_id="b008",
+        speaker="BOB",
+        speaker_role="character",
+        intent="speak",
+        target_words=20,
+        mood="tense",
+        arc_phase="climax",
+    )
+    assert beat_with_arc_phase.arc_phase == "climax", (
+        f"13b: explicit arc_phase must be preserved, got "
+        f"{beat_with_arc_phase.arc_phase!r}"
+    )
+    print("  PASS 13b: explicit arc_phase preserved")
+
+    # 13c: round-trip serialize / deserialize -- the default is
+    # written and read back identically (no None / null surprises).
+    j = beat_no_arc_phase.model_dump_json()
+    assert "setup" in j, f"13c: serialized JSON missing 'setup': {j}"
+    b13c_round = Beat.model_validate_json(j)
+    assert b13c_round.arc_phase == "setup"
+    print("  PASS 13c: round-trip preserves default value")
+
+    # 13d: validator catches a default 'setup' beat that lands in
+    # the WRONG phase for a 5-act episode (arc_phases doesn't
+    # include 'setup'). The reroll signal is bounded, not infinite.
+    print("  PASS 13d (validator path covered in "
+          "tests/test_phase2a_episode_budget.py)")
 
     print("\n=== all self-tests passed ===")
