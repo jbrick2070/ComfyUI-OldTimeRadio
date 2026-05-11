@@ -5,69 +5,69 @@
   "phases": [
     {
       "name": "gemma4_script_writer",
-      "peak_bytes": 9761212416,
-      "current_bytes_after": 17040384,
-      "wall_seconds": 785.9889372999969,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 8.978037199995015,
+      "notes": "runner_error: RuntimeError: Failed to load Tokenizer 'google/gemma-4-E4B-it'. Is it downloaded? Hub error: [WinError 3] The system cannot find the path specified: 'C:\\\\Users\\\\jeffr\\\\.cache\\\\huggingface\\\\hub\\\\models--google--gemma-4-E4B-it\\\\blobs'"
     },
     {
       "name": "gemma4_director",
-      "peak_bytes": 10170041856,
-      "current_bytes_after": 17040384,
-      "wall_seconds": 691.4285126999966,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 6.100002792663872e-06,
+      "notes": "runner_error: KeyError: 'script_text'"
     },
     {
       "name": "kokoro_announcer",
-      "peak_bytes": 867087872,
-      "current_bytes_after": 18088960,
-      "wall_seconds": 4.259912699999404,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0017245000053662807,
+      "notes": "runner_error: KeyError: 'script_json'"
     },
     {
       "name": "musicgen_theme",
-      "peak_bytes": 4503355392,
-      "current_bytes_after": 18088960,
-      "wall_seconds": 103.23702880000201,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0009316000068793073,
+      "notes": "runner_error: KeyError: 'production_plan_json'"
     },
     {
       "name": "batch_bark_generator",
-      "peak_bytes": 2463936000,
-      "current_bytes_after": 2287432192,
-      "wall_seconds": 498.9517793999985,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 4.1000021155923605e-06,
+      "notes": "runner_error: KeyError: 'script_json'"
     },
     {
       "name": "scene_sequencer",
-      "peak_bytes": 2296479232,
-      "current_bytes_after": 2287432192,
-      "wall_seconds": 0.38103099999716505,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 2.8999929782003164e-06,
+      "notes": "runner_error: KeyError: 'script_json'"
     },
     {
       "name": "audio_enhance",
-      "peak_bytes": 2437164544,
-      "current_bytes_after": 2287432192,
-      "wall_seconds": 1.5537020999981905,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.0008730000117793679,
+      "notes": "runner_error: KeyError: 'scene_audio'"
     },
     {
       "name": "episode_assembler",
-      "peak_bytes": 2287432192,
-      "current_bytes_after": 2287432192,
-      "wall_seconds": 0.015274799996404909,
-      "notes": ""
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 3.40001133736223e-06,
+      "notes": "runner_error: KeyError: 'enhanced_audio'"
     },
     {
       "name": "video_engine",
-      "peak_bytes": 2287432192,
-      "current_bytes_after": 2287432192,
-      "wall_seconds": 71.48872069999925,
-      "notes": "runner_error: KeyError: 0"
+      "peak_bytes": 0,
+      "current_bytes_after": 0,
+      "wall_seconds": 0.012557100009871647,
+      "notes": "runner_error: KeyError: 'episode_audio'"
     }
   ],
-  "overall_peak_bytes": 10170041856,
-  "overall_peak_gb": 9.4715895652771,
+  "overall_peak_bytes": 0,
+  "overall_peak_gb": 0.0,
   "ceiling_gb": 14.5
 }

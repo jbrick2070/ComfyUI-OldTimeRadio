@@ -15,7 +15,7 @@ Stored state
   voice id for the announcer). Prevents a character's timbre from drifting
   episode to episode.
 - forbidden_patterns    : list of phrases, tropes, or name collisions the
-  series has already retired. Fed into the Gemma4 prompt as a negative list.
+  series has already retired. Fed into the LLM prompt as a negative list.
 - tone_contract         : short prose description of the series tone (e.g.,
   "wry, mid-century sci-fi radio, optimistic, never cynical"). Injected into
   every script prompt.
@@ -40,7 +40,7 @@ Hard rules (from ROADMAP + CLAUDE.md)
 ComfyUI node
 ------------
 `ProjectStateLoader` exposes the loaded state as a single dict-shaped output
-so downstream nodes (Gemma4ScriptWriter, Gemma4Director) can pull fields
+so downstream nodes (LLMScriptWriter, LLMDirector) can pull fields
 without each having to know the file path. The node has zero writable
 widgets; it is intentionally boring.
 """
@@ -159,7 +159,7 @@ class ProjectState:
         return target
 
     # ------------------------------------------------------------------
-    # Prompt helpers - used by Gemma4ScriptWriter / Gemma4Director
+    # Prompt helpers - used by LLMScriptWriter / LLMDirector
     # ------------------------------------------------------------------
 
     def prompt_preamble(self) -> str:

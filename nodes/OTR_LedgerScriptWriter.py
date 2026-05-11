@@ -47,33 +47,34 @@ Output contract (UNCHANGED from prior v2.0):
     RETURN_NAMES = ("script_text", "script_json", "news_used",
                     "estimated_minutes")
 
-Widget surface (2026-05-10 restoration):
+Widget surface (post-Phase-3 cleanup 2026-05-11):
     required:
-        target_words      INT   (canonical length unit; radio ~140 wpm
-                                 conversion is only for the est_minutes
-                                 output, never for story planning)
-        num_characters    INT   (replaces cast_size — kept legacy name for UX)
+        episode_title     STRING  (optional override; empty -> LLM regen
+                                   from final dialogue post-composition)
+        target_words      INT     (canonical length unit; radio ~140 wpm
+                                   conversion is only for the est_minutes
+                                   output, never for story planning)
+        num_characters    INT     (1-6 speaking characters; 1 = monologue)
     optional:
-        episode_title     STRING       (stamped into ledger.meta.episode_title)
-        model_id          combo        (HF model — story LLM)
-        cleanup_model_id  combo        [v2.0 MVP no-op]  — kept for UX parity
-        custom_premise    STRING       (RSS override; empty triggers feed fetch)
-        include_act_breaks BOOLEAN     (wired into outline prompt 2026-05-10:
-                                        True = ask outline LLM to plan
-                                        music_inter beats between acts;
-                                        False = continuous flow, no music_inter)
-        self_critique     BOOLEAN      [v2.0 MVP no-op]  — script_critic node handles this now
-        target_length     combo        (smoke presets force target_words override;
-                                        full label e.g. "long (7-8 acts)" wired
-                                        into outline prompt 2026-05-10 as the
-                                        "Target episode shape" line so the LLM
-                                        sees the act-count signal)
-        style             combo        (tonal preset)
-        style_custom      STRING       (free-text override; empty falls back to style)
-        creativity        combo        (maps to temperature + top_p preset)
-        arc_enhancer      BOOLEAN      [v2.0 MVP no-op]
-        optimization_profile combo     [v2.0 MVP no-op forward-compat] — plumbed to model loader
-        perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for RTXUpscale spacesaver)
+        seed              INT     (C7 byte-identity seed; shuffle-on
+                                   randomizes per Queue Prompt)
+        model_id          combo   (HF model -- story LLM)
+        custom_premise    STRING  (RSS override; empty triggers feed fetch)
+        include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
+                                    beats between acts; False -> continuous)
+        act_count         INT     (1-7 acts; 0 = auto-derive default from
+                                   target_words. Live-clamped to
+                                   [default..max] by the JS extension at
+                                   web/js/otr_act_count_widget.js)
+        style             combo   (tonal preset; "let the story decide"
+                                   defers to two-pass LLM picker)
+        style_custom      STRING  (free-text override; empty falls back
+                                   to style combo)
+        creativity        combo   (maps to temperature + top_p preset)
+        optimization_profile combo (VRAM-tier; only Standard validated
+                                    today, others fall back to Standard)
+        perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for
+                                        RTXUpscale spacesaver)
 
 Notes:
     - news_seed RSS fetch lifted from story_orchestrator._fetch_science_news.
@@ -1786,27 +1787,10 @@ class OTR_LedgerScriptWriter:
             }
 
         # --- K. Stamp meta block --------------------------------------
-        # Mirrors the legacy writer's gen_params_initial stamp so the
-        # critic (`script_critic._coerce_params`) can keep reading the
-        # same field names. Also stamps episode_title (forward-compat
-        # title chain slot) and perfect_run_spacesaver.
+        # Stamps the run parameters into meta.gen_params_initial for
+        # forensic / soak inspection. Also stamps episode_title
+        # (forward-compat title chain slot) and perfect_run_spacesaver.
         meta = led.data.setdefault("meta", {})
-        # Derived target_length for script_critic back-compat
-        # (post-Phase-3 cleanup 2026-05-11): the writer dropped the
-        # target_length widget, but the legacy script_critic's
-        # rubric still keys its scene_count off a {smoke, short,
-        # medium} bucket. Map act_count -> bucket so the critic's
-        # rubric keeps working without modification. Buckets per
-        # script_critic._SCENE_COUNT_BY_LENGTH: smoke=1 scene,
-        # short=3 scenes, medium=5 scenes.
-        _ac = resolved["act_count"]
-        if _ac <= 1:
-            _derived_target_length = "smoke"
-        elif _ac <= 3:
-            _derived_target_length = "short"
-        else:
-            _derived_target_length = "medium"
-
         meta["gen_params_initial"] = {
             "target_words":         resolved["target_words"],
             "num_characters":       resolved["num_characters"],
@@ -1822,10 +1806,6 @@ class OTR_LedgerScriptWriter:
             "include_act_breaks":    resolved["include_act_breaks"],
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
-            # Back-compat for the legacy script_critic rubric --
-            # derived from act_count, not user-set. See comment
-            # block above.
-            "target_length":         _derived_target_length,
         }
         # Always stamp the resolved final title (user / LLM regen / outline
         # fallback). title_source records which branch won so downstream

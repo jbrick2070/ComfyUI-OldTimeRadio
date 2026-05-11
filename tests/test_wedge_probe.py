@@ -2,7 +2,7 @@
 tests/test_wedge_probe.py
 =========================
 
-Unit tests for otr_v2.visual.wedge_probe.
+Unit tests for visual.wedge_probe.
 
 Coverage
 --------
@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 # Import the module under test
-from otr_v2.visual import wedge_probe as wp
+from visual import wedge_probe as wp
 
 
 # ---- Fixtures --------------------------------------------------------------
@@ -125,9 +125,9 @@ def test_span_records_elapsed_ms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     span_records = [r for r in records if r["kind"] == "render_mux.span"]
     assert len(span_records) == 1
     span = span_records[0]
-    # Sleep was 30ms; elapsed_ms should be >= 25 (allow some slack for
-    # timer resolution on Windows) and < 5000.
-    assert span["elapsed_ms"] >= 25.0, f"Span too fast: {span['elapsed_ms']}"
+    # Sleep was 30ms; elapsed_ms should be >= 15 (Windows timer granularity
+    # is ~15.6ms — sleeps shorter than that routinely round down) and < 5000.
+    assert span["elapsed_ms"] >= 15.0, f"Span too fast: {span['elapsed_ms']}"
     assert span["elapsed_ms"] < 5000.0, f"Span too slow: {span['elapsed_ms']}"
     assert span["shot_id"] == "s002"
     assert span["frames"] == 240
@@ -190,7 +190,7 @@ def test_module_imports_no_audio_or_gpu_libs() -> None:
     """Audio is king (C7).  The probe module must not drag in torch,
     numpy, ffmpeg wrappers, or any audio library even transitively from
     its own module body."""
-    mod = importlib.import_module("otr_v2.visual.wedge_probe")
+    mod = importlib.import_module("visual.wedge_probe")
     src = Path(mod.__file__).read_text(encoding="utf-8")
     forbidden = ("import torch", "import numpy", "from torch", "from numpy")
     for needle in forbidden:
