@@ -34,9 +34,19 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 | 4 | wire announcer + post-assembly | **SHIPPED** | `9f82685` | New `nodes/_otr_news_wiring.py` with `override_announcer_close` + `post_assembly_keyterm_check` helpers. Writer I.5 section runs after per-beat loop: stamps `news_close_brief` onto LAST announcer line; word-boundary audits each `key_term` across voiced lines; stamps `meta["post_assembly_key_terms"]` diagnostic. 13 new wiring tests. ADR deviation tracked: zero-terms-landed ships warn-only; targeted repair pass deferred to follow-up. RADIO portrait + MusicGen canaries reason-text updated to point to future ADR (out of sprint scope per ADR section 1). |
 | 5 | strip era literals | **SHIPPED** | `4f45c7c` (amend of `92e58e5`) | `script_critic.py:330,339-340,556` stripped of "1940s setting" / "1940s-style" / "You are revising a 1940s ..." literals. `story_orchestrator.py:_LTX_STYLE_BRIEF_PROMPT` (lines 3394-3411) fully rewritten per ADR section 7.4 Option A — three style-spanning examples (near-future newsroom / deep-space vessel / rust-belt industrial decay) replace the three baked vacuum-tube anchors. 5 xfail-strict text-scan canaries flipped to PASSED with markers removed in lockstep per the canary mechanic. Originally shipped with wrong subject (cmd-chain stale COMMIT_EDITMSG anti-pattern from CLAUDE.md); force-amended with Jeffrey's OK. |
 
-### A/B sanity check (before commit 3 lands on `main`)
+### A/B sanity check (before merging v2.0-alpha to `main`)
 
 Run 10 episodes through old path + 10 through new path with the same seeds. Eyeball cast diversity (gender balance, role-fit, archetype spread). ~30 min subjective scoring. Catches the category of regression unit tests won't.
+
+### Deferred follow-ups (post-sprint)
+
+Tracked here per project rule — deferrals live in ROADMAP, not in sidecar docs. No separate punch-list document to delete later.
+
+| # | Item | Why deferred | Tracking signal |
+|---|---|---|---|
+| D1 | **Targeted repair pass when zero `key_terms` land in dialogue.** ADR section 4.4 canonical policy is hard-fail + re-compose the line whose intent is closest to the missing term's topic. | Commit 4 shipped warn-only — alpha-branch pragmatism, episodes still ship. | `meta.post_assembly_key_terms.repair_pass == "deferred"` in every produced ledger. Flip to `"v1"` (or whatever scheme) when the pass lands. |
+| D2 | **Future ADR — audio-plane (MusicGen cues).** `nodes/musicgen_theme.py:52-74` still hardcodes "1940s old time radio" as the opening / closing / interstitial cue defaults. Should read `ledger.meta.gen_params_initial.style` (and optionally `meta.news.script_brief` for mood signal). | ADR section 1 explicitly OUT OF SCOPE — "MusicGen cues land in their own ADR once narrative plane is stable." Narrative plane is now stable. | xfail-strict canary `test_musicgen_does_not_default_to_period_cues` in `tests/test_downstream_prompt_contract.py`. Flips to XPASS the moment the fix lands. |
+| D3 | **Future ADR — FLUX character portraits (RADIO portrait fallback).** `scripts/render_flux_batch.py:266` falls back to a hardcoded `"vintage 1940s console radio"` string when `cast["RADIO"].character_description` is empty. Should hard-fail (the cast contract guarantees the field is populated) or read style. | ADR section 1 OUT OF SCOPE — "FLUX character portraits land in their own ADR." | xfail-strict canary `test_radio_portrait_empty_char_desc_hard_fails`. Flips on fix. |
 
 ### Round-robin transcripts
 
