@@ -51,6 +51,8 @@ __all__ = [
     "OutlineRequest",
     "OutlineFailedError",
     "generate_outline",
+    "OutlineBudgetViolation",
+    "validate_outline_against_budget",
 ]
 
 
@@ -118,6 +120,19 @@ class Beat(BaseModel):
         max_length=80,
         description="Optional [SFX:] hint for the surrounding line",
     )
+    arc_phase: Optional[str] = Field(
+        default=None,
+        max_length=40,
+        description=(
+            "Phase 2A (2026-05-11): narrative phase label from "
+            "EpisodeBudget.arc_phases (setup / complication / "
+            "resolution / climax / etc.). Optional in the schema so "
+            "back-compat outlines (pre-Phase 2A) still validate; the "
+            "outline LLM prompt requests this field as a required "
+            "addition to every beat once the budget machinery is "
+            "wired into the writer."
+        ),
+    )
 
     @field_validator("speaker")
     @classmethod
@@ -148,7 +163,10 @@ class Outline(BaseModel):
     premise: str = Field(..., min_length=10, max_length=400)
     setting: str = Field(..., min_length=4, max_length=120)
     time_of_day: str = Field(..., min_length=3, max_length=40)
-    beats: list[Beat] = Field(..., min_length=4, max_length=24)
+    # Phase 2A (2026-05-11) raised max from 24 -> 32 so 6- and 7-act
+    # outlines (synthesis §3 Phase 2A beat-count table) still fit
+    # within the schema cap with music_inter beats.
+    beats: list[Beat] = Field(..., min_length=4, max_length=32)
 
     @model_validator(mode="after")
     def _no_duplicate_beat_ids(self) -> "Outline":
@@ -261,6 +279,26 @@ class OutlineRequest:
                              # the LLM whether to USE it. Wired in
                              # writer D.5 2026-05-10 (closes
                              # [v2.0 MVP no-op]).
+    budget: object = None
+                             # Phase 2A (2026-05-11). Optional
+                             # _otr_episode_budget.EpisodeBudget. When
+                             # non-None, the outline prompt gets an
+                             # "EPISODE BUDGET" block and the post-
+                             # pydantic pipeline runs the 8 Phase 2A
+                             # validators (per-phase word totals,
+                             # per-phase beat counts, per-beat word
+                             # range, arc_phase ordering, music_inter
+                             # count, announcer count) and rerolls on
+                             # failure. Validator #1 (total word
+                             # drift) is WARN-only at ±25% per §6.E.
+                             # Stored as `object` to keep this module
+                             # importable without pulling
+                             # _otr_episode_budget at module load --
+                             # `_get_budget(req)` does a lazy
+                             # isinstance / duck-type check at call
+                             # time. None preserves pre-Phase-2A
+                             # back-compat for tests and early-stage
+                             # callers.
     cast_descriptions: tuple[tuple[str, str, str], ...] = ()
                              # OPTIONAL. Per-character (name, gender,
                              # character_description) tuples from the
@@ -463,6 +501,15 @@ def _build_user_prompt(req: OutlineRequest) -> str:
                 f"Target episode shape: {target_length}. Continuous "
                 f"flow: do not include music_inter beats."
             )
+    # Phase 2A (2026-05-11): EPISODE BUDGET block. Lands BEFORE the
+    # target_words summary so the LLM sees concrete numbers for every
+    # phase + beat-range before being told the rough total. Skipped
+    # entirely when budget is None (back-compat).
+    budget_block = _format_episode_budget_block(req)
+    if budget_block:
+        parts.append(budget_block)
+        parts.append("")
+
     parts.extend([
         f"Target total dialogue length: ~{req.target_words} words "
         f"(sum of per-beat target_words should land near this number).",
@@ -614,6 +661,227 @@ def _check_speaker_role_alignment() -> None:
             "to match the canonical list.",
             sorted(actual), sorted(expected),
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2A (2026-05-11): episode budget rendering + validators
+# ---------------------------------------------------------------------------
+
+
+class OutlineBudgetViolation(ValueError):
+    """Structured signal raised by validate_outline_against_budget on a
+    hard violation. Carried as the error string into the reroll-then-
+    repair loop. Inherits from ValueError so any defensive `except
+    ValueError` clause doesn't drop the signal.
+    """
+
+
+def _get_budget(req: "OutlineRequest"):
+    """Return the EpisodeBudget on req, or None.
+
+    Stored as `object` on OutlineRequest so the module can be imported
+    without coupling to _otr_episode_budget at load time. We check
+    duck-typing here (presence of arc_phases attribute is sufficient).
+    """
+    b = getattr(req, "budget", None)
+    if b is None:
+        return None
+    if (hasattr(b, "arc_phases") and hasattr(b, "per_phase_words")
+            and hasattr(b, "per_phase_beats")):
+        return b
+    return None
+
+
+def _format_episode_budget_block(req: "OutlineRequest") -> str:
+    """Render the EPISODE BUDGET block. Empty string when no budget."""
+    b = _get_budget(req)
+    if b is None:
+        return ""
+    arc_phases = list(b.arc_phases)
+    per_phase_words = list(b.per_phase_words)
+    per_phase_beats = list(b.per_phase_beats)
+    words_lo, words_hi = b.words_per_beat_range
+    lines: list[str] = [
+        "EPISODE BUDGET -- hit these numbers:",
+        f"- Total spoken words: ~{b.target_words} (within 15%)",
+        f"- Structure: {b.act_count} act"
+        f"{'s' if b.act_count != 1 else ''} -> {', '.join(arc_phases)}",
+    ]
+    phase_words = ", ".join(
+        f"{name} ~{w}"
+        for name, w in zip(arc_phases, per_phase_words)
+    )
+    lines.append(f"- Words per phase: {phase_words}")
+    phase_beats = ", ".join(
+        f"{name} {n}"
+        for name, n in zip(arc_phases, per_phase_beats)
+    )
+    lines.append(f"- Voiced beats per phase: {phase_beats}")
+    lines.append(f"- Each voiced beat: {words_lo}-{words_hi} words")
+    lines.append(
+        f"- Music inter beats: {b.music_inter_count} "
+        f"({'one between each pair of phases' if b.music_inter_count > 0 else 'continuous flow, no music_inter'})"
+    )
+    lines.append(
+        f"- Announcer beats: {b.announcer_beats} (open + close)"
+    )
+    lines.append(
+        "- Every voiced beat MUST carry an `arc_phase` field set to "
+        f"one of: {', '.join(arc_phases)}."
+    )
+    return "\n".join(lines)
+
+
+def validate_outline_against_budget(
+    outline: "Outline",
+    req: "OutlineRequest",
+    *,
+    word_drift_warn_ratio: float = 0.25,
+) -> Optional[str]:
+    """Run the Phase 2A outline validators.
+
+    Returns None on pass. Returns an error string on the FIRST hard
+    failure (suitable for the reroll-then-repair loop). Validator #1
+    (total word drift) is WARN-only per §6.E -- never fails. Per
+    §6.G announcer + music + sfx beats are EXCLUDED from word and
+    per-phase budgets but are still counted by validators #6 / #7.
+
+    No-op when req.budget is None (back-compat).
+
+    Validator list (re-numbered after §6.C dropped per-character
+    distribution):
+      #1  total word drift (WARN >25%, no reroll per §6.E)
+      #2  per-phase word totals within [0.80, 1.20] of target
+      #3  per-phase voiced-beat counts within [target-1, target+2]
+      #4  per-voiced-beat target_words ∈ words_per_beat_range
+      #5  arc_phase monotonic ordering (no interleaving)
+      #6  count(music_inter beats) == budget.music_inter_count
+      #7  count(announcer beats) == budget.announcer_beats
+      #8  every speaker ∈ character_cast ∪ {ANNOUNCER}
+          (existing cast-membership check; KEPT)
+    """
+    b = _get_budget(req)
+    if b is None:
+        return None
+
+    voiced = [
+        beat for beat in outline.beats
+        if beat.speaker_role == "character"
+    ]
+    announcer_beats = [
+        beat for beat in outline.beats
+        if beat.speaker_role == "announcer"
+    ]
+    music_inter_beats = [
+        beat for beat in outline.beats
+        if beat.speaker_role == "music_inter"
+    ]
+
+    # Wiring-review #13 (2026-05-11): validate arc_phase
+    # existence + allowed-value-membership + monotonic ordering
+    # BEFORE running per-phase word totals or per-phase beat
+    # counts. Otherwise an unknown / missing phase value silently
+    # miscounts under the per-phase aggregations (validators 2 + 3)
+    # and the reroll prompt fires for the wrong reason.
+
+    arc_phases = list(b.arc_phases)
+    per_phase_words = list(b.per_phase_words)
+    per_phase_beats = list(b.per_phase_beats)
+    phase_index = {ph: i for i, ph in enumerate(arc_phases)}
+
+    # --- arc_phase: existence + value + monotonic order (was #5) ---
+    last_idx = -1
+    for beat in voiced:
+        ph = (beat.arc_phase or "").strip()
+        if not ph:
+            return (
+                f"Beat {beat.beat_id} is missing arc_phase. Every "
+                f"voiced beat MUST carry one of: "
+                f"{', '.join(arc_phases)}."
+            )
+        if ph not in phase_index:
+            return (
+                f"Beat {beat.beat_id} has arc_phase={ph!r}; not in "
+                f"budget arc_phases={arc_phases!r}."
+            )
+        idx = phase_index[ph]
+        if idx < last_idx:
+            return (
+                f"Beat {beat.beat_id} (arc_phase={ph!r}) breaks "
+                f"arc_phase ordering. Voiced beats must be grouped "
+                f"by arc_phase in order {arc_phases!r}."
+            )
+        last_idx = idx
+
+    # --- #1: total word drift (WARN-only per §6.E) ---
+    total = sum(beat.target_words for beat in voiced)
+    if total > 0:
+        ratio = total / max(1, b.target_words)
+        if abs(ratio - 1.0) > word_drift_warn_ratio:
+            log.warning(
+                "[OTR_Outline] WARN: total voiced words=%d vs "
+                "target_words=%d (ratio=%.2f); >25%% drift but "
+                "per §6.E this is warn-only.",
+                total, b.target_words, ratio,
+            )
+
+    # --- #2: per-phase word totals ---
+    for phase, target_w in zip(arc_phases, per_phase_words):
+        got = sum(
+            beat.target_words for beat in voiced
+            if (beat.arc_phase or "").strip() == phase
+        )
+        lo = round(target_w * 0.80)
+        hi = round(target_w * 1.20)
+        if not (lo <= got <= hi):
+            return (
+                f"Phase {phase!r} got {got} words "
+                f"(target {target_w}, allowed {lo}-{hi}). "
+                f"Reallocate words: adjust voiced-beat target_words "
+                f"in that phase."
+            )
+
+    # --- #3: per-phase voiced-beat counts ---
+    for phase, target_n in zip(arc_phases, per_phase_beats):
+        got = sum(
+            1 for beat in voiced
+            if (beat.arc_phase or "").strip() == phase
+        )
+        lo = max(1, target_n - 1)
+        hi = target_n + 2
+        if not (lo <= got <= hi):
+            return (
+                f"Phase {phase!r} has {got} voiced beats "
+                f"(target {target_n}, allowed {lo}-{hi}). "
+                f"Add or remove voiced beats in that phase."
+            )
+
+    # --- #4: per-voiced-beat target_words in range ---
+    words_lo, words_hi = b.words_per_beat_range
+    for beat in voiced:
+        if not (words_lo <= beat.target_words <= words_hi):
+            return (
+                f"Beat {beat.beat_id} has target_words={beat.target_words}; "
+                f"required range is {words_lo}-{words_hi} per the budget."
+            )
+
+    # --- #6: music_inter count ---
+    got_mi = len(music_inter_beats)
+    if got_mi != b.music_inter_count:
+        return (
+            f"music_inter beat count is {got_mi}; budget requires "
+            f"{b.music_inter_count}."
+        )
+
+    # --- #7: announcer count ---
+    got_ann = len(announcer_beats)
+    if got_ann != b.announcer_beats:
+        return (
+            f"announcer beat count is {got_ann}; budget requires "
+            f"{b.announcer_beats} (open + close)."
+        )
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -771,6 +1039,21 @@ def generate_outline(
                 f"locked-but-unused: {sorted(unused)!r}, "
                 f"invented-and-repeated: {dups!r}"
             )
+            log.warning(
+                "[OTR_Outline] attempt %d failed: %s",
+                attempt_idx + 1, err_msg,
+            )
+            attempts.append((last_raw, err_msg))
+            continue
+
+        # Phase 2A (2026-05-11): budget validators. No-op when
+        # req.budget is None (pre-Phase-2A back-compat). On hard
+        # failure, push the structured error onto attempts and
+        # retry; the next attempt's repair-call (when applicable)
+        # sees the exact violation message and can correct.
+        budget_violation = validate_outline_against_budget(outline, req)
+        if budget_violation is not None:
+            err_msg = f"OutlineBudgetViolation: {budget_violation}"
             log.warning(
                 "[OTR_Outline] attempt %d failed: %s",
                 attempt_idx + 1, err_msg,

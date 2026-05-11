@@ -119,9 +119,15 @@ DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
 """Default story-writing LLM. Validated production path (cleared
 BUG-061/062/063 format hardening)."""
 
-LAST_LINES_WINDOW = 3
+LAST_LINES_WINDOW = 5
 """Rolling context window size for compose_line. Each character /
-announcer beat appends to the window; non-voiced beats do not."""
+announcer beat appends to the window; non-voiced beats do not.
+
+Phase 1 (2026-05-11): bumped from 3 to 5 per synthesis §6.D --
+Mistral-Nemo handles the wider window cleanly within the 800-tok
+composer prompt budget, and the extra context smooths line-to-line
+voice consistency (especially in multi-character scenes where the
+prior 3-line window often dropped one speaker's last beat)."""
 
 WORD_BUDGET_RATIO_LO = 0.7
 WORD_BUDGET_RATIO_HI = 1.3
@@ -655,6 +661,7 @@ def _resolve_inputs(
     include_act_breaks: bool = True,
     self_critique: bool = True,
     target_length: str = "short (3 acts)",
+    act_count: int = 0,
     style: str = _STYLE_AUTO_SENTINEL,
     style_custom: str = "",
     creativity: str = "balanced",
@@ -686,6 +693,26 @@ def _resolve_inputs(
     """
     target_words = _resolve_target_words(target_words, target_length)
     num_characters = max(1, min(6, int(num_characters)))
+
+    # Phase 2A (2026-05-11): act_count resolution. 0 (default) means
+    # auto-derive via _otr_episode_budget.default_act_count. Any
+    # non-zero value gets validated by compute_episode_budget in
+    # run() -- including the [default..max] band check.
+    act_count_int = max(0, min(7, int(act_count or 0)))
+    if act_count_int == 0:
+        try:
+            from . import _otr_episode_budget as _OTRB  # type: ignore
+            act_count_int = _OTRB.default_act_count(target_words)
+        except Exception as exc:  # noqa: BLE001
+            # If target_words is below 30, default_act_count raises;
+            # fall through to act_count=1 and let compute_episode_budget
+            # surface the structured InvalidEpisodeBudgetError in run().
+            log.warning(
+                "[OTR_LedgerScriptWriter] act_count auto-derive failed "
+                "(target_words=%d): %s -- defaulting to 1",
+                target_words, exc,
+            )
+            act_count_int = 1
     temperature, top_p = _resolve_creativity(creativity)
     custom = (custom_premise or "").strip()
 
@@ -747,6 +774,7 @@ def _resolve_inputs(
         "include_act_breaks":   bool(include_act_breaks),
         "self_critique":        bool(self_critique),
         "target_length":        str(target_length),
+        "act_count":            int(act_count_int),
         "creativity":           str(creativity),
         "temperature":          float(temperature),
         "top_p":                float(top_p),
@@ -935,16 +963,17 @@ class OTR_LedgerScriptWriter:
                 "target_length": (_TARGET_LENGTH_CHOICES, {
                     "default": "short (3 acts)",
                     "tooltip": (
-                        "Length + structure preset. Two effects:\n\n"
-                        "  1. Smoke presets ('30 words (smoke, 1 act)' "
-                        "and 'tiny (smoke, 1 act)') FORCE "
-                        "target_words=30 / 100, overriding the "
-                        "target_words widget.\n\n"
-                        "  2. The full label (including the '(N acts)' "
-                        "hint) is rendered into the outline prompt as "
-                        "the `Target episode shape` line so the outline "
-                        "LLM sees the act-count signal and paces the "
-                        "beats accordingly. Wired 2026-05-10."
+                        "[Phase 2A deprecated, kept for graph back-"
+                        "compat.] The smoke presets here ('30 words "
+                        "(smoke, 1 act)' / 'tiny (smoke, 1 act)') "
+                        "still FORCE target_words=30 / 100 when "
+                        "selected. The structural act-count signal "
+                        "this widget previously carried is now driven "
+                        "by `act_count` + `target_words` -> "
+                        "`compute_episode_budget`. Saved workflows "
+                        "with a target_length value load cleanly; "
+                        "new workflows should leave this on the "
+                        "default and use `act_count` instead."
                     ),
                 }),
                 "style": (_STYLE_CHOICES, {
@@ -1021,6 +1050,30 @@ class OTR_LedgerScriptWriter:
                         "debugging."
                     ),
                 }),
+                # Phase 2A (2026-05-11). Appended at the END of optional
+                # widgets so legacy saved workflows (widgets_values with
+                # 17 entries, no act_count) preserve their positional
+                # mapping. New workflows pick up act_count as the 18th
+                # entry; missing entries default to 0 (auto-derive).
+                "act_count": ("INT", {
+                    "default": 0, "min": 0, "max": 7, "step": 1,
+                    "tooltip": (
+                        "Phase 2A (2026-05-11). Number of acts (1-7). "
+                        "0 (default) = auto-derive from target_words "
+                        "via _otr_episode_budget.default_act_count.\n\n"
+                        "Default-act thresholds (target_words floor):\n"
+                        "  30   -> default 1 act\n"
+                        "  150  -> default 2 acts\n"
+                        "  300  -> default 3 acts (and all higher words)\n\n"
+                        "Maximum cap per target_words: target_words // 50, "
+                        "hard ceiling 7. The user can pick UP from the "
+                        "default but not below.\n\n"
+                        "The JS extension at web/js/otr_act_count_widget.js "
+                        "live-updates the valid dropdown choices when "
+                        "target_words changes; the Python validator is "
+                        "authoritative (rejects any out-of-band combo)."
+                    ),
+                }),
             },
         }
 
@@ -1060,6 +1113,10 @@ class OTR_LedgerScriptWriter:
         arc_enhancer=True,
         optimization_profile="Standard",
         perfect_run_spacesaver=False,
+        # Phase 2A (2026-05-11). Trailing kwarg to mirror the
+        # tail position in INPUT_TYPES (so legacy graphs keep
+        # mapping). Default 0 = auto-derive.
+        act_count=0,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1074,6 +1131,7 @@ class OTR_LedgerScriptWriter:
             include_act_breaks=include_act_breaks,
             self_critique=self_critique,
             target_length=target_length,
+            act_count=act_count,
             style=style,
             style_custom=style_custom,
             creativity=creativity,
@@ -1328,6 +1386,30 @@ class OTR_LedgerScriptWriter:
             for row in cast_rows
             if row["name"] != "ANNOUNCER"
         )
+        # Phase 2A (2026-05-11): build EpisodeBudget from
+        # (target_words, act_count, include_act_breaks, num_characters).
+        # On invalid combos compute_episode_budget raises
+        # InvalidEpisodeBudgetError (ValueError subclass); we let it
+        # propagate -- the widget delta is the right place to fail
+        # loud, not silently coerce.
+        from . import _otr_episode_budget as _OTRB  # type: ignore
+        episode_budget = _OTRB.compute_episode_budget(
+            target_words=resolved["target_words"],
+            act_count=resolved["act_count"],
+            include_act_breaks=resolved["include_act_breaks"],
+            num_characters=resolved["num_characters"],
+        )
+        log.info(
+            "[OTR_LedgerScriptWriter] phase 2A budget: act_count=%d, "
+            "arc_phases=%s, per_phase_words=%s, per_phase_beats=%s, "
+            "words_per_beat_range=%s, music_inter=%d",
+            episode_budget.act_count, list(episode_budget.arc_phases),
+            list(episode_budget.per_phase_words),
+            list(episode_budget.per_phase_beats),
+            list(episode_budget.words_per_beat_range),
+            episode_budget.music_inter_count,
+        )
+
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
             style=resolved["style"],
@@ -1338,6 +1420,7 @@ class OTR_LedgerScriptWriter:
             cast_descriptions=cast_descriptions,
             target_length=str(resolved.get("target_length") or ""),
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
+            budget=episode_budget,
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
 
@@ -1370,18 +1453,86 @@ class OTR_LedgerScriptWriter:
             "deferred to post-composition title regen)"
         )
 
+        # --- H. Phase 2B (2026-05-11): pre-stamp skeleton ledger -------
+        # Outline validated. Pre-stamp one row per beat NOW so the
+        # composer loop updates in place. Mid-loop crash leaves a
+        # partial-but-coherent ledger on disk (text == "" signals
+        # "row composed pending"). See production_ledger
+        # init_lines_from_outline / update_line_text comments.
+        led.init_lines_from_outline(outline, char_id_by_name)
+        led.save()
+        log.info(
+            "[OTR_LedgerScriptWriter] phase 2B skeleton stamped: "
+            "%d line rows", len(led.data.get("lines", []) or []),
+        )
+
         # --- I. Per-beat loop ------------------------------------------
-        line_rows: list = []
         script_text_parts: list = []
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
 
         base_temp = resolved["temperature"]
+
+        # Phase 0 (2026-05-11): build the UPPERCASE name-roster ONCE.
+        # Passed to every LineRequest so compose_line can detect
+        # proper nouns the LLM invented outside the locked cast +
+        # journalistic key_terms. Detection-only: phantoms are flagged
+        # on lines[k].compose_flags; the composer does NOT reroll.
+        # Phase 3 reviewer + deterministic Step 2.5 fallback own
+        # repair downstream. See synthesis §6.A (Option 1, strict).
+        allowed_roster = _OTRLC.build_allowed_roster(
+            cast_rows=cast_rows,
+            key_terms=key_terms_tuple,
+        )
+        # Wiring-review #7 / #9 (2026-05-11): stamp the canonical
+        # allowed_roster on meta as a sorted JSON-serializable list
+        # so every downstream consumer (composer, Pass 1 auditor,
+        # deterministic repair, Step 2.5 phantom-skip, Pass 3
+        # auditor) reads ONE roster. Nobody recomputes locally; the
+        # roster is immutable for the episode's life.
+        meta["allowed_roster"] = sorted(allowed_roster)
+        log.info(
+            "[OTR_LedgerScriptWriter] phase 0 roster built: %d entries "
+            "(cast=%d + announcer + key_terms=%d), stamped on meta",
+            len(allowed_roster),
+            len([r for r in cast_rows if r.get("name") != "ANNOUNCER"]),
+            len(key_terms_tuple),
+        )
+
+        # Phase 1 (2026-05-11): build outline_spine + voice_card map
+        # ONCE. Both are stable across every composer call in the
+        # episode so they live in the static prefix of the prompt
+        # (KV-cache friendly once reuse is wired in the loader).
+        # See synthesis §6.D for the prompt structure.
+        outline_spine = _OTRLC.render_outline_spine(outline)
+        # Map char_id -> voice_card_str (cast_rows already has the
+        # ANNOUNCER row stamped by _OTRCAST.lock_cast()). Beats look
+        # up by NAME, not char_id, so build a name index too.
+        voice_card_by_name: dict[str, str] = {
+            row.get("name", ""): _OTRLC.build_voice_card(row)
+            for row in cast_rows
+            if row.get("name")
+        }
+        # Fallback ANNOUNCER card if for some reason the cast row's
+        # voice_card came out empty (e.g. unset description).
+        if not voice_card_by_name.get("ANNOUNCER"):
+            voice_card_by_name["ANNOUNCER"] = "ANNOUNCER (omniscient narrator)"
+        log.info(
+            "[OTR_LedgerScriptWriter] phase 1 prompt context built: "
+            "spine=%d chars, voice_cards=%d entries",
+            len(outline_spine), len(voice_card_by_name),
+        )
+
+        # Style descriptor for the composer's STATIC prefix. Empty
+        # string flips the STYLE block off in _build_user_prompt --
+        # back-compat for callers without a style picked yet.
+        style_descriptor = str(resolved.get("style") or "").strip()
 
         for beat in outline.beats:
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
             cid: str
             token: str
+            beat_compose_flags: tuple[str, ...] = ()
 
             if beat.speaker_role == "character":
                 line_req = _OTRLC.LineRequest(
@@ -1391,10 +1542,21 @@ class OTR_LedgerScriptWriter:
                     target_words=beat.target_words,
                     canon_header=canon_header,
                     last_lines=list(last_lines),
+                    allowed_roster=allowed_roster,
+                    # Phase 1 (2026-05-11) prompt enrichment.
+                    style_descriptor=style_descriptor,
+                    outline_spine=outline_spine,
+                    character_voice_card=voice_card_by_name.get(
+                        beat.speaker, beat.speaker,
+                    ),
+                    # Phase 2A (2026-05-11) arc_phase awareness.
+                    arc_phase=(beat.arc_phase or "").strip(),
                 )
-                cleaned = _OTRLC.compose_line(
+                line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
                 )
+                cleaned = line_res.text
+                beat_compose_flags = line_res.compose_flags
                 cid = char_id_by_name[beat.speaker]
                 token = f"[VOICE: {beat.speaker}, {traits}] {cleaned}"
 
@@ -1410,10 +1572,21 @@ class OTR_LedgerScriptWriter:
                     target_words=beat.target_words,
                     canon_header=canon_header,
                     last_lines=list(last_lines),
+                    allowed_roster=allowed_roster,
+                    # Phase 1 (2026-05-11) prompt enrichment.
+                    style_descriptor=style_descriptor,
+                    outline_spine=outline_spine,
+                    character_voice_card=voice_card_by_name.get(
+                        "ANNOUNCER", "ANNOUNCER (omniscient narrator)",
+                    ),
+                    # Phase 2A (2026-05-11) arc_phase awareness.
+                    arc_phase=(beat.arc_phase or "").strip(),
                 )
-                cleaned = _OTRLC.compose_line(
+                line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
                 )
+                cleaned = line_res.text
+                beat_compose_flags = line_res.compose_flags
                 cid = "announcer"
                 token = f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
 
@@ -1434,25 +1607,44 @@ class OTR_LedgerScriptWriter:
                 )
                 continue
 
-            line_rows.append({
-                "line_id":       beat.beat_id,
-                "shot_id":       None,
-                "beat_id":       beat.beat_id,
-                "char_id":       cid,
-                "text":          cleaned,
-                "traits":        traits,
-                "boundary":      None,
-                "bark_wav_path": None,
-                "start_s":       None,
-                "dur_s":         None,
-                "_speaker_role": beat.speaker_role,
-            })
+            # Phase 2B (2026-05-11): in-place ledger update + save.
+            # Skeleton row exists from init_lines_from_outline. Update
+            # text + compose_flags + traits + char_id (skeleton's char_id
+            # came from char_id_by_name lookup, but we re-stamp here
+            # so any post-init speaker resolution is reflected). Save
+            # after EVERY line so a mid-loop crash leaves the work
+            # done so far on disk.
+            #
+            # Wiring-review #4 (2026-05-11): MUST check
+            # update_line_text return value. False means no row
+            # matched -- the ledger skeleton and the outline have
+            # drifted apart and the disk ledger silently misses this
+            # beat while script_text_parts populates. Fail loud.
+            _ok = led.update_line_text(beat.beat_id, cleaned)
+            if not _ok:
+                raise RuntimeError(
+                    f"[OTR_LedgerScriptWriter] LineLedgerMismatchError: "
+                    f"update_line_text returned False for "
+                    f"beat_id={beat.beat_id!r} -- ledger skeleton lacks "
+                    f"this beat. Did init_lines_from_outline run with "
+                    f"the same outline object? "
+                    f"lines={[ln.get('beat_id') for ln in (led.data.get('lines') or [])]}"
+                )
+            _OTRL.patch_line_fields(
+                led.data, beat.beat_id,
+                {
+                    "char_id":       cid,
+                    "traits":        traits,
+                    "compose_flags": list(beat_compose_flags),
+                },
+            )
+            led.save()
             script_text_parts.append(token)
 
-        # --- I.5. News-wiring overlay (commit 4 of news_interpreter sprint)
-        # Two pure operations on the in-flight line_rows BEFORE
-        # set_lines persists them. Both no-op when meta["news"] is
-        # None (graceful-degrade path from commit 3).
+        # --- I.5. News-wiring overlay (Phase 2B: operates on ledger) --
+        # Two pure operations on `led.data["lines"]` AFTER the
+        # progressive composer loop completes. Both no-op when
+        # meta["news"] is None (graceful-degrade path).
         #
         # 1. Announcer closing-line override. The line composer wrote
         #    something at every announcer beat from beat.intent. For
@@ -1461,21 +1653,22 @@ class OTR_LedgerScriptWriter:
         #    from the source article (era-neutral, news_interpreter-
         #    distilled).
         #
-        # 2. Post-assembly key_terms audit. Walk every voiced line
-        #    (character + announcer), check each key_term from the
-        #    brief landed via word-boundary regex. Stamp the result
-        #    on meta["post_assembly_key_terms"] so downstream nodes
-        #    (and a future repair pass) can see what landed vs missed.
-        #    ADR section 4.4 canonical policy is hard-fail at zero
-        #    terms landed with a repair pass; for commit 4 we warn at
-        #    every level and DEFER the repair pass to a future commit.
-        #    The episode ships either way -- this is alpha-branch
-        #    pragmatism.
+        # 2. Post-assembly key_terms audit. Walk every voiced line,
+        #    check each key_term landed via word-boundary regex.
+        #    Stamp the result on meta["post_assembly_key_terms"].
         news_meta = meta.get("news") or {}
         nc_brief = (news_meta.get("news_close_brief") or "").strip()
         if nc_brief:
-            overridden = _OTRNW.override_announcer_close(line_rows, nc_brief)
+            overridden = _OTRNW.override_announcer_close(
+                led.data["lines"], nc_brief,
+            )
             if overridden is not None:
+                # Recompute char_count + word_count after the in-place
+                # text override so downstream consumers see fresh
+                # counts (override_announcer_close only touches `text`).
+                _OTRL.patch_line_text(
+                    led.data, overridden["line_id"], overridden["text"],
+                )
                 log.info(
                     "[OTR_LedgerScriptWriter] news_close_brief stamped "
                     "onto closing announcer line %s",
@@ -1484,15 +1677,15 @@ class OTR_LedgerScriptWriter:
             else:
                 log.warning(
                     "[OTR_LedgerScriptWriter] news_close_brief present "
-                    "but no announcer line found in line_rows to stamp "
-                    "onto; closing read will use the line composer's "
-                    "original text"
+                    "but no announcer line found in led.data['lines'] "
+                    "to stamp onto; closing read will use the line "
+                    "composer's original text"
                 )
 
         nc_key_terms = tuple(news_meta.get("key_terms") or ())
         if nc_key_terms:
             landed, missing = _OTRNW.post_assembly_keyterm_check(
-                line_rows, nc_key_terms, min_required=2,
+                led.data["lines"], nc_key_terms, min_required=2,
             )
             meta["post_assembly_key_terms"] = {
                 "landed":       landed,
@@ -1505,8 +1698,8 @@ class OTR_LedgerScriptWriter:
                 log.warning(
                     "[OTR_LedgerScriptWriter] post-assembly key_terms "
                     "ZERO landed (terms=%r). ADR section 4.4 calls "
-                    "for hard-fail + repair pass; commit 4 ships warn-"
-                    "only and DEFERS the repair pass. Episode proceeds.",
+                    "for hard-fail + repair pass; current alpha ships "
+                    "warn-only and DEFERS the repair pass. Episode proceeds.",
                     list(nc_key_terms),
                 )
             elif len(landed) < 2:
@@ -1528,16 +1721,18 @@ class OTR_LedgerScriptWriter:
                     len(landed),
                 )
 
-        # --- J. set_lines + post-patch additive speaker_role ----------
-        led.set_lines([
-            {k: v for k, v in r.items() if not k.startswith("_")}
-            for r in line_rows
-        ])
-        for r in line_rows:
-            _OTRL.patch_line_fields(
-                led.data, r["line_id"],
-                {"speaker_role": r["_speaker_role"]},
-            )
+        # --- J. Phase 0 aggregate + final save ------------------------
+        # No set_lines + post-patch pass any more -- every line was
+        # stamped progressively inside the composer loop (Phase 2B).
+        # The post-loop work here is just the meta.compose_flag_summary
+        # rollup + a final ledger save (which also flushes any text
+        # the news-wiring overlay mutated above).
+        meta["compose_flag_summary"] = _OTRLC.aggregate_compose_flags(led.data)
+        log.info(
+            "[OTR_LedgerScriptWriter] phase 0 compose_flag_summary: %s",
+            meta["compose_flag_summary"] or "(clean)",
+        )
+        led.save()
 
         # --- J.5. Post-composition title regen ------------------------
         # Per Jeffrey 2026-05-10: when the user leaves episode_title
@@ -1604,6 +1799,14 @@ class OTR_LedgerScriptWriter:
         # title so the announcer / characters actually say the
         # regenerated title aloud. Helper enforces case-insensitive
         # whole-phrase match + the _TITLE_SUB_MIN_LEN guard.
+        #
+        # Phase 2B (2026-05-11) -- the writer no longer accumulates
+        # `line_rows` in memory; all rows live on `led.data["lines"]`
+        # progressively. This loop must walk the ledger directly.
+        # Wiring-review #1 fix: replaced stale `for r in line_rows:`
+        # with `for r in led.data.get("lines", []) or []:` so the
+        # title-substitution branch no longer NameError's the moment
+        # the LLM regenerates a different title.
         _title_sub_meta = None
         if (
             final_title
@@ -1612,14 +1815,15 @@ class OTR_LedgerScriptWriter:
         ):
             n_lines_patched = 0
             n_subs_total = 0
-            for r in line_rows:
+            for r in led.data.get("lines", []) or []:
                 new_text, n_subs = _substitute_title_in_text(
-                    r["text"], old_title_in_lines, final_title,
+                    r.get("text", "") or "",
+                    old_title_in_lines,
+                    final_title,
                 )
                 if n_subs > 0:
-                    r["text"] = new_text
                     _OTRL.patch_line_text(
-                        led.data, r["line_id"], new_text,
+                        led.data, r.get("line_id"), new_text,
                     )
                     n_lines_patched += 1
                     n_subs_total += n_subs

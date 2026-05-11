@@ -219,6 +219,35 @@ def get_ledger() -> "Ledger":
         return _CURRENT
 
 
+# Wiring-review #3 (2026-05-11): non-creating accessors for downstream
+# nodes that should fail loud when called without a writer upstream.
+# The reviewer (OTR_LedgerScriptReviewer) uses these instead of
+# get_ledger() so it never operates on an empty placeholder ledger.
+
+
+def peek_ledger() -> Optional["Ledger"]:
+    """Return the current ledger or None. Never creates a placeholder.
+
+    Use this from downstream nodes (reviewer, sequencer, audit
+    artifacts) where an absent ledger is an error condition rather
+    than a fresh-run signal.
+    """
+    with _LEDGER_LOCK:
+        return _CURRENT
+
+
+def has_current_ledger() -> bool:
+    """True iff a writer-produced ledger with at least one line row
+    exists in the current process. Use this as the gate before any
+    downstream LLM work that would be wasteful on an empty ledger.
+    """
+    with _LEDGER_LOCK:
+        if _CURRENT is None:
+            return False
+        lines = _CURRENT.data.get("lines", []) or []
+        return len(lines) > 0
+
+
 # ---------------------------------------------------------------------------
 # Ledger
 # ---------------------------------------------------------------------------
@@ -611,6 +640,132 @@ class Ledger:
         self.data["total_beats"] = len(rows)
         return self
 
+    # -- Phase 2B (2026-05-11): progressive ledger writes ------------
+    #
+    # Pre-Phase-2B callers (build_test_ledger_from_director, scene
+    # builders, etc.) still use `set_lines()` to stamp the full lines
+    # list at the end of their pipeline. The v2.0-alpha writer
+    # (OTR_LedgerScriptWriter) instead pre-stamps a skeleton via
+    # `init_lines_from_outline()` immediately after outline validates
+    # and then updates each row's text in place via `update_line_text()`
+    # after every `compose_line` call -- saving the ledger between
+    # every line so a mid-loop crash leaves a partial-but-coherent
+    # ledger on disk (`text == ""` signals "row composed pending").
+    #
+    # NOTE on save frequency. The writer calls `led.save()` once per
+    # composed line (~15 times for a 12-beat episode, ~25 times for
+    # a 7-act 19-beat episode plus reviewer rewrites). Every save
+    # goes through write-tmp + atomic-rename, which on a fast NVMe
+    # SSD is microseconds and unremarkable. On slow / network /
+    # antivirus-scanned storage this pattern would degrade. A future
+    # storage migration should reconsider the per-line save cadence
+    # and may want to coalesce writes (e.g. save every K lines).
+
+    def init_lines_from_outline(
+        self,
+        outline,
+        char_id_by_name: Optional[Dict[str, str]] = None,
+    ) -> "Ledger":
+        """Phase 2B: pre-stamp skeleton line rows from a validated outline.
+
+        `outline` must expose ``.beats`` (an iterable of Beat-like
+        objects with beat_id / speaker / speaker_role / intent / mood
+        / target_words / arc_phase / sfx_cue attributes). Plain dicts
+        with the same fields also work for tests.
+
+        Each beat produces ONE line row:
+          * beat_id == line_id (1:1 today; the model can later
+            decimal-sub-beat without breaking, since renumbering is
+            explicitly banned per synthesis §3 Phase 3)
+          * char_id looked up from `char_id_by_name` for character
+            beats; "announcer" for announcer beats; the speaker_role
+            string itself for music/sfx beats (matches existing writer
+            convention).
+          * text starts EMPTY for voiced beats (the composer will fill
+            it via update_line_text). For non-voiced beats it's
+            stamped at init time from sfx_cue / intent verbatim --
+            those rows are complete from the moment they're born.
+          * speaker_role, arc_phase, compose_flags are additive Phase
+            2A / Phase 0 fields stamped at init time so the schema is
+            uniform across rows.
+
+        Returns self so call sites can chain `.save()`.
+        """
+        char_id_by_name = char_id_by_name or {}
+        beats = list(getattr(outline, "beats", []) or [])
+        rows: List[Dict[str, Any]] = []
+        for beat in beats:
+            def _g(k: str, default=""):
+                if isinstance(beat, dict):
+                    return beat.get(k, default)
+                return getattr(beat, k, default)
+            beat_id = _safe_str(_g("beat_id"))
+            speaker = _safe_str(_g("speaker"))
+            role = _safe_str(_g("speaker_role")) or "character"
+            mood = _safe_str(_g("mood"))
+            sfx_cue = _safe_str(_g("sfx_cue"))
+            intent = _safe_str(_g("intent"))
+            arc_phase = _safe_str(_g("arc_phase"))
+            if role == "character":
+                cid = char_id_by_name.get(speaker, "")
+            elif role == "announcer":
+                cid = "announcer"
+            else:
+                cid = role
+            if role in ("character", "announcer"):
+                text = ""    # composer fills via update_line_text
+            else:
+                text = (sfx_cue or intent or "").strip()
+            rows.append({
+                "line_id":       beat_id,
+                "shot_id":       None,
+                "beat_id":       beat_id,
+                "char_id":       cid,
+                "text":          text,
+                "traits":        mood or None,
+                "boundary":      None,
+                "char_count":    _char_count(text),
+                "word_count":    _word_count(text),
+                "bark_wav_path": None,
+                "start_s":       None,
+                "dur_s":         None,
+                # Phase 0 / 2A additive fields (stamped at init time).
+                "speaker_role":  role,
+                "arc_phase":     arc_phase or None,
+                "compose_flags": [],
+            })
+        self.data["lines"] = rows
+        self._recompute_totals()
+        return self
+
+    def update_line_text(
+        self,
+        beat_id: str,
+        text: str,
+    ) -> bool:
+        """Phase 2B: in-place text update on one existing line row.
+
+        Matches the row whose `beat_id` (or fall-back `line_id`)
+        equals `beat_id`. Recomputes char_count + word_count in
+        lockstep so downstream consumers comparing budget vs actual
+        word counts see fresh numbers.
+
+        Returns True if a row was updated, False if no matching row.
+        Does NOT save -- the writer calls `.save()` after the update
+        so a crash between save and update doesn't lose the text.
+        """
+        safe_text = text or ""
+        target = _safe_str(beat_id)
+        for row in self.data["lines"]:
+            if (row.get("beat_id") == target
+                    or row.get("line_id") == target):
+                row["text"] = safe_text
+                row["char_count"] = _char_count(safe_text)
+                row["word_count"] = _word_count(safe_text)
+                self._recompute_totals()
+                return True
+        return False
+
     def set_lines(self, line_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         """Set the lines[] section.
 
@@ -815,6 +970,13 @@ class Ledger:
                 except OSError:
                     pass
             os.replace(tmp, path)
+            # Wiring-review #5 (2026-05-11): assign merged payload
+            # back to self.data so the in-memory ledger matches the
+            # on-disk JSON byte-for-byte. Without this, the next read
+            # of `led.data` returns pre-merge state and
+            # `json.dumps(led.data)` for downstream consumers (writer
+            # slot, reviewer slot) diverges from disk.
+            self.data = merged
             log.info("[Ledger] saved %s (%d lines, %d words)",
                      os.path.basename(path),
                      self.data["total_dialogue_lines"],
