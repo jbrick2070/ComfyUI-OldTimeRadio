@@ -85,11 +85,12 @@ ReviewerVerdict = Literal[
 _LEVENSHTEIN_THRESHOLD = 3
 
 
-# Titled-phantom regex for Step 2.5 deterministic skip-fallback.
-_TITLED_PHANTOM_RE = re.compile(
-    r"\b(Dr|Mr|Ms|Mrs|Prof|Lt|Capt|Cmdr|Adm|Sen|Sgt|Col|Gen)"
-    r"\.\s+[A-Z]\w+"
-)
+# Post-Phase-3 review Gap 2 follow-up (2026-05-11): `_TITLED_PHANTOM_RE`
+# constant removed. All three call sites (apply_phantom_skip_fallback,
+# _final_phantom_check, _detect_titled_phantoms) now import the
+# canonical `_otr_line_composer.detect_phantom_names` which covers
+# titled names + ALL-CAPS tokens + Title-Case bigrams. One detector,
+# one roster, everywhere — the §7 invariant is now enforced.
 
 
 # Generation params for the three LLM calls (kept conservative; the
@@ -719,17 +720,29 @@ def _detect_titled_phantoms(
     candidate_ledger: dict,
     cast_roster: set[str],
 ) -> list[tuple[str, str]]:
-    """Return [(line_id, phantom_token), ...] for titled phantoms
-    present in candidate text. Cast roster is the UPPERCASE set."""
+    """Return [(line_id, phantom_token), ...] for phantoms present
+    in candidate text.
+
+    Post-Phase-3 review Gap 2 follow-up (2026-05-11): migrated from
+    the narrow `_TITLED_PHANTOM_RE` to the canonical
+    `_otr_line_composer.detect_phantom_names` so the doctor's
+    pre-filled work list catches ALL-CAPS phantoms (CARLA) and
+    Title-Case bigrams (Joe Smith), not just titled names (Dr.
+    Patel). One detector, one roster, everywhere — the name kept
+    as `_detect_titled_phantoms` for callsite stability; the
+    behavior is the canonical detector's full three-regex pass.
+    """
+    from ._otr_line_composer import detect_phantom_names  # type: ignore
+
     found: list[tuple[str, str]] = []
+    roster_frozen = frozenset(cast_roster)
     for line in candidate_ledger.get("lines", []) or []:
         text = line.get("text") or ""
         if not text:
             continue
-        for m in _TITLED_PHANTOM_RE.finditer(text):
-            tok = m.group(0)
-            if tok.upper() in cast_roster:
-                continue
+        speaker = line.get("char_id") or line.get("speaker") or ""
+        phantoms = detect_phantom_names(text, speaker, roster_frozen)
+        for tok in phantoms:
             found.append((line.get("line_id", ""), tok))
     return found
 

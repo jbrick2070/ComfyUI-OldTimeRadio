@@ -32,6 +32,36 @@ __all__ = ["OTR_LedgerScriptReviewer"]
 DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
 
 
+def _no_ledger_error_json(incoming_script_json: str) -> str:
+    """Post-Phase-3 review Gap 6 (2026-05-11): on the no-ledger
+    fallback paths, emit a parseable JSON object that signals the
+    error state rather than the bare `"{}"` placeholder.
+
+    If the incoming `script_json` was non-empty (writer DID run but
+    the ledger handle is missing for some other reason), prefer
+    that — downstream consumers see at least the pre-review state.
+    Otherwise stamp a synthetic ledger shell so any consumer doing
+    `json.loads(script_json)` gets back a parseable dict instead of
+    `{}` that they have to special-case.
+    """
+    incoming = (incoming_script_json or "").strip()
+    if incoming and incoming != "{}":
+        return incoming
+    return json.dumps({
+        "schema_version": "synthetic_error_state",
+        "lines": [],
+        "cast": [],
+        "meta": {
+            "reviewer_verdict": "needs_full_rerun",
+            "reviewer_disposition": {
+                "verdict": "needs_full_rerun",
+                "skipped": True,
+                "skipped_reason": "no_writer_produced_ledger",
+            },
+        },
+    }, indent=2, ensure_ascii=False)
+
+
 class OTR_LedgerScriptReviewer:
     """Three-pass cast-gated reviewer for the production ledger.
 
@@ -162,7 +192,7 @@ class OTR_LedgerScriptReviewer:
             )
             return (
                 script_text or "",
-                script_json or "{}",
+                _no_ledger_error_json(script_json),
                 news_used or "",
                 int(estimated_minutes or 0),
                 "needs_full_rerun",
@@ -175,7 +205,7 @@ class OTR_LedgerScriptReviewer:
             )
             return (
                 script_text or "",
-                script_json or "{}",
+                _no_ledger_error_json(script_json),
                 news_used or "",
                 int(estimated_minutes or 0),
                 "needs_full_rerun",

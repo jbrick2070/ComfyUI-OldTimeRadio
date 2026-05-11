@@ -80,12 +80,17 @@ def iter_lines(
     regardless of ``speaker_role`` -- used by the sequencer, which needs
     the full timeline.
 
-    Post-Phase-3 review (Rec 5, 2026-05-11): also skips any line with
-    ``line.get("skip") == True`` OR an empty ``text`` (the §7 skip-
-    canonical mute pattern from Step 2.5 / Script Doctor skip edits).
-    Both signals together are belt-and-suspenders: setting either
-    alone is sufficient to mute; honoring both here protects against
-    a consumer that handles only one.
+    Skip-canonical mute (Rec 5 / Gap 5, 2026-05-11): skips any line
+    with ``line.get("skip") == True``. This is the AUTHORITATIVE
+    mute signal -- set by Step 2.5 phantom-skip fallback, by the
+    Script Doctor's `skip` edit action, and (belt-and-suspenders)
+    by the writer itself which clears `text=""` in lockstep with
+    skip=True. We deliberately DO NOT filter on empty `text` alone:
+    an empty-text line WITHOUT skip=True is a pending-compose row
+    (the brief window between init_lines_from_outline and
+    update_line_text) or a bug, and either way deserves to surface
+    at the consumer rather than be silently dropped (Gap 5
+    recommendation, post-Phase-3 final review).
 
     Pass ``include_skipped=True`` to disable the skip filter (used
     by forensic / audit code paths that want to see what got muted
@@ -94,20 +99,8 @@ def iter_lines(
     for line in ledger.get("lines") or []:
         if roles is not None and line.get("speaker_role") not in roles:
             continue
-        if not include_skipped:
-            # §7 skip-canonical mute (Rec 5, 2026-05-11). Honor
-            # explicit skip=True (Step 2.5 phantom skip + doctor
-            # skip action), AND empty `text` (belt-and-suspenders
-            # signal stamped alongside skip=True). Either alone
-            # mutes the line; both together are the defense-in-
-            # depth pattern. Downstream TTS / clip-timing consumers
-            # (Bark, Kokoro, SceneSequencer) all flow through this
-            # one helper so the gate lives in one place.
-            if line.get("skip"):
-                continue
-            text = line.get("text") or ""
-            if not text.strip():
-                continue
+        if not include_skipped and line.get("skip"):
+            continue
         yield line
 
 
