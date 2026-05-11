@@ -7,8 +7,8 @@ Pipeline (unchanged from v2.0 LPL):
        - news_seed = custom_premise verbatim if non-empty,
          else RSS auto-fetch via story_orchestrator._fetch_science_news.
        - style = style_custom if non-empty, else style combo (with
-         "let the story decide" sentinel deferred to a model call
-         once the LLM is loaded, see _generate_style_via_llm).
+         "let the story decide" sentinel deferred to a two-pass
+         picker once the LLM is loaded, see _otr_style_picker).
        - target_words from widget, optionally overridden by smoke
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
@@ -204,32 +204,31 @@ _STYLE_CHOICES = [
 _LLM_STYLE_FALLBACK = "mission control procedural"
 """Hardcoded slug used by the RSS reranker (`_fetch_rss_seed_or_die`)
 ONLY, when style is still pending (sentinel selected, picker hasn't
-fired yet). NOT used as a fallback by the picker itself — see
-`_generate_style_via_llm`, which raises `StyleGenerationFailedError`
-on any failure path per Jeffrey 2026-05-10: a failed picker fails
-the workflow."""
+fired yet — chicken-and-egg: RSS fetch happens BEFORE the style
+picker since the picker needs the article to derive style from).
+NOT used as a fallback by the picker itself — see
+`_otr_style_picker.pick_style`, which raises
+`StyleGenerationFailedError` on any failure path per Jeffrey
+2026-05-10: a failed picker fails the workflow."""
 
 
-class StyleGenerationFailedError(RuntimeError):
-    """Raised when the auto-derive LLM style picker cannot produce a
-    usable descriptor. Per Jeffrey 2026-05-10 policy: when "let the
-    story decide" is selected and the LLM call fails technically, the
-    workflow halts loudly rather than homogenizing every failed run
-    to the same canned preset.
-
-    Failure modes that trigger this:
-      - generate_fn raises an exception (model offline, OOM,
-        transformers crash, etc.).
-      - LLM returns empty string.
-      - LLM returns a stripped result < 3 chars (gibberish).
-      - news_seed is empty at picker entry (precondition violation
-        upstream — `_resolve_inputs` should always pass non-empty).
-
-    Mirrors the `OutlineFailedError` / `CastingFailedError` pattern
-    used elsewhere in v2.0 LPL — RuntimeError subclass, propagates
-    naturally to ComfyUI which marks the node and the workflow as
-    failed.
-    """
+# Pool fed to the two-pass style picker as "seed flavors" (inspiration
+# only; not echoed back). Same 10 slugs as the user-facing dropdown
+# minus the auto-sentinel — the sentinel is a UX label, not a style.
+# Random sample of 5 per call (deterministic via writer's seed RNG
+# for C7 byte-identity).
+_STYLE_PICKER_SEED_POOL: tuple[str, ...] = (
+    "closed_room_suspense",
+    "detective_case_file",
+    "pulp_serial_cliffhanger",
+    "mission_control_procedural",
+    "deep_space_distress_call",
+    "noir_interrogation",
+    "small_town_uncanny",
+    "radio_newsroom_emergency",
+    "haunted_broadcast_signal",
+    "laboratory_containment",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -341,101 +340,16 @@ def _build_truncating_generate_fn(cache_entry: dict, *, top_p: float = 0.92):
 # ---------------------------------------------------------------------------
 
 
-def _generate_style_via_llm(
-    generate_fn,
-    news_seed: str,
-    *,
-    temperature: float = 0.85,
-) -> str:
-    """Ask the loaded LLM to suggest a tonal style based on the news_seed.
-
-    Used when the user picks "let the story decide" or leaves the
-    `style` widget blank: instead of a hardcoded combo selection, the
-    LLM proposes a 3-6 word phrase that matches the article's content.
-    Per Jeffrey 2026-05-10: "every other style type needs to be
-    generated via LLM not pre-baked in the widget".
-
-    Failure policy (Jeffrey 2026-05-10): raises
-    ``StyleGenerationFailedError`` on any failure path -- empty
-    precondition, generate_fn raise, empty/sub-3-char output. The
-    caller does NOT catch; the workflow halts loudly. Silent
-    fallback to a canned preset is explicitly NOT desired -- that
-    would homogenize every failed run to the same style without the
-    user ever knowing the picker had failed.
-
-    Capped at ~60 chars so downstream prompt budgets stay sane.
-
-    `generate_fn` matches the (messages, *, temperature, max_new_tokens)
-    contract returned by ``_build_truncating_generate_fn``.
-    """
-    seed_excerpt = (news_seed or "").strip()
-    if not seed_excerpt:
-        # Precondition violation -- the writer's _resolve_inputs is
-        # supposed to guarantee non-empty news_seed before the picker
-        # is called. If we got here, upstream wiring is broken; raise
-        # so the symptom surfaces instead of producing a generic
-        # episode under a canned style.
-        raise StyleGenerationFailedError(
-            "news_seed is empty at picker entry; upstream "
-            "_resolve_inputs should have rejected this run"
-        )
-    # Cap the excerpt so the prompt doesn't blow the model's context;
-    # a 1-2 sentence summary is plenty of grounding for the style call.
-    excerpt = seed_excerpt[:600]
-    sys_msg = (
-        "You are a sci-fi radio drama showrunner. Given a real "
-        "science article, you propose a short tonal style descriptor "
-        "for the episode adaptation. Examples of valid output: "
-        "'tense claustrophobic', 'noir mystery', 'pulp adventure', "
-        "'rust-belt cyber-noir', 'paranoid procedural'."
-    )
-    user_msg = (
-        f"Article seed:\n{excerpt}\n\n"
-        f"Reply with ONLY a 3-6 word lowercase tonal style descriptor. "
-        f"No quotes, no commentary, no period at the end."
-    )
-    try:
-        out = generate_fn(
-            [
-                {"role": "system", "content": sys_msg},
-                {"role": "user",   "content": user_msg},
-            ],
-            temperature=float(temperature),
-            max_new_tokens=32,
-        )
-    except Exception as exc:  # noqa: BLE001
-        log.error(
-            "[OTR_LedgerScriptWriter] style picker LLM call FAILED "
-            "(%s); halting workflow per fail-loud policy",
-            exc,
-        )
-        raise StyleGenerationFailedError(
-            f"style picker LLM call failed: {type(exc).__name__}: {exc}"
-        ) from exc
-    text = (out or "").strip().strip('"\'')
-    # Strip the model's usual leading "Style:" / "Suggested:" preamble.
-    for prefix in ("style:", "suggested:", "tone:", "descriptor:"):
-        if text.lower().startswith(prefix):
-            text = text[len(prefix):].strip()
-    # Take only the first line and cap length.
-    text = text.splitlines()[0].strip() if text else ""
-    text = text[:60].rstrip(".,;: ")
-    if not text or len(text) < 3:
-        log.error(
-            "[OTR_LedgerScriptWriter] style picker returned "
-            "empty/short %r; halting workflow per fail-loud policy",
-            text,
-        )
-        raise StyleGenerationFailedError(
-            f"style picker returned empty/sub-3-char output "
-            f"after cleanup: {text!r}"
-        )
-    log.info(
-        "[OTR_LedgerScriptWriter] style LLM-suggest -> %r (from seed "
-        "len=%d)",
-        text, len(seed_excerpt),
-    )
-    return text
+# NOTE: the prior single-shot picker `_generate_style_via_llm` was
+# replaced by the two-pass picker in `nodes/_otr_style_picker.py`
+# (commit landing 2026-05-10). The two-pass design (Pass 1 inventor
+# producing 5 distinct candidates + Pass 2 chooser picking one)
+# fixed the mode-collapse problem the single-shot picker suffered
+# from -- every Mistral-Nemo run defaulted to "tense industrial
+# procedural" or close. The fail-loud policy from commit 62e85f2
+# carries through: any picker failure raises
+# `_otr_style_picker.StyleGenerationFailedError` and halts the
+# workflow. See the picker module for design rationale.
 
 
 def _generate_title_from_script(
@@ -1173,6 +1087,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_model_loader as _OTRML
         from . import _otr_ledger as _OTRL
         from . import _otr_casting as _OTRCAST
+        from . import _otr_style_picker as _OTRSP
         from . import news_interpreter as _OTRNI
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
@@ -1207,23 +1122,35 @@ class OTR_LedgerScriptWriter:
         meta["requested_num_characters"] = resolved["num_characters"]
         meta["episode_seed"] = int(seed)
 
-        # D.2 Style LLM-suggest path (auto sentinel / empty combo).
-        # When the user picked "let the story decide" or left the combo
-        # blank AND no style_custom override, ask the model to propose
-        # a tonal style descriptor based on the resolved news_seed.
+        # D.2 Two-pass style picker (when "let the story decide" is
+        # selected or combo is blank AND no style_custom override).
+        # Pass 1 inventor produces 5 distinct snake_case style
+        # descriptors grounded in the news article + 5 sampled seed
+        # flavors. Pass 2 chooser picks the single best one. The
+        # writer's seed widget seeds the sample RNG so same seed +
+        # same article = same sample = same picks (C7 byte-identity).
+        # See nodes/_otr_style_picker.py for full design.
+        #
         # The widget-typed style_custom and the verbatim combo entries
         # bypass this branch.
         if resolved["style_pending"]:
-            generated_style = _generate_style_via_llm(
+            picker_rng = _random.Random(int(seed))
+            style_pick = _OTRSP.pick_style(
                 generate_fn,
-                resolved["news_seed"],
-                temperature=resolved["temperature"],
+                article_text=resolved["news_seed"],
+                seed_pool=list(_STYLE_PICKER_SEED_POOL),
+                rng=picker_rng,
+                model_id=str(resolved["model_id"]),
             )
-            resolved["style"] = generated_style
+            resolved["style"] = style_pick.chosen
+            meta["style_pick"] = style_pick.model_dump()
             log.info(
-                "[OTR_LedgerScriptWriter] style auto-resolved: %r "
-                "(LLM proposal from news_seed, fallback was %r)",
-                generated_style, _LLM_STYLE_FALLBACK,
+                "[OTR_LedgerScriptWriter] style picker: chosen=%r "
+                "(from candidates %r, %d inventor attempt(s), "
+                "pass1=%dms pass2=%dms)",
+                style_pick.chosen, style_pick.candidates,
+                style_pick.pass1_attempts,
+                style_pick.pass1_duration_ms, style_pick.pass2_duration_ms,
             )
 
         # D.2.5 News interpretation. Read the full article (currently
@@ -1941,69 +1868,65 @@ if __name__ == "__main__":
         failures.append(("6/8_resolve_inputs custom + style 3-way", traceback.format_exc()))
         print("[6/9] FAIL: _resolve_inputs(custom_premise + style 3-way)")
 
-    # 7. _generate_style_via_llm: happy paths return, failure paths
-    #    raise StyleGenerationFailedError (no silent fallback). Per
-    #    Jeffrey 2026-05-10 fail-loud policy.
+    # 7. Two-pass style picker smoke. The picker module
+    #    (nodes/_otr_style_picker.py) has its own dedicated test
+    #    file (tests/test_otr_style_picker.py) with 45 cases
+    #    covering grammar / parse / chooser / model / end-to-end.
+    #    This in-writer smoke only proves the picker module is
+    #    importable AND produces a StylePick model on a happy path,
+    #    so writer-only refactors can't ship a stale picker
+    #    integration.
     try:
-        # 7a. Empty seed -> raise (precondition violation upstream).
+        import random as _random_smoke
+        from nodes import _otr_style_picker as _OTRSP_smoke
+
+        _five = [
+            "decommissioned_dish_signal",
+            "midnight_newsroom_emergency",
+            "vacuum_chamber_breach",
+            "haunted_repeater_loop",
+            "frozen_telemetry_archive",
+        ]
+        _responses = ["\n".join(_five), "vacuum_chamber_breach"]
+        _idx = [0]
+
+        def _smoke_gen(messages, *, temperature, max_new_tokens):
+            r = _responses[_idx[0]]
+            _idx[0] += 1
+            return r
+
+        pick = _OTRSP_smoke.pick_style(
+            _smoke_gen,
+            article_text="Smoke test article body about a real science story.",
+            seed_pool=list(_STYLE_PICKER_SEED_POOL),
+            rng=_random_smoke.Random(42),
+            model_id="smoke",
+        )
+        assert pick.chosen == "vacuum_chamber_breach", \
+            f"expected chooser pick, got {pick.chosen!r}"
+        assert pick.candidates == _five, \
+            f"expected canned candidates, got {pick.candidates!r}"
+        assert pick.pass1_attempts == 1
+        assert len(pick.seed_sample) == 5
+        assert len(pick.article_hash) == 64
+
+        # Fail-loud check: empty article precondition raises.
         try:
-            _generate_style_via_llm(lambda *a, **kw: "x", "")
-            raise AssertionError(
-                "7a: expected StyleGenerationFailedError on empty seed"
+            _OTRSP_smoke.pick_style(
+                _smoke_gen, article_text="",
+                seed_pool=list(_STYLE_PICKER_SEED_POOL),
+                rng=_random_smoke.Random(0), model_id="smoke",
             )
-        except StyleGenerationFailedError:
+            raise AssertionError(
+                "expected StyleGenerationFailedError on empty article"
+            )
+        except _OTRSP_smoke.StyleGenerationFailedError:
             pass  # expected
 
-        # 7b. LLM raises -> StyleGenerationFailedError chained from cause.
-        def _raises(*a, **kw):
-            raise RuntimeError("LLM offline")
-        try:
-            _generate_style_via_llm(_raises, "some seed text")
-            raise AssertionError(
-                "7b: expected StyleGenerationFailedError when LLM raises"
-            )
-        except StyleGenerationFailedError as exc:
-            assert exc.__cause__ is not None, (
-                "7b: StyleGenerationFailedError must chain underlying cause"
-            )
-
-        # 7c. LLM returns clean phrase -> stripped + returned verbatim.
-        def _good(*a, **kw):
-            return "  bleak industrial noir  \n"
-        assert _generate_style_via_llm(_good, "seed") == "bleak industrial noir"
-
-        # 7d. LLM returns labeled preamble -> preamble stripped.
-        def _preamble(*a, **kw):
-            return "Style: claustrophobic procedural"
-        assert _generate_style_via_llm(_preamble, "seed") == "claustrophobic procedural"
-
-        # 7e. LLM returns empty -> raise.
-        def _empty(*a, **kw):
-            return ""
-        try:
-            _generate_style_via_llm(_empty, "seed")
-            raise AssertionError(
-                "7e: expected StyleGenerationFailedError on empty LLM output"
-            )
-        except StyleGenerationFailedError:
-            pass  # expected
-
-        # 7f. LLM returns too-short -> raise.
-        def _short(*a, **kw):
-            return "ok"
-        try:
-            _generate_style_via_llm(_short, "seed")
-            raise AssertionError(
-                "7f: expected StyleGenerationFailedError on sub-3-char "
-                "LLM output"
-            )
-        except StyleGenerationFailedError:
-            pass  # expected
-
-        print("[7/9] PASS: _generate_style_via_llm (2 happy + 4 raise paths)")
+        print("[7/9] PASS: _otr_style_picker integration smoke (happy + precondition)")
     except Exception:
-        failures.append(("7/9 _generate_style_via_llm", traceback.format_exc()))
-        print("[7/9] FAIL: _generate_style_via_llm")
+        failures.append(("7/9 _otr_style_picker integration smoke", traceback.format_exc()))
+        print("[7/9] FAIL: _otr_style_picker integration smoke")
 
     # 8. _generate_title_from_script post-composition title regen.
     try:
