@@ -5,6 +5,23 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: news_interpreter sprint commit 3 — briefs wired into writer + cast + outline (commit f518fb3)
+
+- **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
+- **Symptom:** Commit 2 (70d25eb) shipped the agnostic module standalone. Commit 3 wires it into the production pipeline per Jeffrey's rule "always wire lockstep" — work is not done until it's called.
+- **Diagnosis:** Per ADR section 5. The news_interpreter LLM call inserts between style-resolve (D.2) and cast-lock (D.3) in OTR_LedgerScriptWriter. Briefs land at `ledger.meta.news`; downstream cast LLM reads `casting_brief` (replacing the mechanical 500-char slice of `news_seed`); outline LLM reads `script_brief` + `key_terms` (replacing raw news_seed in the prompt + injecting a "Required terms" line). Schema migration: old ledgers without `meta.news` access cleanly via `.get('news')` returning None; consumers fall back to raw `news_seed` for cast/outline and to a synthesized line for the announcer (commit 4 wires the announcer fallback).
+- **Fix:**
+  - `nodes/_otr_ledger.py:48`: `CURRENT_SCHEMA_VERSION` bumped `"l3-2026-05-08"` → `"l3-2026-05-14"`. SCHEMA_VERSION participates in news_interpreter cache key, so schema bumps force brief regeneration.
+  - `nodes/production_ledger.py:254`: hardcoded fallback bumped to match.
+  - `nodes/OTR_LedgerScriptWriter.py`: `_fetch_rss_seed_or_die` returns `dict` (was `str`) with headline / summary / full_text / source / date / link / seed_text. `_resolve_inputs` plumbs `news_article` dict into resolved (custom_premise path synthesizes the same shape). New D.2.5 calls `build_news_briefs()` and stamps `meta["news"] = briefs.model_dump()`; graceful degrade (warn + fall back) when build_news_briefs raises. `lock_cast` call gains `casting_brief`; OutlineRequest gains `script_brief` + `key_terms`.
+  - `nodes/_otr_casting.py`: `_build_user_prompt` + `cast_one_character` + `lock_cast` gain optional `casting_brief: str = ""` kwarg. When non-empty, replaces the 500-char `news_seed` slice on the prompt's `Story:` line. Empty default preserves every existing test fixture.
+  - `nodes/_otr_outline.py`: `OutlineRequest` gains `script_brief: str = ""` and `key_terms: tuple[str, ...] = ()` defaults. `_build_user_prompt` substitutes `script_brief` for `news_seed` when non-empty + injects a "Required terms" line when key_terms is non-empty.
+  - `tests/test_downstream_prompt_contract.py`: case 12 (`test_old_ledger_without_meta_news_loads_with_warning`) — xfail-strict marker REMOVED in lockstep with the fix. Test body rewritten to actually exercise the graceful-degrade contract (meta.get('news') returns None on pre-commit-3 ledgers; meta.news=None sentinel survives JSON round-trip). The canary mechanic from commit 1 enforces this lockstep automatically: if the marker stayed, the suite would have XPASSed and failed under strict.
+- **Verify:** AST + no-BOM clean on all 6 edited files. `tests/test_news_interpreter.py`: 12 passed. `tests/test_downstream_prompt_contract.py`: 7 xfailed + 1 passed (case 12 flipped). `tests/test_otr_casting.py`: 47 passed (additive kwarg preserved every fixture). Bug Bible regression unchanged: 15 passed / 2 xfailed / 1 skipped. Push verified: local HEAD == origin HEAD == `f518fb3c534684f1c306fdb3724fb86fc804a5e6`.
+- **Tags:** news-interpreter, writer-wiring, schema-bump-l3-2026-05-14, graceful-degrade, canary-lockstep, sprint-milestone
+
+---
+
 ### NON-BUG-2026-05-10: news_interpreter sprint commit 2 — agnostic module + GBNF grammar shipped (commit 70d25eb)
 
 - **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
