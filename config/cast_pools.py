@@ -234,24 +234,38 @@ VOICE_REGISTRY: dict[str, dict] = {
 KNOWN_TTS_MODELS: tuple[str, ...] = tuple(VOICE_REGISTRY.keys())
 
 
-# Bark LEMMY 11% roll - SystemRandom is OS entropy, unaffected by random.seed().
-# This ensures the 11% coin flip gives a true ~11% per run even when the rest
-# of the pipeline is using a seeded RNG for reproducibility.
+# LEMMY 11% cameo rate. Statistically held by tests/lemmy_rng_check.py.
 LEMMY_RATE = 0.11
 
-# Module-level RNG for the LEMMY cameo coin flip. Lifted from
-# v1.7:nodes/story_orchestrator.py:33 -- the SystemRandom usage is
-# load-bearing (see commit history and tests/lemmy_rng_check.py).
-_LEMMY_RNG = SystemRandom()
+# Module-level SystemRandom retained for callers that want pure OS
+# entropy (the v1.7 design). The seeded path now takes precedence in
+# the cast contract writer (rolled into roll_lemmy(rng) below) so
+# explicit-seed runs produce deterministic LEMMY hits for C7. Per
+# round-robin synthesis 2026-05-10: a seeded run with seed=42 that
+# could randomly hit LEMMY on one run and miss on another defeats
+# C7 byte-identity, which is the whole point of having a seed.
+_LEMMY_RNG_SYSTEM = SystemRandom()
 
 
-def roll_lemmy() -> bool:
+def roll_lemmy(rng: random.Random | None = None) -> bool:
     """Return True with probability LEMMY_RATE (~11%), False otherwise.
 
-    Uses OS entropy (SystemRandom) so the same widget config does not
-    freeze the roll to always-hit or always-miss.
+    When `rng` is provided (the cast contract path -- the writer
+    passes its seeded random.Random instance), the roll is
+    deterministic against the seed. C7 byte-identity holds.
+
+    When `rng` is None (legacy callers or anywhere the caller wants
+    OS-entropy randomness), falls back to the module-level
+    SystemRandom -- the v1.7 behavior.
     """
-    return _LEMMY_RNG.random() < LEMMY_RATE
+    source = rng if rng is not None else _LEMMY_RNG_SYSTEM
+    return source.random() < LEMMY_RATE
+
+
+# Back-compat alias: some code expects `_LEMMY_RNG` as a module
+# attribute. Today both story_orchestrator.py:33 and any external
+# reference resolve to the SystemRandom one (the unseeded path).
+_LEMMY_RNG = _LEMMY_RNG_SYSTEM
 
 
 def pick_announcer(rng: random.Random) -> dict:

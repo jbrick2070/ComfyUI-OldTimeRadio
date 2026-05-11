@@ -194,12 +194,17 @@ class OutlineRequest:
     target_words: int        # Canonical length unit (validated below). Words are
                              # the single source of truth for story planning;
                              # there is no seconds field — see Jeffrey 2026-05-10.
-    character_cast: tuple[str, ...] = ()
+    character_cast: tuple[str, ...]
                              # ALL-CAPS character names from the LOCKED cast.
                              # Excludes ANNOUNCER (the writer hardcodes
                              # speaker="ANNOUNCER" on announcer-role beats so
                              # the LLM never needs to handle ANNOUNCER itself).
-                             # 1-6 names. Validated below.
+                             # 1-6 names. Validated below. NO default --
+                             # callers MUST supply this. (Removing the default
+                             # was a round-robin 2026-05-10 nit: an empty-tuple
+                             # default would crash __post_init__ immediately,
+                             # which is a worse failure mode than a clear
+                             # TypeError from the dataclass constructor.)
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -518,21 +523,33 @@ def generate_outline(
             continue
 
         # Post-pydantic cast-contract check: the LLM's outline.cast
-        # MUST match the locked character_cast we passed in. The
-        # writer locks the cast BEFORE this call (per the cast
-        # contract architecture target 2026-05-10); if the LLM
-        # invents or drops names, treat as a validation failure and
-        # reroll. Set equality (order independence is fine).
-        locked_set = set(req.character_cast)
-        outline_set = set(outline.cast)
-        if outline_set != locked_set:
-            extra = outline_set - locked_set
-            missing = locked_set - outline_set
+        # MUST match the locked character_cast we passed in.
+        # Exact-equality comparison: order matters AND duplicates
+        # matter (a set-equality check would let
+        # outline.cast=["ALICE","ALICE","BOB"] pass when locked was
+        # ("ALICE","BOB")).
+        #
+        # IMPORTANT type detail (round-robin 2026-05-10): outline.cast
+        # is parsed as a list by pydantic; req.character_cast is a
+        # tuple. `list != tuple` is True even when contents match,
+        # so we must cast req.character_cast to list before comparing,
+        # otherwise the check would FALSE-positive on every clean run
+        # and trigger the reroll loop indefinitely.
+        expected_cast = list(req.character_cast)
+        if outline.cast != expected_cast:
+            extra = set(outline.cast) - set(expected_cast)
+            missing = set(expected_cast) - set(outline.cast)
+            dups = [
+                n for n in outline.cast
+                if outline.cast.count(n) > 1
+            ]
             err_msg = (
                 "CastContractError: outline.cast drifted from locked "
                 f"character_cast. extra (invented): {sorted(extra)!r}, "
-                f"missing (dropped): {sorted(missing)!r}. Expected "
-                f"exactly: {sorted(locked_set)!r}"
+                f"missing (dropped): {sorted(missing)!r}, "
+                f"duplicates: {sorted(set(dups))!r}. "
+                f"Expected exactly (in order): {expected_cast!r}, "
+                f"got: {outline.cast!r}"
             )
             log.warning(
                 "[OTR_Outline] attempt %d failed: %s",

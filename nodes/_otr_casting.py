@@ -453,8 +453,12 @@ def assemble_pre_locked_rows(
     taken_names.add("ANNOUNCER")
 
     # 2. LEMMY 11% roll (or forced via the testing knob).
+    # roll_lemmy(rng) makes the cameo seed-deterministic when rng is
+    # supplied (round-robin synthesis 2026-05-10: pre-fix the LEMMY
+    # roll used SystemRandom unconditionally, which silently violated
+    # C7 byte-identity for explicit-seed runs).
     if force_lemmy is None:
-        lemmy_hit = _POOLS.roll_lemmy()
+        lemmy_hit = _POOLS.roll_lemmy(rng)
     else:
         lemmy_hit = bool(force_lemmy)
 

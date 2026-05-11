@@ -1137,12 +1137,24 @@ class OTR_LedgerScriptWriter:
 
         # D.3 Lock the cast.
         #
-        # Seed: 0 means "process-level RNG" (non-deterministic). Any
-        # other value seeds random.Random for C7 byte-identity across
-        # runs. LEMMY's 11% roll is unaffected -- it uses SystemRandom
-        # inside _otr_casting / config.cast_pools so the same widget
-        # config never always-hits or always-misses the cameo.
-        cast_rng = _random.Random(int(seed)) if int(seed) != 0 else None
+        # Seed: ALWAYS used to seed random.Random (no zero sentinel).
+        # ComfyUI's frontend handles "randomize" mode by sending a
+        # real 64-bit integer to the backend; the backend should
+        # trust that integer for C7 byte-identity. Branching on
+        # seed==0 would treat a legitimate user choice ("seed 0")
+        # as non-deterministic and silently violate the contract
+        # (round-robin 2026-05-10).
+        #
+        # LEMMY's 11% roll now also runs against this same RNG so
+        # the seed fully determines whether the cameo hits. Prior
+        # design routed LEMMY through SystemRandom for OS entropy,
+        # but that defeated C7 even for explicitly-seeded runs.
+        # The 11% rate remains statistically intact across many
+        # runs (still tested by tests/lemmy_rng_check.py); what
+        # changes is that with seed=42, every run gets the SAME
+        # lemmy_hit value -- which is exactly the reproducibility
+        # contract C7 requires.
+        cast_rng = _random.Random(int(seed))
         cast_rows, cast_meta = _OTRCAST.lock_cast(
             generate_fn,
             num_characters=resolved["num_characters"],
@@ -1176,6 +1188,37 @@ class OTR_LedgerScriptWriter:
             if row["name"] != "ANNOUNCER"
         }
         character_cast: tuple[str, ...] = tuple(char_id_by_name.keys())
+
+        # Post-lock sanity assertions (round-robin 2026-05-10):
+        # Catch any future regression where lock_cast() returns
+        # duplicates, drops a row, or mis-counts. Belt-and-braces;
+        # today the casting module guarantees these by construction.
+        non_announcer_count = len(char_id_by_name)
+        if non_announcer_count == 0:
+            raise RuntimeError(
+                "Cast lock produced no non-announcer characters. "
+                f"cast_rows: {cast_rows!r}"
+            )
+        # Duplicate name check: char_id_by_name as a dict silently
+        # collapses dupes, so compare to the raw row name list.
+        raw_names = [
+            row["name"] for row in cast_rows
+            if row["name"] != "ANNOUNCER"
+        ]
+        if len(raw_names) != len(set(raw_names)):
+            raise RuntimeError(
+                f"Cast lock produced duplicate non-announcer names: "
+                f"{raw_names!r}"
+            )
+        # Count match: the locked open characters should equal the
+        # requested num_characters.
+        if non_announcer_count != resolved["num_characters"]:
+            raise RuntimeError(
+                f"Cast lock count mismatch: requested "
+                f"{resolved['num_characters']} non-announcer "
+                f"characters, got {non_announcer_count}. "
+                f"cast_rows: {cast_rows!r}"
+            )
 
         # D.5 Generate validated outline against the locked cast.
         # The outline LLM is told to use exactly these character names
