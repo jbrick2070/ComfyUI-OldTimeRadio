@@ -5,6 +5,29 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: news_interpreter sprint commit 5 — era literals stripped + 5 text-scan canaries flipped — SPRINT COMPLETE (commit 4f45c7c, amended from 92e58e5)
+
+- **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
+- **Symptom:** CLOSES the news_interpreter sprint. Era flavor now flows ONLY through the two North Star variables (news_story + style). No hardcoded period literals remain in the narrative plane.
+- **Diagnosis:** Per ADR section 7 surgical fixes. Three files edited: `script_critic.py` (3 literal strips at lines 330, 339-340, 556), `story_orchestrator.py:_LTX_STYLE_BRIEF_PROMPT` (full rewrite per ADR section 7.4 Option A, three style-spanning examples replacing the three baked vacuum-tube examples), `test_downstream_prompt_contract.py` (5 xfail-strict markers removed in lockstep with the literal removal per the canary mechanic).
+- **Fix:**
+  - `script_critic.py:330`: "Period-inappropriate vocabulary in 1940s setting" → "Vocabulary that contradicts the established style/setting" (preserves rubric intent; drops era anchor).
+  - `script_critic.py:339-340`: "script doctor for SIGNAL LOST, a 1940s-style {genre_human} radio drama" → "script doctor for a {genre_human} audio drama episode" (drops both brand-priming and era anchor).
+  - `script_critic.py:556`: "revising a 1940s {genre_human} radio drama script" → "revising a {genre_human} audio drama script".
+  - `story_orchestrator.py:3394-3411`: full `_LTX_STYLE_BRIEF_PROMPT` rewrite. Opens with "during an audio drama" (era-neutral). New bullet: "Use equipment design language that fits the setting AND style — do not default to any specific era's hardware unless the story explicitly implies it." Three new examples spanning near-future newsroom, deep-space vessel, rust-belt industrial decay. No vacuum tubes, no brass speaker grilles, no radio bays.
+  - `test_downstream_prompt_contract.py`: removed `xfail(strict=True)` markers on 5 text-scan canaries. Bodies unchanged. Test docstrings + error messages updated to "LANDED in commit 5; marker removed in lockstep; literal must not regress."
+- **History note:** Originally shipped at `92e58e5` with the wrong subject line ("docs: news_interpreter sprint commit 4 logged...") due to the CLAUDE.md commit-message anti-pattern — a chained `git commit -F .git\COMMIT_EDITMSG` consumed a stale message file when a parallel `Write` to update it raced and was rejected. The code diff was correct from the start; only the subject was wrong. Force-amended to `4f45c7c` with Jeffrey's explicit OK (force-push on the working v2.0-alpha branch).
+- **Verify:** AST + no-BOM clean on all 3 edited files. `tests/test_news_interpreter.py`: 12 passed. `tests/test_news_interpreter_wiring.py`: 13 passed. `tests/test_downstream_prompt_contract.py`: 6 passed (5 freshly-flipped + case 12) + 2 xfailed (RADIO portrait + MusicGen, still armed as future-ADR canaries per ADR section 1 out-of-scope). `tests/test_otr_casting.py`: 47 passed. Bug Bible regression: 15p/2x/1s (baseline held across all 5 sprint commits). Push verified: local HEAD == origin HEAD == `4f45c7c77c1401a03c9a14cdca211182adf83330`.
+- **Sprint summary (commits 1-5, all on v2.0-alpha):**
+  - `6f3218d` commit 1 — ADR + xfail-strict canary tests
+  - `70d25eb` commit 2 — agnostic news_interpreter module + GBNF grammar
+  - `f518fb3` commit 3 — wire briefs into writer + cast + outline + schema bump + canary case 12 flip
+  - `9f82685` commit 4 — announcer closing-line override + post-assembly key_terms audit + 13 new wiring tests
+  - `4f45c7c` commit 5 — strip era literals + flip 5 text-scan canaries
+- **Tags:** news-interpreter, sprint-complete, era-literals-stripped, canary-mechanic-end-to-end, north-star-honored, force-amend-recovery
+
+---
+
 ### NON-BUG-2026-05-10: news_interpreter sprint commit 4 — announcer close + post-assembly key_terms (commit 9f82685)
 
 - **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
