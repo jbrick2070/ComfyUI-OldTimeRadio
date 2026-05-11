@@ -216,12 +216,17 @@ class OutlineRequest:
                              # OPTIONAL. news_interpreter's purpose-specific
                              # distillation of the article for script planning
                              # (premise arc, central tension, beat hooks).
-                             # When non-empty, replaces news_seed in the
-                             # prompt's "Science story" line so the outline
-                             # LLM sees a focused brief rather than raw RSS.
-                             # When empty, the prompt falls back to news_seed.
-                             # Commit 3 (news_interpreter sprint, ADR
-                             # docs/news_interpreter_adr.md).
+                             # When non-empty, the prompt routes through the
+                             # "Story brief" branch with a "develops this
+                             # brief" closing verb -- because the brief is a
+                             # distilled story plan, not raw factual material.
+                             # When empty, the prompt falls back to news_seed
+                             # under the "Science story (the factual seed)"
+                             # label with the original "extrapolates from the
+                             # science story" verb. Commit 3 (news_interpreter
+                             # sprint, ADR docs/news_interpreter_adr.md);
+                             # branch added in the post-sprint prompt
+                             # tightening pass (2026-05-10).
     key_terms: tuple[str, ...] = ()
                              # OPTIONAL. news_interpreter's verbatim
                              # journalistic terms (people, places, technology)
@@ -313,20 +318,37 @@ CONSTRAINTS
 def _build_user_prompt(req: OutlineRequest) -> str:
     cast_line = ", ".join(req.character_cast)
     # news_interpreter brief takes precedence over raw news_seed.
-    # When the writer has a brief from build_news_briefs, the prompt
-    # gets the focused distillation; when the writer is on the
-    # graceful-degrade path (brief LLM call failed), it gets raw seed.
-    story_line = (req.script_brief.strip() or req.news_seed)
+    # When the writer has a script_brief from build_news_briefs, the
+    # prompt labels the source line as a brief (it already contains
+    # the distilled premise arc + central tension + beat hooks) and
+    # the closing verb says DEVELOPS the brief, not EXTRAPOLATES from
+    # raw material -- the dramatic extrapolation is already done.
+    # When the writer is on the graceful-degrade path (brief LLM call
+    # failed), the original "Science story (the factual seed)" label
+    # + "extrapolates" verb still apply to the raw RSS payload.
+    brief = req.script_brief.strip()
+    if brief:
+        source_line = f"Story brief: {brief}"
+        develop_verb = "develops this brief"
+    else:
+        source_line = f"Science story (the factual seed): {req.news_seed}"
+        develop_verb = "extrapolates from the science story"
     parts = [
         "Plan a science-fiction audio drama outline.",
         "",
-        f"Science story (the factual seed): {story_line}",
+        source_line,
     ]
     if req.key_terms:
         terms_line = ", ".join(req.key_terms)
+        # The outline LLM writes intent + mood, not dialogue lines
+        # (the line composer does that). Right plane to address: the
+        # beats it plans must be ones that NATURALLY surface these
+        # terms when the line composer renders them. Post-assembly
+        # key_terms audit (commit 4) is what enforces presence in
+        # the finished dialogue.
         parts.append(
-            f"Required terms (each must appear at least once in "
-            f"dialogue, verbatim or naturally inflected): {terms_line}"
+            f"Required terms (plan beats that surface these in "
+            f"dialogue): {terms_line}"
         )
     parts.extend([
         f"Style: {req.style}",
@@ -339,9 +361,9 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     head = "\n".join(parts)
     return (
         f"{head}\n"
-        f"Build a dramatic outline that extrapolates from the science story "
-        f"in the chosen style. Echo the cast list verbatim in the JSON "
-        f"\"cast\" field. Return only the JSON outline."
+        f"Build a dramatic outline that {develop_verb} in the chosen "
+        f"style. Echo the cast list verbatim in the JSON \"cast\" "
+        f"field. Return only the JSON outline."
     )
 
 
