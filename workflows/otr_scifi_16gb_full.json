@@ -24,6 +24,7 @@
         350,
         2,
         0,
+        "randomize",
         "mistralai/Mistral-Nemo-Instruct-2407",
         "auto (use story model)",
         "",
