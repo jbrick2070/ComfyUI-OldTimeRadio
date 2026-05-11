@@ -202,9 +202,34 @@ _STYLE_CHOICES = [
 ]
 
 _LLM_STYLE_FALLBACK = "mission control procedural"
-"""Hardcoded last-resort if the style-generation LLM call fails or
-returns empty / unusable text. Kept short so the outline+critic
-downstream don't get a degenerate prompt."""
+"""Hardcoded slug used by the RSS reranker (`_fetch_rss_seed_or_die`)
+ONLY, when style is still pending (sentinel selected, picker hasn't
+fired yet). NOT used as a fallback by the picker itself — see
+`_generate_style_via_llm`, which raises `StyleGenerationFailedError`
+on any failure path per Jeffrey 2026-05-10: a failed picker fails
+the workflow."""
+
+
+class StyleGenerationFailedError(RuntimeError):
+    """Raised when the auto-derive LLM style picker cannot produce a
+    usable descriptor. Per Jeffrey 2026-05-10 policy: when "let the
+    story decide" is selected and the LLM call fails technically, the
+    workflow halts loudly rather than homogenizing every failed run
+    to the same canned preset.
+
+    Failure modes that trigger this:
+      - generate_fn raises an exception (model offline, OOM,
+        transformers crash, etc.).
+      - LLM returns empty string.
+      - LLM returns a stripped result < 3 chars (gibberish).
+      - news_seed is empty at picker entry (precondition violation
+        upstream — `_resolve_inputs` should always pass non-empty).
+
+    Mirrors the `OutlineFailedError` / `CastingFailedError` pattern
+    used elsewhere in v2.0 LPL — RuntimeError subclass, propagates
+    naturally to ComfyUI which marks the node and the workflow as
+    failed.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -324,14 +349,20 @@ def _generate_style_via_llm(
 ) -> str:
     """Ask the loaded LLM to suggest a tonal style based on the news_seed.
 
-    Used when the user leaves the `style` widget empty: instead of a
-    hardcoded combo selection, the LLM proposes a 3-6 word phrase that
-    matches the article's content. Per Jeffrey 2026-05-10: "every other
-    style type needs to be generated via LLM not pre-baked in the
-    widget".
+    Used when the user picks "let the story decide" or leaves the
+    `style` widget blank: instead of a hardcoded combo selection, the
+    LLM proposes a 3-6 word phrase that matches the article's content.
+    Per Jeffrey 2026-05-10: "every other style type needs to be
+    generated via LLM not pre-baked in the widget".
 
-    Falls back to ``_LLM_STYLE_FALLBACK`` if the LLM is unreachable,
-    returns empty text, or returns something obviously off-spec.
+    Failure policy (Jeffrey 2026-05-10): raises
+    ``StyleGenerationFailedError`` on any failure path -- empty
+    precondition, generate_fn raise, empty/sub-3-char output. The
+    caller does NOT catch; the workflow halts loudly. Silent
+    fallback to a canned preset is explicitly NOT desired -- that
+    would homogenize every failed run to the same style without the
+    user ever knowing the picker had failed.
+
     Capped at ~60 chars so downstream prompt budgets stay sane.
 
     `generate_fn` matches the (messages, *, temperature, max_new_tokens)
@@ -339,7 +370,15 @@ def _generate_style_via_llm(
     """
     seed_excerpt = (news_seed or "").strip()
     if not seed_excerpt:
-        return _LLM_STYLE_FALLBACK
+        # Precondition violation -- the writer's _resolve_inputs is
+        # supposed to guarantee non-empty news_seed before the picker
+        # is called. If we got here, upstream wiring is broken; raise
+        # so the symptom surfaces instead of producing a generic
+        # episode under a canned style.
+        raise StyleGenerationFailedError(
+            "news_seed is empty at picker entry; upstream "
+            "_resolve_inputs should have rejected this run"
+        )
     # Cap the excerpt so the prompt doesn't blow the model's context;
     # a 1-2 sentence summary is plenty of grounding for the style call.
     excerpt = seed_excerpt[:600]
@@ -365,12 +404,14 @@ def _generate_style_via_llm(
             max_new_tokens=32,
         )
     except Exception as exc:  # noqa: BLE001
-        log.warning(
-            "[OTR_LedgerScriptWriter] style LLM-suggest failed (%s); "
-            "falling back to %r",
-            exc, _LLM_STYLE_FALLBACK,
+        log.error(
+            "[OTR_LedgerScriptWriter] style picker LLM call FAILED "
+            "(%s); halting workflow per fail-loud policy",
+            exc,
         )
-        return _LLM_STYLE_FALLBACK
+        raise StyleGenerationFailedError(
+            f"style picker LLM call failed: {type(exc).__name__}: {exc}"
+        ) from exc
     text = (out or "").strip().strip('"\'')
     # Strip the model's usual leading "Style:" / "Suggested:" preamble.
     for prefix in ("style:", "suggested:", "tone:", "descriptor:"):
@@ -380,12 +421,15 @@ def _generate_style_via_llm(
     text = text.splitlines()[0].strip() if text else ""
     text = text[:60].rstrip(".,;: ")
     if not text or len(text) < 3:
-        log.warning(
-            "[OTR_LedgerScriptWriter] style LLM-suggest returned "
-            "empty/short %r; falling back to %r",
-            text, _LLM_STYLE_FALLBACK,
+        log.error(
+            "[OTR_LedgerScriptWriter] style picker returned "
+            "empty/short %r; halting workflow per fail-loud policy",
+            text,
         )
-        return _LLM_STYLE_FALLBACK
+        raise StyleGenerationFailedError(
+            f"style picker returned empty/sub-3-char output "
+            f"after cleanup: {text!r}"
+        )
     log.info(
         "[OTR_LedgerScriptWriter] style LLM-suggest -> %r (from seed "
         "len=%d)",
@@ -1897,15 +1941,31 @@ if __name__ == "__main__":
         failures.append(("6/8_resolve_inputs custom + style 3-way", traceback.format_exc()))
         print("[6/9] FAIL: _resolve_inputs(custom_premise + style 3-way)")
 
-    # 7. _generate_style_via_llm fallback behavior (no actual LLM call).
+    # 7. _generate_style_via_llm: happy paths return, failure paths
+    #    raise StyleGenerationFailedError (no silent fallback). Per
+    #    Jeffrey 2026-05-10 fail-loud policy.
     try:
-        # 7a. Empty seed -> hardcoded fallback (no LLM dereference).
-        assert _generate_style_via_llm(lambda *a, **kw: "x", "") == _LLM_STYLE_FALLBACK
+        # 7a. Empty seed -> raise (precondition violation upstream).
+        try:
+            _generate_style_via_llm(lambda *a, **kw: "x", "")
+            raise AssertionError(
+                "7a: expected StyleGenerationFailedError on empty seed"
+            )
+        except StyleGenerationFailedError:
+            pass  # expected
 
-        # 7b. LLM raises -> fallback.
+        # 7b. LLM raises -> StyleGenerationFailedError chained from cause.
         def _raises(*a, **kw):
             raise RuntimeError("LLM offline")
-        assert _generate_style_via_llm(_raises, "some seed text") == _LLM_STYLE_FALLBACK
+        try:
+            _generate_style_via_llm(_raises, "some seed text")
+            raise AssertionError(
+                "7b: expected StyleGenerationFailedError when LLM raises"
+            )
+        except StyleGenerationFailedError as exc:
+            assert exc.__cause__ is not None, (
+                "7b: StyleGenerationFailedError must chain underlying cause"
+            )
 
         # 7c. LLM returns clean phrase -> stripped + returned verbatim.
         def _good(*a, **kw):
@@ -1917,17 +1977,30 @@ if __name__ == "__main__":
             return "Style: claustrophobic procedural"
         assert _generate_style_via_llm(_preamble, "seed") == "claustrophobic procedural"
 
-        # 7e. LLM returns empty -> fallback.
+        # 7e. LLM returns empty -> raise.
         def _empty(*a, **kw):
             return ""
-        assert _generate_style_via_llm(_empty, "seed") == _LLM_STYLE_FALLBACK
+        try:
+            _generate_style_via_llm(_empty, "seed")
+            raise AssertionError(
+                "7e: expected StyleGenerationFailedError on empty LLM output"
+            )
+        except StyleGenerationFailedError:
+            pass  # expected
 
-        # 7f. LLM returns too-short -> fallback.
+        # 7f. LLM returns too-short -> raise.
         def _short(*a, **kw):
             return "ok"
-        assert _generate_style_via_llm(_short, "seed") == _LLM_STYLE_FALLBACK
+        try:
+            _generate_style_via_llm(_short, "seed")
+            raise AssertionError(
+                "7f: expected StyleGenerationFailedError on sub-3-char "
+                "LLM output"
+            )
+        except StyleGenerationFailedError:
+            pass  # expected
 
-        print("[7/9] PASS: _generate_style_via_llm (5 paths + fallback chain)")
+        print("[7/9] PASS: _generate_style_via_llm (2 happy + 4 raise paths)")
     except Exception:
         failures.append(("7/9 _generate_style_via_llm", traceback.format_exc()))
         print("[7/9] FAIL: _generate_style_via_llm")
