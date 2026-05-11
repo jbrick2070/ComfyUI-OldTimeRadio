@@ -58,9 +58,16 @@ Widget surface (2026-05-10 restoration):
         model_id          combo        (HF model — story LLM)
         cleanup_model_id  combo        [v2.0 MVP no-op]  — kept for UX parity
         custom_premise    STRING       (RSS override; empty triggers feed fetch)
-        include_act_breaks BOOLEAN     [v2.0 MVP no-op]  — outline drives structure
+        include_act_breaks BOOLEAN     (wired into outline prompt 2026-05-10:
+                                        True = ask outline LLM to plan
+                                        music_inter beats between acts;
+                                        False = continuous flow, no music_inter)
         self_critique     BOOLEAN      [v2.0 MVP no-op]  — script_critic node handles this now
-        target_length     combo        (smoke presets force target_words override)
+        target_length     combo        (smoke presets force target_words override;
+                                        full label e.g. "long (7-8 acts)" wired
+                                        into outline prompt 2026-05-10 as the
+                                        "Target episode shape" line so the LLM
+                                        sees the act-count signal)
         style             combo        (tonal preset)
         style_custom      STRING       (free-text override; empty falls back to style)
         creativity        combo        (maps to temperature + top_p preset)
@@ -903,10 +910,17 @@ class OTR_LedgerScriptWriter:
                 "include_act_breaks": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
-                        "[v2.0 MVP no-op] Legacy act-break + sponsor-"
-                        "message generation. v2 LPL structure is driven "
-                        "by the outline schema's beat list; act breaks "
-                        "aren't a separate widget-controlled phase."
+                        "When ON (default), the outline LLM is told to "
+                        "plan music_inter beats between acts so the "
+                        "episode breathes between scenes.\n\n"
+                        "When OFF, the outline LLM is told the episode "
+                        "is one continuous flow with no music_inter "
+                        "beats.\n\n"
+                        "Outline schema (Beat.speaker_role) supports "
+                        "music_inter either way; this widget just "
+                        "tells the LLM whether to use it. Wired into "
+                        "the outline prompt via the `Target episode "
+                        "shape` line 2026-05-10."
                     ),
                 }),
                 "self_critique": ("BOOLEAN", {
@@ -921,12 +935,16 @@ class OTR_LedgerScriptWriter:
                 "target_length": (_TARGET_LENGTH_CHOICES, {
                     "default": "short (3 acts)",
                     "tooltip": (
-                        "Length preset. '30 words (smoke)' and 'tiny "
-                        "(smoke)' FORCE target_words=30 / 100 (the "
-                        "widget value is overridden). short / medium / "
-                        "long / epic are UI labels only — v2 LPL "
-                        "structure is driven by outline schema, not "
-                        "act count."
+                        "Length + structure preset. Two effects:\n\n"
+                        "  1. Smoke presets ('30 words (smoke, 1 act)' "
+                        "and 'tiny (smoke, 1 act)') FORCE "
+                        "target_words=30 / 100, overriding the "
+                        "target_words widget.\n\n"
+                        "  2. The full label (including the '(N acts)' "
+                        "hint) is rendered into the outline prompt as "
+                        "the `Target episode shape` line so the outline "
+                        "LLM sees the act-count signal and paces the "
+                        "beats accordingly. Wired 2026-05-10."
                     ),
                 }),
                 "style": (_STYLE_CHOICES, {
@@ -1318,6 +1336,8 @@ class OTR_LedgerScriptWriter:
             script_brief=script_brief,
             key_terms=key_terms_tuple,
             cast_descriptions=cast_descriptions,
+            target_length=str(resolved.get("target_length") or ""),
+            include_act_breaks=bool(resolved.get("include_act_breaks", True)),
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
 

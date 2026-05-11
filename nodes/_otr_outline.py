@@ -234,6 +234,39 @@ class OutlineRequest:
                              # prompt as a "Required terms" line when non-
                              # empty so the outline can plan beats that
                              # naturally land them.
+    target_length: str = ""
+                             # OPTIONAL. User-facing label from the
+                             # writer's target_length combo, e.g.
+                             # "short (3 acts)", "medium (5 acts)",
+                             # "long (7-8 acts)", "epic (10+ acts)".
+                             # When non-empty, the prompt renders a
+                             # "Target episode shape: <label>" line so
+                             # the outline LLM sees the act-count
+                             # signal embedded in the label. Smoke
+                             # presets ("30 words (smoke, 1 act)" /
+                             # "tiny (smoke, 1 act)") force a
+                             # target_words override at the writer
+                             # layer; the resolved label still flows
+                             # through here so the smoke runs also see
+                             # "(1 act)" guidance. When empty (default
+                             # for tests + early-stage callers), the
+                             # structure line is omitted entirely
+                             # (back-compat). Wired in writer D.5
+                             # 2026-05-10 (closes [v2.0 MVP no-op]).
+    include_act_breaks: bool = True
+                             # OPTIONAL. Mirrors the writer's
+                             # include_act_breaks widget. When True
+                             # AND target_length is non-empty, the
+                             # prompt appends "Include music_inter
+                             # beats between acts." When False (and
+                             # target_length non-empty), the prompt
+                             # appends "Continuous flow: do not
+                             # include music_inter beats." Outline
+                             # schema (Beat.speaker_role) already
+                             # supports music_inter; this just tells
+                             # the LLM whether to USE it. Wired in
+                             # writer D.5 2026-05-10 (closes
+                             # [v2.0 MVP no-op]).
     cast_descriptions: tuple[tuple[str, str, str], ...] = ()
                              # OPTIONAL. Per-character (name, gender,
                              # character_description) tuples from the
@@ -416,8 +449,26 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     # + stakes; bare format is a back-compat fallback for tests +
     # early-stage callers that pre-date the cast contract.
     parts.append(_format_cast_block(req))
+    parts.append(f"Style: {req.style}")
+    # Structure line: target_length label (with embedded "(N acts)"
+    # signal) + act-breaks instruction (include or skip music_inter
+    # beats). Skipped entirely when target_length is empty (back-
+    # compat for tests + early-stage callers). Wired into the
+    # writer's D.5 step 2026-05-10 (closes the [v2.0 MVP no-op]
+    # gap on the include_act_breaks + target_length widgets).
+    target_length = (req.target_length or "").strip()
+    if target_length:
+        if req.include_act_breaks:
+            parts.append(
+                f"Target episode shape: {target_length}. Include "
+                f"music_inter beats between acts."
+            )
+        else:
+            parts.append(
+                f"Target episode shape: {target_length}. Continuous "
+                f"flow: do not include music_inter beats."
+            )
     parts.extend([
-        f"Style: {req.style}",
         f"Target total dialogue length: ~{req.target_words} words "
         f"(sum of per-beat target_words should land near this number).",
         "",
@@ -1010,5 +1061,75 @@ if __name__ == "__main__":
         assert "3-tuple" in str(exc), \
             f"11f: expected 3-tuple ValueError, got: {exc}"
         print("  PASS 11f: bad-shape rejected")
+
+    # Test 12: target_length + include_act_breaks fields
+    print("\n[Test 12] OutlineRequest.target_length + include_act_breaks")
+
+    # 12a: empty target_length -> structure line omitted entirely (back-compat).
+    no_struct_req = OutlineRequest(
+        news_seed="seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=200,
+    )
+    no_struct_prompt = _build_user_prompt(no_struct_req)
+    assert "Target episode shape:" not in no_struct_prompt, \
+        "12a: structure line must NOT render when target_length empty"
+    assert "Target total dialogue length: ~200 words" in no_struct_prompt, \
+        "12a: target_words line must still render"
+    print("  PASS 12a: empty target_length -> no structure line (back-compat)")
+
+    # 12b: populated target_length + act_breaks=True -> include line.
+    with_breaks_req = OutlineRequest(
+        news_seed="seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=350,
+        target_length="long (7-8 acts)",
+        include_act_breaks=True,
+    )
+    with_breaks_prompt = _build_user_prompt(with_breaks_req)
+    assert "Target episode shape: long (7-8 acts). Include music_inter beats between acts." in with_breaks_prompt, \
+        f"12b: act-breaks-on line missing or wrong:\n{with_breaks_prompt}"
+    print("  PASS 12b: target_length + include_act_breaks=True renders 'Include music_inter' instruction")
+
+    # 12c: populated target_length + act_breaks=False -> continuous-flow line.
+    no_breaks_req = OutlineRequest(
+        news_seed="seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=200,
+        target_length="short (3 acts)",
+        include_act_breaks=False,
+    )
+    no_breaks_prompt = _build_user_prompt(no_breaks_req)
+    assert "Target episode shape: short (3 acts). Continuous flow: do not include music_inter beats." in no_breaks_prompt, \
+        f"12c: act-breaks-off line missing or wrong:\n{no_breaks_prompt}"
+    print("  PASS 12c: target_length + include_act_breaks=False renders 'Continuous flow' instruction")
+
+    # 12d: structure line lands BEFORE the target_words line and AFTER style line.
+    order_req = OutlineRequest(
+        news_seed="seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=200,
+        target_length="medium (5 acts)",
+        include_act_breaks=True,
+    )
+    order_prompt = _build_user_prompt(order_req)
+    style_idx = order_prompt.find("Style: noir")
+    shape_idx = order_prompt.find("Target episode shape:")
+    words_idx = order_prompt.find("Target total dialogue length:")
+    assert -1 < style_idx < shape_idx < words_idx, \
+        f"12d: prompt order must be Style -> shape -> target_words; got positions {style_idx}, {shape_idx}, {words_idx}"
+    print("  PASS 12d: prompt section order is Style -> episode shape -> target words")
+
+    # 12e: include_act_breaks default = True (mirrors the writer widget).
+    default_req = OutlineRequest(
+        news_seed="seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=200,
+    )
+    assert default_req.include_act_breaks is True, \
+        "12e: include_act_breaks default must be True (matches widget default)"
+    assert default_req.target_length == "", \
+        "12e: target_length default must be empty (back-compat)"
+    print("  PASS 12e: defaults are include_act_breaks=True, target_length=''")
 
     print("\n=== all self-tests passed ===")
