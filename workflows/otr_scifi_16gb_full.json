@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 61,
-  "last_link_id": 105,
+  "last_node_id": 62,
+  "last_link_id": 109,
   "nodes": [
     {
       "id": 1,
@@ -44,7 +44,7 @@
           "name": "script_text",
           "type": "STRING",
           "links": [
-            84
+            106
           ],
           "slot_index": 0
         },
@@ -52,7 +52,7 @@
           "name": "script_json",
           "type": "STRING",
           "links": [
-            85
+            107
           ],
           "slot_index": 1
         },
@@ -60,14 +60,17 @@
           "name": "news_used",
           "type": "STRING",
           "links": [
-            18
+            18,
+            108
           ],
           "slot_index": 2
         },
         {
           "name": "estimated_minutes",
           "type": "INT",
-          "links": null,
+          "links": [
+            109
+          ],
           "slot_index": 3
         }
       ],
@@ -2056,6 +2059,104 @@
         100,
         true
       ]
+    },
+    {
+      "id": 62,
+      "type": "OTR_LedgerScriptReviewer",
+      "pos": [
+        50,
+        200
+      ],
+      "size": [
+        380,
+        320
+      ],
+      "title": "1b. Script Reviewer (3-pass cast-gated)",
+      "properties": {
+        "Node name for S&R": "OTR_LedgerScriptReviewer"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        0,
+        "mistralai/Mistral-Nemo-Instruct-2407"
+      ],
+      "inputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "link": 106,
+          "widget": {
+            "name": "script_text"
+          }
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "link": 107,
+          "widget": {
+            "name": "script_json"
+          }
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "link": 108,
+          "widget": {
+            "name": "news_used"
+          }
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "link": 109,
+          "widget": {
+            "name": "estimated_minutes"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "script_text",
+          "type": "STRING",
+          "links": [
+            84
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "script_json",
+          "type": "STRING",
+          "links": [
+            85
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "news_used",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "INT",
+          "links": [],
+          "slot_index": 3
+        },
+        {
+          "name": "reviewer_verdict",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 4
+        }
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
     }
   ],
   "links": [
@@ -2381,7 +2482,7 @@
     ],
     [
       84,
-      1,
+      62,
       0,
       53,
       0,
@@ -2389,7 +2490,7 @@
     ],
     [
       85,
-      1,
+      62,
       1,
       53,
       1,
@@ -2538,6 +2639,38 @@
       12,
       4,
       "AUDIO"
+    ],
+    [
+      106,
+      1,
+      0,
+      62,
+      0,
+      "STRING"
+    ],
+    [
+      107,
+      1,
+      1,
+      62,
+      1,
+      "STRING"
+    ],
+    [
+      108,
+      1,
+      2,
+      62,
+      2,
+      "STRING"
+    ],
+    [
+      109,
+      1,
+      3,
+      62,
+      3,
+      "INT"
     ]
   ],
   "groups": [],
