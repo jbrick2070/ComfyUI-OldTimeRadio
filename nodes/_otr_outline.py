@@ -176,6 +176,13 @@ class Outline(BaseModel):
 class OutlineRequest:
     """Input parameters for generate_outline. Frozen so call sites
     can't accidentally mutate after construction.
+
+    Cast contract (2026-05-10): the cast is no longer produced by the
+    outline LLM. The writer locks the cast FIRST via
+    nodes/_otr_casting.lock_cast() and passes the character names
+    into this request via `character_cast`. The outline LLM is told
+    those names are the cast it MUST use; a post-validation guard
+    rejects any outline that drifts.
     """
 
     news_seed: str           # The real science story / factual seed
@@ -184,18 +191,42 @@ class OutlineRequest:
                              # Field renamed from style_hint 2026-05-10 — Jeffrey:
                              # "no 'hint', it's just style". User-visible widget name
                              # is 'style', so the dataclass field matches.
-    cast_size: int           # 1-6 (validated below)
     target_words: int        # Canonical length unit (validated below). Words are
                              # the single source of truth for story planning;
                              # there is no seconds field — see Jeffrey 2026-05-10.
+    character_cast: tuple[str, ...] = ()
+                             # ALL-CAPS character names from the LOCKED cast.
+                             # Excludes ANNOUNCER (the writer hardcodes
+                             # speaker="ANNOUNCER" on announcer-role beats so
+                             # the LLM never needs to handle ANNOUNCER itself).
+                             # 1-6 names. Validated below.
 
     def __post_init__(self) -> None:
-        if not (1 <= self.cast_size <= 6):
-            raise ValueError(f"cast_size must be 1-6, got {self.cast_size}")
+        n = len(self.character_cast)
+        if not (1 <= n <= 6):
+            raise ValueError(
+                f"character_cast must have 1-6 names, got {n}: "
+                f"{self.character_cast!r}"
+            )
         if self.target_words < 5:
             raise ValueError(
                 f"target_words must be >= 5, got {self.target_words}"
             )
+        for name in self.character_cast:
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(
+                    f"character_cast names must be non-empty strings, "
+                    f"got {name!r}"
+                )
+            if name != name.upper():
+                raise ValueError(
+                    f"character_cast names must be ALL CAPS, got {name!r}"
+                )
+
+    @property
+    def cast_size(self) -> int:
+        """Back-compat accessor. Reads len(character_cast)."""
+        return len(self.character_cast)
 
 
 # ---------------------------------------------------------------------------
@@ -251,15 +282,18 @@ CONSTRAINTS
 
 
 def _build_user_prompt(req: OutlineRequest) -> str:
+    cast_line = ", ".join(req.character_cast)
     return (
         f"Plan a science-fiction audio drama outline.\n\n"
         f"Science story (the factual seed): {req.news_seed}\n"
         f"Style: {req.style}\n"
-        f"Cast size: {req.cast_size}\n"
+        f"Cast (already chosen -- use exactly these names in "
+        f"character-role beats): {cast_line}\n"
         f"Target total dialogue length: ~{req.target_words} words "
         f"(sum of per-beat target_words should land near this number).\n\n"
         f"Build a dramatic outline that extrapolates from the science story "
-        f"in the chosen style. Return only the JSON outline."
+        f"in the chosen style. Echo the cast list verbatim in the JSON "
+        f"\"cast\" field. Return only the JSON outline."
     )
 
 
@@ -483,6 +517,30 @@ def generate_outline(
             attempts.append((last_raw, err_msg))
             continue
 
+        # Post-pydantic cast-contract check: the LLM's outline.cast
+        # MUST match the locked character_cast we passed in. The
+        # writer locks the cast BEFORE this call (per the cast
+        # contract architecture target 2026-05-10); if the LLM
+        # invents or drops names, treat as a validation failure and
+        # reroll. Set equality (order independence is fine).
+        locked_set = set(req.character_cast)
+        outline_set = set(outline.cast)
+        if outline_set != locked_set:
+            extra = outline_set - locked_set
+            missing = locked_set - outline_set
+            err_msg = (
+                "CastContractError: outline.cast drifted from locked "
+                f"character_cast. extra (invented): {sorted(extra)!r}, "
+                f"missing (dropped): {sorted(missing)!r}. Expected "
+                f"exactly: {sorted(locked_set)!r}"
+            )
+            log.warning(
+                "[OTR_Outline] attempt %d failed: %s",
+                attempt_idx + 1, err_msg,
+            )
+            attempts.append((last_raw, err_msg))
+            continue
+
         log.info(
             "[OTR_Outline] success on attempt %d/%d: %d beats, cast=%s",
             attempt_idx + 1, max_attempts,
@@ -595,22 +653,81 @@ if __name__ == "__main__":
     # Test 8: OutlineRequest validates inputs.
     print("\n[Test 8] OutlineRequest input validation")
     try:
-        OutlineRequest(news_seed="x", style="y", cast_size=10,
-                       target_words=150)
-        print("  FAIL: cast_size=10 accepted")
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=tuple(f"NAME{i}" for i in range(10)),
+            target_words=150,
+        )
+        print("  FAIL: character_cast=10 accepted")
     except ValueError:
-        print("  PASS: cast_size=10 rejected")
+        print("  PASS: character_cast of 10 names rejected (must be 1-6)")
+    try:
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("alice",),  # not uppercase
+            target_words=150,
+        )
+        print("  FAIL: lowercase character_cast accepted")
+    except ValueError:
+        print("  PASS: lowercase character_cast rejected")
 
     # Test 9: OutlineFailedError carries diagnostics.
     print("\n[Test 9] OutlineFailedError shape")
     err = OutlineFailedError(
         attempts=[("raw1", "err1"), ("raw2", "err2")],
-        request=OutlineRequest(news_seed="x", style="y", cast_size=2,
-                               target_words=150),
+        request=OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("ALICE", "BOB"),
+            target_words=150,
+        ),
     )
     assert len(err.attempts) == 2
     assert err.request.cast_size == 2
+    assert err.request.character_cast == ("ALICE", "BOB")
     assert "2 attempts" in str(err)
     print("  PASS")
+
+    # Test 10: cast-contract drift check rejects mismatched outlines.
+    print("\n[Test 10] generate_outline rejects cast drift")
+    drift_outline_json = json.dumps({
+        "title": "Test", "premise": "A test premise about science.",
+        "setting": "A lab", "time_of_day": "Morning",
+        # request will lock ("ALICE", "BOB") -- LLM returned CAROL instead
+        "cast": ["ALICE", "CAROL"],
+        "beats": [
+            {"beat_id": "b001", "speaker": "NARRATOR",
+             "speaker_role": "music_open",
+             "intent": "open", "target_words": 5, "mood": "bold"},
+            {"beat_id": "b002", "speaker": "ALICE",
+             "speaker_role": "character",
+             "intent": "speak", "target_words": 10, "mood": "wry"},
+            {"beat_id": "b003", "speaker": "CAROL",
+             "speaker_role": "character",
+             "intent": "speak", "target_words": 10, "mood": "wry"},
+            {"beat_id": "b004", "speaker": "NARRATOR",
+             "speaker_role": "music_close",
+             "intent": "close", "target_words": 5, "mood": "resolute"},
+        ],
+    })
+
+    def _drift_gen_fn(messages, *, temperature, max_new_tokens):
+        return drift_outline_json
+
+    try:
+        generate_outline(
+            _drift_gen_fn,
+            OutlineRequest(
+                news_seed="x", style="y",
+                character_cast=("ALICE", "BOB"),
+                target_words=150,
+            ),
+            max_attempts=2,
+        )
+        print("  FAIL: cast drift was silently accepted")
+    except OutlineFailedError as exc:
+        last_err = exc.attempts[-1][1]
+        assert "CastContractError" in last_err, \
+            f"expected CastContractError in error, got: {last_err!r}"
+        print("  PASS: cast drift rejected with CastContractError")
 
     print("\n=== all self-tests passed ===")

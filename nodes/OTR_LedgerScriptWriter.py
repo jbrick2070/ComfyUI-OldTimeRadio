@@ -844,6 +844,19 @@ class OTR_LedgerScriptWriter:
                 }),
             },
             "optional": {
+                "seed": ("INT", {
+                    "default": 0, "min": 0, "max": 2**32 - 1, "step": 1,
+                    "tooltip": (
+                        "Random seed for the cast contract: announcer "
+                        "voice pick + open-character name rolls become "
+                        "deterministic per seed. C7 byte-identity. "
+                        "0 (default) means 'use a fresh process-level "
+                        "RNG' (non-deterministic across runs). LEMMY's "
+                        "11% roll uses SystemRandom and is NEVER seeded "
+                        "-- otherwise the same widget config would "
+                        "always-hit or always-miss the cameo."
+                    ),
+                }),
                 "model_id": (_MODEL_CHOICES, {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
@@ -1013,6 +1026,7 @@ class OTR_LedgerScriptWriter:
         episode_title="",
         target_words=350,
         num_characters=2,
+        seed=0,
         model_id=DEFAULT_MODEL_ID,
         cleanup_model_id="auto (use story model)",
         custom_premise="",
@@ -1063,11 +1077,13 @@ class OTR_LedgerScriptWriter:
         )
 
         # --- B. Late imports (no GPU / no model loads at module import) ---
+        import random as _random
         from . import _otr_outline as _OTRO
         from . import _otr_canon as _OTRC
         from . import _otr_line_composer as _OTRLC
         from . import _otr_model_loader as _OTRML
         from . import _otr_ledger as _OTRL
+        from . import _otr_casting as _OTRCAST
         from . import production_ledger as _PL
 
         # --- C. Load LLM + build truncating generate_fn ---------------
@@ -1079,7 +1095,28 @@ class OTR_LedgerScriptWriter:
             cache_entry, top_p=resolved["top_p"],
         )
 
-        # --- C2. Style LLM-suggest path (auto sentinel / empty combo) ---
+        # --- D. Cast contract -- LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER
+        #
+        # Inversion landed 2026-05-10 per the cast contract
+        # architecture target. Order is now:
+        #   D.1  new_ledger() up front, stamp cast_status="building"
+        #   D.2  optional style LLM-suggest (when style_pending)
+        #   D.3  lock_cast() -- ANNOUNCER first, LEMMY 11%, then
+        #        per-character LLM call for description+gender+voice
+        #   D.4  led.set_cast() + stamp cast_status="locked"
+        #   D.5  generate_outline() consumes the locked character_cast
+        # ---------------------------------------------------------------
+        # D.1 Ledger up front. Subsequent stages stamp meta against it.
+        led = _PL.new_ledger(episode_id=None)
+        episode_id = led.episode_id           # pending_<YYYYMMDD_HHMMSS>
+        audio_dir = Path(led.out_dir)         # otr/episodes/<ep>/audio/
+        episode_root = audio_dir.parent       # otr/episodes/<ep>/
+        meta = led.data.setdefault("meta", {})
+        meta["cast_status"] = "building"
+        meta["requested_num_characters"] = resolved["num_characters"]
+        meta["episode_seed"] = int(seed)
+
+        # D.2 Style LLM-suggest path (auto sentinel / empty combo).
         # When the user picked "auto (LLM generates)" or left the combo
         # blank AND no style_custom override, ask the model to propose
         # a tonal style descriptor based on the resolved news_seed.
@@ -1098,11 +1135,56 @@ class OTR_LedgerScriptWriter:
                 generated_style, _LLM_STYLE_FALLBACK,
             )
 
-        # --- D. Generate validated outline ----------------------------
+        # D.3 Lock the cast.
+        #
+        # Seed: 0 means "process-level RNG" (non-deterministic). Any
+        # other value seeds random.Random for C7 byte-identity across
+        # runs. LEMMY's 11% roll is unaffected -- it uses SystemRandom
+        # inside _otr_casting / config.cast_pools so the same widget
+        # config never always-hits or always-misses the cameo.
+        cast_rng = _random.Random(int(seed)) if int(seed) != 0 else None
+        cast_rows, cast_meta = _OTRCAST.lock_cast(
+            generate_fn,
+            num_characters=resolved["num_characters"],
+            news_seed=resolved["news_seed"],
+            style=resolved["style"],
+            rng=cast_rng,
+        )
+        led.set_cast(cast_rows)
+        meta["cast_status"]           = "locked"
+        meta["cast_locked"]           = True
+        meta["cast_contract_version"] = "cast-v1"
+        meta["cast_contract"] = {
+            "lemmy_hit":              cast_meta["lemmy_hit"],
+            "casting_attempts":       cast_meta["casting_attempts"],
+            "num_characters_request": cast_meta["num_characters_request"],
+            "num_characters_locked":  cast_meta["num_characters_locked"],
+        }
+        log.info(
+            "[OTR_LedgerScriptWriter] cast locked: %d rows "
+            "(announcer + %d characters, lemmy_hit=%s)",
+            len(cast_rows), cast_meta["num_characters_locked"],
+            cast_meta["lemmy_hit"],
+        )
+
+        # Build the name->char_id index the per-beat composer needs.
+        # Excludes ANNOUNCER (announcer-role beats hardcode "announcer"
+        # cid downstream, not the c01 cast row's char_id).
+        char_id_by_name: dict[str, str] = {
+            row["name"]: row["char_id"]
+            for row in cast_rows
+            if row["name"] != "ANNOUNCER"
+        }
+        character_cast: tuple[str, ...] = tuple(char_id_by_name.keys())
+
+        # D.5 Generate validated outline against the locked cast.
+        # The outline LLM is told to use exactly these character names
+        # in character-role beats; generate_outline rerolls on cast
+        # drift (CastContractError).
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
             style=resolved["style"],
-            cast_size=resolved["num_characters"],
+            character_cast=character_cast,
             target_words=resolved["target_words"],
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
@@ -1117,12 +1199,6 @@ class OTR_LedgerScriptWriter:
                 "proceeding anyway",
                 beat_word_sum, resolved["target_words"], ratio,
             )
-
-        # --- F. Create per-episode workspace via new_ledger -----------
-        led = _PL.new_ledger(episode_id=None)
-        episode_id = led.episode_id           # pending_<YYYYMMDD_HHMMSS>
-        audio_dir = Path(led.out_dir)         # otr/episodes/<ep>/audio/
-        episode_root = audio_dir.parent       # otr/episodes/<ep>/
 
         # --- G. Build episode_canon (write deferred to section J.5) ----
         # Disk write moved out so the post-composition title regen
@@ -1141,10 +1217,6 @@ class OTR_LedgerScriptWriter:
             "[OTR_LedgerScriptWriter] episode_canon built (disk write "
             "deferred to post-composition title regen)"
         )
-
-        # --- H. Build cast rows + char_id index ------------------------
-        cast_rows, char_id_by_name = _build_cast_rows(outline.cast)
-        led.set_cast(cast_rows)
 
         # --- I. Per-beat loop ------------------------------------------
         line_rows: list = []
@@ -1436,12 +1508,19 @@ if __name__ == "__main__":
         req_keys = list(spec["required"].keys())
         assert req_keys == ["episode_title", "target_words", "num_characters"], \
             f"required widget order drift: {req_keys}"
-        for k in ("model_id", "cleanup_model_id",
+        for k in ("seed", "model_id", "cleanup_model_id",
                   "custom_premise", "include_act_breaks", "self_critique",
                   "target_length", "style", "style_custom", "creativity",
                   "arc_enhancer", "optimization_profile",
                   "perfect_run_spacesaver"):
             assert k in spec["optional"], f"optional missing key: {k}"
+        # seed widget: INT, 0..2^32-1, default 0 = process RNG
+        seed_type, seed_meta = spec["optional"]["seed"]
+        assert seed_type == "INT", f"seed type drift: {seed_type!r}"
+        assert seed_meta["min"] == 0
+        assert seed_meta["max"] == 2**32 - 1
+        assert seed_meta["default"] == 0, \
+            f"seed default drift: {seed_meta['default']!r}"
         # open_close MUST be absent (dropped 2026-05-10).
         assert "open_close" not in spec["required"]
         assert "open_close" not in spec["optional"]
