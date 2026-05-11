@@ -5,6 +5,22 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: news_interpreter sprint commit 4 — announcer close + post-assembly key_terms (commit 9f82685)
+
+- **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
+- **Symptom:** Commit 3 (f518fb3) stamped `meta.news = briefs.dict()` and piped briefs into cast + outline. Commit 4 closes the loop: the announcer's closing line gets overridden with `news_close_brief` so the listener hears the journalistic content, and a post-assembly check audits whether `key_terms` actually landed in dialogue.
+- **Diagnosis:** Per ADR section 5 commit 4 + section 4.4. Two pure operations run on the in-flight `line_rows` between the per-beat composition loop and `set_lines`: (1) override the LAST announcer line's text with `news_close_brief` when present; (2) word-boundary-check each `key_term` across all voiced lines (character + announcer), stamp `meta["post_assembly_key_terms"] = {landed, missing, min_required, passed, repair_pass}` for downstream nodes.
+- **Fix:**
+  - `nodes/_otr_news_wiring.py` (new): pure helpers `override_announcer_close` and `post_assembly_keyterm_check`. Pulled into their own tiny module so tests don't have to import the heavy OTR_LedgerScriptWriter.
+  - `nodes/OTR_LedgerScriptWriter.py`: new I.5 section after the per-beat loop and before `set_lines`. Reads `meta["news"]`; calls both helpers; stamps diagnostic results back onto `meta`. No-ops when `meta["news"]` is None (graceful degrade carries through from commit 3).
+  - `tests/test_news_interpreter_wiring.py` (new, 13 cases): override-announcer-close behavior (stamps last announcer line, no-op on empty / whitespace / no announcer line, idempotent); key_terms check (all landed, some missing, word-boundary precision so "AI" does NOT match "paid"/"afraid", non-voiced beats ignored, case-insensitive, both `_speaker_role` and `speaker_role` keys accepted, empty-term defensive skip).
+  - `tests/test_downstream_prompt_contract.py`: reason text updated on the 2 remaining xfail-strict integration canaries (RADIO portrait + MusicGen). Per ADR section 1 those sites are explicitly OUT OF SCOPE of the news_interpreter sprint and land in future ADRs. Canaries stay armed — body is unchanged, only the `reason=` documentation was updated to point at "future ADR (TBD)" rather than commit 4.
+- **ADR deviation:** Section 4.4 canonical policy at zero `key_terms` landed is hard-fail + repair pass on the line whose intent is closest to the missing term's topic. Commit 4 ships **warn-only** and DEFERS the repair pass. `meta["post_assembly_key_terms"]["repair_pass"]` is stamped `"deferred"` so future code knows this is a planned follow-up. Rationale: alpha-branch pragmatism — the episode ships and the diagnostic field surfaces the issue clearly, rather than blocking the writer on a missing repair-pass implementation.
+- **Verify:** AST + no-BOM clean. `tests/test_news_interpreter_wiring.py`: 13 passed (new). `tests/test_news_interpreter.py`: 12 passed (unchanged). `tests/test_downstream_prompt_contract.py`: 7 xfailed + 1 passed (case 12 stays flipped from commit 3; cases 1 + 2 still xfailed as future-ADR canaries). `tests/test_otr_casting.py`: 47 passed. Bug Bible regression unchanged: 15p/2x/1s. Push verified: local HEAD == origin HEAD == `9f82685a7a643ba5660e191ce4040b683dc7e1b8`.
+- **Tags:** news-interpreter, announcer-close-override, post-assembly-keyterm-audit, lockstep, sprint-milestone, adr-deviation-tracked
+
+---
+
 ### NON-BUG-2026-05-10: news_interpreter sprint commit 3 — briefs wired into writer + cast + outline (commit f518fb3)
 
 - **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
