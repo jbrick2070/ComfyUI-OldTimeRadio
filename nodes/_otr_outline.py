@@ -133,34 +133,28 @@ class Beat(BaseModel):
 class Outline(BaseModel):
     """Full episode outline. The Outline IS the macro-plan; line composer
     consumes Beat-by-Beat and writes the ledger row by row.
+
+    Cast-contract architecture (2026-05-10): the outline schema does
+    NOT carry a `cast` field. Cast is INGESTED from the writer's
+    locked cast contract (`_otr_casting.lock_cast`) via OutlineRequest
+    .character_cast — never produced by the outline LLM. The cast-
+    membership check on character-role beats lives in
+    `generate_outline()` and validates against `req.character_cast`,
+    NOT against any internal `self.cast` field. Less for the small
+    local LLM to lift per call.
     """
 
     title: str = Field(..., min_length=3, max_length=80)
     premise: str = Field(..., min_length=10, max_length=400)
     setting: str = Field(..., min_length=4, max_length=120)
     time_of_day: str = Field(..., min_length=3, max_length=40)
-    cast: list[str] = Field(
-        ...,
-        min_length=1,
-        max_length=6,
-        description="Declared cast in canonical ALL CAPS form",
-    )
     beats: list[Beat] = Field(..., min_length=4, max_length=24)
 
-    @field_validator("cast")
-    @classmethod
-    def _cast_uppercase(cls, v: list[str]) -> list[str]:
-        return [c.strip().upper() for c in v]
-
     @model_validator(mode="after")
-    def _beats_speakers_consistent_with_cast(self) -> "Outline":
-        cast_set = set(self.cast)
-        for b in self.beats:
-            if b.speaker_role == "character" and b.speaker not in cast_set:
-                raise ValueError(
-                    f"Beat {b.beat_id} has speaker {b.speaker!r} "
-                    f"not in declared cast {sorted(cast_set)}"
-                )
+    def _no_duplicate_beat_ids(self) -> "Outline":
+        """Schema-internal sanity check. Cast-membership cross-check
+        moved to generate_outline (validates beat speakers against
+        req.character_cast, the locked cast)."""
         ids = [b.beat_id for b in self.beats]
         if len(ids) != len(set(ids)):
             raise ValueError(f"duplicate beat_ids in outline: {ids}")
@@ -380,12 +374,12 @@ OUTPUT FORMAT
   "premise":     string (10-400 chars),
   "setting":     string (4-120 chars),
   "time_of_day": string (3-40 chars),
-  "cast":        array of 1-6 ALL-CAPS character names,
   "beats":       array of 4-24 beat objects, where each beat is:
                  {
                    "beat_id":      "b001", "b002", ... (monotonic),
-                   "speaker":      ALL-CAPS name from cast, or "NARRATOR"
-                                   for music/sfx beats,
+                   "speaker":      ALL-CAPS name from the Cast block in
+                                   the user prompt, or "NARRATOR" for
+                                   music / sfx beats,
                    "speaker_role": one of: "character", "announcer",
                                    "music_open", "music_close",
                                    "music_inter", "sfx",
@@ -398,7 +392,8 @@ OUTPUT FORMAT
 
 CONSTRAINTS
 - Every beat with speaker_role "character" MUST have a speaker that
-  appears in the cast array.
+  appears in the Cast block of the user prompt. Do not invent new
+  characters.
 - The first beat is typically speaker_role "music_open" or "announcer".
 - The last beat is typically speaker_role "music_close" or "announcer".
 - Beats should follow a clear arc: setup, complication, resolution.
@@ -477,8 +472,7 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     return (
         f"{head}\n"
         f"Build a dramatic outline that {develop_verb} in the chosen "
-        f"style. Echo the cast list verbatim in the JSON \"cast\" "
-        f"field. Return only the JSON outline."
+        f"style. Return only the JSON outline."
     )
 
 
@@ -743,34 +737,39 @@ def generate_outline(
             attempts.append((last_raw, err_msg))
             continue
 
-        # Post-pydantic cast-contract check: the LLM's outline.cast
-        # MUST match the locked character_cast we passed in.
-        # Exact-equality comparison: order matters AND duplicates
-        # matter (a set-equality check would let
-        # outline.cast=["ALICE","ALICE","BOB"] pass when locked was
-        # ("ALICE","BOB")).
+        # Post-pydantic cast-membership check (replaces the prior
+        # outline.cast drift check 2026-05-10): walk character-role
+        # beats and verify each beat.speaker is in the LOCKED
+        # character_cast. Per Jeffrey: "outline needs to ingest the
+        # cast not create it" + "less for the small LLM to lift at
+        # one time the better." Outline schema no longer has a cast
+        # field; cast lives entirely outside.
         #
-        # IMPORTANT type detail (round-robin 2026-05-10): outline.cast
-        # is parsed as a list by pydantic; req.character_cast is a
-        # tuple. `list != tuple` is True even when contents match,
-        # so we must cast req.character_cast to list before comparing,
-        # otherwise the check would FALSE-positive on every clean run
-        # and trigger the reroll loop indefinitely.
-        expected_cast = list(req.character_cast)
-        if outline.cast != expected_cast:
-            extra = set(outline.cast) - set(expected_cast)
-            missing = set(expected_cast) - set(outline.cast)
-            dups = [
-                n for n in outline.cast
-                if outline.cast.count(n) > 1
-            ]
+        # Diagnostics preserved (extra / missing / duplicates) so
+        # the reroll-then-repair loop produces useful repair-call
+        # context. Order check is per-beat now (each beat's speaker
+        # must be in the locked set); ordering across beats is
+        # narrative choice, not a contract violation.
+        locked_cast_set = set(req.character_cast)
+        used_speakers = [
+            b.speaker for b in outline.beats
+            if b.speaker_role == "character"
+        ]
+        used_speakers_set = set(used_speakers)
+        invented = used_speakers_set - locked_cast_set
+        if invented:
+            unused = locked_cast_set - used_speakers_set
+            dups = sorted({
+                n for n in used_speakers
+                if used_speakers.count(n) > 1 and n in invented
+            })
             err_msg = (
-                "CastContractError: outline.cast drifted from locked "
-                f"character_cast. extra (invented): {sorted(extra)!r}, "
-                f"missing (dropped): {sorted(missing)!r}, "
-                f"duplicates: {sorted(set(dups))!r}. "
-                f"Expected exactly (in order): {expected_cast!r}, "
-                f"got: {outline.cast!r}"
+                "CastContractError: outline beats reference characters "
+                "outside the locked cast. invented (must remove): "
+                f"{sorted(invented)!r}, locked (allowed): "
+                f"{sorted(locked_cast_set)!r}, "
+                f"locked-but-unused: {sorted(unused)!r}, "
+                f"invented-and-repeated: {dups!r}"
             )
             log.warning(
                 "[OTR_Outline] attempt %d failed: %s",
@@ -780,9 +779,10 @@ def generate_outline(
             continue
 
         log.info(
-            "[OTR_Outline] success on attempt %d/%d: %d beats, cast=%s",
+            "[OTR_Outline] success on attempt %d/%d: %d beats, "
+            "characters used: %s",
             attempt_idx + 1, max_attempts,
-            len(outline.beats), outline.cast,
+            len(outline.beats), sorted(used_speakers_set),
         )
         return outline
 
@@ -818,34 +818,42 @@ if __name__ == "__main__":
     assert b.speaker == "AEGEUS", f"expected AEGEUS, got {b.speaker}"
     print("\n[Test 2] speaker uppercase canonicalization: PASS")
 
-    # Test 3: Outline rejects beat speaker not in cast.
-    print("\n[Test 3] Outline cross-validates beat speakers vs cast")
-    bad_data = {
+    # Test 3: Outline schema accepts any beats now (cast-membership
+    # check moved out to generate_outline). The schema still rejects
+    # duplicate beat_ids though -- that's the only cross-beat
+    # invariant the schema enforces.
+    print("\n[Test 3] Outline rejects duplicate beat_ids (schema-internal)")
+    dup_id_data = {
         "title": "Test",
         "premise": "A test premise of sufficient length.",
         "setting": "A test set",
         "time_of_day": "midnight",
-        "cast": ["AEGEUS", "MARCUS"],
         "beats": [
-            {"beat_id": f"b00{i+1}", "speaker": "STRANGER", "speaker_role": "character",
-             "intent": "speak out of turn", "target_words": 12, "mood": "tense"}
-            for i in range(4)
+            {"beat_id": "b001", "speaker": "STRANGER", "speaker_role": "character",
+             "intent": "speak out of turn", "target_words": 12, "mood": "tense"},
+            {"beat_id": "b001", "speaker": "STRANGER", "speaker_role": "character",
+             "intent": "speak again with the same id", "target_words": 12, "mood": "tense"},
+            {"beat_id": "b003", "speaker": "STRANGER", "speaker_role": "character",
+             "intent": "third beat", "target_words": 12, "mood": "tense"},
+            {"beat_id": "b004", "speaker": "STRANGER", "speaker_role": "character",
+             "intent": "fourth beat", "target_words": 12, "mood": "tense"},
         ],
     }
     try:
-        Outline.model_validate(bad_data)
-        print("  FAIL: orphan speaker was accepted")
+        Outline.model_validate(dup_id_data)
+        print("  FAIL: duplicate beat_ids accepted")
     except ValidationError as e:
-        print(f"  PASS: orphan speaker rejected ({type(e).__name__})")
+        assert "duplicate beat_ids" in str(e), f"unexpected error: {e}"
+        print(f"  PASS: duplicate beat_ids rejected ({type(e).__name__})")
 
-    # Test 4: Music/SFX beats can have any speaker.
-    print("\n[Test 4] Music/SFX beats bypass cast check")
+    # Test 4: Schema accepts any speakers (cast-membership lives in
+    # generate_outline now, not in the pydantic model).
+    print("\n[Test 4] Outline schema accepts any speakers (cast-check is external)")
     ok_data = {
         "title": "Test",
         "premise": "A test premise of sufficient length.",
         "setting": "A test set",
         "time_of_day": "midnight",
-        "cast": ["AEGEUS"],
         "beats": [
             {"beat_id": "b001", "speaker": "INTRO", "speaker_role": "music_open",
              "intent": "open the show", "target_words": 5, "mood": "bold"},
@@ -859,7 +867,8 @@ if __name__ == "__main__":
     }
     o = Outline.model_validate(ok_data)
     assert len(o.beats) == 4
-    print("  PASS: music/sfx beats accepted with non-cast speakers")
+    assert not hasattr(o, "cast"), "Outline schema must NOT carry a cast field"
+    print("  PASS: schema accepts beats; no cast field on model")
 
     # Test 5: JSON extraction handles fences, preambles, raw.
     print("\n[Test 5] _extract_json_block strategies")
@@ -926,12 +935,15 @@ if __name__ == "__main__":
     print("  PASS")
 
     # Test 10: cast-contract drift check rejects mismatched outlines.
+    # Architecture (post-2026-05-10): outline schema no longer carries
+    # a `cast` field. The check walks character-role beats and
+    # verifies each beat.speaker is in req.character_cast (the LOCKED
+    # cast). LLM "invents CAROL" -> beat.speaker=CAROL not in
+    # locked {ALICE, BOB} -> reroll.
     print("\n[Test 10] generate_outline rejects cast drift")
     drift_outline_json = json.dumps({
         "title": "Test", "premise": "A test premise about science.",
         "setting": "A lab", "time_of_day": "Morning",
-        # request will lock ("ALICE", "BOB") -- LLM returned CAROL instead
-        "cast": ["ALICE", "CAROL"],
         "beats": [
             {"beat_id": "b001", "speaker": "NARRATOR",
              "speaker_role": "music_open",
@@ -939,6 +951,7 @@ if __name__ == "__main__":
             {"beat_id": "b002", "speaker": "ALICE",
              "speaker_role": "character",
              "intent": "speak", "target_words": 10, "mood": "wry"},
+            # request will lock ("ALICE", "BOB") -- LLM beat invents CAROL
             {"beat_id": "b003", "speaker": "CAROL",
              "speaker_role": "character",
              "intent": "speak", "target_words": 10, "mood": "wry"},
