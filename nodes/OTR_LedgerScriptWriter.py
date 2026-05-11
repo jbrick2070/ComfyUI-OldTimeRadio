@@ -883,16 +883,21 @@ class OTR_LedgerScriptWriter:
             },
             "optional": {
                 "seed": ("INT", {
-                    "default": 0, "min": 0, "max": 2**32 - 1, "step": 1,
+                    "default": 42, "min": 0, "max": 2**32 - 1, "step": 1,
                     "tooltip": (
-                        "Random seed for the cast contract: announcer "
-                        "voice pick + open-character name rolls become "
-                        "deterministic per seed. C7 byte-identity. "
-                        "0 (default) means 'use a fresh process-level "
-                        "RNG' (non-deterministic across runs). LEMMY's "
-                        "11% roll uses SystemRandom and is NEVER seeded "
-                        "-- otherwise the same widget config would "
-                        "always-hit or always-miss the cameo."
+                        "Random seed for the C7 byte-identity contract. "
+                        "Drives cast lock RNG (announcer voice + open-"
+                        "character name rolls), style picker (two-pass "
+                        "inventor + chooser samples), LEMMY's 11% roll, "
+                        "and the reviewer's seed_for_reviewer derivation.\n\n"
+                        "Default is 42 (cosmetic; replaces the previous "
+                        "default of 0). When the ComfyUI 'shuffle' icon "
+                        "next to the seed value is ON, ComfyUI generates "
+                        "a fresh random 64-bit integer on every Queue "
+                        "Prompt and the displayed default is ignored. "
+                        "Click the shuffle icon OFF and type a specific "
+                        "integer to lock the run for byte-identical "
+                        "re-queueing."
                     ),
                 }),
                 "model_id": (_MODEL_CHOICES, {
