@@ -2065,7 +2065,7 @@
       "type": "OTR_LedgerScriptReviewer",
       "pos": [
         50,
-        200
+        -180
       ],
       "size": [
         380,
@@ -2076,44 +2076,28 @@
         "Node name for S&R": "OTR_LedgerScriptReviewer"
       },
       "widgets_values": [
-        "",
-        "",
-        "",
-        0,
         "mistralai/Mistral-Nemo-Instruct-2407"
       ],
       "inputs": [
         {
           "name": "script_text",
           "type": "STRING",
-          "link": 106,
-          "widget": {
-            "name": "script_text"
-          }
+          "link": 106
         },
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 107,
-          "widget": {
-            "name": "script_json"
-          }
+          "link": 107
         },
         {
           "name": "news_used",
           "type": "STRING",
-          "link": 108,
-          "widget": {
-            "name": "news_used"
-          }
+          "link": 108
         },
         {
           "name": "estimated_minutes",
           "type": "INT",
-          "link": 109,
-          "widget": {
-            "name": "estimated_minutes"
-          }
+          "link": 109
         }
       ],
       "outputs": [

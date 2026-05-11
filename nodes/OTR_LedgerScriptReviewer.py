@@ -110,10 +110,16 @@ class OTR_LedgerScriptReviewer:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # The four passthrough sockets (script_text, script_json,
+        # news_used, estimated_minutes) are PURE LINK-BOUND inputs --
+        # `forceInput: True` tells ComfyUI to render them as input
+        # sockets ONLY, never as widget editors. The writer feeds
+        # them by graph wire; no manual widget value is ever useful.
+        # `model_id` stays a regular widget (always typed, no link).
         return {
             "required": {
                 "script_text": ("STRING", {
-                    "default": "",
+                    "forceInput": True,
                     "tooltip": (
                         "Passthrough from OTR_LedgerScriptWriter. The "
                         "reviewer reads the production ledger directly "
@@ -124,7 +130,7 @@ class OTR_LedgerScriptReviewer:
             },
             "optional": {
                 "script_json": ("STRING", {
-                    "default": "",
+                    "forceInput": True,
                     "tooltip": (
                         "Forwarded from the writer's script_json slot. "
                         "The reviewer re-serializes this from the "
@@ -133,7 +139,7 @@ class OTR_LedgerScriptReviewer:
                     ),
                 }),
                 "news_used": ("STRING", {
-                    "default": "",
+                    "forceInput": True,
                     "tooltip": (
                         "Passthrough of the writer's news_used slot. "
                         "Not used by the reviewer; carried through so "
@@ -141,7 +147,7 @@ class OTR_LedgerScriptReviewer:
                     ),
                 }),
                 "estimated_minutes": ("INT", {
-                    "default": 0, "min": 0, "max": 999, "step": 1,
+                    "forceInput": True,
                     "tooltip": (
                         "Passthrough of the writer's estimated_minutes "
                         "INT slot. Not modified by the reviewer."
