@@ -1791,6 +1791,22 @@ class OTR_LedgerScriptWriter:
         # same field names. Also stamps episode_title (forward-compat
         # title chain slot) and perfect_run_spacesaver.
         meta = led.data.setdefault("meta", {})
+        # Derived target_length for script_critic back-compat
+        # (post-Phase-3 cleanup 2026-05-11): the writer dropped the
+        # target_length widget, but the legacy script_critic's
+        # rubric still keys its scene_count off a {smoke, short,
+        # medium} bucket. Map act_count -> bucket so the critic's
+        # rubric keeps working without modification. Buckets per
+        # script_critic._SCENE_COUNT_BY_LENGTH: smoke=1 scene,
+        # short=3 scenes, medium=5 scenes.
+        _ac = resolved["act_count"]
+        if _ac <= 1:
+            _derived_target_length = "smoke"
+        elif _ac <= 3:
+            _derived_target_length = "short"
+        else:
+            _derived_target_length = "medium"
+
         meta["gen_params_initial"] = {
             "target_words":         resolved["target_words"],
             "num_characters":       resolved["num_characters"],
@@ -1806,6 +1822,10 @@ class OTR_LedgerScriptWriter:
             "include_act_breaks":    resolved["include_act_breaks"],
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
+            # Back-compat for the legacy script_critic rubric --
+            # derived from act_count, not user-set. See comment
+            # block above.
+            "target_length":         _derived_target_length,
         }
         # Always stamp the resolved final title (user / LLM regen / outline
         # fallback). title_source records which branch won so downstream
@@ -1864,40 +1884,46 @@ if __name__ == "__main__":
         print("[1/9] FAIL: class instantiation")
 
     # 2. INPUT_TYPES schema introspection.
+    #     Post-Phase-3 cleanup 2026-05-11: legacy widgets dropped
+    #     (cleanup_model_id, self_critique, target_length,
+    #     arc_enhancer). act_count sits where target_length was.
     try:
         spec = cls.INPUT_TYPES()
         assert "required" in spec, "missing required block"
         assert "optional" in spec, "missing optional block"
-        # Required block: legacy widget order — episode_title, target_words, num_characters.
+        # Required block: episode_title, target_words, num_characters.
         req_keys = list(spec["required"].keys())
         assert req_keys == ["episode_title", "target_words", "num_characters"], \
             f"required widget order drift: {req_keys}"
-        for k in ("seed", "model_id", "cleanup_model_id",
-                  "custom_premise", "include_act_breaks", "self_critique",
-                  "target_length", "style", "style_custom", "creativity",
-                  "arc_enhancer", "optimization_profile",
-                  "perfect_run_spacesaver"):
+        # Optional block: the clean set after Phase 0-3 cleanup.
+        for k in ("seed", "model_id", "custom_premise",
+                  "include_act_breaks", "act_count", "style",
+                  "style_custom", "creativity",
+                  "optimization_profile", "perfect_run_spacesaver"):
             assert k in spec["optional"], f"optional missing key: {k}"
-        # seed widget: INT, 0..2^32-1, default 0 = process RNG
+        # Legacy widgets MUST be absent post-cleanup.
+        for legacy in ("cleanup_model_id", "self_critique",
+                       "target_length", "arc_enhancer", "open_close"):
+            assert legacy not in spec["optional"], \
+                f"legacy widget {legacy!r} resurrected"
+        # seed widget: INT, 0..2^32-1, default 42 (post-cleanup
+        # cosmetic flip; shuffle-on randomizes regardless).
         seed_type, seed_meta = spec["optional"]["seed"]
         assert seed_type == "INT", f"seed type drift: {seed_type!r}"
         assert seed_meta["min"] == 0
         assert seed_meta["max"] == 2**32 - 1
-        assert seed_meta["default"] == 0, \
+        assert seed_meta["default"] == 42, \
             f"seed default drift: {seed_meta['default']!r}"
-        # open_close MUST be absent (dropped 2026-05-10).
-        assert "open_close" not in spec["required"]
-        assert "open_close" not in spec["optional"]
         # episode_title is a STRING (default empty).
         et_type, et_meta = spec["required"]["episode_title"]
         assert et_type == "STRING"
         assert et_meta.get("default") == ""
-        # target_words INT clamps + default (locked to 350 per Jeffrey 2026-05-10)
+        # target_words INT clamps + default 350.
         tw_type, tw_meta = spec["required"]["target_words"]
         assert tw_type == "INT"
         assert tw_meta["min"] == 30 and tw_meta["max"] == 10000
         assert tw_meta["default"] == 350, \
-            f"target_words default drift: {tw_meta['default']!r} (must be 350)"
+            f"target_words default drift: {tw_meta['default']!r}"
         # num_characters INT clamps
         nc_type, nc_meta = spec["required"]["num_characters"]
         assert nc_type == "INT"
@@ -1911,12 +1937,12 @@ if __name__ == "__main__":
         cr_choices, _ = spec["optional"]["creativity"]
         assert cr_choices == _CREATIVITY_CHOICES, \
             f"creativity dropdown drift: {cr_choices}"
-        # target_length first two are smoke presets
-        tl_choices, _ = spec["optional"]["target_length"]
-        assert tl_choices[0].startswith("30 words")
-        assert tl_choices[1].startswith("tiny")
-        # style combo: first entry is the LLM-auto sentinel; remaining
-        # entries are the baked-in tonal presets the user can pick.
+        # act_count INT (0 = auto-derive sentinel; JS clamps to
+        # [default..max] at the UI layer per target_words).
+        ac_type, ac_meta = spec["optional"]["act_count"]
+        assert ac_type == "INT", f"act_count type drift: {ac_type!r}"
+        assert ac_meta["min"] == 0 and ac_meta["max"] == 7
+        # style combo: first entry is the LLM-auto sentinel.
         st_choices, st_meta = spec["optional"]["style"]
         assert isinstance(st_choices, list) and len(st_choices) >= 4
         assert st_choices[0] == _STYLE_AUTO_SENTINEL, \
@@ -1927,7 +1953,10 @@ if __name__ == "__main__":
         assert sc_type == "STRING"
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
-        print("[2/9] PASS: INPUT_TYPES schema (15 widgets, open_close absent, style 3-way)")
+        n_optional = len(spec["optional"])
+        assert n_optional == 10, \
+            f"optional widget count drift: {n_optional} (expected 10 post-cleanup)"
+        print("[2/9] PASS: INPUT_TYPES schema (10 optional widgets after Phase 0-3 cleanup)")
     except Exception:
         failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
         print("[2/9] FAIL: INPUT_TYPES schema")
@@ -1972,14 +2001,15 @@ if __name__ == "__main__":
         t, p = _resolve_creativity("???")
         assert (t, p) == (0.85, 0.95)
 
-        # 5c. target_length forces target_words for smoke presets.
-        assert _resolve_target_words(350, "30 words (smoke, 1 act)") == 30
-        assert _resolve_target_words(350, "tiny (smoke, 1 act)") == 100
-        # 5d. Non-smoke presets pass widget value through.
-        assert _resolve_target_words(350, "short (3 acts)") == 350
-        assert _resolve_target_words(1400, "epic (10+ acts)") == 1400
+        # 5c. _resolve_target_words clamps to schema minimum.
+        # (Smoke-preset force logic was retired with the
+        # target_length widget 2026-05-11; type target_words=30
+        # directly for smoke runs.)
+        assert _resolve_target_words(350) == 350
+        assert _resolve_target_words(1400) == 1400
+        assert _resolve_target_words(0) == 5, "min-clamp guard"
 
-        print("[5/9] PASS: resolver helpers (creativity + target_length)")
+        print("[5/9] PASS: resolver helpers (creativity + target_words clamp)")
     except Exception:
         failures.append(("5/9 resolver helpers", traceback.format_exc()))
         print("[5/9] FAIL: resolver helpers")

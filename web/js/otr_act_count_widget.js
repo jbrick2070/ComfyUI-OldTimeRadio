@@ -49,33 +49,58 @@ app.registerExtension({
     const actsWidget  = node.widgets.find(w => w.name === "act_count");
     if (!wordsWidget || !actsWidget) return;
 
+    // Behavior contract (post-Phase-3 review 2026-05-11, per
+    // Jeffrey's "350 -> 3 and dynamic if i change" feedback):
+    //
+    //   - On node creation OR target_words change, the widget's
+    //     displayed value is updated to reflect the DERIVED default
+    //     act_count for the current target_words. The 0 sentinel is
+    //     replaced with the real default so the user sees the
+    //     correct number, not a placeholder.
+    //   - The widget's allowed range becomes [default..max] for the
+    //     current target_words. The user can pick UP within that
+    //     band but never below the default.
+    //   - User picks within the band are preserved across
+    //     target_words changes, UNLESS the new target_words shifts
+    //     the band such that the user's pick is out of range -- in
+    //     which case the value is clamped to the nearest legal pick.
+    //   - When target_words is below 30 (sub-minimum), the widget
+    //     shows 1; Python's run-time validator surfaces the
+    //     InvalidEpisodeBudgetError when Queue Prompt fires.
     const refresh = () => {
       const w = wordsWidget.value;
       const dflt = defaultActCount(w);
       const max = maxActCount(w);
 
-      // act_count value 0 means "Python auto-derives". Keep it
-      // selectable even when target_words is below 30; the Python
-      // validator surfaces the right error in run().
       if (dflt === null) {
+        // Sub-minimum target_words. Pin the widget to 1 -- the
+        // Python validator fails-loud on Queue Prompt anyway.
         actsWidget.options = actsWidget.options || {};
-        actsWidget.options.values = [0, 1];
-        if (actsWidget.value > 1) actsWidget.value = 0;
+        actsWidget.options.values = [1];
+        actsWidget.value = 1;
         node.setDirtyCanvas(true, true);
         return;
       }
 
-      // Allowed values: 0 (auto) + [dflt .. max].
-      const allowed = [0, ...range(dflt, max)];
+      // Allowed band: [default..max].
+      const allowed = range(dflt, max);
       actsWidget.options = actsWidget.options || {};
       actsWidget.options.values = allowed;
-      // The act_count widget is declared as INT in INPUT_TYPES, so
-      // the options.values list is purely informational for any UI
-      // dropdown that surfaces it; we ALSO clamp the raw value so
-      // an out-of-band saved graph snaps to the nearest legal pick.
-      if (actsWidget.value !== 0) {
-        if (actsWidget.value < dflt) actsWidget.value = dflt;
-        if (actsWidget.value > max) actsWidget.value = max;
+
+      const current = actsWidget.value;
+      // Snap to default when value is the 0 sentinel OR below the
+      // current default. Clamp down when above the current max.
+      // Preserve any user pick that's already inside [dflt..max].
+      let next;
+      if (current === 0 || current < dflt) {
+        next = dflt;
+      } else if (current > max) {
+        next = max;
+      } else {
+        next = current;
+      }
+      if (actsWidget.value !== next) {
+        actsWidget.value = next;
       }
       node.setDirtyCanvas(true, true);
     };
@@ -85,6 +110,8 @@ app.registerExtension({
       if (typeof prev === "function") prev(v);
       refresh();
     };
+    // Also run refresh once on creation so an existing graph that
+    // loads with act_count=0 immediately snaps to the right value.
     refresh();
   },
 });
