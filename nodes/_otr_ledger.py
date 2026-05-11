@@ -45,7 +45,7 @@ log = logging.getLogger("OTR")
 # Constants
 # ---------------------------------------------------------------------------
 
-CURRENT_SCHEMA_VERSION = "l3-2026-05-08"
+CURRENT_SCHEMA_VERSION = "l3-2026-05-14"
 """Set on every ledger write performed via this module. Bump when
 adding any field that downstream consumers must check for. Keep the
 date suffix so the lineage is greppable.

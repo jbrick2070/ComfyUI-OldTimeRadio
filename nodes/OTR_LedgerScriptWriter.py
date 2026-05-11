@@ -587,13 +587,22 @@ def _resolve_target_words(target_words, target_length: str) -> int:
     return max(5, int(target_words))
 
 
-def _fetch_rss_seed_or_die(style: str, model_id: str) -> str:
-    """Run the story_orchestrator RSS fetcher and return a news_seed string.
+def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
+    """Run the story_orchestrator RSS fetcher and return the article dict.
 
     Lifts the exact path the legacy writer used. `style` is mapped to
     the closest legacy slug for the LLM re-rank step; if the fetcher
-    returns None (every feed failed) we raise loudly — the legacy
+    returns None (every feed failed) we raise loudly -- the legacy
     writer behaved the same.
+
+    Return shape (commit 3 of the news_interpreter sprint, ADR
+    docs/news_interpreter_adr.md section 9.1): a dict with keys
+    ``headline``, ``summary``, ``full_text``, ``source``, ``date``,
+    ``link``, plus a computed ``seed_text`` for back-compat with
+    consumers that still treat news_seed as a plain string. Previously
+    this function returned only the seed_text string; the richer
+    return lets the news_interpreter stage read the full body that
+    the cast LLM never sees today.
     """
     try:
         try:
@@ -637,7 +646,15 @@ def _fetch_rss_seed_or_die(style: str, model_id: str) -> str:
             "[OTR_LedgerScriptWriter] RSS_FETCH OK: source=%s, len=%d, head=%r",
             article.get("source") or "?", len(seed_text), seed_text[:80],
         )
-        return seed_text
+        return {
+            "headline":  (article.get("headline") or "").strip(),
+            "summary":   (article.get("summary") or "").strip(),
+            "full_text": (article.get("full_text") or "").strip(),
+            "source":    (article.get("source") or "").strip(),
+            "date":      (article.get("date") or "").strip(),
+            "link":      (article.get("link") or "").strip(),
+            "seed_text": seed_text,
+        }
     except Exception as exc:
         # Loud raise: the writer requires a real seed to function. The
         # workflow can override via custom_premise if RSS is unavailable.
@@ -710,6 +727,18 @@ def _resolve_inputs(
         style_pending = True
 
     if custom:
+        # Custom premise path: synthesize the same dict shape RSS
+        # would produce so news_interpreter sees a uniform article
+        # surface no matter how the story entered the writer.
+        news_article = {
+            "headline":  "",
+            "summary":   "",
+            "full_text": custom,
+            "source":    "User Seed",
+            "date":      "",
+            "link":      "",
+            "seed_text": custom,
+        }
         news_seed = custom
         seed_source = "custom_premise"
     else:
@@ -718,11 +747,13 @@ def _resolve_inputs(
         # the writer's final style still gets LLM-proposed from the
         # ACTUAL fetched article below.
         rss_style_slug = resolved_style or _LLM_STYLE_FALLBACK
-        news_seed = _fetch_rss_seed_or_die(rss_style_slug, model_id)
+        news_article = _fetch_rss_seed_or_die(rss_style_slug, model_id)
+        news_seed = news_article["seed_text"]
         seed_source = "rss_fetch"
 
     return {
         "news_seed":            news_seed,
+        "news_article":         news_article,
         "seed_source":          seed_source,
         "style":                resolved_style,
         "style_source":         style_source,
@@ -1084,6 +1115,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_model_loader as _OTRML
         from . import _otr_ledger as _OTRL
         from . import _otr_casting as _OTRCAST
+        from . import news_interpreter as _OTRNI
         from . import production_ledger as _PL
 
         # --- C. Load LLM + build truncating generate_fn ---------------
@@ -1135,6 +1167,54 @@ class OTR_LedgerScriptWriter:
                 generated_style, _LLM_STYLE_FALLBACK,
             )
 
+        # D.2.5 News interpretation. Read the full article (currently
+        # discarded after RSS fetch -- see _fetch_rss_seed_or_die change
+        # in this commit) and emit four purpose-specific briefs that
+        # cast / outline / announcer / line-composer consume INSTEAD
+        # of the mechanical 500-char slice of headline+summary.
+        # ADR docs/news_interpreter_adr.md section 5 -- commit 3 of
+        # the news_interpreter sprint.
+        #
+        # Graceful degrade (ADR section 9.2): if build_news_briefs
+        # exhausts its 3-attempt retry budget, stamp meta["news"] = None
+        # and fall back to raw news_seed on downstream consumers. The
+        # writer MUST produce a complete episode even when the brief
+        # LLM call fails; this is a "warn-and-continue" boundary, not
+        # a hard fail.
+        article = resolved["news_article"]
+        try:
+            briefs = _OTRNI.build_news_briefs(
+                generate_fn,
+                full_text=article.get("full_text", ""),
+                headline=article.get("headline", ""),
+                summary=article.get("summary", ""),
+                outlet=article.get("source", ""),
+                pub_date=article.get("date", ""),
+                style=resolved["style"],
+                seed=int(seed),
+                model_id=str(resolved["model_id"]),
+            )
+            meta["news"] = briefs.model_dump()
+            casting_brief = briefs.casting_brief
+            script_brief = briefs.script_brief
+            key_terms_tuple: tuple[str, ...] = tuple(briefs.key_terms)
+            log.info(
+                "[OTR_LedgerScriptWriter] news_interpreter OK: "
+                "%d key_terms in %d attempt(s)",
+                len(briefs.key_terms), briefs.attempts,
+            )
+        except _OTRNI.NewsInterpreterError as exc:
+            log.warning(
+                "[OTR_LedgerScriptWriter] news_interpreter FAILED after "
+                "all attempts: %s -- falling back to raw news_seed for "
+                "cast + outline (no key_terms enforcement)",
+                exc,
+            )
+            meta["news"] = None
+            casting_brief = ""
+            script_brief = ""
+            key_terms_tuple = ()
+
         # D.3 Lock the cast.
         #
         # Seed: ALWAYS used to seed random.Random (no zero sentinel).
@@ -1159,6 +1239,7 @@ class OTR_LedgerScriptWriter:
             generate_fn,
             num_characters=resolved["num_characters"],
             news_seed=resolved["news_seed"],
+            casting_brief=casting_brief,
             style=resolved["style"],
             rng=cast_rng,
         )
@@ -1229,6 +1310,8 @@ class OTR_LedgerScriptWriter:
             style=resolved["style"],
             character_cast=character_cast,
             target_words=resolved["target_words"],
+            script_brief=script_brief,
+            key_terms=key_terms_tuple,
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
 

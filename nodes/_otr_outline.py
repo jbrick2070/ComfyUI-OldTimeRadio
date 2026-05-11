@@ -185,7 +185,14 @@ class OutlineRequest:
     rejects any outline that drifts.
     """
 
-    news_seed: str           # The real science story / factual seed
+    news_seed: str           # The real science story / factual seed.
+                             # Back-compat field: callers who have no
+                             # news_interpreter brief (e.g. early-stage
+                             # tests, or the writer's fallback path
+                             # when build_news_briefs raised) pass the
+                             # raw seed here. When script_brief is
+                             # non-empty it takes precedence in the
+                             # prompt.
     style: str               # User-selected style, e.g. "psychological slow-burn",
                              # "pulp adventure", "hard sci-fi procedural", "noir thriller".
                              # Field renamed from style_hint 2026-05-10 — Jeffrey:
@@ -205,6 +212,23 @@ class OutlineRequest:
                              # default would crash __post_init__ immediately,
                              # which is a worse failure mode than a clear
                              # TypeError from the dataclass constructor.)
+    script_brief: str = ""
+                             # OPTIONAL. news_interpreter's purpose-specific
+                             # distillation of the article for script planning
+                             # (premise arc, central tension, beat hooks).
+                             # When non-empty, replaces news_seed in the
+                             # prompt's "Science story" line so the outline
+                             # LLM sees a focused brief rather than raw RSS.
+                             # When empty, the prompt falls back to news_seed.
+                             # Commit 3 (news_interpreter sprint, ADR
+                             # docs/news_interpreter_adr.md).
+    key_terms: tuple[str, ...] = ()
+                             # OPTIONAL. news_interpreter's verbatim
+                             # journalistic terms (people, places, technology)
+                             # the dialogue MUST surface. Injected into the
+                             # prompt as a "Required terms" line when non-
+                             # empty so the outline can plan beats that
+                             # naturally land them.
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -288,14 +312,33 @@ CONSTRAINTS
 
 def _build_user_prompt(req: OutlineRequest) -> str:
     cast_line = ", ".join(req.character_cast)
-    return (
-        f"Plan a science-fiction audio drama outline.\n\n"
-        f"Science story (the factual seed): {req.news_seed}\n"
-        f"Style: {req.style}\n"
+    # news_interpreter brief takes precedence over raw news_seed.
+    # When the writer has a brief from build_news_briefs, the prompt
+    # gets the focused distillation; when the writer is on the
+    # graceful-degrade path (brief LLM call failed), it gets raw seed.
+    story_line = (req.script_brief.strip() or req.news_seed)
+    parts = [
+        "Plan a science-fiction audio drama outline.",
+        "",
+        f"Science story (the factual seed): {story_line}",
+    ]
+    if req.key_terms:
+        terms_line = ", ".join(req.key_terms)
+        parts.append(
+            f"Required terms (each must appear at least once in "
+            f"dialogue, verbatim or naturally inflected): {terms_line}"
+        )
+    parts.extend([
+        f"Style: {req.style}",
         f"Cast (already chosen -- use exactly these names in "
-        f"character-role beats): {cast_line}\n"
+        f"character-role beats): {cast_line}",
         f"Target total dialogue length: ~{req.target_words} words "
-        f"(sum of per-beat target_words should land near this number).\n\n"
+        f"(sum of per-beat target_words should land near this number).",
+        "",
+    ])
+    head = "\n".join(parts)
+    return (
+        f"{head}\n"
         f"Build a dramatic outline that extrapolates from the science story "
         f"in the chosen style. Echo the cast list verbatim in the JSON "
         f"\"cast\" field. Return only the JSON outline."

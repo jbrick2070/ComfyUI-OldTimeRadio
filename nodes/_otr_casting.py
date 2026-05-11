@@ -167,6 +167,7 @@ def _build_user_prompt(
     style: str,
     prior_cast: List[dict],
     available_voices: List[tuple[str, str]],
+    casting_brief: str = "",
 ) -> str:
     """Build the casting prompt for one open character.
 
@@ -174,7 +175,7 @@ def _build_user_prompt(
     so-far block is omitted entirely when prior_cast is empty):
 
       Cast this character in a radio drama.
-      Story: <news_seed[:500]>
+      Story: <casting_brief if non-empty else news_seed[:500]>
       Style: <style>
 
       Name: <NAME>
@@ -192,13 +193,25 @@ def _build_user_prompt(
 
       JSON only:
       {"character_description":"<short>","gender":"male|female|other","voice_preset":"<id>"}
+
+    casting_brief (added in commit 3 of the news_interpreter sprint,
+    ADR docs/news_interpreter_adr.md) is the purpose-specific
+    distillation of the article for casting -- "what kinds of people
+    belong in this story". When provided (non-empty), it replaces the
+    mechanical 500-char slice of news_seed on the Story: line. When
+    absent, the legacy slice still runs so older callers and tests
+    keep their behavior.
     """
-    seed = (news_seed or "").strip()[:_NEWS_SEED_CAP]
+    brief = (casting_brief or "").strip()
+    if brief:
+        story_text = brief
+    else:
+        story_text = (news_seed or "").strip()[:_NEWS_SEED_CAP]
     style_str = (style or "").strip() or "open"
 
     parts: list[str] = [
         "Cast this character in a radio drama.",
-        f"Story: {seed}",
+        f"Story: {story_text}",
         f"Style: {style_str}",
         "",
         f"Name: {name}",
@@ -269,6 +282,7 @@ def cast_one_character(
     max_attempts: int = 3,
     base_temperature: float = 0.7,
     max_new_tokens: int = 250,
+    casting_brief: str = "",
 ) -> CastingResponse:
     """Cast one open character. Returns a validated CastingResponse.
 
@@ -299,6 +313,7 @@ def cast_one_character(
         style=style,
         prior_cast=prior_cast,
         available_voices=available_voices,
+        casting_brief=casting_brief,
     )
     attempts: list[tuple[str, str]] = []
     last_raw: str | None = None
@@ -502,6 +517,7 @@ def lock_cast(
     rng: Optional[random.Random] = None,
     force_lemmy: Optional[bool] = None,
     max_attempts_per_call: int = 3,
+    casting_brief: str = "",
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -582,6 +598,7 @@ def lock_cast(
             prior_cast=prior_cast_for_llm,
             available_voices=available_voices,
             max_attempts=max_attempts_per_call,
+            casting_brief=casting_brief,
         )
         new_row = {
             "char_id":               slot.char_id,
