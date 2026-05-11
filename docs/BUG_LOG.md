@@ -5,6 +5,20 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: news_interpreter sprint commit 2 — agnostic module + GBNF grammar shipped (commit 70d25eb)
+
+- **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone)
+- **Symptom:** Commit 1 (6f3218d) locked the API surface via `tests/test_news_interpreter.py` (12 cases skipped via `pytest.importorskip`). Commit 2 lands the module those tests describe.
+- **Diagnosis:** Per ADR section 5 commit order. Module must be strictly LLM-agnostic: `generate_fn(messages, *, temperature, max_new_tokens) -> str` only. No model branches, no chat-template assumptions, no grammar-file kwarg passing (loader-side concern). Gemma 4 + MTP, llama.cpp + GBNF, vLLM, HF Transformers all sit behind generate_fn opaquely.
+- **Fix:**
+  - `nodes/news_interpreter.py` (~700 LOC): NewsBriefs pydantic v2 model + NewsInterpreterError + FORBIDDEN_ERA_TERMS + PROMPT_VERSION/SCHEMA_VERSION/DEFAULT_DECODER_PROFILE + v1/v2/v3 validators (with source-context allowance) + build_source_wrapper + compute_cache_key + extract_json_block + build_news_briefs with 3-attempt T=0.7/0.8/repair@0.3 ladder. Production 2-6 key_terms bound enforced at orchestration layer (V0 check in build_news_briefs); schema field accepts 1-6 so unit tests can isolate V1/V2/V3 with single-term fixtures.
+  - `grammars/news_interpreter.gbnf` (~30 lines): GBNF grammar for future llama.cpp loaders. Loader-side, not passed by the module. Picked up by convention (`<repo>/grammars/<module>.gbnf`) when a llama.cpp loader integrates.
+- **Verify:** AST + no-BOM clean. `tests/test_news_interpreter.py`: 12 passed (was 12 skipped pre-commit). `tests/test_downstream_prompt_contract.py`: 8 xfailed (canaries still armed for commits 3-5). `tests/test_otr_casting.py`: 47 passed (cast contract unaffected). Bug Bible regression unchanged: 15 passed, 2 xfailed, 1 skipped (baseline held). Push verified: local HEAD == origin HEAD == `70d25ebe78e1a2c772fee45e4584c1d950668a5a`.
+- **Schema bump deferred:** SCHEMA_VERSION is set to "l3-2026-05-14" but `production_ledger.py` schema bump + `meta.news` field stamp lands in commit 3 alongside the writer wiring.
+- **Tags:** news-interpreter, agnostic-control-plane, gbnf, pydantic-v2, sprint-milestone
+
+---
+
 ### NON-BUG-2026-05-10: news_interpreter sprint commit 1 — ADR + xfail-strict canary tests armed (commit 6f3218d)
 
 - **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone, not a defect)
