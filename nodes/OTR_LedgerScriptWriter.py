@@ -1291,6 +1291,25 @@ class OTR_LedgerScriptWriter:
         # The outline LLM is told to use exactly these character names
         # in character-role beats; generate_outline rerolls on cast
         # drift (CastContractError).
+        #
+        # cast_descriptions wires the casting LLM's per-character
+        # output (gender + character_description) into the outline
+        # prompt's Cast block so the outline LLM can plan beats that
+        # exploit each character's distinct personality + stakes.
+        # Order MUST match character_cast 1:1 (OutlineRequest
+        # __post_init__ enforces this); both lists derive from
+        # char_id_by_name.keys() above so the order is identical
+        # by construction. ANNOUNCER excluded from both, same as
+        # character_cast.
+        cast_descriptions: tuple[tuple[str, str, str], ...] = tuple(
+            (
+                row["name"],
+                str(row.get("gender") or ""),
+                str(row.get("character_description") or ""),
+            )
+            for row in cast_rows
+            if row["name"] != "ANNOUNCER"
+        )
         outline_req = _OTRO.OutlineRequest(
             news_seed=resolved["news_seed"],
             style=resolved["style"],
@@ -1298,6 +1317,7 @@ class OTR_LedgerScriptWriter:
             target_words=resolved["target_words"],
             script_brief=script_brief,
             key_terms=key_terms_tuple,
+            cast_descriptions=cast_descriptions,
         )
         outline = _OTRO.generate_outline(generate_fn, outline_req)
 

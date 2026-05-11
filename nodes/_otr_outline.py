@@ -234,6 +234,31 @@ class OutlineRequest:
                              # prompt as a "Required terms" line when non-
                              # empty so the outline can plan beats that
                              # naturally land them.
+    cast_descriptions: tuple[tuple[str, str, str], ...] = ()
+                             # OPTIONAL. Per-character (name, gender,
+                             # character_description) tuples from the
+                             # LOCKED cast (the cast LLM's output via
+                             # _otr_casting.lock_cast). When non-empty,
+                             # the prompt's `Cast` line expands from a
+                             # bare name list to a per-character block
+                             # with the description so the outline LLM
+                             # can plan beats that exploit each
+                             # character's distinct personality + stakes
+                             # (instead of writing generic-sci-fi-
+                             # character beats keyed only on ALL-CAPS
+                             # names). When empty, the prompt falls
+                             # back to the bare name list (back-compat
+                             # for tests + early-stage callers).
+                             #
+                             # MUST match character_cast 1:1 in name
+                             # and order when non-empty (validated in
+                             # __post_init__) so the LLM doesn't see
+                             # contradictory cast info between the
+                             # constraint sentence and the description
+                             # block.
+                             #
+                             # Wired by OTR_LedgerScriptWriter D.5
+                             # post-cast-lock (2026-05-10 follow-up).
 
     def __post_init__(self) -> None:
         n = len(self.character_cast)
@@ -256,6 +281,41 @@ class OutlineRequest:
                 raise ValueError(
                     f"character_cast names must be ALL CAPS, got {name!r}"
                 )
+        if self.cast_descriptions:
+            if len(self.cast_descriptions) != len(self.character_cast):
+                raise ValueError(
+                    f"cast_descriptions length {len(self.cast_descriptions)} "
+                    f"!= character_cast length {len(self.character_cast)}; "
+                    f"the two lists must align 1:1"
+                )
+            for i, entry in enumerate(self.cast_descriptions):
+                if (not isinstance(entry, tuple)) or len(entry) != 3:
+                    raise ValueError(
+                        f"cast_descriptions[{i}] must be a 3-tuple "
+                        f"(name, gender, description), got {entry!r}"
+                    )
+                name, gender, desc = entry
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError(
+                        f"cast_descriptions[{i}].name must be a "
+                        f"non-empty string, got {name!r}"
+                    )
+                if name != self.character_cast[i]:
+                    raise ValueError(
+                        f"cast_descriptions[{i}].name {name!r} != "
+                        f"character_cast[{i}] {self.character_cast[i]!r}; "
+                        f"the two lists must align 1:1 in name and order"
+                    )
+                if not isinstance(gender, str):
+                    raise ValueError(
+                        f"cast_descriptions[{i}].gender must be a "
+                        f"string, got {gender!r}"
+                    )
+                if not isinstance(desc, str):
+                    raise ValueError(
+                        f"cast_descriptions[{i}].description must be a "
+                        f"string, got {desc!r}"
+                    )
 
     @property
     def cast_size(self) -> int:
@@ -316,7 +376,6 @@ CONSTRAINTS
 
 
 def _build_user_prompt(req: OutlineRequest) -> str:
-    cast_line = ", ".join(req.character_cast)
     # news_interpreter brief takes precedence over raw news_seed.
     # When the writer has a script_brief from build_news_briefs, the
     # prompt labels the source line as a brief (it already contains
@@ -350,10 +409,15 @@ def _build_user_prompt(req: OutlineRequest) -> str:
             f"Required terms (plan beats that surface these in "
             f"dialogue): {terms_line}"
         )
+    # Cast block: rich (per-character name + gender + description)
+    # when cast_descriptions is present, bare name list otherwise.
+    # Rich format gives the outline LLM enough character signal to
+    # plan beats that exploit each character's distinct personality
+    # + stakes; bare format is a back-compat fallback for tests +
+    # early-stage callers that pre-date the cast contract.
+    parts.append(_format_cast_block(req))
     parts.extend([
         f"Style: {req.style}",
-        f"Cast (already chosen -- use exactly these names in "
-        f"character-role beats): {cast_line}",
         f"Target total dialogue length: ~{req.target_words} words "
         f"(sum of per-beat target_words should land near this number).",
         "",
@@ -365,6 +429,47 @@ def _build_user_prompt(req: OutlineRequest) -> str:
         f"style. Echo the cast list verbatim in the JSON \"cast\" "
         f"field. Return only the JSON outline."
     )
+
+
+def _format_cast_block(req: OutlineRequest) -> str:
+    """Render the Cast block of the outline user prompt.
+
+    Two shapes:
+      Rich (when cast_descriptions present):
+          Cast (already chosen -- use exactly these names in
+          character-role beats):
+          - ALICE (female, weary forensic engineer in her 40s, dry humor)
+          - BOB (male, ambitious grant officer in his 30s, evasive)
+
+      Bare (back-compat when cast_descriptions empty):
+          Cast (already chosen -- use exactly these names in
+          character-role beats): ALICE, BOB
+
+    The rich format gives the outline LLM enough character signal
+    to plan beats that exploit each character's distinct
+    personality + stakes (instead of writing generic-sci-fi-
+    character beats keyed only on ALL-CAPS names). __post_init__
+    has already validated 1:1 alignment between cast_descriptions
+    and character_cast when the rich path is taken.
+    """
+    header = (
+        "Cast (already chosen -- use exactly these names in "
+        "character-role beats):"
+    )
+    if not req.cast_descriptions:
+        return f"{header} {', '.join(req.character_cast)}"
+    lines = [header]
+    for name, gender, desc in req.cast_descriptions:
+        bits: list[str] = []
+        if gender:
+            bits.append(gender)
+        if desc:
+            bits.append(desc)
+        if bits:
+            lines.append(f"- {name} ({', '.join(bits)})")
+        else:
+            lines.append(f"- {name}")
+    return "\n".join(lines)
 
 
 _REPAIR_PROMPT_TEMPLATE = """\
@@ -811,5 +916,99 @@ if __name__ == "__main__":
         assert "CastContractError" in last_err, \
             f"expected CastContractError in error, got: {last_err!r}"
         print("  PASS: cast drift rejected with CastContractError")
+
+    # Test 11: cast_descriptions field — back-compat default + rich render +
+    # validation (length mismatch + name mismatch).
+    print("\n[Test 11] OutlineRequest.cast_descriptions field")
+
+    # 11a: empty default -> bare cast line in prompt (back-compat).
+    bare_req = OutlineRequest(
+        news_seed="science seed", style="noir",
+        character_cast=("ALICE", "BOB"),
+        target_words=200,
+    )
+    bare_prompt = _build_user_prompt(bare_req)
+    assert "Cast (already chosen -- use exactly these names in character-role beats): ALICE, BOB" in bare_prompt, \
+        "11a: bare cast format expected when cast_descriptions empty"
+    assert "- ALICE (" not in bare_prompt, \
+        "11a: rich format must NOT render when cast_descriptions empty"
+    print("  PASS 11a: empty cast_descriptions -> bare cast line (back-compat)")
+
+    # 11b: populated cast_descriptions -> rich block.
+    rich_req = OutlineRequest(
+        news_seed="science seed", style="noir",
+        character_cast=("ALICE", "BOB"),
+        target_words=200,
+        cast_descriptions=(
+            ("ALICE", "female", "weary forensic engineer in her 40s"),
+            ("BOB",   "male",   "ambitious grant officer in his 30s"),
+        ),
+    )
+    rich_prompt = _build_user_prompt(rich_req)
+    assert "- ALICE (female, weary forensic engineer in her 40s)" in rich_prompt, \
+        f"11b: ALICE rich line missing in prompt:\n{rich_prompt}"
+    assert "- BOB (male, ambitious grant officer in his 30s)" in rich_prompt, \
+        f"11b: BOB rich line missing in prompt:\n{rich_prompt}"
+    # Bare list MUST NOT appear when rich is rendered.
+    assert "Cast (already chosen -- use exactly these names in character-role beats): ALICE, BOB" not in rich_prompt, \
+        "11b: bare cast line must NOT render when rich is in play"
+    print("  PASS 11b: populated cast_descriptions -> rich per-character block")
+
+    # 11c: missing gender -> rendered without parens-empty noise.
+    no_gender_req = OutlineRequest(
+        news_seed="science seed", style="noir",
+        character_cast=("ALICE",),
+        target_words=200,
+        cast_descriptions=(("ALICE", "", "lone caretaker"),),
+    )
+    no_gender_prompt = _build_user_prompt(no_gender_req)
+    assert "- ALICE (lone caretaker)" in no_gender_prompt, \
+        f"11c: ALICE without gender expected as '- ALICE (lone caretaker)':\n{no_gender_prompt}"
+    print("  PASS 11c: missing gender renders cleanly")
+
+    # 11d: length mismatch -> __post_init__ raises.
+    try:
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("ALICE", "BOB"),
+            target_words=200,
+            cast_descriptions=(("ALICE", "female", "desc"),),  # length 1 vs cast length 2
+        )
+        print("  FAIL 11d: length-mismatch cast_descriptions accepted")
+    except ValueError as exc:
+        assert "align 1:1" in str(exc) or "length" in str(exc), \
+            f"11d: expected alignment ValueError, got: {exc}"
+        print("  PASS 11d: length-mismatch rejected")
+
+    # 11e: name-order mismatch -> __post_init__ raises.
+    try:
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("ALICE", "BOB"),
+            target_words=200,
+            cast_descriptions=(
+                ("BOB",   "male",   "desc"),     # swapped -- name mismatch at idx 0
+                ("ALICE", "female", "desc"),
+            ),
+        )
+        print("  FAIL 11e: name-order mismatch silently accepted")
+    except ValueError as exc:
+        assert "align 1:1" in str(exc) or "name" in str(exc).lower(), \
+            f"11e: expected name-mismatch ValueError, got: {exc}"
+        print("  PASS 11e: name-order mismatch rejected")
+
+    # 11f: bad shape -> __post_init__ raises.
+    try:
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("ALICE",),
+            target_words=200,
+            cast_descriptions=(("ALICE", "female"),),  # 2-tuple instead of 3-tuple
+        )
+        print("  FAIL 11f: bad-shape cast_descriptions accepted")
+    except ValueError as exc:
+        assert "3-tuple" in str(exc), \
+            f"11f: expected 3-tuple ValueError, got: {exc}"
+        print("  PASS 11f: bad-shape rejected")
 
     print("\n=== all self-tests passed ===")
