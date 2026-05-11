@@ -8,7 +8,53 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
-## CURRENT WORK — Ledger Consumer Rewrite sprint (shipped green 2026-05-09/10)
+## CURRENT WORK — news_interpreter sprint (commit 1 of 5 SHIPPED 2026-05-10)
+
+**State:** Commit 1 landed on `v2.0-alpha` at `6f3218d`. ADR + xfail-strict canary tests armed; commits 2-5 queued. The downstream prompt audit (`outputs/downstream_prompt_audit.html` artifact) identified 5 hardcoded era-literal violations across `script_critic.py` + `story_orchestrator.py` and a structural gap where downstream consumers never see the news article body. Round-robin synthesis (ChatGPT gpt-5.5 + Gemini 3.1 Pro + NVIDIA) converged on a unified 4-output news_interpreter LLM stage inserted between style-resolve (D.2) and cast-lock (D.3) in `OTR_LedgerScriptWriter`. Canonical ADR at `docs/news_interpreter_adr.md`.
+
+### Architecture (locked)
+
+- **One unified LLM call** emits `casting_brief` (≤200ch), `script_brief` (≤350ch), `news_close_brief` (≤250ch), `key_terms` (2-6 entries, ≤40ch each).
+- **Input cap:** `headline + " " + summary + first 1500 chars` of body; on bodies >2500 chars also append last 500 chars with explicit `[BODY_GAP truncated N chars]` marker (inverted-pyramid front + closing-graf tail).
+- **Source wrapper** marks article body as inert via `[SOURCE_BEGIN]` / `[SOURCE_END]` with `INERT SOURCE MATERIAL` preamble (prompt-injection defense).
+- **GBNF grammar** required at commit 2 (small-model JSON reliability — Mistral-Nemo + Gemma both support `--grammar-file`). Structural enforcement; pydantic + validators handle semantic checks.
+- **Validators (source-context allowance):** V1 word-boundary `key_terms` match against `headline + summary + cleaned_body`. V2 rejects period literals only when absent from source. V3 rejects formulaic style phrasing (`in a noir style`, `noir-style`, `make this into a noir`) not bare style-word occurrence.
+- **Cache key:** `sha256(source_hash + style + prompt_version + schema_version + model_id + decoder_profile + seed)`. Stored at `ledger.meta.news.cache_key`. Any change to any field → cache miss → regenerate.
+- **Determinism contract narrowed:** byte-identity is a fixture-test claim only. Live model calls assert schema validity + contract preservation, not byte identity. Documented in ADR section 3.5.
+- **Python stamps** `source_hash`, `model_id`, `attempts`, `attempt_failures` on `meta.news`. LLM does not author its own metadata.
+- **Post-assembly key_terms check** runs after line composer at `min_required=2`. Zero terms landed → hard fail + repair pass. Some missing (≥2 landed) → warn and proceed.
+
+### Commit order — safety net first
+
+| # | Commit | State | Hash | What |
+|---|---|---|---|---|
+| 1 | ADR + xfail-strict canary tests | **SHIPPED** | `6f3218d` | `docs/news_interpreter_adr.md`, `tests/test_news_interpreter.py` (12 unit tests, importorskip dormant), `tests/test_downstream_prompt_contract.py` (8 xfail-strict canaries: 5 text-scan against existing era literals + 3 integration placeholders for commits 3-4). Locks the API surface before any code that satisfies it. |
+| 2 | news_interpreter module | queued | — | `nodes/news_interpreter.py`: `NewsBriefs` pydantic, V1/V2/V3 validators with source-context allowance, `build_source_wrapper`, `compute_cache_key`, `extract_json_block`, `build_news_briefs(generate_fn, *, full_text, headline, summary, style, seed)`. `grammars/news_interpreter.gbnf` (~30 lines). Retry ladder T=0.7 / 0.8 / repair@0.3. Stub `meta.news` schema in `production_ledger.py`. Tested against gemma-2-2b-it proxy first (worst case on agnostic ladder). |
+| 3 | wire into writer/cast/outline | queued | — | `OTR_LedgerScriptWriter._fetch_rss_seed_or_die` retains `full_text` (currently discarded at line 628-633). `build_news_briefs()` call between D.2 and D.3. `meta["news"] = briefs.dict()` stamp. `lock_cast` consumes `casting_brief` verbatim (drops 500-char slice in `_otr_casting.py:196`). `OutlineRequest` gains `script_brief` + `key_terms`. Schema version bump (`l3-2026-05-08` → `l3-2026-05-14`). Graceful degrade for old ledgers without `meta.news` (warn + fall back, no hard fail). |
+| 4 | wire announcer + line composer + post-assembly | queued | — | `kokoro_announcer` reads `meta.news.news_close_brief` for closing read. `_otr_line_composer` optionally surfaces `key_terms` per-line for journalistic accuracy. Post-assembly `key_terms` check + targeted repair pass on missing-term beats. |
+| 5 | strip era literals | queued | — | `script_critic.py:330,339-340,556` and `story_orchestrator.py:_LTX_STYLE_BRIEF_PROMPT` (line 3401 + examples at 3407-3409). Flips the 5 text-scan xfails to PASSED — the canary mechanic forces this file to be updated alongside the fix. |
+
+### A/B sanity check (before commit 3 lands on `main`)
+
+Run 10 episodes through old path + 10 through new path with the same seeds. Eyeball cast diversity (gender balance, role-fit, archetype spread). ~30 min subjective scoring. Catches the category of regression unit tests won't.
+
+### Round-robin transcripts
+
+- Question brief: `outputs/news_interpreter_question.md`
+- Synthesis ADR: `docs/news_interpreter_adr.md`
+
+### Hard rules (locked, never violated this sprint)
+
+- **LLM-agnostic control plane.** No Mistral / Gemma / Qwen branches in news_interpreter. Proxy-test against gemma-2-2b-it first.
+- **Lean prompts.** Prompt body ≤250 tokens. `max_new_tokens=400` (not 250) to leave safety margin on full payloads.
+- **No hardcoded period literals.** Anywhere. Code, comments, prompt strings, test fixtures.
+- **C7 byte-identity** within fixture tests (mocked `generate_fn`). Live runs assert contract preservation only.
+- **14.5 GB VRAM ceiling.** Validator + reroll is the safety net, not prompt cleverness.
+- **UTF-8 no BOM.** No edits to `_otr_outline.py` or `_otr_canon.py` until commit 3 (already-locked v2.0 modules).
+
+---
+
+## PREVIOUS SPRINT — Ledger Consumer Rewrite sprint (shipped green 2026-05-09/10)
 
 **State:** **7 of 7 consumers shipped green.** Patterns doc folded into ROADMAP under "L3 contract — patterns lock-in" below; standalone `docs/2026-05-09-ledger-consumer-rewrite-patterns.md` archived to `docs/ROADMAP_HISTORY.md` and deleted. Bug Bible 23/1/2/0 baseline held across every consumer ship. EpisodeAssembler audited clean (no rewrite needed). No commits, no pushes — working-tree only until soak proves out. Next: video pipeline recon (Flux/HuMo/LTX/VideoComposite, post-consumer #7) + B4 LLM prompt audit + fresh workflow JSON wiring + dry-run gates → STOP, hand to Jeffrey for soak ramp.
 

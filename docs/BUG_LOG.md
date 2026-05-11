@@ -5,6 +5,21 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-10: news_interpreter sprint commit 1 — ADR + xfail-strict canary tests armed (commit 6f3218d)
+
+- **Date:** 2026-05-10 | **Phase:** 4 | **Bible candidate:** no (sprint milestone, not a defect)
+- **Symptom:** Downstream prompt audit (Cowork-driven, full sweep across 25 prompt-building sites) surfaced 5 hardcoded era-literal violations: `script_critic.py:330,339-340,556` ("1940s setting" / "1940s-style" / "You are revising a 1940s ...") and `story_orchestrator.py:3401,3407-3409` (`_LTX_STYLE_BRIEF_PROMPT` "vintage-radio elements ... skinned for the setting" + three vacuum-tube example anchors). Cast LLM `Story:` line was getting a mechanical 500-char slice of `headline + summary`; the per-line composer + announcer closing read never saw the article body at all. News content degraded silently before any prompt fired.
+- **Diagnosis:** Round-robin (ChatGPT gpt-5.5 + Gemini 3.1 Pro + NVIDIA) on the question staged at `outputs/news_interpreter_question.md` converged on a 4-output news_interpreter LLM stage (casting_brief / script_brief / news_close_brief / key_terms) inserted between style-resolve (D.2) and cast-lock (D.3) in `OTR_LedgerScriptWriter`. ADR captured at `docs/news_interpreter_adr.md` (771 lines). Q1-Q4 verdicts locked: one unified call, headline + summary + first 1500 chars (+ last 500 on long bodies), word-boundary regex `key_terms`, news_close_brief on the same upfront call.
+- **Fix:** Commit 1 of 5 lands the safety net first per ADR section 5:
+  - `docs/news_interpreter_adr.md` (canonical ADR)
+  - `tests/test_news_interpreter.py` (12 unit tests, `pytest.importorskip` dormant until commit 2 lands the module; locks the API surface NewsBriefs / v1_validate / v2_validate / v3_validate / build_source_wrapper / compute_cache_key / extract_json_block / build_news_briefs)
+  - `tests/test_downstream_prompt_contract.py` (8 xfail-strict canaries; flips to XPASS and fails the suite the moment commit 5 strips a literal, forcing the marker to be removed in lockstep with the fix)
+- **Verify:** AST parse + no-BOM clean on both test files. `pytest --collect-only`: 8 contract tests collected, news_interpreter file skipped cleanly. Verbose run: all 8 contract tests xfailed as expected. Bug Bible regression unchanged: 15 passed, 2 xfailed, 1 skipped (baseline held). Push verified: local HEAD == origin HEAD == `6f3218d48c6952e452194f03ad9a7192de2bb5a1`.
+- **Commits 2-5 queued:** module + GBNF + validators (commit 2), wire into writer/cast/outline + meta.news schema + graceful degrade (commit 3), wire announcer + line composer + post-assembly key_terms check (commit 4), strip era literals from script_critic + story_orchestrator (commit 5, flips the 5 text-scan xfails).
+- **Tags:** news-interpreter, canary, xfail-strict, adr, downstream-prompt-audit, period-literals, sprint-milestone
+
+---
+
 ### NON-BUG-2026-05-10: downstream visual chain audited clean — no L3 rewrites needed (sprint follow-up to ledger-consumer-rewrite eec4718)
 
 - **Date:** 2026-05-10 | **Phase:** 3 | **Bible candidate:** no (recon-verdict, not code change)
