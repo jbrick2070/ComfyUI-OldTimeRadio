@@ -590,6 +590,11 @@ def lock_cast(
             # voice_preset prefix.
             "tts_model":             "bark",
             "voice_preset":          response.voice_preset,
+            # voice_params: None today (consumers fall back to their
+            # defaults). Phase 2 expands the casting LLM call to ask
+            # for per-character knobs (Bark temperature, Kokoro speed)
+            # bounded by VOICE_REGISTRY[tts_model]["params_spec"].
+            "voice_params":          None,
             "character_description": response.character_description,
         }
         cast.append(new_row)

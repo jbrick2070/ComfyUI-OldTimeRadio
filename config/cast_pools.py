@@ -192,6 +192,48 @@ LEMMY_PROFILE = {
     "notes": "Male, gravelly/raspy, 50s, gruff mechanic voice, iconic",
 }
 
+# -----------------------------------------------------------------------------
+# VOICE_REGISTRY -- unified per-model voice catalog
+# -----------------------------------------------------------------------------
+#
+# Single dict that exposes each TTS family's voices + allowed parameter spec
+# in one place. Today the registry has two entries (bark, kokoro); when a new
+# TTS model lands (Fish Speech, CosyVoice, the future period model) add an
+# entry here.
+#
+# Schema per entry:
+#   "presets":     list of (preset_id, short_description) tuples
+#   "params_spec": dict mapping param-name -> (min, max, default) tuple
+#                  for any model-tunable knob the LLM should pick per
+#                  character. Empty today on both Bark and Kokoro --
+#                  we'll fill these in when the casting LLM call is
+#                  wired to ask for params (cast contract Phase 2;
+#                  see project_cast_contract_p2_followups.md).
+#
+# Consumers should read THIS registry, not the standalone constants below,
+# when they need a model-aware view. The standalone constants are kept for
+# back-compat with code that already imports them directly.
+VOICE_REGISTRY: dict[str, dict] = {
+    "bark": {
+        "presets": [
+            # Lifted from VOICE_PROFILES; flattened to (preset, short)
+            # so the registry shape is uniform across models.
+            (p, " ".join(sorted(tags)))
+            for p, _g, _lang, tags in VOICE_PROFILES
+        ],
+        "params_spec": {},  # placeholder -- e.g. "temperature": (0.5, 0.9, 0.7)
+    },
+    "kokoro": {
+        "presets": list(ANNOUNCER_PRESETS),
+        "params_spec": {},  # placeholder -- e.g. "speed": (0.8, 1.2, 1.0)
+    },
+}
+
+# Convenience constant for callers that want to know which TTS models are
+# currently supported by the registry.
+KNOWN_TTS_MODELS: tuple[str, ...] = tuple(VOICE_REGISTRY.keys())
+
+
 # Bark LEMMY 11% roll - SystemRandom is OS entropy, unaffected by random.seed().
 # This ensures the 11% coin flip gives a true ~11% per run even when the rest
 # of the pipeline is using a seeded RNG for reproducibility.
@@ -242,6 +284,11 @@ def pick_announcer(rng: random.Random) -> dict:
         "gender": gender,
         "tts_model": "kokoro",
         "voice_preset": voice_preset,
+        # voice_params is a model-dependent dict (or None) where the
+        # casting LLM stores per-character knobs it chose (e.g. Bark
+        # "temperature", Kokoro "speed"). None today; Phase 2 will
+        # populate when the LLM call learns to pick params.
+        "voice_params": None,
         "character_description": (
             "Period radio announcer; reads the science story and "
             "frames the drama between beats."
@@ -262,6 +309,11 @@ def lemmy_row() -> dict:
         "gender":                LEMMY_PROFILE["gender"],
         "tts_model":             "bark",
         "voice_preset":          LEMMY_PROFILE["voice_preset"],
+        # voice_params: None today; Phase 2 populates when LLM picks
+        # per-character knobs. LEMMY's fixed iconic profile may stay
+        # at None permanently if we don't want per-episode variation
+        # on his voice.
+        "voice_params":          None,
         "character_description": LEMMY_PROFILE["character_description"],
     }
 

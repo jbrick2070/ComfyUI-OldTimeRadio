@@ -380,6 +380,40 @@ class TestSetters:
         ])
         assert led.data["cast"][0]["tts_model"] is None
 
+    def test_set_cast_voice_params_defaults_to_none(self, tmp_out):
+        """If the caller doesn't supply voice_params, the field
+        defaults to None and consumers fall back to their defaults."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "BOB",
+             "gender": "male", "tts_model": "bark",
+             "voice_preset": "v2/en_speaker_1"},
+        ])
+        assert led.data["cast"][0]["voice_params"] is None
+
+    def test_set_cast_voice_params_preserves_dict(self, tmp_out):
+        """A caller-supplied voice_params dict flows through verbatim."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "BOB",
+             "gender": "male", "tts_model": "bark",
+             "voice_preset": "v2/en_speaker_1",
+             "voice_params": {"temperature": 0.75}},
+        ])
+        assert led.data["cast"][0]["voice_params"] == {"temperature": 0.75}
+
+    def test_set_cast_voice_params_non_dict_coerced_to_none(self, tmp_out):
+        """A stray non-dict / non-None voice_params (e.g. a string)
+        gets coerced to None so the ledger schema stays clean."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "BOB",
+             "gender": "male", "tts_model": "bark",
+             "voice_preset": "v2/en_speaker_1",
+             "voice_params": "not a dict"},
+        ])
+        assert led.data["cast"][0]["voice_params"] is None
+
     def test_set_lines_computes_counts(self, tmp_out):
         led = Ledger("t", str(tmp_out))
         led.set_lines(self._sample_lines())

@@ -178,6 +178,67 @@ def test_lemmy_row_carries_tts_model_bark():
     assert lemmy["voice_preset"] == "v2/en_speaker_8"
 
 
+def test_voice_registry_exposes_bark_and_kokoro():
+    """VOICE_REGISTRY is the unified per-model voice catalog."""
+    assert "bark" in _POOLS.VOICE_REGISTRY
+    assert "kokoro" in _POOLS.VOICE_REGISTRY
+    assert _POOLS.KNOWN_TTS_MODELS == ("bark", "kokoro")
+    # Each entry exposes presets + params_spec
+    for model, entry in _POOLS.VOICE_REGISTRY.items():
+        assert "presets" in entry, f"{model}: missing presets"
+        assert "params_spec" in entry, f"{model}: missing params_spec"
+        assert isinstance(entry["presets"], list)
+        assert isinstance(entry["params_spec"], dict)
+        # presets is list of (preset_id, short_desc) tuples
+        for preset_entry in entry["presets"]:
+            assert isinstance(preset_entry, tuple)
+            assert len(preset_entry) == 2
+
+
+def test_voice_registry_bark_presets_match_voice_profiles():
+    """VOICE_REGISTRY['bark']['presets'] is a flat view of VOICE_PROFILES;
+    the preset IDs must match exactly (the descriptions in the registry
+    are flattened from quality tags)."""
+    bark_presets = {p for p, _ in _POOLS.VOICE_REGISTRY["bark"]["presets"]}
+    profile_presets = {p for p, _, _, _ in _POOLS.VOICE_PROFILES}
+    assert bark_presets == profile_presets
+
+
+def test_announcer_row_carries_voice_params_none():
+    """voice_params default is None until the casting LLM is wired
+    to pick model-specific knobs (Phase 2)."""
+    rng = random.Random("voice-params-announcer")
+    pre_locked, _, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=rng, force_lemmy=False,
+    )
+    assert pre_locked[0]["voice_params"] is None
+
+
+def test_lemmy_row_carries_voice_params_none():
+    rng = random.Random("voice-params-lemmy")
+    pre_locked, _, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=rng, force_lemmy=True,
+    )
+    lemmy = pre_locked[1]
+    assert lemmy["voice_params"] is None
+
+
+def test_lock_cast_open_character_rows_carry_voice_params_none():
+    rng = random.Random("voice-params-open")
+    gen = _make_canned_generate_fn([
+        _good_response(voice_preset="v2/en_speaker_3"),
+    ])
+    cast, _ = _OTRC.lock_cast(
+        gen,
+        num_characters=1,
+        news_seed="story", style="noir",
+        rng=rng,
+        force_lemmy=False,
+    )
+    open_row = cast[1]  # cast[0] is ANNOUNCER
+    assert open_row["voice_params"] is None
+
+
 def test_lock_cast_open_character_rows_carry_tts_model_bark():
     """Every LLM-cast open-character row must stamp tts_model="bark"
     since open characters are drawn from the Bark VOICE_PROFILES

@@ -524,6 +524,20 @@ class Ledger:
             voice_preset = _safe_str(r.get("voice_preset")) or None
             if tts_model is None and voice_preset:
                 tts_model = _derive_tts_model_from_voice_preset(voice_preset)
+            # Cast field added 2026-05-10: voice_params. Model-
+            # dependent dict (or None) where the casting LLM stores
+            # per-character knobs it chose -- Bark might use
+            # "temperature", Kokoro might use "speed", etc.
+            # Allowed param shape per model lives in
+            # config.cast_pools.VOICE_REGISTRY[<model>]["params_spec"].
+            # Today the LLM does not populate this yet (Phase 2);
+            # consumers fall back to their defaults when None.
+            #
+            # Validation: must be a dict or None. A non-dict, non-None
+            # value (e.g. a stray string) gets coerced to None so the
+            # ledger schema stays clean.
+            vparams_in = r.get("voice_params")
+            voice_params = vparams_in if isinstance(vparams_in, dict) else None
             rows.append({
                 "char_id":               _safe_str(r.get("char_id")),
                 "name":                  _safe_str(r.get("name")),
@@ -531,6 +545,7 @@ class Ledger:
                 "gender":                _safe_str(r.get("gender")) or None,
                 "tts_model":             tts_model,
                 "voice_preset":          voice_preset,
+                "voice_params":          voice_params,
                 "line_count":            _safe_int(r.get("line_count")),
                 "word_count":            _safe_int(r.get("word_count")),
             })
