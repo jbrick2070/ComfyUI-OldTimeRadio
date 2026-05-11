@@ -199,31 +199,40 @@ def test_old_ledger_without_meta_news_loads_with_warning():
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "ADR test plan case 1: RADIO portrait fallback must hard-fail "
-        "rather than invent 'vintage 1940s console radio' when the "
-        "cast row has empty character_description. Commit 4 wiring."
+        "ADR docs/news_interpreter_adr.md section 1 OUT OF SCOPE: FLUX "
+        "character portraits land in their own ADR once the narrative "
+        "plane is stable. Canary stays armed -- whenever a future ADR "
+        "rewires scripts/render_flux_batch.py:266 to hard-fail rather "
+        "than invent 'vintage 1940s console radio' on empty char_desc, "
+        "this xfail-strict flips to XPASS and forces the marker removal."
     ),
 )
 def test_radio_portrait_empty_char_desc_hard_fails():
     pytest.fail(
-        "Commit 4 RADIO portrait fallback policy not yet wired; the "
-        "current code in scripts/render_flux_batch.py:266 still "
-        "invents a hardcoded period radio when char_desc is empty."
+        "RADIO portrait fallback policy still not wired (deferred per "
+        "ADR section 1 -- FLUX portraits are out of news_interpreter "
+        "sprint scope). Current code in scripts/render_flux_batch.py:"
+        "266 still invents a hardcoded period radio when char_desc is "
+        "empty. Future ADR will address."
     )
 
 
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "ADR test plan case 2: MusicGen with style 'rust-belt cyber-"
-        "noir' must NOT default to '1940s old time radio'. Requires "
-        "musicgen_theme to read ledger.meta.news + style. Commit 4."
+        "ADR docs/news_interpreter_adr.md section 1 OUT OF SCOPE: "
+        "MusicGen cues land in their own ADR once the narrative plane "
+        "is stable. Canary stays armed -- whenever a future ADR "
+        "rewires musicgen_theme.py to read ledger.meta.news + style "
+        "instead of defaulting to '1940s old time radio', this xfail-"
+        "strict flips to XPASS and forces the marker removal."
     ),
 )
 def test_musicgen_does_not_default_to_period_cues():
     pytest.fail(
-        "Commit 4 MusicGen style-aware cues not yet wired; the "
-        "current code in nodes/musicgen_theme.py:52-74 still hardcodes "
-        "'1940s old time radio' as the default opening/closing/"
-        "interstitial cue."
+        "MusicGen style-aware cues still not wired (deferred per ADR "
+        "section 1 -- MusicGen cues are out of news_interpreter sprint "
+        "scope). Current code in nodes/musicgen_theme.py:52-74 still "
+        "hardcodes '1940s old time radio' as the default opening / "
+        "closing / interstitial cue. Future ADR will address."
     )

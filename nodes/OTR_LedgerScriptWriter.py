@@ -1116,6 +1116,7 @@ class OTR_LedgerScriptWriter:
         from . import _otr_ledger as _OTRL
         from . import _otr_casting as _OTRCAST
         from . import news_interpreter as _OTRNI
+        from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
 
         # --- C. Load LLM + build truncating generate_fn ---------------
@@ -1422,6 +1423,85 @@ class OTR_LedgerScriptWriter:
                 "_speaker_role": beat.speaker_role,
             })
             script_text_parts.append(token)
+
+        # --- I.5. News-wiring overlay (commit 4 of news_interpreter sprint)
+        # Two pure operations on the in-flight line_rows BEFORE
+        # set_lines persists them. Both no-op when meta["news"] is
+        # None (graceful-degrade path from commit 3).
+        #
+        # 1. Announcer closing-line override. The line composer wrote
+        #    something at every announcer beat from beat.intent. For
+        #    the LAST announcer beat we substitute news_close_brief
+        #    so the listener actually hears the journalistic content
+        #    from the source article (era-neutral, news_interpreter-
+        #    distilled).
+        #
+        # 2. Post-assembly key_terms audit. Walk every voiced line
+        #    (character + announcer), check each key_term from the
+        #    brief landed via word-boundary regex. Stamp the result
+        #    on meta["post_assembly_key_terms"] so downstream nodes
+        #    (and a future repair pass) can see what landed vs missed.
+        #    ADR section 4.4 canonical policy is hard-fail at zero
+        #    terms landed with a repair pass; for commit 4 we warn at
+        #    every level and DEFER the repair pass to a future commit.
+        #    The episode ships either way -- this is alpha-branch
+        #    pragmatism.
+        news_meta = meta.get("news") or {}
+        nc_brief = (news_meta.get("news_close_brief") or "").strip()
+        if nc_brief:
+            overridden = _OTRNW.override_announcer_close(line_rows, nc_brief)
+            if overridden is not None:
+                log.info(
+                    "[OTR_LedgerScriptWriter] news_close_brief stamped "
+                    "onto closing announcer line %s",
+                    overridden.get("line_id"),
+                )
+            else:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] news_close_brief present "
+                    "but no announcer line found in line_rows to stamp "
+                    "onto; closing read will use the line composer's "
+                    "original text"
+                )
+
+        nc_key_terms = tuple(news_meta.get("key_terms") or ())
+        if nc_key_terms:
+            landed, missing = _OTRNW.post_assembly_keyterm_check(
+                line_rows, nc_key_terms, min_required=2,
+            )
+            meta["post_assembly_key_terms"] = {
+                "landed":       landed,
+                "missing":      missing,
+                "min_required": 2,
+                "passed":       len(landed) >= 2,
+                "repair_pass":  "deferred",
+            }
+            if not landed:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
+                    "ZERO landed (terms=%r). ADR section 4.4 calls "
+                    "for hard-fail + repair pass; commit 4 ships warn-"
+                    "only and DEFERS the repair pass. Episode proceeds.",
+                    list(nc_key_terms),
+                )
+            elif len(landed) < 2:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
+                    "below min_required=2: %d/%d landed (missing=%r)",
+                    len(landed), len(nc_key_terms), missing,
+                )
+            elif missing:
+                log.warning(
+                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
+                    "%d/%d landed (missing=%r); proceeding",
+                    len(landed), len(nc_key_terms), missing,
+                )
+            else:
+                log.info(
+                    "[OTR_LedgerScriptWriter] post-assembly key_terms "
+                    "all %d landed",
+                    len(landed),
+                )
 
         # --- J. set_lines + post-patch additive speaker_role ----------
         led.set_lines([
