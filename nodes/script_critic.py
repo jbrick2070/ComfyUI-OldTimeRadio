@@ -327,7 +327,7 @@ def _build_critic_prompt(
         "- Every scene opens with a sound cue instead of dialogue.\n"
         "- Two characters back-to-back monologuing exposition.\n"
         "- 'I'll explain on the way' / placeholder transitions.\n"
-        "- Period-inappropriate vocabulary in 1940s setting.\n"
+        "- Vocabulary that contradicts the established style/setting.\n"
         "- Characters narrating their own physical actions.\n"
         "- Telegraphed emotion ('he felt a cold dread').\n"
         "- Animated-environment cliches ('the air hummed').\n"
@@ -336,10 +336,9 @@ def _build_critic_prompt(
         "- News-spine buried (article topic doesn't drive the plot).\n"
     )
     return (
-        f"You are a script doctor for SIGNAL LOST, a 1940s-style "
-        f"{genre_human} radio drama. Your job is to score this draft "
-        f"AGAINST the rejection rubric below and return a structured "
-        f"verdict.\n\n"
+        f"You are a script doctor for a {genre_human} audio drama "
+        f"episode. Your job is to score this draft AGAINST the "
+        f"rejection rubric below and return a structured verdict.\n\n"
         f"You don't have to find defects. If the draft is clean, say "
         f"so. Inventing problems to look thorough is itself a tell.\n\n"
         f"REJECTION RUBRIC:\n{rubric_block}\n\n"
@@ -553,7 +552,7 @@ def _build_revision_prompt(
     genre_human = (style or "sci-fi").replace("_", " ")
     issues_block = "\n".join(f"- {ln}" for ln in issues[:20])
     return (
-        f"You are revising a 1940s {genre_human} radio drama script. "
+        f"You are revising a {genre_human} audio drama script. "
         f"The script has been scored against an anti-slop rubric and "
         f"flagged with these specific issues:\n\n"
         f"{issues_block}\n\n"

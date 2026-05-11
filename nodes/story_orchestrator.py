@@ -3391,22 +3391,22 @@ class GemmaHeartbeatStreamer(BaseStreamer):
             return  # beats are too frequent to log individually
 
 
-_LTX_STYLE_BRIEF_PROMPT = """You are writing a single-sentence VISUAL STYLE BRIEF for the BROADCAST EQUIPMENT shown on screen during a sci-fi radio drama. Describe ONLY the equipment / room aesthetic appropriate to this story's setting. NO people, NO characters, NO action -- just the look of the radio broadcasting equipment and the room it sits in.
+_LTX_STYLE_BRIEF_PROMPT = """You are writing a single-sentence VISUAL STYLE BRIEF for the broadcast equipment shown on screen during an audio drama. Describe ONLY the equipment / room aesthetic appropriate to this story's setting and style. NO people, NO characters, NO action -- just the look of the broadcasting equipment and the room it sits in.
 
 Story style: {style}
 Story snippet: {story_snippet}
 
-Output ONE sentence (20-40 words) describing the radio broadcast equipment and its room. The sentence should:
-- Match the story's sci-fi setting (e.g. lunar base, deep-space vessel, seabase, mars colony, orbital station)
-- Reuse vintage-radio elements (vacuum tubes, dial, brass speaker grille, oscilloscope) but skinned for the setting
-- Include lighting and atmosphere cues (e.g. "cold blue emergency lighting", "bioluminescent algae glow", "magnetic dust drifting")
+Output ONE sentence (20-40 words) describing the broadcast equipment and its room. The sentence should:
+- Match the story's setting (extract from the snippet: lunar base, deep-space vessel, seabase, mars colony, orbital station, near-future newsroom, industrial-decay site, whatever fits)
+- Use equipment design language that fits the setting AND style -- do not default to any specific era's hardware unless the story explicitly implies it
+- Include lighting and atmosphere cues that fit the style
 - NOT mention people, hands, faces, voices, or anyone speaking
 - Be ONE sentence with no preamble
 
-Examples of good answers:
-- Lunar mining base radio bay, copper vacuum tubes retrofitted into a magnetic-tape console, cold blue emergency lighting, low-G dust drifting through volumetric beams.
-- Deep-space science vessel comms console, holographic dial readouts, recycled atmosphere haze, brass speaker grille mounted into a curved bulkhead.
-- Kelp-farm seabase broadcasting room, bioluminescent algae glow on the dial face, tidal hum through the speaker, condensation beading on the brass casing.
+Examples (one near-future newsroom, one deep-space vessel, one industrial decay -- spanning the style range so no single hardware era dominates):
+- Near-future newsroom broadcast desk, edge-lit glass console with floating waveform overlays, cool overhead daylight, condensation rings on a steel coffee cup, hum of HVAC.
+- Deep-space science vessel comms console, holographic dial readouts, recycled-atmosphere haze, speaker grille mounted into a curved bulkhead, magnetic dust drifting through volumetric beams.
+- Rust-belt repurposed factory broadcast loft, scavenged industrial speaker bolted to a corroded I-beam, sodium-vapor work lamps, oil-stained concrete floor, occasional sparks from exposed wiring.
 
 Visual brief:"""
 

@@ -47,55 +47,37 @@ _STORY_ORCHESTRATOR = _REPO_ROOT / "nodes" / "story_orchestrator.py"
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Commit 5 strips '1940s setting' from script_critic.py:330 "
-        "(rubric fallback line). xfail-strict marker fails the suite "
-        "once the literal is gone, forcing this marker to be removed."
-    ),
-)
 def test_script_critic_no_1940s_setting_in_rubric():
+    """LANDED in commit 5 (news_interpreter sprint). xfail-strict
+    marker removed in lockstep with the fix per the canary mechanic.
+    """
     text = _SCRIPT_CRITIC.read_text(encoding="utf-8")
     assert "1940s setting" not in text, (
         "script_critic.py still contains the '1940s setting' rubric "
-        "line (line 330 of the audited snapshot)."
+        "line (regression -- commit 5 stripped this; the literal must "
+        "not return)."
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Commit 5 strips '1940s-style' from script_critic.py:339-340 "
-        "(critic system prompt). xfail-strict forces marker removal "
-        "once the fix lands."
-    ),
-)
 def test_script_critic_no_1940s_style_in_system_prompt():
+    """LANDED in commit 5. Marker removed in lockstep."""
     text = _SCRIPT_CRITIC.read_text(encoding="utf-8")
     assert "1940s-style" not in text, (
-        "script_critic.py system prompt still anchors to '1940s-style' "
-        "(line 339 of the audited snapshot)."
+        "script_critic.py system prompt regressed -- '1940s-style' "
+        "literal must not return after commit 5."
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Commit 5 strips '1940s' from script_critic.py:556 (revision "
-        "prompt). xfail-strict forces marker removal once the fix "
-        "lands."
-    ),
-)
 def test_script_critic_no_1940s_in_revision_prompt():
+    """LANDED in commit 5. Marker removed in lockstep."""
     text = _SCRIPT_CRITIC.read_text(encoding="utf-8")
     # Match the full anchor phrase so this test only triggers on the
     # specific revision-prompt offender, not unrelated commentary that
     # mentions 1940s history.
     assert "You are revising a 1940s" not in text, (
-        "script_critic.py revision prompt still contains "
-        "'You are revising a 1940s ...' (line 556 of the audited "
-        "snapshot)."
+        "script_critic.py revision prompt regressed -- "
+        "'You are revising a 1940s ...' literal must not return "
+        "after commit 5."
     )
 
 
@@ -104,39 +86,28 @@ def test_script_critic_no_1940s_in_revision_prompt():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Commit 5 rewrites story_orchestrator._LTX_STYLE_BRIEF_PROMPT "
-        "to drop the 'vintage-radio elements ... skinned for the "
-        "setting' clause (line 3401). xfail-strict canary."
-    ),
-)
 def test_story_orchestrator_no_vintage_radio_skinning():
+    """LANDED in commit 5. Marker removed in lockstep."""
     text = _STORY_ORCHESTRATOR.read_text(encoding="utf-8")
     assert "vintage-radio" not in text, (
-        "story_orchestrator.py still contains 'vintage-radio' in the "
-        "LTX style brief prompt (line 3401 of the audited snapshot)."
+        "story_orchestrator.py regressed -- 'vintage-radio' literal "
+        "must not return after commit 5 (_LTX_STYLE_BRIEF_PROMPT was "
+        "rewritten to drop the vintage-skinned-for-setting bias)."
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Commit 5 rewrites _LTX_STYLE_BRIEF_PROMPT examples that all "
-        "hardcode vacuum-tube + brass-speaker + radio-bay anchors "
-        "(lines 3407-3409). xfail-strict canary."
-    ),
-)
 def test_story_orchestrator_no_vacuum_tube_example_anchor():
+    """LANDED in commit 5. Marker removed in lockstep. The three
+    baked-in examples now span the style range (near-future news-
+    room / deep-space vessel / industrial-decay loft) so no single
+    hardware era dominates the LTX style brief output.
+    """
     text = _STORY_ORCHESTRATOR.read_text(encoding="utf-8")
     # Loose case-insensitive search -- any "vacuum tube(s)" remaining
-    # in this file means the baked-in examples haven't been replaced
-    # with a style-spanning rotation.
+    # in this file means the baked-in examples regressed.
     assert not re.search(r"vacuum tubes?", text, re.IGNORECASE), (
-        "story_orchestrator.py still has 'vacuum tubes' baked into "
-        "LTX style brief examples (lines 3407-3409 of the audited "
-        "snapshot)."
+        "story_orchestrator.py regressed -- 'vacuum tubes' must not "
+        "return in the LTX style brief examples after commit 5."
     )
 
 
