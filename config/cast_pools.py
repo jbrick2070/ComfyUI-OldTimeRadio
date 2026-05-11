@@ -158,13 +158,26 @@ VOICE_PROFILES = [
     # Polish:  pl_speaker_0 (male), pl_speaker_4 (female)
 ]
 
-# ANNOUNCER voice pool - randomized per episode for gender balance (50/50 male/female)
-# ANNOUNCER always uses neutral English (en_speaker_*) - no accent
+# ANNOUNCER voice pool - randomized per episode for gender balance.
+#
+# CRITICAL: The announcer renders through Kokoro TTS, NOT Bark. These voice
+# IDs are Kokoro-namespaced (bm_* = British male, bf_* = British female) and
+# CANNOT collide with the Bark VOICE_PROFILES above -- they live in separate
+# TTS namespaces. Open-character voice picking only excludes Bark presets;
+# the announcer's Kokoro voice is never on the Bark exclusion list.
+#
+# Pool composition (2 male + 2 female) drives the natural 50/50 announcer
+# gender split per episode that Jeffrey called out 2026-05-10.
+#
+# Source of truth: this list duplicates `ANNOUNCER_VOICE_POOL` in
+# nodes/kokoro_announcer.py:37 verbatim. Keep them in sync; a P2 follow-up
+# is to import the pool here from kokoro_announcer.py so there's one
+# canonical list (see project_cast_contract_p2_followups.md).
 ANNOUNCER_PRESETS = [
-    ("v2/en_speaker_0", "Male, authoritative, deep"),
-    ("v2/en_speaker_1", "Male, measured, calm"),
-    ("v2/en_speaker_4", "Female, warm, energetic"),
-    ("v2/en_speaker_9", "Female, mature, authoritative"),
+    ("bm_george", "BBC authoritative male"),
+    ("bm_fable",  "documentary relaxed male"),
+    ("bf_emma",   "BBC authoritative female"),
+    ("bf_lily",   "documentary relaxed female"),
 ]
 
 # LEMMY fixed profile - always gravelly/raspy male, English-native preset
@@ -200,14 +213,26 @@ def roll_lemmy() -> bool:
 
 
 def pick_announcer(rng: random.Random) -> dict:
-    """Return an announcer cast row.
+    """Return an announcer cast row using a Kokoro voice preset.
 
     Picks one of the four ANNOUNCER_PRESETS at random using the given
     seeded RNG; the 50/50 gender split falls out naturally from the
     pool composition (2 male + 2 female).
+
+    Gender is derived from the Kokoro voice-ID prefix convention:
+      bm_* = British male
+      bf_* = British female
+    (am_*, af_* = American male/female, not currently in our pool but
+    handled defensively below.)
     """
     voice_preset, vocal_desc = rng.choice(ANNOUNCER_PRESETS)
-    gender = "male" if "Male" in vocal_desc else "female"
+    if voice_preset.startswith(("bm_", "am_")):
+        gender = "male"
+    elif voice_preset.startswith(("bf_", "af_")):
+        gender = "female"
+    else:
+        # Fallback: parse the description text.
+        gender = "male" if "male" in vocal_desc.lower() else "female"
     return {
         "name": "ANNOUNCER",
         "gender": gender,

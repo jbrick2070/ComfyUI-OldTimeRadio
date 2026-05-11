@@ -82,7 +82,11 @@ def test_assemble_pre_locked_rows_no_lemmy_basic_shape():
     assert len(pre_locked) == 1
     assert pre_locked[0]["name"] == "ANNOUNCER"
     assert pre_locked[0]["char_id"] == "c01"
-    assert pre_locked[0]["voice_preset"].startswith("v2/en_speaker_")
+    # ANNOUNCER's voice is a Kokoro ID (bm_/bf_/am_/af_ prefix), NOT
+    # a Bark preset. Kokoro and Bark are separate TTS namespaces.
+    assert pre_locked[0]["voice_preset"].startswith(
+        ("bm_", "bf_", "am_", "af_")
+    )
     # Open slots fill ALL the requested num_characters when LEMMY misses
     assert len(open_slots) == 3
     assert [s.char_id for s in open_slots] == ["c02", "c03", "c04"]
@@ -126,22 +130,42 @@ def test_assemble_pre_locked_rows_determinism():
 
 def test_assemble_pre_locked_rows_announcer_pool_has_2m_2f():
     """Determinism-friendly check: the ANNOUNCER pool itself contains
-    exactly 2 male + 2 female presets. The 50/50 distribution is then
-    a property of the pool, not of statistical luck across runs.
+    exactly 2 male + 2 female Kokoro presets. The 50/50 distribution
+    is then a property of the pool composition, not of statistical
+    luck across runs.
+
+    Kokoro convention: bm_* = British male, bf_* = British female,
+    am_* = American male, af_* = American female. (Today's pool is
+    BBC voices only -- bm_* and bf_*.)
 
     Replaces the prior 200-trial statistical test (CI flake bomb per
     round-robin synthesis 2026-05-10).
     """
-    male_count = sum(1 for _, desc in _POOLS.ANNOUNCER_PRESETS
-                     if "Male" in desc)
-    female_count = sum(1 for _, desc in _POOLS.ANNOUNCER_PRESETS
-                       if "Female" in desc)
+    male_count = sum(1 for vid, _ in _POOLS.ANNOUNCER_PRESETS
+                     if vid.startswith(("bm_", "am_")))
+    female_count = sum(1 for vid, _ in _POOLS.ANNOUNCER_PRESETS
+                       if vid.startswith(("bf_", "af_")))
     assert male_count == 2, \
         f"ANNOUNCER pool male count drifted: {male_count} (expected 2)"
     assert female_count == 2, \
         f"ANNOUNCER pool female count drifted: {female_count} (expected 2)"
     assert male_count + female_count == len(_POOLS.ANNOUNCER_PRESETS), \
-        "ANNOUNCER pool has entries that are neither Male nor Female"
+        f"ANNOUNCER pool has entries that are neither bm_/am_ nor " \
+        f"bf_/af_: {_POOLS.ANNOUNCER_PRESETS!r}"
+
+
+def test_announcer_voice_is_kokoro_namespace_not_bark():
+    """The announcer's voice_preset must come from the Kokoro
+    namespace (bm_*, bf_*, am_*, af_*), NOT the Bark namespace
+    (v2/en_speaker_*). Per Jeffrey 2026-05-10: announcer renders
+    through Kokoro, characters render through Bark, two separate
+    TTS pools so they cannot collide."""
+    bark_presets = {p for p, _, _, _ in _POOLS.VOICE_PROFILES}
+    for voice_id, _ in _POOLS.ANNOUNCER_PRESETS:
+        assert voice_id not in bark_presets, \
+            f"ANNOUNCER preset {voice_id!r} collides with Bark pool"
+        assert voice_id.startswith(("bm_", "bf_", "am_", "af_")), \
+            f"ANNOUNCER preset {voice_id!r} not in Kokoro namespace"
 
 
 def test_assemble_pre_locked_rows_announcer_picks_each_preset_with_fixed_seeds():
@@ -568,13 +592,13 @@ def test_prompt_has_no_system_prompt_baked():
 
 
 def test_lock_cast_no_lemmy_end_to_end():
-    """3-character episode, no LEMMY. ANNOUNCER c01, three open slots."""
+    """3-character episode, no LEMMY. ANNOUNCER c01, three open slots.
+
+    ANNOUNCER's voice (Kokoro bm_/bf_) is in a different TTS namespace
+    from Bark v2/en_speaker_*, so any Bark voice is fair game for an
+    open character -- no announcer-collision risk.
+    """
     rng = random.Random("e2e-no-lemmy")
-    # Exactly 3 LLM calls (one per open slot). Each picks a different
-    # voice. ALL three are NEVER in ANNOUNCER_PRESETS ({0,1,4,9}) and
-    # NEVER LEMMY's voice (8), so the responses are seed-safe -- no
-    # matter which announcer voice the seeded RNG picks, none of these
-    # three collide with it.
     gen = _make_canned_generate_fn([
         _good_response(voice_preset="v2/en_speaker_3"),
         _good_response(voice_preset="v2/en_speaker_5"),
@@ -602,10 +626,13 @@ def test_lock_cast_no_lemmy_end_to_end():
 
 
 def test_lock_cast_with_lemmy_end_to_end():
-    """3-character episode with LEMMY. ANNOUNCER c01, LEMMY c02, two open."""
+    """3-character episode with LEMMY. ANNOUNCER c01, LEMMY c02, two open.
+
+    Bark voice exclusion when LEMMY hits: LEMMY's v2/en_speaker_8 is
+    added to taken_voices, so the open slots draw from the remaining
+    Bark pool. ANNOUNCER's Kokoro voice never touches the Bark pool.
+    """
     rng = random.Random("e2e-with-lemmy")
-    # Both responses use voices NEVER in ANNOUNCER_PRESETS so the
-    # test is seed-safe regardless of which announcer voice is picked.
     gen = _make_canned_generate_fn([
         _good_response(voice_preset="v2/en_speaker_3"),
         _good_response(voice_preset="v2/en_speaker_6"),
@@ -639,8 +666,8 @@ def test_lock_cast_open_slots_see_lemmy_in_prior_cast_but_not_announcer():
     def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
         # Capture the user-message content so the test can inspect it
         captured_prompts.append(messages[0]["content"])
-        # Use en_speaker_6: never in ANNOUNCER_PRESETS, not LEMMY's
-        # voice, so it survives both pre-filters regardless of seed.
+        # Any Bark voice works (Kokoro announcer can't collide); pick
+        # one that isn't LEMMY's reserved v2/en_speaker_8.
         return _good_response(voice_preset="v2/en_speaker_6")
 
     rng = random.Random("prior-cast-test")
@@ -667,8 +694,8 @@ def test_lock_cast_voice_pool_pre_filtered_excludes_lemmy_voice():
 
     def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
         captured_prompts.append(messages[0]["content"])
-        # en_speaker_6 is never in ANNOUNCER_PRESETS and is not
-        # LEMMY's reserved voice; safe pick regardless of seed.
+        # Any non-LEMMY Bark voice works (Kokoro announcer doesn't
+        # touch the Bark pool).
         return _good_response(voice_preset="v2/en_speaker_6")
 
     rng = random.Random("voice-filter-test")
@@ -682,3 +709,39 @@ def test_lock_cast_voice_pool_pre_filtered_excludes_lemmy_voice():
     p = captured_prompts[0]
     assert "v2/en_speaker_8" not in p, \
         "LEMMY's voice should be pre-filtered out of the open-slot pool"
+
+
+def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
+    """When the announcer takes a Kokoro voice, the open-slot Bark
+    pool must remain unaffected. Kokoro and Bark are separate TTS
+    namespaces -- no collision possible. Per Jeffrey 2026-05-10:
+    'announcer is in Kokoro so there can be no cast overlaps.'
+
+    Regression guard: if a future refactor accidentally adds the
+    announcer's Kokoro voice to the Bark exclusion set, the
+    open-slot prompt will be missing one Bark voice -- not a
+    correctness bug today (Kokoro IDs don't match Bark presets so
+    the filter is no-op), but a sign of confused intent."""
+    captured_prompts: list[str] = []
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        captured_prompts.append(messages[0]["content"])
+        return _good_response(voice_preset="v2/en_speaker_3")
+
+    rng = random.Random("kokoro-bark-separation")
+    _OTRC.lock_cast(
+        gen_fn,
+        num_characters=1,
+        news_seed="story", style="noir",
+        rng=rng,
+        force_lemmy=False,
+    )
+    p = captured_prompts[0]
+    # The full Bark VOICE_PROFILES list (9 voices) should all appear
+    # in the open-slot prompt -- nothing has been pre-filtered out by
+    # the Kokoro announcer.
+    all_bark_presets = [p for p, _, _, _ in _POOLS.VOICE_PROFILES]
+    for preset in all_bark_presets:
+        assert preset in p, \
+            f"Bark preset {preset!r} missing from open-slot prompt -- " \
+            f"announcer's Kokoro voice was wrongly excluding Bark voices"

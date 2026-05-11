@@ -521,8 +521,18 @@ def lock_cast(
     )
 
     cast: list[dict] = list(pre_locked)
-    # ANNOUNCER's voice + LEMMY's voice (if rolled) are already taken.
-    taken_voices: set[str] = {row["voice_preset"] for row in pre_locked}
+    # Open-character voice exclusion set tracks BARK voices only.
+    # ANNOUNCER renders through Kokoro TTS (separate namespace --
+    # voice IDs like "bm_george" / "bf_emma" can never collide with
+    # Bark's "v2/en_speaker_X" pool), so the announcer's voice is
+    # NOT added here. Per Jeffrey 2026-05-10: "announcer is in
+    # Kokoro so there can be no cast overlaps." LEMMY's voice
+    # (v2/en_speaker_8, Bark) IS added when LEMMY is rolled in.
+    taken_voices: set[str] = {
+        row["voice_preset"]
+        for row in pre_locked
+        if row["name"] != "ANNOUNCER"
+    }
 
     # Preflight capacity check: if the open-slot count exceeds the
     # voices still in the pool, every later iteration will fail. Catch
