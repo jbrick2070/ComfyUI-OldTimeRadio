@@ -711,6 +711,119 @@ def test_lock_cast_voice_pool_pre_filtered_excludes_lemmy_voice():
         "LEMMY's voice should be pre-filtered out of the open-slot pool"
 
 
+def test_assert_unique_bark_voices_accepts_clean_cast():
+    """Happy path: a cast with all-distinct Bark voices + Kokoro
+    announcer passes the invariant cleanly."""
+    cast = [
+        {"char_id": "c01", "name": "ANNOUNCER",
+         "voice_preset": "bm_george"},
+        {"char_id": "c02", "name": "LEMMY",
+         "voice_preset": "v2/en_speaker_8"},
+        {"char_id": "c03", "name": "ALICE",
+         "voice_preset": "v2/en_speaker_4"},
+        {"char_id": "c04", "name": "BOB",
+         "voice_preset": "v2/en_speaker_6"},
+    ]
+    # Should not raise
+    _OTRC._assert_unique_bark_voices(cast)
+
+
+def test_assert_unique_bark_voices_catches_collision():
+    """A regression scenario where two Bark cast rows accidentally
+    share a voice. The invariant must catch it and raise
+    CastingFailedError with a descriptive duplicate report."""
+    cast = [
+        {"char_id": "c01", "name": "ANNOUNCER",
+         "voice_preset": "bm_george"},
+        {"char_id": "c02", "name": "LEMMY",
+         "voice_preset": "v2/en_speaker_8"},
+        {"char_id": "c03", "name": "ALICE",
+         "voice_preset": "v2/en_speaker_4"},
+        # BOB collides with ALICE on en_speaker_4 -- a future
+        # refactor bug that today's pre-filter + validator + reroll
+        # would have prevented.
+        {"char_id": "c04", "name": "BOB",
+         "voice_preset": "v2/en_speaker_4"},
+    ]
+    with pytest.raises(_OTRC.CastingFailedError) as exc_info:
+        _OTRC._assert_unique_bark_voices(cast)
+    msg = str(exc_info.value)
+    assert "v2/en_speaker_4" in msg, \
+        f"error must name the duplicate voice: {msg!r}"
+    assert "c04" in msg and "c03" in msg, \
+        f"error must name both colliding char_ids: {msg!r}"
+
+
+def test_assert_unique_bark_voices_ignores_announcer():
+    """ANNOUNCER's voice (Kokoro namespace) is exempt from the
+    uniqueness check. A cast where the announcer's Kokoro voice
+    happens to lexically match a Bark voice in another row would
+    NOT trigger the invariant -- but in practice the namespaces
+    don't overlap, so this is a defensive test of the exclusion
+    logic itself.
+    """
+    cast = [
+        # Made-up matching string just to prove the exclusion holds;
+        # in production an announcer would never have a Bark ID.
+        {"char_id": "c01", "name": "ANNOUNCER",
+         "voice_preset": "v2/en_speaker_4"},
+        {"char_id": "c02", "name": "ALICE",
+         "voice_preset": "v2/en_speaker_4"},
+    ]
+    # ANNOUNCER is excluded from the check; the second en_speaker_4
+    # (on ALICE) appears only once among non-announcer rows, so the
+    # invariant passes.
+    _OTRC._assert_unique_bark_voices(cast)
+
+
+def test_lock_cast_invariant_fires_at_end_if_voices_collide(
+    monkeypatch,
+):
+    """End-to-end fail-safe: simulate a future refactor where the
+    pre-filter no longer excludes already-taken voices AND the
+    validator no longer rejects duplicates. Two open characters
+    pick the SAME Bark voice; the final invariant in lock_cast
+    must raise.
+
+    To get past the new preflight capacity check, the stubbed pool
+    has to be large enough for the requested open-slot count.
+    """
+    # Stub: pool always returns BOTH voices regardless of `taken`,
+    # simulating a refactor that broke the pre-filter.
+    monkeypatch.setattr(
+        _POOLS, "open_voice_pool",
+        lambda taken: [
+            ("v2/en_speaker_4", "female bright 30s"),
+            ("v2/en_speaker_6", "female throaty 40s"),
+        ],
+    )
+
+    # Stub: cast_one_character always picks the SAME voice -- a
+    # refactor that broke the validator's "voice in available_presets"
+    # check. Returns a valid CastingResponse so the row goes into
+    # the cast.
+    def stub_cast_one_character(generate_fn, **kwargs):  # noqa: ARG001
+        return _OTRC.CastingResponse(
+            character_description="stub character description text",
+            gender="female",
+            voice_preset="v2/en_speaker_4",
+        )
+
+    monkeypatch.setattr(_OTRC, "cast_one_character", stub_cast_one_character)
+
+    rng = random.Random("invariant-fires")
+    with pytest.raises(_OTRC.CastingFailedError) as exc_info:
+        _OTRC.lock_cast(
+            (lambda *_a, **_kw: ""),  # generate_fn unused after stub
+            num_characters=2,
+            news_seed="story", style="noir",
+            rng=rng,
+            force_lemmy=False,
+        )
+    assert "POST-CAST INVARIANT" in str(exc_info.value), \
+        f"final invariant must fire, got: {exc_info.value!r}"
+
+
 def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
     """When the announcer takes a Kokoro voice, the open-slot Bark
     pool must remain unaffected. Kokoro and Bark are separate TTS

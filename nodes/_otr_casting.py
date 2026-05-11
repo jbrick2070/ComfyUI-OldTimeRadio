@@ -595,6 +595,18 @@ def lock_cast(
         # just stamp 1 -- a successful call returned without raising.
         casting_attempts.append(1)
 
+    # Post-cast voice-uniqueness invariant. Belt-and-braces guard
+    # against a future refactor breaking the pre-filter / validator /
+    # reroll chain that today already guarantees uniqueness by
+    # construction. Cheap, deterministic, fast-fails at the right
+    # spot. Per Jeffrey 2026-05-10: "ensure no two characters have
+    # the same voice model including LEMMY a hard decision."
+    #
+    # ANNOUNCER is intentionally excluded -- it's Kokoro-namespaced
+    # (bm_/bf_) and cannot collide with the Bark pool by construction.
+    # The check covers LEMMY (Bark) + all open-character Bark voices.
+    _assert_unique_bark_voices(cast)
+
     meta = {
         "lemmy_hit":              lemmy_hit,
         "casting_attempts":       casting_attempts,
@@ -604,9 +616,47 @@ def lock_cast(
     return cast, meta
 
 
+def _assert_unique_bark_voices(cast: List[dict]) -> None:
+    """Raise CastingFailedError if any two Bark cast rows share a
+    voice_preset. ANNOUNCER (Kokoro namespace) is excluded.
+
+    Called at the end of lock_cast() as a final invariant check.
+    Today this is guaranteed-true by the pre-filter + validator +
+    reroll path; this assertion catches any future regression.
+    """
+    bark_voices: list[tuple[str, str]] = []  # (char_id, voice_preset)
+    for row in cast:
+        if row["name"] == "ANNOUNCER":
+            continue
+        bark_voices.append((row["char_id"], row["voice_preset"]))
+    voices_only = [v for _, v in bark_voices]
+    if len(set(voices_only)) != len(voices_only):
+        # Build a precise duplicate report for the error message
+        seen: dict[str, str] = {}
+        duplicates: list[str] = []
+        for cid, v in bark_voices:
+            if v in seen:
+                duplicates.append(
+                    f"{cid} and {seen[v]} both have {v!r}"
+                )
+            seen[v] = cid
+        raise CastingFailedError(
+            attempts=[(
+                "",
+                "POST-CAST INVARIANT FAILED: duplicate Bark "
+                f"voice_preset across cast rows: {duplicates!r}. "
+                "Pre-filter + validator + reroll should have "
+                "prevented this; a refactor likely broke the "
+                "collision guarantee.",
+            )],
+            name="<lock_cast invariant>",
+        )
+
+
 __all__ = [
     "CastingResponse",
     "CastingFailedError",
+    "_assert_unique_bark_voices",
     "CastSlot",
     "assemble_pre_locked_rows",
     "cast_one_character",
