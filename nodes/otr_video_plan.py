@@ -81,18 +81,27 @@ _DEFAULT_STYLE_TAIL = (
     "subtle film grain, volumetric lighting"
 )
 
-# Era-appropriate tails keyed by OTR's style dropdown options.
-# Fed into every composed prompt so FLUX dresses characters for the
-# right era without requiring per-scene costume prose.
+# Visual aesthetic tails keyed by OTR's style dropdown options.
+# Fed into every composed prompt so FLUX dresses scenes for the
+# chosen style without requiring per-scene costume prose.
+#
+# Slug convention: lowercase snake_case. The writer's style widget
+# emits human-readable labels (e.g. "Closed Room Suspense") which the
+# resolve_era_tail helper normalizes to the slug via lower / space-
+# and-hyphen-to-underscore. New 10-preset set landed 2026-05-10 per
+# Jeffrey; no era literals in the descriptor strings -- visual flavor
+# only.
 _ERA_TAIL_BY_STYLE: dict[str, str] = {
-    "hard_sci_fi":       "near-future industrial sci-fi, clean lines, utilitarian",
-    "space_opera":       "grand operatic space-opera scale, ornate costumes, vibrant",
-    "dystopian":         "oppressive dystopian regime, drab uniforms, concrete",
-    "time_travel":       "anachronistic mix, period-appropriate to the scene",
-    "first_contact":     "scientific sublime, clean institutional aesthetic",
-    "cosmic_horror":     "1920s Lovecraftian era, weathered, shadowed",
-    "cyberpunk":         "1980s neon cyberpunk aesthetic, rain-slick streets, chrome",
-    "post_apocalyptic":  "post-apocalyptic scavenger chic, worn gear, sun-bleached",
+    "closed_room_suspense":       "intimate close interior, dim ambient lighting, claustrophobic framing, careful composition on faces",
+    "detective_case_file":        "evidence-board flat lighting, paper-strewn desk, procedural utility, neutral institutional palette",
+    "pulp_serial_cliffhanger":    "high-contrast theatrical lighting, dramatic cast shadows, bold composition, saturated key colors",
+    "mission_control_procedural": "instrument-panel glow, blue-tinted console banks, focused workspace, clean institutional aesthetic",
+    "deep_space_distress_call":   "vessel interior, red emergency lighting, vacuum-isolation aesthetic, hard rim light on consoles",
+    "noir_interrogation":         "single overhead lamp, deep cast shadows, smoke-filtered air, hard contrast on the subject",
+    "small_town_uncanny":         "diffuse overcast daylight, mid-century domestic detail, quiet wrongness in the framing, muted palette",
+    "radio_newsroom_emergency":   "newsroom set, fluorescent overhead, urgent paperwork clutter, telephones and monitors lit",
+    "haunted_broadcast_signal":   "cathode-tube glow, signal-degraded haze, vacant studio interior, dust motes in dim beams",
+    "laboratory_containment":     "clean-room sterile light, hazmat-yellow accents, isolation-ward composition, glass barriers reflecting",
 }
 
 # Fallback era tail used when style is empty, unknown, or
@@ -443,7 +452,7 @@ def build_shot_plan(
           "shots_per_scene": 3,
           "scenes_covered": 5,
           "total_prompts": 16,
-          "style": "hard_sci_fi",
+          "style": "mission_control_procedural",
           "era_tail": "near-future industrial sci-fi, clean lines, utilitarian",
           "style_tail": "cinematic, 35mm film look, ..."
         }
@@ -737,7 +746,7 @@ class OTRVideoPlan:
                 ),
                 "style": (
                     style_choices,
-                    {"default": "hard_sci_fi"},
+                    {"default": "mission_control_procedural"},
                 ),
             },
             "optional": {

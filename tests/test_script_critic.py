@@ -282,8 +282,10 @@ class TestCoerceParams:
         assert "num_characters" not in out
 
     def test_style_underscore_humanized(self, critic_module):
-        out = critic_module._coerce_params({"style": "hard_sci_fi"})
-        assert out["style"] == "hard sci fi"
+        out = critic_module._coerce_params(
+            {"style": "mission_control_procedural"},
+        )
+        assert out["style"] == "mission control procedural"
 
 
 class TestFilterRubric:
@@ -378,16 +380,17 @@ class TestBuildCriticPrompt:
     def test_includes_script_and_genre(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="ANNOUNCER: Hello.",
-            style="hard_sci_fi",
+            style="mission_control_procedural",
             anti_slop="",
         )
         assert "ANNOUNCER: Hello." in prompt
-        assert "hard sci fi" in prompt  # style with underscore replaced
+        # style with underscores humanized to spaces
+        assert "mission control procedural" in prompt
 
     def test_uses_anti_slop_when_provided(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="x",
-            style="space_opera",
+            style="deep_space_distress_call",
             anti_slop="MY CUSTOM RUBRIC HERE",
         )
         assert "MY CUSTOM RUBRIC HERE" in prompt
@@ -397,7 +400,7 @@ class TestBuildCriticPrompt:
     def test_uses_builtin_when_anti_slop_blank(self, critic_module):
         prompt = critic_module._build_critic_prompt(
             script_text="x",
-            style="dystopian",
+            style="small_town_uncanny",
             anti_slop="",
         )
         assert "GENERAL RUBRIC" in prompt

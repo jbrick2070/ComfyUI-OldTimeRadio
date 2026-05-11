@@ -85,10 +85,15 @@ def test_slugify_length_limit():
 
 def test_resolve_era_tail_known_genres():
     from nodes.otr_video_plan import resolve_era_tail
-    assert "cyberpunk" in resolve_era_tail("cyberpunk").lower()
-    assert "post-apocalyptic" in resolve_era_tail("post_apocalyptic").lower()
-    assert "lovecraftian" in resolve_era_tail("cosmic_horror").lower()
-    assert "near-future" in resolve_era_tail("hard_sci_fi").lower()
+    # Each assertion picks one distinctive keyword from the era-tail
+    # descriptor so the test catches both the lookup AND the
+    # descriptor wording in one shot. New 10-preset set landed
+    # 2026-05-10; era-tail strings are visual aesthetics only --
+    # no era literals.
+    assert "cathode-tube" in resolve_era_tail("haunted_broadcast_signal").lower()
+    assert "vessel" in resolve_era_tail("deep_space_distress_call").lower()
+    assert "smoke-filtered" in resolve_era_tail("noir_interrogation").lower()
+    assert "instrument-panel" in resolve_era_tail("mission_control_procedural").lower()
 
 
 def test_resolve_era_tail_empty_and_unknown():
@@ -101,10 +106,13 @@ def test_resolve_era_tail_empty_and_unknown():
 
 def test_resolve_era_tail_normalizes_case_and_punctuation():
     from nodes.otr_video_plan import resolve_era_tail
-    r1 = resolve_era_tail("cyberpunk")
-    r2 = resolve_era_tail("CYBERPUNK")
-    r3 = resolve_era_tail("Cyberpunk")
-    assert r1 == r2 == r3
+    # All five spellings of the same preset must hit the same era tail.
+    r1 = resolve_era_tail("mission control procedural")
+    r2 = resolve_era_tail("MISSION CONTROL PROCEDURAL")
+    r3 = resolve_era_tail("Mission Control Procedural")
+    r4 = resolve_era_tail("mission_control_procedural")
+    r5 = resolve_era_tail("mission-control-procedural")
+    assert r1 == r2 == r3 == r4 == r5
 
 
 # ------------------------------------------------------------------
@@ -324,7 +332,7 @@ def test_build_shot_plan_basic_counts():
         director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     # 2 scenes * 3 shots + 1 final end = 7
     assert plan["total_prompts"] == 7
@@ -341,7 +349,7 @@ def test_build_shot_plan_tokens_are_env_shaped():
         director_json,
         focus_character="BABA",
         shots_per_scene=2,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     for tok in plan["tokens"]:
         assert tok["type"] == "environment"
@@ -357,7 +365,7 @@ def test_build_shot_plan_compose_includes_portrait_and_scene():
         director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     first = plan["tokens"][0]
     desc = first["description"]
@@ -365,8 +373,8 @@ def test_build_shot_plan_compose_includes_portrait_and_scene():
     assert "silver braids" in desc
     # Should contain scene_1's visual_prompt text
     assert "dim comms bay" in desc or "red alert pulse" in desc
-    # Should contain era tail
-    assert "near-future" in desc.lower() or "sci-fi" in desc.lower()
+    # Should contain era tail (mission_control_procedural keyword)
+    assert "instrument-panel" in desc.lower() or "console" in desc.lower()
 
 
 def test_build_shot_plan_fallback_to_notes():
@@ -570,7 +578,7 @@ def test_plan_method_end_to_end():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     pass3 = json.loads(pass3_json)
     assert pass3["total_prompts"] == pass3_count
@@ -618,7 +626,7 @@ def test_plan_method_empty_scenes_still_returns_envelope():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=3,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     assert count == 0
     payload = json.loads(pass3_json)
@@ -692,7 +700,7 @@ def test_pass3_multi_char_includes_all_portraits():
     # Empty focus_character => include all chars
     plan = build_shot_plan(
         director_json, focus_character="",
-        shots_per_scene=1, style="hard_sci_fi",
+        shots_per_scene=1, style="mission_control_procedural",
     )
     first_desc = plan["tokens"][0]["description"]
     # Both character portraits should appear
@@ -705,7 +713,7 @@ def test_pass3_single_char_mode_only_focus_character():
     director_json = json.dumps(_multi_char_director())
     plan = build_shot_plan(
         director_json, focus_character="LEMMY",
-        shots_per_scene=1, style="hard_sci_fi",
+        shots_per_scene=1, style="mission_control_procedural",
     )
     first_desc = plan["tokens"][0]["description"]
     # Only LEMMY's portrait in compose, not KENJI's
@@ -722,7 +730,7 @@ def test_plan_method_multi_char_default():
         director_json=director_json,
         focus_character="(all)",
         shots_per_scene=1,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 2
@@ -741,14 +749,14 @@ def test_plan_method_accepts_audio_gate_and_ignores_value():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     # With audio_gate wired (arbitrary string value)
     out_b = node.plan(
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=1,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
         audio_gate="C:/path/to/final_episode.mp4",
     )
     # Parse the JSON envelopes and compare — audio_gate should not affect output
@@ -777,7 +785,7 @@ def test_plan_method_single_char_when_focus_set():
         director_json=director_json,
         focus_character="LEMMY",
         shots_per_scene=1,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 1
@@ -794,7 +802,7 @@ def test_plan_output_consumable_by_batch_flux_render_parser():
         director_json=director_json,
         focus_character="BABA",
         shots_per_scene=2,
-        style="hard_sci_fi",
+        style="mission_control_procedural",
     )
     # Every pass output must match BatchFluxRender contract:
     # dict with "tokens" list where each token has type="environment"

@@ -185,18 +185,19 @@ _STYLE_AUTO_SENTINEL = "auto (LLM generates)"
 
 _STYLE_CHOICES = [
     _STYLE_AUTO_SENTINEL,
-    "tense claustrophobic",
-    "space opera epic",
-    "psychological slow-burn",
-    "hard-sci-fi procedural",
-    "noir mystery",
-    "chaotic black-mirror",
-    "pulp adventure",
-    "rust-belt cyber-noir",
-    "paranoid procedural",
+    "closed room suspense",
+    "detective case file",
+    "pulp serial cliffhanger",
+    "mission control procedural",
+    "deep space distress call",
+    "noir interrogation",
+    "small town uncanny",
+    "radio newsroom emergency",
+    "haunted broadcast signal",
+    "laboratory containment",
 ]
 
-_LLM_STYLE_FALLBACK = "psychological slow-burn"
+_LLM_STYLE_FALLBACK = "mission control procedural"
 """Hardcoded last-resort if the style-generation LLM call fails or
 returns empty / unusable text. Kept short so the outline+critic
 downstream don't get a degenerate prompt."""
@@ -612,10 +613,19 @@ def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
         # Style normalization: re-ranker expects a slug like "hard_sci_fi";
         # use the closest match or fall back to the canonical default.
         slug = (style or "").lower().replace(" ", "_").replace("-", "_")
-        if slug not in {"hard_sci_fi", "noir", "psychological_slow_burn",
-                        "space_opera_epic", "tense_claustrophobic",
-                        "chaotic_black_mirror"}:
-            slug = "hard_sci_fi"
+        if slug not in {
+            "closed_room_suspense",
+            "detective_case_file",
+            "pulp_serial_cliffhanger",
+            "mission_control_procedural",
+            "deep_space_distress_call",
+            "noir_interrogation",
+            "small_town_uncanny",
+            "radio_newsroom_emergency",
+            "haunted_broadcast_signal",
+            "laboratory_containment",
+        }:
+            slug = "mission_control_procedural"
         news = _so._fetch_science_news(
             max_feeds=10, style=slug, model_id=model_id,
             optimization_profile="Standard",

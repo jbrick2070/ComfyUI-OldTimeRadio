@@ -95,7 +95,7 @@ def _write_workflow(tmp_path: Path, director: dict) -> Path:
                     director_json_str,
                     "(all)",
                     2,                  # shots_per_scene
-                    "hard_sci_fi",
+                    "mission_control_procedural",
                     "cinematic, 35mm film look",
                     True,               # include_final_end_frame
                 ],
@@ -145,7 +145,7 @@ def test_extract_widget_values_position_layout(tmp_path: Path):
     # [0] director_json, [1] focus, [2] shots_per_scene, [3] genre, [4] style, [5] include_final
     assert wv[1] == "(all)"
     assert wv[2] == 2
-    assert wv[3] == "hard_sci_fi"
+    assert wv[3] == "mission_control_procedural"
     assert wv[5] is True
 
 
