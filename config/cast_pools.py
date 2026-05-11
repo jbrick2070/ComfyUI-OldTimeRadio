@@ -232,12 +232,27 @@ def lemmy_row() -> dict:
     }
 
 
+_VOCAL_TAGS = frozenset({
+    "warm", "weary", "wry", "calm", "measured", "energetic",
+    "sharp", "anxious", "confident", "authoritative", "deep",
+    "intense", "dry", "stoic", "gravelly", "clipped", "precise",
+    "nervous",
+})
+_AGE_TAGS = frozenset({"20s", "30s", "40s", "50s", "60s"})
+
+
 def open_voice_pool(taken: set[str]) -> list[tuple[str, str]]:
     """Return the (preset, short_description) list of voices NOT yet
     taken, suitable for inlining into the per-character casting prompt.
 
     short_description is a compact one-liner derived from the voice's
     quality tags. Keeps the prompt tight per the local-LLM brevity rule.
+
+    DETERMINISM (C7): VOICE_PROFILES tags is a Python set, and Python
+    set iteration order is hash-randomization dependent across runs.
+    Sort tags before slicing so the rendered short-description is
+    byte-stable across processes -- otherwise the LLM prompt itself
+    would drift between identical-input runs and break C7.
     """
     out: list[tuple[str, str]] = []
     for preset, gender, _lang, tags in VOICE_PROFILES:
@@ -246,13 +261,10 @@ def open_voice_pool(taken: set[str]) -> list[tuple[str, str]]:
         # Compress quality tags to "gender + 1-2 vocal traits + age bracket"
         # so the LLM has just enough to pick. Drop role-shaped tags
         # (officer, pilot, etc) -- those bias selection without helping.
-        vocal = [t for t in tags if t in {
-            "warm", "weary", "wry", "calm", "measured", "energetic",
-            "sharp", "anxious", "confident", "authoritative", "deep",
-            "intense", "dry", "stoic", "gravelly", "clipped", "precise",
-            "nervous",
-        }][:2]
-        age = next((t for t in tags if t in {"20s", "30s", "40s", "50s", "60s"}), "")
+        # `sorted(tags)` is the C7 determinism guard.
+        sorted_tags = sorted(tags)
+        vocal = [t for t in sorted_tags if t in _VOCAL_TAGS][:2]
+        age = next((t for t in sorted_tags if t in _AGE_TAGS), "")
         short = " ".join([gender] + vocal + ([age] if age else "")).strip()
         out.append((preset, short))
     return out

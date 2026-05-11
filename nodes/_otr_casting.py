@@ -235,10 +235,22 @@ def _format_prior_entry(row: dict) -> str:
     g = (row.get("gender") or "?").lower()
     g_short = "M" if g == "male" else "F" if g == "female" else "X"
     desc = (row.get("character_description") or "").strip()
-    # Trim long descriptions so the prompt stays lean.
+    # Trim long descriptions so the prompt stays lean. Strip a wider
+    # set of trailing punctuation so the appended "..." doesn't read
+    # as e.g. "weary broadcaster!..." -- per round-robin nit
+    # 2026-05-10.
     if len(desc) > 60:
-        desc = desc[:57].rstrip(",.; ") + "..."
+        desc = desc[:57].rstrip(",.;:!? ") + "..."
     return f"{name} ({g_short}, {desc})"
+
+
+# Cap on how much of a prior raw response we embed into the repair
+# prompt on attempt 3. Local LLMs occasionally babble 4000+ tokens of
+# malformed garbage; passing that into the repair prompt blows the KV
+# cache on the 14.5 GB VRAM ceiling. 1200 chars is plenty for the
+# LLM to see "what it tried last time" without risking OOM. Per
+# round-robin synthesis 2026-05-10 (both ChatGPT and Gemini flagged).
+_REPAIR_RAW_CAP_CHARS = 1200
 
 
 # ---------------------------------------------------------------------------
@@ -263,11 +275,17 @@ def cast_one_character(
     Retry strategy mirrors `_otr_outline.generate_outline`:
       Attempt 1: fresh, base_temperature (0.7).
       Attempt 2: fresh, base_temperature + 0.1 (0.8).
-      Attempt 3: REPAIR call -- prior raw output + the validation
-                 error, temp 0.3.
+      Attempt 3: REPAIR call -- prior raw output (truncated) + the
+                 validation error, temp 0.3.
+
+    `max_attempts=1` is allowed (single-shot, no repair). `0` is not.
 
     Raises CastingFailedError if all attempts fail.
     """
+    if max_attempts < 1:
+        raise ValueError(
+            f"max_attempts must be >= 1, got {max_attempts}"
+        )
     if not available_voices:
         raise CastingFailedError(
             attempts=[("", "available_voices is empty -- nothing to pick")],
@@ -283,16 +301,29 @@ def cast_one_character(
         available_voices=available_voices,
     )
     attempts: list[tuple[str, str]] = []
-    last_raw = ""
+    last_raw: str | None = None
 
     for attempt_idx in range(max_attempts):
-        if attempt_idx == max_attempts - 1 and last_raw:
-            # Repair attempt: hand the prior raw + last error back to
-            # the LLM. Lower temperature for a stable recovery.
+        # Repair branch: only on the final attempt, only when there
+        # IS a prior attempt (so attempt_idx > 0), only when the
+        # prior attempt produced a string we can hand back. Use
+        # `is not None` so an empty-string prior does not silently
+        # change branch semantics. Per round-robin nit 2026-05-10.
+        is_repair = (
+            attempt_idx == max_attempts - 1
+            and attempt_idx > 0
+            and last_raw is not None
+        )
+        if is_repair:
+            # Repair attempt: hand the prior raw (TRUNCATED) + last
+            # error back to the LLM. Lower temperature for a stable
+            # recovery. Truncation is a VRAM ceiling protection --
+            # see _REPAIR_RAW_CAP_CHARS.
             last_err = attempts[-1][1] if attempts else "validation failed"
+            truncated_raw = last_raw[:_REPAIR_RAW_CAP_CHARS]
             messages = [
                 {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": last_raw},
+                {"role": "assistant", "content": truncated_raw},
                 {
                     "role": "user",
                     "content": (
@@ -493,6 +524,24 @@ def lock_cast(
     # ANNOUNCER's voice + LEMMY's voice (if rolled) are already taken.
     taken_voices: set[str] = {row["voice_preset"] for row in pre_locked}
 
+    # Preflight capacity check: if the open-slot count exceeds the
+    # voices still in the pool, every later iteration will fail. Catch
+    # this BEFORE any LLM call so we don't burn time + tokens on a
+    # doomed cast. Per round-robin synthesis 2026-05-10 (both reviewers
+    # flagged).
+    initial_pool_size = len(_POOLS.open_voice_pool(taken_voices))
+    if initial_pool_size < len(open_slots):
+        raise CastingFailedError(
+            attempts=[(
+                "",
+                f"voice pool too small at lock_cast entry: "
+                f"{initial_pool_size} voices available for "
+                f"{len(open_slots)} open slots. Pre-locked rows "
+                f"already claim {sorted(taken_voices)!r}.",
+            )],
+            name=(open_slots[0].name if open_slots else "<no-slots>"),
+        )
+
     # "Cast so far" context for the LLM excludes ANNOUNCER (narrator,
     # not ensemble) but includes LEMMY when rolled.
     prior_cast_for_llm: list[dict] = [
@@ -503,9 +552,11 @@ def lock_cast(
     for slot in open_slots:
         available_voices = _POOLS.open_voice_pool(taken_voices)
         if not available_voices:
+            # Belt-and-braces: should never fire because of the
+            # preflight check above, but kept as a defensive assert.
             raise CastingFailedError(
-                attempts=[("", "voice pool exhausted before all open "
-                              "slots filled")],
+                attempts=[("", "voice pool exhausted mid-loop "
+                              "(preflight should have caught this)")],
                 name=slot.name,
             )
 

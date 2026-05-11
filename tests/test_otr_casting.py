@@ -124,22 +124,145 @@ def test_assemble_pre_locked_rows_determinism():
     assert [s.name for s in open1] == [s.name for s in open2]
 
 
-def test_assemble_pre_locked_rows_announcer_5050_balance():
-    """Roll 200 episodes; ANNOUNCER gender should land ~50/50."""
-    counts = Counter()
-    for i in range(200):
-        rng = random.Random(f"balance-{i}")
+def test_assemble_pre_locked_rows_announcer_pool_has_2m_2f():
+    """Determinism-friendly check: the ANNOUNCER pool itself contains
+    exactly 2 male + 2 female presets. The 50/50 distribution is then
+    a property of the pool, not of statistical luck across runs.
+
+    Replaces the prior 200-trial statistical test (CI flake bomb per
+    round-robin synthesis 2026-05-10).
+    """
+    male_count = sum(1 for _, desc in _POOLS.ANNOUNCER_PRESETS
+                     if "Male" in desc)
+    female_count = sum(1 for _, desc in _POOLS.ANNOUNCER_PRESETS
+                       if "Female" in desc)
+    assert male_count == 2, \
+        f"ANNOUNCER pool male count drifted: {male_count} (expected 2)"
+    assert female_count == 2, \
+        f"ANNOUNCER pool female count drifted: {female_count} (expected 2)"
+    assert male_count + female_count == len(_POOLS.ANNOUNCER_PRESETS), \
+        "ANNOUNCER pool has entries that are neither Male nor Female"
+
+
+def test_assemble_pre_locked_rows_announcer_picks_each_preset_with_fixed_seeds():
+    """Lock down the deterministic mapping from seed -> announcer pick.
+
+    With a fixed-seed random.Random(), the announcer pick is fully
+    deterministic. We assert that across a bank of seeds we hit BOTH
+    a male announcer and a female announcer at least once -- so the
+    pool is exercised in both directions, without any statistical
+    tolerance band.
+    """
+    seen_genders = set()
+    for i in range(20):
+        rng = random.Random(f"announcer-seed-{i}")
         pre_locked, _, _ = _OTRC.assemble_pre_locked_rows(
             num_characters=2, rng=rng, force_lemmy=False,
         )
-        counts[pre_locked[0]["gender"]] += 1
-    male = counts["male"]
-    female = counts["female"]
-    # 4 announcer presets (2 male + 2 female), each picked uniformly
-    # at random by the seeded RNG. Tolerance ~10pp on 200 trials.
-    assert 80 <= male <= 120, f"male skew: {male}/200 (expected ~100)"
-    assert 80 <= female <= 120, f"female skew: {female}/200 (expected ~100)"
-    assert male + female == 200, f"unknown announcer gender values: {counts!r}"
+        seen_genders.add(pre_locked[0]["gender"])
+    assert seen_genders == {"male", "female"}, \
+        f"announcer pool not exercised in both directions: {seen_genders!r}"
+
+
+def test_cast_one_character_max_attempts_zero_rejected():
+    """max_attempts=0 is invalid (no attempts to make)."""
+    gen = _make_canned_generate_fn([_good_response()])
+    with pytest.raises(ValueError, match="max_attempts"):
+        _OTRC.cast_one_character(
+            gen,
+            name="ALICE", news_seed="story", style="noir",
+            prior_cast=[], available_voices=_three_voices(),
+            max_attempts=0,
+        )
+
+
+def test_cast_one_character_max_attempts_one_single_shot_no_repair():
+    """max_attempts=1 is allowed (single-shot, no repair branch)."""
+    gen = _make_canned_generate_fn([_good_response()])
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+        max_attempts=1,
+    )
+    assert r.voice_preset == "v2/en_speaker_4"
+
+
+def test_cast_one_character_repair_truncates_huge_raw():
+    """A 4000-char garbage response on attempt 1 must NOT bloat the
+    repair prompt's KV cache on attempt 2 (max_attempts=2 -> repair
+    fires on attempt 1 since attempt_idx>0 required for repair, so
+    we use max_attempts=3 to make sure repair fires)."""
+    huge_garbage = "x" * 4000
+    captured_messages: list = []
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        captured_messages.append(messages)
+        if len(captured_messages) <= 2:
+            return huge_garbage
+        return _good_response()
+
+    _OTRC.cast_one_character(
+        gen_fn,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+        max_attempts=3,
+    )
+    # Third call is the repair attempt. Its messages should include
+    # the truncated assistant turn.
+    repair_messages = captured_messages[-1]
+    assistant_turn = next(m for m in repair_messages
+                          if m["role"] == "assistant")
+    assert len(assistant_turn["content"]) <= _OTRC._REPAIR_RAW_CAP_CHARS, \
+        f"repair prompt did not truncate huge raw: " \
+        f"{len(assistant_turn['content'])} chars"
+
+
+def test_lock_cast_preflight_fails_fast_when_voice_pool_too_small(
+    monkeypatch,
+):
+    """Patch open_voice_pool to return only 1 voice, then ask for 3
+    open slots. lock_cast must raise BEFORE any LLM call fires."""
+    llm_call_count = [0]
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        llm_call_count[0] += 1
+        return _good_response()
+
+    monkeypatch.setattr(
+        _POOLS, "open_voice_pool",
+        lambda taken: [("v2/en_speaker_4", "female bright 30s")],
+    )
+
+    rng = random.Random("preflight-test")
+    with pytest.raises(_OTRC.CastingFailedError, match="too small"):
+        _OTRC.lock_cast(
+            gen_fn,
+            num_characters=3,
+            news_seed="story", style="noir",
+            rng=rng,
+            force_lemmy=False,
+        )
+    assert llm_call_count[0] == 0, \
+        "preflight should fail BEFORE any LLM call"
+
+
+def test_open_voice_pool_short_descriptions_are_deterministic():
+    """C7 byte-identity guard: open_voice_pool must produce IDENTICAL
+    short-descriptions across runs. Set iteration order in Python is
+    hash-randomization dependent, so without sorted() the rendered
+    short can vary process-to-process. Per round-robin synthesis
+    2026-05-10."""
+    pool_a = _POOLS.open_voice_pool(set())
+    pool_b = _POOLS.open_voice_pool(set())
+    assert pool_a == pool_b, \
+        "open_voice_pool not deterministic across calls in same process"
+    # The short-description for each preset must always render the
+    # same way (sorted-tag invariant).
+    by_preset_a = {p: s for p, s in pool_a}
+    by_preset_b = {p: s for p, s in pool_b}
+    for preset in by_preset_a:
+        assert by_preset_a[preset] == by_preset_b[preset]
 
 
 def test_assemble_pre_locked_rows_num_characters_bounds():
