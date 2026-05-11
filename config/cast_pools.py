@@ -224,6 +224,10 @@ def pick_announcer(rng: random.Random) -> dict:
       bf_* = British female
     (am_*, af_* = American male/female, not currently in our pool but
     handled defensively below.)
+
+    The returned row stamps `tts_model="kokoro"` so downstream
+    consumers can route by reading the field directly instead of
+    pattern-matching the voice_preset prefix.
     """
     voice_preset, vocal_desc = rng.choice(ANNOUNCER_PRESETS)
     if voice_preset.startswith(("bm_", "am_")):
@@ -236,6 +240,7 @@ def pick_announcer(rng: random.Random) -> dict:
     return {
         "name": "ANNOUNCER",
         "gender": gender,
+        "tts_model": "kokoro",
         "voice_preset": voice_preset,
         "character_description": (
             "Period radio announcer; reads the science story and "
@@ -248,10 +253,14 @@ def pick_announcer(rng: random.Random) -> dict:
 def lemmy_row() -> dict:
     """Return a fully-populated LEMMY cast row in the same shape
     pick_announcer / casting LLM responses produce.
+
+    LEMMY is always rendered through Bark with the gravelly
+    `v2/en_speaker_8` preset, so the row stamps `tts_model="bark"`.
     """
     return {
         "name":                  LEMMY_PROFILE["name"],
         "gender":                LEMMY_PROFILE["gender"],
+        "tts_model":             "bark",
         "voice_preset":          LEMMY_PROFILE["voice_preset"],
         "character_description": LEMMY_PROFILE["character_description"],
     }

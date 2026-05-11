@@ -583,6 +583,12 @@ def lock_cast(
             "char_id":               slot.char_id,
             "name":                  slot.name,
             "gender":                response.gender,
+            # Open-character voices are always drawn from the Bark
+            # pool (VOICE_PROFILES in config/cast_pools.py), so the
+            # tts_model is Bark by construction. Downstream consumers
+            # route on this field rather than pattern-matching the
+            # voice_preset prefix.
+            "tts_model":             "bark",
             "voice_preset":          response.voice_preset,
             "character_description": response.character_description,
         }

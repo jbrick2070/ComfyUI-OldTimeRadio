@@ -154,6 +154,52 @@ def test_assemble_pre_locked_rows_announcer_pool_has_2m_2f():
         f"bf_/af_: {_POOLS.ANNOUNCER_PRESETS!r}"
 
 
+def test_announcer_row_carries_tts_model_kokoro():
+    """ANNOUNCER cast row stamps tts_model="kokoro" so downstream
+    consumers can route by reading the field directly."""
+    rng = random.Random("tts-model-announcer")
+    pre_locked, _, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=rng, force_lemmy=False,
+    )
+    announcer = pre_locked[0]
+    assert announcer["name"] == "ANNOUNCER"
+    assert announcer["tts_model"] == "kokoro"
+
+
+def test_lemmy_row_carries_tts_model_bark():
+    """LEMMY cast row stamps tts_model="bark"."""
+    rng = random.Random("tts-model-lemmy")
+    pre_locked, _, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=rng, force_lemmy=True,
+    )
+    lemmy = pre_locked[1]
+    assert lemmy["name"] == "LEMMY"
+    assert lemmy["tts_model"] == "bark"
+    assert lemmy["voice_preset"] == "v2/en_speaker_8"
+
+
+def test_lock_cast_open_character_rows_carry_tts_model_bark():
+    """Every LLM-cast open-character row must stamp tts_model="bark"
+    since open characters are drawn from the Bark VOICE_PROFILES
+    pool by construction."""
+    rng = random.Random("tts-model-open")
+    gen = _make_canned_generate_fn([
+        _good_response(voice_preset="v2/en_speaker_3"),
+        _good_response(voice_preset="v2/en_speaker_5"),
+    ])
+    cast, _ = _OTRC.lock_cast(
+        gen,
+        num_characters=2,
+        news_seed="story", style="noir",
+        rng=rng,
+        force_lemmy=False,
+    )
+    # cast[0] is ANNOUNCER (Kokoro), cast[1:] are open characters (Bark).
+    for row in cast[1:]:
+        assert row["tts_model"] == "bark", \
+            f"open character {row['name']!r} missing tts_model=bark: {row!r}"
+
+
 def test_announcer_voice_is_kokoro_namespace_not_bark():
     """The announcer's voice_preset must come from the Kokoro
     namespace (bm_*, bf_*, am_*, af_*), NOT the Bark namespace

@@ -334,6 +334,52 @@ class TestSetters:
         assert led.data["cast"][0]["char_id"] == "c01"
         assert led.data["cast"][0]["gender"] == "female"
 
+    def test_set_cast_preserves_tts_model_when_supplied(self, tmp_out):
+        """If the caller supplies tts_model on the input row, set_cast
+        writes it through verbatim."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "ANNOUNCER",
+             "gender": "male", "tts_model": "kokoro",
+             "voice_preset": "bm_george"},
+            {"char_id": "c02", "name": "LEMMY",
+             "gender": "male", "tts_model": "bark",
+             "voice_preset": "v2/en_speaker_8"},
+        ])
+        assert led.data["cast"][0]["tts_model"] == "kokoro"
+        assert led.data["cast"][1]["tts_model"] == "bark"
+
+    def test_set_cast_derives_tts_model_from_bark_voice_preset(self, tmp_out):
+        """Back-compat: a row without tts_model but with a Bark
+        voice_preset gets tts_model='bark' inferred."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "BOB",
+             "gender": "male", "voice_preset": "v2/en_speaker_1"},
+        ])
+        assert led.data["cast"][0]["tts_model"] == "bark"
+
+    def test_set_cast_derives_tts_model_from_kokoro_voice_preset(self, tmp_out):
+        """Back-compat: a row without tts_model but with a Kokoro
+        voice_preset (bm_/bf_/am_/af_) gets tts_model='kokoro' inferred."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "ANNOUNCER",
+             "gender": "female", "voice_preset": "bf_emma"},
+        ])
+        assert led.data["cast"][0]["tts_model"] == "kokoro"
+
+    def test_set_cast_tts_model_none_for_unknown_preset(self, tmp_out):
+        """If the voice_preset doesn't match any known TTS prefix and
+        tts_model isn't supplied, the field lands as None and the
+        consumer is responsible for error-checking."""
+        led = Ledger("t", str(tmp_out))
+        led.set_cast([
+            {"char_id": "c01", "name": "MYSTERY",
+             "gender": "other", "voice_preset": "future_tts_xyz"},
+        ])
+        assert led.data["cast"][0]["tts_model"] is None
+
     def test_set_lines_computes_counts(self, tmp_out):
         led = Ledger("t", str(tmp_out))
         led.set_lines(self._sample_lines())
