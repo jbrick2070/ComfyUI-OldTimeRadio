@@ -163,25 +163,12 @@ _CREATIVITY_TOP_P_MAP = {
 _CREATIVITY_CHOICES = list(_CREATIVITY_TEMP_MAP.keys())
 
 
-# ---------------------------------------------------------------------------
-# target_length preset map. Only smoke presets force a target_words
-# override; longer presets are UI labels (the outline schema, not act
-# count, drives v2 LPL structure).
-# ---------------------------------------------------------------------------
-
-_TARGET_LENGTH_CHOICES = [
-    "30 words (smoke, 1 act)",
-    "tiny (smoke, 1 act)",
-    "short (3 acts)",
-    "medium (5 acts)",
-    "long (7-8 acts)",
-    "epic (10+ acts)",
-]
-
-_TARGET_LENGTH_FORCE_WORDS = {
-    "30 words (smoke, 1 act)": 30,
-    "tiny (smoke, 1 act)":     100,
-}
+# target_length widget removed 2026-05-11 (post-Phase-3 cleanup pass).
+# The old "short (3 acts)" / "medium (5 acts)" / "long (7-8 acts)" combo
+# is replaced by the typed `act_count` widget + `target_words` (driven
+# by web/js/otr_act_count_widget.js). Smoke presets are gone with it --
+# for a 30-word smoke run, type target_words=30 directly. Cleaner UX,
+# one source of truth for episode shape.
 
 
 # ---------------------------------------------------------------------------
@@ -278,8 +265,6 @@ _MODEL_CHOICES = [
     "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
     "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
 ]
-
-_CLEANUP_MODEL_CHOICES = ["auto (use story model)"] + _MODEL_CHOICES
 
 _OPTIMIZATION_PROFILE_CHOICES = [
     "Standard",
@@ -546,20 +531,13 @@ def _resolve_creativity(creativity: str) -> tuple[float, float]:
     return (float(temp), float(top_p))
 
 
-def _resolve_target_words(target_words, target_length: str) -> int:
-    """Apply smoke target_length presets that force a target_words override.
+def _resolve_target_words(target_words) -> int:
+    """Clamp target_words to the schema minimum.
 
-    Non-smoke presets (short/medium/long/epic) are UI labels only — the
-    outline schema, not act count, drives v2 LPL structure.
+    Smoke-preset target_length override path removed 2026-05-11
+    (post-Phase-3 cleanup) along with the target_length widget. For
+    a smoke run type target_words=30 directly.
     """
-    forced = _TARGET_LENGTH_FORCE_WORDS.get(target_length)
-    if forced is not None:
-        log.info(
-            "[OTR_LedgerScriptWriter] target_length=%r forces target_words=%d "
-            "(widget value %r overridden)",
-            target_length, forced, target_words,
-        )
-        return int(forced)
     return max(5, int(target_words))
 
 
@@ -656,16 +634,12 @@ def _resolve_inputs(
     num_characters: int = 2,
     *,
     model_id: str = DEFAULT_MODEL_ID,
-    cleanup_model_id: str = "auto (use story model)",
     custom_premise: str = "",
     include_act_breaks: bool = True,
-    self_critique: bool = True,
-    target_length: str = "short (3 acts)",
     act_count: int = 0,
     style: str = _STYLE_AUTO_SENTINEL,
     style_custom: str = "",
     creativity: str = "balanced",
-    arc_enhancer: bool = True,
     optimization_profile: str = "Standard",
     perfect_run_spacesaver: bool = False,
 ) -> dict:
@@ -691,7 +665,7 @@ def _resolve_inputs(
       2. style combo verbatim if != _STYLE_AUTO_SENTINEL
       3. LLM-generated (caller fills `resolved["style"]` post-load)
     """
-    target_words = _resolve_target_words(target_words, target_length)
+    target_words = _resolve_target_words(target_words)
     num_characters = max(1, min(6, int(num_characters)))
 
     # Phase 2A (2026-05-11): act_count resolution. 0 (default) means
@@ -770,15 +744,11 @@ def _resolve_inputs(
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
         "model_id":             str(model_id or DEFAULT_MODEL_ID).strip(),
-        "cleanup_model_id":     str(cleanup_model_id or "auto (use story model)"),
         "include_act_breaks":   bool(include_act_breaks),
-        "self_critique":        bool(self_critique),
-        "target_length":        str(target_length),
         "act_count":            int(act_count_int),
         "creativity":           str(creativity),
         "temperature":          float(temperature),
         "top_p":                float(top_p),
-        "arc_enhancer":         bool(arc_enhancer),
         "optimization_profile": str(optimization_profile),
         "perfect_run_spacesaver": bool(perfect_run_spacesaver),
     }
@@ -909,16 +879,6 @@ class OTR_LedgerScriptWriter:
                         "the loader before HF lookup."
                     ),
                 }),
-                "cleanup_model_id": (_CLEANUP_MODEL_CHOICES, {
-                    "default": "auto (use story model)",
-                    "tooltip": (
-                        "[v2.0 MVP no-op] Legacy two-LLM split widget "
-                        "for cleanup phases. v2 LPL uses one model for "
-                        "outline + line composition; the structured "
-                        "cleanup phases the legacy writer ran are no "
-                        "longer in the pipeline. Kept here for UI parity."
-                    ),
-                }),
                 "custom_premise": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -956,29 +916,30 @@ class OTR_LedgerScriptWriter:
                         "shape` line 2026-05-10."
                     ),
                 }),
-                "self_critique": ("BOOLEAN", {
-                    "default": True,
+                # act_count sits where target_length used to be in the
+                # widget order. Replaced the legacy target_length combo
+                # (post-Phase-3 cleanup 2026-05-11) with the typed,
+                # JS-clamped integer dropdown that the synthesis §3
+                # Phase 2A specified as the authoritative act-count
+                # control. Driven live from target_words by
+                # web/js/otr_act_count_widget.js.
+                "act_count": ("INT", {
+                    "default": 0, "min": 0, "max": 7, "step": 1,
                     "tooltip": (
-                        "[v2.0 MVP no-op] Legacy Draft -> Critique -> "
-                        "Revise loop. v2 pipeline does this in a "
-                        "downstream OTR_LLMScriptCritic node instead "
-                        "of inside the writer."
-                    ),
-                }),
-                "target_length": (_TARGET_LENGTH_CHOICES, {
-                    "default": "short (3 acts)",
-                    "tooltip": (
-                        "[Phase 2A deprecated, kept for graph back-"
-                        "compat.] The smoke presets here ('30 words "
-                        "(smoke, 1 act)' / 'tiny (smoke, 1 act)') "
-                        "still FORCE target_words=30 / 100 when "
-                        "selected. The structural act-count signal "
-                        "this widget previously carried is now driven "
-                        "by `act_count` + `target_words` -> "
-                        "`compute_episode_budget`. Saved workflows "
-                        "with a target_length value load cleanly; "
-                        "new workflows should leave this on the "
-                        "default and use `act_count` instead."
+                        "Number of acts (1-7). 0 (default) = "
+                        "auto-derive from target_words via "
+                        "_otr_episode_budget.default_act_count.\n\n"
+                        "Default-act thresholds (target_words floor):\n"
+                        "  30   -> default 1 act\n"
+                        "  150  -> default 2 acts\n"
+                        "  300  -> default 3 acts (and all higher words)\n\n"
+                        "Maximum cap per target_words: target_words // 50, "
+                        "hard ceiling 7. The user can pick UP from the "
+                        "default but not below.\n\n"
+                        "The JS extension at web/js/otr_act_count_widget.js "
+                        "live-updates the valid dropdown choices when "
+                        "target_words changes; the Python validator is "
+                        "authoritative (rejects any out-of-band combo)."
                     ),
                 }),
                 "style": (_STYLE_CHOICES, {
@@ -1025,14 +986,6 @@ class OTR_LedgerScriptWriter:
                         "so 'maximum chaos' caps at 0.95.)"
                     ),
                 }),
-                "arc_enhancer": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": (
-                        "[v2.0 MVP no-op] Legacy arc-structure "
-                        "enhancer. v2 LPL outline schema enforces a "
-                        "narrative arc via its beat list directly."
-                    ),
-                }),
                 "optimization_profile": (_OPTIMIZATION_PROFILE_CHOICES, {
                     "default": "Standard",
                     "tooltip": (
@@ -1053,30 +1006,6 @@ class OTR_LedgerScriptWriter:
                         "free disk space. Leave OFF for any run you "
                         "want to keep the per-stage mp4 set around for "
                         "debugging."
-                    ),
-                }),
-                # Phase 2A (2026-05-11). Appended at the END of optional
-                # widgets so legacy saved workflows (widgets_values with
-                # 17 entries, no act_count) preserve their positional
-                # mapping. New workflows pick up act_count as the 18th
-                # entry; missing entries default to 0 (auto-derive).
-                "act_count": ("INT", {
-                    "default": 0, "min": 0, "max": 7, "step": 1,
-                    "tooltip": (
-                        "Phase 2A (2026-05-11). Number of acts (1-7). "
-                        "0 (default) = auto-derive from target_words "
-                        "via _otr_episode_budget.default_act_count.\n\n"
-                        "Default-act thresholds (target_words floor):\n"
-                        "  30   -> default 1 act\n"
-                        "  150  -> default 2 acts\n"
-                        "  300  -> default 3 acts (and all higher words)\n\n"
-                        "Maximum cap per target_words: target_words // 50, "
-                        "hard ceiling 7. The user can pick UP from the "
-                        "default but not below.\n\n"
-                        "The JS extension at web/js/otr_act_count_widget.js "
-                        "live-updates the valid dropdown choices when "
-                        "target_words changes; the Python validator is "
-                        "authoritative (rejects any out-of-band combo)."
                     ),
                 }),
             },
@@ -1107,21 +1036,14 @@ class OTR_LedgerScriptWriter:
         num_characters=2,
         seed=0,
         model_id=DEFAULT_MODEL_ID,
-        cleanup_model_id="auto (use story model)",
         custom_premise="",
         include_act_breaks=True,
-        self_critique=True,
-        target_length="short (3 acts)",
+        act_count=0,
         style=_STYLE_AUTO_SENTINEL,
         style_custom="",
         creativity="balanced",
-        arc_enhancer=True,
         optimization_profile="Standard",
         perfect_run_spacesaver=False,
-        # Phase 2A (2026-05-11). Trailing kwarg to mirror the
-        # tail position in INPUT_TYPES (so legacy graphs keep
-        # mapping). Default 0 = auto-derive.
-        act_count=0,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1131,16 +1053,12 @@ class OTR_LedgerScriptWriter:
             num_characters=num_characters,
             episode_title=episode_title,
             model_id=model_id,
-            cleanup_model_id=cleanup_model_id,
             custom_premise=custom_premise,
             include_act_breaks=include_act_breaks,
-            self_critique=self_critique,
-            target_length=target_length,
             act_count=act_count,
             style=style,
             style_custom=style_custom,
             creativity=creativity,
-            arc_enhancer=arc_enhancer,
             optimization_profile=optimization_profile,
             perfect_run_spacesaver=perfect_run_spacesaver,
         )
@@ -1423,7 +1341,6 @@ class OTR_LedgerScriptWriter:
             script_brief=script_brief,
             key_terms=key_terms_tuple,
             cast_descriptions=cast_descriptions,
-            target_length=str(resolved.get("target_length") or ""),
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,
         )
@@ -1878,7 +1795,6 @@ class OTR_LedgerScriptWriter:
             "target_words":         resolved["target_words"],
             "num_characters":       resolved["num_characters"],
             "model_id":              resolved["model_id"],
-            "cleanup_model_id":      resolved["cleanup_model_id"],
             "style":                 resolved["style"],
             "style_combo":           resolved["style_combo"],
             "style_custom":          resolved["style_custom"],
@@ -1886,10 +1802,8 @@ class OTR_LedgerScriptWriter:
             "creativity":            resolved["creativity"],
             "temperature":           resolved["temperature"],
             "top_p":                 resolved["top_p"],
-            "target_length":         resolved["target_length"],
+            "act_count":             resolved["act_count"],
             "include_act_breaks":    resolved["include_act_breaks"],
-            "self_critique":         resolved["self_critique"],
-            "arc_enhancer":          resolved["arc_enhancer"],
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
         }

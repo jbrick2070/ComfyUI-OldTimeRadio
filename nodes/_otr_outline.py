@@ -255,39 +255,19 @@ class OutlineRequest:
                              # prompt as a "Required terms" line when non-
                              # empty so the outline can plan beats that
                              # naturally land them.
-    target_length: str = ""
-                             # OPTIONAL. User-facing label from the
-                             # writer's target_length combo, e.g.
-                             # "short (3 acts)", "medium (5 acts)",
-                             # "long (7-8 acts)", "epic (10+ acts)".
-                             # When non-empty, the prompt renders a
-                             # "Target episode shape: <label>" line so
-                             # the outline LLM sees the act-count
-                             # signal embedded in the label. Smoke
-                             # presets ("30 words (smoke, 1 act)" /
-                             # "tiny (smoke, 1 act)") force a
-                             # target_words override at the writer
-                             # layer; the resolved label still flows
-                             # through here so the smoke runs also see
-                             # "(1 act)" guidance. When empty (default
-                             # for tests + early-stage callers), the
-                             # structure line is omitted entirely
-                             # (back-compat). Wired in writer D.5
-                             # 2026-05-10 (closes [v2.0 MVP no-op]).
+    # target_length field removed 2026-05-11 (post-Phase-3 cleanup
+    # pass). The writer's target_length widget went with it; act-
+    # count signal now flows via the `budget` field
+    # (EpisodeBudget from compute_episode_budget).
     include_act_breaks: bool = True
                              # OPTIONAL. Mirrors the writer's
-                             # include_act_breaks widget. When True
-                             # AND target_length is non-empty, the
-                             # prompt appends "Include music_inter
-                             # beats between acts." When False (and
-                             # target_length non-empty), the prompt
-                             # appends "Continuous flow: do not
-                             # include music_inter beats." Outline
-                             # schema (Beat.speaker_role) already
-                             # supports music_inter; this just tells
-                             # the LLM whether to USE it. Wired in
-                             # writer D.5 2026-05-10 (closes
-                             # [v2.0 MVP no-op]).
+                             # include_act_breaks widget. Affects
+                             # whether the outline LLM is told to plan
+                             # music_inter beats. The EpisodeBudget
+                             # (when `budget` is non-None) is the
+                             # authoritative source for music_inter
+                             # count; this flag is the user-facing
+                             # toggle that drives it.
     budget: object = None
                              # Phase 2A (2026-05-11). Optional
                              # _otr_episode_budget.EpisodeBudget. When
@@ -492,24 +472,11 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     # early-stage callers that pre-date the cast contract.
     parts.append(_format_cast_block(req))
     parts.append(f"Style: {req.style}")
-    # Structure line: target_length label (with embedded "(N acts)"
-    # signal) + act-breaks instruction (include or skip music_inter
-    # beats). Skipped entirely when target_length is empty (back-
-    # compat for tests + early-stage callers). Wired into the
-    # writer's D.5 step 2026-05-10 (closes the [v2.0 MVP no-op]
-    # gap on the include_act_breaks + target_length widgets).
-    target_length = (req.target_length or "").strip()
-    if target_length:
-        if req.include_act_breaks:
-            parts.append(
-                f"Target episode shape: {target_length}. Include "
-                f"music_inter beats between acts."
-            )
-        else:
-            parts.append(
-                f"Target episode shape: {target_length}. Continuous "
-                f"flow: do not include music_inter beats."
-            )
+    # target_length structure line removed 2026-05-11 (post-Phase-3
+    # cleanup). The act-count signal now flows entirely through the
+    # EPISODE BUDGET block below (when `budget` is non-None); the
+    # include_act_breaks toggle drives music_inter_count inside the
+    # budget rather than appearing in its own prose line.
     # Phase 2A (2026-05-11): EPISODE BUDGET block. Lands BEFORE the
     # target_words summary so the LLM sees concrete numbers for every
     # phase + beat-range before being told the rough total. Skipped
@@ -1367,10 +1334,11 @@ if __name__ == "__main__":
             f"11f: expected 3-tuple ValueError, got: {exc}"
         print("  PASS 11f: bad-shape rejected")
 
-    # Test 12: target_length + include_act_breaks fields
-    print("\n[Test 12] OutlineRequest.target_length + include_act_breaks")
+    # Test 12: include_act_breaks default behavior (target_length
+    # removed 2026-05-11; the act-count signal now flows entirely
+    # through the EpisodeBudget block, not a separate prose line).
+    print("\n[Test 12] include_act_breaks defaults + no_struct prompt")
 
-    # 12a: empty target_length -> structure line omitted entirely (back-compat).
     no_struct_req = OutlineRequest(
         news_seed="seed", style="noir",
         character_cast=("ALICE",),
@@ -1378,64 +1346,13 @@ if __name__ == "__main__":
     )
     no_struct_prompt = _build_user_prompt(no_struct_req)
     assert "Target episode shape:" not in no_struct_prompt, \
-        "12a: structure line must NOT render when target_length empty"
+        "12a: legacy 'Target episode shape:' line must not appear"
     assert "Target total dialogue length: ~200 words" in no_struct_prompt, \
         "12a: target_words line must still render"
-    print("  PASS 12a: empty target_length -> no structure line (back-compat)")
-
-    # 12b: populated target_length + act_breaks=True -> include line.
-    with_breaks_req = OutlineRequest(
-        news_seed="seed", style="noir",
-        character_cast=("ALICE",),
-        target_words=350,
-        target_length="long (7-8 acts)",
-        include_act_breaks=True,
-    )
-    with_breaks_prompt = _build_user_prompt(with_breaks_req)
-    assert "Target episode shape: long (7-8 acts). Include music_inter beats between acts." in with_breaks_prompt, \
-        f"12b: act-breaks-on line missing or wrong:\n{with_breaks_prompt}"
-    print("  PASS 12b: target_length + include_act_breaks=True renders 'Include music_inter' instruction")
-
-    # 12c: populated target_length + act_breaks=False -> continuous-flow line.
-    no_breaks_req = OutlineRequest(
-        news_seed="seed", style="noir",
-        character_cast=("ALICE",),
-        target_words=200,
-        target_length="short (3 acts)",
-        include_act_breaks=False,
-    )
-    no_breaks_prompt = _build_user_prompt(no_breaks_req)
-    assert "Target episode shape: short (3 acts). Continuous flow: do not include music_inter beats." in no_breaks_prompt, \
-        f"12c: act-breaks-off line missing or wrong:\n{no_breaks_prompt}"
-    print("  PASS 12c: target_length + include_act_breaks=False renders 'Continuous flow' instruction")
-
-    # 12d: structure line lands BEFORE the target_words line and AFTER style line.
-    order_req = OutlineRequest(
-        news_seed="seed", style="noir",
-        character_cast=("ALICE",),
-        target_words=200,
-        target_length="medium (5 acts)",
-        include_act_breaks=True,
-    )
-    order_prompt = _build_user_prompt(order_req)
-    style_idx = order_prompt.find("Style: noir")
-    shape_idx = order_prompt.find("Target episode shape:")
-    words_idx = order_prompt.find("Target total dialogue length:")
-    assert -1 < style_idx < shape_idx < words_idx, \
-        f"12d: prompt order must be Style -> shape -> target_words; got positions {style_idx}, {shape_idx}, {words_idx}"
-    print("  PASS 12d: prompt section order is Style -> episode shape -> target words")
-
-    # 12e: include_act_breaks default = True (mirrors the writer widget).
-    default_req = OutlineRequest(
-        news_seed="seed", style="noir",
-        character_cast=("ALICE",),
-        target_words=200,
-    )
-    assert default_req.include_act_breaks is True, \
-        "12e: include_act_breaks default must be True (matches widget default)"
-    assert default_req.target_length == "", \
-        "12e: target_length default must be empty (back-compat)"
-    print("  PASS 12e: defaults are include_act_breaks=True, target_length=''")
+    assert no_struct_req.include_act_breaks is True, \
+        "12b: include_act_breaks default must be True"
+    print("  PASS 12: target_length structure line gone; "
+          "include_act_breaks default True preserved")
 
     # Test 13: Fix 1 (post-Phase-3 review, 2026-05-11) -- arc_phase
     # required-with-default. A 12B LLM that omits the field must NOT
