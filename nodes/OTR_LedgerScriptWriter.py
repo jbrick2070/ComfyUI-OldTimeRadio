@@ -339,7 +339,7 @@ def _generate_style_via_llm(
     # a 1-2 sentence summary is plenty of grounding for the style call.
     excerpt = seed_excerpt[:600]
     sys_msg = (
-        "You are a 1940s sci-fi radio drama showrunner. Given a real "
+        "You are a sci-fi radio drama showrunner. Given a real "
         "science article, you propose a short tonal style descriptor "
         "for the episode adaptation. Examples of valid output: "
         "'tense claustrophobic', 'noir mystery', 'pulp adventure', "
@@ -425,7 +425,7 @@ def _generate_title_from_script(
     excerpt = text[:3000]
 
     sys_msg = (
-        "You are titling a single episode of a 1940s sci-fi radio drama. "
+        "You are titling a single episode of a sci-fi radio drama. "
         "You receive the final dialogue transcript and propose an "
         "evocative 2-5 word episode title."
     )
