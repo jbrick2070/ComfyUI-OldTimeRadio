@@ -100,6 +100,16 @@ _NODE_MODULES = {
     # freeze) at exit. The legacy OTR_LedgerScriptReviewer name is
     # registered as an alias below so existing workflow JSONs load.
     "OTR_LedgerFreezeCascade": (".nodes.OTR_LedgerFreezeCascade", "OTR_LedgerFreezeCascade", " LFC Ledger Freeze Cascade (v2.0)"),
+    # Clean-break commit 12.11 (2026-05-12, C1 design call).
+    # Standalone per-phase nodes for the heavy LLM phases. The main
+    # cascade still owns the full chain; these are ADDITIONAL entry
+    # points so operators can per-phase skip / rerun from the
+    # canvas without rerunning the upstream cascade. Each defaults
+    # OFF so dropping a node on the canvas is a no-op until opted
+    # in.
+    "OTR_LFCPhase4Scene": (".nodes.OTR_LFCPhase4Scene", "OTR_LFCPhase4Scene", " LFC Phase 4 - Scene Coherence"),
+    "OTR_LFCPhase5Voice": (".nodes.OTR_LFCPhase5Voice", "OTR_LFCPhase5Voice", " LFC Phase 5 - Voice Drift"),
+    "OTR_LFCPhase6Arc":   (".nodes.OTR_LFCPhase6Arc",   "OTR_LFCPhase6Arc",   " LFC Phase 6 - Episode Arc"),
     "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),
