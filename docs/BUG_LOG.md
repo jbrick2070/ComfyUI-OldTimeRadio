@@ -5,6 +5,32 @@ Entries are never deleted.
 
 ---
 
+### NON-BUG-2026-05-11: LFC sprint (Multi-Turn Polish ADR) — 10 of 14 commits landed on v2.0-alpha at 80b4244
+
+- **Date:** 2026-05-11 | **Phase:** v2.0-alpha post-Phase-3-reviewer | **Bible candidate:** no (sprint milestone)
+- **Symptom:** Multi-turn polish ADR (docs/2026-05-11-multi-turn-polish-adr.md) implementation. Replaces the single optional polish call with a multi-phase Ledger Freeze Cascade between the writer and downstream audio/video chain. Goal state: post-cascade ledger is byte-stable, structurally complete, cast-contract-valid, surface-polished, scene-coherent, voice-consistent, arc-validated, audio-safe, video-safe, stamped with meta.cleanup_locked=True.
+- **Commits landed:**
+  - `64a818f` commit 1  — Phase 0 + Phase 10 scaffolding (gap audit + freeze + null-rejection)
+  - `ba4d7c5` commit 2  — Reviewer rename `OTR_LedgerScriptReviewer` → `OTR_LedgerFreezeCascade` + orchestrator skeleton
+  - `edc2086` commit 3  — Code fixes 6.1-6.4 (announcer guard + refusal detector + polish context + separate generate_fn)
+  - `5f6ceb1` commit 4  — Phase 3 per-line polish wired into the cascade (default OFF)
+  - `b6278e4` commit 5  — Phase 7 audio readiness + Phase 8 video readiness (deterministic, default ON)
+  - `7e8ea6f` commit 6  — Two-step gen + JSON repair loop helpers (ADR 6.11 / 6.12)
+  - `50ad53e` commit 7  — Macro-Bible + Micro-Recap context injection (ADR 6.13)
+  - `b07a6b6` commit 11 — Phase 4.5 Smart Suggestion (deterministic SFX / music synthesis, default OFF)
+  - `03bbcf1` commit 13 — Acceptance test for script_parse_json retirement (ADR §10)
+  - `80b4244` commit 12 — Code fixes 6.5-6.10 (VRAM watchdog + voice-drift stats + per-phase widgets + workflow JSON wiring)
+- **Commits deferred** (handoff doc at `docs/2026-05-11-multi-turn-polish-qa-handoff.md`):
+  - commit 8  — Phase 4 per-scene coherence (heavy LLM phase; orchestrator stub `_phase_4_per_scene_coherence_stub` in place)
+  - commit 9  — Phase 5 per-speaker voice drift (heavy LLM phase; stats helpers already shipped in commit 12 watchdog module)
+  - commit 10 — Phase 6 episode arc (heavy LLM phase; EditorNote / EditorNotesOutput schemas already shipped in commit 6)
+  - commit 14 — Soak test harness (depends on 8/9/10 wiring)
+- **Workflow JSON updated:** node id 62 renamed `OTR_LedgerScriptReviewer` → `OTR_LedgerFreezeCascade`; title "1b. Ledger Freeze Cascade (Phase 0..10)"; output socket 4 renamed `reviewer_verdict` → `freeze_verdict`; `widgets_values` extended 1 → 7 positional slots (model_id, 5 BOOLEAN toggles, 1 FLOAT VRAM ceiling). Back-compat alias preserved in `__init__.py` so existing workflow JSONs referencing the old class name still load.
+- **Verify:** AST clean across all touched modules. pytest tests/test_lfc_*.py + tests/test_phase3_ledger_reviewer.py + tests/test_phase1_composer_prompt.py + tests/test_workflow_json_guardrails.py: 350+ pass / 0 fail across LFC + composer + reviewer + workflow guardrail suites. Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (baseline held). Push verified: local HEAD == origin HEAD == `80b4244`.
+- **Tags:** lfc, multi-turn-polish, cascade, phase-0, phase-3, phase-4-5, phase-7, phase-8, phase-10, reviewer-rename, freeze-cascade, json-wiring, sprint-partial, partial-sprint-handoff
+
+---
+
 ### NON-BUG-2026-05-11: script-writing-architecture Phases 0-3 shipped — phantom-name gate, prompt enrichment, episode budget, progressive ledger, three-pass cast-gated reviewer
 
 - **Date:** 2026-05-11 | **Phase:** v2.0-alpha post-news_interpreter | **Bible candidate:** no (sprint milestone)
