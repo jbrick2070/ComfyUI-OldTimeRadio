@@ -217,14 +217,22 @@ class TestBuildUserPrompt:
         )
         prompt = _build_user_prompt(req)
         assert "STYLE:" not in prompt
+        assert "THEME:" not in prompt
         assert "OUTLINE:" not in prompt
         assert "ALLOWED NAMES" not in prompt
+        assert "NAMED ENTITIES" not in prompt
         assert "CHARACTER:" not in prompt
+        assert "CAST" not in prompt
+        assert "CURRENT BEAT" not in prompt
+        assert "POSITION:" not in prompt
+        assert "SOUND IN THE ROOM" not in prompt
         # Required blocks always present.
         assert "EPISODE CONTEXT" in prompt
-        assert "RECENT DIALOGUE" in prompt
+        assert "LAST SPOKEN (this scene):" in prompt
         assert "WRITE LINE" in prompt
-        assert "Speaker: ALICE" in prompt
+        # v4: role induction replaces "Speaker: ALICE" label.
+        assert "You are ALICE." in prompt
+        assert "Speak now." in prompt
 
     def test_style_block_renders_when_set(self):
         req = LineRequest(
@@ -263,11 +271,137 @@ class TestBuildUserPrompt:
             character_voice_card="ALICE (female, weary forensic engineer)",
         )
         prompt = _build_user_prompt(req)
+        # v4: legacy CHARACTER block still emits when all_voice_cards
+        # is empty. Full-cast CAST block (Commit 2) supersedes it.
         assert "CHARACTER: ALICE (female, weary forensic engineer)" in prompt
 
+    def test_cast_block_replaces_character_when_all_voice_cards_set(self):
+        # v4 Commit 2: full-cast block joined from voice_card_by_name.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            character_voice_card="ALICE (female, weary)",
+            all_voice_cards=(
+                "ALICE (female, weary)\nBOB (male, anxious)"
+            ),
+        )
+        prompt = _build_user_prompt(req)
+        assert "CAST" in prompt
+        # When CAST renders, the single-speaker CHARACTER block is
+        # suppressed.
+        assert "CHARACTER:" not in prompt
+        assert "ALICE (female, weary)" in prompt
+        assert "BOB (male, anxious)" in prompt
+
+    def test_named_entities_block_replaces_allowed_names_when_split_set(self):
+        # v4 Commit 1: when allowed_people / allowed_things are
+        # populated, render NAMED ENTITIES split blocks instead of
+        # the legacy ALLOWED NAMES line.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            allowed_people=frozenset({"ALICE", "BOB"}),
+            allowed_things=frozenset({"CERN", "JPL"}),
+            allowed_roster=frozenset({"ALICE", "BOB", "CERN", "JPL", "ANNOUNCER"}),
+        )
+        prompt = _build_user_prompt(req)
+        assert "NAMED ENTITIES IN THIS WORLD" in prompt
+        assert "People: ALICE, BOB" in prompt
+        assert "Places, agencies, things: CERN, JPL" in prompt
+        assert "Generic roles" in prompt
+        # Legacy ALLOWED NAMES line does NOT also render.
+        assert "ALLOWED NAMES" not in prompt
+
+    def test_current_beat_block_renders_when_set(self):
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            current_beat_block="CURRENT BEAT\n  b003 ALICE (tense): reveal",
+        )
+        prompt = _build_user_prompt(req)
+        assert "CURRENT BEAT" in prompt
+        assert "b003 ALICE (tense): reveal" in prompt
+
+    def test_position_block_renders_when_set(self):
+        # v4 Commit 4: POSITION supersedes ARC PHASE.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            position="complication, beat 2 of 4. Next phase: climax.",
+        )
+        prompt = _build_user_prompt(req)
+        assert "POSITION: complication, beat 2 of 4. Next phase: climax." in prompt
+        # Legacy ARC PHASE block does NOT also render when position is set.
+        assert "ARC PHASE" not in prompt
+
+    def test_position_falls_back_to_arc_phase_when_only_arc_phase_set(self):
+        # Back-compat: arc_phase set + position empty still renders
+        # the legacy ARC PHASE block.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            arc_phase="complication",
+        )
+        prompt = _build_user_prompt(req)
+        assert "ARC PHASE: complication" in prompt
+        assert "POSITION:" not in prompt
+
+    def test_theme_block_renders_when_set(self):
+        # v4 Commit 2: one-sentence theme from meta.news.script_brief.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            theme="A signal from the void answers back.",
+        )
+        prompt = _build_user_prompt(req)
+        assert "THEME: A signal from the void answers back." in prompt
+
+    def test_sfx_cue_block_renders_when_set(self):
+        # v4 Commit 2: beat.sfx_cue threaded as SOUND IN THE ROOM.
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            sfx_cue="distant klaxon",
+        )
+        prompt = _build_user_prompt(req)
+        assert "SOUND IN THE ROOM: distant klaxon" in prompt
+
+    def test_role_induction_responds_to_when_prev_speaker_set(self):
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[("BOB", "Hi.")],
+            prev_speaker="BOB",
+        )
+        prompt = _build_user_prompt(req)
+        assert "You are ALICE. You are responding to BOB." in prompt
+
+    def test_role_induction_no_responding_clause_when_prev_speaker_empty(self):
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[],
+            prev_speaker="",
+        )
+        prompt = _build_user_prompt(req)
+        assert "You are ALICE." in prompt
+        assert "responding to" not in prompt
+
+    def test_role_induction_drops_responding_clause_when_prev_is_self(self):
+        # Edge case: rolling window's last entry is the same speaker
+        # (two-line monologue). Drop the "responding to" clause to
+        # avoid "You are ALICE. You are responding to ALICE."
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense", target_words=15,
+            canon_header="x", last_lines=[("ALICE", "I started.")],
+            prev_speaker="ALICE",
+        )
+        prompt = _build_user_prompt(req)
+        assert "You are ALICE." in prompt
+        assert "responding to" not in prompt
+
     def test_static_blocks_precede_variable_blocks_for_kv_cache(self):
-        """STATIC = style + canon + spine + roster (cached prefix).
-        VARIABLE = character + last_lines + write_line (changes per call).
+        """STATIC = style + theme + canon + entities + cast + spine (cached prefix).
+        VARIABLE = current_beat + position + sfx + last_spoken + write_line
+                   (changes per call).
 
         For KV-cache reuse to hit, every STATIC element must appear
         BEFORE every VARIABLE element. This test pins that ordering
@@ -278,20 +412,34 @@ class TestBuildUserPrompt:
             speaker="ALICE", intent="reveal", mood="tense", target_words=15,
             canon_header="TITLE: x", last_lines=[("BOB", "Hi.")],
             style_descriptor="noir_interrogation",
-            outline_spine="OUTLINE:\n  b001 ALICE (tense): speak",
+            outline_spine="OUTLINE:\n  b001 BOB (worried): warn\n  b002 ALICE (tense): reveal",
             character_voice_card="ALICE (female, weary)",
             allowed_roster=frozenset({"ALICE", "BOB", "ANNOUNCER"}),
+            allowed_people=frozenset({"ALICE", "BOB"}),
+            allowed_things=frozenset({"CERN"}),
+            all_voice_cards="ALICE (female, weary)\nBOB (male, anxious)",
+            theme="The voice on the wire is not who it claims to be.",
+            current_beat_block="CURRENT BEAT\n  b002 ALICE (tense): reveal",
+            position="complication, beat 1 of 2. Next phase: resolution.",
+            sfx_cue="distant klaxon",
+            prev_speaker="BOB",
         )
         prompt = _build_user_prompt(req)
-        static_blocks = ["STYLE:", "EPISODE CONTEXT", "OUTLINE:",
-                         "ALLOWED NAMES"]
-        variable_blocks = ["CHARACTER:", "RECENT DIALOGUE", "WRITE LINE"]
+        static_blocks = ["STYLE:", "THEME:", "EPISODE CONTEXT",
+                         "NAMED ENTITIES", "CAST", "OUTLINE:"]
+        variable_blocks = ["CURRENT BEAT", "POSITION:",
+                           "SOUND IN THE ROOM",
+                           "LAST SPOKEN (this scene):", "WRITE LINE"]
         static_positions = [prompt.find(b) for b in static_blocks]
         variable_positions = [prompt.find(b) for b in variable_blocks]
-        assert all(p > -1 for p in static_positions), \
-            f"missing static blocks: {static_positions}"
-        assert all(p > -1 for p in variable_positions), \
-            f"missing variable blocks: {variable_positions}"
+        assert all(p > -1 for p in static_positions), (
+            f"missing static blocks: "
+            f"{dict(zip(static_blocks, static_positions))}"
+        )
+        assert all(p > -1 for p in variable_positions), (
+            f"missing variable blocks: "
+            f"{dict(zip(variable_blocks, variable_positions))}"
+        )
         max_static = max(static_positions)
         min_variable = min(variable_positions)
         assert max_static < min_variable, (
@@ -334,7 +482,8 @@ class TestBuildUserPrompt:
             canon_header="x", last_lines=[],
         )
         prompt = _build_user_prompt(req)
-        assert "no prior dialogue" in prompt
+        # v4: placeholder phrasing updated to "scene just opened".
+        assert "scene just opened" in prompt
 
 
 # ---------------------------------------------------------------------------

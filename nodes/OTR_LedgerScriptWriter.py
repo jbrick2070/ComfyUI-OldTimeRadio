@@ -92,6 +92,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -1445,6 +1446,72 @@ class OTR_LedgerScriptWriter:
             len(outline_spine), len(voice_card_by_name),
         )
 
+        # Phase 4 v4 (2026-05-11): split rosters for prompt rendering.
+        # `allowed_roster` stays the union (input to the phantom
+        # gate); cast names and journalistic key_terms render in
+        # distinct buckets inside the composer's NAMED ENTITIES block.
+        allowed_people = frozenset(
+            (r.get("name") if isinstance(r, dict) else getattr(r, "name", ""))
+            for r in cast_rows
+            if (r.get("name") if isinstance(r, dict) else getattr(r, "name", ""))
+        )
+        allowed_things = frozenset(key_terms_tuple)
+
+        # Phase 4 v4 (2026-05-11): full-cast voice cards block. Joined
+        # in cast_rows order (dict ordering preserves insertion order).
+        all_voice_cards_str = "\n".join(
+            card for card in voice_card_by_name.values() if card
+        )
+
+        # Phase 4 v4 (2026-05-11): one-sentence theme from
+        # meta.news.script_brief. Robust to abbreviations ("Dr. Smith
+        # ...") via terminal-punctuation + whitespace split, not bare
+        # ".". Empty string flips the THEME block off cleanly.
+        _brief = str(
+            (meta.get("news") or {}).get("script_brief") or ""
+        ).strip()
+        if _brief:
+            _split = re.split(r"(?<=[.!?])\s+", _brief, maxsplit=1)
+            theme = _split[0].strip() if _split and _split[0] else ""
+        else:
+            theme = ""
+
+        # Phase 4 v4 (2026-05-11): precompute per-beat POSITION
+        # strings. Format "<phase>, beat N of M. Next phase: <next>."
+        # or "<phase>, beat N of M. Final phase." for the final phase.
+        phase_beats: dict = {}
+        for _b in outline.beats:
+            phase_beats.setdefault(_b.arc_phase or "setup", []).append(
+                _b.beat_id,
+            )
+        arc_order = (
+            list(episode_budget.arc_phases)
+            if episode_budget is not None
+            else list(dict.fromkeys(
+                (_b.arc_phase or "setup") for _b in outline.beats
+            ))
+        )
+
+        def _position_for(beat) -> str:
+            this_phase = (beat.arc_phase or "setup").strip()
+            phase_idx = (
+                arc_order.index(this_phase) if this_phase in arc_order else 0
+            )
+            next_phase = (
+                arc_order[phase_idx + 1]
+                if phase_idx + 1 < len(arc_order)
+                else "end"
+            )
+            ids = phase_beats.get(this_phase, [])
+            beat_n = ids.index(beat.beat_id) + 1 if beat.beat_id in ids else 1
+            beat_total = len(ids) if ids else 1
+            tail = (
+                f" Next phase: {next_phase}."
+                if next_phase != "end"
+                else " Final phase."
+            )
+            return f"{this_phase}, beat {beat_n} of {beat_total}.{tail}"
+
         # Style descriptor for the composer's STATIC prefix. Empty
         # string flips the STYLE block off in _build_user_prompt --
         # back-compat for callers without a style picked yet.
@@ -1458,6 +1525,10 @@ class OTR_LedgerScriptWriter:
             beat_compose_flags: tuple[str, ...] = ()
 
             if beat.speaker_role == "character":
+                # Phase 4 v4 (2026-05-11): derive prev_speaker from
+                # the rolling-window tail. Empty window -> empty
+                # string (drops "responding to" clause in WRITE LINE).
+                prev_speaker = last_lines[-1][0].strip() if last_lines else ""
                 line_req = _OTRLC.LineRequest(
                     speaker=beat.speaker,
                     intent=beat.intent,
@@ -1474,6 +1545,17 @@ class OTR_LedgerScriptWriter:
                     ),
                     # Phase 2A (2026-05-11) arc_phase awareness.
                     arc_phase=(beat.arc_phase or "").strip(),
+                    # Phase 4 v4 (2026-05-11) prompt revision.
+                    allowed_people=allowed_people,
+                    allowed_things=allowed_things,
+                    prev_speaker=prev_speaker,
+                    current_beat_block=_OTRLC.render_current_beat(
+                        outline, beat.beat_id,
+                    ),
+                    theme=theme,
+                    all_voice_cards=all_voice_cards_str,
+                    sfx_cue=(beat.sfx_cue or "").strip(),
+                    position=_position_for(beat),
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
@@ -1488,6 +1570,8 @@ class OTR_LedgerScriptWriter:
                     last_lines.pop(0)
 
             elif beat.speaker_role == "announcer":
+                # Phase 4 v4 (2026-05-11): prev_speaker from window tail.
+                prev_speaker = last_lines[-1][0].strip() if last_lines else ""
                 line_req = _OTRLC.LineRequest(
                     speaker="ANNOUNCER",
                     intent=beat.intent,
@@ -1504,6 +1588,17 @@ class OTR_LedgerScriptWriter:
                     ),
                     # Phase 2A (2026-05-11) arc_phase awareness.
                     arc_phase=(beat.arc_phase or "").strip(),
+                    # Phase 4 v4 (2026-05-11) prompt revision.
+                    allowed_people=allowed_people,
+                    allowed_things=allowed_things,
+                    prev_speaker=prev_speaker,
+                    current_beat_block=_OTRLC.render_current_beat(
+                        outline, beat.beat_id,
+                    ),
+                    theme=theme,
+                    all_voice_cards=all_voice_cards_str,
+                    sfx_cue=(beat.sfx_cue or "").strip(),
+                    position=_position_for(beat),
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
@@ -1518,6 +1613,15 @@ class OTR_LedgerScriptWriter:
                     last_lines.pop(0)
 
             elif beat.speaker_role in NON_VOICED_ROLES:
+                # Phase 4 v4 (2026-05-11): scene-local LAST SPOKEN
+                # window. Crossing a music marker resets the
+                # conversation context — listeners experience a scene
+                # break, so the composer should too. Lines from before
+                # the marker are wrong signal for what comes after.
+                if beat.speaker_role in {
+                    "music_open", "music_inter", "music_close",
+                }:
+                    last_lines.clear()
                 cleaned = (beat.sfx_cue or beat.intent or "").strip()
                 cid = beat.speaker_role
                 token = f"[SFX: {cleaned}]"

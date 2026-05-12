@@ -47,6 +47,8 @@ __all__ = [
     # Phase 1 (2026-05-11)
     "render_outline_spine",
     "build_voice_card",
+    # Phase 4 v4 (2026-05-11)
+    "render_current_beat",
 ]
 
 
@@ -398,6 +400,52 @@ class LineRequest:
     # ARC_PHASE_GUIDANCE one-liner for the current phase so the
     # composer steers by narrative phase, not just mood.
     arc_phase: str = ""
+    # Phase 4 v4 (2026-05-11) -- prompt revision pass. All defaults
+    # are empty so every existing test / caller keeps working; each
+    # block in `_build_user_prompt` gates on the corresponding field
+    # being non-empty.
+    #
+    #   allowed_people / allowed_things  Split roster for prompt
+    #       rendering. Cast names ("ALICE") and journalistic terms
+    #       ("CERN") render in distinct buckets. `allowed_roster`
+    #       remains the union and stays the input to the phantom gate;
+    #       these two fields are render-only. When both are empty the
+    #       composer falls back to the legacy combined ALLOWED NAMES
+    #       block driven by `allowed_roster`.
+    #   prev_speaker  Name of the character who spoke the immediately
+    #       preceding line. Renders in the WRITE LINE role-induction
+    #       block as "You are responding to <name>." Empty drops that
+    #       sentence (first line of a scene, post-music marker).
+    #   current_beat_block  Pre-rendered CURRENT BEAT block (one
+    #       outline-spine row for the beat we are writing now). The
+    #       writer computes this once per beat via
+    #       `render_current_beat(outline, beat.beat_id)`. Keeping the
+    #       outline_spine itself plain (no arrow) lets the static
+    #       prefix stay byte-stable across every call in an episode
+    #       so a future KV-cache reuse pass lands without re-encoding
+    #       the spine.
+    #   theme  One-sentence theme from `meta.news.script_brief`
+    #       (Commit 2 in the v4 plan). Optional flavor, not the
+    #       structural-direction outline.
+    #   all_voice_cards  Newline-joined voice cards for the whole
+    #       cast (Commit 2). When set, replaces single-speaker
+    #       CHARACTER block with CAST. Falls back to
+    #       `character_voice_card` when empty.
+    #   sfx_cue  `beat.sfx_cue` for this beat (Commit 2). Renders as
+    #       SOUND IN THE ROOM in the per-beat tail.
+    #   position  "<phase>, beat N of M. Next phase: <next>." string
+    #       (Commit 4). Replaces the generic per-phase ARC_PHASE_GUIDANCE
+    #       one-liner with a position-specific directive. Falls back
+    #       to the legacy ARC PHASE block driven by `arc_phase` when
+    #       empty.
+    allowed_people: frozenset[str] = field(default_factory=frozenset)
+    allowed_things: frozenset[str] = field(default_factory=frozenset)
+    prev_speaker: str = ""
+    current_beat_block: str = ""
+    theme: str = ""
+    all_voice_cards: str = ""
+    sfx_cue: str = ""
+    position: str = ""
 
 
 @dataclass(frozen=True)
@@ -484,6 +532,63 @@ def render_outline_spine(outline_or_beats) -> str:
     return "\n".join(lines)
 
 
+def render_current_beat(outline_or_beats, current_beat_id: str) -> str:
+    """Render ONE row from the outline (the beat we are writing now).
+
+    Used by `_build_user_prompt` to emit a CURRENT BEAT block in the
+    per-call tail of the prompt without modifying the outline-spine
+    string (which lives in the static prefix and must stay byte-stable
+    across every composer call in the episode for KV-cache reuse to
+    land).
+
+    Returns:
+      "CURRENT BEAT\n  bNNN SPEAKER (mood): intent"
+        for character / announcer beats
+      "CURRENT BEAT\n  bNNN [role]: intent"
+        for music / sfx beats
+      "" when:
+        - outline_or_beats is None / empty
+        - current_beat_id is empty or does not match any row
+
+    Never raises.
+    """
+    if not current_beat_id:
+        return ""
+    if outline_or_beats is None:
+        return ""
+    if hasattr(outline_or_beats, "beats"):
+        beats = list(getattr(outline_or_beats, "beats") or [])
+    else:
+        try:
+            beats = list(outline_or_beats)
+        except TypeError:
+            return ""
+    if not beats:
+        return ""
+    target = str(current_beat_id).strip()
+    for b in beats:
+        if isinstance(b, dict):
+            beat_id = str(b.get("beat_id", "") or "")
+            speaker = str(b.get("speaker", "") or "")
+            role = str(b.get("speaker_role", "") or "")
+            mood = str(b.get("mood", "") or "")
+            intent = str(b.get("intent", "") or "")
+        else:
+            beat_id = str(getattr(b, "beat_id", "") or "")
+            speaker = str(getattr(b, "speaker", "") or "")
+            role = str(getattr(b, "speaker_role", "") or "")
+            mood = str(getattr(b, "mood", "") or "")
+            intent = str(getattr(b, "intent", "") or "")
+        if beat_id != target:
+            continue
+        if role in ("character", "announcer"):
+            mood_blurb = f" ({mood})" if mood else ""
+            return f"CURRENT BEAT\n  {beat_id} {speaker}{mood_blurb}: {intent}"
+        role_label = f"[{role}]" if role else "[beat]"
+        return f"CURRENT BEAT\n  {beat_id} {role_label}: {intent}"
+    return ""
+
+
 def build_voice_card(cast_row) -> str:
     """Render one cast row as a compact voice card for the composer.
 
@@ -560,19 +665,41 @@ class LineCompositionFailedError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """\
-You write a single line of dialogue for an audio drama.
+You write one spoken line for a character in a radio drama.
 
-Output ONLY the line the character speaks. Do not include the character name. Do not include stage directions. Do not wrap the line in quotes. No prefix, no suffix, no formatting markup.
+OUTPUT FORMAT - strict:
+- Only the words the character speaks out loud.
+- No character name, no colon, no quotation marks.
+- No stage directions. No actions in parentheses or brackets.
+- No "he said" / "she added" / narration of any kind.
+- Output the single line and stop. Nothing before it, nothing after.
 
-Match the requested word count approximately. Match the requested mood. Speak in the voice of the character given the recent dialogue context and the episode setting.
+CRAFT:
+- Imply more than you state. People rarely say what they mean.
+- Push the scene forward by one small step.
+- Follow naturally from the last thing said.
+- Stay in the speaker's voice - their job, their pressure, their habits.
+- Inhabit the mood without naming it.
+- Use only proper nouns listed under NAMED ENTITIES. Generic roles
+  ("the tech", "the lab", "mission control") are fine.
 
-If you have nothing the character should say, output one short natural-sounding line that fits the moment. Never refuse, never explain, never apologize, never output meta commentary. Just the spoken line.
+Short and charged beats long and explanatory. Within plus or minus
+30% of the requested word count.
 """
 
 
 def _format_last_lines(last_lines: list[tuple[str, str]]) -> str:
+    """Render the rolling-window of recent dialogue.
+
+    Phase 4 v4 (2026-05-11): label moved from "RECENT DIALOGUE" to
+    "LAST SPOKEN (this scene)" at the call site. Empty window now
+    emits a more descriptive placeholder so the model knows whether
+    it is writing the first spoken line of a scene vs the first line
+    of the whole episode (Commit 3 cleared the window at music
+    markers so this state is reachable mid-episode too).
+    """
     if not last_lines:
-        return "(no prior dialogue -- this is the first line of the episode)"
+        return "(scene just opened - no one has spoken yet)"
     rows = [f"[{spk}]: {txt}" for spk, txt in last_lines]
     return "\n".join(rows)
 
@@ -580,34 +707,81 @@ def _format_last_lines(last_lines: list[tuple[str, str]]) -> str:
 def _build_user_prompt(req: LineRequest) -> str:
     """Render the per-beat user prompt for the composer.
 
-    Phase 1 (2026-05-11): static-first layout. Blocks ordered so a
-    future KV-cache reuse in the loader covers everything up to the
-    CHARACTER block. The static prefix is shared across every
-    composer call in an episode; the variable suffix (CHARACTER /
-    RECENT DIALOGUE / WRITE LINE) changes per call.
+    Phase 4 v4 (2026-05-11): block order tightened for future KV-cache
+    reuse. Every block that stays byte-identical across all composer
+    calls in an episode lives in the STATIC PREFIX:
 
-    Optional blocks (STYLE, OUTLINE, ALLOWED NAMES, CHARACTER) are
-    dropped entirely when their LineRequest field is empty so early-
-    stage callers and unit tests that haven't populated them don't
-    see "STYLE: " with an empty value. The roster block fires only
-    when allowed_roster is non-empty (the gate already skips itself
-    in that case).
+        STYLE
+        THEME                (Commit 2: meta.news first-sentence theme)
+        EPISODE CONTEXT      (canon_header)
+        NAMED ENTITIES       (people + things, sorted)
+        CAST                 (full voice cards, all characters)
+        OUTLINE              (full spine, plain - no per-call arrow)
+
+    Blocks that change per call live in the PER-BEAT TAIL:
+
+        CURRENT BEAT         (single spine row for the beat we write)
+        POSITION             (Commit 4: phase, beat N of M, next phase)
+        SOUND IN THE ROOM    (Commit 2: beat.sfx_cue)
+        LAST SPOKEN          (last_lines rolling window; scene-local
+                              via Commit 3)
+        WRITE LINE           (role induction + beat + mood + word count
+                              + "Speak now.")
+
+    Optional blocks are dropped entirely when their LineRequest field
+    is empty so early-stage callers and unit tests that haven't
+    populated them keep working. NAMED ENTITIES fires only when
+    allowed_people OR allowed_things is non-empty; back-compat callers
+    that only set the legacy `allowed_roster` get an ALLOWED NAMES
+    block in the same slot.
+
+    The role-induction sentence "You are <SPEAKER>." (plus optional
+    "You are responding to <PREV_SPEAKER>.") sits immediately above
+    the generation target. Small instruct-tuned LLMs in the 7B-14B
+    class hold a per-call role much more reliably when the directive
+    is one block above the response slot vs upstream in the system
+    prompt.
     """
     parts: list[str] = []
 
-    # ----- STATIC (all-episode-stable) -----
+    # ===== STATIC PREFIX (byte-stable across an episode) =====
+
     if req.style_descriptor:
         parts.append(f"STYLE: {req.style_descriptor}")
         parts.append("")
+
+    # THEME emits when the writer threads a non-empty theme via
+    # `LineRequest.theme` (Commit 2 in the v4 plan).
+    if req.theme:
+        parts.append(f"THEME: {req.theme}")
+        parts.append("")
+
     parts.append("EPISODE CONTEXT")
     parts.append(req.canon_header)
-    if req.outline_spine:
+
+    # NAMED ENTITIES split (Commit 1 in the v4 plan). When the writer
+    # populates allowed_people / allowed_things separately, render
+    # them in distinct buckets. Otherwise fall back to the legacy
+    # combined ALLOWED NAMES block driven by allowed_roster so old
+    # callers and unit tests still get the gate signal.
+    if req.allowed_people or req.allowed_things:
         parts.append("")
-        parts.append(req.outline_spine)
-    if req.allowed_roster:
-        # Sort for stability across calls (frozenset iteration order
-        # is implementation-defined; we want the cached prefix to be
-        # byte-identical run to run).
+        parts.append("NAMED ENTITIES IN THIS WORLD")
+        if req.allowed_people:
+            parts.append(
+                "  People: " + ", ".join(sorted(req.allowed_people))
+            )
+        if req.allowed_things:
+            parts.append(
+                "  Places, agencies, things: "
+                + ", ".join(sorted(req.allowed_things))
+            )
+        parts.append(
+            'Generic roles ("the tech", "the lab", "mission control") '
+            "are fine. Do not invent any other proper name."
+        )
+    elif req.allowed_roster:
+        # Legacy combined roster path.
         names_sorted = ", ".join(sorted(req.allowed_roster))
         parts.append("")
         parts.append(
@@ -616,14 +790,40 @@ def _build_user_prompt(req: LineRequest) -> str:
             "be flagged): " + names_sorted
         )
 
-    # ----- VARIABLE (per-call) -----
-    if req.character_voice_card:
+    # CAST replaces single-speaker CHARACTER when all_voice_cards is
+    # threaded. Falls back to the speaker-only voice card on legacy
+    # callers (Commit 2 wires the full-cast path in the writer).
+    if req.all_voice_cards:
+        parts.append("")
+        parts.append("CAST")
+        parts.append(req.all_voice_cards)
+    elif req.character_voice_card:
         parts.append("")
         parts.append(f"CHARACTER: {req.character_voice_card}")
-    # Phase 2A (2026-05-11): arc_phase awareness. Lazy import of
-    # ARC_PHASE_GUIDANCE so this module stays importable without the
-    # episode-budget module being present (back-compat with tests).
-    if req.arc_phase:
+
+    if req.outline_spine:
+        parts.append("")
+        parts.append(req.outline_spine)
+
+    # ===== PER-BEAT TAIL (changes every call) =====
+
+    # CURRENT BEAT — single spine row for the beat we are writing
+    # right now. The outline above stays plain (no arrow) for KV
+    # stability; this block names which row we are on. Writer
+    # pre-renders the string via `render_current_beat(outline,
+    # beat.beat_id)` and threads it on `req.current_beat_block`.
+    if req.current_beat_block:
+        parts.append("")
+        parts.append(req.current_beat_block)
+
+    # POSITION supersedes the old generic ARC PHASE block (Commit 4
+    # in the v4 plan). Emits the position string verbatim. Legacy
+    # arc_phase-only callers still get a fallback ARC PHASE block so
+    # this commit does not regress them in isolation.
+    if req.position:
+        parts.append("")
+        parts.append(f"POSITION: {req.position}")
+    elif req.arc_phase:
         guidance = ""
         try:
             from . import _otr_episode_budget as _OTRB  # type: ignore
@@ -636,17 +836,32 @@ def _build_user_prompt(req: LineRequest) -> str:
             parts.append(f"  {guidance}")
         else:
             parts.append(f"ARC PHASE: {req.arc_phase}")
+
+    # SOUND IN THE ROOM — Commit 2 in the v4 plan. Threaded from
+    # beat.sfx_cue so the line can react to the sound environment.
+    if req.sfx_cue:
+        parts.append("")
+        parts.append(f"SOUND IN THE ROOM: {req.sfx_cue}")
+
     parts.append("")
-    parts.append("RECENT DIALOGUE (most recent at bottom):")
+    parts.append("LAST SPOKEN (this scene):")
     parts.append(_format_last_lines(req.last_lines))
+
     parts.append("")
     parts.append("WRITE LINE")
-    parts.append(f"  Speaker: {req.speaker}")
-    parts.append(f"  This line accomplishes: {req.intent}")
-    parts.append(f"  Mood: {req.mood}")
-    parts.append(f"  Target word count: ~{req.target_words}")
-    parts.append("")
-    parts.append("Write the line. Output only the spoken text.")
+    # Role induction one block above the generation target. Empty
+    # prev_speaker drops the "responding to" clause cleanly (first
+    # line of a scene / post-music marker / first line of episode).
+    if req.prev_speaker and req.prev_speaker.strip().upper() != req.speaker.strip().upper():
+        parts.append(
+            f"You are {req.speaker}. You are responding to {req.prev_speaker}."
+        )
+    else:
+        parts.append(f"You are {req.speaker}.")
+    parts.append(f"Mood: {req.mood}.")
+    parts.append(f"Beat: {req.intent}.")
+    parts.append(f"Word count target: {req.target_words}.")
+    parts.append("Speak now.")
     return "\n".join(parts)
 
 
@@ -803,7 +1018,8 @@ if __name__ == "__main__":
 
     # Test 2: _format_last_lines empty + populated.
     print("\n[Test 2] _format_last_lines")
-    assert "no prior dialogue" in _format_last_lines([])
+    # v4: placeholder phrasing updated to "scene just opened".
+    assert "scene just opened" in _format_last_lines([])
     populated = _format_last_lines([("ALICE", "Hi."), ("BOB", "Hello.")])
     assert "[ALICE]: Hi." in populated
     assert "[BOB]: Hello." in populated
@@ -820,15 +1036,17 @@ if __name__ == "__main__":
         last_lines=[("BOB", "What did you find?")],
     )
     user_prompt = _build_user_prompt(req)
-    # Phase 1 (2026-05-11): prompt header changed from "NEXT LINE"
-    # to "WRITE LINE" to match the synthesis §6.D layout.
-    for required in ("EPISODE CONTEXT", "RECENT DIALOGUE", "WRITE LINE",
-                     "Speaker: ALICE", "Mood: tense", "~15"):
+    # v4 (2026-05-11): block labels updated for the prompt-revision pass.
+    for required in ("EPISODE CONTEXT", "LAST SPOKEN (this scene):",
+                     "WRITE LINE", "You are ALICE.", "Mood: tense.",
+                     "15", "Speak now."):
         assert required in user_prompt, f"missing {required!r}"
-    # Bare-bones request omits STYLE / OUTLINE / ALLOWED NAMES blocks.
-    assert "STYLE:" not in user_prompt
-    assert "OUTLINE:" not in user_prompt
-    assert "ALLOWED NAMES" not in user_prompt
+    # Bare-bones request omits STYLE / THEME / OUTLINE / NAMED ENTITIES
+    # / CAST / CURRENT BEAT / POSITION / SOUND IN THE ROOM blocks.
+    for missing in ("STYLE:", "THEME:", "OUTLINE:", "NAMED ENTITIES",
+                    "ALLOWED NAMES", "CAST", "CURRENT BEAT", "POSITION:",
+                    "SOUND IN THE ROOM"):
+        assert missing not in user_prompt, f"unexpected {missing!r}"
     print("  PASS")
 
     # Test 4: compose_line happy path with mock generate_fn.
