@@ -342,85 +342,117 @@ class OTR_LedgerFreezeCascade:
             led.episode_id,
             len(led.data.get("lines", []) or []),
         )
-        # B2 fix (commit 12.1): vram_ceiling_gb now threads directly
-        # into run_freeze_cascade as a real kwarg (instead of being
-        # stamped on meta and silently ignored). The cascade still
-        # stamps lfc_vram_ceiling_gb on meta inside run_freeze_cascade
-        # for downstream consumers.
-        disp = _LFC_ORCH.run_freeze_cascade(
-            generate_fn,
-            led,
-            polish_generate_fn=polish_generate_fn,
-            enable_phase_3_polish=enable_phase_3_polish,
-            polish_announcer_beats=polish_announcer_beats,
-            enable_phase_4_scene_coherence=enable_phase_4_scene_coherence,
-            enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
-            enable_phase_5_voice_drift=enable_phase_5_voice_drift,
-            enable_phase_6_episode_arc=enable_phase_6_episode_arc,
-            enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
-            enable_phase_8_video_readiness=enable_phase_8_video_readiness,
-            vram_ceiling_gb=float(vram_ceiling_gb),
-        )
-        log.info(
-            "[OTR_LedgerFreezeCascade] freeze_verdict=%s "
-            "(pre_warns=%d post_warns=%s reviewer=%s)",
-            disp.verdict,
-            len(disp.gap_audit_pre.warnings),
-            (
-                len(disp.gap_audit_post.warnings)
-                if disp.gap_audit_post is not None
-                else "n/a"
-            ),
-            (
-                disp.reviewer_disposition.verdict
-                if disp.reviewer_disposition is not None
-                else "n/a"
-            ),
-        )
 
+        # B1 fix (commit 12.12, 2026-05-12): wrap the cascade body
+        # in try/finally so unload_llm() runs even when
+        # run_freeze_cascade raises (LLM OOM, pydantic crash, etc.).
+        # Pre-fix the unload sat outside the try block; on cascade
+        # exception VRAM stayed held and the next downstream visual
+        # node (HuMo / LTX / SignalLostVideo) hit OOM on top of an
+        # un-released Mistral-Nemo cache. The whole point of B14 +
+        # C7 was VRAM-safe handoff.
+        disp = None
+        updated_script_json = script_json or "{}"
+        rebuilt_script_text = script_text or ""
+        unload_ok = True
         try:
-            updated_script_json = json.dumps(
-                led.data, indent=2, ensure_ascii=False,
+            disp = _LFC_ORCH.run_freeze_cascade(
+                generate_fn,
+                led,
+                polish_generate_fn=polish_generate_fn,
+                enable_phase_3_polish=enable_phase_3_polish,
+                polish_announcer_beats=polish_announcer_beats,
+                enable_phase_4_scene_coherence=enable_phase_4_scene_coherence,
+                enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
+                enable_phase_5_voice_drift=enable_phase_5_voice_drift,
+                enable_phase_6_episode_arc=enable_phase_6_episode_arc,
+                enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
+                enable_phase_8_video_readiness=enable_phase_8_video_readiness,
+                vram_ceiling_gb=float(vram_ceiling_gb),
             )
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[OTR_LedgerFreezeCascade] failed to serialize "
-                "post-freeze ledger to JSON (%s); falling back to "
-                "incoming script_json.", exc,
-            )
-            updated_script_json = script_json or "{}"
-
-        try:
-            rebuilt_script_text = _PL.assemble_script_text_from_ledger(
-                led.data,
-            ) or (script_text or "")
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[OTR_LedgerFreezeCascade] assemble_script_text_from_"
-                "ledger raised (%s); falling back to incoming "
-                "script_text.", exc,
-            )
-            rebuilt_script_text = script_text or ""
-
-        # B14 fix (clean-break 2026-05-12): unload the LLM at cascade
-        # exit so SignalLostVideo + HuMo downstream don't inherit a
-        # VRAM-loaded model they didn't ask for. The 5080 Laptop's
-        # 14 GB usable VRAM ceiling is real -- caching Mistral-Nemo
-        # past the cascade is the actual OOM risk. Trade-off: next
-        # cascade run pays the model-load cost again (acceptable for
-        # soak; profile later if it bites). unload is best-effort;
-        # any failure logs at WARNING and the cascade still returns
-        # the verdict.
-        try:
-            _OTRML.unload_llm()
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[OTR_LedgerFreezeCascade] unload_llm at cascade exit "
-                "raised (%s); VRAM may not be released before "
-                "downstream nodes load",
-                exc,
+            log.info(
+                "[OTR_LedgerFreezeCascade] freeze_verdict=%s "
+                "(pre_warns=%d post_warns=%s reviewer=%s)",
+                disp.verdict,
+                len(disp.gap_audit_pre.warnings),
+                (
+                    len(disp.gap_audit_post.warnings)
+                    if disp.gap_audit_post is not None
+                    else "n/a"
+                ),
+                (
+                    disp.reviewer_disposition.verdict
+                    if disp.reviewer_disposition is not None
+                    else "n/a"
+                ),
             )
 
+            # Serialize + rebuild WHILE the model is still loaded.
+            # Neither touches torch tensors (assemble_script_text_from_ledger
+            # is pure dict/string work; json.dumps walks the meta tree)
+            # so placement order is safe -- the model could already be
+            # released here. We keep the order for cleanliness; the
+            # finally-block unload is the actual VRAM-safe gate.
+            try:
+                updated_script_json = json.dumps(
+                    led.data, indent=2, ensure_ascii=False,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_LedgerFreezeCascade] failed to serialize "
+                    "post-freeze ledger to JSON (%s); falling back to "
+                    "incoming script_json.", exc,
+                )
+                updated_script_json = script_json or "{}"
+
+            try:
+                rebuilt_script_text = (
+                    _PL.assemble_script_text_from_ledger(led.data)
+                    or (script_text or "")
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_LedgerFreezeCascade] assemble_script_text_"
+                    "from_ledger raised (%s); falling back to "
+                    "incoming script_text.", exc,
+                )
+                rebuilt_script_text = script_text or ""
+        finally:
+            # B14 (commit 12.5) + B1 (commit 12.12): unload Mistral-
+            # Nemo before downstream visual nodes load. Wrapped in
+            # best-effort try/except -- an unload failure logs at
+            # WARNING + stamps meta.freeze_unload_ok=False so the
+            # next visual node can branch on the stamp instead of
+            # OOM-ing on top of a leaked cache. The cascade itself
+            # still returns its verdict; the downstream visual
+            # nodes decide what to do about a failed unload.
+            try:
+                _OTRML.unload_llm()
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_LedgerFreezeCascade] unload_llm at cascade "
+                    "exit raised (%s); VRAM may not be released "
+                    "before downstream nodes load",
+                    exc,
+                )
+                unload_ok = False
+            # Stamp on meta so soak diagnostics see the unload
+            # outcome without grepping stderr. Best-effort: a
+            # malformed ledger handle should not break the return.
+            try:
+                if hasattr(led, "data") and isinstance(led.data, dict):
+                    led.data.setdefault("meta", {})[
+                        "freeze_unload_ok"
+                    ] = unload_ok
+            except Exception:  # noqa: BLE001
+                pass
+
+        # Cascade body completed (any exception propagated out of
+        # the try/finally above and ComfyUI rendered the node red,
+        # which is the correct loud-failure convention -- the
+        # finally still ran unload_llm so VRAM is released).
+        # disp is non-None here because the cascade body returned
+        # without raising.
         return (
             rebuilt_script_text,
             updated_script_json,
