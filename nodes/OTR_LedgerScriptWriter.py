@@ -718,6 +718,7 @@ def _resolve_inputs(
     min_p: float = 0.0,
     repetition_penalty: float = 1.0,
     max_new_tokens_cap: int = 200,
+    enable_polish_pass: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -837,6 +838,7 @@ def _resolve_inputs(
         "max_new_tokens_cap":   max(40, min(400, int(
             max_new_tokens_cap or 200,
         ))),
+        "enable_polish_pass":   bool(enable_polish_pass),
     }
 
 
@@ -1142,6 +1144,26 @@ class OTR_LedgerScriptWriter:
                         "drift; attempt-2 retry uses the full cap."
                     ),
                 }),
+                "enable_polish_pass": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "After the composer's retry ladder closes, "
+                        "optionally check each generated line against a "
+                        "small narration-leak regex (he said / "
+                        "*asterisk action* / [bracket direction] / "
+                        "opens-with-quote-mark / parenthesized cue "
+                        "verbs). If the line trips the regex, fire ONE "
+                        "polish LLM call with a targeted cleanup prompt "
+                        "and replace the line.\n\n"
+                        "OFF (default) preserves the 1-call-per-voiced-"
+                        "beat composer hot-path. ON typically adds 1-2 "
+                        "extra calls per 15-line episode (~30s); not "
+                        "the full +15 calls (~3-5 min). Backstops the "
+                        "Script Doctor's end-of-episode pass for users "
+                        "who want clean lines in the ledger as they "
+                        "are written."
+                    ),
+                }),
             },
         }
 
@@ -1182,6 +1204,7 @@ class OTR_LedgerScriptWriter:
         min_p=0.0,
         repetition_penalty=1.0,
         max_new_tokens_cap=200,
+        enable_polish_pass=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1203,6 +1226,7 @@ class OTR_LedgerScriptWriter:
             min_p=min_p,
             repetition_penalty=repetition_penalty,
             max_new_tokens_cap=max_new_tokens_cap,
+            enable_polish_pass=enable_polish_pass,
         )
 
         log.info(
@@ -1704,6 +1728,7 @@ class OTR_LedgerScriptWriter:
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                    enable_polish_pass=resolved["enable_polish_pass"],
                 )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
@@ -1748,6 +1773,7 @@ class OTR_LedgerScriptWriter:
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                    enable_polish_pass=resolved["enable_polish_pass"],
                 )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags

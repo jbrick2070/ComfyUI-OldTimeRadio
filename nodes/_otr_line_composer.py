@@ -49,6 +49,8 @@ __all__ = [
     "build_voice_card",
     # Phase 4 v4 (2026-05-11)
     "render_current_beat",
+    "needs_polish",
+    "polish_line",
 ]
 
 
@@ -871,13 +873,135 @@ def _build_user_prompt(req: LineRequest) -> str:
 
 
 _DEFAULT_STOP_STRINGS: tuple[str, ...] = ("\n\n", "\n[", "\n(")
-"""Default stop substrings for compose_line. `\n\n` catches "line +
-stage direction on next paragraph"; `\n[` / `\n(` catch leaked
-bracketed/parenthesized directions on a new line. Do not stop on a
-bare `\n` -- some legitimate lines have a soft break. Forwarded
-through generate_fn's stop= kwarg; loader falls back to a substring-
-matching StoppingCriteria when the underlying generate call doesn't
-natively support stop strings."""
+"""Default stop substrings for compose_line + polish_line. `\n\n`
+catches "line + stage direction on next paragraph"; `\n[` / `\n(`
+catch leaked bracketed/parenthesized directions on a new line.
+Do not stop on a bare `\n` -- some legitimate lines have a soft
+break. Forwarded through generate_fn's stop= kwarg; loader falls
+back to a substring-matching StoppingCriteria when the underlying
+generate call doesn't natively support stop strings."""
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 v4 (2026-05-11) — optional polish pass (regex-gated)
+# ---------------------------------------------------------------------------
+#
+# After the composer's retry ladder closes, optionally check the
+# generated line against a small narration-leak regex set. If the
+# line trips any pattern, fire ONE targeted polish LLM call with a
+# tight cleanup prompt and replace the line. Default OFF — keeps the
+# composer hot-path at 1 call per voiced beat. Opt-in via the
+# `enable_polish_pass` widget on OTR_LedgerScriptWriter.
+#
+# Cost when on: typically +1-2 calls per 15-line episode (~30s),
+# NOT +15 calls (~3-5 min) — the regex gate filters down to lines
+# that actually leaked. Targeted Script Doctor at the end of the
+# writer still catches anything the polish pass misses.
+
+_NARRATION_LEAK_PATTERNS: tuple[str, ...] = (
+    # "he said" / "she replied" / "they whispered" — narration verbs
+    # attached to a pronoun, mid-sentence or end-of-sentence.
+    r"\b(?:he|she|they)\s+(?:said|replied|added|asked|whispered|"
+    r"shouted|paused|continued|murmured|exclaimed)\b",
+    # Opens with a quote mark (smart or straight).
+    r'^["“‘]',
+    # Markdown / asterisk wrapped action ("*sighs*").
+    r"\*[^*]+\*",
+    # Bracket stage direction ("[pauses]" / "[looks away]").
+    r"\[[^\]]+\]",
+    # Parenthesized cue verb ("(sighs)", "(pause)", "(laughs)").
+    r"\([^)]*(?:sigh|pause|beat|laughs?|smiles?|gestures?|nods?|"
+    r"shrugs?|cough)[^)]*\)",
+)
+
+_NARRATION_LEAK_REGEXES: tuple = tuple(
+    re.compile(p, re.IGNORECASE) for p in _NARRATION_LEAK_PATTERNS
+)
+
+
+def needs_polish(line: str) -> bool:
+    """Return True if `line` matches any narration-leak pattern.
+
+    Cheap regex check (no LLM call). Used by `compose_line` to gate
+    the optional polish pass. Empty / falsy input returns False.
+    Never raises.
+    """
+    if not line:
+        return False
+    return any(rx.search(line) for rx in _NARRATION_LEAK_REGEXES)
+
+
+_POLISH_SYSTEM_PROMPT = """\
+You are a script editor cleaning one line of radio drama dialogue.
+The line below leaked narration or stage direction. Rewrite it as
+pure spoken dialogue.
+
+OUTPUT RULES - strict:
+- Only the words the character speaks out loud.
+- No name, no colon, no quotes, no brackets, no parentheses.
+- No "he said" / "she replied" / narration of any kind.
+- Preserve the character's intent. Preserve the speaker's voice.
+- Keep within plus or minus 20% of the original word count.
+
+Output the cleaned line and stop. Nothing else.
+"""
+
+
+_POLISH_BASE_TEMPERATURE = 0.4
+_POLISH_MAX_TOKENS_MULTIPLIER = 3  # ~3 tokens/word target ceiling
+
+
+def polish_line(
+    generate_fn,
+    leaked_line: str,
+    speaker_voice_card: str,
+    *,
+    temperature: float = _POLISH_BASE_TEMPERATURE,
+    stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
+) -> str:
+    """Run ONE polish LLM call against `leaked_line`.
+
+    Targeted edit (low temperature). Returns the cleaned line on
+    success. On any failure (generate raise, empty result, polish
+    still trips the regex), returns the original `leaked_line`
+    unchanged — polish here is a quality nicety, not a correctness
+    requirement.
+    """
+    if not (leaked_line or "").strip():
+        return leaked_line
+    user = (
+        f"CHARACTER: {speaker_voice_card or 'unspecified speaker'}\n"
+        f"ORIGINAL LINE: {leaked_line}\n"
+    )
+    messages = [
+        {"role": "system", "content": _POLISH_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
+    orig_word_count = max(4, len(leaked_line.split()))
+    mnt = max(40, orig_word_count * _POLISH_MAX_TOKENS_MULTIPLIER)
+    try:
+        try:
+            raw = generate_fn(
+                messages,
+                temperature=temperature,
+                max_new_tokens=mnt,
+                stop=list(stop_strings) if stop_strings else None,
+            )
+        except TypeError:
+            raw = generate_fn(
+                messages, temperature=temperature, max_new_tokens=mnt,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_LineComposer] polish_line generate_fn raised: %s",
+            exc,
+        )
+        return leaked_line
+    cleaned = strip_line_formatting(raw or "")
+    if not cleaned:
+        log.debug("[OTR_LineComposer] polish_line produced empty output")
+        return leaked_line
+    return cleaned
 
 
 def compose_line(
@@ -888,6 +1012,7 @@ def compose_line(
     base_temperature: float = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
+    enable_polish_pass: bool = False,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -996,6 +1121,31 @@ def compose_line(
                         attempt_idx + 1, err_msg)
             attempts.append((raw or "", err_msg))
             continue
+
+        # Phase 4 v4 (2026-05-11): optional polish pass. Regex-gated
+        # so polish only fires on lines that actually leaked narration
+        # / stage direction. Default OFF; per-episode opt-in via the
+        # `enable_polish_pass` widget on OTR_LedgerScriptWriter.
+        if enable_polish_pass and needs_polish(cleaned):
+            log.info(
+                "[OTR_LineComposer] polish_line firing on %s "
+                "(narration-leak detected)",
+                req.speaker,
+            )
+            polished = polish_line(
+                generate_fn,
+                cleaned,
+                req.character_voice_card,
+                stop_strings=stop_strings,
+            )
+            # Re-strip in case the polish prompt produced a fresh
+            # speaker tag at the head (defensive — polish's prompt
+            # forbids it but small models occasionally slip).
+            polished_clean = strip_line_formatting(polished or "")
+            if polished_clean:
+                cleaned = polished_clean
+                # Update word_count for the success log below.
+                word_count = len(cleaned.split())
 
         # Phase 0 name-roster gate. Detect-and-flag only -- the line
         # commits regardless. Empty roster skips the gate entirely so

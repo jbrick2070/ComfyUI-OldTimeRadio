@@ -26,8 +26,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes._otr_line_composer import (  # noqa: E402
     LineRequest,
+    LineResult,
     _build_user_prompt,
     build_voice_card,
+    compose_line,
+    needs_polish,
+    polish_line,
     render_outline_spine,
 )
 
@@ -489,6 +493,145 @@ class TestBuildUserPrompt:
 # ---------------------------------------------------------------------------
 # Sliding-window cap (orchestrator-side; mirrored here as a contract test)
 # ---------------------------------------------------------------------------
+
+
+class TestNeedsPolish:
+    """needs_polish() regex gate for the v4 polish pass."""
+
+    def test_clean_line_returns_false(self):
+        assert needs_polish("Then we should go now.") is False
+        assert needs_polish("I never said anything like that.") is False
+
+    def test_he_said_pattern_caught(self):
+        assert needs_polish('Then we should go," she said.') is True
+        assert needs_polish("He whispered the answer.") is True
+        assert needs_polish("They paused before responding.") is True
+
+    def test_opens_with_quote_caught(self):
+        assert needs_polish('"Then we should go now."') is True
+        assert needs_polish("“Then we should go now.”") is True
+
+    def test_asterisk_action_caught(self):
+        assert needs_polish("*sighs* Then we should go now.") is True
+        assert needs_polish("Then we should go *now*.") is True
+
+    def test_bracket_direction_caught(self):
+        assert needs_polish("[pauses] Then we should go now.") is True
+        assert needs_polish("Then we should go now [looks away].") is True
+
+    def test_parenthesized_cue_verbs_caught(self):
+        assert needs_polish("(sighs) Then we should go now.") is True
+        assert needs_polish("Then we should go now (laughs).") is True
+        assert needs_polish("Then we should go now (long pause).") is True
+
+    def test_empty_input_returns_false(self):
+        assert needs_polish("") is False
+        assert needs_polish(None) is False  # type: ignore[arg-type]
+
+
+class TestPolishLine:
+    """polish_line targeted-edit LLM call."""
+
+    def test_returns_cleaned_line_on_success(self):
+        def mock_polish(messages, *, temperature, max_new_tokens, stop=None):
+            assert temperature < 0.6, "polish should use low temperature"
+            return "Then we should go now."
+        result = polish_line(
+            mock_polish,
+            'Then we should go," she said.',
+            "ALICE (female, weary)",
+        )
+        assert result == "Then we should go now."
+
+    def test_falls_back_to_original_on_generate_raise(self):
+        def mock_raise(messages, *, temperature, max_new_tokens, stop=None):
+            raise RuntimeError("simulated LLM crash")
+        original = 'Then we should go," she said.'
+        result = polish_line(mock_raise, original, "ALICE")
+        assert result == original
+
+    def test_falls_back_to_original_on_empty_output(self):
+        def mock_empty(messages, *, temperature, max_new_tokens, stop=None):
+            return ""
+        original = '"Then we should go."'
+        result = polish_line(mock_empty, original, "ALICE")
+        assert result == original
+
+    def test_handles_stop_unsupported_via_typeerror(self):
+        # Generate_fn signatures that don't accept stop= must still
+        # work (the polish call retries without the kwarg).
+        def mock_no_stop(messages, *, temperature, max_new_tokens):
+            return "Cleaned line."
+        result = polish_line(mock_no_stop, '"Leaked."', "ALICE")
+        assert result == "Cleaned line."
+
+
+class TestComposeLinePolishGating:
+    """compose_line + enable_polish_pass interaction."""
+
+    def _req(self, **overrides):
+        kwargs = {
+            "speaker": "ALICE",
+            "intent": "reveal",
+            "mood": "tense",
+            "target_words": 15,
+            "canon_header": "x",
+            "last_lines": [],
+        }
+        kwargs.update(overrides)
+        return LineRequest(**kwargs)
+
+    def test_polish_off_keeps_leaked_line_as_is(self):
+        # Default: enable_polish_pass=False. Even a leaky compose
+        # output is committed without polish.
+        def mock_leak(messages, *, temperature, max_new_tokens, stop=None):
+            return 'Then we should go," she said.'
+        res = compose_line(mock_leak, self._req())
+        assert res.text == 'Then we should go," she said.'
+
+    def test_polish_on_replaces_leaked_line(self):
+        # enable_polish_pass=True + leaky compose output -> ONE extra
+        # generate call, polished line replaces the leak.
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(messages)
+            if len(calls) == 1:
+                return 'Then we should go," she said.'
+            # Polish pass: low temp, system prompt is the polish editor.
+            assert temperature < 0.6
+            assert "script editor" in messages[0]["content"].lower()
+            return "Then we should go now."
+        res = compose_line(mock, self._req(), enable_polish_pass=True)
+        assert res.text == "Then we should go now."
+        assert len(calls) == 2
+
+    def test_polish_on_skips_clean_line(self):
+        # enable_polish_pass=True + clean compose output -> polish
+        # call NOT fired (regex gate skips it).
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(messages)
+            return "Then we should go now."
+        res = compose_line(mock, self._req(), enable_polish_pass=True)
+        assert res.text == "Then we should go now."
+        assert len(calls) == 1  # composer only, no polish
+
+    def test_polish_falls_back_when_polish_call_raises(self):
+        # Need a compose output that survives strip_line_formatting
+        # AND trips the narration-leak regex so polish actually fires.
+        # 'X," she said.' is not a wrapping-quotes pattern (asymmetric),
+        # so strip leaves it largely intact; the "she said" regex fires.
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(messages)
+            if len(calls) == 1:
+                return 'Then we should go," she said.'
+            raise RuntimeError("polish failed")
+        res = compose_line(mock, self._req(), enable_polish_pass=True)
+        # polish_line catches the raise and returns the original (the
+        # cleaned compose output) so the leaky line still ships.
+        assert "Then we should go" in res.text
+        assert len(calls) == 2
 
 
 class TestSlidingWindowConstant:
