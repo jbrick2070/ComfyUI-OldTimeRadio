@@ -198,6 +198,19 @@ class OTR_LedgerFreezeCascade:
                         "OFF for v2.0-alpha per ADR section 6.17."
                     ),
                 }),
+                "enable_phase_5_voice_drift": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 5 -- per-speaker voice drift "
+                        "detection + targeted rewrites. Stats helpers "
+                        "(mean_line_length + vocab diversity) flag "
+                        "lines that diverge from a character's "
+                        "established voice; ONE batched LLM call "
+                        "rewrites the flagged subset. Default OFF "
+                        "until soak data tunes the 40 percent / 60 "
+                        "percent drift thresholds."
+                    ),
+                }),
                 "enable_phase_7_audio_readiness": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
@@ -250,6 +263,7 @@ class OTR_LedgerFreezeCascade:
         enable_phase_3_polish: bool = False,
         polish_announcer_beats: bool = False,
         enable_phase_4_5_smart_suggestion: bool = False,
+        enable_phase_5_voice_drift: bool = False,
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
         vram_ceiling_gb: float = 14.0,
@@ -326,6 +340,7 @@ class OTR_LedgerFreezeCascade:
             enable_phase_3_polish=enable_phase_3_polish,
             polish_announcer_beats=polish_announcer_beats,
             enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
+            enable_phase_5_voice_drift=enable_phase_5_voice_drift,
             enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
             enable_phase_8_video_readiness=enable_phase_8_video_readiness,
             vram_ceiling_gb=float(vram_ceiling_gb),

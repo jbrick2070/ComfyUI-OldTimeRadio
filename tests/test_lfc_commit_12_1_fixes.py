@@ -269,6 +269,10 @@ class TestB5CleanupPassesContiguous:
             )
 
     def test_stub_phase_records_carry_stub_bypassed_reason(self):
+        # Phase 5 wiring landed in commit 9 -- voice drift now stamps
+        # a real record, not stub_bypassed. The remaining stubs are
+        # phase_4 + phase_6. They graduate to real records in
+        # commits 8 + 10 respectively.
         led = _ledger([
             _line("l001", "character", "c01", "Hello there."),
         ])
@@ -279,7 +283,6 @@ class TestB5CleanupPassesContiguous:
         passes = led.data["meta"]["cleanup_passes"]
         for stub_name in (
             "phase_4_per_scene_coherence",
-            "phase_5_voice_drift",
             "phase_6_episode_arc",
         ):
             stub_rec = next(

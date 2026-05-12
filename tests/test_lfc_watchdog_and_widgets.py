@@ -205,6 +205,7 @@ class TestCascadeWidgetSurface:
         for k in ("enable_phase_3_polish",
                   "polish_announcer_beats",
                   "enable_phase_4_5_smart_suggestion",
+                  "enable_phase_5_voice_drift",
                   "enable_phase_7_audio_readiness",
                   "enable_phase_8_video_readiness"):
             assert k in opt, f"missing widget {k}"
@@ -266,11 +267,14 @@ class TestWorkflowJsonWidgetsValues:
                 return node
         pytest.fail("OTR_LedgerFreezeCascade node not found in workflow")
 
-    def test_workflow_node_has_seven_widget_values(self):
+    def test_workflow_node_has_eight_widget_values(self):
         node = self._cascade_node()
-        # model_id + 5 BOOLEAN + 1 FLOAT = 7 positional widgets.
+        # model_id + 6 BOOLEAN + 1 FLOAT = 8 positional widgets.
+        # The 6th BOOLEAN (enable_phase_5_voice_drift) lands in
+        # commit 9. Phase 4 + Phase 6 toggles append in commits 8
+        # and 10 respectively.
         wv = node.get("widgets_values") or []
-        assert len(wv) == 7
+        assert len(wv) == 8
 
     def test_model_id_at_slot_0(self):
         node = self._cascade_node()
@@ -278,21 +282,23 @@ class TestWorkflowJsonWidgetsValues:
             "mistralai/Mistral-Nemo-Instruct-2407"
         )
 
-    def test_default_booleans_at_slots_1_thru_5(self):
+    def test_default_booleans_at_slots_1_thru_6(self):
         node = self._cascade_node()
         wv = node["widgets_values"]
         # enable_phase_3_polish, polish_announcer_beats,
-        # enable_phase_4_5_smart_suggestion default OFF (False).
+        # enable_phase_4_5_smart_suggestion, enable_phase_5_voice_drift
+        # all default OFF (False).
         assert wv[1] is False
         assert wv[2] is False
         assert wv[3] is False
+        assert wv[4] is False
         # enable_phase_7 / 8 default ON (True).
-        assert wv[4] is True
         assert wv[5] is True
+        assert wv[6] is True
 
-    def test_vram_ceiling_at_slot_6(self):
+    def test_vram_ceiling_at_slot_7(self):
         node = self._cascade_node()
-        assert node["widgets_values"][6] == 14.0
+        assert node["widgets_values"][7] == 14.0
 
     def test_output_socket_4_is_freeze_verdict(self):
         node = self._cascade_node()

@@ -435,11 +435,21 @@ def _phase_4_5_smart_suggestion(led, *, enable: bool = False, generate_fn=None):
     )
 
 
-def _phase_5_voice_drift_stub(generate_fn, led) -> None:
-    """Phase 5 no-op stub. Commit 9 wires in voice drift detection.
-
-    B5 fix (commit 12.1): see phase 4 stub note."""
-    log.debug("[LFC:phase_5] stub -- voice drift not yet wired")
+def _phase_5_voice_drift(
+    generate_fn,
+    led,
+    *,
+    enable: bool = False,
+    formatter_generate_fn=None,
+):
+    """LFC Phase 5 caller. Wires into _otr_lfc_phase_5_voice_drift
+    (LFC sprint commit 9, 2026-05-11)."""
+    from . import _otr_lfc_phase_5_voice_drift as _LFC_P5  # type: ignore
+    return _LFC_P5.phase_5_voice_drift(
+        generate_fn, led,
+        enable=enable,
+        formatter_generate_fn=formatter_generate_fn,
+    )
 
 
 def _phase_6_episode_arc_stub(generate_fn, led) -> None:
@@ -518,6 +528,7 @@ def run_freeze_cascade(
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
     enable_phase_4_5_smart_suggestion: bool = False,
+    enable_phase_5_voice_drift: bool = False,
     vram_ceiling_gb: float = 14.0,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
@@ -737,11 +748,27 @@ def run_freeze_cascade(
             if p4_5_report is not None else 0
         ),
     )
-    _phase_5_voice_drift_stub(generate_fn, led)
-    _stamp_stub_or_skipped_phase(
+    # Phase 5 voice drift (LFC commit 9). Default OFF.
+    started_5 = _isoformat_utc_now()
+    hash_before_5 = _hash_lines_text(ledger_data)
+    p5_report = _phase_5_voice_drift(
+        generate_fn, led,
+        enable=enable_phase_5_voice_drift,
+    )
+    hash_after_5 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
         ledger_data,
         phase_name="phase_5_voice_drift",
-        reason="stub_bypassed",
+        text_hash_before=hash_before_5,
+        text_hash_after=hash_after_5,
+        started_at=started_5,
+        finished_at=_isoformat_utc_now(),
+        edits_proposed=(
+            p5_report.edits_proposed if p5_report is not None else 0
+        ),
+        edits_applied=(
+            p5_report.edits_applied if p5_report is not None else 0
+        ),
     )
     _phase_6_episode_arc_stub(generate_fn, led)
     _stamp_stub_or_skipped_phase(
