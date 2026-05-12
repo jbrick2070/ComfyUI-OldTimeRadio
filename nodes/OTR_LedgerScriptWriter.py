@@ -317,6 +317,12 @@ def _build_truncating_generate_fn(
     active_top_p = float(top_p)
     active_min_p = float(min_p or 0.0)
     active_rep_penalty = float(repetition_penalty or 1.0)
+    # Tier 1 fix #8 (2026-05-11): one-shot warning + auto-fallback
+    # for transformers versions < 4.43 that don't accept `min_p` as
+    # a kwarg on model.generate. Closure-scoped mutable cell so the
+    # disable persists across calls within one run without spamming
+    # the warning more than once.
+    _min_p_unsupported = [False]
 
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
@@ -348,7 +354,7 @@ def _build_truncating_generate_fn(
         # Only forward non-default values so older transformers
         # versions that don't accept `min_p` as a kwarg keep working
         # silently when the widget is at its disabled default.
-        if active_min_p > 0.0:
+        if active_min_p > 0.0 and not _min_p_unsupported[0]:
             gen_kwargs["min_p"] = active_min_p
         if active_rep_penalty != 1.0:
             gen_kwargs["repetition_penalty"] = active_rep_penalty
@@ -396,11 +402,46 @@ def _build_truncating_generate_fn(
                 )
 
         with torch.no_grad():
-            out = model.generate(**inputs, **gen_kwargs)
+            try:
+                out = model.generate(**inputs, **gen_kwargs)
+            except TypeError as exc:
+                # Tier 1 fix #8: min_p kwarg unsupported on
+                # transformers < 4.43. Warn once and retry without it
+                # for the rest of this run.
+                if "min_p" in gen_kwargs and "min_p" in str(exc):
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] min_p kwarg not "
+                        "supported by this transformers version; "
+                        "disabling for the remainder of this run "
+                        "(error was: %s)",
+                        exc,
+                    )
+                    _min_p_unsupported[0] = True
+                    gen_kwargs.pop("min_p", None)
+                    out = model.generate(**inputs, **gen_kwargs)
+                else:
+                    raise
         prompt_len = inputs["input_ids"].shape[1]
-        return tokenizer.decode(
+        decoded = tokenizer.decode(
             out[0][prompt_len:], skip_special_tokens=True,
         )
+        # Tier 1 fix #5 (2026-05-11): StoppingCriteria halts
+        # generation but leaves the trigger bytes in the output
+        # buffer. Slice at the first stop substring so leaked
+        # bracketed/parenthesized tails don't survive into the
+        # composer's strip_line_formatting -> ledger pipeline. With
+        # polish OFF (default), this is the last guard before the
+        # text lands. Earliest-match wins.
+        if stop:
+            cut = len(decoded)
+            for s in stop:
+                if not s:
+                    continue
+                idx = decoded.find(s)
+                if idx >= 0 and idx < cut:
+                    cut = idx
+            decoded = decoded[:cut]
+        return decoded
 
     return generate_fn
 
@@ -840,6 +881,57 @@ def _resolve_inputs(
         ))),
         "enable_polish_pass":   bool(enable_polish_pass),
     }
+
+
+def _derive_prev_speaker(
+    last_lines: list,
+    current_speaker: str,
+) -> str:
+    """Walk `last_lines` in reverse, return the first speaker NAME
+    that is not the current speaker and not "ANNOUNCER".
+
+    Tier 1 fix #4 (2026-05-11). Pre-Tier-1 every LineRequest set
+    `prev_speaker = last_lines[-1][0]` which, when the rolling window
+    ended on an announcer beat, produced "You are ALICE. You are
+    responding to ANNOUNCER." — which breaks the fictional layer
+    (characters in radio drama don't hear the narrator).
+
+    The walk skips:
+      - empty / blank names
+      - "ANNOUNCER" (any case)
+      - the current speaker (no "responding to yourself" two-line
+        monologues; the WRITE LINE block already drops the clause
+        in that case but we belt-and-brace it here)
+
+    Returns "" when no qualifying speaker is found (first character
+    line of a scene, or scene composed entirely of self + announcer
+    so far). Empty string drops the "You are responding to ..."
+    clause cleanly in `_build_user_prompt`.
+
+    Inputs:
+      last_lines       writer's rolling window: list[(speaker, text)]
+      current_speaker  the speaker we are writing the line FOR
+
+    Pure stdlib, no LLM cost. Never raises.
+    """
+    cur_u = (current_speaker or "").strip().upper()
+    for entry in reversed(last_lines or []):
+        if not entry:
+            continue
+        try:
+            spk = entry[0]
+        except (TypeError, IndexError):
+            continue
+        s = (spk or "").strip()
+        if not s:
+            continue
+        s_u = s.upper()
+        if s_u == "ANNOUNCER":
+            continue
+        if s_u == cur_u:
+            continue
+        return s
+    return ""
 
 
 def _build_cast_rows(cast_names) -> tuple:
@@ -1639,16 +1731,28 @@ class OTR_LedgerScriptWriter:
             (meta.get("news") or {}).get("script_brief") or ""
         ).strip()
         if _brief:
-            _split = re.split(r"(?<=[.!?])\s+", _brief, maxsplit=1)
-            theme = _split[0].strip() if _split and _split[0] else ""
+            # Tier 1 fix #9 (2026-05-11): drop the sentence-detection
+            # regex (broke on "Dr." / "Mr." / "St." abbreviations and
+            # produced a one-token theme). Theme is flavor, not
+            # structure — cap at the first 15 words and move on.
+            _words = _brief.split()
+            theme = " ".join(_words[:15])
         else:
             theme = ""
 
         # Phase 4 v4 (2026-05-11): precompute per-beat POSITION
         # strings. Format "<phase>, beat N of M. Next phase: <next>."
         # or "<phase>, beat N of M. Final phase." for the final phase.
+        #
+        # Tier 1 fix #3 (2026-05-11): EXCLUDE non-voiced beats (music
+        # markers, sfx) from phase_beats. A character beat surrounded
+        # by two music_inter beats was reading "beat 3 of 5 in setup"
+        # when 2 of the 5 had no dialogue — confusing to the model
+        # and inconsistent with the user's mental model of POSITION.
         phase_beats: dict = {}
         for _b in outline.beats:
+            if _b.speaker_role in NON_VOICED_ROLES:
+                continue
             phase_beats.setdefault(_b.arc_phase or "setup", []).append(
                 _b.beat_id,
             )
@@ -1657,22 +1761,38 @@ class OTR_LedgerScriptWriter:
             if episode_budget is not None
             else list(dict.fromkeys(
                 (_b.arc_phase or "setup") for _b in outline.beats
+                if _b.speaker_role not in NON_VOICED_ROLES
             ))
         )
 
         def _position_for(beat) -> str:
+            # Tier 1 fix #10 (2026-05-11): raise on missing beat_id /
+            # missing arc_phase instead of silently returning "beat 1
+            # of 1". Silent wrong position is prompt poison; a hard
+            # raise surfaces upstream corruption (outline/budget
+            # drift) immediately. Called only for voiced beats, so
+            # both lookups must hit.
             this_phase = (beat.arc_phase or "setup").strip()
-            phase_idx = (
-                arc_order.index(this_phase) if this_phase in arc_order else 0
-            )
+            if this_phase not in arc_order:
+                raise ValueError(
+                    f"[_position_for] beat {beat.beat_id!r} has "
+                    f"arc_phase {this_phase!r} not in arc_order "
+                    f"{arc_order!r}"
+                )
+            ids = phase_beats.get(this_phase, [])
+            if beat.beat_id not in ids:
+                raise ValueError(
+                    f"[_position_for] beat_id {beat.beat_id!r} not "
+                    f"in phase_beats[{this_phase!r}]={ids!r}"
+                )
+            phase_idx = arc_order.index(this_phase)
             next_phase = (
                 arc_order[phase_idx + 1]
                 if phase_idx + 1 < len(arc_order)
                 else "end"
             )
-            ids = phase_beats.get(this_phase, [])
-            beat_n = ids.index(beat.beat_id) + 1 if beat.beat_id in ids else 1
-            beat_total = len(ids) if ids else 1
+            beat_n = ids.index(beat.beat_id) + 1
+            beat_total = len(ids)
             tail = (
                 f" Next phase: {next_phase}."
                 if next_phase != "end"
@@ -1694,9 +1814,13 @@ class OTR_LedgerScriptWriter:
 
             if beat.speaker_role == "character":
                 # Phase 4 v4 (2026-05-11): derive prev_speaker from
-                # the rolling-window tail. Empty window -> empty
-                # string (drops "responding to" clause in WRITE LINE).
-                prev_speaker = last_lines[-1][0].strip() if last_lines else ""
+                # the rolling-window tail. Tier 1 fix #4 — skip
+                # ANNOUNCER and same-speaker to preserve the fictional
+                # layer; empty result drops the "responding to" clause
+                # in WRITE LINE cleanly.
+                prev_speaker = _derive_prev_speaker(
+                    last_lines, beat.speaker,
+                )
                 line_req = _OTRLC.LineRequest(
                     speaker=beat.speaker,
                     intent=beat.intent,
@@ -1741,7 +1865,12 @@ class OTR_LedgerScriptWriter:
 
             elif beat.speaker_role == "announcer":
                 # Phase 4 v4 (2026-05-11): prev_speaker from window tail.
-                prev_speaker = last_lines[-1][0].strip() if last_lines else ""
+                # Tier 1 fix #4 — same helper; announcer never reports
+                # "responding to ANNOUNCER" (its prior self) or to a
+                # missing speaker.
+                prev_speaker = _derive_prev_speaker(
+                    last_lines, "ANNOUNCER",
+                )
                 line_req = _OTRLC.LineRequest(
                     speaker="ANNOUNCER",
                     intent=beat.intent,
@@ -2095,7 +2224,14 @@ class OTR_LedgerScriptWriter:
             meta["perfect_run_spacesaver"] = True
 
         # --- L. Assemble return values --------------------------------
-        script_text = "\n\n".join(script_text_parts)
+        # Tier 1 fix #2 (2026-05-11): derive final script_text from the
+        # CANONICAL ledger rows, not from the in-flight script_text_parts
+        # list. Post-loop mutations (news_close_brief announcer override
+        # in I.5, title substitution in J.6) write to led.data["lines"]
+        # but were not always mirrored back into script_text_parts. The
+        # script_text_parts list is now diagnostic-only; the ledger is
+        # the source of truth for the slot-0 STRING output.
+        script_text = _PL.assemble_script_text_from_ledger(led.data)
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
         news_json = _build_news_payload(
             outline, resolved["news_seed"], resolved["seed_source"],

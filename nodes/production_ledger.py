@@ -1108,8 +1108,71 @@ class Ledger:
         return in_mem
 
 
+def assemble_script_text_from_ledger(led_data: dict) -> str:
+    """Rebuild the writer's slot-0 `script_text` string from the
+    canonical ledger lines.
+
+    Token format matches what `OTR_LedgerScriptWriter.run()` originally
+    accumulates in `script_text_parts`:
+      - character beat:  ``[VOICE: NAME, traits] <text>``
+      - announcer beat:  ``[VOICE: ANNOUNCER, traits] <text>``
+      - music/sfx beat:  ``[SFX: <text>]``
+
+    Used as the post-loop authoritative source for slot-0 in BOTH the
+    writer (after the news-wiring overlay patches `led.data['lines']`
+    in place) and the reviewer (after the 3-pass review may have
+    rewritten line text). Pre-Tier-1, both callers shipped a stale
+    string that did not reflect those mutations.
+
+    `led_data` is the in-memory dict that `Ledger.data` points at.
+    Reads `led_data['cast']` for char_id -> name lookup. Empty / falsy
+    text rows are skipped. Stable across calls (no RNG, no time).
+    Never raises.
+    """
+    if not isinstance(led_data, dict):
+        return ""
+    cast = led_data.get("cast", []) or []
+    name_by_cid: dict[str, str] = {}
+    for row in cast:
+        if not isinstance(row, dict):
+            continue
+        cid = _safe_str(row.get("char_id"))
+        name = _safe_str(row.get("name"))
+        if cid and name:
+            name_by_cid[cid] = name
+    parts: list[str] = []
+    for line in led_data.get("lines", []) or []:
+        if not isinstance(line, dict):
+            continue
+        text = _safe_str(line.get("text")).strip()
+        if not text:
+            continue
+        role = _safe_str(line.get("speaker_role"))
+        traits = _safe_str(line.get("traits")).strip() or "neutral"
+        if role == "character":
+            cid = _safe_str(line.get("char_id"))
+            name = name_by_cid.get(cid) or _safe_str(line.get("speaker"))
+            if not name:
+                # Last-resort fallback: render the char_id literally so
+                # the downstream director / parser still sees a
+                # speaker tag rather than silently dropping the line.
+                name = cid or "UNKNOWN"
+            parts.append(f"[VOICE: {name}, {traits}] {text}")
+        elif role == "announcer":
+            parts.append(f"[VOICE: ANNOUNCER, {traits}] {text}")
+        elif role in {"music_open", "music_close", "music_inter", "sfx"}:
+            parts.append(f"[SFX: {text}]")
+        else:
+            # Unknown role: keep the text visible to downstream
+            # consumers tagged by role so a debug pass can spot it.
+            tag = role.upper() if role else "BEAT"
+            parts.append(f"[{tag}: {text}]")
+    return "\n\n".join(parts)
+
+
 __all__ = [
     "Ledger",
     "get_ledger",
     "new_ledger",
+    "assemble_script_text_from_ledger",
 ]

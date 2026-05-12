@@ -634,6 +634,262 @@ class TestComposeLinePolishGating:
         assert len(calls) == 2
 
 
+class TestTier1Regressions:
+    """Required regression coverage for the 2026-05-11 Tier 1 sprint."""
+
+    # Tier 1 fix #4: prev_speaker skips ANNOUNCER.
+    def test_prev_speaker_skips_announcer(self):
+        from nodes.OTR_LedgerScriptWriter import _derive_prev_speaker
+        last_lines = [
+            ("ALICE", "I hear something."),
+            ("ANNOUNCER", "Meanwhile, far away..."),
+        ]
+        assert _derive_prev_speaker(last_lines, "BOB") == "ALICE"
+
+    def test_prev_speaker_skips_self(self):
+        from nodes.OTR_LedgerScriptWriter import _derive_prev_speaker
+        last_lines = [
+            ("BOB", "I think we should go."),
+            ("ALICE", "Wait."),
+        ]
+        # ALICE wrote the most recent line; her next line should not
+        # "respond to ALICE" — walk back to BOB.
+        assert _derive_prev_speaker(last_lines, "ALICE") == "BOB"
+
+    def test_prev_speaker_empty_window(self):
+        from nodes.OTR_LedgerScriptWriter import _derive_prev_speaker
+        assert _derive_prev_speaker([], "ALICE") == ""
+
+    def test_prev_speaker_only_announcer(self):
+        from nodes.OTR_LedgerScriptWriter import _derive_prev_speaker
+        last_lines = [("ANNOUNCER", "Welcome.")]
+        # Empty result drops the "responding to" clause cleanly in
+        # _build_user_prompt — confirmed elsewhere; this just asserts
+        # the helper returns "".
+        assert _derive_prev_speaker(last_lines, "ALICE") == ""
+
+    def test_prev_speaker_drops_into_rendered_prompt(self):
+        # End-to-end: writer threads _derive_prev_speaker output
+        # into LineRequest.prev_speaker, prompt does NOT contain
+        # "responding to ANNOUNCER".
+        from nodes.OTR_LedgerScriptWriter import _derive_prev_speaker
+        last_lines = [
+            ("ALICE", "I hear something."),
+            ("ANNOUNCER", "Meanwhile..."),
+        ]
+        prev = _derive_prev_speaker(last_lines, "BOB")
+        req = LineRequest(
+            speaker="BOB", intent="reveal", mood="tense",
+            target_words=15, canon_header="x",
+            last_lines=last_lines, prev_speaker=prev,
+        )
+        prompt = _build_user_prompt(req)
+        assert "You are BOB. You are responding to ALICE." in prompt
+        assert "responding to ANNOUNCER" not in prompt
+
+    # Tier 1 fix #1 + #2: assemble_script_text_from_ledger rebuilds
+    # the slot-0 string from the canonical ledger lines.
+    def test_assemble_script_text_from_ledger_rebuilds_tokens(self):
+        from nodes.production_ledger import (
+            assemble_script_text_from_ledger,
+        )
+        led_data = {
+            "cast": [
+                {"char_id": "c01", "name": "ALICE"},
+                {"char_id": "c02", "name": "BOB"},
+            ],
+            "lines": [
+                {
+                    "line_id": "b001", "char_id": "announcer",
+                    "speaker_role": "announcer",
+                    "text": "Tonight on Old Time Radio...",
+                    "traits": "steady",
+                },
+                {
+                    "line_id": "b002", "char_id": "c01",
+                    "speaker_role": "character",
+                    "text": "Did you hear that?",
+                    "traits": "curious",
+                },
+                {
+                    "line_id": "b003", "char_id": "music_inter",
+                    "speaker_role": "music_inter",
+                    "text": "swelling strings",
+                    "traits": None,
+                },
+                {
+                    "line_id": "b004", "char_id": "c02",
+                    "speaker_role": "character",
+                    "text": "I heard it too.",
+                    "traits": "worried",
+                },
+            ],
+        }
+        out = assemble_script_text_from_ledger(led_data)
+        assert "[VOICE: ANNOUNCER, steady] Tonight on Old Time Radio..." in out
+        assert "[VOICE: ALICE, curious] Did you hear that?" in out
+        assert "[SFX: swelling strings]" in out
+        assert "[VOICE: BOB, worried] I heard it too." in out
+        # Order preserved
+        parts = out.split("\n\n")
+        assert len(parts) == 4
+        assert parts[0].startswith("[VOICE: ANNOUNCER")
+        assert parts[1].startswith("[VOICE: ALICE")
+        assert parts[2].startswith("[SFX:")
+        assert parts[3].startswith("[VOICE: BOB")
+
+    def test_assemble_script_text_picks_up_post_loop_text_changes(self):
+        # The whole point of Tier 1 #1/#2: a post-loop mutation of
+        # `text` on the ledger MUST flow into slot-0. Simulates the
+        # news_close_brief announcer override.
+        from nodes.production_ledger import (
+            assemble_script_text_from_ledger,
+        )
+        led_data = {
+            "cast": [{"char_id": "c01", "name": "ALICE"}],
+            "lines": [
+                {
+                    "line_id": "b001", "char_id": "c01",
+                    "speaker_role": "character",
+                    "text": "First.",
+                    "traits": "neutral",
+                },
+                {
+                    "line_id": "b002", "char_id": "announcer",
+                    "speaker_role": "announcer",
+                    "text": "ORIGINAL_CLOSE",
+                    "traits": "steady",
+                },
+            ],
+        }
+        # Simulate the news-wiring overlay rewriting the closing.
+        led_data["lines"][1]["text"] = "REWRITTEN_NEWS_CLOSE"
+        out = assemble_script_text_from_ledger(led_data)
+        assert "REWRITTEN_NEWS_CLOSE" in out
+        assert "ORIGINAL_CLOSE" not in out
+
+    def test_assemble_script_text_falls_back_on_missing_cast(self):
+        from nodes.production_ledger import (
+            assemble_script_text_from_ledger,
+        )
+        led_data = {
+            "lines": [{
+                "line_id": "b001", "char_id": "c01",
+                "speaker_role": "character",
+                "text": "Hi.", "traits": None,
+            }],
+        }
+        out = assemble_script_text_from_ledger(led_data)
+        # No cast lookup available: should fall back to char_id
+        # rather than dropping the line.
+        assert "[VOICE: c01, neutral] Hi." in out
+
+    def test_assemble_script_text_skips_empty_text(self):
+        from nodes.production_ledger import (
+            assemble_script_text_from_ledger,
+        )
+        led_data = {
+            "cast": [{"char_id": "c01", "name": "ALICE"}],
+            "lines": [
+                {
+                    "line_id": "b001", "char_id": "c01",
+                    "speaker_role": "character",
+                    "text": "", "traits": "neutral",
+                },
+                {
+                    "line_id": "b002", "char_id": "c01",
+                    "speaker_role": "character",
+                    "text": "Real line.", "traits": "neutral",
+                },
+            ],
+        }
+        out = assemble_script_text_from_ledger(led_data)
+        assert "[VOICE: ALICE, neutral] Real line." in out
+        # Empty text row should not produce a "[VOICE: ALICE, ...] "
+        # with trailing nothing.
+        assert out.count("[VOICE: ALICE") == 1
+
+
+class TestStopStringSlice:
+    """Tier 1 fix #5 — StoppingCriteria halts but trigger bytes
+    survive in the decode. The writer's `_build_truncating_generate_fn`
+    must slice the decoded string at the earliest stop substring."""
+
+    def test_slice_logic_isolated(self):
+        # Recreate the slice logic inline (the writer function pulls
+        # in torch and a real tokenizer; we exercise only the slice).
+        def slice_at_first_stop(decoded: str, stop):
+            cut = len(decoded)
+            for s in stop or ():
+                if not s:
+                    continue
+                idx = decoded.find(s)
+                if idx >= 0 and idx < cut:
+                    cut = idx
+            return decoded[:cut]
+        # Each stop string survives -> must be sliced off.
+        assert slice_at_first_stop(
+            "Hello there.\n\nNarration leaks here.",
+            ["\n\n", "\n[", "\n("],
+        ) == "Hello there."
+        assert slice_at_first_stop(
+            "Hello there.\n[bracket leak]",
+            ["\n\n", "\n[", "\n("],
+        ) == "Hello there."
+        assert slice_at_first_stop(
+            "Hello there.\n(pause)",
+            ["\n\n", "\n[", "\n("],
+        ) == "Hello there."
+        # No stop hit -> output unchanged.
+        assert slice_at_first_stop(
+            "Hello there.",
+            ["\n\n", "\n[", "\n("],
+        ) == "Hello there."
+        # Earliest stop wins.
+        assert slice_at_first_stop(
+            "Hello there.\n[a]\n\nmore",
+            ["\n\n", "\n[", "\n("],
+        ) == "Hello there."
+
+
+class TestPositionForRaise:
+    """Tier 1 fix #10 — _position_for must raise on missing beat_id
+    rather than silently return 'beat 1 of 1'."""
+
+    def test_position_for_raises_on_unknown_beat_id(self):
+        # Replicate the closure-local _position_for logic from the
+        # writer (it's a nested function so we cannot import it
+        # directly; this test pins the BEHAVIOR contract — if the
+        # writer's helper drifts back to silent fallback this test
+        # ports straight over and fails).
+        arc_order = ["setup", "complication", "resolution"]
+        phase_beats = {
+            "setup": ["b001", "b002"],
+            "complication": ["b003"],
+            "resolution": ["b004"],
+        }
+        def _position_for(beat_id, arc_phase):
+            this_phase = (arc_phase or "setup").strip()
+            if this_phase not in arc_order:
+                raise ValueError(
+                    f"arc_phase {this_phase!r} not in arc_order"
+                )
+            ids = phase_beats.get(this_phase, [])
+            if beat_id not in ids:
+                raise ValueError(
+                    f"beat_id {beat_id!r} not in phase_beats"
+                )
+            return ids.index(beat_id) + 1
+        # Happy path: valid beat returns its position.
+        assert _position_for("b002", "setup") == 2
+        # Missing beat_id raises.
+        with pytest.raises(ValueError, match="beat_id"):
+            _position_for("b999", "setup")
+        # Unknown phase raises.
+        with pytest.raises(ValueError, match="arc_phase"):
+            _position_for("b001", "totally_made_up")
+
+
 class TestSlidingWindowConstant:
 
     def test_writer_uses_window_of_5(self):

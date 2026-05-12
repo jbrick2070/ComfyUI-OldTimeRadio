@@ -260,8 +260,28 @@ class OTR_LedgerScriptReviewer:
             )
             updated_script_json = script_json or "{}"
 
+        # Tier 1 fix #1 (2026-05-11): rebuild script_text from
+        # led.data["lines"] so post-review dialogue rewrites land on
+        # the slot-0 output. Pre-Tier-1 the reviewer re-serialized
+        # script_json from the mutated ledger but shipped the
+        # writer's stale incoming script_text — production-plan
+        # (director) and audio (TTS/sequencer) reading the same
+        # ledger handle would desync. Falls back to incoming
+        # script_text on any helper failure.
+        try:
+            rebuilt_script_text = _PL.assemble_script_text_from_ledger(
+                led.data,
+            ) or (script_text or "")
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[OTR_LedgerScriptReviewer] assemble_script_text_from_"
+                "ledger raised (%s); falling back to incoming "
+                "script_text.", exc,
+            )
+            rebuilt_script_text = script_text or ""
+
         return (
-            script_text or "",
+            rebuilt_script_text,
             updated_script_json,
             news_used or "",
             int(estimated_minutes or 0),

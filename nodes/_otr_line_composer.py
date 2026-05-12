@@ -71,6 +71,13 @@ _PREFIX_VOICE_TAG_RE = re.compile(
 _PREFIX_SPEAKER_COLON_RE = re.compile(
     r"^\s*[A-Z][A-Z0-9_ .]{0,30}\s*[:\-—]\s*",
 )
+# Tier 1 fix #6 (2026-05-11): Mistral-Nemo / Gemma emit mixed-case
+# speaker prefixes ("Alice:", "Bob -") in ~5-10% of attempts. The
+# uppercase-anchored regex above won't catch those. Build a dynamic
+# secondary stripper from the actual cast names + ANNOUNCER, case-
+# insensitive, in compose_line via `_build_named_prefix_re(names)`.
+# The uppercase regex stays as the fallback for cases where the
+# composer is invoked without a roster.
 _MD_BOLD_ITALIC_RE = re.compile(r"(\*\*|__|\*|_|`)")
 _QUOTES_WRAP_RE = re.compile(
     r'^\s*[“”‘’"\']\s*(.*?)\s*[“”‘’"\']\s*$',
@@ -81,6 +88,43 @@ _QUOTES_WRAP_RE = re.compile(
 # ---------------------------------------------------------------------------
 # Format-strip pipeline (public for testability)
 # ---------------------------------------------------------------------------
+
+
+def _build_named_prefix_re(names) -> Optional[re.Pattern]:
+    """Build a case-insensitive regex that strips a leading
+    `<name><sep>` prefix where `<name>` is any string from `names`
+    and `<sep>` is `:`, `-`, or `—` (em dash) with optional
+    surrounding whitespace.
+
+    Returns ``None`` when `names` is empty / all-blank so callers
+    can `if pat is not None:` without an extra falsy check.
+
+    Tier 1 fix #6 (2026-05-11): the uppercase-anchored
+    `_PREFIX_SPEAKER_COLON_RE` misses mixed-case speaker prefixes
+    ("Alice:", "Bob -") that small instruct-tuned LLMs emit in
+    ~5-10% of attempts. A dynamic regex built from the actual
+    locked cast names handles those — and is safe against
+    false-positives because we only strip prefixes that literally
+    match a name from the roster (vs the static uppercase regex
+    which would strip "Hello world:" if applied case-insensitively).
+    """
+    if not names:
+        return None
+    cleaned: list[str] = []
+    for n in names:
+        s = (str(n) or "").strip()
+        if s:
+            cleaned.append(re.escape(s))
+    if not cleaned:
+        return None
+    # Longer names first so "ALICE B" wins over "ALICE" when both
+    # are in the roster.
+    cleaned.sort(key=len, reverse=True)
+    alts = "|".join(cleaned)
+    return re.compile(
+        rf"^\s*(?:{alts})\s*[:\-—]\s*",
+        re.IGNORECASE,
+    )
 
 
 def strip_line_formatting(raw: str) -> str:
@@ -171,6 +215,40 @@ _COMMON_ALLCAPS_NON_NAMES: frozenset[str] = frozenset({
     "OK", "TV", "AI", "USA", "UK", "EU", "UN", "DNA", "RNA",
     "AM", "PM",
 })
+
+# Tier 1 fix #7 (2026-05-11): single Title-Case mid-sentence words
+# that legitimately get capitalized but should not be flagged as
+# phantom names. Days of week, months, common titles / kin terms,
+# holidays, deity references, planetary bodies. Keep conservative —
+# anything ambiguous (e.g. "Mom" might be a real character name in
+# some scripts) errs on the side of NOT flagging.
+_COMMON_TITLE_CASE_WORDS: frozenset[str] = frozenset({
+    # Days
+    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+    "Saturday", "Sunday",
+    # Months
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+    # Titles / kin terms (full forms + abbreviated; abbreviated
+    # variants are also the leading word of a _TITLED_NAME_RE hit
+    # like "Dr. Patel" — skip them as single-word phantoms so the
+    # bigram pass / titled-name pass own those entries cleanly).
+    "Mom", "Dad", "Mother", "Father", "Sir", "Madam", "Maam",
+    "Mister", "Misses", "Miss",
+    "Mr", "Mrs", "Ms", "Dr", "Prof", "Lt", "Capt", "Cmdr", "Adm",
+    "Sen", "Sgt", "Col", "Gen",
+    # Deities / cosmology
+    "God", "Lord", "Heaven", "Hell", "Earth", "Mars", "Moon", "Sun",
+    # Holidays
+    "Christmas", "Easter", "Halloween", "Thanksgiving", "Hanukkah",
+    # English first-words / common Title-Case mid-sentence
+    "English", "American", "British", "European",
+})
+
+# Single Title-Case word, mid-sentence (used by detect_phantom_names'
+# Tier-1-#7 single-word pass — bigrams are already covered by
+# _TITLE_CASE_BIGRAM_RE).
+_TITLE_CASE_WORD_RE = re.compile(r"\b[A-Z][a-z]+\b")
 
 
 def build_allowed_roster(
@@ -307,6 +385,41 @@ def detect_phantom_names(
             # caught by pass 2 (avoid double-reporting "Dr. Patel"
             # if its trailing surname happens to be Title-Case).
             if _TITLED_NAME_RE.fullmatch(tok):
+                continue
+            found.setdefault(tok, None)
+
+    # 4. Single Title-Case mid-sentence words. Tier 1 fix #7
+    # (2026-05-11): catches invented one-word names like "Maya" /
+    # "Carlos" that previously slipped through the bigram-only
+    # pass. Sentence-start words are stripped (Title-Case at line
+    # start is orthography, not signal); a stoplist of common
+    # Title-Case English non-names (days, months, "Mom", "God",
+    # "Earth", etc.) suppresses false positives.
+    for sentence in sentences:
+        body = _strip_sentence_lead_word(sentence)
+        for m in _TITLE_CASE_WORD_RE.finditer(body):
+            tok = m.group(0).strip()
+            if not tok:
+                continue
+            tok_u = tok.upper()
+            if tok_u == speaker_u:
+                continue
+            if tok_u in allowed_roster:
+                continue
+            if tok in _COMMON_TITLE_CASE_WORDS:
+                continue
+            # Skip if this single token is part of a previously-
+            # flagged multi-word entry (avoid double-flagging "Maya"
+            # when "Maya Smith" is already on the list, or the
+            # surname inside a "Dr. Patel" hit).
+            if any(
+                existing != tok and (
+                    f" {tok} " in f" {existing} "
+                    or existing.startswith(tok + " ")
+                    or existing.endswith(" " + tok)
+                )
+                for existing in found
+            ):
                 continue
             found.setdefault(tok, None)
 
@@ -962,10 +1075,16 @@ def polish_line(
     """Run ONE polish LLM call against `leaked_line`.
 
     Targeted edit (low temperature). Returns the cleaned line on
-    success. On any failure (generate raise, empty result, polish
-    still trips the regex), returns the original `leaked_line`
-    unchanged — polish here is a quality nicety, not a correctness
-    requirement.
+    success. Falls back to the original `leaked_line` on:
+      - generate_fn raises
+      - empty / whitespace-only model output
+
+    Tier 1 fix #11 (2026-05-11): does NOT itself re-run
+    `needs_polish()` on the polish output. The caller (compose_line)
+    runs that re-check so it has the option to log a
+    `polish_still_leaky` signal AND keep the pre-polish text rather
+    than ship a "polished" line that still leaks. Polish is a
+    quality nicety, not a correctness requirement.
     """
     if not (leaked_line or "").strip():
         return leaked_line
@@ -1107,6 +1226,23 @@ def compose_line(
 
         cleaned = strip_line_formatting(raw or "")
 
+        # Tier 1 fix #6 (2026-05-11): strip any leading mixed-case
+        # cast-name prefix that survived the uppercase-anchored
+        # `_PREFIX_SPEAKER_COLON_RE` pass. Dynamic alternation built
+        # from `req.allowed_people` + ANNOUNCER. Only fires when a
+        # named roster is available; legacy callers without one
+        # rely on the static regex inside `strip_line_formatting`.
+        if cleaned:
+            roster_names = set(req.allowed_people or ())
+            roster_names.add("ANNOUNCER")
+            if req.speaker:
+                roster_names.add(req.speaker)
+            named_re = _build_named_prefix_re(roster_names)
+            if named_re is not None:
+                stripped = named_re.sub("", cleaned, count=1).strip()
+                if stripped:
+                    cleaned = stripped
+
         if not cleaned:
             err_msg = "empty after format-strip"
             log.warning("[OTR_LineComposer] attempt %d failed: %s (raw=%r)",
@@ -1143,9 +1279,25 @@ def compose_line(
             # forbids it but small models occasionally slip).
             polished_clean = strip_line_formatting(polished or "")
             if polished_clean:
-                cleaned = polished_clean
-                # Update word_count for the success log below.
-                word_count = len(cleaned.split())
+                # Tier 1 fix #11 (2026-05-11): re-run needs_polish()
+                # on the polish output. If the polish ALSO trips the
+                # narration-leak regex, keep the pre-polish cleaned
+                # text and log `polish_still_leaky` at INFO so soak
+                # surfaces it. Shipping a "polished" line that still
+                # leaks is worse than shipping the original — at
+                # least the original has the composer's full attempt
+                # ladder behind it.
+                if needs_polish(polished_clean):
+                    log.info(
+                        "[OTR_LineComposer] polish_still_leaky on "
+                        "%s (polish output retripped the regex); "
+                        "keeping pre-polish text",
+                        req.speaker,
+                    )
+                else:
+                    cleaned = polished_clean
+                    # Update word_count for the success log below.
+                    word_count = len(cleaned.split())
 
         # Phase 0 name-roster gate. Detect-and-flag only -- the line
         # commits regardless. Empty roster skips the gate entirely so
