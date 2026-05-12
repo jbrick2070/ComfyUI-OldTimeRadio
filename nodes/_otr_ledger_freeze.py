@@ -464,16 +464,36 @@ def _check_per_cast_invariants(
                 f"cast[{idx}] (char_id={char_id!r}) traits has type "
                 f"{type(traits).__name__}; expected str or list"
             )
-        voice_preset = (
-            row.get("voice_preset")
-            or row.get("tts_model")
-            or row.get("speaker_role")
-        )
-        if not voice_preset:
-            warnings.append(
-                f"cast[{idx}] (char_id={char_id!r}) has no voice_preset/"
-                f"tts_model/speaker_role"
-            )
+        # G6 invariant (voice-path-cleanbreak, Gate 2 of 3).
+        # Every non-ANNOUNCER cast row must carry a non-empty
+        # ``voice_preset`` starting with ``v2/`` (the Bark preset
+        # namespace). ANNOUNCER is intentionally excluded because it
+        # lives in the Kokoro namespace (bm_* / bf_*) by construction.
+        # Empty / None / non-v2 preset is a writer contract violation
+        # promoted from the legacy WARN-fallback (tts_model /
+        # speaker_role substitutes) which was a back-compat shim.
+        if (isinstance(name, str) and name.strip().upper() == "ANNOUNCER"):
+            # Kokoro namespace -- voice_preset still must be non-empty
+            # but the v2/ prefix does not apply.
+            if not row.get("voice_preset"):
+                warnings.append(
+                    f"cast[{idx}] (char_id={char_id!r}, ANNOUNCER) has no "
+                    f"voice_preset"
+                )
+        else:
+            voice_preset = row.get("voice_preset")
+            if not voice_preset:
+                errors.append(
+                    f"G6: cast[{idx}] (char_id={char_id!r}) has empty/"
+                    f"missing voice_preset (writer cast-lock contract "
+                    f"violation)"
+                )
+            elif not str(voice_preset).startswith("v2/"):
+                errors.append(
+                    f"G6: cast[{idx}] (char_id={char_id!r}) voice_preset "
+                    f"{voice_preset!r} does not start with 'v2/' "
+                    f"(Bark requires v2/* presets on non-ANNOUNCER rows)"
+                )
 
     # Each char_id must be referenced by >= 1 non-skipped line (unless
     # announcer-only-fallback).

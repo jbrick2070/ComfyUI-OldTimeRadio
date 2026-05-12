@@ -102,113 +102,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("huggingface_hub.file_download").setLevel(logging.WARNING)
 
 
-# -- Voice preset resolution (shared logic with SceneSequencer) ---------------
-
-_BARK_VOICE_PRESETS = [
-    # -- English (native) --
-    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_2",
-    "v2/en_speaker_3", "v2/en_speaker_4", "v2/en_speaker_5",
-    "v2/en_speaker_6", "v2/en_speaker_7", "v2/en_speaker_8",
-    "v2/en_speaker_9",
-    # -- International accented English --
-    # European language presets render English words clearly with a
-    # distinct accent/timbre. Adds vocal diversity to the ensemble
-    # without sacrificing intelligibility.
-    "v2/de_speaker_0",  # German male, precise, clipped
-    "v2/de_speaker_4",  # German female, clear, analytical
-    "v2/fr_speaker_0",  # French male, smooth, baritone
-    "v2/fr_speaker_4",  # French female, warm, elegant
-    "v2/es_speaker_0",  # Spanish male, warm, authoritative
-    "v2/es_speaker_9",  # Spanish female, mature, expressive
-    "v2/it_speaker_0",  # Italian male, dramatic, animated
-    "v2/it_speaker_4",  # Italian female, expressive, warm
-    "v2/pt_speaker_0",  # Portuguese male, soft, thoughtful
-    "v2/pt_speaker_4",  # Portuguese female, gentle, clear
-]
-
-_CHARACTER_VOICE_CACHE = {}
-
-
-_FEMALE_PRESETS = [
-    # en_speaker_2 and en_speaker_7 removed - sound male/androgynous in practice
-    "v2/en_speaker_4", "v2/en_speaker_9",
-    "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
-    "v2/it_speaker_4", "v2/pt_speaker_4",
-]
-_MALE_PRESETS = [
-    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_2",
-    "v2/en_speaker_3", "v2/en_speaker_5", "v2/en_speaker_6",
-    "v2/en_speaker_7", "v2/en_speaker_8",
-    "v2/de_speaker_0", "v2/fr_speaker_0", "v2/es_speaker_0",
-    "v2/it_speaker_0", "v2/pt_speaker_0",
-]
-
-
-def _voice_preset_for_character(character, voice_map, voice_traits=""):
-    """Determine Bark voice preset for a character.
-
-    Priority:
-      1. Cached assignment (stable across the episode)
-      2. Director's voice_assignments
-      3. Fuzzy match (uppercase, underscored, partial)
-      4. Gender-aware hash fallback using voice_traits from script
-    """
-    if character in _CHARACTER_VOICE_CACHE:
-        return _CHARACTER_VOICE_CACHE[character]
-
-    voice_info = voice_map.get(character, {})
-    preset = voice_info.get("voice_preset") or voice_info.get("bark_preset")
-    if preset and preset.startswith("v2/"):
-        _CHARACTER_VOICE_CACHE[character] = preset
-        return preset
-
-    char_normalized = character.upper().replace(" ", "_")
-    for map_key, map_val in voice_map.items():
-        key_normalized = map_key.upper().replace(" ", "_")
-        if (key_normalized == char_normalized or
-                key_normalized in char_normalized or
-                char_normalized in key_normalized):
-            preset = map_val.get("voice_preset") or map_val.get("bark_preset")
-            if preset and preset.startswith("v2/"):
-                _CHARACTER_VOICE_CACHE[character] = preset
-                return preset
-
-    # Gender-aware hash fallback with 93/7 English-native/international ratio.
-    # Director always assigns en_speaker_*; this fallback runs only when the
-    # Director mapping is missing. ~93% chance of English native, ~7% of
-    # international accented English (rare accent for vocal variety without
-    # risking language drift - the temp cap + ASCII sanitizer handle the rest).
-    import random
-    traits_lower = voice_traits.lower() if voice_traits else ""
-    is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
-    is_male   = "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower
-
-    # Deterministic seed per character name so same character always gets same voice
-    rng = random.Random(hash(character))
-    use_intl = rng.random() < 0.07  # 7% chance of international preset
-
-    if is_female:
-        en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _FEMALE_PRESETS if not p.startswith("v2/en_")]
-        label = "female"
-    elif is_male:
-        en_pool   = [p for p in _MALE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _MALE_PRESETS if not p.startswith("v2/en_")]
-        label = "male"
-    else:
-        en_pool   = [p for p in _BARK_VOICE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _BARK_VOICE_PRESETS if not p.startswith("v2/en_")]
-        label = "unknown-gender"
-
-    pool = intl_pool if (use_intl and intl_pool) else en_pool
-    if not pool:  # safety net - should never happen with current preset lists
-        pool = _BARK_VOICE_PRESETS
-    preset = rng.choice(pool)
-    _CHARACTER_VOICE_CACHE[character] = preset
-    pool_tag = "international" if (use_intl and intl_pool) else "English-native"
-    log.info("[BatchBark] No Director mapping for '%s' (%s), assigned %s from %s %s pool",
-             character, traits_lower[:30], preset, pool_tag, label)
-    return preset
+# Voice preset resolution: cast.voice_preset is the only source. The
+# legacy Director voice_map fallback + _voice_preset_for_character +
+# gender-aware grab-bag helpers were deleted in the voice-path-cleanbreak
+# 2026-05-12 sprint (Gate 3). Empty / non-v2 cast.voice_preset is a
+# writer contract violation -- BatchBarkGenerator hard-raises ValueError.
 
 
 def _clean_text_for_bark(text):
@@ -461,14 +359,10 @@ class BatchBarkGenerator:
             "required": {
                 "script_json": ("STRING", {
                     "multiline": True, "default": "[]",
-                    "tooltip": "Parsed script JSON from LLMScriptWriter"
+                    "tooltip": "L3 ledger JSON from OTR_LedgerFreezeCascade"
                 }),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully to deterministic char-based voice fallback)"
-                }),
                 "temperature": ("FLOAT", {
                     "default": 0.7, "min": 0.1, "max": 1.5, "step": 0.05,
                     "tooltip": "Bark generation temperature (0.7 = balanced)"
@@ -477,20 +371,17 @@ class BatchBarkGenerator:
         }
 
     @vram_sentinel("bark_batch", max_entry_gb=6.0)
-    def generate_batch(self, script_json, production_plan_json="{}", temperature=0.7):
+    def generate_batch(self, script_json, temperature=0.7):
 
-        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
+        # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
 
-        # Read-side helpers: parse the script_json wire input as a v2 ledger
+        # Read-side helper: parse the script_json wire input as a v2 ledger
         # dict. load_ledger raises ValueError on the legacy parser-list shape;
         # Bark fails loud here (unlike the critic, which is non-blocking).
-        # production_plan_json is now optional: empty / unwired "{}" degrades
-        # to no Director voice_assignments + deterministic char-based fallback.
+        # cast.voice_preset is the only source for voice selection (Gate 3).
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-        plan = _OTRLC.production_plan_or_empty(production_plan_json)
-        voice_map = plan.get("voice_assignments", {})
 
         # -- Step 1: Walk character lines from the ledger ------------------
         # ANNOUNCER lines (speaker_role == "announcer") are intentionally
@@ -511,17 +402,21 @@ class BatchBarkGenerator:
                 continue
             line_id = line.get("line_id")
             character_name = _OTRLC.speaker_name(led, line)
-            voice_traits = (line.get("traits") or "")
-            # Voice preset selection -- prefer cast.voice_preset (v2 cast
-            # contract); fall back to the existing gender-aware char-based
-            # default when missing or when the cast entry doesn't carry a
-            # v2/* preset.
-            preset_from_cast = _OTRLC.voice_preset(led, line)
-            if preset_from_cast and str(preset_from_cast).startswith("v2/"):
-                preset = preset_from_cast
-            else:
-                preset = _voice_preset_for_character(
-                    character_name, voice_map, voice_traits,
+            # Gate 3 (voice-path-cleanbreak, last line of defense):
+            # cast.voice_preset is the only source. Empty / non-v2/* is a
+            # writer cast-lock contract violation that Gate 1 (writer) and
+            # Gate 2 (FreezeCascade G6) should have caught earlier. Bark
+            # hard-raises here so a future bypass of either upstream gate
+            # surfaces at render time instead of silently re-introducing
+            # the deleted Director-voice_map fallback.
+            preset = _OTRLC.voice_preset(led, line)
+            if not preset or not str(preset).startswith("v2/"):
+                raise ValueError(
+                    f"BatchBarkGenerator: cast.voice_preset missing or "
+                    f"non-v2/* for character {character_name!r} "
+                    f"(line_id={line_id}, char_id={line.get('char_id')!r}, "
+                    f"got {preset!r}). Writer cast-lock contract violation "
+                    f"(Gate 1 + Gate 2 should have caught this upstream)."
                 )
             dialogue_items.append({
                 "script_idx":     i,

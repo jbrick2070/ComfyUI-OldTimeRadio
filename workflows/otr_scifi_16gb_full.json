@@ -117,10 +117,7 @@
           "name": "production_plan_json",
           "type": "STRING",
           "links": [
-            4,
-            13,
             17,
-            26,
             38
           ],
           "slot_index": 0
@@ -182,14 +179,6 @@
           "link": 2,
           "widget": {
             "name": "script_json"
-          }
-        },
-        {
-          "name": "production_plan_json",
-          "type": "STRING",
-          "link": 4,
-          "widget": {
-            "name": "production_plan_json"
           }
         },
         {
@@ -378,14 +367,6 @@
           "link": 12,
           "widget": {
             "name": "script_json"
-          }
-        },
-        {
-          "name": "production_plan_json",
-          "type": "STRING",
-          "link": 13,
-          "widget": {
-            "name": "production_plan_json"
           }
         }
       ],
@@ -648,14 +629,6 @@
           "link": 24,
           "widget": {
             "name": "script_json"
-          }
-        },
-        {
-          "name": "production_plan_json",
-          "type": "STRING",
-          "link": 26,
-          "widget": {
-            "name": "production_plan_json"
           }
         }
       ],
@@ -2099,14 +2072,6 @@
       "STRING"
     ],
     [
-      4,
-      2,
-      0,
-      3,
-      1,
-      "STRING"
-    ],
-    [
       5,
       3,
       0,
@@ -2128,14 +2093,6 @@
       1,
       11,
       0,
-      "STRING"
-    ],
-    [
-      13,
-      2,
-      0,
-      11,
-      1,
       "STRING"
     ],
     [
@@ -2225,14 +2182,6 @@
       3,
       4,
       "AUDIO"
-    ],
-    [
-      26,
-      2,
-      0,
-      15,
-      1,
-      "STRING"
     ],
     [
       38,

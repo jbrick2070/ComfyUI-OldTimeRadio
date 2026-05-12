@@ -39,11 +39,17 @@ def _ledger(lines):
             "schema_version": "l3-2026-05-14",
             "episode_id": "ep_c3_test",
             "cast": [
+                # voice_preset populated per G6 invariant (voice-path-cleanbreak):
+                # non-ANNOUNCER rows must carry a v2/* Bark preset; ANNOUNCER
+                # carries a Kokoro namespace id.
                 {"char_id": "c01", "name": "ALICE",
+                 "voice_preset": "v2/en_speaker_4",
                  "portrait_path": "ALICE.png"},
                 {"char_id": "c02", "name": "BOB",
+                 "voice_preset": "v2/en_speaker_6",
                  "portrait_path": "BOB.png"},
                 {"char_id": "announcer", "name": "ANNOUNCER",
+                 "voice_preset": "bm_george",
                  "portrait_path": "ANNOUNCER.png"},
             ],
             "scenes": [], "shots": [], "beats": [],

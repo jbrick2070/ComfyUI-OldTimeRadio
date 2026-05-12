@@ -218,10 +218,6 @@ class BatchAudioGenGenerator:
                 "script_json": ("STRING", {"multiline": True, "default": "[]"}),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully -- sfx_plan falls back to default_duration)",
-                }),
                 "episode_seed": ("STRING", {"default": ""}),
                 # BUG-LOCAL-027: the "3"/"3.0"/3/3.0 entries were scar tissue
                 # from widget-drift hitting this node. With the mapper fix in
@@ -234,29 +230,32 @@ class BatchAudioGenGenerator:
             }
         }
 
-    def generate(self, script_json, production_plan_json="{}", episode_seed="",
+    def generate(self, script_json, episode_seed="",
                  model_id="facebook/audiogen-medium", guidance_scale=3.0, default_duration=3.0):
-        
-        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
+
+        # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
-        
+
         # UI JSON back-compat fix
         if str(model_id) in ["3", "3.0"]:
             model_id = "facebook/audiogen-medium"
-            
+
         batch_log = ["=== Batch AudioGen Generator ==="]
 
         # Read-side: parse the wire input as a v2 ledger dict.
         # load_ledger raises ValueError on the legacy parser-list shape;
         # AudioGen is in the loud-fail group (Pattern 1) -- bad wiring
-        # halts the run early. production_plan_json is now optional;
-        # an empty / unwired "{}" degrades to default_duration via the
-        # graceful production_plan_or_empty helper.
+        # halts the run early. The legacy Director production_plan_json
+        # secondary input was deleted in voice-path-cleanbreak 2026-05-12;
+        # sfx cue text is line["text"] from the ledger, durations default
+        # to default_duration (per-cue overrides via outline beats are a
+        # post-cleanbreak design item).
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-        plan = _OTRLC.production_plan_or_empty(production_plan_json)
 
-        sfx_plan = plan.get("sfx_plan", [])
+        # sfx_plan is gone. Empty list keeps the existing iteration shape
+        # without re-introducing the Director read.
+        sfx_plan: list = []
 
         # Walk ledger sfx lines (Pattern 2: roles={"sfx"}). The cue
         # text comes DIRECTLY from line["text"] -- no [SFX:] regex,

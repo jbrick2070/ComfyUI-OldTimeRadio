@@ -111,27 +111,22 @@ class BatchProceduralSFX:
                 "script_json": ("STRING", {"multiline": True, "default": "[]"}),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; ProcSFX does not consume the plan but the widget slot is preserved for workflow-binding stability)",
-                }),
                 "default_duration": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 10.0, "step": 0.1}),
                 "volume_db": ("FLOAT", {"default": 0.0, "min": -30.0, "max": 6.0, "step": 1.0}),
             }
         }
 
-    def generate(self, script_json, production_plan_json="{}", default_duration=2.0, volume_db=0.0):
+    def generate(self, script_json, default_duration=2.0, volume_db=0.0):
         batch_log = ["=== Batch Procedural SFX (Obsidian) ==="]
 
         # Read-side: parse the wire input as a v2 ledger dict.
         # load_ledger raises ValueError on the legacy parser-list shape;
         # ProcSFX is in the loud-fail group (Pattern 1) -- bad wiring
-        # halts the run early. production_plan_json is optional;
-        # ProcSFX doesn't read the plan but the helper call keeps the
-        # wire shape consistent with the other consumers.
+        # halts the run early. The legacy Director production_plan_json
+        # secondary input was deleted in voice-path-cleanbreak 2026-05-12 --
+        # ProcSFX never read its content (dead-weight socket).
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-        _OTRLC.production_plan_or_empty(production_plan_json)
 
         # 1. Walk ledger sfx lines (Pattern 2). Cue text = line["text"]
         # directly -- no regex on inline [SFX: ...] markers (the legacy

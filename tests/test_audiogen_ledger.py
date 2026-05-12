@@ -26,9 +26,7 @@ import soundfile as sf
 
 from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 
-
 AUDIOGEN_SAMPLE_RATE = 32000
-
 
 # ---------------------------------------------------------------------------
 # Fixture
@@ -36,7 +34,6 @@ AUDIOGEN_SAMPLE_RATE = 32000
 
 def _no_op(*_args, **_kwargs):
     return None
-
 
 @pytest.fixture
 def patched_audiogen_env(tmp_path):
@@ -79,7 +76,6 @@ def patched_audiogen_env(tmp_path):
     ):
         yield state
 
-
 def _seed_cache_for_cue(cache_dir: str, prompt: str, duration: float,
                        episode_seed: str) -> str:
     """Pre-write a valid WAV file at the canonical cache filename so
@@ -94,7 +90,6 @@ def _seed_cache_for_cue(cache_dir: str, prompt: str, duration: float,
     data = np.zeros(samples, dtype=np.float32)
     sf.write(fpath, data, AUDIOGEN_SAMPLE_RATE, subtype="FLOAT", format="WAV")
     return fpath
-
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -120,7 +115,7 @@ def test_audiogen_iter_sfx_only(patched_audiogen_env):
 
     BatchAudioGenGenerator().generate(
         script_json=script_json,
-        production_plan_json="{}",
+
         episode_seed="test-iter",
         default_duration=3.0,
     )
@@ -143,7 +138,6 @@ def test_audiogen_iter_sfx_only(patched_audiogen_env):
         assert "sfx_wav_path" not in row, (
             f"{non_sfx} should not have sfx_wav_path stamped"
         )
-
 
 def test_audiogen_stamps_by_line_id_with_duplicate_text(patched_audiogen_env):
     """Two sfx lines with IDENTICAL cue text but distinct line_ids.
@@ -180,7 +174,7 @@ def test_audiogen_stamps_by_line_id_with_duplicate_text(patched_audiogen_env):
 
     BatchAudioGenGenerator().generate(
         script_json=script_json,
-        production_plan_json="{}",
+
         episode_seed="dup-test",
         default_duration=3.0,
     )
@@ -198,7 +192,6 @@ def test_audiogen_stamps_by_line_id_with_duplicate_text(patched_audiogen_env):
             f"{lid} missing sfx_wav_path"
         )
         assert row.get("dur_s", 0) > 0, f"{lid} missing dur_s"
-
 
 def test_audiogen_cache_hit_path(patched_audiogen_env):
     """Cache-hit path (no real model load) still stamps line_id-keyed
@@ -221,7 +214,7 @@ def test_audiogen_cache_hit_path(patched_audiogen_env):
 
     _audio, batch_log = BatchAudioGenGenerator().generate(
         script_json=script_json,
-        production_plan_json="{}",
+
         episode_seed="cache-hit-test",
         default_duration=3.0,
     )
@@ -245,7 +238,6 @@ def test_audiogen_cache_hit_path(patched_audiogen_env):
     assert row.get("dur_s", 0) > 0
     assert row.get("generated_dur_s", 0) > 0
 
-
 def test_audiogen_legacy_list_raises():
     """Legacy parser-list shape -> load_ledger ValueError surfaces.
     AudioGen is in the loud-fail group."""
@@ -260,7 +252,7 @@ def test_audiogen_legacy_list_raises():
         with pytest.raises(ValueError) as excinfo:
             BatchAudioGenGenerator().generate(
                 script_json=legacy_json,
-                production_plan_json="{}",
+
             )
 
     msg = str(excinfo.value)

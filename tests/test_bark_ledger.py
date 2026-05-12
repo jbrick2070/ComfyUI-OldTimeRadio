@@ -27,7 +27,6 @@ import torch
 
 from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 
-
 # ---------------------------------------------------------------------------
 # Mocks
 # ---------------------------------------------------------------------------
@@ -36,7 +35,6 @@ def _fake_load_bark(_model_id):
     """Return placeholder model + processor; never touched because we also
     mock _generate_single_line."""
     return MagicMock(name="model"), MagicMock(name="processor")
-
 
 def _fake_gen_single_line(text, _voice_preset, _model, _processor,
                           _temperature=0.7, is_first_line=False):
@@ -49,7 +47,6 @@ def _fake_gen_single_line(text, _voice_preset, _model, _processor,
     """
     samples = 24000 + min(len(text) * 10, 5000)
     return np.zeros(samples, dtype=np.float32), 24000
-
 
 @pytest.fixture
 def patched_bark_env(tmp_path):
@@ -100,7 +97,6 @@ def patched_bark_env(tmp_path):
     ):
         yield state
 
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -117,7 +113,7 @@ def test_bark_iter_voiced_lines_only(patched_bark_env):
 
     audio_out, _batch_log = BatchBarkGenerator().generate_batch(
         script_json=script_json,
-        production_plan_json="{}",
+
         temperature=0.7,
     )
 
@@ -143,7 +139,6 @@ def test_bark_iter_voiced_lines_only(patched_bark_env):
     assert "tts_engine" not in by_id["b005"], "sfx line not stamped by Bark"
     assert "tts_engine" not in by_id["b001"], "music_open line not stamped by Bark"
     assert "tts_engine" not in by_id["b006"], "music_close line not stamped by Bark"
-
 
 def test_bark_stamps_by_line_id_with_duplicate_text(patched_bark_env):
     """Two character lines with IDENTICAL text -- the old text-match
@@ -174,7 +169,7 @@ def test_bark_stamps_by_line_id_with_duplicate_text(patched_bark_env):
 
     BatchBarkGenerator().generate_batch(
         script_json=script_json,
-        production_plan_json="{}",
+
         temperature=0.7,
     )
 
@@ -196,16 +191,16 @@ def test_bark_stamps_by_line_id_with_duplicate_text(patched_bark_env):
         by_id["L_alpha"]["dur_s"], rel=1e-6,
     )
 
-
-def test_bark_voice_preset_fallback(patched_bark_env):
-    """Cast entry with voice_preset=None must fall back to the existing
-    deterministic char-based default (gender-aware hash)."""
+def test_bark_voice_preset_fallback_is_gone(patched_bark_env):
+    """Voice-path-cleanbreak (Gate 3): Bark no longer has a fallback for
+    cast.voice_preset=None. The legacy gender-aware grab-bag was deleted.
+    Empty / non-v2 cast.voice_preset hard-raises ValueError. The new
+    contract is fully covered by tests/test_bark_cast_contract.py; this
+    test pins the regression: a cast row with voice_preset=None must
+    raise, not silently grab a default.
+    """
     from nodes.batch_bark_generator import BatchBarkGenerator
 
-    # Stub a ledger where cast c01 has voice_preset=None (legacy default
-    # before the v2 cast contract fills it in). Empty production plan
-    # also has no voice_assignments -- so the only resolution path is
-    # the deterministic _voice_preset_for_character() fallback.
     led_in = {
         "meta":  {"title": "FB", "news_seed": {"headline": "x"}},
         "cast": [
@@ -223,21 +218,11 @@ def test_bark_voice_preset_fallback(patched_bark_env):
     patched_bark_env["led_disk"] = json.loads(json.dumps(led_in))
     script_json = json.dumps(led_in)
 
-    BatchBarkGenerator().generate_batch(
-        script_json=script_json,
-        production_plan_json="{}",
-        temperature=0.7,
-    )
-
-    saved_led = patched_bark_env["led_disk"]
-    row = saved_led["lines"][0]
-    # The deterministic fallback always returns a v2/* preset, never None.
-    assert row.get("voice_preset", "").startswith("v2/"), (
-        f"fallback should produce a v2/* preset; got {row.get('voice_preset')!r}"
-    )
-    assert row["tts_engine"] == "bark"
-    assert row["dur_s"] > 0
-
+    with pytest.raises(ValueError, match=r"voice_preset|v2/"):
+        BatchBarkGenerator().generate_batch(
+            script_json=script_json,
+            temperature=0.7,
+        )
 
 def test_bark_legacy_list_input_raises():
     """Legacy parser-list shape on the wire must raise ValueError --
@@ -259,7 +244,7 @@ def test_bark_legacy_list_input_raises():
         with pytest.raises(ValueError) as excinfo:
             BatchBarkGenerator().generate_batch(
                 script_json=legacy_json,
-                production_plan_json="{}",
+
                 temperature=0.7,
             )
 

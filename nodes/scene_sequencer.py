@@ -254,102 +254,11 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 # INLINE BARK TTS - called by SceneSequencer for dynamic dialogue generation
 # -----------------------------------------------------------------------------
 
-# Default voice preset rotation for characters without explicit assignments
-_BARK_VOICE_PRESETS = [
-    # -- English (native) --
-    "v2/en_speaker_0",  # Male, deep, authoritative (announcer)
-    "v2/en_speaker_1",  # Male, warm, conversational
-    "v2/en_speaker_2",  # Male, calm, measured (sounds male/neutral in practice)
-    "v2/en_speaker_3",  # Male, young, energetic
-    "v2/en_speaker_4",  # Female, warm, expressive
-    "v2/en_speaker_5",  # Male, older, gravelly
-    "v2/en_speaker_6",  # Male, neutral, broadcast
-    "v2/en_speaker_7",  # Male, sharp, anxious (androgynous but reads male)
-    "v2/en_speaker_8",  # Male, deep, dramatic
-    "v2/en_speaker_9",  # Female, mature, sophisticated
-    # -- International accented English --
-    # European presets render English clearly with accent flavor.
-    # Adds vocal diversity without sacrificing intelligibility.
-    "v2/de_speaker_0",  # German male, precise, clipped
-    "v2/de_speaker_4",  # German female, clear, analytical
-    "v2/fr_speaker_0",  # French male, smooth, baritone
-    "v2/fr_speaker_4",  # French female, warm, elegant
-    "v2/es_speaker_0",  # Spanish male, warm, authoritative
-    "v2/es_speaker_9",  # Spanish female, mature, expressive
-    "v2/it_speaker_0",  # Italian male, dramatic, animated
-    "v2/it_speaker_4",  # Italian female, expressive, warm
-    "v2/pt_speaker_0",  # Portuguese male, soft, thoughtful
-    "v2/pt_speaker_4",  # Portuguese female, gentle, clear
-]
-
-_FEMALE_PRESETS = [
-    # en_speaker_2 and en_speaker_7 removed - sound male/androgynous in practice
-    "v2/en_speaker_4", "v2/en_speaker_9",
-    "v2/de_speaker_4", "v2/fr_speaker_4", "v2/es_speaker_9",
-    "v2/it_speaker_4", "v2/pt_speaker_4",
-]
-_MALE_PRESETS = [
-    "v2/en_speaker_0", "v2/en_speaker_1", "v2/en_speaker_3",
-    "v2/en_speaker_5", "v2/en_speaker_6", "v2/en_speaker_8",
-    "v2/de_speaker_0", "v2/fr_speaker_0", "v2/es_speaker_0",
-    "v2/it_speaker_0", "v2/pt_speaker_0",
-]
-
-# Stable character-preset cache so the same character always gets the same voice
-_CHARACTER_VOICE_CACHE = {}
-
-
-def _voice_preset_for_character(voice_tag, voice_map, voice_traits=""):
-    """Determine Bark voice preset for a character/voice_tag.
-
-    Priority:
-      1. Cached assignment (stable across the episode)
-      2. Director's voice_assignments (from LLMDirector voice_map_json)
-      3. Gender-aware hash fallback using voice_traits from script
-    """
-    if voice_tag in _CHARACTER_VOICE_CACHE:
-        return _CHARACTER_VOICE_CACHE[voice_tag]
-
-    # Direct match from Director's voice map (Director maps Tag -> Preset)
-    voice_info = voice_map.get(voice_tag, {})
-    preset = voice_info.get("voice_preset") or voice_info.get("bark_preset")
-    if preset and preset.startswith("v2/"):
-        _CHARACTER_VOICE_CACHE[voice_tag] = preset
-        return preset
-
-    # Gender-aware hash fallback with 93/7 English-native/international ratio.
-    # ~93% chance of English native, ~7% of international accented English.
-    import random as _rng_mod
-    traits_lower = voice_traits.lower() if voice_traits else ""
-    is_female = "female" in traits_lower or "woman" in traits_lower or "girl" in traits_lower
-    is_male   = "male" in traits_lower or "man" in traits_lower or "boy" in traits_lower
-
-    # Deterministic seed per voice_tag so same character always gets same voice
-    rng = _rng_mod.Random(hash(voice_tag))
-    use_intl = rng.random() < 0.07  # 7% chance of international preset
-
-    if is_female:
-        en_pool   = [p for p in _FEMALE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _FEMALE_PRESETS if not p.startswith("v2/en_")]
-        label = "female"
-    elif is_male:
-        en_pool   = [p for p in _MALE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _MALE_PRESETS if not p.startswith("v2/en_")]
-        label = "male"
-    else:
-        en_pool   = [p for p in _BARK_VOICE_PRESETS if p.startswith("v2/en_")]
-        intl_pool = [p for p in _BARK_VOICE_PRESETS if not p.startswith("v2/en_")]
-        label = "unknown-gender"
-
-    pool = intl_pool if (use_intl and intl_pool) else en_pool
-    if not pool:
-        pool = _BARK_VOICE_PRESETS
-    preset = rng.choice(pool)
-    _CHARACTER_VOICE_CACHE[voice_tag] = preset
-    pool_tag = "international" if (use_intl and intl_pool) else "English-native"
-    log.info("[VoiceMap] No Director mapping for '%s' (%s), assigned %s from %s %s pool",
-             voice_tag, traits_lower[:30], preset, pool_tag, label)
-    return preset
+# Voice preset resolution: cast.voice_preset is the only source.
+# Director voice_map fallback + _voice_preset_for_character + gender-aware
+# grab-bag pools were deleted in voice-path-cleanbreak 2026-05-12. Empty /
+# non-v2 cast.voice_preset is a writer contract violation -- SceneSequencer
+# raises ValueError at the inline-Bark fallback site (Gate 3 mirror).
 
 
 def _clean_text_for_bark(text):
@@ -566,11 +475,6 @@ class SceneSequencer:
                 }),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True,
-                    "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully -- voice_assignments / pacing fall back to defaults)"
-                }),
                 "tts_audio_clips": ("AUDIO", {
                     "tooltip": "Pre-rendered TTS audio clips (from Bark/Parler batch). "
                                "If provided, dialogue lines use these clips instead of "
@@ -652,7 +556,7 @@ class SceneSequencer:
 
         return clips
 
-    def sequence(self, script_json, production_plan_json="{}",
+    def sequence(self, script_json,
                  tts_audio_clips=None, sfx_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
@@ -667,21 +571,19 @@ class SceneSequencer:
         # Read-side: parse the wire input as a v2 ledger dict.
         # load_ledger raises ValueError on the legacy parser-list shape;
         # Sequencer is in the loud-fail group (Pattern 1) -- bad wiring
-        # halts the run early. production_plan_json is now optional;
-        # an empty / unwired "{}" degrades to default voice_assignments
-        # and pacing.
+        # halts the run early. The legacy Director production_plan_json
+        # secondary input was deleted in voice-path-cleanbreak 2026-05-12 --
+        # pacing defaults are inlined here, voice_map was unused.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-        plan = _OTRLC.production_plan_or_empty(production_plan_json)
 
-        voice_map = plan.get("voice_assignments", {})
-        pacing = plan.get("pacing", {})
-        # PACING: Breath buffer + dramatic pauses (v1.4 - 50% duration reduction)
-        breath_ms = pacing.get("breath_pause_ms", 200)          # between every dialogue line
-        beat_pause_ms = pacing.get("beat_pause_ms", 750)        # [BEAT] tag - dramatic beat
-        pause_ms = pacing.get("pause_ms", 1000)                 # [PAUSE] tag - longer pause
-        scene_transition_ms = pacing.get("scene_transition_ms", 1250)
-        act_break_ms = pacing.get("act_break_ms", 2500)
+        # PACING: Breath buffer + dramatic pauses (v1.4 - 50% duration reduction).
+        # Defaults inlined; the legacy Director pacing override is gone.
+        breath_ms = 200          # between every dialogue line
+        beat_pause_ms = 750      # [BEAT] tag - dramatic beat
+        pause_ms = 1000          # [PAUSE] tag - longer pause
+        scene_transition_ms = 1250
+        act_break_ms = 2500
 
         # Guard: fall back to DEFAULT_OUT if output_dir is empty/None
         if not output_dir or not output_dir.strip():
@@ -820,10 +722,7 @@ class SceneSequencer:
 
             elif item_type == "dialogue":
                 character_name = _OTRLC.speaker_name(led, item)
-                voice_traits = item.get("traits") or ""
                 line = item.get("text") or ""
-                preset = _voice_preset_for_character(character_name, voice_map, voice_traits)
-
                 is_announcer = (speaker_role == "announcer")
 
                 if is_announcer and announcer_clip_idx < len(announcer_clips):
@@ -840,6 +739,21 @@ class SceneSequencer:
                     tts_clip_idx += 1
                     render_log.append(f"[{global_idx}] {character_name}: {line[:40]}...")
                 else:
+                    # Inline-Bark fallback (no pre-rendered clip available).
+                    # This is the only branch that consumes preset; validate
+                    # cast.voice_preset here so the announcer + Bark-clip
+                    # paths above don't trip on Kokoro-namespace presets.
+                    # Gate 3 mirror -- Gate 1 (writer) + Gate 2 (G6) catch
+                    # this upstream in production runs.
+                    preset = _OTRLC.voice_preset(led, item)
+                    if not preset or not str(preset).startswith("v2/"):
+                        raise ValueError(
+                            f"SceneSequencer: cast.voice_preset missing or "
+                            f"non-v2/* for character {character_name!r} "
+                            f"(line_id={item.get('line_id')!r}, "
+                            f"char_id={item.get('char_id')!r}, got {preset!r}). "
+                            f"Writer cast-lock contract violation."
+                        )
                     log.info(f"[SceneSequencer] Inline Bark [{global_idx}] {character_name}")
                     bark_np, bark_sr = _generate_bark_for_line(line, preset)
                     segment_np = _resample_audio(bark_np, bark_sr, sample_rate)
@@ -904,7 +818,9 @@ class SceneSequencer:
         # -- CANONICAL 1.0 ENVIRONMENT MIXING --------------------------
         total_len = len(combined)
         final_bed = np.zeros(total_len, dtype=np.float32)
-        room_intensity = plan.get("vintage_settings", {}).get("room_tone_intensity", 0.01)
+        # vintage_settings was Director-derived; default room tone intensity
+        # inlined here after the production_plan_json socket deletion (P2).
+        room_intensity = 0.01
         
         for start, end, desc in env_timeline:
             span_len_sec = (end - start) / sample_rate

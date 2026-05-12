@@ -25,7 +25,6 @@ import pytest
 
 from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 
-
 # ---------------------------------------------------------------------------
 # Fixture
 # ---------------------------------------------------------------------------
@@ -60,7 +59,6 @@ def patched_procsfx_env(tmp_path):
     ):
         yield state
 
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -76,7 +74,7 @@ def test_procsfx_iter_sfx_only(patched_procsfx_env):
 
     BatchProceduralSFX().generate(
         script_json=script_json,
-        production_plan_json="{}",
+
         default_duration=2.0,
         volume_db=0.0,
     )
@@ -112,7 +110,6 @@ def test_procsfx_iter_sfx_only(patched_procsfx_env):
             f"{non_sfx} should not have sfx_wav_path stamped"
         )
 
-
 def test_procsfx_stamps_by_line_id(patched_procsfx_env):
     """Two sfx lines (distinct line_ids, sample text variety). Both
     stamped via line_id, both wav files exist on disk."""
@@ -137,7 +134,7 @@ def test_procsfx_stamps_by_line_id(patched_procsfx_env):
 
     BatchProceduralSFX().generate(
         script_json=script_json,
-        production_plan_json="{}",
+
         default_duration=1.5,
         volume_db=0.0,
     )
@@ -171,7 +168,6 @@ def test_procsfx_stamps_by_line_id(patched_procsfx_env):
         )
         assert lid in fname, f"{lid} should appear in filename {fname!r}"
 
-
 def test_procsfx_disk_write_failure_graceful(patched_procsfx_env):
     """Mock the wav writer to raise. Pipeline must NOT crash. The
     ledger row gets sfx_wav_path=None (best-effort fallback). The
@@ -193,7 +189,7 @@ def test_procsfx_disk_write_failure_graceful(patched_procsfx_env):
     ):
         audio_out, batch_log = BatchProceduralSFX().generate(
             script_json=script_json,
-            production_plan_json="{}",
+
             default_duration=2.0,
             volume_db=0.0,
         )
@@ -220,7 +216,6 @@ def test_procsfx_disk_write_failure_graceful(patched_procsfx_env):
     # Log line confirms the failure was surfaced (not silently swallowed).
     assert "disk write failed" in batch_log
 
-
 def test_procsfx_legacy_list_raises():
     """Legacy parser-list shape -> load_ledger ValueError surfaces.
     ProcSFX is in the loud-fail group."""
@@ -231,7 +226,7 @@ def test_procsfx_legacy_list_raises():
     with pytest.raises(ValueError) as excinfo:
         BatchProceduralSFX().generate(
             script_json=legacy_json,
-            production_plan_json="{}",
+
         )
 
     msg = str(excinfo.value)

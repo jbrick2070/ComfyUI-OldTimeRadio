@@ -22,14 +22,12 @@ import torch
 
 from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 
-
 # ---------------------------------------------------------------------------
 # Mocks
 # ---------------------------------------------------------------------------
 
 def _no_op(*_args, **_kwargs):
     return None
-
 
 def _make_audio(n_clips: int, samples_per: int = 24000, sr: int = 24000):
     """Build a batched AUDIO dict with N distinct clips, where each clip
@@ -42,7 +40,6 @@ def _make_audio(n_clips: int, samples_per: int = 24000, sr: int = 24000):
         # purpose is non-zero content the trimmer keeps.
         waveform[b, 0, :] = 0.1 * (b + 1)
     return {"waveform": waveform, "sample_rate": sr}
-
 
 @pytest.fixture
 def patched_sequencer_env(tmp_path):
@@ -94,7 +91,6 @@ def patched_sequencer_env(tmp_path):
     ):
         yield state
 
-
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -118,7 +114,7 @@ def test_sequencer_processes_dialogue_and_sfx_skips_music(patched_sequencer_env)
 
     SceneSequencer().sequence(
         script_json=script_json,
-        production_plan_json="{}",
+
         tts_audio_clips=tts_audio,
         announcer_audio_clips=announcer_audio,
         sfx_audio_clips=sfx_audio,
@@ -165,7 +161,6 @@ def test_sequencer_processes_dialogue_and_sfx_skips_music(patched_sequencer_env)
         "music_close should not have start_s_space stamped by Sequencer"
     )
 
-
 def test_sequencer_stamps_by_line_id_with_duplicate_text(patched_sequencer_env):
     """Two character lines saying 'Okay.' with distinct line_ids. Both
     stamped with monotonic start_s -- the old text-match block would
@@ -196,7 +191,7 @@ def test_sequencer_stamps_by_line_id_with_duplicate_text(patched_sequencer_env):
 
     SceneSequencer().sequence(
         script_json=script_json,
-        production_plan_json="{}",
+
         tts_audio_clips=tts_audio,
     )
 
@@ -214,7 +209,6 @@ def test_sequencer_stamps_by_line_id_with_duplicate_text(patched_sequencer_env):
     assert by_id["L_beta"]["start_s"] == pytest.approx(
         by_id["L_alpha"]["dur_s"], rel=1e-6,
     )
-
 
 def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
     """N character lines + N TTS clips -> Sequencer consumes clips in
@@ -256,7 +250,7 @@ def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
                       side_effect=_counted_bark):
         SceneSequencer().sequence(
             script_json=script_json,
-            production_plan_json="{}",
+
             tts_audio_clips=tts_audio,
         )
 
@@ -275,7 +269,6 @@ def test_sequencer_audio_clip_match_by_iteration_order(patched_sequencer_env):
         "expected 0 because all 3 character lines had pre-rendered clips"
     )
 
-
 def test_sequencer_legacy_list_raises(patched_sequencer_env):
     """Legacy parser-list shape -> load_ledger ValueError surfaces.
     Sequencer is in the loud-fail group."""
@@ -286,7 +279,7 @@ def test_sequencer_legacy_list_raises(patched_sequencer_env):
     with pytest.raises(ValueError) as excinfo:
         SceneSequencer().sequence(
             script_json=legacy_json,
-            production_plan_json="{}",
+
         )
 
     msg = str(excinfo.value)
