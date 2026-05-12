@@ -402,6 +402,25 @@ class OTR_LedgerFreezeCascade:
             )
             rebuilt_script_text = script_text or ""
 
+        # B14 fix (clean-break 2026-05-12): unload the LLM at cascade
+        # exit so SignalLostVideo + HuMo downstream don't inherit a
+        # VRAM-loaded model they didn't ask for. The 5080 Laptop's
+        # 14 GB usable VRAM ceiling is real -- caching Mistral-Nemo
+        # past the cascade is the actual OOM risk. Trade-off: next
+        # cascade run pays the model-load cost again (acceptable for
+        # soak; profile later if it bites). unload is best-effort;
+        # any failure logs at WARNING and the cascade still returns
+        # the verdict.
+        try:
+            _OTRML.unload_llm()
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[OTR_LedgerFreezeCascade] unload_llm at cascade exit "
+                "raised (%s); VRAM may not be released before "
+                "downstream nodes load",
+                exc,
+            )
+
         return (
             rebuilt_script_text,
             updated_script_json,
