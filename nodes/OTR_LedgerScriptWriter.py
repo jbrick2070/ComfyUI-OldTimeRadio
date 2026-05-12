@@ -1806,14 +1806,17 @@ class OTR_LedgerScriptWriter:
             phase_beats.setdefault(_b.arc_phase or "setup", []).append(
                 _b.beat_id,
             )
-        arc_order = (
-            list(episode_budget.arc_phases)
-            if episode_budget is not None
-            else list(dict.fromkeys(
-                (_b.arc_phase or "setup") for _b in outline.beats
-                if _b.speaker_role not in NON_VOICED_ROLES
-            ))
+        # Tier 3 fix #21 (2026-05-11): `episode_budget` is always in
+        # scope by the time the per-beat loop builds POSITION (it is
+        # constructed by section D.5 / compute_episode_budget on
+        # every code path that reaches I). The outline-only fallback
+        # path was defensive dead code; assert to surface drift
+        # immediately if a future refactor moves the budget build.
+        assert episode_budget is not None, (
+            "episode_budget must be non-None before the per-beat "
+            "loop; POSITION derivation depends on its arc_phases."
         )
+        arc_order = list(episode_budget.arc_phases)
 
         def _position_for(beat) -> str:
             # Tier 1 fix #10 (2026-05-11): raise on missing beat_id /
@@ -1855,6 +1858,53 @@ class OTR_LedgerScriptWriter:
         # back-compat for callers without a style picked yet.
         style_descriptor = str(resolved.get("style") or "").strip()
 
+        # Tier 3 fix #19 (2026-05-11): single LineRequest construction
+        # site for both character and announcer beats. Pre-Tier-3 the
+        # body was duplicated twice across ~25 fields each; adding a
+        # field meant editing two literals in lockstep and missing one
+        # was easy. The nested closure pulls loop-scope context
+        # implicitly so the call sites stay one-liners.
+        def _build_line_request_for_beat(
+            beat,
+            *,
+            is_announcer: bool,
+        ):
+            speaker = "ANNOUNCER" if is_announcer else beat.speaker
+            prev_speaker = _derive_prev_speaker(last_lines, speaker)
+            voice_card = (
+                voice_card_by_name.get(
+                    "ANNOUNCER", "ANNOUNCER (omniscient narrator)",
+                )
+                if is_announcer
+                else voice_card_by_name.get(beat.speaker, beat.speaker)
+            )
+            return _OTRLC.LineRequest(
+                speaker=speaker,
+                intent=beat.intent,
+                mood=beat.mood,
+                target_words=beat.target_words,
+                canon_header=canon_header,
+                last_lines=list(last_lines),
+                allowed_roster=allowed_roster,
+                # Phase 1 (2026-05-11) prompt enrichment.
+                style_descriptor=style_descriptor,
+                outline_spine=outline_spine,
+                character_voice_card=voice_card,
+                # Phase 2A (2026-05-11) arc_phase awareness.
+                arc_phase=(beat.arc_phase or "").strip(),
+                # Phase 4 v4 (2026-05-11) prompt revision.
+                allowed_people=allowed_people,
+                allowed_things=allowed_things,
+                prev_speaker=prev_speaker,
+                current_beat_block=_OTRLC.render_current_beat(
+                    outline, beat.beat_id,
+                ),
+                theme=theme,
+                all_voice_cards=all_voice_cards_str,
+                sfx_cue=(beat.sfx_cue or "").strip(),
+                position=_position_for(beat),
+            )
+
         for beat in outline.beats:
             traits = (beat.mood or "").strip() or DEFAULT_TRAITS
             cleaned: str
@@ -1863,41 +1913,8 @@ class OTR_LedgerScriptWriter:
             beat_compose_flags: tuple[str, ...] = ()
 
             if beat.speaker_role == "character":
-                # Phase 4 v4 (2026-05-11): derive prev_speaker from
-                # the rolling-window tail. Tier 1 fix #4 — skip
-                # ANNOUNCER and same-speaker to preserve the fictional
-                # layer; empty result drops the "responding to" clause
-                # in WRITE LINE cleanly.
-                prev_speaker = _derive_prev_speaker(
-                    last_lines, beat.speaker,
-                )
-                line_req = _OTRLC.LineRequest(
-                    speaker=beat.speaker,
-                    intent=beat.intent,
-                    mood=beat.mood,
-                    target_words=beat.target_words,
-                    canon_header=canon_header,
-                    last_lines=list(last_lines),
-                    allowed_roster=allowed_roster,
-                    # Phase 1 (2026-05-11) prompt enrichment.
-                    style_descriptor=style_descriptor,
-                    outline_spine=outline_spine,
-                    character_voice_card=voice_card_by_name.get(
-                        beat.speaker, beat.speaker,
-                    ),
-                    # Phase 2A (2026-05-11) arc_phase awareness.
-                    arc_phase=(beat.arc_phase or "").strip(),
-                    # Phase 4 v4 (2026-05-11) prompt revision.
-                    allowed_people=allowed_people,
-                    allowed_things=allowed_things,
-                    prev_speaker=prev_speaker,
-                    current_beat_block=_OTRLC.render_current_beat(
-                        outline, beat.beat_id,
-                    ),
-                    theme=theme,
-                    all_voice_cards=all_voice_cards_str,
-                    sfx_cue=(beat.sfx_cue or "").strip(),
-                    position=_position_for(beat),
+                line_req = _build_line_request_for_beat(
+                    beat, is_announcer=False,
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
@@ -1914,40 +1931,8 @@ class OTR_LedgerScriptWriter:
                     last_lines.pop(0)
 
             elif beat.speaker_role == "announcer":
-                # Phase 4 v4 (2026-05-11): prev_speaker from window tail.
-                # Tier 1 fix #4 — same helper; announcer never reports
-                # "responding to ANNOUNCER" (its prior self) or to a
-                # missing speaker.
-                prev_speaker = _derive_prev_speaker(
-                    last_lines, "ANNOUNCER",
-                )
-                line_req = _OTRLC.LineRequest(
-                    speaker="ANNOUNCER",
-                    intent=beat.intent,
-                    mood=beat.mood,
-                    target_words=beat.target_words,
-                    canon_header=canon_header,
-                    last_lines=list(last_lines),
-                    allowed_roster=allowed_roster,
-                    # Phase 1 (2026-05-11) prompt enrichment.
-                    style_descriptor=style_descriptor,
-                    outline_spine=outline_spine,
-                    character_voice_card=voice_card_by_name.get(
-                        "ANNOUNCER", "ANNOUNCER (omniscient narrator)",
-                    ),
-                    # Phase 2A (2026-05-11) arc_phase awareness.
-                    arc_phase=(beat.arc_phase or "").strip(),
-                    # Phase 4 v4 (2026-05-11) prompt revision.
-                    allowed_people=allowed_people,
-                    allowed_things=allowed_things,
-                    prev_speaker=prev_speaker,
-                    current_beat_block=_OTRLC.render_current_beat(
-                        outline, beat.beat_id,
-                    ),
-                    theme=theme,
-                    all_voice_cards=all_voice_cards_str,
-                    sfx_cue=(beat.sfx_cue or "").strip(),
-                    position=_position_for(beat),
+                line_req = _build_line_request_for_beat(
+                    beat, is_announcer=True,
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,

@@ -1100,6 +1100,16 @@ def polish_line(
     `polish_still_leaky` signal AND keep the pre-polish text rather
     than ship a "polished" line that still leaks. Polish is a
     quality nicety, not a correctness requirement.
+
+    Tier 3 fix #22 (2026-05-11) caveat: polish_line is called via
+    the SAME `generate_fn` as the composer, which means the writer's
+    closure-captured sampling knobs (min_p, repetition_penalty,
+    top_p) leak into polish unchanged. If `repetition_penalty` is
+    dialed up to 1.08 to fight loops in long-form composes, polish
+    (a short rewrite) inherits the penalty and can produce awkward
+    substitutions. Acceptable for v4; the proper fix is a separate
+    polish-only generate_fn with conservative defaults. Tracked in
+    the round-robin punch-list as "polish closure sampling".
     """
     if not (leaked_line or "").strip():
         return leaked_line
@@ -1310,6 +1320,16 @@ def compose_line(
         # so polish only fires on lines that actually leaked narration
         # / stage direction. Default OFF; per-episode opt-in via the
         # `enable_polish_pass` widget on OTR_LedgerScriptWriter.
+        #
+        # Tier 3 fix #20 (2026-05-11): polish MUST run BEFORE the
+        # phantom-name gate below. Polish output is treated as the
+        # final text for this beat; the phantom gate runs over it so
+        # any new proper noun the polish prompt might have introduced
+        # gets flagged on compose_flags. If a future refactor swaps
+        # this order — polish second — phantom-name flags will
+        # silently disappear from polished lines. The test
+        # `TestPolishBeforePhantom::test_polished_phantom_still_flagged`
+        # pins this contract.
         if enable_polish_pass and needs_polish(cleaned):
             log.info(
                 "[OTR_LineComposer] polish_line firing on %s "

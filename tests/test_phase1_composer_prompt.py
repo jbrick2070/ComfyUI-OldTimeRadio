@@ -985,6 +985,47 @@ class TestPositionForRaise:
             _position_for("b001", "totally_made_up")
 
 
+class TestPolishBeforePhantom:
+    """Tier 3 fix #20 — polish MUST run before the phantom-name
+    gate. If polish runs second any proper noun it introduces
+    silently bypasses the gate. This test pins the order."""
+
+    def test_polished_phantom_still_flagged(self):
+        # Mock returns a leaky line on call 1, then a polish output
+        # that contains a NEW proper noun ("DELTA") not in the
+        # roster. The phantom gate must STILL flag DELTA on the
+        # final LineResult.compose_flags.
+        calls = []
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            calls.append(temperature)
+            if len(calls) == 1:
+                # Leaky output (trips needs_polish via "she said").
+                return 'I think we should go now," she said.'
+            # Polish output: clean of narration tells but
+            # introduces a NEW ALL-CAPS phantom name. Within band:
+            # 6 words for target_words=6 -> [3..10].
+            return "DELTA, hold the line we still have time."
+        roster = frozenset({"ALICE", "BOB", "ANNOUNCER"})
+        req = LineRequest(
+            speaker="ALICE", intent="reveal", mood="tense",
+            target_words=6, canon_header="x", last_lines=[],
+            allowed_roster=roster,
+        )
+        res = compose_line(mock, req, enable_polish_pass=True)
+        # Polish ran: 2 calls.
+        assert len(calls) == 2
+        # Polish output was used.
+        assert "DELTA" in res.text
+        # Phantom gate STILL flagged the new name on the polished
+        # output — proves polish ran BEFORE phantom detection.
+        assert any(
+            "phantom_name:DELTA" in f for f in res.compose_flags
+        ), (
+            f"phantom flag missing on polished output; "
+            f"compose_flags={res.compose_flags!r}"
+        )
+
+
 class TestSlidingWindowConstant:
 
     def test_writer_uses_window_of_5(self):
