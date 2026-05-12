@@ -422,9 +422,12 @@ def _phase_4_per_scene_coherence_stub(generate_fn, led) -> None:
     log.debug("[LFC:phase_4] stub -- per-scene coherence not yet wired")
 
 
-def _phase_4_5_smart_suggestion_stub(led) -> None:
-    """Phase 4.5 no-op stub. Commit 11 wires in deterministic SFX synth."""
-    log.debug("[LFC:phase_4_5] stub -- smart suggestion not yet wired")
+def _phase_4_5_smart_suggestion(led, *, enable: bool = False, generate_fn=None):
+    """LFC Phase 4.5 caller. Wires into _otr_lfc_smart_suggestion."""
+    from . import _otr_lfc_smart_suggestion as _LFC_SS  # type: ignore
+    return _LFC_SS.phase_4_5_smart_suggestion(
+        led, enable=enable, generate_fn=generate_fn,
+    )
 
 
 def _phase_5_voice_drift_stub(generate_fn, led) -> None:
@@ -476,6 +479,7 @@ def run_freeze_cascade(
     polish_announcer_beats: bool = False,
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
+    enable_phase_4_5_smart_suggestion: bool = False,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
 
@@ -584,7 +588,33 @@ def run_freeze_cascade(
     # commit 4/8/9/10/11 land, they operate on post-doctor text. The
     # call order here is the contract; the stubs are no-ops today.
     _phase_4_per_scene_coherence_stub(generate_fn, led)
-    _phase_4_5_smart_suggestion_stub(led)
+    # Phase 4.5 smart suggestion (LFC commit 11). Default OFF
+    # per ADR section 6.17. When enabled, scans for SFX/music
+    # implications and appends auto_generated=True entries.
+    started_4_5 = _isoformat_utc_now()
+    hash_before_4_5 = _hash_lines_text(ledger_data)
+    p4_5_report = _phase_4_5_smart_suggestion(
+        led,
+        enable=enable_phase_4_5_smart_suggestion,
+        generate_fn=generate_fn,
+    )
+    hash_after_4_5 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
+        ledger_data,
+        phase_name="phase_4_5_smart_suggestion",
+        text_hash_before=hash_before_4_5,
+        text_hash_after=hash_after_4_5,
+        started_at=started_4_5,
+        finished_at=_isoformat_utc_now(),
+        edits_proposed=(
+            p4_5_report.sfx_suggested + p4_5_report.music_suggested
+            if p4_5_report is not None else 0
+        ),
+        edits_applied=(
+            p4_5_report.sfx_suggested + p4_5_report.music_suggested
+            if p4_5_report is not None else 0
+        ),
+    )
     _phase_5_voice_drift_stub(generate_fn, led)
     _phase_6_episode_arc_stub(generate_fn, led)
     # Phase 7 / 8 moved INTO this block in a later edit -- the
