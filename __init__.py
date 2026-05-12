@@ -92,9 +92,14 @@ _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
     "OTR_LedgerScriptWriter": (".nodes.OTR_LedgerScriptWriter", "OTR_LedgerScriptWriter", " LPL Script Writer (v2.0)"),
-    # Phase 3 (2026-05-11) -- three-pass cast-gated reviewer.
-    # Wires AFTER OTR_LedgerScriptWriter, BEFORE OTR_SceneSequencer.
-    "OTR_LedgerScriptReviewer": (".nodes.OTR_LedgerScriptReviewer", "OTR_LedgerScriptReviewer", " LPL Script Reviewer (v2.0)"),
+    # Ledger Freeze Cascade (LFC sprint, 2026-05-11). Renamed from
+    # OTR_LedgerScriptReviewer in commit 2 of 14. Wires AFTER
+    # OTR_LedgerScriptWriter, BEFORE OTR_SceneSequencer. Existing
+    # 3-pass cast-gated reviewer (Phases 1, 2, 9) is now wrapped by
+    # Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
+    # freeze) at exit. The legacy OTR_LedgerScriptReviewer name is
+    # registered as an alias below so existing workflow JSONs load.
+    "OTR_LedgerFreezeCascade": (".nodes.OTR_LedgerFreezeCascade", "OTR_LedgerFreezeCascade", " LFC Ledger Freeze Cascade (v2.0)"),
     "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
     "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
     "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),
@@ -235,6 +240,10 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
 # ─────────────────────────────────────────────────────────────────────────────
 _RENAME_ALIASES = {
     "OTR_Gemma4Director":     "OTR_LLMDirector",
+    # LFC sprint commit 2 (2026-05-11): reviewer renamed to cascade.
+    # Workflow JSONs that still say "OTR_LedgerScriptReviewer" load
+    # against the new OTR_LedgerFreezeCascade class.
+    "OTR_LedgerScriptReviewer": "OTR_LedgerFreezeCascade",
 }
 for _old_id, _new_id in _RENAME_ALIASES.items():
     if _new_id in NODE_CLASS_MAPPINGS and _old_id not in NODE_CLASS_MAPPINGS:
