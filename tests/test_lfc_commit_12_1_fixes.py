@@ -248,7 +248,7 @@ class TestB5CleanupPassesContiguous:
                           side_effect=_stub_reviewer("clean_no_edits")):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
+        passes = _LFC_ORCH.all_phase_passes(led.data["meta"])
         names = [p["phase_name"] for p in passes]
         # Every cascade phase has a record, including stubs.
         for required in (
@@ -280,7 +280,7 @@ class TestB5CleanupPassesContiguous:
                           side_effect=_stub_reviewer("clean_no_edits")):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
+        passes = _LFC_ORCH.all_phase_passes(led.data["meta"])
         stub_bypassed_records = []
         for rec in passes:
             for failure in rec.get("failures", []):
@@ -331,7 +331,7 @@ class TestB7TerminalShortCircuitOrdering:
                           side_effect=_stub_reviewer("needs_full_rerun")):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
+        passes = _LFC_ORCH.all_phase_passes(led.data["meta"])
         names = [p["phase_name"] for p in passes]
         # All mutation phases AND Phase 10 should be present with
         # terminal_skipped reason.

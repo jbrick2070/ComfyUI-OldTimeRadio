@@ -66,6 +66,7 @@ __all__ = [
     "run_freeze_cascade",
     "REVIEWER_TO_FREEZE_VERDICT",
     "FREEZE_TERMINAL_FAILURE_VERDICTS",
+    "all_phase_passes",
 ]
 
 
@@ -167,6 +168,61 @@ def _hash_lines_text(ledger_data: dict) -> int:
     return hash(tuple((ln or {}).get("text", "") for ln in lines))
 
 
+# Bucket routing per B6 (clean-break 2026-05-12). "Cleanup" reads as
+# polish / structural-edit scope; readiness checks are not cleanup.
+# Phase 0 + Phase 10 are audit gates -- their own bucket so the
+# semantic split is clean across the four record kinds:
+#   audit_passes      Phase 0 (pre)  + Phase 10 (post + freeze)
+#   cleanup_passes    Phase 1+2+9 (reviewer composite) + Phase 3
+#                     (polish) + Phase 4 (scene coherence) + Phase
+#                     4.5 (smart suggestion) + Phase 5 (voice drift)
+#                     + Phase 6 (episode arc)
+#   readiness_passes  Phase 7 (audio readiness) + Phase 8 (video
+#                     readiness)
+_PHASE_BUCKETS: dict[str, str] = {
+    "phase_0_gap_audit_pre":              "audit_passes",
+    "phase_10_gap_audit_post_and_freeze": "audit_passes",
+    "phase_1_2_9_reviewer_composite":     "cleanup_passes",
+    "phase_3_per_line_polish":            "cleanup_passes",
+    "phase_4_per_scene_coherence":        "cleanup_passes",
+    "phase_4_5_smart_suggestion":         "cleanup_passes",
+    "phase_5_voice_drift":                "cleanup_passes",
+    "phase_6_episode_arc":                "cleanup_passes",
+    "phase_7_audio_readiness":            "readiness_passes",
+    "phase_8_video_readiness":            "readiness_passes",
+}
+
+
+def _bucket_for_phase(phase_name: str) -> str:
+    """Map a phase name to its meta bucket. Unknown phases default
+    to cleanup_passes (safest fall-through for soak telemetry; any
+    new phase will surface as 'in cleanup_passes' until it's
+    classified here).
+    """
+    return _PHASE_BUCKETS.get(phase_name, "cleanup_passes")
+
+
+def all_phase_passes(meta: dict) -> list:
+    """Return the chronological concatenation of phase records across
+    all three buckets (audit_passes + cleanup_passes + readiness_passes).
+
+    Soak diagnostics and tests that want "every cascade phase record
+    in order" call this instead of indexing a single bucket. Records
+    are sorted by `started_at` ISO timestamp so the merged list
+    reflects actual run order regardless of bucket.
+
+    Best-effort: a malformed bucket (not a list) is skipped silently
+    -- the gap-audit invariant will have already flagged the type.
+    """
+    merged: list = []
+    for bucket_key in ("audit_passes", "cleanup_passes", "readiness_passes"):
+        bucket = meta.get(bucket_key)
+        if isinstance(bucket, list):
+            merged.extend(rec for rec in bucket if isinstance(rec, dict))
+    merged.sort(key=lambda r: r.get("started_at", ""))
+    return merged
+
+
 def _stamp_phase_record(
     ledger_data: dict,
     *,
@@ -179,14 +235,15 @@ def _stamp_phase_record(
     edits_applied: int = 0,
     failures: Optional[list] = None,
 ) -> None:
-    """Append a phase record to `meta.cleanup_passes`.
+    """Append a phase record to its meta bucket (B6 split).
 
     Wrapped in best-effort try/except: a stamping failure must never
     break cascade flow (per ADR section 8 skip-and-continue).
     """
     try:
         meta = ledger_data.setdefault("meta", {})
-        passes = meta.setdefault("cleanup_passes", [])
+        bucket_key = _bucket_for_phase(phase_name)
+        passes = meta.setdefault(bucket_key, [])
         if not isinstance(passes, list):
             # Hard-failed by Phase 10 anyway; don't try to recover.
             return

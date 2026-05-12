@@ -335,7 +335,8 @@ class TestPhase5CascadeWiring:
 
         rec = led.data["meta"]["phase_5_voice_drift_record"]
         assert rec["skipped"] is True
-        # Phase 5 record present in cleanup_passes.
+        # Phase 5 record present in cleanup_passes bucket
+        # (B6 split, 2026-05-12).
         names = [p["phase_name"]
                  for p in led.data["meta"]["cleanup_passes"]]
         assert "phase_5_voice_drift" in names

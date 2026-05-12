@@ -386,7 +386,8 @@ class TestCascadeIntegrationFlag:
         assert called["polish"] == 0
         # Record stamped, phase ran as no-op.
         assert "phase_3_polish_record" in led.data["meta"]
-        # Phase 3 entry present in cleanup_passes.
+        # Phase 3 entry present in cleanup_passes bucket
+        # (B6 split, 2026-05-12).
         passes = led.data["meta"]["cleanup_passes"]
         names = [p["phase_name"] for p in passes]
         assert "phase_3_per_line_polish" in names

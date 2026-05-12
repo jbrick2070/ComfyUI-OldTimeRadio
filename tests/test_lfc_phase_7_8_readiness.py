@@ -258,7 +258,7 @@ class TestPhase8VideoReadiness:
 
 
 class TestCascadeWiring:
-    def test_phase_7_record_appended_to_cleanup_passes(self):
+    def test_phase_7_record_appended_to_readiness_passes(self):
         from unittest.mock import patch
         from nodes import _otr_freeze_cascade as _LFC_ORCH
         from nodes import _otr_ledger_reviewer as _OTRLR
@@ -280,10 +280,20 @@ class TestCascadeWiring:
                           side_effect=fake_review):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
-        names = [p["phase_name"] for p in passes]
+        # B6 split (2026-05-12): Phase 7 + Phase 8 go to readiness_passes,
+        # not cleanup_passes. The bucket split makes semantic sense --
+        # readiness checks are not cleanup edits.
+        readiness = led.data["meta"]["readiness_passes"]
+        names = [p["phase_name"] for p in readiness]
         assert "phase_7_audio_readiness" in names
         assert "phase_8_video_readiness" in names
+        # Phase 7 + Phase 8 must NOT land in cleanup_passes (B6
+        # mis-scope check).
+        cleanup_names = [
+            p["phase_name"] for p in led.data["meta"].get("cleanup_passes", [])
+        ]
+        assert "phase_7_audio_readiness" not in cleanup_names
+        assert "phase_8_video_readiness" not in cleanup_names
         # Phase 7 normalized "Mr." -> "Mister" so meta.audio_readiness
         # has lines_normalized >= 1.
         ar = led.data["meta"]["audio_readiness"]

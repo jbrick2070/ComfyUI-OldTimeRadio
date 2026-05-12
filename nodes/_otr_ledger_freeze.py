@@ -510,7 +510,8 @@ def _check_meta_invariants(
     """ADR §7 meta invariants.
 
     schema_version pinned; episode_title / style / episode_id stamped
-    (warn-only); meta.cleanup_passes is a list when present.
+    (warn-only); meta.audit_passes / cleanup_passes / readiness_passes
+    are lists when present (B6 bucket split, 2026-05-12).
     """
     schema_version = ledger_data.get("schema_version")
     if schema_version != EXPECTED_SCHEMA_VERSION:
@@ -536,15 +537,16 @@ def _check_meta_invariants(
         elif val == "":
             warnings.append(f"meta.{key} is empty string")
 
-    # cleanup_passes is the phase-history list (ADR §6.7). Optional
+    # Phase-history bucket lists (B6 split, 2026-05-12). Optional
     # at Phase 0; present-as-list at Phase 10. Validate-when-present
-    # in both phases.
-    cleanup_passes = meta.get("cleanup_passes")
-    if cleanup_passes is not None and not isinstance(cleanup_passes, list):
-        errors.append(
-            f"meta.cleanup_passes has type {type(cleanup_passes).__name__}; "
-            f"expected list"
-        )
+    # for each bucket.
+    for bucket_key in ("audit_passes", "cleanup_passes", "readiness_passes"):
+        bucket = meta.get(bucket_key)
+        if bucket is not None and not isinstance(bucket, list):
+            errors.append(
+                f"meta.{bucket_key} has type {type(bucket).__name__}; "
+                f"expected list"
+            )
 
 
 # ---------------------------------------------------------------------------

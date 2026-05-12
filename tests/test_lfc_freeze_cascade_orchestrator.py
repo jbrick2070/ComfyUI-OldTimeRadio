@@ -248,7 +248,7 @@ class TestCleanupPassesRecording:
                           side_effect=fake_review):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
+        passes = _LFC_ORCH.all_phase_passes(led.data["meta"])
         assert isinstance(passes, list)
         names = [p["phase_name"] for p in passes]
         assert "phase_0_gap_audit_pre" in names
@@ -273,7 +273,7 @@ class TestCleanupPassesRecording:
                           side_effect=fake_review):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
-        passes = led.data["meta"]["cleanup_passes"]
+        passes = _LFC_ORCH.all_phase_passes(led.data["meta"])
         rev_pass = next(
             p for p in passes
             if p["phase_name"] == "phase_1_2_9_reviewer_composite"

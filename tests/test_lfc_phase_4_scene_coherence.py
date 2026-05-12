@@ -357,7 +357,8 @@ class TestPhase4CascadeWiring:
 
         rec = led.data["meta"]["phase_4_scene_coherence_record"]
         assert rec["skipped"] is True
-        # Phase record landed in cleanup_passes.
+        # Phase 4 record landed in cleanup_passes bucket
+        # (B6 split, 2026-05-12).
         names = [
             p["phase_name"] for p in led.data["meta"]["cleanup_passes"]
         ]
