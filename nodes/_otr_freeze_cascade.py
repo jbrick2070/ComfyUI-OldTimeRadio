@@ -218,9 +218,203 @@ def _isoformat_utc_now() -> str:
 # ---------------------------------------------------------------------------
 
 
-def _phase_3_per_line_polish_stub(generate_fn, led) -> None:
-    """Phase 3 no-op stub. Commit 4 wires in the per-line polish refactor."""
-    log.debug("[LFC:phase_3] stub -- per-line polish not yet wired")
+@dataclass
+class Phase3PolishReport:
+    """Per-line polish summary for Phase 3.
+
+    Stamped on `meta.phase_3_polish_record` so soak diagnostics can
+    track how many leaky lines fired, how many were repaired, how
+    many were rejected (still-leaky / refusal / word-cap miss), and
+    which lines were skipped (announcer beats when announcer-polish
+    is disabled).
+    """
+
+    lines_scanned: int = 0
+    lines_examined: int = 0       # tripped needs_polish (would-polish)
+    edits_applied: int = 0
+    edits_rejected_still_leaky: int = 0
+    edits_rejected_refusal: int = 0
+    failures: list = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "lines_scanned": int(self.lines_scanned),
+            "lines_examined": int(self.lines_examined),
+            "edits_applied": int(self.edits_applied),
+            "edits_rejected_still_leaky": int(
+                self.edits_rejected_still_leaky
+            ),
+            "edits_rejected_refusal": int(self.edits_rejected_refusal),
+            "failures": list(self.failures),
+        }
+
+
+def _phase_3_per_line_polish(
+    generate_fn,
+    led,
+    *,
+    polish_generate_fn=None,
+    enable: bool = False,
+    polish_announcer_beats: bool = False,
+) -> Phase3PolishReport:
+    """LFC Phase 3 -- per-line polish wired into the cascade.
+
+    Pre-LFC the polish ran inline inside `compose_line` gated by the
+    writer's `enable_polish_pass` widget. The cascade now offers a
+    SECOND polish opportunity AFTER the reviewer's 3-pass: any line
+    that still trips `needs_polish` gets one polish call with the
+    new ADR-section-6 context (beat intent + last 2 lines + announcer
+    guard + refusal detector + dedicated polish generate_fn).
+
+    `enable=False` (the default) keeps Phase 3 as a no-op so the
+    cascade-widget surface is OFF until soak validates the
+    interaction. Tests can opt in with `enable=True`.
+
+    `polish_announcer_beats=False` skips announcer beats entirely
+    (per ADR section 6.1 "Either skip Phase 3 entirely OR route to
+    _POLISH_SYSTEM_PROMPT_ANNOUNCER"). The composer-side polish_line
+    DOES support announcer routing now; the cascade-side default
+    stays conservative until soak proves the announcer polish prompt
+    behaves on the typical mid-2020s small-LLM corpus.
+
+    Mutation policy:
+      * Mutates only `line.text` on lines that polished cleanly.
+      * Recomputes `word_count` and `char_count` in lockstep.
+      * Never touches skip / char_id / speaker_role.
+      * Never adds or removes lines (ADR section 5 hard rule 1).
+      * On polish refusal / still-leaky / word-cap miss, leaves the
+        pre-polish text in place and records the rejection in the
+        Phase3PolishReport.
+
+    Stamps:
+      meta.phase_3_polish_record  full report dict for forensics.
+    """
+    rep = Phase3PolishReport()
+    if not enable:
+        log.debug("[LFC:phase_3] disabled (enable=False)")
+        led.data.setdefault("meta", {})["phase_3_polish_record"] = (
+            rep.to_dict()
+        )
+        return rep
+
+    # Lazy import keeps the orchestrator module load surface clean
+    # (regex compilation in _otr_line_composer is non-trivial).
+    from ._otr_line_composer import (  # type: ignore
+        needs_polish,
+        polish_line,
+    )
+
+    lines = led.data.get("lines") or []
+    cast = led.data.get("cast") or []
+    cast_by_id = {
+        row.get("char_id", ""): row
+        for row in cast
+        if isinstance(row, dict)
+    }
+
+    rep.lines_scanned = len(lines)
+    last_two: list[str] = []
+
+    for idx, ln in enumerate(lines):
+        if not isinstance(ln, dict):
+            continue
+        if ln.get("skip"):
+            # Already muted -- nothing to polish. Keep last_two
+            # unchanged: skipped lines don't contribute to the
+            # rolling 2-line window.
+            continue
+        text = (ln.get("text") or "")
+        if not text:
+            continue
+        role = (ln.get("speaker_role") or "").strip().lower()
+        if role not in ("character", "announcer"):
+            # Non-voiced beat (sfx / music). Skip + don't update
+            # last_two (those windows are dialogue-only).
+            continue
+        if role == "announcer" and not polish_announcer_beats:
+            # Skip announcer beats per ADR section 6.1 default.
+            # Still advance last_two so character beats that
+            # follow see the announcer line in their PREVIOUS
+            # LINES window.
+            last_two.append(text)
+            if len(last_two) > 2:
+                last_two = last_two[-2:]
+            continue
+        if not needs_polish(text):
+            last_two.append(text)
+            if len(last_two) > 2:
+                last_two = last_two[-2:]
+            continue
+
+        rep.lines_examined += 1
+        # Pull the voice card from the cast row.
+        cid = ln.get("char_id") or ""
+        cast_row = cast_by_id.get(cid) or {}
+        voice_card = (
+            cast_row.get("voice_card")
+            or cast_row.get("name", "")
+            or cid
+            or "unspecified speaker"
+        )
+        beat_intent = ln.get("beat_intent") or ln.get("intent") or ""
+
+        try:
+            polished = polish_line(
+                generate_fn,
+                text,
+                voice_card,
+                speaker_role=role,
+                beat_intent=beat_intent,
+                previous_lines=tuple(last_two),
+                polish_generate_fn=polish_generate_fn,
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[LFC:phase_3] polish_line raised on line_id=%s: %s",
+                ln.get("line_id", ""), exc,
+            )
+            rep.failures.append({
+                "line_id": ln.get("line_id", ""),
+                "reason": f"{type(exc).__name__}: {exc}",
+            })
+            last_two.append(text)
+            if len(last_two) > 2:
+                last_two = last_two[-2:]
+            continue
+
+        if polished == text:
+            # polish_line falls back to the original on refusal / empty
+            # / still-leaky / etc. We can't distinguish refusal vs
+            # other rejection types from this side without parsing the
+            # log; record as "rejected" and rely on polish_line's own
+            # log lines for the breakdown.
+            rep.edits_rejected_refusal += 1
+        elif needs_polish(polished):
+            # Polish output still trips the leak gate -- keep original.
+            rep.edits_rejected_still_leaky += 1
+        else:
+            # Apply the polish.
+            ln["text"] = polished
+            ln["char_count"] = len(polished)
+            ln["word_count"] = sum(1 for _ in polished.split())
+            rep.edits_applied += 1
+            # Update last_two with the polished text, not the leaky
+            # original -- subsequent lines see the cleaned voice.
+            text = polished
+
+        last_two.append(text)
+        if len(last_two) > 2:
+            last_two = last_two[-2:]
+
+    led.data.setdefault("meta", {})["phase_3_polish_record"] = (
+        rep.to_dict()
+    )
+    log.info(
+        "[LFC:phase_3] examined=%d applied=%d still_leaky=%d refusal=%d",
+        rep.lines_examined, rep.edits_applied,
+        rep.edits_rejected_still_leaky, rep.edits_rejected_refusal,
+    )
+    return rep
 
 
 def _phase_4_per_scene_coherence_stub(generate_fn, led) -> None:
@@ -258,7 +452,14 @@ def _phase_8_video_readiness_stub(led) -> None:
 # ---------------------------------------------------------------------------
 
 
-def run_freeze_cascade(generate_fn, led) -> FreezeDisposition:
+def run_freeze_cascade(
+    generate_fn,
+    led,
+    *,
+    polish_generate_fn=None,
+    enable_phase_3_polish: bool = False,
+    polish_announcer_beats: bool = False,
+) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
 
     Behaviour:
@@ -312,11 +513,39 @@ def run_freeze_cascade(generate_fn, led) -> FreezeDisposition:
                   for e in pre_report.errors],
     )
 
-    # ---- Phases 3..8: no-op stubs (filled in later commits) ----
-    # Threading order matches the ADR phase chain so the no-op
-    # contract is locked in commit 2; later commits replace each
-    # stub call with the real implementation in place.
-    _phase_3_per_line_polish_stub(generate_fn, led)
+    # ---- Phase 3: per-line polish (LFC commit 4 wiring) -----
+    # Phase 3 runs BEFORE the reviewer in the ADR phase chain, but
+    # the existing reviewer's snapshot/restore semantics already
+    # protect against a polish-introduced phantom (Pass 3 catches
+    # the phantom; restore returns to pre-polish state). The
+    # mutation order in this orchestrator is therefore:
+    #   Phase 0 -> Phase 3 -> Phases 1+2+9 -> Phase 4..8 stubs ->
+    #   Phase 10.
+    # Default `enable_phase_3_polish=False` keeps the cascade-side
+    # polish OFF until soak validates the interaction with the
+    # composer's existing inline polish path. When OFF the call is
+    # a no-op (Phase3PolishReport with zero counts is stamped).
+    started_3 = _isoformat_utc_now()
+    hash_before_3 = _hash_lines_text(ledger_data)
+    p3_report = _phase_3_per_line_polish(
+        generate_fn,
+        led,
+        polish_generate_fn=polish_generate_fn,
+        enable=enable_phase_3_polish,
+        polish_announcer_beats=polish_announcer_beats,
+    )
+    hash_after_3 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
+        ledger_data,
+        phase_name="phase_3_per_line_polish",
+        text_hash_before=hash_before_3,
+        text_hash_after=hash_after_3,
+        started_at=started_3,
+        finished_at=_isoformat_utc_now(),
+        edits_proposed=p3_report.lines_examined,
+        edits_applied=p3_report.edits_applied,
+        failures=p3_report.failures,
+    )
 
     # ---- Phase 1 + 2 + 9: existing 3-pass reviewer -------
     started = _isoformat_utc_now()
