@@ -437,14 +437,29 @@ def _phase_6_episode_arc_stub(generate_fn, led) -> None:
     log.debug("[LFC:phase_6] stub -- episode arc not yet wired")
 
 
-def _phase_7_audio_readiness_stub(led) -> None:
-    """Phase 7 no-op stub. Commit 5 wires in CMU dict normalization."""
-    log.debug("[LFC:phase_7] stub -- audio readiness not yet wired")
+# LFC commit 5: Phase 7 + Phase 8 wired through `_otr_readiness`. Both
+# phases default ON via cascade kwargs because both are deterministic
+# and cheap.
+def _phase_7_audio_readiness(led, *, enable: bool = True):
+    if not enable:
+        log.debug("[LFC:phase_7] disabled (enable=False)")
+        led.data.setdefault("meta", {})["audio_readiness"] = {
+            "skipped": True, "skipped_reason": "enable=False",
+        }
+        return None
+    from . import _otr_readiness as _LFC_RDY  # type: ignore
+    return _LFC_RDY.phase_7_audio_readiness(led)
 
 
-def _phase_8_video_readiness_stub(led) -> None:
-    """Phase 8 no-op stub. Commit 5 wires in portrait + duration checks."""
-    log.debug("[LFC:phase_8] stub -- video readiness not yet wired")
+def _phase_8_video_readiness(led, *, enable: bool = True):
+    if not enable:
+        log.debug("[LFC:phase_8] disabled (enable=False)")
+        led.data.setdefault("meta", {})["video_readiness"] = {
+            "skipped": True, "skipped_reason": "enable=False",
+        }
+        return None
+    from . import _otr_readiness as _LFC_RDY  # type: ignore
+    return _LFC_RDY.phase_8_video_readiness(led)
 
 
 # ---------------------------------------------------------------------------
@@ -459,6 +474,8 @@ def run_freeze_cascade(
     polish_generate_fn=None,
     enable_phase_3_polish: bool = False,
     polish_announcer_beats: bool = False,
+    enable_phase_7_audio_readiness: bool = True,
+    enable_phase_8_video_readiness: bool = True,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
 
@@ -570,12 +587,45 @@ def run_freeze_cascade(
     _phase_4_5_smart_suggestion_stub(led)
     _phase_5_voice_drift_stub(generate_fn, led)
     _phase_6_episode_arc_stub(generate_fn, led)
+    # Phase 7 / 8 moved INTO this block in a later edit -- the
+    # call site below is the canonical one. (legacy comment.)
 
-    # Phase 7 / 8 deterministic readiness checks -- ALWAYS run
-    # (deterministic & cheap), even on reviewer failure paths in
-    # later commits. Today they are no-op stubs.
-    _phase_7_audio_readiness_stub(led)
-    _phase_8_video_readiness_stub(led)
+    # Phase 7 / 8 -- deterministic readiness checks (LFC commit 5).
+    # Default ON because both are cheap (no LLM calls) and the
+    # downstream audio + video chains benefit from the normalized
+    # text / portrait audit. Run regardless of reviewer outcome --
+    # readiness diagnostics are useful even on a restored ledger.
+    started_7 = _isoformat_utc_now()
+    hash_before_7 = _hash_lines_text(ledger_data)
+    p7_report = _phase_7_audio_readiness(
+        led, enable=enable_phase_7_audio_readiness,
+    )
+    hash_after_7 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
+        ledger_data,
+        phase_name="phase_7_audio_readiness",
+        text_hash_before=hash_before_7,
+        text_hash_after=hash_after_7,
+        started_at=started_7,
+        finished_at=_isoformat_utc_now(),
+        edits_applied=(
+            p7_report.lines_normalized if p7_report is not None else 0
+        ),
+    )
+    started_8 = _isoformat_utc_now()
+    hash_before_8 = _hash_lines_text(ledger_data)
+    _phase_8_video_readiness(
+        led, enable=enable_phase_8_video_readiness,
+    )
+    hash_after_8 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
+        ledger_data,
+        phase_name="phase_8_video_readiness",
+        text_hash_before=hash_before_8,
+        text_hash_after=hash_after_8,
+        started_at=started_8,
+        finished_at=_isoformat_utc_now(),
+    )
 
     # ---- Translate reviewer verdict to interim freeze verdict ----
     interim_verdict = REVIEWER_TO_FREEZE_VERDICT.get(
