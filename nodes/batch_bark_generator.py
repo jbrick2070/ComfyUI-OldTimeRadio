@@ -469,7 +469,7 @@ class BatchBarkGenerator:
         _runtime_log(f"BatchBark: Length-sorted {len(preset_groups)} preset groups")
 
         # -- Step 4: Load Bark once, generate all lines per preset ---------
-        from .bark_tts import _load_bark
+        from ._bark_lib import _load_bark
         model, processor = _load_bark("suno/bark")
 
         # Schema l3: track overall Bark phase wall-clock for the

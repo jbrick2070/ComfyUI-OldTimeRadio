@@ -28,7 +28,7 @@ from typing import Optional
 import numpy as np
 import torch
 
-from .sfx_generator import SFX_GENERATORS
+from ._sfx_lib import SFX_GENERATORS
 
 log = logging.getLogger("OTR")
 

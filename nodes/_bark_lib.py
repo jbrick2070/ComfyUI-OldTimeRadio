@@ -259,8 +259,17 @@ def _unload_bark():
         log.info("Bark unloaded, VRAM freed (gc.collect + empty_cache)")
 
 
-# Voice-path-cleanbreak 2026-05-12 (P3): the OTR_BarkTTS node class
-# (BarkTTSNode) was deleted (legacy single-line node, unused in any
-# active workflow). The _load_bark loader remains because
+# Voice-path-cleanbreak 2026-05-12 (P3, commit 83d7f17): the OTR_BarkTTS
+# node class (BarkTTSNode) was deleted (legacy single-line node, unused
+# in any active workflow). The _load_bark loader remains because
 # batch_bark_generator.py imports it directly. Library-only module --
 # no node class, no NODE_CLASS_MAPPINGS.
+#
+# Voice-path-cleanbreak Sprint 4 (2026-05-12): module renamed
+# nodes/bark_tts.py -> nodes/_bark_lib.py. Underscore prefix marks
+# this as a private internal library; _lib suffix flags it as
+# library-only (no node class). Importers updated in lockstep:
+#   nodes/batch_bark_generator.py
+#   nodes/scene_sequencer.py (inline-Bark fallback)
+#   nodes/story_orchestrator.py (Bark health check + VRAM unload)
+#   tests/test_bark_ledger.py (patch target for _load_bark)

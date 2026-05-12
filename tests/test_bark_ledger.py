@@ -76,11 +76,14 @@ def patched_bark_env(tmp_path):
     def _no_op(*_args, **_kwargs):
         return None
 
-    # Voice-path-cleanbreak 2026-05-12 (P3): nodes.bark_tts was kept as
-    # a library-only module (the OTR_BarkTTS node class was deleted but
-    # _load_bark survives because batch_bark_generator imports it).
+    # Voice-path-cleanbreak 2026-05-12 (P3): nodes.bark_tts was kept
+    # as a library-only module (the OTR_BarkTTS node class was deleted
+    # but _load_bark survives because batch_bark_generator imports it).
     # _load_bark stays patched so the test never tries to download
     # the actual Bark model.
+    #
+    # Sprint 4 (2026-05-12): module renamed nodes.bark_tts ->
+    # nodes._bark_lib. Patch path updated below in lockstep.
     with patch(
         "nodes.batch_bark_generator.force_vram_offload", side_effect=_no_op,
     ), patch(
@@ -89,7 +92,7 @@ def patched_bark_env(tmp_path):
         "nodes.batch_bark_generator._generate_single_line",
         side_effect=_fake_gen_single_line,
     ), patch(
-        "nodes.bark_tts._load_bark", side_effect=_fake_load_bark,
+        "nodes._bark_lib._load_bark", side_effect=_fake_load_bark,
     ), patch(
         "nodes.story_orchestrator._unload_llm", side_effect=_no_op,
     ), patch(

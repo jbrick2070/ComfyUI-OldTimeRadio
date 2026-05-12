@@ -249,8 +249,14 @@ SFX_GENERATORS = {
 }
 
 
-# Voice-path-cleanbreak 2026-05-12 (P3): the OTR_SFXGenerator node
-# class was deleted (legacy single-line node, unused in any active
-# workflow). The procedural SFX_GENERATORS dict remains because
-# batch_procedural_sfx.py imports it directly. The module is library-
-# only now (no node class, no NODE_CLASS_MAPPINGS).
+# Voice-path-cleanbreak 2026-05-12 (P3, commit 83d7f17): the
+# OTR_SFXGenerator node class was deleted (legacy single-line node,
+# unused in any active workflow). The procedural SFX_GENERATORS dict
+# remains because batch_procedural_sfx.py imports it directly. The
+# module is library-only now (no node class, no NODE_CLASS_MAPPINGS).
+#
+# Voice-path-cleanbreak Sprint 4 (2026-05-12): module renamed
+# nodes/sfx_generator.py -> nodes/_sfx_lib.py. Underscore prefix
+# marks this as a private internal library; _lib suffix flags it as
+# library-only. Importers updated in lockstep:
+#   nodes/batch_procedural_sfx.py

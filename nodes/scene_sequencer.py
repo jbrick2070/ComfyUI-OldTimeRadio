@@ -385,7 +385,7 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
         return np.zeros(2400, dtype=np.float32), 24000
 
     # Import the shared Bark loader from our bark_tts module
-    from .bark_tts import _load_bark
+    from ._bark_lib import _load_bark
 
     model, processor = _load_bark("suno/bark")
     sample_rate = model.generation_config.sample_rate  # 24000
