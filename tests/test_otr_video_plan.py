@@ -20,6 +20,25 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
+def _ledger_wrap(director_dict):
+    """Voice-path-cleanbreak Sprint 2 helper: wrap a director-shape
+    dict (the legacy OTR_LLMDirector output shape) inside an L3 ledger
+    JSON so OTRVideoPlan.plan() can read it via the new script_json
+    socket. Mirrors the writer's K.5 stamp pattern: meta.visual_plan +
+    meta.voice_assignments + meta.style.
+    """
+    return json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast":  [],
+        "lines": [],
+        "meta": {
+            "visual_plan":       director_dict.get("visual_plan") or {},
+            "voice_assignments": director_dict.get("voice_assignments") or {},
+            "style":             director_dict.get("style") or "",
+        },
+    })
+
+
 # ------------------------------------------------------------------
 # Import smoke
 # ------------------------------------------------------------------
@@ -534,21 +553,28 @@ def test_build_shot_plan_scene_without_visual_prompt_uses_shot_description():
 
 
 def test_input_types_schema():
+    """Voice-path-cleanbreak Sprint 2 (2026-05-12): the legacy
+    director_json socket was renamed to script_json. The node now
+    reads the L3 ledger from FreezeCascade and derives the legacy
+    director-shape internally before calling the build_* helpers
+    (whose director_json parameter NAME is preserved for back-compat
+    with their own test surface)."""
     from nodes.otr_video_plan import OTRVideoPlan
     schema = OTRVideoPlan.INPUT_TYPES()
     assert "required" in schema
-    assert "director_json" in schema["required"]
+    assert "script_json" in schema["required"]
+    assert "director_json" not in schema["required"]
     assert "focus_character" in schema["required"]
     assert "shots_per_scene" in schema["required"]
     assert "style" in schema["required"]
-    assert schema["required"]["director_json"][0] == "STRING"
+    assert schema["required"]["script_json"][0] == "STRING"
     assert schema["required"]["shots_per_scene"][0] == "INT"
 
 
-def test_director_json_multiline():
+def test_script_json_multiline():
     from nodes.otr_video_plan import OTRVideoPlan
     schema = OTRVideoPlan.INPUT_TYPES()
-    assert schema["required"]["director_json"][1].get("multiline") is True
+    assert schema["required"]["script_json"][1].get("multiline") is True
 
 
 def test_return_types():
@@ -573,9 +599,9 @@ def test_function_and_category():
 def test_plan_method_end_to_end():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     pass1_json, pass2_json, pass3_json, pass3_count, summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=3,
         style="mission_control_procedural",
@@ -604,9 +630,9 @@ def test_plan_method_end_to_end():
 def test_plan_method_handles_none_genre():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     _p1, _p2, pass3_json, _count, _summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="(none)",
@@ -618,12 +644,12 @@ def test_plan_method_handles_none_genre():
 def test_plan_method_empty_scenes_still_returns_envelope():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps({
+    script_json = _ledger_wrap({
         "voice_assignments": {"BABA": {"voice_preset": "x", "notes": "old"}},
         "visual_plan": {"characters": {"BABA": {"portrait_prompt": "p"}}, "scenes": []},
     })
     _p1, _p2, pass3_json, count, _summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=3,
         style="mission_control_procedural",
@@ -725,9 +751,9 @@ def test_plan_method_multi_char_default():
     """Default "(all)" widget value => multi-char mode, both PASS 1 chars."""
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     pass1_json, _p2, _p3, _count, summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="(all)",
         shots_per_scene=1,
         style="mission_control_procedural",
@@ -742,18 +768,18 @@ def test_plan_method_accepts_audio_gate_and_ignores_value():
     """audio_gate is a topsort-dependency input only; value must not affect output."""
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
 
     # Without audio_gate
     out_a = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="mission_control_procedural",
     )
     # With audio_gate wired (arbitrary string value)
     out_b = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="mission_control_procedural",
@@ -780,9 +806,9 @@ def test_input_types_has_audio_gate_optional():
 def test_plan_method_single_char_when_focus_set():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     pass1_json, _p2, pass3_json, _count, _summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="LEMMY",
         shots_per_scene=1,
         style="mission_control_procedural",
@@ -797,9 +823,9 @@ def test_plan_output_consumable_by_batch_flux_render_parser():
     _parse_env_prompts expects so wiring is zero-effort."""
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     pass1_json, pass2_json, pass3_json, _count, _summary = node.plan(
-        director_json=director_json,
+        script_json=script_json,
         focus_character="BABA",
         shots_per_scene=2,
         style="mission_control_procedural",

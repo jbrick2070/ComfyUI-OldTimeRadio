@@ -280,7 +280,9 @@ def test_video_legacy_list_raises(tmp_path):
                 audio=fake_audio,
                 script_json=legacy_json,
                 news_used="[]",
-                production_plan_json="{}",
+                # production_plan_json kwarg removed in voice-path-cleanbreak
+                # Sprint 2 (2026-05-12); SignalLostVideo now reads
+                # voice_assignments + style from L3 ledger meta.
                 fps=24,
                 resolution="832x480",
                 episode_title="Test",

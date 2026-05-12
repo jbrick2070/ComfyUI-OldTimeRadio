@@ -2285,6 +2285,51 @@ class OTR_LedgerScriptWriter:
         if resolved["perfect_run_spacesaver"]:
             meta["perfect_run_spacesaver"] = True
 
+        # K.5 -- voice-path-cleanbreak Sprint 2 (2026-05-12).
+        # Stamp the visual_plan + voice_assignments + style fields that
+        # OTR_VideoPlan and OTR_SignalLostVideo previously read from
+        # OTR_LLMDirector.production_plan_json. Director retirement
+        # depends on these living on meta. The visual_plan shape mirrors
+        # what the legacy Director emitted (characters dict keyed by
+        # name, scenes list, style + genre strings) so downstream code
+        # paths in otr_video_plan.py / video_engine.py work unchanged.
+        #
+        # portrait_prompt is the cast row's character_description. The
+        # downstream FLUX composer (compose_shot_prompt) appends era_tail
+        # + style_tail at render time, so this short, content-focused
+        # field is the right Tier-1 input. The 3-tier fallback in
+        # resolve_character_portrait already covers the empty case.
+        #
+        # scenes is intentionally empty -- the writer doesn't emit
+        # scene-level visual blocking today. OTR_VideoPlan handles the
+        # empty list gracefully (extract_scenes returns [] and the
+        # caller drives the per-shot composition off beats instead).
+        _cast_rows = led.data.get("cast") or []
+        _visual_chars = {}
+        _voice_assignments = {}
+        for _row in _cast_rows:
+            if not isinstance(_row, dict):
+                continue
+            _name = _row.get("name")
+            if not _name:
+                continue
+            _desc = (_row.get("character_description") or "").strip()
+            _visual_chars[_name] = {
+                "portrait_prompt": _desc,
+            }
+            _voice_assignments[_name] = {
+                "voice_preset": _row.get("voice_preset") or "",
+                "notes":        _desc,
+            }
+        meta["visual_plan"] = {
+            "characters": _visual_chars,
+            "scenes":     [],
+            "style":      resolved["style"],
+            "genre":      "audio drama",
+        }
+        meta["voice_assignments"] = _voice_assignments
+        meta["style"] = resolved["style"]
+
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
         # CANONICAL ledger rows, not from the in-flight script_text_parts

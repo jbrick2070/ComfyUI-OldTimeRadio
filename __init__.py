@@ -110,11 +110,17 @@ _NODE_MODULES = {
     "OTR_LFCPhase4Scene": (".nodes.OTR_LFCPhase4Scene", "OTR_LFCPhase4Scene", " LFC Phase 4 - Scene Coherence"),
     "OTR_LFCPhase5Voice": (".nodes.OTR_LFCPhase5Voice", "OTR_LFCPhase5Voice", " LFC Phase 5 - Voice Drift"),
     "OTR_LFCPhase6Arc":   (".nodes.OTR_LFCPhase6Arc",   "OTR_LFCPhase6Arc",   " LFC Phase 6 - Episode Arc"),
-    # OTR_LLMDirector still registered: SignalLostVideoRenderer +
-    # OTRVideoPlan are live readers of production_plan_json.visual_plan /
-    # voice_assignments / style. Director deletion is deferred to the
-    # video-side cleanbreak sprint per voice-path-cleanbreak-plan.md §2.
-    "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
+    # Voice-path-cleanbreak Sprint 2 (2026-05-12): OTR_LLMDirector deleted.
+    # The LLMDirector class was the legacy LLM-derived production plan
+    # generator. P2 severed the voice side (commit 446ec81); Sprint 2
+    # migrated the two remaining video-side consumers (OTR_SignalLostVideo,
+    # OTR_VideoPlan) to read meta.visual_plan + meta.voice_assignments +
+    # meta.style directly from the L3 ledger stamped by the writer.
+    # The Director class + registration + workflow node + workflow links
+    # 17 + 38 all delete in lockstep. See:
+    #   docs/voice-path-cleanbreak-execution-plan.md Sprint 2
+    #   docs/2026-05-12-voice-path-cleanbreak-qa.md §3 + Q3
+    #
     # Voice-path-cleanbreak 2026-05-12 (P3): the legacy single-line
     # nodes OTR_BarkTTS / OTR_SFXGenerator / OTR_VoiceRender plus the
     # pre-L3 parser-list reader OTR_BatchKokoroGenerator are deleted.

@@ -475,60 +475,31 @@ class TestVoicePathCleanbreakWiring:
             + "\n  ".join(offenders)
         )
 
-    def test_no_director_output_links_to_voice_nodes(self):
-        """Sprint 1.1 (voice-path-cleanbreak follow-up). Link-shaped
-        sibling of test_no_production_plan_json_wires_to_voice_nodes.
+    def test_no_llm_director_in_workflow(self):
+        """Sprint 2.5 (voice-path-cleanbreak). Hard guard: the workflow
+        must NOT contain an OTR_LLMDirector node.
 
-        Walks every link emitted from OTR_LLMDirector and asserts the
-        destination is NOT a voice node. The socket-shaped guardrail
-        above pins the absence of the input socket; this one pins the
-        absence of the link itself, which catches the failure mode where
-        someone reconnects Director output to a different voice-node
-        input slot type (audio, news_used, anything).
+        Replaces the conditional Sprint 1.1 guardrail
+        (test_no_director_output_links_to_voice_nodes). Sprint 2 deleted
+        the Director class + workflow node + registration entirely. If
+        someone re-adds the node to the workflow JSON or re-registers
+        the class, this gate fails and the rebuild is blocked.
 
-        Director is retained for video-side until Sprint 2 (its outputs
-        feed SignalLostVideo + OTRVideoPlan). After Sprint 2 deletes the
-        Director class entirely, this test is replaced by
-        test_no_llm_director_in_workflow per the Sprint 2.5 plan.
+        The void left by Director is filled at writer time:
+          - meta.visual_plan + meta.voice_assignments + meta.style are
+            stamped by OTR_LedgerScriptWriter (K.5 block).
+          - OTR_VideoPlan + OTR_SignalLostVideo read those fields from
+            the L3 ledger via FreezeCascade.script_json.
         """
         doc = self._doc()
-        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
-        director = next(
-            (n for n in doc.get("nodes", []) if n.get("type") == "OTR_LLMDirector"),
-            None,
-        )
-        if director is None:
-            # Director already deleted (Sprint 2 ran). Vacuously true;
-            # the Sprint 2.5 replacement test is the active gate now.
-            return
-        offenders = []
-        for L in doc.get("links", []):
-            if not (isinstance(L, list) and len(L) >= 6):
-                continue
-            if L[1] != director["id"]:
-                continue
-            dst_node = nodes_by_id.get(L[3])
-            if dst_node is None:
-                continue
-            dst_type = dst_node.get("type", "")
-            if dst_type in self._VOICE_NODE_TYPES:
-                src_outs = director.get("outputs", [])
-                src_name = (
-                    src_outs[L[2]]["name"]
-                    if 0 <= L[2] < len(src_outs) else f"slot{L[2]}"
-                )
-                dst_ins = dst_node.get("inputs", [])
-                dst_in = (
-                    dst_ins[L[4]]["name"]
-                    if 0 <= L[4] < len(dst_ins) else f"slot{L[4]}"
-                )
-                offenders.append(
-                    f"link {L[0]}: Director.{src_name} -> "
-                    f"{dst_type}(id={dst_node['id']}).{dst_in}"
-                )
-        assert not offenders, (
-            "voice-path-cleanbreak violation: Director output reconnected "
-            "to voice node(s):\n  " + "\n  ".join(offenders)
+        director_nodes = [
+            n for n in doc.get("nodes", [])
+            if n.get("type") == "OTR_LLMDirector"
+        ]
+        assert not director_nodes, (
+            "voice-path-cleanbreak Sprint 2 violation: OTR_LLMDirector "
+            "node re-added to workflow. Director class was deleted; see "
+            "docs/voice-path-cleanbreak-execution-plan.md Sprint 2."
         )
 
     def test_musicgen_script_json_wired_from_freeze_cascade(self):

@@ -47,7 +47,8 @@ FIXED_SEEDS = {
     # renamed/extracted out as OTR_LedgerScriptWriter long before this
     # commit; the seed target tracks the canonical writer node name.
     "OTR_LedgerScriptWriter": 42,
-    "OTR_LLMDirector": 42,
+    # OTR_LLMDirector seed entry deleted in voice-path-cleanbreak Sprint 2
+    # (2026-05-12). Director class + workflow node are gone; no seed to set.
     "OTR_BatchBarkGenerator": 42,
     "OTR_KokoroAnnouncer": 42,
     "OTR_BatchAudioGenGenerator": 42,

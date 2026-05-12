@@ -406,9 +406,12 @@ class TestWorkflowJSONFull:
             assert n["type"].startswith("OTR_") or n["type"] in known
 
     def test_required_pipeline_nodes(self, wf):
+        # OTR_LLMDirector removed from required set in voice-path-cleanbreak
+        # Sprint 2 (2026-05-12). Director class + workflow node deleted;
+        # video consumers migrated to read meta.visual_plan from L3 ledger.
         types = {n["type"] for n in wf["nodes"]}
         required = {
-            "OTR_LedgerScriptWriter", "OTR_LLMDirector",
+            "OTR_LedgerScriptWriter",
             "OTR_BatchBarkGenerator", "OTR_SceneSequencer",
             "OTR_EpisodeAssembler",
         }

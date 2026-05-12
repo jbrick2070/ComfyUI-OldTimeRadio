@@ -717,14 +717,17 @@ class OTRVideoPlan:
         style_choices = list(_ERA_TAIL_BY_STYLE.keys()) + ["(none)"]
         return {
             "required": {
-                "director_json": (
+                "script_json": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "",
                         "tooltip": (
-                            "Full Director JSON from OTR_LLMDirector "
-                            "(contains visual_plan.characters + scenes)"
+                            "L3 ledger JSON from OTR_LedgerFreezeCascade. "
+                            "Reads meta.visual_plan.characters + scenes + "
+                            "meta.voice_assignments stamped by the writer. "
+                            "Replaces the legacy Director production_plan_json "
+                            "input in voice-path-cleanbreak Sprint 2."
                         ),
                     },
                 ),
@@ -791,7 +794,7 @@ class OTRVideoPlan:
 
     def plan(
         self,
-        director_json: str,
+        script_json: str,
         focus_character: str,
         shots_per_scene: int,
         style: str,
@@ -812,6 +815,32 @@ class OTRVideoPlan:
         resolved_focus = focus_character
         if focus_character == "(all)":
             resolved_focus = ""
+
+        # Voice-path-cleanbreak Sprint 2: derive the legacy "director"
+        # dict shape from the L3 ledger meta-stamped by the writer.
+        # The existing helpers (build_pass1_char_prompts /
+        # build_pass2_scene_prompts / build_shot_plan) accept a serialized
+        # director-shape JSON; we synthesize that from meta.visual_plan +
+        # meta.voice_assignments. Helper signatures unchanged so the unit
+        # tests against build_* still work.
+        try:
+            from . import _otr_ledger_consumers as _OTRLC
+            _led = _OTRLC.load_ledger(script_json)
+            _meta = (_led.get("meta") or {})
+            _derived = {
+                "visual_plan":       _meta.get("visual_plan") or {},
+                "voice_assignments": _meta.get("voice_assignments") or {},
+                "style":             _meta.get("style") or "",
+                "genre":             (_meta.get("visual_plan") or {}).get("genre")
+                                     or "audio drama",
+            }
+            director_json = json.dumps(_derived, ensure_ascii=False)
+        except Exception as _exc:
+            log.warning(
+                "OTR_VideoPlan: failed to derive director-shape from ledger "
+                "(%s); falling back to empty director_json", _exc,
+            )
+            director_json = "{}"
 
         # PASS 1: char portraits (one per character, or just the
         # focus character if focus_character is a specific name)

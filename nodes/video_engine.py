@@ -1204,10 +1204,6 @@ class SignalLostVideoRenderer:
                 }),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True, "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector (optional under v2 ledger flow; empty {} degrades gracefully -- voice_assignments / style fall back to defaults)"
-                }),
                 "fps": ("INT", {
                     "default": 24, "min": 12, "max": 60, "step": 1,
                     "tooltip": "Frames per second (24 = cinematic)"
@@ -1248,7 +1244,7 @@ class SignalLostVideoRenderer:
         return _time.time()
 
     def render_video(self, audio, script_json, news_used,
-                     production_plan_json="{}", fps=24, resolution="1920x1080",
+                     fps=24, resolution="1920x1080",
                      episode_title="", closing_audio=None):
 
         from .story_orchestrator import _runtime_log
@@ -1261,9 +1257,23 @@ class SignalLostVideoRenderer:
         # /AudioGen/ProcSFX) has already validated ledger shape, so a
         # legacy-list at this point is upstream-wiring failure, not a
         # silent-degrade case.
+        #
+        # Voice-path-cleanbreak Sprint 2: production_plan_json socket
+        # deleted. style + voice_assignments now live on meta. Build the
+        # legacy-shape `plan` dict from ledger meta so the downstream
+        # plan.get("voice_assignments") / plan.get("style") sites stay
+        # source-stable (they were already defensive against missing
+        # keys; the dict construction below is the single conversion
+        # site).
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-        plan = _OTRLC.production_plan_or_empty(production_plan_json)
+        _meta = led.get("meta") or {}
+        plan = {
+            "voice_assignments": _meta.get("voice_assignments") or {},
+            "style":             _meta.get("style") or "",
+            "genre":             (_meta.get("visual_plan") or {}).get("genre")
+                                 or "",
+        }
 
         # Title chain (Path B confirmed 2026-05-09):
         #   1. led["meta"]["episode_title"]   (architect primary; today
