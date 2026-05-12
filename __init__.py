@@ -110,14 +110,19 @@ _NODE_MODULES = {
     "OTR_LFCPhase4Scene": (".nodes.OTR_LFCPhase4Scene", "OTR_LFCPhase4Scene", " LFC Phase 4 - Scene Coherence"),
     "OTR_LFCPhase5Voice": (".nodes.OTR_LFCPhase5Voice", "OTR_LFCPhase5Voice", " LFC Phase 5 - Voice Drift"),
     "OTR_LFCPhase6Arc":   (".nodes.OTR_LFCPhase6Arc",   "OTR_LFCPhase6Arc",   " LFC Phase 6 - Episode Arc"),
+    # OTR_LLMDirector still registered: SignalLostVideoRenderer +
+    # OTRVideoPlan are live readers of production_plan_json.visual_plan /
+    # voice_assignments / style. Director deletion is deferred to the
+    # video-side cleanbreak sprint per voice-path-cleanbreak-plan.md §2.
     "OTR_LLMDirector":        (".nodes.story_orchestrator", "LLMDirector",      " LLM Director"),
-    "OTR_BarkTTS":            (".nodes.bark_tts",           "BarkTTSNode",          " Bark TTS (Suno)"),
-    "OTR_SFXGenerator":       (".nodes.sfx_generator",      "SFXGenerator",         " SFX Generator"),
+    # Voice-path-cleanbreak 2026-05-12 (P3): the legacy single-line
+    # nodes OTR_BarkTTS / OTR_SFXGenerator / OTR_VoiceRender plus the
+    # pre-L3 parser-list reader OTR_BatchKokoroGenerator are deleted.
+    # Their registrations are removed in lockstep with the file deletes.
     "OTR_SceneSequencer":     (".nodes.scene_sequencer",     "SceneSequencer",       " Scene Sequencer"),
     "OTR_EpisodeAssembler":   (".nodes.scene_sequencer",     "EpisodeAssembler",     " Episode Assembler"),
     "OTR_AudioEnhance":       (".nodes.audio_enhance",       "AudioEnhance",         " Spatial Audio Enhance"),
     "OTR_BatchBarkGenerator": (".nodes.batch_bark_generator", "BatchBarkGenerator",   " Batch Bark Generator"),
-    "OTR_BatchKokoroGenerator":(".nodes.batch_kokoro_generator", "BatchKokoroGenerator"," Batch Kokoro (4GB)"),
     "OTR_BatchAudioGenGenerator":(".nodes.batch_audiogen_generator", "BatchAudioGenGenerator"," Batch AudioGen (Foley)"),
     "OTR_BatchProceduralSFX": (".nodes.batch_procedural_sfx", "BatchProceduralSFX",   " Batch Procedural SFX (Obsidian)"),
     "OTR_SignalLostVideo":    (".nodes.video_engine",          "SignalLostVideoRenderer", " Signal Lost Video"),
@@ -216,17 +221,14 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
         mod = importlib.import_module(module_path, package=__name__)
         cls = getattr(mod, class_name)
 
-        # Primary registration (OTR_ prefix)
+        # Single canonical registration (OTR_ prefix only). The legacy
+        # bare-name (NodeName) alias mirror loop was deleted in the
+        # voice-path-cleanbreak 2026-05-12 sprint per the Standing
+        # Directive. Saved workflow JSONs that reference bare-name
+        # node types are expected to be rewritten against the OTR_
+        # prefix; there is no parallel legacy-workflow path.
         NODE_CLASS_MAPPINGS[node_name] = cls
         NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
-
-        # Legacy alias registration
-        # If the primary ID is "OTR_NodeName", also map "NodeName" to it.
-        # This restores styled widgets in older production workflows.
-        if node_name.startswith("OTR_"):
-            legacy_name = node_name[4:]
-            if legacy_name not in NODE_CLASS_MAPPINGS:
-                NODE_CLASS_MAPPINGS[legacy_name] = cls
 
     except Exception as e:
         log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)

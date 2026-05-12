@@ -249,74 +249,8 @@ SFX_GENERATORS = {
 }
 
 
-class SFXGenerator:
-    """Generate radio drama sound effects via procedural synthesis."""
-
-    CATEGORY = "OldTimeRadio"
-    FUNCTION = "generate"
-    RETURN_TYPES = ("AUDIO", "STRING")
-    RETURN_NAMES = ("sfx_audio", "generation_info")
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "sfx_type": (list(SFX_GENERATORS.keys()), {
-                    "default": "radio_tuning",
-                    "tooltip": "Type of sound effect to generate"
-                }),
-                "duration_sec": ("FLOAT", {
-                    "default": 2.0, "min": 0.1, "max": 30.0, "step": 0.1,
-                    "tooltip": "Duration of the sound effect"
-                }),
-            },
-            "optional": {
-                "sample_rate": ("INT", {
-                    "default": 48000, "min": 22050, "max": 96000, "step": 1000,
-                }),
-                "volume_db": ("FLOAT", {
-                    "default": 0.0, "min": -30.0, "max": 6.0, "step": 1.0,
-                    "tooltip": "Volume adjustment in dB"
-                }),
-            },
-        }
-
-    def generate(self, sfx_type, duration_sec, sample_rate=48000, volume_db=0.0):
-        log.info(f"[SFXGenerator] Generating '{sfx_type}' ({duration_sec:.1f}s @ {sample_rate}Hz)")
-
-        generator = SFX_GENERATORS.get(sfx_type)
-        if generator is None:
-            log.error(f"[SFXGenerator] Unknown SFX type: {sfx_type}")
-            # Return silence
-            silence = np.zeros(int(sample_rate * duration_sec), dtype=np.float32)
-            waveform = torch.from_numpy(silence).unsqueeze(0).unsqueeze(0)
-            return ({"waveform": waveform, "sample_rate": sample_rate},
-                    json.dumps({"error": f"Unknown SFX: {sfx_type}"}))
-
-        # Generate audio
-        audio_np = generator(duration_sec, sample_rate)
-
-        # Apply volume adjustment
-        if volume_db != 0.0:
-            gain = 10.0 ** (volume_db / 20.0)
-            audio_np = audio_np * gain
-
-        # Normalize
-        peak = np.abs(audio_np).max()
-        if peak > 0.95:
-            audio_np = audio_np * (0.95 / peak)
-
-        # To ComfyUI AUDIO format
-        waveform = torch.from_numpy(audio_np).float().unsqueeze(0).unsqueeze(0)
-        audio_out = {"waveform": waveform, "sample_rate": sample_rate}
-
-        info = json.dumps({
-            "sfx_type": sfx_type,
-            "duration_sec": round(duration_sec, 2),
-            "sample_rate": sample_rate,
-            "volume_db": volume_db,
-            "samples": len(audio_np),
-        })
-
-        log.info(f"[SFXGenerator] Complete: Generated {len(audio_np)/sample_rate:.1f}s of audio")
-        return (audio_out, info)
+# Voice-path-cleanbreak 2026-05-12 (P3): the OTR_SFXGenerator node
+# class was deleted (legacy single-line node, unused in any active
+# workflow). The procedural SFX_GENERATORS dict remains because
+# batch_procedural_sfx.py imports it directly. The module is library-
+# only now (no node class, no NODE_CLASS_MAPPINGS).

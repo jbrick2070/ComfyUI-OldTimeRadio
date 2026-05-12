@@ -43,7 +43,10 @@ _WORKFLOW = os.path.join(_HERE, "..", "workflows", "otr_scifi_16gb_full.json")
 # Fixed seed for deterministic audio output.
 # These override the workflow's randomized seeds at runtime.
 FIXED_SEEDS = {
-    "OTR_LLMScriptWriter": 42,
+    # Voice-path-cleanbreak 2026-05-12: legacy OTR_LLMScriptWriter was
+    # renamed/extracted out as OTR_LedgerScriptWriter long before this
+    # commit; the seed target tracks the canonical writer node name.
+    "OTR_LedgerScriptWriter": 42,
     "OTR_LLMDirector": 42,
     "OTR_BatchBarkGenerator": 42,
     "OTR_KokoroAnnouncer": 42,

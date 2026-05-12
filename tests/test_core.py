@@ -275,32 +275,11 @@ class TestCitationGuard:
 # 6. BARK TTS — Static Code Checks
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestBarkTTSCodePatterns:
-
-    @pytest.fixture(scope="class")
-    def src(self):
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "bark_tts.py")
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-
-    def test_warning_filter_present(self, src):
-        assert "filterwarnings" in src
-
-    def test_warning_targets_max_length(self, src):
-        assert "max_length" in src and "max_new_tokens" in src
-
-    def test_local_files_only_present(self, src):
-        assert "local_files_only=True" in src
-
-    def test_oserror_fallback_present(self, src):
-        assert "OSError" in src
-
-    def test_sub_models_patched(self, src):
-        for sub in ("semantic", "coarse_acoustics", "fine_acoustics"):
-            assert sub in src, f"Sub-model {sub!r} not in generation_config patch"
-
-    def test_max_length_nulled(self, src):
-        assert "max_length = None" in src or "max_length=None" in src
+# Voice-path-cleanbreak 2026-05-12 (P3): TestBarkTTSCodePatterns deleted.
+# nodes/bark_tts.py (the legacy single-line OTR_BarkTTS node) was deleted
+# in lockstep. The production Bark surface is BatchBarkGenerator
+# (batch_bark_generator.py), exercised by tests/test_bark_ledger.py +
+# tests/test_bark_cast_contract.py.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -335,16 +314,14 @@ class TestStoryOrchestratorCodePatterns:
     def test_citation_rule_present(self, src):
         assert "CITATION RULE" in src or "cite ONLY" in src
 
-    def test_gender_words_frozenset(self, src):
-        assert "_GENDER_WORDS" in src and "frozenset" in src
-
-    def test_voice_tag_example_has_charactername(self, src):
-        assert "CHARACTERNAME" in src or "CHARACTER NAME" in src
-
-    def test_lemmy_easter_egg(self, src):
-        assert "LEMMY" in src
-        assert "wrench" in src.lower()
-        assert "0.11" in src
+    # Voice-path-cleanbreak 2026-05-12 (P3): test_gender_words_frozenset,
+    # test_voice_tag_example_has_charactername, and test_lemmy_easter_egg
+    # were deleted. They pinned source-level strings inside the legacy
+    # LLMScriptWriter / Director code paths that were extracted out of
+    # story_orchestrator.py during the LPL writer rewrite. The new
+    # OTR_LedgerScriptWriter has its own dedicated cast / writer tests;
+    # the LEMMY easter-egg framework is tracked in BUG_LOG (orphaned
+    # in LPL migration). No replacement assertions needed.
 
     def test_local_files_only_gemma(self, src):
         assert "local_files_only" in src
@@ -460,19 +437,11 @@ class TestAudioContract:
         assert wf.dtype == torch.float32
         assert 8000 <= audio["sample_rate"] <= 96000
 
-    def test_sfx_generator(self):
-        from nodes.sfx_generator import SFXGenerator
-        audio, _ = SFXGenerator().generate("radio_tuning", 2.0, 48000, -6.0)
-        self._check(audio)
-
-    def test_sfx_all_types(self):
-        from nodes.sfx_generator import SFXGenerator
-        node = SFXGenerator()
-        for t in ["radio_tuning", "sci_fi_beep", "theremin", "explosion",
-                  "footsteps", "heartbeat", "door_knock", "wind",
-                  "siren", "ticking_clock", "white_noise", "pink_noise"]:
-            audio, _ = node.generate(t, 1.0, 48000, -6.0)
-            self._check(audio)
+    # Voice-path-cleanbreak 2026-05-12 (P3): test_sfx_generator and
+    # test_sfx_all_types were deleted. The legacy OTR_SFXGenerator node
+    # class is gone; the procedural SFX_GENERATORS dict survives as a
+    # library and feeds BatchProceduralSFX (exercised by
+    # tests/test_procsfx_ledger.py).
 
     def test_episode_assembler(self):
         from nodes.scene_sequencer import EpisodeAssembler
@@ -485,22 +454,13 @@ class TestAudioContract:
 # 11. SCENE SEQUENCER — Clip Wiring (requires torch)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@requires_torch
-class TestSceneSequencerClipWiring:
-
-    def test_resamples_44100_to_48000(self):
-        from nodes.scene_sequencer import SceneSequencer
-        script = json.dumps([
-            {"type": "dialogue", "character_name": "X", "voice_traits": "male,30s", "line": "Test"}
-        ])
-        tts = {"waveform": torch.randn(1, 1, 44100), "sample_rate": 44100}
-        audio, _, _ = SceneSequencer().sequence(script, "{}", tts_audio_clips=tts)
-        assert audio["sample_rate"] == 48000
-
-    def test_empty_script_returns_silence(self):
-        from nodes.scene_sequencer import SceneSequencer
-        audio, _, _ = SceneSequencer().sequence("[]", "{}")
-        assert audio["waveform"].shape[2] > 0
+# Voice-path-cleanbreak 2026-05-12 (P3): TestSceneSequencerClipWiring's
+# two cases pinned the legacy parser-list shape that
+# _otr_ledger_consumers.load_ledger now hard-rejects via ValueError, plus
+# the production_plan_json kwarg that the cleanbreak deleted. The new
+# L3-native SceneSequencer is exercised by tests/test_sequencer_ledger.py
+# (4 cases) and the integration assembly tests. The legacy-shape
+# coverage is deliberately retired -- no replacement assertions.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -602,14 +562,11 @@ class TestAudioGenCanonicalSFX:
             "It should consume canonical parser output instead."
         )
 
-    def test_audiogen_reads_type_sfx(self):
-        """AudioGen source should reference type == sfx for extraction."""
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "batch_audiogen_generator.py")
-        with open(path, encoding="utf-8") as f:
-            src = f.read()
-        assert '"type"' in src and '"sfx"' in src, (
-            "AudioGen should filter script items by type == sfx"
-        )
+    # Voice-path-cleanbreak 2026-05-12 (P3): test_audiogen_reads_type_sfx
+    # was deleted. The new L3-native AudioGen iterates ledger lines via
+    # iter_lines(roles={"sfx"}) rather than the legacy parser-list
+    # `item["type"] == "sfx"` field check. Coverage moved to
+    # tests/test_audiogen_ledger.py (4 cases).
 
     def test_audiogen_reads_description_field(self):
         """AudioGen source should read the 'description' field from SFX items."""

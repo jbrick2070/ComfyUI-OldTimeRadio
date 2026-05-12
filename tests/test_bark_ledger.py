@@ -76,6 +76,11 @@ def patched_bark_env(tmp_path):
     def _no_op(*_args, **_kwargs):
         return None
 
+    # Voice-path-cleanbreak 2026-05-12 (P3): nodes.bark_tts was kept as
+    # a library-only module (the OTR_BarkTTS node class was deleted but
+    # _load_bark survives because batch_bark_generator imports it).
+    # _load_bark stays patched so the test never tries to download
+    # the actual Bark model.
     with patch(
         "nodes.batch_bark_generator.force_vram_offload", side_effect=_no_op,
     ), patch(

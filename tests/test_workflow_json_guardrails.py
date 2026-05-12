@@ -396,5 +396,144 @@ class TestWriterStyleSentinelDefault:
         )
 
 
+class TestVoicePathCleanbreakWiring:
+    """Voice-path-cleanbreak 2026-05-12 (P3) wiring guardrails.
+
+    Pins the post-cleanbreak invariants for the canonical workflow JSON
+    so a future hand-edit cannot silently re-introduce the Director-fed
+    voice-node secondary paths.
+    """
+
+    # Voice-side nodes (the ones P2 pruned). These must NEVER have a
+    # ``production_plan_json`` input socket post-cleanbreak.
+    _VOICE_NODE_TYPES = frozenset({
+        "OTR_BatchBarkGenerator",
+        "OTR_KokoroAnnouncer",
+        "OTR_BatchAudioGenGenerator",
+        "OTR_BatchProceduralSFX",
+        "OTR_SceneSequencer",
+        "OTR_MusicGenTheme",
+    })
+
+    def _doc(self):
+        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
+        assert wf_path.is_file(), (
+            f"Canonical workflow {_CANONICAL_WORKFLOW!r} missing"
+        )
+        return _load_json(wf_path)
+
+    def test_no_production_plan_json_wires_to_voice_nodes(self):
+        """No link's destination is a voice-node ``production_plan_json``
+        slot. Video-side wires (link 17 -> SignalLostVideo,
+        link 38 -> OTRVideoPlan) are intentionally still present until
+        the deferred video-side cleanbreak sprint.
+        """
+        doc = self._doc()
+        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
+        offenders: list[str] = []
+        for L in doc.get("links", []):
+            if not (isinstance(L, list) and len(L) >= 6):
+                continue
+            _lid, _src, _src_slot, dst, dst_slot, _typ = (
+                L[0], L[1], L[2], L[3], L[4], L[5]
+            )
+            dst_node = nodes_by_id.get(dst)
+            if dst_node is None or dst_node.get("type") not in self._VOICE_NODE_TYPES:
+                continue
+            inputs = dst_node.get("inputs", [])
+            if 0 <= dst_slot < len(inputs):
+                in_name = inputs[dst_slot].get("name")
+                if in_name == "production_plan_json":
+                    offenders.append(
+                        f"link {L[0]} -> {dst_node['type']}(id={dst})."
+                        f"production_plan_json"
+                    )
+        assert not offenders, (
+            "voice-path-cleanbreak violation: production_plan_json "
+            "wires still reach voice nodes:\n  "
+            + "\n  ".join(offenders)
+        )
+
+    def test_voice_nodes_have_no_production_plan_json_input_socket(self):
+        """The voice nodes themselves no longer declare a
+        ``production_plan_json`` input socket. Any saved workflow that
+        still carries the socket has stale wiring."""
+        doc = self._doc()
+        offenders: list[str] = []
+        for n in doc.get("nodes", []):
+            if n.get("type") not in self._VOICE_NODE_TYPES:
+                continue
+            for inp in n.get("inputs", []):
+                if inp.get("name") == "production_plan_json":
+                    offenders.append(
+                        f"{n['type']}(id={n['id']}) declares "
+                        f"input.production_plan_json"
+                    )
+        assert not offenders, (
+            "voice-path-cleanbreak violation: production_plan_json input "
+            "socket still present on voice nodes:\n  "
+            + "\n  ".join(offenders)
+        )
+
+    def test_musicgen_script_json_wired_from_freeze_cascade(self):
+        """OTR_MusicGenTheme must read its ``script_json`` input from
+        ``OTR_LedgerFreezeCascade.script_json``. That edge is what
+        gives MusicGen access to meta.gen_params_initial.style and
+        meta.news.script_brief for the deterministic palette."""
+        doc = self._doc()
+        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
+        # Find the single MusicGen and FreezeCascade nodes.
+        musicgens = [
+            n for n in doc.get("nodes", [])
+            if n.get("type") == "OTR_MusicGenTheme"
+        ]
+        cascades = [
+            n for n in doc.get("nodes", [])
+            if n.get("type") == "OTR_LedgerFreezeCascade"
+        ]
+        assert len(musicgens) == 1, (
+            f"expected exactly one OTR_MusicGenTheme; got {len(musicgens)}"
+        )
+        assert len(cascades) == 1, (
+            f"expected exactly one OTR_LedgerFreezeCascade; got {len(cascades)}"
+        )
+        mg = musicgens[0]
+        cas = cascades[0]
+        # Locate script_json input socket on MusicGen.
+        script_input = next(
+            (i for i in mg.get("inputs", []) if i.get("name") == "script_json"),
+            None,
+        )
+        assert script_input is not None, (
+            "OTR_MusicGenTheme is missing a script_json input socket"
+        )
+        link_id = script_input.get("link")
+        assert link_id is not None, (
+            "OTR_MusicGenTheme.script_json has no incoming link"
+        )
+        # Resolve the link and verify it originates at FreezeCascade.script_json.
+        link_row = next(
+            (L for L in doc.get("links", []) if L and L[0] == link_id),
+            None,
+        )
+        assert link_row is not None, (
+            f"link {link_id} referenced by MusicGen.script_json not found"
+        )
+        src_id, src_slot = link_row[1], link_row[2]
+        assert src_id == cas["id"], (
+            f"MusicGen.script_json wired from node id={src_id}; "
+            f"expected FreezeCascade id={cas['id']}"
+        )
+        src_outputs = cas.get("outputs", [])
+        assert 0 <= src_slot < len(src_outputs), (
+            f"FreezeCascade has no output slot {src_slot}"
+        )
+        src_name = src_outputs[src_slot].get("name")
+        assert src_name == "script_json", (
+            f"MusicGen.script_json wired from "
+            f"FreezeCascade.{src_name!r}; expected 'script_json'"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
