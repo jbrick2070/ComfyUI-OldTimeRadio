@@ -107,6 +107,11 @@ class OTR_LedgerFreezeCascade:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # LFC sprint commit 12 (2026-05-11). Each enable_phase_*
+        # widget gates the corresponding cascade phase. New phases
+        # default OFF until soak validates them; deterministic
+        # phases (7, 8, 10) default ON because they are cheap +
+        # high-value.
         return {
             "required": {
                 "script_text": ("STRING", {
@@ -151,6 +156,69 @@ class OTR_LedgerFreezeCascade:
                         "matches the writer's default."
                     ),
                 }),
+                "enable_phase_3_polish": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 3 -- per-line polish. Re-runs the "
+                        "composer's polish_line over any line that "
+                        "still trips needs_polish AFTER the reviewer. "
+                        "Default OFF until soak validates the inter-"
+                        "action with the composer's inline polish pass."
+                    ),
+                }),
+                "polish_announcer_beats": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 3 -- announcer-beat handling. "
+                        "When False (default), announcer beats are "
+                        "skipped (they are by-design narration). "
+                        "When True, the announcer-aware polish prompt "
+                        "fires (per ADR section 6.1)."
+                    ),
+                }),
+                "enable_phase_4_5_smart_suggestion": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 4.5 -- deterministic SFX / music "
+                        "synthesis. Scans dialogue for verb patterns "
+                        "(start the car -> car_engine_start) and "
+                        "appends auto_generated=True beats. Default "
+                        "OFF for v2.0-alpha per ADR section 6.17."
+                    ),
+                }),
+                "enable_phase_7_audio_readiness": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "LFC Phase 7 -- audio readiness. Expands "
+                        "abbreviations (Dr. -> Doctor), symbols (& -> "
+                        "and), and numbers (42 -> forty-two) so TTS "
+                        "produces pronounceable output. Default ON "
+                        "(deterministic + cheap)."
+                    ),
+                }),
+                "enable_phase_8_video_readiness": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "LFC Phase 8 -- video readiness audit. Checks "
+                        "cast portraits + voiced-line visual coverage. "
+                        "Mutates nothing; stamps meta.video_readiness. "
+                        "Default ON."
+                    ),
+                }),
+                "vram_ceiling_gb": ("FLOAT", {
+                    "default": 14.0,
+                    "min": 4.0,
+                    "max": 24.0,
+                    "step": 0.5,
+                    "tooltip": (
+                        "VRAM watchdog ceiling (GB). Before each LFC "
+                        "LLM call, current VRAM allocation is checked "
+                        "against this ceiling; over-ceiling skips the "
+                        "phase with a warn log. ADR section 6.8 caps "
+                        "at 14.0 GB on the 5080 Laptop (16 GB total, "
+                        "0.5 GB margin under the 14.5 GB usable cap)."
+                    ),
+                }),
             },
         }
 
@@ -166,6 +234,12 @@ class OTR_LedgerFreezeCascade:
         news_used: str = "",
         estimated_minutes: int = 0,
         model_id: str = DEFAULT_MODEL_ID,
+        enable_phase_3_polish: bool = False,
+        polish_announcer_beats: bool = False,
+        enable_phase_4_5_smart_suggestion: bool = False,
+        enable_phase_7_audio_readiness: bool = True,
+        enable_phase_8_video_readiness: bool = True,
+        vram_ceiling_gb: float = 14.0,
     ):
         # Lazy imports to keep node-load cheap.
         from . import _otr_freeze_cascade as _LFC_ORCH
@@ -203,6 +277,19 @@ class OTR_LedgerFreezeCascade:
 
         cache_entry = _OTRML.load_llm(model_id=model_id or DEFAULT_MODEL_ID)
         generate_fn = _OTRML.make_generate_fn(cache_entry)
+        # LFC commit 12, ADR section 6.4: build the polish-specific
+        # generate_fn off the same cache_entry so composer-tuned
+        # sampling does not leak in. Best-effort: if the loader
+        # doesn't yet expose make_polish_generate_fn the cascade
+        # falls back to generate_fn.
+        try:
+            polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
+        except Exception as exc:  # noqa: BLE001
+            log.debug(
+                "[OTR_LedgerFreezeCascade] make_polish_generate_fn "
+                "unavailable (%s); falling back to generate_fn", exc,
+            )
+            polish_generate_fn = None
 
         log.info(
             "[OTR_LedgerFreezeCascade] running cascade on ledger %s "
@@ -210,7 +297,24 @@ class OTR_LedgerFreezeCascade:
             led.episode_id,
             len(led.data.get("lines", []) or []),
         )
-        disp = _LFC_ORCH.run_freeze_cascade(generate_fn, led)
+        # LFC commit 12: stamp the vram_ceiling on meta so the
+        # cascade's per-phase VRAM watchdog reads it. The cascade
+        # uses 14.0 GB as the hardcoded default until the orch
+        # helper is upgraded to read from meta in a follow-up
+        # commit (ADR section 6.8 alarm-plumbing scope).
+        led.data.setdefault("meta", {})["lfc_vram_ceiling_gb"] = float(
+            vram_ceiling_gb
+        )
+        disp = _LFC_ORCH.run_freeze_cascade(
+            generate_fn,
+            led,
+            polish_generate_fn=polish_generate_fn,
+            enable_phase_3_polish=enable_phase_3_polish,
+            polish_announcer_beats=polish_announcer_beats,
+            enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
+            enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
+            enable_phase_8_video_readiness=enable_phase_8_video_readiness,
+        )
         log.info(
             "[OTR_LedgerFreezeCascade] freeze_verdict=%s "
             "(pre_warns=%d post_warns=%s reviewer=%s)",

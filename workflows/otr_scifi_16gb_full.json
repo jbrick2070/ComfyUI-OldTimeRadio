@@ -2000,7 +2000,13 @@
         "Node name for S&R": "OTR_LedgerFreezeCascade"
       },
       "widgets_values": [
-        "mistralai/Mistral-Nemo-Instruct-2407"
+        "mistralai/Mistral-Nemo-Instruct-2407",
+        false,
+        false,
+        false,
+        true,
+        true,
+        14.0
       ],
       "inputs": [
         {
