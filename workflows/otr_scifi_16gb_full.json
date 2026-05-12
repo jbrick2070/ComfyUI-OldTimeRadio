@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 63,
-  "last_link_id": 111,
+  "last_node_id": 64,
+  "last_link_id": 112,
   "nodes": [
     {
       "id": 1,
@@ -2064,7 +2064,9 @@
         {
           "name": "estimated_minutes",
           "type": "INT",
-          "links": [],
+          "links": [
+            112
+          ],
           "slot_index": 3
         },
         {
@@ -2105,6 +2107,41 @@
           "name": "text",
           "type": "STRING",
           "link": 111,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "color": "#2B3C5A",
+      "bgcolor": "#1C273C"
+    },
+    {
+      "id": 64,
+      "type": "ShowText|pysssss",
+      "pos": [
+        460,
+        -50
+      ],
+      "size": [
+        200,
+        80
+      ],
+      "title": "estimated_minutes",
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 112,
           "widget": {
             "name": "text"
           }
@@ -2622,6 +2659,14 @@
       63,
       0,
       "STRING"
+    ],
+    [
+      112,
+      62,
+      3,
+      64,
+      0,
+      "INT"
     ]
   ],
   "groups": [],
