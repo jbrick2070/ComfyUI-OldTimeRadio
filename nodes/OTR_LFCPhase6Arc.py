@@ -47,6 +47,19 @@ class OTR_LFCPhase6Arc:
                         "back to outline intents. Default OFF."
                     ),
                 }),
+                "force": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "G2 interlock override (commit 12.14). When "
+                        "False (default), refuses to re-run if "
+                        "Phase 6 already executed via the main "
+                        "cascade. Set True to deliberately re-run. "
+                        "Note: Phase 6 has a graceful fallback when "
+                        "Phase 4 didn't run (outline-intents path), "
+                        "so missing-prerequisite is a soft signal "
+                        "rather than a hard refusal here."
+                    ),
+                }),
                 "model_id": ("STRING", {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
@@ -67,6 +80,7 @@ class OTR_LFCPhase6Arc:
         self,
         script_json: str = "",
         enable: bool = False,
+        force: bool = False,
         model_id: str = DEFAULT_MODEL_ID,
     ):
         if not enable:
@@ -75,6 +89,7 @@ class OTR_LFCPhase6Arc:
         from . import _otr_model_loader as _OTRML
         from . import production_ledger as _PL
         from . import _otr_lfc_phase_6_episode_arc as _LFC_P6
+        from . import _otr_lfc_phase_verdicts as _PV
 
         peek = getattr(_PL, "peek_ledger", None)
         led = (peek() if callable(peek) else _PL.get_ledger())
@@ -83,6 +98,22 @@ class OTR_LFCPhase6Arc:
                 "[OTR_LFCPhase6Arc] no writer ledger; skipping"
             )
             return (script_json or "{}", "no_ledger")
+
+        # G2 interlock (commit 12.14). Phase 6 deliberately does NOT
+        # gate on Phase 4 prerequisite -- the phase function has a
+        # documented fallback path (used_synopses_fallback=True via
+        # outline intents) when scene synopses aren't cached. Adding
+        # a hard prerequisite check here would override that
+        # graceful-degrade contract.
+        meta = led.data.get("meta") or {}
+        if not force and _PV.phase_already_ran_in_cascade(
+            meta, "phase_6_episode_arc",
+        ):
+            log.info(
+                "[OTR_LFCPhase6Arc] phase 6 already ran via main "
+                "cascade; refusing re-run without force=True"
+            )
+            return (script_json or "{}", "already_ran_in_cascade")
 
         cache_entry = _OTRML.load_llm(model_id=model_id or DEFAULT_MODEL_ID)
         generate_fn = _OTRML.make_generate_fn(cache_entry)

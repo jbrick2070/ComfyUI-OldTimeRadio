@@ -106,7 +106,11 @@ def _line(line_id, char_id, text):
 
 
 def _ledger_with_outlier():
-    """Build a ledger where exactly one line trips the drift heuristic."""
+    """Build a ledger where exactly one line trips the drift
+    heuristic. Includes a phase_3_per_line_polish record so the
+    G1 interlock added in commit 12.14 doesn't short-circuit
+    this G3 test.
+    """
     return SimpleNamespace(
         data={
             "schema_version": "l3-2026-05-14",
@@ -129,6 +133,13 @@ def _ledger_with_outlier():
             "meta": {
                 "episode_title": "g3 test",
                 "style": "mission_control_procedural",
+                # G1 prereq: phase_3 must have a real record so the
+                # standalone Phase 5 node's interlock allows the
+                # actual run we're testing here.
+                "cleanup_passes": [{
+                    "phase_name": "phase_3_per_line_polish",
+                    "failures": [],
+                }],
             },
         },
         episode_id="ep_g3_test",

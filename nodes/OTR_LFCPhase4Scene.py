@@ -67,6 +67,19 @@ class OTR_LFCPhase4Scene:
                         "the operator opts in."
                     ),
                 }),
+                "force": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "G2 interlock override (commit 12.14). "
+                        "When False (default), the node refuses "
+                        "to re-run if Phase 4 already executed via "
+                        "the main cascade in this episode "
+                        "(returns verdict `already_ran_in_cascade`). "
+                        "Set True to deliberately re-edit; useful "
+                        "for iterating on a single phase without "
+                        "disabling the cascade widget."
+                    ),
+                }),
                 "model_id": ("STRING", {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
@@ -86,6 +99,7 @@ class OTR_LFCPhase4Scene:
         self,
         script_json: str = "",
         enable: bool = False,
+        force: bool = False,
         model_id: str = DEFAULT_MODEL_ID,
     ):
         if not enable:
@@ -94,6 +108,7 @@ class OTR_LFCPhase4Scene:
         from . import _otr_model_loader as _OTRML
         from . import production_ledger as _PL
         from . import _otr_lfc_phase_4_scene_coherence as _LFC_P4
+        from . import _otr_lfc_phase_verdicts as _PV
 
         peek = getattr(_PL, "peek_ledger", None)
         led = (peek() if callable(peek) else _PL.get_ledger())
@@ -102,6 +117,19 @@ class OTR_LFCPhase4Scene:
                 "[OTR_LFCPhase4Scene] no writer ledger; skipping"
             )
             return (script_json or "{}", "no_ledger")
+
+        # G2 interlock (commit 12.14): refuse to re-run if Phase 4
+        # already executed via the main cascade. `force=True` opts
+        # the operator into a deliberate re-edit.
+        meta = led.data.get("meta") or {}
+        if not force and _PV.phase_already_ran_in_cascade(
+            meta, "phase_4_per_scene_coherence",
+        ):
+            log.info(
+                "[OTR_LFCPhase4Scene] phase 4 already ran via main "
+                "cascade; refusing re-run without force=True"
+            )
+            return (script_json or "{}", "already_ran_in_cascade")
 
         cache_entry = _OTRML.load_llm(model_id=model_id or DEFAULT_MODEL_ID)
         generate_fn = _OTRML.make_generate_fn(cache_entry)

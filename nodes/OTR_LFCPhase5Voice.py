@@ -48,6 +48,19 @@ class OTR_LFCPhase5Voice:
                         "lines and the LLM call is skipped."
                     ),
                 }),
+                "force": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "G1 + G2 interlock override (commit 12.14). "
+                        "When False (default), the node refuses to "
+                        "(a) re-run when Phase 5 already executed "
+                        "via the cascade, OR (b) run when Phase 3 "
+                        "polish hasn't run (missing prerequisite -- "
+                        "voice drift on un-polished text is the "
+                        "wrong scope). Set True to override both "
+                        "checks."
+                    ),
+                }),
                 "model_id": ("STRING", {
                     "default": DEFAULT_MODEL_ID,
                     "tooltip": (
@@ -67,6 +80,7 @@ class OTR_LFCPhase5Voice:
         self,
         script_json: str = "",
         enable: bool = False,
+        force: bool = False,
         model_id: str = DEFAULT_MODEL_ID,
     ):
         if not enable:
@@ -75,6 +89,7 @@ class OTR_LFCPhase5Voice:
         from . import _otr_model_loader as _OTRML
         from . import production_ledger as _PL
         from . import _otr_lfc_phase_5_voice_drift as _LFC_P5
+        from . import _otr_lfc_phase_verdicts as _PV
 
         peek = getattr(_PL, "peek_ledger", None)
         led = (peek() if callable(peek) else _PL.get_ledger())
@@ -83,6 +98,29 @@ class OTR_LFCPhase5Voice:
                 "[OTR_LFCPhase5Voice] no writer ledger; skipping"
             )
             return (script_json or "{}", "no_ledger")
+
+        # G1 + G2 interlocks (commit 12.14). force=True bypasses
+        # both. Order matters: check double-run BEFORE prerequisite
+        # so the operator sees the more-likely-relevant verdict
+        # first.
+        meta = led.data.get("meta") or {}
+        if not force and _PV.phase_already_ran_in_cascade(
+            meta, "phase_5_voice_drift",
+        ):
+            log.info(
+                "[OTR_LFCPhase5Voice] phase 5 already ran via main "
+                "cascade; refusing re-run without force=True"
+            )
+            return (script_json or "{}", "already_ran_in_cascade")
+        if not force and not _PV.prerequisite_phase_ran(
+            meta, "phase_3_per_line_polish",
+        ):
+            log.info(
+                "[OTR_LFCPhase5Voice] prerequisite phase_3_per_line_polish "
+                "did not run; refusing voice drift on un-polished "
+                "text without force=True"
+            )
+            return (script_json or "{}", "missing_prerequisite")
 
         cache_entry = _OTRML.load_llm(model_id=model_id or DEFAULT_MODEL_ID)
         generate_fn = _OTRML.make_generate_fn(cache_entry)

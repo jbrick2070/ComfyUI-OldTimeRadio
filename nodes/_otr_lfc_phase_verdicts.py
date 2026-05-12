@@ -51,6 +51,8 @@ __all__ = [
     "UNIVERSAL_VERDICTS",
     "INTERLOCK_VERDICTS",
     "PHASE_SPECIFIC_VERDICTS",
+    "phase_already_ran_in_cascade",
+    "prerequisite_phase_ran",
 ]
 
 
@@ -112,3 +114,56 @@ PhaseVerdict = Literal[
 ALL_PHASE_VERDICTS: frozenset[str] = (
     UNIVERSAL_VERDICTS | INTERLOCK_VERDICTS | PHASE_SPECIFIC_VERDICTS
 )
+
+
+# ---------------------------------------------------------------------------
+# Interlock helpers (G1 + G2 -- commit 12.14)
+# ---------------------------------------------------------------------------
+
+
+def phase_already_ran_in_cascade(meta: dict, phase_name: str) -> bool:
+    """True if `phase_name` already has a real (non-skipped) record
+    in the cascade's bucket lists.
+
+    A phase-record is "real" when it was NOT stamped via
+    `_stamp_stub_or_skipped_phase` with a `stub_bypassed` /
+    `terminal_skipped` / `enable_false` reason. The G1 + G2
+    interlock should NOT fire on a cascade run that left the
+    corresponding widget OFF -- the standalone node's whole
+    purpose is to fill that gap.
+    """
+    if not isinstance(meta, dict):
+        return False
+    skip_reasons = (
+        "stub_bypassed", "terminal_skipped", "enable_false",
+    )
+    for bucket_key in ("audit_passes", "cleanup_passes", "readiness_passes"):
+        bucket = meta.get(bucket_key)
+        if not isinstance(bucket, list):
+            continue
+        for rec in bucket:
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("phase_name") != phase_name:
+                continue
+            failures = rec.get("failures") or []
+            was_skipped = any(
+                isinstance(f, dict)
+                and any(r in (f.get("reason") or "") for r in skip_reasons)
+                for f in failures
+            )
+            if not was_skipped:
+                return True
+    return False
+
+
+def prerequisite_phase_ran(meta: dict, prereq_phase_name: str) -> bool:
+    """True if the named prerequisite phase ran cleanly (non-skipped)
+    in the cascade. Used by Phase 5 / Phase 6 standalone nodes to
+    refuse running on a raw writer ledger.
+
+    Same skip-detection rules as `phase_already_ran_in_cascade` --
+    the prerequisite must have been a REAL run, not a stub /
+    terminal-skip / enable=False record.
+    """
+    return phase_already_ran_in_cascade(meta, prereq_phase_name)
