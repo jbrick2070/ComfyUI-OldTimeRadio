@@ -25,6 +25,13 @@ Checks
      in its `type` / `class_type` field (D4 extension 12.17).
      Catches the case where a saved-but-stale workflow file still
      references a renamed class.
+  8. Workflow JSON: G5 invariant (commit 12.15). Cascade outputs
+     `freeze_verdict` (slot 4) and `estimated_minutes` (slot 3)
+     MUST have empty `links` lists, AND no `ShowText|pysssss`-typed
+     node may exist in the workflow. v2.0-alpha is a foundational
+     alpha; the core workflow must load on a clean ComfyUI install
+     with zero third-party UI-extension deps. Re-wiring the previews
+     in a future edit fails this check by design.
 
 Exit codes
   0   all checks passed.
@@ -325,6 +332,47 @@ def check_workflow_no_legacy_class_types(
         )
 
 
+def check_g5_preview_nodes_absent(wf: dict, errors: list, warnings: list) -> None:
+    """G5 (commit 12.15): pysssss ShowText preview nodes intentionally
+    removed. Cascade slot 3 (estimated_minutes) and slot 4 (freeze_verdict)
+    are expected to have no downstream links. Re-wiring them is a
+    portability regression -- the workflow must load on a clean ComfyUI
+    core install with no pysssss dependency.
+    """
+    cascade = _node(wf, CASCADE_NODE_ID)
+    outputs = cascade.get("outputs") or []
+
+    # Index by name so a future slot reorder doesn't silently break this.
+    by_name = {o.get("name"): o for o in outputs}
+
+    for slot_name in ("freeze_verdict", "estimated_minutes"):
+        out = by_name.get(slot_name)
+        if out is None:
+            errors.append(
+                f"G5: cascade missing expected output slot {slot_name!r}"
+            )
+            continue
+        links = out.get("links") or []
+        if links:
+            errors.append(
+                f"G5: cascade.{slot_name}.links should be empty post-G5 "
+                f"(commit 12.15 removed the pysssss preview wiring); "
+                f"got {links}. If a downstream consumer was added "
+                f"deliberately, update this check and the QA doc together."
+            )
+
+    # Hard fail on any pysssss class type creeping back into the workflow.
+    for node in wf.get("nodes") or []:
+        ctype = node.get("type", "") or ""
+        if "pysssss" in ctype.lower() or "ShowText|pysssss" in ctype:
+            errors.append(
+                f"G5: workflow JSON carries pysssss node "
+                f"(id={node.get('id')}, type={ctype!r}). Foundational "
+                f"alpha must load on core ComfyUI without third-party "
+                f"extensions."
+            )
+
+
 def check_last_link_id(wf: dict, errors: list, warnings: list) -> None:
     last_link = wf.get("last_link_id", 0)
     max_present = max(
@@ -351,6 +399,7 @@ def main(argv: list[str]) -> int:
     check_news_used_chain(wf, errors, warnings)
     check_last_link_id(wf, errors, warnings)
     check_workflow_no_legacy_class_types(errors, warnings)
+    check_g5_preview_nodes_absent(wf, errors, warnings)
 
     if warnings:
         for w in warnings:
@@ -369,7 +418,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     print(
-        f"[lfc_wiring_smoke] OK -- 7 checks passed "
+        f"[lfc_wiring_smoke] OK -- 8 checks passed "
         f"({len(warnings)} warning(s))"
     )
     return 0

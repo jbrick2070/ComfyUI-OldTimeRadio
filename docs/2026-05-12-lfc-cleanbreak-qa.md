@@ -253,8 +253,8 @@ bucket records by index?
 
 For the series to be accepted, both reviewers should agree:
 
-1. `scripts/lfc_wiring_smoke.py` exits 0 (7 checks pass, after the
-   12.17 hardening commit -- workflow-JSON class-type scan added).
+1. `scripts/lfc_wiring_smoke.py` exits 0 (8 checks pass, after the
+   12.17 hardening commit + the 12.20 G5 invariant check).
 2. `pytest tests/test_lfc_*.py tests/test_phase3_ledger_reviewer.py
    tests/test_workflow_json_guardrails.py tests/test_legacy_contract_retired.py`
    returns 452 passed / 5 skipped / 0 failed.
@@ -264,15 +264,23 @@ For the series to be accepted, both reviewers should agree:
 4. `grep -rn "OTR_LedgerScriptReviewer" nodes/ tests/ __init__.py`
    returns ZERO hits outside the allow-list (acceptance test file +
    smoke script + their pytest wrapper).
-5. Workflow JSON loads in ComfyUI Desktop without missing-node
-   warnings on a clean ComfyUI core install (no third-party UI
-   extensions installed). 12.15 dropped the pysssss previews;
-   cascade outputs `freeze_verdict` + `estimated_minutes` remain
-   on the cascade node (unwired) so operators with pysssss can
-   self-wire previews -- the core workflow no longer requires it.
-   The new 7th smoke check (12.17 `_scan_workflow_class_types`)
-   also verifies no saved workflow node carries a legacy
-   `type` / `class_type` string.
+5. Workflow JSON loads cleanly on a stock ComfyUI Desktop install
+   with zero third-party custom-node packs installed beyond
+   ComfyUI-OldTimeRadio itself. No missing-node placeholders.
+   This is the portability contract for a foundational alpha.
+   Two automated invariants gate it:
+     - 7th smoke check (12.17, `_scan_workflow_class_types`):
+       no saved workflow node carries a legacy `type` /
+       `class_type` string.
+     - 8th smoke check (12.20, `check_g5_preview_nodes_absent`):
+       cascade slot 3 (`estimated_minutes`) and slot 4
+       (`freeze_verdict`) MUST have empty `links` lists, AND no
+       node may carry a `ShowText|pysssss` (or any `pysssss`-named)
+       type. Re-wiring the previews in a future edit fails this
+       check by design.
+   The cascade output ports themselves remain on the node
+   (unwired) so operators who do install pysssss separately can
+   self-wire previews on their own workflow copy.
 6. `v2.0-alpha-cleanbreak` tag resolves to the **current HEAD**
    (`332f0e3` after the 12.12-12.18 follow-up series; the
    pre-existing `46322bd` tag predates the B1 BLOCKER fix and

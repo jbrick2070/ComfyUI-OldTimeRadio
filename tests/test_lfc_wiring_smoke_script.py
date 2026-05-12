@@ -64,6 +64,57 @@ def test_smoke_module_surface():
     assert "OTR_LedgerScriptReviewer" in smoke.WORKFLOW_LEGACY_CLASS_TYPES
 
 
+def test_g5_check_flags_planted_rewire(monkeypatch):
+    """Commit 12.20: the 8th smoke check (check_g5_preview_nodes_absent)
+    must surface a planted regression where the cascade slots are wired
+    back to a pysssss preview node. We plant a synthetic workflow dict
+    that mimics the pre-G5 wiring state and call the check function
+    directly so the test does not depend on writing files to disk."""
+    import importlib
+    smoke = importlib.import_module("lfc_wiring_smoke")
+
+    cascade = {
+        "id": smoke.CASCADE_NODE_ID,
+        "outputs": [
+            {"name": "script_text", "links": [1]},
+            {"name": "script_json", "links": [2]},
+            {"name": "news_used", "links": [110]},
+            {"name": "estimated_minutes", "links": [112]},  # PLANTED
+            {"name": "freeze_verdict", "links": [111]},      # PLANTED
+        ],
+    }
+    planted_wf = {
+        "nodes": [
+            cascade,
+            {"id": 63, "type": "ShowText|pysssss"},   # PLANTED
+            {"id": 64, "type": "ShowText|pysssss"},   # PLANTED
+        ],
+        "links": [],
+    }
+
+    errors: list = []
+    warnings: list = []
+    smoke.check_g5_preview_nodes_absent(planted_wf, errors, warnings)
+
+    # 4 errors expected: 2 for non-empty links + 2 for pysssss nodes.
+    joined = "\n".join(errors)
+    assert "freeze_verdict.links" in joined
+    assert "estimated_minutes.links" in joined
+    assert "pysssss node" in joined
+    assert len([e for e in errors if "G5:" in e]) >= 4
+
+
+def test_g5_check_passes_on_real_workflow():
+    """The check passes on the current workflow JSON (post-G5)."""
+    import importlib
+    smoke = importlib.import_module("lfc_wiring_smoke")
+    wf = smoke._load_workflow()
+    errors: list = []
+    warnings: list = []
+    smoke.check_g5_preview_nodes_absent(wf, errors, warnings)
+    assert errors == [], f"G5 check unexpectedly failed at HEAD: {errors}"
+
+
 def test_workflow_legacy_class_scan_catches_planted_node(tmp_path,
                                                           monkeypatch):
     """D4 extension (commit 12.17): plant a synthetic workflow file
