@@ -596,7 +596,64 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_meta_invariants(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g7_sfx_dur_invariant(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
+
+
+# G7 SFX duration bounds. Phase 0 collect / Phase 10 raise.
+SFX_DUR_MIN_S = 0.25
+SFX_DUR_MAX_S = 12.0
+
+
+def _check_g7_sfx_dur_invariant(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G7 invariant (voice-path-cleanbreak Sprint 3, 2026-05-12).
+
+    SFX lines may carry an optional ``dur_s`` field set by the writer's
+    outline (per-cue duration override; AudioGen + ProcSFX honor it at
+    render time). When present, ``dur_s`` MUST fall within
+    ``[SFX_DUR_MIN_S, SFX_DUR_MAX_S]`` -- the practical generation
+    range. Out-of-bounds values are a writer contract violation.
+
+    Skips when:
+      - the line is not sfx-role (only sfx lines get the per-cue dur_s
+        treatment; dialogue + announcer lines have dur_s populated
+        POST-render by Bark / Kokoro and the value is the rendered
+        clip duration, not a target)
+      - ``dur_s`` is absent / None (back-compat with older ledgers;
+        default_duration applies)
+      - ``dur_s`` is not numeric (already caught by per-line
+        type invariants)
+    """
+    lines = ledger_data.get("lines")
+    if not isinstance(lines, list):
+        return
+    bad: list[str] = []
+    for idx, line in enumerate(lines):
+        if not isinstance(line, dict):
+            continue
+        if line.get("speaker_role") != "sfx":
+            continue
+        dur = line.get("dur_s")
+        if dur is None:
+            continue
+        if not isinstance(dur, (int, float)):
+            continue
+        if dur < SFX_DUR_MIN_S or dur > SFX_DUR_MAX_S:
+            line_id = line.get("line_id") or f"<idx {idx}>"
+            bad.append(f"{line_id}={dur}")
+    if bad:
+        errors.append(
+            f"G7: {len(bad)} sfx line(s) have dur_s outside "
+            f"[{SFX_DUR_MIN_S}, {SFX_DUR_MAX_S}]: {', '.join(bad)} "
+            f"(writer outline contract violation; AudioGen + ProcSFX "
+            f"reject out-of-range cue durations)"
+        )
 
 
 def _coerce_ledger_data(led_or_data) -> dict:

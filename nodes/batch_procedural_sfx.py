@@ -143,6 +143,13 @@ class BatchProceduralSFX:
             sfx_items.append({
                 "line_id": line.get("line_id"),
                 "tag":     cue,
+                # Voice-path-cleanbreak Sprint 3 (2026-05-12): per-cue
+                # dur_s from the writer's outline. None when the outline
+                # doesn't emit a per-cue override; falls back to
+                # default_duration in the generator call below. G7
+                # invariant in the FreezeCascade has already validated
+                # bounds [0.25, 12.0].
+                "dur_s":   line.get("dur_s"),
             })
 
         if not sfx_items:
@@ -181,10 +188,23 @@ class BatchProceduralSFX:
             elif "boom" in tag or "thud" in tag: chosen_type = "explosion"
             elif "theremin" in tag or "eerie" in tag: chosen_type = "theremin"
 
-            batch_log.append(f"  [{i}] Tag: '{tag[:20]}' -> Procedural Model: '{chosen_type}'")
+            # Voice-path-cleanbreak Sprint 3: per-cue dur_s takes
+            # precedence over default_duration. Defensive clamp to the
+            # procedural-synth-friendly window even though G7 already
+            # validated [0.25, 12.0] at freeze time.
+            _cue_dur_s = sfx_item.get("dur_s")
+            if isinstance(_cue_dur_s, (int, float)) and _cue_dur_s > 0:
+                cue_duration = max(0.1, min(10.0, float(_cue_dur_s)))
+            else:
+                cue_duration = float(default_duration)
+
+            batch_log.append(
+                f"  [{i}] Tag: '{tag[:20]}' -> Procedural Model: "
+                f"'{chosen_type}' ({cue_duration:.2f}s)"
+            )
 
             generator = SFX_GENERATORS[chosen_type]
-            audio_np = generator(default_duration, SAMPLE_RATE)
+            audio_np = generator(cue_duration, SAMPLE_RATE)
 
             # Apply volume
             if volume_db != 0.0:

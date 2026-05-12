@@ -205,10 +205,14 @@ def test_audiogen_cache_hit_path(patched_audiogen_env):
     script_json = json.dumps(led_in)
 
     # Pre-seed cache so the sfx cue resolves to a hit.
+    # Voice-path-cleanbreak Sprint 3 (2026-05-12): per-cue dur_s on the
+    # stub SFX line is 0.8 (see tests/fixtures/ledger_stub.py). AudioGen
+    # now honors line.dur_s, so the cache prefix is built against 0.8 --
+    # not the default_duration=3.0 kwarg. Seed at the matching value.
     cache_path = _seed_cache_for_cue(
         patched_audiogen_env["cache_dir"],
         prompt="metal door slam",
-        duration=3.0,
+        duration=0.8,
         episode_seed="cache-hit-test",
     )
 

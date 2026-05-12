@@ -270,6 +270,12 @@ class BatchAudioGenGenerator:
             sfx_items.append({
                 "line_id": line.get("line_id"),
                 "text":    cue,
+                # Voice-path-cleanbreak Sprint 3 (2026-05-12): per-cue
+                # dur_s from the writer's outline. None when the outline
+                # doesn't emit a per-cue override; falls back to
+                # default_duration in the loop below. G7 invariant in
+                # the FreezeCascade has already validated the bounds.
+                "dur_s":   line.get("dur_s"),
             })
         sfx_tags = [item["text"] for item in sfx_items]
 
@@ -280,17 +286,25 @@ class BatchAudioGenGenerator:
         batch_log.append(f"Found {len(sfx_tags)} SFX cues in ledger.")
 
         # 2. Match tags to plan prompts
-        # BUG-LOCAL-116 fix 2026-04-30: honor Director's sfx_plan[i].dur_s
-        # (or .duration_sec / .duration) instead of always using default.
-        # The Director plans per-cue durations to fit narrative beats;
-        # ignoring them was producing a 3.0s render of every SFX even
-        # when the cue was a short sting. Combined with the output-shape
-        # bug, the cache_key collision meant short/long stings shared
-        # cache files. Both fixed here.
+        # BUG-LOCAL-116 fix 2026-04-30: honor per-cue dur_s instead of
+        # always using default. Originally the Director plan emitted
+        # sfx_plan[i].dur_s; voice-path-cleanbreak Sprint 3 (2026-05-12)
+        # moved the per-cue override into the L3 ledger (line.dur_s).
+        # The legacy sfx_plan branch is dead post-P2 but kept here as a
+        # defensive secondary read for ledgers written before Sprint 3.
         render_queue = []
         for i, tag in enumerate(sfx_tags):
             prompt = tag
             duration = float(default_duration)
+
+            # Voice-path-cleanbreak Sprint 3: per-cue dur_s from the L3
+            # ledger line takes precedence over default_duration. G7
+            # invariant in the FreezeCascade has already validated the
+            # bounds [0.25, 12.0]; the defensive clamp below tightens
+            # to the AudioGen-specific generation window.
+            _cue_dur_s = sfx_items[i].get("dur_s") if i < len(sfx_items) else None
+            if isinstance(_cue_dur_s, (int, float)) and _cue_dur_s > 0:
+                duration = max(0.5, min(10.0, float(_cue_dur_s)))
 
             # Try to match to sfx_plan by order or description
             if i < len(sfx_plan):
