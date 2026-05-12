@@ -34,8 +34,8 @@
         "balanced",
         "Standard",
         false,
-        0.0,
-        1.0,
+        0.05,
+        1.03,
         200,
         false
       ],
