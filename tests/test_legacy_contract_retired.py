@@ -53,6 +53,10 @@ _ALLOWED_FILES = {
     # The cascade-orchestrator test asserts the legacy module is
     # dead; it must reference the legacy name to do so.
     "tests/test_lfc_freeze_cascade_orchestrator.py",
+    # The smoke-script + its wrapper hold the canonical legacy-token
+    # list -- they're the CI gate for the clean-break invariant.
+    "tests/test_lfc_wiring_smoke_script.py",
+    "scripts/lfc_wiring_smoke.py",
     "docs/2026-05-11-multi-turn-polish-adr.md",
     "docs/2026-05-11-multi-turn-polish-problem-statement.md",
     "docs/2026-05-11-lfc-go-forward-qa.md",
@@ -160,10 +164,12 @@ def test_allowed_files_set_intact():
     """
     assert isinstance(_ALLOWED_FILES, set)
     assert "tests/test_legacy_contract_retired.py" in _ALLOWED_FILES
-    # Allow-list stays small. If it grows past ~10 entries something
+    # Allow-list stays small. If it grows past ~20 entries something
     # is off -- the cascade should not be tolerating new references
-    # except for docs and the acceptance test itself.
-    assert len(_ALLOWED_FILES) <= 10
+    # except for docs, the acceptance test, the legacy-class-dead
+    # assertion test, and the wiring-smoke script + its pytest
+    # wrapper.
+    assert len(_ALLOWED_FILES) <= 20
 
 
 def _scan_for_arbitrary_token(token: str):
