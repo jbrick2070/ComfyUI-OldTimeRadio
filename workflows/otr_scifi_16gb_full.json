@@ -120,7 +120,6 @@
             4,
             13,
             17,
-            21,
             26,
             38
           ],
@@ -567,7 +566,7 @@
       "mode": 0,
       "inputs": [
         {
-          "name": "production_plan_json",
+          "name": "script_json",
           "type": "STRING",
           "link": 21,
           "widget": {
@@ -2049,7 +2048,8 @@
             12,
             16,
             19,
-            24
+            24,
+            21
           ],
           "slot_index": 1
         },
@@ -2188,8 +2188,8 @@
     ],
     [
       21,
-      2,
-      0,
+      62,
+      1,
       14,
       0,
       "STRING"

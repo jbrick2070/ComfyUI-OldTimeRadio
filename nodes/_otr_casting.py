@@ -638,6 +638,10 @@ def lock_cast(
     # (bm_/bf_) and cannot collide with the Bark pool by construction.
     # The check covers LEMMY (Bark) + all open-character Bark voices.
     _assert_unique_bark_voices(cast)
+    # Gate 1 (voice-path-cleanbreak): every non-ANNOUNCER row carries a
+    # non-empty v2/* voice_preset. Earliest of three gates; Gate 2 lives
+    # in FreezeCascade Phase 0 G6, Gate 3 in BatchBarkGenerator.
+    _assert_voice_preset_invariant(cast)
 
     meta = {
         "lemmy_hit":              lemmy_hit,
@@ -646,6 +650,58 @@ def lock_cast(
         "num_characters_locked":  len(cast) - 1,  # minus ANNOUNCER
     }
     return cast, meta
+
+
+def _assert_voice_preset_invariant(cast: List[dict]) -> None:
+    """Gate 1 (writer cast-lock exit) -- the earliest of three gates
+    enforcing the cast.voice_preset contract for the voice-path-cleanbreak.
+
+    Every non-ANNOUNCER cast row must carry a non-empty ``voice_preset``
+    starting with ``v2/`` (the Bark preset namespace). ANNOUNCER is
+    intentionally excluded because it lives in the Kokoro namespace
+    (``bm_*`` / ``bf_*``) by construction.
+
+    Empty / None / non-v2 preset on a Bark row indicates a writer
+    contract violation. Today the pre-filter + cast LLM + reroll chain
+    already guarantees well-formed v2 presets on every open slot, and
+    pre-locked rows (LEMMY) carry hardcoded v2 ids. This assertion
+    catches a future refactor that breaks any of those guarantees and
+    surfaces the failure at the writer rather than letting an empty
+    preset propagate to the voice nodes (Gate 3) or to the freeze
+    cascade G6 interlock (Gate 2).
+    """
+    missing: list[str] = []
+    bad: list[str] = []
+    for row in cast or []:
+        if not isinstance(row, dict):
+            continue
+        if row.get("name") == "ANNOUNCER":
+            continue
+        char_id = row.get("char_id") or "<no char_id>"
+        preset = row.get("voice_preset")
+        if not preset:
+            missing.append(char_id)
+        elif not str(preset).startswith("v2/"):
+            bad.append(f"{char_id}={preset}")
+    if not missing and not bad:
+        return
+    msg_parts: list[str] = []
+    if missing:
+        msg_parts.append(
+            f"empty voice_preset on {len(missing)} row(s): {', '.join(missing)}"
+        )
+    if bad:
+        msg_parts.append(
+            f"non-v2/* voice_preset on {len(bad)} row(s): {', '.join(bad)}"
+        )
+    raise CastingFailedError(
+        attempts=[(
+            "",
+            f"GATE 1 (writer cast-lock exit) FAILED: {'; '.join(msg_parts)}. "
+            "Bark requires v2/* presets on every non-ANNOUNCER cast row.",
+        )],
+        name="<lock_cast voice_preset invariant>",
+    )
 
 
 def _assert_unique_bark_voices(cast: List[dict]) -> None:
@@ -689,6 +745,7 @@ __all__ = [
     "CastingResponse",
     "CastingFailedError",
     "_assert_unique_bark_voices",
+    "_assert_voice_preset_invariant",
     "CastSlot",
     "assemble_pre_locked_rows",
     "cast_one_character",

@@ -2,31 +2,45 @@
 MusicGen Theme - dedicated instrumental music bus for opening, closing, and
 act-break interstitial cues.
 
-Replaces the previous "no music at all" hole in the OTR pipeline. Reads the
-three fixed music cues out of production_plan_json (written by LLMDirector,
-one tailored prompt per episode), generates them via transformers' native
-MusicGen-medium (facebook/musicgen-medium), and emits three AUDIO tensors that
-feed straight into EpisodeAssembler's opening_theme_audio and
-closing_theme_audio inputs, plus an interstitial clip for future act-break use.
+Reads style + mood signal directly from the L3 ledger (the post-freeze
+script_json emitted by OTR_LedgerFreezeCascade) and synthesizes three
+era-neutral cue prompts via a deterministic palette + mood overlay. No
+LLM call, no Director-derived plan, no period defaults. Generates the
+audio via transformers' native MusicGen-medium and emits three AUDIO
+tensors that feed straight into EpisodeAssembler's opening_theme_audio
+and closing_theme_audio inputs plus an interstitial clip for act-break
+use.
 
-Design notes (see ROADMAP v1.4 Theme A):
+Data source contract:
+  - script_json -> L3 ledger dict (parsed via _otr_ledger_consumers.load_ledger)
+  - style       -> ledger.meta.gen_params_initial.style (snake_case slug)
+  - mood signal -> ledger.meta.news.script_brief (when present)
+  - episode_seed widget overrides ledger.meta.gen_params_initial.seed
+    for cache key construction
+
+Design notes:
   - NO audiocraft dependency. Uses transformers.MusicgenForConditionalGeneration
     and AutoProcessor - both already installed in the OTR venv via the main
-    transformers package. Clean install, no MSVC, no spacy pin, no av conflict.
-  - Per-episode caching. Each (prompt, duration) pair is SHA-256 hashed to a
-    .wav filename under models/musicgen_cache/. If the cache file exists the
-    model is never loaded. Same episode -> same music, deterministic.
+    transformers package.
+  - Per-episode caching. Each (prompt, duration, seed) tuple is SHA-256
+    hashed to a .wav filename under the per-episode workspace dir. If the
+    cache file exists the model is never loaded. Same episode -> same
+    music, deterministic.
   - Sequential VRAM discipline. Model loads only if at least one cue is
     uncached. After generation it is explicitly unloaded and cuda cache is
     flushed, so Bark has its full VRAM window when BatchBark runs next.
   - musicgen-medium is ~6 GB VRAM - fits cleanly inside the 14.5 GB ceiling
-    once the LLM has been unloaded (which happens automatically at the
-    LLMDirector exit, before this node runs).
+    once the LLM has been unloaded.
   - 32 kHz native sample rate, mono. SceneSequencer output is 48 kHz - the
     EpisodeAssembler downstream already handles rate matching, so we leave
     the 32 kHz rate intact in the returned AUDIO dict.
 
-Jeffrey Brick - v1.4 Theme A
+Style palette and mood tags are deliberately era-neutral. No "1940s",
+"vintage", "old time radio", or other period anchors. The writer's
+style slug owns the visual / aural register; this module renders music
+to match.
+
+Jeffrey Brick - voice-path-cleanbreak 2026-05-12
 """
 
 import gc
@@ -45,33 +59,119 @@ from ._vram_log import force_vram_offload
 log = logging.getLogger("OTR")
 
 
-# Fixed cue ids the Director is instructed to emit. If any are missing from
-# the production plan we fall back to sensible defaults so the pipeline never
-# breaks on a malformed plan.
+# Three fixed cues. Durations are part of the cache identity, so changing
+# them invalidates every cached wav on disk. Keep stable.
 CUE_IDS = ["opening", "closing", "interstitial"]
-CUE_DEFAULTS = {
-    "opening": {
-        "duration_sec": 12,
-        "generation_prompt": (
-            "1940s old time radio opening theme, warm brass fanfare, upright bass, "
-            "snare brushes, mono AM radio character, tube saturation, confident and "
-            "mysterious, ends on a held chord"
-        ),
+CUE_DURATIONS = {"opening": 12, "closing": 8, "interstitial": 4}
+
+# Universal suffix appended to every MusicGen prompt. MusicGen-medium can
+# drift into vocal-like artefacts; this steers it back to instrumental.
+# Applied AFTER mood overlay so it always lands last.
+_PROMPT_TAIL = ", instrumental only, no dialogue, no vocals"
+
+# Single source of truth for music cue prompts. One entry per active
+# writer style slug (matches OTR_LedgerScriptWriter._STYLE_PICKER_SEED_POOL).
+# Era-neutral by directive - no "1940s", "vintage", "old time radio",
+# "warm brass", "upright bass" anchors. Unknown slug is a hard fail; no
+# default palette survives.
+_STYLE_PALETTE: dict[str, dict[str, str]] = {
+    "closed_room_suspense": {
+        "opening":      "slow muted strings, low piano cluster, sparse texture, "
+                        "rising tension on a single chord",
+        "closing":      "diminished chord fade, slow exhale of low woodwind, "
+                        "resolves to silence",
+        "interstitial": "single sustained bass note, room tone bed, "
+                        "minimal percussion, brief and unresolved",
     },
-    "closing": {
-        "duration_sec": 8,
-        "generation_prompt": (
-            "1940s old time radio closing sting, brass and strings, resolving cadence, "
-            "warm tube saturation, fades to silence"
-        ),
+    "detective_case_file": {
+        "opening":      "methodical minor piano motif, walking double bass, "
+                        "soft brushed snare, procedural and unhurried",
+        "closing":      "piano cadence resolving down a minor third, "
+                        "single cymbal bell tap, settles cleanly",
+        "interstitial": "short walking bass figure, two-bar minor piano "
+                        "phrase, professional and brief",
     },
-    "interstitial": {
-        "duration_sec": 4,
-        "generation_prompt": (
-            "short old time radio act-break stinger, single brass hit with cymbal "
-            "swell, mono, tube warmth"
-        ),
+    "pulp_serial_cliffhanger": {
+        "opening":      "bold orchestral brass theme, full strings, "
+                        "rolling timpani, theatrical and dramatic, "
+                        "ends on a held suspended chord",
+        "closing":      "orchestral hit, dramatic crescendo into snare "
+                        "roll, resolves on a held major chord",
+        "interstitial": "brass stab, quick timpani roll, single "
+                        "high cymbal accent",
     },
+    "mission_control_procedural": {
+        "opening":      "clean synth pulse, instrument-panel beep accents, "
+                        "tight arpeggiated bass, calm institutional energy",
+        "closing":      "descending synth bleeps, soft pad release, "
+                        "console-shutdown texture",
+        "interstitial": "single synth bleep sequence, quiet hum bed, "
+                        "very short",
+    },
+    "deep_space_distress_call": {
+        "opening":      "modal synthesizer pad, distant pulsing beacon, "
+                        "sub-bass swell, isolated and vast, slow build",
+        "closing":      "isolated low pad, signal dropout, granular "
+                        "static decay into silence",
+        "interstitial": "single sustained tone, faint radio interference, "
+                        "brief and dimensional",
+    },
+    "noir_interrogation": {
+        "opening":      "muted solo trumpet, low double bass walk, "
+                        "smoky tenor saxophone, dim and atmospheric",
+        "closing":      "muted trumpet fade, low bass note hold, "
+                        "single piano chord trailing off",
+        "interstitial": "single muted trumpet phrase, sparse bass, "
+                        "smoky and short",
+    },
+    "small_town_uncanny": {
+        "opening":      "diffuse string pad, muted bell tone, slow harmonic "
+                        "drift, quiet wrongness in the mid register",
+        "closing":      "soft string fade, single high bell strike, "
+                        "decay into ambient hush",
+        "interstitial": "single muted bell, faint string pad, brief and "
+                        "off-balance",
+    },
+    "radio_newsroom_emergency": {
+        "opening":      "urgent ticker percussion, telegraph rhythm pattern, "
+                        "tight low brass pulse, motion and momentum",
+        "closing":      "decisive low brass figure, snare hit, fast cadence "
+                        "to a resolving chord",
+        "interstitial": "short telegraph rhythm, single brass accent, "
+                        "newsroom urgency",
+    },
+    "haunted_broadcast_signal": {
+        "opening":      "degraded signal artefacts, ghostly choir-like synth pad, "
+                        "granular static texture, distant and unstable",
+        "closing":      "pad decay through layered static, fading into "
+                        "noise floor and silence",
+        "interstitial": "short granular swell, signal flutter, brief "
+                        "ghosted texture",
+    },
+    "laboratory_containment": {
+        "opening":      "sterile electronic tone, precise arpeggio, "
+                        "high pure sine layer, clean and isolated",
+        "closing":      "tone descends to a held low frequency, single "
+                        "click, controlled fade",
+        "interstitial": "short electronic pulse sequence, sterile and "
+                        "precise",
+    },
+}
+
+# Light mood overlay mined from meta.news.script_brief. Keyword scan,
+# no LLM. Tags concatenate to the cue prompt as a comma-prefixed suffix.
+# Keywords are checked case-insensitively against the brief.
+_MOOD_TAGS: dict[str, str] = {
+    "betrayal":   "minor mode, unresolved tension",
+    "discovery":  "rising figure, slight upward motion",
+    "loss":       "subdued, slow decay",
+    "urgent":     "tighter rhythm, percussive accents",
+    "isolation":  "sparse texture, wide stereo field",
+    "danger":     "building tension, dissonant cluster",
+    "mystery":    "harmonic ambiguity, slow modulation",
+    "triumph":    "resolving cadence, brighter register",
+    "conflict":   "rhythmic accents, opposing voices",
+    "silence":    "minimal density, long pauses",
 }
 
 MUSICGEN_MODEL_ID = "facebook/musicgen-medium"
@@ -257,19 +357,44 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
             pass
 
 
-def _resolve_cue(cue_id: str, music_plan: list) -> tuple[str, int]:
-    """Pull the matching cue dict out of the plan, falling back to defaults
-    for any missing field."""
-    defaults = CUE_DEFAULTS[cue_id]
-    for entry in music_plan or []:
-        if (entry.get("cue_id") or "").strip().lower() == cue_id:
-            prompt = (entry.get("generation_prompt") or "").strip() or defaults["generation_prompt"]
-            try:
-                duration = int(entry.get("duration_sec") or defaults["duration_sec"])
-            except (TypeError, ValueError):
-                duration = defaults["duration_sec"]
-            return prompt, duration
-    return defaults["generation_prompt"], defaults["duration_sec"]
+def _mood_suffix(script_brief: str) -> str:
+    """Mine mood tags from the news script_brief. Returns a comma-prefixed
+    suffix (e.g. ``", minor mode, unresolved tension"``) or an empty
+    string if no mood keyword matches. Case-insensitive substring match.
+    """
+    if not script_brief:
+        return ""
+    low = script_brief.lower()
+    tags: list[str] = []
+    seen: set[str] = set()
+    for keyword, tag in _MOOD_TAGS.items():
+        if keyword in low and tag not in seen:
+            tags.append(tag)
+            seen.add(tag)
+    return (", " + ", ".join(tags)) if tags else ""
+
+
+def _resolve_cue_from_style(cue_id: str, style: str,
+                            mood_suffix: str) -> tuple[str, int]:
+    """Resolve a single cue from the style palette.
+
+    Returns (prompt, duration_sec). Loud-fails on unknown style slug -
+    no default palette, no fallback. The writer's gen_params_initial.style
+    is the canonical source; an unknown value indicates a writer-side or
+    palette-coverage bug that must be fixed, not papered over.
+    """
+    palette = _STYLE_PALETTE.get(style)
+    if palette is None:
+        known = ", ".join(sorted(_STYLE_PALETTE.keys()))
+        raise ValueError(
+            f"MusicGenTheme: unknown style slug {style!r}. "
+            f"Add an entry to _STYLE_PALETTE. Known slugs: {known}"
+        )
+    base_prompt = palette[cue_id]
+    return (
+        f"{base_prompt}{mood_suffix}{_PROMPT_TAIL}",
+        CUE_DURATIONS[cue_id],
+    )
 
 
 def _silent_audio_dict(sample_rate: int = MUSICGEN_SAMPLE_RATE) -> dict:
@@ -280,12 +405,14 @@ def _silent_audio_dict(sample_rate: int = MUSICGEN_SAMPLE_RATE) -> dict:
 
 
 class MusicGenTheme:
-    """OTR v1.4 - instrumental music generator for opening, closing, and
-    act-break interstitial cues.
+    """Instrumental music generator for opening, closing, and act-break
+    interstitial cues.
 
-    Reads the three music cues written by LLMDirector into
-    production_plan_json, generates any cue that isn't already in the
-    per-episode cache, and returns three AUDIO tensors ready to wire into
+    Reads style + mood signal from the L3 ledger
+    (OTR_LedgerFreezeCascade.script_json) and synthesizes three
+    deterministic cue prompts via _STYLE_PALETTE + _MOOD_TAGS. No LLM
+    call, no Director plan. Generates any cue that isn't already in the
+    per-episode cache and returns three AUDIO tensors ready to wire into
     EpisodeAssembler.
     """
 
@@ -298,16 +425,25 @@ class MusicGenTheme:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "production_plan_json": ("STRING", {
+                "script_json": ("STRING", {
                     "multiline": True,
                     "default": "{}",
-                    "tooltip": "Production plan JSON from LLMDirector. music_plan key is read.",
+                    "forceInput": True,
+                    "tooltip": (
+                        "L3 ledger JSON from OTR_LedgerFreezeCascade. "
+                        "Reads meta.gen_params_initial.style for the "
+                        "music palette and meta.news.script_brief for "
+                        "mood overlay."
+                    ),
                 }),
             },
             "optional": {
                 "episode_seed": ("STRING", {
                     "default": "",
-                    "tooltip": "Episode seed string. Becomes part of the cache key so re-runs of the same episode reuse the same music.",
+                    "tooltip": (
+                        "Cache key component. Leave empty to derive from "
+                        "ledger meta.gen_params_initial.seed."
+                    ),
                 }),
                 "model_id": ("STRING", {
                     "default": MUSICGEN_MODEL_ID,
@@ -320,30 +456,49 @@ class MusicGenTheme:
             },
         }
 
-    def render(self, production_plan_json, episode_seed="",
+    def render(self, script_json, episode_seed="",
                model_id=MUSICGEN_MODEL_ID, guidance_scale=3.0):
 
-        # [EMOJI] MANDATORY VRAM POWER WASH (Clean slate before start)
+        # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
 
-        try:
-            plan = json.loads(production_plan_json) if isinstance(production_plan_json, str) else production_plan_json
-        except Exception as exc:
-            log.error("[MusicGenTheme] production_plan_json parse failed: %s", exc)
-            plan = {}
+        # ---- L3 ledger reads (single source of truth) ----
+        from . import _otr_ledger_consumers as _OTRLC
+        led = _OTRLC.load_ledger(script_json)
+        meta = led.get("meta", {}) or {}
+        gen_params = meta.get("gen_params_initial", {}) or {}
 
-        music_plan = plan.get("music_plan", [])
+        style = (gen_params.get("style") or "").strip()
+        if not style:
+            raise ValueError(
+                "MusicGenTheme: meta.gen_params_initial.style missing "
+                "from ledger. Writer cast-lock contract violation - "
+                "every L3 ledger must stamp a style slug."
+            )
 
-        # Resolve all three cues from the plan (with fallback defaults).
-        cues = {}
+        news_meta = meta.get("news", {}) or {}
+        script_brief = (news_meta.get("script_brief") or "")
+        mood_suffix = _mood_suffix(script_brief)
+
+        if not episode_seed:
+            seed_from_ledger = gen_params.get("seed")
+            if seed_from_ledger is not None:
+                episode_seed = str(seed_from_ledger)
+
+        # ---- Resolve all three cues from the style palette ----
+        cues: dict[str, dict] = {}
         for cue_id in CUE_IDS:
-            prompt, duration = _resolve_cue(cue_id, music_plan)
+            prompt, duration = _resolve_cue_from_style(
+                cue_id, style, mood_suffix
+            )
             cues[cue_id] = {"prompt": prompt, "duration_sec": duration}
 
         cache_dir = _cache_dir()
         render_log = [
             "=== MusicGen Theme (medium) ===",
             f"cache dir: {cache_dir}",
+            f"style: {style}",
+            f"mood suffix: {mood_suffix or '<none>'}",
             f"episode seed: {episode_seed or '<none>'}",
         ]
 
