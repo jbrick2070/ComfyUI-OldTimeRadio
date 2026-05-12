@@ -188,6 +188,19 @@ class OTR_LedgerFreezeCascade:
                         "fires (per ADR section 6.1)."
                     ),
                 }),
+                "enable_phase_4_scene_coherence": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 4 -- per-scene coherence + audio-"
+                        "first directives. Iterates scenes (music_"
+                        "inter dividers) and runs a two-step LLM "
+                        "call per scene; edits cap = min(3, scene_"
+                        "lines // 2). Also caches meta.scene_synopses "
+                        "for Phase 6 (episode arc). Default OFF until "
+                        "soak validates the prompt + scene-boundary "
+                        "logic."
+                    ),
+                }),
                 "enable_phase_4_5_smart_suggestion": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
@@ -262,6 +275,7 @@ class OTR_LedgerFreezeCascade:
         model_id: str = DEFAULT_MODEL_ID,
         enable_phase_3_polish: bool = False,
         polish_announcer_beats: bool = False,
+        enable_phase_4_scene_coherence: bool = False,
         enable_phase_4_5_smart_suggestion: bool = False,
         enable_phase_5_voice_drift: bool = False,
         enable_phase_7_audio_readiness: bool = True,
@@ -339,6 +353,7 @@ class OTR_LedgerFreezeCascade:
             polish_generate_fn=polish_generate_fn,
             enable_phase_3_polish=enable_phase_3_polish,
             polish_announcer_beats=polish_announcer_beats,
+            enable_phase_4_scene_coherence=enable_phase_4_scene_coherence,
             enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
             enable_phase_5_voice_drift=enable_phase_5_voice_drift,
             enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,

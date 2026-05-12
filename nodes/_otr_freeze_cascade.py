@@ -417,14 +417,21 @@ def _phase_3_per_line_polish(
     return rep
 
 
-def _phase_4_per_scene_coherence_stub(generate_fn, led) -> None:
-    """Phase 4 no-op stub. Commit 8 wires in scene coherence.
-
-    B5 fix (commit 12.1): the stub itself only logs; the orchestrator
-    stamps a stub_bypassed record on meta.cleanup_passes so
-    downstream telemetry / soak diagnostics see a contiguous
-    phase-record list with no gaps for stub phases."""
-    log.debug("[LFC:phase_4] stub -- per-scene coherence not yet wired")
+def _phase_4_per_scene_coherence(
+    generate_fn,
+    led,
+    *,
+    enable: bool = False,
+    formatter_generate_fn=None,
+):
+    """LFC Phase 4 caller. Wires into _otr_lfc_phase_4_scene_coherence
+    (LFC sprint commit 8, 2026-05-11)."""
+    from . import _otr_lfc_phase_4_scene_coherence as _LFC_P4  # type: ignore
+    return _LFC_P4.phase_4_scene_coherence(
+        generate_fn, led,
+        enable=enable,
+        formatter_generate_fn=formatter_generate_fn,
+    )
 
 
 def _phase_4_5_smart_suggestion(led, *, enable: bool = False, generate_fn=None):
@@ -527,6 +534,7 @@ def run_freeze_cascade(
     polish_announcer_beats: bool = False,
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
+    enable_phase_4_scene_coherence: bool = False,
     enable_phase_4_5_smart_suggestion: bool = False,
     enable_phase_5_voice_drift: bool = False,
     vram_ceiling_gb: float = 14.0,
@@ -713,13 +721,31 @@ def run_freeze_cascade(
         return disp
 
     # ---- Non-terminal path: Phase 4 / 4.5 / 5 / 6 / 7 / 8 / 10 ----
-    # B5: stubs stamp records with reason="stub_bypassed" so the
-    # cleanup_passes list stays contiguous.
-    _phase_4_per_scene_coherence_stub(generate_fn, led)
-    _stamp_stub_or_skipped_phase(
+    # Phase 4 per-scene coherence (LFC commit 8). Default OFF.
+    started_4 = _isoformat_utc_now()
+    hash_before_4 = _hash_lines_text(ledger_data)
+    p4_report = _phase_4_per_scene_coherence(
+        generate_fn, led,
+        enable=enable_phase_4_scene_coherence,
+    )
+    hash_after_4 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
         ledger_data,
         phase_name="phase_4_per_scene_coherence",
-        reason="stub_bypassed",
+        text_hash_before=hash_before_4,
+        text_hash_after=hash_after_4,
+        started_at=started_4,
+        finished_at=_isoformat_utc_now(),
+        edits_proposed=sum(
+            sr.get("edits_proposed", 0)
+            for sr in (
+                p4_report.scene_results if p4_report is not None else []
+            )
+        ),
+        edits_applied=(
+            p4_report.total_edits_applied
+            if p4_report is not None else 0
+        ),
     )
     # Phase 4.5 smart suggestion (LFC commit 11). Default OFF
     # per ADR section 6.17. When enabled, scans for SFX/music
