@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 62,
-  "last_link_id": 109,
+  "last_link_id": 110,
   "nodes": [
     {
       "id": 1,
@@ -2000,6 +2000,7 @@
       },
       "widgets_values": [
         "mistralai/Mistral-Nemo-Instruct-2407",
+        false,
         false,
         false,
         false,

@@ -224,6 +224,20 @@ class OTR_LedgerFreezeCascade:
                         "percent drift thresholds."
                     ),
                 }),
+                "enable_phase_6_episode_arc": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "LFC Phase 6 -- episode arc audit with "
+                        "Editor-note scaffold. Reads cached "
+                        "meta.scene_synopses from Phase 4 (or "
+                        "falls back to outline intents) and runs "
+                        "ONE two-step LLM call that emits Editor "
+                        "notes scoped per-scene / speaker / "
+                        "episode. Edit cap = min(8, max(3, "
+                        "voiced_beats // 3)) -- shared pool with "
+                        "the reviewer's Doctor. Default OFF."
+                    ),
+                }),
                 "enable_phase_7_audio_readiness": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
@@ -278,6 +292,7 @@ class OTR_LedgerFreezeCascade:
         enable_phase_4_scene_coherence: bool = False,
         enable_phase_4_5_smart_suggestion: bool = False,
         enable_phase_5_voice_drift: bool = False,
+        enable_phase_6_episode_arc: bool = False,
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
         vram_ceiling_gb: float = 14.0,
@@ -356,6 +371,7 @@ class OTR_LedgerFreezeCascade:
             enable_phase_4_scene_coherence=enable_phase_4_scene_coherence,
             enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
             enable_phase_5_voice_drift=enable_phase_5_voice_drift,
+            enable_phase_6_episode_arc=enable_phase_6_episode_arc,
             enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
             enable_phase_8_video_readiness=enable_phase_8_video_readiness,
             vram_ceiling_gb=float(vram_ceiling_gb),

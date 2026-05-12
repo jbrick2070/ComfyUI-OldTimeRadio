@@ -459,11 +459,21 @@ def _phase_5_voice_drift(
     )
 
 
-def _phase_6_episode_arc_stub(generate_fn, led) -> None:
-    """Phase 6 no-op stub. Commit 10 wires in episode arc audit.
-
-    B5 fix (commit 12.1): see phase 4 stub note."""
-    log.debug("[LFC:phase_6] stub -- episode arc not yet wired")
+def _phase_6_episode_arc(
+    generate_fn,
+    led,
+    *,
+    enable: bool = False,
+    formatter_generate_fn=None,
+):
+    """LFC Phase 6 caller. Wires into _otr_lfc_phase_6_episode_arc
+    (LFC sprint commit 10, 2026-05-11)."""
+    from . import _otr_lfc_phase_6_episode_arc as _LFC_P6  # type: ignore
+    return _LFC_P6.phase_6_episode_arc(
+        generate_fn, led,
+        enable=enable,
+        formatter_generate_fn=formatter_generate_fn,
+    )
 
 
 def _stamp_stub_or_skipped_phase(
@@ -537,6 +547,7 @@ def run_freeze_cascade(
     enable_phase_4_scene_coherence: bool = False,
     enable_phase_4_5_smart_suggestion: bool = False,
     enable_phase_5_voice_drift: bool = False,
+    enable_phase_6_episode_arc: bool = False,
     vram_ceiling_gb: float = 14.0,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
@@ -796,11 +807,27 @@ def run_freeze_cascade(
             p5_report.edits_applied if p5_report is not None else 0
         ),
     )
-    _phase_6_episode_arc_stub(generate_fn, led)
-    _stamp_stub_or_skipped_phase(
+    # Phase 6 episode arc (LFC commit 10). Default OFF.
+    started_6 = _isoformat_utc_now()
+    hash_before_6 = _hash_lines_text(ledger_data)
+    p6_report = _phase_6_episode_arc(
+        generate_fn, led,
+        enable=enable_phase_6_episode_arc,
+    )
+    hash_after_6 = _hash_lines_text(ledger_data)
+    _stamp_phase_record(
         ledger_data,
         phase_name="phase_6_episode_arc",
-        reason="stub_bypassed",
+        text_hash_before=hash_before_6,
+        text_hash_after=hash_after_6,
+        started_at=started_6,
+        finished_at=_isoformat_utc_now(),
+        edits_proposed=(
+            p6_report.edits_proposed if p6_report is not None else 0
+        ),
+        edits_applied=(
+            p6_report.edits_applied if p6_report is not None else 0
+        ),
     )
 
     # Phase 7 / 8 -- deterministic readiness checks (LFC commit 5).

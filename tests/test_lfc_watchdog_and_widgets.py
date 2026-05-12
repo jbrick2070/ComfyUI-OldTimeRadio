@@ -207,6 +207,7 @@ class TestCascadeWidgetSurface:
                   "enable_phase_4_scene_coherence",
                   "enable_phase_4_5_smart_suggestion",
                   "enable_phase_5_voice_drift",
+                  "enable_phase_6_episode_arc",
                   "enable_phase_7_audio_readiness",
                   "enable_phase_8_video_readiness"):
             assert k in opt, f"missing widget {k}"
@@ -268,13 +269,12 @@ class TestWorkflowJsonWidgetsValues:
                 return node
         pytest.fail("OTR_LedgerFreezeCascade node not found in workflow")
 
-    def test_workflow_node_has_nine_widget_values(self):
+    def test_workflow_node_has_ten_widget_values(self):
         node = self._cascade_node()
-        # model_id + 7 BOOLEAN + 1 FLOAT = 9 positional widgets.
-        # Phase 4 toggle landed in commit 8. Phase 6 toggle lands
-        # in commit 10.
+        # model_id + 8 BOOLEAN + 1 FLOAT = 10 positional widgets.
+        # All heavy LLM phase toggles landed.
         wv = node.get("widgets_values") or []
-        assert len(wv) == 9
+        assert len(wv) == 10
 
     def test_model_id_at_slot_0(self):
         node = self._cascade_node()
@@ -282,22 +282,20 @@ class TestWorkflowJsonWidgetsValues:
             "mistralai/Mistral-Nemo-Instruct-2407"
         )
 
-    def test_default_booleans_at_slots_1_thru_7(self):
+    def test_default_booleans_at_slots_1_thru_8(self):
         node = self._cascade_node()
         wv = node["widgets_values"]
-        # enable_phase_3_polish, polish_announcer_beats,
-        # enable_phase_4_scene_coherence,
-        # enable_phase_4_5_smart_suggestion,
-        # enable_phase_5_voice_drift all default OFF (False).
-        for i in (1, 2, 3, 4, 5):
+        # 6 BOOLEAN default OFF (Phase 3 / polish-announcer /
+        # Phase 4 / Phase 4.5 / Phase 5 / Phase 6).
+        for i in (1, 2, 3, 4, 5, 6):
             assert wv[i] is False, f"slot {i} expected False, got {wv[i]!r}"
         # enable_phase_7 / 8 default ON (True).
-        assert wv[6] is True
         assert wv[7] is True
+        assert wv[8] is True
 
-    def test_vram_ceiling_at_slot_8(self):
+    def test_vram_ceiling_at_slot_9(self):
         node = self._cascade_node()
-        assert node["widgets_values"][8] == 14.0
+        assert node["widgets_values"][9] == 14.0
 
     def test_output_socket_4_is_freeze_verdict(self):
         node = self._cascade_node()

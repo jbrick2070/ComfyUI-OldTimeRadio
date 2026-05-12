@@ -268,10 +268,11 @@ class TestB5CleanupPassesContiguous:
                 f"got {names}"
             )
 
-    def test_stub_phase_records_carry_stub_bypassed_reason(self):
-        # Phase 4 + 5 wiring landed in commits 8 + 9 -- they now stamp
-        # real records, not stub_bypassed. The remaining stub is
-        # phase_6 (lands in commit 10).
+    def test_no_stub_bypassed_phases_remaining(self):
+        # All three heavy LLM phases (4, 5, 6) landed in commits
+        # 8 / 9 / 10. Every cascade phase now stamps a REAL record
+        # -- no stub_bypassed failures should remain. This test
+        # pins that contract; any future stub regression fails it.
         led = _ledger([
             _line("l001", "character", "c01", "Hello there."),
         ])
@@ -280,17 +281,14 @@ class TestB5CleanupPassesContiguous:
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         passes = led.data["meta"]["cleanup_passes"]
-        for stub_name in (
-            "phase_6_episode_arc",
-        ):
-            stub_rec = next(
-                p for p in passes if p["phase_name"] == stub_name
-            )
-            failures = stub_rec.get("failures", [])
-            assert any(
-                "stub_bypassed" in (f.get("reason") or "")
-                for f in failures
-            ), f"missing stub_bypassed on {stub_name}"
+        stub_bypassed_records = []
+        for rec in passes:
+            for failure in rec.get("failures", []):
+                if "stub_bypassed" in (failure.get("reason") or ""):
+                    stub_bypassed_records.append(rec["phase_name"])
+        assert stub_bypassed_records == [], (
+            f"unexpected stub_bypassed records: {stub_bypassed_records}"
+        )
 
 
 # ---------------------------------------------------------------------------
