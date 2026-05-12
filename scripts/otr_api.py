@@ -2,7 +2,7 @@
 
 BUG-LOCAL-002 fix (2026-05-02). Replaces scripts/soak_operator.py and
 scripts/supersoaker.py, both of which carried stale `WV_*` positional
-widget indices that no longer matched the live OTR_LLMScriptWriter node
+widget indices that no longer matched the live OTR_LedgerScriptWriter node
 (`episode_title` and `num_characters` widgets were added later, shifting
 every downstream index off by 1-2 slots).
 

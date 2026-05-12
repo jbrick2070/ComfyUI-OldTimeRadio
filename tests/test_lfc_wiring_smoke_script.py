@@ -55,3 +55,47 @@ def test_smoke_module_surface():
     assert smoke.CASCADE_NODE_ID == 62
     assert "OTR_LedgerScriptReviewer" in smoke.LEGACY_TOKENS
     assert "OTR_Gemma4Director" in smoke.LEGACY_TOKENS
+    # D4 extension (commit 12.17): extended legacy class set.
+    assert "OTR_LLMScriptWriter" in smoke.LEGACY_TOKENS
+    assert "OTR_Gemma4ScriptWriter" in smoke.LEGACY_TOKENS
+    assert "_RENAME_ALIASES" in smoke.LEGACY_TOKENS
+    # Workflow-JSON class_type scan list exists + is non-empty.
+    assert len(smoke.WORKFLOW_LEGACY_CLASS_TYPES) >= 4
+    assert "OTR_LedgerScriptReviewer" in smoke.WORKFLOW_LEGACY_CLASS_TYPES
+
+
+def test_workflow_legacy_class_scan_catches_planted_node(tmp_path,
+                                                          monkeypatch):
+    """D4 extension (commit 12.17): plant a synthetic workflow file
+    with a legacy class_type and confirm the scanner surfaces it."""
+    import importlib
+    smoke = importlib.import_module("lfc_wiring_smoke")
+
+    # Point ROOT at a tmpdir containing a planted workflow file.
+    fake_root = tmp_path
+    wf_dir = fake_root / "workflows"
+    wf_dir.mkdir()
+    planted_ui = {
+        "nodes": [
+            {"id": 1, "type": "OTR_LedgerScriptReviewer"},
+            {"id": 2, "type": "OTR_LedgerScriptWriter"},  # current name
+        ],
+        "links": [],
+    }
+    (wf_dir / "planted_ui.json").write_text(
+        __import__("json").dumps(planted_ui), encoding="utf-8",
+    )
+    planted_api = {
+        "1": {"class_type": "OTR_LLMScriptWriter", "inputs": {}},
+    }
+    (wf_dir / "planted_api.json").write_text(
+        __import__("json").dumps(planted_api), encoding="utf-8",
+    )
+
+    monkeypatch.setattr(smoke, "ROOT", fake_root)
+    hits = smoke._scan_workflow_class_types()
+    hit_classes = {ctype for (_rel, _nid, _f, ctype) in hits}
+    assert "OTR_LedgerScriptReviewer" in hit_classes
+    assert "OTR_LLMScriptWriter" in hit_classes
+    # Current class name must NOT be flagged.
+    assert "OTR_LedgerScriptWriter" not in hit_classes

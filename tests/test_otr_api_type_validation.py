@@ -35,10 +35,10 @@ from otr_api import (  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Synthetic schemas used across tests. Mirrors the shape ComfyUI's
-# /object_info returns for OTR_LLMScriptWriter (subset).
+# /object_info returns for OTR_LedgerScriptWriter (subset).
 # ---------------------------------------------------------------------------
 SYNTH_SCHEMAS = {
-    "OTR_LLMScriptWriter": {
+    "OTR_LedgerScriptWriter": {
         "input": {
             "required": {
                 "episode_title": ("STRING", {"default": "", "multiline": False}),
@@ -73,16 +73,16 @@ SYNTH_SCHEMAS = {
 # ---------------------------------------------------------------------------
 class TestSpecFor:
     def test_required_widget_returns_spec(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "target_words", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "target_words", SYNTH_SCHEMAS)
         assert spec[0] == "INT"
 
     def test_optional_widget_returns_spec(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "custom_premise", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "custom_premise", SYNTH_SCHEMAS)
         assert spec[0] == "STRING"
 
     def test_unknown_widget_raises(self):
         with pytest.raises(KeyError):
-            _spec_for("OTR_LLMScriptWriter", "no_such_widget", SYNTH_SCHEMAS)
+            _spec_for("OTR_LedgerScriptWriter", "no_such_widget", SYNTH_SCHEMAS)
 
     def test_unknown_node_type_raises(self):
         with pytest.raises(KeyError):
@@ -94,46 +94,46 @@ class TestSpecFor:
 # ---------------------------------------------------------------------------
 class TestValidationHappyPaths:
     def test_int_accepts_int(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "target_words", SYNTH_SCHEMAS)
-        _validate_widget_value("OTR_LLMScriptWriter", "target_words", spec, 30)
-        _validate_widget_value("OTR_LLMScriptWriter", "target_words", spec, 350)
-        _validate_widget_value("OTR_LLMScriptWriter", "target_words", spec, 0)
+        spec = _spec_for("OTR_LedgerScriptWriter", "target_words", SYNTH_SCHEMAS)
+        _validate_widget_value("OTR_LedgerScriptWriter", "target_words", spec, 30)
+        _validate_widget_value("OTR_LedgerScriptWriter", "target_words", spec, 350)
+        _validate_widget_value("OTR_LedgerScriptWriter", "target_words", spec, 0)
 
     def test_string_accepts_str(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "episode_title", SYNTH_SCHEMAS)
-        _validate_widget_value("OTR_LLMScriptWriter", "episode_title", spec, "")
-        _validate_widget_value("OTR_LLMScriptWriter", "episode_title", spec, "Hello")
+        spec = _spec_for("OTR_LedgerScriptWriter", "episode_title", SYNTH_SCHEMAS)
+        _validate_widget_value("OTR_LedgerScriptWriter", "episode_title", spec, "")
+        _validate_widget_value("OTR_LedgerScriptWriter", "episode_title", spec, "Hello")
 
     def test_bool_accepts_bool(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "self_critique", SYNTH_SCHEMAS)
-        _validate_widget_value("OTR_LLMScriptWriter", "self_critique", spec, True)
-        _validate_widget_value("OTR_LLMScriptWriter", "self_critique", spec, False)
+        spec = _spec_for("OTR_LedgerScriptWriter", "self_critique", SYNTH_SCHEMAS)
+        _validate_widget_value("OTR_LedgerScriptWriter", "self_critique", spec, True)
+        _validate_widget_value("OTR_LedgerScriptWriter", "self_critique", spec, False)
 
     def test_float_accepts_int_or_float(self):
         spec = _spec_for(
-            "OTR_LLMScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
+            "OTR_LedgerScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
         )
         _validate_widget_value(
-            "OTR_LLMScriptWriter", "weight_multiplier", spec, 1.0
+            "OTR_LedgerScriptWriter", "weight_multiplier", spec, 1.0
         )
         _validate_widget_value(
-            "OTR_LLMScriptWriter", "weight_multiplier", spec, 1
+            "OTR_LedgerScriptWriter", "weight_multiplier", spec, 1
         )
 
     def test_combo_accepts_declared_choice(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "creativity", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "creativity", SYNTH_SCHEMAS)
         _validate_widget_value(
-            "OTR_LLMScriptWriter", "creativity", spec, "balanced"
+            "OTR_LedgerScriptWriter", "creativity", spec, "balanced"
         )
         _validate_widget_value(
-            "OTR_LLMScriptWriter", "creativity", spec, "maximum chaos"
+            "OTR_LedgerScriptWriter", "creativity", spec, "maximum chaos"
         )
 
     def test_none_is_permissive(self):
         for widget in ("target_words", "creativity", "self_critique",
                        "episode_title", "weight_multiplier"):
-            spec = _spec_for("OTR_LLMScriptWriter", widget, SYNTH_SCHEMAS)
-            _validate_widget_value("OTR_LLMScriptWriter", widget, spec, None)
+            spec = _spec_for("OTR_LedgerScriptWriter", widget, SYNTH_SCHEMAS)
+            _validate_widget_value("OTR_LedgerScriptWriter", widget, spec, None)
 
 
 # ---------------------------------------------------------------------------
@@ -141,91 +141,91 @@ class TestValidationHappyPaths:
 # ---------------------------------------------------------------------------
 class TestValidationRejections:
     def test_int_rejects_bool(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "target_words", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "target_words", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="INT"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "target_words", spec, True
+                "OTR_LedgerScriptWriter", "target_words", spec, True
             )
 
     def test_int_rejects_str(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "target_words", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "target_words", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="INT"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "target_words", spec, "30"
+                "OTR_LedgerScriptWriter", "target_words", spec, "30"
             )
 
     def test_int_rejects_float(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "target_words", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "target_words", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="INT"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "target_words", spec, 30.0
+                "OTR_LedgerScriptWriter", "target_words", spec, 30.0
             )
 
     def test_string_rejects_bool(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "episode_title", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "episode_title", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="STRING"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "episode_title", spec, True
+                "OTR_LedgerScriptWriter", "episode_title", spec, True
             )
 
     def test_string_rejects_int(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "episode_title", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "episode_title", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="STRING"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "episode_title", spec, 5
+                "OTR_LedgerScriptWriter", "episode_title", spec, 5
             )
 
     def test_bool_rejects_int(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "self_critique", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "self_critique", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="BOOL"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "self_critique", spec, 1
+                "OTR_LedgerScriptWriter", "self_critique", spec, 1
             )
 
     def test_bool_rejects_str(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "self_critique", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "self_critique", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="BOOL"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "self_critique", spec, "True"
+                "OTR_LedgerScriptWriter", "self_critique", spec, "True"
             )
 
     def test_float_rejects_bool(self):
         spec = _spec_for(
-            "OTR_LLMScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
+            "OTR_LedgerScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
         )
         with pytest.raises(ValueError, match="FLOAT"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "weight_multiplier", spec, True
+                "OTR_LedgerScriptWriter", "weight_multiplier", spec, True
             )
 
     def test_float_rejects_str(self):
         spec = _spec_for(
-            "OTR_LLMScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
+            "OTR_LedgerScriptWriter", "weight_multiplier", SYNTH_SCHEMAS
         )
         with pytest.raises(ValueError, match="FLOAT"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "weight_multiplier", spec, "1.0"
+                "OTR_LedgerScriptWriter", "weight_multiplier", spec, "1.0"
             )
 
     def test_combo_rejects_undeclared_choice(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "creativity", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "creativity", SYNTH_SCHEMAS)
         with pytest.raises(ValueError, match="COMBO"):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "creativity", spec, "absolute chaos"
+                "OTR_LedgerScriptWriter", "creativity", spec, "absolute chaos"
             )
 
     def test_combo_rejects_typo(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "creativity", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "creativity", SYNTH_SCHEMAS)
         with pytest.raises(ValueError):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "creativity", spec, "Balanced"  # capital B
+                "OTR_LedgerScriptWriter", "creativity", spec, "Balanced"  # capital B
             )
 
     def test_combo_rejects_int_index(self):
-        spec = _spec_for("OTR_LLMScriptWriter", "creativity", SYNTH_SCHEMAS)
+        spec = _spec_for("OTR_LedgerScriptWriter", "creativity", SYNTH_SCHEMAS)
         with pytest.raises(ValueError):
             _validate_widget_value(
-                "OTR_LLMScriptWriter", "creativity", spec, 1
+                "OTR_LedgerScriptWriter", "creativity", spec, 1
             )
 
 
@@ -238,7 +238,7 @@ def _minimal_workflow():
         "nodes": [
             {
                 "id": 1,
-                "type": "OTR_LLMScriptWriter",
+                "type": "OTR_LedgerScriptWriter",
                 "widgets_values": [
                     "",       # episode_title
                     350,      # target_words

@@ -181,7 +181,7 @@ def main() -> int:
     print("Loading + patching workflow...", flush=True)
     wf = load_workflow(WORKFLOW_PATH)
 
-    SCRIPT_WRITER_NODE_ID = 1  # OTR_LLMScriptWriter is node id 1 in this workflow
+    SCRIPT_WRITER_NODE_ID = 1  # OTR_LedgerScriptWriter is node id 1 in this workflow
     for widget_name, value in WIDGET_PATCHES.items():
         try:
             patch_widget_by_name(wf, SCRIPT_WRITER_NODE_ID, widget_name, value, schemas)

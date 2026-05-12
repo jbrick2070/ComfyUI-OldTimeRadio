@@ -692,7 +692,7 @@ class RTXUpscale:
 
         # ----------------------------------------------------------------
         # Spacesaver cleanup: read the ledger's perfect_run_spacesaver
-        # flag (stamped by OTR_LLMScriptWriter at workflow start). When
+        # flag (stamped by OTR_LedgerScriptWriter at workflow start). When
         # ON, wipe every per-episode intermediate file under
         # otr/episodes/<episode_id>/ EXCEPT the ledger json + the
         # treatment txt. The final upscaled mp4 already lives at

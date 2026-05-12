@@ -713,7 +713,7 @@ class OTRVideoPlan:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Style values matched to OTR_LLMScriptWriter dropdown
+        # Style values matched to OTR_LedgerScriptWriter dropdown
         style_choices = list(_ERA_TAIL_BY_STYLE.keys()) + ["(none)"]
         return {
             "required": {

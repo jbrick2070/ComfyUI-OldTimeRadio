@@ -17,7 +17,7 @@ Design intent:
       rule-based fallback, but a fresh node placed on the graph or
       a freshly-loaded workflow with an empty widget now defaults to
       real LLM polish instead of silently falling back.
-    - Choices match OTR_LLMScriptWriter exactly, so the same
+    - Choices match OTR_LedgerScriptWriter exactly, so the same
       canonical list drives both the audio-story and visual paths.
 
 Wiring pattern (typical):

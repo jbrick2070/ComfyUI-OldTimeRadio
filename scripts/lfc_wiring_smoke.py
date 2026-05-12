@@ -14,12 +14,17 @@ Checks
   3. Python: OTR_LedgerFreezeCascade.RETURN_NAMES matches the
      workflow JSON's outputs[].name order (C6).
   4. Repo source: no legacy class names (OTR_LedgerScriptReviewer,
-     OTR_Gemma4Director) appear in source files outside the
-     allow-list (clean-break step 7).
+     OTR_Gemma4Director, OTR_LLMScriptWriter, OTR_Gemma4ScriptWriter,
+     _RENAME_ALIASES) appear in source files outside the
+     allow-list (clean-break step 7, D4 extension 12.17).
   5. Workflow JSON: news_used link chain integrity --
      writer[2] -> cascade[2] -> SignalLostVideo[2].
      Pre-fix bypass link (writer -> SignalLostVideo direct) absent.
   6. Workflow JSON: last_link_id >= max link id present.
+  7. Workflow JSONs: no node carries a legacy class identifier
+     in its `type` / `class_type` field (D4 extension 12.17).
+     Catches the case where a saved-but-stale workflow file still
+     references a renamed class.
 
 Exit codes
   0   all checks passed.
@@ -64,9 +69,29 @@ EXPECTED_RETURN_NAMES = (
     "estimated_minutes", "freeze_verdict",
 )
 
-LEGACY_TOKENS = ("OTR_LedgerScriptReviewer", "OTR_Gemma4Director")
+LEGACY_TOKENS = (
+    "OTR_LedgerScriptReviewer",
+    "OTR_Gemma4Director",
+    # D4 extension (commit 12.17): broader legacy class name set.
+    "OTR_LLMScriptWriter",       # superseded by OTR_LedgerScriptWriter
+    "OTR_Gemma4ScriptWriter",    # defensive; not currently in tree
+    "_RENAME_ALIASES",            # legacy rename-alias dict removed in 12.3
+)
+
+# Workflow-JSON-only scan: catch saved-but-stale workflows whose
+# nodes still carry a renamed class id in the `type` / `class_type`
+# field. Source-code scan above misses these because the strings live
+# inside workflow JSON, not Python.
+WORKFLOW_LEGACY_CLASS_TYPES = (
+    "OTR_LedgerScriptReviewer",
+    "OTR_Gemma4Director",
+    "OTR_LLMScriptWriter",
+    "OTR_Gemma4ScriptWriter",
+    "OTR_LegacyScriptWriter",
+)
 
 SCAN_DIRS = ("nodes", "tests", "otr_v2", "visual", "scripts")
+WORKFLOW_DIRS = ("workflows",)
 
 LEGACY_ALLOW_FILES = {
     "tests/test_legacy_contract_retired.py",
@@ -244,6 +269,62 @@ def check_news_used_chain(wf: dict, errors: list, warnings: list) -> None:
         )
 
 
+def _scan_workflow_class_types() -> list[tuple[str, int, str, str]]:
+    """Walk every workflow JSON under WORKFLOW_DIRS, surface any node
+    whose `type` or `class_type` field carries a legacy class id.
+
+    Returns list of (rel_path, node_id, field_name, value) tuples.
+    """
+    hits: list[tuple[str, int, str, str]] = []
+    for top in WORKFLOW_DIRS:
+        dir_path = ROOT / top
+        if not dir_path.exists():
+            continue
+        for path in dir_path.rglob("*.json"):
+            rel = path.relative_to(ROOT).as_posix()
+            try:
+                doc = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                # Skip malformed JSON; other guardrail tests catch parse errors.
+                continue
+            # UI-format workflow: doc["nodes"] is a list of dicts with "type".
+            for node in doc.get("nodes") or []:
+                if not isinstance(node, dict):
+                    continue
+                node_id = node.get("id", -1)
+                ctype = node.get("type")
+                if isinstance(ctype, str) and ctype in WORKFLOW_LEGACY_CLASS_TYPES:
+                    hits.append((rel, node_id, "type", ctype))
+            # API-format prompt dict: each value is {class_type, inputs}.
+            for k, v in doc.items():
+                if not isinstance(v, dict):
+                    continue
+                ctype = v.get("class_type")
+                if isinstance(ctype, str) and ctype in WORKFLOW_LEGACY_CLASS_TYPES:
+                    try:
+                        nid = int(k)
+                    except (TypeError, ValueError):
+                        nid = -1
+                    hits.append((rel, nid, "class_type", ctype))
+    return hits
+
+
+def check_workflow_no_legacy_class_types(
+    errors: list, warnings: list,
+) -> None:
+    hits = _scan_workflow_class_types()
+    if hits:
+        lines = "\n".join(
+            f"  {rel} node {nid}: {field}={ctype!r}"
+            for rel, nid, field, ctype in hits
+        )
+        errors.append(
+            "clean-break: workflow JSON carries legacy class id in "
+            "node.type / class_type field.\n"
+            f"  hits:\n{lines}"
+        )
+
+
 def check_last_link_id(wf: dict, errors: list, warnings: list) -> None:
     last_link = wf.get("last_link_id", 0)
     max_present = max(
@@ -269,6 +350,7 @@ def main(argv: list[str]) -> int:
     check_legacy_tokens_absent(errors, warnings)
     check_news_used_chain(wf, errors, warnings)
     check_last_link_id(wf, errors, warnings)
+    check_workflow_no_legacy_class_types(errors, warnings)
 
     if warnings:
         for w in warnings:
@@ -287,7 +369,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     print(
-        f"[lfc_wiring_smoke] OK -- 6 checks passed "
+        f"[lfc_wiring_smoke] OK -- 7 checks passed "
         f"({len(warnings)} warning(s))"
     )
     return 0

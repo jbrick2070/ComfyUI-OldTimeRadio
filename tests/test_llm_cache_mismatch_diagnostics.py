@@ -1,7 +1,7 @@
 """Regression test for BUG-LOCAL-065: LLM cache-mismatch reload thrash.
 
 Bug: between LLM phases (title-gen, OpenClose, draft, critique, revision,
-arc-enhancer) inside a single OTR_LLMScriptWriter run, the cache mismatch
+arc-enhancer) inside a single OTR_LedgerScriptWriter run, the cache mismatch
 check at story_orchestrator.py:_load_llm fired between every phase. Each
 mismatch unloaded the model and re-cold-loaded it (~15-17 s wall-clock per
 phase) even though all inputs (model_id, optimization_profile, context_cap)

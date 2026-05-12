@@ -1,6 +1,6 @@
 """Regression test for the two-LLM split feature (task #56 / Block 4).
 
-Feature: OTR_LLMScriptWriter has a `cleanup_model_id` widget that lets
+Feature: OTR_LedgerScriptWriter has a `cleanup_model_id` widget that lets
 users pair a creative LLM (rich draft prose, e.g. Captain-Eris-Violet)
 with a structured LLM (format-compliant rescue paths, e.g. base
 Mistral-Nemo-Instruct-2407). When `cleanup_model_id = "auto (use story

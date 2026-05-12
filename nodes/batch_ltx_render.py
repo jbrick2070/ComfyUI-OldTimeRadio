@@ -393,7 +393,7 @@ _PROMPT_BY_ROLE = {
 # aesthetic in the LTX prompt is wasted bandwidth that throttles motion.
 #
 # What still happens to the deferred context:
-#   - ledger.meta.ltx_style_brief: still stamped by OTR_LLMScriptWriter,
+#   - ledger.meta.ltx_style_brief: still stamped by OTR_LedgerScriptWriter,
 #     used by BUG-LOCAL-111 (FLUX bookend integration, future commit)
 #     so the bookend still itself reflects the per-episode setting.
 #   - line scene_env / episode style: not consumed by LTX anymore;

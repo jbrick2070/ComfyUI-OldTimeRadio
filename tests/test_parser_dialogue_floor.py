@@ -40,7 +40,7 @@ Fix:
 
 This test exercises the diagnostic logic without requiring GPU/transformers:
 it builds realistic post-Grammarian script texts, runs them through the
-parser via OTR_LLMScriptWriter._parse_script, and asserts:
+parser via OTR_LedgerScriptWriter._parse_script, and asserts:
 
 - underscored names parse cleanly (BUG-066 Fix A)
 - the Grammarian counter is symmetric (BUG-066 Fix B)

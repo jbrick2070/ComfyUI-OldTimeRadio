@@ -2,7 +2,7 @@
 soak_operator.py -- LEGACY SHIM (BUG-LOCAL-002 fix, 2026-05-02).
 
 This module used to be a 1500-line soak runner with stale `WV_*` positional
-widget indices that no longer matched the live OTR_LLMScriptWriter node
+widget indices that no longer matched the live OTR_LedgerScriptWriter node
 (`episode_title` and `num_characters` were added between v1.5 and v2.0,
 shifting every downstream index off by 1-2 slots). Anything calling
 `patch_workflow()` from supersoaker would write to the wrong slots --

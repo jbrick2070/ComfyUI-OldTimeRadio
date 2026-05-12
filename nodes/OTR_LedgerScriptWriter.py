@@ -1036,7 +1036,7 @@ class OTR_LedgerScriptWriter:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Widget order matches the legacy OTR_LLMScriptWriter widget
+        # Widget order matches the pre-rename writer widget
         # layout (commit 485874b screenshot), minus open_close per
         # Jeffrey 2026-05-10. Order is load-bearing — saved workflows
         # bind by widget index, and the user's mental model maps the
