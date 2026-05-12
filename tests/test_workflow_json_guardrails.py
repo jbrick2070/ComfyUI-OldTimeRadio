@@ -344,7 +344,16 @@ class TestWorkflowJson:
 # (not imported) so this test stays free of torch / transformers and
 # can run in any CI environment.
 _WRITER_STYLE_SENTINEL = "let the story decide"
-_WRITER_STYLE_SLOT = 11
+# Slot 9 of OTR_LedgerScriptWriter.widgets_values in the current
+# widget order:
+#   0 episode_title / 1 target_words / 2 num_characters / 3 seed
+#   4 seed_mode / 5 model_id / 6 custom_premise / 7 include_act_breaks
+#   8 act_count / 9 style  <- this slot / 10 style_custom
+#   11 creativity / 12 optimization_profile / 13 perfect_run_spacesaver
+#   14 min_p / 15 repetition_penalty / 16 max_new_tokens_cap
+# If the writer's INPUT_TYPES order changes, update this constant
+# in lockstep so the drift guard keeps catching the real regression.
+_WRITER_STYLE_SLOT = 9
 _CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
 
 

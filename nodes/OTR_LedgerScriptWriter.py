@@ -280,14 +280,32 @@ _OPTIMIZATION_PROFILE_CHOICES = [
 # ---------------------------------------------------------------------------
 
 
-def _build_truncating_generate_fn(cache_entry: dict, *, top_p: float = 0.92):
-    """Return a generate_fn (messages, *, temperature, max_new_tokens) that
-    left-truncates oversized prompts before model.generate.
+def _build_truncating_generate_fn(
+    cache_entry: dict,
+    *,
+    top_p: float = 0.92,
+    min_p: float = 0.0,
+    repetition_penalty: float = 1.0,
+):
+    """Return a generate_fn that left-truncates oversized prompts and
+    forwards sampling controls to model.generate.
 
-    `top_p` is captured in the closure so the creativity widget can
-    override it (legacy parity at _otr_legacy_writer.py:768). The
-    `temperature` arg per call is whatever the line composer / outline
-    passes (compose_line bumps it on retry).
+    Closure captures the four episode-level sampling knobs from the
+    writer widgets: top_p, min_p, repetition_penalty. The per-call
+    args (`temperature`, `max_new_tokens`, optional `stop`) are
+    whatever the line composer / outline / picker passes.
+
+    Phase 4 v4 (2026-05-11): min_p and repetition_penalty added as
+    closure-captured params, plus per-call `stop` support via a
+    StoppingCriteria subclass that matches on substring at the tail
+    of the decoded output. Defaults are conservative for the 7B-14B
+    class:
+      top_p              = 0.92   (current default, preserved)
+      min_p              = 0.0    (disabled; 0.05 is the safe non-
+                                   trivial improvement)
+      repetition_penalty = 1.0    (disabled; 1.03 is gentle and
+                                   doesn't damage short outputs)
+    Each widget overrides per-episode from the workflow.
 
     Cap math: max_input_tokens = max(64, context_cap - max_new_tokens).
     Truncation is left-side (drops oldest tokens, preserves most
@@ -297,8 +315,10 @@ def _build_truncating_generate_fn(cache_entry: dict, *, top_p: float = 0.92):
     tokenizer = cache_entry["tokenizer"]
     context_cap = int(cache_entry.get("context_cap") or 8192)
     active_top_p = float(top_p)
+    active_min_p = float(min_p or 0.0)
+    active_rep_penalty = float(repetition_penalty or 1.0)
 
-    def generate_fn(messages, *, temperature, max_new_tokens):
+    def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
@@ -318,15 +338,65 @@ def _build_truncating_generate_fn(cache_entry: dict, *, top_p: float = 0.92):
                 input_len, max_input_tokens, context_cap, max_new_tokens,
             )
 
+        gen_kwargs = {
+            "do_sample": True,
+            "temperature": float(temperature),
+            "top_p": active_top_p,
+            "max_new_tokens": int(max_new_tokens),
+            "pad_token_id": tokenizer.eos_token_id,
+        }
+        # Only forward non-default values so older transformers
+        # versions that don't accept `min_p` as a kwarg keep working
+        # silently when the widget is at its disabled default.
+        if active_min_p > 0.0:
+            gen_kwargs["min_p"] = active_min_p
+        if active_rep_penalty != 1.0:
+            gen_kwargs["repetition_penalty"] = active_rep_penalty
+
+        # Stop-string support (Phase 4 v4). Implemented via a
+        # StoppingCriteria subclass that decodes the tail of the
+        # generated tokens and matches on substring. Works across
+        # any transformers-backed model regardless of family.
+        if stop:
+            try:
+                from transformers import (  # noqa: I001
+                    StoppingCriteria, StoppingCriteriaList,
+                )
+                prompt_len_now = inputs["input_ids"].shape[1]
+                stop_strings = tuple(s for s in stop if s)
+
+                class _SubstringStop(StoppingCriteria):
+                    def __init__(self, tokenizer, stops, prompt_len):
+                        self._tok = tokenizer
+                        self._stops = stops
+                        self._prompt_len = prompt_len
+
+                    def __call__(self, input_ids, scores, **kwargs):  # noqa: D401
+                        gen_ids = input_ids[0][self._prompt_len:]
+                        if gen_ids.shape[0] == 0:
+                            return False
+                        # Decode the tail; cap to last 64 tokens so
+                        # the per-step decode stays cheap.
+                        tail_ids = gen_ids[-64:]
+                        decoded = self._tok.decode(
+                            tail_ids, skip_special_tokens=True,
+                        )
+                        return any(s in decoded for s in self._stops)
+
+                gen_kwargs["stopping_criteria"] = StoppingCriteriaList([
+                    _SubstringStop(tokenizer, stop_strings, prompt_len_now),
+                ])
+            except Exception as exc:  # noqa: BLE001
+                # Stop strings are a quality nicety, not a correctness
+                # requirement. Drop them on import error rather than
+                # failing the whole generate call.
+                log.debug(
+                    "[OTR_LedgerScriptWriter] stop-strings disabled: %s",
+                    exc,
+                )
+
         with torch.no_grad():
-            out = model.generate(
-                **inputs,
-                do_sample=True,
-                temperature=float(temperature),
-                top_p=active_top_p,
-                max_new_tokens=int(max_new_tokens),
-                pad_token_id=tokenizer.eos_token_id,
-            )
+            out = model.generate(**inputs, **gen_kwargs)
         prompt_len = inputs["input_ids"].shape[1]
         return tokenizer.decode(
             out[0][prompt_len:], skip_special_tokens=True,
@@ -644,6 +714,10 @@ def _resolve_inputs(
     creativity: str = "balanced",
     optimization_profile: str = "Standard",
     perfect_run_spacesaver: bool = False,
+    # Phase 4 v4 (2026-05-11) sampling knobs.
+    min_p: float = 0.0,
+    repetition_penalty: float = 1.0,
+    max_new_tokens_cap: int = 200,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -753,6 +827,16 @@ def _resolve_inputs(
         "top_p":                float(top_p),
         "optimization_profile": str(optimization_profile),
         "perfect_run_spacesaver": bool(perfect_run_spacesaver),
+        # Phase 4 v4 (2026-05-11) sampling knobs. Clamped to widget
+        # ranges so a hand-edited workflow JSON can't slip through
+        # out-of-band values.
+        "min_p":                max(0.0, min(0.5, float(min_p or 0.0))),
+        "repetition_penalty":   max(1.0, min(1.2, float(
+            repetition_penalty or 1.0,
+        ))),
+        "max_new_tokens_cap":   max(40, min(400, int(
+            max_new_tokens_cap or 200,
+        ))),
     }
 
 
@@ -1010,6 +1094,54 @@ class OTR_LedgerScriptWriter:
                         "debugging."
                     ),
                 }),
+                # Phase 4 v4 (2026-05-11): sampling knobs appended at
+                # the END of optional so existing saved workflows keep
+                # binding positionally to the old widgets; ComfyUI
+                # fills the new positions with the defaults below on
+                # workflow load.
+                "min_p": ("FLOAT", {
+                    "default": 0.0, "min": 0.0, "max": 0.5, "step": 0.01,
+                    "tooltip": (
+                        "min_p sampling threshold (HuggingFace "
+                        "transformers).\n\n"
+                        "0.0 (default) = disabled — preserves current "
+                        "behavior on any saved workflow.\n\n"
+                        "Conservative non-trivial value: 0.05 cuts the "
+                        "long tail of low-probability tokens that "
+                        "produce the occasional off-key word in an "
+                        "otherwise good line on 7B-14B small local "
+                        "LLMs (Mistral-Nemo, Gemma-2, Qwen2.5). "
+                        "Aggressive: 0.10. Pairs with the existing "
+                        "creativity top_p — when both are active the "
+                        "tail cut is the union."
+                    ),
+                }),
+                "repetition_penalty": ("FLOAT", {
+                    "default": 1.0, "min": 1.0, "max": 1.2, "step": 0.01,
+                    "tooltip": (
+                        "Repetition penalty for HuggingFace "
+                        "transformers generate.\n\n"
+                        "1.0 (default) = disabled — preserves current "
+                        "behavior.\n\n"
+                        "1.03 is gentle and helps small local LLMs "
+                        "avoid looping on character names / "
+                        "high-frequency tokens in short outputs. "
+                        "Values above 1.08 commonly damage short "
+                        "generations on the 7B-14B class."
+                    ),
+                }),
+                "max_new_tokens_cap": ("INT", {
+                    "default": 200, "min": 40, "max": 400, "step": 10,
+                    "tooltip": (
+                        "Per-line max_new_tokens ceiling on the "
+                        "composer hot-path.\n\n"
+                        "Default 200 preserves current behavior. The "
+                        "composer scales attempt-1 max_new_tokens with "
+                        "min(cap, target_words * 4) so short lines do "
+                        "not get a profligate budget that invites "
+                        "drift; attempt-2 retry uses the full cap."
+                    ),
+                }),
             },
         }
 
@@ -1046,6 +1178,10 @@ class OTR_LedgerScriptWriter:
         creativity="balanced",
         optimization_profile="Standard",
         perfect_run_spacesaver=False,
+        # Phase 4 v4 (2026-05-11) sampling knobs appended at end.
+        min_p=0.0,
+        repetition_penalty=1.0,
+        max_new_tokens_cap=200,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1063,6 +1199,10 @@ class OTR_LedgerScriptWriter:
             creativity=creativity,
             optimization_profile=optimization_profile,
             perfect_run_spacesaver=perfect_run_spacesaver,
+            # Phase 4 v4 (2026-05-11) sampling knobs.
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            max_new_tokens_cap=max_new_tokens_cap,
         )
 
         log.info(
@@ -1099,7 +1239,11 @@ class OTR_LedgerScriptWriter:
             optimization_profile=resolved["optimization_profile"],
         )
         generate_fn = _build_truncating_generate_fn(
-            cache_entry, top_p=resolved["top_p"],
+            cache_entry,
+            top_p=resolved["top_p"],
+            # Phase 4 v4 (2026-05-11) sampling knobs.
+            min_p=resolved["min_p"],
+            repetition_penalty=resolved["repetition_penalty"],
         )
 
         # --- D. Cast contract -- LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER
@@ -1559,6 +1703,7 @@ class OTR_LedgerScriptWriter:
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
+                    max_new_tokens_cap=resolved["max_new_tokens_cap"],
                 )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
@@ -1602,6 +1747,7 @@ class OTR_LedgerScriptWriter:
                 )
                 line_res = _OTRLC.compose_line(
                     generate_fn, line_req, base_temperature=base_temp,
+                    max_new_tokens_cap=resolved["max_new_tokens_cap"],
                 )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags

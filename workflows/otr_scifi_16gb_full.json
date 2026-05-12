@@ -33,7 +33,10 @@
         "",
         "balanced",
         "Standard",
-        false
+        false,
+        0.0,
+        1.0,
+        200
       ],
       "inputs": [],
       "outputs": [

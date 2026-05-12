@@ -870,12 +870,24 @@ def _build_user_prompt(req: LineRequest) -> str:
 # ---------------------------------------------------------------------------
 
 
+_DEFAULT_STOP_STRINGS: tuple[str, ...] = ("\n\n", "\n[", "\n(")
+"""Default stop substrings for compose_line. `\n\n` catches "line +
+stage direction on next paragraph"; `\n[` / `\n(` catch leaked
+bracketed/parenthesized directions on a new line. Do not stop on a
+bare `\n` -- some legitimate lines have a soft break. Forwarded
+through generate_fn's stop= kwarg; loader falls back to a substring-
+matching StoppingCriteria when the underlying generate call doesn't
+natively support stop strings."""
+
+
 def compose_line(
     generate_fn,                # same GenerateFn contract as _otr_outline
     req: LineRequest,
     *,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,
+    max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
+    stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -883,6 +895,15 @@ def compose_line(
     trigger reroll, per §6.A):
       Attempt 1: temperature = base_temperature (0.8).
       Attempt 2: temperature = base_temperature + 0.1 (0.9).
+
+    Phase 4 v4 (2026-05-11): max_new_tokens scales with target_words
+    on attempt 1 (`min(max_new_tokens_cap, target_words * 4)`) so a
+    short line does not get a profligate token budget that invites
+    drift. Attempt 2 uses the full cap as retry headroom.
+
+    Stop strings are passed through to generate_fn via the optional
+    `stop=` kwarg. Loaders that don't accept `stop=` swallow the
+    kwarg silently (the writer's _build_truncating_generate_fn does).
 
     Failure conditions that trigger retry:
       - generate_fn raises.
@@ -914,20 +935,45 @@ def compose_line(
 
     attempts: list[tuple[str, str]] = []
     word_cap = max(15, int(req.target_words * _MAX_OVERSIZE_RATIO))
+    # Attempt-1 max_new_tokens scaled to target line length; attempt 2
+    # uses the full cap. ~4 tokens per English word is the textbook
+    # transformers heuristic.
+    attempt_tokens = (
+        min(int(max_new_tokens_cap), max(40, int(req.target_words) * 4)),
+        int(max_new_tokens_cap),
+    )
 
     for attempt_idx in range(max_attempts):
         temp = base_temperature + (0.1 * attempt_idx)
+        # Pick from attempt_tokens by index, falling back to the cap
+        # on any extra attempt past the table.
+        if attempt_idx < len(attempt_tokens):
+            mnt = attempt_tokens[attempt_idx]
+        else:
+            mnt = int(max_new_tokens_cap)
         log.info(
-            "[OTR_LineComposer] attempt %d/%d for %s (temp=%.2f, target=%d words)",
-            attempt_idx + 1, max_attempts, req.speaker, temp, req.target_words,
+            "[OTR_LineComposer] attempt %d/%d for %s "
+            "(temp=%.2f, max_new_tokens=%d, target=%d words)",
+            attempt_idx + 1, max_attempts, req.speaker, temp, mnt,
+            req.target_words,
         )
 
         try:
-            raw = generate_fn(
-                messages,
-                temperature=temp,
-                max_new_tokens=_MAX_NEW_TOKENS_PER_LINE,
-            )
+            # Try with stop= first; older generate_fn signatures
+            # without the kwarg fall back to the no-stop path.
+            try:
+                raw = generate_fn(
+                    messages,
+                    temperature=temp,
+                    max_new_tokens=mnt,
+                    stop=list(stop_strings) if stop_strings else None,
+                )
+            except TypeError:
+                raw = generate_fn(
+                    messages,
+                    temperature=temp,
+                    max_new_tokens=mnt,
+                )
         except Exception as exc:  # noqa: BLE001
             err_msg = f"generate_fn raised: {type(exc).__name__}: {exc}"
             log.warning("[OTR_LineComposer] %s", err_msg)
