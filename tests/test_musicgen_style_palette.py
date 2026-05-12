@@ -181,3 +181,44 @@ def test_director_secondary_path_is_gone(musicgen_mod):
         assert not hasattr(musicgen_mod, attr), (
             f"musicgen_theme.{attr} must be deleted (Standing Directive)"
         )
+
+
+def test_palette_covers_writer_style_pool(musicgen_mod):
+    """Sprint 1.3 drift guardrail (voice-path-cleanbreak follow-up).
+
+    The MusicGen palette MUST stay in lockstep with the writer's
+    ``_STYLE_PICKER_SEED_POOL``. Any slug the writer can emit for the
+    style widget must have a palette entry; any palette entry that
+    doesn't appear in the writer's pool is dead vocabulary.
+
+    Catches the failure mode that Q2 of the QA doc named: a writer-side
+    pool extension lands without a palette extension and MusicGen
+    raises ValueError("unknown style slug 'X'") at render time. With
+    this test in CI, the drift is caught at commit instead of soak.
+    """
+    from nodes.OTR_LedgerScriptWriter import _STYLE_PICKER_SEED_POOL
+    palette_slugs = set(musicgen_mod._STYLE_PALETTE)
+    pool_slugs = set(_STYLE_PICKER_SEED_POOL)
+    in_palette_only = palette_slugs - pool_slugs
+    in_pool_only = pool_slugs - palette_slugs
+    assert palette_slugs == pool_slugs, (
+        f"Style palette drifted from writer style pool. "
+        f"In palette only (dead vocab): {sorted(in_palette_only)}. "
+        f"In pool only (writer can emit but MusicGen will hard-fail): "
+        f"{sorted(in_pool_only)}."
+    )
+
+
+def test_canonical_slugs_in_test_match_writer_pool(musicgen_mod):
+    """Defensive: the CANONICAL_STYLE_SLUGS constant in this test
+    file is a snapshot of the writer's pool. If the writer's pool
+    drifts and someone forgets to update CANONICAL_STYLE_SLUGS, the
+    other tests in this file would silently still pass against the
+    stale snapshot. This test catches that case independently of the
+    palette-vs-pool drift test above."""
+    from nodes.OTR_LedgerScriptWriter import _STYLE_PICKER_SEED_POOL
+    assert set(CANONICAL_STYLE_SLUGS) == set(_STYLE_PICKER_SEED_POOL), (
+        "CANONICAL_STYLE_SLUGS in this test file is stale relative to "
+        "OTR_LedgerScriptWriter._STYLE_PICKER_SEED_POOL. Update both "
+        "in lockstep."
+    )

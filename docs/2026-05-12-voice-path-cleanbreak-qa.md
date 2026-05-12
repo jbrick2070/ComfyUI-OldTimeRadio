@@ -44,18 +44,21 @@ Three Director-output links retired: link 4 (→ SceneSequencer), link 13 (→ B
 
 ```json
 "name": "script_json",
-"links": [2, 12, 19, 21, 24]
+"links": [2, 12, 16, 19, 21, 24]
 ```
 
-Five downstream voice consumers all read the L3 ledger from the same source:
+**Six downstream consumers** all read the L3 ledger from the same source. Five of them are voice nodes; the sixth is `OTR_SignalLostVideo`, which dual-reads (see Director section below).
 
 ```
 FreezeCascade(62).script_json --[2]--> SceneSequencer(3).script_json
 FreezeCascade(62).script_json --[12]--> BatchBarkGenerator(11).script_json
+FreezeCascade(62).script_json --[16]--> SignalLostVideo(12).script_json   (video-side; dual-read with link 17)
 FreezeCascade(62).script_json --[19]--> KokoroAnnouncer(13).script_json
 FreezeCascade(62).script_json --[21]--> MusicGenTheme(14).script_json   (new in P1)
 FreezeCascade(62).script_json --[24]--> BatchAudioGenGenerator(15).script_json
 ```
+
+**Amendment 2026-05-12 (Sprint 1.4):** earlier versions of this doc enumerated 5 consumers and missed link 16. SignalLostVideo's `script_json` input has been wired off FreezeCascade since the consumer-rewrite sprint; the `production_plan_json` input (link 17) is the surviving second source. SignalLostVideo therefore reads BOTH the L3 ledger AND the Director production plan today; the Sprint 2 plan reframes around collapsing this dual-read into a single ledger source by stamping `meta.visual_plan` + `meta.style` at writer/freeze time and dropping link 17.
 
 ### `OTR_LLMDirector(id=2)` production_plan_json output (slot 0)
 
@@ -64,10 +67,10 @@ FreezeCascade(62).script_json --[24]--> BatchAudioGenGenerator(15).script_json
 "links": [17, 38]
 ```
 
-Only the two video-side consumers remain. Voice side is fully disconnected from the Director output.
+Voice side is fully disconnected from the Director output. The two remaining wires are both video-side and both targeted for retirement in Sprint 2:
 
 ```
-Director(2).production_plan_json --[17]--> SignalLostVideo(12).production_plan_json
+Director(2).production_plan_json --[17]--> SignalLostVideo(12).production_plan_json   (dual-read; sibling of link 16)
 Director(2).production_plan_json --[38]--> OTRVideoPlan(20).director_json
 ```
 

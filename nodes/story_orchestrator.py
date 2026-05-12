@@ -4641,6 +4641,18 @@ def _build_fallback_director_plan(script_text: str, max_chars: int = 8) -> dict:
     }
 
 
+# VIDEO-SIDE ONLY. Do not reconnect this node's outputs to voice/audio
+# nodes. Voice consumers (Bark / KokoroAnnouncer / AudioGen / ProcSFX /
+# SceneSequencer / MusicGen) read the L3 ledger via
+# OTR_LedgerFreezeCascade.script_json. The voice path was severed from
+# Director output in voice-path-cleanbreak P2 (commit 446ec81); this
+# class is retained only because OTR_SignalLostVideo + OTRVideoPlan
+# still consume production_plan_json.visual_plan / voice_assignments /
+# style. Scheduled for retirement in voice-path-cleanbreak Sprint 2 --
+# the visual_plan + style fields move to L3 ledger meta-stamping at
+# writer/freeze time, both video nodes migrate to load_ledger reads,
+# and this class + its workflow node + registration all delete.
+# See: docs/2026-05-12-voice-path-cleanbreak-qa.md §3 + Q3.
 class LLMDirector:
     """Takes a script and generates a full production plan via LLM."""
 
