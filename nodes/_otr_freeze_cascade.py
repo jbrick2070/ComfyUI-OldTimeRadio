@@ -31,18 +31,17 @@ ADR mapping (`docs/2026-05-11-multi-turn-polish-adr.md`):
         v
     [Frozen ledger; meta.cleanup_locked == True]
 
-Verdict mapping (ADR section 9 -- preserves the existing 5-slot output
-contract, just renames `reviewer_verdict` -> `freeze_verdict`):
+Verdict mapping (ADR section 9):
 
     Reviewer verdict          Freeze verdict
     ----------------          --------------
     clean_no_edits + clean    -> frozen_clean
     clean_no_edits + warns    -> frozen_with_warns
     improved                  -> frozen_with_doctor_edits
-    cast_unrecoverable        -> cast_unrecoverable      (preserved)
-    too_many_edits            -> too_many_edits          (preserved)
-    needs_full_rerun          -> needs_full_rerun        (preserved)
-    post_audit_failed         -> post_audit_failed       (preserved)
+    cast_unrecoverable        -> cast_unrecoverable
+    too_many_edits            -> too_many_edits
+    needs_full_rerun          -> needs_full_rerun
+    post_audit_failed         -> post_audit_failed
     Phase 10 raises           -> needs_full_rerun        (gap audit forced)
 
 Failure cascade (ADR section 8): the cascade is skip-and-continue

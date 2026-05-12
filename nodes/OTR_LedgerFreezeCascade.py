@@ -1,30 +1,23 @@
 """nodes/OTR_LedgerFreezeCascade.py — Ledger Freeze Cascade ComfyUI node.
 
-Renamed in LFC sprint commit 2 from `OTR_LedgerScriptReviewer`. The
-previous module is preserved as a back-compat shim that re-exports
-this class so existing workflow JSONs referencing the old name
-continue to load.
-
 Wires AFTER OTR_LedgerScriptWriter and BEFORE SceneSequencer. Touches
 the production ledger only; emits no audio, no video, no LLM weights
 beyond what the writer already loaded.
 
-Output contract (preserved from the OTR_LedgerScriptReviewer 5-slot
-shape -- ADR section 9):
+Output contract (5 slots):
     script_text, script_json, news_used, estimated_minutes, freeze_verdict
 
-The fifth slot is renamed `reviewer_verdict` -> `freeze_verdict`. The
-verdict literal set is extended:
+`freeze_verdict` literal set:
 
     frozen_clean
     frozen_with_warns
     frozen_with_doctor_edits
-    cast_unrecoverable        (preserved)
-    too_many_edits            (preserved)
-    needs_full_rerun          (preserved)
-    post_audit_failed         (preserved)
+    cast_unrecoverable
+    too_many_edits
+    needs_full_rerun
+    post_audit_failed
 
-Status: LFC sprint commit 2 of 14 (2026-05-11).
+Status: LFC v2.0-alpha (2026-05-12 clean-break).
 """
 from __future__ import annotations
 
@@ -43,13 +36,10 @@ DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
 def _no_ledger_error_json(incoming_script_json: str) -> str:
     """Synthesize a parseable error-state JSON when no ledger exists.
 
-    W3 fix (commit 12.1): ALWAYS stamp the synthetic-error-state
-    shape regardless of whether the incoming script_json is empty.
-    Pre-12.1 a non-empty incoming JSON was returned unchanged --
-    downstream consumers parsing `meta.freeze_verdict` saw one
-    thing, consumers parsing `schema_version` saw another. Now the
-    return is consistent: synthetic_error_state schema_version +
-    freeze_verdict=needs_full_rerun + freeze_disposition stamped.
+    Always stamps the synthetic-error-state shape regardless of
+    whether the incoming script_json is empty -- consumers parsing
+    `meta.freeze_verdict` and `schema_version` see a consistent
+    signal.
 
     The incoming JSON content (truncated to 200 chars) is preserved
     on `meta.freeze_disposition.skipped_reason_detail` for forensic
@@ -74,10 +64,6 @@ def _no_ledger_error_json(incoming_script_json: str) -> str:
                 "skipped_reason": "no_writer_produced_ledger",
                 "skipped_reason_detail": detail,
             },
-            # Legacy field kept so consumers still keyed on the old
-            # name see the same signal until the cascade migration
-            # lands across every downstream node.
-            "reviewer_verdict": "needs_full_rerun",
         },
     }, indent=2, ensure_ascii=False)
 
@@ -100,11 +86,10 @@ class OTR_LedgerFreezeCascade:
                           Phase 9 Auditor). Phase 3/4/4.5/5/6 future
                           LLM phases reuse the same loader.
 
-    Outputs (matches writer's RETURN_TYPES for drop-in midstream
-    wiring; fifth slot renamed reviewer_verdict -> freeze_verdict):
+    Outputs (5 slots):
       script_text         Rebuilt from the post-freeze ledger.
       script_json         JSON snapshot of the post-freeze ledger.
-      news_used           Passthrough.
+      news_used           Passthrough from writer to SignalLostVideo.
       estimated_minutes   Passthrough INT.
       freeze_verdict      One of the FreezeVerdict literals.
     """

@@ -46,16 +46,34 @@ _SCAN_DIRS = ("nodes", "tests", "otr_v2", "visual")
 _SCAN_EXTENSIONS = (".py",)
 
 
-# Files that are ALLOWED to mention "script_parse_json" -- usually
-# the acceptance test itself, plus any rename-history docs.
+# Files that are ALLOWED to mention legacy tokens -- usually the
+# acceptance test itself, plus any rename-history docs.
 _ALLOWED_FILES = {
     "tests/test_legacy_contract_retired.py",
+    # The cascade-orchestrator test asserts the legacy module is
+    # dead; it must reference the legacy name to do so.
+    "tests/test_lfc_freeze_cascade_orchestrator.py",
     "docs/2026-05-11-multi-turn-polish-adr.md",
     "docs/2026-05-11-multi-turn-polish-problem-statement.md",
+    "docs/2026-05-11-lfc-go-forward-qa.md",
+    "docs/2026-05-11-lfc-wiring-qa-roundrobin.md",
+    "docs/2026-05-11-multi-turn-polish-qa-handoff.md",
+    "docs/2026-05-12-lfc-clean-break.md",
+    "docs/BUG_LOG.md",
+    "ROADMAP.md",
 }
 
 
 _LEGACY_TOKEN = "script_parse_json"
+
+
+# Clean-break v2.0-alpha (2026-05-12): additional legacy class /
+# meta-key names that must not appear in source files outside the
+# allowed docs.
+_CLEAN_BREAK_LEGACY_TOKENS = (
+    "OTR_LedgerScriptReviewer",
+    "OTR_Gemma4Director",
+)
 
 
 def _scan_for_legacy_references():
@@ -146,6 +164,60 @@ def test_allowed_files_set_intact():
     # is off -- the cascade should not be tolerating new references
     # except for docs and the acceptance test itself.
     assert len(_ALLOWED_FILES) <= 10
+
+
+def _scan_for_arbitrary_token(token: str):
+    """Same scan-and-skip logic as _scan_for_legacy_references but
+    for any token (clean-break helper)."""
+    hits = []
+    for top in _SCAN_DIRS:
+        dir_path = REPO_ROOT / top
+        if not dir_path.exists():
+            continue
+        for path in dir_path.rglob("*.py"):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel in _ALLOWED_FILES:
+                continue
+            try:
+                content = path.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if token not in content:
+                continue
+            for lineno, line in enumerate(content.splitlines(), start=1):
+                if token not in line:
+                    continue
+                hash_pos = line.find("#")
+                token_pos = line.find(token)
+                if hash_pos != -1 and hash_pos < token_pos:
+                    continue
+                stripped = line.lstrip()
+                if stripped.startswith(('"""', "'''")):
+                    continue
+                if stripped.startswith('"') or stripped.startswith("'"):
+                    continue
+                hits.append((rel, lineno, line.rstrip()))
+    return hits
+
+
+@pytest.mark.parametrize("token", list(_CLEAN_BREAK_LEGACY_TOKENS))
+def test_clean_break_legacy_names_absent(token):
+    """Clean-break v2.0-alpha (2026-05-12). Legacy class names
+    that were aliased pre-cleanbreak must NOT appear in code
+    (comments + docstrings still tolerated). Enforced by
+    automated scan so a future contributor reintroducing the
+    name fails CI loudly.
+    """
+    hits = _scan_for_arbitrary_token(token)
+    if hits:
+        lines = "\n".join(
+            f"  {rel}:{lineno}: {text}" for rel, lineno, text in hits
+        )
+        pytest.fail(
+            f"Found {len(hits)} CODE reference(s) to legacy token "
+            f"`{token}`. Clean-break v2.0-alpha requires zero "
+            f"legacy back-compat surface.\n\nHits:\n{lines}"
+        )
 
 
 def test_scanner_finds_token_when_present_synthetic():

@@ -221,7 +221,7 @@ def get_ledger() -> "Ledger":
 
 # Wiring-review #3 (2026-05-11): non-creating accessors for downstream
 # nodes that should fail loud when called without a writer upstream.
-# The reviewer (OTR_LedgerScriptReviewer) uses these instead of
+# The cascade (OTR_LedgerFreezeCascade) uses these instead of
 # get_ledger() so it never operates on an empty placeholder ledger.
 
 

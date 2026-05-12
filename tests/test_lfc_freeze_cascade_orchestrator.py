@@ -353,15 +353,13 @@ class TestNodeOutputContract:
             "STRING", "STRING", "STRING", "INT", "STRING",
         )
 
-    def test_back_compat_alias_module(self):
-        # OTR_LedgerScriptReviewer module still resolves to the same
-        # class -- workflow JSONs that haven't been migrated still
-        # load.
-        from nodes.OTR_LedgerScriptReviewer import (
-            OTR_LedgerScriptReviewer,
-            OTR_LedgerFreezeCascade,
-        )
-        assert OTR_LedgerScriptReviewer is OTR_LedgerFreezeCascade
+    def test_legacy_class_name_is_dead(self):
+        # Clean-break v2.0-alpha (2026-05-12): the legacy
+        # OTR_LedgerScriptReviewer module is deleted; no back-compat
+        # surface. Importing it must raise.
+        import importlib
+        with pytest.raises((ImportError, ModuleNotFoundError)):
+            importlib.import_module("nodes.OTR_LedgerScriptReviewer")
 
     def test_class_input_types_schema(self):
         from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade

@@ -223,33 +223,15 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
         print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RENAME ALIASES — keep older workflow JSONs loading after we generalize node IDs
-#
-# The Director node was originally named after the Gemma model family
-# ("OTR_Gemma4Director"), but Gemma is only ONE of several LLM choices the
-# dropdown exposes (Mistral-Nemo, Qwen2.5, etc.). The canonical ID is now
-# OTR_LLMDirector.
-#
-# Old workflow JSONs that reference the Gemma4 ID continue to load via this
-# alias. Safe to remove this entry once all production workflows have been
-# re-saved against the new ID.
-#
-# 2026-05-10: OTR_Gemma4ScriptWriter -> OTR_LLMScriptWriter alias removed
-# alongside the legacy writer itself (nodes/_otr_legacy_writer.py). v2.0
-# canonical writer is OTR_LedgerScriptWriter (LPL).
+# Clean-break v2.0-alpha (2026-05-12): _RENAME_ALIASES dict removed. No
+# back-compat surface. Every workflow JSON references the current canonical
+# class names directly. Legacy class names (OTR_Gemma4Director,
+# OTR_LedgerScriptReviewer, OTR_Gemma4ScriptWriter, OTR_LLMScriptWriter) are
+# DEAD -- attempting to load a workflow that references one will fail loudly,
+# which is the desired behaviour during a greenfield rewrite.
 # ─────────────────────────────────────────────────────────────────────────────
-_RENAME_ALIASES = {
-    "OTR_Gemma4Director":     "OTR_LLMDirector",
-    # LFC sprint commit 2 (2026-05-11): reviewer renamed to cascade.
-    # Workflow JSONs that still say "OTR_LedgerScriptReviewer" load
-    # against the new OTR_LedgerFreezeCascade class.
-    "OTR_LedgerScriptReviewer": "OTR_LedgerFreezeCascade",
-}
-for _old_id, _new_id in _RENAME_ALIASES.items():
-    if _new_id in NODE_CLASS_MAPPINGS and _old_id not in NODE_CLASS_MAPPINGS:
-        NODE_CLASS_MAPPINGS[_old_id] = NODE_CLASS_MAPPINGS[_new_id]
 
-_loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_") and k not in _RENAME_ALIASES)
+_loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
 _total = len(_NODE_MODULES)
 if _loaded == _total:
     print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
