@@ -168,6 +168,14 @@ class Phase5VoiceDriftReport:
     edits_rejected_not_flagged: int = 0
     skipped: bool = False
     skipped_reason: str = ""
+    # G3 fix (commit 12.13): explicit failure flag. When
+    # two_step_generate returns None (parse exhaustion / LLM
+    # crash) the report previously left edits_applied=0 with
+    # flagged_lines populated -- indistinguishable from a real
+    # "editor declined to revise" outcome. failed=True
+    # distinguishes those two paths.
+    failed: bool = False
+    failure_reason: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -190,6 +198,8 @@ class Phase5VoiceDriftReport:
             ),
             "skipped": bool(self.skipped),
             "skipped_reason": self.skipped_reason,
+            "failed": bool(self.failed),
+            "failure_reason": self.failure_reason,
         }
 
 
@@ -325,6 +335,11 @@ def phase_5_voice_drift(
         formatter_temperature=0.1,
     )
     if result is None:
+        # G3 fix (commit 12.13): flag the failure explicitly so the
+        # standalone Phase 5 node can return verdict "failed"
+        # instead of conflating it with "completed_no_edits_after_flag".
+        rep.failed = True
+        rep.failure_reason = "two_step_generate returned None"
         log.warning(
             "[LFC:phase_5] two_step_generate returned None on %d "
             "flagged lines; dropping all edits", len(flagged),

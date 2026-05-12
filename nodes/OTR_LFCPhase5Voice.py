@@ -105,7 +105,13 @@ class OTR_LFCPhase5Voice:
         except Exception:  # noqa: BLE001
             new_json = script_json or "{}"
 
-        if rep.edits_applied > 0:
+        # G3 fix (commit 12.13): surface the explicit `failed` flag
+        # before bucketing by edit count. Pre-fix a two_step
+        # parse-exhaustion returned "completed_no_edits_after_flag",
+        # masking the real failure mode.
+        if rep.failed:
+            verdict = "failed"
+        elif rep.edits_applied > 0:
             verdict = "completed_with_edits"
         elif rep.flagged_lines:
             verdict = "completed_no_edits_after_flag"
