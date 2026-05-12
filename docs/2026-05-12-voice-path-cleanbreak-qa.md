@@ -228,13 +228,19 @@ For the series to be accepted, both reviewers should agree:
 
 ---
 
-## 6. Known deferrals (in scope of follow-up sprints, not this one)
+## 6. Status of follow-up items
 
-| Item | Why deferred | Tracking signal |
+Originally listed as "known deferrals" pre-cleanbreak. Updated 2026-05-12
+end-of-sprint-batch:
+
+| Item | Status | Tracking |
 |---|---|---|
-| Director-class delete + workflow Director-node removal | `SignalLostVideoRenderer` + `OTRVideoPlan` still read `production_plan_json.visual_plan / voice_assignments / style`. Migrating those is a separate visual-plan-schema design pass. | Workflow JSON still contains `OTR_LLMDirector(id=2)` + links 17 + 38. |
-| Per-cue SFX duration via writer outline | P2 deleted the Director `sfx_plan[i].dur_s` override path. Outline-side stamping requires a writer beat-schema extension. | All AudioGen cues currently render at `default_duration`. |
-| 6 unrelated pre-existing test failures | Not voice-path-related (phase_ms KeyError, save-to-workspace NaN, video_composite canvas size). Identified in the audit but explicitly out of scope. | Listed under §5.4 above. |
+| Director-class delete + workflow Director-node removal | **SHIPPED Sprint 2** (commit `249bc06`). `meta.visual_plan` + `meta.voice_assignments` + `meta.style` stamped at writer cast-lock exit; `OTR_VideoPlan` + `OTR_SignalLostVideo` migrated to read from L3 ledger. Workflow now 33 nodes / 57 links. | `tests/test_workflow_json_guardrails.py::TestVoicePathCleanbreakWiring::test_no_llm_director_in_workflow` |
+| Per-cue SFX duration via writer outline | **SHIPPED Sprint 3** (commit `b1bfe90`). G7 invariant in FreezeCascade enforces `[0.25, 12.0]` bounds; AudioGen + ProcSFX honor `line.dur_s` with default fallback. Writer-side outline-prompt extension (asking the LLM to emit per-beat dur_s) is the remaining piece -- still deferred. | `tests/test_per_cue_sfx_dur.py` (10 cases) |
+| Library-stub rename | **SHIPPED Sprint 4** (commit `6218de7`). `bark_tts.py` -> `_bark_lib.py`; `sfx_generator.py` -> `_sfx_lib.py`. All 5 import sites + 1 mock.patch path updated. | grep -r "from .bark_tts\|from .sfx_generator" -> zero hits in active code |
+| Doc discipline | **SHIPPED Sprint 5** (this sprint). `docs/gates.md` (Gate 1 + 2 (G6/G7) + 3A/3B naming convention), `docs/test-retirement-log.md` (23-test retirement table for P3 + Sprint 2 deletes), this Q5 promotion. | this doc |
+| 6 unrelated pre-existing test failures | Quarantined in `docs/known-failures.md`. KNOWN-FAIL-001 through KNOWN-FAIL-006. Not voice-path-related (phase_ms KeyError, save-to-workspace NaN, video_composite canvas size); explicit non-blockers per the quarantine contract. | `docs/known-failures.md` |
+| Writer outline prompt -- emit per-beat dur_s for SFX | **DEFERRED**. Sprint 3 enabled the consumer surface; the LLM-prompt change to populate it requires its own LLM-quality testing pass + outline-schema extension. The L3 ledger schema slot is open and back-compatible. | None until follow-up sprint scope. |
 
 ---
 
