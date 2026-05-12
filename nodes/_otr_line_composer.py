@@ -561,6 +561,13 @@ class LineRequest:
     all_voice_cards: str = ""
     sfx_cue: str = ""
     position: str = ""
+    # LFC sprint commit 3, section 6.1 (2026-05-11). speaker_role lets
+    # polish_line branch its system prompt -- character beats get
+    # the strict "no narration" prompt; announcer beats get the
+    # narration-allowed prompt that still strips bracket stage
+    # directions and asterisk action. Default "character" so legacy
+    # callers / tests see the original prompt unchanged.
+    speaker_role: str = "character"
 
 
 @dataclass(frozen=True)
@@ -1075,6 +1082,84 @@ Output the cleaned line and stop. Nothing else.
 """
 
 
+# LFC sprint commit 3, section 6.1 (2026-05-11). Announcer beats are
+# by design narration -- the character-polish prompt above wrongly
+# forbids it. The announcer-polish prompt allows narration but still
+# strips bracket stage directions, asterisk action, and unpaired
+# leading quotes. ALL OUTPUT RULES that target voice-tag leaks
+# ("[VOICE:]", "[SFX:]", "(pauses)") remain in force.
+_POLISH_SYSTEM_PROMPT_ANNOUNCER = """\
+You are a script editor cleaning one line of announcer narration for
+a radio drama. The line below leaked bracket stage direction or
+asterisk action that does not belong in spoken broadcast copy.
+Rewrite as clean spoken announcer narration -- third-person
+storyteller voice is FINE.
+
+OUTPUT RULES - strict:
+- Only words the announcer speaks aloud (third-person narration is OK).
+- No bracket stage direction ([pauses], [whispers], [VOICE: ...]).
+- No asterisk-wrapped action (*sighs*, *beat*).
+- No parenthesized cue verbs ((sighs), (laughs), (long pause)).
+- No unpaired leading or trailing quote marks.
+- Preserve the announcer's intent. Preserve the journalistic tone.
+- Keep within plus or minus 20% of the original word count.
+
+Output the cleaned line and stop. Nothing else.
+"""
+
+
+# LFC sprint commit 3, section 6.2 (2026-05-11). Refusal detector.
+# Small instruction-tuned LLMs occasionally fall back to a polite
+# refusal ("I cannot rewrite this.") instead of doing the polish.
+# Shipping that as the polished dialogue corrupts the line; reject
+# the polish output and keep the pre-polish text in that case.
+#
+# Distinguishing real refusals from natural in-character dialogue
+# ("I cannot believe you did that.", "I'm afraid I lied to you.")
+# requires the regex to anchor on a refusal-action VERB, not just
+# the "I cannot..." opener -- otherwise legitimate dialogue gets
+# flagged. The verb whitelist below covers the common refusals
+# emitted by Mistral / Gemma / Qwen instruction-tuned 7B-12B class.
+_REFUSAL_VERBS = (
+    r"rewrite|help|do\s+that|do\s+this|comply|assist|fulfill|"
+    r"provide|produce|generate|complete|process|engage"
+)
+_REFUSAL_PATTERNS: tuple[str, ...] = (
+    # "I cannot rewrite this." / "I can't help with that."
+    rf"^\s*I\s+cannot\s+(?:{_REFUSAL_VERBS})\b",
+    rf"^\s*I\s+can[’']t\s+(?:{_REFUSAL_VERBS})\b",
+    # Apology openers that classifiers tend to attach verbatim.
+    r"^\s*Sorry,\s+I\s+can(?:not|[’']t)\b",
+    r"^\s*I[’']m\s+sorry,?\s+(?:but\s+)?I\s+can(?:not|[’']t)\b",
+    # AI-self-reference openers are refusals regardless of verb.
+    r"^\s*As\s+a(?:n)?\s+(?:language\s+model|AI|assistant|chatbot)\b",
+    # Apology + AI-self-reference combo ("I'm sorry, but as a language model...").
+    r"^\s*I[’']m\s+sorry,?\s+(?:but\s+)?as\s+a(?:n)?\s+(?:language\s+model|AI|assistant|chatbot)\b",
+    rf"^\s*I[’']m\s+unable\s+to\s+(?:{_REFUSAL_VERBS})\b",
+    rf"^\s*I\s+won[’']t\s+(?:{_REFUSAL_VERBS})\b",
+    rf"^\s*I\s+will\s+not\s+(?:{_REFUSAL_VERBS})\b",
+    rf"^\s*I[’']m\s+afraid\s+I\s+can(?:not|[’']t)\s+(?:{_REFUSAL_VERBS})\b",
+    rf"^\s*Unfortunately,\s+I\s+can(?:not|[’']t)\s+(?:{_REFUSAL_VERBS})\b",
+)
+
+_REFUSAL_REGEX: tuple = tuple(
+    re.compile(p, re.IGNORECASE) for p in _REFUSAL_PATTERNS
+)
+
+
+def is_polish_refusal(text: str) -> bool:
+    """True if `text` looks like a model refusal masquerading as a polish.
+
+    Used by `polish_line` to reject "I cannot rewrite this." style
+    outputs that would otherwise ship as the polished dialogue. Empty
+    / falsy input returns False (caller's empty-output branch handles
+    the empty case). Never raises.
+    """
+    if not text:
+        return False
+    return any(rx.search(text) for rx in _REFUSAL_REGEX)
+
+
 _POLISH_BASE_TEMPERATURE = 0.4
 _POLISH_MAX_TOKENS_MULTIPLIER = 3  # ~3 tokens/word target ceiling
 
@@ -1086,6 +1171,10 @@ def polish_line(
     *,
     temperature: float = _POLISH_BASE_TEMPERATURE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
+    speaker_role: str = "character",
+    beat_intent: str = "",
+    previous_lines: tuple[str, ...] = (),
+    polish_generate_fn=None,
 ) -> str:
     """Run ONE polish LLM call against `leaked_line`.
 
@@ -1093,6 +1182,37 @@ def polish_line(
     success. Falls back to the original `leaked_line` on:
       - generate_fn raises
       - empty / whitespace-only model output
+      - LFC commit 3 section 6.2: polish output is a model refusal
+        (rejection regex hit). Shipping "I cannot rewrite this." as
+        the polished dialogue would corrupt the line.
+
+    LFC sprint commit 3 fixes (2026-05-11, ADR sections 6.1 / 6.3 /
+    6.4):
+
+      section 6.1 (announcer guard). When `speaker_role == "announcer"`
+        the announcer-specific system prompt fires; that prompt allows
+        third-person narration (announcer beats are by design
+        narrative) but still strips bracket stage direction, asterisk
+        action, parenthesized cue verbs, and unpaired leading quotes.
+
+      section 6.3 (context expansion). When `beat_intent` or
+        `previous_lines` are provided, they are appended to the user
+        prompt body as BEAT INTENT / PREVIOUS LINES blocks. Roughly
+        80 extra tokens; large coherence gain at almost zero cost.
+        `previous_lines` is capped at the last 2 entries (the ADR's
+        recommendation) so the polish prompt stays lean. Callers that
+        do not pass these fields get the original (pre-fix) behaviour.
+
+      section 6.4 (separate polish_generate_fn). When
+        `polish_generate_fn` is provided, polish_line uses it for the
+        LLM call instead of the writer's main `generate_fn`. The
+        writer's main fn typically has min_p / repetition_penalty /
+        top_p baked into its closure for long-form composition; those
+        knobs leak into polish (a short rewrite) and produce awkward
+        substitutions. The dedicated polish fn (built via
+        `_otr_model_loader.make_polish_generate_fn`) uses conservative
+        sampling. When `polish_generate_fn` is None, polish_line falls
+        back to `generate_fn` for back-compat with existing call sites.
 
     Tier 1 fix #11 (2026-05-11): does NOT itself re-run
     `needs_polish()` on the polish output. The caller (compose_line)
@@ -1100,39 +1220,60 @@ def polish_line(
     `polish_still_leaky` signal AND keep the pre-polish text rather
     than ship a "polished" line that still leaks. Polish is a
     quality nicety, not a correctness requirement.
-
-    Tier 3 fix #22 (2026-05-11) caveat: polish_line is called via
-    the SAME `generate_fn` as the composer, which means the writer's
-    closure-captured sampling knobs (min_p, repetition_penalty,
-    top_p) leak into polish unchanged. If `repetition_penalty` is
-    dialed up to 1.08 to fight loops in long-form composes, polish
-    (a short rewrite) inherits the penalty and can produce awkward
-    substitutions. Acceptable for v4; the proper fix is a separate
-    polish-only generate_fn with conservative defaults. Tracked in
-    the round-robin punch-list as "polish closure sampling".
     """
     if not (leaked_line or "").strip():
         return leaked_line
-    user = (
-        f"CHARACTER: {speaker_voice_card or 'unspecified speaker'}\n"
-        f"ORIGINAL LINE: {leaked_line}\n"
+
+    # section 6.1: pick the system prompt based on speaker_role.
+    is_announcer = (speaker_role or "").strip().lower() == "announcer"
+    system_prompt = (
+        _POLISH_SYSTEM_PROMPT_ANNOUNCER
+        if is_announcer
+        else _POLISH_SYSTEM_PROMPT
     )
+
+    # section 6.3: extended user prompt body with beat intent + recent
+    # dialogue when provided. Cap previous_lines at 2 entries (ADR
+    # section 6.3) so the prompt stays under the lean-prompt budget.
+    user_parts: list[str] = []
+    role_label = "ANNOUNCER" if is_announcer else "CHARACTER"
+    user_parts.append(
+        f"{role_label}: {speaker_voice_card or 'unspecified speaker'}"
+    )
+    if beat_intent:
+        intent_str = str(beat_intent).strip()
+        if intent_str:
+            user_parts.append(f"BEAT INTENT: {intent_str}")
+    if previous_lines:
+        recent = tuple(previous_lines)[-2:]
+        recent_clean = [str(x).strip() for x in recent if str(x).strip()]
+        if recent_clean:
+            user_parts.append("PREVIOUS LINES:")
+            for line in recent_clean:
+                user_parts.append(f"  {line}")
+    user_parts.append(f"ORIGINAL LINE: {leaked_line}")
+    user = "\n".join(user_parts) + "\n"
+
     messages = [
-        {"role": "system", "content": _POLISH_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user},
     ]
     orig_word_count = max(4, len(leaked_line.split()))
     mnt = max(40, orig_word_count * _POLISH_MAX_TOKENS_MULTIPLIER)
+
+    # section 6.4: use the polish-specific generate_fn when provided.
+    active_fn = polish_generate_fn if polish_generate_fn is not None else generate_fn
+
     try:
         try:
-            raw = generate_fn(
+            raw = active_fn(
                 messages,
                 temperature=temperature,
                 max_new_tokens=mnt,
                 stop=list(stop_strings) if stop_strings else None,
             )
         except TypeError:
-            raw = generate_fn(
+            raw = active_fn(
                 messages, temperature=temperature, max_new_tokens=mnt,
             )
     except Exception as exc:  # noqa: BLE001
@@ -1144,6 +1285,14 @@ def polish_line(
     cleaned = strip_line_formatting(raw or "")
     if not cleaned:
         log.debug("[OTR_LineComposer] polish_line produced empty output")
+        return leaked_line
+    # section 6.2: reject model-refusal outputs masquerading as polish.
+    if is_polish_refusal(cleaned):
+        log.info(
+            "[OTR_LineComposer] polish_line REFUSAL detected; keeping "
+            "pre-polish text. refusal=%r",
+            cleaned[:80],
+        )
         return leaked_line
     return cleaned
 
@@ -1157,6 +1306,7 @@ def compose_line(
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     enable_polish_pass: bool = False,
+    polish_generate_fn=None,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1336,11 +1486,23 @@ def compose_line(
                 "(narration-leak detected)",
                 req.speaker,
             )
+            # LFC sprint commit 3 (2026-05-11): thread the new
+            # context fields through. polish_generate_fn defaults to
+            # None and the polish call falls back to `generate_fn`
+            # for back-compat with callers that don't yet build a
+            # polish-specific generate_fn (composer-tuned sampling
+            # leaks in -- a known regression tracked since Tier 3 #22).
             polished = polish_line(
                 generate_fn,
                 cleaned,
                 req.character_voice_card,
                 stop_strings=stop_strings,
+                speaker_role=req.speaker_role,
+                beat_intent=req.intent,
+                previous_lines=tuple(
+                    txt for _spk, txt in (req.last_lines or [])
+                ),
+                polish_generate_fn=polish_generate_fn,
             )
             # Re-strip in case the polish prompt produced a fresh
             # speaker tag at the head (defensive — polish's prompt

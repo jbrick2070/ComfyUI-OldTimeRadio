@@ -277,6 +277,82 @@ def make_generate_fn(cache_entry: dict[str, Any]):
 
 
 # ---------------------------------------------------------------------------
+# Polish-specific generate fn (LFC sprint commit 3, section 6.4)
+# ---------------------------------------------------------------------------
+
+
+# Polish-specific sampling baked in per ADR section 6.4. None of these
+# are configurable per-call -- the whole point of the dedicated polish
+# fn is that the writer's closure-captured composer tuning
+# (repetition_penalty, min_p, top_p tweaks) cannot leak in.
+_POLISH_TOP_P: float = 0.9
+_POLISH_DO_SAMPLE: bool = True
+
+
+def make_polish_generate_fn(cache_entry: dict[str, Any]):
+    """Build a polish-specific generate fn from `cache_entry`.
+
+    LFC sprint commit 3, ADR section 6.4 (2026-05-11). Polish is a
+    short, targeted rewrite -- conceptually closer to a constrained
+    edit than the composer's long-form generation. The writer's main
+    `make_generate_fn` (via the OTR_LedgerScriptWriter
+    `_build_truncating_generate_fn` wrapper) bakes
+    repetition_penalty / min_p / top_p into its closure tuned for
+    composition. Those settings leak into polish via closure capture
+    and produce awkward substitutions on short rewrites.
+
+    The polish fn here is a SEPARATE closure off the same cache_entry
+    with composer-independent sampling:
+
+        temperature      -- caller-provided per call (defaults to 0.4
+                            via _otr_line_composer.polish_line)
+        top_p            -- 0.9 (slightly tighter than composer 0.92)
+        do_sample        -- True
+        min_p            -- not passed (transformers default 0)
+        repetition_penalty -- not passed (transformers default 1.0)
+
+    Returns a callable with the same signature as `make_generate_fn`:
+        (messages, *, temperature, max_new_tokens) -> str
+    """
+    required = {"model", "tokenizer"}
+    missing = required - set(cache_entry)
+    if missing:
+        raise ModelLoaderError(
+            f"cache_entry missing required keys: {sorted(missing)}"
+        )
+
+    model = cache_entry["model"]
+    tokenizer = cache_entry["tokenizer"]
+
+    def polish_generate_fn(messages, *, temperature, max_new_tokens):
+        try:
+            import torch  # noqa: F401
+        except ImportError as exc:
+            raise ModelLoaderError("torch not available") from exc
+
+        prompt = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        with __import__("torch").no_grad():
+            out = model.generate(
+                **inputs,
+                do_sample=_POLISH_DO_SAMPLE,
+                temperature=temperature,
+                top_p=_POLISH_TOP_P,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        prompt_len = inputs["input_ids"].shape[1]
+        return tokenizer.decode(
+            out[0][prompt_len:],
+            skip_special_tokens=True,
+        )
+
+    return polish_generate_fn
+
+
+# ---------------------------------------------------------------------------
 # Self-test (run as `python nodes/_otr_model_loader.py`)
 # ---------------------------------------------------------------------------
 
