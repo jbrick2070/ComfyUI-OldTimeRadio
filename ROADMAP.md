@@ -8,6 +8,39 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
+## STANDING DIRECTIVE — NO LEGACY BACK-COMPAT (Jeffrey, 2026-05-11)
+
+OTR v2.0 is **greenfield**. The project is being written front-to-back as a single rigorous workflow. We are NOT preserving compatibility with legacy nodes, legacy class names, legacy field names, or legacy on-disk shapes from any pre-v2.0 / pre-LFC state.
+
+**Rule for every contributor (human + AI):**
+
+- When a node is renamed, **delete** the old name. Do not ship a re-export shim.
+- When `_RENAME_ALIASES` (or equivalent) gets a new entry, **delete the entry** along with the rename. The old workflow JSON is expected to be updated to the new class name.
+- When a meta field gets a new canonical name, **delete the old key**. Do not stamp both names "to keep legacy consumers working".
+- When a phase / pass is replaced, **delete the old function** and every test that pinned the old contract. The new contract is the only contract.
+- When an output socket renames, **don't carry the old name in the JSON shape**. Update every consumer.
+
+**Audit hits as of HEAD `302b839`** that need to be pruned in a follow-up commit (call it `commit 12.3 — legacy prune`):
+
+- `nodes/OTR_LedgerScriptReviewer.py` re-export shim → DELETE the file.
+- `__init__.py` `_RENAME_ALIASES["OTR_LedgerScriptReviewer"]` entry → REMOVE the line.
+- `__init__.py` `_RENAME_ALIASES["OTR_Gemma4Director"]` entry → REMOVE the line (the legacy Gemma director name is dead).
+- `nodes/OTR_LedgerFreezeCascade.py::_no_ledger_error_json` stamps `"reviewer_verdict"` alongside `"freeze_verdict"` with comment "Legacy field kept so consumers still keyed on the old name see the same signal" → DROP the legacy field; downstream nodes should read `freeze_verdict` only.
+- Any test asserting that `OTR_LedgerScriptReviewer` (old name) still resolves to a class → DELETE the assertion.
+- Workflow JSON `widgets_values` defaults that exist purely to "match the pre-rename legacy" → review; the JSON should be the single canonical surface, written from scratch if needed.
+
+**Acceptance criteria for `commit 12.3 — legacy prune`:**
+
+1. `grep -rn "OTR_LedgerScriptReviewer" nodes/ __init__.py` returns ZERO hits outside the legacy-rename log entry in BUG_LOG.md and the ADR text.
+2. `grep -rn "Gemma4" nodes/ __init__.py` returns zero hits.
+3. `grep -rn "reviewer_verdict" nodes/` returns zero hits.
+4. The workflow JSON loads in ComfyUI Desktop with NO missing-node warnings or back-compat aliases firing.
+5. Bug Bible regression holds 23/1/2xf.
+
+The legacy-prune is its own commit so the diff stays small + auditable. Defer it to a fresh session — context-heavy sessions tend to put the legacy shims back if they aren't pruned in a clean pass.
+
+---
+
 ## CURRENT WORK — news_interpreter sprint (all 5 commits SHIPPED 2026-05-10) — COMPLETE
 
 **State:** Sprint complete on `v2.0-alpha`. Commits: `6f3218d` (ADR + canary tests), `70d25eb` (agnostic module + GBNF grammar), `f518fb3` (writer wiring + cast + outline + schema bump `l3-2026-05-14` + canary case 12 flipped), `9f82685` (announcer closing-line override + post-assembly key_terms audit + 13 new wiring tests), `4f45c7c` (era literals stripped + 5 text-scan canaries flipped, originally shipped at `92e58e5` with wrong subject and force-amended). Module is strictly LLM-agnostic — `generate_fn(messages, *, temperature, max_new_tokens) -> str` only, no model branches. End-to-end pipeline: RSS → full article dict → `build_news_briefs` (one LLM call, 4 outputs) → `meta.news` → cast prompt + outline prompt + announcer closing line + post-assembly key_terms audit. Bug Bible 15p/2x/1s baseline held across every commit. Two canaries remain armed as out-of-scope future-ADR work (RADIO portrait + MusicGen cues per ADR section 1). The downstream prompt audit (`outputs/downstream_prompt_audit.html` artifact) identified 5 hardcoded era-literal violations across `script_critic.py` + `story_orchestrator.py` and a structural gap where downstream consumers never see the news article body. Round-robin synthesis (ChatGPT gpt-5.5 + Gemini 3.1 Pro + NVIDIA) converged on a unified 4-output news_interpreter LLM stage inserted between style-resolve (D.2) and cast-lock (D.3) in `OTR_LedgerScriptWriter`. Canonical ADR at `docs/news_interpreter_adr.md`.
