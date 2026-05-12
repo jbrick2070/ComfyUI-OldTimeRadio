@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Set
 
 log = logging.getLogger("OTR.lfc_smart_suggestion")
 
@@ -144,7 +144,16 @@ class SmartSuggestionReport:
 
 
 def _existing_sfx_tags(ledger_data: dict, scene_lines: list) -> set[str]:
-    """Set of sfx tags already stamped on this scene's lines."""
+    """Set of canonical sfx tags already stamped on this scene's lines.
+
+    B1 fix (commit 12.1): for auto_generated SFX entries the canonical
+    tag lives on the `sfx_tag` field stamped at synthesis time. For
+    user-stamped SFX entries (no `sfx_tag` field), fall back to the
+    text-derived token form.
+
+    Canonical tag format matches the SFX_VERB_PATTERNS table:
+    snake_case identifier like "car_engine_start".
+    """
     tags: set[str] = set()
     for ln in scene_lines:
         if not isinstance(ln, dict):
@@ -152,12 +161,26 @@ def _existing_sfx_tags(ledger_data: dict, scene_lines: list) -> set[str]:
         role = (ln.get("speaker_role") or "").strip().lower()
         if role != "sfx":
             continue
-        text = (ln.get("text") or "").strip().lower()
-        if text:
-            # Keep a coarse-grained token for set membership -- the
-            # caller wants "was anything sfx-shaped in this beat?"
-            # not perfect parsing.
-            tags.add(re.sub(r"\W+", "_", text))
+        # B1 fix: prefer the canonical sfx_tag field when present.
+        canonical = ln.get("sfx_tag")
+        if isinstance(canonical, str) and canonical:
+            tags.add(canonical.lower())
+            continue
+        # Fallback for user-stamped SFX: strip the "SFX: " prefix
+        # if present, then snake_case the remainder. Matches the
+        # canonical tag format closely enough for the common case
+        # where the user typed "SFX: car_engine_start".
+        text = (ln.get("text") or "").strip()
+        if not text:
+            continue
+        lowered = text.lower()
+        if lowered.startswith("sfx:"):
+            lowered = lowered[4:].strip()
+        # Try the raw lowered form first (matches if user typed the
+        # canonical tag verbatim); also add the snake_case form for
+        # near-matches.
+        tags.add(lowered)
+        tags.add(re.sub(r"\W+", "_", lowered).strip("_"))
     return tags
 
 
@@ -172,23 +195,43 @@ def _existing_music_tags(scene_lines: list) -> set[str]:
     return tags
 
 
-def _next_beat_id(ledger_data: dict, prefix: str = "auto_sfx_") -> str:
-    """Generate a stable auto-incrementing beat_id for synthesized
-    SFX / music entries. Scans existing beats so re-running Phase
-    4.5 is idempotent (same input -> same generated IDs)."""
-    existing = set()
+def _next_beat_id(
+    ledger_data: dict,
+    prefix: str = "auto_sfx_",
+    *,
+    reserved: Optional[set[str]] = None,
+) -> str:
+    """Generate a stable auto-incrementing beat_id for synthesized entries.
+
+    Scans existing beat_id + line_id fields under the same prefix on
+    the ledger. The optional `reserved` set lets the caller pass a
+    running registry of IDs claimed in the current synthesis pass --
+    needed because synthesised entries are accumulated in a LOCAL
+    new_lines list during the scene loop and aren't visible on
+    ledger_data["lines"] until the loop exits (B6 fix).
+
+    Returns the next free `f"{prefix}{i:03d}"` id and adds it to
+    `reserved` when supplied so the caller's next call gets a fresh
+    id.
+    """
+    existing: set[str] = set()
     for source in (ledger_data.get("beats") or [],
                    ledger_data.get("lines") or []):
         for item in source:
             if not isinstance(item, dict):
                 continue
-            bid = item.get("beat_id") or ""
-            if bid.startswith(prefix):
-                existing.add(bid)
+            for key in ("beat_id", "line_id"):
+                val = item.get(key) or ""
+                if isinstance(val, str) and val.startswith(prefix):
+                    existing.add(val)
+    if reserved:
+        existing |= reserved
     i = 0
     while True:
         candidate = f"{prefix}{i:03d}"
         if candidate not in existing:
+            if reserved is not None:
+                reserved.add(candidate)
             return candidate
         i += 1
 
@@ -267,6 +310,16 @@ def phase_4_5_smart_suggestion(
     # implementation so the ordering invariant holds.
     scene_buf: list = []
 
+    # B6 fix (commit 12.1): track IDs reserved across the whole
+    # synthesis pass so two SFX/music suggestions in one run can't
+    # collide on the same `auto_sfx_000` / `auto_music_000` id. The
+    # set is per-namespace (line_id and beat_id share the same
+    # prefix system, but each new entry needs its own line_id AND
+    # its own beat_id -- so we keep them in one combined reservation
+    # to guarantee uniqueness across both fields).
+    reserved_line_ids: set[str] = set()
+    reserved_beat_ids: set[str] = set()
+
     def _flush_scene_with_suggestions():
         if not scene_buf:
             return
@@ -320,12 +373,22 @@ def phase_4_5_smart_suggestion(
                 })
 
         # Append the scene's original lines, then the synthesized
-        # entries at the end of the scene block.
+        # entries at the end of the scene block. B6 fix: each ID
+        # generator call threads through the running reservation
+        # sets so two SFX synths in one run get distinct IDs. B1
+        # fix: stamp `sfx_tag` so cross-run dedupe via
+        # _existing_sfx_tags matches the canonical tag.
         new_lines.extend(scene_buf)
         for entry in added_this_scene_sfx:
             new_lines.append({
-                "line_id": _next_beat_id(ledger_data, "auto_sfx_"),
-                "beat_id": _next_beat_id(ledger_data, "auto_sfx_beat_"),
+                "line_id": _next_beat_id(
+                    ledger_data, "auto_sfx_",
+                    reserved=reserved_line_ids,
+                ),
+                "beat_id": _next_beat_id(
+                    ledger_data, "auto_sfx_beat_",
+                    reserved=reserved_beat_ids,
+                ),
                 "speaker_role": "sfx",
                 "char_id": "",
                 "text": f"SFX: {entry}",
@@ -333,11 +396,18 @@ def phase_4_5_smart_suggestion(
                 "word_count": 2,
                 "skip": False,
                 "auto_generated": True,
+                "sfx_tag": entry,
             })
         for entry in added_this_scene_music:
             new_lines.append({
-                "line_id": _next_beat_id(ledger_data, "auto_music_"),
-                "beat_id": _next_beat_id(ledger_data, "auto_music_beat_"),
+                "line_id": _next_beat_id(
+                    ledger_data, "auto_music_",
+                    reserved=reserved_line_ids,
+                ),
+                "beat_id": _next_beat_id(
+                    ledger_data, "auto_music_beat_",
+                    reserved=reserved_beat_ids,
+                ),
                 "speaker_role": "music_inter",
                 "char_id": "",
                 "text": f"MUSIC: {entry}",
@@ -345,6 +415,7 @@ def phase_4_5_smart_suggestion(
                 "word_count": len(entry.split()),
                 "skip": False,
                 "auto_generated": True,
+                "music_tag": entry,
             })
 
     for ln in lines:

@@ -418,7 +418,12 @@ def _phase_3_per_line_polish(
 
 
 def _phase_4_per_scene_coherence_stub(generate_fn, led) -> None:
-    """Phase 4 no-op stub. Commit 8 wires in scene coherence."""
+    """Phase 4 no-op stub. Commit 8 wires in scene coherence.
+
+    B5 fix (commit 12.1): the stub itself only logs; the orchestrator
+    stamps a stub_bypassed record on meta.cleanup_passes so
+    downstream telemetry / soak diagnostics see a contiguous
+    phase-record list with no gaps for stub phases."""
     log.debug("[LFC:phase_4] stub -- per-scene coherence not yet wired")
 
 
@@ -431,13 +436,46 @@ def _phase_4_5_smart_suggestion(led, *, enable: bool = False, generate_fn=None):
 
 
 def _phase_5_voice_drift_stub(generate_fn, led) -> None:
-    """Phase 5 no-op stub. Commit 9 wires in voice drift detection."""
+    """Phase 5 no-op stub. Commit 9 wires in voice drift detection.
+
+    B5 fix (commit 12.1): see phase 4 stub note."""
     log.debug("[LFC:phase_5] stub -- voice drift not yet wired")
 
 
 def _phase_6_episode_arc_stub(generate_fn, led) -> None:
-    """Phase 6 no-op stub. Commit 10 wires in episode arc audit."""
+    """Phase 6 no-op stub. Commit 10 wires in episode arc audit.
+
+    B5 fix (commit 12.1): see phase 4 stub note."""
     log.debug("[LFC:phase_6] stub -- episode arc not yet wired")
+
+
+def _stamp_stub_or_skipped_phase(
+    ledger_data: dict,
+    *,
+    phase_name: str,
+    reason: str,
+) -> None:
+    """Append a zero-cost phase record for stub / terminal-skipped phases.
+
+    B5 fix (commit 12.1): ensures meta.cleanup_passes is contiguous
+    even when a phase didn't actually run. `reason` is one of:
+      "stub_bypassed"     -- the phase implementation is a no-op stub
+                            (Phase 4 / 5 / 6 today).
+      "terminal_skipped"  -- the reviewer returned a terminal verdict
+                            and the cascade short-circuited (B7 fix).
+      "enable_false"      -- phase disabled via the widget toggle.
+    """
+    hash_now = _hash_lines_text(ledger_data)
+    ts = _isoformat_utc_now()
+    _stamp_phase_record(
+        ledger_data,
+        phase_name=phase_name,
+        text_hash_before=hash_now,
+        text_hash_after=hash_now,
+        started_at=ts,
+        finished_at=ts,
+        failures=[{"line_id": f"__{phase_name}__", "reason": reason}],
+    )
 
 
 # LFC commit 5: Phase 7 + Phase 8 wired through `_otr_readiness`. Both
@@ -480,6 +518,7 @@ def run_freeze_cascade(
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
     enable_phase_4_5_smart_suggestion: bool = False,
+    vram_ceiling_gb: float = 14.0,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
 
@@ -517,6 +556,30 @@ def run_freeze_cascade(
     freeze contract (ledger-health audit) independent of LLM cleanup.
     """
     ledger_data = led.data
+
+    # ---- B2 fix (commit 12.1): VRAM watchdog at cascade entry ----
+    # Alarm plumbing only -- single measurement, warn on over-ceiling,
+    # continue regardless. Per-phase gating is follow-up wiring once
+    # soak data shows where the actual ceiling hits are.
+    meta = ledger_data.setdefault("meta", {})
+    meta["lfc_vram_ceiling_gb"] = float(vram_ceiling_gb)
+    try:
+        from . import _otr_lfc_watchdog as _LFC_WD  # type: ignore
+        over_ceiling, current_gb = _LFC_WD.vram_over_ceiling(
+            ceiling_gb=float(vram_ceiling_gb),
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[LFC] VRAM watchdog read failed at cascade entry: %s; "
+            "stamping 0.0 GB and proceeding", exc,
+        )
+        over_ceiling, current_gb = False, 0.0
+    meta["vram_at_cascade_entry_gb"] = float(current_gb)
+    if over_ceiling:
+        log.warning(
+            "[LFC] WARN VRAM at %.2f GB over %.2f ceiling; cascade "
+            "will proceed", current_gb, float(vram_ceiling_gb),
+        )
 
     # ---- Phase 0: deterministic warn-mode audit ----------
     started = _isoformat_utc_now()
@@ -584,10 +647,69 @@ def run_freeze_cascade(
         edits_applied=reviewer_disp.doctor_edits_applied,
     )
 
-    # Phase 4, 4.5, 5, 6 -- stubs run AFTER the reviewer because once
-    # commit 4/8/9/10/11 land, they operate on post-doctor text. The
-    # call order here is the contract; the stubs are no-ops today.
+    # ---- B7 fix (commit 12.1): terminal-verdict check moved here ----
+    # Pre-12.1 the terminal check fired AFTER Phase 4.5 / 7 / 8 had
+    # already mutated the restored ledger, breaking the "ledger
+    # byte-identical to input" guarantee that justifies skipping
+    # Phase 10. New order: reviewer composite -> terminal check ->
+    # (terminal: stamp remaining phases as terminal_skipped + return)
+    # OR (non-terminal: continue through Phase 4..8 + Phase 10).
+    interim_verdict = REVIEWER_TO_FREEZE_VERDICT.get(
+        reviewer_disp.verdict, "needs_full_rerun",
+    )
+    if interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
+        meta = ledger_data.setdefault("meta", {})
+        meta["freeze_verdict"] = interim_verdict
+        # B5: stamp the remaining phases as terminal_skipped so
+        # meta.cleanup_passes stays contiguous.
+        for skipped_name in (
+            "phase_4_per_scene_coherence",
+            "phase_4_5_smart_suggestion",
+            "phase_5_voice_drift",
+            "phase_6_episode_arc",
+            "phase_7_audio_readiness",
+            "phase_8_video_readiness",
+            "phase_10_gap_audit_post_and_freeze",
+        ):
+            _stamp_stub_or_skipped_phase(
+                ledger_data,
+                phase_name=skipped_name,
+                reason="terminal_skipped",
+            )
+        # Stamp the skipped-phase status on their respective meta keys
+        # so downstream readers see a consistent shape.
+        meta.setdefault("phase_4_5_smart_suggestion", {
+            "skipped": True, "skipped_reason": "terminal_skipped",
+        })
+        meta.setdefault("audio_readiness", {
+            "skipped": True, "skipped_reason": "terminal_skipped",
+        })
+        meta.setdefault("video_readiness", {
+            "skipped": True, "skipped_reason": "terminal_skipped",
+        })
+        disp = FreezeDisposition(
+            verdict=interim_verdict,
+            reviewer_disposition=reviewer_disp,
+            gap_audit_pre=pre_report,
+            gap_audit_post=None,
+        )
+        meta["freeze_disposition"] = disp.to_dict()
+        log.info(
+            "[LFC] terminal reviewer verdict %r -- skipping Phase 4..10 "
+            "(B7 fix: short-circuit moved before mutation phases)",
+            interim_verdict,
+        )
+        return disp
+
+    # ---- Non-terminal path: Phase 4 / 4.5 / 5 / 6 / 7 / 8 / 10 ----
+    # B5: stubs stamp records with reason="stub_bypassed" so the
+    # cleanup_passes list stays contiguous.
     _phase_4_per_scene_coherence_stub(generate_fn, led)
+    _stamp_stub_or_skipped_phase(
+        ledger_data,
+        phase_name="phase_4_per_scene_coherence",
+        reason="stub_bypassed",
+    )
     # Phase 4.5 smart suggestion (LFC commit 11). Default OFF
     # per ADR section 6.17. When enabled, scans for SFX/music
     # implications and appends auto_generated=True entries.
@@ -616,15 +738,19 @@ def run_freeze_cascade(
         ),
     )
     _phase_5_voice_drift_stub(generate_fn, led)
+    _stamp_stub_or_skipped_phase(
+        ledger_data,
+        phase_name="phase_5_voice_drift",
+        reason="stub_bypassed",
+    )
     _phase_6_episode_arc_stub(generate_fn, led)
-    # Phase 7 / 8 moved INTO this block in a later edit -- the
-    # call site below is the canonical one. (legacy comment.)
+    _stamp_stub_or_skipped_phase(
+        ledger_data,
+        phase_name="phase_6_episode_arc",
+        reason="stub_bypassed",
+    )
 
     # Phase 7 / 8 -- deterministic readiness checks (LFC commit 5).
-    # Default ON because both are cheap (no LLM calls) and the
-    # downstream audio + video chains benefit from the normalized
-    # text / portrait audit. Run regardless of reviewer outcome --
-    # readiness diagnostics are useful even on a restored ledger.
     started_7 = _isoformat_utc_now()
     hash_before_7 = _hash_lines_text(ledger_data)
     p7_report = _phase_7_audio_readiness(
@@ -656,30 +782,6 @@ def run_freeze_cascade(
         started_at=started_8,
         finished_at=_isoformat_utc_now(),
     )
-
-    # ---- Translate reviewer verdict to interim freeze verdict ----
-    interim_verdict = REVIEWER_TO_FREEZE_VERDICT.get(
-        reviewer_disp.verdict, "needs_full_rerun",
-    )
-
-    # ---- Terminal failure -> skip Phase 10 ----------------
-    if interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
-        meta = ledger_data.setdefault("meta", {})
-        meta["freeze_verdict"] = interim_verdict
-        # cleanup_locked stays False -- the reviewer's restore preserves
-        # the pre-cascade state and the cascade is not advancing.
-        disp = FreezeDisposition(
-            verdict=interim_verdict,
-            reviewer_disposition=reviewer_disp,
-            gap_audit_pre=pre_report,
-            gap_audit_post=None,
-        )
-        meta["freeze_disposition"] = disp.to_dict()
-        log.info(
-            "[LFC] terminal reviewer verdict %r -- skipping Phase 10",
-            interim_verdict,
-        )
-        return disp
 
     # ---- Phase 10: hard gate ------------------------------
     started = _isoformat_utc_now()

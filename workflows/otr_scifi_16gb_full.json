@@ -61,7 +61,6 @@
           "name": "news_used",
           "type": "STRING",
           "links": [
-            18,
             108
           ],
           "slot_index": 2
@@ -453,7 +452,7 @@
         {
           "name": "news_used",
           "type": "STRING",
-          "link": 18,
+          "link": 110,
           "widget": {
             "name": "news_used"
           }
@@ -2054,7 +2053,9 @@
         {
           "name": "news_used",
           "type": "STRING",
-          "links": [],
+          "links": [
+            110
+          ],
           "slot_index": 2
         },
         {
@@ -2164,14 +2165,6 @@
       0,
       12,
       3,
-      "STRING"
-    ],
-    [
-      18,
-      1,
-      2,
-      12,
-      2,
       "STRING"
     ],
     [
@@ -2573,6 +2566,14 @@
       62,
       3,
       "INT"
+    ],
+    [
+      110,
+      62,
+      2,
+      12,
+      2,
+      "STRING"
     ]
   ],
   "groups": [],

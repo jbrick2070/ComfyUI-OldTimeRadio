@@ -44,6 +44,7 @@ __all__ = [
     "unload_llm",
     "MODEL_CONTEXT_CAPS",
     "make_generate_fn",
+    "make_polish_generate_fn",
     "ModelLoaderError",
 ]
 

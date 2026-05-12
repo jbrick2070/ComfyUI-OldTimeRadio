@@ -43,14 +43,25 @@ DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
 def _no_ledger_error_json(incoming_script_json: str) -> str:
     """Synthesize a parseable error-state JSON when no ledger exists.
 
-    Mirrors the previous OTR_LedgerScriptReviewer behaviour: any
-    downstream consumer doing `json.loads(script_json)` gets back a
-    dict (not `"{}"` placeholder) flagged with freeze_verdict =
-    needs_full_rerun.
+    W3 fix (commit 12.1): ALWAYS stamp the synthetic-error-state
+    shape regardless of whether the incoming script_json is empty.
+    Pre-12.1 a non-empty incoming JSON was returned unchanged --
+    downstream consumers parsing `meta.freeze_verdict` saw one
+    thing, consumers parsing `schema_version` saw another. Now the
+    return is consistent: synthetic_error_state schema_version +
+    freeze_verdict=needs_full_rerun + freeze_disposition stamped.
+
+    The incoming JSON content (truncated to 200 chars) is preserved
+    on `meta.freeze_disposition.skipped_reason_detail` for forensic
+    inspection.
     """
     incoming = (incoming_script_json or "").strip()
+    detail = ""
     if incoming and incoming != "{}":
-        return incoming
+        # Preserve a forensic snippet so soak diagnostics can see
+        # what the writer DID produce, even though the ledger handle
+        # was lost.
+        detail = incoming[:200]
     return json.dumps({
         "schema_version": "synthetic_error_state",
         "lines": [],
@@ -61,6 +72,7 @@ def _no_ledger_error_json(incoming_script_json: str) -> str:
                 "verdict": "needs_full_rerun",
                 "skipped": True,
                 "skipped_reason": "no_writer_produced_ledger",
+                "skipped_reason_detail": detail,
             },
             # Legacy field kept so consumers still keyed on the old
             # name see the same signal until the cascade migration
@@ -211,12 +223,13 @@ class OTR_LedgerFreezeCascade:
                     "max": 24.0,
                     "step": 0.5,
                     "tooltip": (
-                        "VRAM watchdog ceiling (GB). Before each LFC "
-                        "LLM call, current VRAM allocation is checked "
-                        "against this ceiling; over-ceiling skips the "
-                        "phase with a warn log. ADR section 6.8 caps "
-                        "at 14.0 GB on the 5080 Laptop (16 GB total, "
-                        "0.5 GB margin under the 14.5 GB usable cap)."
+                        "VRAM ceiling (GB) stamped on meta; entry-time "
+                        "check warns on over-ceiling. Per-phase "
+                        "skipping is follow-up wiring once soak data "
+                        "shows where the actual ceiling hits are. ADR "
+                        "section 6.8 caps at 14.0 GB on the 5080 "
+                        "Laptop (16 GB total, 0.5 GB margin under the "
+                        "14.5 GB usable cap)."
                     ),
                 }),
             },
@@ -285,7 +298,11 @@ class OTR_LedgerFreezeCascade:
         try:
             polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
         except Exception as exc:  # noqa: BLE001
-            log.debug(
+            # B4 fix (commit 12.1): bumped from debug -> warning so a
+            # real make_polish_generate_fn regression surfaces in the
+            # boot log instead of silently falling back to the
+            # closure-leak path.
+            log.warning(
                 "[OTR_LedgerFreezeCascade] make_polish_generate_fn "
                 "unavailable (%s); falling back to generate_fn", exc,
             )
@@ -297,14 +314,11 @@ class OTR_LedgerFreezeCascade:
             led.episode_id,
             len(led.data.get("lines", []) or []),
         )
-        # LFC commit 12: stamp the vram_ceiling on meta so the
-        # cascade's per-phase VRAM watchdog reads it. The cascade
-        # uses 14.0 GB as the hardcoded default until the orch
-        # helper is upgraded to read from meta in a follow-up
-        # commit (ADR section 6.8 alarm-plumbing scope).
-        led.data.setdefault("meta", {})["lfc_vram_ceiling_gb"] = float(
-            vram_ceiling_gb
-        )
+        # B2 fix (commit 12.1): vram_ceiling_gb now threads directly
+        # into run_freeze_cascade as a real kwarg (instead of being
+        # stamped on meta and silently ignored). The cascade still
+        # stamps lfc_vram_ceiling_gb on meta inside run_freeze_cascade
+        # for downstream consumers.
         disp = _LFC_ORCH.run_freeze_cascade(
             generate_fn,
             led,
@@ -314,6 +328,7 @@ class OTR_LedgerFreezeCascade:
             enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
             enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
             enable_phase_8_video_readiness=enable_phase_8_video_readiness,
+            vram_ceiling_gb=float(vram_ceiling_gb),
         )
         log.info(
             "[OTR_LedgerFreezeCascade] freeze_verdict=%s "
