@@ -1,7 +1,7 @@
 # LFC Clean-Break — Reviewer QA
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
-**HEAD:** `46322bd` (tag `v2.0-alpha-cleanbreak` at `0f0c564`)
+**HEAD:** `46322bd` (tag `v2.0-alpha-cleanbreak` at `46322bd`)
 **Series:** 9 commits (12.3 → 12.11) + annotated tag
 **Premise:** v2.0-alpha is a clean break. No legacy back-compat
 surface. Every cascade phase has its own record; cascade unloads
@@ -24,7 +24,7 @@ them are the signal.
 | 12.7 | `890e3f7` | C5 + C6: `scripts/lfc_wiring_smoke.py` runs widget defaults + RETURN_NAMES + legacy-token + news_used chain + last_link_id checks. Pytest wrapper gates it in `pytest tests/` |
 | 12.8 | `4a7da85` | C2: `freeze_verdict` slot 4 wired to `ShowText\|pysssss` node 63 via link 111 |
 | 12.9 | `ea83e48` | C9: `estimated_minutes` slot 3 wired to `ShowText\|pysssss` node 64 via link 112 |
-| 12.10 | `dd2ec26` | C4: runtime smoke test asserts writer → cascade → SignalLostVideo `news_used` parsed-equality (non-empty input is byte-identical) |
+| 12.10 | `dd2ec26` | C4: runtime smoke test asserts writer → cascade → SignalLostVideo `news_used` is byte-identical end-to-end. The cascade passes `news_used` through as an unmodified STRING (no re-serialization), so the stronger byte-identical invariant holds and is the one the test pins. |
 | 12.11 | `46322bd` | C1: standalone `OTR_LFCPhase4Scene` / `OTR_LFCPhase5Voice` / `OTR_LFCPhase6Arc` nodes — each defaults OFF, peeks the ledger, delegates to its phase module |
 
 ---
@@ -212,11 +212,14 @@ share a common typing (e.g. a `Literal` type alias) so future
 consumers have one source of truth?
 
 ### Q6 — Legacy purge completeness
-`scripts/lfc_wiring_smoke.py` scans for `OTR_LedgerScriptReviewer`
-and `OTR_Gemma4Director`. Are there other legacy class / meta
-names worth adding to the scan list (e.g. `OTR_LLMScriptWriter`,
-`OTR_Gemma4ScriptWriter`, the `script_parse_json` token already
-checked by `test_legacy_contract_retired.py`)?
+**ANSWERED by commit 12.17 (D4 hardening).** `scripts/lfc_wiring_smoke.py`
+LEGACY_TOKENS now scans for: `OTR_LedgerScriptReviewer`,
+`OTR_Gemma4Director`, `OTR_LLMScriptWriter`, `OTR_Gemma4ScriptWriter`,
+`_RENAME_ALIASES`. Plus a new workflow-JSON scan
+(`WORKFLOW_LEGACY_CLASS_TYPES` against every saved workflow's
+`type` / `class_type` field) catches the case where a stale
+workflow file references a renamed class id. `script_parse_json`
+stays under `test_legacy_contract_retired.py` where it lives now.
 
 ### Q7 — `meta.freeze_phase_telemetry` cost
 The telemetry array contains one entry per phase (10 entries on
@@ -233,18 +236,30 @@ bucket records by index?
 
 For the series to be accepted, both reviewers should agree:
 
-1. `scripts/lfc_wiring_smoke.py` exits 0 (6 checks pass).
+1. `scripts/lfc_wiring_smoke.py` exits 0 (7 checks pass, after the
+   12.17 hardening commit -- workflow-JSON class-type scan added).
 2. `pytest tests/test_lfc_*.py tests/test_phase3_ledger_reviewer.py
    tests/test_workflow_json_guardrails.py tests/test_legacy_contract_retired.py`
    returns 452 passed / 5 skipped / 0 failed.
-3. Bug Bible regression holds 23 passed / 1 skipped / 2 xfailed.
+3. Bug Bible regression holds 23 passed / 1 skipped / 2 xfailed
+   (skip/xfail split may shift by environment; the only firm
+   contract is "0 failed").
 4. `grep -rn "OTR_LedgerScriptReviewer" nodes/ tests/ __init__.py`
    returns ZERO hits outside the allow-list (acceptance test file +
    smoke script + their pytest wrapper).
 5. Workflow JSON loads in ComfyUI Desktop without missing-node
-   warnings on a system with `pysssss` installed.
-6. `git tag --list v2.0-alpha-cleanbreak` shows the tag pointing at
-   `46322bd`.
+   warnings on a clean ComfyUI core install. (12.15: pysssss
+   previews dropped; cascade outputs `freeze_verdict` +
+   `estimated_minutes` remain available for operators who want to
+   wire their own preview.)
+6. `v2.0-alpha-cleanbreak` tag resolves to commit `46322bd`. Check
+   with an explicit equality, not a list-only existence test:
+   ```bash
+   test "$(git rev-list -n 1 v2.0-alpha-cleanbreak)" = "$(git rev-parse 46322bd)"
+   ```
+   `git tag --list v2.0-alpha-cleanbreak` only proves the tag
+   exists; the equality above proves it points at the right
+   commit.
 
 ---
 
