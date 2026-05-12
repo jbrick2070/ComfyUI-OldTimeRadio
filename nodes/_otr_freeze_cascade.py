@@ -67,6 +67,7 @@ __all__ = [
     "REVIEWER_TO_FREEZE_VERDICT",
     "FREEZE_TERMINAL_FAILURE_VERDICTS",
     "all_phase_passes",
+    "build_phase_telemetry",
 ]
 
 
@@ -200,6 +201,79 @@ def _bucket_for_phase(phase_name: str) -> str:
     classified here).
     """
     return _PHASE_BUCKETS.get(phase_name, "cleanup_passes")
+
+
+def build_phase_telemetry(meta: dict) -> list:
+    """Build a compact per-phase telemetry payload for soak diagnostics.
+
+    C3 of the clean-break go-forward plan (2026-05-12). The cascade's
+    `freeze_verdict` STRING output is a single literal -- useful but
+    coarse. This helper builds a structured per-phase summary that
+    rides on `meta.freeze_phase_telemetry` (NOT the output STRING --
+    that stays the literal verdict for graph-canvas readability).
+
+    Each entry shape:
+      {
+        "phase":    "phase_3_per_line_polish",  # phase_name
+        "bucket":   "cleanup_passes",            # audit/cleanup/readiness
+        "skipped":  bool,                        # did the phase run?
+        "changed":  bool,                        # did line.text mutate?
+        "warnings": int,                         # count of failure entries
+        "edits_proposed": int,
+        "edits_applied":  int,
+      }
+
+    `skipped` is True when the phase's failures list carries a
+    "stub_bypassed" / "terminal_skipped" / "enable_false" reason.
+    `changed` is True when text_hash_before != text_hash_after.
+    """
+    out: list = []
+    for bucket_key in ("audit_passes", "cleanup_passes", "readiness_passes"):
+        bucket = meta.get(bucket_key)
+        if not isinstance(bucket, list):
+            continue
+        for rec in bucket:
+            if not isinstance(rec, dict):
+                continue
+            failures = rec.get("failures") or []
+            skip_reasons = (
+                "stub_bypassed", "terminal_skipped", "enable_false",
+            )
+            skipped = any(
+                isinstance(f, dict)
+                and any(r in (f.get("reason") or "") for r in skip_reasons)
+                for f in failures
+            )
+            hash_before = rec.get("text_hash_before")
+            hash_after = rec.get("text_hash_after")
+            changed = (
+                hash_before is not None
+                and hash_after is not None
+                and hash_before != hash_after
+            )
+            real_failure_count = sum(
+                1 for f in failures
+                if isinstance(f, dict)
+                and not any(
+                    r in (f.get("reason") or "") for r in skip_reasons
+                )
+            )
+            out.append({
+                "phase": rec.get("phase_name", ""),
+                "bucket": bucket_key,
+                "skipped": skipped,
+                "changed": changed,
+                "warnings": real_failure_count,
+                "edits_proposed": int(rec.get("edits_proposed") or 0),
+                "edits_applied": int(rec.get("edits_applied") or 0),
+                "started_at": rec.get("started_at", ""),
+            })
+    out.sort(key=lambda r: r.get("started_at", ""))
+    # `started_at` is a forensic detail; drop from the public-shape
+    # output so soak diagnostics see the compact form.
+    for rec in out:
+        rec.pop("started_at", None)
+    return out
 
 
 def all_phase_passes(meta: dict) -> list:
@@ -780,6 +854,11 @@ def run_freeze_cascade(
             gap_audit_post=None,
         )
         meta["freeze_disposition"] = disp.to_dict()
+        # C3 (clean-break 2026-05-12): compact per-phase telemetry
+        # for soak diagnostics. Lives on meta only -- the
+        # freeze_verdict output STRING stays the verdict literal
+        # so graph-canvas previews are readable.
+        meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
         log.info(
             "[LFC] terminal reviewer verdict %r -- skipping Phase 4..10 "
             "(B7 fix: short-circuit moved before mutation phases)",
@@ -948,6 +1027,11 @@ def run_freeze_cascade(
             gap_audit_post=exc.report,
         )
         meta["freeze_disposition"] = disp.to_dict()
+        # C3 (clean-break 2026-05-12): compact per-phase telemetry
+        # for soak diagnostics. Lives on meta only -- the
+        # freeze_verdict output STRING stays the verdict literal
+        # so graph-canvas previews are readable.
+        meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
         log.warning(
             "[LFC] Phase 10 rejected freeze (%d critical gap(s))",
             len(exc.errors),
@@ -982,6 +1066,10 @@ def run_freeze_cascade(
         gap_audit_post=post_report,
     )
     meta["freeze_disposition"] = disp.to_dict()
+    # C3 (clean-break 2026-05-12): compact per-phase telemetry
+    # for soak diagnostics. Lives on meta only -- the
+    # freeze_verdict output STRING stays the verdict literal.
+    meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
     log.info(
         "[LFC] freeze landed: verdict=%s reviewer=%s pre_warns=%d "
         "post_warns=%d",
