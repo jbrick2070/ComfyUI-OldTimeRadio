@@ -132,6 +132,9 @@ def test_audiogen_iter_sfx_only(patched_audiogen_env):
 
         episode_seed="test-iter",
         default_duration=3.0,
+        # S17.2: test env has no transformers/AudioGen; opt into
+        # silence fallback so the strict-failure path doesn't fire.
+        allow_silence_fallback=True,
     )
 
     saved_led = patched_audiogen_env["led_disk"]

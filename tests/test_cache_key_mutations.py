@@ -35,11 +35,17 @@ from nodes import batch_audiogen_generator as AG
 # ---------------------------------------------------------------------------
 
 class TestMusicGenPrefixMutations:
+    # S17.1: keyword-only signature now requires model_id + guidance_scale
+    # on every call (parity with AudioGen's S12.3 cache key uplift). Defaults
+    # match BatchMusicGenTheme.render so tests written against the original
+    # 4-input signature stay focused on the dimensions they vary.
     BASE = dict(
         cue_id="opening",
         prompt="warm brass fanfare with snare brushes",
         duration_sec=12,
         episode_seed="seed_xyz",
+        model_id="facebook/musicgen-medium",
+        guidance_scale=3.0,
     )
 
     def _prefix(self, **overrides):
@@ -115,12 +121,22 @@ class TestAudioGenPrefixMutations:
 # Backward-compatible _cache_key still works
 # ---------------------------------------------------------------------------
 
-def test_musicgen_cache_key_returns_canonical_filename():
-    name = MT._cache_key("opening", "warm brass", 12, "seed1")
+def test_musicgen_cache_filename_for_write_returns_canonical():
+    """S17.1: MusicGen's legacy _cache_key wrapper was deleted (directive 11);
+    use _cache_filename_for_write directly with keyword-only args."""
+    name = MT._cache_filename_for_write(
+        cue_id="opening",
+        prompt="warm brass",
+        duration_sec=12,
+        episode_seed="seed1",
+        model_id="facebook/musicgen-medium",
+        guidance_scale=3.0,
+    )
     # No timestamp in canonical name
     assert name.endswith(".wav")
     assert name.count("_") == 1, (
-        f"musicgen canonical filename should be <cue>_<sha>.wav (one underscore), got {name}"
+        f"musicgen canonical filename should be <cue>_<sha>.wav "
+        f"(one underscore), got {name}"
     )
 
 

@@ -11,8 +11,8 @@ Covers four canonical Pattern 7 cases:
   - test_procsfx_stamps_by_line_id -- two sfx lines, both stamped with
     sfx_wav_path + sfx_engine + sfx_type + dur_s; wav files exist on disk
   - test_procsfx_disk_write_failure_graceful -- mock the wav writer to
-    raise; pipeline doesn't crash, sfx_wav_path stamped as None,
-    AUDIO batch still returns
+    raise; pipeline doesn't crash, sfx_wav_path stamped as "" (S18.1
+    convention; was None pre-cleanbreak), AUDIO batch still returns
   - test_procsfx_legacy_list_raises -- load_ledger ValueError surfaces
 """
 from __future__ import annotations
@@ -170,8 +170,8 @@ def test_procsfx_stamps_by_line_id(patched_procsfx_env):
 
 def test_procsfx_disk_write_failure_graceful(patched_procsfx_env):
     """Mock the wav writer to raise. Pipeline must NOT crash. The
-    ledger row gets sfx_wav_path=None (best-effort fallback). The
-    AUDIO batch return still ships."""
+    ledger row gets sfx_wav_path="" (S18.1 convention; was None
+    pre-cleanbreak). The AUDIO batch return still ships."""
     from nodes.batch_procedural_sfx import BatchProceduralSFX
 
     led_in = make_stub_ledger()
@@ -201,16 +201,21 @@ def test_procsfx_disk_write_failure_graceful(patched_procsfx_env):
     )
     assert audio_out["sample_rate"] == 48000
 
-    # Ledger stamped, but sfx_wav_path is None.
+    # Ledger stamped, sfx_wav_path is "" per S18.1 §6.16 convention.
     saved_led = patched_procsfx_env["led_disk"]
     by_id = {ln["line_id"]: ln for ln in saved_led["lines"]}
     row = by_id["b005"]
     assert row.get("sfx_engine") == "procedural"
     assert row.get("sfx_type") == "door_knock"
     assert row.get("dur_s", 0) > 0
-    assert row.get("sfx_wav_path") is None, (
-        f"on disk-write failure sfx_wav_path must be None; "
-        f"got {row.get('sfx_wav_path')!r}"
+    assert row.get("sfx_wav_path") == "", (
+        f"on disk-write failure sfx_wav_path must be \"\" "
+        f"(S18.1 convention); got {row.get('sfx_wav_path')!r}"
+    )
+    # S18.4: sfx_render_status surfaces the error path.
+    assert row.get("sfx_render_status") == "error", (
+        f"on disk-write failure sfx_render_status must be 'error'; "
+        f"got {row.get('sfx_render_status')!r}"
     )
 
     # Log line confirms the failure was surfaced (not silently swallowed).

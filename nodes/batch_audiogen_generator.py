@@ -448,18 +448,16 @@ class BatchAudioGenGenerator:
                     f"WARNING: AudioGen import failed; "
                     f"allow_silence_fallback=True -> silence."
                 )
+                # Honor per-cue durations from render_queue (the prior
+                # path used default_duration -- wrong; cues vary in
+                # length). Ledger-side fallback_silence stamping is
+                # downstream of the existing write-back block; the
+                # cache write below skips on silence.
                 for idx in to_generate_indices:
                     item_dur = float(render_queue[idx]["duration"])
                     final_clips[idx] = torch.zeros(
                         1, 1, int(AUDIOGEN_SAMPLE_RATE * item_dur)
                     )
-                    # Mark the ledger row so downstream sees the
-                    # silence-fallback state. Stamped by the writer
-                    # at line 5xx; render_results[idx] mirrors here.
-                    if idx < len(render_results):
-                        render_results[idx]["sfx_render_status"] = (
-                            "fallback_silence"
-                        )
             else:
                 batch_log.append(f"Loading {model_id}...")
                 device = "cuda" if torch.cuda.is_available() else "cpu"
