@@ -30,9 +30,12 @@ v1.7 ships the audio-reactive CRT video pipeline. **v2.0-alpha** adds in-graph H
 ### What's in the v2.0-alpha FULL workflow (`workflows/otr_scifi_16gb_full.json`)
 
 ```
-Audio path (v1.7 unchanged):
-  Story (LLM) → Director (LLM) → SceneSequencer → AudioEnhance → EpisodeAssembler → SignalLostVideo
+Audio path (v2.0-alpha ledger-based):
+  LedgerScriptWriter (LLM) → FreezeCascade → BatchBarkGenerator → KokoroAnnouncer →
+  AudioGen + MusicGen + ProcSFX (parallel) → SceneSequencer → AudioEnhance →
+  EpisodeAssembler → SignalLostVideo
   Output: signal_lost_<id>.mp4 — 1920x1080 audio-reactive CRT proc gen with 48 kHz audio embedded
+  (Legacy Director stage retired in voice-path-cleanbreak S2 / commit 249bc06.)
 
 FLUX environment stills (v1.7 unchanged):
   VideoPlan → ShotDurationCalculator → BatchFluxRender → UnloadAll → SaveImage
@@ -192,15 +195,18 @@ Run SIGNAL LOST as a live generative broadcast — each output episode auto-load
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ 1. WRITE THE STORY 📝                                                                              │
 │                                                                                                    │
-│ ┌──────────────────────────────┐                  ┌──────────────────────────────────────┐        │
-│ │ 1. LLM Story Writer        │─────────────────►│ 2. LLM Director              │        │
-│ │ (OTR_LLMScriptWriter)        │                  │ (OTR_LLMDirector)                    │        │
-│ │ RSS → LLM → Script           │                  │ Procedural cast • voices • SFX • music │        │
-│ │ Open-Close expansion         │                  │ LEMMY stays LEMMY (en_speaker_8)     │        │
-│ │ Self-critique loop           │                  └──────────────────────────────────────┘        │
-│ └──────────────────────────────┘                                                                    │
+│ ┌──────────────────────────────────────┐         ┌────────────────────────────────────────┐       │
+│ │ 1. LedgerScriptWriter                │────────►│ 2. FreezeCascade                       │       │
+│ │ (OTR_LedgerScriptWriter)             │         │ (OTR_LedgerFreezeCascade)              │       │
+│ │ RSS → LLM → L3 ledger                │         │ G1-G8 invariants enforced              │       │
+│ │ Outline + cast-lock + line composer  │         │ script_json fanout to 7+ consumers     │       │
+│ │ News interpreter (l3-2026-05-14)     │         │ LEMMY stays LEMMY (en_speaker_8)       │       │
+│ └──────────────────────────────────────┘         └────────────────────────────────────────┘       │
+│                                                                                                    │
+│ (Legacy "LLM Director" stage retired in voice-path-cleanbreak S2 / commit 249bc06.                │
+│  Cast + voice presets are now generated inside LedgerScriptWriter and locked at writer exit.)     │
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
-                                   │ script_json + production_plan
+                                   │ script_json (L3 ledger)
                                    ▼
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ 2. MAKE THE VOICES & SOUNDS 🎙️                                                                    │
@@ -287,8 +293,9 @@ ComfyUI/
                 │   ├── opening_<sha8>_<ts>.wav               # MusicGen opening theme
                 │   ├── closing_<sha8>_<ts>.wav               # MusicGen closing theme
                 │   ├── interstitial_<sha8>_<ts>.wav          # MusicGen interstitial
-                │   ├── sfx_<prompt>_<sha8>_<ts>.wav          # AudioGen SFX cues
-                │   └── director_dump_<ts>.txt                # LLMDirector raw dumps (BUG-090)
+                │   └── sfx_<prompt>_<sha8>_<ts>.wav          # AudioGen SFX cues
+                │   # (legacy director_dump_<ts>.txt files were retired in voice-path-cleanbreak S23.1
+                │   #  when the LLMDirector class + its raw-output dump helper were deleted)
                 │
                 ├── stills/                               # FLUX environment + radio bookend
                 │   ├── full_env_NNNNN_.png                   # Cast environments
@@ -330,7 +337,28 @@ ComfyUI/
 
 ## Node Reference
 
-NodeWhat It Does**1. LLM Story Writer**Fetches real RSS science headlines, then uses the selected LLM to write a multi-act script. **v1.5 Story Editor** critiques the outline before writing and generates per-act briefs that guide each act's dialogue. Open-Close expansion generates 3 competing 7-line micro-spines and picks the best. Arc Enhancer polishes opening/closing using act summaries + critique findings for start-to-end coherence. 12 dramatic story arc templates.**2. LLM Director**Scans the script and generates a production plan. Character names, traits, accents, and voice models are procedurally overridden. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails.**3. Voice Maker Machine**Generates TTS for every line sequentially using Bark with the Director's voice assignments. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated.**🎙️ Kokoro Announcer**Dedicated British narrator bus. Routes ANNOUNCER dialogue to Kokoro v1.0 for high-fidelity opening/closing bookends.**🎺 MusicGen Theme**Generates tone-mapped orchestral themes using `music_plan` prompts. SHA-256 caching environment prevents redundant generations.**🔊 SFX Maker Machine (AudioGen**)Generates high-fidelity Foley sound effects from Director prompts using `facebook/audiogen-medium`, natively cached to save VRAM.**🔊 SFX Maker Machine (Procedural**)Zero-VRAM fallback generator for 4GB Obsidian users, synthesizing clean procedural effects without loading heavy audio models.**4. Scene Builder**Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in script order.**5. Make It Sound Awesome**Masters the mix to 48kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization.**6. Glue Everything Together**Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration.**7. Make the Final Video**Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats.**v2.0 — Visual Drama Engine\[ALPHA — on** `v2.0-alpha` **branch\]8. Character Forge** `[v2.0]`Generates one portrait per cast member via Flux/SD using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Configurable portrait size, steps, and CFG. Sequential VRAM handoff after audio generation completes.**9. Scene Painter** `[v2.0]`Generates cinematic establishing shot backgrounds via Flux/SD. One background per scene from the Director's `visual_plan`. Seed offset from portraits to avoid visual correlation.**10. Visual Compositor** `[v2.0]`Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required.**11. Production Bus** `[v2.0]`FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track.
+| Node | What it does |
+|---|---|
+| **1. LedgerScriptWriter** | Fetches real RSS science headlines, then uses the selected LLM to write a multi-act L3 ledger (cast + lines + meta). News interpreter (`l3-2026-05-14`) builds a casting brief, script brief, and key terms in a single LLM call. Outline + cast-lock + line composer produces the final ledger; cast-lock invariants run at writer exit so downstream consumers see a frozen contract. LEMMY always gets `v2/en_speaker_8`. ANNOUNCER gets a gender-balanced random preset. International presets produce accented English with safety rails. _(Replaces the legacy ScriptWriter → LLMDirector chain retired in voice-path-cleanbreak S2.)_ |
+| **2. FreezeCascade** | G1-G8 invariant battery over the ledger. Phase 0 warns; Phase 10 raises `FreezeAssertionError`. Emits `script_json` (the ledger as a JSON string) to all downstream consumers via a single fanout output. |
+| **3. BatchBarkGenerator** | Generates TTS for every character line sequentially using Bark with the cast's locked voice presets. ASCII sanitizer strips non-ASCII before Bark. Temperature cap (0.55 for international, 0.5 for first lines). GPU-accelerated. Reads `cast.voice_preset` directly from the ledger; no legacy Director fallback. |
+| **🎙️ Kokoro Announcer** | Dedicated British narrator bus. Routes ANNOUNCER-role lines to Kokoro v1.0 for high-fidelity opening/closing bookends. |
+| **🎺 MusicGen Theme** | Generates tone-mapped orchestral themes from the cast-locked style slug. SHA-256 caching with 12-char digest + model_id + guidance_scale dimensions prevents redundant generations on parameter changes. |
+| **🔊 AudioGen SFX** | Generates high-fidelity Foley sound effects from per-line cue text using `facebook/audiogen-medium`. Strict ImportError default (Directive 1); `allow_silence_fallback` widget opts into silence-on-import-error for smoke tests only. |
+| **🔊 ProcSFX (Procedural)** | Zero-VRAM fallback generator for low-VRAM systems, synthesizing clean procedural effects without loading heavy audio models. Stamps `sfx_render_status` on every line. |
+| **4. SceneSequencer** | Stitches TTS lines, SFX cues, and `(beat)` pauses into scene audio in ledger order. |
+| **5. AudioEnhance** | Masters the mix to 48 kHz stereo with Haas-effect spatial widening, bass warmth, and loudness normalization. |
+| **6. EpisodeAssembler** | Sandwiches scenes with intro/outro theme music. Configurable crossfade and duration. |
+| **7. SignalLostVideo** | Procedural CRT frame rendering + NVIDIA hardware video encoding (`h264_nvenc`, CPU fallback). Saves `_treatment.txt` alongside the MP4 — full cast, voice assignments, complete script, and production stats. |
+
+**v2.0 — Visual Drama Engine** [ALPHA — on `v2.0-alpha` branch]
+
+| Node | What it does |
+|---|---|
+| **8. BatchFluxPortraitRender** `[v2.0]` | Generates one portrait per cast member via FLUX using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Sequential VRAM handoff after audio generation completes. Reads cast traits from the L3 ledger. |
+| **9. BatchFluxRender** `[v2.0]` | Generates cinematic establishing shot backgrounds via FLUX. One background per scene from the ledger's `meta.visual_plan`. Seed offset from portraits to avoid visual correlation. |
+| **10. VideoComposite** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
+| **11. PostAudioVideoPipeline** `[v2.0]` | FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track. |
 
 ---
 
@@ -447,9 +475,9 @@ The canonical parser now handles bare `NAME: dialogue` lines natively (Mistral's
 
 The LLM-based canonical rewrite pass (`_normalize_script_format`) previously counted bare `NAME:` lines as "already canonical" and skipped the rewrite. This meant Mistral scripts bypassed the voice-trait enrichment pass entirely, then hit a parser that couldn't read them. The skip now requires actual `[VOICE:]` bracket tags, forcing bare-NAME scripts through the rewrite every time.
 
-#### Director JSON Resilience
+#### Director JSON Resilience _(legacy — retained for v1.x history)_
 
-LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A new state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the Director now survives malformed output that previously crashed the entire pipeline.
+LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the legacy Director path survived malformed output that previously crashed the entire pipeline. (The Director class itself was deleted in voice-path-cleanbreak S2; the L3 ledger writer uses GBNF grammar-constrained generation instead, which makes the comment-stripper obsolete in v2.0.)
 
 #### Title Extraction Hardening
 
@@ -461,7 +489,7 @@ The recovery path inside `_parse_script` now fires when the strict parse finds f
 
 #### Soak-Hardened
 
-Seven bugs found and fixed in a single session (BUG-LOCAL-034 through 040), all verified on live end-to-end episode runs. Streak auto-halt, TITLE_STUCK filename resolution, WordExtend NameError, TITLE-as-character regression, bare-NAME dialogue parser, markdown-bold title leak, and Director JSON comment parsing.
+Seven bugs found and fixed in a single session (BUG-LOCAL-034 through 040), all verified on live end-to-end episode runs. Streak auto-halt, TITLE_STUCK filename resolution, WordExtend NameError, TITLE-as-character regression, bare-NAME dialogue parser, markdown-bold title leak, and legacy Director JSON comment parsing.
 
 ### What's New in v1.5 — CLEAN (Story Editor & Pipeline Hardening)
 
@@ -545,7 +573,7 @@ The Flash Attention 2 probe now logs a precise platform message instead of a gen
 
 #### Stability (from v1.3-beta)
 
-`prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the `LLMDirector` stage so the LLM has full VRAM during Arc Enhancer operations.
+`prestartup_script.py` injects a no-op mock for `transformers.safetensors_conversion` before any node imports, permanently eliminating the `JSONDecodeError` crash in offline/air-gapped environments. Bark's VRAM health probe is deferred to the legacy `LLMDirector` stage (retired in voice-path-cleanbreak S2 — the probe is now lazy-fired by the writer's cast-lock path) so the LLM has full VRAM during Arc Enhancer operations.
 
 #### Gemma 4 VRAM Release Fix (v1.3 final)
 
@@ -620,7 +648,7 @@ Continually monitoring the footprint and removing unused nodes. Boot log confirm
 
 1. **Offline First:** This project is designed for air-gapped performance. Never add code that relies on real-time `transformers` Hub pings or `requests.get` to remote servers without the safety mocks in `prestartup_script.py`.
 2. **cache_dir is MANDATORY:** Every `from_pretrained()` call in the codebase MUST pass `cache_dir` explicitly (derived from `HF_HOME` env var). Relying on implicit HF_HOME resolution or `__file__`-relative dirname counting WILL break on Windows symlinks and ComfyUI Desktop App environments. The v1.4 lesson: 3 `os.path.dirname()` calls resolved to `custom_nodes/models/` (wrong), not `ComfyUI/models/` (correct).
-3. **VRAM Sequencing:** Do not load Bark models while the LLM is active. The `LLMDirector` is the bridge where the LLM unloads and Bark prepares. Keep this boundary clean.
+3. **VRAM Sequencing:** Do not load Bark models while the LLM is active. The writer's cast-lock exit is the bridge where the LLM unloads and Bark prepares. (Pre-cleanbreak the bridge was the legacy `LLMDirector` stage; that stage was deleted in voice-path-cleanbreak S2 and the unload/prepare invariant moved into the writer.) Keep this boundary clean.
 4. **Regex Parity:** The dialogue filter `_clean_text_for_bark` is duplicated in `batch_bark_generator.py` and `scene_sequencer.py`. Any change to one must be applied to both.
 5. **Test Sovereignty:** Run `python -m pytest tests/` before committing. The arc coherence tests in `tests/test_arc_check.py` cover Phase A scoring and Plot Spine extraction — do not skip them.
 6. **Flash Attention 2:** No prebuilt wheel exists for torch 2.10 + CUDA 13 + Blackwell sm_120 on Windows. SageAttention is already active. Do not attempt FA2 installation on this platform.
