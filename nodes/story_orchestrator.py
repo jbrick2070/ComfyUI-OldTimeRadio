@@ -9,9 +9,12 @@ Two nodes:
      headlines become the inciting incident, extrapolated to dramatic extremes.
      Includes a hard-science epilogue citing real sources (ArXiv, Nature, etc.).
 
-  2. LLMDirector - Takes a finished script and generates a production plan:
-     TTS voice assignments, SFX cue list, music cues, timing, and spatial audio
-     settings. Outputs structured JSON that drives all downstream nodes.
+  2. LPL writer + cast helpers - Generates the L3 ledger directly (cast,
+     lines, meta.visual_plan, meta.style) via the LedgerScriptWriter path.
+     Cast-lock invariants run at writer exit; downstream consumers read the
+     ledger via FreezeCascade.script_json fanout. The legacy LLMDirector
+     class was removed in voice-path-cleanbreak S2 (commit 249bc06) --
+     voice and video paths now share the L3 ledger as single source of truth.
 
 LLM runs via transformers (local GPU). Content safety filter catches
 profanity/NSFW that slips past the prompt policy.
@@ -346,9 +349,9 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 
 # -----------------------------------------------------------------------------
 # CAST CONSOLIDATION HELPERS
-# Used by LLMDirector cast-merge to collapse near-duplicate cast rows that
-# arise from prefix-overlap (LLOYD vs LLOYD KAPOOR) or LLM typo divergence
-# (STANLEY vs STANLEARY). BUG-LOCAL-068 expansion 2026-04-26 PM.
+# Used by the LPL writer's cast-lock path to collapse near-duplicate cast
+# rows that arise from prefix-overlap (LLOYD vs LLOYD KAPOOR) or LLM typo
+# divergence (STANLEY vs STANLEARY). BUG-LOCAL-068 anchor preserved.
 # -----------------------------------------------------------------------------
 
 
@@ -600,10 +603,11 @@ def _bark_health_check():
     from `_VOICE_PROFILES`, `_ANNOUNCER_PRESETS`, and `_LEMMY_PROFILE`.
     Idempotent: runs only on the first call per process.
 
-    NOTE: As of 2026-04-26 PM the orchestrator no longer calls this from
-    `LLMDirector.direct()`; the new lazy `_bark_health_check_for_cast()`
-    runs after cast assignment instead. This function is kept exported
-    for any external caller and as a manual catalog-validation tool.
+    NOTE: This function is kept exported as a manual catalog-validation
+    tool and for any external caller. It is no longer invoked by the
+    default orchestration path -- the lazy `_bark_health_check_for_cast()`
+    runs after cast assignment instead. Historical context: see commit
+    249bc06 (voice-path-cleanbreak S2).
     """
     global _BARK_HEALTH_CHECKED, _VOICE_PROFILES, _ANNOUNCER_PRESETS, _LEMMY_PROFILE
     if _BARK_HEALTH_CHECKED:
