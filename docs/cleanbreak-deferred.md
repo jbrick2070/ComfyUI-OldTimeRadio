@@ -1,8 +1,12 @@
 # Voice-Path-Cleanbreak — Deferred Items
 
-Tracking page for sprint tasks that have shipped enough mitigation
-to lock the batch but remain open. One entry per deferral with the
-reason, the mitigation already in place, and the unblock condition.
+Per-item detail entries for cleanbreak deferrals (reason, mitigation
+already in place, unblock condition). One entry per deferral.
+
+**For the consolidated cross-batch view -- everything outstanding,
+tiered by priority, with suggested S25+ sprint packaging -- see
+`docs/2026-05-13-S25-plus-sprint-planning-tracker.md`.** This file
+is the per-item drill-down; the tracker is the planning surface.
 
 ## C10 — LFC audit regex extension (DEFERRED, 2026-05-13)
 
