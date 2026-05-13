@@ -18,7 +18,7 @@ ask: please scrutinize the post-S5 wiring + mechanics for bugs,
 accuracy issues, and possible improvements **before S8.3 and S9.1
 ship**.
 
-The QA scope is the seven commits below, plus the in-flight plan
+The QA scope is the six commits below, plus the in-flight plan
 for the two remaining items.
 
 | # | Commit  | Sprint | Subject                                                                          |
@@ -62,38 +62,48 @@ If any reviewer finds a violation in this batch, flag it as a
 ## 2. Current voice-path wiring (post-S8 state)
 
 ```
-                                     ┌──────────────────────┐
-                                     │ OTR_LedgerScriptWriter│  ← writer
-                                     │  (LPL, cast-locked)  │
-                                     └──────────┬───────────┘
-                                                │ script_json (L3 ledger)
-                                                │  meta.style
-                                                │  meta.visual_plan
-                                                │  cast[]
-                                                │  lines[]
-                                                ▼
-                ┌────────────────────────────────────────────────────────────┐
-                │  consumers (each loads the ledger via                       │
-                │  _otr_ledger_consumers.load_ledger, derives what it needs)  │
-                └────────────────────────────────────────────────────────────┘
-                  │           │           │           │           │
-                  ▼           ▼           ▼           ▼           ▼
-            ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐
-            │ Bark TTS│ │AudioGen │ │ ProcSFX │ │Sequencer│ │ MusicGen    │
-            │(speech) │ │ (SFX)   │ │ (SFX)   │ │ (mix)   │ │ (open/close)│
-            └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────────┘
-                                                                  │
-                                                                  ▼
-                                                          ┌──────────────┐
-                                                          │OTR_VideoPlan │  ← video
-                                                          │ (FLUX prompts)│
-                                                          └──────────────┘
-                                                                  │
-                                                                  ▼
-                                                       ┌──────────────────┐
-                                                       │ video_engine     │
-                                                       │ (HUD + treatment)│
-                                                       └──────────────────┘
+              ┌────────────────────────┐
+              │ OTR_LedgerScriptWriter │  ← writer (LPL, cast-locked)
+              │  cast / lines /        │
+              │  meta.visual_plan /    │
+              │  meta.style            │
+              └───────────┬────────────┘
+                          │ script_json (L3 ledger, content-addressed)
+                          ▼
+              ┌────────────────────────┐
+              │     FreezeCascade      │  ← G1-G7 invariants; fan-out source
+              │  Phase 0 audit / clean │     for every downstream consumer
+              │  Phase 10 freeze gate  │
+              └───────────┬────────────┘
+                          │ script_json fanout (one link per consumer)
+                          │
+   ┌────────┬────────┬────┴────┬─────────┬──────────┬────────────────┐
+   ▼        ▼        ▼         ▼         ▼          ▼                ▼
+┌──────┐┌────────┐┌────────┐┌─────────┐┌────────┐┌──────────────┐┌──────────────┐
+│ Bark ││AudioGen││ProcSFX ││Sequencer││MusicGen││  Kokoro      ││  SignalLost  │
+│ TTS  ││ (SFX)  ││ (SFX)  ││ (mix)   ││(theme) ││  Announcer   ││  Video       │
+└──────┘└────────┘└────────┘└─────────┘└────────┘└──────────────┘└──────┬───────┘
+                                                                         │
+                                                                         ▼
+                                                              ┌────────────────┐
+                                                              │ OTR_VideoPlan  │
+                                                              │  (FLUX prompts │
+                                                              │   from L3)     │
+                                                              └───────┬────────┘
+                                                                      ▼
+                                                              ┌────────────────┐
+                                                              │ video_engine   │
+                                                              │ (HUD +         │
+                                                              │  treatment)    │
+                                                              └────────────────┘
+```
+
+All seven consumers (Bark / AudioGen / ProcSFX / Sequencer / MusicGen /
+KokoroAnnouncer / SignalLostVideo) hang off the FreezeCascade fanout
+at the same level. OTRVideoPlan reads through SignalLostVideo (which
+forwards the L3 ledger), not downstream of MusicGen as the prior
+diagram showed. video_engine is the leaf consumer of the FLUX prompt
+plan. F-8 fix from the S6-S8 round-robin.
 ```
 
 **What's gone vs. pre-cleanbreak:**
@@ -504,7 +514,7 @@ next person adding a library module won't see the rule.
 
 ```powershell
 cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
-git log --oneline v2.0-alpha b22e418..HEAD   # the 6 S6-S8 commits
+git log --oneline b22e418..HEAD   # the 6 S6-S8 commits (range, no branch arg)
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest tests/ -q
 C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m pytest `
   C:/Users/jeffr/Documents/ComfyUI/comfyui-custom-node-survival-guide/tests/bug_bible_regression.py -q
