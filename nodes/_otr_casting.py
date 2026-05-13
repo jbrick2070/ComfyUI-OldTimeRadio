@@ -642,6 +642,10 @@ def lock_cast(
     # non-empty v2/* voice_preset. Earliest of three gates; Gate 2 lives
     # in FreezeCascade Phase 0 G6, Gate 3 in BatchBarkGenerator.
     _assert_voice_preset_invariant(cast)
+    # S13.1: structural-token guard. Reject cast rows whose name is a
+    # SFX cue / screenplay meta-direction / parser artefact / one of
+    # TITLE / NOTE / TARGET / STYLE.
+    _assert_no_structural_tokens_in_cast(cast)
 
     meta = {
         "lemmy_hit":              lemmy_hit,
@@ -704,6 +708,107 @@ def _assert_voice_preset_invariant(cast: List[dict]) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Structural-token guard (S13.1, ports + extends the deleted
+# story_orchestrator._looks_like_non_character_cast_name heuristic)
+# ---------------------------------------------------------------------------
+
+
+# Patterns that indicate the cast name is a parser artefact / SFX cue /
+# screenplay meta-direction tag, NOT a real character. Ported verbatim
+# from the pre-S7.1 story_orchestrator._SFX_CAST_BLOCKLIST_PATTERNS
+# (deleted in commit b6fb314) plus FIVE additional standalone tokens
+# (TITLE / NOTE / TARGET / STYLE / NARRATOR-as-name) that appeared in
+# the pre-S7.1 story_orchestrator._BRACKET_STRUCTURAL_TOKENS but were
+# not in the cast-blocklist patterns. The S13.1 cast-contract
+# verification confirmed all five slipped through pre-port. After
+# port: each one raises CastingFailedError with a structural-token
+# diagnostic.
+_NON_CHARACTER_CAST_PATTERNS = (
+    # SFX cue artefacts (BUG-LOCAL-090 root cause)
+    r"^SFX\b", r"^MUSIC\b", r"^THEME\b",
+    r"\bBLARING\b", r"\bBLARE\b", r"\bWHOOSH\b", r"\bWHOOSHING\b",
+    r"\bFLICKERS?\b", r"\bFLICKER\b",
+    r"\bCHAMBER\b", r"\bPORTAL\b", r"\bALARM\b",
+    r"\bEQUIPMENT\b", r"\bCUE\b",
+    r"\bAT THE\b",
+    r"\bSOUND\b", r"\bMUSIC QUEUE\b",
+    r"\bINTENSE\b", r"\bMYSTERIOUS VOICE\b",
+    # Screenplay meta-direction (BUG-LOCAL-097)
+    r"\bVOICEOVER\b", r"\bVOICE\s?OVER\b", r"\bVOICEOBER\b",
+    r"\bNARRATOR\b",
+    # NOTE: Original pre-S7.1 patterns had trailing ``\b`` after the
+    # final ``\.`` -- a no-op because ``.`` is non-word and the post-
+    # period regex \b never fires. Faithful port + bugfix here drops
+    # the trailing \b so ``JOHN V.O.`` actually matches.
+    r"\bV\.O\.", r"\bO\.S\.",
+    r"\bSCREEN\b", r"\bOFF.SCREEN\b",
+    # S13.1 additions: structural tokens that the LLM occasionally
+    # emits as standalone "character" names. The risk asymmetry
+    # (real character named "Style" gets rejected) is far lower than
+    # the false-negative cost (an LLM hallucination renders as a
+    # voice line in production).
+    r"^TITLE$", r"^NOTE$", r"^TARGET$", r"^STYLE$",
+)
+
+
+def _looks_like_non_character_cast_name(name: str) -> bool:
+    """Return True when ``name`` is almost certainly an SFX cue,
+    music stinger, scene-direction fragment, structural token, or
+    other parser artefact -- not a real character.
+
+    Ported from story_orchestrator (deleted in S7.1 / commit b6fb314)
+    and extended with TITLE / NOTE / TARGET / STYLE per S13.1
+    cast-contract verification.
+    """
+    if not name:
+        return True
+    n = name.upper().strip()
+    for pat in _NON_CHARACTER_CAST_PATTERNS:
+        if re.search(pat, n):
+            return True
+    return False
+
+
+def _assert_no_structural_tokens_in_cast(cast: List[dict]) -> None:
+    """Cast contract S13.1: reject any cast row whose ``name`` is
+    a structural token (SFX cue, screenplay meta-direction, parser
+    artefact, or one of TITLE / NOTE / TARGET / STYLE). ANNOUNCER
+    is allowed because it's the canonical narrator slot, not an
+    artefact.
+
+    The risk asymmetry (false-positive: a real character named
+    "Style" gets rejected; false-negative: an LLM hallucination
+    renders as a voice line in production) heavily favors
+    rejection. If a future story legitimately needs a character
+    named one of these tokens, the right move is to add a
+    case-sensitive whitelist check, not to widen the patterns.
+    """
+    bad: list[str] = []
+    for row in cast or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name") or ""
+        if name == "ANNOUNCER":
+            continue
+        if _looks_like_non_character_cast_name(name):
+            bad.append(name)
+    if not bad:
+        return
+    raise CastingFailedError(
+        attempts=[(
+            "",
+            f"S13.1 STRUCTURAL TOKEN GUARD: {len(bad)} cast row(s) "
+            f"have names that look like SFX cues / screenplay meta-"
+            f"direction / structural tokens, not real characters: "
+            f"{', '.join(repr(n) for n in bad)}. The pre-filter + cast "
+            f"LLM should have rejected these; a refactor likely broke "
+            f"the upstream guarantee.",
+        )],
+        name="<lock_cast structural-token invariant>",
+    )
+
+
 def _assert_unique_bark_voices(cast: List[dict]) -> None:
     """Raise CastingFailedError if any two Bark cast rows share a
     voice_preset. ANNOUNCER (Kokoro namespace) is excluded.
@@ -746,6 +851,8 @@ __all__ = [
     "CastingFailedError",
     "_assert_unique_bark_voices",
     "_assert_voice_preset_invariant",
+    "_assert_no_structural_tokens_in_cast",
+    "_looks_like_non_character_cast_name",
     "CastSlot",
     "assemble_pre_locked_rows",
     "cast_one_character",
