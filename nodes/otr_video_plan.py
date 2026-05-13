@@ -2,10 +2,9 @@
 nodes.otr_video_plan  --  OTR_VideoPlan read-only adapter
 ==========================================================
 
-MIT-licensed, OTR-original.  Read-only adapter: parses the Director
-JSON (``_DIRECTOR_SCHEMA`` per nodes/story_orchestrator.py:6814) plus
-the raw script text into a structured list of FLUX render prompts
-suitable for OTR_BatchFluxRender.
+MIT-licensed, OTR-original.  Read-only adapter: parses the L3 ledger
+(``meta.visual_plan`` + ``cast`` + ``lines``) into a structured list of
+FLUX render prompts suitable for OTR_BatchFluxRender.
 
 This is the "Ideas / multi-pass FLUX" machinery from the
 otr-video-node-anatomy artifact, implemented in its thinnest form:
@@ -220,26 +219,13 @@ def resolve_character_portrait(
     if portrait:
         return portrait
 
-    # Fallback 2: synthesize from voice_assignments notes
-    voice_assignments = director.get("voice_assignments") or {}
-    if not isinstance(voice_assignments, dict):
-        voice_assignments = {}
-    va_entry = voice_assignments.get(character_name)
-    if isinstance(va_entry, list):
-        merged_va: dict = {}
-        for item in va_entry:
-            if isinstance(item, dict):
-                merged_va.update(item)
-        va_entry = merged_va
-    elif not isinstance(va_entry, dict):
-        va_entry = {}
-    notes = (va_entry.get("notes") or "").strip()
-    if notes:
-        return (
-            f"Cinematic portrait of {character_name}, {notes}, {style_tail}"
-        )
+    # Voice-path-cleanbreak Sprint 6.2 (2026-05-12): the legacy Tier-2
+    # fallback (synthesize from voice_assignments[NAME].notes) was
+    # retired. The notes field no longer exists -- character_description
+    # lives only on portrait_prompt now. The 3-tier chain collapses to
+    # 2 tiers: Tier 1 portrait_prompt, Tier 2 generic-template fallback.
 
-    # Fallback 3: generic
+    # Fallback: generic template
     log.warning(
         "OTR_VideoPlan: no portrait data for %r; falling back to generic",
         character_name,
@@ -287,16 +273,56 @@ def compose_shot_prompt(
     return ", ".join(parts)
 
 
+def _director_from_script_json(script_json: str) -> dict:
+    """Voice-path-cleanbreak Sprint 6.5 (2026-05-12). Single
+    derivation point that turns an L3 ledger JSON string into the
+    legacy director-shape dict the build_* helpers consume internally.
+
+    Replaces the adapter that used to live in OTRVideoPlan.plan() (the
+    one S2 added when migrating off the deleted Director node). Each
+    helper now does its own derivation; the node-level adapter
+    is gone.
+
+    Returns an empty dict on any parse / shape failure -- the helpers'
+    downstream graceful-empty paths handle the empty case.
+    """
+    if not script_json:
+        return {}
+    try:
+        from . import _otr_ledger_consumers as _OTRLC
+        led = _OTRLC.load_ledger(script_json)
+    except (ValueError, json.JSONDecodeError) as exc:
+        log.warning(
+            "OTR_VideoPlan: script_json parse failed (%s); using empty director",
+            exc,
+        )
+        return {}
+    if not isinstance(led, dict):
+        return {}
+    meta = led.get("meta") or {}
+    visual_plan = meta.get("visual_plan") or {}
+    return {
+        "visual_plan":       visual_plan,
+        "voice_assignments": _OTRLC.voice_assignments_from_cast(led),
+        "style":             meta.get("style") or "",
+        "genre":             visual_plan.get("genre") or "",
+    }
+
+
 def build_pass1_char_prompts(
-    director_json: str,
+    script_json: str,
     focus_character: str = "",
     *,
     style_tail: str = "",
 ) -> dict:
     """PASS 1 envelope: one token for each character's portrait.
 
+    Reads the L3 ledger directly (via ``_otr_ledger_consumers.load_ledger``)
+    and derives the per-character + per-scene shape from
+    ``meta.visual_plan`` + cast at call time -- no upstream adapter.
+
     Multi-character mode (default): emits one token per character found
-    in ``director.visual_plan.characters``. Use this to render the whole
+    in ``led.meta.visual_plan.characters``. Use this to render the whole
     cast's portraits up front as FLUX images that can be reused across
     every shot they appear in.
 
@@ -306,12 +332,7 @@ def build_pass1_char_prompts(
     Output envelope matches BatchFluxRender's env-token schema so it
     consumes the list as-is.
     """
-    try:
-        director = json.loads(director_json) if director_json else {}
-    except json.JSONDecodeError:
-        director = {}
-    if not isinstance(director, dict):
-        director = {}
+    director = _director_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
 
@@ -363,23 +384,20 @@ def build_pass1_char_prompts(
 
 
 def build_pass2_scene_prompts(
-    director_json: str,
+    script_json: str,
     *,
     style_tail: str = "",
 ) -> dict:
     """PASS 2 envelope: one token per scene environment.
 
+    Same ledger-side derivation as ``build_pass1_char_prompts``.
+
     Each scene's visual_prompt is wrapped with the style tail. No
-    character, no era, no action — just the empty scene.
+    character, no era, no action -- just the empty scene.
 
     Output envelope matches BatchFluxRender's env-token schema.
     """
-    try:
-        director = json.loads(director_json) if director_json else {}
-    except json.JSONDecodeError:
-        director = {}
-    if not isinstance(director, dict):
-        director = {}
+    director = _director_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
     scenes = extract_scenes(director)
@@ -423,7 +441,7 @@ def build_pass2_scene_prompts(
 
 
 def build_shot_plan(
-    director_json: str,
+    script_json: str,
     focus_character: str,
     *,
     shots_per_scene: int = 3,
@@ -466,15 +484,8 @@ def build_shot_plan(
             f"shots_per_scene must be >= 1, got {shots_per_scene}"
         )
 
-    try:
-        director = json.loads(director_json) if director_json else {}
-    except json.JSONDecodeError as exc:
-        log.warning(
-            "OTR_VideoPlan: director_json JSONDecodeError (%s); using empty",
-            exc,
-        )
-        director = {}
-
+    # Helper derives the per-scene shot shape from the L3 ledger.
+    director = _director_from_script_json(script_json)
     if not isinstance(director, dict):
         log.warning(
             "OTR_VideoPlan: director root is %s not dict; using empty",
@@ -816,49 +827,28 @@ class OTRVideoPlan:
         if focus_character == "(all)":
             resolved_focus = ""
 
-        # Voice-path-cleanbreak Sprint 2: derive the legacy "director"
-        # dict shape from the L3 ledger meta-stamped by the writer.
-        # The existing helpers (build_pass1_char_prompts /
-        # build_pass2_scene_prompts / build_shot_plan) accept a serialized
-        # director-shape JSON; we synthesize that from meta.visual_plan +
-        # meta.voice_assignments. Helper signatures unchanged so the unit
-        # tests against build_* still work.
-        try:
-            from . import _otr_ledger_consumers as _OTRLC
-            _led = _OTRLC.load_ledger(script_json)
-            _meta = (_led.get("meta") or {})
-            _derived = {
-                "visual_plan":       _meta.get("visual_plan") or {},
-                "voice_assignments": _meta.get("voice_assignments") or {},
-                "style":             _meta.get("style") or "",
-                "genre":             (_meta.get("visual_plan") or {}).get("genre")
-                                     or "audio drama",
-            }
-            director_json = json.dumps(_derived, ensure_ascii=False)
-        except Exception as _exc:
-            log.warning(
-                "OTR_VideoPlan: failed to derive director-shape from ledger "
-                "(%s); falling back to empty director_json", _exc,
-            )
-            director_json = "{}"
+        # Voice-path-cleanbreak Sprint 6.5 (2026-05-12): the
+        # director-shape adapter that lived here is gone. Each helper
+        # now reads script_json directly via _director_from_script_json.
+        # Pass through to all three passes.
 
         # PASS 1: char portraits (one per character, or just the
         # focus character if focus_character is a specific name)
         pass1 = build_pass1_char_prompts(
-            director_json=director_json,
+            script_json=script_json,
             focus_character=resolved_focus,
             style_tail=style_tail,
         )
 
         # PASS 2: scene envs (one per scene)
         pass2 = build_pass2_scene_prompts(
-            director_json=director_json,
+            script_json=script_json,
             style_tail=style_tail,
         )
 
         # PASS 3: composite shot frames (S scenes x K shots + 1 end)
         pass3 = build_shot_plan(
-            director_json=director_json,
+            script_json=script_json,
             focus_character=resolved_focus,
             shots_per_scene=shots_per_scene,
             style=style,

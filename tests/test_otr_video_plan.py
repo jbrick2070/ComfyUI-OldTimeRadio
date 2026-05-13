@@ -155,7 +155,14 @@ def test_portrait_canonical_path():
     assert "style_tail" not in result  # canonical path doesn't append tail
 
 
-def test_portrait_fallback_from_notes():
+def test_portrait_tier_2_notes_fallback_is_retired():
+    """Voice-path-cleanbreak Sprint 6.2 (2026-05-12): the Tier-2
+    fallback that synthesized portraits from
+    voice_assignments[NAME].notes was retired. The notes field no
+    longer exists in the post-Sprint-6.2 voice_assignments shape
+    (only voice_preset). resolve_character_portrait now falls
+    straight from Tier 1 (portrait_prompt) to the generic template.
+    """
     from nodes.otr_video_plan import resolve_character_portrait
     director = {
         "visual_plan": {"characters": {"BABA": {}}},
@@ -165,8 +172,10 @@ def test_portrait_fallback_from_notes():
         },
     }
     result = resolve_character_portrait(director, "BABA", "cinematic tail")
+    # Tier 2 retired: the notes string MUST NOT appear in output.
+    assert "Female, 60s, weary, low" not in result
+    # Falls to the generic template (Tier-3-now-Tier-2).
     assert "BABA" in result
-    assert "Female, 60s, weary, low" in result
     assert "cinematic tail" in result
 
 
@@ -186,15 +195,20 @@ def test_portrait_empty_character_name():
     assert "style" in result
 
 
-def test_portrait_empty_portrait_prompt_triggers_fallback():
-    """If visual_plan.characters[NAME].portrait_prompt is '', fall through."""
+def test_portrait_empty_portrait_prompt_falls_to_generic():
+    """If visual_plan.characters[NAME].portrait_prompt is '', fall through
+    to the generic template (Sprint 6.2 retired the notes-based Tier-2)."""
     from nodes.otr_video_plan import resolve_character_portrait
     director = {
         "visual_plan": {"characters": {"BABA": {"portrait_prompt": ""}}},
         "voice_assignments": {"BABA": {"notes": "old pilot"}},
     }
     result = resolve_character_portrait(director, "BABA", "x")
-    assert "old pilot" in result
+    # Falls past empty Tier 1, past the retired Tier 2 (notes ignored
+    # entirely now), to the generic Tier-3 template.
+    assert "BABA" in result
+    assert "x" in result
+    assert "old pilot" not in result
 
 
 # ------------------------------------------------------------------
@@ -346,9 +360,9 @@ def _sample_director() -> dict:
 
 def test_build_shot_plan_basic_counts():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json,
+        script_json,
         focus_character="BABA",
         shots_per_scene=3,
         style="mission_control_procedural",
@@ -363,9 +377,9 @@ def test_build_shot_plan_basic_counts():
 def test_build_shot_plan_tokens_are_env_shaped():
     """BatchFluxRender reads tokens where type='environment'."""
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json,
+        script_json,
         focus_character="BABA",
         shots_per_scene=2,
         style="mission_control_procedural",
@@ -379,9 +393,9 @@ def test_build_shot_plan_tokens_are_env_shaped():
 
 def test_build_shot_plan_compose_includes_portrait_and_scene():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json,
+        script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="mission_control_procedural",
@@ -396,31 +410,36 @@ def test_build_shot_plan_compose_includes_portrait_and_scene():
     assert "instrument-panel" in desc.lower() or "console" in desc.lower()
 
 
-def test_build_shot_plan_fallback_to_notes():
-    """Director with no portrait_prompt -> uses voice_assignments.notes."""
+def test_build_shot_plan_empty_portrait_falls_to_generic():
+    """Voice-path-cleanbreak Sprint 6.2 (2026-05-12): the legacy
+    Tier-2 fallback (synthesize from voice_assignments[NAME].notes)
+    is retired. With portrait_prompt empty, build_shot_plan falls
+    straight to the generic Tier-3 template ("Cinematic portrait of
+    BABA, ...") -- the notes string MUST NOT appear."""
     from nodes.otr_video_plan import build_shot_plan
     director = _sample_director()
     director["visual_plan"]["characters"]["BABA"]["portrait_prompt"] = ""
-    director_json = json.dumps(director)
+    script_json = _ledger_wrap(director)
     plan = build_shot_plan(
-        director_json,
+        script_json,
         focus_character="BABA",
         shots_per_scene=1,
     )
     first = plan["tokens"][0]
-    assert "Female, 60s, weary, low" in first["description"]
+    assert "Female, 60s, weary, low" not in first["description"]
+    assert "BABA" in first["description"]
 
 
 def test_build_shot_plan_final_end_frame_toggle():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
 
     with_end = build_shot_plan(
-        director_json, "BABA", shots_per_scene=3,
+        script_json, "BABA", shots_per_scene=3,
         include_final_end_frame=True,
     )
     without = build_shot_plan(
-        director_json, "BABA", shots_per_scene=3,
+        script_json, "BABA", shots_per_scene=3,
         include_final_end_frame=False,
     )
     assert with_end["total_prompts"] == without["total_prompts"] + 1
@@ -459,9 +478,9 @@ def test_build_shot_plan_invalid_shots_per_scene_raises():
 
 def test_build_shot_plan_unknown_genre_uses_default_era():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "BABA", shots_per_scene=1,
+        script_json, "BABA", shots_per_scene=1,
         style="gothic_romance",  # not in dict
     )
     assert "timeless" in plan["era_tail"].lower()
@@ -469,9 +488,9 @@ def test_build_shot_plan_unknown_genre_uses_default_era():
 
 def test_build_shot_plan_shot_ids_unique():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "BABA", shots_per_scene=3,
+        script_json, "BABA", shots_per_scene=3,
     )
     shot_ids = [t["shot_id"] for t in plan["tokens"]]
     assert len(shot_ids) == len(set(shot_ids)), \
@@ -481,9 +500,9 @@ def test_build_shot_plan_shot_ids_unique():
 def test_build_shot_plan_frame_ids_are_global_4digit():
     """Schema: frame IDs are global 4-digit, no character suffix."""
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "KENJI CROSS", shots_per_scene=1,
+        script_json, "KENJI CROSS", shots_per_scene=1,
     )
     for tok in plan["tokens"]:
         # frame_0000, frame_0001, ...
@@ -494,9 +513,9 @@ def test_build_shot_plan_frame_ids_are_global_4digit():
 def test_build_shot_plan_shot_ids_are_global_3digit():
     """Schema: shot IDs are global 'shot_NNN' across the whole episode."""
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "BABA", shots_per_scene=3,
+        script_json, "BABA", shots_per_scene=3,
     )
     shot_ids = [s["shot_id"] for s in plan["shots"]]
     # 2 scenes x 3 shots = 6 shots
@@ -509,9 +528,9 @@ def test_build_shot_plan_shot_ids_are_global_3digit():
 def test_build_shot_plan_clip_ids_indexed_from_one():
     """Schema: clip IDs are 'shot_NNN_c1', 'shot_NNN_c2', ..."""
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "BABA", shots_per_scene=1,
+        script_json, "BABA", shots_per_scene=1,
     )
     for shot in plan["shots"]:
         assert len(shot["segments"]) >= 1
@@ -522,9 +541,9 @@ def test_build_shot_plan_clip_ids_indexed_from_one():
 def test_build_shot_plan_shared_boundary_frames():
     """Schema: adjacent shots share boundary frames (FLF chain)."""
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_sample_director())
+    script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
-        director_json, "BABA", shots_per_scene=2,
+        script_json, "BABA", shots_per_scene=2,
     )
     shots = plan["shots"]
     # shot_001's end_frame == shot_002's start_frame (shared)
@@ -538,8 +557,8 @@ def test_build_shot_plan_scene_without_visual_prompt_uses_shot_description():
     director = _sample_director()
     director["visual_plan"]["scenes"][0]["visual_prompt"] = ""
     director["visual_plan"]["scenes"][0]["shot_description"] = "custom_desc_xyz"
-    director_json = json.dumps(director)
-    plan = build_shot_plan(director_json, "BABA", shots_per_scene=1)
+    script_json = _ledger_wrap(director)
+    plan = build_shot_plan(script_json, "BABA", shots_per_scene=1)
     # First scene's shot should include the shot_description fallback
     scene_1_tokens = [
         t for t in plan["tokens"] if t["scene_id"] == "scene_1"
@@ -692,9 +711,9 @@ def _multi_char_director() -> dict:
 
 def test_pass1_multi_char_emits_one_token_per_character():
     from nodes.otr_video_plan import build_pass1_char_prompts
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     # Empty focus_character => multi-char mode
-    pass1 = build_pass1_char_prompts(director_json, "", style_tail="style")
+    pass1 = build_pass1_char_prompts(script_json, "", style_tail="style")
     assert pass1["character_count"] == 2
     assert set(pass1["characters"]) == {"LEMMY", "KENJI CROSS"}
     # Each token has the right portrait
@@ -705,27 +724,27 @@ def test_pass1_multi_char_emits_one_token_per_character():
 
 def test_pass1_all_sentinel_equals_multi_char():
     from nodes.otr_video_plan import build_pass1_char_prompts
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     # "(all)" sentinel => multi-char mode
-    pass1 = build_pass1_char_prompts(director_json, "(all)", style_tail="style")
+    pass1 = build_pass1_char_prompts(script_json, "(all)", style_tail="style")
     assert pass1["character_count"] == 2
 
 
 def test_pass1_single_char_mode_respects_focus():
     """When focus_character is a specific name, only that one portrait."""
     from nodes.otr_video_plan import build_pass1_char_prompts
-    director_json = json.dumps(_multi_char_director())
-    pass1 = build_pass1_char_prompts(director_json, "LEMMY", style_tail="style")
+    script_json = _ledger_wrap(_multi_char_director())
+    pass1 = build_pass1_char_prompts(script_json, "LEMMY", style_tail="style")
     assert pass1["character_count"] == 1
     assert pass1["characters"] == ["LEMMY"]
 
 
 def test_pass3_multi_char_includes_all_portraits():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     # Empty focus_character => include all chars
     plan = build_shot_plan(
-        director_json, focus_character="",
+        script_json, focus_character="",
         shots_per_scene=1, style="mission_control_procedural",
     )
     first_desc = plan["tokens"][0]["description"]
@@ -736,9 +755,9 @@ def test_pass3_multi_char_includes_all_portraits():
 
 def test_pass3_single_char_mode_only_focus_character():
     from nodes.otr_video_plan import build_shot_plan
-    director_json = json.dumps(_multi_char_director())
+    script_json = _ledger_wrap(_multi_char_director())
     plan = build_shot_plan(
-        director_json, focus_character="LEMMY",
+        script_json, focus_character="LEMMY",
         shots_per_scene=1, style="mission_control_procedural",
     )
     first_desc = plan["tokens"][0]["description"]
