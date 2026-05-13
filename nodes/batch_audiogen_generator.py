@@ -263,14 +263,29 @@ class BatchAudioGenGenerator:
                     "max": SFX_DUR_MAX_S,   # G7 upper bound -- imported, not magic
                     "step": 0.5,
                 }),
+                # S17.2 (IMP-19): default False -- transformers/AudioGen
+                # ImportError raises RuntimeError so production never
+                # silently substitutes silence at wrong duration. Opt
+                # in for smoke tests where the optional dep isn't
+                # installed; silence renders honor per-cue render_queue
+                # durations and stamp sfx_render_status="fallback_silence"
+                # so downstream can branch.
+                "allow_silence_fallback": ("BOOLEAN", {"default": False}),
             }
         }
 
     def generate(self, script_json, episode_seed="",
-                 model_id="facebook/audiogen-medium", guidance_scale=3.0, default_duration=3.0):
+                 model_id="facebook/audiogen-medium", guidance_scale=3.0,
+                 default_duration=3.0, allow_silence_fallback=False):
 
         # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
+
+        # S17.4 (IMP-17): defensive coercion at the node boundary.
+        # The cache_prefix path calls str(episode_seed); a future
+        # caller passing a dict would str() it to a Py-version-stable
+        # but fragile representation. Coerce here, once.
+        episode_seed = str(episode_seed) if episode_seed is not None else ""
 
         # UI JSON back-compat fix
         if str(model_id) in ["3", "3.0"]:
@@ -409,10 +424,42 @@ class BatchAudioGenGenerator:
             try:
                 from transformers import AutoProcessor, AudiogenForConditionalGeneration
             except ImportError as exc:
-                batch_log.append(f"Error: transformers AudioGen not available: {exc}")
-                # Fallback to silence for missing
+                # S17.2 (IMP-19): strict failure by default.
+                # The prior path silently filled silence at
+                # default_duration -- Directive 1 breach (audio is
+                # king; silence is degraded output) AND wrong
+                # duration (default_duration ignored the per-cue
+                # render_queue durations). The opt-in fallback path
+                # honors render_queue[i]["duration"] and stamps the
+                # ledger row so downstream sees it.
+                msg = (
+                    f"AudioGen ImportError: transformers/AudioGen "
+                    f"not available: {exc}. This is a production "
+                    f"surface; silent silence is a Directive 1 "
+                    f"breach. Install the AudioGen optional deps "
+                    f"or set allow_silence_fallback=True for smoke "
+                    f"tests only."
+                )
+                if not allow_silence_fallback:
+                    log.error(f"[BatchAudioGen] {msg}")
+                    raise RuntimeError(msg) from exc
+                log.warning(f"[BatchAudioGen] FALLBACK SILENCE: {msg}")
+                batch_log.append(
+                    f"WARNING: AudioGen import failed; "
+                    f"allow_silence_fallback=True -> silence."
+                )
                 for idx in to_generate_indices:
-                    final_clips[idx] = torch.zeros(1, 1, int(AUDIOGEN_SAMPLE_RATE * default_duration))
+                    item_dur = float(render_queue[idx]["duration"])
+                    final_clips[idx] = torch.zeros(
+                        1, 1, int(AUDIOGEN_SAMPLE_RATE * item_dur)
+                    )
+                    # Mark the ledger row so downstream sees the
+                    # silence-fallback state. Stamped by the writer
+                    # at line 5xx; render_results[idx] mirrors here.
+                    if idx < len(render_results):
+                        render_results[idx]["sfx_render_status"] = (
+                            "fallback_silence"
+                        )
             else:
                 batch_log.append(f"Loading {model_id}...")
                 device = "cuda" if torch.cuda.is_available() else "cpu"

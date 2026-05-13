@@ -217,46 +217,73 @@ def _cache_dir() -> str:
     return base
 
 
-def _cache_prefix(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
+def _cache_prefix(*, cue_id: str, prompt: str, duration_sec: float,
+                  episode_seed: str, model_id: str,
+                  guidance_scale: float) -> str:
     """Deterministic cache identity prefix.
 
-    Format: ``<cue_id>_<sha8>``
+    Format: ``<cue_id>_<sha12>``
       - ``cue_id`` -- human-readable cue (opening / closing / interstitial)
-      - ``sha8`` -- 8 hex chars of SHA256(cue_id|duration|prompt|seed)
+      - ``sha12`` -- 12 hex chars of SHA256 over a JSON-canonical
+        payload of every output-determining input
 
-    BUG-LOCAL-017 (Phase D, 2026-05-02): the prior implementation appended
-    ``_<timestamp_ms>`` to this prefix and returned a full filename. That
-    forced a fresh filename on every call, which guaranteed a cache MISS
-    every run (the lookup checked exactly the just-computed path). Net
-    cost: ~22s wasted MusicGen renders per episode AND a Rule C7 violation
-    because FFmpeg embeds input WAV filenames in MP4 metadata streams,
-    so the final mp4 bytes drifted between identical-input runs.
+    S17.1 (IMP-11): ported AudioGen's S12.3 cache key uplift verbatim
+    so MusicGen has the same invariant. Three changes from the prior
+    8-char positional implementation:
 
-    Fix: split lookup identity (this function, deterministic prefix) from
-    write filename (``_cache_filename_for_write``, canonical
-    ``<prefix>.wav``). Lookup uses ``_find_cached`` which checks the
-    canonical filename first, then falls back to legacy timestamped
-    files for back-compat.
+      1. 12 hex chars (was 8): collision risk at MusicGen scale drops
+         to negligible.
+      2. JSON-canonical payload: floats serialized via f"{x:.3f}" /
+         f"{x:.2f}" so IEEE-754 float-string drift no longer collapses
+         or splits keys.
+      3. ``model_id`` + ``guidance_scale`` included: switching MusicGen
+         models or CFG no longer silently returns the prior cue.
+
+    BUG-LOCAL-017 (Phase D, 2026-05-02): the pre-Phase-D implementation
+    appended ``_<timestamp_ms>`` and returned a full filename, forcing
+    a cache MISS every run AND violating Rule C7 because FFmpeg
+    embeds input WAV filenames in MP4 metadata streams. Lookup
+    identity (this function) split from write filename
+    (``_cache_filename_for_write``, canonical ``<prefix>.wav``) at
+    that point; S17.1 only changes the identity payload, not the
+    split.
+
+    Keyword-only: every output-determining input is spelled at the
+    call site so a future knob added to MusicGen has to extend the
+    signature deliberately.
     """
-    payload = f"{cue_id}|{duration_sec}|{prompt}|{episode_seed}".encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()[:8]
+    payload = json.dumps({
+        "cue_id":         str(cue_id),
+        "duration_sec":   f"{float(duration_sec):.3f}",
+        "prompt":         prompt,
+        "episode_seed":   str(episode_seed),
+        "model_id":       str(model_id),
+        "guidance_scale": f"{float(guidance_scale):.2f}",
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()[:12]
     return f"{cue_id}_{digest}"
 
 
-def _cache_filename_for_write(cue_id: str, prompt: str, duration_sec: int,
-                              episode_seed: str) -> str:
+def _cache_filename_for_write(*, cue_id: str, prompt: str,
+                              duration_sec: float, episode_seed: str,
+                              model_id: str,
+                              guidance_scale: float) -> str:
     """Canonical filename for a fresh cache write. Deterministic -- no
-    timestamp. C7-safe: same inputs always land at the same filename so
-    downstream FFmpeg metadata stays byte-identical run-to-run."""
-    return f"{_cache_prefix(cue_id, prompt, duration_sec, episode_seed)}.wav"
+    timestamp. C7-safe: same inputs always land at the same filename
+    so downstream FFmpeg metadata stays byte-identical run-to-run.
 
-
-def _cache_key(cue_id: str, prompt: str, duration_sec: int, episode_seed: str) -> str:
-    """Backward-compatible wrapper -- returns the canonical write filename.
-    Kept so any external import of ``_cache_key`` from this module still
-    resolves. New code should call ``_cache_filename_for_write`` (write)
-    or ``_cache_prefix`` + ``_find_cached`` (lookup) directly."""
-    return _cache_filename_for_write(cue_id, prompt, duration_sec, episode_seed)
+    Keyword-only signature mirrors ``_cache_prefix`` -- positional
+    callers raise TypeError, intentional after S17.1.
+    """
+    prefix = _cache_prefix(
+        cue_id=cue_id,
+        prompt=prompt,
+        duration_sec=duration_sec,
+        episode_seed=episode_seed,
+        model_id=model_id,
+        guidance_scale=guidance_scale,
+    )
+    return f"{prefix}.wav"
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:
@@ -462,6 +489,13 @@ class MusicGenTheme:
         # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
 
+        # S17.4 (IMP-17): defensive coercion at the node boundary.
+        # The cache_prefix path calls str(episode_seed); a future
+        # caller passing a dict would str() it to a Py-version-stable
+        # but fragile representation. Coerce here, once, at the
+        # public surface.
+        episode_seed = str(episode_seed) if episode_seed is not None else ""
+
         # ---- L3 ledger reads (single source of truth) ----
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
@@ -515,7 +549,12 @@ class MusicGenTheme:
         to_generate: list[str] = []
         for cue_id, cue in cues.items():
             prefix = _cache_prefix(
-                cue_id, cue["prompt"], cue["duration_sec"], episode_seed
+                cue_id=cue_id,
+                prompt=cue["prompt"],
+                duration_sec=cue["duration_sec"],
+                episode_seed=episode_seed,
+                model_id=model_id,
+                guidance_scale=guidance_scale,
             )
             hit_path = _find_cached(cache_dir, prefix)
             if hit_path is not None:
@@ -537,7 +576,12 @@ class MusicGenTheme:
             cue["cache_path"] = os.path.join(
                 cache_dir,
                 _cache_filename_for_write(
-                    cue_id, cue["prompt"], cue["duration_sec"], episode_seed
+                    cue_id=cue_id,
+                    prompt=cue["prompt"],
+                    duration_sec=cue["duration_sec"],
+                    episode_seed=episode_seed,
+                    model_id=model_id,
+                    guidance_scale=guidance_scale,
                 ),
             )
             to_generate.append(cue_id)
