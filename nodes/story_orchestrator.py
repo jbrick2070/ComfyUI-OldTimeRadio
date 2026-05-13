@@ -2010,8 +2010,14 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
     # OOMs on a longer-target run, drop to 6144 next.
     _MODEL_CONTEXT_CAPS = {
         "mistralai/Mistral-Nemo-Instruct-2407":               8192,
-        "google/gemma-4-E2B-it":                             16384,
-        "google/gemma-4-E4B-it":                             16384,
+        # S21.2 (IMP-27, 2026-05-13): aligned with the rest of the
+        # table at 8192. The prior 16384 cap added 2-3 GiB of dynamic
+        # VRAM during long generation right when audio models want
+        # the envelope. The 310-word episode budget fits comfortably
+        # in 8K and leaves headroom for audio co-residency on a 16GB
+        # card.
+        "google/gemma-4-E2B-it":                              8192,
+        "google/gemma-4-E4B-it":                              8192,
         "Qwen/Qwen2.5-14B-Instruct":                          8192,
         "Nitral-AI/Captain-Eris_Violet-V0.420-12B":           8192,
         "inflatebot/MN-12B-Mag-Mell-R1":                      8192,
@@ -2322,9 +2328,24 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
                 
                 # FLAGSHIP 16GB OVERRIDE: 2B and 12B models fit easily if context is capped.
                 # Force GPU-only to avoid sneaky CPU offloading by 'auto' device_map.
-                if total_vram >= 15.0:
-                    common_kwargs["device_map"] = {"": 0} 
-                    _runtime_log(f"[StoryOrchestrator] Flagship Sovereignty: Forcing 100% GPU for {model_id}")
+                #
+                # S21.1 (IMP-25, 2026-05-13): lowered threshold 15.0 -> 14.5
+                # to catch RTX 5080 Laptop class hardware that reports
+                # ~14.7 GiB after OS and driver reservations on a nominally
+                # 16GB card. The prior >= 15.0 missed this class and let
+                # bitsandbytes silently fragment.
+                if total_vram >= 14.5:
+                    common_kwargs["device_map"] = {"": 0}
+                    _runtime_log(
+                        f"[StoryOrchestrator] Flagship Sovereignty: "
+                        f"Forcing 100% GPU for {model_id} "
+                        f"(total_vram={total_vram:.2f} GiB)"
+                    )
+                else:
+                    _runtime_log(
+                        f"[StoryOrchestrator] device_map=auto path "
+                        f"(total_vram={total_vram:.2f} GiB < 14.5 GiB)"
+                    )
                 # else: device_map already set to "auto" in max_memory block above
 
             try:
