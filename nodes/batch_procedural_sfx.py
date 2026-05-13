@@ -122,12 +122,16 @@ class BatchProceduralSFX:
                     "step": 0.1,
                 }),
                 "volume_db": ("FLOAT", {"default": 0.0, "min": -30.0, "max": 6.0, "step": 1.0}),
-                # S18.3 (IMP-20 part 3): default False preserves the
-                # existing log-and-continue behavior. Flip True once
-                # S18.2's audit walker has stayed clean for one full
-                # pipeline run -- then any ledger writeback failure
-                # raises instead of being swallowed.
-                "strict_writeback": ("BOOLEAN", {"default": False}),
+                # S25/AG-9 (BUG-LOCAL-219): default True. The audit
+                # walker (audit_post_freeze_writeback) is wired in soft
+                # mode at every consumer in this sprint and surfaces
+                # drift to batch_log; a real ledger writeback failure
+                # is now loud, not log-and-continue. The S18.3 "flip
+                # once the audit walker has stayed clean for one full
+                # pipeline run" criterion was unreachable because the
+                # walker was never running (deadlock noted in the
+                # BUG-LOCAL-219 general-lesson).
+                "strict_writeback": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -177,7 +181,7 @@ class BatchProceduralSFX:
 
         # 2. Resolve per-episode sfx output dir (best-effort; None on
         # headless / test paths -> skip disk write, sfx_wav_path stays
-        # None on the ledger row).
+        # "" on the ledger row (S18.1 §6.16 convention; pre-S18 used None).
         sfx_dir = _resolve_proc_sfx_dir()
 
         # 3. Match tags to available procedural generators
@@ -318,7 +322,7 @@ class BatchProceduralSFX:
 
         # 5. Per-line ledger write-back (Pattern 4): patch by line_id
         # on ledger.lines[]. Fields per architect spec: sfx_wav_path
-        # (may be None on disk-write failure), sfx_engine="procedural",
+        # (is "" on disk-write failure; §6.16), sfx_engine="procedural",
         # sfx_type, dur_s. ProcSFX never had a legacy ledger.sfx[]
         # write-back; this is purely the new lines[]-side stamping.
         # Single save_ledger_safe at the end. Best-effort -- any I/O
