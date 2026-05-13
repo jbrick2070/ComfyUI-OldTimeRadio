@@ -678,18 +678,11 @@ class BatchAudioGenGenerator:
             batched_waveform[i, 0, :samples] = clip[0, 0, :samples]
 
         # ---- BUG-LOCAL-095: write SFX wav_paths back to ledger ----
-        # Two parallel write-back paths:
-        #   1. Legacy ledger.sfx[] parallel-index walk (preserved
-        #      for back-compat producers that still emit a separate
-        #      ledger.sfx[] array; v2 producers leave sfx[] empty
-        #      and this loop no-ops).
-        #   2. NEW v2: per-line stamp on ledger.lines[] for sfx
-        #      rows via patch_line_fields(led, line_id, ...). sfx
-        #      are first-class lines in the v2 ledger -- this
-        #      mirrors Sequencer's new sfx_line_positions pattern
-        #      from consumer #4.
-        # Both paths mutate the same led_disk dict; one save_ledger_safe
-        # at the end (Pattern 4 contract).
+        # v2: per-line stamp on ledger.lines[] for sfx rows via
+        # patch_line_fields(led, line_id, ...). sfx are first-class
+        # lines in the v2 ledger -- this mirrors Sequencer's
+        # sfx_line_positions pattern from consumer #4. Single
+        # save_ledger_safe at the end (Pattern 4 contract).
         try:
             ledger_path = _OTRL_PATHS.in_flight_ledger_path()
             if ledger_path is not None:
@@ -701,70 +694,7 @@ class BatchAudioGenGenerator:
                         ledger_path,
                     )
                 else:
-                    # Path 1: legacy ledger.sfx[] (preserved as-is).
-                    sfx_rows = led_disk.get("sfx") or []
-                    # S25/AG-3 (BUG-LOCAL-217 sibling): a non-empty
-                    # ledger.sfx[] means a legacy v1 producer is still
-                    # in the graph. v2 producers leave sfx[] empty and
-                    # stamp lines[] sfx rows. CD-3 audit in Phase 7
-                    # determines whether this path stays or gets
-                    # deleted in S26; the deprecation warning surfaces
-                    # the existence of the legacy path either way.
-                    if sfx_rows:
-                        import warnings as _w
-                        _w.warn(
-                            "ledger.sfx[] is non-empty; legacy v1 "
-                            "producer detected. v2 producers leave "
-                            "sfx[] empty and stamp lines[] sfx rows. "
-                            "Scheduled for review in S26 (see "
-                            "ROADMAP.md CD-3 audit).",
-                            DeprecationWarning,
-                            stacklevel=2,
-                        )
-                    updated_sfx_array = 0
-                    for i, item in enumerate(render_queue):
-                        if i >= len(sfx_rows):
-                            break
-                        row = sfx_rows[i]
-                        cache_path = item.get("cache_path")
-                        clip_t = final_clips[i] if i < len(final_clips) else None
-                        dur = None
-                        if clip_t is not None:
-                            try:
-                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
-                            except Exception:
-                                dur = None
-                        # S25/AG-2 (BUG-LOCAL-217): apply the C2 ghost-
-                        # path gate to the legacy sfx[] writeback too.
-                        # C2 fixed the lines[] writeback path but
-                        # missed this parallel one -- same field, same
-                        # failure mode (ledger row points at a path
-                        # that was never confirmed on disk).
-                        save_ok = bool(item.get("_save_ok"))
-                        had_cache_hit = bool(item.get("had_cache_hit_at_resolve"))
-                        if (cache_path
-                                and (save_ok or had_cache_hit)
-                                and os.path.isfile(cache_path)):
-                            row["wav_path"] = str(cache_path)
-                        else:
-                            row["wav_path"] = ""
-                        row["sfx_render_status"] = (
-                            item.get("_render_status") or "ok"
-                        )
-                        if dur is not None:
-                            row["dur_s"] = dur
-                        row["tts_engine"] = "audiogen"
-                        if item.get("_render_ms"):
-                            row["render_ms"] = int(item["_render_ms"])
-                        if dur is not None:
-                            row["generated_dur_s"] = float(dur)
-                        if item.get("_audio_sample_hash"):
-                            row["audio_sample_hash"] = str(
-                                item["_audio_sample_hash"]
-                            )
-                        updated_sfx_array += 1
-
-                    # Path 2: NEW v2 ledger.lines[] sfx rows via line_id.
+                    # v2 ledger.lines[] sfx rows via line_id.
                     # Field names: sfx_wav_path, dur_s, sfx_engine="audiogen"
                     # (sfx-specific names disambiguate from dialogue's
                     # tts_engine/voice_preset/bark_wav_path on the same
@@ -828,7 +758,7 @@ class BatchAudioGenGenerator:
                         ):
                             updated_lines += 1
 
-                    if updated_sfx_array or updated_lines:
+                    if updated_lines:
                         # S25/AG-5 (BUG-LOCAL-219): soft-mode audit
                         # walker. Surfaces §6.16 violations to
                         # batch_log; the consumer stays non-halting
@@ -853,7 +783,6 @@ class BatchAudioGenGenerator:
                         _OTRL_PATHS.save_ledger_safe(ledger_path, led_disk)
                         batch_log.append(
                             f"BUG-095 ledger updated (line_id stamping): "
-                            f"sfx_array={updated_sfx_array}/{len(render_queue)}, "
                             f"lines={updated_lines}/{len(render_queue)} -> "
                             f"{ledger_path.name}"
                         )
