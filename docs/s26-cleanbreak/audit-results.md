@@ -72,4 +72,16 @@ Blast radius: 19 files (2 production + 17 tests). Below the §5 circuit-breaker 
 - Unexpected failures: none
 - Notes: AST clean. A4b workflow-fixture audit (next item) propagates this default to saved widget vectors in the workflow JSONs.
 
+## A4b — Workflow fixture textual audit + scrub
+- Commit: (pending)
+- Fixtures enumerated via `git grep -lE 'OTR_LedgerScriptWriter|OTR_BatchAudioGen|OTR_BatchProceduralSFX|MusicGenTheme' -- '*.json'`:
+    - `workflows/otr_scifi_16gb_full.json` — affected (1 node)
+    - `docs/2026-05-10-cast-contract-wiring-review__transcript.json` — round-robin transcript artifact, not a Comfy graph; out of scope
+    - All other `workflows/*.json` (humo smoke, ltx 2.3 smoke, external_examples/*) — no AudioGen/ProcSFX/MusicGen node-class references; nothing to scrub
+- Affected node in the canonical fixture: `OTR_BatchAudioGenGenerator` id=15 — `widgets_values[0]` = `"[]"`. Slot is unambiguous (positional script_json widget per INPUT_TYPES order). Patched in place to `"{}"`. The node also has `script_json` as a wired input, so the widget default isn't consumed at runtime; this is textual-cleanliness, not behavioral.
+- Targeted test command: `pytest tests/test_workflow_json_guardrails.py tests/test_workflow_audio_widget_vectors.py tests/test_workflow_contract_validation.py tests/test_workflow_live_passes_validator.py tests/test_workflow_validator_extended.py tests/test_workflow_zod_shape.py -q`
+- Result: 116 passed, 5 skipped
+- Unexpected failures: none
+- Notes: ComfyUI Desktop re-save deferred to §11 post-cleanbreak per plan; only ComfyUI's own save path normalizes the full widget vector against the current INPUT_TYPES contract. JSON is structurally valid (json.loads passes).
+
 

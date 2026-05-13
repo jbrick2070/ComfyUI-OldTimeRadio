@@ -541,7 +541,7 @@
         "Node name for S&R": "OTR_BatchAudioGenGenerator"
       },
       "widgets_values": [
-        "[]",
+        "{}",
         "",
         "facebook/audiogen-medium",
         3.0,
