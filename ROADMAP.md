@@ -43,6 +43,109 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
+## NEXT SPRINT — `meta.story_brief` v2 (planning, not started)
+
+**State:** Planning. Three canonical docs locked; one round-robin question open before build starts.
+
+**Problem.** Every downstream visual prompt (FLUX env, FLUX radio bookend, FLUX portraits, LTX motion, HuMo lip-sync) plus MusicGen mood currently keys off `meta.style` — a slug picked **before the script is written**. The story drifts during writing; the slug is a hypothesis, not a description. Result: rendered visuals have a generic "noir audio drama" feel instead of reflecting the specific scene that actually emerged. Solution: a post-write reflection pass over the finished `lines[]` + `cast[]` produces a 1-sentence `meta.story_brief`, and every visual/music consumer reads it through a small set of central helpers.
+
+### Canonical artifacts
+
+| Doc | Purpose |
+|---|---|
+| `docs/2026-05-12-story-brief-v2-problem-statement.md` (Jeffrey, uploaded) | The original ask — schema, scope (FLUX/LTX/HuMo/MusicGen, NOT Bark/Kokoro/AudioGen/ProcSFX), deliverable shape |
+| `docs/2026-05-12-story-brief-v2-research.md` (Cowork R1) | Inventory of every post-script prompt assembly site; provenance of the reintroduced `_GENRE_BY_STYLE`; prior art from the orphan `_LTX_STYLE_BRIEF_PROMPT`; six open questions |
+| `docs/2026-05-12-story-brief-v2-design-refinements.md` (three reviewer passes synthesized) | The locked design surface — brief scope, capped input builder, strict-JSON reflection prompt, validation gate + repair pass, central helpers, per-consumer integration shapes, VRAM envelope discipline |
+
+### Pre-flight cleanbreaks (must land before the build sprint, in order)
+
+| # | Cleanbreak | Why |
+|---|---|---|
+| 1 | **Era literals.** `visual/batch_flux_portrait_render.py:107` (`"1940s noir radio drama style"`) and `nodes/otr_video_plan.py:79` (`_DEFAULT_STYLE_TAIL` contains `"1980s broadcast aesthetic"`). Both replaced with era-neutral text. | If the literals don't clean first, brief testing is polluted — visual drift in a soak could come from the brief or from a hardcoded decade fighting it. |
+| 2 | **`_GENRE_BY_STYLE` deletion.** `nodes/OTR_LedgerScriptWriter.py:246-301` + `meta.visual_plan.genre` stamp at 2400 + three video_engine fall-throughs (711, 836, 1075) + the `tests/test_musicgen_style_palette.py` genre-table guards + projection in `nodes/otr_video_plan.py:306`. The table was reintroduced 2026-05-12 in Sprint 6.1; full grep confirms zero FLUX/LTX/HuMo/MusicGen consumers; only HUD + treatment-text display reads it. | Standing directive #1 (no silent fallbacks) + standing no-back-compat — `genre` is a dead-code categorical projection of `style`. Adding `story_brief` while `genre` survives invites two competing flavor sources to fight for the same prompt real estate. |
+| 3 | **VRAM envelope tightenings (refinement §11).** Default model Mistral-Nemo → `google/gemma-4-E4B-it`; flagship VRAM threshold `15.0 → 14.5`; Gemma-4-E4B context cap `16384 → 8192`; `_run_with_timeout` orphan-thread hard sync barrier on `_LLMTimeout`. | Infrastructure for the reflection pass to run safely on the 16 GB envelope. Worst-case path is three LLM calls (composition → reflection → repair) — three orphan-thread opportunities without §11.4. Non-negotiable. |
+| 4 | **`meta.story_brief` build sprint.** Reflection pass + central helpers + per-consumer integration. Refinement §6 has the placement table. | Only after 1-3 close. |
+
+### Locked design decisions (refinement §12)
+
+These resolve the corresponding R1 open questions; no further round-robin needed:
+
+- **6.1 brief length window** → char-count caps (180-260 preferred, 300 hard max). Word count discarded.
+- **6.3 failure mode** → empty-string with explicit `story_brief_status` field; not raw empty (silent), not raise (wrong cost-benefit). Resolves directive #1 tension by making failure observable in metadata.
+- **6.4 slug-vs-brief conflict** → no conflict by design; brief follows script, refinement §3.3 prompt rule forbids slug-hallucination.
+- **6.5 token budget** → capped input builder (refinement §2) makes input length deterministic regardless of episode length.
+- **6.6 retire `meta.ltx_style_brief`** → confirmed retire; `meta.story_brief` is the only field name going forward.
+- **NEW: 6.7 LTX prompt-length budget** → 220-240 chars total, 80-100 chars brief fragment, motion verbs lead, drop brief if it pushes motion past char 140. Dual-purpose (BUG-LOCAL-112 dilution fix + VRAM micro-optimization).
+
+### Open round-robin question (one focused pass before build starts)
+
+- **6.2 reflection-pass call-site position.** Inside `OTR_LedgerScriptWriter.execute()` (section after K.5, before return) vs new `OTR_StoryBriefReflection` node between writer and FreezeCascade. The §11.4 hard-sync-barrier requirement applies either way; the question is where the call site lives. Tradeoff: cohesion-with-writer vs separation-of-concerns / separate test surface / workflow JSON wire.
+
+### Test discipline (refinement §9 — three ugly ledgers)
+
+Adversarial fixtures required before any soak:
+
+1. Noir slug + space-colony script — does the brief follow the script or hallucinate noir from the slug?
+2. Detective script with no clear setting — does the brief invent a setting (forbidden by §3.3) or produce a sparse atmosphere-only output?
+3. Long script (15+ min) with three distinct locations — does the brief pick a dominant scene or smear them all together; does the §2 input cap cause information loss?
+
+Same three fixtures double as the §6.1 LTX-budget tuning set and the §11 VRAM-monitoring set.
+
+### Standing directives this sprint inherits
+
+- No legacy back-compat — `meta.ltx_style_brief` retires cleanly; no alias, no shim.
+- 14.5 GB VRAM ceiling — refinement §11 is the infrastructure; the reflection pass must stay inside it across the worst-case three-LLM-call path.
+- Lean prompts — reflection prompt body ≤250 tokens. Refinement §3 has the schema and the cleanup wrapper sized accordingly.
+- UTF-8 no BOM throughout.
+- Bug Bible 23/1/2 must hold after each pre-flight cleanbreak ships and after the build sprint commit lands.
+
+---
+
+## FUTURE SPRINT — S24 public-facing polish (gated on cleanbreak close, not started)
+
+**State:** Notes locked. Do not start until S15.5 → S23 cleanbreak closes AND the `meta.story_brief` v2 build sprint above lands. Public polish is the LAST sprint before announcement — cleanbreak is the prerequisite to being shareable.
+
+**Premise.** The pipeline is real and the news-fed daily-fresh hook is genuinely interesting. What gates public reach isn't whether the code works — it's whether a stranger can get to "first episode" in under 15 minutes without help. S24 is the difference between a portfolio piece and a thing people actually use.
+
+### Canonical artifact
+
+- `docs/2026-05-13-otr-public-facing-polish.md` — the notes. Twelve sections covering the 90-second test, the install cliff, the first-run experience, the news-feed hook as the moat, failure-mode messages, community/showcase loop, user docs (separate from contributor docs), license + expectation, and the S24.1-S24.8 sequencing.
+
+### S24 sequence (locked)
+
+| # | Item | Estimate |
+|---|---|---|
+| S24.1 | One sample episode in `samples/` (MP3 + MP4, 60-90s) + README rewrite + hardware-tier table ("Works on 8GB / Works on 16GB / Recommended") | 4 hours |
+| S24.2 | Failure-mode audit: every `raise RuntimeError(...)` in consumer nodes gets a useful message (what failed / why it matters / what to do next) | 3 hours |
+| S24.3 | Pre-flight check script: `python -m otr.preflight` — CUDA present? VRAM? FLUX downloaded? Bark downloaded? RSS feeds reachable? Stops the 4-min-render-fails-at-minute-4 failure mode | 2 hours |
+| S24.4 | HuggingFace Space wrapping the `8gb_safe` preset. Single highest-impact item. Free-tier GPU, zero-install, one-click "generate today's episode" — every person who can't install ComfyUI becomes a possible user | 1 full day |
+| S24.5 | `make-an-episode.bat` / `make-an-episode.sh` one-command runner. Pure pass-through to ComfyUI's headless CLI; hides the dropdown chooser | 2 hours |
+| S24.6 | News-feed front-loading: README rewrite around the daily-fresh hook + curated default feed set (BBC, NPR, Reuters, ArXiv top-1, Nature top-1) + `feeds.yaml` config | 3 hours |
+| S24.7 | User docs (separate from contributor docs): quickstart, hardware tiers, model swapping guide, news-feed configuration, "what to do when..." troubleshooting. Three docs explicitly NOT created: architecture overview, "why we deleted LLMDirector", standing-directives audit (all contributor-only) | 4 hours |
+| S24.8 | `gallery/` folder + GitHub Action auto-building `episodes/INDEX.md` + first announcement post. Hashtag convention so people posting on Mastodon / Bluesky / YouTube can find each other | 3 hours + announcement-day time |
+
+**Total:** 3-4 focused days of work, post-cleanbreak.
+
+### Gating
+
+- S15.5 → S23 cleanbreak must close (current cleanbreak workstream).
+- `meta.story_brief` v2 must ship (NEXT SPRINT above) — public-facing visuals key off the brief, so polish without the brief showcases the slug-only output the brief was built to replace.
+- Era literals deletion + `_GENRE_BY_STYLE` deletion (pre-flight cleanbreaks for `meta.story_brief` — see above) must land. Sample episode in S24.1 should not ship a hardcoded "1940s" decade visible in any rendered output.
+
+### Re-read triggers
+
+- Cleanbreak (S15.5 → S23) closes and the next-sprint question opens.
+- Tempted to add a new feature instead of polishing what exists.
+- A user tries the pipeline and bounces — post-mortem belongs against the §1-§8 checklist in the canonical doc.
+
+### Standing directives this sprint inherits
+
+- Contributor docs and user docs stay separate. The contributor docs (BUG_LOG, ROADMAP, survival guide, ADRs) are good and stay where they are. The user docs S24.7 lists are new surfaces, not rewrites of existing ones.
+- License + content-policy + included-model-license disclosure must land before announcement. Public release means strangers using OTR for purposes Jeffrey didn't predict.
+- Sample episode quality must reflect post-cleanbreak baseline, not legacy-path output. Re-render S24.1 if it predates the `meta.story_brief` ship.
+
+---
+
 ## CURRENT WORK — voice-path-cleanbreak S10-S15 (COMPLETE 2026-05-12)
 
 **State:** 17 commits SHIPPED on `v2.0-alpha` between `3090007` (S10.1) and `f813b37` (S15.1+S15.2), plus QA doc commit `ef8c409`. KNOWN-FAIL count steady at 6 throughout (see `docs/known-failures.md` + `tests/conftest.py::EXPECTED_FAILED_NODEIDS`); Bug Bible regression 23/1/2 throughout. Test count 2047 → 2096 (+49 net new tests).

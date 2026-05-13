@@ -26,7 +26,7 @@ FIXTURES_DIR = pathlib.Path(__file__).resolve().parent / "fixtures"
 def _looks_like_l3_ledger(d) -> bool:
     """Quick shape check for JSON files: the dict has a top-level
     ``schema_version`` starting with ``l3-`` AND a ``lines`` field.
-    Strict so a non-ledger JSON file (Director-shape, config, etc.)
+    Strict so a non-ledger JSON file (legacy Director-shape, config, etc.)
     doesn't get audited."""
     if not isinstance(d, dict):
         return False

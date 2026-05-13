@@ -11,7 +11,8 @@ GPU thrashing), this node:
   3. Generates all lines per character in a single pass (GPU stays hot)
   4. Returns clips in original script order as batched AUDIO
 
-Pipeline position:  Director - BatchBarkGenerator - SceneSequencer
+Pipeline position:  LedgerScriptWriter - FreezeCascade - BatchBarkGenerator - SceneSequencer
+                    (legacy Director stage retired in voice-path-cleanbreak S2)
 
 The SceneSequencer receives pre-rendered clips via its `tts_audio_clips`
 input and skips inline Bark calls entirely. Result: 60-70% faster renders

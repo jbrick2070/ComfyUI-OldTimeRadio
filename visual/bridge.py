@@ -1,9 +1,13 @@
 """
 bridge.py  --  OTR_VisualBridge ComfyUI node
 ===============================================
-Writes Director plan + scene manifest to io/visual_in/,
+Writes script_lines + scene manifest to io/visual_in/,
 generates shotlist via deterministic rules, and spawns the
 sidecar worker process.
+
+(Legacy production_plan_json input + production_plan.json sidecar
+file were removed in voice-path-cleanbreak S23.7. The Director-shape
+metadata they carried had no downstream consumer.)
 
 Design doc: docs/2026-04-15-visual-poc-design.md  Section 6
 Mapping doc: docs/2026-04-15-otr-to-visual-narrative-mapping.md
@@ -238,7 +242,8 @@ class VisualBridge:
     """
     ComfyUI node: OTR_VisualBridge
 
-    Takes Director output + script_json from the v1.7 audio pipeline,
+    Takes script_json from the audio pipeline (the legacy Director
+    production-plan input was removed in voice-path-cleanbreak S23.7),
     generates a deterministic shotlist, writes the sidecar contract
     files, and spawns the Visual worker subprocess.
 
@@ -267,11 +272,14 @@ class VisualBridge:
                 }),
             },
             "optional": {
-                "production_plan_json": ("STRING", {
-                    "multiline": True,
-                    "default": "{}",
-                    "tooltip": "Director production plan (optional, enriches shotlist metadata).",
-                }),
+                # production_plan_json optional socket removed in
+                # voice-path-cleanbreak S23.7 (2026-05-13) -- directive
+                # 11 violation: live Director-era input on a production
+                # node with zero downstream consumers reading the file
+                # written here. The shotlist generator gets all it needs
+                # from script_json + scene_manifest_json; the Director
+                # plan was forensic data that the sidecar wrote but no
+                # consumer read.
                 "scene_manifest_json": ("STRING", {
                     "multiline": True,
                     "default": "{}",
@@ -311,7 +319,6 @@ class VisualBridge:
         self,
         script_json: str,
         episode_title: str,
-        production_plan_json: str = "{}",
         scene_manifest_json: str = "{}",
         lane: str = "faithful",
         chaos_ops: str = "",
@@ -363,7 +370,8 @@ class VisualBridge:
         # after spawn) from landing on a half-written contract file.
         atomic_write_text(job_dir / "script_lines.json", script_json)
         atomic_write_text(job_dir / "shotlist.json", shotlist_json)
-        atomic_write_text(job_dir / "production_plan.json", production_plan_json)
+        # production_plan.json was written here pre-S23.7; the sidecar
+        # never read it, so the file is now skipped entirely.
         atomic_write_text(job_dir / "scene_manifest.json", scene_manifest_json)
 
         # Metadata for the sidecar

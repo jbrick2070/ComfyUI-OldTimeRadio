@@ -40,9 +40,10 @@ Hard rules (from ROADMAP + CLAUDE.md)
 ComfyUI node
 ------------
 `ProjectStateLoader` exposes the loaded state as a single dict-shaped output
-so downstream nodes (LLMScriptWriter, LLMDirector) can pull fields
-without each having to know the file path. The node has zero writable
-widgets; it is intentionally boring.
+so downstream nodes (originally LLMScriptWriter + the legacy LLMDirector;
+post-cleanbreak LedgerScriptWriter alone) can pull fields without each
+having to know the file path. The node has zero writable widgets; it is
+intentionally boring.
 """
 
 from __future__ import annotations
@@ -159,7 +160,7 @@ class ProjectState:
         return target
 
     # ------------------------------------------------------------------
-    # Prompt helpers - used by LLMScriptWriter / LLMDirector
+    # Prompt helpers - used by LLMScriptWriter (legacy LLMDirector retired)
     # ------------------------------------------------------------------
 
     def prompt_preamble(self) -> str:

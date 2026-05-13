@@ -171,8 +171,10 @@ def otr_audio_dir(episode_id: str = "") -> Path:
     """Per-episode audio + ledger dir: ``<output>/otr/episodes/<episode_id>/audio/``.
 
     Holds the procgen mp4, the canonical ``<episode_id>_ledger.json``,
-    Bark / Kokoro output wavs, MusicGen + AudioGen cache files for
-    this episode, and the LLMDirector raw-output dump for this episode.
+    Bark / Kokoro output wavs, and MusicGen + AudioGen cache files
+    for this episode. (LLMDirector raw-output dumps were removed in
+    voice-path-cleanbreak S23.1 along with the helper that owned
+    them.)
 
     The ``episode_id`` argument is REQUIRED for new code. Calls without
     it fall back to a degraded per-episode-less path under
@@ -356,16 +358,10 @@ def episodes_for_obs_dir(episode_id: str = "") -> Path:
     return otr_episodes_root()
 
 
-def director_raw_dump_dir(episode_id: str = "") -> Path:
-    """Where ``LLMDirector`` parks raw output dumps for BUG-090.
-
-    Lives alongside the ledger files (per-episode ``otr/episodes/<ep>/audio/``)
-    so a single ``ls`` of the audio dir surfaces both the ledger and any
-    failed-parse raw dumps for the same run. Falls back to the legacy
-    audio dir when no ``episode_id`` is given (for callers that don't
-    yet have one).
-    """
-    return otr_audio_dir(episode_id)
+# director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
+# (2026-05-13) along with the LLMDirector class itself (S2,
+# commit 249bc06). No replacement is needed -- the L3 ledger and
+# atomic save_ledger_safe path replace the raw-dump scheme.
 
 
 def comfyui_log_path() -> Optional[str]:
@@ -534,7 +530,7 @@ __all__ = [
     "otr_obs_dir",
     "otr_state_dir",
     "episodes_for_obs_dir",
-    "director_raw_dump_dir",
+    # director_raw_dump_dir entry removed in voice-path-cleanbreak S23.1
     "resolve_hf_model_path",
     "comfyui_log_path",
 ]

@@ -34,9 +34,11 @@ Strict on shape, graceful on missing fields:
     gracefully (return ``{}`` / ``"UNKNOWN"`` / ``None``) on missing
     char_id so a stub ledger or a non-character line (announcer, sfx,
     music) doesn't blow up.
-  * ``production_plan_or_empty`` returns ``{}`` for empty / None /
-    invalid plan_json so consumers can demote production_plan_json
-    from required to optional without a special-case branch.
+
+(``production_plan_or_empty`` was deleted in voice-path-cleanbreak
+S23.6 along with its tests -- the helper was a Director-derived
+fallback with zero production consumers, in violation of standing
+directive 11.)
 
 UTF-8 no BOM. No GPU. No I/O. Safe to import anywhere.
 """
@@ -143,21 +145,11 @@ def voice_preset(ledger: dict, line: dict) -> Optional[str]:
     return cast_lookup(ledger, char_id).get("voice_preset")
 
 
-def production_plan_or_empty(plan_json: str) -> dict:
-    """Parse the optional Director ``production_plan_json``; return ``{}``
-    for empty / None / invalid input.
-
-    The Director is not part of the v2 ledger flow. Consumers that took
-    ``production_plan_json`` as required get this graceful fallback so
-    an unwired socket degrades cleanly.
-    """
-    if not plan_json:
-        return {}
-    try:
-        parsed = json.loads(plan_json)
-    except (TypeError, ValueError):
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+# production_plan_or_empty was removed in voice-path-cleanbreak S23.6.
+# The helper was a Director-derived fallback (parses a legacy
+# production_plan_json string) with zero production consumers per the
+# S15.5.1 audit -- directive 11 violation. Its companion tests in
+# tests/test_otr_ledger_consumers.py were removed in lockstep.
 
 
 def voice_assignments_from_cast(led: dict) -> dict:
@@ -262,6 +254,5 @@ __all__ = [
     "speaker_name",
     "voice_preset",
     "voice_assignments_from_cast",
-    "production_plan_or_empty",
     "audit_post_freeze_writeback",
 ]

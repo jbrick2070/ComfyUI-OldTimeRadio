@@ -4,8 +4,9 @@ smoke_downstream_from_assets.py
 
 REPRO HARNESS for the BUG-LOCAL-031 RTXUpscale-emits-black bug.
 
-Instead of running the full ~90 min OTR pipeline (Story -> Director -> Bark
--> Kokoro -> MusicGen -> AudioGen -> SceneSequencer -> AudioEnhance ->
+Instead of running the full ~90 min OTR pipeline (Story -> FreezeCascade
+-> Bark -> Kokoro -> MusicGen -> AudioGen -> SceneSequencer -> AudioEnhance ->
+(legacy Director stage retired in voice-path-cleanbreak S2)
 EpisodeAssembler -> SignalLostVideo -> FLUX -> HuMo -> LTX -> Composite ->
 RTXUpscale -> PostUpscaleProcgenBlend), this script REUSES pre-rendered
 assets from a previous completed run and ONLY exercises the suspect tail:

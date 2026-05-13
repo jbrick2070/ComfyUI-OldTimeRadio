@@ -1,25 +1,31 @@
 r"""
-OTR Orchestrator - Script Writer + Director for "SIGNAL LOST"
+OTR Orchestrator - Script Writer + Ledger Writer for "SIGNAL LOST"
 ===================================================================
 
 Two nodes:
-  1. LLMScriptWriter - Fetches real daily science news via RSS, feeds it to
-     LLM to generate a full audio drama script. Contemporary sci-fi anthology
-     format (Black Mirror / NPR Invisibilia / Arrival). News-as-spine: real
-     headlines become the inciting incident, extrapolated to dramatic extremes.
-     Includes a hard-science epilogue citing real sources (ArXiv, Nature, etc.).
+  1. LLMScriptWriter - Fetches real daily science news via RSS, feeds
+     it to an LLM to generate a full audio drama script. Contemporary
+     sci-fi anthology format (Black Mirror / NPR Invisibilia / Arrival).
+     News-as-spine: real headlines become the inciting incident,
+     extrapolated to dramatic extremes. Includes a hard-science
+     epilogue citing real sources (ArXiv, Nature, etc.).
 
-  2. LPL writer + cast helpers - Generates the L3 ledger directly (cast,
-     lines, meta.visual_plan, meta.style) via the LedgerScriptWriter path.
-     Cast-lock invariants run at writer exit; downstream consumers read the
-     ledger via FreezeCascade.script_json fanout. The legacy LLMDirector
-     class was removed in voice-path-cleanbreak S2 (commit 249bc06) --
-     voice and video paths now share the L3 ledger as single source of truth.
+  2. LPL writer + cast helpers - Generates the L3 ledger directly
+     (cast, lines, meta.visual_plan, meta.style) via the
+     LedgerScriptWriter path. Cast-lock invariants run at writer
+     exit; downstream consumers read the ledger via
+     FreezeCascade.script_json fanout.
 
-LLM runs via transformers (local GPU). Content safety filter catches
-profanity/NSFW that slips past the prompt policy.
+The legacy LLMDirector class was removed in voice-path-cleanbreak
+S2 (commit 249bc06). Voice and video paths share the L3 ledger as
+the single source of truth; there is no Director-shape projection
+anywhere in active code.
+
+LLM runs via transformers (local GPU). Content safety filter
+catches profanity/NSFW that slips past the prompt policy.
 
 v1.0  2026-04-04  Jeffrey Brick
+v2.0  2026-05-13  voice-path-cleanbreak S23.2 (docstring scrub)
 """
 
 import json
@@ -50,7 +56,8 @@ from .project_state import ProjectState
 from ._vram_log import vram_snapshot, vram_reset_peak, force_vram_offload
 
 # Canonical OTR paths -- single source of truth for output locations.
-from ._otr_paths import director_raw_dump_dir
+# (director_raw_dump_dir was deleted in voice-path-cleanbreak S23.1
+# with no live consumer remaining; no replacement import needed.)
 
 
 def _flush_vram_keep_llm():
@@ -572,7 +579,7 @@ def _consolidate_similar_cast_rows_with_aliases(cast_rows):
 # Phase 3d: BARK VOICE HEALTH CHECK
 # Synthesize a 1-second test clip for each active English preset at startup.
 # Any preset that returns silence or NaN gets removed from _VOICE_PROFILES
-# for the rest of the session, so the Director can never assign a broken
+# for the rest of the session, so the writer can never re-assign a broken
 # voice. Runs once per process, lazily on first ScriptWriter init so we
 # don't pay the Bark load cost in environments that only import the module.
 # -----------------------------------------------------------------------------
@@ -680,9 +687,9 @@ def _bark_health_check():
 def _bark_health_check_for_cast(cast_rows):
     """LAZY: validate only the Bark presets the cast actually uses.
 
-    Trades a one-time ~120s full-catalog warmup at Director start for a
-    ~5-25s targeted check after Director assigns voices. On any preset
-    failure, swaps the cast row's voice_preset for a known-good fallback
+    Trades a one-time ~120s full-catalog warmup at writer start for a
+    ~5-25s targeted check after the writer locks the cast. On any
+    preset failure, swaps the cast row's voice_preset for a known-good fallback
     of the same gender from `_VOICE_PROFILES` and records the swap.
 
     Mutates cast_rows IN PLACE; returns the list (same object) for
@@ -3696,7 +3703,7 @@ def _truncate_at_sentence_boundary(text, max_chars):
     return snippet
 
 
-# This lets the Director automatically inherit the exact same model memory
+# This lets the next phase automatically inherit the exact same model memory
 # space the Script Writer loaded without requiring the user to sync two disjointed dropdowns.
 # -----------------------------------------------------------------------------
 _CURRENT_LLM_MODEL = "mistralai/Mistral-Nemo-Instruct-2407"

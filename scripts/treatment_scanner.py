@@ -5,7 +5,7 @@ Checks for:
   1. __NEEDS_LLM_CLOSING__ -- announcer sign-off never generated
   2. Zero dialogue lines in any scene
   3. Missing cast members (empty CAST & VOICES)
-  4. Gender mismatch -- Director says female but cast profile says male (or vice versa)
+  4. Gender mismatch -- legacy Director said female but cast profile says male (or vice versa)
   5. Duplicate voice presets -- two characters sharing the same voice
   6. Missing SFX -- scenes with no [SFX] cues at all
   7. Suspiciously short duration (under 30s)

@@ -8,7 +8,8 @@ left dirty memory (a pending illegal access not yet observed), the
 would promote the access to a process-level fault, and the python
 process would become an unkillable CUDA-locked zombie holding port
 8000. Live evidence (2026-04-26 PM): two-LLM-split run hit this at
-the OpenClose -> Director transition, log line `[StoryOrchestrator]
+the OpenClose -> Director transition (legacy Director stage was
+later retired in voice-path-cleanbreak S2), log line `[StoryOrchestrator]
 model.cpu() during unload failed: CUDA error: an illegal memory
 access was encountered`, server unresponsive after.
 

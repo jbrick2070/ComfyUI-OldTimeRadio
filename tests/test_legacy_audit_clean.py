@@ -47,10 +47,14 @@ FORENSIC_MARKERS = (
     "deleted_node_types",
     "forbidden_input_sockets",
     # Sprint citations also count as forensic anchors -- they tie the
-    # mention to a specific historical decision.
+    # mention to a specific historical decision. Both hyphenated and
+    # space-separated forms appear in shipped docstrings.
     "post-cleanbreak",
     "voice-path-cleanbreak",
+    "voice-path cleanbreak",
     "pre-cleanbreak",
+    # Catches "retired" / "retirement" common in test guardrail docs
+    "retired",
 )
 
 
@@ -70,6 +74,20 @@ EXCLUDED_PATH_PREFIXES = (
 )
 
 
+# Specific files that are inherently forensic (e.g., this audit test
+# itself describes the legacy tokens it scans for; the workflow-Director-
+# freedom test was built specifically to assert Director surfaces are gone
+# from the workflow JSON, so it has to reference them by name).
+EXCLUDED_PATHS = frozenset({
+    "tests/test_legacy_audit_clean.py",
+    "tests/test_workflow_director_freedom.py",
+    # Both guardrail test suites assert the forbidden names are gone
+    # from the workflow / validator -- they HAVE to reference them.
+    "tests/test_workflow_json_guardrails.py",
+    "tests/test_workflow_validator_extended.py",
+})
+
+
 def _is_forensic(line_text: str) -> bool:
     lower = line_text.lower()
     return any(marker in lower for marker in FORENSIC_MARKERS)
@@ -81,7 +99,42 @@ def _is_generic_english(line_text: str) -> bool:
 
 
 def _is_excluded(path: str) -> bool:
+    if path in EXCLUDED_PATHS:
+        return True
     return any(path.startswith(p) for p in EXCLUDED_PATH_PREFIXES)
+
+
+# Number of preceding lines to scan for a forensic anchor when the
+# current line lacks one on itself. Covers multi-line comment blocks
+# where the marker word appears once and following lines elaborate.
+_CONTEXT_WINDOW = 5
+
+
+def _is_forensic_in_context(
+    path: str, lineno_str: str, _content_cache: dict
+) -> bool:
+    """Walk up to _CONTEXT_WINDOW lines preceding the current line and
+    check if any of them is forensic. Reads the file (cached per-path)
+    and returns True if any preceding line in the window has a
+    forensic marker substring.
+    """
+    try:
+        lineno = int(lineno_str)
+    except ValueError:
+        return False
+    if path not in _content_cache:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                _content_cache[path] = fh.readlines()
+        except OSError:
+            _content_cache[path] = []
+    lines = _content_cache[path]
+    start = max(0, lineno - 1 - _CONTEXT_WINDOW)
+    end = lineno - 1
+    for i in range(start, end):
+        if i < len(lines) and _is_forensic(lines[i]):
+            return True
+    return False
 
 
 def test_no_unclassified_legacy_references():
@@ -96,9 +149,12 @@ def test_no_unclassified_legacy_references():
         ["git", "grep", "-nE", LEGACY_PATTERN, "--", "*.py", "*.json"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     unclassified = []
+    content_cache: dict = {}
     for raw in out.stdout.splitlines():
         # git grep format: path:lineno:content
         try:
@@ -108,6 +164,11 @@ def test_no_unclassified_legacy_references():
         if _is_excluded(path):
             continue
         if _is_forensic(content) or _is_generic_english(content):
+            continue
+        # Multi-line forensic comment blocks: if any of the
+        # _CONTEXT_WINDOW preceding lines has a marker, the current
+        # line is part of the same documentation block.
+        if _is_forensic_in_context(path, lineno, content_cache):
             continue
         unclassified.append(f"{path}:{lineno}: {content.strip()}")
 

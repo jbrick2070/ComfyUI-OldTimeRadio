@@ -28,8 +28,9 @@ L2 scope:
   * Writes NEVER raise. A ledger failure is logged and the pipeline continues.
 
 Stages that populate the ledger (in pipeline order):
-  ScriptWriter DONE    -> cast + lines (text + word/char counts)
-  LLMDirector DONE     -> cast (voice_presets) + scenes (env) + shots (visual prompts)
+  LedgerScriptWriter DONE -> cast (voice_presets) + lines + meta.visual_plan
+                             (replaces legacy ScriptWriter -> LLMDirector chain
+                             retired in voice-path-cleanbreak S2)
   SceneSequencer DONE  -> lines/sfx/music start_s + dur_s + beats (speaker turns)
   SignalLostVideo DONE -> episode_id (real title), final_audio_path,
                           final_video_path, total_episode_dur_s

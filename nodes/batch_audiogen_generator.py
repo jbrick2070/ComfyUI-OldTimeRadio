@@ -306,7 +306,7 @@ class BatchAudioGenGenerator:
 
         # Walk ledger sfx lines (Pattern 2: roles={"sfx"}). The cue
         # text comes DIRECTLY from line["text"] -- no [SFX:] regex,
-        # no parser-list "description" field. line_id is carried
+        # no legacy parser-list "description" field. line_id is carried
         # through render_queue so the write-back below can stamp by
         # line_id (Pattern 4) on ledger.lines[].
         sfx_items = []

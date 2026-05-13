@@ -3,19 +3,24 @@ Scene Sequencer + Episode Assembler - Orchestrate the Full Radio Show
 ======================================================================
 
 Two nodes:
-  1. SceneSequencer - Takes a parsed script JSON and production plan,
-     renders each line through the appropriate TTS engine (Bark or Parler),
-     inserts SFX/music cues at the right moments, and outputs a scene.
-     Features: Intelligent pacing (breath buffers, BEAT/PAUSE tags), continuous
-     room tone bed, Gemma Director voice_map dispatch.
+  1. SceneSequencer - Takes the L3 ledger and renders each line through
+     the appropriate TTS engine (Bark or Parler), inserts SFX/music
+     cues at the right moments, and outputs a scene. Features:
+     intelligent pacing (breath buffers, BEAT/PAUSE tags), continuous
+     room tone bed, voice_assignments dispatch from the ledger's cast
+     block.
 
-  2. EpisodeAssembler - Takes multiple rendered scenes, adds act breaks,
-     opening/closing themes, and assembles the complete episode WAV.
+  2. EpisodeAssembler - Takes multiple rendered scenes, adds act
+     breaks, opening/closing themes, and assembles the complete
+     episode WAV.
 
-These nodes tie together the Gemma 4 Director output with all the
-audio generation nodes into a complete pipeline.
+These nodes consume the L3 ledger produced by LedgerScriptWriter and
+emitted via the FreezeCascade.script_json fanout. The legacy parser-
+list / Director-shape inputs were removed in voice-path-cleanbreak
+S2-S8; forensic comments downstream mark the migration points.
 
 v1.0  2026-04-04  Jeffrey Brick
+v2.0  2026-05-13  voice-path-cleanbreak S23.4 (docstring scrub)
 """
 
 import json
@@ -255,10 +260,11 @@ def _generate_room_tone(duration_sec, sample_rate=48000, intensity=0.03, descrip
 # -----------------------------------------------------------------------------
 
 # Voice preset resolution: cast.voice_preset is the only source.
-# Director voice_map fallback + _voice_preset_for_character + gender-aware
-# grab-bag pools were deleted in voice-path-cleanbreak 2026-05-12. Empty /
-# non-v2 cast.voice_preset is a writer contract violation -- SceneSequencer
-# raises ValueError at the inline-Bark fallback site (Gate 3 mirror).
+# The legacy Director voice_map fallback + _voice_preset_for_character +
+# gender-aware grab-bag pools were deleted in voice-path-cleanbreak
+# 2026-05-12. Empty / non-v2 cast.voice_preset is a writer contract
+# violation -- SceneSequencer raises ValueError at the inline-Bark
+# fallback site (Gate 3 mirror).
 
 
 def _clean_text_for_bark(text):
@@ -818,8 +824,9 @@ class SceneSequencer:
         # -- CANONICAL 1.0 ENVIRONMENT MIXING --------------------------
         total_len = len(combined)
         final_bed = np.zeros(total_len, dtype=np.float32)
-        # vintage_settings was Director-derived; default room tone intensity
-        # inlined here after the production_plan_json socket deletion (P2).
+        # vintage_settings was legacy Director-derived; default room tone
+        # intensity inlined here after the production_plan_json socket
+        # deletion (P2).
         room_intensity = 0.01
         
         for start, end, desc in env_timeline:

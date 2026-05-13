@@ -10,8 +10,9 @@ Generates full-length sci-fi anthology radio dramas using:
 
 Self-contained: drop into custom_nodes/ and go. No external node deps.
 
-Audio:  ScriptWriter -> Director -> BatchBark -> SceneSequencer -> AudioEnhance -> EpisodeAssembler
+Audio:  LedgerScriptWriter -> FreezeCascade -> BatchBark -> SceneSequencer -> AudioEnhance -> EpisodeAssembler
 Video:  EpisodeAssembler -> SignalLostVideo -> .mp4 + _treatment.txt (cast, voices, full script, stats)
+        (legacy "Director" stage was removed in voice-path-cleanbreak S2)
 
 BEST PRACTICE (per comfyui-custom-node-survival-guide Section 8):
   Uses isolated per-node loading so a broken dependency in one node
@@ -116,8 +117,8 @@ _NODE_MODULES = {
     # migrated the two remaining video-side consumers (OTR_SignalLostVideo,
     # OTR_VideoPlan) to read meta.visual_plan + meta.voice_assignments +
     # meta.style directly from the L3 ledger stamped by the writer.
-    # The Director class + registration + workflow node + workflow links
-    # 17 + 38 all delete in lockstep. See:
+    # The deleted Director class + registration + workflow node +
+    # workflow links 17 + 38 all delete in lockstep. See:
     #   docs/voice-path-cleanbreak-execution-plan.md Sprint 2
     #   docs/2026-05-12-voice-path-cleanbreak-qa.md §3 + Q3
     #
@@ -139,7 +140,8 @@ _NODE_MODULES = {
     "OTR_VRAMContextTest":    (".nodes.vram_context_test",     "VRAMContextTest",         " VRAM Context Test (diagnostics)"),
     # v2.0 Visual Generation Trio
     # Sidecar-isolated visual (stills/portraits/motion) generation from
-    # OTR Director output. Audio path NEVER touched. Falls back to
+    # the L3 ledger (replaces the legacy OTR Director output the visual
+    # bridge used to read). Audio path NEVER touched. Falls back to
     # OTR_SignalLostVideo on failure.  See docs/OTR_PIPELINE_EXPLAINER.md
     "OTR_VisualBridge":         (".visual.bridge",            "VisualBridge",         " Visual Bridge"),
     "OTR_VisualPoll":           (".visual.poll",              "VisualPoll",           " Visual Poll"),
@@ -159,7 +161,8 @@ _NODE_MODULES = {
     "OTR_BatchFluxPortraitRender": (".visual.batch_flux_portrait_render", "BatchFluxPortraitRender", " Batch FLUX Portrait Render (per-cast)"),
     # v2.0 MIT-original video-chain nodes (replace VideoHelperSuite-GPL deps)
     "OTR_VideoConcat":             (".nodes.otr_video_concat",         "OTRVideoConcat",        " OTR Video Concat"),
-    # v2.0 read-only Director/script adapter for multi-pass FLUX rendering
+    # v2.0 read-only ledger/script adapter for multi-pass FLUX rendering
+    # (legacy "Director" naming retired in voice-path-cleanbreak S23.9).
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
     # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
     "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),

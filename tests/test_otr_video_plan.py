@@ -4,7 +4,7 @@ test_otr_video_plan.py  --  OTR_VideoPlan adapter unit tests
 
 Validates ``nodes.otr_video_plan`` without torch, diffusers, or
 ComfyUI.  Covers the pure helpers + node surface area + the
-fallback chain for missing Director fields.
+fallback chain for missing legacy Director fields.
 """
 
 from __future__ import annotations
@@ -448,7 +448,7 @@ def test_build_shot_plan_final_end_frame_toggle():
 
 
 def test_build_shot_plan_empty_director():
-    """Empty Director -> empty token list, doesn't crash."""
+    """Empty (legacy) Director input -> empty token list, doesn't crash."""
     from nodes.otr_video_plan import build_shot_plan
     plan = build_shot_plan("", "BABA", shots_per_scene=3)
     assert plan["total_prompts"] == 0
@@ -575,7 +575,7 @@ def test_input_types_schema():
     schema = OTRVideoPlan.INPUT_TYPES()
     assert "required" in schema
     assert "script_json" in schema["required"]
-    assert "director_json" not in schema["required"]
+    assert "director_json" not in schema["required"]  # legacy name
     assert "focus_character" in schema["required"]
     assert "shots_per_scene" in schema["required"]
     assert "style" in schema["required"]

@@ -36,7 +36,8 @@ What this keeps:
     - Node 42 (PathchSageAttentionKJ FLUX, DISABLED per BUG-070) is
       independent of the HuMo branch -- stays.
     - OTR_VideoPlan / OTR_ShotDurationCalculator (the read-only
-      Director/script adapters used downstream by FLUX).
+      ledger/script adapters used downstream by FLUX; legacy
+      "Director" naming retired in voice-path-cleanbreak S23.9).
     - OTR_PostAudioVideoPipeline (id=44) -- the new node that handles
       real HuMo batching post-audio.
 

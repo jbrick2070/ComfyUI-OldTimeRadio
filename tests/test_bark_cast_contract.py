@@ -1,8 +1,8 @@
 """tests/test_bark_cast_contract.py
 
 P2 Gate 3 — BatchBarkGenerator must hard-raise on empty / non-v2/*
-``cast.voice_preset``. No Director fallback, no
-``_voice_preset_for_character`` helper, no production_plan_json
+``cast.voice_preset``. No legacy Director fallback, no legacy
+``_voice_preset_for_character`` helper, no legacy production_plan_json
 socket. Last line of defense after Gate 1 (writer) and Gate 2
 (FreezeCascade Phase 0/10).
 """
@@ -42,16 +42,19 @@ def _ledger_with_preset(preset_value: str | None) -> str:
 
 
 def test_bark_has_no_production_plan_json_socket():
-    """Voice-path cleanbreak: production_plan_json socket is gone from Bark."""
+    """Voice-path cleanbreak: legacy production_plan_json socket gone from Bark."""
     from nodes.batch_bark_generator import BatchBarkGenerator
     schema = BatchBarkGenerator.INPUT_TYPES()
     required = set(schema.get("required", {}))
     optional = set(schema.get("optional", {}))
+    # The legacy production_plan_json socket was removed in P2 of
+    # voice-path-cleanbreak; both the required and optional INPUT_TYPES
+    # buckets must reject it.
     assert "production_plan_json" not in required, (
-        "production_plan_json must not be a required input"
+        "legacy production_plan_json must not be a required input"
     )
     assert "production_plan_json" not in optional, (
-        "production_plan_json must not be an optional input"
+        "legacy production_plan_json must not be an optional input"
     )
 
 

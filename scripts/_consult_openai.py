@@ -146,7 +146,7 @@ Read the bundle. Critique the Visual pipeline (Bridge -> Poll -> Renderer + Work
 
 1. **Failure modes I'm not handling.** What can break that the current code does not catch? Be concrete: name the function and the case.
 2. **Race conditions.** STATUS.json is written by the worker subprocess and read by the poll node. Where can they collide? Are the write/read patterns safe?
-3. **Contract violations.** What can a malformed `script_lines` or `production_plan_json` do to the bridge / shotlist / renderer? Where do invariants leak?
+3. **Contract violations.** What can a malformed `script_lines` or legacy `production_plan_json` do to the bridge / shotlist / renderer? Where do invariants leak?
 4. **Process lifecycle.** The bridge spawns the worker fire-and-forget. What happens when the user cancels the ComfyUI workflow mid-run? When ComfyUI itself crashes? When the worker hangs? Are PIDs tracked correctly? Are zombies possible?
 5. **Audio-byte-identical guarantee (C7).** Are there any code paths in renderer.py that could re-encode or modify the audio? Any subprocess invocations missing `-c:a copy`?
 6. **Disk hygiene.** `io/visual_in/<job_id>/` and `io/visual_out/<job_id>/` accumulate forever. Is there a sweep? When should there be?

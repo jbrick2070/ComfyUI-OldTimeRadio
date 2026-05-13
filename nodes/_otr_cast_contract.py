@@ -254,7 +254,7 @@ def _coerce_voice_spec(raw) -> str:
 
 
 def build_contract_from_director_plan(director_plan: dict) -> CastContract:
-    """Build a versioned CastContract from a Director plan.
+    """Build a versioned CastContract from a legacy Director plan dict.
 
     Reads ``director_plan["voice_assignments"]`` (a mapping from canonical
     character name to a voice spec). Characters are emitted in

@@ -147,7 +147,7 @@ def _extract_refs(shot: dict) -> list[str]:
     """Pull reference image paths / identifiers out of a shotlist entry.
 
     The shotlist schema carries them under ``refs`` (list[str]) per the
-    Director's plan.  Older plans may instead embed a single ``ref`` or
+    legacy Director's plan.  Older plans may instead embed a single ``ref`` or
     a ``character`` field -- support both.  Returns a normalized list
     (strings, deduped, order-preserving).
     """

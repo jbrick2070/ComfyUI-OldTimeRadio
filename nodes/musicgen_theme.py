@@ -5,7 +5,7 @@ act-break interstitial cues.
 Reads style + mood signal directly from the L3 ledger (the post-freeze
 script_json emitted by OTR_LedgerFreezeCascade) and synthesizes three
 era-neutral cue prompts via a deterministic palette + mood overlay. No
-LLM call, no Director-derived plan, no period defaults. Generates the
+LLM call, no legacy Director-derived plan, no period defaults. Generates the
 audio via transformers' native MusicGen-medium and emits three AUDIO
 tensors that feed straight into EpisodeAssembler's opening_theme_audio
 and closing_theme_audio inputs plus an interstitial clip for act-break
@@ -438,7 +438,7 @@ class MusicGenTheme:
     Reads style + mood signal from the L3 ledger
     (OTR_LedgerFreezeCascade.script_json) and synthesizes three
     deterministic cue prompts via _STYLE_PALETTE + _MOOD_TAGS. No LLM
-    call, no Director plan. Generates any cue that isn't already in the
+    call, no legacy Director plan. Generates any cue that isn't already in the
     per-episode cache and returns three AUDIO tensors ready to wire into
     EpisodeAssembler.
     """
@@ -741,10 +741,11 @@ class MusicGenTheme:
                             row["dur_s"] = dur
                         # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
                         # stamp tts_engine + render_ms + generated_dur_s +
-                        # audio_sample_hash on the music row. The
-                        # generation_prompt is already populated by
-                        # LLMDirector; this closes the loop on the
-                        # render-result side.
+                        # audio_sample_hash on the music row. Historically
+                        # the generation_prompt was already populated by
+                        # the legacy LLMDirector; post-cleanbreak it comes
+                        # from the ledger meta. Either way this closes
+                        # the loop on the render-result side.
                         row["tts_engine"] = "musicgen"
                         if cue_dict.get("_render_ms"):
                             row["render_ms"] = int(cue_dict["_render_ms"])

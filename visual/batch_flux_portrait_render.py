@@ -26,7 +26,9 @@ After this fix:
   character's lines).
 
 Cast traits (appearance, voice, etc.) come from the ledger's ``cast[]``
-section populated by LLMDirector. Each portrait prompt is built as:
+section. Historically populated by the legacy LLMDirector; post-
+voice-path-cleanbreak populated by OTR_LedgerScriptWriter directly.
+Each portrait prompt is built as:
 
     "<period style anchor>, head and shoulders portrait of {speaker},
      {appearance}, neutral expression, centered composition, soft

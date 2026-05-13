@@ -1541,7 +1541,8 @@ class BatchHumoRender:
         lines = ledger.get("lines") or []
 
         # BUG-LOCAL-079 (2026-05-03 EVENING): orphan char_id detection +
-        # fuzzy rescue. If LLMDirector emits a cast member name like
+        # fuzzy rescue. Historically the legacy LLMDirector could emit
+        # a cast member name like
         # "MANFRED" but a line is attributed to "MANFRED DIALLO" (or
         # the fuzzy consolidator BUG-098 misses a merge), the line's
         # char_id may NOT be in cast[]. Without this rescue:

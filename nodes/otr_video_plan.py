@@ -275,7 +275,7 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
     per-scene projection consumed by the three build_* helpers.
 
     Returns a flat 5-key dict -- no nested ``visual_plan`` envelope,
-    no Director-shape mirror. S11.6 closed the last surface where
+    no legacy Director-shape mirror. S11.6 closed the last surface where
     the deleted Director's key set was anchored in active code.
 
     Keys
@@ -900,7 +900,7 @@ class OTRVideoPlan:
         # Production Ledger (L2 prep). VideoPlan emits the canonical PASS3
         # shot list. Write it to the ledger so:
         #   - FULL run: shots[] gets the detailed visual_prompt + per-shot
-        #     scene_id (richer than the Director-stage one-shot-per-scene
+        #     scene_id (richer than the legacy Director-stage one-shot-per-scene
         #     placeholder).
         #   - TEST run: VideoPlan is typically the FIRST OTR node. If no
         #     ledger exists yet, get_ledger() auto-creates a placeholder

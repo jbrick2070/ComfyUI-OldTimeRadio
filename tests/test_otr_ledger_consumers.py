@@ -1,9 +1,12 @@
 """tests/test_otr_ledger_consumers.py -- helper API tests for `_otr_ledger_consumers.py`.
 
-Covers the six public read-side helpers used by every L3 consumer:
+Covers the five public read-side helpers used by every L3 consumer:
 
     load_ledger, iter_lines, cast_lookup, speaker_name,
-    voice_preset, production_plan_or_empty
+    voice_preset
+
+(production_plan_or_empty was deleted in voice-path-cleanbreak
+S23.6 along with its TestProductionPlanOrEmpty test class.)
 
 These tests treat the helper module as the contract. If a future schema
 bump (l4) changes ledger shape, the failures land here first instead of
@@ -337,49 +340,8 @@ class TestVoicePreset:
         assert _OTRLC.voice_preset(led, line) is None
 
 
-# ---------------------------------------------------------------------------
-# production_plan_or_empty
-# ---------------------------------------------------------------------------
-
-class TestProductionPlanOrEmpty:
-    """`production_plan_or_empty(plan_json)` is the graceful demotion path
-    for the optional `production_plan_json` socket. Pattern 5 contract:
-    consumers degrade cleanly when Director is unwired in the v2 flow.
-    """
-
-    def test_valid_dict_plan_returns_plan(self):
-        plan = {"voice_assignments": {"LEMMY": "v2/en_speaker_3"}}
-        out = _OTRLC.production_plan_or_empty(json.dumps(plan))
-        assert out == plan
-
-    def test_empty_string_returns_empty_dict(self):
-        assert _OTRLC.production_plan_or_empty("") == {}
-
-    def test_none_returns_empty_dict(self):
-        assert _OTRLC.production_plan_or_empty(None) == {}
-
-    def test_empty_braces_returns_empty_dict(self):
-        # The default value the demoted INPUT_TYPES carries.
-        assert _OTRLC.production_plan_or_empty("{}") == {}
-
-    def test_invalid_json_returns_empty_dict(self):
-        # Best-effort: don't propagate JSONDecodeError; consumers
-        # degrade to "no plan" instead of halting.
-        assert _OTRLC.production_plan_or_empty("{ not json") == {}
-
-    def test_list_root_returns_empty_dict(self):
-        # Plan must be a dict; a list root means the writer emitted
-        # the wrong shape -- treat as missing.
-        assert _OTRLC.production_plan_or_empty("[1, 2, 3]") == {}
-
-    def test_string_root_returns_empty_dict(self):
-        assert _OTRLC.production_plan_or_empty('"just a string"') == {}
-
-    def test_int_root_returns_empty_dict(self):
-        assert _OTRLC.production_plan_or_empty("42") == {}
-
-    def test_null_root_returns_empty_dict(self):
-        assert _OTRLC.production_plan_or_empty("null") == {}
+# production_plan_or_empty + TestProductionPlanOrEmpty were removed in
+# voice-path-cleanbreak S23.6 along with the helper they tested.
 
 
 # ---------------------------------------------------------------------------
