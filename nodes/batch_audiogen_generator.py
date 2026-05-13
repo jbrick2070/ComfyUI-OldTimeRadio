@@ -197,9 +197,14 @@ def _find_cached(cache_dir: str, prefix: str) -> str | None:
     return str(matches[0])
 
 
-def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
+def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> bool:
     """Atomic WAV write: write to ``.tmp`` then ``os.replace``. Prevents
     corrupted cache hits if the process is killed mid-write.
+
+    Returns ``True`` on confirmed write, ``False`` on any exception.
+    The writeback path uses the return value to gate ``sfx_wav_path``
+    stamping -- without this proof, the ledger could stamp a path
+    that doesn't exist on disk (C2 / S24 / 2026-05-13).
 
     Note: explicit ``format='WAV'`` is required because soundfile cannot
     infer the audio format from the ``.tmp`` extension.
@@ -210,6 +215,7 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
         sf.write(tmp_path, waveform, sample_rate,
                  subtype="FLOAT", format="WAV")
         os.replace(tmp_path, path)
+        return True
     except Exception as exc:
         log.warning("[BatchAudioGen] Failed to write cache %s: %s", path, exc)
         try:
@@ -217,6 +223,7 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
                 os.unlink(tmp_path)
         except Exception:
             pass
+        return False
 
 
 def _load_cached_wav(path: str) -> torch.Tensor | None:
@@ -394,6 +401,10 @@ class BatchAudioGenGenerator:
             if cached:
                 item["audio"], sr = cached
                 final_clips[i] = item["audio"]
+                # C2 (S24): cache-hit path stamps "ok_cache" so the
+                # ledger writeback below can distinguish a fresh
+                # generate ("ok") from a served cached wav.
+                item["_render_status"] = "ok_cache"
                 batch_log.append(
                     f"  [{i}] CACHE HIT: {item['tag'][:30]} "
                     f"({os.path.basename(item['cache_path'])})"
@@ -450,14 +461,17 @@ class BatchAudioGenGenerator:
                 )
                 # Honor per-cue durations from render_queue (the prior
                 # path used default_duration -- wrong; cues vary in
-                # length). Ledger-side fallback_silence stamping is
-                # downstream of the existing write-back block; the
-                # cache write below skips on silence.
+                # length). The render-status stamp on each item is
+                # picked up by the writeback block; sfx_wav_path is
+                # NOT stamped because nothing was saved (silence
+                # shouldn't ever land on disk).
                 for idx in to_generate_indices:
                     item_dur = float(render_queue[idx]["duration"])
                     final_clips[idx] = torch.zeros(
                         1, 1, int(AUDIOGEN_SAMPLE_RATE * item_dur)
                     )
+                    render_queue[idx]["_render_status"] = "fallback_silence"
+                    render_queue[idx]["_save_ok"] = False
             else:
                 batch_log.append(f"Loading {model_id}...")
                 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -532,7 +546,8 @@ class BatchAudioGenGenerator:
                         # so the timeline still has a plausible slot
                         # rather than a 3 ms blip.
                         _min_samples = int(AUDIOGEN_SAMPLE_RATE * 0.25)
-                        if audio_np.size < _min_samples:
+                        short_output_fallback = audio_np.size < _min_samples
+                        if short_output_fallback:
                             log.warning(
                                 "[BatchAudioGen] [%d] generated audio too "
                                 "short (%d samples = %.4fs) -- expected "
@@ -555,7 +570,48 @@ class BatchAudioGenGenerator:
                         peak = np.abs(audio_np).max() or 1.0
                         audio_np = (audio_np / peak * 0.9).astype(np.float32)
 
-                        _save_wav(item["cache_path"], audio_np, AUDIOGEN_SAMPLE_RATE)
+                        # C2 (S24): canonical cache poisoning fix.
+                        # On short-output fallback the audio is silence,
+                        # NOT the prompt's intended render. Writing to
+                        # the canonical cache_path would mean every
+                        # future run hits the cache and serves the
+                        # silence forever. Route the fallback save to a
+                        # sibling `_fallback/` dir so a subsequent
+                        # transformers fix can re-generate cleanly to
+                        # the canonical path. Stamp the render status
+                        # so downstream consumers see the degraded
+                        # state on the ledger row.
+                        if short_output_fallback:
+                            fb_dir = os.path.join(
+                                os.path.dirname(item["cache_path"]),
+                                "_fallback",
+                            )
+                            try:
+                                os.makedirs(fb_dir, exist_ok=True)
+                            except Exception:
+                                fb_dir = None
+                            if fb_dir is not None:
+                                fb_path = os.path.join(
+                                    fb_dir,
+                                    os.path.basename(item["cache_path"]),
+                                )
+                                save_ok = _save_wav(
+                                    fb_path, audio_np, AUDIOGEN_SAMPLE_RATE
+                                )
+                                item["_fallback_path"] = (
+                                    fb_path if save_ok else ""
+                                )
+                            item["_render_status"] = "fallback_output_shape"
+                            item["_save_ok"] = False  # canonical not written
+                        else:
+                            save_ok = _save_wav(
+                                item["cache_path"], audio_np,
+                                AUDIOGEN_SAMPLE_RATE,
+                            )
+                            item["_save_ok"] = bool(save_ok)
+                            item["_render_status"] = (
+                                "ok" if save_ok else "error"
+                            )
                         final_clips[idx] = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
                         # BUG-LOCAL-030 audit-completion: stash hash for
                         # ledger write-back. compute_audio_sample_hash
@@ -692,11 +748,36 @@ class BatchAudioGenGenerator:
                                 dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
                             except Exception:
                                 dur = None
+                        # C2 (S24): sfx_render_status MUST land on every
+                        # row. Default to "ok_cache" if the item came
+                        # from cache; the generate path stamped explicit
+                        # statuses on items it touched.
+                        render_status = item.get("_render_status") or (
+                            "ok_cache"
+                            if item.get("had_cache_hit_at_resolve")
+                            else "ok"
+                        )
                         line_fields: dict = {
                             "sfx_engine": "audiogen",
+                            "sfx_render_status": render_status,
                         }
-                        if cache_path:
-                            line_fields["sfx_wav_path"] = str(cache_path)
+                        # C2 (S24): sfx_wav_path is stamped ONLY when
+                        # the save returned True AND the file actually
+                        # exists on disk. Cache hits stamp the path
+                        # they loaded from. Fallback paths and
+                        # save-failures leave sfx_wav_path="" (the
+                        # post-freeze §6.16 convention).
+                        save_ok = bool(item.get("_save_ok"))
+                        had_cache_hit = bool(
+                            item.get("had_cache_hit_at_resolve")
+                        )
+                        if cache_path and (save_ok or had_cache_hit):
+                            if os.path.isfile(cache_path):
+                                line_fields["sfx_wav_path"] = str(cache_path)
+                            else:
+                                line_fields["sfx_wav_path"] = ""
+                        else:
+                            line_fields["sfx_wav_path"] = ""
                         if dur is not None:
                             line_fields["dur_s"] = float(dur)
                             line_fields["generated_dur_s"] = float(dur)

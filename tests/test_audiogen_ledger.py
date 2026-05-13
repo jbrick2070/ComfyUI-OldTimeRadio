@@ -142,7 +142,12 @@ def test_audiogen_iter_sfx_only(patched_audiogen_env):
 
     # SFX line b005 stamped with audiogen fields.
     assert by_id["b005"].get("sfx_engine") == "audiogen"
-    assert by_id["b005"].get("sfx_wav_path", "").endswith(".wav")
+    # C2 (S24, 2026-05-13): with allow_silence_fallback=True (no real
+    # transformers/AudioGen in the test env), no wav is actually
+    # written; the hardened writeback stamps sfx_wav_path="" per
+    # §6.16. sfx_render_status carries the degraded state instead.
+    assert by_id["b005"].get("sfx_wav_path", "<missing>") == ""
+    assert by_id["b005"].get("sfx_render_status") == "fallback_silence"
     assert by_id["b005"].get("dur_s", 0) > 0
     assert by_id["b005"].get("generated_dur_s", 0) > 0
 
