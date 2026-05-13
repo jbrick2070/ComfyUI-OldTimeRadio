@@ -96,7 +96,7 @@ import sys as _sys
 _NODES_DIR = Path(__file__).resolve().parent
 if str(_NODES_DIR) not in _sys.path:
     _sys.path.insert(0, str(_NODES_DIR))
-from _otr_paths import otr_episodes_root, otr_legacy_audio_dir  # noqa: E402
+from _otr_paths import otr_episodes_root  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _WRAPPER_PATH = _REPO_ROOT / "scripts" / "test_humo_batch_concat.ps1"
@@ -119,21 +119,16 @@ def _resolve_ledger_from_input(path_str: str) -> Path | None:
       - empty str  -> auto-pick across the canonical audio dirs
     """
     if not path_str or not path_str.strip():
-        # Fall back to scanning the canonical audio dirs.
-        # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
-        # plus the legacy flat layout pattern for back-compat.
+        # Fall back to scanning the canonical per-episode workspace.
+        # S26-B6 cleanbreak: dropped the legacy flat-layout scan path
+        # (this node is retired per __init__.py and the flat layout is
+        # extinct in the v2 workspace).
         candidates: list[Path] = []
-        for d in (otr_episodes_root(), otr_legacy_audio_dir()):
-            if not d.exists():
-                continue
+        d = otr_episodes_root()
+        if d.exists():
             # Per-episode tree: <root>/<ep>/audio/*_ledger.json
             candidates.extend(
                 p for p in d.glob("*/audio/*_ledger.json")
-                if not p.name.startswith("pending_")
-            )
-            # Legacy flat layout: <root>/*_ledger.json
-            candidates.extend(
-                p for p in d.glob("*_ledger.json")
                 if not p.name.startswith("pending_")
             )
         if not candidates:

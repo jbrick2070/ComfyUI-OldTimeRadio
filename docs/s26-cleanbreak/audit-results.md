@@ -140,4 +140,21 @@ Per-site audit (`git grep -nE "back-compat|legacy fallback" <file>`):
 - `nodes/_otr_paths.py:204, 338` (back-compat search root + function-name keepalive) — DELETE in Phase 3 if both shown-zero producers.
 - `nodes/post_audio_video_pipeline.py:124` (flat layout for retired node) — plan §4 confirms the node is RETIRED per `__init__.py:176`. **DELETE unconditionally in Phase 3**.
 
+---
+
+## Phase 3 — Section B deletes (results appended per item)
+
+## B6/post_audio_video_pipeline — legacy flat-layout fallback removed
+- Commit: (pending)
+- File: nodes/post_audio_video_pipeline.py — deleted the legacy `otr_legacy_audio_dir()` scan branch in `_resolve_ledger_from_input`'s auto-pick path; trimmed unused import; comment now points at S26-B6 cleanbreak.
+- Targeted test command: `pytest tests/test_post_audio_video_pipeline.py -q`
+- Result: 14 passed
+- Unexpected failures: none
+- Notes: Node is registered as RETIRED in __init__.py:176; the auto-pick flat-layout was forensic leftover. `otr_legacy_audio_dir` still in use by other consumer nodes (audio_enhance, batch_audiogen, batch_bark, batch_humo, batch_ltx, scene_sequencer, video_composite) — those are out of scope here (each has its own deferral verdict in B6).
+
+## B6/scene_sequencer (sfx[] consumers L939, L958, L1319) — DEFERRED
+- The two `.get("sfx") or []` reads are live consumer walks in the BUG-LOCAL-107 SFX writeback + master-mix shift path, not docstring shims. With the legacy top-level sfx[] now empty, the loops become no-ops; the SFX mirror into lines[] needs an alternate producer.
+- Audit verdict: architectural migration (touches audio path; SFX-into-lines mirror is the live producer for BatchHumoRender wall-to-wall coverage).
+- Action: **DEFERRED**. Surface stays as-is; no gate added. Named follow-up: "B6 sequencer SFX-mirror migration to lines[]-native source".
+
 
