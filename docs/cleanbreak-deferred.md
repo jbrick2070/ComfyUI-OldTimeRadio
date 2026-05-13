@@ -47,13 +47,14 @@ This is a real architectural call, not a mechanical move. Plan as its own sprint
 
 ---
 
-## S14.2 — Validator auto-invoke (DEFERRED, 2026-05-13)
+## S14.2 — Validator auto-invoke (DEFERRED — implementation scheduled for S25+; ADR at docs/2026-05-13-S14_2-active-validation-ADR.md)
 
-**Status:** indefinitely deferred.
-**Reason:** ComfyUI has no central Python-side workflow loader to wrap. The frontend parses JSON in JavaScript and dispatches per-node; there is no single chokepoint for `validate_workflow_contract()`.
+**Status:** DEFERRED (was: INDEFINITELY DEFERRED until 2026-05-13).
+**Decision locked:** Option B — opt-in `OTR_WorkflowValidator` first-node. See ADR for the full rationale + alternatives + consequences.
+**Reason for original deferral:** ComfyUI has no central Python-side workflow loader to wrap. The frontend parses JSON in JavaScript and dispatches per-node; there is no single chokepoint for `validate_workflow_contract()`.
 
 **Mitigation already in place:**
 - `tests/test_workflow_live_passes_validator.py` (S16.6) validates the production workflow JSON in CI.
 - `tests/test_legacy_audit_clean.py` (S15.5.1) catches legacy Director-era surfaces repo-wide.
 
-**If runtime validation is ever needed:** revisit as a ComfyUI frontend extension or an `OTR_WorkflowValidator` opt-in first-node. Both are larger than original S14.2 scope; plan as their own sprint.
+**Implementation path (S25+):** new node class `OTR_WorkflowValidator` in `nodes/_otr_workflow_validator.py` (~150 LOC) wired as position-0 in the production workflow JSON. Tests cover the canonical workflow + an adversarial broken workflow fixture. ADR section "Status" lists the estimated scope.
