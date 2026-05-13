@@ -480,11 +480,20 @@ class MusicGenTheme:
                     "default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5,
                     "tooltip": "Classifier-free guidance. 3.0 is the MusicGen default.",
                 }),
+                # C3 (S24, 2026-05-13): default False -- transformers
+                # MusicGen ImportError raises RuntimeError so production
+                # never silently substitutes silence on the music bus
+                # (Directive 1). Opt in for smoke tests where the
+                # optional dep isn't installed; silence renders stamp
+                # music_render_status="fallback_silence" on each cue's
+                # ledger row.
+                "allow_silence_fallback": ("BOOLEAN", {"default": False}),
             },
         }
 
     def render(self, script_json, episode_seed="",
-               model_id=MUSICGEN_MODEL_ID, guidance_scale=3.0):
+               model_id=MUSICGEN_MODEL_ID, guidance_scale=3.0,
+               allow_silence_fallback=False):
 
         # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
@@ -593,11 +602,35 @@ class MusicGenTheme:
             try:
                 from transformers import MusicgenForConditionalGeneration, AutoProcessor
             except ImportError as exc:
-                log.error("[MusicGenTheme] transformers MusicGen not available: %s", exc)
-                # Return silence for anything we could not generate.
+                # C3 (S24, 2026-05-13): strict failure by default,
+                # matching AudioGen S17.2 (IMP-19). Silent silence on
+                # a production music bus is a Directive 1 breach
+                # (audio is king). The allow_silence_fallback widget
+                # opts into the prior silence-fill path for smoke
+                # tests where transformers/MusicGen isn't installed.
+                msg = (
+                    f"MusicGen ImportError: transformers MusicGen not "
+                    f"available: {exc}. This is a production surface; "
+                    f"silent silence is a Directive 1 breach. Install "
+                    f"the MusicGen optional deps or set "
+                    f"allow_silence_fallback=True for smoke tests only."
+                )
+                if not allow_silence_fallback:
+                    log.error(f"[MusicGenTheme] {msg}")
+                    raise RuntimeError(msg) from exc
+                log.warning(f"[MusicGenTheme] FALLBACK SILENCE: {msg}")
+                render_log.append(
+                    f"  WARNING: transformers MusicGen import failed; "
+                    f"allow_silence_fallback=True -> silence."
+                )
                 for cue_id in to_generate:
                     results[cue_id] = _silent_audio_dict()
-                render_log.append(f"  ERROR: transformers MusicGen import failed: {exc}")
+                    # Tag cue dict so the writeback below stamps
+                    # music_render_status="fallback_silence" on the
+                    # ledger row (handled in the per-cue post-render
+                    # block; this just carries the marker forward).
+                    if cue_id in cues:
+                        cues[cue_id]["_render_status"] = "fallback_silence"
                 return (
                     results["opening"], results["closing"], results["interstitial"],
                     "\n".join(render_log),

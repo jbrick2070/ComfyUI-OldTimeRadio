@@ -518,7 +518,8 @@
         "{}",
         "",
         "facebook/musicgen-medium",
-        3.0
+        3.0,
+        false
       ],
       "color": "#234035",
       "bgcolor": "#162821",
@@ -541,11 +542,11 @@
       },
       "widgets_values": [
         "[]",
-        "{}",
         "",
         "facebook/audiogen-medium",
         3.0,
-        3.0
+        3.0,
+        false
       ],
       "inputs": [
         {
