@@ -260,16 +260,45 @@ _GENRE_BY_STYLE: dict[str, str] = {
 def _resolve_genre(style: str) -> str:
     """Resolve a style slug to a HUD/FLUX-friendly genre string.
 
-    Standing directive (no silent fallbacks): unknown style slugs use
-    a mechanical "<words> audio drama" fallback that's loud (visibly
-    non-curated, suggests the slug needs an explicit table entry) but
-    never empty. Drift guard in tests/test_musicgen_style_palette.py
-    catches any new _STYLE_PICKER_SEED_POOL entry that's missing here.
+    Per standing directive #1 (no silent fallbacks on production
+    surfaces) -- raises on contract violations:
+      - empty style means the picker contract broke upstream
+      - unknown slug means _GENRE_BY_STYLE has drifted from
+        _STYLE_PICKER_SEED_POOL
+
+    Both conditions surface at the writer surface where they can be
+    diagnosed, instead of silently degrading downstream. Use
+    ``_preview_genre`` for any UI/demo path that legitimately needs
+    a best-effort string for an arbitrary or partial slug.
     """
+    if not (style or "").strip():
+        raise ValueError(
+            "_resolve_genre: empty style; picker contract violation. "
+            "Check _STYLE_PICKER_SEED_POOL stamping in the writer."
+        )
+    if style not in _GENRE_BY_STYLE:
+        raise ValueError(
+            f"_resolve_genre: unknown style {style!r}. "
+            f"Add to _GENRE_BY_STYLE or fix the palette drift. "
+            f"Known: {sorted(_GENRE_BY_STYLE)}"
+        )
+    return _GENRE_BY_STYLE[style]
+
+
+def _preview_genre(style: str) -> str:
+    """Best-effort genre rendering for UI / demo / preview surfaces.
+
+    Mirrors the pre-S10.2 ``_resolve_genre`` behavior (mechanical
+    "<words> audio drama" fallback, generic default on empty). NEVER
+    invoke from the production writer or freeze cascade -- those
+    paths must use ``_resolve_genre`` and let invalid input raise.
+    Standing directive #1 explicitly carves out this isolation.
+    """
+    if not style:
+        return "audio drama"
     if style in _GENRE_BY_STYLE:
         return _GENRE_BY_STYLE[style]
-    words = (style or "").replace("_", " ").strip()
-    return f"{words} audio drama" if words else "audio drama"
+    return style.replace("_", " ") + " audio drama"
 
 
 # ---------------------------------------------------------------------------

@@ -224,28 +224,28 @@ def test_canonical_slugs_in_test_match_writer_pool(musicgen_mod):
     )
 
 
-def test_genre_table_covers_writer_style_pool():
-    """Voice-path-cleanbreak Sprint 6.1 (2026-05-12). Drift guard for
-    the genre lookup table that replaced the hardcoded "audio drama"
-    fallback. Every writer style slug must have an explicit row in
-    _GENRE_BY_STYLE; the mechanical fallback in _resolve_genre is a
-    safety net, not the contract surface.
+def test_genre_table_strict_equality_with_style_pool():
+    """Voice-path-cleanbreak Sprint 10.2 (2026-05-12). Strict drift
+    guard: _GENRE_BY_STYLE keys must EQUAL _STYLE_PICKER_SEED_POOL
+    contents -- no missing entries (writer would raise) and no
+    orphaned entries (table drifted past the palette).
     """
     from nodes.OTR_LedgerScriptWriter import (
         _GENRE_BY_STYLE,
         _STYLE_PICKER_SEED_POOL,
     )
-    missing = set(_STYLE_PICKER_SEED_POOL) - set(_GENRE_BY_STYLE)
-    assert not missing, (
-        f"Genre table missing entries for writer styles: {sorted(missing)}. "
-        "Add explicit entries to _GENRE_BY_STYLE in OTR_LedgerScriptWriter.py "
-        "or accept the mechanical fallback (which is loud + visibly "
-        "uncurated by design)."
+    missing  = set(_STYLE_PICKER_SEED_POOL) - set(_GENRE_BY_STYLE)
+    orphaned = set(_GENRE_BY_STYLE) - set(_STYLE_PICKER_SEED_POOL)
+    assert not missing and not orphaned, (
+        f"Genre table drift. "
+        f"In palette only (writer will raise on these): {sorted(missing)}. "
+        f"In table only (orphaned -- pool removed but table didn't): "
+        f"{sorted(orphaned)}."
     )
 
 
 def test_resolve_genre_known_styles_use_table():
-    """_resolve_genre prefers the table over the mechanical fallback."""
+    """_resolve_genre returns the curated table value for every known slug."""
     from nodes.OTR_LedgerScriptWriter import _GENRE_BY_STYLE, _resolve_genre
     for slug, expected in _GENRE_BY_STYLE.items():
         assert _resolve_genre(slug) == expected, (
@@ -254,9 +254,78 @@ def test_resolve_genre_known_styles_use_table():
         )
 
 
-def test_resolve_genre_unknown_uses_mechanical_fallback():
-    """Unknown slug -> mechanical "<words> audio drama" fallback (loud,
-    never empty). Standing directive: no silent fallbacks."""
+def test_resolve_genre_empty_raises():
+    """Empty style means the picker contract broke upstream -- raise
+    loudly per standing directive #1."""
     from nodes.OTR_LedgerScriptWriter import _resolve_genre
-    assert _resolve_genre("totally_made_up_slug") == "totally made up slug audio drama"
-    assert _resolve_genre("") == "audio drama"
+    with pytest.raises(ValueError, match="empty style"):
+        _resolve_genre("")
+    with pytest.raises(ValueError, match="empty style"):
+        _resolve_genre("   ")
+
+
+def test_resolve_genre_unknown_raises():
+    """Unknown slug means _GENRE_BY_STYLE has drifted from
+    _STYLE_PICKER_SEED_POOL -- raise loudly per standing directive #1.
+    The error message names the slug AND lists the known set."""
+    from nodes.OTR_LedgerScriptWriter import _resolve_genre
+    with pytest.raises(ValueError) as excinfo:
+        _resolve_genre("totally_made_up_slug")
+    assert "totally_made_up_slug" in str(excinfo.value)
+    assert "Known:" in str(excinfo.value)
+
+
+def test_preview_genre_is_isolated_from_writer_path():
+    """``_preview_genre`` is the best-effort UI helper. It MUST NOT
+    be CALLED from the writer (OTR_LedgerScriptWriter.py) or from the
+    freeze cascade. AST-based: walks Call nodes to find actual call
+    sites; ignores docstring mentions and comments.
+    """
+    import ast
+    import inspect
+    from nodes import OTR_LedgerScriptWriter as writer_mod
+    from nodes import _otr_ledger_freeze as freeze_mod
+
+    def _call_sites(src: str, name: str) -> list[int]:
+        """Return line numbers of Call sites where the callable's
+        bare name matches ``name``. Catches both `name(...)` and
+        `module.name(...)` shapes."""
+        tree = ast.parse(src)
+        hits = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Name) and func.id == name:
+                hits.append(node.lineno)
+            elif isinstance(func, ast.Attribute) and func.attr == name:
+                hits.append(node.lineno)
+        return hits
+
+    writer_src = inspect.getsource(writer_mod)
+    freeze_src = inspect.getsource(freeze_mod)
+
+    writer_calls = _call_sites(writer_src, "_preview_genre")
+    assert not writer_calls, (
+        f"_preview_genre called at line(s) {writer_calls} in "
+        f"OTR_LedgerScriptWriter.py -- directive #1 violation. The writer "
+        "path must use _resolve_genre and let invalid input raise."
+    )
+
+    freeze_calls = _call_sites(freeze_src, "_preview_genre")
+    assert not freeze_calls, (
+        f"_preview_genre called at line(s) {freeze_calls} in "
+        f"_otr_ledger_freeze.py -- directive #1 violation. Freeze "
+        "cascade is a production surface."
+    )
+
+
+def test_preview_genre_keeps_legacy_fallback_behavior():
+    """Sanity check: _preview_genre still returns a string for empty,
+    known, and unknown inputs (the pre-S10.2 _resolve_genre semantics).
+    UI/demo callers need this behavior."""
+    from nodes.OTR_LedgerScriptWriter import _GENRE_BY_STYLE, _preview_genre
+    assert _preview_genre("") == "audio drama"
+    assert _preview_genre("totally_made_up_slug") == "totally made up slug audio drama"
+    sample = next(iter(_GENRE_BY_STYLE))
+    assert _preview_genre(sample) == _GENRE_BY_STYLE[sample]
