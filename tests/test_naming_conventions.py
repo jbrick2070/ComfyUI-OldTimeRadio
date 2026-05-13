@@ -1,11 +1,13 @@
-"""S10.3 -- Test enforcement of docs/conventions.md.
+"""S10.3 + S19.2 -- Test enforcement of docs/conventions.md.
 
-Pins the two structural rules from the conventions doc:
+Pins the three structural rules from the conventions doc:
 
   1. Library-only private modules MUST follow ``_otr_<name>_lib.py``
      (leading underscore + project prefix + library suffix).
   2. ``_otr_*_lib.py`` modules MUST be library-only (no
      ``NODE_CLASS_MAPPINGS`` export).
+  3. (S19.2 / IMP-15, IMP-16) The conventions doc itself must
+     reference every ``_otr_*_lib.py`` module that exists on disk.
 
 Without these tests, the next contributor adding a library module
 would have no automated reminder of the rule.
@@ -69,4 +71,29 @@ def test_lib_modules_have_no_node_class_mappings():
         "Per docs/conventions.md, library-only modules must not "
         "register node classes. Move the class to a non-prefixed "
         "module and import the helpers from the _lib module."
+    )
+
+
+def test_conventions_doc_lists_every_lib_module():
+    """S19.2 (IMP-15, IMP-16): every ``nodes/_otr_*_lib.py`` on disk
+    MUST be mentioned in docs/conventions.md.
+
+    Catches: a 6th library module lands on disk but the "current
+    modules" table in the doc isn't refreshed in lockstep. The
+    doc and the filesystem are two surfaces of the same contract;
+    they drift apart silently without a test like this one.
+    """
+    doc_path = NODES_DIR.parent / "docs" / "conventions.md"
+    assert doc_path.exists(), (
+        "docs/conventions.md missing -- the naming-convention doc is "
+        "load-bearing for the doc-freshness guard."
+    )
+    doc_text = doc_path.read_text(encoding="utf-8")
+    fs_modules = sorted(p.stem for p in NODES_DIR.glob("_otr_*_lib.py"))
+    missing = [m for m in fs_modules if m not in doc_text]
+    assert not missing, (
+        f"nodes/_otr_*_lib.py modules exist on disk but are NOT "
+        f"listed in docs/conventions.md: {missing!r}\n\n"
+        f"Add them to the 'current modules' table in lockstep with "
+        f"the file creation."
     )

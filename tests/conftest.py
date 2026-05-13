@@ -156,10 +156,17 @@ def pytest_sessionfinish(session, exitstatus):
     if len(expected_seen) < 0.8 * len(EXPECTED_FAILED_NODEIDS):
         return  # focused subset run; skip the diff
 
+    # S19.1 (IMP-24): track all three pytest phases. Reading only
+    # rep_call meant tests that errored in setup or teardown leaked
+    # past the diff as silent-passes. pytest_runtest_makereport
+    # above stashes rep_setup / rep_call / rep_teardown on the item.
     actual_failed = set()
     for it in items:
-        rep = getattr(it, "rep_call", None)
-        if rep is not None and getattr(rep, "failed", False):
+        failed_in_any_phase = any(
+            getattr(getattr(it, f"rep_{phase}", None), "failed", False)
+            for phase in ("setup", "call", "teardown")
+        )
+        if failed_in_any_phase:
             actual_failed.add(it.nodeid)
 
     new_failures = actual_failed - EXPECTED_FAILED_NODEIDS
