@@ -19,6 +19,15 @@ production_plan_json socket deletion, DELETED_NODE_TYPES,
 FORBIDDEN_INPUT_SOCKETS, post-cleanbreak, voice-path-cleanbreak,
 pre-cleanbreak) OR is on the GENERIC_ENGLISH_LINES allowlist
 (specific known-keep lines from prompt templates).
+
+EXCLUDED_PATHS discipline (C11 / IMP-38 / S24, 2026-05-13):
+adding to ``EXCLUDED_PATHS`` requires a one-line ``# justification:``
+comment naming the reason. PRs that add an entry without this
+comment must be rejected. The justification rule exists because
+EXCLUDED_PATHS has load-bearing semantics -- every file on the
+list is invisible to the audit -- and a future contributor adding
+a path without explaining why is silently widening the audit's
+blind spot.
 """
 from __future__ import annotations
 
@@ -74,16 +83,33 @@ EXCLUDED_PATH_PREFIXES = (
 )
 
 
-# Specific files that are inherently forensic (e.g., this audit test
-# itself describes the legacy tokens it scans for; the workflow-Director-
-# freedom test was built specifically to assert Director surfaces are gone
-# from the workflow JSON, so it has to reference them by name).
+# Specific files that are inherently forensic. Every entry MUST
+# carry a per-file ``# justification:`` comment explaining why the
+# audit's substring rule can't be applied to it. Adding to
+# EXCLUDED_PATHS without a justification comment is a contract
+# breach -- PRs that do so must be rejected (C11 / IMP-38 / S24).
+#
+# The rule exists because EXCLUDED_PATHS is a small allowlist with
+# load-bearing semantics: every file on the list is invisible to
+# the audit. A future contributor adding a path without explaining
+# why is silently widening the audit's blind spot.
 EXCLUDED_PATHS = frozenset({
+    # justification: this test file itself describes the legacy
+    # tokens it scans for + classifies, so it has to mention them
+    # verbatim in source.
     "tests/test_legacy_audit_clean.py",
+    # justification: built specifically to assert Director surfaces
+    # are gone from the workflow JSON; references the forbidden
+    # names by string literal in every assertion.
     "tests/test_workflow_director_freedom.py",
-    # Both guardrail test suites assert the forbidden names are gone
-    # from the workflow / validator -- they HAVE to reference them.
+    # justification: workflow contract guardrail tests assert
+    # FORBIDDEN_INPUT_SOCKETS names are absent from the JSON. Each
+    # name appears as a string literal in the assertion body.
     "tests/test_workflow_json_guardrails.py",
+    # justification: extended-validator tests pass forbidden names
+    # through synthetic workflow fixtures to verify the validator
+    # raises. Forbidden names appear as widget.name / title / S&R
+    # values in the test fixtures.
     "tests/test_workflow_validator_extended.py",
 })
 
