@@ -203,3 +203,71 @@ def test_no_stale_dict_residue_in_widget_vector(
                 f"{node_type} widget[{i}] ({name}) is enum "
                 f"({type_decl!r}) but value is {val!r}."
             )
+
+
+# -------------------------------------------------------------------
+# S25 / MG-12 (BUG-LOCAL-210 production-drift regression pin)
+# -------------------------------------------------------------------
+
+
+def test_pre_cleanbreak_widget_vector_with_stale_empty_dict_fails():
+    """S25/MG-12: ensure the BUG-LOCAL-210 production-drift surface
+    is pinned with the exact pre-cleanbreak vector, not just the
+    synthetic shape fixtures elsewhere in this file.
+
+    History: before C3 the AudioGen widget vector in the canonical
+    workflow JSON was a 7-entry list -- ['[]', '{}', '', model_id,
+    3.0, 3.0, False]. The {} at position 1 was the leftover default
+    value of the deleted REQUIRED `production_plan_json` input.
+    ComfyUI silently positionally mapped the remaining 5 values to
+    INPUT_TYPES's 5 declared widget slots, shifting model_id ->
+    episode_seed, guidance_scale -> model_id, etc.
+
+    The fix (C3, commit f7a5ca0) realigned the vector to 6 entries
+    by dropping the {}. This test re-asserts the *shape* check
+    against the production drift's exact length-mismatch failure
+    mode, complementing the synthetic-vector tests above.
+    """
+    from nodes.batch_audiogen_generator import BatchAudioGenGenerator
+    it = BatchAudioGenGenerator.INPUT_TYPES()
+    expected_slots = (
+        list((it.get("required") or {}).keys())
+        + list((it.get("optional") or {}).keys())
+    )
+
+    # The exact pre-C3 vector that shipped BUG-LOCAL-210. Length 7.
+    pre_cleanbreak_vector = [
+        "[]",
+        "{}",
+        "",
+        "facebook/audiogen-medium",
+        3.0,
+        3.0,
+        False,
+    ]
+    assert len(pre_cleanbreak_vector) != len(expected_slots), (
+        "S25/MG-12 regression: the pre-cleanbreak vector length now "
+        "matches the current INPUT_TYPES slot count, which means "
+        "either INPUT_TYPES grew an entry without the workflow JSON "
+        "being updated, or this test fixture is stale. Either way, "
+        "audit before clearing."
+    )
+
+    # And the production workflow JSON must NOT carry the stale vector.
+    wf = _load_workflow()
+    node = _find_node(wf, "OTR_BatchAudioGenGenerator")
+    assert node is not None
+    wv = node.get("widgets_values") or []
+    assert wv != pre_cleanbreak_vector, (
+        "S25/MG-12 regression: the production workflow JSON's "
+        "OTR_BatchAudioGenGenerator widget vector is identical to "
+        "the pre-cleanbreak BUG-LOCAL-210 fixture. The C3 fix was "
+        "reverted in the JSON."
+    )
+    # Length must match INPUT_TYPES exactly (the C6 length test
+    # above covers this in the general case; this test is the
+    # historical-fixture anchor specifically for BUG-LOCAL-210).
+    assert len(wv) == len(expected_slots), (
+        f"S25/MG-12: widget vector length drift -- got {len(wv)}, "
+        f"expected {len(expected_slots)}. BUG-LOCAL-210 drift class."
+    )
