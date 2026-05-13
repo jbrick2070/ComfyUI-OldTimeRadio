@@ -35,8 +35,10 @@ import pytest
 from nodes.batch_audiogen_generator import (
     _cache_prefix,
     _cache_filename_for_write,
-    _cache_key,
 )
+# _cache_key was deleted in C7 (S24, 2026-05-13); the
+# test_audiogen_cache_key_alias_matches_filename_for_write
+# assertion that pinned its existence was removed in lockstep.
 
 
 # ---------------------------------------------------------------------------
@@ -192,11 +194,9 @@ def test_audiogen_cache_filename_extension_is_wav():
     assert fn.endswith(".wav"), fn
 
 
-def test_audiogen_cache_key_alias_matches_filename_for_write():
-    """``_cache_key`` MUST return the same string as
-    ``_cache_filename_for_write``. The alias exists as the legacy
-    public name; the two surfaces must not drift."""
-    assert _cache_key(**_BASELINE) == _cache_filename_for_write(**_BASELINE)
+# test_audiogen_cache_key_alias_matches_filename_for_write was
+# deleted in C7 (S24, 2026-05-13) along with the _cache_key alias
+# itself. Per directive 11 (no legacy back-compat).
 
 
 def test_audiogen_cache_hash_length_is_12():

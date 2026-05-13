@@ -131,16 +131,11 @@ def _cache_filename_for_write(*, prompt: str, duration_sec: float,
     return f"{_cache_prefix(prompt=prompt, duration_sec=duration_sec, episode_seed=episode_seed, model_id=model_id, guidance_scale=guidance_scale)}.wav"
 
 
-def _cache_key(*, prompt: str, duration_sec: float, episode_seed: str,
-               model_id: str, guidance_scale: float) -> str:
-    """Returns the canonical write filename. Same signature as
-    ``_cache_filename_for_write`` -- kept as the legacy public name
-    so external callers don't have to rename. New code should call
-    ``_cache_filename_for_write`` directly."""
-    return _cache_filename_for_write(
-        prompt=prompt, duration_sec=duration_sec, episode_seed=episode_seed,
-        model_id=model_id, guidance_scale=guidance_scale,
-    )
+# _cache_key was deleted in C7 (S24, 2026-05-13) per directive 11
+# (no legacy back-compat). It was a thin alias around
+# _cache_filename_for_write; zero production consumers, only tests
+# imported it. Matches the MusicGen S17.1 deletion. New code uses
+# _cache_filename_for_write directly.
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:

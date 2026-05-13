@@ -13,7 +13,10 @@ Covers the cache-key fix for MusicGen + AudioGen. Two test surfaces:
 
 3. **Atomic write test:** _save_wav writes through .tmp + os.replace.
 
-4. **Back-compat:** _cache_key still resolves to the canonical filename.
+4. **Canonical filename:** _cache_filename_for_write resolves to the
+   ``<prefix>.wav`` shape. (The legacy _cache_key alias was deleted
+   in S17.1 for MusicGen and C7 / S24 for AudioGen; both modules
+   now expose only the canonical name.)
 
 Consult source: docs/2026-05-02-phase-d-cache-key-consult__*
 """
@@ -118,7 +121,8 @@ class TestAudioGenPrefixMutations:
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible _cache_key still works
+# Canonical filename shape (legacy _cache_key wrappers deleted:
+# MusicGen in S17.1, AudioGen in C7 / S24)
 # ---------------------------------------------------------------------------
 
 def test_musicgen_cache_filename_for_write_returns_canonical():
@@ -140,8 +144,10 @@ def test_musicgen_cache_filename_for_write_returns_canonical():
     )
 
 
-def test_audiogen_cache_key_returns_canonical_filename():
-    name = AG._cache_key(
+def test_audiogen_cache_filename_for_write_returns_canonical():
+    """C7 (S24): the legacy _cache_key alias was deleted; use
+    _cache_filename_for_write directly with keyword-only args."""
+    name = AG._cache_filename_for_write(
         prompt="thunder rumble",
         duration_sec=3.0,
         episode_seed="seed1",
