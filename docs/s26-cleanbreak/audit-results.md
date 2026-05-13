@@ -61,4 +61,15 @@ Per directive ("downstream breakage is a feature; fix the caller, not the legacy
 
 Blast radius: 19 files (2 production + 17 tests). Below the §5 circuit-breaker bound. Architectural surface unchanged (no module boundary or class signature moves). Within scope of A3 -- the validator was the contractual mirror of the deleted schema scaffold.
 
+## A4a — script_json node-class default "[]" -> "{}" (AudioGen + ProcSFX)
+- Commit: (pending)
+- Files:
+  - nodes/batch_audiogen_generator.py:210 — `"default": "[]"` -> `"default": "{}"`
+  - nodes/batch_procedural_sfx.py:115 — same
+- Rationale: matches MusicGen (already `"{}"`) and the v2 ledger contract — `load_ledger` parses a JSON dict, not a list. The previous `"[]"` default failed silently when wired with no upstream (interpreted as an empty list, not the expected dict).
+- Targeted test command: `pytest tests/test_workflow_audio_widget_vectors.py tests/test_audiogen_writeback_hardening.py tests/test_procsfx_isolation.py tests/test_procsfx_ledger.py tests/test_procsfx_writeback_convention.py -q`
+- Result: 32 passed
+- Unexpected failures: none
+- Notes: AST clean. A4b workflow-fixture audit (next item) propagates this default to saved widget vectors in the workflow JSONs.
+
 

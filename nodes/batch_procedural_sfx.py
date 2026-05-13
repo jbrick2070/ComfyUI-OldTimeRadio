@@ -112,7 +112,7 @@ class BatchProceduralSFX:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "script_json": ("STRING", {"multiline": True, "default": "[]"}),
+                "script_json": ("STRING", {"multiline": True, "default": "{}"}),
             },
             "optional": {
                 "default_duration": ("FLOAT", {
