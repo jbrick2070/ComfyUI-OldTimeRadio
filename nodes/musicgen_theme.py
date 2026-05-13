@@ -883,6 +883,26 @@ class MusicGenTheme:
                                 )
                             updated += 1
                     if updated:
+                        # S25/AG-7 (BUG-LOCAL-219): soft-mode audit
+                        # walker. Surfaces §6.16 violations to
+                        # render_log; the consumer stays non-halting
+                        # until the per-consumer strict flip lands
+                        # after the walker holds clean for two full
+                        # pipeline runs (post-S25 soak).
+                        violations = _OTRLC.audit_post_freeze_writeback(
+                            led, strict=False,
+                        )
+                        if violations:
+                            render_log.append(
+                                f"§6.16 audit: {len(violations)} violation(s)"
+                            )
+                            for v in violations[:5]:
+                                render_log.append(f"  {v}")
+                            if len(violations) > 5:
+                                render_log.append(
+                                    f"  ... +{len(violations) - 5} more "
+                                    "(see audit_post_freeze_writeback)"
+                                )
                         _OTRL_PATHS.save_ledger_safe(ledger_path, led)
                         log.info(
                             "[MusicGenTheme] BUG-095 ledger updated: "

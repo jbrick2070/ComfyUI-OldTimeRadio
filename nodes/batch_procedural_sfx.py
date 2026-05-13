@@ -360,6 +360,26 @@ class BatchProceduralSFX:
                         ):
                             updated_lines += 1
                     if updated_lines:
+                        # S25/AG-6 (BUG-LOCAL-219): soft-mode audit
+                        # walker. Surfaces §6.16 violations to
+                        # batch_log; the consumer stays non-halting
+                        # until the per-consumer strict flip lands
+                        # after the walker holds clean for two full
+                        # pipeline runs (post-S25 soak).
+                        violations = _OTRLC.audit_post_freeze_writeback(
+                            led_disk, strict=False,
+                        )
+                        if violations:
+                            batch_log.append(
+                                f"§6.16 audit: {len(violations)} violation(s)"
+                            )
+                            for v in violations[:5]:
+                                batch_log.append(f"  {v}")
+                            if len(violations) > 5:
+                                batch_log.append(
+                                    f"  ... +{len(violations) - 5} more "
+                                    "(see audit_post_freeze_writeback)"
+                                )
                         _OTRL.save_ledger_safe(ledger_path, led_disk)
                         batch_log.append(
                             f"ledger updated (line_id stamping): "
