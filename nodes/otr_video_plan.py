@@ -273,15 +273,13 @@ def compose_shot_prompt(
     return ", ".join(parts)
 
 
-def _director_from_script_json(script_json: str) -> dict:
-    """Voice-path-cleanbreak Sprint 6.5 (2026-05-12). Single
-    derivation point that turns an L3 ledger JSON string into the
-    legacy director-shape dict the build_* helpers consume internally.
+def _visual_plan_from_script_json(script_json: str) -> dict:
+    """Single derivation seam from L3 ledger to per-character +
+    per-scene projection consumed by the three build_* helpers.
 
-    Replaces the adapter that used to live in OTRVideoPlan.plan() (the
-    one S2 added when migrating off the deleted Director node). Each
-    helper now does its own derivation; the node-level adapter
-    is gone.
+    Loads the L3 ledger via _otr_ledger_consumers.load_ledger and
+    projects ``meta.visual_plan`` + ``cast`` + ``lines`` into the
+    shape video-render code expects.
 
     Returns an empty dict on any parse / shape failure -- the helpers'
     downstream graceful-empty paths handle the empty case.
@@ -332,7 +330,7 @@ def build_pass1_char_prompts(
     Output envelope matches BatchFluxRender's env-token schema so it
     consumes the list as-is.
     """
-    director = _director_from_script_json(script_json)
+    director = _visual_plan_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
 
@@ -397,7 +395,7 @@ def build_pass2_scene_prompts(
 
     Output envelope matches BatchFluxRender's env-token schema.
     """
-    director = _director_from_script_json(script_json)
+    director = _visual_plan_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
     scenes = extract_scenes(director)
@@ -485,7 +483,7 @@ def build_shot_plan(
         )
 
     # Helper derives the per-scene shot shape from the L3 ledger.
-    director = _director_from_script_json(script_json)
+    director = _visual_plan_from_script_json(script_json)
     if not isinstance(director, dict):
         log.warning(
             "OTR_VideoPlan: director root is %s not dict; using empty",
@@ -827,10 +825,10 @@ class OTRVideoPlan:
         if focus_character == "(all)":
             resolved_focus = ""
 
-        # Voice-path-cleanbreak Sprint 6.5 (2026-05-12): the
-        # director-shape adapter that lived here is gone. Each helper
-        # now reads script_json directly via _director_from_script_json.
-        # Pass through to all three passes.
+        # The upstream adapter that lived here is gone. Each helper
+        # now derives the per-character + per-scene shape it needs from
+        # the L3 ledger via _visual_plan_from_script_json. Pass through
+        # to all three passes.
 
         # PASS 1: char portraits (one per character, or just the
         # focus character if focus_character is a specific name)
