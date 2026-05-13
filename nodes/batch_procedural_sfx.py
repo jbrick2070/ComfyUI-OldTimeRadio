@@ -13,10 +13,11 @@ script_json wire input, walks sfx lines, persists per-cue wavs to
 ``<episode>/audio/sfx/proc_<sfx_type>_<line_id>_<perm>.wav`` (best-effort,
 where ``<perm>`` is an 8-char SHA-256 over (dur_s, type, line_id) per S12.1),
 and stamps ``sfx_wav_path`` + ``sfx_engine="procedural"`` + ``sfx_type``
-+ ``dur_s`` per line_id on ``ledger.lines[]``. No cache layer
-(procedural is cheap + deterministic). Disk-write failure falls
-through to ``sfx_wav_path=None`` on the row; AUDIO batch return is
-unaffected.
++ ``dur_s`` + ``sfx_render_status`` per line_id on ``ledger.lines[]``.
+No cache layer (procedural is cheap + deterministic). Disk-write
+failure falls through to ``sfx_wav_path=""`` on the row (S18.1 /
+§6.16 convention) with ``sfx_render_status="error"``; AUDIO batch
+return is unaffected.
 """
 from __future__ import annotations
 
@@ -163,7 +164,8 @@ class BatchProceduralSFX:
                 # doesn't emit a per-cue override; falls back to
                 # default_duration in the generator call below. G7
                 # invariant in the FreezeCascade has already validated
-                # bounds [0.25, 12.0].
+                # bounds [SFX_DUR_MIN_S, SFX_DUR_MAX_S] (post-S6.4
+                # tightening; previously [0.25, 12.0]).
                 "dur_s":   line.get("dur_s"),
             })
 
@@ -189,19 +191,37 @@ class BatchProceduralSFX:
             tag = sfx_item["tag"]
             line_id = sfx_item.get("line_id")
             chosen_type = "radio_tuning" # Default fallback
+            # C4 (S24, 2026-05-13): track whether the resolver actually
+            # matched on the cue's tag content. If no keyword/alias
+            # matches and we stay on "radio_tuning" (the default
+            # fallback), the writeback below stamps
+            # sfx_render_status="fallback_default_type" so the ledger
+            # row surfaces the fact that no semantic match landed.
+            matched = False
 
             # Simple keyword matching
             for t in available_types:
                 if t in tag or tag in t:
                     chosen_type = t
+                    matched = True
                     break
 
             # Additional semantic aliases
-            if "knock" in tag or "door" in tag: chosen_type = "door_knock"
-            elif "beep" in tag or "computer" in tag or "digital" in tag: chosen_type = "sci_fi_beep"
-            elif "static" in tag or "noise" in tag: chosen_type = "white_noise"
-            elif "boom" in tag or "thud" in tag: chosen_type = "explosion"
-            elif "theremin" in tag or "eerie" in tag: chosen_type = "theremin"
+            if "knock" in tag or "door" in tag:
+                chosen_type = "door_knock"
+                matched = True
+            elif "beep" in tag or "computer" in tag or "digital" in tag:
+                chosen_type = "sci_fi_beep"
+                matched = True
+            elif "static" in tag or "noise" in tag:
+                chosen_type = "white_noise"
+                matched = True
+            elif "boom" in tag or "thud" in tag:
+                chosen_type = "explosion"
+                matched = True
+            elif "theremin" in tag or "eerie" in tag:
+                chosen_type = "theremin"
+                matched = True
 
             # Voice-path-cleanbreak Sprint 10.1 (S10.1): per-cue dur_s
             # takes precedence over default_duration. Defensive clamp
@@ -241,19 +261,25 @@ class BatchProceduralSFX:
             # Procedural wavs are deterministic so collisions within
             # fixed inputs are impossible. Disk usage grows with
             # iteration count but procedural wavs are kB-scale.
-            # On any disk error the function returns False and we
-            # stamp sfx_wav_path=None on the ledger row (the AUDIO
-            # batch return still ships).
+            # On any disk error _save_proc_sfx_wav returns False and
+            # we stamp sfx_wav_path="" on the ledger row (S18.1
+            # convention, §6.16). The AUDIO batch return still ships.
+            #
             # S18.1 (IMP-20 part 1): wav_path defaults to "" not None.
             # Per _otr_ledger_freeze.py lines 37-39, optional string
             # fields must be "" when unset, never null; the ledger
             # convention is enforced at freeze time but consumer
             # writebacks were not re-validating until S18.2.
             wav_path: str = ""
-            # S18.4: sfx_render_status surfaces the path the renderer
-            # took. "ok" on the happy path; "fallback_default_type"
-            # when the resolver fell back; "error" on disk failure.
-            render_status = "ok"
+            # S18.4 + C4 (S24, 2026-05-13): sfx_render_status surfaces
+            # the path the renderer took. "ok" on the happy path with
+            # a matched semantic resolution; "fallback_default_type"
+            # when the resolver fell through to "radio_tuning" without
+            # matching the tag; "error" on disk failure.
+            if matched:
+                render_status = "ok"
+            else:
+                render_status = "fallback_default_type"
             if sfx_dir is not None and line_id:
                 perm = hashlib.sha256(
                     f"{cue_duration:.3f}|{chosen_type}|{line_id}".encode("utf-8")

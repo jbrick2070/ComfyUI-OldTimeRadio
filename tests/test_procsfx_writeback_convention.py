@@ -87,3 +87,72 @@ def test_strict_writeback_raises_on_failure_path():
     assert pat.search(_PROCSFX_SRC), (
         "S18.3: strict branch must raise RuntimeError, not just log."
     )
+
+
+# ---------------------------------------------------------------------
+# C4 (S24, 2026-05-13) -- fallback_default_type + stale-comment cleanup
+# ---------------------------------------------------------------------
+
+
+def test_resolver_tracks_matched_flag():
+    """C4: the resolver loop must set ``matched = True`` on every
+    keyword / alias hit so the default-path can be distinguished from
+    a successful semantic match."""
+    assert "matched = False" in _PROCSFX_SRC, (
+        "C4: resolver matched-flag initializer missing or moved."
+    )
+    # At least 6 ``matched = True`` lines: one per keyword branch
+    # (door_knock, sci_fi_beep, white_noise, explosion, theremin)
+    # plus one inside the ``for t in available_types`` loop.
+    n_true = _PROCSFX_SRC.count("matched = True")
+    assert n_true >= 6, (
+        f"C4: expected >=6 matched=True branches; got {n_true}. "
+        "A future refactor may have folded the alias chain; verify "
+        "every keyword path still flips the flag."
+    )
+
+
+def test_fallback_default_type_status_stamped_when_no_match():
+    """C4: when the resolver falls through without matching, the
+    render_status must take the literal ``fallback_default_type``."""
+    pat = re.compile(
+        r"if matched:\s*\n"
+        r"\s*render_status = \"ok\"\s*\n"
+        r"\s*else:\s*\n"
+        r"\s*render_status = \"fallback_default_type\"",
+        re.MULTILINE,
+    )
+    assert pat.search(_PROCSFX_SRC), (
+        "C4: matched-flag must select between 'ok' and "
+        "'fallback_default_type' render_status. Either the branch "
+        "shape changed or the status string differs."
+    )
+
+
+def test_stale_sfx_wav_path_None_doc_scrubbed():
+    """C4 (b): every docstring / comment mention of
+    ``sfx_wav_path=None`` must be replaced with the §6.16 convention
+    ``sfx_wav_path=""``."""
+    assert "sfx_wav_path=None" not in _PROCSFX_SRC, (
+        "C4: stale sfx_wav_path=None mention surfaced. Per S18.1, "
+        "the disk-write-failure stamp is \"\" not None."
+    )
+
+
+def test_stale_dur_range_literal_scrubbed():
+    """C4 (c): the bare ``[0.25, 12.0]`` G7-old-range literal in the
+    `dur_s` outline comment must be replaced with the symbolic
+    SFX_DUR_MIN_S / SFX_DUR_MAX_S form. A forensic-only mention
+    inside a "previously [0.25, 12.0]" anchor is allowed."""
+    # Find every literal occurrence.
+    hits = re.findall(r"\[0\.25,\s*12\.0\]", _PROCSFX_SRC)
+    for h in hits:
+        # Each hit must be inside a "previously [0.25, 12.0]" anchor.
+        # The anchor must appear within 30 characters of the hit.
+        idx = _PROCSFX_SRC.find(h)
+        context = _PROCSFX_SRC[max(0, idx - 40):idx + len(h)]
+        assert "previously" in context, (
+            f"C4: bare [0.25, 12.0] reference at offset {idx} lacks "
+            f"the 'previously' forensic anchor. Use SFX_DUR_MIN_S / "
+            f"SFX_DUR_MAX_S symbolic in active code."
+        )
