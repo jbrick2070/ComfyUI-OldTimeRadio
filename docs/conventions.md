@@ -37,6 +37,26 @@ Current modules following this convention:
 | `nodes/_otr_ledger_consumers.py` | `load_ledger`, `iter_lines`, ... | `batch_audiogen_generator.py`, `batch_procedural_sfx.py`, `scene_sequencer.py`, `musicgen_theme.py`, `video_engine.py`, `otr_video_plan.py` |
 | `nodes/_otr_ledger_freeze.py` | `FreezeCascade`, gate helpers     | `OTR_LedgerScriptWriter.py`, `batch_bark_generator.py`                     |
 
+### Test enforcement (S10.3)
+
+Both rules are pinned by `tests/test_naming_conventions.py`:
+
+| Pattern                  | Meaning                                              | Test                                            |
+|--------------------------|------------------------------------------------------|-------------------------------------------------|
+| `_otr_*.py` (no `_lib`)  | Package-internal, mixed concerns                     | —                                               |
+| `_otr_*_lib.py`          | Package-internal, library-only (no node class)       | `test_lib_modules_have_otr_prefix`, `test_lib_modules_have_no_node_class_mappings` |
+| `<name>.py` (no prefix)  | Node-bearing module                                  | —                                               |
+
+The two enforced rules:
+
+1. Any module whose name ends `_lib.py` MUST also start with `_otr_`.
+2. Any `_otr_*_lib.py` module MUST NOT define `NODE_CLASS_MAPPINGS`
+   (AST-walk catches this at any scope).
+
+Rule (3) — non-`_lib` modules registering node classes follow the
+`OTR_<Capitalized>` class-name convention — is conventionally honored
+but not test-enforced. Add a test if drift surfaces.
+
 ### Non-library modules: `<name>.py`
 
 Modules that register a node class (have `NODE_CLASS_MAPPINGS`) use
