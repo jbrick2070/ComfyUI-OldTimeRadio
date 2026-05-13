@@ -265,9 +265,11 @@ def _unload_bark():
 # batch_bark_generator.py imports it directly. Library-only module --
 # no node class, no NODE_CLASS_MAPPINGS.
 #
-# Voice-path-cleanbreak Sprint 4 (2026-05-12): module renamed
-# nodes/bark_tts.py -> nodes/_bark_lib.py. Underscore prefix marks
-# this as a private internal library; _lib suffix flags it as
+# Voice-path-cleanbreak Sprint 7.2 (2026-05-12): module renamed
+# nodes/_bark_lib.py -> nodes/_otr_bark_lib.py per docs/conventions.md
+# (project-prefix discipline for private library modules).
+# Underscore prefix marks this as a private internal library; otr_
+# prefix scopes the name to this project; _lib suffix flags it as
 # library-only (no node class). Importers updated in lockstep:
 #   nodes/batch_bark_generator.py
 #   nodes/scene_sequencer.py (inline-Bark fallback)

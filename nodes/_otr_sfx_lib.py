@@ -255,8 +255,10 @@ SFX_GENERATORS = {
 # remains because batch_procedural_sfx.py imports it directly. The
 # module is library-only now (no node class, no NODE_CLASS_MAPPINGS).
 #
-# Voice-path-cleanbreak Sprint 4 (2026-05-12): module renamed
-# nodes/sfx_generator.py -> nodes/_sfx_lib.py. Underscore prefix
-# marks this as a private internal library; _lib suffix flags it as
+# Voice-path-cleanbreak Sprint 7.2 (2026-05-12): module renamed
+# nodes/_sfx_lib.py -> nodes/_otr_sfx_lib.py per docs/conventions.md
+# (project-prefix discipline for private library modules).
+# Underscore prefix marks this as a private internal library; otr_
+# prefix scopes the name to this project; _lib suffix flags it as
 # library-only. Importers updated in lockstep:
 #   nodes/batch_procedural_sfx.py
