@@ -157,4 +157,17 @@ Per-site audit (`git grep -nE "back-compat|legacy fallback" <file>`):
 - Audit verdict: architectural migration (touches audio path; SFX-into-lines mirror is the live producer for BatchHumoRender wall-to-wall coverage).
 - Action: **DEFERRED**. Surface stays as-is; no gate added. Named follow-up: "B6 sequencer SFX-mirror migration to lines[]-native source".
 
+## B3 — production_ledger.py set_cast input shims + HuMo prompt fallback removed
+- Commit: (pending)
+- Files:
+  - nodes/production_ledger.py — `set_cast` no longer reads legacy `description` input key; no longer derives `tts_model` from `voice_preset`; `_derive_tts_model_from_voice_preset` helper deleted.
+  - nodes/batch_humo_render.py — `_build_pos_prompt` no longer falls back to `description`; only reads `character_description`.
+  - tests/test_batch_humo_render.py — `test_build_pos_prompt_back_compat_old_description_key` deleted (pinned the removed fallback).
+  - tests/test_render_flux_batch.py — synthetic ledger fixture migrated from `description` to `character_description` (lines 41/43).
+  - tests/test_production_ledger.py — `test_set_cast_derives_tts_model_from_bark_voice_preset` + `test_set_cast_derives_tts_model_from_kokoro_voice_preset` deleted (pinned removed shim); explanatory comment retained inline.
+- Targeted test command: `pytest tests/test_production_ledger.py tests/test_batch_humo_render.py tests/test_render_flux_batch.py tests/test_otr_ledger_consumers.py -q`
+- Result: 145 passed, 1 failed
+- Unexpected failures: none. Single failure (`TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk`) is in the baseline known-fail set.
+- Notes: Blast radius 5 files, within circuit-breaker bound. The remaining synthetic-ledger schema_version `"l2-2026-04-25"` in test_render_flux_batch.py:37 is a legacy timestamp string in input test data, not live l2 fallback code; documented for sweep awareness but not pulled into this commit.
+
 

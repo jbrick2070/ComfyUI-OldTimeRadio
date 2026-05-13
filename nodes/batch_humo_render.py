@@ -1145,14 +1145,9 @@ def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
     speaker_desc = ""
     for c in cast:
         if (c.get("name") or "").upper().strip() == (speaker or "").upper().strip():
-            # Cast field renamed 2026-05-10: description -> character_description.
-            # Read the new key first; fall back to the old key for any ledger
-            # written before the rename landed.
-            speaker_desc = (
-                c.get("character_description")
-                or c.get("description")
-                or ""
-            ).strip()
+            # S26-B3 cleanbreak: legacy `description` fallback removed;
+            # callers MUST supply `character_description`.
+            speaker_desc = (c.get("character_description") or "").strip()
             break
     if not speaker_desc:
         speaker_desc = (

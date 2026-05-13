@@ -156,37 +156,6 @@ def _safe_int(v: Any, default: int = 0) -> int:
             return default
 
 
-def _derive_tts_model_from_voice_preset(voice_preset: str) -> Optional[str]:
-    """Map a cast row's voice_preset to its TTS family.
-
-    Bark presets follow the Suno convention `v2/en_speaker_*` (and
-    legacy foreign-accent presets like `de_speaker_*` / `fr_speaker_*`
-    if they're ever re-enabled). Kokoro presets follow the BBC/American
-    convention `bm_*` / `bf_*` / `am_*` / `af_*`.
-
-    Used as a back-compat shim in `Ledger.set_cast` when a caller
-    passes a pre-tts_model cast row. New code MUST supply `tts_model`
-    explicitly; this helper only catches in-flight rows that haven't
-    been updated yet. Returns None for unknown prefixes.
-    """
-    if not voice_preset:
-        return None
-    s = voice_preset.strip()
-    if s.startswith("v2/") and "speaker" in s:
-        return "bark"
-    if s.startswith(("bm_", "bf_", "am_", "af_")):
-        return "kokoro"
-    # Legacy Bark foreign-accent presets (currently disabled per
-    # cast_pools.py commentary; kept here in case they're re-enabled).
-    if any(s.startswith(p) for p in (
-        "de_speaker_", "es_speaker_", "fr_speaker_", "hi_speaker_",
-        "it_speaker_", "ja_speaker_", "ko_speaker_", "ru_speaker_",
-        "pt_speaker_", "pl_speaker_",
-    )):
-        return "bark"
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -578,31 +547,19 @@ class Ledger:
         rows: List[Dict[str, Any]] = []
         for r in cast_rows or []:
             # Cast field renamed 2026-05-10: description -> character_description.
-            # Back-compat input shim: still accept the old key on the way IN
-            # so any in-flight ledger or cached cast row from a prior session
-            # normalizes cleanly. Output is always the new key.
-            cdesc = (
-                _safe_str(r.get("character_description"))
-                or _safe_str(r.get("description"))
-                or None
-            )
+            # S26-B3 cleanbreak: legacy `description` input key dropped;
+            # callers MUST supply `character_description`.
+            cdesc = _safe_str(r.get("character_description")) or None
             # Cast field added 2026-05-10: tts_model. Routing column
             # that says which TTS family the voice_preset belongs to
             # ("bark", "kokoro", future: "fish_speech", "cosyvoice", ...).
             # Lets downstream consumers route by reading the field
             # directly instead of pattern-matching the voice_preset
             # prefix.
-            #
-            # Back-compat input shim: if a caller doesn't supply
-            # tts_model (e.g. an in-flight cast row from before the
-            # field landed), derive it from the voice_preset prefix.
-            # Bark presets are "v2/en_speaker_*"; Kokoro presets are
-            # "bm_*", "bf_*", "am_*", "af_*". Anything else falls back
-            # to None and the consumer must error-check.
+            # S26-B3 cleanbreak: legacy voice_preset->tts_model derivation
+            # dropped; callers MUST supply tts_model explicitly.
             tts_model = _safe_str(r.get("tts_model")) or None
             voice_preset = _safe_str(r.get("voice_preset")) or None
-            if tts_model is None and voice_preset:
-                tts_model = _derive_tts_model_from_voice_preset(voice_preset)
             # Cast field added 2026-05-10: voice_params. Model-
             # dependent dict (or None) where the casting LLM stores
             # per-character knobs it chose -- Bark might use

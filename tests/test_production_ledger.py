@@ -353,25 +353,11 @@ class TestSetters:
         assert led.data["cast"][0]["tts_model"] == "kokoro"
         assert led.data["cast"][1]["tts_model"] == "bark"
 
-    def test_set_cast_derives_tts_model_from_bark_voice_preset(self, tmp_out):
-        """Back-compat: a row without tts_model but with a Bark
-        voice_preset gets tts_model='bark' inferred."""
-        led = Ledger("t", str(tmp_out))
-        led.set_cast([
-            {"char_id": "c01", "name": "BOB",
-             "gender": "male", "voice_preset": "v2/en_speaker_1"},
-        ])
-        assert led.data["cast"][0]["tts_model"] == "bark"
-
-    def test_set_cast_derives_tts_model_from_kokoro_voice_preset(self, tmp_out):
-        """Back-compat: a row without tts_model but with a Kokoro
-        voice_preset (bm_/bf_/am_/af_) gets tts_model='kokoro' inferred."""
-        led = Ledger("t", str(tmp_out))
-        led.set_cast([
-            {"char_id": "c01", "name": "ANNOUNCER",
-             "gender": "female", "voice_preset": "bf_emma"},
-        ])
-        assert led.data["cast"][0]["tts_model"] == "kokoro"
+    # S26-B3: legacy `_derive_tts_model_from_voice_preset` shim removed;
+    # the two derivation tests (bark-preset + kokoro-preset) deleted with it
+    # per the "delete the test AND the dead caller" pattern. The
+    # test_set_cast_tts_model_none_for_unknown_preset case below still
+    # pins the contract: if tts_model is not supplied, it lands as None.
 
     def test_set_cast_tts_model_none_for_unknown_preset(self, tmp_out):
         """If the voice_preset doesn't match any known TTS prefix and
