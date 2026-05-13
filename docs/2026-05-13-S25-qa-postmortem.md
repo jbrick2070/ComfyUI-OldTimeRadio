@@ -177,3 +177,175 @@ python -c "from nodes._otr_ledger_consumers import ALLOWED_MUSIC_RENDER_STATUS; 
 pytest tests/test_musicgen_parity.py tests/test_audiogen_legacy_gate.py tests/test_workflow_audio_widget_vectors.py tests/test_style_palette_drift.py -q
 # Expected: 24 passed
 ```
+
+---
+
+# ADDENDUM -- Cleanbreak audit for next-sprint planning (2026-05-13 post-S25 review)
+
+**Audience:** Jeffrey + round-robin sprint consultant. **Goal:** make a complete, deliberate decision on what to delete next so the no-back-compat directive is fully honored before any new feature work (e.g. Two-Model Selector) begins.
+
+**Scope of this addendum:** explicitly EXCLUDES the in-flight Two-Model Selector / Sprint #1 (B) scoping work in the working tree. That's after-cleanbreak by Jeffrey's direction.
+
+**What prompted this addendum:** the S25 sprint repeatedly chose "gate the legacy path + schedule deletion for S26" over "delete the legacy path now." That posture is itself legacy-tolerance debris under the no-back-compat directive. The audit below catalogs every such surface so the consultant can decide which to delete in the next sprint vs which need a dedicated sprint vs which are explicitly out of scope.
+
+## A. Items S25 LEFT as legacy-tolerant (highest priority -- these are debris the sprint itself created or perpetuated)
+
+### A1. Legacy `ledger.sfx[]` writeback loop in `batch_audiogen_generator.py:701-765`
+
+**Current state after S25:**
+- The entire `Path 1: legacy ledger.sfx[]` loop survives.
+- Phase 3 added a C2 ghost-path gate (`(save_ok or had_cache_hit) AND os.path.isfile`).
+- Phase 3 added a `DeprecationWarning` on non-empty `sfx_rows`.
+- Phase 3 stamps `sfx_render_status` on each legacy row.
+- CD-3 audit (Phase 7) confirmed **zero current producers** populate `ledger["sfx"]`.
+
+**Cleanbreak action:** delete the entire `Path 1` block:
+- `sfx_rows = led_disk.get("sfx") or []` lookup
+- the `if sfx_rows: warnings.warn(...)` DeprecationWarning
+- the `for i, item in enumerate(render_queue):` parallel-index loop and all its writeback stamping
+- the `updated_sfx_array` counter and the dual-stat log surface (`sfx_array=N/M, lines=N/M`) collapses to lines-only
+
+**Why it wasn't done in S25:** the playbook had it as CD-3 audit -> "schedule deletion for S26." With CD-3 returning empty (zero producers), the correct cleanbreak action was deletion in this sprint, not gating + scheduling. The C2 gate I added is itself the kind of legacy-tolerance debris the directive forbids.
+
+**Risk:** none if the audit is right. The full codebase grep returned zero producers. A real producer would now be surfaced by the DeprecationWarning before this lands, so the gate has done its alarm-plumbing job.
+
+### A2. MusicGen `_find_cached` legacy timestamped-filename fallback (`musicgen_theme.py:230-261`)
+
+**Current state after S25:** Lines 230-261 are a fallback for `<prefix>_<ts>.wav` cache files written by a "pre-Phase-D" implementation that no current code path produces. The full `legacy_prefix` / `matches` / `_legacy_sort_key` machinery runs on every cache miss.
+
+**Cleanbreak action:** delete the whole legacy branch. Drop to a single-tier lookup -- canonical filename only. On a fresh install or fresh per-episode dir, the legacy lookup matches nothing anyway.
+
+**Risk:** any leftover pre-Phase-D wavs in a long-running install's cache dir will rebuild on first run instead of being reused. Acceptable per the directive.
+
+**Sibling for the consultant to consider:** `batch_audiogen_generator.py:144` carries the same pattern.
+
+### A3. `production_ledger.py:357 "sfx": []` schema scaffold
+
+**Current state after S25:** the empty-list schema field survives as a legacy-shape carryover. The L3 schema otherwise puts SFX rows on `ledger.lines[]` with `role="sfx"`.
+
+**Cleanbreak action:** delete the `"sfx": []` line from the schema initializer. Verify (via grep before commit) that no consumer reads `ledger["sfx"]` after the legacy writeback path (A1) goes.
+
+**Risk:** consumers using `ledger.get("sfx") or []` keep working (default-empty). Consumers using `ledger["sfx"]` would KeyError -- this is the verification step.
+
+### A4. AudioGen + ProcSFX `script_json` default `"[]"` (legacy parser-list shape)
+
+**Current state after S25:**
+- `batch_audiogen_generator.py:251` -- `"script_json": ("STRING", {..., "default": "[]"})`
+- `batch_procedural_sfx.py:115` -- same
+- `musicgen_theme.py` -- `"{}"` (v2 ledger shape)
+
+**Cleanbreak action:** change both `"[]"` defaults to `"{}"`. Matches MusicGen and the v2 ledger contract (`load_ledger` parses a JSON dict, not a list).
+
+**Risk:** zero runtime risk -- the value is the empty-state default; both shapes parse to "no work" in `load_ledger`. Pure consistency cleanup.
+
+## B. Items from the broader codebase audit (deferred mid-workflow legacy surfaces)
+
+The S25 audit grep (`grep -rn 'back-compat|back_compat|backcompat' nodes/`) returned ~35 hits across 17 files. Triaged below by category. The consultant decides scope per sprint.
+
+### B1. Multi-shim ledger I/O surfaces in `_otr_ledger.py` (4 sites)
+
+Lines 27, 63, 166, 906 carry "back-compat with l2 ledgers" / "older ledgers that lack this" comments. The current ledger schema is L3 (`schema_version: "l3-2026-05-08"`).
+
+**Cleanbreak question:** are L2 ledgers still produced anywhere? If no, the L2 fallbacks delete. Producer grep is the audit.
+
+### B2. Multi-shim outline back-compat in `_otr_outline.py` (10+ sites)
+
+Lines 138, 210, 289, 304, 376, 471, 483, 512, 725, 1026 + test fixtures at 1243, 1247, 1258. All "pre-Phase-2A budget" or "bare cast list" back-compat. The outline pipeline has moved through Phase 2A+; question is whether ANY current writer path takes the bare fallback.
+
+**Cleanbreak question:** does the writer + outline still accept the bare format, or is it always the rich one? This needs a code-trace from `OTR_LedgerScriptWriter.generate()` through the outline call sites.
+
+### B3. Production-ledger back-compat shims in `set_cast` (`production_ledger.py:167, 582, 597`)
+
+Three "Back-compat input shim" comments. These accept old key shapes "on the way IN" to `set_cast`. With v2 ledger contract locked, any caller still using old keys is itself a legacy surface.
+
+**Cleanbreak question:** what callers do `set_cast`? Are any using the old keys?
+
+### B4. Line-composer back-compat (`_otr_line_composer.py:468, 856, 1215, 1492`)
+
+`back-compat with callers that don't yet build a ...` and similar phrasing across four sites. Each is a defensive fallback for a caller pattern that may or may not still exist.
+
+**Cleanbreak question:** are there still callers without the rich call signature? Producer-side audit.
+
+### B5. Freeze-cascade back-compat (`_otr_ledger_freeze.py:275, 478, 665`)
+
+- L275: outline beats fallback
+- L478: speaker_role substitutes (was a back-compat shim)
+- L665: dur_s absent / None (older ledger tolerance)
+
+**Cleanbreak question:** can we tighten the freeze contract so these are required not optional?
+
+### B6. Other back-compat surfaces (lower priority)
+
+- `OTR_LedgerScriptWriter.py:776, 1951` -- seed_text shim, no-style-picked fallback
+- `batch_humo_render.py:889, 2928` -- flat-dir patterns + direct stem match
+- `otr_video_plan.py:645` -- `shot_id` alias kept for some callers
+- `story_orchestrator.py:483, 3814` -- alias back-compat + skip=True legacy guard
+- `scene_sequencer.py:939, 958` -- back-compat consumer notes
+- `video_engine.py:664` -- voice_assignments-only cast fallback
+- `video_composite.py:2183` -- audio_source back-compat alias
+- `_otr_paths.py:204, 338` -- back-compat search root + function-name keepalive
+- `post_audio_video_pipeline.py:124` -- flat layout (note: this node is RETIRED per __init__.py:176, so the back-compat is doubly dead)
+
+Each is a 1-3 line surgical delete pending verification of zero callers.
+
+## C. Items NOT in scope for the next sprint
+
+### C1. Two-Model Selector / Sprint #1 (B)
+
+In the working tree as uncommitted edits in `ROADMAP.md` + the untracked `docs/2026-05-13-two-model-selector-scoping.md`. **Excluded by Jeffrey's direction:** after-cleanbreak; do not plan as next sprint.
+
+### C2. C8 / CastContract quarantine
+
+CD-1 decision was Option 3 (drop quarantine, accept production-wired). Not a cleanbreak target; the module IS the production cast pipeline.
+
+### C3. The big `_otr_outline.py` back-compat sweep (B2)
+
+10+ sites; needs a dedicated sprint with budget-flow code-tracing, not a "tag along" in the next bug-fix sprint.
+
+### C4. Survivor: forensic comments in BUG_LOG.md, ROADMAP.md, ADRs
+
+These reference deleted classes by name (e.g. "OTR_Gemma4Director", "OTR_LLMDirector") in historical context. They are documentation of past state, not legacy-tolerance code. Leave alone.
+
+## Recommended next-sprint package (consultant decides)
+
+**Option D-MIN (focused cleanbreak completion -- low risk, high signal):**
+- A1: delete legacy ledger.sfx[] loop entirely
+- A2: delete MusicGen `_find_cached` legacy timestamped branch
+- A2-sibling: delete AudioGen `_find_cached` legacy timestamped branch
+- A3: delete `production_ledger.py:357 "sfx": []` (after verifying no consumer reads the key)
+- A4: standardize AudioGen + ProcSFX `script_json` defaults to `"{}"`
+
+Estimated scope: ~60 LOC net deletion, 2-4 tests updated, regression must hold at 2165+/8/6.
+
+**Option D-WIDE (full cleanbreak sweep including ledger I/O + freeze tightening):**
+- Everything in D-MIN
+- B1: `_otr_ledger.py` L2 back-compat sweep (4 sites)
+- B5: `_otr_ledger_freeze.py` shim tightening (3 sites)
+- B3: `set_cast` shim removal in `production_ledger.py` (3 sites; pending caller audit)
+
+Estimated scope: ~150 LOC net deletion, more tests touched, larger blast radius.
+
+**Option D-MASSIVE (everything except C1/C3):**
+- D-WIDE + B4 (line composer) + B6 (other back-compat sites)
+- _otr_outline.py sweep (B2) deferred separately to its own dedicated sprint
+
+Estimated scope: too large for a single bug-fix sprint. Split.
+
+## Acceptance criteria for "cleanbreak complete for the legacy ledger"
+
+The standing directive in ROADMAP.md lists these acceptance criteria (originally for commit 12.3):
+
+1. `grep -rn "OTR_LedgerScriptReviewer" nodes/ __init__.py` returns ZERO hits outside forensic comments
+2. `grep -rn "Gemma4" nodes/ __init__.py` returns zero hits
+3. `grep -rn "reviewer_verdict" nodes/` returns zero hits
+4. The workflow JSON loads in ComfyUI Desktop with NO missing-node warnings or back-compat aliases firing
+5. Bug Bible regression holds 23/1/2xf
+
+**All five hold at S25 close.** The legacy ledger CLASS / FIELD names are gone.
+
+What remains is legacy-tolerance CODE that handles hypothetical inputs from extinct producers. That's the cleanbreak completion item — and it's exactly what this addendum is asking the consultant to plan.
+
+## Round-robin question for the consultant
+
+> The S25 sprint added a C2 gate + DeprecationWarning to the legacy `ledger.sfx[]` writeback loop, then scheduled deletion for S26. Per the no-back-compat directive, the correct action was deletion in S25. The sprint repeated this "gate + schedule" pattern across multiple surfaces. Going forward, when an audit confirms zero producers, what's the consultant's framing for "delete now" vs "gate now, delete next sprint"? The pattern shipped because the playbook framed it that way; the directive forbids it.
+
