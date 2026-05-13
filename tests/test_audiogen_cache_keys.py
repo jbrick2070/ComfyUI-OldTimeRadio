@@ -199,6 +199,35 @@ def test_audiogen_cache_key_alias_matches_filename_for_write():
     assert _cache_key(**_BASELINE) == _cache_filename_for_write(**_BASELINE)
 
 
+def test_audiogen_cache_hash_length_is_12():
+    """S12.4 / IMP-2 drift guard. The SHA-256 digest is truncated
+    to 12 hex chars (48 bits). Don't silently change the length:
+      - shortening to 8 reverts the IMP-1 layer-1 collision-risk fix
+      - extending to 16 invalidates every cached wav across the
+        deployment (cache MISS once per cue on the next run)
+    Either change is a deliberate decision that needs a paired
+    update to this test, this comment, and the in-source rationale.
+
+    The prefix shape is ``sfx_<safe_name>_<digest>`` where
+    ``safe_name`` is up to 20 sanitized chars of the prompt. We
+    pin the digest length by splitting on ``_`` and inspecting
+    the LAST component -- the only segment that is guaranteed to
+    be exactly the SHA truncation."""
+    prefix = _cache_prefix(**_BASELINE)
+    parts = prefix.split("_")
+    digest = parts[-1]
+    assert len(digest) == 12, (
+        f"AudioGen cache prefix digest length is {len(digest)}; "
+        f"expected 12. Either restore the truncation OR update "
+        f"this test + nodes/batch_audiogen_generator.py:_cache_prefix "
+        f"docstring + commit message in lockstep."
+    )
+    assert all(c in "0123456789abcdef" for c in digest), (
+        f"AudioGen cache digest is not pure hex: {digest!r}. "
+        f"hashlib.hexdigest()[:12] is the contract."
+    )
+
+
 # ---------------------------------------------------------------------------
 # ProcSFX no-cache invariant tests (source inspection)
 # ---------------------------------------------------------------------------
