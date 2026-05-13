@@ -354,7 +354,6 @@ class Ledger:
             "shots": [],
             "beats": [],
             "lines": [],
-            "sfx": [],
             "music": [],
             "clips": [],
             "final_audio_path": None,

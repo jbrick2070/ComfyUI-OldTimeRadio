@@ -64,7 +64,7 @@ def _ledger(lines, cast=None):
                  "portrait_path": "ANNOUNCER.png"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {
                 "episode_title": "Commit 12.1 fixture",
                 "style": "mission_control_procedural",

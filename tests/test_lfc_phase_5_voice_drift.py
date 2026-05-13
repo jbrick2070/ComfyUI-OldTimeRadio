@@ -47,7 +47,7 @@ def _ledger(lines, cast=None):
                  "traits": "warm broadcast"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {
                 "episode_title": "p5 test",
                 "style": "mission_control_procedural",

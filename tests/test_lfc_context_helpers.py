@@ -85,7 +85,7 @@ def _ledger_data(lines=None, *, with_music_inter=False,
         "cast": cast,
         "scenes": [], "shots": [],
         "beats": [], "lines": lines,
-        "sfx": [], "music": [], "clips": [],
+        "music": [], "clips": [],
         "meta": meta,
     }
 

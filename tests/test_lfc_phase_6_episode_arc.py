@@ -71,7 +71,7 @@ def _ledger(*, with_scene_synopses=True, lines=None, cast=None):
                  "traits": "skeptical analyst"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": meta,
         },
         episode_id="ep_p6_test",

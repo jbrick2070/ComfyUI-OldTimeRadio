@@ -59,7 +59,7 @@ def _ledger_two_scenes():
                 _line("l005", "c02", "character",
                       "That can't be right -- they overlap."),
             ],
-            "sfx": [], "music": [], "clips": [],
+            "music": [], "clips": [],
             "meta": {
                 "episode_title": "p4 test",
                 "style": "mission_control_procedural",

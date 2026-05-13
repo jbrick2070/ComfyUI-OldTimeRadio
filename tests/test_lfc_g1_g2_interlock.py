@@ -131,7 +131,7 @@ def _ledger_with_meta(meta_overrides=None):
         "cast": [{"char_id": "c01", "name": "ALICE"}],
         "scenes": [], "shots": [], "beats": [],
         "lines": [_line("l001", "c01", "character", "Hello.")],
-        "sfx": [], "music": [], "clips": [],
+        "music": [], "clips": [],
         "meta": {"episode_title": "g1/g2", "style": "x"},
     }
     if meta_overrides:

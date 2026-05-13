@@ -26,12 +26,14 @@ Cascade ADR).
 Schema mapping (ADR §6.16 reality-check vs L3 ledger):
     ADR §6.16 references `sfx_cues` / `music_cues` (plural lists) on
     each line. The live L3 schema has scalar `sfx_cue` on outline
-    beats and on `LineRequest`, plus top-level lists `sfx` / `music`
-    on the ledger root. The null-rejection invariants here apply to
-    the fields that actually exist:
+    beats and on `LineRequest`, plus top-level `music` list on the
+    ledger root. The legacy top-level `sfx` list was deleted in S26
+    (CD-3) -- sfx are now first-class lines[] rows with
+    `line.speaker_role == "sfx"`. The null-rejection invariants here
+    apply to the fields that actually exist:
 
       * top-level `cast` / `lines` / `beats` / `scenes` / `shots`
-        / `sfx` / `music` / `clips`  -- must be list, never null.
+        / `music` / `clips`  -- must be list, never null.
       * `meta.news.key_terms`  -- must be list when present, never null.
       * `meta.episode_title` / `meta.style` / `meta.episode_id`
         -- must be non-empty string when present.
@@ -122,7 +124,9 @@ _REQUIRED_TOP_LEVEL_LISTS: tuple[str, ...] = (
     "beats",
     "scenes",
     "shots",
-    "sfx",
+    # S26-A3: legacy top-level "sfx" list removed from schema. sfx are
+    # first-class lines[] rows in v2. The line.speaker_role == "sfx"
+    # case is still part of ALLOWED_SPEAKER_ROLES above.
     "music",
     "clips",
 )

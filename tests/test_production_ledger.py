@@ -79,9 +79,13 @@ class TestLedgerBasics:
         # _otr_ledger.CURRENT_SCHEMA_VERSION so both write paths stay
         # in lockstep.
         assert led.data["schema_version"].startswith("l3-")
+        # S26-A3: "sfx" key removed from schema scaffold -- sfx are
+        # first-class lines[] rows in the v2 ledger; the standalone
+        # sfx[] array (and its tolerant consumers) is dead.
         for key in ("cast", "scenes", "shots", "beats", "lines",
-                    "sfx", "music", "clips"):
+                    "music", "clips"):
             assert led.data[key] == []
+        assert "sfx" not in led.data
         assert led.data["final_audio_path"] is None
         assert led.data["final_video_path"] is None
         assert led.data["total_episode_dur_s"] is None

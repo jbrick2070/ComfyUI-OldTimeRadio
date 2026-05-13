@@ -33,7 +33,7 @@ def _ledger(lines):
             ],
             "scenes": [], "shots": [],
             "beats": [], "lines": lines,
-            "sfx": [], "music": [], "clips": [],
+            "music": [], "clips": [],
             "meta": {},
         },
         episode_id="ep_ss_test",

@@ -36,3 +36,29 @@ Baseline:
 - Unexpected failures: none
 - Notes: Identical edit pattern to A2 — same iterdir loop, same `_legacy_sort_key`, same multi-match warning, same docstring framing. Now the AudioGen + MusicGen cache lookups share the same minimal "canonical exists? else None" surface.
 
+## A3 — production_ledger.py `"sfx": []` schema scaffold deleted
+- Commit: (pending)
+- File: nodes/production_ledger.py — `"sfx": []` line removed from Ledger.__init__ schema initializer.
+- Pre-delete audit (both quote styles):
+    - `ledger["sfx"]` / `ledger['sfx']` -> 0 hits (no KeyError consumers)
+    - `.get("sfx" ...)` -> 2 hits in nodes/scene_sequencer.py (L950, L1319), both `.get("sfx") or []` — default-empty semantics intact. (These are B6 surfaces and will be handled separately in Phase 3.)
+- Test migration in-commit: tests/test_production_ledger.py::test_new_ledger_creates_structure dropped "sfx" from its expected-key tuple and added `assert "sfx" not in led.data` to pin the new contract.
+- Targeted test command: `pytest tests/test_production_ledger.py tests/test_otr_ledger_consumers.py tests/test_procsfx_ledger.py -q --tb=no`
+- Result: 1 failed, 82 passed
+- Unexpected failures: none. The single failure (`TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk`) is in the baseline known-fail set — pre-existing, not introduced by A3.
+- Notes: AST parse clean. `git grep -nE "['\"]sfx['\"]: \[\]" nodes/ tests/` -> 0 hits post-commit.
+
+### A3 extension — required-list validator + test-fixture scrub (in-commit)
+The initial A3 commit removed only the schema scaffold line. The post-commit zero-hit grep surfaced 17 test fixtures still constructing ledger dicts with `"sfx": [],`. Mechanically scrubbing them surfaced a deeper coupling:
+- `nodes/_otr_ledger_freeze.py::_REQUIRED_TOP_LEVEL_LISTS` still required a top-level `sfx` list.
+- `tests/test_lfc_phase_0_10_gap_audit.py::TestNullRejection` parametrized over that required-list including `sfx`.
+
+Per directive ("downstream breakage is a feature; fix the caller, not the legacy code"), A3 extended to:
+- Remove `"sfx"` from `_REQUIRED_TOP_LEVEL_LISTS`.
+- Update the freeze module docstring to drop the now-removed top-level from the schema mapping (keep `ALLOWED_SPEAKER_ROLES` intact — line.speaker_role == "sfx" is the v2 contract).
+- Remove `"sfx"` from the 3 parametrize lists in test_lfc_phase_0_10_gap_audit.py.
+- Re-run the full LFC + ledger + silent-test-episode suite: 400 passed, 1 failed (pre-existing baseline known-fail).
+
+Blast radius: 19 files (2 production + 17 tests). Below the §5 circuit-breaker bound. Architectural surface unchanged (no module boundary or class signature moves). Within scope of A3 -- the validator was the contractual mirror of the deleted schema scaffold.
+
+

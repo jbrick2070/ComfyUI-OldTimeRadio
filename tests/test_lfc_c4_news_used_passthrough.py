@@ -53,7 +53,7 @@ def _ledger_data():
             _line("l001", "c01", "character", "Hello there general."),
             _line("l002", "c02", "character", "Hi there friend."),
         ],
-        "sfx": [], "music": [], "clips": [],
+        "music": [], "clips": [],
         "meta": {
             "episode_title": "c4 test",
             "style": "mission_control_procedural",

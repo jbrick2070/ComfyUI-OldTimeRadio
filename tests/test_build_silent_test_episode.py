@@ -324,7 +324,6 @@ def _mini_source_ledger() -> dict:
             {"line_id": "l004", "char_id": "c01", "scene_id": "scene_02",
              "text": "Down the hall, behind the bulkhead, a strange light flickers softly.", },
         ],
-        "sfx": [],
         "music": [],
     }
 
@@ -547,7 +546,7 @@ def _speaker_repeat_source_ledger() -> dict:
             {"line_id": "l003", "char_id": "c01", "scene_id": "scene_lab",
              "text": "Resume now.", },                            # ALICE returns
         ],
-        "sfx": [], "music": [],
+        "music": [],
     }
 
 
@@ -603,7 +602,7 @@ def test_beat_resume_does_not_leak_across_shots(tmp_path: Path):
             {"line_id": "l002", "char_id": "c01",
              "scene_id": "scene_b", "text": "Scene two."},
         ],
-        "sfx": [], "music": [],
+        "music": [],
     }
     src_path = tmp_path / "src_ledger.json"
     src_path.write_text(json.dumps(src), encoding="utf-8")

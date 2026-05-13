@@ -53,7 +53,7 @@ def _ledger(lines):
                  "portrait_path": "ANNOUNCER.png"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {
                 "episode_title": "c3 test",
                 "style": "mission_control_procedural",

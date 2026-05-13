@@ -36,7 +36,7 @@ def _ledger(lines, cast=None):
                  "portrait_path": "ANNOUNCER_portrait.png"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {},
         },
         episode_id="ep_test_readiness",
