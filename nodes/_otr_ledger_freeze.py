@@ -601,6 +601,9 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
         _check_g7_sfx_dur_invariant(
             ledger_data, report.errors, report.warnings,
         )
+        _check_g8_line_id_uniqueness(
+            ledger_data, report.errors, report.warnings,
+        )
     return report
 
 
@@ -669,6 +672,64 @@ def _check_g7_sfx_dur_invariant(
             f"[{SFX_DUR_MIN_S}, {SFX_DUR_MAX_S}]: {', '.join(bad)} "
             f"(writer outline contract violation; AudioGen + ProcSFX "
             f"reject out-of-range cue durations)"
+        )
+
+
+# G8 line_id uniqueness. Phase 0 collect / Phase 10 raise.
+#
+# Voice-path-cleanbreak Sprint 13.2 (2026-05-12): added per IMP-8
+# from the S6-S8 round-robin. ProcSFX's filename scheme
+# (proc_<sfx_type>_<line_id>_<perm>.wav) and every ledger write-back
+# path that stamps by line_id assume uniqueness. Without G8 enforcing
+# it, two lines with the same line_id silently overwrite each other
+# both on disk and in the ledger.
+
+
+def _check_g8_line_id_uniqueness(
+    ledger_data: dict,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """G8: line_id uniqueness across ledger.lines[].
+
+    The ProcSFX filename scheme and every ledger write-back path
+    (ledger.apply_line_timings, ledger.patch_line_fields, etc.) key
+    by line_id. Duplicates produce silent overwrites in BOTH places:
+    on disk the second render replaces the first wav, in the ledger
+    the second patch_line_fields call clobbers the first row's
+    stamps. The user notices when an episode renders with the wrong
+    audio in a slot -- too late to abort cleanly.
+
+    Skips lines without line_id (already caught by per-line type
+    invariants; no need to double-report). Empty list / non-list
+    `lines` value handled defensively.
+    """
+    lines = ledger_data.get("lines")
+    if not isinstance(lines, list):
+        return
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        lid = line.get("line_id")
+        if not lid or not isinstance(lid, str):
+            continue
+        if lid in seen:
+            duplicates.append(lid)
+        else:
+            seen.add(lid)
+    if duplicates:
+        # Cap the displayed list at 5 to keep the diagnostic short.
+        # The full count gives the operator a sense of severity.
+        sample = duplicates[:5]
+        more = "" if len(duplicates) <= 5 else f" (+{len(duplicates) - 5} more)"
+        errors.append(
+            f"G8: {len(duplicates)} duplicate line_id(s) across "
+            f"ledger.lines[]: {', '.join(sample)}{more}. "
+            f"ProcSFX filenames and ledger write-back paths key by "
+            f"line_id; duplicates produce silent overwrites in BOTH "
+            f"places. The writer must emit unique line_ids."
         )
 
 
