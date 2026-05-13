@@ -260,6 +260,33 @@ class _LLMTimeout(Exception):
     pass
 
 
+class _LLMTimeoutWorkflowPause(_LLMTimeout):
+    """S22.1 (IMP-26): raised when an LLM timeout occurs AND the next
+    workflow stage cannot safely run with an orphan worker still on
+    GPU. ComfyUI catches this at the node boundary and halts the
+    queue cleanly.
+
+    Subclasses ``_LLMTimeout`` so existing handlers that catch the
+    base class still match -- they just see a more specific subtype
+    now. New downstream consumers can branch on this class for
+    graceful UI handling (e.g., a "rerun" prompt).
+
+    The _LLM_CACHE invalidation in ``_run_with_timeout`` handles the
+    LLM -> LLM case (next LLM phase forces a fresh load from disk).
+    Raising this class handles the LLM -> visual case where the
+    next stage is FLUX/LTX/HuMo and would race the orphan's still-
+    running CUDA kernels. The only safe move is to halt the workflow
+    so the orphan finishes naturally without anything else trying
+    to touch the GPU.
+
+    Assumption: ComfyUI's node-execution layer surfaces uncaught
+    exceptions as queue halts. Stable since the 2025 unified-
+    execution refactor; if a future ComfyUI version swallows the
+    exception, this assumption needs revisiting.
+    """
+    pass
+
+
 import threading
 _TIMEOUT_CTX = threading.local()
 
@@ -339,7 +366,19 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
                     _recovery_exc,
                 )
 
-            raise _LLMTimeout(f"{phase_label} exceeded {timeout_sec}s")
+            # S22.1 (IMP-26): raise the workflow-pause subclass so
+            # ComfyUI halts the queue before the next stage races
+            # the orphan worker's still-running CUDA kernels. The
+            # cache invalidation above handles LLM -> LLM; this
+            # raise handles LLM -> visual (FLUX / LTX / HuMo).
+            raise _LLMTimeoutWorkflowPause(
+                f"{phase_label} exceeded {timeout_sec}s; orphan "
+                f"worker still on GPU. Halting workflow to prevent "
+                f"the next visual stage from racing the orphan's "
+                f"CUDA kernels. Re-run the workflow; the cache "
+                f"invalidation above guarantees the next attempt "
+                f"loads fresh."
+            )
     finally:
         # Don't wait for the orphaned worker - let it drain in the background.
         # Combined with the cache invalidation above, the orphan completes
