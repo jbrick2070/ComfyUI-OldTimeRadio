@@ -2,7 +2,7 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-207 (2026-05-13)
+**Last entry:** BUG-LOCAL-210 (2026-05-13)
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
 
 ---
@@ -132,6 +132,24 @@ sprints, regardless of fix-status.
 - **Tags:** legacy-fallback, directive-11, audit-found, orphan-helper, voice-path-cleanbreak
 - **Bible candidate rationale:** General lesson -- a "graceful fallback" surface introduced for a now-deleted upstream consumer is dead weight that lulls future contributors into thinking the upstream is still alive. Audit fallbacks tied to deleted upstreams in the same commit that deletes the upstream; or run a periodic "no production callers" sweep on helpers whose docstring mentions a known-deleted class.
 
+### BUG-LOCAL-210: AudioGen widget vector carried a stale `{}` shifting every subsequent slot [FIXED f7a5ca0 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** S24 C3 dependency audit found `OTR_BatchAudioGenGenerator.widgets_values` in the production workflow JSON was `['[]', '{}', '', 'facebook/audiogen-medium', 3.0, 3.0]` -- 6 values. INPUT_TYPES declared 6 slots in order `[script_json, episode_seed, model_id, guidance_scale, default_duration, allow_silence_fallback]`. The `{}` at position 1 was the default value of the legacy `production_plan_json` REQUIRED input that voice-path-cleanbreak P2 deleted; the widget value survived the input deletion. Net effect: positions 2-5 all map to the wrong INPUT_TYPES slot. ComfyUI's permissive type coercion masked the misalignment in soak (the runtime didn't crash) but the values getting bound to `episode_seed` (got '{}'), `model_id` (got ''), and `guidance_scale` (got the model_id string) were nonsense.
+- **Cause:** When P2 deleted `production_plan_json` from INPUT_TYPES.required, the widget vector in the workflow JSON wasn't trimmed in lockstep. ComfyUI doesn't validate widget-vector length against INPUT_TYPES on load; it accepts any length and silently positionally maps what's there.
+- **Fix:** C3 -- widget vector realigned to `['[]', '', 'facebook/audiogen-medium', 3.0, 3.0, False]` with the stale `{}` removed and `allow_silence_fallback=False` appended. C6 added a parametrized test (`test_no_stale_dict_residue_in_widget_vector`) that reflects each class's INPUT_TYPES against the workflow JSON and asserts shape match. Future drift fires here.
+- **Verify:** `pytest tests/test_workflow_audio_widget_vectors.py::test_no_stale_dict_residue_in_widget_vector -v`. The runtime values that flow through the graph are now correct.
+- **Tags:** widget-vector, position-pinned, cleanbreak-debris, audiogen, voice-path-cleanbreak
+- **Bible candidate rationale:** General lesson -- when a cleanbreak deletes a REQUIRED INPUT_TYPES entry, the workflow JSON's widgets_values vector MUST be trimmed in the same commit. ComfyUI's permissive load means the misalignment ships silently. Future plans should add a step to the cleanbreak playbook: "delete input X" -> "shrink every saved-workflow widget vector by 1 at X's index". This batch's C6 widget-vector test catches the next instance.
+
+### BUG-LOCAL-209: AudioGen `_save_wav` returned None on both success and failure paths [FIXED 2002958 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** C2 audit of nodes/batch_audiogen_generator.py:200 found `_save_wav` declared `-> None`. The success path fell off after `os.replace(tmp, path)`; the except path fell off after the warning log. Both returned `None`. The writeback block at L688-720 unconditionally stamped `sfx_wav_path = item["cache_path"]` whenever `cache_path` was truthy, with no proof the file actually existed on disk. Net: the ledger could carry a sfx_wav_path pointing at a path that was never written.
+- **Cause:** Implicit-None on a function whose return value WAS being consumed. The writeback path didn't check the return; it checked the cache_path string variable, which was set regardless of save outcome.
+- **Fix:** C2 -- _save_wav signature changed to `-> bool` with explicit `return True` after os.replace and `return False` from the except branch. The render-path now captures `save_ok = _save_wav(...)` and stores it in `item["_save_ok"]`. The writeback gates `sfx_wav_path` stamping on `(save_ok or had_cache_hit) AND os.path.isfile(cache_path)`. Failure paths stamp `sfx_wav_path=""` per §6.16. 3 source-level pins in tests/test_audiogen_writeback_hardening.py.
+- **Verify:** `pytest tests/test_audiogen_writeback_hardening.py::test_save_wav_returns_bool tests/test_audiogen_writeback_hardening.py::test_writeback_gates_sfx_wav_path_on_save_proof -v`.
+- **Tags:** silent-failure, return-value, save-proof, sfx_wav_path, audiogen
+- **Bible candidate rationale:** General lesson -- when a function's return value is consumed by a contract (in this case, "did the write succeed?"), the function must return an explicit bool, not implicit None. Implicit-None on a function whose callers branch on the return is silent-failure scaffolding. Audit `-> None` declarations on functions whose callers check truthiness.
+
 ### BUG-LOCAL-208: `visual/bridge.py` carried a live `production_plan_json` socket [FIXED b443f46 2026-05-13]
 - **Date:** 2026-05-13 | **Phase:** 6 | **Bible candidate:** yes
 - **Symptom:** S15.5.1 audit surfaced `visual/bridge.py:270` -- the OTR_VisualBridge node declared `production_plan_json` as an optional `STRING` input in INPUT_TYPES, the execute() signature accepted it as `production_plan_json: str = "{}"`, and the body wrote the value to `<job_dir>/production_plan.json` via `atomic_write_text`. Grep across the sidecar / visual worker confirmed NO downstream consumer read the file -- the bridge wrote it for an audience that no longer existed.
@@ -164,6 +182,8 @@ and the fix is verified:
 - BUG-LOCAL-205 (`\b` after non-word char at end-of-string is a no-op; audit similar regex shapes)
 - BUG-LOCAL-207 (graceful-fallback helpers tied to deleted upstreams are dead weight; audit at deletion time)
 - BUG-LOCAL-208 (subsystem-scoped deletion waves leave debris in sidecar-isolated subsystems; run a repo-wide audit at the END of every cleanbreak)
+- BUG-LOCAL-209 (functions whose return is consumed must declare an explicit bool, not implicit None; audit `-> None` on save/write helpers)
+- BUG-LOCAL-210 (cleanbreak deleting a REQUIRED INPUT_TYPES entry MUST trim every saved-workflow widget vector at the same index in lockstep)
 
 Per memory note ("Keep ROADMAP + BUG_LOG live; Bible promotion
 waits until v2.0 ships"), batch-promote after v2.0 lands.

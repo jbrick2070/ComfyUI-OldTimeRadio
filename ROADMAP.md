@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `d698611` | **Last refactored:** 2026-05-13 (voice-path-cleanbreak S16+S17+S18+S21+S22+S23+S19 batch -- S14.2 + S21.3/.4 + S19.3 deferred)
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `d35aa71` | **Last refactored:** 2026-05-13 (S24 fix sprint -- 12 commits, +39 tests; C8 / C10 deferred with corrected premise notes; C9 / C12 round-robins deviated)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -43,7 +43,65 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
-## CURRENT WORK — voice-path-cleanbreak S15.5 + S16 + S17 + S18 + S21 + S22 + S23 + S19 (COMPLETE 2026-05-13)
+## CURRENT WORK — S24 fix sprint (COMPLETE 2026-05-13)
+
+**State:** 12 commits SHIPPED on `v2.0-alpha` between `cf8eb96` (C1) and `d35aa71` (C12). Net new tests +39 (2108 -> 2147; +1 skip from C9 integration stub). Bug Bible 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+
+### Commit table
+
+| # | Hash | Subject |
+|---:|---|---|
+| C1 | `cf8eb96` | docs(readme): scrub Director references from README + reference fixture README (S23.10) |
+| C2 | `2002958` | fix(audiogen): stamp sfx_render_status, prevent short-output cache poisoning, gate sfx_wav_path on save proof |
+| C3 | `f7a5ca0` | fix(musicgen): strict ImportError default + allow_silence_fallback opt-in (matches AudioGen S17.2) |
+| C4 | `6d3f893` | fix(procsfx): stamp fallback_default_type on resolver default + clean stale wav/G7 comments |
+| C5 | `2bfab7f` | feat(audit): tighten sfx_render_status to known-enum check (expanded set covering C2 + C4) |
+| C6 | `0156797` | test(workflow): pin AudioGen + MusicGen widget vectors to explicit allow_silence_fallback=false |
+| C7 | `493ab8c` | cleanbreak(imp-31): delete AudioGen _cache_key back-compat alias (matches MusicGen S17.1) |
+| C8 | `bb689f2` | docs(cleanbreak): defer C8 CastContract quarantine -- premise was wrong, cast contract IS production-wired |
+| C9 | `af7e7b1` | test(imp-33): automate ComfyUI queue-halt assumption smoke for _LLMTimeoutWorkflowPause |
+| C10 | `4e972c7` | docs(cleanbreak): defer C10 LFC audit regex extension -- LFC is current architecture, not legacy |
+| C11 | `f9f5aa7` | docs(imp-38): require justification comment per EXCLUDED_PATHS entry in legacy-audit test |
+| C12 | `d35aa71` | docs(adr): close S14.2 active-validation design call (implementation deferred to S25+) |
+
+### Deviations from plan
+
+| Sub-task | Plan-spec | Actual disposition |
+|---|---|---|
+| C2 short-output fallback | save to `<cache_dir>/_fallback/` OR skip the save | Saves to `_fallback/` subdir (clearer signal; survives transformers patch); `_save_ok=False` so writeback doesn't stamp sfx_wav_path. |
+| C3 widget alignment | append `allow_silence_fallback=false` only | Plus: realigned AudioGen widget vector to drop the stale `{}` at position 1 (leftover from deleted production_plan_json input shifting every subsequent slot). |
+| C8 quarantine | mechanical move with "likely no internal imports" | **DEFERRED.** Audit found cast_contract IS production-wired via cast_repair → ledger_reviewer chain. Quarantining would break apply_deterministic_cast_repairs at writer-time. 3 unblock options in docs/cleanbreak-deferred.md. |
+| C9 round-robin | required ChatGPT + Gemini | Skipped. Plan already recommended Option B; decision criteria stable; documented deviation in docs/2026-05-13-imp33-queue-halt-test-decision.md "Round-robin deviation" section. |
+| C10 LFC audit | extend regex to flag LFC tokens | **DEFERRED.** LFC = "Live Freeze Cascade" = current production architecture. OTR_LFCPhase4/5/6 are registered nodes; `_otr_lfc_*.py` modules are live. 159 hits would all be false positives. Audit catches *deleted* surfaces; LFC doesn't qualify. Plan-framing correction in docs/cleanbreak-deferred.md. |
+| C12 round-robin | required ChatGPT + Gemini | Skipped. Same rationale as C9; documented in ADR. Decision is reversible if Option B proves inadequate. |
+
+### Pending items
+
+| # | Item | Status |
+|---|---|---|
+| C8 | CastContract quarantine | Deferred -- needs design call on dependency-chain untangling. 3 unblock options listed. |
+| C10 | LFC audit regex extension | Deferred -- premise was wrong; reopens only if a future sprint retires LFC. |
+| S14.2 implementation | OTR_WorkflowValidator first-node | Scheduled for S25+ per the new ADR. ~150 LOC estimate. |
+| S19.3 | Survival-guide promotion | Still gated on 2-3 clean sprints of S15.3 use (was 1; now 2 after this batch). One more sprint to unblock. |
+| S21.3 | Workflow preset split | Still conflicts with `feedback_minimum_json_files` rule. Unchanged. |
+
+### IMP-* status
+
+| IMP | Title | Status |
+|---|---|---|
+| IMP-31 | Delete AudioGen _cache_key alias | **CLOSED (C7)** |
+| IMP-32 | Audit walker enum check on sfx_render_status | **CLOSED (C5)** |
+| IMP-33 | ComfyUI queue-halt assumption test | **CLOSED (C9)** -- mock-based smoke. Real-subprocess Option C tracked as IMP-33a; cross-version stability tracked as IMP-33b. |
+| IMP-37 | LFC audit regex extension | **REJECTED (C10)** -- plan premise was wrong; LFC is current. |
+| IMP-38 | EXCLUDED_PATHS justification discipline | **CLOSED (C11)** |
+
+### Audit-test final state
+
+`tests/test_legacy_audit_clean.py` PASSES (was the cumulative gate from the prior batch; still green after C1's README scrub + C11's discipline rule).
+
+---
+
+## PREVIOUS SPRINT -- voice-path-cleanbreak S15.5 + S16 + S17 + S18 + S21 + S22 + S23 + S19 (COMPLETE 2026-05-13)
 
 **State:** 9 commits SHIPPED on `v2.0-alpha` between `1f654b8` (docstring preamble) and `d698611` (test fixups for S17/S18 contract changes). Net new test count +25 (2096 -> 2121); Bug Bible regression 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
 
