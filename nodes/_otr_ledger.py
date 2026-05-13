@@ -21,10 +21,11 @@ failure abort their main work.
 
 Schema version
 --------------
-Current canonical: ``l3-2026-04-28`` (post-BUG-100/101/102 diagnostic
-expansion). Previous: ``l2-2026-04-25``. The version string is
-written to ``ledger["schema_version"]`` AND ``ledger["meta"]["schema_version"]``.
-Consumers should accept either location for back-compat with l2 ledgers.
+Current canonical: see ``CURRENT_SCHEMA_VERSION`` below. The version
+string is written to both ``ledger["schema_version"]`` and
+``ledger["meta"]["schema_version"]`` -- mirrored locations on every
+write. Readers may use either; the freeze validator pins the top-level
+value.
 """
 from __future__ import annotations
 
@@ -59,9 +60,9 @@ Lineage:
   l3-2026-05-02 -- ADDITIVE: meta.paths block resolved at write time so
                    downstream nodes can look up canonical episode dirs
                    without reconstructing them from episode_id (Phase E,
-                   BUG-LOCAL-018). All readers must continue to use
-                   meta.get(...) with default-None to stay back-compat
-                   with l3-2026-04-28 ledgers.
+                   BUG-LOCAL-018). Readers should still use
+                   ``meta.get("paths")`` so missing-block cases degrade
+                   to None rather than KeyError.
   l3-2026-05-08 -- ADDITIVE: BUG-126 telemetry + Cast Contract pre-wiring
                    per round-robin synthesis (ChatGPT gpt-5.5 +
                    Gemini gemini-3.1-pro-preview-customtools, transcripts
@@ -162,9 +163,9 @@ def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
     downstream nodes look up canonical paths via
     ``ledger["meta"]["paths"]["audio_dir"]`` instead of reconstructing
     them from episode_id (which would re-introduce the slug-mismatch
-    risk Phase C closed). All readers must use ``.get(...)`` with
-    default-None for back-compat with older ledgers that lack this
-    block.
+    risk Phase C closed). Readers should use ``.get(...)`` with
+    default-None so a missing block degrades to None rather than
+    KeyError.
     """
     ledger_path = Path(ledger_path).resolve()
     audio_dir = ledger_path.parent
@@ -903,7 +904,8 @@ def stamp_meta_audit_verdict(
 
 def stamp_cast_contract_version(ledger: dict, version: Optional[str]) -> None:
     """Stamp top-level ``cast_contract_version``. Pass ``None`` to
-    keep the field absent (back-compat with l3-2026-05-02 readers).
+    keep the field absent (e.g. when the cast contract has not been
+    locked yet for this episode).
     """
     try:
         if version is None:

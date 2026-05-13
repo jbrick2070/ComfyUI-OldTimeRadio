@@ -84,4 +84,60 @@ Blast radius: 19 files (2 production + 17 tests). Below the §5 circuit-breaker 
 - Unexpected failures: none
 - Notes: ComfyUI Desktop re-save deferred to §11 post-cleanbreak per plan; only ComfyUI's own save path normalizes the full widget vector against the current INPUT_TYPES contract. JSON is structurally valid (json.loads passes).
 
+---
+
+## Phase 2 — Section B audits
+
+## B1 — `_otr_ledger.py` L2 fallback narrative
+- Audit (`git grep -nE "schema_version.*['\"]l2-|['\"]l2-" nodes/ tests/`):
+    - Producers (l2 schema writes): 0
+    - Consumers (l2 fallback branches): 0
+    - Tests pinning l2 shape: 0
+    - Workflow fixture references: 0
+- The 4 named lines (L27, L63, L166, L906) carry **docstring** back-compat narrative — no live fallback code. Per cleanbreak directive the l2 framing is dead documentation; rewrite to drop the "back-compat with l2 / older ledgers" language while keeping the defensive `.get(...)` guidance (which is just good defensive coding, not a tolerance shim).
+- Action: **DELETE the back-compat narrative in-commit** (under B1 commit message).
+
+## B3 — `production_ledger.py::set_cast` input shims
+- Audit (`git grep -n "\.set_cast(" nodes/ tests/` + L167/582/597):
+    - 3 production callers (OTR_LedgerScriptWriter:1636, story_orchestrator:3377, peek_ledger/get_ledger; all supply the new schema)
+    - 3 test fixtures pass legacy `description` key (test_batch_humo_render:330, test_render_flux_batch:41/43)
+    - `_derive_tts_model_from_voice_preset` helper called only once (by set_cast itself)
+- Audit verdict: producers non-zero (3 test fixtures). Migration scope is small (rename `description` -> `character_description` in 2 test files; tts_model derivation has no real callers).
+- Action: **DELETE both shims in Phase 3 + migrate the 3 test inputs in the same commit**.
+
+## B4 — `_otr_line_composer.py` defensive fallbacks
+- Audit (`git grep -nE "back-compat" nodes/_otr_line_composer.py`):
+    - L468 — `allowed_*` defaults to empty frozenset for back-compat
+    - L856 — `allowed_people OR allowed_things` non-empty branch keeps a back-compat caller path
+    - L1215 — `generate_fn` fallback for "existing call sites"
+    - L1492 — back-compat call site that "doesn't yet build a..."
+- All 4 sites carry behavioral back-compat (not just docstring text). Tracing the real producer set requires inspecting every call site of the composer entry points + the build-prompt helpers — meaningful blast radius if migrated.
+- Audit verdict: producers non-zero (likely many; not all enumerated in this static pass).
+- Action: **DEFERRED to dedicated migration sprint**. Surface stays as-is; no gate added. Named follow-up: "B4 line-composer back-compat sweep".
+
+## B5 — `_otr_ledger_freeze.py` outline-beats / speaker_role / dur_s shims
+- Audit (`git grep -nE "back-compat" nodes/_otr_ledger_freeze.py`):
+    - L275/279 — `meta.outline.beats` fallback for "caller-shaped" data
+    - L356 — `skip=True` warning legitimized by "some legacy fallbacks"
+    - L478/482 — speaker_role substitute "was a back-compat shim"
+    - L665/669 — `dur_s` absent/None tolerance for "older ledgers"
+- Per plan §4: B5 requires manual data-flow trace through getattr / **kwargs / variable-keyed lookups; grep alone is the starting list, not the conclusion.
+- Action: **DEFERRED to dedicated migration sprint**. Audit not complete enough for safe deletion; would risk silent behavior change on the freeze cascade hot path. Named follow-up: "B5 freeze-cascade tolerance trace + tighten".
+
+## B6 — Misc 1-3 line surfaces
+Per-site audit (`git grep -nE "back-compat|legacy fallback" <file>`):
+- `nodes/OTR_LedgerScriptWriter.py:776` (seed_text back-compat) — production-facing helper text; defer.
+- `nodes/OTR_LedgerScriptWriter.py:1951` (no-style-picked back-compat) — defer (sentinel handling per current style picker design).
+- `nodes/batch_humo_render.py:889` (legacy flat-dir patterns) — kept for transitional file layouts; defer.
+- `nodes/batch_humo_render.py:1795` (legacy idx * clip_length fallback) — defer; defensive last-resort numeric.
+- `nodes/batch_humo_render.py:2928` (direct stem match legacy) — defer (paired with the L889 layout fallback).
+- `nodes/otr_video_plan.py:645` (`shot_id` alias) — small surface; **DELETE in Phase 3 if producers audit clean**.
+- `nodes/story_orchestrator.py:483` (alias back-compat for callers without alias tracking) — defer; orchestrator hot path.
+- `nodes/story_orchestrator.py:3814` (`skip=True` legacy small-model collapse) — defer; collapse-guard interaction with cascade.
+- `nodes/scene_sequencer.py:939, 958` (sfx[]-array consumer notes) — DELETE in Phase 3 (paired with A3; the .get("sfx") or [] is the now-dead surface).
+- `nodes/video_engine.py:664` (voice_assignments-only cast fallback) — defer; ledger-vs-bag interplay.
+- `nodes/video_composite.py:2183` (`audio_source` back-compat alias) — defer.
+- `nodes/_otr_paths.py:204, 338` (back-compat search root + function-name keepalive) — DELETE in Phase 3 if both shown-zero producers.
+- `nodes/post_audio_video_pipeline.py:124` (flat layout for retired node) — plan §4 confirms the node is RETIRED per `__init__.py:176`. **DELETE unconditionally in Phase 3**.
+
 
