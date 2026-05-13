@@ -160,11 +160,47 @@ def production_plan_or_empty(plan_json: str) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def voice_assignments_from_cast(led: dict) -> dict:
+    """Voice-path-cleanbreak Sprint 6.2 (2026-05-12). Render-time
+    derivation of the legacy ``voice_assignments`` shape from the
+    canonical ``led["cast"]``.
+
+    Replaces ``meta.voice_assignments`` which Sprint 2 stamped at
+    writer-time and Sprint 6 retired. The cast contract is the only
+    source of truth for per-character voice data; persisting a
+    derived view in ``meta`` invited drift between cast.voice_preset
+    and meta.voice_assignments[name].voice_preset.
+
+    Shape:
+        {
+          "<name>": { "voice_preset": "<v2/...>" },
+          ...   # ANNOUNCER excluded -- Kokoro namespace, not Bark
+        }
+
+    The ``notes`` field is intentionally absent. Sprint 2 mirrored
+    character_description into both ``portrait_prompt`` (visual_plan)
+    and ``notes`` (voice_assignments); Sprint 6 retired ``notes`` --
+    ``portrait_prompt`` is the canonical character description.
+    """
+    out: dict = {}
+    for c in led.get("cast") or []:
+        if not isinstance(c, dict):
+            continue
+        name = c.get("name")
+        if not name or name == "ANNOUNCER":
+            continue
+        out[name] = {
+            "voice_preset": c.get("voice_preset") or "",
+        }
+    return out
+
+
 __all__ = [
     "load_ledger",
     "iter_lines",
     "cast_lookup",
     "speaker_name",
     "voice_preset",
+    "voice_assignments_from_cast",
     "production_plan_or_empty",
 ]

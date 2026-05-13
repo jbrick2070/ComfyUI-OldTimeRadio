@@ -233,6 +233,45 @@ _STYLE_PICKER_SEED_POOL: tuple[str, ...] = (
 )
 
 
+# Voice-path-cleanbreak Sprint 6.1 (2026-05-12). Genre table for the
+# meta.visual_plan.genre stamp. Replaces the hardcoded "audio drama"
+# fallback Sprint 2 used. The genre string surfaces in:
+#   - SignalLostVideo HUD overlay
+#   - FLUX scene-prompt composition (style_tail + genre)
+#   - episode metadata (treatment txt, video info card)
+#
+# Drift guard: tests/test_musicgen_style_palette.py asserts every
+# entry in _STYLE_PICKER_SEED_POOL has an explicit row in this table
+# (mechanical fallback below is a safety net, not the contract).
+_GENRE_BY_STYLE: dict[str, str] = {
+    "closed_room_suspense":       "thriller audio drama",
+    "detective_case_file":        "detective audio drama",
+    "pulp_serial_cliffhanger":    "pulp serial audio drama",
+    "mission_control_procedural": "procedural audio drama",
+    "deep_space_distress_call":   "sci-fi audio drama",
+    "noir_interrogation":         "noir audio drama",
+    "small_town_uncanny":         "uncanny audio drama",
+    "radio_newsroom_emergency":   "newsroom audio drama",
+    "haunted_broadcast_signal":   "horror audio drama",
+    "laboratory_containment":     "containment audio drama",
+}
+
+
+def _resolve_genre(style: str) -> str:
+    """Resolve a style slug to a HUD/FLUX-friendly genre string.
+
+    Standing directive (no silent fallbacks): unknown style slugs use
+    a mechanical "<words> audio drama" fallback that's loud (visibly
+    non-curated, suggests the slug needs an explicit table entry) but
+    never empty. Drift guard in tests/test_musicgen_style_palette.py
+    catches any new _STYLE_PICKER_SEED_POOL entry that's missing here.
+    """
+    if style in _GENRE_BY_STYLE:
+        return _GENRE_BY_STYLE[style]
+    words = (style or "").replace("_", " ").strip()
+    return f"{words} audio drama" if words else "audio drama"
+
+
 # ---------------------------------------------------------------------------
 # Title regeneration (post-composition, news-seed-free per Jeffrey 2026-05-10)
 # ---------------------------------------------------------------------------
@@ -2285,14 +2324,23 @@ class OTR_LedgerScriptWriter:
         if resolved["perfect_run_spacesaver"]:
             meta["perfect_run_spacesaver"] = True
 
-        # K.5 -- voice-path-cleanbreak Sprint 2 (2026-05-12).
-        # Stamp the visual_plan + voice_assignments + style fields that
-        # OTR_VideoPlan and OTR_SignalLostVideo previously read from
-        # OTR_LLMDirector.production_plan_json. Director retirement
-        # depends on these living on meta. The visual_plan shape mirrors
-        # what the legacy Director emitted (characters dict keyed by
-        # name, scenes list, style + genre strings) so downstream code
-        # paths in otr_video_plan.py / video_engine.py work unchanged.
+        # K.5 -- voice-path-cleanbreak Sprint 2 + Sprint 6 (2026-05-12).
+        # Stamp the visual_plan + style fields that OTR_VideoPlan and
+        # OTR_SignalLostVideo previously read from
+        # OTR_LLMDirector.production_plan_json.
+        #
+        # Sprint 6 changes vs Sprint 2:
+        #   - genre: was hardcoded "audio drama"; now resolved from style
+        #     via _GENRE_BY_STYLE (S6.1). Style-specific genre strings
+        #     surface in the SignalLostVideo HUD and FLUX prompts.
+        #   - voice_assignments: was persisted to meta; now derived at
+        #     render time from led["cast"] via
+        #     _otr_ledger_consumers.voice_assignments_from_cast (S6.2).
+        #     Cast is the canonical source; persisting a derived view
+        #     invited drift.
+        #   - notes: was mirrored from character_description into both
+        #     portrait_prompt and notes; now portrait_prompt is the only
+        #     character description surface (S6.2).
         #
         # portrait_prompt is the cast row's character_description. The
         # downstream FLUX composer (compose_shot_prompt) appends era_tail
@@ -2306,7 +2354,6 @@ class OTR_LedgerScriptWriter:
         # caller drives the per-shot composition off beats instead).
         _cast_rows = led.data.get("cast") or []
         _visual_chars = {}
-        _voice_assignments = {}
         for _row in _cast_rows:
             if not isinstance(_row, dict):
                 continue
@@ -2317,17 +2364,12 @@ class OTR_LedgerScriptWriter:
             _visual_chars[_name] = {
                 "portrait_prompt": _desc,
             }
-            _voice_assignments[_name] = {
-                "voice_preset": _row.get("voice_preset") or "",
-                "notes":        _desc,
-            }
         meta["visual_plan"] = {
             "characters": _visual_chars,
             "scenes":     [],
             "style":      resolved["style"],
-            "genre":      "audio drama",
+            "genre":      _resolve_genre(resolved["style"]),
         }
-        meta["voice_assignments"] = _voice_assignments
         meta["style"] = resolved["style"]
 
         # --- L. Assemble return values --------------------------------

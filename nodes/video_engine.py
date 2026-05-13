@@ -596,28 +596,35 @@ def _get_latest_telemetry():
         
     return peak_gb, speed, model
 
-def _parse_hud_data(episode_title, led, plan, news_used, duration_s, W, H):
+def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
+                    news_used, duration_s, W, H):
     """Return a clean data dict for *_TelemetryHUDRenderer*.
 
     v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
-    dict) and ``plan`` (production plan dict, possibly empty). Single
-    parse at top of render_video; no re-parsing here.
+    dict). Single parse at top of render_video; no re-parsing here.
+
+    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
+    from `plan` (director-shaped intermediate dict) to explicit
+    `voice_assignments` + `style` + `genre` parameters. Caller derives
+    voice_assignments from led["cast"] via
+    _otr_ledger_consumers.voice_assignments_from_cast.
 
     Behavior change vs legacy: scene_break / environment / pause
     item-types don't exist in the v2 ledger schema, so the multi-scene
     structure collapses to a single pseudo-scene containing all
     dialogue + sfx items from led.lines in ledger order. Cast is
-    enriched from led.cast (which has name + voice_preset per entry)
-    so the HUD shows the cast even when production_plan is empty.
+    enriched from led.cast (which has name + voice_preset per entry).
     """
     import time as _t
 
     led = led if isinstance(led, dict) else {}
-    plan = plan if isinstance(plan, dict) else {}
+    voice_assignments = voice_assignments if isinstance(voice_assignments, dict) else {}
 
-    # Voice assignments from production plan (legacy Director output)
+    # Voice assignments are now derived from cast at the call site.
+    # The dict is shaped {"<name>": {"voice_preset": "..."}} (Sprint 6.2
+    # helper output); flatten to {"<name>": "<preset>"} for HUD use.
     voices = {}
-    for k, v in (plan.get("voice_assignments", {}) or {}).items():
+    for k, v in voice_assignments.items():
         if isinstance(v, dict):
             voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", ""))))
         else:
@@ -696,9 +703,12 @@ def _parse_hud_data(episode_title, led, plan, news_used, duration_s, W, H):
 
     return {
         "title":      episode_title,
-        # Master style key. Backward-compat reads of legacy "genre" keys
-        # in old saved plans still resolve via the inner .get() fallback.
-        "style":      plan.get("style", plan.get("genre", "sci-fi")),
+        # Master style key. Sprint 6.3 (2026-05-12): explicit `style`
+        # parameter from the caller; the legacy `plan.get("genre")`
+        # fallback chain is gone (genre is now its own parameter, used
+        # downstream where the HUD wants a human-readable genre string
+        # rather than a slug).
+        "style":      style or genre or "sci-fi",
         "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
         "duration_s": duration_s,
         "resolution": f"{W}x{H}",
@@ -1003,21 +1013,27 @@ _PRESET_DESC = {
 }
 
 
-def _write_story_treatment(out_path, episode_title, led, plan, news_used,
+def _write_story_treatment(out_path, episode_title, led,
+                            voice_assignments, style, genre,
+                            news_used,
                             duration, W, H, fps, size_mb):
     """Save a complete episode treatment alongside the MP4.
 
     v2 ledger consumer (2026-05-09): takes parsed ``led`` (v2 ledger
-    dict) and ``plan`` (production plan dict, possibly empty). Single
-    parse at top of render_video.
+    dict). Single parse at top of render_video.
+
+    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
+    from `plan` (director-shaped intermediate dict) to explicit
+    `voice_assignments` + `style` + `genre` parameters. Caller derives
+    voice_assignments from led["cast"] via
+    _otr_ledger_consumers.voice_assignments_from_cast.
 
     Behavior change vs legacy: scene_break / environment / pause
     item-types don't exist in the v2 ledger schema. The treatment
     output loses scene-arc summary, scene headers, and environment
     descriptions in the FULL SCRIPT section. Replaces with a flat
     list of dialogue + sfx in ledger order. Cast block is enriched
-    from led.cast (which carries name + voice_preset per entry) so
-    voice info appears even when production_plan is empty.
+    from led.cast (which carries name + voice_preset per entry).
     """
     try:
         import time as _t
@@ -1025,21 +1041,22 @@ def _write_story_treatment(out_path, episode_title, led, plan, news_used,
         from . import _otr_ledger_consumers as _OTRLC
 
         led = led if isinstance(led, dict) else {}
-        plan = plan if isinstance(plan, dict) else {}
+        voice_assignments = voice_assignments if isinstance(voice_assignments, dict) else {}
 
-        # Normalize voice_assignments: values may be dicts like {"voice_preset": "v2/en_speaker_0", ...}
-        voices_raw = plan.get("voice_assignments", {})
+        # Sprint 6.3: voice_assignments arrives pre-derived from cast
+        # (Sprint 6.2 helper output). Flatten {"name": {"voice_preset": "..."}}
+        # to {"name": "preset"} for treatment-text use.
         voices = {}
-        if isinstance(voices_raw, dict):
-            for k, v in voices_raw.items():
-                if isinstance(v, dict):
-                    voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", str(v)))))
-                else:
-                    voices[str(k)] = str(v)
+        for k, v in voice_assignments.items():
+            if isinstance(v, dict):
+                voices[str(k)] = str(v.get("voice_preset", v.get("preset", v.get("voice", str(v)))))
+            else:
+                voices[str(k)] = str(v)
 
-        # Also build a cast-name -> preset lookup from led.cast so we
-        # can surface voice info on dialogue lines even when the
-        # production_plan voice_assignments dict is empty.
+        # Also build a cast-name -> preset lookup from led.cast directly --
+        # equivalent to voice_assignments_from_cast but kept here as a
+        # belt-and-braces fallback for ledgers where the helper produced
+        # an empty dict (e.g. all rows are ANNOUNCER-skipped).
         led_cast_lookup: dict[str, str] = {}
         for entry in (led.get("cast") or []):
             if not isinstance(entry, dict):
@@ -1052,7 +1069,10 @@ def _write_story_treatment(out_path, episode_title, led, plan, news_used,
         def _preset_for(char_name: str) -> str:
             return voices.get(char_name) or led_cast_lookup.get(char_name, "")
 
-        style  = plan.get("style", plan.get("genre", "sci-fi radio drama"))
+        # Sprint 6.3: explicit `style` + `genre` parameters; no plan.get
+        # chain. Treatment text uses style first, falls back to genre,
+        # then to a generic descriptor.
+        style = style or genre or "audio drama"
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64
@@ -1258,22 +1278,21 @@ class SignalLostVideoRenderer:
         # legacy-list at this point is upstream-wiring failure, not a
         # silent-degrade case.
         #
-        # Voice-path-cleanbreak Sprint 2: production_plan_json socket
-        # deleted. style + voice_assignments now live on meta. Build the
-        # legacy-shape `plan` dict from ledger meta so the downstream
-        # plan.get("voice_assignments") / plan.get("style") sites stay
-        # source-stable (they were already defensive against missing
-        # keys; the dict construction below is the single conversion
-        # site).
+        # Voice-path-cleanbreak Sprint 2 + Sprint 6 (2026-05-12).
+        # Sprint 2 deleted the production_plan_json socket and built
+        # a legacy-shape `plan` dict from meta so downstream plan.get()
+        # sites stayed source-stable. Sprint 6.3 deconstructs that
+        # intermediate dict: voice_assignments now derives from
+        # led["cast"] at render time (Sprint 6.2 helper); style + genre
+        # are unpacked into local variables. Helpers (_parse_hud_data,
+        # _write_story_treatment) take voice_assignments/style/genre
+        # as separate parameters instead of a director-shaped plan dict.
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
         _meta = led.get("meta") or {}
-        plan = {
-            "voice_assignments": _meta.get("voice_assignments") or {},
-            "style":             _meta.get("style") or "",
-            "genre":             (_meta.get("visual_plan") or {}).get("genre")
-                                 or "",
-        }
+        voice_assignments = _OTRLC.voice_assignments_from_cast(led)
+        style = _meta.get("style") or ""
+        genre = (_meta.get("visual_plan") or {}).get("genre") or ""
 
         # Title chain (Path B confirmed 2026-05-09):
         #   1. led["meta"]["episode_title"]   (architect primary; today
@@ -1366,7 +1385,8 @@ class SignalLostVideoRenderer:
         # v2 ledger consumer: pass parsed led + plan dicts (parsed at
         # the top of render_video). HUD never re-parses script_json.
         try:
-            _hud_data     = _parse_hud_data(episode_title, led, plan,
+            _hud_data     = _parse_hud_data(episode_title, led,
+                                            voice_assignments, style, genre,
                                             news_used, duration, W, H)
             _hud_renderer = _TelemetryHUDRenderer(W, H, fps, _hud_data)
             _hud_frames   = _hud_renderer.hud_frames()
@@ -1567,9 +1587,12 @@ class SignalLostVideoRenderer:
         _runtime_log(f"Video: DONE -- {os.path.basename(out_path)} ({size_mb:.1f} MB)")
 
         # Write story treatment companion file. v2 ledger consumer:
-        # pass parsed led + plan dicts (parsed at top of render_video).
+        # pass parsed led + voice_assignments/style/genre (Sprint 6.3
+        # rename of the legacy `plan` parameter).
         _write_story_treatment(
-            out_path, episode_title, led, plan, news_used,
+            out_path, episode_title, led,
+            voice_assignments, style, genre,
+            news_used,
             duration, W, H, fps, size_mb
         )
 

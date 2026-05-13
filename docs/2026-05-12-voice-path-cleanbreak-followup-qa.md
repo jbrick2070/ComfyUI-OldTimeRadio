@@ -255,7 +255,7 @@ Drops:
 ### Final `FreezeCascade.script_json` fanout
 
 ```
-FreezeCascade(62).script_json  -> 6 destinations
+FreezeCascade(62).script_json  -> 7 destinations
   link   2 -> SceneSequencer(3).script_json
   link  12 -> BatchBarkGenerator(11).script_json
   link  16 -> SignalLostVideo(12).script_json

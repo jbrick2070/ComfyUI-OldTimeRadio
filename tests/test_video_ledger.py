@@ -41,17 +41,24 @@ from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
 def test_video_hud_telemetry_from_ledger():
     """_parse_hud_data with a stub ledger produces the expected
     line-count fidelity: 2 character + 1 announcer dialogue items,
-    1 sfx item, music lines silently dropped."""
+    1 sfx item, music lines silently dropped.
+
+    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
+    from `plan` (legacy director-shaped dict) to explicit
+    `voice_assignments` + `style` + `genre` parameters. Empty dicts /
+    strings reproduce the legacy `plan = {}` behavior.
+    """
     from nodes.video_engine import _parse_hud_data
 
     led = make_stub_ledger()
-    plan = {}  # empty production plan -- v2 default
     news_used = json.dumps([{"headline": "Test seed"}])
 
     data = _parse_hud_data(
         episode_title="Test Title",
         led=led,
-        plan=plan,
+        voice_assignments={},
+        style="",
+        genre="",
         news_used=news_used,
         duration_s=12.3,
         W=1920, H=1080,
@@ -96,16 +103,19 @@ def test_video_hud_telemetry_from_ledger():
 def test_video_treatment_writes_flat_list(tmp_path):
     """_write_story_treatment writes a treatment file with a cast
     block + flat dialogue/sfx list (no scene_break / environment
-    headers, since the v2 ledger schema has no such markers)."""
+    headers, since the v2 ledger schema has no such markers).
+
+    Voice-path-cleanbreak Sprint 6.3 (2026-05-12): signature changed
+    from `plan` (legacy director-shaped dict) to explicit
+    `voice_assignments` + `style` + `genre` parameters.
+    """
     from nodes.video_engine import _write_story_treatment
 
     led = make_stub_ledger()
-    plan = {}
     news_used = json.dumps([{"headline": "Stub headline"}])
 
     out_path = tmp_path / "TestEp.mp4"
     out_path.touch()  # _write_story_treatment uses out_path basename
-    treatment_path = tmp_path / "TestEp.txt"
 
     # The treatment writer derives the .txt path internally from out_path.
     # Look up where it actually writes by reading the function source --
@@ -115,7 +125,9 @@ def test_video_treatment_writes_flat_list(tmp_path):
         out_path=str(out_path),
         episode_title="Test Episode",
         led=led,
-        plan=plan,
+        voice_assignments={},
+        style="",
+        genre="",
         news_used=news_used,
         duration=12.3,
         W=1920, H=1080, fps=24,

@@ -222,3 +222,41 @@ def test_canonical_slugs_in_test_match_writer_pool(musicgen_mod):
         "OTR_LedgerScriptWriter._STYLE_PICKER_SEED_POOL. Update both "
         "in lockstep."
     )
+
+
+def test_genre_table_covers_writer_style_pool():
+    """Voice-path-cleanbreak Sprint 6.1 (2026-05-12). Drift guard for
+    the genre lookup table that replaced the hardcoded "audio drama"
+    fallback. Every writer style slug must have an explicit row in
+    _GENRE_BY_STYLE; the mechanical fallback in _resolve_genre is a
+    safety net, not the contract surface.
+    """
+    from nodes.OTR_LedgerScriptWriter import (
+        _GENRE_BY_STYLE,
+        _STYLE_PICKER_SEED_POOL,
+    )
+    missing = set(_STYLE_PICKER_SEED_POOL) - set(_GENRE_BY_STYLE)
+    assert not missing, (
+        f"Genre table missing entries for writer styles: {sorted(missing)}. "
+        "Add explicit entries to _GENRE_BY_STYLE in OTR_LedgerScriptWriter.py "
+        "or accept the mechanical fallback (which is loud + visibly "
+        "uncurated by design)."
+    )
+
+
+def test_resolve_genre_known_styles_use_table():
+    """_resolve_genre prefers the table over the mechanical fallback."""
+    from nodes.OTR_LedgerScriptWriter import _GENRE_BY_STYLE, _resolve_genre
+    for slug, expected in _GENRE_BY_STYLE.items():
+        assert _resolve_genre(slug) == expected, (
+            f"_resolve_genre({slug!r}) returned {_resolve_genre(slug)!r}; "
+            f"expected {expected!r} from _GENRE_BY_STYLE."
+        )
+
+
+def test_resolve_genre_unknown_uses_mechanical_fallback():
+    """Unknown slug -> mechanical "<words> audio drama" fallback (loud,
+    never empty). Standing directive: no silent fallbacks."""
+    from nodes.OTR_LedgerScriptWriter import _resolve_genre
+    assert _resolve_genre("totally_made_up_slug") == "totally made up slug audio drama"
+    assert _resolve_genre("") == "audio drama"
