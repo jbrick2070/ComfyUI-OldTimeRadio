@@ -139,57 +139,16 @@ def _cache_filename_for_write(*, prompt: str, duration_sec: float,
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:
-    """Find a cached SFX WAV for ``prefix``. Two-level lookup:
-      1. Canonical: ``<prefix>.wav`` (preferred, written by current code)
-      2. Legacy:    ``<prefix>_<ts>.wav`` (back-compat with files written
-         by the pre-Phase-D timestamped implementation)
-
-    Per Phase D consult (Gemini): use ``iterdir() + startswith`` rather
-    than ``Path.glob()`` because prompts can contain glob metacharacters
-    like ``[`` and ``*``. Sort legacy matches by parsed filename
-    timestamp (not mtime) for stability across copy/restore.
+    """Find a cached SFX WAV for ``prefix``. Single-tier canonical
+    lookup: ``<prefix>.wav``. Returns the absolute path on hit, None
+    on miss. Never raises.
     """
     from pathlib import Path
 
-    base = Path(cache_dir)
-    canonical = base / f"{prefix}.wav"
+    canonical = Path(cache_dir) / f"{prefix}.wav"
     if canonical.is_file():
         return str(canonical)
-
-    if not base.exists():
-        return None
-
-    legacy_prefix = prefix + "_"
-    matches: list[Path] = []
-    try:
-        for path in base.iterdir():
-            name = path.name
-            if (path.is_file()
-                    and name.startswith(legacy_prefix)
-                    and name.lower().endswith(".wav")):
-                matches.append(path)
-    except OSError as exc:
-        log.warning("[BatchAudioGen] cache_dir iterdir failed: %s", exc)
-        return None
-
-    if not matches:
-        return None
-    if len(matches) > 1:
-        log.warning(
-            "[BatchAudioGen] multiple legacy cache files for prefix %s; "
-            "using newest filename timestamp",
-            prefix,
-        )
-
-    def _legacy_sort_key(path: Path):
-        suffix = path.name[len(legacy_prefix):-4]
-        try:
-            return (1, int(suffix), path.name)
-        except ValueError:
-            return (0, 0, path.name)
-
-    matches.sort(key=_legacy_sort_key, reverse=True)
-    return str(matches[0])
+    return None
 
 
 def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> bool:

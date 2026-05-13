@@ -28,3 +28,11 @@ Baseline:
 - Unexpected failures: none
 - Notes: The docstring also rewritten to remove the "Two-level lookup" framing and the Phase D consult note about glob metacharacters (the iterdir loop they referenced is gone).
 
+## A2-sibling — AudioGen `_find_cached` legacy timestamped branch deleted
+- Commit: (pending)
+- File: nodes/batch_audiogen_generator.py — `_find_cached` collapsed to single-tier canonical-filename lookup (matches the A2 pattern).
+- Targeted test command: `pytest tests/test_workflow_audio_widget_vectors.py tests/test_audiogen_writeback_hardening.py -q`
+- Result: 17 passed
+- Unexpected failures: none
+- Notes: Identical edit pattern to A2 — same iterdir loop, same `_legacy_sort_key`, same multi-match warning, same docstring framing. Now the AudioGen + MusicGen cache lookups share the same minimal "canonical exists? else None" surface.
+
