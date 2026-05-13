@@ -52,27 +52,34 @@ def test_sfx_render_status_in_writeback():
 
 
 def test_strict_writeback_kwarg_in_signature():
-    """S18.3: generate() accepts strict_writeback with default False."""
+    """S25/AG-9: generate() accepts strict_writeback with default True
+    (post-S18.3 flip; the audit walker is wired in soft mode at every
+    consumer this sprint so the criterion for the strict default --
+    walker stays clean for one full pipeline run -- is no longer
+    deadlocked)."""
     from nodes.batch_procedural_sfx import BatchProceduralSFX
     sig = inspect.signature(BatchProceduralSFX.generate)
     params = sig.parameters
     assert "strict_writeback" in params, (
         "S18.3: strict_writeback kwarg missing from generate()."
     )
-    assert params["strict_writeback"].default is False, (
-        "S18.3: strict_writeback default must be False for "
-        "soft-rollout compatibility."
+    assert params["strict_writeback"].default is True, (
+        "S25/AG-9 (BUG-LOCAL-219): strict_writeback default must be "
+        "True after the soft-rollout deadlock fix. If you're flipping "
+        "back to False you also need to update the audit walker wiring "
+        "in Phase 5 and re-document the flip-criterion."
     )
 
 
 def test_strict_writeback_input_types_optional():
-    """The widget must be declared in INPUT_TYPES().optional."""
+    """The widget must be declared in INPUT_TYPES().optional with
+    default True (post-S25/AG-9 flip)."""
     pat = re.compile(
-        r'"strict_writeback":\s*\("BOOLEAN",\s*\{"default":\s*False\}\)'
+        r'"strict_writeback":\s*\("BOOLEAN",\s*\{"default":\s*True\}\)'
     )
     assert pat.search(_PROCSFX_SRC), (
-        "S18.3: strict_writeback widget not in INPUT_TYPES().optional "
-        "or shape changed."
+        "S25/AG-9: strict_writeback widget not in INPUT_TYPES().optional "
+        "with default True, or shape changed."
     )
 
 

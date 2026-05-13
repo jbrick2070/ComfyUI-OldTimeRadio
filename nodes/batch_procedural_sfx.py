@@ -136,7 +136,7 @@ class BatchProceduralSFX:
         }
 
     def generate(self, script_json, default_duration=2.0, volume_db=0.0,
-                 strict_writeback=False):
+                 strict_writeback=True):
         batch_log = ["=== Batch Procedural SFX (Obsidian) ==="]
 
         # Read-side: parse the wire input as a v2 ledger dict.
