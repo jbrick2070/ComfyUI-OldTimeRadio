@@ -476,7 +476,7 @@
           "type": "STRING",
           "link": 21,
           "widget": {
-            "name": "production_plan_json"
+            "name": "script_json"
           }
         }
       ],
@@ -593,14 +593,14 @@
       "flags": {},
       "order": 11,
       "mode": 0,
-      "title": "Video Plan (wired from Director)",
+      "title": "Video Plan (from FreezeCascade)",
       "inputs": [
         {
           "name": "script_json",
           "type": "STRING",
           "link": 113,
           "widget": {
-            "name": "director_json"
+            "name": "script_json"
           }
         },
         {
