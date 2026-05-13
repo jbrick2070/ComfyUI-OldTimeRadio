@@ -208,6 +208,44 @@ _OPTIONAL_STRING_FIELDS = (
 )
 
 
+# C5 (S24, 2026-05-13): the enum the AudioGen + ProcSFX writeback
+# paths stamp on every line.lines[] sfx row.
+#
+#   ""                       -- unrendered (test fixtures, in-flight
+#                               ledgers, pre-render state).
+#   "ok"                     -- fresh generate, save confirmed.
+#   "ok_cache"               -- cache hit at resolve; audio loaded.
+#   "error"                  -- _save_wav returned False / disk failure.
+#   "fallback_silence"       -- transformers ImportError + the
+#                               allow_silence_fallback opt-in fired.
+#   "fallback_output_shape"  -- BUG-LOCAL-116 short-output case:
+#                               AudioGen returned < _min_samples;
+#                               silence padded; saved to
+#                               <cache_dir>/_fallback/ NOT canonical.
+#   "fallback_default_type"  -- ProcSFX resolver fell through to
+#                               "radio_tuning" without matching the
+#                               cue's tag content.
+#   "skipped"                -- consumer chose not to render (reserved
+#                               for future use; no producer stamps it
+#                               today, but the enum is wired so a
+#                               future skip-path doesn't break the
+#                               walker).
+#
+# Other fields in _OPTIONAL_STRING_FIELDS keep the string-shape-only
+# audit (only None counts as a violation). Only sfx_render_status
+# carries the enum check.
+ALLOWED_SFX_RENDER_STATUS: frozenset = frozenset({
+    "",
+    "ok",
+    "ok_cache",
+    "error",
+    "fallback_silence",
+    "fallback_output_shape",
+    "fallback_default_type",
+    "skipped",
+})
+
+
 def audit_post_freeze_writeback(
     ledger: dict,
     *,
@@ -223,6 +261,13 @@ def audit_post_freeze_writeback(
     convention has historically drifted (ProcSFX wrote None on
     disk-write failure until S18.1).
 
+    C5 (S24): for the ``sfx_render_status`` field the walker also
+    enforces membership in ``ALLOWED_SFX_RENDER_STATUS``. A typo like
+    ``"fallback_silnce"`` lands as a violation. Other 9 fields stay
+    string-shape-only -- only None is rejected; arbitrary string
+    values are accepted because the producer-side enum hasn't been
+    audited for them.
+
     Use ``strict=False`` (the default) for the soft-rollout phase --
     consumers log violations to batch_log so live runs surface
     drift without halting. Flip to ``strict=True`` per consumer
@@ -234,10 +279,21 @@ def audit_post_freeze_writeback(
             continue
         lid = line.get("line_id", "<no-id>")
         for field in _OPTIONAL_STRING_FIELDS:
-            if field in line and line[field] is None:
+            if field not in line:
+                continue
+            val = line[field]
+            if val is None:
                 violations.append(
                     f"line_id={lid!r} field {field!r} is None; "
                     f"§6.16 requires \"\" (empty string)."
+                )
+            elif field == "sfx_render_status" and val not in ALLOWED_SFX_RENDER_STATUS:
+                # C5 (S24): enum violation. A typo lands here instead
+                # of silently passing.
+                violations.append(
+                    f"line_id={lid!r} field {field!r} = {val!r} is "
+                    f"not in ALLOWED_SFX_RENDER_STATUS "
+                    f"({sorted(ALLOWED_SFX_RENDER_STATUS)!r})."
                 )
     if strict and violations:
         raise ValueError(
@@ -255,4 +311,5 @@ __all__ = [
     "voice_preset",
     "voice_assignments_from_cast",
     "audit_post_freeze_writeback",
+    "ALLOWED_SFX_RENDER_STATUS",
 ]
