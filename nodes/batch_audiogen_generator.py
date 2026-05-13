@@ -252,11 +252,14 @@ class BatchAudioGenGenerator:
             },
             "optional": {
                 "episode_seed": ("STRING", {"default": ""}),
-                # BUG-LOCAL-027: the "3"/"3.0"/3/3.0 entries were scar tissue
-                # from widget-drift hitting this node. With the mapper fix in
-                # _workflow_to_api_prompt, socket-only inputs no longer leak
-                # into widget slots, so the hack is no longer needed. Fail
-                # loudly on bad input instead of silently accepting garbage.
+                # BUG-LOCAL-027 / S25/AG-4: the combo-list constraint
+                # here is the only allowed model_id surface. With the
+                # mapper fix in _workflow_to_api_prompt, socket-only
+                # inputs no longer leak into widget slots, so the
+                # downstream silent-repair landmine (removed S25/AG-4,
+                # BUG-LOCAL-218) is no longer needed. The combo-list
+                # enforces; a bad widget vector now fails loudly at
+                # node load instead of being silently rewritten.
                 "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small"], {"default": "facebook/audiogen-medium"}),
                 "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5}),
                 "default_duration": ("FLOAT", {
@@ -289,9 +292,14 @@ class BatchAudioGenGenerator:
         # but fragile representation. Coerce here, once.
         episode_seed = str(episode_seed) if episode_seed is not None else ""
 
-        # UI JSON back-compat fix
-        if str(model_id) in ["3", "3.0"]:
-            model_id = "facebook/audiogen-medium"
+        # S25/AG-4 (BUG-LOCAL-218): legacy `if str(model_id) in ["3", "3.0"]:
+        # model_id = "facebook/audiogen-medium"` silent repair deleted.
+        # The combo-list constraint at INPUT_TYPES["optional"]["model_id"]
+        # is the only allowed surface; the widget vector that triggered
+        # the original BUG-LOCAL-027 drift was already cleaned at S24/C3.
+        # The downstream defender was masking misconfiguration and
+        # contradicted the loud-fail comment immediately above the
+        # combo-list. Loud-fail is now the literal behavior.
 
         batch_log = ["=== Batch AudioGen Generator ==="]
 
@@ -695,6 +703,24 @@ class BatchAudioGenGenerator:
                 else:
                     # Path 1: legacy ledger.sfx[] (preserved as-is).
                     sfx_rows = led_disk.get("sfx") or []
+                    # S25/AG-3 (BUG-LOCAL-217 sibling): a non-empty
+                    # ledger.sfx[] means a legacy v1 producer is still
+                    # in the graph. v2 producers leave sfx[] empty and
+                    # stamp lines[] sfx rows. CD-3 audit in Phase 7
+                    # determines whether this path stays or gets
+                    # deleted in S26; the deprecation warning surfaces
+                    # the existence of the legacy path either way.
+                    if sfx_rows:
+                        import warnings as _w
+                        _w.warn(
+                            "ledger.sfx[] is non-empty; legacy v1 "
+                            "producer detected. v2 producers leave "
+                            "sfx[] empty and stamp lines[] sfx rows. "
+                            "Scheduled for review in S26 (see "
+                            "ROADMAP.md CD-3 audit).",
+                            DeprecationWarning,
+                            stacklevel=2,
+                        )
                     updated_sfx_array = 0
                     for i, item in enumerate(render_queue):
                         if i >= len(sfx_rows):
@@ -708,8 +734,23 @@ class BatchAudioGenGenerator:
                                 dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
                             except Exception:
                                 dur = None
-                        if cache_path:
+                        # S25/AG-2 (BUG-LOCAL-217): apply the C2 ghost-
+                        # path gate to the legacy sfx[] writeback too.
+                        # C2 fixed the lines[] writeback path but
+                        # missed this parallel one -- same field, same
+                        # failure mode (ledger row points at a path
+                        # that was never confirmed on disk).
+                        save_ok = bool(item.get("_save_ok"))
+                        had_cache_hit = bool(item.get("had_cache_hit_at_resolve"))
+                        if (cache_path
+                                and (save_ok or had_cache_hit)
+                                and os.path.isfile(cache_path)):
                             row["wav_path"] = str(cache_path)
+                        else:
+                            row["wav_path"] = ""
+                        row["sfx_render_status"] = (
+                            item.get("_render_status") or "ok"
+                        )
                         if dur is not None:
                             row["dur_s"] = dur
                         row["tts_engine"] = "audiogen"
