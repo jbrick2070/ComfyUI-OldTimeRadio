@@ -1,0 +1,14 @@
+nodes/batch_audiogen_generator.py:704:                    # Path 1: legacy ledger.sfx[] (preserved as-is).
+nodes/batch_audiogen_generator.py:162:    legacy_prefix = prefix + "_"
+nodes/batch_audiogen_generator.py:168:                    and name.startswith(legacy_prefix)
+nodes/batch_audiogen_generator.py:184:    def _legacy_sort_key(path: Path):
+nodes/batch_audiogen_generator.py:185:        suffix = path.name[len(legacy_prefix):-4]
+nodes/batch_audiogen_generator.py:191:    matches.sort(key=_legacy_sort_key, reverse=True)
+nodes/musicgen_theme.py:230:    legacy_prefix = prefix + "_"
+nodes/musicgen_theme.py:236:                    and name.startswith(legacy_prefix)
+nodes/musicgen_theme.py:252:    def _legacy_sort_key(path: Path):
+nodes/musicgen_theme.py:254:        suffix = path.name[len(legacy_prefix):-4]
+nodes/musicgen_theme.py:260:    matches.sort(key=_legacy_sort_key, reverse=True)
+nodes/production_ledger.py:357:            "sfx": [],
+nodes/batch_audiogen_generator.py:251:                "script_json": ("STRING", {"multiline": True, "default": "[]"}),
+nodes/batch_procedural_sfx.py:115:                "script_json": ("STRING", {"multiline": True, "default": "[]"}),
