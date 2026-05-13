@@ -1,0 +1,149 @@
+# OTR Bug Log
+
+**Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
+**Owner:** Jeffrey A. Brick
+**Last entry:** BUG-LOCAL-206 (2026-05-12)
+**Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
+
+---
+
+## What this file is
+
+Live, append-only record of every bug found in OTR development.
+Per CLAUDE.md project rule:
+
+> Maintain `BUG_LOG.md` actively. Every bug logged the moment it's
+> found -- no batching, no waiting. Live document tracking the
+> build history.
+
+Bugs are numbered `BUG-LOCAL-NNN` with monotonic per-era ranges:
+
+- `001-129` -- pre-voice-path-cleanbreak era (LFC + earlier)
+- `200+`    -- voice-path-cleanbreak era (P1-P3, S1-S15)
+
+Numbering reset is intentional -- it gives a clean visual cut
+between sprint epochs and lets a reader skim "find me a v2.0-alpha
+bug" without scrolling through legacy entries.
+
+---
+
+## Entry schema (per CLAUDE.md)
+
+```markdown
+### BUG-LOCAL-NNN: Title
+- **Date:** YYYY-MM-DD | **Phase:** 0-6 | **Bible candidate:** yes/no
+- **Symptom:** exact error / console output
+- **Cause:** root cause (or "pending -- awaiting investigation")
+- **Fix:** what resolved it (or "pending")
+- **Verify:** how to confirm
+- **Tags:** vram, widget-drift, ffmpeg, subprocess, parse-fatal, dialogue-scaling, json-wiring, etc.
+```
+
+Mark `[FIXED commit-sha YYYY-MM-DD]` after the title when resolved
+-- do not delete entries. When `Bible candidate: yes` and the fix
+is verified, promote to the survival guide repo per CLAUDE.md
+"Bug Log Pipeline" section.
+
+---
+
+## Active known failures (S15 quarantine)
+
+The 6 entries in `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (and
+mirrored in `docs/known-failures.md`) are NOT bugs in this file's
+sense -- they are failing tests under quarantine, not unfixed
+production runtime bugs. The `pytest_sessionfinish` hook
+(S15.1+S15.2 / commit `f813b37`) enforces that the failure SET
+stays exactly that 6.
+
+Entries below are bugs found in production logic during S6-S15
+sprints, regardless of fix-status.
+
+---
+
+## Voice-path-cleanbreak era (BUG-LOCAL-200+)
+
+### BUG-LOCAL-200: G7 contract drift in consumer widgets [FIXED 3090007 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** no
+- **Symptom:** AudioGen widget `default_duration.min` was the literal `0.5`; ProcSFX widget `default_duration.min` was the literal `0.1`. The freeze cascade enforced G7 SFX `dur_s` bounds at `[SFX_DUR_MIN_S=0.5, SFX_DUR_MAX_S=10.0]` (post-S6.4 tightening). ProcSFX accepted writer values down to 0.1 -- silently disagreeing with the freeze contract -- and clamped them post-hoc. Internal per-cue clamps in BOTH consumers also used magic-number literals (`max(0.5, min(10.0, ...))`, `max(0.1, min(10.0, ...))`).
+- **Cause:** Magic-number literal at the consumer surface AND in the consumer clamp; no import of the freeze cascade's authoritative constants. A future bound shift in `_otr_ledger_freeze.py` would have left consumer surfaces silently disagreeing.
+- **Fix:** S10.1 -- export `SFX_DUR_MIN_S` and `SFX_DUR_MAX_S` from `_otr_ledger_freeze.py::__all__`; both consumers import them for widget min/max AND internal clamp. Plus drift guard `tests/test_g7_consumer_constants.py` (5 tests) including object-identity assertion catching the local-shadow refactor case.
+- **Verify:** `findstr /SI "0.1\|0.5\|10.0\|12.0" nodes\batch_procedural_sfx.py` filtered to widget/clamp sites returns zero hits. Same gate on AudioGen returns zero clamp/widget hits.
+- **Tags:** widget-drift, magic-number, contract-honesty, g7
+
+### BUG-LOCAL-201: AudioGen cache key was model-id-blind and guidance-scale-blind [FIXED 574038e 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Switching AudioGen models (`facebook/audiogen-medium` -> `facebook/audiogen-large`) or guidance scales (CFG 3.0 -> 5.0) between runs silently returned the prior model's wav -- the cache key didn't include either input. The user got a "cached" render that was the wrong model's output.
+- **Cause:** `_cache_prefix(prompt, duration_sec, episode_seed)` payload was `f"{duration_sec}|{prompt}|{episode_seed}"`. Output-determining inputs `model_id` and `guidance_scale` were never hashed.
+- **Fix:** S12.3 -- keyword-only signature `_cache_prefix(*, prompt, duration_sec, episode_seed, model_id, guidance_scale)`. JSON-canonical payload via `json.dumps(..., sort_keys=True, separators=(",", ":"))`. Truncation extended `[:8] -> [:12]` for collision-resistance. Three new dimension tests + drift guards.
+- **Verify:** `pytest tests/test_audiogen_cache_keys.py::test_audiogen_cache_prefix_changes_when_model_id_changes -v` (and the guidance_scale + float-canonical siblings).
+- **Tags:** cache-key, ledger-derived, audiogen, content-addressed
+- **Bible candidate rationale:** General lesson -- cache keys must include every output-determining input. Standing-directive #9 in OTR codifies this; the survival guide should publish it as a pattern.
+
+### BUG-LOCAL-202: ProcSFX silently overwrote on dur_s iteration [FIXED c4ab258 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** When the writer iterated on scene timing -- emitting the same `line_id` at a new `dur_s` between runs -- the second render OVERWROTE the first wav on disk. The user lost A/B history; the cache identity (the on-disk filename) didn't reflect the changed input. Found via the F-6 finding in the S6-S8 round-robin: "active iteration on scene timing is a real workflow."
+- **Cause:** Filename was `proc_<sfx_type>_<line_id>.wav`. Identity surface keyed only by line, not by duration. ProcSFX has no formal cache layer, so the on-disk filename IS the de-facto identity.
+- **Fix:** S12.1 -- filename extended to `proc_<sfx_type>_<line_id>_<perm>.wav` where `<perm>` is `hashlib.sha256(f"{cue_duration:.3f}|{chosen_type}|{line_id}").hexdigest()[:8]`. Disk usage grows with iteration count; procedural wavs are kB-scale so the trade-off is favorable.
+- **Verify:** `pytest tests/test_audiogen_cache_keys.py::test_procsfx_filename_perm_hash_varies_with_dur_s -v`. Also the source-level guard `test_procsfx_perm_hash_in_module_source` catches a future refactor that strips the perm segment.
+- **Tags:** cache-key, on-disk-identity, procsfx, content-addressed
+- **Bible candidate rationale:** Same general lesson as BUG-LOCAL-201 in a no-cache-layer variant -- the on-disk filename IS the identity surface and must include every output-determining input.
+
+### BUG-LOCAL-203: cast contract accepted structural tokens as character names [FIXED badcae5 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** no
+- **Symptom:** A cast row like `{"name": "TITLE", "voice_preset": "v2/en_speaker_0", ...}` passed `_assert_voice_preset_invariant` and `_assert_unique_bark_voices` cleanly. The two existing assertions had no opinion on the *name* shape. An LLM hallucination that emitted any of TITLE / NOTE / TARGET / STYLE / NARRATOR as a character name rendered as a Bark voice line in production with no contract pushback.
+- **Cause:** Cast contract was preset-shape-aware but not name-shape-aware. The deleted `story_orchestrator._SFX_CAST_BLOCKLIST_PATTERNS` had screenplay-meta-direction patterns (KEVIN VOICEOVER, JOHN V.O., etc.) but never anchored the structural-token names from `_BRACKET_STRUCTURAL_TOKENS`.
+- **Fix:** S13.1 -- ported the pre-S7.1 `_SFX_CAST_BLOCKLIST_PATTERNS` into `_otr_casting._NON_CHARACTER_CAST_PATTERNS` and EXTENDED with five exact-match patterns (`r"^TITLE$"`, etc). Anchored as exact-match on upcased names to minimize false positives ("Anna Title-Holder" passes). New `_assert_no_structural_tokens_in_cast(cast)` wired into `lock_cast()`. 10-test parametrized + sanity pin in `tests/test_cast_contract_rejects_structural_tokens.py`.
+- **Verify:** `pytest tests/test_cast_contract_rejects_structural_tokens.py -v` (10 tests, all green). Audit doc `docs/audit-S13.1.md`.
+- **Tags:** cast-contract, structural-tokens, llm-hallucination, defense-in-depth
+
+### BUG-LOCAL-204: no enforcement of line_id uniqueness across ledger.lines[] [FIXED 02ca26c 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Two lines with the same `line_id` in `ledger.lines[]` silently overwrote each other in BOTH places ProcSFX's filename scheme keys by line_id (post-S12.1) AND every ledger write-back path (`patch_line_fields`, `apply_line_timings`) keys by line_id. The user noticed only when an episode rendered with the wrong audio in a slot -- too late to abort cleanly.
+- **Cause:** No invariant in the FreezeCascade enforced `line_id` uniqueness. The writer was *expected* to emit unique ids, and historically did, but the contract was implicit.
+- **Fix:** S13.2 -- new G8 invariant `_check_g8_line_id_uniqueness` in `_otr_ledger_freeze.py`, wired into `run_gap_audit` alongside G1-G7. Phase 0 collects (warn-mode), Phase 10 raises FreezeAssertionError. Diagnostic caps displayed duplicates at 5 + `(+N more)` suffix.
+- **Verify:** `pytest tests/test_g8_line_id_uniqueness.py -v` (7 tests, all green). Production fixtures all pass G8 cleanly -- the writer was already emitting unique ids; G8 makes the invariant load-bearing.
+- **Tags:** invariant, freeze-cascade, g8, line-id, write-back
+- **Bible candidate rationale:** General lesson -- any system with paths that key by an ID needs structural enforcement that the ID is unique. Structural invariant complements the implicit producer contract.
+
+### BUG-LOCAL-205: regex `\bV\.O\.\b` and `\bO\.S\.\b` patterns never matched [FIXED badcae5 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Pre-S7.1 `story_orchestrator._SFX_CAST_BLOCKLIST_PATTERNS` had `r"\bV\.O\.\b"` and `r"\bO\.S\.\b"` intended to catch screenplay meta-direction artefacts like `JOHN V.O.` and `JANE O.S.`. The patterns were DEAD -- they never matched. The trailing `\b` after the final `\.` never fires because Python regex word-boundary doesn't trigger between a non-word char and end-of-string. So the legacy heuristic silently allowed the artefacts through. Discovered during the S13.1 port when the new test `test_legacy_sfx_cue_artefacts_still_caught` failed on `JOHN V.O.`.
+- **Cause:** Misuse of `\b` after a non-word char. Regex word-boundary semantics: `\b` matches between a word char and a non-word char. After `.` (non-word) at end-of-string, there is no word char on the right, so `\b` doesn't fire. The pattern silently rejected every input it was supposed to match.
+- **Fix:** S13.1 (during port) -- dropped the trailing `\b`. New patterns: `r"\bV\.O\."` and `r"\bO\.S\."`. Verified the post-fix patterns match `JOHN V.O.` via reproduction script before commit.
+- **Verify:** `python3 -c "import re; print(bool(re.search(r'\bV\.O\.', 'JOHN V.O.')))"` -> True. Regression test `test_legacy_sfx_cue_artefacts_still_caught` covers it.
+- **Tags:** regex, word-boundary, port-found, dead-pattern, legacy-bug
+- **Bible candidate rationale:** General lesson -- `\b` after `.` (or any non-word char) at end-of-string is a no-op. Audit any regex of the shape `\b<word>\.<word>\.\b` for the same bug. IMP-15 in the S10-S15 QA doc proposes a codebase sweep.
+
+### BUG-LOCAL-206: `_resolve_genre("")` returned `" audio drama"` with leading space [FIXED 47eb644 2026-05-12]
+- **Date:** 2026-05-12 | **Phase:** 5 | **Bible candidate:** no
+- **Symptom:** During S6-A initial implementation, `_resolve_genre("")` returned `" audio drama"` (leading space) due to f-string concatenation `f"{words} audio drama"` where `words` was empty after the `.replace("_", " ").strip()` chain. Caught during pre-commit dev iteration, never shipped.
+- **Cause:** Naive f-string concatenation without checking the substituted value's emptiness. `f"{''} audio drama"` = `" audio drama"`, not `"audio drama"`.
+- **Fix:** S6-A pre-commit -- conditional `f"{words} audio drama" if words else "audio drama"`. Then S10.2 retired the silent fallback entirely; `_resolve_genre` now raises ValueError on empty input. The mechanical fallback survives only in `_preview_genre` (UI helper, isolated from writer / freeze paths by AST-walk test).
+- **Verify:** `pytest tests/test_musicgen_style_palette.py::test_resolve_genre_empty_raises -v`.
+- **Tags:** f-string, empty-input, dev-iteration, fallback-isolation
+- **Bible candidate rationale:** Cosmetic in isolation; the broader S10.2 lesson (never silently degrade on production surfaces) is the standing directive #1, already canonical.
+
+---
+
+## Promotion to Bug Bible
+
+Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
+Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
+and the fix is verified:
+
+1. Add entry to `BUG_BIBLE.yaml` (schema: `id`, `phase`, `area`,
+   `symptom`, `cause`, `fix`, `verify`, `tags`, `legacy_id`).
+2. Add regression test to `tests/bug_bible_regression.py` in the
+   survival guide repo.
+3. Update `README.md` entry count.
+4. Run the three-file contract test to confirm sync.
+
+**Bible candidates pending promotion:**
+
+- BUG-LOCAL-201 (cache key includes every output-determining input)
+- BUG-LOCAL-202 (on-disk filename IS the identity surface for no-cache renderers)
+- BUG-LOCAL-204 (structural ID-uniqueness enforcement complements implicit producer contracts)
+- BUG-LOCAL-205 (`\b` after non-word char at end-of-string is a no-op; audit similar regex shapes)
+
+Per memory note ("Keep ROADMAP + BUG_LOG live; Bible promotion
+waits until v2.0 ships"), batch-promote after v2.0 lands.

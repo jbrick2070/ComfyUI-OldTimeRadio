@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `5d7e887` | **Last refactored:** 2026-05-09/10 (LPL sprint in flight)
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `ef8c409` | **Last refactored:** 2026-05-12 (voice-path-cleanbreak S10-S15 batch + QA doc)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -39,9 +39,65 @@ OTR v2.0 is **greenfield**. The project is being written front-to-back as a sing
 
 The legacy-prune is its own commit so the diff stays small + auditable. Defer it to a fresh session — context-heavy sessions tend to put the legacy shims back if they aren't pruned in a clean pass.
 
+**Status as of HEAD `ef8c409` (2026-05-12):** the audit hits called out under HEAD `302b839` were largely closed during voice-path-cleanbreak P1-P3 + S1-S15 (commit history: `git log --oneline 302b839..ef8c409`). The Director re-export shim, `_RENAME_ALIASES["OTR_LedgerScriptReviewer"]` + `_RENAME_ALIASES["OTR_Gemma4Director"]` entries, and the `reviewer_verdict` legacy field have all been deleted. Acceptance criteria 1-3 are met (`grep -rn "OTR_LedgerScriptReviewer|Gemma4|reviewer_verdict" nodes/ __init__.py` returns zero hits outside forensic comments with sprint citations). Acceptance criteria 4-5 (workflow JSON loads cleanly + Bug Bible 23/1/2xf) hold. This standing-directive section stays as the **canonical no-back-compat policy** for every contributor going forward; new audit hits get appended here when they surface.
+
 ---
 
-## CURRENT WORK — news_interpreter sprint (all 5 commits SHIPPED 2026-05-10) — COMPLETE
+## CURRENT WORK — voice-path-cleanbreak S10-S15 (COMPLETE 2026-05-12)
+
+**State:** 17 commits SHIPPED on `v2.0-alpha` between `3090007` (S10.1) and `f813b37` (S15.1+S15.2), plus QA doc commit `ef8c409`. KNOWN-FAIL count steady at 6 throughout (see `docs/known-failures.md` + `tests/conftest.py::EXPECTED_FAILED_NODEIDS`); Bug Bible regression 23/1/2 throughout. Test count 2047 → 2096 (+49 net new tests).
+
+**Canonical reference:** `docs/2026-05-12-voice-path-cleanbreak-S10-S15-qa.md` -- the full QA doc covering all 17 commits with mechanics walkthrough, bug-hunt prompts per surface, drift-guard table, deferred items + IMP-* candidates.
+
+### Sprint summary
+
+| Sprint | Subject | Commits |
+|---|---|---|
+| S10 | Contract honesty (G7 constants, `_resolve_genre` raises, conventions enforcement) | 3 (`3090007` `55f52f4` `5363966`) |
+| S11 | Symbolic + doc cleanup (LLMDirector residue, `_visual_plan` rename, projection flatten) | 5 (`53ed966` `6ed0fd8` `5f10188` `cdc176a` `1a23976`) |
+| S12 | Cache + guard hardening (ProcSFX perm hash, AST import guard, AudioGen 12-char + JSON-canonical, length pin) | 4 (`c4ab258` `74c1f9f` `574038e` `7ea481e`) |
+| S13 | Pre-S14 gates (cast structural-token guard, G8 line_id uniqueness, fixture audit) | 3 (`badcae5` `02ca26c` `7a7607a`) |
+| S14 | Workflow contract validator commit A (auto-invoke deferred 1 week per Q-D10) | 1 (`5652c7c`) |
+| S15 | Known-failures with nodeid tracking (S15.3 promotion deferred 2-3 sprints per Q-D11) | 1 (`f813b37`) |
+
+### Standing directives extended this batch
+
+The pre-S10 standing directives carry forward; S10-S15 added five new ones (now 12 total). See QA doc §1 for the full list. The five additions:
+
+8. G7 bounds are honest with the writer -- no magic numbers in widget mins or internal clamps. (S10.1)
+9. Cache keys include every output-determining input. Adding a new generation knob means extending the cache key in the same commit. (S12.3 / IMP-1)
+10. Renamed-but-keep-history filenames carry both old + new names in their provenance comment. (S7.2 ratified by S6-S8 QA)
+11. Deleted symbols don't survive as words in active code. Forensic comments cite commit hashes, not symbol names. (S11.3 / S11.6)
+12. Structural invariants get structural tests. AST-walk over grep; `frozenset` constants over hardcoded literals. (S12.2 / S14.1)
+
+### Pending items (gated, NOT shipped)
+
+| # | Item | Earliest ship | Gating condition |
+|---|---|---|---|
+| S14.2 | Validator auto-invoke on workflow load (commit B of IMP-7) | 2026-05-19 (one week after S14.1) | Test-only mode false-positive count stays at zero through the observation window |
+| S15.3 | Survival-guide promotion of the known-failures hook + nodeid pattern | After 2-3 sprints of OTR-scoped use | Zero unhandled false-positive modes surface in OTR usage; schema is stable |
+
+### Round-robin votes pending — IMP-10 through IMP-17
+
+The S10-S15 QA doc nominates 8 sight-improvements for the next round-robin to vote MERGE / DEFER / REJECT on. Headline candidates:
+
+- **IMP-11 (most consequential):** Extend MusicGen cache key with `model_id` + `guidance_scale` -- same class of fix S12.3 just landed for AudioGen. MusicGen still on 8-char hash + 4-input payload.
+- **IMP-14:** Tighter widget-drift check in workflow validator -- positional pinning instead of "widgets_values is non-empty" heuristic.
+- **IMP-15:** Codebase sweep for other broken `\b<chars>\.<chars>\.\b` regex patterns (audit triggered by BUG-LOCAL-205 finding).
+
+Full IMP-10..17 list with severity, rationale, location: see QA doc §6.
+
+### S6-S8 batch (predecessor, all shipped) — REFERENCE
+
+For continuity, the S6-S8 batch (`docs/2026-05-12-voice-path-cleanbreak-S6-S8-qa.md`) shipped 6 commits between `47eb644` (S6-A) and `89c56da` (S8.1+8.2). All findings (F-1 through F-9) were addressed by the S10-S15 batch; all sight-improvements (IMP-1 through IMP-9) shipped or were folded into S13/S14. Q-D9/Q-D10/Q-D11 votes shipped per the S10-S15 plan. The S10-S15 QA doc §0 has the full predecessor commit table.
+
+### Bug log
+
+`BUG_LOG.md` (this commit) created for the voice-path-cleanbreak era. 7 entries (BUG-LOCAL-200..206) covering production bugs found during S6-S15. 4 are Bible candidates pending promotion; promotion batched per the standing rule "wait until v2.0 ships."
+
+---
+
+## PREVIOUS SPRINT — news_interpreter sprint (all 5 commits SHIPPED 2026-05-10) — COMPLETE
 
 **State:** Sprint complete on `v2.0-alpha`. Commits: `6f3218d` (ADR + canary tests), `70d25eb` (agnostic module + GBNF grammar), `f518fb3` (writer wiring + cast + outline + schema bump `l3-2026-05-14` + canary case 12 flipped), `9f82685` (announcer closing-line override + post-assembly key_terms audit + 13 new wiring tests), `4f45c7c` (era literals stripped + 5 text-scan canaries flipped, originally shipped at `92e58e5` with wrong subject and force-amended). Module is strictly LLM-agnostic — `generate_fn(messages, *, temperature, max_new_tokens) -> str` only, no model branches. End-to-end pipeline: RSS → full article dict → `build_news_briefs` (one LLM call, 4 outputs) → `meta.news` → cast prompt + outline prompt + announcer closing line + post-assembly key_terms audit. Bug Bible 15p/2x/1s baseline held across every commit. Two canaries remain armed as out-of-scope future-ADR work (RADIO portrait + MusicGen cues per ADR section 1). The downstream prompt audit (`outputs/downstream_prompt_audit.html` artifact) identified 5 hardcoded era-literal violations across `script_critic.py` + `story_orchestrator.py` and a structural gap where downstream consumers never see the news article body. Round-robin synthesis (ChatGPT gpt-5.5 + Gemini 3.1 Pro + NVIDIA) converged on a unified 4-output news_interpreter LLM stage inserted between style-resolve (D.2) and cast-lock (D.3) in `OTR_LedgerScriptWriter`. Canonical ADR at `docs/news_interpreter_adr.md`.
 
