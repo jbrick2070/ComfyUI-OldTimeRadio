@@ -78,40 +78,69 @@ def _cache_dir() -> str:
     return base
 
 
-def _cache_prefix(prompt: str, duration_sec: float, episode_seed: str) -> str:
+def _cache_prefix(*, prompt: str, duration_sec: float, episode_seed: str,
+                  model_id: str, guidance_scale: float) -> str:
     """Deterministic SFX cache identity prefix.
 
-    Format: ``sfx_<safe_prompt_prefix>_<sha8>``
+    Format: ``sfx_<safe_prompt_prefix>_<sha12>``
       - ``safe_prompt_prefix`` -- first 20 chars of prompt, sanitized
         for filenames (human-readable; cosmetic, not identity)
-      - ``sha8`` -- 8 hex chars of SHA256(duration|prompt|episode_seed)
+      - ``sha12`` -- 12 hex chars of SHA256 over a JSON-canonical
+        payload of every output-determining input
 
-    BUG-LOCAL-017 (Phase D, 2026-05-02): the prior implementation appended
-    ``_<timestamp_ms>`` to this prefix and returned a full filename. That
-    forced a fresh filename on every call, which guaranteed a cache MISS
-    every run AND violated Rule C7 because FFmpeg embeds input WAV
-    filenames in MP4 metadata. Same fix as MusicGen: split lookup
-    identity (this function) from write filename
+    Three layers landed in S12.3 (IMP-1):
+      1. 12 hex chars (was 8): collision risk at 5,000-cue catalog
+         scale drops from ~3e-3 to ~1.8e-8.
+      2. JSON-canonical payload: ``str(0.1+0.2)`` and ``str(0.3)``
+         both serialize to ``"0.300"`` via ``f"{x:.3f}"`` -- IEEE
+         754 float-string drift no longer collapses or splits keys.
+      3. ``model_id`` + ``guidance_scale`` included: changing the
+         AudioGen model or CFG between runs no longer silently
+         returns the prior wav.
+
+    BUG-LOCAL-017 (Phase D, 2026-05-02): the prior implementation
+    appended ``_<timestamp_ms>`` to this prefix and returned a full
+    filename. That forced a fresh filename on every call, which
+    guaranteed a cache MISS every run AND violated Rule C7 because
+    FFmpeg embeds input WAV filenames in MP4 metadata. Lookup
+    identity (this function) is split from write filename
     (``_cache_filename_for_write``, canonical ``<prefix>.wav``).
+
+    Keyword-only signature: every output-determining input is
+    spelled at the call site so a future knob added to AudioGen
+    has to extend the signature deliberately (no positional
+    silent-shadowing).
     """
-    payload = f"{duration_sec}|{prompt}|{episode_seed}".encode("utf-8")
-    digest = hashlib.sha256(payload).hexdigest()[:8]
+    payload = json.dumps({
+        "duration_sec":   f"{float(duration_sec):.3f}",
+        "prompt":         prompt,
+        "episode_seed":   str(episode_seed),
+        "model_id":       str(model_id),
+        "guidance_scale": f"{float(guidance_scale):.2f}",
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(payload).hexdigest()[:12]
     safe_name = re.sub(r'[^a-zA-Z0-9]', '_', prompt[:20]).lower()
     return f"sfx_{safe_name}_{digest}"
 
 
-def _cache_filename_for_write(prompt: str, duration_sec: float,
-                              episode_seed: str) -> str:
+def _cache_filename_for_write(*, prompt: str, duration_sec: float,
+                              episode_seed: str, model_id: str,
+                              guidance_scale: float) -> str:
     """Canonical filename for a fresh cache write. Deterministic -- no
     timestamp. C7-safe."""
-    return f"{_cache_prefix(prompt, duration_sec, episode_seed)}.wav"
+    return f"{_cache_prefix(prompt=prompt, duration_sec=duration_sec, episode_seed=episode_seed, model_id=model_id, guidance_scale=guidance_scale)}.wav"
 
 
-def _cache_key(prompt: str, duration_sec: float, episode_seed: str) -> str:
-    """Backward-compatible wrapper -- returns the canonical write filename.
-    Kept so any external import of ``_cache_key`` from this module still
-    resolves."""
-    return _cache_filename_for_write(prompt, duration_sec, episode_seed)
+def _cache_key(*, prompt: str, duration_sec: float, episode_seed: str,
+               model_id: str, guidance_scale: float) -> str:
+    """Returns the canonical write filename. Same signature as
+    ``_cache_filename_for_write`` -- kept as the legacy public name
+    so external callers don't have to rename. New code should call
+    ``_cache_filename_for_write`` directly."""
+    return _cache_filename_for_write(
+        prompt=prompt, duration_sec=duration_sec, episode_seed=episode_seed,
+        model_id=model_id, guidance_scale=guidance_scale,
+    )
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:
@@ -311,11 +340,23 @@ class BatchAudioGenGenerator:
             # canonical (no-timestamp) filename so re-runs produce
             # byte-identical mp4 metadata (Rule C7).
             cache_dir_now = _cache_dir()
-            prefix = _cache_prefix(prompt, duration, episode_seed)
+            prefix = _cache_prefix(
+                prompt=prompt,
+                duration_sec=duration,
+                episode_seed=episode_seed,
+                model_id=model_id,
+                guidance_scale=guidance_scale,
+            )
             hit_path = _find_cached(cache_dir_now, prefix)
             cache_path = hit_path if hit_path is not None else os.path.join(
                 cache_dir_now,
-                _cache_filename_for_write(prompt, duration, episode_seed),
+                _cache_filename_for_write(
+                    prompt=prompt,
+                    duration_sec=duration,
+                    episode_seed=episode_seed,
+                    model_id=model_id,
+                    guidance_scale=guidance_scale,
+                ),
             )
             render_queue.append({
                 "index":   i,
@@ -352,7 +393,11 @@ class BatchAudioGenGenerator:
                     item["cache_path"] = os.path.join(
                         cache_dir_now,
                         _cache_filename_for_write(
-                            item["prompt"], item["duration"], episode_seed
+                            prompt=item["prompt"],
+                            duration_sec=item["duration"],
+                            episode_seed=episode_seed,
+                            model_id=model_id,
+                            guidance_scale=guidance_scale,
                         ),
                     )
                 else:

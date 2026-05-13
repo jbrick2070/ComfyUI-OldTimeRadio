@@ -77,13 +77,27 @@ def patched_audiogen_env(tmp_path):
         yield state
 
 def _seed_cache_for_cue(cache_dir: str, prompt: str, duration: float,
-                       episode_seed: str) -> str:
+                       episode_seed: str,
+                       model_id: str = "facebook/audiogen-medium",
+                       guidance_scale: float = 3.0) -> str:
     """Pre-write a valid WAV file at the canonical cache filename so
-    the consumer's _find_cached returns a hit and skips real generation."""
+    the consumer's _find_cached returns a hit and skips real generation.
+
+    S12.3 (2026-05-12): cache key now includes model_id +
+    guidance_scale. Defaults match BatchAudioGenGenerator.generate
+    so existing tests continue to seed the same key the consumer
+    looks up.
+    """
     from nodes.batch_audiogen_generator import (
         _cache_filename_for_write,
     )
-    fname = _cache_filename_for_write(prompt, duration, episode_seed)
+    fname = _cache_filename_for_write(
+        prompt=prompt,
+        duration_sec=duration,
+        episode_seed=episode_seed,
+        model_id=model_id,
+        guidance_scale=guidance_scale,
+    )
     fpath = os.path.join(cache_dir, fname)
     # 1.0s mono buffer at AudioGen sample rate
     samples = AUDIOGEN_SAMPLE_RATE

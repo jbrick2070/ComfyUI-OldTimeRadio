@@ -66,10 +66,17 @@ class TestMusicGenPrefixMutations:
 
 
 class TestAudioGenPrefixMutations:
+    # S12.3: keyword-only signature now requires model_id +
+    # guidance_scale on every call. Defaults match
+    # BatchAudioGenGenerator.generate so tests written against the
+    # original 3-input signature stay focused on the dimensions
+    # they're varying.
     BASE = dict(
         prompt="thunder rumble in distance",
         duration_sec=3.0,
         episode_seed="seed_xyz",
+        model_id="facebook/audiogen-medium",
+        guidance_scale=3.0,
     )
 
     def _prefix(self, **overrides):
@@ -118,17 +125,23 @@ def test_musicgen_cache_key_returns_canonical_filename():
 
 
 def test_audiogen_cache_key_returns_canonical_filename():
-    name = AG._cache_key("thunder rumble", 3.0, "seed1")
+    name = AG._cache_key(
+        prompt="thunder rumble",
+        duration_sec=3.0,
+        episode_seed="seed1",
+        model_id="facebook/audiogen-medium",
+        guidance_scale=3.0,
+    )
     assert name.endswith(".wav")
     # sfx_<safe_name>_<sha>.wav has 3 underscores between sfx, safe_name, sha
     # safe_name itself may contain underscores (sanitized prompt). Test
-    # that no millisecond timestamp suffix remains.
+    # that no millisecond timestamp suffix remains. Post-S12.3 the digest
+    # is 12 hex chars (was 8) per IMP-1 layer 1.
     stem = name[:-4]  # strip .wav
     parts = stem.split("_")
-    # Last component is the 8-char hex digest; no all-digits ts at the end.
-    assert len(parts[-1]) == 8 and all(
+    assert len(parts[-1]) == 12 and all(
         c in "0123456789abcdef" for c in parts[-1]
-    ), f"audiogen canonical filename last component should be 8-char hex sha, got {name}"
+    ), f"audiogen canonical filename last component should be 12-char hex sha, got {name}"
 
 
 # ---------------------------------------------------------------------------
