@@ -4,6 +4,26 @@ Tracking page for sprint tasks that have shipped enough mitigation
 to lock the batch but remain open. One entry per deferral with the
 reason, the mitigation already in place, and the unblock condition.
 
+## C10 — LFC audit regex extension (DEFERRED, 2026-05-13)
+
+**Status:** deferred. The plan's premise was wrong.
+
+**Reason:** the C10 plan (IMP-37) extended the legacy-audit regex with `\bLFC\b`, `\bLive Freeze Cascade\b`, and `\blfc_` prefix tokens — the assumption being that LFC was a deleted legacy generation needing forensic-marker discipline (like Director). Pre-edit dry-run grep found 159 hits across the repo, and inspection of the top hit-files surfaces the actual situation:
+
+- `OTR_LFCPhase4Scene`, `OTR_LFCPhase5Voice`, `OTR_LFCPhase6Arc` are **registered ComfyUI nodes** in `__init__.py`.
+- `nodes/_otr_lfc_phase_4_scene_coherence.py`, `_otr_lfc_phase_5_voice_drift.py`, `_otr_lfc_phase_6_episode_arc.py`, `_otr_lfc_context.py`, `_otr_lfc_llm_helpers.py`, `_otr_lfc_phase_verdicts.py`, `_otr_lfc_smart_suggestion.py`, `_otr_lfc_watchdog.py` are **all live infrastructure**.
+- `nodes/OTR_LedgerFreezeCascade.py` (the FreezeCascade itself) names "LFC" in its forensic comments as part of its own naming history.
+
+LFC is the **current** Live Freeze Cascade architecture, not a deleted lineage. Adding LFC tokens to the audit regex would flag every legitimate reference (159 of them) as a violation. The audit's contract is to catch *deleted* surfaces that survived a cleanbreak — LFC doesn't qualify.
+
+**Mitigation already in place:** none specific. The current audit (S15.5.1) catches Director-era surfaces; legacy LFC variants (if any exist) would surface there only if they were ALSO Director-era. None have been observed.
+
+**Unblock condition:** if a future sprint retires the LFC system (replaces LFCPhase4/5/6 with a different cascade architecture), revisit the regex extension. The audit token to add at that point is whatever's deleted, not the generic "LFC" name.
+
+**Plan correction:** the IMP-37 framing of "LFC tokens are legacy" in the S24 plan was an incorrect assumption. Future plans should distinguish between (a) names of currently-live systems that happen to be acronyms (LFC, FLUX, HuMo, LTX -- leave alone), and (b) names of deleted systems (Director, LLMDirector, production_plan_json -- audit).
+
+---
+
 ## C8 — CastContract quarantine (DEFERRED, 2026-05-13)
 
 **Status:** deferred. The plan's premise was wrong.
