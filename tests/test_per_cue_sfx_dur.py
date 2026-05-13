@@ -46,8 +46,13 @@ def _ledger_with_sfx_dur(dur_s):
 
 
 def test_g7_dur_s_within_bounds_passes():
-    """A SFX line with dur_s in [0.25, 12.0] produces no G7 error."""
-    for dur in (0.25, 1.0, 3.0, 8.0, 12.0):
+    """A SFX line with dur_s in [0.5, 10.0] produces no G7 error.
+
+    Voice-path-cleanbreak Sprint 6.4 (2026-05-12): bounds tightened
+    from (0.25, 12.0) to (0.5, 10.0) -- the consumer intersection of
+    AudioGen + ProcSFX. Boundary values 0.5 and 10.0 are inclusive.
+    """
+    for dur in (0.5, 1.0, 3.0, 8.0, 10.0):
         led = _ledger_with_sfx_dur(dur)
         report = _LFC.run_gap_audit(led, label="test")
         g7_errors = [e for e in report.errors if "G7" in e]
@@ -55,7 +60,8 @@ def test_g7_dur_s_within_bounds_passes():
 
 
 def test_g7_dur_s_below_min_raises():
-    """dur_s under 0.25 is a writer contract violation."""
+    """dur_s under 0.5 is a writer contract violation (Sprint 6.4
+    tightened from 0.25 to 0.5)."""
     led = _ledger_with_sfx_dur(0.1)
     report = _LFC.run_gap_audit(led, label="test")
     g7_errors = [e for e in report.errors if "G7" in e]
@@ -63,13 +69,49 @@ def test_g7_dur_s_below_min_raises():
     assert "sfx_001" in g7_errors[0]
 
 
+def test_g7_dur_s_at_old_lower_bound_now_raises():
+    """Sprint 6.4 contract: dur_s=0.25 used to pass G7; now it raises.
+    Pin the intent so a future 'relaxation' has to explicitly defeat
+    this test."""
+    led = _ledger_with_sfx_dur(0.25)
+    report = _LFC.run_gap_audit(led, label="test")
+    g7_errors = [e for e in report.errors if "G7" in e]
+    assert g7_errors, (
+        "dur_s=0.25 must FAIL G7 post-Sprint-6.4 (tightened to 0.5 minimum)"
+    )
+
+
 def test_g7_dur_s_above_max_raises():
-    """dur_s over 12.0 is a writer contract violation."""
+    """dur_s over 10.0 is a writer contract violation (Sprint 6.4
+    tightened from 12.0 to 10.0)."""
     led = _ledger_with_sfx_dur(15.0)
     report = _LFC.run_gap_audit(led, label="test")
     g7_errors = [e for e in report.errors if "G7" in e]
     assert g7_errors, "G7 should error on dur_s above MAX"
     assert "sfx_001" in g7_errors[0]
+
+
+def test_g7_dur_s_at_old_upper_bound_now_raises():
+    """Sprint 6.4 contract: dur_s=12.0 used to pass G7; now it raises."""
+    led = _ledger_with_sfx_dur(12.0)
+    report = _LFC.run_gap_audit(led, label="test")
+    g7_errors = [e for e in report.errors if "G7" in e]
+    assert g7_errors, (
+        "dur_s=12.0 must FAIL G7 post-Sprint-6.4 (tightened to 10.0 maximum)"
+    )
+
+
+def test_g7_bounds_match_consumer_intersection():
+    """Sprint 6.4 drift guard. The G7 bounds MUST equal the
+    consumer-intersection of AudioGen + ProcSFX. If a future change
+    relaxes G7 without confirming both consumers can render the wider
+    range, this test catches it."""
+    from nodes._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
+    # AudioGen clamp from batch_audiogen_generator.py: max(0.5, min(10.0, dur))
+    # ProcSFX clamp from batch_procedural_sfx.py:      max(0.1, min(10.0, dur))
+    # Intersection: max(0.5, 0.1)=0.5  min(10.0, 10.0)=10.0
+    assert SFX_DUR_MIN_S == 0.5
+    assert SFX_DUR_MAX_S == 10.0
 
 
 def test_g7_absent_dur_s_is_skipped():

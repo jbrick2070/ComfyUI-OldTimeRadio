@@ -50,24 +50,37 @@ catches the violation before any audio renders.
 
 **Tests:** `tests/test_freeze_cascade_g6.py` (8 cases).
 
-### G7: SFX dur_s bounds (voice-path-cleanbreak Sprint 3)
+### G7: SFX dur_s bounds (voice-path-cleanbreak Sprint 3 + Sprint 6.4)
 
 **Where:** `nodes/_otr_ledger_freeze.py::_check_g7_sfx_dur_invariant`,
 called from the same `run_gap_audit()` walk as G6.
 
 **Checks:** Every SFX line whose `dur_s` is set to a numeric value
-must fall in `[SFX_DUR_MIN_S=0.25, SFX_DUR_MAX_S=12.0]`. Lines
-without `dur_s` (back-compat) and non-sfx lines (whose `dur_s` is
-post-render data) are skipped.
+must fall in `[SFX_DUR_MIN_S=0.5, SFX_DUR_MAX_S=10.0]` — the
+**consumer intersection** of AudioGen + ProcSFX. Lines without
+`dur_s` (back-compat) and non-sfx lines (whose `dur_s` is post-render
+data) are skipped.
 
 **On violation:** Same Phase 0 / Phase 10 contract as G6 — Phase 10
 raises `FreezeAssertionError`.
 
-**Why this gate exists:** Catches outline-prompt drift if a future
-writer change emits a per-cue `dur_s` outside AudioGen's practical
-generation window.
+**G7 routing invariant.** `dur_s` is the writer's contract surface.
+Each SFX line routes to exactly one renderer based on `shot_engine`
+(or equivalent). Renderers apply their own quality-window clamps on
+top; **if those clamps ever fire, the writer has drifted from G7.**
+Bounds: `0.5 ≤ dur_s ≤ 10.0` (consumer intersection of AudioGen and
+ProcSFX). If a backend's quality window legitimately differs from
+this intersection, that's a `dur_s_<backend>` schema split decision,
+not a relaxation of G7.
 
-**Tests:** `tests/test_per_cue_sfx_dur.py::test_g7_*` (6 cases).
+**History:** Sprint 3 originally landed at `(0.25, 12.0)` — the
+loose union of the consumers' tolerances. QA round-robin Q-D5
+flagged the asymmetry as a footgun; Sprint 6.4 tightened to the
+intersection.
+
+**Tests:** `tests/test_per_cue_sfx_dur.py::test_g7_*` (8 cases),
+including drift guard `test_g7_bounds_match_consumer_intersection`
+and "old bound now fails" pins for both ends.
 
 ---
 

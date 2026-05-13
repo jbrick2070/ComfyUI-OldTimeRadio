@@ -603,8 +603,22 @@ def run_gap_audit(ledger_data: dict, *, label: str) -> GapAuditReport:
 
 
 # G7 SFX duration bounds. Phase 0 collect / Phase 10 raise.
-SFX_DUR_MIN_S = 0.25
-SFX_DUR_MAX_S = 12.0
+#
+# Voice-path-cleanbreak Sprint 6.4 (2026-05-12): tightened from
+# (0.25, 12.0) to (0.5, 10.0) -- the consumer intersection of
+# AudioGen + ProcSFX. The writer's contract surface is now honest:
+# every dur_s that passes G7 renders at face value through every
+# consumer. Consumer-side clamps remain as belt-and-suspenders
+# guards; if those clamps ever fire, the writer has drifted from
+# G7 (a real bug, not a quality-window mismatch).
+#
+# G7 routing invariant (see docs/gates.md): dur_s is the writer's
+# contract surface. Each SFX line routes to exactly one renderer
+# based on shot_engine (or equivalent). Renderers apply their own
+# quality-window clamps on top; if those clamps ever fire, the
+# writer has drifted from G7.
+SFX_DUR_MIN_S = 0.5
+SFX_DUR_MAX_S = 10.0
 
 
 def _check_g7_sfx_dur_invariant(
