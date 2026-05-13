@@ -147,32 +147,15 @@ _PROCSFX_SRC = (
 ).read_text(encoding="utf-8")
 
 
-def test_procsfx_module_does_not_define_cache_lookup_helpers():
-    """ProcSFX has no cache layer by design (procedural is cheap +
-    deterministic). If a future patch introduces a cache-lookup
-    helper, that helper MUST include dur_s in its key -- the same
-    invariant AudioGen pins above. This test fires when such a
-    helper appears so the author has to wire dur_s into it
-    deliberately, with their own test."""
-    forbidden_names = (
-        "_find_cached",       # AudioGen's lookup; ProcSFX shouldn't grow one
-        "_load_cached_wav",   # AudioGen's wav reader
-        "_cache_prefix",      # AudioGen's identity hash
-        "_cache_key",         # AudioGen's legacy alias
-    )
-    hits = []
-    for name in forbidden_names:
-        # Match ``def <name>(`` -- a definition, not a use site.
-        if re.search(rf"^def\s+{re.escape(name)}\s*\(", _PROCSFX_SRC, re.MULTILINE):
-            hits.append(name)
-    assert not hits, (
-        "ProcSFX has grown one or more cache-lookup helpers: "
-        f"{hits}. If this is intentional, the helper MUST include the "
-        "line's resolved dur_s in its identity (otherwise a writer-side "
-        "dur_s edit will serve a stale wav). Add a duration-aware test "
-        "to test_audiogen_cache_keys.py and remove the symbol(s) from "
-        "the forbidden list above."
-    )
+# ---------------------------------------------------------------------------
+# NOTE: ``test_procsfx_module_does_not_define_cache_lookup_helpers`` was
+# RETIRED in S12.2 (F-7 fix). The hardcoded-symbol-name source-grep was
+# rename-blind: AudioGen renaming ``_cache_prefix`` to ``_lookup_prefix``
+# would have left the guard silently passing while ProcSFX could import
+# the new name. Replaced by ``test_procsfx_does_not_import_from_audiogen_cache``
+# in tests/test_procsfx_isolation.py -- AST-walk over import statements,
+# rename-immune by construction.
+# ---------------------------------------------------------------------------
 
 
 def test_procsfx_filename_contract_documented():
