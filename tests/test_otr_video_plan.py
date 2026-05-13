@@ -141,16 +141,14 @@ def test_resolve_era_tail_normalizes_case_and_punctuation():
 
 def test_portrait_canonical_path():
     from nodes.otr_video_plan import resolve_character_portrait
-    director = {
-        "visual_plan": {
-            "characters": {
-                "BABA": {
-                    "portrait_prompt": "Cinematic portrait of elderly spacer, silver braids"
-                }
+    derived = {
+        "characters": {
+            "BABA": {
+                "portrait_prompt": "Cinematic portrait of elderly spacer, silver braids"
             }
         }
     }
-    result = resolve_character_portrait(director, "BABA", "style_tail")
+    result = resolve_character_portrait(derived, "BABA", "style_tail")
     assert "silver braids" in result
     assert "style_tail" not in result  # canonical path doesn't append tail
 
@@ -164,14 +162,14 @@ def test_portrait_tier_2_notes_fallback_is_retired():
     straight from Tier 1 (portrait_prompt) to the generic template.
     """
     from nodes.otr_video_plan import resolve_character_portrait
-    director = {
-        "visual_plan": {"characters": {"BABA": {}}},
+    derived = {
+        "characters": {"BABA": {}},
         "voice_assignments": {
             "BABA": {"voice_preset": "v2/en_speaker_8",
                      "notes": "Female, 60s, weary, low"}
         },
     }
-    result = resolve_character_portrait(director, "BABA", "cinematic tail")
+    result = resolve_character_portrait(derived, "BABA", "cinematic tail")
     # Tier 2 retired: the notes string MUST NOT appear in output.
     assert "Female, 60s, weary, low" not in result
     # Falls to the generic template (Tier-3-now-Tier-2).
@@ -180,10 +178,10 @@ def test_portrait_tier_2_notes_fallback_is_retired():
 
 
 def test_portrait_fallback_generic():
-    """No visual_plan, no voice_assignments -> generic template."""
+    """Empty projection -> generic template."""
     from nodes.otr_video_plan import resolve_character_portrait
-    director = {}
-    result = resolve_character_portrait(director, "BOOEY", "the tail")
+    derived = {}
+    result = resolve_character_portrait(derived, "BOOEY", "the tail")
     assert "BOOEY" in result
     assert "the tail" in result
 
@@ -196,14 +194,14 @@ def test_portrait_empty_character_name():
 
 
 def test_portrait_empty_portrait_prompt_falls_to_generic():
-    """If visual_plan.characters[NAME].portrait_prompt is '', fall through
+    """If derived["characters"][NAME].portrait_prompt is '', fall through
     to the generic template (Sprint 6.2 retired the notes-based Tier-2)."""
     from nodes.otr_video_plan import resolve_character_portrait
-    director = {
-        "visual_plan": {"characters": {"BABA": {"portrait_prompt": ""}}},
+    derived = {
+        "characters": {"BABA": {"portrait_prompt": ""}},
         "voice_assignments": {"BABA": {"notes": "old pilot"}},
     }
-    result = resolve_character_portrait(director, "BABA", "x")
+    result = resolve_character_portrait(derived, "BABA", "x")
     # Falls past empty Tier 1, past the retired Tier 2 (notes ignored
     # entirely now), to the generic Tier-3 template.
     assert "BABA" in result
@@ -218,15 +216,13 @@ def test_portrait_empty_portrait_prompt_falls_to_generic():
 
 def test_extract_scenes_basic():
     from nodes.otr_video_plan import extract_scenes
-    director = {
-        "visual_plan": {
-            "scenes": [
-                {"scene_id": "scene_1", "visual_prompt": "bridge"},
-                {"scene_id": "scene_2", "visual_prompt": "corridor"},
-            ]
-        }
+    derived = {
+        "scenes": [
+            {"scene_id": "scene_1", "visual_prompt": "bridge"},
+            {"scene_id": "scene_2", "visual_prompt": "corridor"},
+        ]
     }
-    scenes = extract_scenes(director)
+    scenes = extract_scenes(derived)
     assert len(scenes) == 2
     assert scenes[0]["scene_id"] == "scene_1"
 
@@ -234,30 +230,27 @@ def test_extract_scenes_basic():
 def test_extract_scenes_empty():
     from nodes.otr_video_plan import extract_scenes
     assert extract_scenes({}) == []
-    assert extract_scenes({"visual_plan": {}}) == []
-    assert extract_scenes({"visual_plan": {"scenes": []}}) == []
+    assert extract_scenes({"scenes": []}) == []
 
 
 def test_extract_scenes_malformed_skips_non_dicts():
     from nodes.otr_video_plan import extract_scenes
-    director = {
-        "visual_plan": {
-            "scenes": [
-                {"scene_id": "good", "visual_prompt": "ok"},
-                "bogus_string_entry",
-                42,
-                {"scene_id": "also_good"},
-            ]
-        }
+    derived = {
+        "scenes": [
+            {"scene_id": "good", "visual_prompt": "ok"},
+            "bogus_string_entry",
+            42,
+            {"scene_id": "also_good"},
+        ]
     }
-    scenes = extract_scenes(director)
+    scenes = extract_scenes(derived)
     assert len(scenes) == 2
 
 
 def test_extract_scenes_malformed_root_returns_empty():
     from nodes.otr_video_plan import extract_scenes
-    director = {"visual_plan": {"scenes": "not a list"}}
-    assert extract_scenes(director) == []
+    derived = {"scenes": "not a list"}
+    assert extract_scenes(derived) == []
 
 
 # ------------------------------------------------------------------

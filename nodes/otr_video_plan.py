@@ -162,27 +162,25 @@ def resolve_era_tail(style: str) -> str:
 
 
 def resolve_character_portrait(
-    director: dict,
+    derived: dict,
     character_name: str,
     style_tail: str,
 ) -> str:
     """Fallback chain for a character's visual description.
 
-    1. director.visual_plan.characters[NAME].portrait_prompt  (canonical)
-    2. Synthesized from voice_assignments[NAME].notes         (fallback)
-    3. Generic template using just the name                   (last resort)
+    1. derived["characters"][NAME].portrait_prompt   (canonical)
+    2. Generic template using just the name          (last resort)
 
     Always returns a non-empty string.
     """
     if not character_name:
         return f"Cinematic portrait of a mysterious figure, {style_tail}"
 
-    visual_plan = director.get("visual_plan") or {}
-    characters = visual_plan.get("characters") or {}
+    characters = derived.get("characters") or {}
     # BUG-LOCAL-080 (2026-05-03 EVENING): defensive coercion for
-    # LLMDirector output shape drift. The expected shape is
-    # ``visual_plan.characters[NAME] = {"portrait_prompt": "...", ...}``
-    # but high-temperature LLMDirector occasionally emits one of:
+    # writer-side visual_plan shape drift. The expected shape is
+    # ``characters[NAME] = {"portrait_prompt": "...", ...}``
+    # but high-temperature LLM output occasionally emits one of:
     #   (a) characters as a top-level LIST instead of dict (rare)
     #   (b) characters[NAME] = [{"portrait_prompt": "..."}, {"voice":
     #       "..."}] -- list-of-dicts instead of single merged dict
@@ -233,18 +231,17 @@ def resolve_character_portrait(
     return f"Cinematic portrait of {character_name}, {style_tail}"
 
 
-def extract_scenes(director: dict) -> list[dict]:
-    """Return director.visual_plan.scenes as a list of dicts.
+def extract_scenes(derived: dict) -> list[dict]:
+    """Return the projected scenes as a list of dicts.
 
     Each dict has ``scene_id``, ``shot_description``, ``visual_prompt``
-    fields (may be missing; callers must handle).  Returns empty list
+    fields (may be missing; callers must handle). Returns empty list
     if no scenes are present.
     """
-    visual_plan = director.get("visual_plan") or {}
-    scenes = visual_plan.get("scenes") or []
+    scenes = derived.get("scenes") or []
     if not isinstance(scenes, list):
         log.warning(
-            "OTR_VideoPlan: visual_plan.scenes is not a list (%s); ignoring",
+            "OTR_VideoPlan: derived.scenes is not a list (%s); ignoring",
             type(scenes).__name__,
         )
         return []
@@ -277,9 +274,16 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
     """Single derivation seam from L3 ledger to per-character +
     per-scene projection consumed by the three build_* helpers.
 
-    Loads the L3 ledger via _otr_ledger_consumers.load_ledger and
-    projects ``meta.visual_plan`` + ``cast`` + ``lines`` into the
-    shape video-render code expects.
+    Returns a flat 5-key dict -- no nested ``visual_plan`` envelope,
+    no Director-shape mirror. S11.6 closed the last surface where
+    the deleted Director's key set was anchored in active code.
+
+    Keys
+      characters         -- dict (from led.meta.visual_plan.characters)
+      scenes             -- list (from led.meta.visual_plan.scenes)
+      voice_assignments  -- dict (from led.cast at render time)
+      style              -- str (from led.meta.style)
+      genre              -- str (from led.meta.visual_plan.genre)
 
     Returns an empty dict on any parse / shape failure -- the helpers'
     downstream graceful-empty paths handle the empty case.
@@ -291,7 +295,7 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
         led = _OTRLC.load_ledger(script_json)
     except (ValueError, json.JSONDecodeError) as exc:
         log.warning(
-            "OTR_VideoPlan: script_json parse failed (%s); using empty director",
+            "OTR_VideoPlan: script_json parse failed (%s); using empty projection",
             exc,
         )
         return {}
@@ -300,7 +304,8 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
     meta = led.get("meta") or {}
     visual_plan = meta.get("visual_plan") or {}
     return {
-        "visual_plan":       visual_plan,
+        "characters":        visual_plan.get("characters") or {},
+        "scenes":            visual_plan.get("scenes")     or [],
         "voice_assignments": _OTRLC.voice_assignments_from_cast(led),
         "style":             meta.get("style") or "",
         "genre":             visual_plan.get("genre") or "",
@@ -330,13 +335,12 @@ def build_pass1_char_prompts(
     Output envelope matches BatchFluxRender's env-token schema so it
     consumes the list as-is.
     """
-    director = _visual_plan_from_script_json(script_json)
+    derived = _visual_plan_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
 
     # Collect all character names that have portrait data
-    visual_plan = director.get("visual_plan") or {}
-    chars_dict = visual_plan.get("characters") or {}
+    chars_dict = derived.get("characters") or {}
     all_char_names = [
         n for n in chars_dict.keys() if isinstance(n, str) and n.strip()
     ]
@@ -357,7 +361,7 @@ def build_pass1_char_prompts(
     tokens: list[dict[str, Any]] = []
     for name in target_names:
         portrait = resolve_character_portrait(
-            director, name, resolved_style_tail
+            derived, name, resolved_style_tail
         )
         char_slug = slugify(name) if name else "unnamed"
         tokens.append({
@@ -395,10 +399,10 @@ def build_pass2_scene_prompts(
 
     Output envelope matches BatchFluxRender's env-token schema.
     """
-    director = _visual_plan_from_script_json(script_json)
+    derived = _visual_plan_from_script_json(script_json)
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
-    scenes = extract_scenes(director)
+    scenes = extract_scenes(derived)
 
     tokens: list[dict[str, Any]] = []
     for scene in scenes:
@@ -448,7 +452,7 @@ def build_shot_plan(
     include_final_end_frame: bool = True,
 ) -> dict:
     """Build the per-shot FLUX prompt plan for one character across
-    all scenes in the Director JSON.
+    all scenes in the L3 ledger's visual_plan.
 
     Output envelope:
 
@@ -483,23 +487,22 @@ def build_shot_plan(
         )
 
     # Helper derives the per-scene shot shape from the L3 ledger.
-    director = _visual_plan_from_script_json(script_json)
-    if not isinstance(director, dict):
+    derived = _visual_plan_from_script_json(script_json)
+    if not isinstance(derived, dict):
         log.warning(
-            "OTR_VideoPlan: director root is %s not dict; using empty",
-            type(director).__name__,
+            "OTR_VideoPlan: derived root is %s not dict; using empty",
+            type(derived).__name__,
         )
-        director = {}
+        derived = {}
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
     era_tail = resolve_era_tail(style)
 
     # Multi-character compose: concatenate portraits for every character
-    # in visual_plan.characters (the whole cast). Single-character mode
+    # in derived.characters (the whole cast). Single-character mode
     # activates when ``focus_character`` is set to a specific non-empty
     # name (not "(all)"), emitting only that character's portrait.
-    visual_plan = director.get("visual_plan") or {}
-    chars_dict = visual_plan.get("characters") or {}
+    chars_dict = derived.get("characters") or {}
 
     # BUG-LOCAL-023 (Phase H, 2026-05-03): EXCLUDE non-visual roles
     # from portrait composition. ANNOUNCER (and any narrator-style
@@ -508,11 +511,10 @@ def build_shot_plan(
     # BUG-LOCAL-129b: VideoComposite static-radio fill, BatchHumoRender
     # skip). Including their portrait_prompt in scene visuals wastes
     # FLUX context AND skews composition by forcing every shot to
-    # accommodate an extra character. Belt-and-suspenders: the
-    # LLMDirector prompt also instructs the LLM to skip these roles
-    # in its visual_plan.characters output (story_orchestrator.py
-    # VISUAL PLAN RULES), but a future LLM regression could re-include
-    # them, so the filter here catches that case too.
+    # accommodate an extra character. Belt-and-suspenders: the writer
+    # is also instructed to skip these roles when emitting
+    # meta.visual_plan.characters, but a future LLM regression could
+    # re-include them, so the filter here catches that case too.
     NON_VISUAL_ROLES = {"ANNOUNCER", "NARRATOR"}
     raw_char_names = [
         n for n in chars_dict.keys() if isinstance(n, str) and n.strip()
@@ -543,15 +545,15 @@ def build_shot_plan(
 
     # Collect portrait strings for the target characters and join.
     portrait_parts = [
-        resolve_character_portrait(director, n, resolved_style_tail)
+        resolve_character_portrait(derived, n, resolved_style_tail)
         for n in target_char_names
     ]
     portrait = ", ".join(p.strip().rstrip(",").strip() for p in portrait_parts if p) \
         if portrait_parts else resolve_character_portrait(
-            director, focus_character, resolved_style_tail
+            derived, focus_character, resolved_style_tail
         )
 
-    scenes = extract_scenes(director)
+    scenes = extract_scenes(derived)
     tokens: list[dict[str, Any]] = []
 
     char_slug = slugify(focus_character)
@@ -586,7 +588,7 @@ def build_shot_plan(
 
     # Render N+1 frames. Frame k bounds shot k (as its start) and shot k-1
     # (as its end). Edge cases: frame 0 is only a start; frame N is only an
-    # end. If there are zero shots, emit zero frames (empty director case).
+    # end. If there are zero shots, emit zero frames (empty projection case).
     #
     # For N shots, we emit len(shots)+1 frames when include_final_end_frame
     # is True, else len(shots) frames (dropping the final cap).
@@ -718,7 +720,7 @@ def build_shot_plan(
 
 
 class OTRVideoPlan:
-    """OTR_VideoPlan  --  read-only Director/script adapter."""
+    """OTR_VideoPlan  --  read-only L3 ledger -> FLUX prompt adapter."""
 
     @classmethod
     def INPUT_TYPES(cls):
