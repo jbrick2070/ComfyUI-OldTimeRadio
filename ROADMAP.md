@@ -49,6 +49,32 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
+## SPRINT SEQUENCING — B -> C -> A, upstream to downstream (Jeffrey, 2026-05-13)
+
+After the current round of cleanbreak validation work closes, the next three sprints land in this order. The order is "furthest upstream first, then downstream" — pipeline order, fixing each surface before the next builds on it.
+
+| # | Sprint | Scope | Rationale for position |
+|---:|---|---|---|
+| 1 | **B — Two-Model Selector** | Two slots on `OTR_LedgerScriptWriter`: `model_creative` + `model_technical`. Every other node loses its `model_id` widget and reads from the writer's broadcast outputs. | Most upstream — lives entirely inside the writer. Mechanical 2.5-3 days. Audio C7 safe (Slot 1 defaults to current Mistral-Nemo). Clears the writer's model surface before C3 tries to flip the default. |
+| 2 | **C — `meta.story_brief` v2** | Post-write reflection pass; FLUX / LTX / HuMo / MusicGen consumers read `meta.story_brief` instead of `meta.style`. 4 pre-flight cleanbreaks + 5 build commits. | Mostly writer + helper work. C's pre-flight cleanbreaks (C2 deletes `_GENRE_BY_STYLE` + retires `meta.ltx_style_brief`; C1 deletes era literals) reshape parts of the downstream surface that A would otherwise repair. Doing C before A means A verifies the **final** contract, not an intermediate one. |
+| 3 | **A — Downstream ledger verification + repair (FLUX / LTX / HuMo)** | End-to-end pass through FLUX, LTX, HuMo confirming the post-LFC ledger + `meta.story_brief` reach every consumer correctly. Estimated 3-4 rounds of round-robin + edits per Jeffrey. | Most downstream. Once B + C land, the consumer contracts are stable; A becomes a single coherent verification + repair sprint against the shipping contract rather than a moving target. Some A-scope bugs (era literals, `_GENRE_BY_STYLE` paths, `meta.ltx_style_brief` reads) are deleted by C's cleanbreaks, so doing A second would be repair-then-demolish work. |
+
+**Don't merge A bugs into C.** Surfaces revealed during C's soak runs that aren't about the brief itself get logged to BUG_LOG.md as A-scope and either fixed inline if small or deferred to A. Keeping the scopes separate keeps each sprint attributable; otherwise C7-C9 silently absorbs a 1-2 week repair sprint and the C calendar slips.
+
+**Audio C7 baseline rules across the sequence:**
+- B preserves byte-identity (Slot 1 default == current Mistral-Nemo).
+- C3 legitimately shifts the baseline (default flips to Gemma-4-E4B-it for VRAM headroom); the new baseline is documented in the C3 commit and becomes the post-C3 reference.
+- A holds the C3 baseline throughout — any A repair work that drifts audio is reverted immediately per Prime Directive 1.
+
+**Canonical artifacts:**
+- **B** -- `docs/2026-05-13-two-model-selector-scoping.md` (scoping, 14 sections, 6 open decisions).
+- **C** -- `docs/2026-05-12-story-brief-v2-problem-statement.md` + `docs/2026-05-12-story-brief-v2-research.md` + `docs/2026-05-12-story-brief-v2-design-refinements.md` + `docs/2026-05-13-story-brief-v2-go-forward-plan.md`.
+- **A** -- TBD; opens when the sprint starts. Likely lives under `docs/<date>-downstream-ledger-verification/` per the round-robin save discipline (CLAUDE.md round-robin section).
+
+**S24 public-facing polish (already on the roadmap below) gates on A close** -- can't ship a sample episode + README rewrite while downstream is still mid-repair.
+
+---
+
 ## CURRENT WORK -- S25 MusicGen parity + soft-rollout flip + legacy gating (LOCKED 2026-05-13)
 
 **Stack head:** `1b08ad9` (Phase 9 commit on `s25-musicgen-parity`; final push hash lands in Phase 11 post-mortem).
@@ -152,7 +178,7 @@ Each consumer's `audit_post_freeze_writeback(..., strict=True)` flip is gated on
 
 ---
 
-## NEXT SPRINT — `meta.story_brief` v2 (planning, not started)
+## SPRINT #2 (C) — `meta.story_brief` v2 (planning, not started)
 
 **State:** Planning. Three canonical docs locked; one round-robin question open before build starts.
 
@@ -238,8 +264,10 @@ Same three fixtures double as the §6.1 LTX-budget tuning set and the §11 VRAM-
 ### Gating
 
 - S15.5 → S23 cleanbreak must close (current cleanbreak workstream).
-- `meta.story_brief` v2 must ship (NEXT SPRINT above) — public-facing visuals key off the brief, so polish without the brief showcases the slug-only output the brief was built to replace.
-- Era literals deletion + `_GENRE_BY_STYLE` deletion (pre-flight cleanbreaks for `meta.story_brief` — see above) must land. Sample episode in S24.1 should not ship a hardcoded "1940s" decade visible in any rendered output.
+- **SPRINT #1 (B) must close** — Two-Model Selector. Sample episode in S24.1 should reflect the post-B selector surface, not the legacy `model_id` widget.
+- **SPRINT #2 (C) must close** — `meta.story_brief` v2. Public-facing visuals key off the brief, so polish without the brief showcases the slug-only output the brief was built to replace.
+- **SPRINT #3 (A) must close** — downstream ledger verification + repair (FLUX / LTX / HuMo). Can't ship a sample episode + README rewrite while downstream is still mid-repair.
+- Era literals deletion + `_GENRE_BY_STYLE` deletion (pre-flight cleanbreaks for `meta.story_brief` — see SPRINT #2 above) must land. Sample episode in S24.1 should not ship a hardcoded "1940s" decade visible in any rendered output.
 
 ### Re-read triggers
 
@@ -252,6 +280,80 @@ Same three fixtures double as the §6.1 LTX-budget tuning set and the §11 VRAM-
 - Contributor docs and user docs stay separate. The contributor docs (BUG_LOG, ROADMAP, survival guide, ADRs) are good and stay where they are. The user docs S24.7 lists are new surfaces, not rewrites of existing ones.
 - License + content-policy + included-model-license disclosure must land before announcement. Public release means strangers using OTR for purposes Jeffrey didn't predict.
 - Sample episode quality must reflect post-cleanbreak baseline, not legacy-path output. Re-render S24.1 if it predates the `meta.story_brief` ship.
+
+---
+
+## SPRINT #1 (B) — Two-Model Selector on Story Writer (scoping, not started — next up)
+
+**State:** Scoping only. Jeffrey 2026-05-13. Timing open ("not sure when I will do this"). No code or workflow JSON changes — full scoping doc captures the design.
+
+**Premise.** The Story Writer (`OTR_LedgerScriptWriter`) should be the **only** place in the workflow where a model is picked. Two dropdowns: `model_creative` (narrative LLM — outline / cast / dialogue / polish) and `model_technical` (structured LLM — JSON validators / freeze-cascade verdicts / format rescue / critic). Every other node currently exposing a `model_id` widget (Freeze Cascade + LFC Phase 4/5/6 + visual selector + AudioGen + MusicGen) gets its widget deleted and reads from the writer's broadcast outputs via wires.
+
+**History.** A partial version of this feature already shipped — `tests/test_two_llm_split.py` proves a `cleanup_model_id` widget existed on the writer and routed structured phases to the technical model. The widget was deleted during the S15.5+ writer slim-down; the legacy-strip loop at `OTR_LedgerScriptWriter.py:2475` still pops `cleanup_model_id` off old workflow JSONs. This sprint is **finishing the rollback + reinstating the design properly** with full centralization, not greenfield.
+
+### Canonical artifact
+
+- `docs/2026-05-13-two-model-selector-scoping.md` — the full scoping doc. 14 sections covering current state inventory (10 model-pick sites identified), target widget surface, dropdown source (curated + local-cache scan), red-state UX for not-downloaded models, security model, workflow JSON re-wiring, per-file change manifest, test plan, six open decisions for Jeffrey, round-robin trigger points, rollout phases.
+
+### Open decisions before any code moves (scoping doc §10)
+
+1. **Non-LLM model picks (TTS / SFX / music / video).** Shape A (writer carries N slots) vs Shape B (dedicated `OTR_ModelHub` node) vs Shape C (defaults locked behind a maintainer config flag). Doc recommends **B**.
+2. **Red-state UX.** Label-suffix `[NOT DOWNLOADED]` (zero-JS) vs custom JS widget extension. Doc recommends **suffix first**, JS as follow-up.
+3. **Auto-download default.** ON (with env-var off switch) vs OFF (manual). Doc recommends **ON**.
+4. **`vram_context_test.py` test bench.** Touch in first PR vs carve-out. Doc recommends **carve-out**.
+5. **`OTR_VisualLLMSelector`.** Keep as a passthrough vs delete. Doc recommends **delete** per `feedback_no_legacy_back_compat`.
+6. **Slot 2 default model.** Same as Slot 1 (single-LLM baseline) vs a different small model. Doc recommends **same as Slot 1** so audio C7 byte-identity holds across the switch.
+
+### Gating
+
+- No hard gate; can land anytime Jeffrey opens the sprint.
+- Phases 2 + 3 (writer surgery + consumer rewire) touch the audio path indirectly via `model_creative` defaulting to the prior `model_id`. **Bug Bible regression + `test_audio_byte_identical.py` must hold** at every commit. Prime Directive 1 (audio is king) governs revert decisions.
+- Round-robin triggered for: (a) the Shape A/B/C decision, (b) the two-model VRAM swap pattern (`_flush_vram_keep_llm` between slots), (c) auto-download on Windows HF paths.
+
+### Standing directives this sprint inherits
+
+- No legacy back-compat — old `model_id` widgets get deleted, no transition shims, workflow JSON re-written clean.
+- 14.5 GB VRAM ceiling — two models requested back-to-back must use `_flush_vram_keep_llm()` between phases, never `force_vram_offload()`.
+- Wire it or don't ship it — writer node-side changes are not done until workflow JSON is re-wired + drift-guard test pins the new widget order.
+- Lean docs — the scoping doc is the canonical artifact; no sidecar briefs needed during build.
+
+### Re-entry trigger
+
+- Jeffrey opens this sprint OR another sprint touches the writer's widget surface (collision risk — coordinate first).
+
+---
+
+## SPRINT #3 (A) — Downstream ledger verification + repair (not started)
+
+**State:** Not started. Gated on C close. Jeffrey 2026-05-13: "I am pretty darn sure that A wiring was not good — likely 3-4 rounds of round-robin and edits to go through to ensure."
+
+**Premise.** After the L3 ledger contract landed and the post-LFC writeback path was finished, the audio path was verified end-to-end. The visual path (FLUX env / FLUX portraits / LTX motion / HuMo lip-sync) has **not** been verified against the new ledger surface. Hardcoded era literals, deleted-but-still-referenced fields, and stale prompt-assembly paths are likely still wired into the downstream consumers in ways that work-by-accident or fail-silently.
+
+**Why it lands last (per the B -> C -> A sequencing block above):**
+- C's pre-flight cleanbreaks already delete `_GENRE_BY_STYLE`, retire `meta.ltx_style_brief`, and remove era literals — repairing those in A first would be repair-then-demolish work.
+- C5/C6 rewrite the consumer reads from `meta.style` + legacy fallbacks to `meta.story_brief` via central helpers. The contract A verifies against is the post-C contract, not the in-flight one.
+
+**Scope (provisional — finalize when sprint opens):**
+
+1. **FLUX env + radio bookend.** One short episode (~30 words) through `visual/batch_flux_env_render.py` + `visual/batch_flux_portrait_render.py`. Confirm `cast[*].portrait_prompt`, `meta.style`, `meta.story_brief` (post-C), and any ledger-driven lighting / atmosphere fields are read correctly. Spot any "works by accident" reads.
+2. **LTX motion.** Same episode through `nodes/batch_ltx_render.py` + `_build_ltx_role_prompt`. Confirm motion verbs lead, brief fragment lands at the §6.7 budget (220-240 chars total, 80-100 chars brief), no `meta.ltx_style_brief` fallback fires.
+3. **HuMo lip-sync.** Same episode through `nodes/batch_humo_render.py`. Confirm audio + ledger contracts match the per-clip wall-time profile (10-12 min per character line per `reference_humo_per_clip_wall_time`).
+4. **Round-robin per bug.** ChatGPT + Gemini per CLAUDE.md round-robin section. Save transcripts under `docs/<date>-downstream-ledger-verification/`. Expected 3-4 rounds per Jeffrey's estimate.
+
+**Estimate:** 1-2 weeks of focused sessions. HuMo's per-clip wall time means smoke episodes are 30-60 min wall time each, so the iterative loop is naturally slow.
+
+**Gating:**
+- C must close (writer + brief + helpers + consumer rewires all green per their respective Bug Bible regressions).
+- Bug Bible regression 23/1/2 must hold after every A repair commit.
+- Audio C7 byte-identity must hold against the **post-C3 baseline** (the Gemma-4-E4B-it audio output, documented in the C3 commit).
+
+**Re-entry trigger:**
+- C closes its Bug Bible green + Jeffrey opens this sprint.
+
+**Standing directives this sprint inherits:**
+- No legacy back-compat. Delete dead surfaces; don't add transition shims.
+- Prime Directive 1 — audio is king. If an A repair touches the audio path and drifts byte-identity, revert immediately.
+- Lean docs. Round-robin transcripts go under `docs/<date>-downstream-ledger-verification/`; canonical written artifacts are BUG_LOG.md + ROADMAP.md.
 
 ---
 
