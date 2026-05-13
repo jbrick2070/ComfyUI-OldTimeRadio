@@ -37,6 +37,25 @@ Current modules following this convention:
 | `nodes/_otr_ledger_consumers.py` | `load_ledger`, `iter_lines`, ... | `batch_audiogen_generator.py`, `batch_procedural_sfx.py`, `scene_sequencer.py`, `musicgen_theme.py`, `video_engine.py`, `otr_video_plan.py` |
 | `nodes/_otr_ledger_freeze.py` | `FreezeCascade`, gate helpers     | `OTR_LedgerScriptWriter.py`, `batch_bark_generator.py`                     |
 
+**Note on the `_lib` suffix:** only the first two entries above
+(`_otr_bark_lib.py`, `_otr_sfx_lib.py`) carry the strict `_lib`
+suffix this section's header documents. The three remaining
+entries (`_otr_casting.py`, `_otr_ledger_consumers.py`,
+`_otr_ledger_freeze.py`) are private library modules that predate
+the suffix convention; they're listed here because they expose
+the same kind of helper surface, but they aren't required to
+follow the `_lib` test rule (which only fires for
+`_otr_*_lib.py`). New private library modules going forward
+should adopt the `_otr_<name>_lib.py` shape so the test enforces
+the no-node-class invariant; the three legacy entries are
+grandfathered.
+
+The S19.2 doc-freshness check
+(`tests/test_naming_conventions.py::test_conventions_doc_lists_every_lib_module`)
+scans `nodes/_otr_*_lib.py` strictly and asserts every match
+appears in this doc. As of 2026-05-13 there are 2 such modules and
+both are listed.
+
 ### Test enforcement (S10.3)
 
 Both rules are pinned by `tests/test_naming_conventions.py`:
