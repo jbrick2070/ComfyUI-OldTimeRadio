@@ -10,7 +10,8 @@ model.
 v1.5 AudioGen Integration - Jeffrey Brick
 v2 ledger consumer (2026-05-09): Reads the v2 ledger from the
 script_json wire input, walks sfx lines, persists per-cue wavs to
-``<episode>/audio/sfx/proc_<sfx_type>_<line_id>.wav`` (best-effort),
+``<episode>/audio/sfx/proc_<sfx_type>_<line_id>_<perm>.wav`` (best-effort,
+where ``<perm>`` is an 8-char SHA-256 over (dur_s, type, line_id) per S12.1),
 and stamps ``sfx_wav_path`` + ``sfx_engine="procedural"`` + ``sfx_type``
 + ``dur_s`` per line_id on ``ledger.lines[]``. No cache layer
 (procedural is cheap + deterministic). Disk-write failure falls
@@ -19,6 +20,7 @@ unaffected.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -223,15 +225,26 @@ class BatchProceduralSFX:
                 audio_np *= (0.95 / peak)
 
             # 3a. Persist per-cue wav to <episode>/audio/sfx/ (best-effort).
-            # Filename: proc_<sfx_type>_<line_id>.wav, both segments
-            # sanitized. On any disk error the function returns False
-            # and we stamp sfx_wav_path=None on the ledger row (the
-            # AUDIO batch return still ships).
+            # Filename: proc_<sfx_type>_<line_id>_<perm>.wav, all
+            # segments sanitized. <perm> is an 8-char content-addressed
+            # SHA-256 over (cue_duration, chosen_type, line_id) so
+            # iteration on scene timing doesn't overwrite the previous
+            # render -- the same line_id at two different durations
+            # produces two distinct on-disk wavs (S12.1 / F-6 fix).
+            # Procedural wavs are deterministic so collisions within
+            # fixed inputs are impossible. Disk usage grows with
+            # iteration count but procedural wavs are kB-scale.
+            # On any disk error the function returns False and we
+            # stamp sfx_wav_path=None on the ledger row (the AUDIO
+            # batch return still ships).
             wav_path: Optional[str] = None
             if sfx_dir is not None and line_id:
+                perm = hashlib.sha256(
+                    f"{cue_duration:.3f}|{chosen_type}|{line_id}".encode("utf-8")
+                ).hexdigest()[:8]
                 fname = (
                     f"proc_{_safe_filename_segment(chosen_type)}_"
-                    f"{_safe_filename_segment(line_id)}.wav"
+                    f"{_safe_filename_segment(line_id)}_{perm}.wav"
                 )
                 fpath = os.path.join(sfx_dir, fname)
                 if _save_proc_sfx_wav(fpath, audio_np, SAMPLE_RATE):
