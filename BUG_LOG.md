@@ -2,10 +2,10 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-210 (2026-05-13) -- no new bugs since S24 batch close at `fdb164b`. Post-batch docs (`f529812` QA + `f11fee1` master tracker) added no code surface.
-**Stack head when last updated:** `f11fee1`
+**Last entry:** BUG-LOCAL-220 (2026-05-13) -- S25/MusicGen-parity + soft-rollout-flip + legacy-gating sprint added BUG-LOCAL-211..220 covering the MusicGen path's AudioGen-parity gap + the soft-rollout deadlock.
+**Stack head when last updated:** S25 phase 9 commit (s25-musicgen-parity branch)
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
-**Bible candidates pending promotion:** 8 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`.
+**Bible candidates pending promotion:** 17 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210, 211, 212, 213, 214, 216, 217, 218, 219, 220) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`.
 
 ---
 
@@ -143,6 +143,96 @@ sprints, regardless of fix-status.
 - **Tags:** widget-vector, position-pinned, cleanbreak-debris, audiogen, voice-path-cleanbreak
 - **Bible candidate rationale:** General lesson -- when a cleanbreak deletes a REQUIRED INPUT_TYPES entry, the workflow JSON's widgets_values vector MUST be trimmed in the same commit. ComfyUI's permissive load means the misalignment ships silently. Future plans should add a step to the cleanbreak playbook: "delete input X" -> "shrink every saved-workflow widget vector by 1 at X's index". This batch's C6 widget-vector test catches the next instance.
 
+### BUG-LOCAL-220: `_fallback/` directory had no garbage collection [FIXED f4403e6+d289e29 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** S24/C2's `_fallback/` redirect (correct fix for cache-poisoning on short-output renders) shipped without a cleanup hook. Across re-runs of the same episode, the `<cache_dir>/_fallback/` directory accumulated orphan silence wavs that no consumer ever read. Bounded per cue but unbounded across iterations -- effectively an unowned cache that grew until manual cleanup.
+- **Cause:** The C2 fix was scoped to "stop poisoning the canonical cache_path on the short-output path." The `_fallback/` dir was framed as ephemeral but the cleanup was never wired -- a classic "we'll get to that later" oversight that lasted from S24 close to S25 open. The "soft-rollout deadlock" sibling (BUG-LOCAL-219) shares the same anti-pattern: ship the alarm wiring, defer the implementation, never wire the implementation.
+- **Fix:** S25/AG-1+MG-7 -- per-episode `_fallback/` cleanup hook added immediately after `_cache_dir()` resolves in BOTH `batch_audiogen_generator.py::BatchAudioGenGenerator.generate()` AND `musicgen_theme.py::MusicGenTheme.render()`. Wipes stale `.wav` entries and logs `_fallback/ cleanup: removed N stale wav(s)` to batch_log / render_log when N > 0.
+- **Verify:** Manual: drop a file in `output/otr/episodes/<ep>/audio/_fallback/foo.wav`, run AudioGen, confirm the file is gone and the log line fires.
+- **Tags:** cache-cleanup, ephemeral-dir, c2-followup, audiogen, musicgen, soft-rollout-debt
+- **Bible candidate rationale:** General lesson -- whenever a fix introduces a "this is ephemeral" surface (cache, scratch dir, temp file), the cleanup hook lands in the same commit. "We'll get to that later" cleanup hooks accumulate across sprints and create unowned cache surfaces that no one notices until disk fills up.
+
+### BUG-LOCAL-219: "Soft-rollout never flipped" deadlock [FIXED 9afa54a+f592d71 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `audit_post_freeze_writeback` shipped at S18.2 with the docstring "use strict=False for the soft-rollout phase -- consumers log violations to batch_log." No consumer ever called it. `ProcSFX.strict_writeback` defaulted to False at S18.3 with the flip-criterion "once the audit walker has stayed clean for one full pipeline run" -- but the walker was never running, so the criterion was unreachable. Net: a Phase-0 alarm shipped as "off but ready to flip on once it proves itself clean", the path to "prove itself clean" required the consumer to call it, the consumer never did, and the audit slept for five sprints.
+- **Cause:** Two safety surfaces shipped with flip-criteria that referenced each other in an unreachable cycle. Neither shipped with an inline owner; neither sprint after S18 audited whether the criteria had been met. The "soft rollout" framing made each individual half look like work-in-progress rather than the deadlock it was in aggregate.
+- **Fix:** S25/AG-5..9 -- wired `audit_post_freeze_writeback` in soft mode at all three line-writing consumers (AudioGen, MusicGen, ProcSFX; VideoComposite writeback doesn't touch any audited line field so it's documented N/A). Flipped `ProcSFX.strict_writeback` default to True in the same sprint -- with the walker actually running, the criterion is now satisfiable and the strict default is honest about what the production contract is.
+- **Verify:** `pytest tests/test_procsfx_writeback_convention.py -v` (10 passed; the two strict-default pins now lock True). Grep audit: `grep -rn 'audit_post_freeze_writeback' nodes/ --include='*.py' | grep -v _otr_ledger_consumers.py` returns 3 active call sites.
+- **Tags:** soft-rollout, deadlock, audit-walker, flip-criterion, ownerless-defer
+- **Bible candidate rationale:** General lesson -- any feature shipped behind a "soft rollout" flag MUST include (a) an inline flip-criterion that is *checkable* from the current commit's state, and (b) a named owner with a sprint deadline. Without both, "soft rollout" deterministically becomes "permanent off" because each sprint's planning pass treats it as "already shipped, not my problem." If the criterion references "the audit walker stays clean for one run", the same commit MUST wire the walker -- otherwise the criterion is unreachable and the flag is dead.
+
+### BUG-LOCAL-218: Silent `model_id` repair contradicted loud-fail comment [FIXED d289e29 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `batch_audiogen_generator.py:293-294` silently mapped `str(model_id) in {"3", "3.0"}` to `"facebook/audiogen-medium"` while the INPUT_TYPES comment at `:255-259` explicitly stated "Fail loudly on bad input." The widget vector that originally triggered the drift (BUG-LOCAL-027) was already cleaned at S24/C3 -- the runtime repair had no production case left to defend against AND was masking misconfiguration AND contradicted the documented loud-fail behavior.
+- **Cause:** When BUG-LOCAL-027 was fixed at the root by the C3 widget vector realignment, the downstream defender wasn't audited and deleted. It accumulated as silent-repair debris -- a code block whose triggering condition was fixed upstream months earlier.
+- **Fix:** S25/AG-4 -- deleted the active `if str(model_id) in ["3", "3.0"]: model_id = "facebook/audiogen-medium"` lines; forensic comment preserved citing the deletion sprint + tying it to the original BUG-LOCAL-027 root-cause fix at S24/C3. Updated INPUT_TYPES.optional.model_id comment to remove the contradiction: loud-fail is now the literal behavior (combo-list enforces).
+- **Verify:** `pytest tests/test_audiogen_legacy_gate.py::test_model_id_silent_repair_removed tests/test_audiogen_legacy_gate.py::test_model_id_input_combo_list_intact -v`.
+- **Tags:** silent-repair, defender-debris, comment-code-drift, audiogen, c3-followup
+- **Bible candidate rationale:** General lesson -- when a defensive code block's triggering condition is fixed at the root, audit and delete the downstream defenders. Otherwise they accumulate as silent-repair landmines that mask the next class of misconfiguration AND contradict the code's documented "loud fail" contract. Pattern: every "fix root cause" commit should grep for downstream defenders against the original bug's symptom and prune them in lockstep.
+
+### BUG-LOCAL-217: AudioGen legacy `ledger.sfx[]` skipped C2 gate [FIXED d289e29 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** S24/C2's ghost-path fix landed on the new v2 `ledger.lines[]` writeback path at `batch_audiogen_generator.py:765-775` but not on the parallel legacy `ledger.sfx[]` loop at `:696-724`. Same field (`wav_path`), same failure mode (ledger row points at a path that was never confirmed on disk). The legacy path is dead code for current v2 producers but is the contract for any external producer still emitting the legacy shape -- and an "unused" path that ships with a bug is still a bug.
+- **Cause:** C2's audit framing was "fix the new v2 writeback path." The legacy parallel loop wasn't in scope. A `git grep wav_path` against `batch_audiogen_generator.py` would have caught both paths in seconds; the audit was narrower than the field surface.
+- **Fix:** S25/AG-2 -- mirrored the C2 gate `(save_ok or had_cache_hit) AND os.path.isfile(cache_path)` onto the legacy loop. Failure branch stamps `row["wav_path"] = ""` per §6.16. Added `sfx_render_status` stamping on the legacy loop too so the audit walker (S25/AG-5) sees a consistent enum surface across both paths. CD-3 audit (S25 phase 7) confirmed zero current producers populate the legacy `sfx[]` -- the gate is conservative belt-and-suspenders until the S26.X deletion lands.
+- **Verify:** `pytest tests/test_audiogen_legacy_gate.py -v`. Grep audit: 2 `os.path.isfile(cache_path)` sites in `batch_audiogen_generator.py` (v2 lines[] + legacy sfx[]).
+- **Tags:** parallel-path, ghost-path, c2-followup, legacy-loop, sibling-audit
+- **Bible candidate rationale:** General lesson -- when a safety fix lands on path A, audit every parallel path that handles the same ledger field. The audit should be a `git grep <field>` across the entire module (or repo, depending on field scope), not a manual walk of the changed file's neighbors. The "but it's the legacy path / dead code" framing is exactly when the bug ships unnoticed because the fix author and the reviewer both skip it.
+
+### BUG-LOCAL-216: Style slug drift surface (writer pool vs palette) [FIXED 9679217 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `musicgen_theme._STYLE_PALETTE` (10-key dict mapping slug -> cue prompts) and `OTR_LedgerScriptWriter._STYLE_PICKER_SEED_POOL` (10-tuple of slugs) were maintained as two parallel lists in two files. Drift between them caused MusicGen to halt mid-pipeline (after the script writer + freeze cascade had already spent minutes of model time + thousands of tokens) -- the writer emitted a slug that the palette didn't cover, MusicGen raised at lookup, the operator lost the run.
+- **Cause:** Two surfaces, one contract, no enforcement. When a new style slug was added, the contributor had to remember to update both -- and even when they did, a future contributor renaming one entry would silently break the other.
+- **Fix:** S25/MG-6 -- hoisted both sources of truth to `nodes/_otr_style_palette.py` with `STYLE_PALETTE` + `KNOWN_STYLE_SLUGS`. `musicgen_theme.py` re-imports as `_STYLE_PALETTE`; the writer pool stays its own surface but `tests/test_style_palette_drift.py` pins set-equality with `KNOWN_STYLE_SLUGS`. Freeze cascade gained an additional check in `_check_meta_invariants` that validates `meta.gen_params_initial.style ∈ KNOWN_STYLE_SLUGS` -- writer drift now surfaces at freeze time, before MusicGen even tries to look the slug up.
+- **Verify:** `pytest tests/test_style_palette_drift.py -v` (5 tests: palette == known, writer pool == known, every entry has 3 cues, freeze rejects unknown, freeze accepts known).
+- **Tags:** drift, source-of-truth, parallel-list, freeze-cascade, style-palette
+- **Bible candidate rationale:** General lesson -- any data contract maintained as two parallel lists in two files becomes drift-prone in O(weeks). Hoist to a shared module on first drift detection (or pre-emptively if the parallel structure is visible at design time). Pin set-equality with a unit test that imports both surfaces; any future drift fires at unit-test time, not soak time.
+
+### BUG-LOCAL-215: MusicGen NODE_CLASS_MAPPINGS prefix drift [FIXED f4403e6 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** no
+- **Symptom:** `musicgen_theme.py` registered the node as `NODE_CLASS_MAPPINGS = {"MusicGenTheme": MusicGenTheme}` while `__init__.py:_NODE_MODULES` registers the same class under the canonical `OTR_MusicGenTheme` key. The in-module dict was dead code (the top-level `__init__.py` re-registers from the class object directly, not from the in-module mapping dict) -- but ANY test or external consumer that imported `NODE_CLASS_MAPPINGS` from the module directly got the bare name. Display name also carried a literal `"[EMOJI]"` placeholder string.
+- **Cause:** The OTR_ prefix migration touched the registration site in `__init__.py` but not the leftover in-module declarations on each node file. No test pinned the in-module dict's key to match the top-level registration.
+- **Fix:** S25/MG-5 -- aligned the in-module mapping to `{"OTR_MusicGenTheme": MusicGenTheme}`, dropped the `"[EMOJI]"` placeholder string from the display name. New regression test `test_musicgen_parity.py::test_node_registered_under_otr_prefix` pins the prefix; `test_node_display_name_has_no_placeholder` pins the no-placeholder rule.
+- **Verify:** `pytest tests/test_musicgen_parity.py::test_node_registered_under_otr_prefix tests/test_musicgen_parity.py::test_node_display_name_has_no_placeholder -v`.
+- **Tags:** node-registration, prefix-drift, dead-code, display-name
+- **Bible candidate rationale:** Cosmetic in isolation; the broader lesson (any registration surface stamped in multiple files needs a test pin) is covered by the general drift-pattern entries (BUG-LOCAL-216, IMP-43).
+
+### BUG-LOCAL-214: Silence fallback ignored cue duration [FIXED f4403e6 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `musicgen_theme._silent_audio_dict(sample_rate)` emitted a fixed `int(sample_rate * 0.1)`-sample clip regardless of cue. On the ImportError + `allow_silence_fallback=True` path, the 12-second opening cue and the 8-second closing cue both got 100 ms of silence -- which then propagated into EpisodeAssembler and broke the timeline (opening theme slot was 100 ms of silence then a 11.9s gap to the dialogue, closing theme was 100 ms then nothing). The bug shipped silently because the fallback path is rarely exercised (transformers is installed in production).
+- **Cause:** Helper was a one-liner written under the assumption "we only need a brief placeholder." The signature didn't take a duration; every caller passed nothing; nobody noticed the EpisodeAssembler downstream needed real per-cue durations.
+- **Fix:** S25/MG-4 -- `_silent_audio_dict(duration_sec, sample_rate=MUSICGEN_SAMPLE_RATE)` -- duration is now required. The ImportError fallback loop passes `CUE_DURATIONS[cue_id]`. Test `tests/test_musicgen_parity.py::test_silent_audio_dict_honors_duration` pins the contract.
+- **Verify:** `pytest tests/test_musicgen_parity.py::test_silent_audio_dict_honors_duration -v`.
+- **Tags:** silence-fallback, duration, musicgen, timeline, rarely-exercised
+- **Bible candidate rationale:** General lesson -- a rarely-exercised code path (transformers ImportError on a box where transformers IS installed) is exactly the kind of fallback that ships with sloppy semantics for years because nobody hits it in soak. Audit fallback paths for "does this honor every contract the success path honors?" -- in this case, the cue duration is part of the EpisodeAssembler timeline contract, and the fallback emitted nonsense.
+
+### BUG-LOCAL-213: MusicGen `music_render_status` documented but never written [FIXED f4403e6 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** `musicgen_theme.MusicGenTheme.INPUT_TYPES` docstring and the ImportError fallback comment both promised stamping `music_render_status="fallback_silence"` on each affected ledger row. No code path actually wrote the field. Compounded by an early `return` in the ImportError fallback that bypassed the writeback block entirely -- so even if the field had been stamped in `cues[cue_id]`, the writeback never ran on the fallback path.
+- **Cause:** Two bugs in one surface: (1) the writeback block didn't include `row["music_render_status"]` (it stamped wav_path, dur_s, tts_engine, etc., but not the status enum), and (2) the ImportError branch returned early before the writeback block could fire. Both bugs are easy to introduce when "soft path returns early" looks like a defensive shortcut.
+- **Fix:** S25/MG-3 -- writeback block now always stamps `row["music_render_status"] = str(cue.get("_render_status") or "ok")`. ImportError branch refactored to fall through to the writeback block (added `else:` clause on the try/except so the model-loading code only runs when the import succeeded, then the writeback fires on whatever shape the cues are in). Audit walker (`audit_post_freeze_writeback`) gained `ALLOWED_MUSIC_RENDER_STATUS` enum check so typos surface.
+- **Verify:** Source-level pin in `tests/test_post_freeze_writeback_audit.py` via `ALLOWED_MUSIC_RENDER_STATUS`. End-to-end pin via the wired-walker calls in Phase 5.
+- **Tags:** comment-code-drift, early-return, render-status, enum, musicgen
+- **Bible candidate rationale:** General lesson -- comments promising ledger behavior must be exercised by an acceptance test in the same commit. Otherwise the documentation drifts from the code and becomes a silent contract drift that future contributors believe is honored. Pattern: when a docstring says "stamps X", the same commit should add a test `assert "X" in ledger_row_dict`. Belt-and-suspenders: include the field in `audit_post_freeze_writeback`'s field list so the soft-mode walker fires on any consumer that drops the stamp.
+
+### BUG-LOCAL-212: MusicGen writeback ghost-path [FIXED f4403e6 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Sibling of S24/C2's AudioGen ghost-path. `musicgen_theme.py:771` stamped `row["wav_path"] = str(cache_path)` unconditionally whenever `cache_path` was a truthy string. Cache_path was set from the canonical cache filename builder regardless of whether the save eventually succeeded -- so on `_save_wav` failure (BUG-LOCAL-211), short-output fallback, or ImportError silence-fallback, the ledger row pointed at a path that was never confirmed on disk.
+- **Cause:** Same root cause as BUG-LOCAL-209 (AudioGen): writeback gated on the string variable instead of the save outcome. The implicit assumption was "if we computed a cache_path, the file is there." That's only true on the happy path; the ImportError + short-output + disk-failure paths all violate it.
+- **Fix:** S25/MG-2 -- writeback now reads `save_ok = bool(cue_dict.get("_save_ok"))` and `had_cache_hit = bool(cue_dict.get("_had_cache_hit"))` and gates `row["wav_path"] = str(cache_path)` on `cache_path AND (save_ok OR had_cache_hit) AND os.path.isfile(cache_path)`. Failure paths stamp `row["wav_path"] = ""` per §6.16. The cache-hit branch in the resolve loop also stamps `cue["_had_cache_hit"] = True` so the gate distinguishes a fresh-save from a load-from-disk hit.
+- **Verify:** Source-level pin via `tests/test_workflow_audio_widget_vectors.py` (BUG-LOCAL-210 sibling test) + `tests/test_musicgen_parity.py::test_save_wav_returns_bool_on_success/failure` (which gates the upstream save outcome). End-to-end: any production run with the ImportError fallback now produces `row["wav_path"] = ""` instead of a ghost path.
+- **Tags:** ghost-path, writeback, c2-sibling, musicgen, save-proof
+- **Bible candidate rationale:** General lesson -- already covered by BUG-LOCAL-209's promotion. The Bible entry that lands from #209 should explicitly enumerate "audit every sibling consumer with the same shape" so #212 doesn't ship in S25 the way it did. The pattern audit needs to run BEFORE the bible promotion, not after.
+
+### BUG-LOCAL-211: MusicGen `_save_wav -> None` [FIXED f4403e6 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** Direct sibling of BUG-LOCAL-209 (AudioGen). `_save_wav` in `nodes/musicgen_theme.py:281` declared `-> None`. Success path fell off after `os.replace(tmp, path)`; the except path fell off after `log.warning(...)`. Both returned implicit None. Callers couldn't distinguish a confirmed write from a swallowed exception. The writeback path keyed on `cache_path` (the string variable, always truthy after the filename builder) instead of the save's outcome -- so any save failure left a ledger row pointing at a path that was never written. BUG-LOCAL-212 is the immediate downstream consequence.
+- **Cause:** Same implicit-None bug as BUG-LOCAL-209 -- function signature declared `-> None`, both code paths just ran off the end and returned None. The function was originally written as fire-and-forget (only the log.warning mattered on failure) but the writeback path quietly became a consumer of its outcome.
+- **Fix:** S25/MG-1 -- signature changed to `-> bool` with explicit `return True` after `os.replace` and `return False` from the except branch. The render path captures `save_ok = _save_wav(...)` and stores it in `cue["_save_ok"]`. Writeback gates `wav_path` stamping on `(save_ok or had_cache_hit) AND os.path.isfile(cache_path)` per §6.16.
+- **Verify:** `pytest tests/test_musicgen_parity.py::test_save_wav_returns_bool_on_success tests/test_musicgen_parity.py::test_save_wav_returns_bool_on_failure -v`.
+- **Tags:** implicit-none, save-proof, audiogen-sibling, musicgen, bug-209-mirror
+- **Bible candidate rationale:** General lesson -- the BUG-LOCAL-209 Bible entry (when it promotes after v2.0 ships) should explicitly include an audit step "grep for `-> None` on every save-style function whose callers check truthiness" -- across the whole repo, not just the consumer that triggered the original entry. The sibling-audit gap that let #211 ship five sprints after #209 is the real lesson here; the per-function fix is mechanical once the audit fires.
+
 ### BUG-LOCAL-209: AudioGen `_save_wav` returned None on both success and failure paths [FIXED 2002958 2026-05-13]
 - **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
 - **Symptom:** C2 audit of nodes/batch_audiogen_generator.py:200 found `_save_wav` declared `-> None`. The success path fell off after `os.replace(tmp, path)`; the except path fell off after the warning log. Both returned `None`. The writeback block at L688-720 unconditionally stamped `sfx_wav_path = item["cache_path"]` whenever `cache_path` was truthy, with no proof the file actually existed on disk. Net: the ledger could carry a sfx_wav_path pointing at a path that was never written.
@@ -186,6 +276,15 @@ and the fix is verified:
 - BUG-LOCAL-208 (subsystem-scoped deletion waves leave debris in sidecar-isolated subsystems; run a repo-wide audit at the END of every cleanbreak)
 - BUG-LOCAL-209 (functions whose return is consumed must declare an explicit bool, not implicit None; audit `-> None` on save/write helpers)
 - BUG-LOCAL-210 (cleanbreak deleting a REQUIRED INPUT_TYPES entry MUST trim every saved-workflow widget vector at the same index in lockstep)
+- BUG-LOCAL-211 (sibling-audit on every Bible-pattern landing -- the BUG-209 `-> None` audit should have run on every save-style helper repo-wide at S24 close, not just AudioGen)
+- BUG-LOCAL-212 (ghost-path siblings -- a writeback safety fix on path A audits every parallel path that handles the same ledger field; covered by the sibling-audit lesson from #211)
+- BUG-LOCAL-213 (comments promising ledger behavior must be exercised by an acceptance test in the same commit; otherwise documentation drift becomes silent contract drift)
+- BUG-LOCAL-214 (rarely-exercised fallback paths must honor every contract the success path honors -- in particular timeline-relevant outputs like duration)
+- BUG-LOCAL-216 (any data contract maintained as parallel lists in two files is drift-prone; hoist to a shared module + pin set-equality with a unit test)
+- BUG-LOCAL-217 (parallel-path safety drift -- when a safety fix lands on path A, audit every parallel path via `git grep <field>`)
+- BUG-LOCAL-218 (when a defensive code block's triggering condition is fixed at the root, audit and delete the downstream defenders in lockstep)
+- BUG-LOCAL-219 (any "soft rollout" flag MUST include an inline flip-criterion AND an owner; the criterion must be reachable from the same commit's state, not require future wiring)
+- BUG-LOCAL-220 (introducing an "ephemeral" surface -- cache, scratch dir, temp file -- requires the cleanup hook to land in the same commit; "we'll get to that later" cleanup never lands)
 
 Per memory note ("Keep ROADMAP + BUG_LOG live; Bible promotion
 waits until v2.0 ships"), batch-promote after v2.0 lands.
