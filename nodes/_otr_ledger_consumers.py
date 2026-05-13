@@ -195,6 +195,66 @@ def voice_assignments_from_cast(led: dict) -> dict:
     return out
 
 
+# S18.2 (IMP-20 part 2): post-freeze writeback §6.16 audit walker.
+# Optional string fields per _otr_ledger_freeze.py lines 37-39 must
+# be "" when unset, never null. Freeze enforces this at freeze time
+# but consumers (Bark, AudioGen, ProcSFX, MusicGen, SignalLostVideo)
+# stamp fields AFTER freeze; nothing was re-validating until this
+# walker. Promote to strict=True per consumer once the per-consumer
+# violation count stays at zero for two full pipeline runs.
+_OPTIONAL_STRING_FIELDS = (
+    "sfx_wav_path",
+    "sfx_engine",
+    "sfx_type",
+    "audio_wav_path",
+    "audio_cache_key",
+    "music_wav_path",
+    "music_cache_key",
+    "video_clip_path",
+    "tts_skip_reason",
+    "sfx_render_status",
+)
+
+
+def audit_post_freeze_writeback(
+    ledger: dict,
+    *,
+    strict: bool = False,
+) -> list[str]:
+    """Re-check §6.16 null-rejection over fields a consumer may have
+    stamped after freeze. Returns a list of violations; raises
+    ValueError if ``strict=True`` and violations exist.
+
+    Optional string fields per ``_otr_ledger_freeze.py`` lines 37-39:
+    must be ``""`` when unset, never null. The §6.16 invariant is
+    enforced at freeze time; consumers stamp after freeze and the
+    convention has historically drifted (ProcSFX wrote None on
+    disk-write failure until S18.1).
+
+    Use ``strict=False`` (the default) for the soft-rollout phase --
+    consumers log violations to batch_log so live runs surface
+    drift without halting. Flip to ``strict=True`` per consumer
+    once the audit holds clean for two full pipeline runs.
+    """
+    violations: list[str] = []
+    for line in ledger.get("lines") or []:
+        if not isinstance(line, dict):
+            continue
+        lid = line.get("line_id", "<no-id>")
+        for field in _OPTIONAL_STRING_FIELDS:
+            if field in line and line[field] is None:
+                violations.append(
+                    f"line_id={lid!r} field {field!r} is None; "
+                    f"§6.16 requires \"\" (empty string)."
+                )
+    if strict and violations:
+        raise ValueError(
+            f"Post-freeze writeback violations ({len(violations)}):\n"
+            + "\n".join(violations[:10])
+        )
+    return violations
+
+
 __all__ = [
     "load_ledger",
     "iter_lines",
@@ -203,4 +263,5 @@ __all__ = [
     "voice_preset",
     "voice_assignments_from_cast",
     "production_plan_or_empty",
+    "audit_post_freeze_writeback",
 ]

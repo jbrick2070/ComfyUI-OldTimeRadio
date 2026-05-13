@@ -121,10 +121,17 @@ class BatchProceduralSFX:
                     "step": 0.1,
                 }),
                 "volume_db": ("FLOAT", {"default": 0.0, "min": -30.0, "max": 6.0, "step": 1.0}),
+                # S18.3 (IMP-20 part 3): default False preserves the
+                # existing log-and-continue behavior. Flip True once
+                # S18.2's audit walker has stayed clean for one full
+                # pipeline run -- then any ledger writeback failure
+                # raises instead of being swallowed.
+                "strict_writeback": ("BOOLEAN", {"default": False}),
             }
         }
 
-    def generate(self, script_json, default_duration=2.0, volume_db=0.0):
+    def generate(self, script_json, default_duration=2.0, volume_db=0.0,
+                 strict_writeback=False):
         batch_log = ["=== Batch Procedural SFX (Obsidian) ==="]
 
         # Read-side: parse the wire input as a v2 ledger dict.
@@ -237,7 +244,16 @@ class BatchProceduralSFX:
             # On any disk error the function returns False and we
             # stamp sfx_wav_path=None on the ledger row (the AUDIO
             # batch return still ships).
-            wav_path: Optional[str] = None
+            # S18.1 (IMP-20 part 1): wav_path defaults to "" not None.
+            # Per _otr_ledger_freeze.py lines 37-39, optional string
+            # fields must be "" when unset, never null; the ledger
+            # convention is enforced at freeze time but consumer
+            # writebacks were not re-validating until S18.2.
+            wav_path: str = ""
+            # S18.4: sfx_render_status surfaces the path the renderer
+            # took. "ok" on the happy path; "fallback_default_type"
+            # when the resolver fell back; "error" on disk failure.
+            render_status = "ok"
             if sfx_dir is not None and line_id:
                 perm = hashlib.sha256(
                     f"{cue_duration:.3f}|{chosen_type}|{line_id}".encode("utf-8")
@@ -251,14 +267,19 @@ class BatchProceduralSFX:
                     wav_path = fpath
                     batch_log.append(f"    [{i}] wrote {fname}")
                 else:
-                    batch_log.append(f"    [{i}] disk write failed; sfx_wav_path=None")
+                    batch_log.append(
+                        f"    [{i}] disk write failed; "
+                        f"sfx_wav_path=\"\" (S18.1 convention)"
+                    )
+                    render_status = "error"
 
             final_clips.append(torch.from_numpy(audio_np).float().unsqueeze(0).unsqueeze(0))
             render_results.append({
-                "line_id":     line_id,
-                "chosen_type": chosen_type,
-                "dur_s":       float(audio_np.shape[-1]) / float(SAMPLE_RATE),
-                "wav_path":    wav_path,
+                "line_id":           line_id,
+                "chosen_type":       chosen_type,
+                "dur_s":             float(audio_np.shape[-1]) / float(SAMPLE_RATE),
+                "wav_path":          wav_path,
+                "sfx_render_status": render_status,
             })
 
         # 4. Build batched AUDIO output
@@ -293,11 +314,16 @@ class BatchProceduralSFX:
                         line_id = r.get("line_id")
                         if not line_id:
                             continue
+                        # S18.1: sfx_wav_path is "" not None on
+                        # failure (post-freeze §6.16 convention).
+                        # S18.4: sfx_render_status surfaces fallback
+                        # state on the ledger row.
                         line_fields = {
-                            "sfx_engine":   "procedural",
-                            "sfx_type":     str(r["chosen_type"]),
-                            "dur_s":        float(r["dur_s"]),
-                            "sfx_wav_path": r.get("wav_path"),
+                            "sfx_engine":        "procedural",
+                            "sfx_type":          str(r["chosen_type"]),
+                            "dur_s":             float(r["dur_s"]),
+                            "sfx_wav_path":      r.get("wav_path") or "",
+                            "sfx_render_status": str(r.get("sfx_render_status") or "ok"),
                         }
                         if _OTRL.patch_line_fields(
                             led_disk, line_id, line_fields,
@@ -311,7 +337,13 @@ class BatchProceduralSFX:
                             f"line(s) -> {ledger_path.name}"
                         )
         except Exception as _exc:
-            batch_log.append(f"ledger write-back failed (non-fatal): {_exc}")
+            # S18.3: strict_writeback opt-in. Default behavior
+            # preserves the historical log-and-continue path;
+            # strict mode raises so production CI fails fast.
+            msg = f"ledger write-back failed: {_exc}"
+            batch_log.append(msg)
+            if strict_writeback:
+                raise RuntimeError(msg) from _exc
 
         return ({"waveform": batched_waveform, "sample_rate": SAMPLE_RATE}, "\n".join(batch_log))
 
