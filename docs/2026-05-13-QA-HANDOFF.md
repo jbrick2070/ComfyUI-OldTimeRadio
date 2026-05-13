@@ -3,6 +3,8 @@
 **Branch:** `v2.0-alpha` at `7012eb4` (pushed; local == origin).
 **Audience:** QA review team. **Goal:** verify the S24 fix sprint wiring shipped correctly, audit the deferrals, vote on the next-sprint plan.
 
+> **2026-05-13 update -- S25 LANDED.** The next-sprint plan in §3 was executed under the playbook handed to Cowork. Branch `s25-musicgen-parity` at `a78e282` (pushed; local == origin). See **`docs/2026-05-13-S25-qa-postmortem.md`** for the single-doc summary of what shipped, the three inline CD-1/CD-2/CD-3 decisions, the +18 test delta, and carry-forward to S26. This original handoff stays as the historical S24 review surface.
+
 This doc is the single entry-point. Use the orientation map below to navigate to deeper docs without re-reading what you don't need.
 
 ---
