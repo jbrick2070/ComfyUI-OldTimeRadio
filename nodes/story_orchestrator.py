@@ -554,7 +554,7 @@ def _bark_test_presets(presets_to_test):
 
     try:
         import numpy as np
-        from ._bark_lib import _load_bark
+        from ._otr_bark_lib import _load_bark
         from .batch_bark_generator import _generate_single_line
     except ImportError as e:
         log.info("[VoiceHealth] Bark not importable (%s) - skipping health check", e)
@@ -2132,7 +2132,7 @@ def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda
             # -- VRAM Hardening v1.4: Strict Handoff --
             # If Bark is in VRAM, evict it now before loading LLM.
             try:
-                from ._bark_lib import _unload_bark
+                from ._otr_bark_lib import _unload_bark
                 _unload_bark()
             except ImportError:
                 pass

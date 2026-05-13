@@ -82,8 +82,9 @@ def patched_bark_env(tmp_path):
     # _load_bark stays patched so the test never tries to download
     # the actual Bark model.
     #
-    # Sprint 4 (2026-05-12): module renamed nodes.bark_tts ->
-    # nodes._bark_lib. Patch path updated below in lockstep.
+    # Sprint 7.2 (2026-05-12): module renamed nodes._bark_lib ->
+    # nodes._otr_bark_lib per docs/conventions.md. Patch path updated
+    # below in lockstep.
     with patch(
         "nodes.batch_bark_generator.force_vram_offload", side_effect=_no_op,
     ), patch(
@@ -92,7 +93,7 @@ def patched_bark_env(tmp_path):
         "nodes.batch_bark_generator._generate_single_line",
         side_effect=_fake_gen_single_line,
     ), patch(
-        "nodes._bark_lib._load_bark", side_effect=_fake_load_bark,
+        "nodes._otr_bark_lib._load_bark", side_effect=_fake_load_bark,
     ), patch(
         "nodes.story_orchestrator._unload_llm", side_effect=_no_op,
     ), patch(
