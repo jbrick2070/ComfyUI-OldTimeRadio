@@ -2,8 +2,10 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-210 (2026-05-13)
+**Last entry:** BUG-LOCAL-210 (2026-05-13) -- no new bugs since S24 batch close at `fdb164b`. Post-batch docs (`f529812` QA + `f11fee1` master tracker) added no code surface.
+**Stack head when last updated:** `f11fee1`
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
+**Bible candidates pending promotion:** 8 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`.
 
 ---
 

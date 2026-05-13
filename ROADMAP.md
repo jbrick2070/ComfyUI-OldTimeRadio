@@ -1,8 +1,14 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `d35aa71` | **Last refactored:** 2026-05-13 (S24 fix sprint -- 12 commits, +39 tests; C8 / C10 deferred with corrected premise notes; C9 / C12 round-robins deviated)
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `f11fee1` | **Last refactored:** 2026-05-13 (S24 fix sprint LOCKED + QA doc + S25+ master sprint tracker)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
+
+**Sprint planning surface:** `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` -- consolidated tier-organized view of every outstanding item across all batches with suggested S25+ sprint packaging. Update on every batch close.
+
+**Batch QA docs:**
+- `docs/2026-05-13-voice-path-cleanbreak-S15.5-S19-qa.md` -- S15.5-S19 batch
+- `docs/2026-05-13-S24-fix-sprint-qa.md` -- S24 batch
 
 **Format codename:** the new structured-ledger contract is **L3** (matches `schema_version: "l3-2026-05-08"` already on the wire). All consumer rewrites target L3-native reads + L3-native write-back via `patch_line_fields(led, line_id, {...})`. When the schema bumps next, the codename evolves cleanly to L4.
 
@@ -45,7 +51,9 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ## CURRENT WORK — S24 fix sprint (COMPLETE 2026-05-13)
 
-**State:** 12 commits SHIPPED on `v2.0-alpha` between `cf8eb96` (C1) and `d35aa71` (C12). Net new tests +39 (2108 -> 2147; +1 skip from C9 integration stub). Bug Bible 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+**State:** 12 sub-task commits + 1 docs commit + QA doc + master tracker SHIPPED on `v2.0-alpha` between `cf8eb96` (C1) and `f11fee1` (master tracker). Net new tests +39 (2108 -> 2147; +1 skip from C9 integration stub). Bug Bible 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+
+**Canonical docs:** `docs/2026-05-13-S24-fix-sprint-qa.md` (QA / round-robin prompt) + `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` (forward-looking master sprint plan covering every outstanding item across all batches).
 
 ### Commit table
 
