@@ -1,99 +1,174 @@
 # Known Test Failures — Quarantine List
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
-**Last reconciled:** 2026-05-12 (voice-path-cleanbreak Sprint 1)
-**Baseline pytest:** 2033 passed / 7 skipped / **6 failed**
+**Last reconciled:** 2026-05-12 (voice-path-cleanbreak Sprint 15.2)
+**Baseline pytest:** **6 failed**, 2096+ passed, 6 skipped
+**Enforcement:** `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (S15.1
+hook) tracks the failure SET, not just the count. Adding a failure
+not in that set fires `[KNOWN-FAIL-GUARD] NEW failures (REGRESSION)`
+and exits with code 2; a known failure that starts passing fires
+`[KNOWN-FAIL-GUARD] PROMOTABLE`.
 
-This file lists every failing test the regression suite is allowed to
-produce. Any failure NOT on this list is a real regression that blocks
-merge.
+This file lists every nodeid the regression suite is allowed to
+produce. The list MUST stay in lockstep with
+`tests/conftest.py::EXPECTED_FAILED_NODEIDS` -- when one moves, the
+other moves in the same commit.
 
-When a quarantined test is fixed, mark it RESOLVED and remove from the
-active list within the same commit.
+When a quarantined test is fixed:
+1. Remove its entry from `EXPECTED_FAILED_NODEIDS` in `conftest.py`.
+2. Move the entry below to the "Resolved" section with the fixing
+   commit hash + date.
+3. Decrement the "Baseline pytest" failure count above.
+
+---
+
+## Schema (S15.2 nodeid-tracking)
+
+Each entry below uses the schema:
+
+```
+KNOWN-FAIL-NNN
+  Nodeid:        <pytest collection ID -- copy-paste reproducible>
+  First seen:    <commit-sha or sprint name when first added>
+  Expected mode: <error class + brief signature>
+  Owner:         <name or TBD>
+  Removal cond:  <what has to land before the test can be promoted>
+  Reproduce:     <one-line pytest command>
+```
+
+The `Nodeid` field is the load-bearing one -- the conftest hook
+matches by exact string against pytest's collected `item.nodeid`.
 
 ---
 
 ## Active known failures (6 total)
 
-### KNOWN-FAIL-001: `test_production_ledger::test_save_merges_schema_l3_fields_from_disk`
+### KNOWN-FAIL-001
 
-- **Error:** `KeyError: 'phase_ms'`
-- **Symptom:** `production_ledger.save_ledger_safe`'s in-place merge of schema-l3 fields drops `meta.phase_ms` when the on-disk ledger predates the field's introduction.
-- **Tracked:** voice-path-cleanbreak Sprint 1 audit (not voice-path-caused)
-- **Owner:** TBD
-- **Target sprint:** unscheduled (separate writer-internals cleanup)
-- **First seen passing baseline:** pre-LFC sprint
-- **First seen failing:** pre-voice-path-cleanbreak (carried through from prior sprints)
-- **Reproduce:** `python -m pytest tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk -v`
+```
+Nodeid:        tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk
+First seen:    pre-voice-path-cleanbreak (carried from prior sprints)
+Expected mode: KeyError: 'phase_ms'
+Owner:         TBD
+Removal cond:  production_ledger.save_ledger_safe stops dropping
+               meta.phase_ms when the on-disk ledger predates the
+               field's introduction. Tracked: writer-internals
+               cleanup (unscheduled).
+Reproduce:     python -m pytest tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk -v
+```
 
-### KNOWN-FAIL-002: `test_save_to_episode_workspace::test_save_to_per_episode_dir_when_singleton_active`
+### KNOWN-FAIL-002
 
-- **Error:** `assert 0 == 1` (expected 1 PNG saved, got 0)
-- **Symptom:** Save path produces `BAD_IMAGE_SAVE: ... 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan`. Test fixture builds a tensor with NaN values; the save node correctly rejects it with the gate but the test expected a file to appear.
-- **Tracked:** voice-path-cleanbreak Sprint 1 audit (not voice-path-caused)
-- **Owner:** TBD
-- **Target sprint:** unscheduled (test fixture needs valid tensor data, not NaN)
-- **Reproduce:** `python -m pytest tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active -v`
+```
+Nodeid:        tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active
+First seen:    voice-path-cleanbreak Sprint 1 audit (not voice-path-caused)
+Expected mode: AssertionError: assert 0 == 1 (expected 1 PNG saved, got 0)
+               -- save node correctly rejects NaN-laden tensor with
+               BAD_IMAGE_SAVE gate; test fixture is the broken party.
+Owner:         TBD
+Removal cond:  Test fixture switches from NaN-init tensor to valid
+               image data. The save node's gate is correct; the test
+               is wrong. Tracked: test-fixture cleanup (unscheduled).
+Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active -v
+```
 
-### KNOWN-FAIL-003: `test_save_to_episode_workspace::test_portraits_role_routes_to_portraits_dir`
+### KNOWN-FAIL-003
 
-- **Error:** `assert 0 == 1` (same NaN-tensor pattern as KNOWN-FAIL-002)
-- **Symptom:** identical to KNOWN-FAIL-002, different routing branch (portraits subdir).
-- **Tracked / Owner / Target:** ditto KNOWN-FAIL-002.
-- **Reproduce:** `python -m pytest tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir -v`
+```
+Nodeid:        tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir
+First seen:    voice-path-cleanbreak Sprint 1 audit
+Expected mode: AssertionError: assert 0 == 1 (same NaN-tensor pattern as 002)
+Owner:         TBD
+Removal cond:  Same fix as KNOWN-FAIL-002 (NaN tensor in fixture).
+Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir -v
+```
 
-### KNOWN-FAIL-004: `test_save_to_episode_workspace::test_falls_back_to_legacy_dir_when_no_singleton`
+### KNOWN-FAIL-004
 
-- **Error:** `assert 0 == 1` (same NaN-tensor pattern)
-- **Symptom:** identical to KNOWN-FAIL-002, exercising the no-singleton fallback path.
-- **Tracked / Owner / Target:** ditto KNOWN-FAIL-002.
-- **Reproduce:** `python -m pytest tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton -v`
+```
+Nodeid:        tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton
+First seen:    voice-path-cleanbreak Sprint 1 audit
+Expected mode: AssertionError: assert 0 == 1 (same NaN-tensor pattern)
+Owner:         TBD
+Removal cond:  Same fix as KNOWN-FAIL-002.
+Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton -v
+```
 
-### KNOWN-FAIL-005: `test_save_to_episode_workspace::test_per_episode_counter_starts_at_1`
+### KNOWN-FAIL-005
 
-- **Error:** `assert [] == ['full_env_00001_.png', 'full_env_00002_.png']` (same NaN-tensor pattern)
-- **Symptom:** identical to KNOWN-FAIL-002, exercising the counter-increment path.
-- **Tracked / Owner / Target:** ditto KNOWN-FAIL-002.
-- **Reproduce:** `python -m pytest tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1 -v`
+```
+Nodeid:        tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1
+First seen:    voice-path-cleanbreak Sprint 1 audit
+Expected mode: AssertionError: assert [] == ['full_env_00001_.png', 'full_env_00002_.png']
+               (same NaN-tensor pattern; counter-increment path)
+Owner:         TBD
+Removal cond:  Same fix as KNOWN-FAIL-002.
+Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1 -v
+```
 
-### KNOWN-FAIL-006: `test_video_composite::test_default_canvas_is_native_832x480_at_25fps`
+### KNOWN-FAIL-006
 
-- **Error:** `assert 1472 == 832` (canvas width assertion drift)
-- **Symptom:** Test expected the default canvas to be 832×480 (LTX 2B v0.9 native), but the current default emits 1472. Likely the canvas-size default was bumped during the HuMo / LTX 2.3 video-stack sprint without updating this test.
-- **Tracked:** voice-path-cleanbreak Sprint 1 audit (not voice-path-caused)
-- **Owner:** TBD
-- **Target sprint:** unscheduled (video-stack consistency cleanup)
-- **Reproduce:** `python -m pytest tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps -v`
+```
+Nodeid:        tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps
+First seen:    voice-path-cleanbreak Sprint 1 audit (HuMo / LTX 2.3
+               video-stack default-canvas drift)
+Expected mode: AssertionError: assert 1472 == 832 (canvas width drift)
+Owner:         TBD
+Removal cond:  Either (a) the default canvas reverts to 832x480, or
+               (b) the test updates to expect 1472. The video-stack
+               sprint consensus determines which.
+Reproduce:     python -m pytest tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps -v
+```
 
 ---
 
-## Enforcement
+## Enforcement (S15.1 conftest hook)
 
-The voice-path-cleanbreak sprint regression run produces exactly 6
-failures. Adding a failure that doesn't have a `KNOWN-FAIL-NNN` ID
-on this list is a regression that must be addressed (either fixed or
-explicitly added with reason).
+`tests/conftest.py::EXPECTED_FAILED_NODEIDS` is the source of truth
+for the conftest hook. The list above and that set MUST stay in
+lockstep -- when adding or removing a known-fail, both files move
+in the same commit.
 
-Sprint 2+ ship-gates enforce: if the regression run produces N failures
-and N != len(known-failures list), the sprint is blocked until the
-delta is reconciled.
+The `pytest_sessionfinish` hook in conftest.py runs after the suite
+finishes and:
 
-Practical recipe:
+1. Builds the actual-failed-nodeid set from
+   `item.rep_call.failed`.
+2. Diffs against `EXPECTED_FAILED_NODEIDS`.
+3. If any nodeid in `actual_failed - expected` (NEW failure ->
+   regression): prints `[KNOWN-FAIL-GUARD] NEW failures` and exits
+   with code 2.
+4. If any nodeid in `expected - actual_failed` (PROMOTABLE -> a
+   known-fail is now passing): prints `[KNOWN-FAIL-GUARD]
+   PROMOTABLE` so the contributor can promote it.
 
-```bash
-python -m pytest tests/ --ignore=tests/integration -q 2>&1 | grep -E "^\d+ failed"
-# Expected: "6 failed, 2033 passed, 7 skipped"
-# If "6 failed" is anything else, audit before shipping.
-```
+Subset-run guard: the diff only fires when at least 80% of the
+expected nodeids were actually collected. This means a focused
+``pytest tests/test_xyz.py`` won't fire PROMOTABLE on every other
+known-fail it didn't run.
 
 ---
 
 ## Resolution log (none yet)
 
-When a KNOWN-FAIL-NNN is fixed:
-1. Add a `[RESOLVED commit-hash YYYY-MM-DD]` line under the entry.
-2. Move the entry to a "Resolved" section at the bottom of this file.
-3. Decrement the active-count expectation at the top.
+When a KNOWN-FAIL-NNN is fixed, move it here with:
 
-Keep resolution entries forever (deletion erases the history this file
-is meant to track).
+```
+KNOWN-FAIL-NNN  [RESOLVED <commit-sha> YYYY-MM-DD]
+  ... (original entry preserved)
+  Resolution:    <what landed; commit subject is fine>
+```
+
+Keep resolution entries forever -- deletion erases the history this
+file exists to track.
+
+---
+
+## Promotion to survival guide (S15.3, deferred)
+
+The S15.1 hook + nodeid-tracking pattern stays OTR-scoped for at
+least 2-3 sprints of active use before promotion to the
+`comfyui-custom-node-survival-guide` repo. The deferral is
+deliberate: the schema is new, false-positive modes haven't surfaced
+yet, and the survival guide should publish patterns that have a
+track record. S15.3 is its own commit when the threshold lands.
