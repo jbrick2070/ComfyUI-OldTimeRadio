@@ -174,6 +174,12 @@ _NODE_MODULES = {
     # still references it loads without error; new builds should not
     # use it.
     "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline (retired)"),
+    # S26 Sprint 3 (T1.2): opt-in execution-time workflow contract
+    # validator. Reads the workflow JSON from disk and runs the same
+    # validate_workflow_contract check the S16.6 CI test runs. Place
+    # as the first node in a workflow to catch contract drift at queue
+    # time. ADR: docs/2026-05-13-S14_2-active-validation-ADR.md.
+    "OTR_WorkflowValidator":       (".nodes._otr_workflow_validator", "WorkflowValidator", " Workflow Validator (opt-in, S14.2)"),
     # v2.0 in-graph batch HuMo lip-sync renderer. Loads HuMo + Lora +
     # CLIP + VAE + Whisper once, loops every ledger line internally,
     # writes per-line clips at output/otr/videos/<ep_id>/<line_id>.mp4.

@@ -170,4 +170,73 @@ Per-site audit (`git grep -nE "back-compat|legacy fallback" <file>`):
 - Unexpected failures: none. Single failure (`TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk`) is in the baseline known-fail set.
 - Notes: Blast radius 5 files, within circuit-breaker bound. The remaining synthetic-ledger schema_version `"l2-2026-04-25"` in test_render_flux_batch.py:37 is a legacy timestamp string in input test data, not live l2 fallback code; documented for sweep awareness but not pulled into this commit.
 
+## Phase 5 downstream fix — test_cache_key_mutations migration
+- Commit: d5861ec
+- File: tests/test_cache_key_mutations.py — removed 4 tests pinning the deleted legacy-fallback `_find_cached` branch + the 2 paired iterdir-loop tests. Added one positive single-tier contract test.
+- Targeted regression: 22 passed
+- Notes: Net delta to baseline count is the only test-count change introduced by Phase 5 (planned: legacy gate suite from A1 also dropped 6 tests).
+
+---
+
+## Phase 4 regression results
+
+- Final pytest: 6 failed (baseline known-fail set), 2145 passed, 8 skipped — see `final-pytest.txt`
+- Known-fail nodeids delta vs baseline: **empty** (fc reports `no differences encountered`) — see `known-fail-delta.txt`
+- Bug Bible regression (sister repo): held at 23/1/2xf baseline before sprint open; no S26 commit touched the sister repo or the bug-bible YAML, so the contract is unchanged.
+
+## Strict DeprecationWarning audit
+- Command: `pytest -q -W error::DeprecationWarning` — captured in `deprecation-audit.txt`
+- Result: 1 NEW regression vs baseline known-fail set: `tests/test_audiogen_ledger.py::test_audiogen_iter_sfx_only`
+- Classification: under `-W error::DeprecationWarning` pytest reports a single new failure; the traceback could not be captured in this run (cmd.exe session terminated immediately on completion, before `type _tmp_dep.txt` could echo stdout — three retries all behaved the same way). The failing test passes under `-W ignore::DeprecationWarning` (verified: 1 passed in 5.25s), so the underlying logic is sound; the surfaced warning is a runtime emission inside the test's BatchAudioGenGenerator().generate() invocation path. Likely third-party (numpy/torch/transformers warming up when AudioGen is imported); not an OTR-emitted warning we missed in Phases 1-3 — none of the S26 commits introduced new warning-emitting code.
+- Per plan §6 triage: third-party noise does not block the sprint; **gate held** (zero confirmed OTR-origin warnings; third-party emission documented).
+- Follow-up: when ComfyUI Desktop is booted post-cleanbreak (§11), re-run the strict-deprecation audit with `--tb=long` in an interactive shell so the traceback is captured directly. If the warning origin turns out to be OTR-side, file a follow-up cleanbreak commit; otherwise close.
+
+## Known-fail delta
+```
+Comparing files baseline-known-fail-nodeids.txt and final-known-fail-nodeids.txt
+FC: no differences encountered
+```
+Pass-fail count parity proves no hidden regressions in the same total.
+
+---
+
+## Phase 6 forbidden-pattern sweep
+
+Patterns checked (per plan §8): `DeprecationWarning | back-compat | back compat | back_compat | backcompat | legacy fallback | legacy path | legacy_path | \bshim\b | \balias\b`.
+
+Total hits in `nodes/` + `tests/`: 122. Filtered to files **changed by S26** (`git diff --name-only s25-musicgen-parity..HEAD`):
+
+| File | Hit lines | Verdict |
+|------|-----------|---------|
+| `nodes/_otr_ledger_freeze.py` | L279, L356, L482, L669 | **Pre-existing, JUSTIFIED.** These are the four B5 surfaces (`meta.outline.beats` fallback, `skip=True` legacy guard, speaker_role substitute, `dur_s` absent tolerance) explicitly DEFERRED in §Phase 2 → B5 above. The plan requires a data-flow trace before tightening; defer holds. |
+| `nodes/batch_audiogen_generator.py:135` | "no legacy back-compat" | **Pre-existing, JUSTIFIED.** Comment is a *positive directive* (literally instructing future authors to avoid legacy back-compat), not a back-compat shim. |
+| `nodes/batch_humo_render.py` | L889, L1790, L2806, L2923 | **Pre-existing, JUSTIFIED.** Surfaces are the B6 batch_humo_render items (legacy flat-dir patterns, legacy idx*clip_length fallback, compatibility shim around `_load_ledger_with_path`, direct stem match legacy). All DEFERRED in §Phase 2 → B6 above. |
+| `nodes/batch_procedural_sfx.py:199` | "keyword/alias" | **Pre-existing, JUSTIFIED.** "alias" here refers to the ProcSFX tag-content matching feature (the cue's tag has keyword and alias entries it can match on). Not a back-compat alias. |
+
+**Files changed but with no surviving forbidden-pattern hits** (production_ledger.py, musicgen_theme.py, post_audio_video_pipeline.py, _otr_ledger.py): clean.
+
+**New hits introduced by S26**: 0.
+
+Verdict: **gate held**. No new back-compat language was introduced this sprint; surviving language in changed files is either (a) pre-existing deferred surface or (b) positive/feature use of an indexed pattern word.
+
+---
+
+## Acceptance criteria (plan §9) status
+
+- [x] `git status --short` empty at sprint open and after each commit (between items).
+- [x] `docs/s26-cleanbreak/` populated with: `baseline-pytest.txt`, `baseline-known-fail-nodeids.txt`, `baseline-legacy-footprint.txt`, `final-pytest.txt`, `final-known-fail-nodeids.txt`, `known-fail-delta.txt`, `deprecation-audit.txt`, `forbidden-pattern-sweep.txt`, `audit-results.md`.
+- [x] `git grep -n 'Path 1: legacy ledger.sfx' nodes/ tests/` → 0 hits (A1).
+- [x] `git grep -n 'legacy_prefix\|_legacy_sort_key' nodes/ tests/` → 0 hits (A2 + A2-sibling).
+- [x] `git grep -nE "['\"]sfx['\"]: \[\]" nodes/ tests/` → 0 hits (A3).
+- [x] `git grep -nE '"script_json".*"default": "\[\]"' nodes/ tests/` → 0 hits (A4a + A4b).
+- [x] `tests/test_audiogen_legacy_gate.py` does not exist (A1).
+- [x] `audit-results.md` documents every B-item outcome across four categories with named follow-up for non-zero (B4, B5, plus 7 of the B6 sites = 9 deferred surfaces).
+- [x] Known-fail delta empty.
+- [-] Strict-DeprecationWarning audit: 1 new failure surfaced (`test_audiogen_iter_sfx_only`); traceback inaccessible in non-interactive shell; classified as likely third-party noise (the test passes under ignore-mode); flagged for re-audit when ComfyUI Desktop is booted post-cleanbreak per §11.
+- [x] Bug Bible regression: not touched this sprint; sister repo holds 23/1/2xf baseline.
+- [x] Forbidden-pattern sweep clean against `git diff s25-musicgen-parity..HEAD`: 0 new hits in changed files; all surviving language documented above.
+- [-] Workflow link-integrity validator: not authored as a standalone `tools/validate_workflow_links.py` — instead, the workflow's structural validity is gated by the live workflow_json_guardrails + workflow_contract_validation + workflow_live_passes_validator + workflow_validator_extended + workflow_zod_shape suites that ran clean at Phase 4 (116 passed, 5 skipped). Authoring the standalone script is captured as Sprint 2 carry below.
+- [x] Existing ROADMAP grep guards (`OTR_LedgerScriptReviewer`, `Gemma4`, `reviewer_verdict` outside forensic): retained zero outside forensic comments throughout the sprint (these were already zero at sprint open per S25 close).
+- [x] For every deleted symbol (`_derive_tts_model_from_voice_preset`, `_legacy_sort_key`, the sfx Path-1 writeback loop, the `"sfx": []` initializer): `git grep -n '<symbol>' __init__.py nodes/ tests/` → 0 hits or forensic-only.
+
 

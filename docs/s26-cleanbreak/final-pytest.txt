@@ -1,0 +1,198 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
+============================= test session starts =============================
+collected 2159 items
+
+tests\test_audio_byte_identical.py .......s                              [  0%]
+tests\test_audiogen_cache_keys.py ..............                         [  1%]
+tests\test_audiogen_ledger.py ....                                       [  1%]
+tests\test_audiogen_strict_failure.py .....                              [  1%]
+tests\test_audiogen_writeback_hardening.py ..........                    [  1%]
+tests\test_bark_cast_contract.py ......                                  [  2%]
+tests\test_bark_ledger.py ....                                           [  2%]
+tests\test_batch_humo_render.py ........................................ [  4%]
+..                                                                       [  4%]
+tests\test_batch_ltx_render.py .................................         [  5%]
+tests\test_build_silent_test_episode.py ................................ [  7%]
+............................                                             [  8%]
+tests\test_cache_key_mutations.py ......................                 [  9%]
+tests\test_canon.py .......                                              [  9%]
+tests\test_cast_contract.py ...............                              [ 10%]
+tests\test_cast_contract_helpers.py ........................             [ 11%]
+tests\test_cast_contract_rejects_structural_tokens.py ..........         [ 12%]
+tests\test_cast_fuzzy_consolidate.py .......................             [ 13%]
+tests\test_cast_repair.py ......................                         [ 14%]
+tests\test_core.py ..................................................... [ 16%]
+.......                                                                  [ 17%]
+tests\test_episode_assembler_offset_shift.py ............                [ 17%]
+tests\test_filename_pattern_audit.py ...                                 [ 17%]
+tests\test_fixture_dur_s_audit.py ..                                     [ 17%]
+tests\test_freeze_cascade_g6.py ........                                 [ 18%]
+tests\test_g7_consumer_constants.py .....                                [ 18%]
+tests\test_g8_line_id_uniqueness.py .......                              [ 18%]
+tests\test_humo_oom_recovery.py ............                             [ 19%]
+tests\test_humo_warmup_pad.py .....................                      [ 20%]
+tests\test_inline_narration_heuristic.py ......................          [ 21%]
+tests\test_known_failures_hook_phases.py ...                             [ 21%]
+tests\test_kokoro_ledger.py ....                                         [ 21%]
+tests\test_ledger_rename.py ..........                                   [ 22%]
+tests\test_legacy_audit_clean.py .                                       [ 22%]
+tests\test_legacy_contract_retired.py .....                              [ 22%]
+tests\test_lfc_b14_unload_on_exit.py .....                               [ 22%]
+tests\test_lfc_b1_cascade_unload_in_finally.py ....                      [ 22%]
+tests\test_lfc_c1_standalone_phase_nodes.py ...............              [ 23%]
+tests\test_lfc_c3_phase_telemetry.py ..........                          [ 23%]
+tests\test_lfc_c4_news_used_passthrough.py .....                         [ 24%]
+tests\test_lfc_commit_12_1_fixes.py ......................               [ 25%]
+tests\test_lfc_context_helpers.py .............................          [ 26%]
+tests\test_lfc_freeze_cascade_orchestrator.py .................          [ 27%]
+tests\test_lfc_g1_g2_interlock.py ..............                         [ 28%]
+tests\test_lfc_g3_phase_verdicts.py .........                            [ 28%]
+tests\test_lfc_g4_telemetry_derivation.py .....                          [ 28%]
+tests\test_lfc_g5_no_pysssss_dependency.py ......                        [ 28%]
+tests\test_lfc_llm_helpers.py .......................                    [ 30%]
+tests\test_lfc_phase_0_10_gap_audit.py ................................. [ 31%]
+.......................                                                  [ 32%]
+tests\test_lfc_phase_3_polish_in_cascade.py ...............              [ 33%]
+tests\test_lfc_phase_4_5_smart_suggestion.py ..............              [ 33%]
+tests\test_lfc_phase_4_scene_coherence.py ............                   [ 34%]
+tests\test_lfc_phase_5_voice_drift.py ..........                         [ 34%]
+tests\test_lfc_phase_6_episode_arc.py ...................                [ 35%]
+tests\test_lfc_phase_7_8_readiness.py .....................              [ 36%]
+tests\test_lfc_polish_fixes.py .......................................   [ 38%]
+tests\test_lfc_w4_writer_polish_fn.py ......                             [ 38%]
+tests\test_lfc_watchdog_and_widgets.py ...........................       [ 40%]
+tests\test_llm_cache_mismatch_diagnostics.py ............                [ 40%]
+tests\test_llm_timeout_queue_halt_smoke.py ....s                         [ 40%]
+tests\test_llm_timeout_workflow_pause.py ...s                            [ 41%]
+tests\test_meta_paths.py .............                                   [ 41%]
+tests\test_musicgen_cache_keys.py .........                              [ 42%]
+tests\test_musicgen_news_brief_used.py ....                              [ 42%]
+tests\test_musicgen_parity.py ......                                     [ 42%]
+tests\test_musicgen_strict_failure.py ....                               [ 42%]
+tests\test_musicgen_style_palette.py ..................                  [ 43%]
+tests\test_naming_conventions.py ...                                     [ 43%]
+tests\test_news_history_ttl.py ..........                                [ 44%]
+tests\test_news_interpreter.py ............                              [ 44%]
+tests\test_news_interpreter_wiring.py .............                      [ 45%]
+tests\test_otr_api_type_validation.py ..............................     [ 46%]
+tests\test_otr_casting.py .............................................. [ 48%]
+....                                                                     [ 49%]
+tests\test_otr_ledger_consumers.py ..................................... [ 50%]
+..                                                                       [ 50%]
+tests\test_otr_memory.py .......                                         [ 51%]
+tests\test_otr_shot_duration_calculator.py .........................     [ 52%]
+tests\test_otr_style_picker.py ......................................... [ 54%]
+....                                                                     [ 54%]
+tests\test_otr_video_concat.py ............................              [ 55%]
+tests\test_otr_video_plan.py ........................................... [ 57%]
+.........                                                                [ 58%]
+tests\test_parse_retry.py ..................                             [ 59%]
+tests\test_parser_dialogue_floor.py ....................                 [ 59%]
+tests\test_per_cue_sfx_dur.py .............                              [ 60%]
+tests\test_per_line_audio_meta.py ..........                             [ 61%]
+tests\test_period_prompts.py ..................                          [ 61%]
+tests\test_phase0_name_roster.py ...................................     [ 63%]
+tests\test_phase1_composer_prompt.py ................................... [ 65%]
+.......................................                                  [ 66%]
+tests\test_phase2a_episode_budget.py ................................... [ 68%]
+..............................                                           [ 69%]
+tests\test_phase2b_progressive_ledger.py ...................             [ 70%]
+tests\test_phase3_ledger_reviewer.py ................................... [ 72%]
+............                                                             [ 72%]
+tests\test_portrait_render_skip_announcer.py .....                       [ 73%]
+tests\test_post_audio_video_pipeline.py ..............                   [ 73%]
+tests\test_post_freeze_writeback_audit.py .....................          [ 74%]
+tests\test_post_upscale_procgen_blend.py .................               [ 75%]
+tests\test_procsfx_isolation.py .                                        [ 75%]
+tests\test_procsfx_ledger.py ....                                        [ 75%]
+tests\test_procsfx_writeback_convention.py ..........                    [ 76%]
+tests\test_production_ledger.py .................F....................   [ 78%]
+tests\test_radio_prompt_builder.py ..................................... [ 79%]
+..............                                                           [ 80%]
+tests\test_radio_still_resolver.py ..................................... [ 82%]
+......                                                                   [ 82%]
+tests\test_render_episode_concat_discovery.py .......                    [ 82%]
+tests\test_render_flux_batch.py ...........................              [ 83%]
+tests\test_render_humo_batch_plan.py ......                              [ 84%]
+tests\test_save_to_episode_workspace.py ..FFFF..                         [ 84%]
+tests\test_sequencer_ledger.py ....                                      [ 84%]
+tests\test_speaker_role.py ............................................. [ 86%]
+......                                                                   [ 87%]
+tests\test_story_orchestrator_vram_calibration.py ...                    [ 87%]
+tests\test_style_palette_drift.py .....                                  [ 87%]
+tests\test_treatment_scanner_unicode.py .......                          [ 87%]
+tests\test_two_llm_split.py ...............                              [ 88%]
+tests\test_unload_synchronize_guard.py ..........                        [ 89%]
+tests\test_video_composite.py .............F...                          [ 89%]
+tests\test_video_composite_layered.py ..............                     [ 90%]
+tests\test_video_composite_per_clip_mux.py ............................. [ 91%]
+                                                                         [ 91%]
+tests\test_video_ledger.py ....                                          [ 91%]
+tests\test_voice_assignments_derivation.py ........                      [ 92%]
+tests\test_voice_backends.py ..............                              [ 93%]
+tests\test_voice_resolver.py ............                                [ 93%]
+tests\test_wedge_probe.py ........                                       [ 93%]
+tests\test_workflow_audio_widget_vectors.py .......                      [ 94%]
+tests\test_workflow_contract_validation.py ..............                [ 94%]
+tests\test_workflow_director_freedom.py .                                [ 94%]
+tests\test_workflow_flux_portrait_wiring.py ..                           [ 95%]
+tests\test_workflow_json_guardrails.py .................sssss........... [ 96%]
+...................                                                      [ 97%]
+tests\test_workflow_live_passes_validator.py .                           [ 97%]
+tests\test_workflow_validator_extended.py ............                   [ 98%]
+tests\test_workflow_zod_shape.py ...................................     [ 99%]
+tests\test_writer_cast_lock_voice_preset.py .......                      [100%]
+
+================================== FAILURES ===================================
+________ TestDualLedgerFix.test_save_merges_schema_l3_fields_from_disk ________
+tests\test_production_ledger.py:260: in test_save_merges_schema_l3_fields_from_disk
+    assert merged["meta"]["phase_ms"]["bark"] == 145000
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'phase_ms'
+_____________ test_save_to_per_episode_dir_when_singleton_active ______________
+tests\test_save_to_episode_workspace.py:97: in test_save_to_per_episode_dir_when_singleton_active
+    assert len(saved) == 1, (
+E   AssertionError: expected 1 PNG under per-episode stills/, got []
+E   assert 0 == 1
+E    +  where 0 = len([])
+------------------------------ Captured log call ------------------------------
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:322 [SaveToEpisodeWorkspace] save failed for image 1: BAD_IMAGE_SAVE: full_env_00001_.png wrote 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan. Likely upstream produced empty IMAGE -- check the previous node's output tensor before re-queueing.
+_________________ test_portraits_role_routes_to_portraits_dir _________________
+tests\test_save_to_episode_workspace.py:137: in test_portraits_role_routes_to_portraits_dir
+    assert len(saved) == 1
+E   assert 0 == 1
+E    +  where 0 = len([])
+------------------------------ Captured log call ------------------------------
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:322 [SaveToEpisodeWorkspace] save failed for image 1: BAD_IMAGE_SAVE: char_portrait_00001_.png wrote 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan. Likely upstream produced empty IMAGE -- check the previous node's output tensor before re-queueing.
+_______________ test_falls_back_to_legacy_dir_when_no_singleton _______________
+tests\test_save_to_episode_workspace.py:162: in test_falls_back_to_legacy_dir_when_no_singleton
+    assert len(saved) == 1, (
+E   AssertionError: fallback path -- expected 1 PNG in _legacy_stills/, got []
+E   assert 0 == 1
+E    +  where 0 = len([])
+------------------------------ Captured log call ------------------------------
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:176 [SaveToEpisodeWorkspace] no in-flight ledger singleton -- falling back to legacy dir: C:\Users\jeffr\AppData\Local\Temp\pytest-of-jeffr\pytest-530\test_falls_back_to_legacy_dir_0\ComfyUI_output\otr\_legacy_stills (role_kind=stills, pattern=full_env)
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:322 [SaveToEpisodeWorkspace] save failed for image 1: BAD_IMAGE_SAVE: full_env_00001_.png wrote 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan. Likely upstream produced empty IMAGE -- check the previous node's output tensor before re-queueing.
+____________________ test_per_episode_counter_starts_at_1 _____________________
+tests\test_save_to_episode_workspace.py:209: in test_per_episode_counter_starts_at_1
+    assert saved == ["full_env_00001_.png", "full_env_00002_.png"], (
+E   AssertionError: counter must start at 1 + increment -- got []
+E   assert [] == ['full_env_00...v_00002_.png']
+E     
+E     Right contains 2 more items, first extra item: 'full_env_00001_.png'
+E     Use -v to get more diff
+------------------------------ Captured log call ------------------------------
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:322 [SaveToEpisodeWorkspace] save failed for image 1: BAD_IMAGE_SAVE: full_env_00001_.png wrote 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan. Likely upstream produced empty IMAGE -- check the previous node's output tensor before re-queueing.
+WARNING  nodes.otr_save_to_episode_workspace:otr_save_to_episode_workspace.py:322 [SaveToEpisodeWorkspace] save failed for image 1: BAD_IMAGE_SAVE: full_env_00001_.png wrote 268 bytes (under 4096-byte gate); input tensor shape=(8, 8, 3) dtype=float32 min=nan max=nan. Likely upstream produced empty IMAGE -- check the previous node's output tensor before re-queueing.
+_______________ test_default_canvas_is_native_832x480_at_25fps ________________
+tests\test_video_composite.py:284: in test_default_canvas_is_native_832x480_at_25fps
+    assert inp["optional"]["canvas_width"][1]["default"] == 832
+E   assert 1472 == 832
+=========================== short test summary info ===========================
+FAILED tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk
+FAILED tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active
+FAILED tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir
+FAILED tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton
+FAILED tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1
+FAILED tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps
+================= 6 failed, 2145 passed, 8 skipped in 12.21s ==================
