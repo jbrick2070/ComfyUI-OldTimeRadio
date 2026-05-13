@@ -47,6 +47,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Literal, Optional
 
+from ._otr_style_palette import KNOWN_STYLE_SLUGS
+
 log = logging.getLogger("OTR.ledger_freeze")
 
 
@@ -558,6 +560,22 @@ def _check_meta_invariants(
             )
         elif val == "":
             warnings.append(f"meta.{key} is empty string")
+
+    # S25 / MG-6 (BUG-LOCAL-216). Freeze-time slug validation.
+    # meta.gen_params_initial.style is the writer-stamped slug consumed
+    # by musicgen_theme to look up the cue palette. If it drifts from
+    # KNOWN_STYLE_SLUGS the consumer halts mid-pipeline -- after the
+    # script writer + freeze have already spent time / tokens. Catch the
+    # drift here instead.
+    gp_initial = meta.get("gen_params_initial")
+    if isinstance(gp_initial, dict):
+        gp_style = gp_initial.get("style")
+        if isinstance(gp_style, str) and gp_style and gp_style not in KNOWN_STYLE_SLUGS:
+            errors.append(
+                f"FreezeCascade: meta.gen_params_initial.style="
+                f"{gp_style!r} not in KNOWN_STYLE_SLUGS. Writer drift "
+                f"from palette. Known: {sorted(KNOWN_STYLE_SLUGS)}"
+            )
 
     # Phase-history bucket lists (B6 split, 2026-05-12). Optional
     # at Phase 0; present-as-list at Phase 10. Validate-when-present
