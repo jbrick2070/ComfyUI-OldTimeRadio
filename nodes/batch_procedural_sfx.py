@@ -29,6 +29,7 @@ import numpy as np
 import torch
 
 from ._otr_sfx_lib import SFX_GENERATORS
+from ._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
 
 log = logging.getLogger("OTR")
 
@@ -111,7 +112,12 @@ class BatchProceduralSFX:
                 "script_json": ("STRING", {"multiline": True, "default": "[]"}),
             },
             "optional": {
-                "default_duration": ("FLOAT", {"default": 2.0, "min": 0.1, "max": 10.0, "step": 0.1}),
+                "default_duration": ("FLOAT", {
+                    "default": 2.0,
+                    "min": SFX_DUR_MIN_S,   # G7 lower bound -- imported, not magic
+                    "max": SFX_DUR_MAX_S,   # G7 upper bound -- imported, not magic
+                    "step": 0.1,
+                }),
                 "volume_db": ("FLOAT", {"default": 0.0, "min": -30.0, "max": 6.0, "step": 1.0}),
             }
         }
@@ -188,13 +194,13 @@ class BatchProceduralSFX:
             elif "boom" in tag or "thud" in tag: chosen_type = "explosion"
             elif "theremin" in tag or "eerie" in tag: chosen_type = "theremin"
 
-            # Voice-path-cleanbreak Sprint 3: per-cue dur_s takes
-            # precedence over default_duration. Defensive clamp to the
-            # procedural-synth-friendly window even though G7 already
-            # validated [0.25, 12.0] at freeze time.
+            # Voice-path-cleanbreak Sprint 10.1 (S10.1): per-cue dur_s
+            # takes precedence over default_duration. Defensive clamp
+            # imports G7 constants -- no magic numbers in the consumer.
+            # If G7's window changes, this clamp moves with it.
             _cue_dur_s = sfx_item.get("dur_s")
             if isinstance(_cue_dur_s, (int, float)) and _cue_dur_s > 0:
-                cue_duration = max(0.1, min(10.0, float(_cue_dur_s)))
+                cue_duration = max(SFX_DUR_MIN_S, min(SFX_DUR_MAX_S, float(_cue_dur_s)))
             else:
                 cue_duration = float(default_duration)
 

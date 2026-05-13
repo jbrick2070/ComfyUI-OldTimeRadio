@@ -6,8 +6,9 @@ Replaces the previous "silence" or procedural-only SFX with high-quality sound
 effects generated via facebook/audiogen-medium. 
 
 Architectural Highlights:
-  - Contextual Matching: Parses the script_json for [SFX: ...] tags and matches 
-    them in order to the sfx_plan dictionary from LLMDirector.
+  - Ledger-Driven: Reads SFX cues from the L3 ledger (lines with
+    speaker_role="sfx") via _otr_ledger_consumers.iter_lines. Each
+    cue carries its own per-line dur_s; G7-validated at freeze time.
   - Per-Prompt Caching: SHA-256 hashed filenames under models/sfx_cache/ ensure
     we never waste VRAM or time generating the same sound twice for the same episode.
   - VRAM Discipline: Loads the model only if uncached cues exist. unloads it
@@ -31,6 +32,7 @@ import torch
 
 from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
 from . import _otr_ledger as _OTRL_PATHS
+from ._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -226,7 +228,12 @@ class BatchAudioGenGenerator:
                 # loudly on bad input instead of silently accepting garbage.
                 "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small"], {"default": "facebook/audiogen-medium"}),
                 "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5}),
-                "default_duration": ("FLOAT", {"default": 3.0, "min": 0.5, "max": 10.0, "step": 0.5}),
+                "default_duration": ("FLOAT", {
+                    "default": 3.0,
+                    "min": SFX_DUR_MIN_S,   # G7 lower bound -- imported, not magic
+                    "max": SFX_DUR_MAX_S,   # G7 upper bound -- imported, not magic
+                    "step": 0.5,
+                }),
             }
         }
 
@@ -252,10 +259,6 @@ class BatchAudioGenGenerator:
         # post-cleanbreak design item).
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
-
-        # sfx_plan is gone. Empty list keeps the existing iteration shape
-        # without re-introducing the Director read.
-        sfx_plan: list = []
 
         # Walk ledger sfx lines (Pattern 2: roles={"sfx"}). The cue
         # text comes DIRECTLY from line["text"] -- no [SFX:] regex,
@@ -285,45 +288,22 @@ class BatchAudioGenGenerator:
 
         batch_log.append(f"Found {len(sfx_tags)} SFX cues in ledger.")
 
-        # 2. Match tags to plan prompts
-        # BUG-LOCAL-116 fix 2026-04-30: honor per-cue dur_s instead of
-        # always using default. Originally the Director plan emitted
-        # sfx_plan[i].dur_s; voice-path-cleanbreak Sprint 3 (2026-05-12)
-        # moved the per-cue override into the L3 ledger (line.dur_s).
-        # The legacy sfx_plan branch is dead post-P2 but kept here as a
-        # defensive secondary read for ledgers written before Sprint 3.
+        # 2. Build render queue. BUG-LOCAL-116 fix (2026-04-30): honor
+        # per-cue dur_s instead of always using default. Per-cue values
+        # come from the L3 ledger ``line.dur_s`` (Sprint 3 / S10.1).
         render_queue = []
         for i, tag in enumerate(sfx_tags):
             prompt = tag
             duration = float(default_duration)
 
-            # Voice-path-cleanbreak Sprint 3: per-cue dur_s from the L3
-            # ledger line takes precedence over default_duration. G7
-            # invariant in the FreezeCascade has already validated the
-            # bounds [0.25, 12.0]; the defensive clamp below tightens
-            # to the AudioGen-specific generation window.
+            # Voice-path-cleanbreak Sprint 10.1 (S10.1): per-cue dur_s
+            # from the L3 ledger line takes precedence over
+            # default_duration. Defensive clamp imports G7 constants --
+            # no magic numbers in the consumer. If G7's window changes,
+            # this clamp moves with it.
             _cue_dur_s = sfx_items[i].get("dur_s") if i < len(sfx_items) else None
             if isinstance(_cue_dur_s, (int, float)) and _cue_dur_s > 0:
-                duration = max(0.5, min(10.0, float(_cue_dur_s)))
-
-            # Try to match to sfx_plan by order or description
-            if i < len(sfx_plan):
-                plan_entry = sfx_plan[i] if isinstance(sfx_plan[i], dict) else {}
-                prompt = (
-                    plan_entry.get("generation_prompt")
-                    or plan_entry.get("description")
-                    or tag
-                )
-                # Director-specified duration takes precedence over default.
-                # Several schema variants exist across versions of the
-                # Director output -- accept any of them.
-                for _key in ("dur_s", "duration_sec", "duration"):
-                    _v = plan_entry.get(_key)
-                    if isinstance(_v, (int, float)) and _v > 0:
-                        # Clamp to AudioGen's reasonable bounds so a
-                        # hallucinated 60-second cue doesn't OOM.
-                        duration = max(0.5, min(10.0, float(_v)))
-                        break
+                duration = max(SFX_DUR_MIN_S, min(SFX_DUR_MAX_S, float(_cue_dur_s)))
 
             # BUG-LOCAL-017 (Phase D): split lookup from write path. Lookup
             # via _find_cached checks canonical <prefix>.wav first then

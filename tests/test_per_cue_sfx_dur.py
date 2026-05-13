@@ -102,14 +102,25 @@ def test_g7_dur_s_at_old_upper_bound_now_raises():
 
 
 def test_g7_bounds_match_consumer_intersection():
-    """Sprint 6.4 drift guard. The G7 bounds MUST equal the
-    consumer-intersection of AudioGen + ProcSFX. If a future change
-    relaxes G7 without confirming both consumers can render the wider
-    range, this test catches it."""
+    """Sprint 10.1 (post-S6.4) drift guard. The G7 bounds MUST equal
+    the consumer-intersection of AudioGen + ProcSFX. Post-S10.1 both
+    consumers import these constants directly, so the intersection is
+    enforced structurally -- this test verifies the freeze module
+    still exposes the canonical numeric values."""
     from nodes._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
-    # AudioGen clamp from batch_audiogen_generator.py: max(0.5, min(10.0, dur))
-    # ProcSFX clamp from batch_procedural_sfx.py:      max(0.1, min(10.0, dur))
-    # Intersection: max(0.5, 0.1)=0.5  min(10.0, 10.0)=10.0
+    import nodes.batch_audiogen_generator as ag
+    import nodes.batch_procedural_sfx as proc
+
+    # The consumers' module-level constants MUST be the same objects
+    # as the freeze module's. (Identity, not equality -- catches a
+    # local-shadow refactor that would silently diverge.)
+    assert ag.SFX_DUR_MIN_S is SFX_DUR_MIN_S
+    assert ag.SFX_DUR_MAX_S is SFX_DUR_MAX_S
+    assert proc.SFX_DUR_MIN_S is SFX_DUR_MIN_S
+    assert proc.SFX_DUR_MAX_S is SFX_DUR_MAX_S
+
+    # The numeric values themselves -- pinned for the canonical
+    # cleanbreak intersection.
     assert SFX_DUR_MIN_S == 0.5
     assert SFX_DUR_MAX_S == 10.0
 

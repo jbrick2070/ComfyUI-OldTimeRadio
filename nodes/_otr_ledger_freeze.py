@@ -57,6 +57,8 @@ __all__ = [
     "ALLOWED_FREEZE_VERDICTS",
     "ALLOWED_SPEAKER_ROLES",
     "EXPECTED_SCHEMA_VERSION",
+    "SFX_DUR_MIN_S",
+    "SFX_DUR_MAX_S",
     "run_gap_audit",
     "phase_0_gap_audit_pre",
     "phase_10_gap_audit_post_and_freeze",
