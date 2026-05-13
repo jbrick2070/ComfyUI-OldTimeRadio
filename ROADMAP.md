@@ -49,63 +49,58 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
-## CURRENT WORK — S24 fix sprint (COMPLETE 2026-05-13)
+## CURRENT WORK -- S25 MusicGen parity + soft-rollout flip + legacy gating (LOCKED 2026-05-13)
 
-**State:** 12 sub-task commits + 1 docs commit + QA doc + master tracker SHIPPED on `v2.0-alpha` between `cf8eb96` (C1) and `f11fee1` (master tracker). Net new tests +39 (2108 -> 2147; +1 skip from C9 integration stub). Bug Bible 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+**Stack head:** `1b08ad9` (Phase 9 commit on `s25-musicgen-parity`; final push hash lands in Phase 11 post-mortem).
+**Branch:** `s25-musicgen-parity` (off `v2.0-alpha @ 98489da`; merge to `v2.0-alpha` after QA review).
+**Tests:** 2165 passed / 8 skipped / 6 known-fail (baseline 2147 held; +18 net new tests).
 
-**Canonical docs:** `docs/2026-05-13-S24-fix-sprint-qa.md` (QA / round-robin prompt) + `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` (forward-looking master sprint plan covering every outstanding item across all batches).
+### Closed this sprint
+
+- **MG-1..7,11 + 12** (BUG-LOCAL-211..216, 220): MusicGen brought to AudioGen post-S24 parity. `_save_wav -> bool`; writeback gates `wav_path` on save proof + `os.path.isfile`; `music_render_status` always stamped on the ledger row; ImportError fallback no longer early-returns; `_silent_audio_dict` honors caller duration; NODE_CLASS_MAPPINGS aligned to `OTR_` prefix; short-output sanity + `_fallback/` redirect ported from AudioGen S24/C2; per-episode `_fallback/` cleanup hook; ledger I/O via safe helpers.
+- **AG-1..9** (BUG-LOCAL-217..220): C2 ghost-path gate applied to the legacy `ledger.sfx[]` writeback loop; DeprecationWarning fires when a legacy v1 producer is detected; silent `model_id` repair deleted (loud-fail is now literal behavior); `audit_post_freeze_writeback` wired in soft mode at AudioGen + MusicGen + ProcSFX (VideoComposite skipped with documented rationale -- no per-line audit fields touched); `strict_writeback` default flipped to `True` on ProcSFX (the soft-rollout deadlock is fixed because the walker now actually runs).
+- **MG-6 / Style palette hoist** (BUG-LOCAL-216): single source of truth in `nodes/_otr_style_palette.py`; writer pool + palette + freeze validator all pin set-equality with `KNOWN_STYLE_SLUGS`; new freeze-time check in `_check_meta_invariants` rejects writer drift before MusicGen consumes the slug.
+- **CD-1** (C8 CastContract quarantine): Option 3 selected -- drop the quarantine plan, accept production-wired. Audit + decision in `docs/cleanbreak-deferred.md` C8.
+- **CD-2** (IMP-46 retired LFC names): **closed empty** -- audit returned only deleted test files / a wiring-smoke script; zero retired production LFC class names. Rejection stands; no additions land in `tests/test_legacy_audit_clean.py`.
+- **CD-3** (legacy `ledger.sfx[]` producers): audit returned only the empty-list schema scaffold at `production_ledger.py:357` (consumer-side, not a producer). **Scheduled for deletion in S26.X.**
 
 ### Commit table
 
 | # | Hash | Subject |
 |---:|---|---|
-| C1 | `cf8eb96` | docs(readme): scrub Director references from README + reference fixture README (S23.10) |
-| C2 | `2002958` | fix(audiogen): stamp sfx_render_status, prevent short-output cache poisoning, gate sfx_wav_path on save proof |
-| C3 | `f7a5ca0` | fix(musicgen): strict ImportError default + allow_silence_fallback opt-in (matches AudioGen S17.2) |
-| C4 | `6d3f893` | fix(procsfx): stamp fallback_default_type on resolver default + clean stale wav/G7 comments |
-| C5 | `2bfab7f` | feat(audit): tighten sfx_render_status to known-enum check (expanded set covering C2 + C4) |
-| C6 | `0156797` | test(workflow): pin AudioGen + MusicGen widget vectors to explicit allow_silence_fallback=false |
-| C7 | `493ab8c` | cleanbreak(imp-31): delete AudioGen _cache_key back-compat alias (matches MusicGen S17.1) |
-| C8 | `bb689f2` | docs(cleanbreak): defer C8 CastContract quarantine -- premise was wrong, cast contract IS production-wired |
-| C9 | `af7e7b1` | test(imp-33): automate ComfyUI queue-halt assumption smoke for _LLMTimeoutWorkflowPause |
-| C10 | `4e972c7` | docs(cleanbreak): defer C10 LFC audit regex extension -- LFC is current architecture, not legacy |
-| C11 | `f9f5aa7` | docs(imp-38): require justification comment per EXCLUDED_PATHS entry in legacy-audit test |
-| C12 | `d35aa71` | docs(adr): close S14.2 active-validation design call (implementation deferred to S25+) |
+| 1 | `9679217` | s25 phase 1: shared style palette module |
+| 2 | `f4403e6` | s25 phase 2: MusicGen hardening (AudioGen parity) |
+| 3 | `d289e29` | s25 phase 3: AudioGen legacy + repair cleanup |
+| 4 | `9afa54a` | s25 phase 4: ProcSFX comment polish + strict_writeback flip |
+| 5 | `f592d71` | s25 phase 5: audit walker wiring (4 consumers, soft mode) |
+| 6 | `9fc8c6d` | s25 phase 6: test additions |
+| 7 | `70c5958` | s25 phase 7: CD-1/CD-2/CD-3 decisions resolved via inline grep audits |
+| 8 | `ba4bbe7` | s25 phase 8: regression pass -- 2147+18 / 8 / 6 |
+| 9 | `1b08ad9` | s25 phase 9: BUG_LOG entries 211-220 |
 
-### Deviations from plan
+### Audit-walker wiring inventory (post-S25)
 
-| Sub-task | Plan-spec | Actual disposition |
-|---|---|---|
-| C2 short-output fallback | save to `<cache_dir>/_fallback/` OR skip the save | Saves to `_fallback/` subdir (clearer signal; survives transformers patch); `_save_ok=False` so writeback doesn't stamp sfx_wav_path. |
-| C3 widget alignment | append `allow_silence_fallback=false` only | Plus: realigned AudioGen widget vector to drop the stale `{}` at position 1 (leftover from deleted production_plan_json input shifting every subsequent slot). |
-| C8 quarantine | mechanical move with "likely no internal imports" | **DEFERRED.** Audit found cast_contract IS production-wired via cast_repair → ledger_reviewer chain. Quarantining would break apply_deterministic_cast_repairs at writer-time. 3 unblock options in docs/cleanbreak-deferred.md. |
-| C9 round-robin | required ChatGPT + Gemini | Skipped. Plan already recommended Option B; decision criteria stable; documented deviation in docs/2026-05-13-imp33-queue-halt-test-decision.md "Round-robin deviation" section. |
-| C10 LFC audit | extend regex to flag LFC tokens | **DEFERRED.** LFC = "Live Freeze Cascade" = current production architecture. OTR_LFCPhase4/5/6 are registered nodes; `_otr_lfc_*.py` modules are live. 159 hits would all be false positives. Audit catches *deleted* surfaces; LFC doesn't qualify. Plan-framing correction in docs/cleanbreak-deferred.md. |
-| C12 round-robin | required ChatGPT + Gemini | Skipped. Same rationale as C9; documented in ADR. Decision is reversible if Option B proves inadequate. |
+| Consumer | Wired in soft mode | Notes |
+|---|:---:|---|
+| `batch_audiogen_generator.py` | yes (5.3) | Pre-save violations -> batch_log |
+| `batch_procedural_sfx.py` | yes (5.4) | strict_writeback default flipped True in lockstep |
+| `musicgen_theme.py` | yes (5.5) | Violations -> render_log |
+| `video_composite.py` | N/A (5.6) | Two save_ledger_safe sites, neither touches an audited line field -- documented skip |
 
 ### Pending items
 
 | # | Item | Status |
 |---|---|---|
-| C8 | CastContract quarantine | Deferred -- needs design call on dependency-chain untangling. 3 unblock options listed. |
-| C10 | LFC audit regex extension | Deferred -- premise was wrong; reopens only if a future sprint retires LFC. |
-| S14.2 implementation | OTR_WorkflowValidator first-node | Scheduled for S25+ per the new ADR. ~150 LOC estimate. |
-| S19.3 | Survival-guide promotion | Still gated on 2-3 clean sprints of S15.3 use (was 1; now 2 after this batch). One more sprint to unblock. |
-| S21.3 | Workflow preset split | Still conflicts with `feedback_minimum_json_files` rule. Unchanged. |
+| S14.2 | OTR_WorkflowValidator first-node | Next: S26 (T1.2 from the master tracker, ~150 LOC) |
+| S19.3 | Survival-guide promotion | Gated on 2-3 clean sprints of S15.3 use; S25 is sprint #3 of stable use -- promotion candidate. |
+| S21.3 | Workflow preset split | Still conflicts with `feedback_minimum_json_files`; reopen only on explicit Jeffrey direction. |
+| S26.X | Delete legacy `ledger.sfx[]` path in `batch_audiogen_generator.py` | CD-3 audit clean -- scheduled. Legacy parallel-index loop + sfx_rows lookup + DeprecationWarning + dual-stat log surface all delete in lockstep. |
 
-### IMP-* status
+### Per-consumer audit-walker strict-mode flip schedule
 
-| IMP | Title | Status |
-|---|---|---|
-| IMP-31 | Delete AudioGen _cache_key alias | **CLOSED (C7)** |
-| IMP-32 | Audit walker enum check on sfx_render_status | **CLOSED (C5)** |
-| IMP-33 | ComfyUI queue-halt assumption test | **CLOSED (C9)** -- mock-based smoke. Real-subprocess Option C tracked as IMP-33a; cross-version stability tracked as IMP-33b. |
-| IMP-37 | LFC audit regex extension | **REJECTED (C10)** -- plan premise was wrong; LFC is current. |
-| IMP-38 | EXCLUDED_PATHS justification discipline | **CLOSED (C11)** |
+Each consumer's `audit_post_freeze_writeback(..., strict=True)` flip is gated on the walker staying clean (zero violations in `batch_log` / `render_log`) for 2 full pipeline runs after S25 ships. Tracked separately (operator soak; not a code item).
 
-### Audit-test final state
-
-`tests/test_legacy_audit_clean.py` PASSES (was the cumulative gate from the prior batch; still green after C1's README scrub + C11's discipline rule).
+**Next: S26 -- Validator implementation (handoff's original S25 package: T1.2 + T3.1 + T2.1).**
 
 ---
 
@@ -1825,6 +1820,49 @@ worth pulling in for the v2.0 release notes. Added 2026-05-07.
   pipeline or the LTX encoder layer. Submission window may also
   be a forcing function to publish OTR's Gemma usage pattern as
   a contest entry — free marketing for the project.
+
+---
+
+## Roadmap-only items (not blocking; opportunistic batch)
+
+Stored here so we don't lose track but none are sprint blockers; fold into adjacent work when convenient.
+
+- **Naming-conventions test broadening.** Extend `tests/test_naming_conventions.py` to assert no `NODE_DISPLAY_NAME_MAPPINGS` value contains `[EMOJI]`, `[TODO]`, `[PLACEHOLDER]`, or `[FIXME]` placeholder strings. S25 caught one `[EMOJI]` instance in MusicGen via the new `test_node_display_name_has_no_placeholder` test; a repo-wide assertion in `test_naming_conventions.py` future-proofs the rest.
+- **`_load_cached_wav` return-type annotation.** Both AudioGen + MusicGen declare `_load_cached_wav -> torch.Tensor | None` but actually return `tuple[torch.Tensor, int] | None` (the (tensor, sample_rate) tuple). Annotation should be corrected to match the runtime contract.
+- **Per-consumer `audit_post_freeze_writeback` strict-mode flip.** After each consumer (AudioGen, ProcSFX, MusicGen) stays clean for 2 full pipeline runs post-S25, flip its caller from `strict=False` to `strict=True`. Operator-driven; not a code change in S26.
+- **C11 per-entry justification rule generalization.** S24/C11 added `# justification: <reason>` requirement for every `EXCLUDED_PATHS` entry in `tests/test_legacy_audit_clean.py`. Generalize the rule to all module-level `EXCLUDED_*` / `ALLOWED_*` collections (e.g., `EXPECTED_FAILED_NODEIDS` in `tests/conftest.py` already has the per-entry rationale, but other audit-tuning sets don't).
+- **AudioGen / ProcSFX default `script_json` standardization to `"{}"`.** Both nodes default `script_json` to `"[]"` (legacy parser-list shape) but actually parse it as a v2 ledger dict. Standardizing the default to `"{}"` matches the runtime contract and matches MusicGen.
+
+---
+
+## CD-2 / CD-3 audit outcomes (S25 phase 7, 2026-05-13)
+
+Audit data captured here for the record; the S26 scheduling lines are in the CURRENT WORK "Pending items" table above.
+
+### CD-2 -- IMP-46 retired LFC names audit
+
+```
+$ git log --all --diff-filter=D --name-only | grep -i lfc | sort -u
+scripts/lfc_wiring_smoke.py
+tests/test_lfc_c2_freeze_verdict_preview.py
+tests/test_lfc_c9_estimated_minutes_preview.py
+tests/test_lfc_wiring_smoke_script.py
+```
+
+All four hits are deleted test files or a wiring-smoke script. Zero retired production LFC class names. Current LFC node classes (`OTR_LFCPhase4Scene`, `OTR_LFCPhase5Voice`, `OTR_LFCPhase6Arc`, `OTR_LedgerFreezeCascade`) are all live registrations -- they were never renamed in flight.
+
+**IMP-46 closed: no retired LFC names exist; rejection stands.** No additions land in `tests/test_legacy_audit_clean.py`.
+
+### CD-3 -- legacy `ledger.sfx[]` producer audit
+
+```
+$ grep -rn 'led\["sfx"\]\s*=\|ledger\["sfx"\]\s*=\|\.append.*ledger.sfx' nodes/
+(no hits)
+$ grep -rn '"sfx":\s*\[' nodes/ | grep -v test_
+nodes/production_ledger.py:357:            "sfx": [],
+```
+
+Only hit is `production_ledger.py:357` -- the empty-list schema scaffold (consumer-side initialization, not a producer). No production code writes a non-empty `ledger.sfx[]`. **Scheduled for deletion in S26.X** (see CURRENT WORK pending items).
 
 ---
 
