@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 62,
-  "last_link_id": 113,
+  "last_link_id": 114,
   "nodes": [
     {
       "id": 1,
@@ -1835,7 +1835,7 @@
         {
           "name": "ledger_json",
           "type": "STRING",
-          "link": null,
+          "link": 114,
           "widget": {
             "name": "ledger_json"
           }
@@ -1946,7 +1946,8 @@
             19,
             24,
             21,
-            113
+            113,
+            114
           ],
           "slot_index": 1
         },
@@ -2433,6 +2434,14 @@
       1,
       20,
       0,
+      "STRING"
+    ],
+    [
+      114,
+      62,
+      1,
+      59,
+      3,
       "STRING"
     ]
   ],

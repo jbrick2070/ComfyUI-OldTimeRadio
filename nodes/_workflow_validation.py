@@ -173,17 +173,33 @@ def validate_workflow_contract(
                 f"not declared by INPUT_TYPES()."
             )
 
-        # Required-input wiring check: every required-by-class input
-        # must either have a link OR be widget-fulfilled. Widgets in
-        # ComfyUI workflow JSON live in widgets_values (positional
-        # list); this check uses a presence heuristic -- if the input
-        # name appears in declared.required AND there's no link AND
-        # no widget value present, it's drift.
+        # --- Check 3: widget-drift (S16.3: positional + None-aware) ------
+        # ComfyUI's widget storage is positional: widgets_values[i]
+        # corresponds to the i-th entry in INPUT_TYPES().required that
+        # is NOT also a wired socket. We walk decl_required in declared
+        # order and consume widget_values in the same order.
+        #
+        # S16.3 plan deviation: the original spec said empty string
+        # "" also counts as unfilled. ComfyUI's INPUT_TYPES.required
+        # routinely declares ``("STRING", {"default": ""})`` for
+        # fields like ``episode_title`` where blank means "auto-
+        # derive at runtime". Failing on bare "" here breaks every
+        # such node. The validator is for CONTRACT violations, not
+        # operational nits; per-field "must be non-empty" checks
+        # belong in the node's runtime ``generate()``.
+        #
+        # The remaining contract guarantees:
+        #   - the widgets_values list has at least as many slots as
+        #     decl_required has unwired entries (else, widget
+        #     storage drift -- node will crash at runtime)
+        #   - slot is not explicit None (Comfy treats None as the
+        #     "this socket got dropped" marker)
+        #
+        # Python 3.7+ dict insertion order is guaranteed, so iterating
+        # decl_required gives the same order ComfyUI uses when
+        # materializing widget slots.
         widget_values = node.get("widgets_values") or []
-        # Heuristic: socket-only required inputs in declared.required
-        # should appear in actual_inputs with a non-null link. If they
-        # don't appear OR the link is null AND there's no widget for
-        # them, raise WidgetDrift.
+        widget_iter = iter(widget_values)
         for input_name in decl_required:
             wired = next(
                 (i for i in actual_inputs
@@ -191,18 +207,23 @@ def validate_workflow_contract(
                 None,
             )
             if wired is not None and wired.get("link") is not None:
-                continue
-            # Not wired -- needs a widget. ComfyUI's widget storage
-            # is positional, so a strict positional-index check would
-            # be brittle. We accept "widgets_values is non-empty" as
-            # sufficient evidence the input has a widget value;
-            # tighter positional pinning is a future enhancement.
-            if widget_values:
-                continue
-            raise WorkflowWidgetDriftError(
-                f"{t}(id={node.get('id')}): required input "
-                f"{input_name!r} is unwired AND no widget value present."
-            )
+                continue  # wired -- no widget consumed
+            # Not wired -- must have a widget slot at this position.
+            try:
+                slot = next(widget_iter)
+            except StopIteration:
+                raise WorkflowWidgetDriftError(
+                    f"{t}(id={node.get('id')}): required input "
+                    f"{input_name!r} unwired AND widgets_values "
+                    f"exhausted before this slot."
+                )
+            if slot is None:
+                raise WorkflowWidgetDriftError(
+                    f"{t}(id={node.get('id')}): required input "
+                    f"{input_name!r} unwired AND widget slot is "
+                    f"explicit None (Comfy uses None for dropped "
+                    f"sockets; widget storage drift)."
+                )
 
     # --- Check 4: deleted node types ---------------------------------
     for node in nodes:
@@ -213,17 +234,32 @@ def validate_workflow_contract(
                 f"This type was retired; the workflow needs migration."
             )
 
-    # --- Check 5: forbidden input sockets ----------------------------
+    # --- Check 5: forbidden input sockets (extended in S16.2) ------------
+    # Scans the four user-facing surfaces where Director-era names can
+    # survive a rename: socket name, nested widget name, node title, and
+    # the Save/Restore identifier in properties. The original check only
+    # read inp.get("name") -- the workflow JSON discovered three nested
+    # widget.name and title hits in production (S16.1) that the narrow
+    # version missed.
     for node in nodes:
+        surfaces: list[tuple[str, Any]] = []
         for inp in (node.get("inputs") or []):
             if not isinstance(inp, dict):
                 continue
-            if inp.get("name") in FORBIDDEN_INPUT_SOCKETS:
+            surfaces.append(("socket", inp.get("name")))
+            widget = inp.get("widget") or {}
+            if isinstance(widget, dict):
+                surfaces.append(("widget", widget.get("name")))
+        surfaces.append(("title", node.get("title")))
+        sr_name = (node.get("properties") or {}).get("Node name for S&R")
+        surfaces.append(("s_and_r", sr_name))
+        for kind, val in surfaces:
+            if val and val in FORBIDDEN_INPUT_SOCKETS:
                 raise WorkflowInputSocketError(
                     f"{node.get('type')}(id={node.get('id')}): "
-                    f"forbidden socket {inp.get('name')!r}. Names in "
-                    f"FORBIDDEN_INPUT_SOCKETS are retired from the "
-                    f"wire-input vocabulary."
+                    f"forbidden name {val!r} on {kind!r} surface. "
+                    f"Names in FORBIDDEN_INPUT_SOCKETS are retired from "
+                    f"every user-facing surface, not just the socket."
                 )
 
     # --- Check 6: link-table battery ---------------------------------
@@ -231,18 +267,23 @@ def validate_workflow_contract(
         return  # empty workflow / nothing to validate
     link_ids = []
     for L in links:
-        if not isinstance(L, list) or len(L) < 5:
+        # S16.5 (IMP-22): ComfyUI's link tuple is 6 elements:
+        # [link_id, src_node, src_slot, dst_node, dst_slot, type]
+        # The original threshold (>=5) passed degenerate 5-tuples
+        # missing the trailing type tag.
+        if not isinstance(L, list) or len(L) < 6:
             raise WorkflowValidationError(
-                f"Malformed link entry: {L!r}; expected list of >=5 elements."
+                f"Malformed link entry: {L!r}; expected list of >=6 "
+                f"elements [link_id, src_node, src_slot, dst_node, "
+                f"dst_slot, type]."
             )
         link_ids.append(L[0])
-    if len(link_ids) != len(set(link_ids)):
-        seen: set = set()
-        dups = []
-        for lid in link_ids:
-            if lid in seen:
-                dups.append(lid)
-            seen.add(lid)
+    # S16.5 (IMP-23): dedup duplicate-ID accumulator. An ID present
+    # 3 times reported as [42, 42] under the old manual loop.
+    from collections import Counter
+    counts = Counter(link_ids)
+    dups = sorted(lid for lid, n in counts.items() if n > 1)
+    if dups:
         raise WorkflowValidationError(
             f"Duplicate link IDs present: {dups}"
         )
