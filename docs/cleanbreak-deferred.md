@@ -49,6 +49,34 @@ Cast contract IS wired into production via the `cast_repair → ledger_reviewer`
 
 This is a real architectural call, not a mechanical move. Plan as its own sprint.
 
+### CD-1 decision — Option 3 selected (S25, 2026-05-13)
+
+**Outcome:** Option 3 (drop quarantine, accept production-wired). Cast contract IS the canonical production module; the quarantine plan is closed.
+
+**Narrow grep audit (per S25 playbook CD-1 spec):**
+
+```
+$ grep -h 'from .*_otr_cast_contract import' nodes/*.py | sort -u
+nodes/_otr_cast_repair.py:40:from nodes._otr_cast_contract import (
+nodes/_otr_cast_repair.py:312:    from nodes._otr_cast_contract import _extract_dialogue_tags
+```
+
+Narrow rule: ≤ 2 hits AND no `CharacterEntry` re-export → mechanically points at Option 1 (extract helpers).
+
+**Broader reference graph (production code consumers of CastContract / detect_aliases / _extract_dialogue_tags):**
+
+- `nodes/_otr_cast_contract.py` — source
+- `nodes/_otr_cast_repair.py` — imports (2 sites: top-level + inline)
+- `nodes/OTR_LedgerScriptWriter.py` — forensic reference (CastContractError)
+- `nodes/_otr_outline.py` — reference
+- `nodes/_otr_ledger.py` — reference
+
+**Tests:** `test_cast_contract.py`, `test_cast_contract_helpers.py`, `test_phase3_ledger_reviewer.py`, `test_cast_repair.py`.
+
+**Why Option 3 over Option 1:** the mechanical rule was based on the narrow `from import` grep alone, but the broader graph shows cast_contract is referenced by 4 production modules + 4 test files. The standing no-back-compat directive forbids re-export shims, so Option 1 would require touching every consumer to update import paths -- not a low-risk in-sprint move. Option 3 honestly reflects what the codebase shows: cast_contract is the production module for the cast pipeline; quarantining it was the wrong frame.
+
+**Action shipped this sprint:** none in code. C8 status updates to CLOSED with "cast_contract = production module" framing. The narrow grep + broader audit above is the historical record.
+
 ---
 
 ## S14.2 — Validator auto-invoke (DEFERRED — implementation scheduled for S25+; ADR at docs/2026-05-13-S14_2-active-validation-ADR.md)
