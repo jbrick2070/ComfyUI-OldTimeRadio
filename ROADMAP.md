@@ -1,6 +1,6 @@
 # OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `ef8c409` | **Last refactored:** 2026-05-12 (voice-path-cleanbreak S10-S15 batch + QA doc)
+**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `d698611` | **Last refactored:** 2026-05-13 (voice-path-cleanbreak S16+S17+S18+S21+S22+S23+S19 batch -- S14.2 + S21.3/.4 + S19.3 deferred)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -40,6 +40,54 @@ OTR v2.0 is **greenfield**. The project is being written front-to-back as a sing
 The legacy-prune is its own commit so the diff stays small + auditable. Defer it to a fresh session — context-heavy sessions tend to put the legacy shims back if they aren't pruned in a clean pass.
 
 **Status as of HEAD `ef8c409` (2026-05-12):** the audit hits called out under HEAD `302b839` were largely closed during voice-path-cleanbreak P1-P3 + S1-S15 (commit history: `git log --oneline 302b839..ef8c409`). The Director re-export shim, `_RENAME_ALIASES["OTR_LedgerScriptReviewer"]` + `_RENAME_ALIASES["OTR_Gemma4Director"]` entries, and the `reviewer_verdict` legacy field have all been deleted. Acceptance criteria 1-3 are met (`grep -rn "OTR_LedgerScriptReviewer|Gemma4|reviewer_verdict" nodes/ __init__.py` returns zero hits outside forensic comments with sprint citations). Acceptance criteria 4-5 (workflow JSON loads cleanly + Bug Bible 23/1/2xf) hold. This standing-directive section stays as the **canonical no-back-compat policy** for every contributor going forward; new audit hits get appended here when they surface.
+
+---
+
+## CURRENT WORK — voice-path-cleanbreak S15.5 + S16 + S17 + S18 + S21 + S22 + S23 + S19 (COMPLETE 2026-05-13)
+
+**State:** 9 commits SHIPPED on `v2.0-alpha` between `1f654b8` (docstring preamble) and `d698611` (test fixups for S17/S18 contract changes). Net new test count +25 (2096 -> 2121); Bug Bible regression 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+
+### Sprint summary
+
+| Sprint | Subject | Commit |
+|---|---|---|
+| preamble | _bark_lib + _sfx_lib Sprint 4 -> 7.2 rename-note docstring fix | `1f654b8` |
+| S15.5.1 | Pre-flight legacy audit + tests/test_legacy_audit_clean.py | `62f5042` |
+| S16.1 | Scrub Director-era widget names from production workflow JSON | `a261a7f` |
+| S16.2+3+4+5+6 | Extended validator (4-surface scan, positional widget-drift, link-tuple, dup dedup) + FluxPortrait.ledger_json wired + live-workflow gate | `6c7e784` |
+| S17.1+2+3+4 | MusicGen S12.3 uplift + AudioGen strict failure + drift-guard pins + episode_seed coercion | `5c49d20` |
+| S18.1+2+3+4 | ProcSFX writes "" not None + audit_post_freeze_writeback walker + strict_writeback opt-in + sfx_render_status field | `1ddad72` |
+| S21.1+2 | Flagship VRAM threshold 15.0 -> 14.5 + Gemma 4 E-series context cap 16K -> 8K | `6d08f63` |
+| S22.1+2 | _LLMTimeoutWorkflowPause subclass + manual smoke-test doc | `b4a3098` |
+| S23.1-9 | Director scrub repo-wide + audit-discovered orphan removals (production_plan_or_empty deleted, visual/bridge socket removed, 7 stale test/script files deleted) | `b443f46` |
+| S19.1+2 | Known-failures hook tracks setup/call/teardown phases + conventions.md doc-freshness check | `32f62eb` |
+| fixups | Test fixups for S17/S18 contract breaks | `d698611` |
+
+### Deviations from the upload-set plan
+
+| Sub-task | Plan-spec | Actual disposition |
+|---|---|---|
+| S16.3 empty-string-fail | "if slot is None or (isinstance(slot, str) and slot == ""): raise" | **Plan deviation.** Restricted to None-only. ComfyUI's INPUT_TYPES.required routinely declares default="" (e.g. OTR_LedgerScriptWriter.episode_title for auto-derive); failing on bare "" broke 8 existing tests + the canonical-workflow assertion. The validator is for contract violations, not operational nits; "must be non-empty" lives in the node's runtime generate(). |
+| S16.6 strict mode | "validate with strict_unknown_types=True" | **Default mode.** The bare test env has known import-skip cases (HuMo / LTX / Upscale optional deps); strict mode is exercised at the production loader (S14.2.1) where every class loads. |
+| S21.3 preset split | Rename to _16gb_aggressive.json + add _8gb_safe.json sibling | **Deferred.** Conflicts with standing "keep workflow JSONs to minimum -- no _v2/_safe variants" memory rule. Reopens when Jeffrey gives explicit direction. |
+| S21.4 LTX prompt clamp 300 -> 225 | Find `[:300]` slice in otr_video_plan.py and lower | **N/A.** The repo's actual LTX prompt flow is `_build_ltx_role_prompt()` in batch_ltx_render.py:404 which returns a fixed `_PROMPT_BY_ROLE` dict entry verbatim. No 300-char slice exists. |
+| S23 scope | 5 sub-tasks (S23.1-S23.5) | **Expanded to 9.** Audit discovered orphan `production_plan_or_empty` helper, live `production_plan_json` socket in visual/bridge.py, 7 stale test/script files testing or using deleted classes. S23.10 (README rewrite) deferred. |
+| S14.2 auto-invoke | "Wire validate_workflow_contract into production loader after json.loads" | **Deferred.** OTR has no central loader -- ComfyUI loads workflows itself. Auto-invoke requires either an HTTP route handler that POST-validates or a node-side execution gate; both bigger than the plan's wire-in scope. Calendar gate (2026-05-19) also unmet. Reopens when Jeffrey picks an integration path. |
+| S19.3 survival-guide promotion | "Gated on 2-3 clean sprints of S15.3 use" | **Deferred.** S15.3 only landed 2026-05-12 (one sprint ago). Reopens when the gate is met. |
+| S20 stretch | Optional | **Skipped.** Marked non-blocking by the plan. |
+
+### Pending items (gated, NOT shipped)
+
+| # | Item | Earliest ship | Gating condition |
+|---|---|---|---|
+| S14.2 | Validator auto-invoke on workflow load | When Jeffrey picks an integration path (HTTP route vs node gate) | Plan-spec wire-in doesn't fit OTR architecture; needs design call |
+| S19.3 | Survival-guide promotion of known-failures hook | After 2-3 clean sprints of OTR-scoped S15.3 use | One sprint complete (2026-05-12 -> 2026-05-13); need 1-2 more |
+| S21.3 | Workflow preset split (8gb_safe / 16gb_aggressive) | When Jeffrey opts in (vs the "keep JSONs minimum" preference) | Direct contradiction with standing memory rule |
+| S23.10 | README + reference_episode/README rewrite | Next batch | Audit clean-test scoped to *.py + *.json; README cleanup tracked separately |
+
+### Audit-test final state
+
+`tests/test_legacy_audit_clean.py` PASSES (was the cumulative gate for batch closure). Scope: bounded regex against `\bDirector\b|\bdirector_json\b|...` over `*.py` + `*.json`; forensic-marker substring match per line with a 5-line context-window lookback for multi-line forensic comment blocks; `EXCLUDED_PATHS` set for files inherently forensic by purpose (this test itself + 3 guardrail-test suites that have to reference forbidden names by string literal).
 
 ---
 

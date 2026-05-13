@@ -2,7 +2,7 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-206 (2026-05-12)
+**Last entry:** BUG-LOCAL-207 (2026-05-13)
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
 
 ---
@@ -123,6 +123,24 @@ sprints, regardless of fix-status.
 - **Tags:** f-string, empty-input, dev-iteration, fallback-isolation
 - **Bible candidate rationale:** Cosmetic in isolation; the broader S10.2 lesson (never silently degrade on production surfaces) is the standing directive #1, already canonical.
 
+### BUG-LOCAL-207: `production_plan_or_empty` was an orphan Director-derived fallback [FIXED b443f46 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
+- **Symptom:** S15.5.1 pre-flight legacy audit surfaced `nodes/_otr_ledger_consumers.production_plan_or_empty(plan_json)` -- a helper that parses an optional `production_plan_json` Director-shape string and returns `{}` for empty / None / invalid input. The docstring framed it as "the graceful fallback for the optional Director input under v2." Repo-wide grep showed ZERO production callers outside the helper's own module + its own test file (`tests/test_otr_ledger_consumers.py::TestProductionPlanOrEmpty`). It was a dead Director-derived fallback that violated standing directive #11 ("no Director-derived fallbacks").
+- **Cause:** The L3 consumer rewrite sprint (2026-05-09/10) preserved this helper as a "Pattern 5 demotion" path so old consumers could degrade gracefully when the Director was unwired. Subsequent voice-path-cleanbreak P2/P3 deleted the Director class + the production_plan_json sockets, but this helper was overlooked when the sprint scope tightened. The "no production callers" status was never re-checked.
+- **Fix:** S23.6 -- deleted the function from `nodes/_otr_ledger_consumers.py`, removed the `__all__` entry, dropped the helper-list mention from the module docstring. Deleted `TestProductionPlanOrEmpty` (9 tests) from `tests/test_otr_ledger_consumers.py` in lockstep. Forensic comment preserved at the deletion site citing S23.6 + directive 11.
+- **Verify:** `git grep -n "production_plan_or_empty" -- '*.py' '*.json'` returns zero hits across nodes/ scripts/ visual/ tests/ (excluding docs/ which carries the migration history).
+- **Tags:** legacy-fallback, directive-11, audit-found, orphan-helper, voice-path-cleanbreak
+- **Bible candidate rationale:** General lesson -- a "graceful fallback" surface introduced for a now-deleted upstream consumer is dead weight that lulls future contributors into thinking the upstream is still alive. Audit fallbacks tied to deleted upstreams in the same commit that deletes the upstream; or run a periodic "no production callers" sweep on helpers whose docstring mentions a known-deleted class.
+
+### BUG-LOCAL-208: `visual/bridge.py` carried a live `production_plan_json` socket [FIXED b443f46 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 6 | **Bible candidate:** yes
+- **Symptom:** S15.5.1 audit surfaced `visual/bridge.py:270` -- the OTR_VisualBridge node declared `production_plan_json` as an optional `STRING` input in INPUT_TYPES, the execute() signature accepted it as `production_plan_json: str = "{}"`, and the body wrote the value to `<job_dir>/production_plan.json` via `atomic_write_text`. Grep across the sidecar / visual worker confirmed NO downstream consumer read the file -- the bridge wrote it for an audience that no longer existed.
+- **Cause:** When the legacy LLMDirector was deleted in voice-path-cleanbreak S2 (commit 249bc06) the Director's outputs were no longer being produced anywhere upstream of the bridge. The bridge's optional socket survived because S2 scoped to the audio path, and the visual bridge is sidecar-isolated -- the deletion wave didn't reach this side of the repo until the S15.5.1 audit.
+- **Fix:** S23.7 -- deleted the INPUT_TYPES entry, the kwarg from execute()'s signature, and the atomic_write_text(production_plan.json) call. Module + class docstrings rewritten to reflect "script_json + scene_manifest_json" as the actual input contract. Forensic comment at the deletion site cites S23.7 + directive 11.
+- **Verify:** `git grep -n "production_plan_json" visual/` returns zero hits.
+- **Tags:** legacy-socket, directive-11, audit-found, sidecar-isolation, voice-path-cleanbreak
+- **Bible candidate rationale:** Bookend to BUG-LOCAL-207 -- when a deletion wave is scoped to one subsystem, sidecar-isolated subsystems can carry the deletion's debris forward for sprints. A repo-wide audit grep at the END of every cleanbreak (not just inside the affected subsystem) catches this class of survival.
+
 ---
 
 ## Promotion to Bug Bible
@@ -144,6 +162,8 @@ and the fix is verified:
 - BUG-LOCAL-202 (on-disk filename IS the identity surface for no-cache renderers)
 - BUG-LOCAL-204 (structural ID-uniqueness enforcement complements implicit producer contracts)
 - BUG-LOCAL-205 (`\b` after non-word char at end-of-string is a no-op; audit similar regex shapes)
+- BUG-LOCAL-207 (graceful-fallback helpers tied to deleted upstreams are dead weight; audit at deletion time)
+- BUG-LOCAL-208 (subsystem-scoped deletion waves leave debris in sidecar-isolated subsystems; run a repo-wide audit at the END of every cleanbreak)
 
 Per memory note ("Keep ROADMAP + BUG_LOG live; Bible promotion
 waits until v2.0 ships"), batch-promote after v2.0 lands.
