@@ -20,3 +20,11 @@ Baseline:
 - Unexpected failures: none
 - Notes: AST parse clean. The `sfx_rows = led_disk.get("sfx") or []` lookup, `if sfx_rows: warnings.warn(...)` DeprecationWarning, and parallel-index `for i, item in enumerate(render_queue)` loop are all gone; only the v2 lines[] stamping path remains.
 
+## A2 — MusicGen `_find_cached` legacy timestamped branch deleted
+- Commit: (pending)
+- File: nodes/musicgen_theme.py — `_find_cached` collapsed to single-tier canonical-filename lookup (`<prefix>.wav`). Deleted: `legacy_prefix`, `matches`, `_legacy_sort_key`, iterdir loop, multi-match warning, sort + tail-select.
+- Targeted test command: `pytest tests/test_musicgen_parity.py tests/test_musicgen_strict_failure.py -q`
+- Result: 10 passed
+- Unexpected failures: none
+- Notes: The docstring also rewritten to remove the "Two-level lookup" framing and the Phase D consult note about glob metacharacters (the iterdir loop they referenced is gone).
+
