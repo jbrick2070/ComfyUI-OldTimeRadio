@@ -336,6 +336,10 @@ class MusicGenTheme:
     CATEGORY = "OldTimeRadio"
     FUNCTION = "render"
     RETURN_TYPES = ("AUDIO", "AUDIO", "AUDIO", "STRING")
+    # S30 B6 opt-in: this `model_id` widget picks a MusicGen
+    # checkpoint (facebook/musicgen-small etc.), not an LLM. The
+    # two-slot LLM rule does not apply.
+    NON_LLM_MODEL_WIDGET_OK = True
     RETURN_NAMES = ("opening_audio", "closing_audio", "interstitial_audio", "render_log")
 
     @classmethod

@@ -130,6 +130,14 @@ class VRAMContextTest:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("report",)
     OUTPUT_NODE = True
+    # S30 B6 opt-in: VRAMContextTest is a DIAGNOSTIC node that
+    # measures LLM VRAM consumption at varying prompt lengths. It
+    # picks an LLM by widget on purpose (the whole point of the
+    # diagnostic is "pick a model + measure it"). It is NOT a
+    # production consumer surface; the two-slot LLM rule does not
+    # apply. Marker borrowed from the non-LLM media-node exemption
+    # since the structural guard rule is the same.
+    NON_LLM_MODEL_WIDGET_OK = True
 
     @classmethod
     def INPUT_TYPES(cls):

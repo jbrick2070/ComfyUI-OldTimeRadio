@@ -203,6 +203,11 @@ class BatchAudioGenGenerator:
     FUNCTION = "generate"
     RETURN_TYPES = ("AUDIO", "STRING")
     RETURN_NAMES = ("sfx_audio_clips", "batch_log")
+    # S30 B6 opt-in: this `model_id` widget picks an AudioGen
+    # checkpoint (facebook/audiogen-medium etc.), not an LLM. The
+    # writer's `creative_writing_model` / `technical_model` two-slot
+    # rule applies only to LLM consumer surfaces.
+    NON_LLM_MODEL_WIDGET_OK = True
 
     @classmethod
     def INPUT_TYPES(cls):
