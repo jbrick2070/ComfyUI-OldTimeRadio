@@ -8,8 +8,8 @@
       "id": 63,
       "type": "OTR_WorkflowValidator",
       "pos": [
-        -300,
-        -300
+        50,
+        2100
       ],
       "size": [
         400,
@@ -33,7 +33,7 @@
         "cnr_id": "OldTimeRadio"
       },
       "widgets_values": [
-        "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_scifi_16gb_full.json",
+        "",
         true,
         true
       ]
@@ -179,12 +179,6 @@
           "type": "STRING",
           "links": null,
           "slot_index": 1
-        },
-        {
-          "name": "DEPRECATED_manifest",
-          "type": "STRING",
-          "links": null,
-          "slot_index": 2
         }
       ],
       "flags": {},

@@ -443,32 +443,12 @@ def _generate_bark_for_line(text, voice_preset, temperature=0.7):
 
 
 class SceneSequencer:
-    """Render a script scene: TTS for each line, SFX cues, pauses.
-
-    NOTE on the third output ``DEPRECATED_manifest`` (BUG-LOCAL-125,
-    deprecated 2026-05-01):
-        Originally exposed as ``scene_manifest_json``. Implementation
-        was always a stub (``manifest = []`` initialized at line 689,
-        never appended to, serialized at line 890 -> always emits the
-        literal string ``"[]"``). The slot misled an external static-
-        analysis QA report into recommending it be wired to
-        BatchHumoRender's ledger_json input (BUG-LOCAL-124), which
-        crashed the run with ``ledger path not found: []``.
-
-        Renamed to ``DEPRECATED_manifest`` so future graph editors
-        and static analyzers can't make the same mistake. Kept on
-        the class in deprecated form for one minor version so saved
-        workflow JSONs that wire to slot index 2 don't break with a
-        red-wire error. Will be removed entirely in v2.0-beta.
-
-        Downstream consumers should read the canonical scene/shot/
-        beat data from ``ledger.json`` on disk, not from this output.
-    """
+    """Render a script scene: TTS for each line, SFX cues, pauses."""
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "sequence"
-    RETURN_TYPES = ("AUDIO", "STRING", "STRING")
-    RETURN_NAMES = ("scene_audio", "render_log", "DEPRECATED_manifest")
+    RETURN_TYPES = ("AUDIO", "STRING")
+    RETURN_NAMES = ("scene_audio", "render_log")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -622,8 +602,7 @@ class SceneSequencer:
         all_segments = []
         sfx_timeline = []
         render_log = []
-        manifest = []
-        
+
         # Canonical 1.0+ state tracking
         current_character_name = None
         current_env = "silent room"
@@ -866,7 +845,6 @@ class SceneSequencer:
         waveform = torch.from_numpy(combined).float().unsqueeze(0).unsqueeze(0)
         audio_out = {"waveform": waveform, "sample_rate": sample_rate}
         log_text = "\n".join(render_log)
-        manifest_json = json.dumps(manifest, indent=2)
 
         # Schema l3 ledger write-back: phase_ms.scene_sequencer +
         # audio_gates "post_scene_sequencer" sha256-of-leading-1KB.
@@ -964,7 +942,7 @@ class SceneSequencer:
                 "[SceneSequencer] schema-l3 ledger update failed: %s", _meta_exc
             )
 
-        return (audio_out, log_text, manifest_json)
+        return (audio_out, log_text)
 
 
 class EpisodeAssembler:
