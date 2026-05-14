@@ -44,6 +44,27 @@ forbidden = re.compile(
     # by that name. Forensic mentions (string literals in legacy guard
     # lists, doc references) are suppressed by the tokenize classifier.
     r"|\bcleanup_model_id\b"
+    # S30 B7 (2026-05-14): extinction markers from the two-model
+    # selector sprint. Each name appears verbatim in some deleted
+    # symbol; reintroduction trips the sweep loud.
+    r"|\bOTR_VisualLLMSelector\b"           # B5: deleted node class
+    r"|\bVisualLLMSelector\b"               # B5: deleted node class (no OTR_ prefix form)
+    r"|\b_LLM_MODEL_CHOICES\b"              # B5: deleted dropdown literal (visual selector)
+    r"|\b_MODEL_CHOICES\b"                  # B2a: deleted writer dropdown literal
+    r"|\bDEFAULT_MODEL_ID\b"                # B3: deleted DEFAULT_MODEL_ID at cascade scope
+    r"|\b_POLISH_CACHE\b"                   # B5: collapsed into LLM_CACHE
+    r"|\bMODEL_CONTEXT_CAPS\b"              # B1b: deleted static context-cap dict
+    r"|\bDEFAULT_CONTEXT_CAP\b"             # B1b: deleted default-cap fallback
+    r"|\bOTR_LFCPhase4Scene\b"              # B4: deleted standalone node class
+    r"|\bOTR_LFCPhase5Voice\b"              # B4: deleted standalone node class
+    r"|\bOTR_LFCPhase6Arc\b"                # B4: deleted standalone node class
+    r"|\benable_phase_3_polish\b"           # B3/B4: deleted cascade-toggle widget
+    r"|\bpolish_announcer_beats\b"          # B3/B4: deleted cascade-toggle widget
+    r"|\benable_phase_4_scene_coherence\b"  # B3/B4: deleted cascade-toggle widget
+    r"|\benable_phase_4_5_smart_suggestion\b"  # B3/B4: deleted cascade-toggle widget
+    r"|\benable_phase_5_voice_drift\b"      # B3/B4: deleted cascade-toggle widget
+    r"|\benable_phase_6_episode_arc\b"      # B3/B4: deleted cascade-toggle widget
+    r"|\bPhase3PolishReport\b"              # B4: deleted dataclass
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
@@ -63,13 +84,26 @@ def classify_lines(path: Path) -> dict[int, str]:
         return classifications
     string_lines: set[int] = set()
     comment_lines: set[int] = set()
+    # S30 B7: also classify Python 3.12 f-string tokens
+    # (FSTRING_START, FSTRING_MIDDLE, FSTRING_END) as string context.
+    # Without this, an f-string embedded in code (e.g. `raise
+    # AssertionError(f"... _POLISH_CACHE ...")`) would land on a line
+    # that has both STRING and code tokens; the classifier picks
+    # the dominant non-string token type and the line gets marked as
+    # "code", producing a spurious runtime hit on a forensic mention.
+    _STRING_TOKEN_TYPES = (
+        tokenize.STRING,
+        getattr(tokenize, "FSTRING_START", -1),
+        getattr(tokenize, "FSTRING_MIDDLE", -1),
+        getattr(tokenize, "FSTRING_END", -1),
+    )
     for tok in toks:
-        if tok.type == tokenize.STRING and "\n" in tok.string:
+        if tok.type in _STRING_TOKEN_TYPES and "\n" in tok.string:
             start_l, _ = tok.start
             end_l, _ = tok.end
             for L in range(start_l, end_l + 1):
                 string_lines.add(L)
-        elif tok.type == tokenize.STRING:
+        elif tok.type in _STRING_TOKEN_TYPES:
             # Single-line string — these don't span lines so just
             # mark the one.
             start_l, _ = tok.start

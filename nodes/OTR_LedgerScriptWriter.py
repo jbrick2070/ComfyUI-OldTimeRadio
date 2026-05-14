@@ -122,9 +122,12 @@ DEFAULT_TRAITS = "neutral"
 """Fallback traits string when a beat has no mood. Mirrors the
 'traits = beat.mood or "neutral"' rule from the kickoff prompt."""
 
-DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
-"""Default story-writing LLM. Validated production path (cleared
-BUG-061/062/063 format hardening)."""
+# S30 B7: _otr_model_catalog.DEFAULT_LLM literal DELETED. The canonical default
+# lives in _otr_model_catalog.DEFAULT_LLM (already imported at the
+# top of this module). Every call site that used _otr_model_catalog.DEFAULT_LLM
+# now references _otr_model_catalog.DEFAULT_LLM directly. B7's
+# forbidden-pattern sweep locks the symbol name out of any new
+# runtime code.
 
 LAST_LINES_WINDOW = 5
 """Rolling context window size for compose_line. Each character /
@@ -984,8 +987,8 @@ def _resolve_inputs(
     # slots. Labels passed in may carry the [NOT DOWNLOADED] suffix from
     # the dropdown; _strip_label_suffix normalizes both before they hit
     # the meta block or any consumer.
-    creative_writing_model: str = DEFAULT_MODEL_ID,
-    technical_model: str = DEFAULT_MODEL_ID,
+    creative_writing_model: str = _otr_model_catalog.DEFAULT_LLM,
+    technical_model: str = _otr_model_catalog.DEFAULT_LLM,
     custom_premise: str = "",
     include_act_breaks: bool = True,
     act_count: int = 0,
@@ -1027,14 +1030,14 @@ def _resolve_inputs(
     # S30 B2a: normalize each model id by stripping the [NOT DOWNLOADED]
     # dropdown suffix. Raw widget values never reach a consumer / meta
     # stamp -- catalog._strip_label_suffix is the single normalization
-    # point. Default both inputs to DEFAULT_MODEL_ID so an empty widget
+    # point. Default both inputs to _otr_model_catalog.DEFAULT_LLM so an empty widget
     # value (e.g. an old workflow with shorter widgets_values vector)
     # still produces a usable id.
     creative_writing_model = _otr_model_catalog._strip_label_suffix(
-        str(creative_writing_model or DEFAULT_MODEL_ID)
+        str(creative_writing_model or _otr_model_catalog.DEFAULT_LLM)
     )
     technical_model = _otr_model_catalog._strip_label_suffix(
-        str(technical_model or DEFAULT_MODEL_ID)
+        str(technical_model or _otr_model_catalog.DEFAULT_LLM)
     )
 
     target_words = _resolve_target_words(target_words)
@@ -1583,12 +1586,12 @@ class OTR_LedgerScriptWriter:
         num_characters=2,
         seed=0,
         # S30 B2a: single model_id widget split into two surface widgets.
-        # Both default to DEFAULT_MODEL_ID so the audio C7 baseline is
+        # Both default to _otr_model_catalog.DEFAULT_LLM so the audio C7 baseline is
         # unchanged when the user accepts defaults. B2b adds the internal
         # routing that uses technical_model on structured passes; in B2a
         # both ids feed the same legacy generation path.
-        creative_writing_model=DEFAULT_MODEL_ID,
-        technical_model=DEFAULT_MODEL_ID,
+        creative_writing_model=_otr_model_catalog.DEFAULT_LLM,
+        technical_model=_otr_model_catalog.DEFAULT_LLM,
         custom_premise="",
         include_act_breaks=True,
         act_count=0,
