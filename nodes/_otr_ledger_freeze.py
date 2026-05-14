@@ -275,9 +275,11 @@ def _check_per_line_invariants(
         return
     info["line_count"] = len(lines)
 
-    # Build the set of valid beat ids (top-level beats first; fall
-    # back to meta.outline.beats for back-compat with caller-shaped
-    # ledgers).
+    # Build the set of valid beat ids from top-level beats.
+    # S28 cleanbreak: dropped the meta.outline.beats walk that was a
+    # back-compat fallback for caller-shaped ledgers (pre-D-inversion,
+    # pre-2026-05-10). OTR_LedgerScriptWriter always stamps top-level
+    # `ledger["beats"]` from the outline pass.
     valid_beat_ids: set[str] = set()
     top_beats = ledger_data.get("beats")
     if isinstance(top_beats, list):
@@ -286,16 +288,6 @@ def _check_per_line_invariants(
                 bid = b.get("beat_id")
                 if isinstance(bid, str) and bid:
                     valid_beat_ids.add(bid)
-    meta = ledger_data.get("meta") or {}
-    outline = meta.get("outline") if isinstance(meta, dict) else None
-    if isinstance(outline, dict):
-        outline_beats = outline.get("beats")
-        if isinstance(outline_beats, list):
-            for b in outline_beats:
-                if isinstance(b, dict):
-                    bid = b.get("beat_id")
-                    if isinstance(bid, str) and bid:
-                        valid_beat_ids.add(bid)
 
     seen_line_ids: set[str] = set()
     voiced = 0
