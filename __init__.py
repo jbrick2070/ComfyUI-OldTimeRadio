@@ -166,14 +166,15 @@ _NODE_MODULES = {
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
     # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
     "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),
-    # v2.0 post-audio video pipeline trigger -- fires HuMo batch + concat
-    # in a subprocess after the audio path produces a ledger. RETIRED
-    # in favour of in-graph batch nodes (OTR_BatchHumoRender +
-    # OTR_VideoComposite) that keep all production work inside the
-    # workflow JSON. Kept registered so any old workflow JSON that
-    # still references it loads without error; new builds should not
-    # use it.
-    "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline (retired)"),
+    # OTR_PostAudioVideoPipeline -- DELETED S27 (commit lands in s27-
+    # cleanbreak-tail). The class was a subprocess trigger for the
+    # pre-2026-04-27 HuMo batch + concat pipeline; it was superseded
+    # in-graph by OTR_BatchHumoRender + OTR_VideoComposite. S26 kept
+    # the registration "so any old workflow JSON that still references
+    # it loads without error" -- exactly the back-compat-for-old-data
+    # pattern S27 was authorized to delete. Old workflow JSONs that
+    # still name the type now fail to load loudly via the workflow
+    # validator's DELETED_NODE_TYPES sentinel; they must be re-saved.
     # S26 Sprint 3 (T1.2): opt-in execution-time workflow contract
     # validator. Reads the workflow JSON from disk and runs the same
     # validate_workflow_contract check the S16.6 CI test runs. Place
