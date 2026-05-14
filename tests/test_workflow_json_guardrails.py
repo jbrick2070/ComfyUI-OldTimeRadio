@@ -353,7 +353,9 @@ _WRITER_STYLE_SENTINEL = "let the story decide"
 #   14 min_p / 15 repetition_penalty / 16 max_new_tokens_cap
 # If the writer's INPUT_TYPES order changes, update this constant
 # in lockstep so the drift guard keeps catching the real regression.
-_WRITER_STYLE_SLOT = 9
+# S30 B2a: writer widgets_values vector grew by 1 (technical_model
+# inserted at index 6), so the style widget moved from slot 9 to 10.
+_WRITER_STYLE_SLOT = 10
 _CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
 
 
@@ -559,6 +561,221 @@ class TestVoicePathCleanbreakWiring:
         assert src_name == "script_json", (
             f"MusicGen.script_json wired from "
             f"FreezeCascade.{src_name!r}; expected 'script_json'"
+        )
+
+
+class TestWriterB2aSurface:
+    """S30 B2a writer-surface guardrails. Pins the post-B2a invariants
+    so a future commit cannot silently regress the two-widget surface
+    or the two new output sockets.
+    """
+
+    def _doc(self):
+        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
+        assert wf_path.is_file(), (
+            f"Canonical workflow {_CANONICAL_WORKFLOW!r} missing"
+        )
+        return _load_json(wf_path)
+
+    def _writer(self):
+        doc = self._doc()
+        writers = [
+            n for n in doc.get("nodes", [])
+            if n.get("type") == "OTR_LedgerScriptWriter"
+        ]
+        assert len(writers) == 1
+        return writers[0]
+
+    def test_writer_output_slot_indexes_stable(self):
+        """Every existing link's source slot still resolves to its
+        original output name post-B2a. The two new outputs append at
+        the end so existing slot_indices for links 106..109 are
+        unchanged.
+        """
+        doc = self._doc()
+        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
+        writer = self._writer()
+        expected = {
+            0: "script_text",
+            1: "script_json",
+            2: "news_used",
+            3: "estimated_minutes",
+            4: "creative_writing_model",
+            5: "technical_model",
+        }
+        outputs = writer.get("outputs", [])
+        for slot, expected_name in expected.items():
+            assert slot < len(outputs), (
+                f"writer output slot {slot} missing"
+            )
+            actual = outputs[slot].get("name")
+            assert actual == expected_name, (
+                f"writer output slot {slot} -> {actual!r}; "
+                f"expected {expected_name!r}"
+            )
+
+        # Defense in depth: walk every link sourced at the writer and
+        # verify the source slot still resolves to the right name on
+        # the writer's outputs list.
+        for L in doc.get("links", []):
+            if not (isinstance(L, list) and len(L) >= 6):
+                continue
+            _lid, src, src_slot, _dst, _dst_slot, _typ = L[:6]
+            if src != writer["id"]:
+                continue
+            assert 0 <= src_slot < len(outputs), (
+                f"link {_lid} references writer output slot {src_slot} "
+                f"out of range {len(outputs)}"
+            )
+
+    def test_writer_widget_migration_preserves_values(self):
+        """The pre-B2a widgets_values vector position 5 carried
+        `model_id`; B2a renames that position to `creative_writing_model`
+        and inserts `technical_model` at position 6. Every value that
+        was at positions 6..17 pre-B2a now lives at 7..18 post-B2a.
+        """
+        writer = self._writer()
+        wv = writer.get("widgets_values", [])
+        # Post-B2a expected layout:
+        #   0  episode_title           ""
+        #   1  target_words            350
+        #   2  num_characters          2
+        #   3  seed                    0
+        #   4  seed_mode               "randomize" / "fixed"
+        #   5  creative_writing_model  catalog default repo_id
+        #   6  technical_model         catalog default repo_id
+        #   7  custom_premise          ""
+        #   8  include_act_breaks      True
+        #   9  act_count               3
+        #  10  style                   "let the story decide"
+        #  11  style_custom            ""
+        #  12  creativity              "balanced"
+        #  13  optimization_profile    "Standard"
+        #  14  perfect_run_spacesaver  False
+        #  15  min_p                   0.05
+        #  16  repetition_penalty      1.03
+        #  17  max_new_tokens_cap      200
+        #  18  enable_polish_pass      False
+        assert len(wv) == 19, (
+            f"writer widgets_values length drift: {len(wv)} "
+            f"(expected 19 post-B2a)"
+        )
+        # Creative + technical slots both bound to a string repo id
+        # (default = catalog DEFAULT_LLM but any non-empty STRING is
+        # acceptable here -- the catalog validator handles label
+        # suffixes at run time).
+        assert isinstance(wv[5], str) and wv[5], (
+            f"creative_writing_model widget value not a non-empty "
+            f"string: {wv[5]!r}"
+        )
+        assert isinstance(wv[6], str) and wv[6], (
+            f"technical_model widget value not a non-empty string: "
+            f"{wv[6]!r}"
+        )
+        assert wv[10] == "let the story decide", (
+            f"style widget drifted from canonical default: {wv[10]!r}"
+        )
+        assert wv[12] == "balanced", (
+            f"creativity widget drifted: {wv[12]!r}"
+        )
+        assert wv[13] == "Standard", (
+            f"optimization_profile widget drifted: {wv[13]!r}"
+        )
+
+    def test_writer_broadcasts_normalized_model_ids(self):
+        """AST-walk OTR_LedgerScriptWriter source. Both new outputs
+        must route through _strip_label_suffix before being broadcast.
+        Stripping happens in _resolve_inputs and the writer returns
+        resolved["creative_writing_model"] / ["technical_model"]
+        unchanged -- so it is enough to verify _strip_label_suffix is
+        invoked inside _resolve_inputs.
+        """
+        import ast
+
+        writer_src = (
+            PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(writer_src)
+        # Find _resolve_inputs.
+        target = None
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "_resolve_inputs"
+            ):
+                target = node
+                break
+        assert target is not None, "_resolve_inputs not found"
+        # Count _strip_label_suffix calls inside _resolve_inputs.
+        strip_calls = 0
+        for sub in ast.walk(target):
+            if isinstance(sub, ast.Call):
+                fn = sub.func
+                if (
+                    isinstance(fn, ast.Attribute)
+                    and fn.attr == "_strip_label_suffix"
+                ):
+                    strip_calls += 1
+        assert strip_calls >= 2, (
+            f"expected _resolve_inputs to call _strip_label_suffix at "
+            f"least twice (once per slot); found {strip_calls}"
+        )
+
+    def test_writer_b2a_surface_only(self):
+        """B2a: the writer's surface is the only change. The internal
+        routing change (request_slot("technical", ...) calls inside
+        run()) is B2b's job. Assert ZERO request_slot calls anywhere
+        in OTR_LedgerScriptWriter.run -- B2b's commit will flip this
+        when it lands.
+        """
+        import ast
+
+        writer_src = (
+            PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(writer_src)
+        # Find the OTR_LedgerScriptWriter.run method.
+        run_method = None
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ClassDef)
+                and node.name == "OTR_LedgerScriptWriter"
+            ):
+                for sub in node.body:
+                    if (
+                        isinstance(sub, ast.FunctionDef)
+                        and sub.name == "run"
+                    ):
+                        run_method = sub
+                        break
+                break
+        assert run_method is not None, (
+            "OTR_LedgerScriptWriter.run not found"
+        )
+        bad_calls: list[str] = []
+        for sub in ast.walk(run_method):
+            if isinstance(sub, ast.Call):
+                fn = sub.func
+                if (
+                    isinstance(fn, ast.Attribute)
+                    and fn.attr == "request_slot"
+                ):
+                    bad_calls.append(
+                        f"line {getattr(sub, 'lineno', '?')}: "
+                        f"request_slot(...)"
+                    )
+                elif (
+                    isinstance(fn, ast.Name)
+                    and fn.id == "request_slot"
+                ):
+                    bad_calls.append(
+                        f"line {getattr(sub, 'lineno', '?')}: "
+                        f"request_slot(...)"
+                    )
+        assert not bad_calls, (
+            "B2a surface-only commit must not contain request_slot "
+            "calls inside writer.run; that is B2b's change. Found:\n  "
+            + "\n  ".join(bad_calls)
         )
 
 

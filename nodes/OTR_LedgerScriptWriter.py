@@ -96,6 +96,11 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+# S30 B2a: catalog drives the dropdown_choices() for the two model widgets
+# at INPUT_TYPES() registration time. Pure-Python module, no torch /
+# transformers / GPU work -- safe at module-import time.
+from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
+
 log = logging.getLogger("OTR")
 
 
@@ -324,17 +329,16 @@ _TITLE_PREFIX_RE = None  # compiled lazily inside the helper to keep
 
 
 # ---------------------------------------------------------------------------
-# Model dropdown (matches legacy + cleanup model dropdown)
+# Model dropdowns -- S30 B2a two-widget surface.
+#
+# The hardcoded _MODEL_CHOICES list was deleted in B2a; both writer slots
+# now build their dropdown live from `_otr_model_catalog.dropdown_choices()`,
+# which scans the local HF cache and applies the [NOT DOWNLOADED] suffix
+# to curated entries not yet on disk. The single legacy "model_id" widget
+# was replaced by `creative_writing_model` + `technical_model`; broadcast
+# as two STRING output sockets at the end of RETURN_NAMES.
 # ---------------------------------------------------------------------------
 
-_MODEL_CHOICES = [
-    "mistralai/Mistral-Nemo-Instruct-2407",
-    "google/gemma-4-E2B-it",
-    "google/gemma-4-E4B-it",
-    "Qwen/Qwen2.5-14B-Instruct [ALPHA]",
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B (EXPERIMENTAL)",
-    "inflatebot/MN-12B-Mag-Mell-R1 (EXPERIMENTAL)",
-]
 
 _OPTIMIZATION_PROFILE_CHOICES = [
     "Standard",
@@ -854,7 +858,12 @@ def _resolve_inputs(
     target_words: int = 350,
     num_characters: int = 2,
     *,
-    model_id: str = DEFAULT_MODEL_ID,
+    # S30 B2a: split single model_id input into the two writer-surface
+    # slots. Labels passed in may carry the [NOT DOWNLOADED] suffix from
+    # the dropdown; _strip_label_suffix normalizes both before they hit
+    # the meta block or any consumer.
+    creative_writing_model: str = DEFAULT_MODEL_ID,
+    technical_model: str = DEFAULT_MODEL_ID,
     custom_premise: str = "",
     include_act_breaks: bool = True,
     act_count: int = 0,
@@ -893,6 +902,19 @@ def _resolve_inputs(
       2. style combo verbatim if != _STYLE_AUTO_SENTINEL
       3. LLM-generated (caller fills `resolved["style"]` post-load)
     """
+    # S30 B2a: normalize each model id by stripping the [NOT DOWNLOADED]
+    # dropdown suffix. Raw widget values never reach a consumer / meta
+    # stamp -- catalog._strip_label_suffix is the single normalization
+    # point. Default both inputs to DEFAULT_MODEL_ID so an empty widget
+    # value (e.g. an old workflow with shorter widgets_values vector)
+    # still produces a usable id.
+    creative_writing_model = _otr_model_catalog._strip_label_suffix(
+        str(creative_writing_model or DEFAULT_MODEL_ID)
+    )
+    technical_model = _otr_model_catalog._strip_label_suffix(
+        str(technical_model or DEFAULT_MODEL_ID)
+    )
+
     target_words = _resolve_target_words(target_words)
     num_characters = max(1, min(6, int(num_characters)))
 
@@ -955,7 +977,12 @@ def _resolve_inputs(
         # the writer's final style still gets LLM-proposed from the
         # ACTUAL fetched article below.
         rss_style_slug = resolved_style or _LLM_STYLE_FALLBACK
-        news_article = _fetch_rss_seed_or_die(rss_style_slug, model_id)
+        # B2a: RSS news re-rank still uses one model (creative). The
+        # B4b rewire moves this call to request_slot("technical", ...)
+        # along with the rest of the orchestrator-side LLM stack.
+        news_article = _fetch_rss_seed_or_die(
+            rss_style_slug, creative_writing_model,
+        )
         news_seed = news_article["seed_text"]
         seed_source = "rss_fetch"
 
@@ -971,7 +998,15 @@ def _resolve_inputs(
         "target_words":         target_words,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
-        "model_id":             str(model_id or DEFAULT_MODEL_ID).strip(),
+        # S30 B2a: writer surface broadcasts both ids. Internal generation
+        # still uses one model (creative) in B2a -- B2b adds the routing
+        # split. `model_id` stays in resolved for B2a-era legacy call
+        # sites (still references it via resolved["model_id"]); B2b
+        # deletes it once every consumer has migrated to the per-slot
+        # keys.
+        "creative_writing_model": creative_writing_model,
+        "technical_model":        technical_model,
+        "model_id":             creative_writing_model,
         "include_act_breaks":   bool(include_act_breaks),
         "act_count":            int(act_count_int),
         "creativity":           str(creativity),
@@ -1160,15 +1195,43 @@ class OTR_LedgerScriptWriter:
                         "re-queueing."
                     ),
                 }),
-                "model_id": (_MODEL_CHOICES, {
-                    "default": DEFAULT_MODEL_ID,
-                    "tooltip": (
-                        "Hugging Face model ID. Mistral-Nemo is the "
-                        "validated production default. Suffix tags "
-                        "([ALPHA], (EXPERIMENTAL)) are stripped by "
-                        "the loader before HF lookup."
-                    ),
-                }),
+                # S30 B2a: single model_id widget replaced by two slots.
+                # The catalog dropdown_choices() call scans the local HF
+                # cache live and applies the [NOT DOWNLOADED] suffix to
+                # curated entries that aren't on disk yet. Labels are
+                # stripped via _otr_model_catalog._strip_label_suffix
+                # before any consumer / meta stamp gets the value -- raw
+                # widget strings never reach downstream nodes.
+                "creative_writing_model": (
+                    _otr_model_catalog.dropdown_choices(),
+                    {
+                        "default": _otr_model_catalog.DEFAULT_LLM,
+                        "tooltip": (
+                            "LLM for the creative/narrative passes "
+                            "(outline, cast, dialogue composer, polish, "
+                            "style picker invention). Mistral-Nemo is "
+                            "the C7 byte-identical audio baseline. "
+                            "Suffix tags like [NOT DOWNLOADED] are "
+                            "stripped before HF lookup."
+                        ),
+                    },
+                ),
+                "technical_model": (
+                    _otr_model_catalog.dropdown_choices(),
+                    {
+                        "default": _otr_model_catalog.DEFAULT_LLM,
+                        "tooltip": (
+                            "LLM for the technical/structured passes "
+                            "(JSON validators, GBNF grammar output, "
+                            "reviewer verdicts, cast contract checks, "
+                            "format normalization, news interpreter). "
+                            "Default matches creative_writing_model so "
+                            "the single-model audio baseline holds; "
+                            "pick a smaller model here when you want "
+                            "Slot 1 != Slot 2 routing for VRAM headroom."
+                        ),
+                    },
+                ),
                 "custom_premise": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -1374,9 +1437,14 @@ class OTR_LedgerScriptWriter:
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "run"
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
+    # S30 B2a: two new STRING outputs broadcast the resolved model IDs
+    # for downstream consumers. B2a wires the widget surface only --
+    # the cascade consumer is wired in B3, the writer's internal slot
+    # routing comes in B2b.
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "INT", "STRING", "STRING")
     RETURN_NAMES = (
         "script_text", "script_json", "news_used", "estimated_minutes",
+        "creative_writing_model", "technical_model",
     )
 
     @classmethod
@@ -1396,7 +1464,13 @@ class OTR_LedgerScriptWriter:
         target_words=350,
         num_characters=2,
         seed=0,
-        model_id=DEFAULT_MODEL_ID,
+        # S30 B2a: single model_id widget split into two surface widgets.
+        # Both default to DEFAULT_MODEL_ID so the audio C7 baseline is
+        # unchanged when the user accepts defaults. B2b adds the internal
+        # routing that uses technical_model on structured passes; in B2a
+        # both ids feed the same legacy generation path.
+        creative_writing_model=DEFAULT_MODEL_ID,
+        technical_model=DEFAULT_MODEL_ID,
         custom_premise="",
         include_act_breaks=True,
         act_count=0,
@@ -1423,7 +1497,8 @@ class OTR_LedgerScriptWriter:
             target_words=target_words,
             num_characters=num_characters,
             episode_title=episode_title,
-            model_id=model_id,
+            creative_writing_model=creative_writing_model,
+            technical_model=technical_model,
             custom_premise=custom_premise,
             include_act_breaks=include_act_breaks,
             act_count=act_count,
@@ -2324,7 +2399,13 @@ class OTR_LedgerScriptWriter:
         meta["gen_params_initial"] = {
             "target_words":         resolved["target_words"],
             "num_characters":       resolved["num_characters"],
+            # S30 B2a: stamp both new slot ids. The legacy `model_id`
+            # key stays in B2a for parity with downstream consumers
+            # that still key on it; B2b deletes it after migrating
+            # every reader.
             "model_id":              resolved["model_id"],
+            "creative_writing_model": resolved["creative_writing_model"],
+            "technical_model":        resolved["technical_model"],
             "style":                 resolved["style"],
             "style_combo":           resolved["style_combo"],
             "style_custom":          resolved["style_custom"],
@@ -2425,7 +2506,18 @@ class OTR_LedgerScriptWriter:
             episode_id, len(led.data["lines"]), actual_word_count,
             est_minutes, saved_path,
         )
-        return (script_text, script_json, news_json, est_minutes)
+        # S30 B2a: broadcast both resolved model ids on the writer's
+        # output sockets. Labels stripped (resolved["creative_writing_model"]
+        # / ["technical_model"] are already _strip_label_suffix-normalized).
+        # B3 wires `technical_model` into the cascade.
+        return (
+            script_text,
+            script_json,
+            news_json,
+            est_minutes,
+            resolved["creative_writing_model"],
+            resolved["technical_model"],
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2452,6 +2544,9 @@ if __name__ == "__main__":
     #     Post-Phase-3 cleanup 2026-05-11: legacy widgets dropped
     #     (cleanup_model_id, self_critique, target_length,
     #     arc_enhancer). act_count sits where target_length was.
+    #     S30 B2a: single `model_id` widget split into
+    #     `creative_writing_model` + `technical_model`; optional
+    #     widget count grows 10 -> 11.
     try:
         spec = cls.INPUT_TYPES()
         assert "required" in spec, "missing required block"
@@ -2460,15 +2555,18 @@ if __name__ == "__main__":
         req_keys = list(spec["required"].keys())
         assert req_keys == ["episode_title", "target_words", "num_characters"], \
             f"required widget order drift: {req_keys}"
-        # Optional block: the clean set after Phase 0-3 cleanup.
-        for k in ("seed", "model_id", "custom_premise",
-                  "include_act_breaks", "act_count", "style",
-                  "style_custom", "creativity",
+        # Optional block: the clean set after Phase 0-3 cleanup + B2a
+        # two-widget split.
+        for k in ("seed", "creative_writing_model", "technical_model",
+                  "custom_premise", "include_act_breaks", "act_count",
+                  "style", "style_custom", "creativity",
                   "optimization_profile", "perfect_run_spacesaver"):
             assert k in spec["optional"], f"optional missing key: {k}"
-        # Legacy widgets MUST be absent post-cleanup.
+        # Legacy widgets MUST be absent post-cleanup. `model_id` joins
+        # the legacy list at B2a (replaced by the two slot widgets).
         for legacy in ("cleanup_model_id", "self_critique",
-                       "target_length", "arc_enhancer", "open_close"):
+                       "target_length", "arc_enhancer", "open_close",
+                       "model_id"):
             assert legacy not in spec["optional"], \
                 f"legacy widget {legacy!r} resurrected"
         # seed widget: INT, 0..2^32-1, default 42 (post-cleanup
@@ -2519,19 +2617,37 @@ if __name__ == "__main__":
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
         n_optional = len(spec["optional"])
-        assert n_optional == 10, \
-            f"optional widget count drift: {n_optional} (expected 10 post-cleanup)"
-        print("[2/9] PASS: INPUT_TYPES schema (10 optional widgets after Phase 0-3 cleanup)")
+        assert n_optional == 11, (
+            f"optional widget count drift: {n_optional} "
+            f"(expected 11 after S30 B2a two-widget split)"
+        )
+        # S30 B2a: both model widgets carry the catalog dropdown_choices()
+        # output (list of labels). DEFAULT must match catalog.DEFAULT_LLM.
+        for slot_key in ("creative_writing_model", "technical_model"):
+            choices, meta = spec["optional"][slot_key]
+            assert isinstance(choices, list) and choices, (
+                f"{slot_key} dropdown empty or wrong shape"
+            )
+            from nodes._otr_model_catalog import DEFAULT_LLM as _D
+            assert meta["default"] == _D, (
+                f"{slot_key} default drift: {meta['default']!r} != {_D!r}"
+            )
+        print("[2/9] PASS: INPUT_TYPES schema (11 optional widgets after S30 B2a)")
     except Exception:
         failures.append(("2/9 INPUT_TYPES", traceback.format_exc()))
         print("[2/9] FAIL: INPUT_TYPES schema")
 
     # 3. Locked output contract.
+    #     S30 B2a: two new STRING outputs broadcast the resolved model
+    #     ids (creative_writing_model, technical_model). RETURN_TYPES
+    #     grows from 4 to 6.
     try:
-        assert cls.RETURN_TYPES == ("STRING", "STRING", "STRING", "INT"), \
-            f"RETURN_TYPES drift: {cls.RETURN_TYPES}"
+        assert cls.RETURN_TYPES == (
+            "STRING", "STRING", "STRING", "INT", "STRING", "STRING",
+        ), f"RETURN_TYPES drift: {cls.RETURN_TYPES}"
         assert cls.RETURN_NAMES == (
             "script_text", "script_json", "news_used", "estimated_minutes",
+            "creative_writing_model", "technical_model",
         ), f"RETURN_NAMES drift: {cls.RETURN_NAMES}"
         assert cls.FUNCTION == "run"
         assert cls.CATEGORY == "OldTimeRadio"
