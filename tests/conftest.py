@@ -38,6 +38,27 @@ os.environ.setdefault("PYTORCH_NO_CUDA_MEMORY_CACHING", "1")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 
+@pytest.fixture
+def standard_budget():
+    """v2.0 production-shape EpisodeBudget for outline + composer tests.
+
+    Mirrors OTR_LedgerScriptWriter defaults (target_words=350,
+    num_characters=2, include_act_breaks=True, act_count auto-derived)
+    so prompt-shape tests exercise the production code path. S28
+    cleanbreak removed the `budget=None` back-compat — every
+    OutlineRequest now needs a real budget; this fixture is the
+    canonical one for tests that don't pin a specific shape.
+    """
+    from nodes._otr_episode_budget import compute_episode_budget, default_act_count
+    target_words = 350
+    return compute_episode_budget(
+        target_words=target_words,
+        act_count=default_act_count(target_words),
+        include_act_breaks=True,
+        num_characters=2,
+    )
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _otr_no_cuda_during_collection():
     """Autouse session-scope fixture; documents the env-var approach.
@@ -104,18 +125,17 @@ def pytest_sessionstart(session):
 
 
 EXPECTED_FAILED_NODEIDS = frozenset({
-    # KNOWN-FAIL-001
-    "tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk",
-    # KNOWN-FAIL-002
-    "tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active",
-    # KNOWN-FAIL-003
-    "tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir",
-    # KNOWN-FAIL-004
-    "tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton",
-    # KNOWN-FAIL-005
-    "tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1",
-    # KNOWN-FAIL-006
-    "tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps",
+    # KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
+    # (s26-downstream missed-regression sweep). The 5 BUG-108 + save
+    # workspace entries went green when the test fixtures + the
+    # production_ledger meta-merge bug got fixed; KNOWN-FAIL-006 was
+    # renamed in lockstep with the BUG-LOCAL-030 canvas geometry bump
+    # and now passes under the new name
+    # (test_default_canvas_is_layered_1472x832_at_25fps). See commits
+    # ba8a02e (meta merge), a70aeb8 (fixture size), 8181950 (canvas
+    # rename) for the migration trail. Empty set is the durable clean
+    # baseline state -- the known-fail-guard hook still runs and will
+    # fail loud on any new regression.
 })
 
 

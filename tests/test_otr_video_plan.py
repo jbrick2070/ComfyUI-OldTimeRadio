@@ -380,7 +380,11 @@ def test_build_shot_plan_tokens_are_env_shaped():
     for tok in plan["tokens"]:
         assert tok["type"] == "environment"
         assert tok["description"]
-        assert tok["shot_id"]
+        # Was `tok["shot_id"]` pre-S27. The shot_id alias on these
+        # envelope tokens was deleted as a back-compat surface in
+        # cleanbreak-tail Phase 2 / QA-3; frame_id was always the
+        # canonical key and the alias copied frame_id verbatim.
+        assert tok["frame_id"]
         assert tok["focus_character"] == "BABA"
 
 
@@ -479,15 +483,19 @@ def test_build_shot_plan_unknown_genre_uses_default_era():
     assert "timeless" in plan["era_tail"].lower()
 
 
-def test_build_shot_plan_shot_ids_unique():
+def test_build_shot_plan_frame_ids_unique():
+    """Was test_build_shot_plan_shot_ids_unique pre-S27. Renamed in
+    lockstep with the QA-3 envelope-alias deletion -- the test
+    contract is unchanged (per-token unique identifiers across the
+    episode), only the key name moved to its canonical form."""
     from nodes.otr_video_plan import build_shot_plan
     script_json = _ledger_wrap(_sample_director())
     plan = build_shot_plan(
         script_json, "BABA", shots_per_scene=3,
     )
-    shot_ids = [t["shot_id"] for t in plan["tokens"]]
-    assert len(shot_ids) == len(set(shot_ids)), \
-        "shot_ids must be unique across the episode"
+    frame_ids = [t["frame_id"] for t in plan["tokens"]]
+    assert len(frame_ids) == len(set(frame_ids)), \
+        "frame_ids must be unique across the episode"
 
 
 def test_build_shot_plan_frame_ids_are_global_4digit():

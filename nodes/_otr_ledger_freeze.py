@@ -26,12 +26,14 @@ Cascade ADR).
 Schema mapping (ADR §6.16 reality-check vs L3 ledger):
     ADR §6.16 references `sfx_cues` / `music_cues` (plural lists) on
     each line. The live L3 schema has scalar `sfx_cue` on outline
-    beats and on `LineRequest`, plus top-level lists `sfx` / `music`
-    on the ledger root. The null-rejection invariants here apply to
-    the fields that actually exist:
+    beats and on `LineRequest`, plus top-level `music` list on the
+    ledger root. The legacy top-level `sfx` list was deleted in S26
+    (CD-3) -- sfx are now first-class lines[] rows with
+    `line.speaker_role == "sfx"`. The null-rejection invariants here
+    apply to the fields that actually exist:
 
       * top-level `cast` / `lines` / `beats` / `scenes` / `shots`
-        / `sfx` / `music` / `clips`  -- must be list, never null.
+        / `music` / `clips`  -- must be list, never null.
       * `meta.news.key_terms`  -- must be list when present, never null.
       * `meta.episode_title` / `meta.style` / `meta.episode_id`
         -- must be non-empty string when present.
@@ -46,6 +48,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Literal, Optional
+
+from ._otr_style_palette import KNOWN_STYLE_SLUGS
 
 log = logging.getLogger("OTR.ledger_freeze")
 
@@ -120,7 +124,9 @@ _REQUIRED_TOP_LEVEL_LISTS: tuple[str, ...] = (
     "beats",
     "scenes",
     "shots",
-    "sfx",
+    # S26-A3: legacy top-level "sfx" list removed from schema. sfx are
+    # first-class lines[] rows in v2. The line.speaker_role == "sfx"
+    # case is still part of ALLOWED_SPEAKER_ROLES above.
     "music",
     "clips",
 )
@@ -269,9 +275,11 @@ def _check_per_line_invariants(
         return
     info["line_count"] = len(lines)
 
-    # Build the set of valid beat ids (top-level beats first; fall
-    # back to meta.outline.beats for back-compat with caller-shaped
-    # ledgers).
+    # Build the set of valid beat ids from top-level beats.
+    # S28 cleanbreak: dropped the meta.outline.beats walk that was a
+    # back-compat fallback for caller-shaped ledgers (pre-D-inversion,
+    # pre-2026-05-10). OTR_LedgerScriptWriter always stamps top-level
+    # `ledger["beats"]` from the outline pass.
     valid_beat_ids: set[str] = set()
     top_beats = ledger_data.get("beats")
     if isinstance(top_beats, list):
@@ -280,16 +288,6 @@ def _check_per_line_invariants(
                 bid = b.get("beat_id")
                 if isinstance(bid, str) and bid:
                     valid_beat_ids.add(bid)
-    meta = ledger_data.get("meta") or {}
-    outline = meta.get("outline") if isinstance(meta, dict) else None
-    if isinstance(outline, dict):
-        outline_beats = outline.get("beats")
-        if isinstance(outline_beats, list):
-            for b in outline_beats:
-                if isinstance(b, dict):
-                    bid = b.get("beat_id")
-                    if isinstance(bid, str) and bid:
-                        valid_beat_ids.add(bid)
 
     seen_line_ids: set[str] = set()
     voiced = 0
@@ -346,12 +344,15 @@ def _check_per_line_invariants(
                 )
             tsr = ln.get("tts_skip_reason")
             if not isinstance(tsr, str) or not tsr:
-                # Phantom-skip + reviewer-skip both stamp this; missing
-                # is a warning because some legacy fallbacks set skip
-                # without the reason.
-                warnings.append(
+                # S28 cleanbreak: promoted warning -> error. Phantom-skip
+                # and reviewer-skip both stamp tts_skip_reason on every
+                # production path. The pre-S28 warn-only tolerance for
+                # "some legacy fallbacks set skip without the reason"
+                # is extinct under Rule A + Rule B (uniform shape).
+                errors.append(
                     f"line_id={line_id!r} skip=True but tts_skip_reason "
-                    f"empty/missing"
+                    f"empty/missing (writer contract violation; every "
+                    f"skip path must stamp the reason)"
                 )
         else:
             # Non-skipped voiced beats must have non-empty text.
@@ -471,9 +472,13 @@ def _check_per_cast_invariants(
         # ``voice_preset`` starting with ``v2/`` (the Bark preset
         # namespace). ANNOUNCER is intentionally excluded because it
         # lives in the Kokoro namespace (bm_* / bf_*) by construction.
-        # Empty / None / non-v2 preset is a writer contract violation
-        # promoted from the legacy WARN-fallback (tts_model /
-        # speaker_role substitutes) which was a back-compat shim.
+        # Empty / None / non-v2 preset is a writer contract violation.
+        # S28 cleanbreak: dropped the "promoted from the legacy
+        # WARN-fallback (tts_model / speaker_role substitutes) which
+        # was a back-compat shim" framing — that retirement happened
+        # in voice-path-cleanbreak Gate 2 and the shim is long gone;
+        # the comment was carrying forensic history that's now in the
+        # git log instead.
         if (isinstance(name, str) and name.strip().upper() == "ANNOUNCER"):
             # Kokoro namespace -- voice_preset still must be non-empty
             # but the v2/ prefix does not apply.
@@ -558,6 +563,22 @@ def _check_meta_invariants(
             )
         elif val == "":
             warnings.append(f"meta.{key} is empty string")
+
+    # S25 / MG-6 (BUG-LOCAL-216). Freeze-time slug validation.
+    # meta.gen_params_initial.style is the writer-stamped slug consumed
+    # by musicgen_theme to look up the cue palette. If it drifts from
+    # KNOWN_STYLE_SLUGS the consumer halts mid-pipeline -- after the
+    # script writer + freeze have already spent time / tokens. Catch the
+    # drift here instead.
+    gp_initial = meta.get("gen_params_initial")
+    if isinstance(gp_initial, dict):
+        gp_style = gp_initial.get("style")
+        if isinstance(gp_style, str) and gp_style and gp_style not in KNOWN_STYLE_SLUGS:
+            errors.append(
+                f"FreezeCascade: meta.gen_params_initial.style="
+                f"{gp_style!r} not in KNOWN_STYLE_SLUGS. Writer drift "
+                f"from palette. Known: {sorted(KNOWN_STYLE_SLUGS)}"
+            )
 
     # Phase-history bucket lists (B6 split, 2026-05-12). Optional
     # at Phase 0; present-as-list at Phase 10. Validate-when-present
@@ -644,15 +665,22 @@ def _check_g7_sfx_dur_invariant(
         treatment; dialogue + announcer lines have dur_s populated
         POST-render by Bark / Kokoro and the value is the rendered
         clip duration, not a target)
-      - ``dur_s`` is absent / None (back-compat with older ledgers;
-        default_duration applies)
       - ``dur_s`` is not numeric (already caught by per-line
         type invariants)
+
+    S28 cleanbreak: dropped the "``dur_s`` is absent / None
+    (back-compat with older ledgers; default_duration applies)" skip.
+    Older flat-layout ledgers are extinct after S26's per-episode-
+    workspace cutover; the producer (find_clip_durations / upstream
+    timing in OTR_LedgerScriptWriter outline pass) always stamps
+    dur_s on every sfx line. Missing dur_s is now a hard validation
+    error.
     """
     lines = ledger_data.get("lines")
     if not isinstance(lines, list):
         return
     bad: list[str] = []
+    missing: list[str] = []
     for idx, line in enumerate(lines):
         if not isinstance(line, dict):
             continue
@@ -660,12 +688,23 @@ def _check_g7_sfx_dur_invariant(
             continue
         dur = line.get("dur_s")
         if dur is None:
+            # S28 cleanbreak: missing dur_s on sfx line is now a
+            # writer contract violation, not a tolerated back-compat
+            # shape. Producer always populates from outline pass.
+            line_id = line.get("line_id") or f"<idx {idx}>"
+            missing.append(line_id)
             continue
         if not isinstance(dur, (int, float)):
             continue
         if dur < SFX_DUR_MIN_S or dur > SFX_DUR_MAX_S:
             line_id = line.get("line_id") or f"<idx {idx}>"
             bad.append(f"{line_id}={dur}")
+    if missing:
+        errors.append(
+            f"G7: {len(missing)} sfx line(s) missing dur_s: "
+            f"{', '.join(missing)} (writer outline contract violation; "
+            f"producer must stamp target dur_s on every sfx line)"
+        )
     if bad:
         errors.append(
             f"G7: {len(bad)} sfx line(s) have dur_s outside "

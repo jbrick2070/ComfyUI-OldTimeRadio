@@ -125,8 +125,15 @@ def test_g7_bounds_match_consumer_intersection():
     assert SFX_DUR_MAX_S == 10.0
 
 
-def test_g7_absent_dur_s_is_skipped():
-    """Back-compat: SFX line without dur_s passes G7 silently."""
+def test_g7_absent_dur_s_is_hard_error():
+    """S28 cleanbreak (Rule C): pre-S28 G7 silently passed sfx lines
+    missing dur_s as a back-compat tolerance for older flat-layout
+    ledgers. Post-S28 the producer (find_clip_durations / upstream
+    timing) always stamps dur_s on every sfx line; a missing value
+    is now a hard writer-contract violation, not a tolerated legacy
+    shape. The test assertion is flipped from "no G7 errors" to
+    "G7 reports the missing dur_s as an error."
+    """
     led = {
         "schema_version": "l3-2026-05-14",
         "cast": [],
@@ -137,14 +144,18 @@ def test_g7_absent_dur_s_is_skipped():
                 "speaker_role": "sfx",
                 "text":         "door knock",
                 "traits":       "ambient",
-                # no dur_s field at all
+                # no dur_s field at all -- producer leak under v2.0
             },
         ],
         "meta": {},
     }
     report = _LFC.run_gap_audit(led, label="test")
     g7_errors = [e for e in report.errors if "G7" in e]
-    assert not g7_errors
+    assert g7_errors, "expected G7 missing-dur_s error, got none"
+    assert any("missing dur_s" in e for e in g7_errors), (
+        f"expected 'missing dur_s' wording in G7 error, got: {g7_errors!r}"
+    )
+    assert any("sfx_002" in e for e in g7_errors)
 
 
 def test_g7_non_sfx_lines_excluded():

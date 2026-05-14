@@ -109,7 +109,6 @@ def _clean_ledger_data() -> dict:
                 "skip": False,
             },
         ],
-        "sfx": [],
         "music": [],
         "clips": [],
         "meta": {
@@ -298,8 +297,10 @@ class TestPhase10HardFail:
 
 class TestNullRejection:
     @pytest.mark.parametrize(
+        # S26-A3: "sfx" removed -- legacy top-level sfx list deleted
+        # from schema; sfx are first-class lines[] rows now.
         "field", ["cast", "lines", "beats", "scenes", "shots",
-                  "sfx", "music", "clips"],
+                  "music", "clips"],
     )
     def test_required_top_level_list_missing_raises(self, field):
         data = _clean_ledger_data()
@@ -309,8 +310,10 @@ class TestNullRejection:
         assert any(field in e and "MISSING" in e for e in ei.value.errors)
 
     @pytest.mark.parametrize(
+        # S26-A3: "sfx" removed -- legacy top-level sfx list deleted
+        # from schema; sfx are first-class lines[] rows now.
         "field", ["cast", "lines", "beats", "scenes", "shots",
-                  "sfx", "music", "clips"],
+                  "music", "clips"],
     )
     def test_required_top_level_list_null_raises(self, field):
         data = _clean_ledger_data()
@@ -320,8 +323,10 @@ class TestNullRejection:
         assert any(field in e and "null" in e for e in ei.value.errors)
 
     @pytest.mark.parametrize(
+        # S26-A3: "sfx" removed -- legacy top-level sfx list deleted
+        # from schema; sfx are first-class lines[] rows now.
         "field", ["cast", "lines", "beats", "scenes", "shots",
-                  "sfx", "music", "clips"],
+                  "music", "clips"],
     )
     def test_required_top_level_list_wrong_type_raises(self, field):
         data = _clean_ledger_data()

@@ -279,12 +279,16 @@ def expand_plan_with_durations(
         shot_id = owning["shot_id"] if owning else None
         scene_id = owning["scene_id"] if owning else None
         desc = shot_composes.get(shot_id, "") if shot_id else ""
+        # `shot_id: frame_id` alias deleted S27 (cleanbreak-tail Phase 2
+        # / QA-3). Audit found zero callers reading `shot_id` from these
+        # envelope tokens; the canonical `frame_id` key is what every
+        # consumer reads (3 in tests, none elsewhere). The `owning_shot`
+        # key below is the real shot reference -- not the alias.
         new_tokens.append({
             "type": "environment",
             "description": desc,
             "role": "char_scene_composite",
             "frame_id": frame_id,
-            "shot_id": frame_id,  # legacy alias some callers still use
             "scene_id": scene_id,
             "owning_shot": shot_id,
             "focus_character": plan.get("focus_character", ""),

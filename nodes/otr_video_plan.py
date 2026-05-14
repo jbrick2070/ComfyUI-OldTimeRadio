@@ -637,12 +637,18 @@ def build_shot_plan(
 
         frame_id = f"frame_{frame_idx:04d}"
 
+        # `shot_id: frame_id` alias deleted S27 in lockstep with the
+        # sibling site at otr_shot_duration_calculator.py:287 (Phase 2
+        # / QA-3). Zero callers read `shot_id` from these envelope
+        # tokens. `starts_shot` / `ends_shot` below carry real shot
+        # references via `shot_id` lookups on a DIFFERENT dict shape
+        # (the shots[] registry) -- they are unrelated to the deleted
+        # token-level alias.
         tokens.append({
             "type": "environment",
             "description": composed,
             "role": "char_scene_composite",
             "frame_id": frame_id,
-            "shot_id": frame_id,  # back-compat: some callers still key on shot_id
             "scene_id": scene_id,
             "focus_character": focus_character,
             "frame_index": frame_idx,
@@ -881,8 +887,11 @@ class OTRVideoPlan:
             "first PASS 3 composite:",
         ]
         for tok in pass3["tokens"][:1]:
+            # Was tok['shot_id'] pre-S27. Migrated to tok['frame_id']
+            # in lockstep with the QA-3 envelope-alias deletion -- the
+            # value was identical (alias copied frame_id verbatim).
             summary_lines.append(
-                f"  [{tok['shot_id']}] "
+                f"  [{tok['frame_id']}] "
                 f"{tok['description'][:160]}"
                 f"{'...' if len(tok['description']) > 160 else ''}"
             )
@@ -913,8 +922,13 @@ class OTRVideoPlan:
             for idx, tok in enumerate(pass3.get("tokens") or []):
                 if not isinstance(tok, dict):
                     continue
+                # Was tok.get("shot_id") pre-S27. After the QA-3
+                # envelope-alias deletion the alias is gone; reading
+                # frame_id directly preserves the prior value (the
+                # alias was a verbatim copy of frame_id). Fallback
+                # remains for any token that lacks both keys.
                 shot_rows.append({
-                    "shot_id":       str(tok.get("shot_id") or f"sh{idx+1:02d}"),
+                    "shot_id":       str(tok.get("frame_id") or f"sh{idx+1:02d}"),
                     "scene_id":      str(tok.get("scene_id") or "") or None,
                     "description":   str(tok.get("description") or "")[:200],
                     "visual_prompt": str(tok.get("visual_prompt")

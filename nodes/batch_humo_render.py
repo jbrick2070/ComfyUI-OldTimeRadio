@@ -62,7 +62,7 @@ from _otr_paths import (  # noqa: E402
     comfy_output_dir,
     otr_audio_dir,
     otr_episodes_root,
-    otr_legacy_audio_dir,
+    # S28 cleanbreak: dropped otr_legacy_audio_dir.
     otr_stills_dir,
     otr_videos_dir,
 )
@@ -1145,14 +1145,9 @@ def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
     speaker_desc = ""
     for c in cast:
         if (c.get("name") or "").upper().strip() == (speaker or "").upper().strip():
-            # Cast field renamed 2026-05-10: description -> character_description.
-            # Read the new key first; fall back to the old key for any ledger
-            # written before the rename landed.
-            speaker_desc = (
-                c.get("character_description")
-                or c.get("description")
-                or ""
-            ).strip()
+            # S26-B3 cleanbreak: legacy `description` fallback removed;
+            # callers MUST supply `character_description`.
+            speaker_desc = (c.get("character_description") or "").strip()
             break
     if not speaker_desc:
         speaker_desc = (
@@ -2807,17 +2802,6 @@ class BatchHumoRender:
         return (str(clips_dir_path), total_clips_output, "\n".join(report_lines))
 
     @staticmethod
-    def _load_ledger(ledger_arg: str) -> dict:
-        """Compatibility shim around ``_load_ledger_with_path``: returns
-        only the parsed dict for callers that don't need the source
-        path. New code should prefer ``_load_ledger_with_path`` so
-        ledger-mtime-based freshness checks (BUG-LOCAL-088) can use
-        the file's mtime as a cutoff.
-        """
-        ledger, _ = BatchHumoRender._load_ledger_with_path(ledger_arg)
-        return ledger
-
-    @staticmethod
     def _load_ledger_with_path(ledger_arg: str) -> tuple[dict, Path | None]:
         """Accept either:
           - inline JSON string (starts with '{') -- returns (dict, None)
@@ -2840,9 +2824,10 @@ class BatchHumoRender:
 
         # Auto-pick fallback when input empty
         if not s:
+            # S28 cleanbreak: dropped otr_legacy_audio_dir() from the
+            # search list. Per-episode workspace is the only contract.
             audio_dirs = [
                 otr_episodes_root(),
-                otr_legacy_audio_dir(),
             ]
             cands = []
             for d in audio_dirs:

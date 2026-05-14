@@ -1,6 +1,6 @@
-# OTR Roadmap
+﻿# OTR Roadmap
 
-**Branch:** `v2.0-alpha` | **Owner:** Jeffrey A. Brick | **Stack head:** `f11fee1` | **Last refactored:** 2026-05-13 (S24 fix sprint LOCKED + QA doc + S25+ master sprint tracker)
+**Branch:** `v2.0-alpha` (next-up) | **Active branch:** `s28-cleaner-break` (autonomous Cowork swim-run 2026-05-13) | **Owner:** Jeffrey A. Brick | **Stack head:** `dfcc406` pushed to origin | **Last refactored:** 2026-05-13 (S28 cleaner-break complete; last cleanbreak sprint in the S24→S25→S26→S27→S28 chain; awaiting Jeffrey return for ComfyUI Desktop runtime pass + merge to v2.0-alpha)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -49,63 +49,241 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
-## CURRENT WORK — S24 fix sprint (COMPLETE 2026-05-13)
+## SPRINT SEQUENCING — B -> C -> A, upstream to downstream (Jeffrey, 2026-05-13)
 
-**State:** 12 sub-task commits + 1 docs commit + QA doc + master tracker SHIPPED on `v2.0-alpha` between `cf8eb96` (C1) and `f11fee1` (master tracker). Net new tests +39 (2108 -> 2147; +1 skip from C9 integration stub). Bug Bible 23/1/2 baseline held; KNOWN-FAIL count steady at 6.
+After the current round of cleanbreak validation work closes, the next three sprints land in this order. The order is "furthest upstream first, then downstream" — pipeline order, fixing each surface before the next builds on it.
 
-**Canonical docs:** `docs/2026-05-13-S24-fix-sprint-qa.md` (QA / round-robin prompt) + `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` (forward-looking master sprint plan covering every outstanding item across all batches).
+| # | Sprint | Scope | Rationale for position |
+|---:|---|---|---|
+| 1 | **B — Two-Model Selector** | Two slots on `OTR_LedgerScriptWriter`: `model_creative` + `model_technical`. Every other node loses its `model_id` widget and reads from the writer's broadcast outputs. | Most upstream — lives entirely inside the writer. Mechanical 2.5-3 days. Audio C7 safe (Slot 1 defaults to current Mistral-Nemo). Clears the writer's model surface before C3 tries to flip the default. |
+| 2 | **C — `meta.story_brief` v2** | Post-write reflection pass; FLUX / LTX / HuMo / MusicGen consumers read `meta.story_brief` instead of `meta.style`. 4 pre-flight cleanbreaks + 5 build commits. | Mostly writer + helper work. C's pre-flight cleanbreaks (C2 deletes `_GENRE_BY_STYLE` + retires `meta.ltx_style_brief`; C1 deletes era literals) reshape parts of the downstream surface that A would otherwise repair. Doing C before A means A verifies the **final** contract, not an intermediate one. |
+| 3 | **A — Downstream ledger verification + repair (FLUX / LTX / HuMo)** | End-to-end pass through FLUX, LTX, HuMo confirming the post-LFC ledger + `meta.story_brief` reach every consumer correctly. Estimated 3-4 rounds of round-robin + edits per Jeffrey. | Most downstream. Once B + C land, the consumer contracts are stable; A becomes a single coherent verification + repair sprint against the shipping contract rather than a moving target. Some A-scope bugs (era literals, `_GENRE_BY_STYLE` paths, `meta.ltx_style_brief` reads) are deleted by C's cleanbreaks, so doing A second would be repair-then-demolish work. |
+
+**Don't merge A bugs into C.** Surfaces revealed during C's soak runs that aren't about the brief itself get logged to BUG_LOG.md as A-scope and either fixed inline if small or deferred to A. Keeping the scopes separate keeps each sprint attributable; otherwise C7-C9 silently absorbs a 1-2 week repair sprint and the C calendar slips.
+
+**Audio C7 baseline rules across the sequence:**
+- B preserves byte-identity (Slot 1 default == current Mistral-Nemo).
+- C3 legitimately shifts the baseline (default flips to Gemma-4-E4B-it for VRAM headroom); the new baseline is documented in the C3 commit and becomes the post-C3 reference.
+- A holds the C3 baseline throughout — any A repair work that drifts audio is reverted immediately per Prime Directive 1.
+
+**Canonical artifacts:**
+- **B** -- `docs/2026-05-13-two-model-selector-scoping.md` (scoping, 14 sections, 6 open decisions).
+- **C** -- `docs/2026-05-12-story-brief-v2-problem-statement.md` + `docs/2026-05-12-story-brief-v2-research.md` + `docs/2026-05-12-story-brief-v2-design-refinements.md` + `docs/2026-05-13-story-brief-v2-go-forward-plan.md`.
+- **A** -- TBD; opens when the sprint starts. Likely lives under `docs/<date>-downstream-ledger-verification/` per the round-robin save discipline (CLAUDE.md round-robin section).
+
+**S24 public-facing polish (already on the roadmap below) gates on A close** -- can't ship a sample episode + README rewrite while downstream is still mid-repair.
+
+---
+
+## CURRENT WORK -- S28 cleaner break (COMPLETE 2026-05-13, awaiting Jeffrey return)
+
+**Branch:** `s28-cleaner-break` (cut from `s27-cleanbreak-tail` HEAD `4277952`). Pushed to origin as the run close.
+
+**Stack head:** `dfcc406` (Phase 5 final QA + hand-off artifacts). 20 commits on branch.
+
+**Spec:** `docs/2026-05-13-S28-cleanbreak-plan.md`. **Final QA review:** `docs/2026-05-13-S28-final-qa-review.md`. **Audit results:** `docs/2026-05-13-S28-audit-results.md`.
+
+### What closed in this run
+
+**Phase 0 baseline (1 commit).** Footprint capture of the 5 S28 target surfaces + 2145-passed-8-skipped baseline pytest committed for delta tracking. Empty `baseline-known-fail-nodeids.txt` confirms the s26-downstream sweep's no-known-fails state held through S27.
+
+**Phase 1 — `otr_legacy_audio_dir()` extinction (10 commits).** All 13 caller sites migrated across 8 nodes (`_otr_ledger.py`, `audio_enhance.py`, `batch_audiogen_generator.py`, `batch_bark_generator.py`, `batch_humo_render.py`, `batch_ltx_render.py`, `scene_sequencer.py`, `video_composite.py`). Function deleted from `_otr_paths.py:201` + `__all__` entry. Flat-layout walker (`d.glob("*_ledger.json")`) stripped from `find_most_recent_ledger`. Per-episode workspace is now the only contract.
+
+**Phase 2 — `req.budget is None` extinction (3 commits).** `standard_budget` fixture in `tests/conftest.py`. Two legacy-tolerance tests deleted under Rule C (`test_block_omitted_when_budget_none`, `test_no_budget_no_op`). Production fallbacks dropped from `_otr_outline.py`: `__post_init__` now enforces `not hasattr(self.budget, "arc_phases")` (catches both None and wrong-type leaks; avoids tripping the `req\.budget is None|budget is None` forbidden-pattern grep). `_build_user_prompt` budget block always renders. `validate_outline_against_budget` runs unconditionally. Inline harness updated with `_HARNESS_BUDGET_*` fixtures so it still runs end-to-end; Test 11a (bare-format cast_descriptions=() back-compat assertion) deleted per plan.
+
+**Phase 3 — `_otr_line_composer.py` caller-shape extinction (3 commits).** Producer audit found one real leak: `OTR_LedgerScriptWriter` wrapped `make_polish_generate_fn` in a `try/except ... = None` that silently re-injected the Tier 3 #22 awkward-substitution regression on factory failure. Fix landed as `s28-p3-producer-1` (BUG-LOCAL-224 logged). Consumer-side: `allowed_roster` empty-frozenset default reframed as dataclass-ordering artifact (not back-compat); `elif req.allowed_roster:` legacy combined-roster prompt block deleted; `polish_line` docstring updated to drop "back-compat" framing (runtime fallback retained as defense-in-depth per producer-contract guarantee — documented deviation in final QA review).
+
+**Phase 4 — `_otr_ledger_freeze.py` ledger-shape extinction (5 commits, audio-critical).** Producer audit found no live leaks (all 4 sites defended against retired shapes). One-site-per-commit deletion sequence: `meta.outline.beats` walk dropped, `skip=True` without `tts_skip_reason` promoted warning→error, `speaker_role` substitute forensic-comment cleanup, `dur_s is None` skip dropped (replaced with hard `G7: missing dur_s` error + test flipped under Rule C). **Audio-byte-identical regression PASSED at every site boundary.** Rule F revert+trace never invoked.
+
+**Phase 5 — Final static verification + push (2 commits).**
+
+  * Pre-existing UTF-8 BOM on `tools/validate_workflow_links.py` surfaced by the Bug Bible regression — inherited from before s27-cleanbreak-tail; stripped in commit `b334b3a`. BUG-LOCAL-225 logged (Bug Bible repo-wide gate must run alongside Phase 0 baseline + Phase 5 close).
+  * Final hand-off commit `dfcc406` with audit-results, final-qa-review, final-pytest, link-integrity-report, forbidden-pattern-sweep (0 runtime hits / 31 forensic via tokenize-classified docstring/comment suppression), known-fail-delta (empty), and `_s28_forbidden_sweep.py` (reusable tokenize-based gate script).
+
+### Acceptance results
+
+  * Pytest: **2143 passed, 8 skipped, 0 failed** (delta -2 from baseline = Phase 2 legacy-tolerance tests).
+  * Bug Bible: **23 passed, 1 skipped, 2 xfailed** (matches plan after BOM strip).
+  * Workflow link integrity: **TOTAL violations 0** across all 5 workflow JSONs.
+  * Audio-byte-identical: **PASS** at every Phase 4 site boundary and at final.
+  * Forbidden-pattern sweep: **empty file** (0 runtime hits; 31 forensic suppressed).
+  * `git push origin s28-cleaner-break` succeeded; local HEAD == origin HEAD == `dfcc406`.
+  * `docs/cleanbreak-deferred.md` stubbed (zero active deferrals; C10/C8/S14.2 retained as historical resolution audit trail).
+
+### Documented deviations from plan (all captured in final QA review §Deviations)
+
+  1. `_otr_line_composer.py:1265` runtime polish_generate_fn fallback retained as defense-in-depth (producer-contract guarantee makes it unreachable in production; preserved for test-harness ergonomics).
+  2. `OutlineRequest.__post_init__` enforcement uses `not hasattr(self.budget, "arc_phases")` instead of `is None` (catches both None and wrong-type leaks + avoids the forbidden-pattern guard).
+  3. Inline `_otr_outline.py` harness needed `_HARNESS_BUDGET_*` fixtures threaded through 5 OutlineRequest construction sites (broader than the plan's "delete Test 11a" line).
+  4. `docs/cleanbreak-deferred.md` stubbed rather than fully emptied (preserves C10/C8/S14.2 historical resolution audit trail).
+
+### Why this is the LAST cleanbreak sprint
+
+After S28 every legacy path from the S24→S25→S26→S27→S28 chain is extinct. The v2.0 contract is the only contract. Producers respect their own contracts; consumers trust producers; no fallbacks, no defensive guards beyond enforced producer-contract checks. If a future audit finds a missed surface, it's a `BUG-LOCAL-NNN` with a single-commit fix — not a sprint name. **100% means 100%. The cleaner break ends the chain.**
+
+### Forward work (not S28; tracked elsewhere)
+
+Unchanged from the S27 close: B Two-Model Selector → C `meta.story_brief` v2 → A downstream verification. The B→C→A sequencing section above remains canonical.
+
+---
+
+## PRIOR CURRENT WORK -- S27 cleanbreak tail (COMPLETE 2026-05-13)
+
+**Branch:** `s27-cleanbreak-tail` (cut from `s26-cleanbreak` HEAD `19cf286` post Phase B downstream sweep; planning + 5 fix-commits landed on `s26-cleanbreak` first to clear 7 missed-regressions S26 didn't surface).
+
+**Stack head before push:** `cabee65` (Phase 2-4 QA-N closures). Final QA + ROADMAP + S28 prep commit follows and is pushed to origin as the run close.
+
+**Spec:** `docs/2026-05-13-S27-cleanbreak-tail-sprint.md`. **Final QA review:** `docs/2026-05-13-S27-final-qa-review.md`. **S28 prep:** `docs/2026-05-13-S27-s28-prep-qa.md`.
+
+### What closed in this run
+
+**Phase A / B downstream sweep (5 commits on `s26-cleanbreak`).** Recovered git state from a path-truncated HEAD + corrupt index that blocked the initial Cowork launch. Surfaced and fixed 7 missed regressions S26 hadn't run a full-suite pytest against. Three were real production bugs (meta.phase_ms merge, save-to-workspace fixture, video_composite canvas test migration); the 4th was a legacy-token scan gap; 6 went into the resolved-log of `docs/known-failures.md`. After this sweep, `EXPECTED_FAILED_NODEIDS` is empty.
+
+**S27 sprint (4 commits on `s27-cleanbreak-tail`).**
+
+| Phase | Items shipped |
+|-------|---------------|
+| Phase 0 | baseline-pytest.txt, baseline-known-fail-nodeids.txt (empty), baseline-footprint.txt (3 deletion targets confirmed), audit-results.md seed |
+| Phase 1 Item 1 | `OTR_PostAudioVideoPipeline` class entirely deleted (`nodes/post_audio_video_pipeline.py` file, `__init__.py` registration, `tests/test_post_audio_video_pipeline.py` 14 tests, README node-11 row). `DELETED_NODE_TYPES` extended so old workflow JSONs fail-loud. |
+| Phase 1 Item 2 | `set_sfx`, `apply_sfx_timings`, `_merge_with_disk::ROW_KEYED["sfx"]` deleted. Test split: music-only assertions retained, sfx half deleted. |
+| Phase 2 QA-2 | `_load_ledger` shims at `video_composite.py:382` and `batch_humo_render.py:2805` deleted inline. 3 test callers migrated to `_load_ledger_with_path(x)[0]`. |
+| Phase 2 QA-3 | `shot_id: frame_id` envelope alias deleted in lockstep across both sites. 2 production consumers + 3 test consumers migrated to canonical `frame_id`. |
+| Phase 2 QA-4 | 13 `otr_legacy_audio_dir()` callers enumerated in `docs/2026-05-13-S26-audit-results.md`. `tools/validate_workflow_links.py` gained `FORBIDDEN_PATTERNS` catalogue. |
+| Phase 3 QA-6 | Scene_sequencer + EpisodeAssembler dead sfx-mirror walks stripped (~122 lines total). Audio-byte-identical test still passes. |
+| Phase 4 QA-5 | Strict-deprecation audit reclassified. pytest-asyncio config warning FIXED via pyproject.toml. torchao import warning documented as third-party. `_strict_probe.py` durable harness shipped. BUG-LOCAL-221 CLOSED. |
+| Phase 5 | full pytest 2145 passed / 8 skipped / 0 failed (baseline -14 = exactly the deleted Item 1 tests). Bug Bible 23/1/2xf. Forbidden-pattern new hits: 23 raw matches, all forensic/catalogue/harness -- zero new back-compat surfaces. Link integrity zero violations across 5 workflows. |
+
+### What was deferred (named follow-up sprints generated by this run)
+
+| Sprint | Scope | Trigger |
+|---|---|---|
+| B6 path back-compat -- small (otr_legacy_audio_dir migration) | 13 caller sites, all secondary-fallback entries; one-line swap each | QA-4 enumeration closed S27, mechanical migration deferred |
+
+No new deferrals -- only the existing B6 entry's enumeration gap was closed. B4, B5, B2 deferrals from S26 carry forward unchanged.
+
+### Next on-ramp (priority order)
+
+1. **Post-cleanbreak ComfyUI runtime pass** -- boot ComfyUI Desktop, re-save any workflow that surfaces `WorkflowDeletedNodeError` for `OTR_PostAudioVideoPipeline`, run canonical short-settings smoke. **Requires Jeffrey at the console.**
+2. **B6 path back-compat -- small (otr_legacy_audio_dir migration)** -- 13 caller sweep, Cowork-runnable.
+3. **B2 `_otr_outline.py` back-compat sweep** -- STOPPED in S26 pending design judgment.
+4. **B4/B5 line-composer + freeze-contract tightening** -- deferred S26 entries.
+5. **Two-Model Selector / Sprint #1 (B)** -- Jeffrey's deferred feature work, now fully unblocked.
+
+### Independent QA review (for the next Claude session)
+
+Paste the prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md` into a fresh Claude session. Attach: `docs/2026-05-13-S27-final-qa-review.md`, `docs/2026-05-13-S27-audit-results.md`, the updated `BUG_LOG.md` + `ROADMAP.md`, and the S27 directive file. Apply Jeffrey's threshold: zero current callers is the green light to DELETE, not the excuse to preserve.
+
+---
+
+## PRIOR CURRENT WORK -- S26 cleanbreak + chained sprints (COMPLETE 2026-05-13)
+
+**Branch:** `s26-cleanbreak` (cut from `s25-musicgen-parity` HEAD `3393b39`; planning carry committed before sprint open).
+
+**Stack head before push:** `88cd1e5` (Sprint 3 / T1.2 OTR_WorkflowValidator). Final QA commit (`docs(s26): final QA review, BUG_LOG + ROADMAP updates`) follows and is pushed to origin as the run close.
+
+**Spec:** `docs/2026-05-13-S26-cleanbreak-plan.md`. **Directive:** `docs/2026-05-13-S26-cowork-autonomous-directive.md`. **Final QA review:** `docs/2026-05-13-S26-final-qa-review.md`.
+
+### What closed in this run
+
+**S26 cleanbreak (Sprint 1 — 12 commits).** Phase 0 baseline + Phase 1 (A1-A4b) + Phase 2 audits + Phase 3 deletes for in-scope B-section items + Phase 4 regression + Phase 5 downstream fix + Phase 6 forbidden-pattern sweep. Known-fail delta vs baseline: **empty** (FC reports no differences). Net pass-count change is -20, all intentional test deletions documented in their commit messages and `audit-results.md`.
+
+| Phase | Items shipped |
+|-------|---------------|
+| Phase 0 | baseline-pytest.txt, baseline-known-fail-nodeids.txt, baseline-legacy-footprint.txt, audit-results.md seed |
+| Phase 1 (A) | A1 (legacy ledger.sfx[] writeback loop), A2 (MusicGen `_find_cached` legacy branch), A2-sibling (AudioGen same), A3 (production_ledger sfx schema scaffold + validator), A4a (script_json node-class default), A4b (workflow fixture textual scrub) |
+| Phase 2 (B audits) | B1, B3, B4, B5, B6 audits completed; deferral verdicts captured |
+| Phase 3 (B deletes) | B1 (l2 back-compat narrative), B3 (set_cast input shims + HuMo prompt fallback), B6/post_audio_video_pipeline (legacy flat-layout) |
+| Phase 4 (regression) | full pytest delta empty; strict-deprecation audit gate held with 1 third-party noise flagged (BUG-LOCAL-221) |
+| Phase 5 (downstream) | test_cache_key_mutations migrated to single-tier `_find_cached` contract |
+| Phase 6 (forbidden) | 0 new hits introduced; surviving hits in changed files all pre-existing deferred surfaces |
+
+**Sprint 2 — post-cleanbreak STATIC items (1 commit).** Built `tools/validate_workflow_links.py` (no-ComfyUI-boot link integrity checker); runs clean against all 5 in-repo workflows. Stale-widget textual scrub closed under A4b. `__init__.py` deleted-symbol scan: 0 hits.
+
+**Sprint 3 — T1.2 OTR_WorkflowValidator (1 commit).** Built `nodes/_otr_workflow_validator.py` + wired into `__init__.py` + added node id=63 at position 0 of `workflows/otr_scifi_16gb_full.json`. Tests `tests/test_otr_workflow_validator.py` (4 canonical + 4 adversarial) all green.
+
+### What stopped
+
+**Sprint 4 — B2 `_otr_outline.py` back-compat sweep — STOPPED per directive §5 row 4 (design judgment required).** 22 hits across `_otr_outline.py` all gated on `req.budget is None` (pre-Phase-2A back-compat); production callers DO supply budgets but tests + fixture-level callers exercise the no-budget path deliberately. Whether those tests pin removable legacy tolerance or represent a still-supported simpler-mode is a design call Jeffrey owns. Stop record: `docs/2026-05-13-S26-cowork-stop-log.md`. Named follow-up sprint: **"B2 `_otr_outline.py` budget-required cleanbreak"** -- design call first, then mechanical execution per the Section B per-item loop.
+
+### What was deferred (named follow-up sprints generated by this run)
+
+| Sprint | Scope | Trigger |
+|--------|-------|---------|
+| B4 line-composer back-compat sweep | 4 sites in `_otr_line_composer.py`; behavioral back-compat; call-site tracing required | when ready |
+| B5 freeze-cascade tolerance trace + tighten | 4 sites in `_otr_ledger_freeze.py`; audio-path coupled | when ready (round-robin recommended) |
+| B6 sequencer SFX-mirror migration | 3 sites in `scene_sequencer.py`; audio path; BUG-LOCAL-107 contract | merge into SPRINT #3 (A) |
+| B6 writer back-compat sweep | 2 sites in `OTR_LedgerScriptWriter.py` | merge into SPRINT #1 (B) Two-Model Selector |
+| B6 batch_humo_render back-compat | 4 sites in `batch_humo_render.py` | merge into SPRINT #3 (A) |
+| B6 video plan misc back-compat | 1 site in `otr_video_plan.py`; small | small standalone |
+| B6 video pipeline misc | 2 sites in `video_engine.py` + `video_composite.py` | merge into SPRINT #3 (A) |
+| B6 path back-compat | 2 sites in `_otr_paths.py`; small | small standalone |
+| B2 `_otr_outline.py` budget-required cleanbreak | 22 sites; Jeffrey design call first | when Jeffrey opens |
+
+### CD-3 (carry from S25): CLOSED
+
+The CD-3 audit conclusion (legacy `ledger.sfx[]` writeback loop has zero producers) was acted on this sprint -- the surface is deleted, not gated. The S25-era gate-and-schedule debris is gone.
+
+### Sprints opened in queue
+
+1. **ComfyUI Desktop runtime pass (§11 post-cleanbreak)** -- first action awaiting Jeffrey on return. See `docs/2026-05-13-S26-final-qa-review.md` §8 for the hand-back checklist (boot ComfyUI, load canonical workflow, drag OTR_WorkflowValidator id=63 into position, re-save the fixture for widget-vector normalization, queue at shortest settings to confirm runtime contracts, capture strict-deprecation traceback in interactive shell).
+2. **SPRINT #1 (B) Two-Model Selector** -- scoping doc owns this; not touched by this run.
+3. **SPRINT #2 (C) `meta.story_brief` v2** -- pre-flight cleanbreaks already documented; not touched.
+4. **SPRINT #3 (A) Downstream ledger verification** -- gated on C close.
+
+---
+
+## PRIOR CURRENT WORK -- S25 MusicGen parity + soft-rollout flip + legacy gating (LOCKED 2026-05-13)
+
+**Stack head:** `1b08ad9` (Phase 9 commit on `s25-musicgen-parity`; final push hash lands in Phase 11 post-mortem).
+**Branch:** `s25-musicgen-parity` (off `v2.0-alpha @ 98489da`; merge to `v2.0-alpha` after QA review).
+**Tests:** 2165 passed / 8 skipped / 6 known-fail (baseline 2147 held; +18 net new tests).
+
+### Closed this sprint
+
+- **MG-1..7,11 + 12** (BUG-LOCAL-211..216, 220): MusicGen brought to AudioGen post-S24 parity. `_save_wav -> bool`; writeback gates `wav_path` on save proof + `os.path.isfile`; `music_render_status` always stamped on the ledger row; ImportError fallback no longer early-returns; `_silent_audio_dict` honors caller duration; NODE_CLASS_MAPPINGS aligned to `OTR_` prefix; short-output sanity + `_fallback/` redirect ported from AudioGen S24/C2; per-episode `_fallback/` cleanup hook; ledger I/O via safe helpers.
+- **AG-1..9** (BUG-LOCAL-217..220): C2 ghost-path gate applied to the legacy `ledger.sfx[]` writeback loop; DeprecationWarning fires when a legacy v1 producer is detected; silent `model_id` repair deleted (loud-fail is now literal behavior); `audit_post_freeze_writeback` wired in soft mode at AudioGen + MusicGen + ProcSFX (VideoComposite skipped with documented rationale -- no per-line audit fields touched); `strict_writeback` default flipped to `True` on ProcSFX (the soft-rollout deadlock is fixed because the walker now actually runs).
+- **MG-6 / Style palette hoist** (BUG-LOCAL-216): single source of truth in `nodes/_otr_style_palette.py`; writer pool + palette + freeze validator all pin set-equality with `KNOWN_STYLE_SLUGS`; new freeze-time check in `_check_meta_invariants` rejects writer drift before MusicGen consumes the slug.
+- **CD-1** (C8 CastContract quarantine): Option 3 selected -- drop the quarantine plan, accept production-wired. Audit + decision in `docs/cleanbreak-deferred.md` C8.
+- **CD-2** (IMP-46 retired LFC names): **closed empty** -- audit returned only deleted test files / a wiring-smoke script; zero retired production LFC class names. Rejection stands; no additions land in `tests/test_legacy_audit_clean.py`.
+- **CD-3** (legacy `ledger.sfx[]` producers): audit returned only the empty-list schema scaffold at `production_ledger.py:357` (consumer-side, not a producer). **Scheduled for deletion in S26.X.**
 
 ### Commit table
 
 | # | Hash | Subject |
 |---:|---|---|
-| C1 | `cf8eb96` | docs(readme): scrub Director references from README + reference fixture README (S23.10) |
-| C2 | `2002958` | fix(audiogen): stamp sfx_render_status, prevent short-output cache poisoning, gate sfx_wav_path on save proof |
-| C3 | `f7a5ca0` | fix(musicgen): strict ImportError default + allow_silence_fallback opt-in (matches AudioGen S17.2) |
-| C4 | `6d3f893` | fix(procsfx): stamp fallback_default_type on resolver default + clean stale wav/G7 comments |
-| C5 | `2bfab7f` | feat(audit): tighten sfx_render_status to known-enum check (expanded set covering C2 + C4) |
-| C6 | `0156797` | test(workflow): pin AudioGen + MusicGen widget vectors to explicit allow_silence_fallback=false |
-| C7 | `493ab8c` | cleanbreak(imp-31): delete AudioGen _cache_key back-compat alias (matches MusicGen S17.1) |
-| C8 | `bb689f2` | docs(cleanbreak): defer C8 CastContract quarantine -- premise was wrong, cast contract IS production-wired |
-| C9 | `af7e7b1` | test(imp-33): automate ComfyUI queue-halt assumption smoke for _LLMTimeoutWorkflowPause |
-| C10 | `4e972c7` | docs(cleanbreak): defer C10 LFC audit regex extension -- LFC is current architecture, not legacy |
-| C11 | `f9f5aa7` | docs(imp-38): require justification comment per EXCLUDED_PATHS entry in legacy-audit test |
-| C12 | `d35aa71` | docs(adr): close S14.2 active-validation design call (implementation deferred to S25+) |
+| 1 | `9679217` | s25 phase 1: shared style palette module |
+| 2 | `f4403e6` | s25 phase 2: MusicGen hardening (AudioGen parity) |
+| 3 | `d289e29` | s25 phase 3: AudioGen legacy + repair cleanup |
+| 4 | `9afa54a` | s25 phase 4: ProcSFX comment polish + strict_writeback flip |
+| 5 | `f592d71` | s25 phase 5: audit walker wiring (4 consumers, soft mode) |
+| 6 | `9fc8c6d` | s25 phase 6: test additions |
+| 7 | `70c5958` | s25 phase 7: CD-1/CD-2/CD-3 decisions resolved via inline grep audits |
+| 8 | `ba4bbe7` | s25 phase 8: regression pass -- 2147+18 / 8 / 6 |
+| 9 | `1b08ad9` | s25 phase 9: BUG_LOG entries 211-220 |
 
-### Deviations from plan
+### Audit-walker wiring inventory (post-S25)
 
-| Sub-task | Plan-spec | Actual disposition |
-|---|---|---|
-| C2 short-output fallback | save to `<cache_dir>/_fallback/` OR skip the save | Saves to `_fallback/` subdir (clearer signal; survives transformers patch); `_save_ok=False` so writeback doesn't stamp sfx_wav_path. |
-| C3 widget alignment | append `allow_silence_fallback=false` only | Plus: realigned AudioGen widget vector to drop the stale `{}` at position 1 (leftover from deleted production_plan_json input shifting every subsequent slot). |
-| C8 quarantine | mechanical move with "likely no internal imports" | **DEFERRED.** Audit found cast_contract IS production-wired via cast_repair → ledger_reviewer chain. Quarantining would break apply_deterministic_cast_repairs at writer-time. 3 unblock options in docs/cleanbreak-deferred.md. |
-| C9 round-robin | required ChatGPT + Gemini | Skipped. Plan already recommended Option B; decision criteria stable; documented deviation in docs/2026-05-13-imp33-queue-halt-test-decision.md "Round-robin deviation" section. |
-| C10 LFC audit | extend regex to flag LFC tokens | **DEFERRED.** LFC = "Live Freeze Cascade" = current production architecture. OTR_LFCPhase4/5/6 are registered nodes; `_otr_lfc_*.py` modules are live. 159 hits would all be false positives. Audit catches *deleted* surfaces; LFC doesn't qualify. Plan-framing correction in docs/cleanbreak-deferred.md. |
-| C12 round-robin | required ChatGPT + Gemini | Skipped. Same rationale as C9; documented in ADR. Decision is reversible if Option B proves inadequate. |
+| Consumer | Wired in soft mode | Notes |
+|---|:---:|---|
+| `batch_audiogen_generator.py` | yes (5.3) | Pre-save violations -> batch_log |
+| `batch_procedural_sfx.py` | yes (5.4) | strict_writeback default flipped True in lockstep |
+| `musicgen_theme.py` | yes (5.5) | Violations -> render_log |
+| `video_composite.py` | N/A (5.6) | Two save_ledger_safe sites, neither touches an audited line field -- documented skip |
 
 ### Pending items
 
 | # | Item | Status |
 |---|---|---|
-| C8 | CastContract quarantine | Deferred -- needs design call on dependency-chain untangling. 3 unblock options listed. |
-| C10 | LFC audit regex extension | Deferred -- premise was wrong; reopens only if a future sprint retires LFC. |
-| S14.2 implementation | OTR_WorkflowValidator first-node | Scheduled for S25+ per the new ADR. ~150 LOC estimate. |
-| S19.3 | Survival-guide promotion | Still gated on 2-3 clean sprints of S15.3 use (was 1; now 2 after this batch). One more sprint to unblock. |
-| S21.3 | Workflow preset split | Still conflicts with `feedback_minimum_json_files` rule. Unchanged. |
+| S14.2 | OTR_WorkflowValidator first-node | Next: S26 (T1.2 from the master tracker, ~150 LOC) |
+| S19.3 | Survival-guide promotion | Gated on 2-3 clean sprints of S15.3 use; S25 is sprint #3 of stable use -- promotion candidate. |
+| S21.3 | Workflow preset split | Still conflicts with `feedback_minimum_json_files`; reopen only on explicit Jeffrey direction. |
+| S26.X | Delete legacy `ledger.sfx[]` path in `batch_audiogen_generator.py` | CD-3 audit clean -- scheduled. Legacy parallel-index loop + sfx_rows lookup + DeprecationWarning + dual-stat log surface all delete in lockstep. |
 
-### IMP-* status
+### Per-consumer audit-walker strict-mode flip schedule
 
-| IMP | Title | Status |
-|---|---|---|
-| IMP-31 | Delete AudioGen _cache_key alias | **CLOSED (C7)** |
-| IMP-32 | Audit walker enum check on sfx_render_status | **CLOSED (C5)** |
-| IMP-33 | ComfyUI queue-halt assumption test | **CLOSED (C9)** -- mock-based smoke. Real-subprocess Option C tracked as IMP-33a; cross-version stability tracked as IMP-33b. |
-| IMP-37 | LFC audit regex extension | **REJECTED (C10)** -- plan premise was wrong; LFC is current. |
-| IMP-38 | EXCLUDED_PATHS justification discipline | **CLOSED (C11)** |
+Each consumer's `audit_post_freeze_writeback(..., strict=True)` flip is gated on the walker staying clean (zero violations in `batch_log` / `render_log`) for 2 full pipeline runs after S25 ships. Tracked separately (operator soak; not a code item).
 
-### Audit-test final state
-
-`tests/test_legacy_audit_clean.py` PASSES (was the cumulative gate from the prior batch; still green after C1's README scrub + C11's discipline rule).
+**Next: S26 -- Validator implementation (handoff's original S25 package: T1.2 + T3.1 + T2.1).**
 
 ---
 
@@ -157,7 +335,7 @@ The legacy-prune is its own commit so the diff stays small + auditable. Defer it
 
 ---
 
-## NEXT SPRINT — `meta.story_brief` v2 (planning, not started)
+## SPRINT #2 (C) — `meta.story_brief` v2 (planning, not started)
 
 **State:** Planning. Three canonical docs locked; one round-robin question open before build starts.
 
@@ -243,8 +421,10 @@ Same three fixtures double as the §6.1 LTX-budget tuning set and the §11 VRAM-
 ### Gating
 
 - S15.5 → S23 cleanbreak must close (current cleanbreak workstream).
-- `meta.story_brief` v2 must ship (NEXT SPRINT above) — public-facing visuals key off the brief, so polish without the brief showcases the slug-only output the brief was built to replace.
-- Era literals deletion + `_GENRE_BY_STYLE` deletion (pre-flight cleanbreaks for `meta.story_brief` — see above) must land. Sample episode in S24.1 should not ship a hardcoded "1940s" decade visible in any rendered output.
+- **SPRINT #1 (B) must close** — Two-Model Selector. Sample episode in S24.1 should reflect the post-B selector surface, not the legacy `model_id` widget.
+- **SPRINT #2 (C) must close** — `meta.story_brief` v2. Public-facing visuals key off the brief, so polish without the brief showcases the slug-only output the brief was built to replace.
+- **SPRINT #3 (A) must close** — downstream ledger verification + repair (FLUX / LTX / HuMo). Can't ship a sample episode + README rewrite while downstream is still mid-repair.
+- Era literals deletion + `_GENRE_BY_STYLE` deletion (pre-flight cleanbreaks for `meta.story_brief` — see SPRINT #2 above) must land. Sample episode in S24.1 should not ship a hardcoded "1940s" decade visible in any rendered output.
 
 ### Re-read triggers
 
@@ -257,6 +437,80 @@ Same three fixtures double as the §6.1 LTX-budget tuning set and the §11 VRAM-
 - Contributor docs and user docs stay separate. The contributor docs (BUG_LOG, ROADMAP, survival guide, ADRs) are good and stay where they are. The user docs S24.7 lists are new surfaces, not rewrites of existing ones.
 - License + content-policy + included-model-license disclosure must land before announcement. Public release means strangers using OTR for purposes Jeffrey didn't predict.
 - Sample episode quality must reflect post-cleanbreak baseline, not legacy-path output. Re-render S24.1 if it predates the `meta.story_brief` ship.
+
+---
+
+## SPRINT #1 (B) — Two-Model Selector on Story Writer (scoping, not started — next up)
+
+**State:** Scoping only. Jeffrey 2026-05-13. Timing open ("not sure when I will do this"). No code or workflow JSON changes — full scoping doc captures the design.
+
+**Premise.** The Story Writer (`OTR_LedgerScriptWriter`) should be the **only** place in the workflow where a model is picked. Two dropdowns: `model_creative` (narrative LLM — outline / cast / dialogue / polish) and `model_technical` (structured LLM — JSON validators / freeze-cascade verdicts / format rescue / critic). Every other node currently exposing a `model_id` widget (Freeze Cascade + LFC Phase 4/5/6 + visual selector + AudioGen + MusicGen) gets its widget deleted and reads from the writer's broadcast outputs via wires.
+
+**History.** A partial version of this feature already shipped — `tests/test_two_llm_split.py` proves a `cleanup_model_id` widget existed on the writer and routed structured phases to the technical model. The widget was deleted during the S15.5+ writer slim-down; the legacy-strip loop at `OTR_LedgerScriptWriter.py:2475` still pops `cleanup_model_id` off old workflow JSONs. This sprint is **finishing the rollback + reinstating the design properly** with full centralization, not greenfield.
+
+### Canonical artifact
+
+- `docs/2026-05-13-two-model-selector-scoping.md` — the full scoping doc. 14 sections covering current state inventory (10 model-pick sites identified), target widget surface, dropdown source (curated + local-cache scan), red-state UX for not-downloaded models, security model, workflow JSON re-wiring, per-file change manifest, test plan, six open decisions for Jeffrey, round-robin trigger points, rollout phases.
+
+### Open decisions before any code moves (scoping doc §10)
+
+1. **Non-LLM model picks (TTS / SFX / music / video).** Shape A (writer carries N slots) vs Shape B (dedicated `OTR_ModelHub` node) vs Shape C (defaults locked behind a maintainer config flag). Doc recommends **B**.
+2. **Red-state UX.** Label-suffix `[NOT DOWNLOADED]` (zero-JS) vs custom JS widget extension. Doc recommends **suffix first**, JS as follow-up.
+3. **Auto-download default.** ON (with env-var off switch) vs OFF (manual). Doc recommends **ON**.
+4. **`vram_context_test.py` test bench.** Touch in first PR vs carve-out. Doc recommends **carve-out**.
+5. **`OTR_VisualLLMSelector`.** Keep as a passthrough vs delete. Doc recommends **delete** per `feedback_no_legacy_back_compat`.
+6. **Slot 2 default model.** Same as Slot 1 (single-LLM baseline) vs a different small model. Doc recommends **same as Slot 1** so audio C7 byte-identity holds across the switch.
+
+### Gating
+
+- No hard gate; can land anytime Jeffrey opens the sprint.
+- Phases 2 + 3 (writer surgery + consumer rewire) touch the audio path indirectly via `model_creative` defaulting to the prior `model_id`. **Bug Bible regression + `test_audio_byte_identical.py` must hold** at every commit. Prime Directive 1 (audio is king) governs revert decisions.
+- Round-robin triggered for: (a) the Shape A/B/C decision, (b) the two-model VRAM swap pattern (`_flush_vram_keep_llm` between slots), (c) auto-download on Windows HF paths.
+
+### Standing directives this sprint inherits
+
+- No legacy back-compat — old `model_id` widgets get deleted, no transition shims, workflow JSON re-written clean.
+- 14.5 GB VRAM ceiling — two models requested back-to-back must use `_flush_vram_keep_llm()` between phases, never `force_vram_offload()`.
+- Wire it or don't ship it — writer node-side changes are not done until workflow JSON is re-wired + drift-guard test pins the new widget order.
+- Lean docs — the scoping doc is the canonical artifact; no sidecar briefs needed during build.
+
+### Re-entry trigger
+
+- Jeffrey opens this sprint OR another sprint touches the writer's widget surface (collision risk — coordinate first).
+
+---
+
+## SPRINT #3 (A) — Downstream ledger verification + repair (not started)
+
+**State:** Not started. Gated on C close. Jeffrey 2026-05-13: "I am pretty darn sure that A wiring was not good — likely 3-4 rounds of round-robin and edits to go through to ensure."
+
+**Premise.** After the L3 ledger contract landed and the post-LFC writeback path was finished, the audio path was verified end-to-end. The visual path (FLUX env / FLUX portraits / LTX motion / HuMo lip-sync) has **not** been verified against the new ledger surface. Hardcoded era literals, deleted-but-still-referenced fields, and stale prompt-assembly paths are likely still wired into the downstream consumers in ways that work-by-accident or fail-silently.
+
+**Why it lands last (per the B -> C -> A sequencing block above):**
+- C's pre-flight cleanbreaks already delete `_GENRE_BY_STYLE`, retire `meta.ltx_style_brief`, and remove era literals — repairing those in A first would be repair-then-demolish work.
+- C5/C6 rewrite the consumer reads from `meta.style` + legacy fallbacks to `meta.story_brief` via central helpers. The contract A verifies against is the post-C contract, not the in-flight one.
+
+**Scope (provisional — finalize when sprint opens):**
+
+1. **FLUX env + radio bookend.** One short episode (~30 words) through `visual/batch_flux_env_render.py` + `visual/batch_flux_portrait_render.py`. Confirm `cast[*].portrait_prompt`, `meta.style`, `meta.story_brief` (post-C), and any ledger-driven lighting / atmosphere fields are read correctly. Spot any "works by accident" reads.
+2. **LTX motion.** Same episode through `nodes/batch_ltx_render.py` + `_build_ltx_role_prompt`. Confirm motion verbs lead, brief fragment lands at the §6.7 budget (220-240 chars total, 80-100 chars brief), no `meta.ltx_style_brief` fallback fires.
+3. **HuMo lip-sync.** Same episode through `nodes/batch_humo_render.py`. Confirm audio + ledger contracts match the per-clip wall-time profile (10-12 min per character line per `reference_humo_per_clip_wall_time`).
+4. **Round-robin per bug.** ChatGPT + Gemini per CLAUDE.md round-robin section. Save transcripts under `docs/<date>-downstream-ledger-verification/`. Expected 3-4 rounds per Jeffrey's estimate.
+
+**Estimate:** 1-2 weeks of focused sessions. HuMo's per-clip wall time means smoke episodes are 30-60 min wall time each, so the iterative loop is naturally slow.
+
+**Gating:**
+- C must close (writer + brief + helpers + consumer rewires all green per their respective Bug Bible regressions).
+- Bug Bible regression 23/1/2 must hold after every A repair commit.
+- Audio C7 byte-identity must hold against the **post-C3 baseline** (the Gemma-4-E4B-it audio output, documented in the C3 commit).
+
+**Re-entry trigger:**
+- C closes its Bug Bible green + Jeffrey opens this sprint.
+
+**Standing directives this sprint inherits:**
+- No legacy back-compat. Delete dead surfaces; don't add transition shims.
+- Prime Directive 1 — audio is king. If an A repair touches the audio path and drifts byte-identity, revert immediately.
+- Lean docs. Round-robin transcripts go under `docs/<date>-downstream-ledger-verification/`; canonical written artifacts are BUG_LOG.md + ROADMAP.md.
 
 ---
 
@@ -658,7 +912,7 @@ Recon pass over every active downstream visual + post-process + cast/portrait + 
 | `nodes/otr_save_to_episode_workspace.py` | AUDITED CLEAN | IMAGE save sink. Uses `_OTRL.in_flight_ledger_path()` + `episode_id` only. No `lines[]` reads. |
 | `nodes/otr_video_plan.py` + `otr_shot_duration_calculator.py` | AUDITED CLEAN | Pre-FLUX adapters. Take `production_plan_json` (Director output) and emit shot/compose plans. Don't touch `script_json`/ledger directly. |
 | `nodes/otr_save_copy.py` + `otr_video_concat.py` | AUDITED CLEAN | Pure path-in/path-out helpers. No ledger reads. |
-| `nodes/post_audio_video_pipeline.py` | RETIRED | Per `__init__.py` comment: "RETIRED in favour of in-graph batch nodes". NOT in `workflows/otr_scifi_16gb_full.json`. Backward-compat-only registration. Audit moot. |
+| `nodes/post_audio_video_pipeline.py` | DELETED S27 (commit `412781f`) | Was kept registered through S26 with the comment "Kept registered so any old workflow JSON that still references it loads without error" -- exactly the back-compat-for-old-data pattern S27 was authorized to delete. Whole file gone; class added to `DELETED_NODE_TYPES` registry so stale workflows fail-loud at validation time. |
 | `nodes/_otr_cast_repair.py` | AUDITED CLEAN | Helper module (no INPUT_TYPES). Used by writer; orphan classification + plateau-bounded repair. No legacy parser-list assumptions. |
 | `nodes/_otr_voice_resolver.py` | AUDITED CLEAN | Helper module (no INPUT_TYPES). `VoiceSpec` dataclass for engine:preset parsing. Field-agnostic. |
 | `nodes/voice_render.py` | NOT REGISTERED | `OTR_VoiceRender` class exists with `RETURN_TYPES = ("AUDIO",)` but is NOT in `__init__.py:_NODE_MODULES`. Not in active workflow. |
@@ -1027,7 +1281,7 @@ These are all "edit-locked-file" tasks. They can land in a single follow-up sess
 - `nodes/batch_ltx_render.py:300/846` use `otr_stills_dir()` / `otr_audio_dir()` with NO episode_id (returns legacy dirs).
 - `nodes/video_composite.py:282` legacy audio dir scan.
 - `nodes/story_orchestrator.py:6276` hardcoded `output/otr/audio/` path.
-- `nodes/post_audio_video_pipeline.py:126` empty-input fallback uses mtime walker (intentional for headless mode).
+- ~~`nodes/post_audio_video_pipeline.py:126` empty-input fallback uses mtime walker (intentional for headless mode).~~ Whole file DELETED in S27 (commit `412781f`); entry moot.
 
 These are documented in the Phase G consult (`docs/2026-05-03-phase-g-path-reorg-blast-radius__01_chatgpt.md` Section 3) and queued for a future pass.
 
@@ -1825,6 +2079,49 @@ worth pulling in for the v2.0 release notes. Added 2026-05-07.
   pipeline or the LTX encoder layer. Submission window may also
   be a forcing function to publish OTR's Gemma usage pattern as
   a contest entry — free marketing for the project.
+
+---
+
+## Roadmap-only items (not blocking; opportunistic batch)
+
+Stored here so we don't lose track but none are sprint blockers; fold into adjacent work when convenient.
+
+- **Naming-conventions test broadening.** Extend `tests/test_naming_conventions.py` to assert no `NODE_DISPLAY_NAME_MAPPINGS` value contains `[EMOJI]`, `[TODO]`, `[PLACEHOLDER]`, or `[FIXME]` placeholder strings. S25 caught one `[EMOJI]` instance in MusicGen via the new `test_node_display_name_has_no_placeholder` test; a repo-wide assertion in `test_naming_conventions.py` future-proofs the rest.
+- **`_load_cached_wav` return-type annotation.** Both AudioGen + MusicGen declare `_load_cached_wav -> torch.Tensor | None` but actually return `tuple[torch.Tensor, int] | None` (the (tensor, sample_rate) tuple). Annotation should be corrected to match the runtime contract.
+- **Per-consumer `audit_post_freeze_writeback` strict-mode flip.** After each consumer (AudioGen, ProcSFX, MusicGen) stays clean for 2 full pipeline runs post-S25, flip its caller from `strict=False` to `strict=True`. Operator-driven; not a code change in S26.
+- **C11 per-entry justification rule generalization.** S24/C11 added `# justification: <reason>` requirement for every `EXCLUDED_PATHS` entry in `tests/test_legacy_audit_clean.py`. Generalize the rule to all module-level `EXCLUDED_*` / `ALLOWED_*` collections (e.g., `EXPECTED_FAILED_NODEIDS` in `tests/conftest.py` already has the per-entry rationale, but other audit-tuning sets don't).
+- **AudioGen / ProcSFX default `script_json` standardization to `"{}"`.** Both nodes default `script_json` to `"[]"` (legacy parser-list shape) but actually parse it as a v2 ledger dict. Standardizing the default to `"{}"` matches the runtime contract and matches MusicGen.
+
+---
+
+## CD-2 / CD-3 audit outcomes (S25 phase 7, 2026-05-13)
+
+Audit data captured here for the record; the S26 scheduling lines are in the CURRENT WORK "Pending items" table above.
+
+### CD-2 -- IMP-46 retired LFC names audit
+
+```
+$ git log --all --diff-filter=D --name-only | grep -i lfc | sort -u
+scripts/lfc_wiring_smoke.py
+tests/test_lfc_c2_freeze_verdict_preview.py
+tests/test_lfc_c9_estimated_minutes_preview.py
+tests/test_lfc_wiring_smoke_script.py
+```
+
+All four hits are deleted test files or a wiring-smoke script. Zero retired production LFC class names. Current LFC node classes (`OTR_LFCPhase4Scene`, `OTR_LFCPhase5Voice`, `OTR_LFCPhase6Arc`, `OTR_LedgerFreezeCascade`) are all live registrations -- they were never renamed in flight.
+
+**IMP-46 closed: no retired LFC names exist; rejection stands.** No additions land in `tests/test_legacy_audit_clean.py`.
+
+### CD-3 -- legacy `ledger.sfx[]` producer audit
+
+```
+$ grep -rn 'led\["sfx"\]\s*=\|ledger\["sfx"\]\s*=\|\.append.*ledger.sfx' nodes/
+(no hits)
+$ grep -rn '"sfx":\s*\[' nodes/ | grep -v test_
+nodes/production_ledger.py:357:            "sfx": [],
+```
+
+Only hit is `production_ledger.py:357` -- the empty-list schema scaffold (consumer-side initialization, not a producer). No production code writes a non-empty `ledger.sfx[]`. **Scheduled for deletion in S26.X** (see CURRENT WORK pending items).
 
 ---
 

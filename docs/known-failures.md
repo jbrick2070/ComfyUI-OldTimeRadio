@@ -1,8 +1,8 @@
 # Known Test Failures — Quarantine List
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
-**Last reconciled:** 2026-05-12 (voice-path-cleanbreak Sprint 15.2)
-**Baseline pytest:** **6 failed**, 2096+ passed, 6 skipped
+**Last reconciled:** 2026-05-13 (s26-downstream missed-regression sweep)
+**Baseline pytest:** **0 failed**, 2160+ passed, 8 skipped (clean baseline)
 **Enforcement:** `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (S15.1
 hook) tracks the failure SET, not just the count. Adding a failure
 not in that set fires `[KNOWN-FAIL-GUARD] NEW failures (REGRESSION)`
@@ -41,84 +41,16 @@ matches by exact string against pytest's collected `item.nodeid`.
 
 ---
 
-## Active known failures (6 total)
+## Active known failures (none)
 
-### KNOWN-FAIL-001
+All 6 prior known failures were promoted on 2026-05-13 during the
+s26-downstream missed-regression sweep. See the Resolution log below.
 
-```
-Nodeid:        tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk
-First seen:    pre-voice-path-cleanbreak (carried from prior sprints)
-Expected mode: KeyError: 'phase_ms'
-Owner:         TBD
-Removal cond:  production_ledger.save_ledger_safe stops dropping
-               meta.phase_ms when the on-disk ledger predates the
-               field's introduction. Tracked: writer-internals
-               cleanup (unscheduled).
-Reproduce:     python -m pytest tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk -v
-```
-
-### KNOWN-FAIL-002
-
-```
-Nodeid:        tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active
-First seen:    voice-path-cleanbreak Sprint 1 audit (not voice-path-caused)
-Expected mode: AssertionError: assert 0 == 1 (expected 1 PNG saved, got 0)
-               -- save node correctly rejects NaN-laden tensor with
-               BAD_IMAGE_SAVE gate; test fixture is the broken party.
-Owner:         TBD
-Removal cond:  Test fixture switches from NaN-init tensor to valid
-               image data. The save node's gate is correct; the test
-               is wrong. Tracked: test-fixture cleanup (unscheduled).
-Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active -v
-```
-
-### KNOWN-FAIL-003
-
-```
-Nodeid:        tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir
-First seen:    voice-path-cleanbreak Sprint 1 audit
-Expected mode: AssertionError: assert 0 == 1 (same NaN-tensor pattern as 002)
-Owner:         TBD
-Removal cond:  Same fix as KNOWN-FAIL-002 (NaN tensor in fixture).
-Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir -v
-```
-
-### KNOWN-FAIL-004
-
-```
-Nodeid:        tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton
-First seen:    voice-path-cleanbreak Sprint 1 audit
-Expected mode: AssertionError: assert 0 == 1 (same NaN-tensor pattern)
-Owner:         TBD
-Removal cond:  Same fix as KNOWN-FAIL-002.
-Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton -v
-```
-
-### KNOWN-FAIL-005
-
-```
-Nodeid:        tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1
-First seen:    voice-path-cleanbreak Sprint 1 audit
-Expected mode: AssertionError: assert [] == ['full_env_00001_.png', 'full_env_00002_.png']
-               (same NaN-tensor pattern; counter-increment path)
-Owner:         TBD
-Removal cond:  Same fix as KNOWN-FAIL-002.
-Reproduce:     python -m pytest tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1 -v
-```
-
-### KNOWN-FAIL-006
-
-```
-Nodeid:        tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps
-First seen:    voice-path-cleanbreak Sprint 1 audit (HuMo / LTX 2.3
-               video-stack default-canvas drift)
-Expected mode: AssertionError: assert 1472 == 832 (canvas width drift)
-Owner:         TBD
-Removal cond:  Either (a) the default canvas reverts to 832x480, or
-               (b) the test updates to expect 1472. The video-stack
-               sprint consensus determines which.
-Reproduce:     python -m pytest tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps -v
-```
+The quarantine list is currently empty -- the baseline is clean. Adding
+a new known failure requires updating both this file and
+`tests/conftest.py::EXPECTED_FAILED_NODEIDS` in the same commit, and the
+fix's removal-condition must be specific enough that the next reviewer
+can independently judge whether the condition has been met.
 
 ---
 
@@ -149,14 +81,56 @@ known-fail it didn't run.
 
 ---
 
-## Resolution log (none yet)
-
-When a KNOWN-FAIL-NNN is fixed, move it here with:
+## Resolution log
 
 ```
-KNOWN-FAIL-NNN  [RESOLVED <commit-sha> YYYY-MM-DD]
-  ... (original entry preserved)
-  Resolution:    <what landed; commit subject is fine>
+KNOWN-FAIL-001  [RESOLVED ba8a02e 2026-05-13]
+  Nodeid:        tests/test_production_ledger.py::TestDualLedgerFix::test_save_merges_schema_l3_fields_from_disk
+  First seen:    pre-voice-path-cleanbreak
+  Expected mode: KeyError: 'phase_ms'
+  Resolution:    Real production bug, not a test issue. BUG-LOCAL-018
+                 (7c84ee8) added meta.paths to the in-memory ledger
+                 initializer; after that, in_mem["meta"] was always
+                 non-empty at save() time, making the bulk-replace rule
+                 in Ledger._merge_with_disk silently drop disk-side
+                 meta.phase_ms.bark / git_commit / etc. Fixed by
+                 splitting meta out of TOP_PRESERVE and giving it its
+                 own per-key recursive-merge clause. ba8a02e.
+```
+
+```
+KNOWN-FAIL-002..005  [RESOLVED a70aeb8 2026-05-13]
+  Nodeids:       tests/test_save_to_episode_workspace.py::test_save_to_per_episode_dir_when_singleton_active
+                 tests/test_save_to_episode_workspace.py::test_portraits_role_routes_to_portraits_dir
+                 tests/test_save_to_episode_workspace.py::test_falls_back_to_legacy_dir_when_no_singleton
+                 tests/test_save_to_episode_workspace.py::test_per_episode_counter_starts_at_1
+  First seen:    voice-path-cleanbreak Sprint 1 audit
+  Expected mode: AssertionError 0 == 1 / [] == [...] from BAD_IMAGE_SAVE
+                 4096-byte gate tripping on the 8x8 fixture
+  Resolution:    Shared fixture _fake_image_tensor() bumped from 8x8
+                 (~268 byte PNG, under the gate) to 128x128 (~30-40 KB,
+                 well over the gate). The diagnostic min/max=nan in
+                 the BAD_IMAGE_SAVE message was the diagnostic's
+                 fallback for non-torch tensors, not actual NaN data
+                 in the fixture -- the prior KNOWN-FAIL entries
+                 misattributed the failure to NaN content. The fixture
+                 was always valid random float data, just sized for
+                 the pre-gate world. a70aeb8.
+```
+
+```
+KNOWN-FAIL-006  [RESOLVED 8181950 2026-05-13]
+  Nodeid (old):  tests/test_video_composite.py::test_default_canvas_is_native_832x480_at_25fps
+  Nodeid (new):  tests/test_video_composite.py::test_default_canvas_is_layered_1472x832_at_25fps
+  First seen:    voice-path-cleanbreak Sprint 1 audit
+  Expected mode: AssertionError: assert 1472 == 832
+  Resolution:    Test migration (b) per the original removal-condition.
+                 BUG-LOCAL-030 (5a71f83) bumped canvas to layered
+                 1472x832 so HuMo 1280x720 + LTX 1216x704 + FLUX env
+                 backdrop fit natively without pillarbox at composite;
+                 humo_target_height moved 480 -> 832 in lockstep.
+                 Test was renamed and assertions updated to the
+                 current contract. 8181950.
 ```
 
 Keep resolution entries forever -- deletion erases the history this

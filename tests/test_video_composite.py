@@ -274,61 +274,49 @@ def test_default_blend_mode_is_lighten_with_zero_opacity(m) -> None:
     }
 
 
-def test_default_canvas_is_native_832x480_at_25fps(m) -> None:
-    """Pin the canonical canvas geometry. 2026-05-01 EVENING (Jeffrey):
-    downscaled from 1920x1080 to native 832x480 to match HuMo + LTX
-    render dims directly. Upscale (RTX VSR) added as a separate later
-    stage rather than baked into the base canvas. Pre-2026-05-01 this
-    test was named test_default_canvas_is_1920x1080_at_25fps."""
+def test_default_canvas_is_layered_1472x832_at_25fps(m) -> None:
+    """Pin the canonical canvas geometry. History of this surface:
+      - pre-2026-05-01: 1920x1080 (the 1080p delivery target)
+      - 2026-05-01 EVENING (Jeffrey): downscaled to native 832x480 to
+        match HuMo + LTX render dims directly; RTX VSR upscale added as
+        a separate later stage rather than baked into the base canvas.
+      - BUG-LOCAL-030 (commit 5a71f83): bumped to layered 1472x832 so
+        HuMo 1280x720 + LTX 1216x704 + FLUX env-still backdrop all fit
+        natively without pillarbox at composite. humo_target_height
+        moved to 832 in lockstep. This is the current contract.
+    """
     inp = m.VideoComposite.INPUT_TYPES()
-    assert inp["optional"]["canvas_width"][1]["default"] == 832
-    assert inp["optional"]["canvas_height"][1]["default"] == 480
+    assert inp["optional"]["canvas_width"][1]["default"] == 1472
+    assert inp["optional"]["canvas_height"][1]["default"] == 832
     assert inp["optional"]["canvas_fps"][1]["default"] == 25
-    assert inp["optional"]["humo_target_height"][1]["default"] == 480
+    assert inp["optional"]["humo_target_height"][1]["default"] == 832
 
 
 # ---------------------------------------------------------------------------
-# _load_ledger
+# _load_ledger_with_path
 # ---------------------------------------------------------------------------
+# The bare `_load_ledger` shim was deleted S27 (cleanbreak-tail Phase 2
+# / QA-2) -- callers now use `_load_ledger_with_path(x)[0]` for the dict
+# only or unpack `(led, path)` when they also need the source path.
 
-def test_load_ledger_accepts_inline_json(m) -> None:
+def test_load_ledger_with_path_accepts_inline_json(m) -> None:
     inp = json.dumps({"episode_id": "test", "lines": []})
-    led = m._load_ledger(inp)
+    led, source = m._load_ledger_with_path(inp)
     assert led["episode_id"] == "test"
+    assert source is None  # inline JSON has no on-disk source
 
 
-def test_load_ledger_accepts_path_arg(tmp_path: Path, m) -> None:
+def test_load_ledger_with_path_accepts_path_arg(tmp_path: Path, m) -> None:
     p = tmp_path / "ledger.json"
     p.write_text(json.dumps({"episode_id": "filebased", "lines": []}), encoding="utf-8")
-    led = m._load_ledger(str(p))
+    led, source = m._load_ledger_with_path(str(p))
     assert led["episode_id"] == "filebased"
+    assert source is not None and source.name == "ledger.json"
 
 
-def test_load_ledger_empty_falls_back_to_auto_pick(m, monkeypatch, tmp_path) -> None:
-    """Empty input triggers auto-pick of newest non-pending ledger
-    in the canonical audio dirs. Test by monkeypatching the search
-    dir to a tmp dir so we don't depend on the user's real output."""
-    fake_audio = tmp_path / "fake_audio"
-    fake_audio.mkdir()
-    target = fake_audio / "signal_lost_test_ledger.json"
-    target.write_text('{"episode_id": "auto_picked"}', encoding="utf-8")
-    pending = fake_audio / "pending_old_ledger.json"
-    pending.write_text("{}", encoding="utf-8")
-
-    # Patch the auto-pick path list inside _load_ledger
-    import re
-    orig = m._load_ledger
-    src = orig.__code__
-    # Easier: just call with the directory as input -- but VideoComposite
-    # _load_ledger only accepts inline json / .json / .mp4. Empty input
-    # uses hardcoded audio_dirs. Skip the auto-pick branch test here;
-    # instead verify auto-pick raises cleanly when no ledgers exist.
-    # (Production behavior with real audio dirs is integration-tested.)
+def test_load_ledger_with_path_invalid_input_raises_cleanly(m) -> None:
+    """Bad input never crashes silently -- raises RuntimeError with a
+    clear message. Pre-S27 this was test_load_ledger_empty_falls_back_to_auto_pick
+    on the deleted `_load_ledger` shim; the contract is identical."""
     with pytest.raises(RuntimeError):
-        # Whitespace-only -> auto-pick on hardcoded audio dirs.
-        # If those dirs are empty on the test machine, raises cleanly.
-        # We can't easily monkeypatch hardcoded module-level paths
-        # without refactoring _load_ledger, which is out of scope for
-        # this smoke. The contract we want pinned here: bad input
-        # never crashes silently -- raises with a clear message.
-        m._load_ledger("   THIS_IS_NOT_A_VALID_PATH_OR_JSON_zzz   ")
+        m._load_ledger_with_path("   THIS_IS_NOT_A_VALID_PATH_OR_JSON_zzz   ")

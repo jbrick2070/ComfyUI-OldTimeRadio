@@ -1,0 +1,8 @@
+=== OTR_PostAudioVideoPipeline === 
+__init__.py:176:    "OTR_PostAudioVideoPipeline":  (".nodes.post_audio_video_pipeline", "PostAudioVideoPipeline", " Post-Audio Video Pipeline (retired)"),
+nodes/post_audio_video_pipeline.py:2:post_audio_video_pipeline.py  --  OTR_PostAudioVideoPipeline ComfyUI node
+=== def set_sfx / def apply_sfx_timings === 
+nodes/production_ledger.py:810:    def set_sfx(self, sfx_rows: Iterable[Dict[str, Any]]) -> "Ledger":
+nodes/production_ledger.py:865:    def apply_sfx_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
+=== sfx:cue_id ROW_KEYED === 
+nodes/production_ledger.py:1058:            "sfx": "cue_id",

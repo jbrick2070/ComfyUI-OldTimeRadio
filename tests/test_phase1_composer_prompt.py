@@ -257,16 +257,22 @@ class TestBuildUserPrompt:
         assert "OUTLINE:" in prompt
         assert "b001 ALICE (tense): speak" in prompt
 
-    def test_allowed_roster_block_renders_when_set(self):
+    def test_allowed_roster_no_longer_renders_allowed_names_block(self):
+        # S28 cleanbreak (Rule C): pre-S28 the prompt rendered an
+        # ALLOWED NAMES block when only the legacy `allowed_roster`
+        # was populated (`allowed_people` / `allowed_things` empty).
+        # Post-S28 the producer always populates the split shape, and
+        # the legacy combined-roster prompt block is extinct.
+        # `allowed_roster` is still consumed downstream by the phantom-
+        # gate check, but it no longer renders into the LLM prompt.
         req = LineRequest(
             speaker="ALICE", intent="reveal", mood="tense", target_words=15,
             canon_header="x", last_lines=[],
             allowed_roster=frozenset({"ALICE", "BOB", "ANNOUNCER"}),
         )
         prompt = _build_user_prompt(req)
-        assert "ALLOWED NAMES" in prompt
-        # Sorted for KV-cache stability across calls.
-        assert "ALICE, ANNOUNCER, BOB" in prompt
+        assert "ALLOWED NAMES" not in prompt
+        assert "NAMED ENTITIES IN THIS WORLD" not in prompt
 
     def test_character_voice_card_block_renders_when_set(self):
         req = LineRequest(

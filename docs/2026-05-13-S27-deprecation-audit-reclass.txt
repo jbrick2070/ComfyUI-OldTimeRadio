@@ -1,0 +1,98 @@
+﻿=============================================================================
+S27 QA-5 -- strict DeprecationWarning audit reclassification (BUG-LOCAL-221)
+=============================================================================
+
+Run: 2026-05-13, s27-cleanbreak-tail
+Target: pytest tests/test_audiogen_ledger.py::test_audiogen_iter_sfx_only
+        -p no:cacheprovider -W error::DeprecationWarning --tb=long -v
+Method: programmatic pytest.main() with the project conftest's
+        pytest_sessionfinish hook monkey-patched to a no-op so the
+        FAILURES traceback survives the run (the conftest's normal
+        SystemExit(2) was eating the traceback in S26's audit
+        attempts -- documented as BUG-LOCAL-221 instrumentation gap).
+Driver: _strict_probe.py (committed alongside this artifact).
+
+=============================================================================
+CLASSIFICATION
+=============================================================================
+
+Two distinct DeprecationWarnings were promoted to errors under strict
+mode. Both are THIRD-PARTY -- neither is emitted by OTR code.
+
+-----------------------------------------------------------------------------
+Warning 1: pytest-asyncio config
+-----------------------------------------------------------------------------
+
+Source : C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\
+         pytest_asyncio\plugin.py:247
+Class  : pytest.PytestDeprecationWarning
+Message: The configuration option "asyncio_default_fixture_loop_scope"
+         is unset. The event loop scope for asynchronous fixtures will
+         default to the fixture caching scope. Future versions of
+         pytest-asyncio will default the loop scope for asynchronous
+         fixtures to function scope.
+Trigger: pytest plugin import time (pytest_configure hook).
+Fix    : pyproject.toml [tool.pytest.ini_options] gained
+         `asyncio_default_fixture_loop_scope = "function"` -- the
+         upstream-recommended value. Plugin no longer emits the
+         warning. Verified by re-running the audit; this entry is
+         absent from the second-pass traceback.
+
+-----------------------------------------------------------------------------
+Warning 2: torchao deprecated import path
+-----------------------------------------------------------------------------
+
+Source : C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\
+         torchao\dtypes\uintx\__init__.py:1
+Class  : DeprecationWarning
+Message: Importing from torchao.dtypes.uintx.dyn_int8_act_int4_wei_cpu_layout
+         is deprecated. Please use
+         'from torchao.prototype.dtypes import Int8DynamicActInt4WeightCPULayout'
+         instead. This import path will be removed in a future release
+         of torchao. See https://github.com/pytorch/ao/issues/2752 for
+         more details.
+Trigger: BatchAudioGenGenerator.generate at nodes/batch_audiogen_generator.py:398
+         does `from transformers import AutoProcessor,
+         AudiogenForConditionalGeneration`. Inside transformers, the
+         AutoProcessor import chain transitively imports torchao's
+         dtypes module, which still re-exports from the deprecated
+         path under `torchao.dtypes.uintx.*`.
+Fix    : NONE in OTR code. OTR doesn't import torchao directly. The
+         deprecation is upstream (torchao + transformers internals).
+         The only OTR-side levers are (a) wait for transformers /
+         torchao to land their migration to
+         `torchao.prototype.dtypes`, or (b) suppress the warning at
+         OTR's pytest config to keep strict mode usable. We do
+         neither -- the audit's purpose is to surface, not silence,
+         third-party deprecations so we know what's piling up.
+
+=============================================================================
+VERDICT
+=============================================================================
+
+BUG-LOCAL-221: CLOSED -- "third-party" classification with full
+traceback evidence captured above and in BUG_LOG.md.
+
+OTR code has zero contribution to the strict-DeprecationWarning
+failure. The 2 entries are torchao (upstream PyTorch quantization
+library) and pytest-asyncio (test plugin config option default).
+Pytest-asyncio resolved via pyproject.toml config; torchao stays
+documented because no OTR-side fix exists.
+
+S26's instrumentation gap (the SystemExit(2) traceback swallower)
+also identified -- the standalone probe script at
+docs/2026-05-13-S27-_strict_probe.py is the durable harness for
+re-running this audit under strict mode without losing the
+traceback.
+
+=============================================================================
+RE-RUN COMMAND (for future audits)
+=============================================================================
+
+  cd C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+  C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe _strict_probe.py
+
+Reads the project conftest, replaces its pytest_sessionfinish hook
+with a no-op, runs pytest with `-W error::DeprecationWarning`. If
+any new third-party deprecation accumulates, the FAILURES section
+will name it.

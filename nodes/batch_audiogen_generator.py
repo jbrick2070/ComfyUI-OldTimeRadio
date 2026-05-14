@@ -30,7 +30,8 @@ import re
 import numpy as np
 import torch
 
-from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+# S28 cleanbreak: dropped dead `from ._otr_paths import otr_episodes_root,
+# otr_legacy_audio_dir`. Neither symbol referenced in this module.
 from . import _otr_ledger as _OTRL_PATHS
 from ._otr_ledger_freeze import SFX_DUR_MIN_S, SFX_DUR_MAX_S
 from ._vram_log import force_vram_offload
@@ -139,57 +140,16 @@ def _cache_filename_for_write(*, prompt: str, duration_sec: float,
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:
-    """Find a cached SFX WAV for ``prefix``. Two-level lookup:
-      1. Canonical: ``<prefix>.wav`` (preferred, written by current code)
-      2. Legacy:    ``<prefix>_<ts>.wav`` (back-compat with files written
-         by the pre-Phase-D timestamped implementation)
-
-    Per Phase D consult (Gemini): use ``iterdir() + startswith`` rather
-    than ``Path.glob()`` because prompts can contain glob metacharacters
-    like ``[`` and ``*``. Sort legacy matches by parsed filename
-    timestamp (not mtime) for stability across copy/restore.
+    """Find a cached SFX WAV for ``prefix``. Single-tier canonical
+    lookup: ``<prefix>.wav``. Returns the absolute path on hit, None
+    on miss. Never raises.
     """
     from pathlib import Path
 
-    base = Path(cache_dir)
-    canonical = base / f"{prefix}.wav"
+    canonical = Path(cache_dir) / f"{prefix}.wav"
     if canonical.is_file():
         return str(canonical)
-
-    if not base.exists():
-        return None
-
-    legacy_prefix = prefix + "_"
-    matches: list[Path] = []
-    try:
-        for path in base.iterdir():
-            name = path.name
-            if (path.is_file()
-                    and name.startswith(legacy_prefix)
-                    and name.lower().endswith(".wav")):
-                matches.append(path)
-    except OSError as exc:
-        log.warning("[BatchAudioGen] cache_dir iterdir failed: %s", exc)
-        return None
-
-    if not matches:
-        return None
-    if len(matches) > 1:
-        log.warning(
-            "[BatchAudioGen] multiple legacy cache files for prefix %s; "
-            "using newest filename timestamp",
-            prefix,
-        )
-
-    def _legacy_sort_key(path: Path):
-        suffix = path.name[len(legacy_prefix):-4]
-        try:
-            return (1, int(suffix), path.name)
-        except ValueError:
-            return (0, 0, path.name)
-
-    matches.sort(key=_legacy_sort_key, reverse=True)
-    return str(matches[0])
+    return None
 
 
 def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> bool:
@@ -248,15 +208,18 @@ class BatchAudioGenGenerator:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "script_json": ("STRING", {"multiline": True, "default": "[]"}),
+                "script_json": ("STRING", {"multiline": True, "default": "{}"}),
             },
             "optional": {
                 "episode_seed": ("STRING", {"default": ""}),
-                # BUG-LOCAL-027: the "3"/"3.0"/3/3.0 entries were scar tissue
-                # from widget-drift hitting this node. With the mapper fix in
-                # _workflow_to_api_prompt, socket-only inputs no longer leak
-                # into widget slots, so the hack is no longer needed. Fail
-                # loudly on bad input instead of silently accepting garbage.
+                # BUG-LOCAL-027 / S25/AG-4: the combo-list constraint
+                # here is the only allowed model_id surface. With the
+                # mapper fix in _workflow_to_api_prompt, socket-only
+                # inputs no longer leak into widget slots, so the
+                # downstream silent-repair landmine (removed S25/AG-4,
+                # BUG-LOCAL-218) is no longer needed. The combo-list
+                # enforces; a bad widget vector now fails loudly at
+                # node load instead of being silently rewritten.
                 "model_id": (["facebook/audiogen-medium", "facebook/audiogen-small"], {"default": "facebook/audiogen-medium"}),
                 "guidance_scale": ("FLOAT", {"default": 3.0, "min": 1.0, "max": 10.0, "step": 0.5}),
                 "default_duration": ("FLOAT", {
@@ -289,9 +252,14 @@ class BatchAudioGenGenerator:
         # but fragile representation. Coerce here, once.
         episode_seed = str(episode_seed) if episode_seed is not None else ""
 
-        # UI JSON back-compat fix
-        if str(model_id) in ["3", "3.0"]:
-            model_id = "facebook/audiogen-medium"
+        # S25/AG-4 (BUG-LOCAL-218): legacy `if str(model_id) in ["3", "3.0"]:
+        # model_id = "facebook/audiogen-medium"` silent repair deleted.
+        # The combo-list constraint at INPUT_TYPES["optional"]["model_id"]
+        # is the only allowed surface; the widget vector that triggered
+        # the original BUG-LOCAL-027 drift was already cleaned at S24/C3.
+        # The downstream defender was masking misconfiguration and
+        # contradicted the loud-fail comment immediately above the
+        # combo-list. Loud-fail is now the literal behavior.
 
         batch_log = ["=== Batch AudioGen Generator ==="]
 
@@ -670,18 +638,11 @@ class BatchAudioGenGenerator:
             batched_waveform[i, 0, :samples] = clip[0, 0, :samples]
 
         # ---- BUG-LOCAL-095: write SFX wav_paths back to ledger ----
-        # Two parallel write-back paths:
-        #   1. Legacy ledger.sfx[] parallel-index walk (preserved
-        #      for back-compat producers that still emit a separate
-        #      ledger.sfx[] array; v2 producers leave sfx[] empty
-        #      and this loop no-ops).
-        #   2. NEW v2: per-line stamp on ledger.lines[] for sfx
-        #      rows via patch_line_fields(led, line_id, ...). sfx
-        #      are first-class lines in the v2 ledger -- this
-        #      mirrors Sequencer's new sfx_line_positions pattern
-        #      from consumer #4.
-        # Both paths mutate the same led_disk dict; one save_ledger_safe
-        # at the end (Pattern 4 contract).
+        # v2: per-line stamp on ledger.lines[] for sfx rows via
+        # patch_line_fields(led, line_id, ...). sfx are first-class
+        # lines in the v2 ledger -- this mirrors Sequencer's
+        # sfx_line_positions pattern from consumer #4. Single
+        # save_ledger_safe at the end (Pattern 4 contract).
         try:
             ledger_path = _OTRL_PATHS.in_flight_ledger_path()
             if ledger_path is not None:
@@ -693,37 +654,7 @@ class BatchAudioGenGenerator:
                         ledger_path,
                     )
                 else:
-                    # Path 1: legacy ledger.sfx[] (preserved as-is).
-                    sfx_rows = led_disk.get("sfx") or []
-                    updated_sfx_array = 0
-                    for i, item in enumerate(render_queue):
-                        if i >= len(sfx_rows):
-                            break
-                        row = sfx_rows[i]
-                        cache_path = item.get("cache_path")
-                        clip_t = final_clips[i] if i < len(final_clips) else None
-                        dur = None
-                        if clip_t is not None:
-                            try:
-                                dur = float(clip_t.shape[2]) / float(AUDIOGEN_SAMPLE_RATE)
-                            except Exception:
-                                dur = None
-                        if cache_path:
-                            row["wav_path"] = str(cache_path)
-                        if dur is not None:
-                            row["dur_s"] = dur
-                        row["tts_engine"] = "audiogen"
-                        if item.get("_render_ms"):
-                            row["render_ms"] = int(item["_render_ms"])
-                        if dur is not None:
-                            row["generated_dur_s"] = float(dur)
-                        if item.get("_audio_sample_hash"):
-                            row["audio_sample_hash"] = str(
-                                item["_audio_sample_hash"]
-                            )
-                        updated_sfx_array += 1
-
-                    # Path 2: NEW v2 ledger.lines[] sfx rows via line_id.
+                    # v2 ledger.lines[] sfx rows via line_id.
                     # Field names: sfx_wav_path, dur_s, sfx_engine="audiogen"
                     # (sfx-specific names disambiguate from dialogue's
                     # tts_engine/voice_preset/bark_wav_path on the same
@@ -787,12 +718,31 @@ class BatchAudioGenGenerator:
                         ):
                             updated_lines += 1
 
-                    if updated_sfx_array or updated_lines:
+                    if updated_lines:
+                        # S25/AG-5 (BUG-LOCAL-219): soft-mode audit
+                        # walker. Surfaces §6.16 violations to
+                        # batch_log; the consumer stays non-halting
+                        # until the per-consumer strict flip lands
+                        # after the walker holds clean for two full
+                        # pipeline runs (post-S25 soak).
+                        violations = _OTRLC.audit_post_freeze_writeback(
+                            led_disk, strict=False,
+                        )
+                        if violations:
+                            batch_log.append(
+                                f"§6.16 audit: {len(violations)} violation(s)"
+                            )
+                            for v in violations[:5]:
+                                batch_log.append(f"  {v}")
+                            if len(violations) > 5:
+                                batch_log.append(
+                                    f"  ... +{len(violations) - 5} more "
+                                    "(see audit_post_freeze_writeback)"
+                                )
                         # Single atomic save (Pattern 4 contract).
                         _OTRL_PATHS.save_ledger_safe(ledger_path, led_disk)
                         batch_log.append(
                             f"BUG-095 ledger updated (line_id stamping): "
-                            f"sfx_array={updated_sfx_array}/{len(render_queue)}, "
                             f"lines={updated_lines}/{len(render_queue)} -> "
                             f"{ledger_path.name}"
                         )

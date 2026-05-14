@@ -30,7 +30,8 @@ import warnings
 import numpy as np
 import torch
 
-from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+# S28 cleanbreak: dropped dead `from ._otr_paths import otr_episodes_root,
+# otr_legacy_audio_dir`. Neither symbol referenced in this module.
 from . import _otr_ledger as _OTRL_PATHS
 from .story_orchestrator import _runtime_log
 from ._vram_log import force_vram_offload, vram_sentinel

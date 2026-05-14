@@ -129,7 +129,7 @@ def _ledger_with_outlier():
                       "phi chi psi omega aleph beth gimel daleth he."),
                 _line("l004", "c01", "x " * 30),  # outlier
             ],
-            "sfx": [], "music": [], "clips": [],
+            "music": [], "clips": [],
             "meta": {
                 "episode_title": "g3 test",
                 "style": "mission_control_procedural",

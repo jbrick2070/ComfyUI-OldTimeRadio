@@ -52,8 +52,8 @@ import os
 import numpy as np
 import torch
 
-from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
 from . import _otr_ledger as _OTRL_PATHS
+from ._otr_style_palette import STYLE_PALETTE as _STYLE_PALETTE, KNOWN_STYLE_SLUGS
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -69,94 +69,11 @@ CUE_DURATIONS = {"opening": 12, "closing": 8, "interstitial": 4}
 # Applied AFTER mood overlay so it always lands last.
 _PROMPT_TAIL = ", instrumental only, no dialogue, no vocals"
 
-# Single source of truth for music cue prompts. One entry per active
-# writer style slug (matches OTR_LedgerScriptWriter._STYLE_PICKER_SEED_POOL).
-# Era-neutral by directive - no "1940s", "vintage", "old time radio",
-# "warm brass", "upright bass" anchors. Unknown slug is a hard fail; no
-# default palette survives.
-_STYLE_PALETTE: dict[str, dict[str, str]] = {
-    "closed_room_suspense": {
-        "opening":      "slow muted strings, low piano cluster, sparse texture, "
-                        "rising tension on a single chord",
-        "closing":      "diminished chord fade, slow exhale of low woodwind, "
-                        "resolves to silence",
-        "interstitial": "single sustained bass note, room tone bed, "
-                        "minimal percussion, brief and unresolved",
-    },
-    "detective_case_file": {
-        "opening":      "methodical minor piano motif, walking double bass, "
-                        "soft brushed snare, procedural and unhurried",
-        "closing":      "piano cadence resolving down a minor third, "
-                        "single cymbal bell tap, settles cleanly",
-        "interstitial": "short walking bass figure, two-bar minor piano "
-                        "phrase, professional and brief",
-    },
-    "pulp_serial_cliffhanger": {
-        "opening":      "bold orchestral brass theme, full strings, "
-                        "rolling timpani, theatrical and dramatic, "
-                        "ends on a held suspended chord",
-        "closing":      "orchestral hit, dramatic crescendo into snare "
-                        "roll, resolves on a held major chord",
-        "interstitial": "brass stab, quick timpani roll, single "
-                        "high cymbal accent",
-    },
-    "mission_control_procedural": {
-        "opening":      "clean synth pulse, instrument-panel beep accents, "
-                        "tight arpeggiated bass, calm institutional energy",
-        "closing":      "descending synth bleeps, soft pad release, "
-                        "console-shutdown texture",
-        "interstitial": "single synth bleep sequence, quiet hum bed, "
-                        "very short",
-    },
-    "deep_space_distress_call": {
-        "opening":      "modal synthesizer pad, distant pulsing beacon, "
-                        "sub-bass swell, isolated and vast, slow build",
-        "closing":      "isolated low pad, signal dropout, granular "
-                        "static decay into silence",
-        "interstitial": "single sustained tone, faint radio interference, "
-                        "brief and dimensional",
-    },
-    "noir_interrogation": {
-        "opening":      "muted solo trumpet, low double bass walk, "
-                        "smoky tenor saxophone, dim and atmospheric",
-        "closing":      "muted trumpet fade, low bass note hold, "
-                        "single piano chord trailing off",
-        "interstitial": "single muted trumpet phrase, sparse bass, "
-                        "smoky and short",
-    },
-    "small_town_uncanny": {
-        "opening":      "diffuse string pad, muted bell tone, slow harmonic "
-                        "drift, quiet wrongness in the mid register",
-        "closing":      "soft string fade, single high bell strike, "
-                        "decay into ambient hush",
-        "interstitial": "single muted bell, faint string pad, brief and "
-                        "off-balance",
-    },
-    "radio_newsroom_emergency": {
-        "opening":      "urgent ticker percussion, telegraph rhythm pattern, "
-                        "tight low brass pulse, motion and momentum",
-        "closing":      "decisive low brass figure, snare hit, fast cadence "
-                        "to a resolving chord",
-        "interstitial": "short telegraph rhythm, single brass accent, "
-                        "newsroom urgency",
-    },
-    "haunted_broadcast_signal": {
-        "opening":      "degraded signal artefacts, ghostly choir-like synth pad, "
-                        "granular static texture, distant and unstable",
-        "closing":      "pad decay through layered static, fading into "
-                        "noise floor and silence",
-        "interstitial": "short granular swell, signal flutter, brief "
-                        "ghosted texture",
-    },
-    "laboratory_containment": {
-        "opening":      "sterile electronic tone, precise arpeggio, "
-                        "high pure sine layer, clean and isolated",
-        "closing":      "tone descends to a held low frequency, single "
-                        "click, controlled fade",
-        "interstitial": "short electronic pulse sequence, sterile and "
-                        "precise",
-    },
-}
+# Music cue prompts now live in nodes/_otr_style_palette.py (S25/MG-6,
+# BUG-LOCAL-216). Imported above as _STYLE_PALETTE + KNOWN_STYLE_SLUGS;
+# both names preserved here so existing call sites at _resolve_cue_from_style
+# need no edit. tests/test_style_palette_drift.py pins the writer pool +
+# palette + freeze validator to set-equality with the single source of truth.
 
 # Light mood overlay mined from meta.news.script_brief. Keyword scan,
 # no LLM. Tags concatenate to the cue prompt as a comma-prefixed suffix.
@@ -287,61 +204,16 @@ def _cache_filename_for_write(*, cue_id: str, prompt: str,
 
 
 def _find_cached(cache_dir: str, prefix: str) -> str | None:
-    """Find a cached WAV for ``prefix``. Two-level lookup:
-      1. Canonical: ``<prefix>.wav`` (preferred, written by current code)
-      2. Legacy:    ``<prefix>_<ts>.wav`` (back-compat with files written
-         by the pre-Phase-D timestamped implementation)
-
-    Returns the absolute path on hit, None on miss. Never raises.
-
-    Per Phase D consult (Gemini): use ``iterdir() + startswith`` rather
-    than ``Path.glob()`` because prompts can contain glob metacharacters
-    like ``[`` and ``*`` which break glob patterns. Sort legacy matches
-    by parsed filename timestamp (not mtime) so selection is stable
-    across copy/restore/touch operations.
+    """Find a cached WAV for ``prefix``. Single-tier canonical lookup:
+    ``<prefix>.wav``. Returns the absolute path on hit, None on miss.
+    Never raises.
     """
     from pathlib import Path
 
-    base = Path(cache_dir)
-    canonical = base / f"{prefix}.wav"
+    canonical = Path(cache_dir) / f"{prefix}.wav"
     if canonical.is_file():
         return str(canonical)
-
-    if not base.exists():
-        return None
-
-    legacy_prefix = prefix + "_"
-    matches: list[Path] = []
-    try:
-        for path in base.iterdir():
-            name = path.name
-            if (path.is_file()
-                    and name.startswith(legacy_prefix)
-                    and name.lower().endswith(".wav")):
-                matches.append(path)
-    except OSError as exc:
-        log.warning("[MusicGenTheme] cache_dir iterdir failed: %s", exc)
-        return None
-
-    if not matches:
-        return None
-    if len(matches) > 1:
-        log.warning(
-            "[MusicGenTheme] multiple legacy cache files for prefix %s; "
-            "using newest filename timestamp",
-            prefix,
-        )
-
-    def _legacy_sort_key(path: Path):
-        # name = "<prefix>_<ts_ms>.wav" -- strip prefix and .wav, parse int
-        suffix = path.name[len(legacy_prefix):-4]
-        try:
-            return (1, int(suffix), path.name)
-        except ValueError:
-            return (0, 0, path.name)
-
-    matches.sort(key=_legacy_sort_key, reverse=True)
-    return str(matches[0])
+    return None
 
 
 def _load_cached_wav(path: str) -> torch.Tensor | None:
@@ -360,13 +232,22 @@ def _load_cached_wav(path: str) -> torch.Tensor | None:
         return None
 
 
-def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
-    """Atomic WAV write: write to a sibling ``.tmp`` then ``os.replace``
-    into the canonical path. Prevents corrupted cache hits if the
-    process is killed mid-write (Phase D consult, Gemini's catch).
+def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> bool:
+    """Atomic WAV write. Returns True on confirmed write, False on any
+    exception. Callers gate ledger wav_path stamping on this return.
 
-    Note: explicit ``format='WAV'`` is required because soundfile cannot
-    infer the audio format from the ``.tmp`` extension.
+    Write to a sibling ``.tmp`` then ``os.replace`` into the canonical
+    path. Prevents corrupted cache hits if the process is killed
+    mid-write (Phase D consult, Gemini's catch). Explicit
+    ``format='WAV'`` is required because soundfile cannot infer the
+    audio format from the ``.tmp`` extension.
+
+    S25/MG-1 (BUG-LOCAL-211) -- parity with AudioGen S24/C2: prior
+    contract was ``-> None``, so callers couldn't distinguish a
+    confirmed write from a swallowed exception. The writeback path
+    keyed on the (truthy) cache_path string instead of the save's
+    outcome, which could leave a ledger row pointing at a path that
+    was never written.
     """
     tmp_path = path + ".tmp"
     try:
@@ -374,6 +255,7 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
         sf.write(tmp_path, waveform, sample_rate,
                  subtype="FLOAT", format="WAV")
         os.replace(tmp_path, path)
+        return True
     except Exception as exc:
         log.warning("[MusicGenTheme] Failed to write cache %s: %s", path, exc)
         # Best-effort cleanup of tmp on failure
@@ -382,6 +264,7 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> None:
                 os.unlink(tmp_path)
         except Exception:
             pass
+        return False
 
 
 def _mood_suffix(script_brief: str) -> str:
@@ -424,9 +307,16 @@ def _resolve_cue_from_style(cue_id: str, style: str,
     )
 
 
-def _silent_audio_dict(sample_rate: int = MUSICGEN_SAMPLE_RATE) -> dict:
+def _silent_audio_dict(duration_sec: float,
+                       sample_rate: int = MUSICGEN_SAMPLE_RATE) -> dict:
+    """S25/MG-4 (BUG-LOCAL-214): honor caller-supplied duration so
+    silence fallbacks don't break the EpisodeAssembler timeline.
+    Prior implementation always emitted 0.1s regardless of cue, so the
+    12s opening + 8s closing cues both got a 100 ms silence on the
+    ImportError fallback path."""
+    samples = int(sample_rate * float(duration_sec))
     return {
-        "waveform": torch.zeros(1, 1, int(sample_rate * 0.1)),
+        "waveform": torch.zeros(1, 1, samples),
         "sample_rate": sample_rate,
     }
 
@@ -545,6 +435,26 @@ class MusicGenTheme:
             f"episode seed: {episode_seed or '<none>'}",
         ]
 
+        # S25/AG-1+MG-7 (BUG-LOCAL-220): _fallback/ is ephemeral by
+        # design; wipe stale entries from prior runs of the same
+        # episode. C2's _fallback/ redirect (short-output cache
+        # poisoning guard) shipped without a cleanup hook so the dir
+        # accumulated orphan silence wavs across iterations.
+        _fb_dir = os.path.join(cache_dir, "_fallback")
+        if os.path.isdir(_fb_dir):
+            _removed = 0
+            for _f in os.listdir(_fb_dir):
+                if _f.lower().endswith(".wav"):
+                    try:
+                        os.unlink(os.path.join(_fb_dir, _f))
+                        _removed += 1
+                    except OSError:
+                        pass
+            if _removed:
+                render_log.append(
+                    f"_fallback/ cleanup: removed {_removed} stale wav(s)"
+                )
+
         # First pass: try to load all three from cache. Only load the model if
         # at least one cue is missing. This keeps re-runs of the same episode
         # instant and VRAM-free.
@@ -570,6 +480,13 @@ class MusicGenTheme:
                 cached = _load_cached_wav(hit_path)
                 if cached is not None:
                     cue["cache_path"] = hit_path
+                    # S25/MG-2 (BUG-LOCAL-212): mark this cue as a
+                    # confirmed cache hit so the writeback block can
+                    # gate wav_path on either fresh-save success OR
+                    # pre-existing cache presence (matching AudioGen
+                    # S24/C2 pattern).
+                    cue["_had_cache_hit"] = True
+                    cue["_render_status"] = "ok_cache"
                     tensor, sr = cached
                     results[cue_id] = {"waveform": tensor, "sample_rate": sr}
                     render_log.append(
@@ -623,108 +540,203 @@ class MusicGenTheme:
                     f"  WARNING: transformers MusicGen import failed; "
                     f"allow_silence_fallback=True -> silence."
                 )
+                # S25/MG-3 (BUG-LOCAL-213) + MG-4: stamp render_status
+                # + save_ok on each silenced cue and emit a
+                # correct-duration silence wav so the writeback block
+                # below sees a consistent shape and the EpisodeAssembler
+                # timeline doesn't break. Prior implementation emitted a
+                # 100 ms silence regardless of cue and returned early,
+                # bypassing the writeback block entirely so
+                # music_render_status was never written.
                 for cue_id in to_generate:
-                    results[cue_id] = _silent_audio_dict()
-                    # Tag cue dict so the writeback below stamps
-                    # music_render_status="fallback_silence" on the
-                    # ledger row (handled in the per-cue post-render
-                    # block; this just carries the marker forward).
+                    cue_dur = CUE_DURATIONS.get(cue_id, 0)
+                    results[cue_id] = _silent_audio_dict(duration_sec=cue_dur)
                     if cue_id in cues:
                         cues[cue_id]["_render_status"] = "fallback_silence"
-                return (
-                    results["opening"], results["closing"], results["interstitial"],
-                    "\n".join(render_log),
-                )
+                        cues[cue_id]["_save_ok"] = False
+                # Intentional: NO early return here. The writeback
+                # block at the end of render() now sees the cues + the
+                # status stamps and routes wav_path / music_render_status
+                # accordingly. Same exit path as the success branch.
 
-            log.info("[MusicGenTheme] Loading %s for %d uncached cue(s)",
-                     model_id, len(to_generate))
-            render_log.append(f"loading {model_id} for {len(to_generate)} cue(s)...")
+            else:
+                # S25/MG-3 (BUG-LOCAL-213): the original control flow
+                # let the fallback-silence path fall through into the
+                # model-loading code (NameError on undefined classes).
+                # Wrapping the load + generate block in `else:` ensures
+                # model loading only runs when the transformers import
+                # succeeded; the fallback branch above falls through
+                # straight to the writeback block at the bottom.
+                log.info("[MusicGenTheme] Loading %s for %d uncached cue(s)",
+                         model_id, len(to_generate))
+                render_log.append(f"loading {model_id} for {len(to_generate)} cue(s)...")
 
-            # v1.4.10 Hardening: Force cache_dir to our local Hub directory
-            cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            dtype = torch.float16 if device == "cuda" else torch.float32
+                # v1.4.10 Hardening: Force cache_dir to our local Hub directory
+                cache_dir_path = os.path.join(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")), "hub")
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                dtype = torch.float16 if device == "cuda" else torch.float32
 
-            processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir_path)
-            model = MusicgenForConditionalGeneration.from_pretrained(
-                model_id, torch_dtype=dtype, cache_dir=cache_dir_path
-            ).to(device)
-            model.eval()
+                processor = AutoProcessor.from_pretrained(model_id, cache_dir=cache_dir_path)
+                model = MusicgenForConditionalGeneration.from_pretrained(
+                    model_id, torch_dtype=dtype, cache_dir=cache_dir_path
+                ).to(device)
+                model.eval()
 
-            # MusicGen produces ~50 tokens per second of audio at 32 kHz.
-            tokens_per_sec = 50
+                # MusicGen produces ~50 tokens per second of audio at 32 kHz.
+                tokens_per_sec = 50
 
-            try:
-                for cue_id in to_generate:
-                    cue = cues[cue_id]
-                    prompt = cue["prompt"]
-                    duration = cue["duration_sec"]
-                    max_new_tokens = int(duration * tokens_per_sec) + 8
-
-                    log.info("[MusicGenTheme] Generating %s (%ds): %s",
-                             cue_id, duration, prompt[:60])
-
-                    inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
-
-                    # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
-                    # track per-cue render wall-clock so the ledger can
-                    # stamp ledger.music[].render_ms.
-                    import time as _mg_time
-                    _mg_t0 = _mg_time.time()
-                    with torch.no_grad():
-                        audio_values = model.generate(
-                            **inputs,
-                            max_new_tokens=max_new_tokens,
-                            do_sample=True,
-                            guidance_scale=guidance_scale,
-                        )
-                    _mg_render_ms = int((_mg_time.time() - _mg_t0) * 1000)
-
-                    # audio_values shape: (batch=1, channels=1, samples)
-                    audio_np = audio_values[0, 0].detach().cpu().float().numpy()
-                    # Peak normalize to -1 dBFS so cues sit at consistent level.
-                    peak = float(np.max(np.abs(audio_np))) or 1.0
-                    audio_np = (audio_np / peak * 0.89).astype(np.float32)
-
-                    _save_wav(cue["cache_path"], audio_np, MUSICGEN_SAMPLE_RATE)
-
-                    tensor = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
-                    # BUG-LOCAL-030 audit-completion: stash render_ms +
-                    # audio_sample_hash on the cue dict so the ledger
-                    # write-back loop below can pick them up alongside
-                    # the existing wav_path + dur_s stamps.
-                    cue["_render_ms"] = int(_mg_render_ms)
-                    try:
-                        from . import _otr_ledger as _OTRL_HASH  # type: ignore
-                        cue["_audio_sample_hash"] = (
-                            _OTRL_HASH.compute_audio_sample_hash(audio_np)
-                        )
-                    except Exception:
-                        cue["_audio_sample_hash"] = ""
-                    results[cue_id] = {
-                        "waveform": tensor,
-                        "sample_rate": MUSICGEN_SAMPLE_RATE,
-                    }
-                    render_log.append(
-                        f"  [{cue_id}] GENERATED {len(audio_np) / MUSICGEN_SAMPLE_RATE:.1f}s "
-                        f"-> {os.path.basename(cue['cache_path'])} "
-                        f"(render_ms={_mg_render_ms})"
-                    )
-            finally:
-                # Always unload to return VRAM to Bark, even if generation failed.
-                # Bug Bible 12.19 VRAM leak fix - explicit .cpu() before dropping references
                 try:
-                    if 'model' in locals():
-                        model.cpu()
-                        del model
-                    if 'processor' in locals():
-                        del processor
-                except Exception:
-                    pass
-                gc.collect()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                render_log.append("model unloaded, cuda cache cleared")
+                    for cue_id in to_generate:
+                        cue = cues[cue_id]
+                        prompt = cue["prompt"]
+                        duration = cue["duration_sec"]
+                        max_new_tokens = int(duration * tokens_per_sec) + 8
+
+                        log.info("[MusicGenTheme] Generating %s (%ds): %s",
+                                 cue_id, duration, prompt[:60])
+
+                        inputs = processor(text=[prompt], padding=True, return_tensors="pt").to(device)
+
+                        # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                        # track per-cue render wall-clock so the ledger can
+                        # stamp ledger.music[].render_ms.
+                        import time as _mg_time
+                        _mg_t0 = _mg_time.time()
+                        with torch.no_grad():
+                            audio_values = model.generate(
+                                **inputs,
+                                max_new_tokens=max_new_tokens,
+                                do_sample=True,
+                                guidance_scale=guidance_scale,
+                            )
+                        _mg_render_ms = int((_mg_time.time() - _mg_t0) * 1000)
+
+                        # S25/MG-7 (BUG-LOCAL-220): robust shape extraction
+                        # ported from AudioGen S24/C2. transformers' MusicGen
+                        # output shape varies across versions:
+                        #   - [batch, channels, samples]   (older, decoded)
+                        #   - [batch, samples]             (newer, decoded mono)
+                        #   - [batch, num_codebooks, seq]  (token IDs - bug)
+                        # The legacy audio_values[0, 0] on a token-ID tensor
+                        # returned the codebook 0 token sequence (~150 ints),
+                        # producing 3 ms WAVs. New logic: pick the float
+                        # slice that matches the expected shape; fall back
+                        # to flatten if all else fails.
+                        _av = audio_values
+                        if hasattr(_av, "audio_values"):
+                            _av = _av.audio_values   # named-tuple wrapper
+                        _av = _av.detach().cpu().float()
+                        if _av.dim() == 3:
+                            audio_np = _av[0, 0].numpy()
+                        elif _av.dim() == 2:
+                            audio_np = _av[0].numpy()
+                        elif _av.dim() == 1:
+                            audio_np = _av.numpy()
+                        else:
+                            audio_np = _av.flatten().numpy()
+
+                        # S25/MG-7: short-output sanity. Anything under
+                        # 0.25s is an output-shape bug or generation
+                        # failure; fall back to canonical-duration
+                        # silence so the timeline still has a plausible
+                        # slot, AND route the save to _fallback/ so the
+                        # canonical cache_path isn't poisoned with the
+                        # silence stand-in (a subsequent transformers
+                        # fix can re-generate cleanly to the canonical
+                        # path on the next run).
+                        _min_samples = int(MUSICGEN_SAMPLE_RATE * 0.25)
+                        short_output_fallback = audio_np.size < _min_samples
+                        if short_output_fallback:
+                            log.warning(
+                                "[MusicGenTheme] [%s] generated audio too "
+                                "short (%d samples = %.4fs) -- expected "
+                                ">= %.2fs. Output shape was %s. "
+                                "Falling back to silence at %.2fs. "
+                                "(BUG-LOCAL-220 / transformers MusicGen "
+                                "output-shape regression.)",
+                                cue_id, audio_np.size,
+                                audio_np.size / MUSICGEN_SAMPLE_RATE,
+                                _min_samples / MUSICGEN_SAMPLE_RATE,
+                                tuple(audio_values.shape) if hasattr(audio_values, "shape") else "?",
+                                duration,
+                            )
+                            audio_np = np.zeros(
+                                int(MUSICGEN_SAMPLE_RATE * duration),
+                                dtype=np.float32,
+                            )
+
+                        # Peak normalize to -1 dBFS so cues sit at consistent level.
+                        peak = float(np.max(np.abs(audio_np))) or 1.0
+                        audio_np = (audio_np / peak * 0.89).astype(np.float32)
+
+                        if short_output_fallback:
+                            fb_dir = os.path.join(
+                                os.path.dirname(cue["cache_path"]),
+                                "_fallback",
+                            )
+                            try:
+                                os.makedirs(fb_dir, exist_ok=True)
+                            except Exception:
+                                fb_dir = None
+                            if fb_dir is not None:
+                                fb_path = os.path.join(
+                                    fb_dir,
+                                    os.path.basename(cue["cache_path"]),
+                                )
+                                _save_wav(
+                                    fb_path, audio_np, MUSICGEN_SAMPLE_RATE,
+                                )
+                                cue["_fallback_path"] = fb_path
+                            cue["_render_status"] = "fallback_output_shape"
+                            cue["_save_ok"] = False  # canonical not written
+                        else:
+                            # S25/MG-2 (BUG-LOCAL-212): capture the save
+                            # outcome so the writeback block can gate
+                            # wav_path on confirmed disk presence.
+                            save_ok = _save_wav(
+                                cue["cache_path"], audio_np, MUSICGEN_SAMPLE_RATE
+                            )
+                            cue["_save_ok"] = bool(save_ok)
+                            cue["_render_status"] = "ok" if save_ok else "error"
+
+                        tensor = torch.from_numpy(audio_np).unsqueeze(0).unsqueeze(0)
+                        # BUG-LOCAL-030 audit-completion: stash render_ms +
+                        # audio_sample_hash on the cue dict so the ledger
+                        # write-back loop below can pick them up alongside
+                        # the existing wav_path + dur_s stamps.
+                        cue["_render_ms"] = int(_mg_render_ms)
+                        try:
+                            from . import _otr_ledger as _OTRL_HASH  # type: ignore
+                            cue["_audio_sample_hash"] = (
+                                _OTRL_HASH.compute_audio_sample_hash(audio_np)
+                            )
+                        except Exception:
+                            cue["_audio_sample_hash"] = ""
+                        results[cue_id] = {
+                            "waveform": tensor,
+                            "sample_rate": MUSICGEN_SAMPLE_RATE,
+                        }
+                        render_log.append(
+                            f"  [{cue_id}] GENERATED {len(audio_np) / MUSICGEN_SAMPLE_RATE:.1f}s "
+                            f"-> {os.path.basename(cue['cache_path'])} "
+                            f"(render_ms={_mg_render_ms}, "
+                            f"status={cue.get('_render_status', '?')})"
+                        )
+                finally:
+                    # Always unload to return VRAM to Bark, even if generation failed.
+                    # Bug Bible 12.19 VRAM leak fix - explicit .cpu() before dropping references
+                    try:
+                        if 'model' in locals():
+                            model.cpu()
+                            del model
+                        if 'processor' in locals():
+                            del processor
+                    except Exception:
+                        pass
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    render_log.append("model unloaded, cuda cache cleared")
         else:
             render_log.append("all cues cached - MusicGen model not loaded")
 
@@ -733,76 +745,129 @@ class MusicGenTheme:
         )
 
         # ---- BUG-LOCAL-095: write music wav_paths back to ledger ----
-        # Find the most recent pending or final ledger and stamp each
-        # cue's wav_path + dur_s into ledger.music[]. Silent skip when
-        # no ledger exists yet (rare; usually ScriptWriter has run by
-        # the time MusicGen does). Errors logged but never crash.
+        # Find the in-flight Ledger singleton's on-disk path and stamp
+        # each cue's wav_path + dur_s + music_render_status into
+        # ledger.music[]. Silent skip when no in-flight ledger exists
+        # (rare; usually ScriptWriter has run by the time MusicGen
+        # does). Errors logged but never crash.
+        #
+        # S25/MG-8 (BUG-LOCAL-211..213 sibling): swap the legacy
+        # find_most_recent_ledger / write_text path for the safe
+        # helpers in _otr_ledger.py:
+        #   - in_flight_ledger_path()  -- BUG-LOCAL-021 contract
+        #   - load_ledger_safe()       -- skip-on-error contract
+        #   - save_ledger_safe()       -- atomic + path-stamping
         try:
-            import json as _json
-            import time as _time
-            # Per-episode workspace: walk otr/episodes/<ep>/audio/*_ledger.json
-            # via the centralized helper so both layouts (legacy flat +
-            # per-episode tree) are searched.
-            ledger_path = _OTRL_PATHS.find_most_recent_ledger(
-                [otr_episodes_root(), otr_legacy_audio_dir()]
-            )
+            # S25/MG-2 + MG-3: writeback gates and music_render_status
+            # ledger_path is the in-flight singleton (None when no
+            # ledger has been registered yet -- usually means the
+            # writer hasn't run, in which case there's nothing to
+            # stamp).
+            ledger_path = _OTRL_PATHS.in_flight_ledger_path()
             if ledger_path is not None:
-                led = _json.loads(ledger_path.read_text(encoding="utf-8"))
-                music_rows = led.get("music") or []
-                # Build a lookup by cue_id; if a row is missing for
-                # one of our cues, skip that one (don't synthesize
-                # ledger schema -- keep node side-effect bounded).
-                music_by_id = {(r.get("cue_id") or ""): r for r in music_rows}
-                updated = 0
-                for cue_id in CUE_IDS:
-                    cue_dict = cues.get(cue_id) or {}
-                    cache_path = cue_dict.get("cache_path")
-                    result_dict = results.get(cue_id) or {}
-                    wf = result_dict.get("waveform")
-                    sr = int(result_dict.get("sample_rate", 0)) or MUSICGEN_SAMPLE_RATE
-                    dur = None
-                    if wf is not None and sr > 0:
-                        try:
-                            dur = float(wf.shape[-1]) / float(sr)
-                        except Exception:
-                            dur = None
-                    row = music_by_id.get(cue_id)
-                    if row is not None:
-                        if cache_path:
-                            row["wav_path"] = str(cache_path)
-                        if dur is not None:
-                            row["dur_s"] = dur
-                        # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
-                        # stamp tts_engine + render_ms + generated_dur_s +
-                        # audio_sample_hash on the music row. Historically
-                        # the generation_prompt was already populated by
-                        # the legacy LLMDirector; post-cleanbreak it comes
-                        # from the ledger meta. Either way this closes
-                        # the loop on the render-result side.
-                        row["tts_engine"] = "musicgen"
-                        if cue_dict.get("_render_ms"):
-                            row["render_ms"] = int(cue_dict["_render_ms"])
-                        if dur is not None:
-                            row["generated_dur_s"] = float(dur)
-                        if cue_dict.get("_audio_sample_hash"):
-                            row["audio_sample_hash"] = str(
-                                cue_dict["_audio_sample_hash"]
+                led = _OTRL_PATHS.load_ledger_safe(ledger_path)
+                if led is None:
+                    log.warning(
+                        "[MusicGenTheme] BUG-095 ledger load returned "
+                        "None for %s; skipping wav_path writeback",
+                        ledger_path.name,
+                    )
+                else:
+                    music_rows = led.get("music") or []
+                    # Build a lookup by cue_id; if a row is missing for
+                    # one of our cues, skip that one (don't synthesize
+                    # ledger schema -- keep node side-effect bounded).
+                    music_by_id = {(r.get("cue_id") or ""): r for r in music_rows}
+                    updated = 0
+                    for cue_id in CUE_IDS:
+                        cue_dict = cues.get(cue_id) or {}
+                        cache_path = cue_dict.get("cache_path")
+                        result_dict = results.get(cue_id) or {}
+                        wf = result_dict.get("waveform")
+                        sr = int(result_dict.get("sample_rate", 0)) or MUSICGEN_SAMPLE_RATE
+                        dur = None
+                        if wf is not None and sr > 0:
+                            try:
+                                dur = float(wf.shape[-1]) / float(sr)
+                            except Exception:
+                                dur = None
+                        row = music_by_id.get(cue_id)
+                        if row is not None:
+                            # S25/MG-2 (BUG-LOCAL-212): gate wav_path
+                            # stamping on confirmed disk presence.
+                            # Prior code stamped str(cache_path)
+                            # unconditionally, leaving ghost-path rows
+                            # on save failure / silence fallback.
+                            save_ok = bool(cue_dict.get("_save_ok"))
+                            had_cache_hit = bool(cue_dict.get("_had_cache_hit"))
+                            if (cache_path
+                                    and (save_ok or had_cache_hit)
+                                    and os.path.isfile(cache_path)):
+                                row["wav_path"] = str(cache_path)
+                            else:
+                                row["wav_path"] = ""
+                            # S25/MG-3 (BUG-LOCAL-213): always stamp the
+                            # render status -- "ok" / "ok_cache" /
+                            # "error" / "fallback_silence" /
+                            # "fallback_output_shape". Previously the
+                            # docstring promised stamping but no path
+                            # ever wrote it (the ImportError branch
+                            # returned early; the success branch never
+                            # stamped). Default to "ok" only when
+                            # nothing else set it (defensive).
+                            row["music_render_status"] = str(
+                                cue_dict.get("_render_status") or "ok"
                             )
-                        updated += 1
-                if updated:
-                    ledger_path.write_text(
-                        _json.dumps(led, indent=2, ensure_ascii=False),
-                        encoding="utf-8",
-                    )
-                    log.info(
-                        "[MusicGenTheme] BUG-095 ledger updated: "
-                        "%d music cue path(s) written to %s",
-                        updated, ledger_path.name,
-                    )
-                    render_log.append(
-                        f"ledger updated: {updated} music wav_path(s) -> "
-                        f"{ledger_path.name}"
-                    )
+                            if dur is not None:
+                                row["dur_s"] = dur
+                            # BUG-LOCAL-030 audit-completion (2026-05-03 EVENING):
+                            # stamp tts_engine + render_ms + generated_dur_s +
+                            # audio_sample_hash on the music row. Historically
+                            # the generation_prompt was already populated by
+                            # the legacy LLMDirector; post-cleanbreak it comes
+                            # from the ledger meta. Either way this closes
+                            # the loop on the render-result side.
+                            row["tts_engine"] = "musicgen"
+                            if cue_dict.get("_render_ms"):
+                                row["render_ms"] = int(cue_dict["_render_ms"])
+                            if dur is not None:
+                                row["generated_dur_s"] = float(dur)
+                            if cue_dict.get("_audio_sample_hash"):
+                                row["audio_sample_hash"] = str(
+                                    cue_dict["_audio_sample_hash"]
+                                )
+                            updated += 1
+                    if updated:
+                        # S25/AG-7 (BUG-LOCAL-219): soft-mode audit
+                        # walker. Surfaces §6.16 violations to
+                        # render_log; the consumer stays non-halting
+                        # until the per-consumer strict flip lands
+                        # after the walker holds clean for two full
+                        # pipeline runs (post-S25 soak).
+                        violations = _OTRLC.audit_post_freeze_writeback(
+                            led, strict=False,
+                        )
+                        if violations:
+                            render_log.append(
+                                f"§6.16 audit: {len(violations)} violation(s)"
+                            )
+                            for v in violations[:5]:
+                                render_log.append(f"  {v}")
+                            if len(violations) > 5:
+                                render_log.append(
+                                    f"  ... +{len(violations) - 5} more "
+                                    "(see audit_post_freeze_writeback)"
+                                )
+                        _OTRL_PATHS.save_ledger_safe(ledger_path, led)
+                        log.info(
+                            "[MusicGenTheme] BUG-095 ledger updated: "
+                            "%d music cue path(s) written to %s",
+                            updated, ledger_path.name,
+                        )
+                        render_log.append(
+                            f"ledger updated: {updated} music wav_path(s) -> "
+                            f"{ledger_path.name}"
+                        )
         except Exception as _exc:
             log.warning("[MusicGenTheme] BUG-095 ledger write-back failed: %s", _exc)
 
@@ -815,5 +880,13 @@ class MusicGenTheme:
         )
 
 
-NODE_CLASS_MAPPINGS = {"MusicGenTheme": MusicGenTheme}
-NODE_DISPLAY_NAME_MAPPINGS = {"MusicGenTheme": "[EMOJI] MusicGen Theme"}
+# S25/MG-5 (BUG-LOCAL-215): in-module mapping aligned to the canonical
+# OTR_ prefix that the top-level __init__.py registers under. The
+# repo's actual ComfyUI registration is __init__.py:_NODE_MODULES,
+# which already keys this class as "OTR_MusicGenTheme"; this in-module
+# dict was inconsistent and would break any test harness that imported
+# from nodes.musicgen_theme directly. Also dropped the literal
+# "[EMOJI]" placeholder string from the display name -- minimal-emoji
+# convention.
+NODE_CLASS_MAPPINGS = {"OTR_MusicGenTheme": MusicGenTheme}
+NODE_DISPLAY_NAME_MAPPINGS = {"OTR_MusicGenTheme": "MusicGen Theme"}

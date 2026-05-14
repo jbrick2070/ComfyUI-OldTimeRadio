@@ -21,10 +21,11 @@ failure abort their main work.
 
 Schema version
 --------------
-Current canonical: ``l3-2026-04-28`` (post-BUG-100/101/102 diagnostic
-expansion). Previous: ``l2-2026-04-25``. The version string is
-written to ``ledger["schema_version"]`` AND ``ledger["meta"]["schema_version"]``.
-Consumers should accept either location for back-compat with l2 ledgers.
+Current canonical: see ``CURRENT_SCHEMA_VERSION`` below. The version
+string is written to both ``ledger["schema_version"]`` and
+``ledger["meta"]["schema_version"]`` -- mirrored locations on every
+write. Readers may use either; the freeze validator pins the top-level
+value.
 """
 from __future__ import annotations
 
@@ -59,9 +60,9 @@ Lineage:
   l3-2026-05-02 -- ADDITIVE: meta.paths block resolved at write time so
                    downstream nodes can look up canonical episode dirs
                    without reconstructing them from episode_id (Phase E,
-                   BUG-LOCAL-018). All readers must continue to use
-                   meta.get(...) with default-None to stay back-compat
-                   with l3-2026-04-28 ledgers.
+                   BUG-LOCAL-018). Readers should still use
+                   ``meta.get("paths")`` so missing-block cases degrade
+                   to None rather than KeyError.
   l3-2026-05-08 -- ADDITIVE: BUG-126 telemetry + Cast Contract pre-wiring
                    per round-robin synthesis (ChatGPT gpt-5.5 +
                    Gemini gemini-3.1-pro-preview-customtools, transcripts
@@ -162,9 +163,9 @@ def _build_meta_paths(ledger_path: Path, episode_id: str) -> dict:
     downstream nodes look up canonical paths via
     ``ledger["meta"]["paths"]["audio_dir"]`` instead of reconstructing
     them from episode_id (which would re-introduce the slug-mismatch
-    risk Phase C closed). All readers must use ``.get(...)`` with
-    default-None for back-compat with older ledgers that lack this
-    block.
+    risk Phase C closed). Readers should use ``.get(...)`` with
+    default-None so a missing block degrades to None rather than
+    KeyError.
     """
     ledger_path = Path(ledger_path).resolve()
     audio_dir = ledger_path.parent
@@ -323,9 +324,9 @@ def in_flight_ledger_path() -> Optional[Path]:
             from . import _otr_paths as _P
         except ImportError:
             import _otr_paths as _P  # type: ignore
-        return find_most_recent_ledger(
-            [_P.otr_episodes_root(), _P.otr_legacy_audio_dir()]
-        )
+        # S28 cleanbreak: dropped _P.otr_legacy_audio_dir() — per-episode
+        # workspace is the only contract; legacy flat audio dir is extinct.
+        return find_most_recent_ledger([_P.otr_episodes_root()])
     except Exception as exc:  # noqa: BLE001
         log.warning("[OTR_Ledger] fallback mtime walker failed: %s", exc)
         return None
@@ -335,11 +336,10 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     """Search the supplied dirs for ``*_ledger.json`` and return the
     newest by mtime. Returns None if no candidates found.
 
-    Walks each given dir at TWO levels:
-      1. ``<dir>/*_ledger.json``                   (legacy flat layout)
-      2. ``<dir>/<episode_id>/audio/*_ledger.json``  (per-episode workspace
-         layout, post 2026-05-02 EVENING reorg -- see
-         ``otr_episodes_root()`` in ``_otr_paths``)
+    Walks each given dir at ONE level only:
+      ``<dir>/<episode_id>/audio/*_ledger.json``  (per-episode workspace
+      layout, post 2026-05-02 EVENING reorg -- see
+      ``otr_episodes_root()`` in ``_otr_paths``)
 
     BUG-LOCAL-103 (2026-04-29 morning): we used to filter out
     ``pending_*_ledger.json`` here, which silently broke every
@@ -353,9 +353,9 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     sort still prefers the newest, so a renamed canonical ledger
     naturally wins after rename.
 
-    Use ``otr_episodes_root()`` (per-episode workspace) +
-    ``otr_legacy_audio_dir()`` (pre-cutover legacy) from
-    ``_otr_paths`` as the canonical search list.
+    S28 cleanbreak retired the legacy flat-layout walk
+    (``<dir>/*_ledger.json``) — the per-episode workspace glob is
+    the only contract.
     """
     candidates: list[Path] = []
     for d in audio_dirs:
@@ -363,8 +363,9 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             d = Path(d)
             if not d.exists():
                 continue
-            # Legacy flat layout: ledgers directly in the dir.
-            candidates.extend(d.glob("*_ledger.json"))
+            # S28 cleanbreak: dropped flat-layout walk
+            # `candidates.extend(d.glob("*_ledger.json"))`. Per-episode
+            # workspace is the only contract.
             # Per-episode workspace layout (post 2026-05-02 EVENING):
             # ledgers under <dir>/<episode_id>/audio/*_ledger.json.
             candidates.extend(d.glob("*/audio/*_ledger.json"))
@@ -903,7 +904,8 @@ def stamp_meta_audit_verdict(
 
 def stamp_cast_contract_version(ledger: dict, version: Optional[str]) -> None:
     """Stamp top-level ``cast_contract_version``. Pass ``None`` to
-    keep the field absent (back-compat with l3-2026-05-02 readers).
+    keep the field absent (e.g. when the cast contract has not been
+    locked yet for this episode).
     """
     try:
         if version is None:

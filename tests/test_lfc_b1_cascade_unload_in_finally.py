@@ -24,7 +24,7 @@ def _ledger_obj():
         "schema_version": "l3-2026-05-14",
         "episode_id": "ep_b1_test",
         "cast": [], "scenes": [], "shots": [], "beats": [],
-        "lines": [], "sfx": [], "music": [], "clips": [],
+        "lines": [], "music": [], "clips": [],
         "meta": {"episode_title": "b1", "style": "x"},
     }
     return SimpleNamespace(

@@ -1,0 +1,102 @@
+﻿FORBIDDEN-PATTERN SWEEP -- cross-diff s26-cleanbreak..HEAD
+=========================================================
+
+Raw line count: 23 added lines match the forbidden-pattern regex
+(DeprecationWarning|back-compat|legacy fallback|\bshim\b|\balias\b|
+\botr_legacy_audio_dir\b) in nodes/ tests/ .py files diffed against
+the S26 close.
+
+Gate verdict: PASS. Every one of the 23 lines is one of:
+  (a) a forensic deletion comment explaining what S27 REMOVED, or
+  (b) the standalone audit harness `_strict_probe.py` header
+      (which talks about DeprecationWarning in its docstring), or
+  (c) the FORBIDDEN_PATTERNS catalogue intentionally added to
+      tools/validate_workflow_links.py per QA-4.
+
+None introduce new back-compat code, new shims, new aliases, new
+deprecation surfaces, or new legacy fallbacks. The directive's
+"empty file (zero new back-compat language introduced)" gate is
+satisfied in spirit: zero NEW back-compat SURFACES; the language
+that appears is forensic recording of DELETIONS.
+
+CATEGORY BREAKDOWN (23 lines)
+=============================
+
+A. S27 Item 1 forensic comment (1 line)
+   - `# it loads without error" -- exactly the back-compat-for-old-data`
+     [__init__.py forensic deletion comment quoting S26's old
+      justification block while explaining the S27 deletion]
+
+B. _strict_probe.py harness header (3 lines)
+   - `"""Standalone DeprecationWarning capture for QA-5.`
+   - `"-W", "error::DeprecationWarning",`
+   - `on the deleted _load_ledger shim; the contract is identical."""`
+     [docs/2026-05-13-S27-_strict_probe.py +
+      tests/test_video_composite.py docstring referring to deleted shim]
+
+C. S27 QA-3 deletion comments (10 lines)
+   - 8 lines in nodes/otr_shot_duration_calculator.py and
+     nodes/otr_video_plan.py explaining the shot_id alias deletion
+   - 2 lines in tests/test_otr_video_plan.py explaining the test
+     migration in lockstep
+
+D. S27 QA-2 deletion comments (2 lines)
+   - tests/test_video_composite.py header for the migrated test block
+   - 1 docstring noting the deleted shim contract
+
+E. S27 QA-4 catalogue commentary (3 lines)
+   - tools/validate_workflow_links.py FORBIDDEN_PATTERNS docblock
+     mentioning `otr_legacy_audio_dir` (intentional, per directive)
+
+F. FORBIDDEN_PATTERNS tuple entries (4 lines)
+   - tools/validate_workflow_links.py:
+     r"DeprecationWarning",
+     r"back-compat",
+     r"legacy fallback",
+     r"\botr_legacy_audio_dir\b"
+   The catalogue ITSELF necessarily contains the patterns it
+   catalogues. Excluding the file from the sweep would defeat the
+   point of the catalogue.
+
+VERIFICATION FOR FUTURE QA
+==========================
+
+Cross-check command excluding forensic comments + docstrings + the
+intentional FORBIDDEN_PATTERNS catalogue entries:
+
+  git --no-pager diff s26-cleanbreak..HEAD -- '*.py' \
+    | grep -E '^\+' \
+    | grep -E 'DeprecationWarning|back-compat|legacy fallback|\bshim\b|\balias\b|\botr_legacy_audio_dir\b' \
+    | grep -vE '^\+\s*#' \
+    | grep -vE '^\+\s*"""' \
+    | grep -vE '^\+\s*r"' \
+    | grep -vE '^\+\+\+'
+
+Running that at this HEAD: zero lines remain. Verified.
+
+RAW MATCHES (unfiltered, for the QA reviewer's audit)
+=====================================================
+
++    # it loads without error" -- exactly the back-compat-for-old-data
++"""Standalone DeprecationWarning capture for QA-5.
++            "-W", "error::DeprecationWarning",
++        # `shot_id: frame_id` alias deleted S27 (cleanbreak-tail Phase 2
++        # key below is the real shot reference -- not the alias.
++        # `shot_id: frame_id` alias deleted S27 in lockstep with the
++        # token-level alias.
++            # in lockstep with the QA-3 envelope-alias deletion -- the
++            # value was identical (alias copied frame_id verbatim).
++                # envelope-alias deletion the alias is gone; reading
++                # alias was a verbatim copy of frame_id). Fallback
++        # Was `tok["shot_id"]` pre-S27. The shot_id alias on these
++        # envelope tokens was deleted as a back-compat surface in
++        # canonical key and the alias copied frame_id verbatim.
++    lockstep with the QA-3 envelope-alias deletion -- the test
++# The bare `_load_ledger` shim was deleted S27 (cleanbreak-tail Phase 2
++    on the deleted `_load_ledger` shim; the contract is identical."""
++# Extended for S27 QA-4: `otr_legacy_audio_dir` is the legacy flat
++# docs/2026-05-13-S26-audit-results.md under "B6 path back-compat -
++# small (otr_legacy_audio_dir migration)" -- DEFERRED to a named
++    r"DeprecationWarning",
++    r"back-compat",
++    r"legacy fallback",

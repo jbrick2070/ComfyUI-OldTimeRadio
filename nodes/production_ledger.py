@@ -156,37 +156,6 @@ def _safe_int(v: Any, default: int = 0) -> int:
             return default
 
 
-def _derive_tts_model_from_voice_preset(voice_preset: str) -> Optional[str]:
-    """Map a cast row's voice_preset to its TTS family.
-
-    Bark presets follow the Suno convention `v2/en_speaker_*` (and
-    legacy foreign-accent presets like `de_speaker_*` / `fr_speaker_*`
-    if they're ever re-enabled). Kokoro presets follow the BBC/American
-    convention `bm_*` / `bf_*` / `am_*` / `af_*`.
-
-    Used as a back-compat shim in `Ledger.set_cast` when a caller
-    passes a pre-tts_model cast row. New code MUST supply `tts_model`
-    explicitly; this helper only catches in-flight rows that haven't
-    been updated yet. Returns None for unknown prefixes.
-    """
-    if not voice_preset:
-        return None
-    s = voice_preset.strip()
-    if s.startswith("v2/") and "speaker" in s:
-        return "bark"
-    if s.startswith(("bm_", "bf_", "am_", "af_")):
-        return "kokoro"
-    # Legacy Bark foreign-accent presets (currently disabled per
-    # cast_pools.py commentary; kept here in case they're re-enabled).
-    if any(s.startswith(p) for p in (
-        "de_speaker_", "es_speaker_", "fr_speaker_", "hi_speaker_",
-        "it_speaker_", "ja_speaker_", "ko_speaker_", "ru_speaker_",
-        "pt_speaker_", "pl_speaker_",
-    )):
-        return "bark"
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -354,7 +323,6 @@ class Ledger:
             "shots": [],
             "beats": [],
             "lines": [],
-            "sfx": [],
             "music": [],
             "clips": [],
             "final_audio_path": None,
@@ -579,31 +547,19 @@ class Ledger:
         rows: List[Dict[str, Any]] = []
         for r in cast_rows or []:
             # Cast field renamed 2026-05-10: description -> character_description.
-            # Back-compat input shim: still accept the old key on the way IN
-            # so any in-flight ledger or cached cast row from a prior session
-            # normalizes cleanly. Output is always the new key.
-            cdesc = (
-                _safe_str(r.get("character_description"))
-                or _safe_str(r.get("description"))
-                or None
-            )
+            # S26-B3 cleanbreak: legacy `description` input key dropped;
+            # callers MUST supply `character_description`.
+            cdesc = _safe_str(r.get("character_description")) or None
             # Cast field added 2026-05-10: tts_model. Routing column
             # that says which TTS family the voice_preset belongs to
             # ("bark", "kokoro", future: "fish_speech", "cosyvoice", ...).
             # Lets downstream consumers route by reading the field
             # directly instead of pattern-matching the voice_preset
             # prefix.
-            #
-            # Back-compat input shim: if a caller doesn't supply
-            # tts_model (e.g. an in-flight cast row from before the
-            # field landed), derive it from the voice_preset prefix.
-            # Bark presets are "v2/en_speaker_*"; Kokoro presets are
-            # "bm_*", "bf_*", "am_*", "af_*". Anything else falls back
-            # to None and the consumer must error-check.
+            # S26-B3 cleanbreak: legacy voice_preset->tts_model derivation
+            # dropped; callers MUST supply tts_model explicitly.
             tts_model = _safe_str(r.get("tts_model")) or None
             voice_preset = _safe_str(r.get("voice_preset")) or None
-            if tts_model is None and voice_preset:
-                tts_model = _derive_tts_model_from_voice_preset(voice_preset)
             # Cast field added 2026-05-10: voice_params. Model-
             # dependent dict (or None) where the casting LLM stores
             # per-character knobs it chose -- Bark might use
@@ -851,20 +807,14 @@ class Ledger:
         self._recompute_totals()
         return self
 
-    def set_sfx(self, sfx_rows: Iterable[Dict[str, Any]]) -> "Ledger":
-        rows: List[Dict[str, Any]] = []
-        for r in sfx_rows or []:
-            rows.append({
-                "cue_id":            _safe_str(r.get("cue_id")),
-                "shot_id":           _safe_str(r.get("shot_id")) or None,
-                "description":       _safe_str(r.get("description")),
-                "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
-                "wav_path":          _safe_str(r.get("wav_path")) or None,
-                "start_s":           _safe_float(r.get("start_s")),
-                "dur_s":             _safe_float(r.get("dur_s")),
-            })
-        self.data["sfx"] = rows
-        return self
+    # set_sfx + apply_sfx_timings deleted S27 (cleanbreak-tail Item 2).
+    # The S25/CD-3 + S26-A3 sweep had already removed the sfx[] schema
+    # scaffold from the canonical ledger; these two methods were kept
+    # alive only to forward stale sfx rows from old on-disk ledger
+    # files back into memory at save time. Per S27 directive: old
+    # on-disk ledgers rebuild on next run. Zero current producers was
+    # the green light to delete, not the excuse to preserve. Audio
+    # writes flow through nodes/_otr_ledger.save_ledger_safe directly.
 
     def set_music(self, music_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
@@ -904,16 +854,6 @@ class Ledger:
                 row["dur_s"]   = _safe_float(t.get("dur_s"))
                 if t.get("bark_wav_path"):
                     row["bark_wav_path"] = str(t["bark_wav_path"])
-        return self
-
-    def apply_sfx_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
-        for row in self.data["sfx"]:
-            t = timing.get(row.get("cue_id"))
-            if t:
-                row["start_s"] = _safe_float(t.get("start_s"))
-                row["dur_s"]   = _safe_float(t.get("dur_s"))
-                if t.get("wav_path"):
-                    row["wav_path"] = str(t["wav_path"])
         return self
 
     def apply_music_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
@@ -1067,19 +1007,42 @@ class Ledger:
         # SignalLostVideo overwrites it via set_final_paths -- that's
         # an explicit overwrite, not a merge concern.
         TOP_PRESERVE = (
-            "schema_version", "meta", "audio_gates", "transitions",
+            "schema_version", "audio_gates", "transitions",
             "radio_bookend_path",
         )
         for k in TOP_PRESERVE:
             if k in on_disk and (k not in in_mem or in_mem.get(k) in (None, "", [], {})):
                 in_mem[k] = on_disk[k]
 
+        # `meta` is recursive: BUG-LOCAL-018 (7c84ee8) added meta.paths
+        # which made in_mem["meta"] always non-empty at save time, so
+        # the bulk-replace rule above stopped copying disk meta. That
+        # silently dropped schema-l3 phase telemetry written by audio
+        # nodes (meta.phase_ms.bark, meta.git_commit, etc.) on every
+        # SignalLostVideo dual-ledger save. Fix: per-key merge -- disk
+        # wins where in-mem doesn't have a key or has an empty value;
+        # in-mem wins where it has a real value.
+        if "meta" in on_disk:
+            disk_meta = on_disk.get("meta") or {}
+            if not isinstance(disk_meta, dict):
+                disk_meta = {}
+            in_mem_meta = in_mem.get("meta")
+            if not isinstance(in_mem_meta, dict):
+                in_mem_meta = {}
+            for mk, mv in disk_meta.items():
+                if mk not in in_mem_meta or in_mem_meta.get(mk) in (None, "", [], {}):
+                    in_mem_meta[mk] = mv
+            in_mem["meta"] = in_mem_meta
+
         # Per-row merge. Keyed by line_id (lines, clips) or cue_id
-        # (sfx, music).
+        # (music). "sfx": "cue_id" entry deleted S27 (cleanbreak-tail
+        # Item 2) -- the sfx[] schema scaffold was deleted in S26-A3
+        # and the ROW_KEYED entry was kept only to forward stale rows
+        # from old on-disk ledger files. Old ledgers rebuild on next
+        # run; the merge no longer tries to preserve a deleted shape.
         ROW_KEYED = {
             "lines": "line_id",
             "clips": "line_id",
-            "sfx": "cue_id",
             "music": "cue_id",
         }
         for arr_name, key_field in ROW_KEYED.items():

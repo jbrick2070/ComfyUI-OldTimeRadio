@@ -198,13 +198,10 @@ def otr_audio_dir(episode_id: str = "") -> Path:
     return comfy_output_dir() / "otr" / "_legacy_audio"
 
 
-def otr_legacy_audio_dir() -> Path:
-    """Pre-BUG-079 legacy audio dir: ``<output>/old_time_radio/``.
-
-    Kept as a back-compat search root for ledger auto-discover so we
-    don't lose track of pre-cutover episode files. Do not write here.
-    """
-    return comfy_output_dir() / "old_time_radio"
+# S28 cleanbreak: otr_legacy_audio_dir() removed. The pre-BUG-079
+# fallback root (`<output>/old_time_radio/`) was extinct in production
+# — per-episode workspace is the only contract. All callers were
+# extinguished in s28-p1-1 through s28-p1-8 before this deletion.
 
 
 def otr_stills_dir(episode_id: str = "") -> Path:
@@ -521,7 +518,7 @@ __all__ = [
     "comfy_input_dir",
     "comfy_models_dir",
     "otr_audio_dir",
-    "otr_legacy_audio_dir",
+    # S28 cleanbreak: dropped "otr_legacy_audio_dir".
     "otr_stills_dir",
     "otr_portraits_dir",
     "otr_videos_dir",

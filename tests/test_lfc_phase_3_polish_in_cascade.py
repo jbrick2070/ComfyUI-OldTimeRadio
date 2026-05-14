@@ -52,7 +52,7 @@ def _ledger(lines, cast=None):
                  "voice_card": "ANNOUNCER (warm broadcast)"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {"episode_title": "phase 3 test",
                      "style": "mission_control_procedural"},
         },

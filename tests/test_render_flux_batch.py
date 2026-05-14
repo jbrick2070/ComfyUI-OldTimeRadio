@@ -38,9 +38,9 @@ def _l2_ledger() -> dict:
         "episode_id": "test_ep",
         "cast": [
             {"char_id": "c01", "name": "ALICE",
-             "description": "young scientist, dark hair"},
+             "character_description": "young scientist, dark hair"},
             {"char_id": "c02", "name": "BOB",
-             "description": "weathered captain, grey beard"},
+             "character_description": "weathered captain, grey beard"},
         ],
         "scenes": [
             {"scene_id": "scene_lab", "description": "research lab, clean white panels"},

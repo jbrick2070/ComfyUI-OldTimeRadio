@@ -1,0 +1,18 @@
+Known-fail delta: EMPTY.
+
+baseline-known-fail-nodeids.txt:  0 lines (Phase B downstream sweep
+                                  cleared EXPECTED_FAILED_NODEIDS to
+                                  empty before S27 cut)
+final-known-fail-nodeids.txt:     0 lines (S27 introduced zero new
+                                  FAILED or XFAIL nodeids)
+
+Diff result: no differences. Both files are intentionally empty.
+
+The [KNOWN-FAIL-GUARD] hook in tests/conftest.py reports zero
+PROMOTABLE entries and zero NEW failures in the final-pytest.txt
+run. Pass count: 2145 passed, 8 skipped. Baseline was 2159 passed
+(2145 + 14 = 2159 -- the 14 deleted tests live in
+tests/test_post_audio_video_pipeline.py, removed in S27 Item 1).
+Math exact.
+
+No diffs to explain. Phase 5 known-fail gate: PASS.

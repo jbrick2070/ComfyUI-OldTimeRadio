@@ -358,7 +358,6 @@ ComfyUI/
 | **8. BatchFluxPortraitRender** `[v2.0]` | Generates one portrait per cast member via FLUX using `comfy.sample` internals. Consistent per-character seeds for reproducible appearance. Sequential VRAM handoff after audio generation completes. Reads cast traits from the L3 ledger. |
 | **9. BatchFluxRender** `[v2.0]` | Generates cinematic establishing shot backgrounds via FLUX. One background per scene from the ledger's `meta.visual_plan`. Seed offset from portraits to avoid visual correlation. |
 | **10. VideoComposite** `[v2.0]` | Layers character portraits over scene backgrounds using PIL. CRT scanline + vignette post-process. Configurable character scale. CPU-only — no GPU required. |
-| **11. PostAudioVideoPipeline** `[v2.0]` | FFmpeg video assembly synced to audio timeline. Frame-per-scene distribution across audio duration. Outputs final `.mp4` with embedded audio track. |
 
 ---
 

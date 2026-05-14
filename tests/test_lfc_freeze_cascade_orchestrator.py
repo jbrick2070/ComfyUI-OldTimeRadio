@@ -68,7 +68,7 @@ def _clean_ledger_data() -> dict:
              "text": "Stay tuned.",
              "word_count": 2, "char_count": 11, "skip": False},
         ],
-        "sfx": [], "music": [], "clips": [],
+        "music": [], "clips": [],
         "meta": {
             "episode_title": "The Calibration Drift",
             "style": "mission_control_procedural",

@@ -191,66 +191,28 @@ class TestFindCached:
         result = module._find_cached(str(cache_workspace), prefix)
         assert result == str(canonical)
 
+    # S26-A2 + A2-sibling: legacy timestamped-filename branch deleted from
+    # both MT._find_cached and AG._find_cached. The following tests pinned
+    # the removed behavior and were dropped with the surface:
+    #   - test_falls_back_to_legacy_when_only_legacy_present
+    #   - test_newest_filename_timestamp_wins_among_legacy
+    # test_canonical_wins_when_both_present is also dropped: the
+    # "two files present, canonical wins" contract collapses to the
+    # single-tier "canonical only" contract already pinned by
+    # test_returns_canonical_on_hit above.
+    # test_does_not_match_unrelated_prefix and
+    # test_handles_prefix_with_glob_metacharacters both asserted
+    # iterdir-loop behavior that no longer exists; dropped with the loop.
+
     @pytest.mark.parametrize("module", [MT, AG])
-    def test_falls_back_to_legacy_when_only_legacy_present(
+    def test_returns_none_when_canonical_missing_even_if_unrelated_wav_present(
         self, cache_workspace, module
     ):
-        prefix = "opening_abcd1234"
-        legacy = cache_workspace / f"{prefix}_1712345678901.wav"
-        legacy.write_bytes(b"placeholder")
-        result = module._find_cached(str(cache_workspace), prefix)
-        assert result == str(legacy)
-
-    @pytest.mark.parametrize("module", [MT, AG])
-    def test_canonical_wins_when_both_present(self, cache_workspace, module):
-        prefix = "opening_abcd1234"
-        canonical = cache_workspace / f"{prefix}.wav"
-        canonical.write_bytes(b"canonical")
-        legacy = cache_workspace / f"{prefix}_1712345678901.wav"
-        legacy.write_bytes(b"legacy")
-        result = module._find_cached(str(cache_workspace), prefix)
-        assert result == str(canonical)
-
-    @pytest.mark.parametrize("module", [MT, AG])
-    def test_newest_filename_timestamp_wins_among_legacy(
-        self, cache_workspace, module
-    ):
-        prefix = "opening_abcd1234"
-        old = cache_workspace / f"{prefix}_1700000000000.wav"
-        new = cache_workspace / f"{prefix}_1799999999999.wav"
-        # Write in reverse order to verify mtime is NOT the selector
-        new.write_bytes(b"new")
-        old.write_bytes(b"old")
-        result = module._find_cached(str(cache_workspace), prefix)
-        assert result == str(new), (
-            "must prefer newest filename timestamp, not mtime"
-        )
-
-    @pytest.mark.parametrize("module", [MT, AG])
-    def test_does_not_match_unrelated_prefix(self, cache_workspace, module):
-        # Files for a different prefix must not be returned
-        (cache_workspace / "closing_zzzz9999_1700000000000.wav").write_bytes(b"x")
+        """Single-tier contract: only the canonical filename is consulted.
+        Any other .wav in the cache dir is irrelevant."""
+        (cache_workspace / "closing_zzzz9999.wav").write_bytes(b"x")
         result = module._find_cached(str(cache_workspace), "opening_abcd1234")
         assert result is None
-
-    @pytest.mark.parametrize("module", [MT, AG])
-    def test_handles_prefix_with_glob_metacharacters(
-        self, cache_workspace, module
-    ):
-        """The Phase D consult flagged that ``Path.glob()`` chokes on
-        glob metacharacters like ``[``. In practice the real prefix from
-        ``_cache_prefix`` is always ``<role>_<8-hex>`` and cannot contain
-        such characters, but the lookup function should tolerate them
-        anyway because it uses ``iterdir() + startswith``, not glob.
-
-        We use ``[`` only -- ``*``, ``?``, ``"``, ``<``, ``>``, ``|``,
-        ``\\``, ``/``, ``:`` are illegal in Windows filenames.
-        """
-        weird = "opening_[abcd1234"
-        (cache_workspace / f"{weird}.wav").write_bytes(b"weird")
-        # iterdir + startswith must find this without crashing on the [
-        result = module._find_cached(str(cache_workspace), weird)
-        assert result == str(cache_workspace / f"{weird}.wav")
 
 
 # ---------------------------------------------------------------------------

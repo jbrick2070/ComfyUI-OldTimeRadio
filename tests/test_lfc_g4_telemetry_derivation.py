@@ -49,7 +49,7 @@ def _ledger(lines, cast=None):
                  "portrait_path": "ANNOUNCER.png"},
             ],
             "scenes": [], "shots": [], "beats": [],
-            "lines": lines, "sfx": [], "music": [], "clips": [],
+            "lines": lines, "music": [], "clips": [],
             "meta": {
                 "episode_title": "g4 test",
                 "style": "mission_control_procedural",

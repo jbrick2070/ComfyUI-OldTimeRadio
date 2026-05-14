@@ -65,11 +65,12 @@ G5_RESERVED_LINK_IDS = frozenset({111, 112})
 # workflow JSON. Listing them here means a stale workflow surfaces
 # at validation time rather than at runtime.
 DELETED_NODE_TYPES = frozenset({
-    "OTR_LLMDirector",         # deleted in S2 (commit 249bc06)
-    "OTR_BarkTTS",             # legacy single-line node
-    "OTR_SFXGenerator",        # legacy single-line node
-    "OTR_VoiceRender",         # legacy aggregator
-    "OTR_BatchKokoroGenerator",# replaced by OTR_KokoroAnnouncer
+    "OTR_LLMDirector",            # deleted in S2 (commit 249bc06)
+    "OTR_BarkTTS",                # legacy single-line node
+    "OTR_SFXGenerator",           # legacy single-line node
+    "OTR_VoiceRender",            # legacy aggregator
+    "OTR_BatchKokoroGenerator",   # replaced by OTR_KokoroAnnouncer
+    "OTR_PostAudioVideoPipeline", # S27: subprocess HuMo trigger, superseded in-graph by OTR_BatchHumoRender + OTR_VideoComposite
 })
 
 

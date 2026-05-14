@@ -1489,21 +1489,16 @@ class OTR_LedgerScriptWriter:
         # dedicated fn uses polish-conservative sampling
         # (top_p=0.9, no min_p, no repetition_penalty -- see
         # _otr_model_loader.make_polish_generate_fn).
-        # Best-effort: if the factory isn't available on older
-        # builds, falls back to None and compose_line uses
-        # generate_fn for polish (pre-W4 behaviour).
-        try:
-            polish_generate_fn = _OTRML.make_polish_generate_fn(
-                cache_entry,
-            )
-        except Exception as _polish_exc:  # noqa: BLE001
-            log.warning(
-                "[OTR_LedgerScriptWriter] make_polish_generate_fn "
-                "unavailable (%s); falling back to generate_fn "
-                "for inline polish",
-                _polish_exc,
-            )
-            polish_generate_fn = None
+        #
+        # S28 cleanbreak (Phase 3 producer fix): dropped the
+        # `try/except ... polish_generate_fn = None` best-effort
+        # fallback. make_polish_generate_fn is required v2.0
+        # infrastructure; "older builds" without it are extinct.
+        # A factory failure now surfaces as a hard error rather than
+        # silently substituting the composer-tuned generate_fn into
+        # polish (which produced the awkward substitutions this whole
+        # path exists to prevent).
+        polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
 
         # --- D. Cast contract -- LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER
         #

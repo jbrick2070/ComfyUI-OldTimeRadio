@@ -87,7 +87,7 @@ if str(_NODES_DIR) not in _sys.path:
 from _otr_paths import (  # noqa: E402
     episodes_for_obs_dir,
     otr_episodes_root,
-    otr_legacy_audio_dir,
+    # S28 cleanbreak: dropped otr_legacy_audio_dir.
     otr_stills_dir,
 )
 
@@ -379,15 +379,6 @@ def _ffprobe_dur(path: Path, ffprobe: str = "ffprobe") -> float | None:
         return None
 
 
-def _load_ledger(arg: str) -> dict:
-    """Backwards-compat shim around _load_ledger_with_path. Returns
-    only the parsed ledger dict for callers that don't need the
-    source path. New code should prefer _load_ledger_with_path so
-    the source path is available for write-back."""
-    ledger, _ = _load_ledger_with_path(arg)
-    return ledger
-
-
 def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
     """Accept inline JSON, ledger.json path, .mp4 path (suffix-swap
     to ledger), or empty (auto-pick newest non-pending). Mirrors
@@ -400,9 +391,10 @@ def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
     s = (arg or "").strip()
 
     if not s:
+        # S28 cleanbreak: dropped otr_legacy_audio_dir() from the
+        # search list. Per-episode workspace is the only contract.
         audio_dirs = [
             otr_episodes_root(),
-            otr_legacy_audio_dir(),
         ]
         cands = []
         for d in audio_dirs:

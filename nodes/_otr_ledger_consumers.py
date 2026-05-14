@@ -205,6 +205,10 @@ _OPTIONAL_STRING_FIELDS = (
     "video_clip_path",
     "tts_skip_reason",
     "sfx_render_status",
+    # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field; walker enforces
+    # its own enum (ALLOWED_MUSIC_RENDER_STATUS) below in addition to
+    # the string-shape-not-None check.
+    "music_render_status",
 )
 
 
@@ -243,6 +247,26 @@ ALLOWED_SFX_RENDER_STATUS: frozenset = frozenset({
     "fallback_output_shape",
     "fallback_default_type",
     "skipped",
+})
+
+# S25/MG-3 (BUG-LOCAL-213). MusicGen parity. Enum the music writeback
+# may stamp. Mirrors ALLOWED_SFX_RENDER_STATUS structure; the
+# fallback_default_type / skipped slots from the sfx enum don't apply
+# to MusicGen (no default-type fallback path; no consumer skips a cue
+# today).
+#   ""                       -- unrendered / pre-render state
+#   "ok"                     -- fresh generate, save confirmed
+#   "ok_cache"               -- cache hit at resolve
+#   "error"                  -- _save_wav returned False
+#   "fallback_silence"       -- ImportError + allow_silence_fallback
+#   "fallback_output_shape"  -- short-output guard fired
+ALLOWED_MUSIC_RENDER_STATUS: frozenset = frozenset({
+    "",
+    "ok",
+    "ok_cache",
+    "error",
+    "fallback_silence",
+    "fallback_output_shape",
 })
 
 
@@ -295,6 +319,14 @@ def audit_post_freeze_writeback(
                     f"not in ALLOWED_SFX_RENDER_STATUS "
                     f"({sorted(ALLOWED_SFX_RENDER_STATUS)!r})."
                 )
+            elif field == "music_render_status" and val not in ALLOWED_MUSIC_RENDER_STATUS:
+                # S25/MG-3 (BUG-LOCAL-213): MusicGen parity enum. A
+                # typo lands here instead of silently passing.
+                violations.append(
+                    f"line_id={lid!r} field {field!r} = {val!r} is "
+                    f"not in ALLOWED_MUSIC_RENDER_STATUS "
+                    f"({sorted(ALLOWED_MUSIC_RENDER_STATUS)!r})."
+                )
     if strict and violations:
         raise ValueError(
             f"Post-freeze writeback violations ({len(violations)}):\n"
@@ -312,4 +344,5 @@ __all__ = [
     "voice_assignments_from_cast",
     "audit_post_freeze_writeback",
     "ALLOWED_SFX_RENDER_STATUS",
+    "ALLOWED_MUSIC_RENDER_STATUS",
 ]

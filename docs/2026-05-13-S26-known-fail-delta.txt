@@ -1,0 +1,3 @@
+Comparing files DOCS\S26-CLEANBREAK\baseline-known-fail-nodeids.txt and DOCS\S26-CLEANBREAK\FINAL-KNOWN-FAIL-NODEIDS.TXT
+FC: no differences encountered
+

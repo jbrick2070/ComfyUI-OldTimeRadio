@@ -1,9 +1,43 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 62,
+  "last_node_id": 63,
   "last_link_id": 114,
   "nodes": [
+    {
+      "id": 63,
+      "type": "OTR_WorkflowValidator",
+      "pos": [
+        -300,
+        -300
+      ],
+      "size": [
+        400,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "validation_report",
+          "type": "STRING",
+          "links": null,
+          "shape": 3,
+          "label": "validation_report"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_WorkflowValidator",
+        "cnr_id": "OldTimeRadio"
+      },
+      "widgets_values": [
+        "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_scifi_16gb_full.json",
+        true,
+        true
+      ]
+    },
     {
       "id": 1,
       "type": "OTR_LedgerScriptWriter",
@@ -541,7 +575,7 @@
         "Node name for S&R": "OTR_BatchAudioGenGenerator"
       },
       "widgets_values": [
-        "[]",
+        "{}",
         "",
         "facebook/audiogen-medium",
         3.0,
