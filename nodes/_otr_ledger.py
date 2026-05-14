@@ -324,9 +324,9 @@ def in_flight_ledger_path() -> Optional[Path]:
             from . import _otr_paths as _P
         except ImportError:
             import _otr_paths as _P  # type: ignore
-        return find_most_recent_ledger(
-            [_P.otr_episodes_root(), _P.otr_legacy_audio_dir()]
-        )
+        # S28 cleanbreak: dropped _P.otr_legacy_audio_dir() — per-episode
+        # workspace is the only contract; legacy flat audio dir is extinct.
+        return find_most_recent_ledger([_P.otr_episodes_root()])
     except Exception as exc:  # noqa: BLE001
         log.warning("[OTR_Ledger] fallback mtime walker failed: %s", exc)
         return None
@@ -354,9 +354,9 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     sort still prefers the newest, so a renamed canonical ledger
     naturally wins after rename.
 
-    Use ``otr_episodes_root()`` (per-episode workspace) +
-    ``otr_legacy_audio_dir()`` (pre-cutover legacy) from
-    ``_otr_paths`` as the canonical search list.
+    Use ``otr_episodes_root()`` (per-episode workspace) from
+    ``_otr_paths`` as the canonical search root. S28 cleanbreak
+    retired the ``otr_legacy_audio_dir()`` companion.
     """
     candidates: list[Path] = []
     for d in audio_dirs:
