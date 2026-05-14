@@ -14,8 +14,7 @@ B1a (offline) defines:
     require_model(...)     -- shared helper that fails loud if the
                               socket arrived with a falsy value.
 
-B1a2 will add GatedModelError + InsufficientDiskSpaceError alongside
-these. B1c will add VRAMFitFailedError + ContextCapUnknownError.
+B1c will add VRAMFitFailedError + ContextCapUnknownError.
 """
 
 from __future__ import annotations
@@ -34,6 +33,24 @@ class UnknownModelError(RuntimeError):
     formats) or does not match any of the three admit-paths
     (curated / locally-scanned / valid org/name when auto-download
     enabled). Carries an actionable recovery hint in the message."""
+
+
+class GatedModelError(RuntimeError):
+    """Raised by auto_download_if_missing's pre-flight check when the
+    requested repo_id is in GATED_CURATED_MODELS and resolve_hf_token()
+    returns None. The user gets a dual-path recovery message: HF account
+    setup vs. pick a different model.
+
+    Critical: this is raised BEFORE any snapshot_download attempt so
+    the user sees the helpful message instead of a raw 401 buried in
+    the HF stack trace."""
+
+
+class InsufficientDiskSpaceError(RuntimeError):
+    """Raised by auto_download_if_missing's pre-flight disk-space
+    check when (free_bytes - download_bytes - 5GB_margin) < 0.
+    Refuses to attempt the download because partial-download cleanup
+    on a near-full disk is brittle."""
 
 
 def require_model(model_id: str | None, *, slot: str) -> str:

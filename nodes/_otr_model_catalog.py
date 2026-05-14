@@ -394,6 +394,207 @@ def validate_model_id(
     )
 
 
+# ---------------------------------------------------------------------------
+# B1a2: HF network surface -- auto-download + size estimate + pre-flight checks
+# ---------------------------------------------------------------------------
+
+
+# Conservative weight-file allow-list. Transformers loader path only.
+# Excludes .gguf intentionally (deferred to a future llama.cpp backend).
+ALLOW_PATTERNS = (
+    "*.json",
+    "*.safetensors",
+    "*.txt",
+    "*.model",
+    "tokenizer*",
+    "special_tokens_map.json",
+    "generation_config.json",
+    "preprocessor_config.json",
+    "processor_config.json",
+    "added_tokens.json",
+    "chat_template*.jinja",
+    "*.md",
+)
+
+# Pre-flight disk-space margin: leave at least 5 GB free after the
+# download lands. Prevents partial-download cleanup brittleness on a
+# near-full disk.
+_DISK_SPACE_MARGIN_BYTES = 5 * 1024**3
+
+
+def _format_gated_message(repo_id: str) -> str:
+    return (
+        f"GatedModelError: {repo_id!r} requires HuggingFace authentication.\n"
+        f"To run OTR end-to-end as designed, free one-time setup (~5 min):\n"
+        f"  1. Create HF account at https://huggingface.co/join.\n"
+        f"  2. Accept the license at https://huggingface.co/{repo_id}.\n"
+        f"  3. Set HF_TOKEN in your environment (or HKCU on Windows).\n"
+        f"Once configured, this download fires automatically on first Queue."
+    )
+
+
+def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> float:
+    """Estimate total safetensors download size in GB. Used by the
+    pre-fetch disk-space check + queue-UI announcement.
+
+    For curated entries, returns the catalog's approx_safetensors_gb
+    immediately (no network call). For uncurated remote ids, calls
+    HfApi().model_info(...) -- this is the only path that fires a
+    network request; callers MUST be on a user-action code path.
+
+    `_hf_api` is a test seam: pass a mock object with a model_info()
+    method to avoid the network call.
+    """
+    curated = _by_repo_id().get(repo_id)
+    if curated is not None:
+        return float(curated.approx_safetensors_gb)
+    if _hf_api is None:
+        from huggingface_hub import HfApi  # local import: defer network deps
+
+        _hf_api = HfApi()
+    info = _hf_api.model_info(repo_id, files_metadata=True)  # type: ignore[union-attr]
+    total = 0
+    for sibling in getattr(info, "siblings", []) or []:
+        size = getattr(sibling, "size", None) or 0
+        path = (getattr(sibling, "rfilename", "") or "").lower()
+        if path.endswith(".safetensors") or path.endswith(".bin"):
+            total += size
+    if total <= 0:
+        return 0.0
+    return float(total) / float(1024**3)
+
+
+def _free_disk_bytes_for(path: Path) -> int:
+    """shutil.disk_usage on the deepest existing parent of `path`."""
+    import shutil
+
+    p = path
+    while not p.exists():
+        if p.parent == p:
+            break
+        p = p.parent
+    return shutil.disk_usage(str(p)).free
+
+
+def auto_download_if_missing(
+    repo_id: str,
+    *,
+    hub_root: Path | None = None,
+    progress_pbar: object | None = None,
+    _snapshot_download: object | None = None,
+    _hf_api: object | None = None,
+) -> str:
+    """Resolve `repo_id` to a local snapshot path, downloading on first
+    use. Three pre-flight checks fire BEFORE snapshot_download:
+
+        1. OTR_MODEL_CATALOG_AUTO_DOWNLOAD=0 -> UnknownModelError.
+        2. Gated curated repo + no HF_TOKEN     -> GatedModelError.
+        3. Free disk - estimated size - margin <= 0 -> InsufficientDiskSpaceError.
+
+    Test seams: pass `_snapshot_download` (callable replacing
+    huggingface_hub.snapshot_download) and `_hf_api` (object with
+    model_info() method) to drive tests without network calls.
+    """
+    from ._otr_hf_auth import resolve_hf_token
+    from ._otr_model_inputs import (
+        GatedModelError,
+        InsufficientDiskSpaceError,
+        UnknownModelError,
+    )
+
+    if os.environ.get("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1") == "0":
+        raise UnknownModelError(
+            _unknown_recovery_hint(
+                repo_id,
+                "auto-download disabled via OTR_MODEL_CATALOG_AUTO_DOWNLOAD=0",
+                hub_root=hub_root,
+            )
+        )
+
+    # Pre-flight gated check: must run BEFORE any HF API call (otherwise
+    # the user gets a generic 401 from snapshot_download).
+    if repo_id in GATED_CURATED_MODELS and resolve_hf_token() is None:
+        raise GatedModelError(_format_gated_message(repo_id))
+
+    # Pre-flight size estimate + disk-space check.
+    size_gb = estimate_model_size_gb(repo_id, _hf_api=_hf_api)
+    size_bytes = int(size_gb * 1024**3)
+    hub_root_path = hub_root if hub_root is not None else _hf_hub_root()
+    if hub_root_path is None:
+        # Fall back to default location for the disk-usage check; the
+        # actual download will create the dir.
+        hub_root_path = Path.home() / ".cache" / "huggingface" / "hub"
+    free_bytes = _free_disk_bytes_for(hub_root_path)
+    margin = size_bytes + _DISK_SPACE_MARGIN_BYTES
+    if size_bytes > 0 and (free_bytes - margin) < 0:
+        free_gb = free_bytes / 1024**3
+        raise InsufficientDiskSpaceError(
+            f"InsufficientDiskSpaceError: downloading {repo_id} requires "
+            f"{size_gb:.1f} GB + {_DISK_SPACE_MARGIN_BYTES / 1024**3:.0f} GB "
+            f"margin = {(size_gb + 5):.1f} GB, but only {free_gb:.1f} GB free "
+            f"at {hub_root_path}. Free up disk space and retry."
+        )
+
+    # Announce download intent to the console (cheap; queue UI gets the
+    # ProgressBar separately).
+    print(
+        f"[OTR] Downloading {repo_id} -- {size_gb:.1f} GB -> "
+        f"{hub_root_path} (first run only)"
+    )
+
+    if _snapshot_download is None:
+        from huggingface_hub import snapshot_download as _snapshot_download  # type: ignore
+
+    # Forward the token + allow_patterns; let the caller wire a
+    # ProgressBar via tqdm_class if they're on the worker-thread.
+    kwargs: dict[str, object] = {
+        "repo_id": repo_id,
+        "allow_patterns": list(ALLOW_PATTERNS),
+        "token": resolve_hf_token(),
+    }
+    if progress_pbar is not None:
+        kwargs["tqdm_class"] = _make_pbar_tqdm_adapter(progress_pbar)
+    return str(_snapshot_download(**kwargs))  # type: ignore[operator]
+
+
+def _make_pbar_tqdm_adapter(pbar: object) -> type:
+    """Build a minimal tqdm-shaped class that forwards update() into a
+    ComfyUI ProgressBar. huggingface_hub's tqdm_class hook expects a
+    context-manager class with update(), set_description(), __enter__,
+    __exit__.
+    """
+
+    class _PBarTqdm:
+        def __init__(self, *args, **kwargs):
+            self._total = kwargs.get("total")
+            self._n = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def update(self, n: int = 1):
+            self._n += int(n)
+            if self._total and hasattr(pbar, "update_absolute"):
+                try:
+                    pbar.update_absolute(self._n, int(self._total))  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+
+        def set_description(self, *_a, **_kw):
+            return None
+
+        def close(self):
+            return None
+
+        def __iter__(self):
+            return iter(())
+
+    return _PBarTqdm
+
+
 __all__ = [
     "CuratedModel",
     "CURATED_LLM_MODELS",
@@ -402,10 +603,13 @@ __all__ = [
     "TEST_TECHNICAL_LLM",
     "TEST_OVERSIZED_LLM",
     "NOT_DOWNLOADED_SUFFIX",
+    "ALLOW_PATTERNS",
     "ScanResult",
     "DropdownEntry",
     "scan_local_llm_cache",
     "build_dropdown_choices",
     "dropdown_choices",
     "validate_model_id",
+    "estimate_model_size_gb",
+    "auto_download_if_missing",
 ]
