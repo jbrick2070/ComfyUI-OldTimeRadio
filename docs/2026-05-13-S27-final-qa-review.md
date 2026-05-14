@@ -1,4 +1,4 @@
-# S27 Cleanbreak Tail — Final QA Review
+﻿# S27 Cleanbreak Tail — Final QA Review
 
 ## Verdict
 
@@ -47,8 +47,8 @@ After Phase B: `EXPECTED_FAILED_NODEIDS` empty, full pytest 2159 passed
 | QA-6 | scene_sequencer dead sfx-mirror walk | `nodes/scene_sequencer.py` ~L936-1046 + EpisodeAssembler L1190-1223 | DELETED (~110 + 12 lines); log lines lost dead fields | 19 passed (incl. audio-byte-identical) |
 | QA-2 | `_load_ledger` shims | `nodes/video_composite.py:382`, `nodes/batch_humo_render.py:2805` | DELETED inline; 3 video_composite test callers migrated to `_load_ledger_with_path(x)[0]` | 92 passed |
 | QA-3 | `shot_id: frame_id` envelope alias | `nodes/otr_shot_duration_calculator.py:287`, `nodes/otr_video_plan.py:645` | DELETED in lockstep; 2 production consumers (L891, L926) + 3 test consumers migrated to `frame_id` | 110 passed |
-| QA-4 | `otr_legacy_audio_dir()` enumeration | 13 caller sites in `nodes/` | ENUMERATED in `docs/s26-cleanbreak/audit-results.md`; `tools/validate_workflow_links.py` gained `FORBIDDEN_PATTERNS` catalogue including the symbol | Out of scope (deferred to B6 follow-up) |
-| QA-5 | Strict-deprecation audit reclassification | `pyproject.toml` + `docs/s27-cleanbreak-tail/_strict_probe.py` + `docs/s27-cleanbreak-tail/deprecation-audit-reclass.txt` | Two third-party DeprecationWarnings classified; pytest-asyncio fixed via config; torchao documented as third-party. BUG-LOCAL-221 CLOSED | Re-run via `_strict_probe.py` |
+| QA-4 | `otr_legacy_audio_dir()` enumeration | 13 caller sites in `nodes/` | ENUMERATED in `docs/2026-05-13-S26-audit-results.md`; `tools/validate_workflow_links.py` gained `FORBIDDEN_PATTERNS` catalogue including the symbol | Out of scope (deferred to B6 follow-up) |
+| QA-5 | Strict-deprecation audit reclassification | `pyproject.toml` + `docs/2026-05-13-S27-_strict_probe.py` + `docs/2026-05-13-S27-deprecation-audit-reclass.txt` | Two third-party DeprecationWarnings classified; pytest-asyncio fixed via config; torchao documented as third-party. BUG-LOCAL-221 CLOSED | Re-run via `_strict_probe.py` |
 
 ## What was deferred and why
 
@@ -57,7 +57,7 @@ deferral:
 
 - **B6 path back-compat -- small (otr_legacy_audio_dir migration)** -- QA-4
   closed by enumerating the 13 caller sites in
-  `docs/s26-cleanbreak/audit-results.md`. The actual migration is a
+  `docs/2026-05-13-S26-audit-results.md`. The actual migration is a
   follow-up sprint per the S26 deferral path (each caller is a one-line
   swap from a secondary fallback-list entry to the canonical
   `otr_audio_dir()` / `otr_episodes_root()`).
@@ -71,13 +71,13 @@ No circuit-breaker trips during S27. No items abandoned mid-run.
 | baseline (s26-cleanbreak @ `19cf286`, post-downstream-sweep) | 2159 | 8 | 0 | EXPECTED_FAILED_NODEIDS empty |
 | final (s27-cleanbreak-tail HEAD) | 2145 | 8 | 0 | -14 = exactly `tests/test_post_audio_video_pipeline.py` (14 tests in Item 1) |
 
-Known-fail delta: `docs/s27-cleanbreak-tail/known-fail-delta.txt` --
+Known-fail delta: `docs/2026-05-13-S27-known-fail-delta.txt` --
 empty. Zero `[KNOWN-FAIL-GUARD] NEW failures (REGRESSION)`, zero
 `[KNOWN-FAIL-GUARD] PROMOTABLE`.
 
 ## Forbidden-pattern sweep
 
-`docs/s27-cleanbreak-tail/new-forbidden-hits.txt`: 23 raw added-line
+`docs/2026-05-13-S27-new-forbidden-hits.txt`: 23 raw added-line
 matches across nodes/ tests/ .py files diffed against s26-cleanbreak.
 All 23 are forensic deletion comments, the `_strict_probe.py` harness
 header, or the intentional `FORBIDDEN_PATTERNS` catalogue entries in
@@ -88,7 +88,7 @@ regex catalogue entries returns zero hits.
 
 ## Link-integrity report
 
-`docs/s27-cleanbreak-tail/link-integrity-report.txt`: all 5 workflow
+`docs/2026-05-13-S27-link-integrity-report.txt`: all 5 workflow
 JSONs (`ltx_2_3_downstream_smoke.json`, `otr_humo_4x_smoke.json`,
 `otr_humo_only_smoke.json`, `otr_humo_smoke.json`,
 `otr_scifi_16gb_full.json`) report TOTAL violations: 0.
@@ -102,8 +102,8 @@ user re-opens.
 ## BUG-LOCAL-221 resolution
 
 CLOSED with full classification at
-`docs/s27-cleanbreak-tail/deprecation-audit-reclass.txt`. Source code +
-durable harness at `docs/s27-cleanbreak-tail/_strict_probe.py` so any
+`docs/2026-05-13-S27-deprecation-audit-reclass.txt`. Source code +
+durable harness at `docs/2026-05-13-S27-_strict_probe.py` so any
 future strict-mode audit survives the conftest's SystemExit(2) hook.
 
 Both warnings classified as third-party:
@@ -146,14 +146,14 @@ expected `23/1/2xf` gate exactly.
 - [x] BUG-LOCAL-221 closed with classification (third-party documented)
 - [x] QA-2, QA-3 deleted inline with full sibling lockstep
 - [x] QA-4 -- 13 (not 14) `otr_legacy_audio_dir()` callers enumerated in the S26 audit-results.md
-- [x] `docs/s27-cleanbreak-tail/` complete with: `baseline-pytest.txt`, `baseline-known-fail-nodeids.txt`, `baseline-footprint.txt`, `final-pytest.txt`, `final-known-fail-nodeids.txt`, `known-fail-delta.txt`, `forbidden-pattern-sweep.txt`, `new-forbidden-hits.txt`, `deprecation-audit-reclass.txt`, `link-integrity-report.txt`, `audit-results.md`, `final-qa-review.md` (this doc), `s28-prep-qa.md`, `_strict_probe.py`
+- [x] `docs/2026-05-13-S27-` complete with: `baseline-pytest.txt`, `baseline-known-fail-nodeids.txt`, `baseline-footprint.txt`, `final-pytest.txt`, `final-known-fail-nodeids.txt`, `known-fail-delta.txt`, `forbidden-pattern-sweep.txt`, `new-forbidden-hits.txt`, `deprecation-audit-reclass.txt`, `link-integrity-report.txt`, `audit-results.md`, `final-qa-review.md` (this doc), `s28-prep-qa.md`, `_strict_probe.py`
 
 ## Hand-back checklist for Jeffrey on swim-return
 
 1. Pull `s27-cleanbreak-tail` from origin (push is the next step).
 2. Run the full pytest one more time on your machine to confirm
    `2145 passed, 8 skipped` -- the durable baseline.
-3. Re-run `python docs/s27-cleanbreak-tail/_strict_probe.py` if you
+3. Re-run `python docs/2026-05-13-S27-_strict_probe.py` if you
    want to see the third-party deprecation classification yourself.
 4. Read the independent QA prompt at directive §13 -- paste into a
    fresh Claude session, attach the four named artifacts, get a

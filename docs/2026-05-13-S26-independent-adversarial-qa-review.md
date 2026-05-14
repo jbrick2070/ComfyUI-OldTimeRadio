@@ -1,4 +1,4 @@
-# S26 Cleanbreak -- Independent Adversarial QA Review
+﻿# S26 Cleanbreak -- Independent Adversarial QA Review
 
 **Verdict:** CLEANBREAK COMPLETE -- 7 issues (1 cleanup on internally-inconsistent SFX contract, 2 cleanup on sibling-pattern audit misses, 2 cleanup on sweep-pattern gap + downstream of deferred B6, 2 nits)
 **Reviewer:** Independent QA pass, adversarial framing
@@ -190,14 +190,14 @@ The "3+ rounds" framing is too dramatic. The audit-completeness gaps are real bu
 
 ## Sources
 
-- `docs/s26-cleanbreak/final-qa-review.md`
-- `docs/s26-cleanbreak/audit-results.md`
-- `docs/s26-cleanbreak/cowork-stop-log.md`
-- `docs/s26-cleanbreak/baseline-known-fail-nodeids.txt`
-- `docs/s26-cleanbreak/final-known-fail-nodeids.txt`
-- `docs/s26-cleanbreak/known-fail-delta.txt`
-- `docs/s26-cleanbreak/forbidden-pattern-sweep.txt` (cross-verified with independent re-run)
-- `docs/s26-cleanbreak/deprecation-audit.txt`
+- `docs/2026-05-13-S26-final-qa-review.md`
+- `docs/2026-05-13-S26-audit-results.md`
+- `docs/2026-05-13-S26-cowork-stop-log.md`
+- `docs/2026-05-13-S26-baseline-known-fail-nodeids.txt`
+- `docs/2026-05-13-S26-final-known-fail-nodeids.txt`
+- `docs/2026-05-13-S26-known-fail-delta.txt`
+- `docs/2026-05-13-S26-forbidden-pattern-sweep.txt` (cross-verified with independent re-run)
+- `docs/2026-05-13-S26-deprecation-audit.txt`
 - `docs/2026-05-13-S25-qa-postmortem.md` (ADDENDUM A/B/C)
 - `git log --oneline s25-musicgen-parity..s26-cleanbreak`
 - `git diff --name-status s25-musicgen-parity..s26-cleanbreak`

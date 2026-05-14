@@ -1,4 +1,4 @@
-=============================================================================
+﻿=============================================================================
 S27 QA-5 -- strict DeprecationWarning audit reclassification (BUG-LOCAL-221)
 =============================================================================
 
@@ -81,7 +81,7 @@ documented because no OTR-side fix exists.
 
 S26's instrumentation gap (the SystemExit(2) traceback swallower)
 also identified -- the standalone probe script at
-docs/s27-cleanbreak-tail/_strict_probe.py is the durable harness for
+docs/2026-05-13-S27-_strict_probe.py is the durable harness for
 re-running this audit under strict mode without losing the
 traceback.
 

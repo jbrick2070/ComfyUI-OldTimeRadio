@@ -1,4 +1,4 @@
-# OTR Roadmap
+﻿# OTR Roadmap
 
 **Branch:** `v2.0-alpha` (next-up) | **Active branch:** `s26-cleanbreak` (autonomous Cowork swim-run 2026-05-13) | **Owner:** Jeffrey A. Brick | **Stack head:** `88cd1e5` -> final QA commit pending push | **Last refactored:** 2026-05-13 (S26 cleanbreak + chained sprints complete; B2 stopped per directive; awaiting Jeffrey return for ComfyUI Desktop runtime pass)
 
@@ -81,7 +81,7 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 **Stack head before push:** `cabee65` (Phase 2-4 QA-N closures). Final QA + ROADMAP + S28 prep commit follows and is pushed to origin as the run close.
 
-**Spec:** `docs/2026-05-13-S27-cleanbreak-tail-sprint.md`. **Final QA review:** `docs/s27-cleanbreak-tail/final-qa-review.md`. **S28 prep:** `docs/s27-cleanbreak-tail/s28-prep-qa.md`.
+**Spec:** `docs/2026-05-13-S27-cleanbreak-tail-sprint.md`. **Final QA review:** `docs/2026-05-13-S27-final-qa-review.md`. **S28 prep:** `docs/2026-05-13-S27-s28-prep-qa.md`.
 
 ### What closed in this run
 
@@ -96,7 +96,7 @@ After the current round of cleanbreak validation work closes, the next three spr
 | Phase 1 Item 2 | `set_sfx`, `apply_sfx_timings`, `_merge_with_disk::ROW_KEYED["sfx"]` deleted. Test split: music-only assertions retained, sfx half deleted. |
 | Phase 2 QA-2 | `_load_ledger` shims at `video_composite.py:382` and `batch_humo_render.py:2805` deleted inline. 3 test callers migrated to `_load_ledger_with_path(x)[0]`. |
 | Phase 2 QA-3 | `shot_id: frame_id` envelope alias deleted in lockstep across both sites. 2 production consumers + 3 test consumers migrated to canonical `frame_id`. |
-| Phase 2 QA-4 | 13 `otr_legacy_audio_dir()` callers enumerated in `docs/s26-cleanbreak/audit-results.md`. `tools/validate_workflow_links.py` gained `FORBIDDEN_PATTERNS` catalogue. |
+| Phase 2 QA-4 | 13 `otr_legacy_audio_dir()` callers enumerated in `docs/2026-05-13-S26-audit-results.md`. `tools/validate_workflow_links.py` gained `FORBIDDEN_PATTERNS` catalogue. |
 | Phase 3 QA-6 | Scene_sequencer + EpisodeAssembler dead sfx-mirror walks stripped (~122 lines total). Audio-byte-identical test still passes. |
 | Phase 4 QA-5 | Strict-deprecation audit reclassified. pytest-asyncio config warning FIXED via pyproject.toml. torchao import warning documented as third-party. `_strict_probe.py` durable harness shipped. BUG-LOCAL-221 CLOSED. |
 | Phase 5 | full pytest 2145 passed / 8 skipped / 0 failed (baseline -14 = exactly the deleted Item 1 tests). Bug Bible 23/1/2xf. Forbidden-pattern new hits: 23 raw matches, all forensic/catalogue/harness -- zero new back-compat surfaces. Link integrity zero violations across 5 workflows. |
@@ -119,7 +119,7 @@ No new deferrals -- only the existing B6 entry's enumeration gap was closed. B4,
 
 ### Independent QA review (for the next Claude session)
 
-Paste the prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md` into a fresh Claude session. Attach: `docs/s27-cleanbreak-tail/final-qa-review.md`, `docs/s27-cleanbreak-tail/audit-results.md`, the updated `BUG_LOG.md` + `ROADMAP.md`, and the S27 directive file. Apply Jeffrey's threshold: zero current callers is the green light to DELETE, not the excuse to preserve.
+Paste the prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md` into a fresh Claude session. Attach: `docs/2026-05-13-S27-final-qa-review.md`, `docs/2026-05-13-S27-audit-results.md`, the updated `BUG_LOG.md` + `ROADMAP.md`, and the S27 directive file. Apply Jeffrey's threshold: zero current callers is the green light to DELETE, not the excuse to preserve.
 
 ---
 
@@ -129,7 +129,7 @@ Paste the prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md` into
 
 **Stack head before push:** `88cd1e5` (Sprint 3 / T1.2 OTR_WorkflowValidator). Final QA commit (`docs(s26): final QA review, BUG_LOG + ROADMAP updates`) follows and is pushed to origin as the run close.
 
-**Spec:** `docs/2026-05-13-S26-cleanbreak-plan.md`. **Directive:** `docs/2026-05-13-S26-cowork-autonomous-directive.md`. **Final QA review:** `docs/s26-cleanbreak/final-qa-review.md`.
+**Spec:** `docs/2026-05-13-S26-cleanbreak-plan.md`. **Directive:** `docs/2026-05-13-S26-cowork-autonomous-directive.md`. **Final QA review:** `docs/2026-05-13-S26-final-qa-review.md`.
 
 ### What closed in this run
 
@@ -151,7 +151,7 @@ Paste the prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md` into
 
 ### What stopped
 
-**Sprint 4 — B2 `_otr_outline.py` back-compat sweep — STOPPED per directive §5 row 4 (design judgment required).** 22 hits across `_otr_outline.py` all gated on `req.budget is None` (pre-Phase-2A back-compat); production callers DO supply budgets but tests + fixture-level callers exercise the no-budget path deliberately. Whether those tests pin removable legacy tolerance or represent a still-supported simpler-mode is a design call Jeffrey owns. Stop record: `docs/s26-cleanbreak/cowork-stop-log.md`. Named follow-up sprint: **"B2 `_otr_outline.py` budget-required cleanbreak"** -- design call first, then mechanical execution per the Section B per-item loop.
+**Sprint 4 — B2 `_otr_outline.py` back-compat sweep — STOPPED per directive §5 row 4 (design judgment required).** 22 hits across `_otr_outline.py` all gated on `req.budget is None` (pre-Phase-2A back-compat); production callers DO supply budgets but tests + fixture-level callers exercise the no-budget path deliberately. Whether those tests pin removable legacy tolerance or represent a still-supported simpler-mode is a design call Jeffrey owns. Stop record: `docs/2026-05-13-S26-cowork-stop-log.md`. Named follow-up sprint: **"B2 `_otr_outline.py` budget-required cleanbreak"** -- design call first, then mechanical execution per the Section B per-item loop.
 
 ### What was deferred (named follow-up sprints generated by this run)
 
@@ -173,7 +173,7 @@ The CD-3 audit conclusion (legacy `ledger.sfx[]` writeback loop has zero produce
 
 ### Sprints opened in queue
 
-1. **ComfyUI Desktop runtime pass (§11 post-cleanbreak)** -- first action awaiting Jeffrey on return. See `docs/s26-cleanbreak/final-qa-review.md` §8 for the hand-back checklist (boot ComfyUI, load canonical workflow, drag OTR_WorkflowValidator id=63 into position, re-save the fixture for widget-vector normalization, queue at shortest settings to confirm runtime contracts, capture strict-deprecation traceback in interactive shell).
+1. **ComfyUI Desktop runtime pass (§11 post-cleanbreak)** -- first action awaiting Jeffrey on return. See `docs/2026-05-13-S26-final-qa-review.md` §8 for the hand-back checklist (boot ComfyUI, load canonical workflow, drag OTR_WorkflowValidator id=63 into position, re-save the fixture for widget-vector normalization, queue at shortest settings to confirm runtime contracts, capture strict-deprecation traceback in interactive shell).
 2. **SPRINT #1 (B) Two-Model Selector** -- scoping doc owns this; not touched by this run.
 3. **SPRINT #2 (C) `meta.story_brief` v2** -- pre-flight cleanbreaks already documented; not touched.
 4. **SPRINT #3 (A) Downstream ledger verification** -- gated on C close.

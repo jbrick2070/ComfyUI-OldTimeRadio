@@ -1,4 +1,4 @@
-"""Static workflow link-integrity validator (no ComfyUI boot required).
+﻿"""Static workflow link-integrity validator (no ComfyUI boot required).
 
 Rule set per S26 cleanbreak plan §4:
   - every link ID referenced by a node input MUST exist in workflow["links"]
@@ -34,14 +34,14 @@ INIT_PATH = REPO_ROOT / "__init__.py"
 # Extended for S27 QA-4: `otr_legacy_audio_dir` is the legacy flat
 # audio-dir helper kept as a SECONDARY entry in every audio-side auto-
 # pick fallback chain. The 13 caller sites are enumerated in
-# docs/s26-cleanbreak/audit-results.md under "B6 path back-compat -
+# docs/2026-05-13-S26-audit-results.md under "B6 path back-compat -
 # small (otr_legacy_audio_dir migration)" -- DEFERRED to a named
 # follow-up sprint. Future audits use this regex set so the pattern
 # stays visible and a new caller surfaces loudly.
 #
 # This validator itself only checks workflow JSON link integrity; the
 # patterns below are consumed by the Phase 5 forbidden-pattern grep
-# sweep documented in docs/s27-cleanbreak-tail/audit-results.md. Kept
+# sweep documented in docs/2026-05-13-S27-audit-results.md. Kept
 # here as the durable catalogue so future tooling can `from
 # tools.validate_workflow_links import FORBIDDEN_PATTERNS`.
 FORBIDDEN_PATTERNS: tuple[str, ...] = (

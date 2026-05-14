@@ -1,4 +1,4 @@
-# S27 Cleanbreak Tail — audit results
+﻿# S27 Cleanbreak Tail — audit results
 
 **Branch:** `s27-cleanbreak-tail` cut from `s26-cleanbreak` HEAD `19cf286`
 **Posture:** DELETE NOW. THE NEW LEDGER IS THE ONLY LEDGER. NO BACK-COMPAT FOR OLD JSON, NO BACK-COMPAT FOR OLD ON-DISK LEDGERS.
@@ -144,7 +144,7 @@ Remaining `shot_id` references in these two files are NOT aliases:
 
 #### QA-4 — `otr_legacy_audio_dir()` caller enumeration (deferred with full inventory)
 
-13 caller sites enumerated in `docs/s26-cleanbreak/audit-results.md` under "B6/post_audio_video_pipeline -- legacy flat-layout fallback removed" (extension subsection). The deferral entry is in the S26 audit doc per the directive's instruction -- this is closing a known gap in the prior deferral, not a new S27 surface.
+13 caller sites enumerated in `docs/2026-05-13-S26-audit-results.md` under "B6/post_audio_video_pipeline -- legacy flat-layout fallback removed" (extension subsection). The deferral entry is in the S26 audit doc per the directive's instruction -- this is closing a known gap in the prior deferral, not a new S27 surface.
 
 Pattern in every caller: `otr_legacy_audio_dir()` is the SECONDARY entry in an auto-pick fallback list, after `otr_episodes_root()` or `otr_audio_dir()`. Future "B6 path back-compat -- small (otr_legacy_audio_dir migration)" sprint will sweep them in one pass.
 
@@ -157,10 +157,10 @@ S26 left BUG-LOCAL-221 deferred because the strict-mode FAILURES traceback could
 | Finding | Detail |
 |---|---|
 | Real cause of S26's traceback swallow | `tests/conftest.py::pytest_sessionfinish` does `raise SystemExit(2)` on any [KNOWN-FAIL-GUARD] NEW failure; SystemExit aborts before pytest prints the FAILURES section. S26's "cmd.exe shell terminated" theory was wrong -- cmd.exe was honest; the conftest hook was eating the traceback. |
-| Durable fix | Built `docs/s27-cleanbreak-tail/_strict_probe.py`: a standalone harness that monkey-patches the conftest hook to a no-op before pytest collects. The FAILURES traceback now survives. |
+| Durable fix | Built `docs/2026-05-13-S27-_strict_probe.py`: a standalone harness that monkey-patches the conftest hook to a no-op before pytest collects. The FAILURES traceback now survives. |
 | Warning 1 (third-party) | `pytest_asyncio.plugin:247` -- PytestDeprecationWarning about `asyncio_default_fixture_loop_scope` unset. FIXED via pyproject.toml `[tool.pytest.ini_options] asyncio_default_fixture_loop_scope = "function"` (upstream-recommended value). |
 | Warning 2 (third-party) | `torchao.dtypes.uintx.__init__:1` -- deprecated import path inside transformers' `AutoProcessor` chain. OTR doesn't import torchao directly; no OTR-side fix. Documented as `third_party_deprecation`. |
-| BUG-LOCAL-221 status | CLOSED. Full traceback evidence at `docs/s27-cleanbreak-tail/deprecation-audit-reclass.txt`. |
+| BUG-LOCAL-221 status | CLOSED. Full traceback evidence at `docs/2026-05-13-S27-deprecation-audit-reclass.txt`. |
 
 **Commit:** Phases 2 + 3 + 4 ship together (pending).
 

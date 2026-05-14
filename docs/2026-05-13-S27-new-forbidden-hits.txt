@@ -1,4 +1,4 @@
-FORBIDDEN-PATTERN SWEEP -- cross-diff s26-cleanbreak..HEAD
+﻿FORBIDDEN-PATTERN SWEEP -- cross-diff s26-cleanbreak..HEAD
 =========================================================
 
 Raw line count: 23 added lines match the forbidden-pattern regex
@@ -31,7 +31,7 @@ B. _strict_probe.py harness header (3 lines)
    - `"""Standalone DeprecationWarning capture for QA-5.`
    - `"-W", "error::DeprecationWarning",`
    - `on the deleted _load_ledger shim; the contract is identical."""`
-     [docs/s27-cleanbreak-tail/_strict_probe.py +
+     [docs/2026-05-13-S27-_strict_probe.py +
       tests/test_video_composite.py docstring referring to deleted shim]
 
 C. S27 QA-3 deletion comments (10 lines)
@@ -95,7 +95,7 @@ RAW MATCHES (unfiltered, for the QA reviewer's audit)
 +# The bare `_load_ledger` shim was deleted S27 (cleanbreak-tail Phase 2
 +    on the deleted `_load_ledger` shim; the contract is identical."""
 +# Extended for S27 QA-4: `otr_legacy_audio_dir` is the legacy flat
-+# docs/s26-cleanbreak/audit-results.md under "B6 path back-compat -
++# docs/2026-05-13-S26-audit-results.md under "B6 path back-compat -
 +# small (otr_legacy_audio_dir migration)" -- DEFERRED to a named
 +    r"DeprecationWarning",
 +    r"back-compat",

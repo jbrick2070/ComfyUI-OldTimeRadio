@@ -1,4 +1,4 @@
-# S26 Cleanbreak + Chained Sprints — Swim-Return QA Review
+﻿# S26 Cleanbreak + Chained Sprints — Swim-Return QA Review
 
 **Branch:** `s26-cleanbreak` (cut from `s25-musicgen-parity` HEAD `3393b39`; planning carry committed before sprint open)
 **Run date:** 2026-05-13 (autonomous Cowork execution)
@@ -13,7 +13,7 @@
 - **Sprint 1 (S26 cleanbreak):** complete; 12 commits; full regression delta vs baseline is empty.
 - **Sprint 2 (post-cleanbreak static items):** complete; workflow link-integrity validator built, runs clean across all 5 in-repo workflows.
 - **Sprint 3 (T1.2 OTR_WorkflowValidator):** complete; new node + workflow JSON wiring + 8-test suite all green.
-- **Sprint 4 (B2 _otr_outline.py back-compat sweep):** **STOPPED per directive §5** — budget-flow ambiguity requires Jeffrey's design call. Stop-log captured at `docs/s26-cleanbreak/cowork-stop-log.md`.
+- **Sprint 4 (B2 _otr_outline.py back-compat sweep):** **STOPPED per directive §5** — budget-flow ambiguity requires Jeffrey's design call. Stop-log captured at `docs/2026-05-13-S26-cowork-stop-log.md`.
 - **No regressions** vs baseline (known-fail delta empty).
 - **No new OTR-origin DeprecationWarnings** introduced (audit gate held; one third-party emission flagged for re-audit when ComfyUI Desktop is booted post-cleanbreak).
 
@@ -25,7 +25,7 @@
 
 | Item | Surface | Commit | File(s) | Targeted test result |
 |------|---------|--------|---------|----------------------|
-| Phase 0 | Baseline capture | `41a43b5` | docs/s26-cleanbreak/baseline-* | 6 failed (known-fail) / 2165 passed / 8 skipped |
+| Phase 0 | Baseline capture | `41a43b5` | docs/2026-05-13-S26-baseline-* | 6 failed (known-fail) / 2165 passed / 8 skipped |
 | A1 | legacy `ledger.sfx[]` writeback loop | `3aa1494` | nodes/batch_audiogen_generator.py L701-765 + tests/test_audiogen_legacy_gate.py deleted | 17 passed |
 | A2 | MusicGen `_find_cached` legacy timestamped branch | `1d06107` | nodes/musicgen_theme.py L230-261 | 10 passed |
 | A2-sibling | AudioGen `_find_cached` legacy timestamped branch | `3f3c625` | nodes/batch_audiogen_generator.py L141-192 | 17 passed |
@@ -41,7 +41,7 @@
 
 | Item | File(s) | Commit | Result |
 |------|---------|--------|--------|
-| Workflow link-integrity validator | tools/validate_workflow_links.py + docs/s26-cleanbreak/workflow-link-integrity-report.txt | `a924c2f` | 0 violations across 5 in-repo fixtures |
+| Workflow link-integrity validator | tools/validate_workflow_links.py + docs/2026-05-13-S26-workflow-link-integrity-report.txt | `a924c2f` | 0 violations across 5 in-repo fixtures |
 | Stale-widget textual scrub | (subsumed by A4b in Sprint 1) | — | clean |
 | `__init__.py` deleted-symbol scan | (audit only) | — | 0 hits for `_derive_tts_model`, `_legacy_sort_key`, `legacy_prefix` |
 
@@ -56,7 +56,7 @@
 
 ### Sprint 4 — B2 `_otr_outline.py` back-compat sweep
 
-**STOPPED.** See `docs/s26-cleanbreak/cowork-stop-log.md` for the stop record and the named follow-up sprint title.
+**STOPPED.** See `docs/2026-05-13-S26-cowork-stop-log.md` for the stop record and the named follow-up sprint title.
 
 ---
 
@@ -115,7 +115,7 @@ All deletions are documented in their respective audit-results.md entries and co
 
 ## 5. Forbidden-pattern sweep
 
-`docs/s26-cleanbreak/forbidden-pattern-sweep.txt` — 122 total hits in `nodes/` + `tests/`. Filtered to files **changed by S26** (per plan §8): all 13 surviving hits in changed files are pre-existing surfaces explicitly documented in `audit-results.md` as either:
+`docs/2026-05-13-S26-forbidden-pattern-sweep.txt` — 122 total hits in `nodes/` + `tests/`. Filtered to files **changed by S26** (per plan §8): all 13 surviving hits in changed files are pre-existing surfaces explicitly documented in `audit-results.md` as either:
 - B4 / B5 / B6 DEFERRED to named follow-up sprints (audit verdicts captured), or
 - positive directive language ("no legacy back-compat" telling future authors what to avoid), or
 - feature uses of an indexed pattern word (ProcSFX cue `keyword/alias` matching).

@@ -1,4 +1,4 @@
-# S26 Cleanbreak — Audit & Per-Item Results
+﻿# S26 Cleanbreak — Audit & Per-Item Results
 
 Run start: 2026-05-13. Branch `s26-cleanbreak` cut from `s25-musicgen-parity` (HEAD `3393b39` — includes planning carry-along commit `3393b39` on top of `5369da4` cleanbreak audit addendum).
 
@@ -261,7 +261,7 @@ Verdict: **gate held**. No new back-compat language was introduced this sprint; 
 ## Acceptance criteria (plan §9) status
 
 - [x] `git status --short` empty at sprint open and after each commit (between items).
-- [x] `docs/s26-cleanbreak/` populated with: `baseline-pytest.txt`, `baseline-known-fail-nodeids.txt`, `baseline-legacy-footprint.txt`, `final-pytest.txt`, `final-known-fail-nodeids.txt`, `known-fail-delta.txt`, `deprecation-audit.txt`, `forbidden-pattern-sweep.txt`, `audit-results.md`.
+- [x] `docs/2026-05-13-S26-` populated with: `baseline-pytest.txt`, `baseline-known-fail-nodeids.txt`, `baseline-legacy-footprint.txt`, `final-pytest.txt`, `final-known-fail-nodeids.txt`, `known-fail-delta.txt`, `deprecation-audit.txt`, `forbidden-pattern-sweep.txt`, `audit-results.md`.
 - [x] `git grep -n 'Path 1: legacy ledger.sfx' nodes/ tests/` → 0 hits (A1).
 - [x] `git grep -n 'legacy_prefix\|_legacy_sort_key' nodes/ tests/` → 0 hits (A2 + A2-sibling).
 - [x] `git grep -nE "['\"]sfx['\"]: \[\]" nodes/ tests/` → 0 hits (A3).
