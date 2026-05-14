@@ -32,8 +32,16 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 
-def _fake_image_tensor(h: int = 8, w: int = 8) -> np.ndarray:
-    """Tiny RGB image as a numpy array in 0..1 float, ComfyUI tensor shape."""
+def _fake_image_tensor(h: int = 128, w: int = 128) -> np.ndarray:
+    """High-entropy RGB image as a numpy array in 0..1 float, ComfyUI tensor shape.
+
+    Sized to clear the SaveToEpisodeWorkspace ``_MIN_VALID_PNG_BYTES`` gate
+    (4096 bytes) that catches empty FLUX outputs. Random RGB data compresses
+    poorly under PNG deflate -- a 128x128 fixture lands at ~30-40 KB, well
+    over the gate. Was 8x8 before the gate shipped (2026-05-08 morning run);
+    that produced a 268-byte PNG that tripped the empty-FLUX detector and
+    raised BAD_IMAGE_SAVE in every save_to_episode_workspace test.
+    """
     return np.random.RandomState(42).random((h, w, 3)).astype(np.float32)
 
 
