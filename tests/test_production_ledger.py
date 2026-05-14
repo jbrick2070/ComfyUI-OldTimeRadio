@@ -286,23 +286,23 @@ class TestDualLedgerFix:
             "in-memory text must win over stale on-disk value"
 
     def test_save_preserves_disk_rows_when_in_mem_array_empty(self, tmp_out):
-        """If memory has no rows for an array but disk has rows
-        (e.g. audio_gates populated by audio nodes, in-mem Ledger
-        never set them), keep the disk rows."""
+        """If memory has no rows for a ROW_KEYED array but disk has
+        rows, keep the disk rows. Was sfx-based pre-S27; migrated to
+        music in lockstep with the S27 Item 2 sfx-scaffold deletion."""
         import json as _json
         led = Ledger("empty_mem_test", str(tmp_out))
         led.save()
         path = Path(led.path)
         on_disk = _json.loads(path.read_text(encoding="utf-8"))
-        on_disk["sfx"] = [
-            {"cue_id": "sfx_door_slam", "start_s": 22.4, "dur_s": 1.2,
-             "description": "door slam", "start_s_space": "master_mix"},
+        on_disk["music"] = [
+            {"cue_id": "opening_theme", "start_s": 0.0, "dur_s": 12.0,
+             "description": "opening theme", "wav_path": "/tmp/opening.wav"},
         ]
         path.write_text(_json.dumps(on_disk, indent=2), encoding="utf-8")
-        led.save()  # in-mem sfx is empty []
+        led.save()  # in-mem music is empty []
         merged = _json.loads(path.read_text(encoding="utf-8"))
-        assert len(merged["sfx"]) == 1
-        assert merged["sfx"][0]["cue_id"] == "sfx_door_slam"
+        assert len(merged["music"]) == 1
+        assert merged["music"][0]["cue_id"] == "opening_theme"
 
 
 # ---------------------------------------------------------------------------
@@ -475,14 +475,16 @@ class TestTimingBackfill:
         led.apply_line_timings({"l999": {"start_s": 1.0, "dur_s": 1.0}})
         assert led.data["lines"][0]["start_s"] is None
 
-    def test_apply_sfx_and_music_timings(self, tmp_out):
+    def test_apply_music_timings(self, tmp_out):
+        # Sfx half of the prior `test_apply_sfx_and_music_timings`
+        # deleted S27 (cleanbreak-tail Item 2) along with set_sfx /
+        # apply_sfx_timings. The music half stays -- music timings
+        # are still part of the active ledger contract.
         led = Ledger("t", str(tmp_out))
-        led.set_sfx([{"cue_id": "sfx_001", "description": "alarm"}])
         led.set_music([{"cue_id": "opening"}])
-        led.apply_sfx_timings({"sfx_001": {"start_s": 5.0, "dur_s": 1.2, "wav_path": "/tmp/a.wav"}})
         led.apply_music_timings({"opening": {"start_s": 0.0, "dur_s": 12.0, "wav_path": "/tmp/m.wav"}})
-        assert led.data["sfx"][0]["start_s"] == 5.0
         assert led.data["music"][0]["dur_s"] == 12.0
+        assert led.data["music"][0]["wav_path"] == "/tmp/m.wav"
 
 
 # ---------------------------------------------------------------------------

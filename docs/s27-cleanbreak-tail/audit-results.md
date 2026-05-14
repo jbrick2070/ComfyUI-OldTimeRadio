@@ -46,5 +46,34 @@ All three Phase 1 deletion targets are present — work queue proceeds.
 
 **Targeted regression:** `pytest tests/ -q -k 'not test_audiogen_legacy_gate' -W ignore::DeprecationWarning` → 2145 passed, 8 skipped. Diff from baseline (-14) accounts exactly for `tests/test_post_audio_video_pipeline.py` (14 tests). Zero unexpected fails. No `[KNOWN-FAIL-GUARD]` lines.
 
+**Commit:** `412781f` cleanbreak(s27-1): delete OTR_PostAudioVideoPipeline entirely
+
+### Item 2 — Delete `set_sfx`, `apply_sfx_timings`, ROW_KEYED `"sfx"` entry
+
+| Surface | Action | Verification |
+|---|---|---|
+| `nodes/production_ledger.py::set_sfx` (~L810, 14 lines) | DELETED, replaced with one forensic comment | grep returns only the comment |
+| `nodes/production_ledger.py::apply_sfx_timings` (~L865, 9 lines) | DELETED | grep returns only the comment |
+| `nodes/production_ledger.py::_merge_with_disk::ROW_KEYED["sfx"]` (~L1042) | DELETED — ROW_KEYED shrank from 4 entries to 3 (lines, clips, music) | grep `"sfx"\s*:\s*"cue_id"` returns 0 hits |
+| `tests/test_production_ledger.py::TestTimingBackfill::test_apply_sfx_and_music_timings` | SPLIT — sfx half deleted, music half kept and renamed to `test_apply_music_timings` (the contract under test is still alive for music) | one test method instead of one mixed test |
+| `tests/test_production_ledger.py::TestDualLedgerFix::test_save_preserves_disk_rows_when_in_mem_array_empty` | MIGRATED — example array switched from sfx to music (was using sfx purely as a convenient sample; the contract is about ROW_KEYED merge behavior in general, which still holds for music/lines/clips) | test passes, contract unchanged |
+
+**Verification grep result:**
+
+```
+git grep -n 'set_sfx|apply_sfx_timings' nodes/ tests/
+  -> nodes/production_ledger.py:810      forensic comment only
+     tests/test_production_ledger.py:480 forensic comment only
+     tests/test_production_ledger.py:481 forensic comment only
+
+git grep -nE '"sfx"\s*:\s*"cue_id"' nodes/
+  -> nodes/production_ledger.py:1038    forensic comment only
+```
+
+All non-comment occurrences are gone. Forensic comments preserve the
+deletion trail per directive policy.
+
+**Targeted regression:** `pytest tests/test_production_ledger.py tests/test_audiogen_ledger.py -q` → 42 passed (was 38 + 4). Zero failures, zero `[KNOWN-FAIL-GUARD]` lines.
+
 **Commit:** pending.
 

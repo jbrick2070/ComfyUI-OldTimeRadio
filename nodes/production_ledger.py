@@ -807,20 +807,14 @@ class Ledger:
         self._recompute_totals()
         return self
 
-    def set_sfx(self, sfx_rows: Iterable[Dict[str, Any]]) -> "Ledger":
-        rows: List[Dict[str, Any]] = []
-        for r in sfx_rows or []:
-            rows.append({
-                "cue_id":            _safe_str(r.get("cue_id")),
-                "shot_id":           _safe_str(r.get("shot_id")) or None,
-                "description":       _safe_str(r.get("description")),
-                "generation_prompt": _safe_str(r.get("generation_prompt")) or None,
-                "wav_path":          _safe_str(r.get("wav_path")) or None,
-                "start_s":           _safe_float(r.get("start_s")),
-                "dur_s":             _safe_float(r.get("dur_s")),
-            })
-        self.data["sfx"] = rows
-        return self
+    # set_sfx + apply_sfx_timings deleted S27 (cleanbreak-tail Item 2).
+    # The S25/CD-3 + S26-A3 sweep had already removed the sfx[] schema
+    # scaffold from the canonical ledger; these two methods were kept
+    # alive only to forward stale sfx rows from old on-disk ledger
+    # files back into memory at save time. Per S27 directive: old
+    # on-disk ledgers rebuild on next run. Zero current producers was
+    # the green light to delete, not the excuse to preserve. Audio
+    # writes flow through nodes/_otr_ledger.save_ledger_safe directly.
 
     def set_music(self, music_rows: Iterable[Dict[str, Any]]) -> "Ledger":
         rows: List[Dict[str, Any]] = []
@@ -860,16 +854,6 @@ class Ledger:
                 row["dur_s"]   = _safe_float(t.get("dur_s"))
                 if t.get("bark_wav_path"):
                     row["bark_wav_path"] = str(t["bark_wav_path"])
-        return self
-
-    def apply_sfx_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
-        for row in self.data["sfx"]:
-            t = timing.get(row.get("cue_id"))
-            if t:
-                row["start_s"] = _safe_float(t.get("start_s"))
-                row["dur_s"]   = _safe_float(t.get("dur_s"))
-                if t.get("wav_path"):
-                    row["wav_path"] = str(t["wav_path"])
         return self
 
     def apply_music_timings(self, timing: Dict[str, Dict[str, float]]) -> "Ledger":
@@ -1051,11 +1035,14 @@ class Ledger:
             in_mem["meta"] = in_mem_meta
 
         # Per-row merge. Keyed by line_id (lines, clips) or cue_id
-        # (sfx, music).
+        # (music). "sfx": "cue_id" entry deleted S27 (cleanbreak-tail
+        # Item 2) -- the sfx[] schema scaffold was deleted in S26-A3
+        # and the ROW_KEYED entry was kept only to forward stale rows
+        # from old on-disk ledger files. Old ledgers rebuild on next
+        # run; the merge no longer tries to preserve a deleted shape.
         ROW_KEYED = {
             "lines": "line_id",
             "clips": "line_id",
-            "sfx": "cue_id",
             "music": "cue_id",
         }
         for arr_name, key_field in ROW_KEYED.items():
