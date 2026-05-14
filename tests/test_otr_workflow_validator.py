@@ -144,10 +144,12 @@ class TestAdversarialWorkflow:
             )
 
     def test_deleted_node_type_raises(self, tmp_path):
-        """A workflow that still references a known-deleted node class
-        (e.g. OTR_LedgerScriptReviewer from S15.5-S19 cleanbreak) raises
-        WorkflowDeletedNodeError. The DELETED_NODE_TYPES list in
-        _workflow_validation pins each retirement."""
+        # Adversarial smoke for the DELETED_NODE_TYPES sentinel list.
+        # OTR_LedgerScriptReviewer (retired S15.5-S19 cleanbreak) is
+        # one of the pinned entries; the validator must raise
+        # WorkflowDeletedNodeError when a workflow JSON still names
+        # it. _workflow_validation.DELETED_NODE_TYPES holds the full
+        # retirement registry.
         from nodes._workflow_validation import DELETED_NODE_TYPES
         # Take the first registered deleted-type sentinel to drive the
         # adversarial case so the test stays in sync with the registry.
