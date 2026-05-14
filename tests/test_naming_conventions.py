@@ -74,6 +74,46 @@ def test_lib_modules_have_no_node_class_mappings():
     )
 
 
+def test_node_display_names_have_no_placeholder_strings():
+    """S29 Phase 4.1: no NODE_DISPLAY_NAME_MAPPINGS value may contain
+    a placeholder substring like ``[EMOJI]``, ``[TODO]``,
+    ``[PLACEHOLDER]``, or ``[FIXME]``.
+
+    Catches: a contributor lands a new node with the display name
+    ``" [EMOJI] My New Node"`` (or similar in-place reminder) and
+    forgets to fill the real label. The S25 MusicGen drift had a
+    literal ``[EMOJI]`` ship in this surface; this test pins the
+    rule going forward.
+    """
+    import importlib
+    import sys
+
+    pkg_root = NODES_DIR.parent
+    sys.path.insert(0, str(pkg_root))
+    sys.path.insert(0, str(pkg_root.parent))
+    pkg_name = pkg_root.name
+    try:
+        pkg = importlib.import_module(pkg_name)
+    finally:
+        sys.path.pop(0)
+        sys.path.pop(0)
+
+    mapping = getattr(pkg, "NODE_DISPLAY_NAME_MAPPINGS", {})
+    forbidden = ("[EMOJI]", "[TODO]", "[PLACEHOLDER]", "[FIXME]")
+    bad = []
+    for key, value in mapping.items():
+        s = str(value)
+        for marker in forbidden:
+            if marker in s:
+                bad.append((key, value, marker))
+    assert not bad, (
+        f"NODE_DISPLAY_NAME_MAPPINGS values with placeholder markers: "
+        f"{bad}. Per S29 plan §Phase 4.1, every display name must "
+        "ship a real label; placeholder substrings like [EMOJI] / "
+        "[TODO] / [PLACEHOLDER] / [FIXME] are not allowed."
+    )
+
+
 def test_conventions_doc_lists_every_lib_module():
     """S19.2 (IMP-15, IMP-16): every ``nodes/_otr_*_lib.py`` on disk
     MUST be mentioned in docs/conventions.md.
