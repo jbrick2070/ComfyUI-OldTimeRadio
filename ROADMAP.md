@@ -1,6 +1,6 @@
 ﻿# OTR Roadmap
 
-**Branch:** `v2.0-alpha` (next-up) | **Active branch:** `s26-cleanbreak` (autonomous Cowork swim-run 2026-05-13) | **Owner:** Jeffrey A. Brick | **Stack head:** `88cd1e5` -> final QA commit pending push | **Last refactored:** 2026-05-13 (S26 cleanbreak + chained sprints complete; B2 stopped per directive; awaiting Jeffrey return for ComfyUI Desktop runtime pass)
+**Branch:** `v2.0-alpha` (next-up) | **Active branch:** `s28-cleaner-break` (autonomous Cowork swim-run 2026-05-13) | **Owner:** Jeffrey A. Brick | **Stack head:** `dfcc406` pushed to origin | **Last refactored:** 2026-05-13 (S28 cleaner-break complete; last cleanbreak sprint in the S24→S25→S26→S27→S28 chain; awaiting Jeffrey return for ComfyUI Desktop runtime pass + merge to v2.0-alpha)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -75,7 +75,59 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## CURRENT WORK -- S27 cleanbreak tail (COMPLETE 2026-05-13, awaiting Jeffrey return)
+## CURRENT WORK -- S28 cleaner break (COMPLETE 2026-05-13, awaiting Jeffrey return)
+
+**Branch:** `s28-cleaner-break` (cut from `s27-cleanbreak-tail` HEAD `4277952`). Pushed to origin as the run close.
+
+**Stack head:** `dfcc406` (Phase 5 final QA + hand-off artifacts). 20 commits on branch.
+
+**Spec:** `docs/2026-05-13-S28-cleanbreak-plan.md`. **Final QA review:** `docs/2026-05-13-S28-final-qa-review.md`. **Audit results:** `docs/2026-05-13-S28-audit-results.md`.
+
+### What closed in this run
+
+**Phase 0 baseline (1 commit).** Footprint capture of the 5 S28 target surfaces + 2145-passed-8-skipped baseline pytest committed for delta tracking. Empty `baseline-known-fail-nodeids.txt` confirms the s26-downstream sweep's no-known-fails state held through S27.
+
+**Phase 1 — `otr_legacy_audio_dir()` extinction (10 commits).** All 13 caller sites migrated across 8 nodes (`_otr_ledger.py`, `audio_enhance.py`, `batch_audiogen_generator.py`, `batch_bark_generator.py`, `batch_humo_render.py`, `batch_ltx_render.py`, `scene_sequencer.py`, `video_composite.py`). Function deleted from `_otr_paths.py:201` + `__all__` entry. Flat-layout walker (`d.glob("*_ledger.json")`) stripped from `find_most_recent_ledger`. Per-episode workspace is now the only contract.
+
+**Phase 2 — `req.budget is None` extinction (3 commits).** `standard_budget` fixture in `tests/conftest.py`. Two legacy-tolerance tests deleted under Rule C (`test_block_omitted_when_budget_none`, `test_no_budget_no_op`). Production fallbacks dropped from `_otr_outline.py`: `__post_init__` now enforces `not hasattr(self.budget, "arc_phases")` (catches both None and wrong-type leaks; avoids tripping the `req\.budget is None|budget is None` forbidden-pattern grep). `_build_user_prompt` budget block always renders. `validate_outline_against_budget` runs unconditionally. Inline harness updated with `_HARNESS_BUDGET_*` fixtures so it still runs end-to-end; Test 11a (bare-format cast_descriptions=() back-compat assertion) deleted per plan.
+
+**Phase 3 — `_otr_line_composer.py` caller-shape extinction (3 commits).** Producer audit found one real leak: `OTR_LedgerScriptWriter` wrapped `make_polish_generate_fn` in a `try/except ... = None` that silently re-injected the Tier 3 #22 awkward-substitution regression on factory failure. Fix landed as `s28-p3-producer-1` (BUG-LOCAL-224 logged). Consumer-side: `allowed_roster` empty-frozenset default reframed as dataclass-ordering artifact (not back-compat); `elif req.allowed_roster:` legacy combined-roster prompt block deleted; `polish_line` docstring updated to drop "back-compat" framing (runtime fallback retained as defense-in-depth per producer-contract guarantee — documented deviation in final QA review).
+
+**Phase 4 — `_otr_ledger_freeze.py` ledger-shape extinction (5 commits, audio-critical).** Producer audit found no live leaks (all 4 sites defended against retired shapes). One-site-per-commit deletion sequence: `meta.outline.beats` walk dropped, `skip=True` without `tts_skip_reason` promoted warning→error, `speaker_role` substitute forensic-comment cleanup, `dur_s is None` skip dropped (replaced with hard `G7: missing dur_s` error + test flipped under Rule C). **Audio-byte-identical regression PASSED at every site boundary.** Rule F revert+trace never invoked.
+
+**Phase 5 — Final static verification + push (2 commits).**
+
+  * Pre-existing UTF-8 BOM on `tools/validate_workflow_links.py` surfaced by the Bug Bible regression — inherited from before s27-cleanbreak-tail; stripped in commit `b334b3a`. BUG-LOCAL-225 logged (Bug Bible repo-wide gate must run alongside Phase 0 baseline + Phase 5 close).
+  * Final hand-off commit `dfcc406` with audit-results, final-qa-review, final-pytest, link-integrity-report, forbidden-pattern-sweep (0 runtime hits / 31 forensic via tokenize-classified docstring/comment suppression), known-fail-delta (empty), and `_s28_forbidden_sweep.py` (reusable tokenize-based gate script).
+
+### Acceptance results
+
+  * Pytest: **2143 passed, 8 skipped, 0 failed** (delta -2 from baseline = Phase 2 legacy-tolerance tests).
+  * Bug Bible: **23 passed, 1 skipped, 2 xfailed** (matches plan after BOM strip).
+  * Workflow link integrity: **TOTAL violations 0** across all 5 workflow JSONs.
+  * Audio-byte-identical: **PASS** at every Phase 4 site boundary and at final.
+  * Forbidden-pattern sweep: **empty file** (0 runtime hits; 31 forensic suppressed).
+  * `git push origin s28-cleaner-break` succeeded; local HEAD == origin HEAD == `dfcc406`.
+  * `docs/cleanbreak-deferred.md` stubbed (zero active deferrals; C10/C8/S14.2 retained as historical resolution audit trail).
+
+### Documented deviations from plan (all captured in final QA review §Deviations)
+
+  1. `_otr_line_composer.py:1265` runtime polish_generate_fn fallback retained as defense-in-depth (producer-contract guarantee makes it unreachable in production; preserved for test-harness ergonomics).
+  2. `OutlineRequest.__post_init__` enforcement uses `not hasattr(self.budget, "arc_phases")` instead of `is None` (catches both None and wrong-type leaks + avoids the forbidden-pattern guard).
+  3. Inline `_otr_outline.py` harness needed `_HARNESS_BUDGET_*` fixtures threaded through 5 OutlineRequest construction sites (broader than the plan's "delete Test 11a" line).
+  4. `docs/cleanbreak-deferred.md` stubbed rather than fully emptied (preserves C10/C8/S14.2 historical resolution audit trail).
+
+### Why this is the LAST cleanbreak sprint
+
+After S28 every legacy path from the S24→S25→S26→S27→S28 chain is extinct. The v2.0 contract is the only contract. Producers respect their own contracts; consumers trust producers; no fallbacks, no defensive guards beyond enforced producer-contract checks. If a future audit finds a missed surface, it's a `BUG-LOCAL-NNN` with a single-commit fix — not a sprint name. **100% means 100%. The cleaner break ends the chain.**
+
+### Forward work (not S28; tracked elsewhere)
+
+Unchanged from the S27 close: B Two-Model Selector → C `meta.story_brief` v2 → A downstream verification. The B→C→A sequencing section above remains canonical.
+
+---
+
+## PRIOR CURRENT WORK -- S27 cleanbreak tail (COMPLETE 2026-05-13)
 
 **Branch:** `s27-cleanbreak-tail` (cut from `s26-cleanbreak` HEAD `19cf286` post Phase B downstream sweep; planning + 5 fix-commits landed on `s26-cleanbreak` first to clear 7 missed-regressions S26 didn't surface).
 
