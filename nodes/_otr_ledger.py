@@ -336,11 +336,10 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     """Search the supplied dirs for ``*_ledger.json`` and return the
     newest by mtime. Returns None if no candidates found.
 
-    Walks each given dir at TWO levels:
-      1. ``<dir>/*_ledger.json``                   (legacy flat layout)
-      2. ``<dir>/<episode_id>/audio/*_ledger.json``  (per-episode workspace
-         layout, post 2026-05-02 EVENING reorg -- see
-         ``otr_episodes_root()`` in ``_otr_paths``)
+    Walks each given dir at ONE level only:
+      ``<dir>/<episode_id>/audio/*_ledger.json``  (per-episode workspace
+      layout, post 2026-05-02 EVENING reorg -- see
+      ``otr_episodes_root()`` in ``_otr_paths``)
 
     BUG-LOCAL-103 (2026-04-29 morning): we used to filter out
     ``pending_*_ledger.json`` here, which silently broke every
@@ -354,9 +353,9 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
     sort still prefers the newest, so a renamed canonical ledger
     naturally wins after rename.
 
-    Use ``otr_episodes_root()`` (per-episode workspace) from
-    ``_otr_paths`` as the canonical search root. S28 cleanbreak
-    retired the ``otr_legacy_audio_dir()`` companion.
+    S28 cleanbreak retired the legacy flat-layout walk
+    (``<dir>/*_ledger.json``) — the per-episode workspace glob is
+    the only contract.
     """
     candidates: list[Path] = []
     for d in audio_dirs:
@@ -364,8 +363,9 @@ def find_most_recent_ledger(audio_dirs: Iterable[Path]) -> Optional[Path]:
             d = Path(d)
             if not d.exists():
                 continue
-            # Legacy flat layout: ledgers directly in the dir.
-            candidates.extend(d.glob("*_ledger.json"))
+            # S28 cleanbreak: dropped flat-layout walk
+            # `candidates.extend(d.glob("*_ledger.json"))`. Per-episode
+            # workspace is the only contract.
             # Per-episode workspace layout (post 2026-05-02 EVENING):
             # ledgers under <dir>/<episode_id>/audio/*_ledger.json.
             candidates.extend(d.glob("*/audio/*_ledger.json"))
