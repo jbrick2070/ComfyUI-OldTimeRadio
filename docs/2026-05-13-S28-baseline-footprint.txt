@@ -1,0 +1,32 @@
+nodes/_otr_ledger.py:328:            [_P.otr_episodes_root(), _P.otr_legacy_audio_dir()]
+nodes/_otr_ledger.py:358:    ``otr_legacy_audio_dir()`` (pre-cutover legacy) from
+nodes/_otr_paths.py:201:def otr_legacy_audio_dir() -> Path:
+nodes/_otr_paths.py:524:    "otr_legacy_audio_dir",
+nodes/audio_enhance.py:434:            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+nodes/batch_audiogen_generator.py:33:from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+nodes/batch_bark_generator.py:33:from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+nodes/batch_humo_render.py:65:    otr_legacy_audio_dir,
+nodes/batch_humo_render.py:2829:                otr_legacy_audio_dir(),
+nodes/batch_ltx_render.py:82:    otr_legacy_audio_dir,
+nodes/batch_ltx_render.py:2090:            audio_dirs = [otr_audio_dir(), otr_legacy_audio_dir()]
+nodes/scene_sequencer.py:879:            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+nodes/scene_sequencer.py:1123:            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+nodes/video_composite.py:90:    otr_legacy_audio_dir,
+nodes/video_composite.py:396:            otr_legacy_audio_dir(),
+---  
+nodes/_otr_ledger.py:368:            candidates.extend(d.glob("*_ledger.json"))
+nodes/_otr_ledger.py:371:            candidates.extend(d.glob("*/audio/*_ledger.json"))
+---  
+nodes/_otr_outline.py:483:    # entirely when budget is None (back-compat).
+nodes/_otr_outline.py:725:    No-op when req.budget is None (back-compat).
+nodes/_otr_outline.py:1026:        # req.budget is None (pre-Phase-2A back-compat). On hard
+---  
+nodes/_otr_line_composer.py:468:    gate check. Defaults to an empty frozenset for back-compat with
+nodes/_otr_line_composer.py:856:    allowed_people OR allowed_things is non-empty; back-compat callers
+nodes/_otr_line_composer.py:1215:        back to `generate_fn` for back-compat with existing call sites.
+nodes/_otr_line_composer.py:1492:            # for back-compat with callers that don't yet build a
+---  
+nodes/_otr_ledger_freeze.py:279:    # back to meta.outline.beats for back-compat with caller-shaped
+nodes/_otr_ledger_freeze.py:356:                # is a warning because some legacy fallbacks set skip
+nodes/_otr_ledger_freeze.py:482:        # speaker_role substitutes) which was a back-compat shim.
+nodes/_otr_ledger_freeze.py:669:      - ``dur_s`` is absent / None (back-compat with older ledgers;
