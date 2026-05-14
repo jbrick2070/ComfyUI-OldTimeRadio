@@ -545,7 +545,7 @@ class TestPolishLine:
         result = polish_line(
             mock_polish,
             'Then we should go," she said.',
-            "ALICE (female, weary)",
+            "ALICE (female, weary)", polish_generate_fn=mock_polish,
         )
         assert result == "Then we should go now."
 
@@ -553,14 +553,14 @@ class TestPolishLine:
         def mock_raise(messages, *, temperature, max_new_tokens, stop=None):
             raise RuntimeError("simulated LLM crash")
         original = 'Then we should go," she said.'
-        result = polish_line(mock_raise, original, "ALICE")
+        result = polish_line(mock_raise, original, "ALICE", polish_generate_fn=mock_raise)
         assert result == original
 
     def test_falls_back_to_original_on_empty_output(self):
         def mock_empty(messages, *, temperature, max_new_tokens, stop=None):
             return ""
         original = '"Then we should go."'
-        result = polish_line(mock_empty, original, "ALICE")
+        result = polish_line(mock_empty, original, "ALICE", polish_generate_fn=mock_empty)
         assert result == original
 
     def test_handles_stop_unsupported_via_typeerror(self):
@@ -568,7 +568,7 @@ class TestPolishLine:
         # work (the polish call retries without the kwarg).
         def mock_no_stop(messages, *, temperature, max_new_tokens):
             return "Cleaned line."
-        result = polish_line(mock_no_stop, '"Leaked."', "ALICE")
+        result = polish_line(mock_no_stop, '"Leaked."', "ALICE", polish_generate_fn=mock_no_stop)
         assert result == "Cleaned line."
 
 

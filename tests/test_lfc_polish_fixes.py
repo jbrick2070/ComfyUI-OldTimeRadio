@@ -67,7 +67,7 @@ class TestAnnouncerGuard:
             capture,
             leaked_line="(beat) Stay tuned [whispers]",
             speaker_voice_card="ANNOUNCER",
-            speaker_role="announcer",
+            speaker_role="announcer", polish_generate_fn=capture,
         )
         assert seen["system"] == _POLISH_SYSTEM_PROMPT_ANNOUNCER
 
@@ -84,7 +84,7 @@ class TestAnnouncerGuard:
             capture,
             leaked_line='"It was rigged," she said.',
             speaker_voice_card="ALICE",
-            speaker_role="character",
+            speaker_role="character", polish_generate_fn=capture,
         )
         assert seen["system"] == _POLISH_SYSTEM_PROMPT
 
@@ -99,7 +99,7 @@ class TestAnnouncerGuard:
             )
             return "Hello there."
 
-        polish_line(capture, "x", "ALICE")
+        polish_line(capture, "x", "ALICE", polish_generate_fn=capture)
         assert seen["system"] == _POLISH_SYSTEM_PROMPT
 
     def test_announcer_role_label_in_user_prompt(self):
@@ -113,7 +113,7 @@ class TestAnnouncerGuard:
 
         polish_line(
             capture, "(beat) Stay tuned.", "ANNOUNCER",
-            speaker_role="announcer",
+            speaker_role="announcer", polish_generate_fn=capture,
         )
         assert "ANNOUNCER:" in seen["user"]
         assert "CHARACTER:" not in seen["user"]
@@ -128,7 +128,7 @@ class TestAnnouncerGuard:
             return "fixed line"
 
         polish_line(
-            capture, "leaked", "ALICE", speaker_role="character",
+            capture, "leaked", "ALICE", speaker_role="character", polish_generate_fn=capture,
         )
         assert "CHARACTER:" in seen["user"]
         assert "ANNOUNCER:" not in seen["user"]
@@ -169,7 +169,7 @@ class TestRefusalDetector:
             return "I cannot rewrite this."
 
         original = '"That can\'t be right," she whispered.'
-        result = polish_line(refusal, original, "ALICE")
+        result = polish_line(refusal, original, "ALICE", polish_generate_fn=refusal)
         assert result == original
 
     def test_polish_returns_original_on_apology(self):
@@ -177,7 +177,7 @@ class TestRefusalDetector:
             return "I'm sorry, but I cannot produce that line."
 
         original = "*sighs* I don't know what to say."
-        result = polish_line(refusal, original, "ALICE")
+        result = polish_line(refusal, original, "ALICE", polish_generate_fn=refusal)
         assert result == original
 
 
@@ -198,7 +198,7 @@ class TestPolishContextExpansion:
 
         polish_line(
             capture, "leaked", "ALICE",
-            beat_intent="reveal the discovery to BOB",
+            beat_intent="reveal the discovery to BOB", polish_generate_fn=capture,
         )
         assert "BEAT INTENT: reveal the discovery to BOB" in seen["user"]
 
@@ -213,7 +213,7 @@ class TestPolishContextExpansion:
 
         polish_line(
             capture, "leaked", "ALICE",
-            previous_lines=("Bob, look at this.", "What did you find?"),
+            previous_lines=("Bob, look at this.", "What did you find?"), polish_generate_fn=capture,
         )
         assert "PREVIOUS LINES:" in seen["user"]
         assert "Bob, look at this." in seen["user"]
@@ -232,7 +232,7 @@ class TestPolishContextExpansion:
             capture, "leaked", "ALICE",
             previous_lines=(
                 "line one", "line two", "line three", "line four",
-            ),
+            ), polish_generate_fn=capture,
         )
         # Cap = last 2 entries.
         assert "line three" in seen["user"]
@@ -253,7 +253,7 @@ class TestPolishContextExpansion:
             )
             return "fixed"
 
-        polish_line(capture, "leaked", "ALICE")
+        polish_line(capture, "leaked", "ALICE", polish_generate_fn=capture)
         assert "BEAT INTENT:" not in seen["user"]
         assert "PREVIOUS LINES:" not in seen["user"]
         assert "CHARACTER: ALICE" in seen["user"]
@@ -271,7 +271,7 @@ class TestPolishContextExpansion:
         polish_line(
             capture, "leaked", "ALICE",
             beat_intent="   ",
-            previous_lines=("", "  ", ""),
+            previous_lines=("", "  ", ""), polish_generate_fn=capture,
         )
         assert "BEAT INTENT:" not in seen["user"]
         assert "PREVIOUS LINES:" not in seen["user"]
@@ -309,7 +309,7 @@ class TestPolishGenerateFnRouting:
             calls["main"] += 1
             return "main-result"
 
-        result = polish_line(main_fn, "leaked", "ALICE")
+        result = polish_line(main_fn, "leaked", "ALICE", polish_generate_fn=main_fn)
         assert calls["main"] == 1
         assert result == "main-result"
 
@@ -378,7 +378,7 @@ class TestBackCompatLegacyCallers:
             return "Then we should go now."
 
         result = polish_line(
-            mock, '"Then we should go," she said.', "ALICE",
+            mock, '"Then we should go," she said.', "ALICE", polish_generate_fn=mock,
         )
         assert result == "Then we should go now."
 
@@ -395,7 +395,7 @@ class TestBackCompatLegacyCallers:
             calls["without_stop"] += 1
             return "Then we should go now."
 
-        result = polish_line(mock_no_stop, '"Leaked."', "ALICE")
+        result = polish_line(mock_no_stop, '"Leaked."', "ALICE", polish_generate_fn=mock_no_stop)
         assert calls["with_stop"] == 1
         assert calls["without_stop"] == 1
         assert result == "Then we should go now."
