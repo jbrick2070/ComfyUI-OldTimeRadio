@@ -79,7 +79,7 @@ except ImportError:
 
 from _otr_paths import (  # noqa: E402
     otr_audio_dir,
-    otr_legacy_audio_dir,
+    # S28 cleanbreak: dropped otr_legacy_audio_dir.
     otr_stills_dir,
     otr_videos_dir,
 )
@@ -2087,7 +2087,9 @@ class BatchLTXRender:
 
         # Layer 0: empty input -> auto-pick newest non-pending ledger.
         if not s:
-            audio_dirs = [otr_audio_dir(), otr_legacy_audio_dir()]
+            # S28 cleanbreak: dropped otr_legacy_audio_dir() from the
+            # search list. Only the live audio dir is contract.
+            audio_dirs = [otr_audio_dir()]
             cands = []
             for d in audio_dirs:
                 if d.exists():
