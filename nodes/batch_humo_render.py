@@ -62,7 +62,7 @@ from _otr_paths import (  # noqa: E402
     comfy_output_dir,
     otr_audio_dir,
     otr_episodes_root,
-    otr_legacy_audio_dir,
+    # S28 cleanbreak: dropped otr_legacy_audio_dir.
     otr_stills_dir,
     otr_videos_dir,
 )
@@ -2824,9 +2824,10 @@ class BatchHumoRender:
 
         # Auto-pick fallback when input empty
         if not s:
+            # S28 cleanbreak: dropped otr_legacy_audio_dir() from the
+            # search list. Per-episode workspace is the only contract.
             audio_dirs = [
                 otr_episodes_root(),
-                otr_legacy_audio_dir(),
             ]
             cands = []
             for d in audio_dirs:
