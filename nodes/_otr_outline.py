@@ -269,25 +269,34 @@ class OutlineRequest:
                              # count; this flag is the user-facing
                              # toggle that drives it.
     budget: object = None
-                             # Phase 2A (2026-05-11). Optional
-                             # _otr_episode_budget.EpisodeBudget. When
-                             # non-None, the outline prompt gets an
-                             # "EPISODE BUDGET" block and the post-
-                             # pydantic pipeline runs the 8 Phase 2A
-                             # validators (per-phase word totals,
-                             # per-phase beat counts, per-beat word
-                             # range, arc_phase ordering, music_inter
-                             # count, announcer count) and rerolls on
-                             # failure. Validator #1 (total word
-                             # drift) is WARN-only at ±25% per §6.E.
+                             # REQUIRED. _otr_episode_budget.EpisodeBudget
+                             # built by OTR_LedgerScriptWriter via
+                             # compute_episode_budget. The outline prompt
+                             # always renders an "EPISODE BUDGET" block
+                             # and the post-pydantic pipeline always runs
+                             # the 8 Phase 2A validators. Validator #1
+                             # (total word drift) is WARN-only at ±25%
+                             # per §6.E.
+                             #
                              # Stored as `object` to keep this module
                              # importable without pulling
                              # _otr_episode_budget at module load --
                              # `_get_budget(req)` does a lazy
                              # isinstance / duck-type check at call
-                             # time. None preserves pre-Phase-2A
-                             # back-compat for tests and early-stage
-                             # callers.
+                             # time.
+                             #
+                             # S28 cleanbreak: the `None` default is
+                             # retained only because dataclass field
+                             # ordering forbids a non-defaulted field
+                             # after defaulted ones. __post_init__
+                             # raises ValueError when budget is missing
+                             # — the v2.0 contract requires a populated
+                             # budget. Pre-S28 the None branch was a
+                             # back-compat fallback for tests and
+                             # early-stage callers; both producer sites
+                             # (OTR_LedgerScriptWriter) populate it
+                             # unconditionally, so the fallback was
+                             # leak-prone and is now extinct.
     cast_descriptions: tuple[tuple[str, str, str], ...] = ()
                              # OPTIONAL. Per-character (name, gender,
                              # character_description) tuples from the
@@ -370,6 +379,29 @@ class OutlineRequest:
                         f"cast_descriptions[{i}].description must be a "
                         f"string, got {desc!r}"
                     )
+        # S28 cleanbreak: budget is REQUIRED for the v2.0 contract.
+        # OTR_LedgerScriptWriter always builds and passes a real
+        # EpisodeBudget via compute_episode_budget. A missing budget
+        # here is a producer leak — surface it loudly at construction
+        # time rather than silently skipping budget rendering +
+        # validators downstream. Check runs LAST so legacy-shape
+        # character_cast and cast_descriptions validation errors
+        # still fire with their original messages (otherwise the
+        # budget error would mask the upstream defect).
+        #
+        # Duck-type via hasattr so both `budget=None` and `budget=42`
+        # (or any other wrong-type leak) trip the same producer-
+        # contract error. We can't isinstance-check EpisodeBudget
+        # without importing _otr_episode_budget at module load.
+        if not hasattr(self.budget, "arc_phases"):
+            raise ValueError(
+                "OutlineRequest.budget is required (v2.0 contract) "
+                "and must be an EpisodeBudget. Build via "
+                "_otr_episode_budget.compute_episode_budget with "
+                "(target_words, act_count, include_act_breaks, "
+                "num_characters) and pass it on construction; got "
+                f"{type(self.budget).__name__}={self.budget!r}."
+            )
 
     @property
     def cast_size(self) -> int:
@@ -479,12 +511,12 @@ def _build_user_prompt(req: OutlineRequest) -> str:
     # budget rather than appearing in its own prose line.
     # Phase 2A (2026-05-11): EPISODE BUDGET block. Lands BEFORE the
     # target_words summary so the LLM sees concrete numbers for every
-    # phase + beat-range before being told the rough total. Skipped
-    # entirely when budget is None (back-compat).
-    budget_block = _format_episode_budget_block(req)
-    if budget_block:
-        parts.append(budget_block)
-        parts.append("")
+    # phase + beat-range before being told the rough total.
+    # S28 cleanbreak: the `if budget_block:` guard was extinct — the
+    # producer (OTR_LedgerScriptWriter) always supplies a budget so
+    # _format_episode_budget_block always returns a non-empty string.
+    parts.append(_format_episode_budget_block(req))
+    parts.append("")
 
     parts.extend([
         f"Target total dialogue length: ~{req.target_words} words "
@@ -722,7 +754,10 @@ def validate_outline_against_budget(
     §6.G announcer + music + sfx beats are EXCLUDED from word and
     per-phase budgets but are still counted by validators #6 / #7.
 
-    No-op when req.budget is None (back-compat).
+    S28 cleanbreak: budget is now required at OutlineRequest
+    construction time, so _get_budget always returns a populated
+    EpisodeBudget here. The pre-S28 `if b is None: return None`
+    branch is extinct.
 
     Validator list (re-numbered after §6.C dropped per-character
     distribution):
@@ -737,8 +772,8 @@ def validate_outline_against_budget(
           (existing cast-membership check; KEPT)
     """
     b = _get_budget(req)
-    if b is None:
-        return None
+    # S28 cleanbreak: dropped `if b is None: return None` no-op
+    # fallback. Producer contract guarantees b is non-None here.
 
     voiced = [
         beat for beat in outline.beats
@@ -1022,11 +1057,13 @@ def generate_outline(
             attempts.append((last_raw, err_msg))
             continue
 
-        # Phase 2A (2026-05-11): budget validators. No-op when
-        # req.budget is None (pre-Phase-2A back-compat). On hard
-        # failure, push the structured error onto attempts and
-        # retry; the next attempt's repair-call (when applicable)
-        # sees the exact violation message and can correct.
+        # Phase 2A (2026-05-11): budget validators. Always runs —
+        # S28 cleanbreak retired the `req.budget is None` no-op
+        # branch (budget is required at OutlineRequest construction
+        # time). On hard failure, push the structured error onto
+        # attempts and retry; the next attempt's repair-call (when
+        # applicable) sees the exact violation message and can
+        # correct.
         budget_violation = validate_outline_against_budget(outline, req)
         if budget_violation is not None:
             err_msg = f"OutlineBudgetViolation: {budget_violation}"
@@ -1055,6 +1092,20 @@ def generate_outline(
 
 if __name__ == "__main__":
     print("=== _otr_outline.py self-test ===")
+
+    # S28 cleanbreak: budget is now required at OutlineRequest
+    # construction time. Shared EpisodeBudget for the harness tests
+    # that aren't specifically exercising the budget-missing reject
+    # path. Mirrors compute_episode_budget defaults. Try both import
+    # styles so the harness still runs under either
+    # `python nodes/_otr_outline.py` or `python -m nodes._otr_outline`.
+    try:
+        from ._otr_episode_budget import compute_episode_budget as _ceb
+    except ImportError:
+        from _otr_episode_budget import compute_episode_budget as _ceb  # type: ignore[no-redef]
+    _HARNESS_BUDGET_200 = _ceb(200, 3, True, 2)
+    _HARNESS_BUDGET_150 = _ceb(150, 3, True, 2)
+    _HARNESS_BUDGET_200_1CHAR = _ceb(200, 3, True, 1)
 
     # Test 1: Beat schema rejects bad inputs.
     print("\n[Test 1] Beat schema validation")
@@ -1185,6 +1236,7 @@ if __name__ == "__main__":
             news_seed="x", style="y",
             character_cast=("ALICE", "BOB"),
             target_words=150,
+            budget=_HARNESS_BUDGET_150,
         ),
     )
     assert len(err.attempts) == 2
@@ -1230,6 +1282,7 @@ if __name__ == "__main__":
                 news_seed="x", style="y",
                 character_cast=("ALICE", "BOB"),
                 target_words=150,
+                budget=_HARNESS_BUDGET_150,
             ),
             max_attempts=2,
         )
@@ -1240,28 +1293,22 @@ if __name__ == "__main__":
             f"expected CastContractError in error, got: {last_err!r}"
         print("  PASS: cast drift rejected with CastContractError")
 
-    # Test 11: cast_descriptions field — back-compat default + rich render +
-    # validation (length mismatch + name mismatch).
+    # Test 11: cast_descriptions field — rich render + validation
+    # (length mismatch + name mismatch). S28 cleanbreak: dropped 11a
+    # (the bare-format / empty-default back-compat assertion). The
+    # cast_descriptions=() back-compat is still tolerated by the
+    # __post_init__ (cast_descriptions defaults to ()), but the
+    # bare-format prompt rendering is no longer the asserted
+    # default-shape contract — producers (OTR_LedgerScriptWriter
+    # D.5 post-cast-lock) always populate cast_descriptions.
     print("\n[Test 11] OutlineRequest.cast_descriptions field")
-
-    # 11a: empty default -> bare cast line in prompt (back-compat).
-    bare_req = OutlineRequest(
-        news_seed="science seed", style="noir",
-        character_cast=("ALICE", "BOB"),
-        target_words=200,
-    )
-    bare_prompt = _build_user_prompt(bare_req)
-    assert "Cast (already chosen -- use exactly these names in character-role beats): ALICE, BOB" in bare_prompt, \
-        "11a: bare cast format expected when cast_descriptions empty"
-    assert "- ALICE (" not in bare_prompt, \
-        "11a: rich format must NOT render when cast_descriptions empty"
-    print("  PASS 11a: empty cast_descriptions -> bare cast line (back-compat)")
 
     # 11b: populated cast_descriptions -> rich block.
     rich_req = OutlineRequest(
         news_seed="science seed", style="noir",
         character_cast=("ALICE", "BOB"),
         target_words=200,
+        budget=_HARNESS_BUDGET_200,
         cast_descriptions=(
             ("ALICE", "female", "weary forensic engineer in her 40s"),
             ("BOB",   "male",   "ambitious grant officer in his 30s"),
@@ -1282,6 +1329,7 @@ if __name__ == "__main__":
         news_seed="science seed", style="noir",
         character_cast=("ALICE",),
         target_words=200,
+        budget=_HARNESS_BUDGET_200_1CHAR,
         cast_descriptions=(("ALICE", "", "lone caretaker"),),
     )
     no_gender_prompt = _build_user_prompt(no_gender_req)
@@ -1343,6 +1391,7 @@ if __name__ == "__main__":
         news_seed="seed", style="noir",
         character_cast=("ALICE",),
         target_words=200,
+        budget=_HARNESS_BUDGET_200_1CHAR,
     )
     no_struct_prompt = _build_user_prompt(no_struct_req)
     assert "Target episode shape:" not in no_struct_prompt, \
