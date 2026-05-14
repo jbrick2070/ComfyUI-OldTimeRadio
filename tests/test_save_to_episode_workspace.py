@@ -248,8 +248,7 @@ def test_node_registered_in_init():
     """OTR_SaveToEpisodeWorkspace must be in NODE_CLASS_MAPPINGS."""
     import importlib
 
-    pkg = importlib.import_module("__init__") if False else None  # noqa: E501 -- linter dodge
-    # Cleaner: import the package via its actual module path.
+    # Import the package via its actual module path.
     sys.path.insert(0, str(_REPO_ROOT.parent))
     try:
         import importlib

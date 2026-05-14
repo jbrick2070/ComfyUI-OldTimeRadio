@@ -1640,7 +1640,7 @@ def _llm_rerank_with_bodies(
         return list(candidates_with_body)
 
 
-def _fetch_science_news(max_feeds=10, style="mission_control_procedural",
+def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None, optimization_profile="Standard"):
     """Fetch science stories from multiple RSS feeds in parallel.
 

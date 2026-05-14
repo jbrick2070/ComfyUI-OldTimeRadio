@@ -12,10 +12,8 @@ Two entry points:
 Requires ComfyUI Desktop running on localhost:8000 (default port).
 """
 
-import io
 import json
 import os
-import struct
 import time
 import logging
 

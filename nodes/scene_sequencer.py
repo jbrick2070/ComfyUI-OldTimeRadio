@@ -546,7 +546,7 @@ class SceneSequencer:
                  tts_audio_clips=None, sfx_audio_clips=None,
                  announcer_audio_clips=None,
                  start_line=0, end_line=999, output_dir=DEFAULT_OUT,
-                 default_tts="bark",
+                 default_tts="bark",  # kept: widget INPUT accepted by node contract; per-line TTS routing reads voice_assignments in the ledger, not this widget
                  dialogue_offset_ms=0.0, sfx_offset_ms=0.0):
 
         _runtime_log("SceneSequencer: Starting 1.0 audio assembly...")

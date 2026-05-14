@@ -385,7 +385,7 @@ def _get_substring_stop_class():
             self._tail = ""
             self._tail_window = int(tail_window)
 
-        def __call__(self, input_ids, scores, **kwargs):  # noqa: D401
+        def __call__(self, input_ids, scores, **kwargs):  # noqa: D401  # kept: scores required by HF StoppingCriteria contract
             ids = input_ids[0]
             cur_len = int(ids.shape[0])
             if cur_len <= self._last_seen:

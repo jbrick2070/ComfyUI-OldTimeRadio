@@ -140,7 +140,7 @@ EXPECTED_FAILED_NODEIDS = frozenset({
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item, call):
+def pytest_runtest_makereport(item, call):  # kept: pytest hook signature contract
     """Stash each test's per-phase report (setup / call / teardown) on
     the item so pytest_sessionfinish can read .rep_call.failed below.
     Standard pytest pattern -- there's no built-in "did this test fail"
@@ -150,7 +150,7 @@ def pytest_runtest_makereport(item, call):
     setattr(item, f"rep_{rep.when}", rep)
 
 
-def pytest_sessionfinish(session, exitstatus):
+def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature contract
     """Diff the actual-failed-nodeid set against EXPECTED_FAILED_NODEIDS.
 
     NEW failures (actual - expected): regression -- hard-fail with

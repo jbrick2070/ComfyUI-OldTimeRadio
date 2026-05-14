@@ -149,7 +149,7 @@ class SaveToEpisodeWorkspace:
         role_kind: str = "stills",
         filename_pattern: str = "full_env",
         prompt=None,
-        extra_pnginfo=None,
+        extra_pnginfo=None,  # kept: ComfyUI hidden input contract -- runtime always passes it, body does not need to consume
     ):
         episode_id = _resolve_episode_id()
         target_dir = _resolve_target_dir(role_kind, episode_id)

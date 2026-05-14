@@ -399,14 +399,14 @@ if __name__ == "__main__":
     print("\n[Test 5] make_generate_fn returns callable")
     class _StubTok:
         eos_token_id = 0
-        def apply_chat_template(self, messages, tokenize, add_generation_prompt):
+        def apply_chat_template(self, messages, tokenize, add_generation_prompt):  # kept: mirror HF tokenizer signature
             return "stub-prompt"
-        def __call__(self, prompt, return_tensors):
+        def __call__(self, prompt, return_tensors):  # kept: mirror HF tokenizer signature
             class _Out:
                 input_ids = type("S", (), {"shape": (1, 5)})()
-                def to(self, device): return self
+                def to(self, device): return self  # kept: mirror torch tensor .to(device) signature
             return _Out()
-        def decode(self, ids, skip_special_tokens):
+        def decode(self, ids, skip_special_tokens):  # kept: mirror HF tokenizer signature
             return "stub-output"
     class _StubModel:
         device = "cpu"

@@ -41,7 +41,7 @@ class _FakeKPipeline:
     def __init__(self, lang_code, device, repo_id):
         self.model = MagicMock()
 
-    def __call__(self, text, voice, speed=0.95, split_pattern=None):
+    def __call__(self, text, voice, speed=0.95, split_pattern=None):  # kept: mirrors real Kokoro pipeline signature; consumer passes split_pattern via kwarg
         # Length encodes input length so the test can assert distinct
         # dur_s per line_id. Tiny sleep so the consumer's render_ms
         # measurement clears the integer-millisecond floor (Kokoro

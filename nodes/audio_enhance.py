@@ -323,7 +323,7 @@ class AudioEnhance:
 
     def enhance(self, audio, target_sample_rate=48000, spatial_width=0.3,
                 haas_delay_ms=0.4, bass_warmth=0.1, lpf_cutoff_hz=16000.0,
-                normalize_dbfs=-1.0, tape_emulation="off"):
+                normalize_dbfs=-1.0, tape_emulation="off"):  # kept: normalize_dbfs is a widget INPUT, accepted by node contract; consumed by ComfyUI graph runtime not the body
 
         # Schema l3 (2026-04-28): wall-clock for meta.phase_ms.audio_enhance.
         import time as _time

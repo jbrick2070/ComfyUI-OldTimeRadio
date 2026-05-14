@@ -85,7 +85,7 @@ Classifier = Callable[[str, CastContract, str], ClassificationResult]
 def classify_orphans_stub(
     orphan_tag: str,
     contract: CastContract,
-    script_excerpt: str,  # noqa: ARG001 -- present in real signature, unused in stub
+    script_excerpt: str,  # noqa: ARG001  # kept: present in real classifier signature, unused in this deterministic stub
 ) -> ClassificationResult:
     """Deterministic placeholder classifier so the repair loop is
     exercisable before the real LLM hookup lands.
