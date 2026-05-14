@@ -395,6 +395,110 @@ def validate_model_id(
 
 
 # ---------------------------------------------------------------------------
+# B1b: dynamic context-cap resolution (replaces _otr_model_loader's
+# MODEL_CONTEXT_CAPS static dict + DEFAULT_CONTEXT_CAP)
+# ---------------------------------------------------------------------------
+
+
+# Hardware-aware ceiling on the effective context window. A small model
+# like Gemma-4-E4B advertises a 128k context in its config.json, but
+# feeding 128k tokens on a 16 GB card OOMs instantly. The clamp keeps
+# the upper bound sane regardless of the model's claim.
+#
+# Default: 8192 on the 5080 16 GB target. Configurable via
+# OTR_HARD_VRAM_CONTEXT_LIMIT so users on bigger hardware can raise it.
+def _hard_vram_context_limit() -> int:
+    raw = os.environ.get("OTR_HARD_VRAM_CONTEXT_LIMIT")
+    if raw:
+        try:
+            return max(512, int(raw))
+        except (TypeError, ValueError):
+            pass
+    return 8192
+
+
+HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
+
+
+# Explicit per-model effective-context overrides for the curated set
+# only (where config.json advertises a larger window than what the
+# inference pipeline can sanely feed). The Mistral-Nemo entry pins the
+# C7 audio-baseline value -- _otr_model_loader's prior static dict said
+# 8192 for Mistral-Nemo even though config.json advertises 131072.
+# Holding that here keeps audio byte-identity across B1b.
+CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
+    "mistralai/Mistral-Nemo-Instruct-2407": 8192,
+    "google/gemma-4-E2B-it": 8192,
+    "google/gemma-4-E4B-it": 8192,
+    "Qwen/Qwen2.5-14B-Instruct": 8192,
+    "Nitral-AI/Captain-Eris_Violet-V0.420-12B": 8192,
+    "inflatebot/MN-12B-Mag-Mell-R1": 8192,
+}
+
+
+@dataclass(frozen=True)
+class ContextCapVerdict:
+    """Tiered verdict from resolve_context_cap. Mirrors VRAMFitVerdict
+    shape (B1c). Never raises -- the request_slot escalation logic in
+    B1c makes a single combined decision."""
+
+    tier: Literal["PASS", "WARN", "UNKNOWN"]
+    value: int
+    source: str
+
+
+def _read_config_context(model_id: str, hub_root: Path | None = None) -> int | None:
+    """Best-effort read of advertised context window from a locally-
+    scanned snapshot's config.json. Returns None if no snapshot is on
+    disk or config.json is unreadable."""
+    for r in scan_local_llm_cache(hub_root=hub_root):
+        if r.repo_id == model_id and r.on_disk and r.advertised_context:
+            return r.advertised_context
+    return None
+
+
+def resolve_context_cap(
+    model_id: str, *, hub_root: Path | None = None
+) -> ContextCapVerdict:
+    """Resolve the effective context-window cap for `model_id`.
+
+    Returns a tiered verdict (never raises):
+        PASS    -- model_id has an explicit override (soak-tested cap);
+                   value = min(override, HARD_VRAM_CONTEXT_LIMIT).
+        WARN    -- config.json parses cleanly but model isn't in the
+                   override table; value = min(parsed, HARD_VRAM_CONTEXT_LIMIT).
+        UNKNOWN -- neither source resolves; value = HARD_VRAM_CONTEXT_LIMIT
+                   (the only safe default; B1c's request_slot makes the
+                   combined fit/cap decision).
+
+    The clamp handles two real failure modes:
+      * "model says 4k but we feed 8k": parsed used, clamped down to
+        limit if needed.
+      * "model says 128k, we'd OOM on 16 GB": clamped to limit.
+    """
+    limit = HARD_VRAM_CONTEXT_LIMIT
+    override = CURATED_CONTEXT_OVERRIDES.get(model_id)
+    if override is not None:
+        return ContextCapVerdict(
+            tier="PASS",
+            value=min(override, limit),
+            source=f"curated-override (raw {override})",
+        )
+    parsed = _read_config_context(model_id, hub_root=hub_root)
+    if parsed is not None:
+        return ContextCapVerdict(
+            tier="WARN",
+            value=min(parsed, limit),
+            source=f"config.json (raw {parsed})",
+        )
+    return ContextCapVerdict(
+        tier="UNKNOWN",
+        value=limit,
+        source=f"unresolved -- defaulted to HARD_VRAM_CONTEXT_LIMIT={limit}",
+    )
+
+
+# ---------------------------------------------------------------------------
 # B1a2: HF network surface -- auto-download + size estimate + pre-flight checks
 # ---------------------------------------------------------------------------
 
@@ -604,12 +708,16 @@ __all__ = [
     "TEST_OVERSIZED_LLM",
     "NOT_DOWNLOADED_SUFFIX",
     "ALLOW_PATTERNS",
+    "HARD_VRAM_CONTEXT_LIMIT",
+    "CURATED_CONTEXT_OVERRIDES",
     "ScanResult",
     "DropdownEntry",
+    "ContextCapVerdict",
     "scan_local_llm_cache",
     "build_dropdown_choices",
     "dropdown_choices",
     "validate_model_id",
     "estimate_model_size_gb",
     "auto_download_if_missing",
+    "resolve_context_cap",
 ]

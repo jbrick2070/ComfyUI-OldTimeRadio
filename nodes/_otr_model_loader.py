@@ -42,7 +42,6 @@ log = logging.getLogger("OTR")
 __all__ = [
     "load_llm",
     "unload_llm",
-    "MODEL_CONTEXT_CAPS",
     "make_generate_fn",
     "make_polish_generate_fn",
     "ModelLoaderError",
@@ -50,66 +49,13 @@ __all__ = [
 
 
 # ---------------------------------------------------------------------------
-# Constants -- MODEL_CONTEXT_CAPS with drift check
+# S30 B1b: MODEL_CONTEXT_CAPS static dict + DEFAULT_CONTEXT_CAP constant
+# DELETED. Context-cap resolution now goes through
+# nodes._otr_model_catalog.resolve_context_cap which returns a tiered
+# ContextCapVerdict (PASS for curated overrides, WARN for parsed
+# config.json, UNKNOWN for unresolved) and clamps everything against
+# HARD_VRAM_CONTEXT_LIMIT.
 # ---------------------------------------------------------------------------
-
-# Duplicated from _load_llm's function-local dict (story_orchestrator.py
-# line ~2007). When the legacy writer retires in v2.1, the dict moves
-# here and this duplicate becomes the single source of truth. Until
-# then, _check_context_caps_alignment() runs once on first load_llm()
-# call and logs a WARNING if the two diverge.
-MODEL_CONTEXT_CAPS: dict[str, int] = {
-    "mistralai/Mistral-Nemo-Instruct-2407":             8192,
-    "google/gemma-4-E2B-it":                           16384,
-    "google/gemma-4-E4B-it":                           16384,
-    "Qwen/Qwen2.5-14B-Instruct":                        8192,
-    "Nitral-AI/Captain-Eris_Violet-V0.420-12B":         8192,
-    "inflatebot/MN-12B-Mag-Mell-R1":                    8192,
-    "google/gemma-2-2b-it":                             8192,
-    "google/gemma-2-9b-it":                             8192,
-}
-
-DEFAULT_CONTEXT_CAP = 8192
-
-
-_CONTEXT_CAPS_CHECKED = False
-
-
-def _check_context_caps_alignment() -> None:
-    """Verify MODEL_CONTEXT_CAPS matches the legacy function-local dict.
-
-    Lazy: only runs once per process, on first load_llm call. Best-effort:
-    if the legacy module's internal layout changes, this just warns rather
-    than raising. The drift signal goes to logs so we catch divergence
-    during normal operation rather than at unrelated call sites.
-    """
-    global _CONTEXT_CAPS_CHECKED
-    if _CONTEXT_CAPS_CHECKED:
-        return
-    _CONTEXT_CAPS_CHECKED = True
-    try:
-        # Best-effort introspection. The dict is function-local in _load_llm,
-        # which means we can't import it directly. Skip the check entirely
-        # if introspection fails -- this is a soft drift detector, not a
-        # hard contract.
-        import inspect
-        from . import story_orchestrator as _so
-        src = inspect.getsource(_so._load_llm)
-        # Crude but sufficient: look for each canonical model_id literal
-        # in the source. If any of our keys is missing from _load_llm,
-        # warn. We don't try to parse the dict literal itself.
-        missing = [k for k in MODEL_CONTEXT_CAPS if k not in src]
-        if missing:
-            log.warning(
-                "[OTR_ModelLoader] MODEL_CONTEXT_CAPS drift: keys not "
-                "found in _load_llm source: %s. Update the duplicate or "
-                "verify the legacy dict still matches.",
-                missing,
-            )
-    except Exception as exc:  # noqa: BLE001
-        log.debug(
-            "[OTR_ModelLoader] context-caps drift check skipped: %s", exc,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +107,6 @@ def load_llm(
     Raises ModelLoaderError on any underlying failure (wraps the
     original exception via __cause__).
     """
-    _check_context_caps_alignment()
     try:
         from . import story_orchestrator as _so
     except ImportError as exc:
@@ -181,8 +126,13 @@ def load_llm(
             f"_load_llm failed for model_id={model_id!r}: {exc}"
         ) from exc
 
+    # B1b: dynamic context-cap via the catalog. UI label-suffixes are
+    # stripped by validate_model_id elsewhere; defensive strip-on-space
+    # here keeps the loader path resilient against any caller that
+    # forgets to normalize first.
+    from . import _otr_model_catalog as _otr_catalog
     canonical_id = model_id.split(" ")[0].strip()
-    context_cap = MODEL_CONTEXT_CAPS.get(canonical_id, DEFAULT_CONTEXT_CAP)
+    context_cap = _otr_catalog.resolve_context_cap(canonical_id).value
     is_quantized = (
         "Obsidian" in optimization_profile
         or "8-bit" in optimization_profile
@@ -361,18 +311,20 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
 if __name__ == "__main__":
     print("=== _otr_model_loader.py self-test ===")
 
-    # Test 1: MODEL_CONTEXT_CAPS shape.
-    print("\n[Test 1] MODEL_CONTEXT_CAPS shape")
-    assert isinstance(MODEL_CONTEXT_CAPS, dict)
-    assert all(isinstance(k, str) for k in MODEL_CONTEXT_CAPS)
-    assert all(isinstance(v, int) and v > 0 for v in MODEL_CONTEXT_CAPS.values())
-    assert "mistralai/Mistral-Nemo-Instruct-2407" in MODEL_CONTEXT_CAPS
-    print(f"  PASS ({len(MODEL_CONTEXT_CAPS)} entries)")
+    # Test 1: catalog.resolve_context_cap returns a sane PASS for the
+    # C7 audio-baseline model (Mistral-Nemo).
+    print("\n[Test 1] resolve_context_cap baseline")
+    from . import _otr_model_catalog as _otr_catalog
+    verdict = _otr_catalog.resolve_context_cap(_otr_catalog.DEFAULT_LLM)
+    assert verdict.tier == "PASS"
+    assert verdict.value == 8192
+    print(f"  PASS ({verdict.tier} @ {verdict.value}, source={verdict.source})")
 
-    # Test 2: DEFAULT_CONTEXT_CAP sane.
-    print("\n[Test 2] DEFAULT_CONTEXT_CAP is sane")
-    assert DEFAULT_CONTEXT_CAP >= 4096
-    print(f"  PASS ({DEFAULT_CONTEXT_CAP})")
+    # Test 2: HARD_VRAM_CONTEXT_LIMIT is at least 4096 (matches old
+    # DEFAULT_CONTEXT_CAP minimum invariant).
+    print("\n[Test 2] HARD_VRAM_CONTEXT_LIMIT is sane")
+    assert _otr_catalog.HARD_VRAM_CONTEXT_LIMIT >= 4096
+    print(f"  PASS ({_otr_catalog.HARD_VRAM_CONTEXT_LIMIT})")
 
     # Test 3: ModelLoaderError shape.
     print("\n[Test 3] ModelLoaderError is RuntimeError subclass")
@@ -416,12 +368,13 @@ if __name__ == "__main__":
     assert callable(fn)
     print("  PASS: make_generate_fn returned callable")
 
-    # Test 6: drift check runs without raising.
-    print("\n[Test 6] _check_context_caps_alignment runs without raising")
-    _check_context_caps_alignment()
-    # Reset so a second call also doesn't blow up; verify idempotent.
-    _check_context_caps_alignment()
-    print("  PASS")
+    # Test 6: resolve_context_cap clamps advertised window to
+    # HARD_VRAM_CONTEXT_LIMIT for an uncurated unknown id (UNKNOWN tier).
+    print("\n[Test 6] resolve_context_cap UNKNOWN-tier defaults to limit")
+    v = _otr_catalog.resolve_context_cap("some/uncurated-test-id")
+    assert v.tier == "UNKNOWN"
+    assert v.value == _otr_catalog.HARD_VRAM_CONTEXT_LIMIT
+    print(f"  PASS ({v.tier} @ {v.value})")
 
     # Test 7: load_llm raises ModelLoaderError, not bare ImportError,
     #         when story_orchestrator can't be imported.

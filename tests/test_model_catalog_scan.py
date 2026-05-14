@@ -301,3 +301,77 @@ def test_require_model_raises_on_none():
 def test_require_model_raises_on_whitespace_only():
     with pytest.raises(MissingModelInputError):
         require_model("   ", slot="creative")
+
+
+# ---------------------------------------------------------------------------
+# B1b: resolve_context_cap (dynamic context-cap with HARD_VRAM clamp)
+# ---------------------------------------------------------------------------
+
+
+def test_hard_vram_context_limit_default_is_8192(monkeypatch):
+    """Test seam: we re-read the env var each call. Module-level constant
+    is fixed at import time so we re-import via the helper."""
+    monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
+    # The module-level constant captured the value at import; re-test
+    # via the resolver function on a model that triggers the limit.
+    assert catalog._hard_vram_context_limit() == 8192
+
+
+def test_hard_vram_context_limit_env_override(monkeypatch):
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "16384")
+    assert catalog._hard_vram_context_limit() == 16384
+
+
+def test_hard_vram_context_limit_garbage_env_falls_back(monkeypatch):
+    monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "not-a-number")
+    assert catalog._hard_vram_context_limit() == 8192
+
+
+def test_resolve_context_cap_pass_for_curated_override(empty_hub_root):
+    """C7 audio-baseline guard: Mistral-Nemo must return PASS @ 8192."""
+    v = catalog.resolve_context_cap(catalog.DEFAULT_LLM, hub_root=empty_hub_root)
+    assert v.tier == "PASS"
+    assert v.value == 8192
+    assert "curated-override" in v.source
+
+
+def test_resolve_context_cap_warn_for_uncurated_with_config(hub_root_with_uncurated):
+    """Uncurated model with parseable config.json returns WARN."""
+    v = catalog.resolve_context_cap(
+        "meta-llama/Llama-3-8B-Instruct", hub_root=hub_root_with_uncurated
+    )
+    assert v.tier == "WARN"
+    # advertised 8192 is below the limit; value matches.
+    assert v.value == 8192
+    assert "config.json" in v.source
+
+
+def test_resolve_context_cap_clamps_warn_to_hard_limit(tmp_path):
+    """Uncurated model advertising 128k must be clamped to HARD_VRAM
+    limit (8192 on the 16 GB target)."""
+    root = tmp_path / "hub"
+    root.mkdir()
+    _make_snapshot(root, "huge", "Context-128k-Model", advertised_context=131072)
+    v = catalog.resolve_context_cap("huge/Context-128k-Model", hub_root=root)
+    assert v.tier == "WARN"
+    assert v.value == 8192
+    assert "131072" in v.source
+
+
+def test_resolve_context_cap_unknown_for_unresolved_model(empty_hub_root):
+    """Neither curated nor locally-scanned -> UNKNOWN @ limit."""
+    v = catalog.resolve_context_cap(
+        "totally/uncurated-no-snapshot", hub_root=empty_hub_root
+    )
+    assert v.tier == "UNKNOWN"
+    assert v.value == catalog.HARD_VRAM_CONTEXT_LIMIT
+
+
+def test_resolve_context_cap_never_raises_on_arbitrary_input(empty_hub_root):
+    """The contract is: return a verdict, never raise. B1c's request_slot
+    makes the combined fit/cap escalation decision; resolve_context_cap
+    is policy-free."""
+    for weird in ["", " ", "foo", "no slash here", "/leading-slash"]:
+        v = catalog.resolve_context_cap(weird, hub_root=empty_hub_root)
+        assert v.tier in ("PASS", "WARN", "UNKNOWN")
+        assert v.value >= 512
