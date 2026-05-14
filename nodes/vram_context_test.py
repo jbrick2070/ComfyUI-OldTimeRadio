@@ -1,10 +1,11 @@
 """vram_context_test.py -- OTR_VRAMContextTest ComfyUI node.
 
 Production-accurate VRAM measurement at varying prompt context lengths,
-running INSIDE ComfyUI via the same `_load_llm()` + `_generate_with_llm()`
-code path that real renders use. Replaces the earlier headless standalone
-script (`scripts/vram_context_test.py`), which loaded models outside
-ComfyUI and undercounted runtime overhead.
+running INSIDE ComfyUI via the same canonical loader surface
+(`_otr_model_loader.request_slot` + `make_generate_fn`) that real
+renders use. Replaces the earlier headless standalone script
+(`scripts/vram_context_test.py`), which loaded models outside ComfyUI
+and undercounted runtime overhead.
 
 Why an in-workflow node:
 
@@ -12,9 +13,9 @@ Why an in-workflow node:
     other co-resident state add ~500 MB-1 GB of VRAM the headless
     measurement misses. Cap-tuning decisions need numbers from the
     real path.
-  - The node calls `_load_llm()` and `_generate_with_llm()` directly,
-    so quantization config, attention backend selection, tokenizer
-    setup, and prompt-truncation logic exactly match what
+  - The node calls `request_slot` and `make_generate_fn` directly, so
+    quantization config, attention backend selection, tokenizer setup,
+    and prompt-truncation logic exactly match what
     LLMScriptWriter.write_script() does.
   - Results are stamped into the ledger via the early-init / per-clip
     pattern used elsewhere in OTR, so they're inspectable post-run
@@ -119,10 +120,11 @@ def _parse_lengths(s: str) -> list[int]:
 class VRAMContextTest:
     """Measure VRAM (PyTorch + NVML) and CPU RAM at each probe prompt length.
 
-    Calls _load_llm() and _generate_with_llm() so measurements reflect the
-    same code path LLMScriptWriter uses in production renders. Results
-    stamp into ledger.meta.vram_test_results[] and a markdown report
-    is returned as the node's STRING output.
+    Calls `_otr_model_loader.request_slot` and `make_generate_fn` so
+    measurements reflect the same canonical code path LLMScriptWriter
+    uses in production renders. Results stamp into
+    ledger.meta.vram_test_results[] and a markdown report is returned
+    as the node's STRING output.
     """
 
     CATEGORY = "OTR/v2/Diagnostics"
@@ -150,7 +152,7 @@ class VRAMContextTest:
                         "dropdown so production-relevant models are first-"
                         "class. Suffix tags ([ALPHA], (EXPERIMENTAL)) are "
                         "stripped before the HF lookup -- same behaviour as "
-                        "the writer's _load_llm()."
+                        "the writer's request_slot path."
                     ),
                 }),
                 "probe_lengths": ("STRING", {
@@ -203,17 +205,20 @@ class VRAMContextTest:
         optimization_profile: str = "Standard",
         measurement_label: str = "",
     ):
-        # Late imports so the node loads cleanly even if the orchestrator
+        # Late imports so the node loads cleanly even if the loader
         # module has heavy dependencies missing in some environments.
+        # S31 B1: switched off legacy `_SO._load_llm` / `_SO._generate_with_llm`
+        # onto the canonical `_otr_model_loader.request_slot` +
+        # `make_generate_fn` surface (Hard rule #5).
         try:
-            from . import story_orchestrator as _SO
+            from . import _otr_model_loader as _OTRML
         except ImportError:
             import sys
             from pathlib import Path
             _NODES_DIR = Path(__file__).resolve().parent
             if str(_NODES_DIR) not in sys.path:
                 sys.path.insert(0, str(_NODES_DIR))
-            import story_orchestrator as _SO  # type: ignore
+            import _otr_model_loader as _OTRML  # type: ignore
 
         try:
             import torch
@@ -226,14 +231,19 @@ class VRAMContextTest:
             model_id, lengths, max_new_tokens, measurement_label or "<none>",
         )
 
-        # Pre-load the model once. _load_llm caches; the first call is the
-        # "real" load and subsequent generations reuse the cached instance.
+        # Pre-load the model once via the canonical lifecycle helper.
+        # request_slot caches by (slot, model_id); the first call is the
+        # "real" load and subsequent generations reuse the cached entry.
+        # S31 B1: VRAMContextTest is a diagnostic surface that picks a
+        # single LLM by widget for measurement, so it claims the
+        # "technical" slot. NON_LLM_MODEL_WIDGET_OK = True keeps this
+        # exempt from the two-slot writer rule (see class marker).
         log.info("[VRAMContextTest] pre-loading %s ...", model_id)
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
         load_t0 = time.time()
         try:
-            _SO._load_llm(model_id, optimization_profile=optimization_profile)
+            cache_entry = _OTRML.request_slot("technical", model_id)
         except Exception as exc:
             msg = (
                 f"## VRAM Context Test\n\n"
@@ -251,10 +261,12 @@ class VRAMContextTest:
             load_s, base_torch_gb, base_nvml_gb, base_cpu_gb,
         )
 
-        # Probe each prompt length via the production _generate_with_llm
-        # path. Captures three orthogonal memory numbers per probe
-        # (see docs/2026-04-29-vram-context-test.md for the column
+        # Probe each prompt length via the canonical generate surface
+        # (Hard rule #5): request_slot + make_generate_fn. Captures three
+        # orthogonal memory numbers per probe (see
+        # docs/2026-04-29-vram-context-test.md for the column
         # definitions). VRAM nvml is the cap-tuning truth.
+        gen_fn = _OTRML.make_generate_fn(cache_entry)
         results: list[dict] = []
         for n_target in lengths:
             torch.cuda.empty_cache()
@@ -265,13 +277,10 @@ class VRAMContextTest:
 
             t0 = time.time()
             try:
-                _ = _SO._generate_with_llm(
-                    prompt,
-                    model_id=model_id,
-                    max_new_tokens=max_new_tokens,
+                _ = gen_fn(
+                    messages=[{"role": "user", "content": prompt}],
                     temperature=0.0,
-                    top_p=1.0,
-                    optimization_profile=optimization_profile,
+                    max_new_tokens=max_new_tokens,
                 )
             except Exception as exc:
                 log.exception(
