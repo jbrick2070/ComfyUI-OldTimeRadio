@@ -192,15 +192,20 @@ def unload_llm() -> None:
                                         when the byte budget fits.
         6. torch.cuda.synchronize()  -- let in-flight ops finish.
 
-    Also tears down story_orchestrator's legacy LLM stack (still
-    reachable via the RSS fetch path until B4b). Best-effort; never
+    Also tears down story_orchestrator's legacy LLM stack as a
+    best-effort fallback. The orchestrator's `_LLM_CACHE` dict + its
+    `_load_llm` body remain alive as the underlying implementation
+    layer (this loader's `load_llm` still delegates back to them);
+    the teardown ensures both surfaces are quiesced together. Never
     raises -- a teardown failure should NOT propagate as a node error.
 
-    B0's three production importers (batch_bark_generator, _otr_bark_lib,
-    scene_sequencer) still pull `from .story_orchestrator import _unload_llm`;
-    that orchestrator-side function delegates to this path. B4b will
-    rewire those importers to `from ._otr_model_loader import unload_llm`
-    directly and delete the orchestrator-side shim.
+    S30 B4b: the three production importers (batch_bark_generator,
+    _otr_bark_lib, scene_sequencer) now import this `unload_llm`
+    directly rather than the orchestrator's `_unload_llm` (the
+    audit-miss BUG-LOCAL-226 fix). Story orchestrator's
+    `_generate_with_llm` also routes through `request_slot("technical",
+    ...)` to acquire its cache_entry; the RSS news path no longer
+    holds a parallel reference to the legacy cache.
     """
     import gc
 

@@ -578,9 +578,10 @@ class SceneSequencer:
 
         # Free LLM VRAM before TTS generation - Bark needs GPU headroom.
         # LLM is done by this point (script + plan already generated).
+        # S30 B4b: route through the modern loader's unload_llm.
         try:
-            from .story_orchestrator import _unload_llm
-            _unload_llm()
+            from ._otr_model_loader import unload_llm
+            unload_llm()
             log.info("[SceneSequencer] Freed LLM VRAM for inline TTS")
         except Exception:
             pass  # LLM may already be unloaded or not imported

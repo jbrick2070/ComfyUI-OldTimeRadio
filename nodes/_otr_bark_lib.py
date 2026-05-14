@@ -141,9 +141,10 @@ def _load_bark(model_id="suno/bark", device=None):
 
         # -- VRAM Hardening v1.4: Strict Handoff --
         # If Gemma is in VRAM, evict it now before loading Bark.
+        # S30 B4b: route through the modern loader's unload_llm.
         try:
-            from .story_orchestrator import _unload_llm
-            _unload_llm()
+            from ._otr_model_loader import unload_llm
+            unload_llm()
         except ImportError:
             pass
         except Exception as handoff_err:

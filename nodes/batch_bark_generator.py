@@ -438,9 +438,12 @@ class BatchBarkGenerator:
             return (empty, "No dialogue lines found")
 
         # -- Step 2: Free LLM VRAM - Bark needs GPU headroom ------------
+        # S30 B4b: route through the modern loader's unload_llm. That
+        # path tears down both the new _otr_model_loader.LLM_CACHE
+        # and (best-effort) the legacy story_orchestrator._LLM_CACHE.
         try:
-            from .story_orchestrator import _unload_llm
-            _unload_llm()
+            from ._otr_model_loader import unload_llm
+            unload_llm()
             log.info("[BatchBark] Freed LLM VRAM for batch TTS")
         except Exception:
             pass

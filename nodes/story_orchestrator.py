@@ -343,25 +343,17 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
             # collides with the orphan's stale ops and Python aborts with
             # `cudaErrorIllegalAddress`.
             #
-            # Fix: invalidate _LLM_CACHE so the NEXT _load_llm() call forces
-            # a fresh load from disk. The orphan worker's tensors get
-            # garbage-collected naturally once its frame returns; we just
-            # don't try to reuse them. Cost: ~10-15s extra reload time on
-            # the next phase. Benefit: no crash, run continues.
+            # S30 B4b: route timeout-recovery through the modern slot
+            # scheduler's unload_llm. That helper clears both the
+            # _otr_model_loader.LLM_CACHE (new resident-state dict) and
+            # the legacy _LLM_CACHE here (best-effort fallback inside
+            # unload_llm). Single canonical teardown surface; no more
+            # manual cache-key shuffling at this site.
             try:
-                global _LLM_CACHE
-                _LLM_CACHE["model"]     = None
-                _LLM_CACHE["tokenizer"] = None
-                _LLM_CACHE["model_id"]  = None
-                _LLM_CACHE["device"]    = None
-                _LLM_CACHE["context_cap"] = None
-                # Free our REFERENCES to the cached model. Python's gc will
-                # release the actual VRAM when the orphan worker also drops
-                # its reference. We don't try to forcibly empty CUDA cache
-                # here -- the orphan is still using it and an empty_cache
-                # call from the main thread would race the kernel writes.
+                from . import _otr_model_loader as _otr_loader_mod
+                _otr_loader_mod.unload_llm()
                 _runtime_log(
-                    f"TIMEOUT_RECOVERY: invalidated _LLM_CACHE so next "
+                    f"TIMEOUT_RECOVERY: unload_llm() invoked so next "
                     f"phase forces a fresh load (avoids "
                     f"cudaErrorIllegalAddress from orphan {phase_label} "
                     f"worker still on GPU)"
@@ -3551,10 +3543,24 @@ def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
     critique / revision / grammarian calls leave it False so they don't
     repeatedly overwrite the singleton ledger with their own intermediate
     drafts.
+
+    S30 B4b: model acquisition routes through the modern slot
+    scheduler via `_otr_model_loader.request_slot("technical", ...)`.
+    Fixes BUG-LOCAL-226 (the S30 plan section 2b audit claim that
+    `_load_llm` was dead-runtime was wrong -- the RSS news path here
+    keeps it alive). Routing through request_slot tags this surface
+    as a technical-slot consumer in the slot scheduler's transition
+    accounting; under the default config (creative == technical) the
+    cache-hit path is identical to pre-B4b.
     """
     import torch
 
-    model, tokenizer = _load_llm(model_id, optimization_profile=optimization_profile)
+    # LLM slot: technical -- RSS news headline rank + body rerank +
+    # LTX style brief are all structured short-output calls.
+    from . import _otr_model_loader as _otr_loader_mod
+    cache_entry = _otr_loader_mod.request_slot("technical", model_id)
+    model = cache_entry["model"]
+    tokenizer = cache_entry["tokenizer"]
     is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
 
     # Multimodal vs Text-Only wrapper
@@ -3580,7 +3586,9 @@ def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
     # NOT enforce this at the input level - it still accepts a 3000-token prompt
     # and pre-fills the full KV cache, causing the 110s stall and 25GB VRAM spike.
     # We must truncate the input explicitly to leave room for output tokens.
-    _context_cap = _LLM_CACHE.get("context_cap", 8192)
+    # S30 B4b: pull from the cache_entry returned by request_slot
+    # rather than the legacy _LLM_CACHE module-level dict.
+    _context_cap = int(cache_entry.get("context_cap") or 8192)
     _max_input_tokens = max(64, _context_cap - max_new_tokens)
     _input_len = inputs["input_ids"].shape[-1]
     if _input_len > _max_input_tokens:
