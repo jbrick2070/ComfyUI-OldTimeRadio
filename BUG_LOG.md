@@ -2,10 +2,10 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-222 (2026-05-13) -- S26 cleanbreak introduced two general-lesson Bible-candidate entries (221, 222) below; the deletion-only commits themselves are not new bugs.
+**Last entry:** BUG-LOCAL-223 (2026-05-13) -- general lesson surfaced by the s26-downstream missed-regression sweep: a sprint that deletes a contract MUST run pytest before declaring its verification phase complete; an EXPECTED_FAILED_NODEIDS byte-identical delta is not the same as an actual-suite-green delta.
 **Stack head when last updated:** S26 cleanbreak final QA commit (s26-cleanbreak branch)
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
-**Bible candidates pending promotion:** 17 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210, 211, 212, 213, 214, 216, 217, 218, 219, 220) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`.
+**Bible candidates pending promotion:** 19 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210, 211, 212, 213, 214, 216, 217, 218, 219, 220, 222, 223) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`. 221 remains deferred pending interactive shell re-audit.
 
 ---
 
@@ -142,6 +142,15 @@ sprints, regardless of fix-status.
 - **Verify:** `pytest tests/test_workflow_audio_widget_vectors.py::test_no_stale_dict_residue_in_widget_vector -v`. The runtime values that flow through the graph are now correct.
 - **Tags:** widget-vector, position-pinned, cleanbreak-debris, audiogen, voice-path-cleanbreak
 - **Bible candidate rationale:** General lesson -- when a cleanbreak deletes a REQUIRED INPUT_TYPES entry, the workflow JSON's widgets_values vector MUST be trimmed in the same commit. ComfyUI's permissive load means the misalignment ships silently. Future plans should add a step to the cleanbreak playbook: "delete input X" -> "shrink every saved-workflow widget vector by 1 at X's index". This batch's C6 widget-vector test catches the next instance.
+
+### BUG-LOCAL-223: Sprint Phase 4 must run pytest, not just delta `EXPECTED_FAILED_NODEIDS` [FIXED — s26-downstream sweep general lesson 2026-05-13]
+- **Date:** 2026-05-13 | **Phase:** 6 | **Bible candidate:** yes
+- **Symptom:** S26's final QA review claimed `regression delta byte-identical` (baseline and final `EXPECTED_FAILED_NODEIDS` sets matched). The next-morning s26-downstream sweep showed the actual full-suite pytest run had **7 failures** not in any documented quarantine. The byte-identical-delta gate had passed cleanly while real test failures shipped under it. The gap: the byte-identical claim referred to the expected-fail SET, not to the actual run output. A sprint can satisfy "no new entries in EXPECTED_FAILED_NODEIDS" without ever running pytest end-to-end.
+- **Cause:** S26's Phase 4 verification used the `[KNOWN-FAIL-GUARD]` summary captured during earlier phases as the regression artifact. That summary is only emitted when the conftest hook actually fires; if the cleanbreak commits' direct test runs all targeted subsets (each subset trips the 80%-collected guard and the diff returns early), the full-suite hook never runs against the cleanbreak HEAD. The S26 reviewer accepted the targeted-subset coverage as "regression delta" evidence — a category error.
+- **Fix:** Phase B downstream sweep ran the full suite from `5bf9d3a`, surfaced 7 real failures (6 in the targeted-baseline file list + 1 missed by the file list -- legacy-token scan vs interior docstring), classified each per the directive's table, and shipped 4 fixes (commits `ba8a02e`, `a70aeb8`, `8181950`, `39b1670`). End-state: 2159 passed, 8 skipped, 0 failed, empty `EXPECTED_FAILED_NODEIDS`, zero `[KNOWN-FAIL-GUARD]` lines on full-suite re-run. The 7 failures had been latent on `s26-cleanbreak` HEAD; nothing in S27 caused them.
+- **Verify:** Future Phase 4 verification must satisfy BOTH of: (1) `EXPECTED_FAILED_NODEIDS` delta empty AND (2) the audit-results doc contains the actual `============ N passed, M skipped, K failed ============` summary line from a full-suite run at the cleanbreak HEAD. (1) alone is not a gate.
+- **Tags:** sprint-verification, expected-fail-vs-actual-fail, full-suite-gate, regression-delta, s26-downstream, general-lesson
+- **Bible candidate rationale:** General lesson -- a quality gate's PASS evidence must be the artifact the gate actually defends against, not a proxy for it. `EXPECTED_FAILED_NODEIDS` defends against silent shifts in the known-fail SET; it does NOT defend against the suite acquiring new failures that aren't yet in the set. The full-suite pytest summary line is the artifact that defends against the latter. Both must appear in audit-results.md for the regression-delta gate to be satisfied. Add to the cleanbreak playbook: "Phase 4 pass gate requires actual `N passed / M failed` summary, not just delta-vs-expected-fails." Pairs naturally with BUG-LOCAL-221's bible lesson ("any quality gate that surfaces regressions must surface the classification evidence in the same artifact") -- gates demand both the result and the evidence in their final artifact.
 
 ### BUG-LOCAL-222: Audit-completeness signal: zero-hit grep on changed surfaces is the gate, not the audit [FIXED — S26 cleanbreak general lesson 2026-05-13]
 - **Date:** 2026-05-13 | **Phase:** 5 | **Bible candidate:** yes
