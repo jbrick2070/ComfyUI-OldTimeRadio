@@ -75,7 +75,7 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## CURRENT WORK -- S30 Two-Model Selector (IN FLIGHT, paused at B1c 2026-05-14)
+## CURRENT WORK -- S30 Two-Model Selector (COMPLETE 2026-05-14)
 
 **Branch:** `s30-two-model-selector` (cut from `s29-clean-slate-gate @ a63f3e7`; S29 has not been merged to `v2.0-alpha` yet, so the cut point captures the post-S29 code state without an autonomous merge to `v2.0-alpha`). **Single linear branch — no sub-branches for B1d-B8; commits land here.**
 **Parent plan:** `docs/2026-05-14-S30-two-model-selector-sprint-plan.md` (original 14-commit playbook).
@@ -92,7 +92,19 @@ After the current round of cleanbreak validation work closes, the next three spr
 | 4 | `d307348` | B1b: dynamic context-cap (catalog ContextCapVerdict + HARD_VRAM_CONTEXT_LIMIT clamp); delete MODEL_CONTEXT_CAPS / DEFAULT_CONTEXT_CAP |
 | 5 | `53ac152` | B1c: loader slot primitives (unload_llm + request_slot + check_vram_fit) |
 
-**Pending (11):** B1d (new pre-B2a hotfix — 7 P0 defects in B0-B1c), B2a, B2b, B2c, B3, B4, B4b, B5, B6, B7, B8.
+**Pending (0):** all 16 commits landed (B0-B8 inclusive). Sprint closed at HEAD `b44c83c` (B7) + the B8 close commit.
+
+**Final commits (B1d → B7):** `e0baab8` (B1d), `5d173f2` (B2a), `6554466` (B2b), `c3b7069` (B2c), `1ca25d7` (B3), `cbe56a9` (B4), `7e65e57` (B4b), `4351d6c` (B5), `1278125` (B6), `b44c83c` (B7).
+
+**Regression at sprint close:**
+- Canonical pytest: 253 passed / 7 skipped / 2 xfailed.
+- Bug Bible: 23 passed / 1 skipped / 2 xfailed (held).
+- Forbidden-pattern sweep: 0 runtime hits (66 forensic).
+- Workflow link validator: 0 violations across all 8 workflow JSONs.
+
+**Acceptance:** See `docs/2026-05-14-S30-final-qa-review.md` for the 30-row acceptance table + 10 documented deviations from plan (most significant: full `_load_llm` symbol deletion deferred to a follow-up sprint -- B4b structurally fixed BUG-LOCAL-226 by rewiring the RSS path through `request_slot` but kept the orchestrator-side implementation alive as the underlying loader body).
+
+**Next sprint:** Sprint C (`meta.story_brief` v2) opens per the sprint sequencing B -> C -> A.
 
 **Branch / no-legacy / no-extra-branches rules for B1d onward:**
 
