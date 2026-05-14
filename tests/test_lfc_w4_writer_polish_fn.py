@@ -42,23 +42,25 @@ class TestW4WriterBuildsDedicatedPolishFn:
             "off cache_entry via _OTRML.make_polish_generate_fn"
         )
 
-    def test_polish_fallback_logged_at_warning(self):
-        # Locate the fallback log site -- the writer wraps the
-        # factory call in try/except and falls back to None on
-        # failure. The log must be at WARNING level so a real
-        # loader regression surfaces in the boot log.
+    def test_polish_factory_call_is_unconditional(self):
+        """S28 cleanbreak (Rule C): pre-S28 the writer wrapped
+        make_polish_generate_fn in a try/except that silently fell
+        back to polish_generate_fn=None on factory failure, logged at
+        WARNING. That fallback was the producer leak retired by
+        s28-p3-producer-1 — make_polish_generate_fn is required v2.0
+        infrastructure, and a factory failure should surface as a
+        hard error, not silently degrade polish to the composer-tuned
+        generate_fn (Tier 3 #22 regression).
+
+        Post-S28 the writer call is unconditional. This test asserts
+        the cleanbreak: the "make_polish_generate_fn unavailable"
+        warning message no longer appears in the writer source.
+        """
         marker = "make_polish_generate_fn unavailable"
-        idx = _FLAT.find(marker)
-        assert idx != -1, "W4 fallback log message not found"
-        context = _FLAT[max(0, idx - 400): idx]
-        warn_pos = context.rfind("log.warning")
-        debug_pos = context.rfind("log.debug")
-        assert warn_pos != -1, (
-            f"expected log.warning before {marker!r}; got: {context!r}"
-        )
-        assert warn_pos > debug_pos, (
-            "log.debug appears more recent than log.warning in the "
-            "fallback context; W4 fix regressed"
+        assert marker not in _FLAT, (
+            f"S28 cleanbreak regression: writer still carries the "
+            f"pre-S28 fallback log message {marker!r}. The producer "
+            f"leak must stay extinct — see s28-p3-producer-1."
         )
 
     def test_polish_generate_fn_threaded_to_compose_line(self):
