@@ -665,15 +665,22 @@ def _check_g7_sfx_dur_invariant(
         treatment; dialogue + announcer lines have dur_s populated
         POST-render by Bark / Kokoro and the value is the rendered
         clip duration, not a target)
-      - ``dur_s`` is absent / None (back-compat with older ledgers;
-        default_duration applies)
       - ``dur_s`` is not numeric (already caught by per-line
         type invariants)
+
+    S28 cleanbreak: dropped the "``dur_s`` is absent / None
+    (back-compat with older ledgers; default_duration applies)" skip.
+    Older flat-layout ledgers are extinct after S26's per-episode-
+    workspace cutover; the producer (find_clip_durations / upstream
+    timing in OTR_LedgerScriptWriter outline pass) always stamps
+    dur_s on every sfx line. Missing dur_s is now a hard validation
+    error.
     """
     lines = ledger_data.get("lines")
     if not isinstance(lines, list):
         return
     bad: list[str] = []
+    missing: list[str] = []
     for idx, line in enumerate(lines):
         if not isinstance(line, dict):
             continue
@@ -681,12 +688,23 @@ def _check_g7_sfx_dur_invariant(
             continue
         dur = line.get("dur_s")
         if dur is None:
+            # S28 cleanbreak: missing dur_s on sfx line is now a
+            # writer contract violation, not a tolerated back-compat
+            # shape. Producer always populates from outline pass.
+            line_id = line.get("line_id") or f"<idx {idx}>"
+            missing.append(line_id)
             continue
         if not isinstance(dur, (int, float)):
             continue
         if dur < SFX_DUR_MIN_S or dur > SFX_DUR_MAX_S:
             line_id = line.get("line_id") or f"<idx {idx}>"
             bad.append(f"{line_id}={dur}")
+    if missing:
+        errors.append(
+            f"G7: {len(missing)} sfx line(s) missing dur_s: "
+            f"{', '.join(missing)} (writer outline contract violation; "
+            f"producer must stamp target dur_s on every sfx line)"
+        )
     if bad:
         errors.append(
             f"G7: {len(bad)} sfx line(s) have dur_s outside "
