@@ -302,17 +302,6 @@ class TestPolishGenerateFnRouting:
         assert calls["polish"] == 1
         assert result == "polish-result"
 
-    def test_polish_falls_back_to_generate_fn_when_polish_fn_is_none(self):
-        calls = {"main": 0}
-
-        def main_fn(messages, *, temperature, max_new_tokens, stop=None):
-            calls["main"] += 1
-            return "main-result"
-
-        result = polish_line(main_fn, "leaked", "ALICE", polish_generate_fn=main_fn)
-        assert calls["main"] == 1
-        assert result == "main-result"
-
     def test_make_polish_generate_fn_factory_shape(self):
         # The model-loader factory exists and rejects malformed input.
         from nodes._otr_model_loader import (

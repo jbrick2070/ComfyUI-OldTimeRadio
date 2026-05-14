@@ -139,7 +139,7 @@ class TestPhase3EnabledMutations:
         led = _ledger([
             _line("l001", "c01", "character", "Then we should go."),
         ])
-        rep = _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True)
+        rep = _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True, polish_generate_fn=fn)
         assert called["n"] == 0
         assert rep.edits_examined if hasattr(rep, "edits_examined") else (
             rep.lines_examined == 0
@@ -152,7 +152,7 @@ class TestPhase3EnabledMutations:
         ])
         rep = _LFC_ORCH._phase_3_per_line_polish(
             _polish_fn(["I told you it was rigged."]),
-            led, enable=True,
+            led, enable=True, polish_generate_fn=_polish_fn(["I told you it was rigged."]),
         )
         assert rep.lines_examined == 1
         assert rep.edits_applied == 1
@@ -174,7 +174,7 @@ class TestPhase3EnabledMutations:
             _line("l001", "announcer", "announcer",
                   "Tonight, [pauses dramatically] on Signal Lost."),
         ])
-        rep = _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True)
+        rep = _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True, polish_generate_fn=fn)
         assert called["n"] == 0
         assert rep.lines_examined == 0
         # Text unchanged.
@@ -187,7 +187,7 @@ class TestPhase3EnabledMutations:
         ])
         rep = _LFC_ORCH._phase_3_per_line_polish(
             _polish_fn(["Tonight, on Signal Lost."]),
-            led, enable=True, polish_announcer_beats=True,
+            led, enable=True, polish_announcer_beats=True, polish_generate_fn=_polish_fn(["Tonight, on Signal Lost."]),
         )
         assert rep.lines_examined == 1
         assert rep.edits_applied == 1
@@ -206,7 +206,7 @@ class TestPhase3EnabledMutations:
         ])
         # Even though the text trips needs_polish, skip=True means
         # the line is already muted -- polish_line wouldn't help.
-        _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True)
+        _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True, polish_generate_fn=fn)
         assert called["n"] == 0
 
     def test_non_voiced_lines_not_polished(self):
@@ -222,7 +222,7 @@ class TestPhase3EnabledMutations:
             _line("l001", "sfx", "sfx", "[door slam] *crunch*"),
             _line("l002", "music", "music_open", "(rising horn theme)"),
         ])
-        _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True)
+        _LFC_ORCH._phase_3_per_line_polish(fn, led, enable=True, polish_generate_fn=fn)
         assert called["n"] == 0
 
     def test_word_char_counts_lockstep(self):
@@ -233,7 +233,7 @@ class TestPhase3EnabledMutations:
         replacement = "I knew it all along."
         _LFC_ORCH._phase_3_per_line_polish(
             _polish_fn([replacement]),
-            led, enable=True,
+            led, enable=True, polish_generate_fn=_polish_fn([replacement]),
         )
         assert led.data["lines"][0]["text"] == replacement
         assert led.data["lines"][0]["char_count"] == len(replacement)
@@ -251,7 +251,7 @@ class TestPhase3Rejection:
         led = _ledger([_line("l001", "c01", "character", original)])
         rep = _LFC_ORCH._phase_3_per_line_polish(
             _polish_fn(["I cannot rewrite this."]),
-            led, enable=True,
+            led, enable=True, polish_generate_fn=_polish_fn(["I cannot rewrite this."]),
         )
         assert led.data["lines"][0]["text"] == original
         assert rep.edits_applied == 0
@@ -265,7 +265,7 @@ class TestPhase3Rejection:
         # needs_polish again.
         rep = _LFC_ORCH._phase_3_per_line_polish(
             _polish_fn(["It was him, he whispered."]),
-            led, enable=True,
+            led, enable=True, polish_generate_fn=_polish_fn(["It was him, he whispered."]),
         )
         assert led.data["lines"][0]["text"] == original
         assert rep.edits_applied == 0
@@ -278,7 +278,7 @@ class TestPhase3Rejection:
         led = _ledger([
             _line("l001", "c01", "character", '"Leaky," she said.'),
         ])
-        rep = _LFC_ORCH._phase_3_per_line_polish(boom, led, enable=True)
+        rep = _LFC_ORCH._phase_3_per_line_polish(boom, led, enable=True, polish_generate_fn=boom)
         # polish_line itself catches the raise and returns the
         # original; phase_3 treats that as a rejection-refusal-style
         # outcome (text unchanged).
@@ -334,7 +334,10 @@ class TestPhase3RecordStamping:
                 "I told you so.",       # accepts
                 "I cannot rewrite this.",  # refusal -> reject
             ]),
-            led, enable=True,
+            led, enable=True, polish_generate_fn=_polish_fn([
+                "I told you so.",       # accepts
+                "I cannot rewrite this.",  # refusal -> reject
+            ]),
         )
         rec = led.data["meta"]["phase_3_polish_record"]
         assert rec["lines_scanned"] == 4

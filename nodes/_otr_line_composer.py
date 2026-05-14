@@ -469,8 +469,7 @@ class LineRequest:
     once via build_allowed_roster after cast lock + news_interpreter.
     The empty-frozenset default is retained ONLY as a dataclass-
     ordering artifact (non-defaulted fields can't follow defaulted
-    ones); S28 cleanbreak retired the back-compat-with-early-stage-
-    tests framing.
+    ones).
 
     Phase 1 (2026-05-11): three new context fields replace the
     composer's previous "speaker + intent + mood + canon header +
@@ -856,9 +855,6 @@ def _build_user_prompt(req: LineRequest) -> str:
     is empty so unit tests that pin a specific minimal shape keep
     working. NAMED ENTITIES fires when allowed_people OR
     allowed_things is non-empty.
-    S28 cleanbreak retired the "back-compat callers that only set the
-    legacy `allowed_roster`" fallback (the producer
-    OTR_LedgerScriptWriter D.5+ always populates the new shape).
 
     The role-induction sentence "You are <SPEAKER>." (plus optional
     "You are responding to <PREV_SPEAKER>.") sits immediately above
@@ -886,14 +882,9 @@ def _build_user_prompt(req: LineRequest) -> str:
 
     # NAMED ENTITIES split (Commit 1 in the v4 plan). The writer
     # populates allowed_people / allowed_things separately on every
-    # real call.
-    # S28 cleanbreak: dropped the `elif req.allowed_roster:` legacy
-    # combined-roster path. The producer (OTR_LedgerScriptWriter D.5+
-    # post-cast-lock) always populates the split shape; the legacy
-    # ALLOWED NAMES block was a back-compat tolerance for early-stage
-    # callers that no longer exist. allowed_roster is still consumed
-    # by the phantom-gate check downstream (detect_phantom_names),
-    # but the prompt-rendering side is split-only.
+    # real call. allowed_roster is still consumed by the phantom-gate
+    # check downstream (detect_phantom_names); the prompt-rendering
+    # side is split-only.
     if req.allowed_people or req.allowed_things:
         parts.append("")
         parts.append("NAMED ENTITIES IN THIS WORLD")
@@ -1168,12 +1159,12 @@ def polish_line(
     leaked_line: str,
     speaker_voice_card: str,
     *,
+    polish_generate_fn,
     temperature: float = _POLISH_BASE_TEMPERATURE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     speaker_role: str = "character",
     beat_intent: str = "",
     previous_lines: tuple[str, ...] = (),
-    polish_generate_fn=None,
 ) -> str:
     """Run ONE polish LLM call against `leaked_line`.
 
@@ -1210,12 +1201,9 @@ def polish_line(
         (a short rewrite) and produce awkward substitutions. The
         dedicated polish fn (built via
         `_otr_model_loader.make_polish_generate_fn`) uses conservative
-        sampling.
-        S28 cleanbreak: dropped the "When `polish_generate_fn` is None,
-        polish_line falls back to `generate_fn` for back-compat" path.
-        The producer (OTR_LedgerScriptWriter) now always populates
-        polish_generate_fn unconditionally (s28-p3-producer-1); the
-        consumer-side substitution branch is extinct.
+        sampling. polish_generate_fn is REQUIRED -- the producer
+        (OTR_LedgerScriptWriter) always populates it unconditionally
+        and no consumer-side substitution path remains.
 
     Tier 1 fix #11 (2026-05-11): does NOT itself re-run
     `needs_polish()` on the polish output. The caller (compose_line)
@@ -1264,28 +1252,17 @@ def polish_line(
     orig_word_count = max(4, len(leaked_line.split()))
     mnt = max(40, orig_word_count * _POLISH_MAX_TOKENS_MULTIPLIER)
 
-    # section 6.4: use the polish-specific generate_fn when provided.
-    # S28 cleanbreak: the producer (OTR_LedgerScriptWriter) now always
-    # passes a populated polish_generate_fn — the writer-side
-    # try/except that silently set None was removed in
-    # s28-p3-producer-1. The `polish_generate_fn is not None`
-    # condition below is therefore unreachable in production but
-    # retained as a defense-in-depth default for the function's own
-    # test harnesses, which call polish_line(fn, ...) with a single
-    # generate_fn for ergonomic reasons. Not a back-compat tolerance —
-    # the producer-contract guarantee is what makes this safe.
-    active_fn = polish_generate_fn if polish_generate_fn is not None else generate_fn
-
+    # section 6.4: polish_generate_fn is required (no fallback).
     try:
         try:
-            raw = active_fn(
+            raw = polish_generate_fn(
                 messages,
                 temperature=temperature,
                 max_new_tokens=mnt,
                 stop=list(stop_strings) if stop_strings else None,
             )
         except TypeError:
-            raw = active_fn(
+            raw = polish_generate_fn(
                 messages, temperature=temperature, max_new_tokens=mnt,
             )
     except Exception as exc:  # noqa: BLE001
@@ -1498,14 +1475,11 @@ def compose_line(
                 "(narration-leak detected)",
                 req.speaker,
             )
-            # LFC sprint commit 3 (2026-05-11): thread the new
-            # context fields through. polish_generate_fn is required —
-            # S28 cleanbreak retired the "falls back to generate_fn
-            # for callers that don't build a polish-specific fn"
-            # tolerance. The producer (OTR_LedgerScriptWriter) builds
-            # it unconditionally via make_polish_generate_fn so the
-            # composer-tuned sampling never leaks into a polish
-            # rewrite (Tier 3 #22 regression).
+            # LFC sprint commit 3 (2026-05-11): thread context fields
+            # through. polish_generate_fn is required — the producer
+            # (OTR_LedgerScriptWriter) builds it unconditionally via
+            # make_polish_generate_fn so the composer-tuned sampling
+            # never leaks into a polish rewrite (Tier 3 #22 regression).
             polished = polish_line(
                 generate_fn,
                 cleaned,
