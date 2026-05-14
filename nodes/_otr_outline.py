@@ -34,6 +34,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from ._otr_episode_budget import EpisodeBudget
 from pydantic import (
     BaseModel,
     Field,
@@ -379,21 +380,15 @@ class OutlineRequest:
                         f"cast_descriptions[{i}].description must be a "
                         f"string, got {desc!r}"
                     )
-        # S28 cleanbreak: budget is REQUIRED for the v2.0 contract.
-        # OTR_LedgerScriptWriter always builds and passes a real
-        # EpisodeBudget via compute_episode_budget. A missing budget
-        # here is a producer leak — surface it loudly at construction
-        # time rather than silently skipping budget rendering +
-        # validators downstream. Check runs LAST so legacy-shape
-        # character_cast and cast_descriptions validation errors
-        # still fire with their original messages (otherwise the
-        # budget error would mask the upstream defect).
-        #
-        # Duck-type via hasattr so both `budget=None` and `budget=42`
-        # (or any other wrong-type leak) trip the same producer-
-        # contract error. We can't isinstance-check EpisodeBudget
-        # without importing _otr_episode_budget at module load.
-        if not hasattr(self.budget, "arc_phases"):
+        # budget is REQUIRED for the v2.0 contract. OTR_LedgerScript
+        # Writer always builds and passes a real EpisodeBudget via
+        # compute_episode_budget. A missing budget here is a producer
+        # leak — surface it loudly at construction time rather than
+        # silently skipping budget rendering + validators downstream.
+        # Check runs LAST so character_cast / cast_descriptions
+        # validation errors still fire with their original messages
+        # (otherwise the budget error would mask the upstream defect).
+        if not isinstance(self.budget, EpisodeBudget):
             raise ValueError(
                 "OutlineRequest.budget is required (v2.0 contract) "
                 "and must be an EpisodeBudget. Build via "
