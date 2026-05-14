@@ -18,6 +18,7 @@ DIFF_PATH = ROOT / "docs" / "s28_diff_tmp.txt"
 OUT_PATH = ROOT / "docs" / "2026-05-13-S28-new-forbidden-hits.txt"
 
 forbidden = re.compile(
+    # S28 original markers
     r"DeprecationWarning"
     r"|back-compat"
     r"|legacy fallback"
@@ -26,6 +27,16 @@ forbidden = re.compile(
     r"|\balias\b"
     r"|\botr_legacy_audio_dir\b"
     r"|budget is None"
+    # S29 Phase 6.2 extinction markers (per S29 plan §Phase 6.2).
+    # Anything that was extincted in S28 + S29 STAYS extincted.
+    r"|req\.budget is None"
+    r"|polish_generate_fn is not None"
+    r"|hasattr\(self\.budget"
+    r"|DEPRECATED_manifest"
+    r"|C:/Users/jeffr"
+    r"|\bOTR_LedgerScriptReviewer\b"
+    r"|\bGemma4\b"
+    r"|\breviewer_verdict\b"
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
