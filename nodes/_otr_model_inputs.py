@@ -53,6 +53,22 @@ class InsufficientDiskSpaceError(RuntimeError):
     on a near-full disk is brittle."""
 
 
+class VRAMFitFailedError(RuntimeError):
+    """Raised by request_slot when check_vram_fit returns a FAIL verdict
+    (e.g. 70B-on-16GB). The model would OOM at load; the user gets a
+    pre-load failure with estimated-vs-ceiling reason instead of an
+    opaque CUDA error at first generation token.
+
+    Carries verdict + reason; callers can str() it for the recovery
+    message or inspect .estimated_gb / .ceiling_gb attributes if needed.
+    """
+
+    def __init__(self, message: str, *, estimated_gb: float = 0.0, ceiling_gb: float = 0.0):
+        super().__init__(message)
+        self.estimated_gb = estimated_gb
+        self.ceiling_gb = ceiling_gb
+
+
 def require_model(model_id: str | None, *, slot: str) -> str:
     """Resolve / fail-loud helper used by every consumer socket.
 

@@ -42,10 +42,29 @@ log = logging.getLogger("OTR")
 __all__ = [
     "load_llm",
     "unload_llm",
+    "request_slot",
     "make_generate_fn",
     "make_polish_generate_fn",
     "ModelLoaderError",
+    "LLM_CACHE",
 ]
+
+
+# ---------------------------------------------------------------------------
+# B1c: shared slot-aware LLM cache (the modern facade).
+#
+# Records the currently-resident cache_entry so request_slot can detect
+# slot transitions and decide between cache-reuse (same model) vs full
+# unload + reload (different model). visual/llm_polish.py's local
+# _POLISH_CACHE collapses into this in B5.
+# ---------------------------------------------------------------------------
+
+
+LLM_CACHE: dict[str, Any] = {
+    "model_id": None,
+    "slot": None,
+    "cache_entry": None,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -150,15 +169,176 @@ def load_llm(
 
 
 def unload_llm() -> None:
-    """Free the cached LLM. Re-exports story_orchestrator._unload_llm."""
+    """Full VRAM teardown for cross-model slot transitions.
+
+    Canonical sequence (matches reference_chained_backend_teardown):
+        1. model.to("cpu")           -- move weights off the GPU.
+        2. del cache_entry           -- drop references so gc can reap.
+        3. gc.collect()              -- purge Python-side refs.
+        4. torch.cuda.empty_cache()  -- return free blocks to allocator.
+        5. torch.cuda.ipc_collect()  -- release inter-process CUDA IPC
+                                        handles. CRITICAL when LLM load
+                                        follows a video-model run (FLUX/
+                                        HuMo/LTX). Without ipc_collect,
+                                        the next load_llm can OOM even
+                                        when the byte budget fits.
+        6. torch.cuda.synchronize()  -- let in-flight ops finish.
+
+    Also tears down story_orchestrator's legacy LLM stack (still
+    reachable via the RSS fetch path until B4b). Best-effort; never
+    raises -- a teardown failure should NOT propagate as a node error.
+
+    B0's three production importers (batch_bark_generator, _otr_bark_lib,
+    scene_sequencer) still pull `from .story_orchestrator import _unload_llm`;
+    that orchestrator-side function delegates to this path. B4b will
+    rewire those importers to `from ._otr_model_loader import unload_llm`
+    directly and delete the orchestrator-side shim.
+    """
+    global LLM_CACHE
+    import gc
+
+    entry = LLM_CACHE.get("cache_entry")
+    if entry is not None:
+        model = entry.get("model")
+        if model is not None and hasattr(model, "to"):
+            try:
+                model.to("cpu")
+            except Exception as exc:  # noqa: BLE001
+                log.debug("[OTR_ModelLoader] model.to(cpu) failed: %s", exc)
+        # Drop our references; let gc collect the model.
+        LLM_CACHE = {"model_id": None, "slot": None, "cache_entry": None}
+
+    gc.collect()
+
+    try:
+        import torch  # noqa: F401
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception as exc:  # noqa: BLE001
+                log.debug("[OTR_ModelLoader] ipc_collect skipped: %s", exc)
+            try:
+                torch.cuda.synchronize()
+            except Exception as exc:  # noqa: BLE001
+                log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
+    except ImportError:
+        pass
+
+    # Also nuke the legacy orchestrator's parallel cache, which is
+    # still alive at this commit. B4b deletes that stack outright and
+    # removes this delegation.
     try:
         from . import story_orchestrator as _so
-    except ImportError:
-        return
-    try:
-        _so._unload_llm()
+
+        if hasattr(_so, "_LLM_CACHE") and _so._LLM_CACHE.get("model") is not None:
+            try:
+                _so._LLM_CACHE["model"].to("cpu")  # type: ignore[union-attr]
+            except Exception:
+                pass
+            _so._LLM_CACHE["model"] = None
+            _so._LLM_CACHE["tokenizer"] = None
+            _so._LLM_CACHE["model_id"] = None
+        try:
+            import torch  # noqa: F401
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
     except Exception as exc:  # noqa: BLE001
-        log.warning("[OTR_ModelLoader] unload_llm raised: %s", exc)
+        log.debug("[OTR_ModelLoader] legacy orchestrator teardown skipped: %s", exc)
+
+
+def request_slot(slot: str, model_id: str) -> dict[str, Any]:
+    """Slot-aware entry point. Loads (or reuses cached) LLM, handling
+    cache reuse vs full teardown automatically.
+
+    Eight-step sequence (mirrors plan section B1c):
+      1. normalize model_id via catalog.validate_model_id (strips
+         [NOT DOWNLOADED] suffix, structural rejection, admit-path check).
+      2. Cache hit (same model_id resident) -> return entry. Done.
+      3. auto_download_if_missing(model_id) -- pre-flight gated check
+         + disk-space check + snapshot_download. Curated PASS entries
+         skip the model_info pre-fetch.
+      4. resolve_context_cap(model_id) -> tiered ContextCapVerdict.
+      5. check_vram_fit(model_id, ctx_verdict.value) -> tiered VRAMFitVerdict.
+      6. Combined escalation:
+            FAIL                -> raise VRAMFitFailedError.
+            PASS + PASS         -> quiet success path.
+            otherwise           -> log combined caution + proceed.
+      7. unload_llm() (only if a different model was resident),
+         then load_llm(model_id).
+      8. Cache the entry under (slot, model_id).
+
+    `slot` is "creative" or "technical" -- used for log lines + cache
+    keying. The cache holds at most one resident model regardless of
+    slot; same-slot reuse and cross-slot identity-reuse both return the
+    cached entry without a full teardown.
+    """
+    from . import _otr_model_catalog as _otr_catalog
+    from ._otr_model_inputs import VRAMFitFailedError
+
+    if slot not in ("creative", "technical"):
+        raise ModelLoaderError(
+            f"request_slot: slot must be 'creative' or 'technical', got {slot!r}"
+        )
+
+    # Step 1: normalize.
+    normalized = _otr_catalog.validate_model_id(model_id)
+
+    # Step 2: cache hit on the same model id (regardless of slot).
+    if LLM_CACHE.get("model_id") == normalized and LLM_CACHE.get("cache_entry") is not None:
+        log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
+        LLM_CACHE["slot"] = slot
+        return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
+
+    # Step 3: ensure on-disk + handle gating / disk-space pre-flight.
+    # On curated PASS entries this is a no-op when the snapshot is
+    # already present; the catalog logic skips the network call.
+    _otr_catalog.auto_download_if_missing(normalized)
+
+    # Step 4: context cap (never raises).
+    ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
+
+    # Step 5: VRAM fit (never raises).
+    fit_verdict = _otr_catalog.check_vram_fit(normalized, ctx_verdict.value)
+
+    # Step 6: combined escalation.
+    if fit_verdict.tier == "FAIL":
+        raise VRAMFitFailedError(
+            f"VRAMFitFailedError: {normalized!r}: {fit_verdict.reason}. "
+            f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
+            estimated_gb=fit_verdict.estimated_gb,
+            ceiling_gb=fit_verdict.ceiling_gb,
+        )
+    if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
+        log.info(
+            "[Selector] proceeding with caution: ctx_cap=%s@%d, "
+            "vram_fit=%s@%.1f GB",
+            ctx_verdict.tier,
+            ctx_verdict.value,
+            fit_verdict.tier,
+            fit_verdict.estimated_gb,
+        )
+
+    # Step 7: if a different model is resident, unload it. Then load.
+    if LLM_CACHE.get("model_id") not in (None, normalized):
+        log.info(
+            "[Selector] slot transition: %s -> %s (full teardown)",
+            LLM_CACHE.get("model_id"),
+            normalized,
+        )
+        unload_llm()
+
+    cache_entry = load_llm(normalized)
+
+    # Step 8: cache.
+    LLM_CACHE["model_id"] = normalized
+    LLM_CACHE["slot"] = slot
+    LLM_CACHE["cache_entry"] = cache_entry
+    return cache_entry
 
 
 # ---------------------------------------------------------------------------

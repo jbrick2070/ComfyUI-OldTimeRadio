@@ -499,6 +499,130 @@ def resolve_context_cap(
 
 
 # ---------------------------------------------------------------------------
+# B1c: check_vram_fit -- tiered VRAMFitVerdict (PASS / WARN / UNKNOWN / FAIL)
+# ---------------------------------------------------------------------------
+
+
+# 16 GB rig usable ceiling. 14.5 GB target -- DWM + background apps eat
+# the rest. live LibreHardwareMonitor polling is the real-time signal;
+# this constant is the conservative ceiling the fit-checker uses for
+# the obvious-oversize case (70B-on-16GB).
+DEFAULT_VRAM_CEILING_GB = 14.5
+
+# An estimate_gb / ceiling_gb ratio above this triggers FAIL. Below it
+# (even with WARN-tier ambiguity) the load proceeds with a logged caution.
+_FAIL_RATIO = 1.5
+
+
+@dataclass(frozen=True)
+class VRAMFitVerdict:
+    """Tiered verdict from check_vram_fit. Mirrors ContextCapVerdict.
+    `soak_tested` only True for curated PASS entries."""
+
+    tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
+    estimated_gb: float
+    ceiling_gb: float
+    reason: str
+    soak_tested: bool
+
+
+def _estimate_resident_gb(model_id: str) -> float | None:
+    """Rough heuristic for VRAM resident size on the OTR pipeline.
+
+    OTR's loader (story_orchestrator._load_llm) uses 8-bit / NF4-style
+    quantization by default for the Standard / Obsidian profiles, so
+    peak resident is roughly half the BF16 safetensors download size.
+    Documented numbers per plan section 6:
+        Mistral-Nemo:  ~24 GB disk -> ~12 GB resident.
+        Gemma-4-E2B:    ~6 GB disk -> ~3 GB resident.
+
+    A factor-of-2 divisor matches both anchor points. The estimate is
+    intentionally coarse -- VRAMFitVerdict tiers (PASS/WARN/UNKNOWN/
+    FAIL) are the policy surface; precise math isn't.
+    """
+    curated = _by_repo_id().get(model_id)
+    if curated is None:
+        return None
+    return float(curated.approx_safetensors_gb) / 2.0
+
+
+def check_vram_fit(
+    model_id: str,
+    context_cap: int,
+    *,
+    ceiling_gb: float | None = None,
+) -> VRAMFitVerdict:
+    """Coarse guardrail against the obvious oversize case (70B-on-16GB).
+    Returns a tiered verdict (never raises):
+
+      PASS    -- curated entry with soak-tested vram_fit_tier == "PASS"
+                 and estimated resident <= ceiling.
+      WARN    -- curated WARN entry (ungated 12B/14B at the edge), OR
+                 uncurated with parseable size and estimate <= ceiling.
+                 Load proceeds with a logged caution.
+      UNKNOWN -- uncurated and we can't reliably parse param count /
+                 dtype. Load proceeds; rely on the runtime OOM safety net.
+      FAIL    -- estimated >= 1.5x ceiling. Only the clearly-oversized
+                 case (e.g. Llama-3-70B at ~42 GB resident). Caller raises.
+
+    Honest note: HF config.json has no standardized num_parameters
+    field. UNKNOWN is the expected verdict for most uncurated arbitrary
+    org/name models. This is a coarse guardrail, not a precise oracle.
+    """
+    ceiling = ceiling_gb if ceiling_gb is not None else DEFAULT_VRAM_CEILING_GB
+    curated = _by_repo_id().get(model_id)
+    estimate = _estimate_resident_gb(model_id)
+
+    # FAIL case first: clearly oversized regardless of curation.
+    if estimate is not None and estimate >= ceiling * _FAIL_RATIO:
+        return VRAMFitVerdict(
+            tier="FAIL",
+            estimated_gb=estimate,
+            ceiling_gb=ceiling,
+            reason=(
+                f"estimated {estimate:.1f} GB peak resident vs "
+                f"{ceiling:.1f} GB ceiling -- pick a smaller model"
+            ),
+            soak_tested=False,
+        )
+
+    if curated is not None and curated.vram_fit_tier == "PASS" and estimate is not None and estimate <= ceiling:
+        return VRAMFitVerdict(
+            tier="PASS",
+            estimated_gb=estimate,
+            ceiling_gb=ceiling,
+            reason=f"curated soak-tested PASS @ {estimate:.1f} GB",
+            soak_tested=True,
+        )
+
+    if curated is not None and estimate is not None:
+        return VRAMFitVerdict(
+            tier="WARN",
+            estimated_gb=estimate,
+            ceiling_gb=ceiling,
+            reason=(
+                f"curated WARN-tier ({curated.vram_fit_tier}) @ "
+                f"{estimate:.1f} GB on {ceiling:.1f} GB ceiling -- "
+                "may need quantization / offload"
+            ),
+            soak_tested=False,
+        )
+
+    # Hard-to-estimate case: uncurated, no curated rough size.
+    return VRAMFitVerdict(
+        tier="UNKNOWN",
+        estimated_gb=0.0,
+        ceiling_gb=ceiling,
+        reason=(
+            "uncurated model -- HF config.json has no standardized "
+            "num_parameters field; rely on runtime OOM safety net + "
+            "LibreHardwareMonitor"
+        ),
+        soak_tested=False,
+    )
+
+
+# ---------------------------------------------------------------------------
 # B1a2: HF network surface -- auto-download + size estimate + pre-flight checks
 # ---------------------------------------------------------------------------
 
@@ -710,9 +834,11 @@ __all__ = [
     "ALLOW_PATTERNS",
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",
+    "DEFAULT_VRAM_CEILING_GB",
     "ScanResult",
     "DropdownEntry",
     "ContextCapVerdict",
+    "VRAMFitVerdict",
     "scan_local_llm_cache",
     "build_dropdown_choices",
     "dropdown_choices",
@@ -720,4 +846,5 @@ __all__ = [
     "estimate_model_size_gb",
     "auto_download_if_missing",
     "resolve_context_cap",
+    "check_vram_fit",
 ]
