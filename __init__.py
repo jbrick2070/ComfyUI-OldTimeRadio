@@ -99,7 +99,11 @@ _NODE_MODULES = {
     # 3-pass cast-gated reviewer (Phases 1, 2, 9) is now wrapped by
     # Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
     # freeze) at exit. The legacy OTR_LedgerScriptReviewer name is
-    # registered as an alias below so existing workflow JSONs load.
+    # DEAD as of S29 (2026-05-14) per the no-legacy-back-compat
+    # standing directive; workflow JSONs that still reference it
+    # fail to load loudly via the workflow validator's
+    # DELETED_NODE_TYPES sentinel. They must be re-saved against
+    # OTR_LedgerFreezeCascade. See S29 final QA review.
     "OTR_LedgerFreezeCascade": (".nodes.OTR_LedgerFreezeCascade", "OTR_LedgerFreezeCascade", " LFC Ledger Freeze Cascade (v2.0)"),
     # Clean-break commit 12.11 (2026-05-12, C1 design call).
     # Standalone per-phase nodes for the heavy LLM phases. The main
