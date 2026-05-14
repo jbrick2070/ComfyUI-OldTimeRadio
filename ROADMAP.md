@@ -75,6 +75,45 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CURRENT WORK -- S30 Two-Model Selector (IN FLIGHT, paused at B1c 2026-05-14)
+
+**Branch:** `s30-two-model-selector` (cut from `s29-clean-slate-gate @ a63f3e7`; S29 has not been merged to `v2.0-alpha` yet, so the cut point captures the post-S29 code state without an autonomous merge to `v2.0-alpha`).
+**Plan:** `docs/2026-05-14-S30-two-model-selector-sprint-plan.md`
+**Total commits planned:** 15 (was 14; +1 for B4b added below).
+**Landed (5):**
+
+| # | Hash | Subject |
+|--:|---|---|
+| 1 | `46edb4d` | B0: __init__.py forensic-comment scrub (S30 cleanbreak; LLM-stack deletion moved to B4b) |
+| 2 | `2316760` | B1a: catalog dataclass + scan_local_llm_cache + dropdown choices + validator (offline-only) |
+| 3 | `94d5d20` | B1a2: auto_download_if_missing + size estimate + disk pre-check + GatedModelError + resolve_hf_token |
+| 4 | `d307348` | B1b: dynamic context-cap (catalog ContextCapVerdict + HARD_VRAM_CONTEXT_LIMIT clamp); delete MODEL_CONTEXT_CAPS / DEFAULT_CONTEXT_CAP |
+| 5 | `53ac152` | B1c: loader slot primitives (unload_llm + request_slot + check_vram_fit) |
+
+**Pending (10):** B2a, B2b, B2c, B3, B4, B4b (new), B5, B6, B7, B8.
+
+**P0 finding logged in BUG_LOG.md as BUG-LOCAL-226:** the S30 sprint plan section 2b claimed `nodes/story_orchestrator.py::_load_llm` is dead-runtime. The mandatory REVIEW-step grep at B0 kickoff caught a live caller chain (`OTR_LedgerScriptWriter._resolve_news_seed -> _fetch_rss_seed_or_die -> _so._fetch_science_news -> _llm_rank_news_candidates / _llm_rerank_with_bodies -> _generate_with_llm -> _load_llm`). Sprint plan adjusted: new commit B4b inserted between B4 and B5 to rewire the RSS news path through `_otr_model_loader.request_slot` BEFORE deleting the orchestrator's parallel LLM stack.
+
+**Regression at HEAD (`53ac152`):**
+
+- Bug Bible: 23 passed / 1 skipped / 2 xfailed (held against baseline)
+- Combined canonical: 197 passed / 7 skipped / 2 xfailed
+- New test files: `tests/test_model_catalog_scan.py` (35 tests), `tests/test_model_catalog_download.py` (12 tests), `tests/test_loader_slot_primitives.py` (13 tests)
+- Forbidden sweep: 0 runtime hits
+- Audio C7 byte-identical: pytest proxy holds at every commit; real-pipeline gate deferred to B3 end-to-end + B8 close per the operator-handles-real-runtime decision at session kickoff
+
+**Hand-off doc:** `docs/2026-05-14-S30-B1c-handoff.md` -- pickup instructions + remaining commit list + plan-vs-reality deviations recorded so far.
+
+**Documented deviations from plan so far:**
+
+1. `tests/test_dropdown_guardrails.py` (in CLAUDE.md + plan) does not exist; substituted `tests/test_workflow_json_guardrails.py`.
+2. `tests/v2/test_audio_byte_identical.py` (in plan) does not exist; substituted `tests/test_audio_byte_identical.py`.
+3. Branch cut from `s29-clean-slate-gate` tip rather than `v2.0-alpha @ HEAD-post-S29-merge` (S29 not yet merged to v2.0-alpha; code state is equivalent).
+4. B0 narrowed (LLM-stack deletion moved to B4b after audit-miss finding).
+5. B1c `_estimate_resident_gb` divides BF16 download size by 2 to match OTR's 8-bit quantization default; documented in code.
+
+---
+
 ## CURRENT WORK -- S29 Clean-Slate Gate (COMPLETE 2026-05-14)
 
 **Branch:** `s29-clean-slate-gate` (cut from `v2.0-alpha @ aad568c`, the merge commit that brought s28-cleaner-break into v2.0-alpha).
