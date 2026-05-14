@@ -37,6 +37,13 @@ forbidden = re.compile(
     r"|\bOTR_LedgerScriptReviewer\b"
     r"|\bGemma4\b"
     r"|\breviewer_verdict\b"
+    # S30 B2c: cleanup_model_id was a legacy normalizer + widget that
+    # the two-model selector replaces. The widget was already gone
+    # pre-S30; this marker locks the SYMBOL out so any future
+    # contributor cannot reintroduce a function / parameter / variable
+    # by that name. Forensic mentions (string literals in legacy guard
+    # lists, doc references) are suppressed by the tokenize classifier.
+    r"|\bcleanup_model_id\b"
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
