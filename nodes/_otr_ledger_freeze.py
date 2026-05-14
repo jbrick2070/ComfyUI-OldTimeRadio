@@ -472,9 +472,13 @@ def _check_per_cast_invariants(
         # ``voice_preset`` starting with ``v2/`` (the Bark preset
         # namespace). ANNOUNCER is intentionally excluded because it
         # lives in the Kokoro namespace (bm_* / bf_*) by construction.
-        # Empty / None / non-v2 preset is a writer contract violation
-        # promoted from the legacy WARN-fallback (tts_model /
-        # speaker_role substitutes) which was a back-compat shim.
+        # Empty / None / non-v2 preset is a writer contract violation.
+        # S28 cleanbreak: dropped the "promoted from the legacy
+        # WARN-fallback (tts_model / speaker_role substitutes) which
+        # was a back-compat shim" framing — that retirement happened
+        # in voice-path-cleanbreak Gate 2 and the shim is long gone;
+        # the comment was carrying forensic history that's now in the
+        # git log instead.
         if (isinstance(name, str) and name.strip().upper() == "ANNOUNCER"):
             # Kokoro namespace -- voice_preset still must be non-empty
             # but the v2/ prefix does not apply.
