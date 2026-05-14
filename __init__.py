@@ -105,16 +105,16 @@ _NODE_MODULES = {
     # DELETED_NODE_TYPES sentinel. They must be re-saved against
     # OTR_LedgerFreezeCascade. See S29 final QA review.
     "OTR_LedgerFreezeCascade": (".nodes.OTR_LedgerFreezeCascade", "OTR_LedgerFreezeCascade", " LFC Ledger Freeze Cascade (v2.0)"),
-    # Clean-break commit 12.11 (2026-05-12, C1 design call).
-    # Standalone per-phase nodes for the heavy LLM phases. The main
-    # cascade still owns the full chain; these are ADDITIONAL entry
-    # points so operators can per-phase skip / rerun from the
-    # canvas without rerunning the upstream cascade. Each defaults
-    # OFF so dropping a node on the canvas is a no-op until opted
-    # in.
-    "OTR_LFCPhase4Scene": (".nodes.OTR_LFCPhase4Scene", "OTR_LFCPhase4Scene", " LFC Phase 4 - Scene Coherence"),
-    "OTR_LFCPhase5Voice": (".nodes.OTR_LFCPhase5Voice", "OTR_LFCPhase5Voice", " LFC Phase 5 - Voice Drift"),
-    "OTR_LFCPhase6Arc":   (".nodes.OTR_LFCPhase6Arc",   "OTR_LFCPhase6Arc",   " LFC Phase 6 - Episode Arc"),
+    # S30 B4 (2026-05-14): standalone OTR_LFCPhase4Scene /
+    # OTR_LFCPhase5Voice / OTR_LFCPhase6Arc node classes DELETED.
+    # The three classes were orphaned from every shipped workflow JSON
+    # (per S30 parent plan section 2a-bis audit). Combined with the
+    # deletion-bias policy, the node files + their _otr_lfc phase
+    # function backing (_phase_3_per_line_polish,
+    # _phase_4_scene_coherence, _phase_4_5_smart_suggestion,
+    # _phase_5_voice_drift, _phase_6_episode_arc) go entirely. B7 adds
+    # the three class names as forbidden-pattern markers so the symbols
+    # cannot reappear.
     # Voice-path-cleanbreak Sprint 2 (2026-05-12): OTR_LLMDirector deleted.
     # The LLMDirector class was the legacy LLM-derived production plan
     # generator. P2 severed the voice side (commit 446ec81); Sprint 2

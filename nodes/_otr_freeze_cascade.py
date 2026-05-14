@@ -52,7 +52,7 @@ Status: sprint commit 2 of 14 (2026-05-11).
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from . import _otr_ledger_freeze as _LFC
@@ -180,15 +180,12 @@ def _hash_lines_text(ledger_data: dict) -> int:
 #                     + Phase 6 (episode arc)
 #   readiness_passes  Phase 7 (audio readiness) + Phase 8 (video
 #                     readiness)
+# S30 B4: phase_3 / 4 / 4.5 / 5 / 6 entries DELETED from this table.
+# Those phases were removed from the cascade in the same commit.
 _PHASE_BUCKETS: dict[str, str] = {
     "phase_0_gap_audit_pre":              "audit_passes",
     "phase_10_gap_audit_post_and_freeze": "audit_passes",
     "phase_1_2_9_reviewer_composite":     "cleanup_passes",
-    "phase_3_per_line_polish":            "cleanup_passes",
-    "phase_4_per_scene_coherence":        "cleanup_passes",
-    "phase_4_5_smart_suggestion":         "cleanup_passes",
-    "phase_5_voice_drift":                "cleanup_passes",
-    "phase_6_episode_arc":                "cleanup_passes",
     "phase_7_audio_readiness":            "readiness_passes",
     "phase_8_video_readiness":            "readiness_passes",
 }
@@ -214,7 +211,7 @@ def build_phase_telemetry(meta: dict) -> list:
 
     Each entry shape:
       {
-        "phase":    "phase_3_per_line_polish",  # phase_name
+        "phase":    "phase_1_2_9_reviewer_composite",  # phase_name
         "bucket":   "cleanup_passes",            # audit/cleanup/readiness
         "skipped":  bool,                        # did the phase run?
         "changed":  bool,                        # did line.text mutate?
@@ -344,266 +341,32 @@ def _isoformat_utc_now() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Phase-3/4/4.5/5/6/7/8 stubs (no-op holes filled in later commits)
+# Phase 7 / 8 readiness stubs (deterministic; Phase 3 / 4 / 4.5 / 5 / 6
+# DELETED at S30 B4 -- the standalone OTR_LFCPhase4Scene / 5Voice /
+# 6Arc node classes were orphaned from every shipped workflow JSON and
+# all five backing functions defaulted OFF on every code path. The
+# cascade's main path is now:
+#   Phase 0 -> Phase 1/2/9 (reviewer composite) -> Phase 7 -> Phase 8
+#   -> Phase 10
+# Phase3PolishReport + the five `_phase_*` wrappers + their backing
+# files (_otr_lfc_phase_4_scene_coherence, _otr_lfc_phase_5_voice_drift,
+# _otr_lfc_phase_6_episode_arc, _otr_lfc_smart_suggestion,
+# _otr_lfc_phase_verdicts, _otr_lfc_llm_helpers) all deleted in
+# lockstep. B7 adds the symbol names as forbidden-pattern markers.
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class Phase3PolishReport:
-    """Per-line polish summary for Phase 3.
-
-    Stamped on `meta.phase_3_polish_record` so soak diagnostics can
-    track how many leaky lines fired, how many were repaired, how
-    many were rejected (still-leaky / refusal / word-cap miss), and
-    which lines were skipped (announcer beats when announcer-polish
-    is disabled).
-    """
-
-    lines_scanned: int = 0
-    lines_examined: int = 0       # tripped needs_polish (would-polish)
-    edits_applied: int = 0
-    edits_rejected_still_leaky: int = 0
-    edits_rejected_refusal: int = 0
-    failures: list = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "lines_scanned": int(self.lines_scanned),
-            "lines_examined": int(self.lines_examined),
-            "edits_applied": int(self.edits_applied),
-            "edits_rejected_still_leaky": int(
-                self.edits_rejected_still_leaky
-            ),
-            "edits_rejected_refusal": int(self.edits_rejected_refusal),
-            "failures": list(self.failures),
-        }
-
-
-def _phase_3_per_line_polish(
-    generate_fn,
-    led,
-    *,
-    polish_generate_fn=None,
-    enable: bool = False,
-    polish_announcer_beats: bool = False,
-) -> Phase3PolishReport:
-    """LFC Phase 3 -- per-line polish wired into the cascade.
-
-    Pre-LFC the polish ran inline inside `compose_line` gated by the
-    writer's `enable_polish_pass` widget. The cascade now offers a
-    SECOND polish opportunity AFTER the reviewer's 3-pass: any line
-    that still trips `needs_polish` gets one polish call with the
-    new ADR-section-6 context (beat intent + last 2 lines + announcer
-    guard + refusal detector + dedicated polish generate_fn).
-
-    `enable=False` (the default) keeps Phase 3 as a no-op so the
-    cascade-widget surface is OFF until soak validates the
-    interaction. Tests can opt in with `enable=True`.
-
-    `polish_announcer_beats=False` skips announcer beats entirely
-    (per ADR section 6.1 "Either skip Phase 3 entirely OR route to
-    _POLISH_SYSTEM_PROMPT_ANNOUNCER"). The composer-side polish_line
-    DOES support announcer routing now; the cascade-side default
-    stays conservative until soak proves the announcer polish prompt
-    behaves on the typical mid-2020s small-LLM corpus.
-
-    Mutation policy:
-      * Mutates only `line.text` on lines that polished cleanly.
-      * Recomputes `word_count` and `char_count` in lockstep.
-      * Never touches skip / char_id / speaker_role.
-      * Never adds or removes lines (ADR section 5 hard rule 1).
-      * On polish refusal / still-leaky / word-cap miss, leaves the
-        pre-polish text in place and records the rejection in the
-        Phase3PolishReport.
-
-    Stamps:
-      meta.phase_3_polish_record  full report dict for forensics.
-    """
-    rep = Phase3PolishReport()
-    if not enable:
-        log.debug("[LFC:phase_3] disabled (enable=False)")
-        led.data.setdefault("meta", {})["phase_3_polish_record"] = (
-            rep.to_dict()
-        )
-        return rep
-
-    # Lazy import keeps the orchestrator module load surface clean
-    # (regex compilation in _otr_line_composer is non-trivial).
-    from ._otr_line_composer import (  # type: ignore
-        needs_polish,
-        polish_line,
-    )
-
-    lines = led.data.get("lines") or []
-    cast = led.data.get("cast") or []
-    cast_by_id = {
-        row.get("char_id", ""): row
-        for row in cast
-        if isinstance(row, dict)
-    }
-
-    rep.lines_scanned = len(lines)
-    last_two: list[str] = []
-
-    for idx, ln in enumerate(lines):
-        if not isinstance(ln, dict):
-            continue
-        if ln.get("skip"):
-            # Already muted -- nothing to polish. Keep last_two
-            # unchanged: skipped lines don't contribute to the
-            # rolling 2-line window.
-            continue
-        text = (ln.get("text") or "")
-        if not text:
-            continue
-        role = (ln.get("speaker_role") or "").strip().lower()
-        if role not in ("character", "announcer"):
-            # Non-voiced beat (sfx / music). Skip + don't update
-            # last_two (those windows are dialogue-only).
-            continue
-        if role == "announcer" and not polish_announcer_beats:
-            # Skip announcer beats per ADR section 6.1 default.
-            # Still advance last_two so character beats that
-            # follow see the announcer line in their PREVIOUS
-            # LINES window.
-            last_two.append(text)
-            if len(last_two) > 2:
-                last_two = last_two[-2:]
-            continue
-        if not needs_polish(text):
-            last_two.append(text)
-            if len(last_two) > 2:
-                last_two = last_two[-2:]
-            continue
-
-        rep.lines_examined += 1
-        # Pull the voice card from the cast row.
-        cid = ln.get("char_id") or ""
-        cast_row = cast_by_id.get(cid) or {}
-        voice_card = (
-            cast_row.get("voice_card")
-            or cast_row.get("name", "")
-            or cid
-            or "unspecified speaker"
-        )
-        beat_intent = ln.get("beat_intent") or ln.get("intent") or ""
-
-        try:
-            polished = polish_line(
-                generate_fn,
-                text,
-                voice_card,
-                speaker_role=role,
-                beat_intent=beat_intent,
-                previous_lines=tuple(last_two),
-                polish_generate_fn=polish_generate_fn,
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "[LFC:phase_3] polish_line raised on line_id=%s: %s",
-                ln.get("line_id", ""), exc,
-            )
-            rep.failures.append({
-                "line_id": ln.get("line_id", ""),
-                "reason": f"{type(exc).__name__}: {exc}",
-            })
-            last_two.append(text)
-            if len(last_two) > 2:
-                last_two = last_two[-2:]
-            continue
-
-        if polished == text:
-            # polish_line falls back to the original on refusal / empty
-            # / still-leaky / etc. We can't distinguish refusal vs
-            # other rejection types from this side without parsing the
-            # log; record as "rejected" and rely on polish_line's own
-            # log lines for the breakdown.
-            rep.edits_rejected_refusal += 1
-        elif needs_polish(polished):
-            # Polish output still trips the leak gate -- keep original.
-            rep.edits_rejected_still_leaky += 1
-        else:
-            # Apply the polish.
-            ln["text"] = polished
-            ln["char_count"] = len(polished)
-            ln["word_count"] = sum(1 for _ in polished.split())
-            rep.edits_applied += 1
-            # Update last_two with the polished text, not the leaky
-            # original -- subsequent lines see the cleaned voice.
-            text = polished
-
-        last_two.append(text)
-        if len(last_two) > 2:
-            last_two = last_two[-2:]
-
-    led.data.setdefault("meta", {})["phase_3_polish_record"] = (
-        rep.to_dict()
-    )
-    log.info(
-        "[LFC:phase_3] examined=%d applied=%d still_leaky=%d refusal=%d",
-        rep.lines_examined, rep.edits_applied,
-        rep.edits_rejected_still_leaky, rep.edits_rejected_refusal,
-    )
-    return rep
-
-
-def _phase_4_per_scene_coherence(
-    generate_fn,
-    led,
-    *,
-    enable: bool = False,
-    formatter_generate_fn=None,
-):
-    """LFC Phase 4 caller. Wires into _otr_lfc_phase_4_scene_coherence
-    (LFC sprint commit 8, 2026-05-11)."""
-    from . import _otr_lfc_phase_4_scene_coherence as _LFC_P4  # type: ignore
-    return _LFC_P4.phase_4_scene_coherence(
-        generate_fn, led,
-        enable=enable,
-        formatter_generate_fn=formatter_generate_fn,
-    )
-
-
-def _phase_4_5_smart_suggestion(led, *, enable: bool = False, generate_fn=None):
-    """LFC Phase 4.5 caller. Wires into _otr_lfc_smart_suggestion."""
-    from . import _otr_lfc_smart_suggestion as _LFC_SS  # type: ignore
-    return _LFC_SS.phase_4_5_smart_suggestion(
-        led, enable=enable, generate_fn=generate_fn,
-    )
-
-
-def _phase_5_voice_drift(
-    generate_fn,
-    led,
-    *,
-    enable: bool = False,
-    formatter_generate_fn=None,
-):
-    """LFC Phase 5 caller. Wires into _otr_lfc_phase_5_voice_drift
-    (LFC sprint commit 9, 2026-05-11)."""
-    from . import _otr_lfc_phase_5_voice_drift as _LFC_P5  # type: ignore
-    return _LFC_P5.phase_5_voice_drift(
-        generate_fn, led,
-        enable=enable,
-        formatter_generate_fn=formatter_generate_fn,
-    )
-
-
-def _phase_6_episode_arc(
-    generate_fn,
-    led,
-    *,
-    enable: bool = False,
-    formatter_generate_fn=None,
-):
-    """LFC Phase 6 caller. Wires into _otr_lfc_phase_6_episode_arc
-    (LFC sprint commit 10, 2026-05-11)."""
-    from . import _otr_lfc_phase_6_episode_arc as _LFC_P6  # type: ignore
-    return _LFC_P6.phase_6_episode_arc(
-        generate_fn, led,
-        enable=enable,
-        formatter_generate_fn=formatter_generate_fn,
-    )
+# S30 B4: the five phase function wrappers
+# (_phase_3_per_line_polish, _phase_4_per_scene_coherence,
+# _phase_4_5_smart_suggestion, _phase_5_voice_drift,
+# _phase_6_episode_arc) and the Phase3PolishReport dataclass DELETED.
+# Standalone OTR_LFCPhase4Scene / 5Voice / 6Arc node classes and their
+# backing files (_otr_lfc_phase_4_scene_coherence,
+# _otr_lfc_phase_5_voice_drift, _otr_lfc_phase_6_episode_arc,
+# _otr_lfc_smart_suggestion, _otr_lfc_phase_verdicts,
+# _otr_lfc_llm_helpers) deleted in the same commit. All five phases
+# defaulted OFF on every code path; the cascade-side enable widgets
+# were already removed in B3.
 
 
 def _stamp_stub_or_skipped_phase(
@@ -670,14 +433,8 @@ def run_freeze_cascade(
     led,
     *,
     polish_generate_fn=None,
-    enable_phase_3_polish: bool = False,
-    polish_announcer_beats: bool = False,
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
-    enable_phase_4_scene_coherence: bool = False,
-    enable_phase_4_5_smart_suggestion: bool = False,
-    enable_phase_5_voice_drift: bool = False,
-    enable_phase_6_episode_arc: bool = False,
     vram_ceiling_gb: float = 14.0,
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
@@ -757,39 +514,12 @@ def run_freeze_cascade(
                   for e in pre_report.errors],
     )
 
-    # ---- Phase 3: per-line polish (LFC commit 4 wiring) -----
-    # Phase 3 runs BEFORE the reviewer in the ADR phase chain, but
-    # the existing reviewer's snapshot/restore semantics already
-    # protect against a polish-introduced phantom (Pass 3 catches
-    # the phantom; restore returns to pre-polish state). The
-    # mutation order in this orchestrator is therefore:
-    #   Phase 0 -> Phase 3 -> Phases 1+2+9 -> Phase 4..8 stubs ->
-    #   Phase 10.
-    # Default `enable_phase_3_polish=False` keeps the cascade-side
-    # polish OFF until soak validates the interaction with the
-    # composer's existing inline polish path. When OFF the call is
-    # a no-op (Phase3PolishReport with zero counts is stamped).
-    started_3 = _isoformat_utc_now()
-    hash_before_3 = _hash_lines_text(ledger_data)
-    p3_report = _phase_3_per_line_polish(
-        generate_fn,
-        led,
-        polish_generate_fn=polish_generate_fn,
-        enable=enable_phase_3_polish,
-        polish_announcer_beats=polish_announcer_beats,
-    )
-    hash_after_3 = _hash_lines_text(ledger_data)
-    _stamp_phase_record(
-        ledger_data,
-        phase_name="phase_3_per_line_polish",
-        text_hash_before=hash_before_3,
-        text_hash_after=hash_after_3,
-        started_at=started_3,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=p3_report.lines_examined,
-        edits_applied=p3_report.edits_applied,
-        failures=p3_report.failures,
-    )
+    # ---- Phase 3 DELETED (S30 B4) --------------------------------
+    # The per-line polish phase ran with `enable=False` on every code
+    # path (the cascade widget defaulted OFF; B3 deleted the widget
+    # entirely). Composer-inline polish via the writer's
+    # `enable_polish_pass` widget covers the same surface; the
+    # cascade-side second polish opportunity was never exercised.
 
     # ---- Phase 1 + 2 + 9: existing 3-pass reviewer -------
     started = _isoformat_utc_now()
@@ -821,12 +551,9 @@ def run_freeze_cascade(
         meta = ledger_data.setdefault("meta", {})
         meta["freeze_verdict"] = interim_verdict
         # B5: stamp the remaining phases as terminal_skipped so
-        # meta.cleanup_passes stays contiguous.
+        # meta.cleanup_passes stays contiguous. S30 B4: phase 4/4.5/5/6
+        # names removed -- those phases no longer exist.
         for skipped_name in (
-            "phase_4_per_scene_coherence",
-            "phase_4_5_smart_suggestion",
-            "phase_5_voice_drift",
-            "phase_6_episode_arc",
             "phase_7_audio_readiness",
             "phase_8_video_readiness",
             "phase_10_gap_audit_post_and_freeze",
@@ -838,9 +565,6 @@ def run_freeze_cascade(
             )
         # Stamp the skipped-phase status on their respective meta keys
         # so downstream readers see a consistent shape.
-        meta.setdefault("phase_4_5_smart_suggestion", {
-            "skipped": True, "skipped_reason": "terminal_skipped",
-        })
         meta.setdefault("audio_readiness", {
             "skipped": True, "skipped_reason": "terminal_skipped",
         })
@@ -866,104 +590,12 @@ def run_freeze_cascade(
         )
         return disp
 
-    # ---- Non-terminal path: Phase 4 / 4.5 / 5 / 6 / 7 / 8 / 10 ----
-    # Phase 4 per-scene coherence (LFC commit 8). Default OFF.
-    started_4 = _isoformat_utc_now()
-    hash_before_4 = _hash_lines_text(ledger_data)
-    p4_report = _phase_4_per_scene_coherence(
-        generate_fn, led,
-        enable=enable_phase_4_scene_coherence,
-    )
-    hash_after_4 = _hash_lines_text(ledger_data)
-    _stamp_phase_record(
-        ledger_data,
-        phase_name="phase_4_per_scene_coherence",
-        text_hash_before=hash_before_4,
-        text_hash_after=hash_after_4,
-        started_at=started_4,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=sum(
-            sr.get("edits_proposed", 0)
-            for sr in (
-                p4_report.scene_results if p4_report is not None else []
-            )
-        ),
-        edits_applied=(
-            p4_report.total_edits_applied
-            if p4_report is not None else 0
-        ),
-    )
-    # Phase 4.5 smart suggestion (LFC commit 11). Default OFF
-    # per ADR section 6.17. When enabled, scans for SFX/music
-    # implications and appends auto_generated=True entries.
-    started_4_5 = _isoformat_utc_now()
-    hash_before_4_5 = _hash_lines_text(ledger_data)
-    p4_5_report = _phase_4_5_smart_suggestion(
-        led,
-        enable=enable_phase_4_5_smart_suggestion,
-        generate_fn=generate_fn,
-    )
-    hash_after_4_5 = _hash_lines_text(ledger_data)
-    _stamp_phase_record(
-        ledger_data,
-        phase_name="phase_4_5_smart_suggestion",
-        text_hash_before=hash_before_4_5,
-        text_hash_after=hash_after_4_5,
-        started_at=started_4_5,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=(
-            p4_5_report.sfx_suggested + p4_5_report.music_suggested
-            if p4_5_report is not None else 0
-        ),
-        edits_applied=(
-            p4_5_report.sfx_suggested + p4_5_report.music_suggested
-            if p4_5_report is not None else 0
-        ),
-    )
-    # Phase 5 voice drift (LFC commit 9). Default OFF.
-    started_5 = _isoformat_utc_now()
-    hash_before_5 = _hash_lines_text(ledger_data)
-    p5_report = _phase_5_voice_drift(
-        generate_fn, led,
-        enable=enable_phase_5_voice_drift,
-    )
-    hash_after_5 = _hash_lines_text(ledger_data)
-    _stamp_phase_record(
-        ledger_data,
-        phase_name="phase_5_voice_drift",
-        text_hash_before=hash_before_5,
-        text_hash_after=hash_after_5,
-        started_at=started_5,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=(
-            p5_report.edits_proposed if p5_report is not None else 0
-        ),
-        edits_applied=(
-            p5_report.edits_applied if p5_report is not None else 0
-        ),
-    )
-    # Phase 6 episode arc (LFC commit 10). Default OFF.
-    started_6 = _isoformat_utc_now()
-    hash_before_6 = _hash_lines_text(ledger_data)
-    p6_report = _phase_6_episode_arc(
-        generate_fn, led,
-        enable=enable_phase_6_episode_arc,
-    )
-    hash_after_6 = _hash_lines_text(ledger_data)
-    _stamp_phase_record(
-        ledger_data,
-        phase_name="phase_6_episode_arc",
-        text_hash_before=hash_before_6,
-        text_hash_after=hash_after_6,
-        started_at=started_6,
-        finished_at=_isoformat_utc_now(),
-        edits_proposed=(
-            p6_report.edits_proposed if p6_report is not None else 0
-        ),
-        edits_applied=(
-            p6_report.edits_applied if p6_report is not None else 0
-        ),
-    )
+    # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
+    # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
+    # OTR_LFCPhase4Scene / 5Voice / 6Arc node classes were orphaned
+    # from every shipped workflow JSON and all five backing functions
+    # defaulted OFF on every code path. Cascade flow is now:
+    #   Phase 0 -> Phase 1/2/9 reviewer -> Phase 7 -> Phase 8 -> Phase 10.
 
     # Phase 7 / 8 -- deterministic readiness checks (LFC commit 5).
     started_7 = _isoformat_utc_now()
