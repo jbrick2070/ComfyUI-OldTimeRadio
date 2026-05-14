@@ -31,6 +31,7 @@ blind spot.
 """
 from __future__ import annotations
 
+import ast
 import subprocess
 
 
@@ -75,10 +76,17 @@ GENERIC_ENGLISH_LINES = frozenset({
 })
 
 
-# Path prefixes that are out of scope for this audit.
+# Path prefixes that are out of scope for this audit. Per S29 §Phase
+# 4.4, every entry carries a one-line ``# justification:`` comment.
 EXCLUDED_PATH_PREFIXES = (
+    # justification: forensic migration commentary tracked in the
+    # deferred S23.10 docs-rewrite task; not source code.
     "docs/",
+    # justification: pytest output artifacts (HTML reports, logs);
+    # not source the audit can constrain.
     "tests/_reports/",
+    # justification: data files (workflow JSON copies, golden audio),
+    # not source code; legacy strings appear by design.
     "tests/fixtures/",
 )
 
@@ -161,6 +169,94 @@ def _is_forensic_in_context(
         if i < len(lines) and _is_forensic(lines[i]):
             return True
     return False
+
+
+def _scan_collection_entries(src: str, target_node: ast.AST) -> list[int]:
+    """Return the 1-indexed line numbers of each entry in a module-
+    level collection literal (Set/FrozenSet/Tuple/List/Dict). Only
+    pure literals are scanned; anything dynamic (function calls,
+    comprehensions, name references) yields an empty list so the
+    test silently skips it.
+    """
+    if isinstance(target_node, ast.Call):
+        # frozenset({...}) / set([...])
+        if not target_node.args:
+            return []
+        inner = target_node.args[0]
+        return _scan_collection_entries(src, inner)
+    if isinstance(target_node, (ast.Set, ast.List, ast.Tuple)):
+        return [e.lineno for e in target_node.elts]
+    if isinstance(target_node, ast.Dict):
+        return [k.lineno for k in target_node.keys if k is not None]
+    return []
+
+
+def test_excluded_allowed_collections_have_per_entry_justification():
+    """S29 Phase 4.4 -- generalize the C11 / IMP-38 / S24 rule from
+    EXCLUDED_PATHS (test_legacy_audit_clean.py) to every module-level
+    ``EXCLUDED_*`` / ``ALLOWED_*`` collection across tests/.
+
+    Each entry in any such collection MUST be preceded (within the
+    3 lines above the entry) by a ``# justification:`` comment. The
+    rule exists because these collections widen the audit's blind
+    spot one entry at a time; without per-entry reasons, future
+    contributors silently bypass the audit.
+    """
+    import pathlib
+
+    tests_dir = pathlib.Path(__file__).resolve().parent
+    offenders: list[str] = []
+    for f in sorted(tests_dir.glob("*.py")):
+        src = f.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            continue
+        lines = src.splitlines()
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            if not names:
+                continue
+            name = names[0]
+            if not (name.startswith("EXCLUDED_") or name.startswith("ALLOWED_")):
+                continue
+            entry_linenos = _scan_collection_entries(src, node.value)
+            for entry_lineno in entry_linenos:
+                # Walk backwards from the line above the entry,
+                # consuming the contiguous block of `#` comment lines
+                # (and blank lines that may separate sub-comments).
+                # If the block contains `# justification:` anywhere,
+                # the entry is documented. Lines is 0-indexed;
+                # entry_lineno is 1-indexed.
+                idx = entry_lineno - 2
+                found = False
+                while idx >= 0:
+                    raw = lines[idx].strip()
+                    if raw.startswith("#"):
+                        if "# justification:" in lines[idx]:
+                            found = True
+                            break
+                        idx -= 1
+                        continue
+                    # Allow a single blank line between sub-comments,
+                    # but stop at code / multi-blank breaks.
+                    if raw == "" and idx - 1 >= 0 and lines[idx - 1].strip().startswith("#"):
+                        idx -= 1
+                        continue
+                    break
+                if not found:
+                    offenders.append(
+                        f"{f.name}:{entry_lineno} ({name}) -- "
+                        f"{lines[entry_lineno - 1].strip()[:60]}"
+                    )
+
+    assert not offenders, (
+        f"{len(offenders)} EXCLUDED_*/ALLOWED_* entries missing "
+        f"# justification: comment.\n"
+        + "\n".join(offenders[:30])
+    )
 
 
 def test_no_unclassified_legacy_references():
