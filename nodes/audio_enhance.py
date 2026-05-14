@@ -431,7 +431,9 @@ class AudioEnhance:
         try:
             import os as _os
             from . import _otr_ledger as _OTRL  # type: ignore
-            from ._otr_paths import otr_episodes_root, otr_legacy_audio_dir
+            # S28 cleanbreak: dropped dead inline `from ._otr_paths import
+            # otr_episodes_root, otr_legacy_audio_dir`. Neither symbol was
+            # referenced here; the in-flight singleton resolves the path.
             _phase_ms = int((_time.time() - _phase_t0) * 1000)
             # BUG-LOCAL-021 (Phase G): use in-flight singleton, not mtime
             # walker. See _otr_ledger.in_flight_ledger_path docstring.
