@@ -181,7 +181,7 @@ def _save_wav(path: str, waveform: np.ndarray, sample_rate: int) -> bool:
         return False
 
 
-def _load_cached_wav(path: str) -> torch.Tensor | None:
+def _load_cached_wav(path: str) -> tuple[torch.Tensor, int] | None:
     if not os.path.exists(path):
         return None
     try:

@@ -216,8 +216,8 @@ def _find_cached(cache_dir: str, prefix: str) -> str | None:
     return None
 
 
-def _load_cached_wav(path: str) -> torch.Tensor | None:
-    """Load a cached .wav as a (1, 1, T) float tensor, or None if missing."""
+def _load_cached_wav(path: str) -> tuple[torch.Tensor, int] | None:
+    """Load a cached .wav as ((1, 1, T) float tensor, sr), or None if missing."""
     if not os.path.exists(path):
         return None
     try:
