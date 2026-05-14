@@ -150,7 +150,44 @@ Per-site audit (`git grep -nE "back-compat|legacy fallback" <file>`):
 - Targeted test command: `pytest tests/test_post_audio_video_pipeline.py -q`
 - Result: 14 passed
 - Unexpected failures: none
-- Notes: Node is registered as RETIRED in __init__.py:176; the auto-pick flat-layout was forensic leftover. `otr_legacy_audio_dir` still in use by other consumer nodes (audio_enhance, batch_audiogen, batch_bark, batch_humo, batch_ltx, scene_sequencer, video_composite) — those are out of scope here (each has its own deferral verdict in B6).
+- Notes: Node is registered as RETIRED in __init__.py:176; the auto-pick flat-layout was forensic leftover. `otr_legacy_audio_dir` still in use by other consumer nodes — those are out of scope here (each has its own deferral verdict in B6).
+
+### `otr_legacy_audio_dir()` caller enumeration — closed by S27 QA-4
+
+The S26 independent QA review flagged the prior bullet's "still in use by..." list as under-enumerated. Below is the full caller inventory at s27-cleanbreak-tail HEAD (re-run `git grep -n 'otr_legacy_audio_dir' nodes/` to refresh). The enumeration is complete; the migration / deletion decision remains DEFERRED to the named B6 path-back-compat follow-up sprint.
+
+Definition + export (the `otr_legacy_audio_dir` symbol itself):
+
+- `nodes/_otr_paths.py:201` — `def otr_legacy_audio_dir() -> Path:`
+- `nodes/_otr_paths.py:524` — `"otr_legacy_audio_dir"` in `__all__`
+
+Production caller sites (13 total):
+
+- `nodes/_otr_ledger.py:328` — call site inside `in_flight_ledger_path()` fallback chain
+- `nodes/_otr_ledger.py:358` — docstring reference describing the fallback
+- `nodes/audio_enhance.py:434` — local import + call in the schema-l3 ledger writeback path
+- `nodes/batch_audiogen_generator.py:33` — module-level import
+- `nodes/batch_bark_generator.py:33` — module-level import
+- `nodes/batch_humo_render.py:65` — module-level import
+- `nodes/batch_humo_render.py:2829` — call inside `_load_ledger_with_path` auto-pick fallback
+- `nodes/batch_ltx_render.py:82` — module-level import
+- `nodes/batch_ltx_render.py:2090` — call inside `_resolve_ledger_from_input` auto-pick fallback
+- `nodes/scene_sequencer.py:879` — local import + call (SceneSequencer schema-l3 writeback path)
+- `nodes/scene_sequencer.py:1123` — local import + call (EpisodeAssembler schema-l3 writeback path)
+- `nodes/video_composite.py:90` — module-level import
+- `nodes/video_composite.py:396` — call inside `_load_ledger_with_path` auto-pick fallback
+
+(13 caller sites, not 14 as the S26 reviewer estimated. The discrepancy was the docstring reference at `_otr_ledger.py:358` being counted as a caller in the reviewer's pass.)
+
+Pattern: every caller uses `otr_legacy_audio_dir()` as a SECONDARY entry in an auto-pick fallback list, after `otr_episodes_root()` (the canonical per-episode layout) or `otr_audio_dir()` (the canonical per-episode audio dir). The migration is a search-and-replace of the legacy entry, with each call site verified to have the canonical dir already first in the list.
+
+Forensic-only references that should NOT be migrated (audit history):
+
+- `docs/2026-05-13-S25-qa-postmortem.md` and other `docs/**` entries — fine.
+- BUG_LOG.md entries — fine.
+- The forbidden-pattern sweep regex set (extended in S27 -- see Phase 5 below) -- intentional inclusion to keep future audits aware.
+
+Deferred sprint name: **"B6 path back-compat — small (otr_legacy_audio_dir migration)"**.
 
 ## B6/scene_sequencer (sfx[] consumers L939, L958, L1319) — DEFERRED
 - The two `.get("sfx") or []` reads are live consumer walks in the BUG-LOCAL-107 SFX writeback + master-mix shift path, not docstring shims. With the legacy top-level sfx[] now empty, the loops become no-ops; the SFX mirror into lines[] needs an alternate producer.

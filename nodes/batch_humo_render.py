@@ -2802,17 +2802,6 @@ class BatchHumoRender:
         return (str(clips_dir_path), total_clips_output, "\n".join(report_lines))
 
     @staticmethod
-    def _load_ledger(ledger_arg: str) -> dict:
-        """Compatibility shim around ``_load_ledger_with_path``: returns
-        only the parsed dict for callers that don't need the source
-        path. New code should prefer ``_load_ledger_with_path`` so
-        ledger-mtime-based freshness checks (BUG-LOCAL-088) can use
-        the file's mtime as a cutoff.
-        """
-        ledger, _ = BatchHumoRender._load_ledger_with_path(ledger_arg)
-        return ledger
-
-    @staticmethod
     def _load_ledger_with_path(ledger_arg: str) -> tuple[dict, Path | None]:
         """Accept either:
           - inline JSON string (starts with '{') -- returns (dict, None)

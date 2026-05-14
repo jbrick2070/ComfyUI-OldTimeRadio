@@ -379,15 +379,6 @@ def _ffprobe_dur(path: Path, ffprobe: str = "ffprobe") -> float | None:
         return None
 
 
-def _load_ledger(arg: str) -> dict:
-    """Backwards-compat shim around _load_ledger_with_path. Returns
-    only the parsed ledger dict for callers that don't need the
-    source path. New code should prefer _load_ledger_with_path so
-    the source path is available for write-back."""
-    ledger, _ = _load_ledger_with_path(arg)
-    return ledger
-
-
 def _load_ledger_with_path(arg: str) -> tuple[dict, "Path | None"]:
     """Accept inline JSON, ledger.json path, .mp4 path (suffix-swap
     to ledger), or empty (auto-pick newest non-pending). Mirrors

@@ -25,6 +25,12 @@ Issues = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+# Set explicitly per pytest-asyncio's recommendation -- otherwise the
+# plugin emits PytestDeprecationWarning at import time that
+# `asyncio_default_fixture_loop_scope` is unset. Classified as third-
+# party (pytest-asyncio plugin internal) in S27 QA-5; configuring it
+# explicitly is the upstream-recommended fix. Closes BUG-LOCAL-221.
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.pytest.ini_options.markers]
 bug_bible = "Bug Bible regression tests from survival guide"

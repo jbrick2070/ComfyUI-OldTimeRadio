@@ -933,117 +933,16 @@ class SceneSequencer:
                         if _OTRL.patch_line_fields(_led, _sfx_line_id, _sfx_fields):
                             _sfx_line_matched += 1
 
-                    # Re-pull ledger_lines after patching so the
-                    # downstream legacy ledger.sfx[] walk + SFX-mirror
-                    # block (kept as a no-op on v2 ledgers but live
-                    # for any back-compat producer) sees the latest.
-                    _ledger_lines = _led.get("lines") or []
-
-                    # BUG-LOCAL-107 (authoritative-log expansion):
-                    # write-back SFX cue placements to ledger.sfx[].
-                    # SceneSequencer's sfx_timeline holds (start_sample,
-                    # sfx_np, desc) tuples in script order; ledger.sfx[]
-                    # is also in script order so we walk both in
-                    # parallel. Positions are in SCENE-AUDIO space;
-                    # EpisodeAssembler shifts them to MASTER-MIX
-                    # alongside lines[] / clips[].
-                    _ledger_sfx = _led.get("sfx") or []
-                    _sfx_matched = 0
-                    # ROADMAP P0 step 4b (2026-04-30): also collect
-                    # SFX entries in a parallel list for mirroring
-                    # into ledger.lines[] below.  This is what gives
-                    # BatchHumoRender wall-to-wall iteration coverage
-                    # without it having to walk a separate ledger
-                    # array.  ledger.sfx[] stays populated for any
-                    # back-compat consumers.
-                    _sfx_to_mirror_into_lines = []
-                    for _sfx_idx, (_sfx_pos, _sfx_np, _sfx_desc) in enumerate(sfx_timeline):
-                        if _sfx_idx >= len(_ledger_sfx):
-                            break
-                        _sfx_row = _ledger_sfx[_sfx_idx]
-                        _sfx_row["start_s"] = float(_sfx_pos) / float(sample_rate)
-                        _sfx_row["dur_s"] = float(len(_sfx_np)) / float(sample_rate)
-                        _sfx_row["start_s_space"] = "scene_audio"
-                        # Capture the description SceneSequencer
-                        # actually placed (for diagnostic clarity).
-                        if _sfx_desc and not _sfx_row.get("description"):
-                            _sfx_row["description"] = str(_sfx_desc)
-                        _sfx_matched += 1
-                        # Mirror entry candidate.
-                        _sfx_to_mirror_into_lines.append({
-                            "line_id": _sfx_row.get("sfx_id") or _sfx_row.get("id") or f"sfx_{_sfx_idx:03d}",
-                            "speaker": "SFX",
-                            "speaker_role": "sfx",
-                            "text": str(_sfx_desc) if _sfx_desc else "",
-                            "start_s": float(_sfx_pos) / float(sample_rate),
-                            "dur_s": float(len(_sfx_np)) / float(sample_rate),
-                            "start_s_space": "scene_audio",
-                            "shot_id": _sfx_row.get("shot_id"),
-                        })
-
-                    # ROADMAP P0 step 4b: append SFX mirrors to
-                    # ledger.lines[] so BatchHumoRender's existing
-                    # speaker_role-aware loop picks them up.
-                    # 2026-04-30 round-robin hardening:
-                    #   - mirrored_from="sfx" marker so a re-run can
-                    #     drop stale entries before re-mirroring
-                    #     (Gemini's append-only-leak catch).
-                    #   - sort lines[] by start_s after mirror so the
-                    #     timeline stays chronological.
-                    # ledger.sfx[] is NOT removed -- it remains the
-                    # canonical SFX index for any consumer that walks
-                    # SFX explicitly.
-                    if _sfx_to_mirror_into_lines:
-                        # Refresh: drop prior SFX mirror rows before
-                        # re-mirroring so resume + reconfig stays clean.
-                        _kept_sfx = []
-                        _removed_sfx = 0
-                        for _ln in _ledger_lines:
-                            if (
-                                isinstance(_ln, dict)
-                                and _ln.get("mirrored_from") == "sfx"
-                            ):
-                                _removed_sfx += 1
-                                continue
-                            _kept_sfx.append(_ln)
-                        if _removed_sfx:
-                            log.info(
-                                "[SceneSequencer] dropped %d stale "
-                                "mirrored SFX line(s) before re-mirror",
-                                _removed_sfx,
-                            )
-                        _ledger_lines = _kept_sfx
-                        _existing_ids = {
-                            ln.get("line_id") for ln in _ledger_lines
-                            if isinstance(ln, dict) and ln.get("line_id")
-                        }
-                        _appended = 0
-                        for _mirror in _sfx_to_mirror_into_lines:
-                            if _mirror["line_id"] in _existing_ids:
-                                continue
-                            _mirror["mirrored_from"] = "sfx"
-                            _ledger_lines.append(_mirror)
-                            _appended += 1
-                        if _appended or _removed_sfx:
-                            # Sort by start_s so SFX entries land in
-                            # chronological order alongside dialogue.
-                            _ledger_lines.sort(
-                                key=lambda _l: (
-                                    float(_l.get("start_s"))
-                                    if isinstance(_l, dict)
-                                    and isinstance(_l.get("start_s"), (int, float))
-                                    else 1e18
-                                )
-                            )
-                            _led["lines"] = _ledger_lines
-                            log.info(
-                                "[SceneSequencer] SFX mirror: "
-                                "appended=%d, stale_removed=%d, "
-                                "total_lines=%d "
-                                "(BatchHumoRender wall-to-wall coverage)",
-                                _appended, _removed_sfx,
-                                len(_ledger_lines),
-                            )
+                    # SFX-mirror walk + ledger.sfx[] write-back deleted
+                    # S27 (cleanbreak-tail Phase 3 / QA-6). After S26-A3
+                    # dropped the sfx[] schema scaffold, _led.get("sfx")
+                    # was always []; the `if _sfx_idx >= len(_ledger_sfx):
+                    # break` guard tripped on iteration 0 every run. The
+                    # walk + its mirror block had been a permanent no-op.
+                    # SFX placement now flows through ledger.lines[] rows
+                    # carrying speaker_role="sfx", which the dialogue_
+                    # positions + sfx_line_positions loops above already
+                    # patch in scene-audio space.
 
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1054,12 +953,10 @@ class SceneSequencer:
                     log.info(
                         "[SceneSequencer] schema-l3 ledger update: phase_ms=%d "
                         "gate=post_scene_sequencer dur=%.1fs "
-                        "lines_positioned=%d/%d sfx_lines_positioned=%d/%d "
-                        "legacy_sfx_array_positioned=%d/%d",
+                        "lines_positioned=%d/%d sfx_lines_positioned=%d/%d",
                         _phase_ms, total_sec,
                         _matched, len(dialogue_positions),
                         _sfx_line_matched, len(sfx_line_positions),
-                        _sfx_matched, len(sfx_timeline),
                     )
         except Exception as _meta_exc:
             log.warning(
@@ -1290,13 +1187,16 @@ class EpisodeAssembler:
 
                     _shifted_lines = 0
                     _shifted_clips = 0
-                    _shifted_sfx = 0
                     if _shift_s > 0.0:
                         for _ln in (_led.get("lines") or []):
                             # Only shift entries that are in
                             # scene-audio space (set by SceneSequencer
                             # write-back). Avoids double-shifting on
-                            # re-runs.
+                            # re-runs. SFX rows now live as lines[]
+                            # entries with speaker_role="sfx", so this
+                            # one loop covers dialogue + sfx together
+                            # (S27 / QA-6 swept the parallel sfx-array
+                            # shift below).
                             if (
                                 _ln.get("start_s_space") == "scene_audio"
                                 and isinstance(_ln.get("start_s"), (int, float))
@@ -1314,16 +1214,6 @@ class EpisodeAssembler:
                                 _cl["start_s"] = float(_cl["start_s"]) + _shift_s
                                 _cl["start_s_space"] = "master_mix"
                                 _shifted_clips += 1
-                        # BUG-LOCAL-107: same shift for SFX cues so
-                        # ledger.sfx[].start_s is master-mix space too.
-                        for _sx in (_led.get("sfx") or []):
-                            if (
-                                _sx.get("start_s_space") == "scene_audio"
-                                and isinstance(_sx.get("start_s"), (int, float))
-                            ):
-                                _sx["start_s"] = float(_sx["start_s"]) + _shift_s
-                                _sx["start_s_space"] = "master_mix"
-                                _shifted_sfx += 1
 
                     # BUG-LOCAL-107: stamp the music cue placements.
                     # Opening theme starts at master t=0 and ends at
@@ -1598,10 +1488,8 @@ class EpisodeAssembler:
                     if _shift_s > 0.0:
                         log.info(
                             "[EpisodeAssembler] BUG-106 master-mix shift: "
-                            "+%.3fs applied to %d line(s) + %d clip(s) "
-                            "+ %d sfx",
+                            "+%.3fs applied to %d line(s) + %d clip(s)",
                             _shift_s, _shifted_lines, _shifted_clips,
-                            _shifted_sfx,
                         )
                     _gc = _OTRL.lookup_git_commit(
                         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
