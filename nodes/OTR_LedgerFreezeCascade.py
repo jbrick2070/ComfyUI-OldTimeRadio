@@ -30,7 +30,12 @@ log = logging.getLogger("OTR")
 __all__ = ["OTR_LedgerFreezeCascade"]
 
 
-DEFAULT_MODEL_ID = "mistralai/Mistral-Nemo-Instruct-2407"
+# S30 B3: DEFAULT_MODEL_ID literal DELETED. The cascade no longer
+# carries a local widget default; the technical_model id arrives over
+# the wire from the writer's broadcast output socket. An unwired
+# socket triggers MissingModelInputError at run-time -- the recovery
+# is graph-level (connect the writer's `technical_model` output),
+# not a code-side fallback.
 
 
 def _no_ledger_error_json(incoming_script_json: str) -> str:
@@ -145,82 +150,23 @@ class OTR_LedgerFreezeCascade:
                         "INT slot. Not touched by the cascade."
                     ),
                 }),
-                "model_id": ("STRING", {
-                    "default": DEFAULT_MODEL_ID,
+                # S30 B3: model_id widget + 6 phase-toggle widgets
+                # DELETED. Reviewer passes (Phase 1 / 2 / 9) consume
+                # the writer's broadcast `technical_model` socket via
+                # `technical_model` input below. Phase 3/4/4.5/5/6
+                # toggles were all defaulted OFF and the surrounding
+                # standalone LFC nodes go away in B4 -- the cascade
+                # never invoked those phases in any shipped workflow.
+                "technical_model": ("STRING", {
+                    "forceInput": True,
                     "tooltip": (
-                        "HF model ID for the reviewer LLM passes "
-                        "(Phase 1 / 2 / 9). Default Mistral-Nemo "
-                        "matches the writer's default."
-                    ),
-                }),
-                "enable_phase_3_polish": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 3 -- per-line polish. Re-runs the "
-                        "composer's polish_line over any line that "
-                        "still trips needs_polish AFTER the reviewer. "
-                        "Default OFF until soak validates the inter-"
-                        "action with the composer's inline polish pass."
-                    ),
-                }),
-                "polish_announcer_beats": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 3 -- announcer-beat handling. "
-                        "When False (default), announcer beats are "
-                        "skipped (they are by-design narration). "
-                        "When True, the announcer-aware polish prompt "
-                        "fires (per ADR section 6.1)."
-                    ),
-                }),
-                "enable_phase_4_scene_coherence": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 4 -- per-scene coherence + audio-"
-                        "first directives. Iterates scenes (music_"
-                        "inter dividers) and runs a two-step LLM "
-                        "call per scene; edits cap = min(3, scene_"
-                        "lines // 2). Also caches meta.scene_synopses "
-                        "for Phase 6 (episode arc). Default OFF until "
-                        "soak validates the prompt + scene-boundary "
-                        "logic."
-                    ),
-                }),
-                "enable_phase_4_5_smart_suggestion": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 4.5 -- deterministic SFX / music "
-                        "synthesis. Scans dialogue for verb patterns "
-                        "(start the car -> car_engine_start) and "
-                        "appends auto_generated=True beats. Default "
-                        "OFF for v2.0-alpha per ADR section 6.17."
-                    ),
-                }),
-                "enable_phase_5_voice_drift": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 5 -- per-speaker voice drift "
-                        "detection + targeted rewrites. Stats helpers "
-                        "(mean_line_length + vocab diversity) flag "
-                        "lines that diverge from a character's "
-                        "established voice; ONE batched LLM call "
-                        "rewrites the flagged subset. Default OFF "
-                        "until soak data tunes the 40 percent / 60 "
-                        "percent drift thresholds."
-                    ),
-                }),
-                "enable_phase_6_episode_arc": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "LFC Phase 6 -- episode arc audit with "
-                        "Editor-note scaffold. Reads cached "
-                        "meta.scene_synopses from Phase 4 (or "
-                        "falls back to outline intents) and runs "
-                        "ONE two-step LLM call that emits Editor "
-                        "notes scoped per-scene / speaker / "
-                        "episode. Edit cap = min(8, max(3, "
-                        "voiced_beats // 3)) -- shared pool with "
-                        "the reviewer's Doctor. Default OFF."
+                        "Resolved technical_model id from the writer's "
+                        "broadcast output (S30 B3). No local widget; "
+                        "the cascade must be wired into the writer's "
+                        "technical_model output socket to receive its "
+                        "reviewer-LLM id. Validated at run-time via "
+                        "_otr_model_inputs.require_model -- an unwired "
+                        "socket raises MissingModelInputError loud."
                     ),
                 }),
                 "enable_phase_7_audio_readiness": ("BOOLEAN", {
@@ -271,13 +217,10 @@ class OTR_LedgerFreezeCascade:
         script_json: str = "",
         news_used: str = "",
         estimated_minutes: int = 0,
-        model_id: str = DEFAULT_MODEL_ID,
-        enable_phase_3_polish: bool = False,
-        polish_announcer_beats: bool = False,
-        enable_phase_4_scene_coherence: bool = False,
-        enable_phase_4_5_smart_suggestion: bool = False,
-        enable_phase_5_voice_drift: bool = False,
-        enable_phase_6_episode_arc: bool = False,
+        # S30 B3: technical_model arrives via input socket (no widget).
+        # The 6 phase-toggle kwargs are deleted; the orchestrator's
+        # function defaults still keep Phases 3/4/4.5/5/6 OFF.
+        technical_model: str = "",
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
         vram_ceiling_gb: float = 14.0,
@@ -285,6 +228,7 @@ class OTR_LedgerFreezeCascade:
         # Lazy imports to keep node-load cheap.
         from . import _otr_freeze_cascade as _LFC_ORCH
         from . import _otr_model_loader as _OTRML
+        from . import _otr_model_inputs as _OTRMI
         from . import production_ledger as _PL
 
         has_current = getattr(_PL, "has_current_ledger", None)
@@ -316,25 +260,28 @@ class OTR_LedgerFreezeCascade:
                 "needs_full_rerun",
             )
 
-        cache_entry = _OTRML.load_llm(model_id=model_id or DEFAULT_MODEL_ID)
+        # S30 B3: resolve the technical_model id via the shared
+        # require_model helper. Fail loud (MissingModelInputError) if
+        # the input socket is unwired -- the recovery is to connect
+        # the writer's broadcast `technical_model` output.
+        # LLM slot: technical -- reviewer Phase 1 (auditor), Phase 2
+        # (Script Doctor), Phase 9 (post-edit auditor) all consume
+        # this entry. Structured verdict-style passes; routes to the
+        # technical slot per the S30 routing table.
+        resolved_technical_id = _OTRMI.require_model(
+            technical_model, slot="technical",
+        )
+        cache_entry = _OTRML.request_slot(
+            "technical", resolved_technical_id,
+        )
         generate_fn = _OTRML.make_generate_fn(cache_entry)
         # LFC commit 12, ADR section 6.4: build the polish-specific
         # generate_fn off the same cache_entry so composer-tuned
-        # sampling does not leak in. Best-effort: if the loader
-        # doesn't yet expose make_polish_generate_fn the cascade
-        # falls back to generate_fn.
-        try:
-            polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
-        except Exception as exc:  # noqa: BLE001
-            # B4 fix (commit 12.1): bumped from debug -> warning so a
-            # real make_polish_generate_fn regression surfaces in the
-            # boot log instead of silently falling back to the
-            # closure-leak path.
-            log.warning(
-                "[OTR_LedgerFreezeCascade] make_polish_generate_fn "
-                "unavailable (%s); falling back to generate_fn", exc,
-            )
-            polish_generate_fn = None
+        # sampling does not leak in. S28 cleanbreak: drop the
+        # try/except None-fallback (producer-side legacy debris).
+        # B3 keeps the call required; a factory failure surfaces as
+        # a hard node error rather than silently degrading.
+        polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
 
         log.info(
             "[OTR_LedgerFreezeCascade] running cascade on ledger %s "
@@ -356,16 +303,14 @@ class OTR_LedgerFreezeCascade:
         rebuilt_script_text = script_text or ""
         unload_ok = True
         try:
+            # S30 B3: Phase 3/4/4.5/5/6 toggles deleted at the
+            # cascade-NODE surface. The orchestrator's defaults
+            # (all OFF) carry them; B4 deletes the underlying
+            # phase functions from _otr_lfc.py.
             disp = _LFC_ORCH.run_freeze_cascade(
                 generate_fn,
                 led,
                 polish_generate_fn=polish_generate_fn,
-                enable_phase_3_polish=enable_phase_3_polish,
-                polish_announcer_beats=polish_announcer_beats,
-                enable_phase_4_scene_coherence=enable_phase_4_scene_coherence,
-                enable_phase_4_5_smart_suggestion=enable_phase_4_5_smart_suggestion,
-                enable_phase_5_voice_drift=enable_phase_5_voice_drift,
-                enable_phase_6_episode_arc=enable_phase_6_episode_arc,
                 enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
                 enable_phase_8_video_readiness=enable_phase_8_video_readiness,
                 vram_ceiling_gb=float(vram_ceiling_gb),

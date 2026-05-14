@@ -771,5 +771,235 @@ class TestWriterB2aSurface:
         )
 
 
+class TestCascadeB3Surface:
+    """S30 B3 cascade-surface guardrails. The cascade's local `model_id`
+    widget + 6 phase-toggle widgets are deleted; a `technical_model`
+    input socket replaces them, wired from the writer's broadcast
+    output. Canonical workflow JSON is the only one with the cascade
+    placed; other workflow JSONs are exempt.
+    """
+
+    _DELETED_PHASE_WIDGETS = frozenset({
+        "enable_phase_3_polish",
+        "polish_announcer_beats",
+        "enable_phase_4_scene_coherence",
+        "enable_phase_4_5_smart_suggestion",
+        "enable_phase_5_voice_drift",
+        "enable_phase_6_episode_arc",
+    })
+
+    def _cascade_class(self):
+        # Lazy import: nodes/_otr_*.py do not import torch but pulling
+        # the cascade class via `nodes.OTR_LedgerFreezeCascade` walks
+        # the package's __init__.py which DOES import torch in some
+        # paths. AST-walk the source file instead to keep this test
+        # cheap.
+        return None
+
+    def test_cascade_has_no_local_model_widget(self):
+        """AST scan of OTR_LedgerFreezeCascade.INPUT_TYPES: the
+        `optional` block must NOT contain a `model_id` widget. The
+        only model-related entry is `technical_model` and it MUST be
+        a forceInput socket (no local widget).
+        """
+        import ast
+
+        src = (
+            PACK_ROOT / "nodes" / "OTR_LedgerFreezeCascade.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        # Find OTR_LedgerFreezeCascade.INPUT_TYPES classmethod.
+        target = None
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ClassDef)
+                and node.name == "OTR_LedgerFreezeCascade"
+            ):
+                for sub in node.body:
+                    if (
+                        isinstance(sub, ast.FunctionDef)
+                        and sub.name == "INPUT_TYPES"
+                    ):
+                        target = sub
+                        break
+                break
+        assert target is not None, (
+            "OTR_LedgerFreezeCascade.INPUT_TYPES not found"
+        )
+        # Walk the function body looking for any "model_id" Dict key.
+        bad_keys: list[str] = []
+        for sub in ast.walk(target):
+            if not isinstance(sub, ast.Dict):
+                continue
+            for k in sub.keys:
+                if (
+                    isinstance(k, ast.Constant)
+                    and isinstance(k.value, str)
+                    and k.value == "model_id"
+                ):
+                    bad_keys.append(
+                        f"line {getattr(k, 'lineno', '?')}: 'model_id' key"
+                    )
+        assert not bad_keys, (
+            "cascade INPUT_TYPES must not declare a model_id widget "
+            "post-B3:\n  " + "\n  ".join(bad_keys)
+        )
+        # Confirm `technical_model` is present (sanity).
+        found_technical = False
+        for sub in ast.walk(target):
+            if not isinstance(sub, ast.Dict):
+                continue
+            for k in sub.keys:
+                if (
+                    isinstance(k, ast.Constant)
+                    and isinstance(k.value, str)
+                    and k.value == "technical_model"
+                ):
+                    found_technical = True
+                    break
+        assert found_technical, (
+            "cascade INPUT_TYPES must declare a `technical_model` "
+            "input socket (forceInput) post-B3"
+        )
+
+    def test_cascade_phase_toggles_extinct(self):
+        """AST scan: none of the 6 deleted phase-toggle widgets
+        (`enable_phase_3_polish`, `polish_announcer_beats`, etc.)
+        may appear as a key inside cascade INPUT_TYPES.
+        """
+        import ast
+
+        src = (
+            PACK_ROOT / "nodes" / "OTR_LedgerFreezeCascade.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        target = None
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ClassDef)
+                and node.name == "OTR_LedgerFreezeCascade"
+            ):
+                for sub in node.body:
+                    if (
+                        isinstance(sub, ast.FunctionDef)
+                        and sub.name == "INPUT_TYPES"
+                    ):
+                        target = sub
+                        break
+                break
+        assert target is not None
+        bad_keys: list[str] = []
+        for sub in ast.walk(target):
+            if not isinstance(sub, ast.Dict):
+                continue
+            for k in sub.keys:
+                if (
+                    isinstance(k, ast.Constant)
+                    and isinstance(k.value, str)
+                    and k.value in self._DELETED_PHASE_WIDGETS
+                ):
+                    bad_keys.append(
+                        f"line {getattr(k, 'lineno', '?')}: {k.value!r}"
+                    )
+        assert not bad_keys, (
+            "cascade INPUT_TYPES must not carry the deleted phase-"
+            "toggle widgets post-B3:\n  " + "\n  ".join(bad_keys)
+        )
+
+    def test_cascade_technical_socket_wired_in_canonical_json(self):
+        """Canonical workflow JSON must have exactly one link from
+        the writer's `technical_model` output (slot 5) to the
+        cascade's `technical_model` input. last_link_id reflects the
+        new link.
+        """
+        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
+        doc = _load_json(wf_path)
+        nodes_by_id = {n["id"]: n for n in doc.get("nodes", [])}
+        writer = next(
+            n for n in doc["nodes"]
+            if n.get("type") == "OTR_LedgerScriptWriter"
+        )
+        cascade = next(
+            n for n in doc["nodes"]
+            if n.get("type") == "OTR_LedgerFreezeCascade"
+        )
+
+        # writer.outputs[5] must broadcast at least one link.
+        writer_outputs = writer.get("outputs", [])
+        assert len(writer_outputs) >= 6
+        tm_output = writer_outputs[5]
+        assert tm_output["name"] == "technical_model"
+        assert tm_output.get("links"), (
+            f"writer.technical_model output must have at least one "
+            f"link; got {tm_output.get('links')}"
+        )
+
+        # Cascade must have technical_model input slot with a link id.
+        cascade_inputs = cascade.get("inputs", [])
+        tm_input = next(
+            (i for i in cascade_inputs if i.get("name") == "technical_model"),
+            None,
+        )
+        assert tm_input is not None, (
+            "cascade must declare a `technical_model` input slot in "
+            "the canonical workflow JSON post-B3"
+        )
+        link_id = tm_input.get("link")
+        assert link_id is not None
+
+        # Walk doc["links"] for the link with id == link_id; verify
+        # source = writer's id at slot 5.
+        link_row = next(
+            (L for L in doc.get("links", []) if L and L[0] == link_id),
+            None,
+        )
+        assert link_row is not None, (
+            f"link id {link_id} missing from doc['links']"
+        )
+        _lid, src_id, src_slot, dst_id, _dst_slot, _typ = link_row[:6]
+        assert src_id == writer["id"], (
+            f"cascade.technical_model wired from node id={src_id}; "
+            f"expected writer id={writer['id']}"
+        )
+        assert src_slot == 5, (
+            f"cascade.technical_model wired from writer output slot "
+            f"{src_slot}; expected slot 5 (writer's technical_model)"
+        )
+        assert dst_id == cascade["id"], (
+            f"link {link_id} dst={dst_id}; expected cascade id "
+            f"{cascade['id']}"
+        )
+
+        # last_link_id must reflect at least the new link id.
+        assert doc["last_link_id"] >= link_id, (
+            f"last_link_id={doc['last_link_id']} < new link "
+            f"id={link_id}"
+        )
+
+    def test_cascade_widget_vector_trimmed_in_canonical_json(self):
+        """The 7 widgets deleted from cascade INPUT_TYPES (model_id +
+        6 phase toggles) must also be trimmed from `widgets_values`.
+        Post-B3 cascade carries 3 entries: `enable_phase_7`,
+        `enable_phase_8`, `vram_ceiling_gb`.
+        """
+        wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
+        doc = _load_json(wf_path)
+        cascade = next(
+            n for n in doc["nodes"]
+            if n.get("type") == "OTR_LedgerFreezeCascade"
+        )
+        wv = cascade.get("widgets_values", [])
+        assert len(wv) == 3, (
+            f"cascade widgets_values length drift: {len(wv)} "
+            f"(expected 3 post-B3: phase_7, phase_8, vram_ceiling)"
+        )
+        # 0 = enable_phase_7_audio_readiness  (bool)
+        # 1 = enable_phase_8_video_readiness  (bool)
+        # 2 = vram_ceiling_gb                 (float)
+        assert isinstance(wv[0], bool)
+        assert isinstance(wv[1], bool)
+        assert isinstance(wv[2], (int, float))
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

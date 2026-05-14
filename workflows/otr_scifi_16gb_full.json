@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 63,
-  "last_link_id": 114,
+  "last_link_id": 115,
   "nodes": [
     {
       "id": 63,
@@ -117,7 +117,9 @@
         {
           "name": "technical_model",
           "type": "STRING",
-          "links": null,
+          "links": [
+            115
+          ],
           "slot_index": 5
         }
       ],
@@ -1938,13 +1940,6 @@
         "Node name for S&R": "OTR_LedgerFreezeCascade"
       },
       "widgets_values": [
-        "mistralai/Mistral-Nemo-Instruct-2407",
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
         true,
         true,
         14.0
@@ -1969,6 +1964,11 @@
           "name": "estimated_minutes",
           "type": "INT",
           "link": 109
+        },
+        {
+          "name": "technical_model",
+          "type": "STRING",
+          "link": 115
         }
       ],
       "outputs": [
@@ -2484,6 +2484,14 @@
       1,
       59,
       3,
+      "STRING"
+    ],
+    [
+      115,
+      1,
+      5,
+      62,
+      4,
       "STRING"
     ]
   ],
