@@ -1,0 +1,132 @@
+# S28 prep -- what the next sprint needs to know
+
+## Status at hand-back
+
+Branch `s27-cleanbreak-tail` is clean and ready to merge into
+`main` (per project rule, only Jeffrey merges). Pass count 2145 / 8
+skipped / 0 failed. EXPECTED_FAILED_NODEIDS empty. Bug Bible 23/1/2xf.
+
+S26 closed with 7 latent missed regressions; the Phase B downstream
+sweep cleared all 7 and now `s26-cleanbreak` HEAD `19cf286` is also
+clean (the merge-base S28 cuts from). No carry-over baseline noise.
+
+## S28 candidate scope
+
+### Cowork-runnable (static, no ComfyUI boot)
+
+1. **B6 path back-compat -- small (otr_legacy_audio_dir migration)**.
+   QA-4 enumerated the 13 caller sites under
+   `docs/s26-cleanbreak/audit-results.md`. Each is a one-line swap from a
+   secondary fallback-list entry to the canonical
+   `otr_audio_dir()` / `otr_episodes_root()`. The pattern is uniform,
+   the producers are zero, and the tests will catch any drift.
+   Suggested cut: one sweep PR covering all 13 sites + one targeted
+   pytest run per producer (`pytest tests/test_batch_*.py
+   tests/test_video_composite.py tests/test_scene_sequencer.py`).
+
+2. **B4 line-composer + B5 freeze-contract tightening**. Deferred from
+   S26 with named follow-up sprints. Static-only if the producer-side
+   audits complete cleanly first. Cowork-runnable as long as the
+   producer audit doesn't surface a runtime question.
+
+3. **Three-File Contract promotion**. BUG-LOCAL-221, 222, 223 are now
+   all FIXED Bible candidates; the promotion list at the top of
+   `BUG_LOG.md` is 20 entries deep. Batch-promote to the
+   `comfyui-custom-node-survival-guide` repo per the standing
+   feedback_roadmap_buglog_live_docs rule once v2.0 ships. (Out of S28
+   scope but ready when the v2.0 milestone lands.)
+
+### Jeffrey-driven (needs the console)
+
+1. **Post-cleanbreak ComfyUI runtime pass**. Boot ComfyUI Desktop at
+   `localhost:8000`, load `workflows/otr_scifi_16gb_full.json`, run a
+   canonical short-settings smoke (3 scenes, ~30 second target). Watch
+   for the `DELETED_NODE_TYPES` validator firing on any stale workflow
+   the user still has cached. Re-save any workflow that Cowork's S27
+   directive flagged for re-save in the textual scrub step (zero
+   flagged this sprint -- workflows were already clean).
+
+2. **B2 _otr_outline.py back-compat sweep**. STOPPED in S26 pending
+   design judgment on mandate-budget vs preserve-bare-format. Resumes
+   when Jeffrey provides direction. Cowork cannot decide this alone.
+
+3. **Two-Model Selector / Sprint #1 (B)**. Jeffrey's deferred feature
+   work, now fully unblocked. Out of cleanbreak scope -- this is
+   forward feature work.
+
+## Suggested S28 split
+
+- **S28a** -- static, Cowork-runnable: B6 path-back-compat sweep
+  (13 sites). Single PR, single regression pass.
+- **S28b** -- ComfyUI runtime pass, Jeffrey-driven. Boots Desktop,
+  runs the canonical workflow, confirms no node-class loader warnings
+  and no validator violations.
+
+After S28a + S28b: cleanbreak is genuinely done. Forward work
+(features, the visual sidecar, the LFC freeze-cascade hardening that
+already shipped, etc.) is all that remains.
+
+## Known production bugs that stay
+
+Per the directive §13 reviewer prompt:
+
+> Sync drift, LTX clip metadata, Gaussian splat rendering, SIGNAL LOST
+> narrative layer. These are forward work on the new ledger, not
+> cleanbreak targets. Do not flag them in the next QA.
+
+These are real bugs to file work against -- but they're not S27 or
+S28 cleanbreak targets. The independent QA reviewer should NOT flag
+them as missed cleanbreak items.
+
+## The independent QA prompt
+
+Verbatim from the S27 directive §13 -- paste into a fresh Claude
+session after S27 closes:
+
+```
+Independent adversarial QA review of an autonomous cleanbreak tail
+sprint Claude Cowork just ran.
+
+The rule: the new ledger is the only ledger. Legacy ledger
+tolerance code deletes. Production nodes that consumed the old
+ledger get migrated to the new ledger -- touching them is correct,
+deleting them is not. The production pipeline (FLUX, LTX, HuMo, RTX
+upscale, MusicGen, AudioGen, the LFC freeze cascade, WorldMirror,
+the cast pipeline, etc.) stays. Known bugs in production code stay
+-- bugs are forward work, not cleanbreak targets.
+
+S27 is the tail sprint that closes the back-compat-for-old-data
+surfaces the S26 reviewer accepted as scope decisions. The two
+specific surfaces S27 was authorized to delete:
+
+1. __init__.py:181 OTR_PostAudioVideoPipeline registration (kept
+   only for old workflow JSON to load) + the whole file
+   nodes/post_audio_video_pipeline.py + workflow JSON scrub
+2. production_ledger.py set_sfx + apply_sfx_timings +
+   _merge_with_disk::ROW_KEYED["sfx"] (kept only for old on-disk
+   ledger forwarding)
+
+Plus enumeration closures for the QA-2 / QA-3 / QA-4 / QA-5 / QA-6
+items from the S26 independent review.
+
+Read in this order:
+1. docs/s27-cleanbreak-tail/final-qa-review.md
+2. docs/2026-05-13-S27-cleanbreak-tail-sprint.md
+3. docs/s26-cleanbreak/final-qa-review.md + the S26 independent review
+4. git log s26-cleanbreak..HEAD and git diff s26-cleanbreak..HEAD
+5. Current BUG_LOG.md and ROADMAP.md
+
+Start from "cleanbreak is incomplete until proven otherwise." The
+S24->S25->S26->S27 chain has rationalized deferrals before; your job
+is to catch that pattern if it came back.
+
+[full check list at directive §13]
+
+Be adversarial. The S26 review applied "zero current callers" as a
+sufficient threshold to keep back-compat surfaces alive. By
+Jeffrey's directive that threshold is wrong -- zero current callers
+is the green light to DELETE, not the excuse to preserve. Apply
+Jeffrey's threshold, not the prior reviewer's.
+```
+
+The full directive prompt at §13 of `docs/2026-05-13-S27-cleanbreak-tail-sprint.md`.
