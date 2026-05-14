@@ -1,0 +1,20 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1
+============================= test session starts =============================
+platform win32 -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+configfile: pyproject.toml
+plugins: anyio-4.12.1, jaxtyping-0.3.9, langsmith-0.7.12, asyncio-1.3.0, typeguard-4.5.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/test_audio_byte_identical.py::TestBaselineFixtureIntegrity::test_baseline_wav_not_empty PASSED [ 12%]
+tests/test_audio_byte_identical.py::TestBaselineFixtureIntegrity::test_baseline_sha_matches_wav PASSED [ 25%]
+tests/test_audio_byte_identical.py::TestBaselineFixtureIntegrity::test_baseline_sha_is_valid_hex PASSED [ 37%]
+tests/test_audio_byte_identical.py::TestWorkflowSeedContract::test_workflow_exists PASSED [ 50%]
+tests/test_audio_byte_identical.py::TestWorkflowSeedContract::test_workflow_valid_json PASSED [ 62%]
+tests/test_audio_byte_identical.py::TestWorkflowSeedContract::test_all_seed_target_nodes_exist_in_workflow PASSED [ 75%]
+tests/test_audio_byte_identical.py::TestWorkflowSeedContract::test_episode_assembler_present PASSED [ 87%]
+tests/test_audio_byte_identical.py::TestAudioRegressionGate::test_audio_byte_identical_to_baseline SKIPPEDmfyUI + GPU.) [100%]
+
+======================== 7 passed, 1 skipped in 1.64s =========================
