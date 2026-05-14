@@ -77,9 +77,11 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ## CURRENT WORK -- S30 Two-Model Selector (IN FLIGHT, paused at B1c 2026-05-14)
 
-**Branch:** `s30-two-model-selector` (cut from `s29-clean-slate-gate @ a63f3e7`; S29 has not been merged to `v2.0-alpha` yet, so the cut point captures the post-S29 code state without an autonomous merge to `v2.0-alpha`).
-**Plan:** `docs/2026-05-14-S30-two-model-selector-sprint-plan.md`
-**Total commits planned:** 15 (was 14; +1 for B4b added below).
+**Branch:** `s30-two-model-selector` (cut from `s29-clean-slate-gate @ a63f3e7`; S29 has not been merged to `v2.0-alpha` yet, so the cut point captures the post-S29 code state without an autonomous merge to `v2.0-alpha`). **Single linear branch — no sub-branches for B1d-B8; commits land here.**
+**Parent plan:** `docs/2026-05-14-S30-two-model-selector-sprint-plan.md` (original 14-commit playbook).
+**Continuation plan:** `docs/2026-05-14-S30-continuation-plan.md` (fresh-session execution for B1d → B8, pytest-only, no ComfyUI runs in this sprint).
+**Final QA template:** `docs/2026-05-14-S30-final-qa-review.md` (filled in at B8).
+**Total commits planned:** 16 (was 14; +1 for B4b which fixes BUG-LOCAL-226, +1 for B1d hotfix added during B1c handoff review).
 **Landed (5):**
 
 | # | Hash | Subject |
@@ -90,7 +92,15 @@ After the current round of cleanbreak validation work closes, the next three spr
 | 4 | `d307348` | B1b: dynamic context-cap (catalog ContextCapVerdict + HARD_VRAM_CONTEXT_LIMIT clamp); delete MODEL_CONTEXT_CAPS / DEFAULT_CONTEXT_CAP |
 | 5 | `53ac152` | B1c: loader slot primitives (unload_llm + request_slot + check_vram_fit) |
 
-**Pending (10):** B2a, B2b, B2c, B3, B4, B4b (new), B5, B6, B7, B8.
+**Pending (11):** B1d (new pre-B2a hotfix — 7 P0 defects in B0-B1c), B2a, B2b, B2c, B3, B4, B4b, B5, B6, B7, B8.
+
+**Branch / no-legacy / no-extra-branches rules for B1d onward:**
+
+- Every commit lands on `s30-two-model-selector` directly. No sub-branches.
+- v2.0-alpha umbrella holds. No version-label bumps in commits, docs, BUG_LOG entries, or filenames.
+- No legacy back-compat reintroduced (no `_RENAME_ALIASES`, no fallback-on-unknown, no "stamp both" meta keys, no transition shims).
+- No separate change-log files. Updates flow only to `BUG_LOG.md` and `ROADMAP.md`.
+- No ComfyUI Desktop runtime testing in this sprint. Pytest gates only. Real-pipeline audio gate deferred to an operator-driven follow-up sprint after B8.
 
 **P0 finding logged in BUG_LOG.md as BUG-LOCAL-226:** the S30 sprint plan section 2b claimed `nodes/story_orchestrator.py::_load_llm` is dead-runtime. The mandatory REVIEW-step grep at B0 kickoff caught a live caller chain (`OTR_LedgerScriptWriter._resolve_news_seed -> _fetch_rss_seed_or_die -> _so._fetch_science_news -> _llm_rank_news_candidates / _llm_rerank_with_bodies -> _generate_with_llm -> _load_llm`). Sprint plan adjusted: new commit B4b inserted between B4 and B5 to rewire the RSS news path through `_otr_model_loader.request_slot` BEFORE deleting the orchestrator's parallel LLM stack.
 

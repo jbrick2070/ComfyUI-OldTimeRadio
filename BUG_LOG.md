@@ -2,8 +2,8 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-226 (2026-05-14) -- S30 sprint-plan §2b audit claimed `nodes/story_orchestrator.py::_load_llm` is dead-runtime; a fresh grep at B0 kickoff caught a live caller chain `OTR_LedgerScriptWriter._resolve_news_seed -> _fetch_rss_seed_or_die -> _so._fetch_science_news -> _llm_rank_news_candidates / _llm_rerank_with_bodies -> _generate_with_llm -> _load_llm`. B0 narrowed to forensic-comment scrub only; LLM-stack deletion moved to new commit B4b after the RSS path is rewired through the slot scheduler.
-**Stack head when last updated:** S30 B0 commit (s30-two-model-selector branch)
+**Last entry:** BUG-LOCAL-226 (2026-05-14) -- S30 sprint-plan §2b audit claimed `nodes/story_orchestrator.py::_load_llm` is dead-runtime; a fresh grep at B0 kickoff caught a live caller chain `OTR_LedgerScriptWriter._resolve_news_seed -> _fetch_rss_seed_or_die -> _so._fetch_science_news -> _llm_rank_news_candidates / _llm_rerank_with_bodies -> _generate_with_llm -> _load_llm`. Fix scheduled at B4b after the RSS path is rewired through `_otr_model_loader.request_slot`. Mark `[FIXED <hash> <date>]` in the B4b commit.
+**Stack head when last updated:** S30 paused at B1c handoff `b12b941` (s30-two-model-selector branch). Continuation plan at `docs/2026-05-14-S30-continuation-plan.md`. Final QA review template at `docs/2026-05-14-S30-final-qa-review.md` (filled in at B8).
 **Promotion target:** `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`
 **Bible candidates pending promotion:** 22 entries (BUG-LOCAL-201, 202, 204, 205, 207, 208, 209, 210, 211, 212, 213, 214, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225) -- see "Bible candidates pending promotion" section below. Batch-promote after v2.0 ships per `feedback_roadmap_buglog_live_docs`. 221 closed S27 QA-5 (third-party reclassification + `_strict_probe.py` durable harness).
 
