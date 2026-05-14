@@ -1023,12 +1023,32 @@ class Ledger:
         # SignalLostVideo overwrites it via set_final_paths -- that's
         # an explicit overwrite, not a merge concern.
         TOP_PRESERVE = (
-            "schema_version", "meta", "audio_gates", "transitions",
+            "schema_version", "audio_gates", "transitions",
             "radio_bookend_path",
         )
         for k in TOP_PRESERVE:
             if k in on_disk and (k not in in_mem or in_mem.get(k) in (None, "", [], {})):
                 in_mem[k] = on_disk[k]
+
+        # `meta` is recursive: BUG-LOCAL-018 (7c84ee8) added meta.paths
+        # which made in_mem["meta"] always non-empty at save time, so
+        # the bulk-replace rule above stopped copying disk meta. That
+        # silently dropped schema-l3 phase telemetry written by audio
+        # nodes (meta.phase_ms.bark, meta.git_commit, etc.) on every
+        # SignalLostVideo dual-ledger save. Fix: per-key merge -- disk
+        # wins where in-mem doesn't have a key or has an empty value;
+        # in-mem wins where it has a real value.
+        if "meta" in on_disk:
+            disk_meta = on_disk.get("meta") or {}
+            if not isinstance(disk_meta, dict):
+                disk_meta = {}
+            in_mem_meta = in_mem.get("meta")
+            if not isinstance(in_mem_meta, dict):
+                in_mem_meta = {}
+            for mk, mv in disk_meta.items():
+                if mk not in in_mem_meta or in_mem_meta.get(mk) in (None, "", [], {}):
+                    in_mem_meta[mk] = mv
+            in_mem["meta"] = in_mem_meta
 
         # Per-row merge. Keyed by line_id (lines, clips) or cue_id
         # (sfx, music).
