@@ -223,18 +223,25 @@ class VisualPromptCoercion:
     """
     Clean raw script_json before it reaches OTR_VisualBridge.
 
-    Wire:
-        OTR_VisualLLMSelector.model_id ──┐
+    Wire (S30 B5):
+        OTR_LedgerScriptWriter.creative_writing_model ──┐
         raw_script_json ─► OTR_VisualPromptCoercion ─► OTR_VisualBridge
+
+    The legacy OTR_VisualLLMSelector node was a local model picker
+    that duplicated the writer's model surface; S30 B5 deleted it
+    and routes the model_id directly from the writer's broadcast
+    `creative_writing_model` output socket. Wire the socket up to
+    enable the LLM polish pass; leave unwired for rule-based-only
+    cleanup.
 
     Required input:
         script_json: STRING (Canonical Audio Token array as JSON)
 
     Optional inputs:
-        model_id:       STRING ("none" or a HF id from the central
-                                OTR_VisualLLMSelector switcher).  When
-                                != "none", the LLM polish pass slot is
-                                activated; v1 is a no-op stub.
+        model_id:       STRING (HF id from the writer's
+                                `creative_writing_model` broadcast).
+                                Empty / unwired = rule-based cleanup
+                                only, no LLM pass.
         llm_model:      any    (pre-loaded LLM handle; v2 seam)
         max_env_words:  INT    (override environment word cap)
 
@@ -262,17 +269,19 @@ class VisualPromptCoercion:
                 }),
             },
             "optional": {
-                # Feed this from OTR_VisualLLMSelector.model_id so the
-                # whole visual path shares one LLM choice.  Default
-                # "none" keeps the node in rule-based-only mode, which
-                # is the safe behaviour when the selector is not wired.
+                # S30 B5: feed this from OTR_LedgerScriptWriter's
+                # `creative_writing_model` broadcast output. Visual-
+                # prompt polish is a narrative-style rewrite (cinematic
+                # diffusion prompt cleanup), so it routes to the
+                # creative slot per the S30 routing table. Empty /
+                # unwired keeps the node in rule-based-only mode.
                 "model_id": ("STRING", {
-                    "default": "none",
+                    "default": "",
                     "forceInput": True,
                     "tooltip": (
-                        "Wire from OTR_VisualLLMSelector.model_id. "
-                        "'none' (default) = rule-based cleanup only, "
-                        "no LLM pass."
+                        "Wire from OTR_LedgerScriptWriter."
+                        "creative_writing_model. Empty / unwired = "
+                        "rule-based cleanup only, no LLM pass."
                     ),
                 }),
                 # Optional loaded-model handle -- reserved for v2 when

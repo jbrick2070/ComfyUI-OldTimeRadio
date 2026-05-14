@@ -55,8 +55,9 @@ __all__ = [
 #
 # Records the currently-resident cache_entry so request_slot can detect
 # slot transitions and decide between cache-reuse (same model) vs full
-# unload + reload (different model). visual/llm_polish.py's local
-# _POLISH_CACHE collapses into this in B5.
+# unload + reload (different model). S30 B5 collapsed
+# visual/llm_polish.py's local cache into this single source of truth
+# so the 16 GB card never double-loads a model.
 # ---------------------------------------------------------------------------
 
 

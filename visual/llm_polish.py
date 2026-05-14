@@ -1,8 +1,9 @@
 """
 llm_polish.py  --  Real LLM polish pass for visual-path prompts
 =================================================================
-Consumed by OTR_VisualPromptCoercion when the central
-OTR_VisualLLMSelector hands it a model_id other than "none".
+Consumed by OTR_VisualPromptCoercion. Receives its model_id from the
+writer's `creative_writing_model` broadcast output socket (S30 B5;
+the legacy OTR_VisualLLMSelector picker node was deleted).
 
 Scope (v1 live):
     - Polish ENVIRONMENT tokens only.  Dialogue text is TTS-critical
@@ -12,23 +13,23 @@ Scope (v1 live):
     - Deterministic (do_sample=False) so the same input yields the
       same polished output across runs.
 
-Design intent:
-    - Single module-level model cache keyed by (model_id, dtype)
-      so swapping model_id on the selector reloads lazily.
-    - HF_TOKEN is resolved via _hf_token.ensure_hf_token() on every
-      load so gated models (Gemma/Mistral) work without manual setup.
-    - local_files_only=True first, Hub fallback only if the cache
-      lookup raises -- matches story_orchestrator's pattern.
-    - 1-token warmup after load to absorb CUDA JIT stall (Blackwell
-      sm_120 + SDPA hits this on first generate).
+Design intent (S30 B5 onward):
+    - Model acquisition routes through
+      `_otr_model_loader.request_slot("creative", model_id)`. ONE
+      LLM_CACHE in the loader holds at most one resident model
+      regardless of how many surfaces request it (writer +
+      cascade + visual all share the cache).
+    - HF_TOKEN is resolved via _hf_token.ensure_hf_token() before
+      request_slot so gated models (Gemma/Mistral) work without
+      manual setup.
     - Graceful fallback: any exception returns the rule-cleaned
       input untouched + a diagnostic note.  Audio is never threatened.
 
 Not in v1 (deferred):
-    - Quantization dispatch (story_orchestrator owns this for now).
-    - max_memory / device_map "auto" -- visual polish is small enough
-      that plain .to(device) is fine.
     - Multi-token polish of dialogue (TTS parity too risky).
+    - Sampling-config respect for the model's own generation_config.json
+      (currently uses do_sample=False; the audio-intentional sprint
+      will address this for the polish path).
 """
 
 from __future__ import annotations
@@ -44,15 +45,15 @@ log = logging.getLogger("OTR.visual.llm_polish")
 
 
 # ---------------------------------------------------------------------------
-# Module-level model cache
+# S30 B5: _POLISH_CACHE module-level dict + _load_model() function
+# DELETED. Three caches existed before this commit (writer-side,
+# orchestrator-side, polish-side); on the 16 GB card any one
+# combination could double-load Mistral-Nemo and OOM (Prime Directive
+# 2). Visual polish now acquires its model_id via the shared
+# _otr_model_loader.request_slot("creative", model_id) entry point so
+# the single LLM_CACHE in the loader holds at most ONE resident model
+# regardless of how many surfaces request it.
 # ---------------------------------------------------------------------------
-_POLISH_CACHE: dict[str, Any] = {
-    "model_id": None,
-    "model": None,
-    "tokenizer": None,
-    "device": None,
-    "loaded_at": 0.0,
-}
 
 
 _SYSTEM_PROMPT = (
@@ -64,150 +65,52 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _load_model(model_id: str) -> tuple[Any, Any, str] | None:
-    """Load (or reuse) the LLM for visual-prompt polish.
+def _acquire_polish_entry(model_id: str) -> tuple[Any, Any, str] | None:
+    """Acquire (or reuse cached) LLM cache_entry for visual-prompt
+    polish via the shared loader's slot scheduler.
+
+    LLM slot: creative -- visual prompt cleanup is narrative-style
+    rewrite (one-line cinematic descriptions for diffusion); routes
+    to the creative slot per the S30 routing table.
 
     Returns (model, tokenizer, device) on success, None on failure.
-    Failures are logged but never raise.
+    Failures are logged but never raise -- the polish path falls
+    back to rule-based cleanup whenever this returns None.
     """
-    if _POLISH_CACHE["model_id"] == model_id and _POLISH_CACHE["model"] is not None:
-        return (
-            _POLISH_CACHE["model"],
-            _POLISH_CACHE["tokenizer"],
-            _POLISH_CACHE["device"],
-        )
-
-    # Heavy imports are lazy so node-scan never pays transformers cost.
     try:
-        import torch
-        from transformers import AutoTokenizer, AutoModelForCausalLM
+        # Lazy import: visual/ depends on torch via the loader chain
+        # but llm_polish is consumed at module-load time by node-scan;
+        # the import lives inside the function so importing this
+        # module never pulls torch.
+        from nodes import _otr_model_loader as _OTRML  # type: ignore
     except ImportError as exc:
-        log.warning("[llm_polish] transformers/torch not available: %s", exc)
+        log.warning(
+            "[llm_polish] _otr_model_loader not importable: %s", exc,
+        )
         return None
-
-    # Make sure HF_TOKEN is live in os.environ before load attempts.
-    token = ensure_hf_token()
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    load_dtype = torch.bfloat16 if device == "cuda" else torch.float32
-    cache_dir = os.path.join(
-        os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface")),
-        "hub",
+    # Make sure HF_TOKEN is live in os.environ before request_slot
+    # hits any gated repo (Mistral-Nemo / Gemma family).
+    ensure_hf_token()
+    try:
+        cache_entry = _OTRML.request_slot("creative", model_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[llm_polish] request_slot failed for %s: %s", model_id, exc,
+        )
+        return None
+    model = cache_entry.get("model")
+    tokenizer = cache_entry.get("tokenizer")
+    device = cache_entry.get("device", "cuda")
+    if model is None or tokenizer is None:
+        log.warning(
+            "[llm_polish] request_slot returned incomplete entry for %s",
+            model_id,
+        )
+        return None
+    log.info(
+        "[llm_polish] using cache_entry for %s on %s (single LLM_CACHE)",
+        model_id, device,
     )
-
-    # Tokenizer first -- cheaper, proves the cache works before we
-    # download multi-GB weights.
-    try:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_id,
-                local_files_only=True,
-                trust_remote_code=False,
-                cache_dir=cache_dir,
-                token=token,
-            )
-        except Exception:
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_id,
-                trust_remote_code=False,
-                cache_dir=cache_dir,
-                token=token,
-            )
-    except Exception as exc:
-        log.warning("[llm_polish] tokenizer load failed for %s: %s", model_id, exc)
-        return None
-
-    # v1.7 parity: 4-bit NF4 quantization via bitsandbytes.  Mirrors
-    # story_orchestrator's fast-path so Mistral-Nemo 12B drops from
-    # ~24 GB bf16 to ~6 GB NF4 and generation speeds up 2-3x from memory
-    # bandwidth savings.  Visual polish produces short outputs (<= 80
-    # words) so NF4 quality loss is irrelevant in practice.
-    quant_config = None
-    if device == "cuda":
-        try:
-            from transformers import BitsAndBytesConfig  # type: ignore
-            quant_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.bfloat16,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-            )
-            log.info("[llm_polish] 4-bit NF4 enabled (bitsandbytes)")
-        except ImportError:
-            log.warning(
-                "[llm_polish] bitsandbytes not installed -- Mistral-Nemo 12B "
-                "will load at bfloat16 (~24 GB). Install with: pip install bitsandbytes"
-            )
-
-    load_kwargs: dict[str, Any] = dict(
-        trust_remote_code=False,
-        attn_implementation="sdpa",
-        low_cpu_mem_usage=True,
-        cache_dir=cache_dir,
-        token=token,
-    )
-    if quant_config is not None:
-        load_kwargs["quantization_config"] = quant_config
-        # Pin on GPU 0 -- matches story_orchestrator's flagship override
-        # so bitsandbytes doesn't sneakily dispatch layers to CPU.
-        load_kwargs["device_map"] = {"": 0}
-    else:
-        load_kwargs["torch_dtype"] = load_dtype
-
-    # Now the model weights.  Visual polish generates short outputs
-    # (<= 80 words), so no KV-cache hardening is required here.
-    try:
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                local_files_only=True,
-                **load_kwargs,
-            )
-        except Exception as cache_err:
-            log.info(
-                "[llm_polish] local cache miss for %s (%s); trying Hub",
-                model_id,
-                type(cache_err).__name__,
-            )
-            model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                **load_kwargs,
-            )
-    except Exception as exc:
-        log.warning("[llm_polish] model load failed for %s: %s", model_id, exc)
-        return None
-
-    try:
-        # When quant_config is set, bitsandbytes + device_map already placed
-        # the model on GPU.  Calling .to("cuda") on a 4-bit quantized model
-        # raises; skip it.  For the bfloat16 fallback path, .to(device) is
-        # the legacy behavior.
-        if quant_config is None:
-            model = model.to(device)
-        model = model.eval()
-    except Exception as exc:
-        log.warning("[llm_polish] model.to(%s) failed: %s", device, exc)
-        return None
-
-    # 1-token warmup -- absorbs the Blackwell SDPA JIT stall so the
-    # first real polish call does not block for 30s+.
-    try:
-        warm_ids = tokenizer("Test.", return_tensors="pt")["input_ids"].to(device)
-        with torch.no_grad():
-            model.generate(warm_ids, max_new_tokens=1, do_sample=False)
-        del warm_ids
-        if device == "cuda":
-            torch.cuda.empty_cache()
-    except Exception as exc:
-        log.debug("[llm_polish] warmup failed (non-fatal): %s", exc)
-
-    _POLISH_CACHE["model_id"] = model_id
-    _POLISH_CACHE["model"] = model
-    _POLISH_CACHE["tokenizer"] = tokenizer
-    _POLISH_CACHE["device"] = device
-    _POLISH_CACHE["loaded_at"] = time.time()
-
-    log.info("[llm_polish] loaded %s on %s", model_id, device)
     return (model, tokenizer, device)
 
 
@@ -291,13 +194,16 @@ def polish_environment_prompts(
         "model_id": model_id,
     }
 
-    if model_id == "none" or not model_id:
+    # S30 B5: legacy "none" sentinel deleted (it tied to the deleted
+    # OTR_VisualLLMSelector picker). An empty / unwired model_id
+    # still skips the LLM pass and routes to rule-based-only cleanup.
+    if not model_id:
         stats["polish_skipped"] = sum(
             1 for t in tokens if isinstance(t, dict) and t.get("type") == "environment"
         )
         return list(tokens), stats
 
-    loaded = _load_model(model_id)
+    loaded = _acquire_polish_entry(model_id)
     if loaded is None:
         stats["polish_fallback"] = True
         stats["polish_skipped"] = sum(
@@ -389,23 +295,20 @@ def polish_environment_prompts(
 
 
 def unload() -> None:
-    """Release cached model (test hook + manual VRAM flush path)."""
-    model = _POLISH_CACHE.get("model")
-    if model is not None:
-        try:
-            import gc
-            import torch
-            del _POLISH_CACHE["model"]
-            _POLISH_CACHE["model"] = None
-            _POLISH_CACHE["tokenizer"] = None
-            _POLISH_CACHE["model_id"] = None
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except Exception:
-            _POLISH_CACHE["model"] = None
-            _POLISH_CACHE["tokenizer"] = None
-            _POLISH_CACHE["model_id"] = None
+    """Release cached model (test hook + manual VRAM flush path).
+
+    S30 B5: delegates to the shared _otr_model_loader.unload_llm()
+    since visual polish no longer owns a separate cache. Any
+    consumer that was calling visual.llm_polish.unload() continues
+    to work; the teardown now releases the single LLM_CACHE in the
+    loader (and the legacy orchestrator stack via the loader's
+    best-effort fallback).
+    """
+    try:
+        from nodes import _otr_model_loader as _OTRML  # type: ignore
+        _OTRML.unload_llm()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("[llm_polish] unload delegation failed: %s", exc)
 
 
 __all__ = ["polish_environment_prompts", "unload"]

@@ -151,7 +151,14 @@ _NODE_MODULES = {
     "OTR_VisualPoll":           (".visual.poll",              "VisualPoll",           " Visual Poll"),
     "OTR_VisualRenderer":       (".visual.renderer",          "VisualRenderer",       " Visual Renderer"),
     "OTR_VisualPromptCoercion": (".visual.prompt_coercion",   "VisualPromptCoercion", " Visual Prompt Coercion"),
-    "OTR_VisualLLMSelector":    (".visual.llm_selector",      "VisualLLMSelector",    " Visual LLM Selector"),
+    # S30 B5 (2026-05-14): OTR_VisualLLMSelector node + visual/llm_selector.py
+    # DELETED. The visual-polish path now consumes the writer's broadcast
+    # `creative_writing_model` socket directly (the selector was a
+    # redundant local model picker that duplicated the writer's surface).
+    # visual/llm_polish.py's _POLISH_CACHE module-level dict + _load_model()
+    # function were collapsed into the modern _otr_model_loader.LLM_CACHE
+    # in the same commit (Prime Directive 2: never double-load
+    # Mistral-Nemo on the 16 GB card).
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
     "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
     "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),

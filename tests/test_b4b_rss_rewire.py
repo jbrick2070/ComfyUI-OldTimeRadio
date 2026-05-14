@@ -138,15 +138,15 @@ def test_importers_use_new_unload_path(rel_path):
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             module = node.module or ""
-            for alias in node.names:
+            for imp_alias in node.names:
                 if (
                     module.endswith("story_orchestrator")
-                    and alias.name == "_unload_llm"
+                    and imp_alias.name == "_unload_llm"
                 ):
                     legacy_imports.append(f"line {node.lineno}")
                 if (
                     module.endswith("_otr_model_loader")
-                    and alias.name == "unload_llm"
+                    and imp_alias.name == "unload_llm"
                 ):
                     new_imports.append(f"line {node.lineno}")
     assert not legacy_imports, (
@@ -179,8 +179,8 @@ def test_no_orchestrator_unload_llm_import_in_packages():
                     module = node.module or ""
                     if not module.endswith("story_orchestrator"):
                         continue
-                    for alias in node.names:
-                        if alias.name == "_unload_llm":
+                    for imp_alias in node.names:
+                        if imp_alias.name == "_unload_llm":
                             offenders.append(
                                 f"{path.relative_to(PACK_ROOT).as_posix()}"
                                 f":{node.lineno}"
