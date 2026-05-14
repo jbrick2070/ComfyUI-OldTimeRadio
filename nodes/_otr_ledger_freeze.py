@@ -344,12 +344,15 @@ def _check_per_line_invariants(
                 )
             tsr = ln.get("tts_skip_reason")
             if not isinstance(tsr, str) or not tsr:
-                # Phantom-skip + reviewer-skip both stamp this; missing
-                # is a warning because some legacy fallbacks set skip
-                # without the reason.
-                warnings.append(
+                # S28 cleanbreak: promoted warning -> error. Phantom-skip
+                # and reviewer-skip both stamp tts_skip_reason on every
+                # production path. The pre-S28 warn-only tolerance for
+                # "some legacy fallbacks set skip without the reason"
+                # is extinct under Rule A + Rule B (uniform shape).
+                errors.append(
                     f"line_id={line_id!r} skip=True but tts_skip_reason "
-                    f"empty/missing"
+                    f"empty/missing (writer contract violation; every "
+                    f"skip path must stamp the reason)"
                 )
         else:
             # Non-skipped voiced beats must have non-empty text.
