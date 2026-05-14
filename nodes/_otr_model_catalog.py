@@ -526,7 +526,25 @@ class VRAMFitVerdict:
     soak_tested: bool
 
 
-def _estimate_resident_gb(model_id: str) -> float | None:
+# B1d: special-case resident estimates for uncurated ids we KNOW are
+# oversize regardless of dtype / quantization. Used so the 70B-on-16GB
+# guardrail fires without requiring the model to be added to the
+# curated set (we never want to advertise 70B in the dropdown).
+# Values are RESIDENT GB estimates -- _estimate_resident_gb returns
+# them as-is (curated entries go through the BF16-download/2 path).
+SPECIAL_VRAM_ESTIMATES_GB: dict[str, float] = {
+    TEST_OVERSIZED_LLM: 42.0,
+    # 70B-class roughly 35 GB at NF4, 70 GB at 8-bit, 140 GB BF16; 42
+    # sits between NF4 and 8-bit and still trips the 1.5x FAIL ratio on
+    # the 14.5 GB ceiling.
+}
+
+
+def _estimate_resident_gb(
+    model_id: str,
+    *,
+    safetensors_gb_hint: float | None = None,
+) -> float | None:
     """Rough heuristic for VRAM resident size on the OTR pipeline.
 
     OTR's loader (story_orchestrator._load_llm) uses 8-bit / NF4-style
@@ -536,14 +554,27 @@ def _estimate_resident_gb(model_id: str) -> float | None:
         Mistral-Nemo:  ~24 GB disk -> ~12 GB resident.
         Gemma-4-E2B:    ~6 GB disk -> ~3 GB resident.
 
-    A factor-of-2 divisor matches both anchor points. The estimate is
-    intentionally coarse -- VRAMFitVerdict tiers (PASS/WARN/UNKNOWN/
-    FAIL) are the policy surface; precise math isn't.
+    A factor-of-2 divisor matches both anchor points for curated entries.
+    SPECIAL_VRAM_ESTIMATES_GB (B1d) lets us pin an explicit resident
+    estimate for an uncurated id we KNOW is oversize -- entries there
+    are returned as-is (no halving). `safetensors_gb_hint` lets a caller
+    forward an HfApi size estimate for an uncurated remote id; the hint
+    is halved like a curated download size.
+
+    The estimate is intentionally coarse -- VRAMFitVerdict tiers
+    (PASS/WARN/UNKNOWN/FAIL) are the policy surface; precise math isn't.
     """
+    # SPECIAL table wins -- uncurated-but-known-oversize stays in policy
+    # surface without polluting the curated dropdown.
+    special = SPECIAL_VRAM_ESTIMATES_GB.get(model_id)
+    if special is not None:
+        return float(special)
     curated = _by_repo_id().get(model_id)
-    if curated is None:
-        return None
-    return float(curated.approx_safetensors_gb) / 2.0
+    if curated is not None:
+        return float(curated.approx_safetensors_gb) / 2.0
+    if safetensors_gb_hint is not None and safetensors_gb_hint > 0:
+        return float(safetensors_gb_hint) / 2.0
+    return None
 
 
 def check_vram_fit(
@@ -551,6 +582,7 @@ def check_vram_fit(
     context_cap: int,
     *,
     ceiling_gb: float | None = None,
+    safetensors_gb_hint: float | None = None,
 ) -> VRAMFitVerdict:
     """Coarse guardrail against the obvious oversize case (70B-on-16GB).
     Returns a tiered verdict (never raises):
@@ -571,7 +603,9 @@ def check_vram_fit(
     """
     ceiling = ceiling_gb if ceiling_gb is not None else DEFAULT_VRAM_CEILING_GB
     curated = _by_repo_id().get(model_id)
-    estimate = _estimate_resident_gb(model_id)
+    estimate = _estimate_resident_gb(
+        model_id, safetensors_gb_hint=safetensors_gb_hint
+    )
 
     # FAIL case first: clearly oversized regardless of curation.
     if estimate is not None and estimate >= ceiling * _FAIL_RATIO:
@@ -680,7 +714,21 @@ def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> fl
         from huggingface_hub import HfApi  # local import: defer network deps
 
         _hf_api = HfApi()
-    info = _hf_api.model_info(repo_id, files_metadata=True)  # type: ignore[union-attr]
+    # B1d: wrap the network call. RepositoryNotFoundError, HfHubHTTPError,
+    # ConnectionError, etc. all collapse to UnknownModelError carrying the
+    # actionable recovery hint -- callers (e.g. auto_download_if_missing,
+    # check_vram_fit) get a stable exception type to surface in the UI.
+    try:
+        info = _hf_api.model_info(repo_id, files_metadata=True)  # type: ignore[union-attr]
+    except Exception as exc:  # noqa: BLE001 -- broad to also catch network errors
+        from ._otr_model_inputs import UnknownModelError
+
+        raise UnknownModelError(
+            _unknown_recovery_hint(
+                repo_id,
+                f"HfApi.model_info failed ({type(exc).__name__}: {exc})",
+            )
+        ) from exc
     total = 0
     for sibling in getattr(info, "siblings", []) or []:
         size = getattr(sibling, "size", None) or 0
@@ -729,6 +777,15 @@ def auto_download_if_missing(
         InsufficientDiskSpaceError,
         UnknownModelError,
     )
+
+    # B1d: local-cache short-circuit FIRST. If the snapshot is already on
+    # disk, return the path immediately. This also makes a cached gated
+    # repo (e.g. Mistral-Nemo) usable when HF_TOKEN is unset -- the user
+    # downloaded it once; we don't punish them for losing their token.
+    scan = {r.repo_id: r for r in scan_local_llm_cache(hub_root=hub_root)}
+    cached = scan.get(repo_id)
+    if cached is not None and cached.on_disk and cached.snapshot_path:
+        return cached.snapshot_path
 
     if os.environ.get("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1") == "0":
         raise UnknownModelError(
@@ -835,6 +892,7 @@ __all__ = [
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",
     "DEFAULT_VRAM_CEILING_GB",
+    "SPECIAL_VRAM_ESTIMATES_GB",
     "ScanResult",
     "DropdownEntry",
     "ContextCapVerdict",

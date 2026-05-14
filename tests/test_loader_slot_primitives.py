@@ -133,31 +133,40 @@ def test_check_vram_fit_curated_pass_returns_pass_tier():
 
 
 def test_check_vram_fit_oversized_returns_fail():
-    # Inject a synthetic 70B-class curated entry via monkey-patched
-    # _by_repo_id? Simpler: assert on the real-world TEST_OVERSIZED_LLM
-    # which is uncurated -> UNKNOWN. To get FAIL we need a curated
-    # entry over the limit. Use a manual call site instead.
+    """B1d: TEST_OVERSIZED_LLM (uncurated) trips FAIL via the
+    SPECIAL_VRAM_ESTIMATES_GB table -- no curated-splice mocking
+    required. The fix closes the prior gap where uncurated oversized
+    ids fell through to UNKNOWN instead of FAIL.
+    """
+    v = catalog.check_vram_fit(catalog.TEST_OVERSIZED_LLM, 8192)
+    assert v.tier == "FAIL"
+    # SPECIAL pins TEST_OVERSIZED_LLM at 42 GB resident; FAIL ratio
+    # kicks in at 1.5x 14.5 GB = 21.75 GB.
+    assert v.estimated_gb >= 30
+    assert "pick a smaller model" in v.reason.lower()
+
+
+def test_check_vram_fit_special_table_overrides_curated_lookup():
+    """If a repo_id is in SPECIAL_VRAM_ESTIMATES_GB AND also (somehow)
+    curated, the SPECIAL value wins. Guards against future splicing
+    that could mask a known-oversize entry."""
+    import nodes._otr_model_catalog as c
+
     fake_curated = catalog.CuratedModel(
-        repo_id="meta-llama/Llama-3.1-70B-Instruct",
+        repo_id=catalog.TEST_OVERSIZED_LLM,
         requires_auth=True,
         loader_backend="transformers_safetensors",
         vram_fit_tier="FAIL",
         approx_safetensors_gb=140.0,
         notes="test-only oversize",
     )
-    # Splice into the by-repo-id lookup for this test only.
-    import nodes._otr_model_catalog as c
-
     original_curated = c.CURATED_LLM_MODELS
     c.CURATED_LLM_MODELS = original_curated + (fake_curated,)
     try:
-        v = catalog.check_vram_fit("meta-llama/Llama-3.1-70B-Instruct", 8192)
+        v = catalog.check_vram_fit(catalog.TEST_OVERSIZED_LLM, 8192)
         assert v.tier == "FAIL"
-        # _estimate_resident_gb divides BF16-download-size by 2 to
-        # match the OTR loader's 8-bit/NF4 default. 140 GB -> 70 GB
-        # resident; FAIL ratio kicks in at 1.5x ceiling (21.75 GB).
-        assert v.estimated_gb >= 50
-        assert "pick a smaller model" in v.reason.lower()
+        # SPECIAL value (42) wins, not curated/2 (70).
+        assert v.estimated_gb == pytest.approx(42.0, abs=0.1)
     finally:
         c.CURATED_LLM_MODELS = original_curated
 
@@ -185,6 +194,27 @@ def test_check_vram_fit_custom_ceiling():
 # ---------------------------------------------------------------------------
 # unload_llm -- teardown order
 # ---------------------------------------------------------------------------
+
+
+def test_unload_llm_preserves_cache_identity():
+    """B1d: id(LLM_CACHE) must NOT change across unload_llm(). The
+    previous code rebound the module-level name (LLM_CACHE = {...}),
+    which leaves any `from _otr_model_loader import LLM_CACHE` consumer
+    holding a stale dict reference -- silently breaking slot transitions
+    on the next request_slot call.
+    """
+    original_id = id(loader.LLM_CACHE)
+    loader.LLM_CACHE["model_id"] = catalog.DEFAULT_LLM
+    loader.LLM_CACHE["slot"] = "creative"
+    loader.LLM_CACHE["cache_entry"] = {
+        "model": _FakeModel(),
+        "tokenizer": _FakeTokenizer(),
+    }
+    loader.unload_llm()
+    assert id(loader.LLM_CACHE) == original_id
+    assert loader.LLM_CACHE["model_id"] is None
+    assert loader.LLM_CACHE["slot"] is None
+    assert loader.LLM_CACHE["cache_entry"] is None
 
 
 def test_unload_llm_clears_llm_cache():
@@ -265,24 +295,27 @@ def test_request_slot_different_model_triggers_full_teardown(monkeypatch):
     assert loader.LLM_CACHE["model_id"] == catalog.TEST_TECHNICAL_LLM
 
 
-def test_request_slot_propagates_vram_fit_fail():
-    """A clearly-oversize model raises VRAMFitFailedError before any load."""
-    fake_curated = catalog.CuratedModel(
-        repo_id="meta-llama/Llama-3.1-70B-Instruct",
-        requires_auth=True,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="FAIL",
-        approx_safetensors_gb=140.0,
-        notes="test-only oversize",
-    )
-    import nodes._otr_model_catalog as c
+def test_request_slot_oversized_fails_before_download(monkeypatch):
+    """B1d: VRAMFitFailedError must fire BEFORE auto_download_if_missing
+    so a 70B-on-16GB pick never triggers a network pull or disk-space
+    pre-check pass on a doomed-to-OOM load. Asserts both the exception
+    type and the order-of-operations (download never called).
+    """
+    download_calls: list[str] = []
 
-    original_curated = c.CURATED_LLM_MODELS
-    c.CURATED_LLM_MODELS = original_curated + (fake_curated,)
-    try:
-        with pytest.raises(VRAMFitFailedError) as exc:
-            loader.request_slot("creative", "meta-llama/Llama-3.1-70B-Instruct")
-        assert exc.value.estimated_gb >= 50  # 140 BF16 -> ~70 resident
-        assert "pick a smaller model" in str(exc.value).lower()
-    finally:
-        c.CURATED_LLM_MODELS = original_curated
+    def counting_auto_download(repo_id, **kw):
+        download_calls.append(repo_id)
+        return f"/fake/snapshot/{repo_id}"
+
+    monkeypatch.setattr(
+        catalog, "auto_download_if_missing", counting_auto_download
+    )
+
+    with pytest.raises(VRAMFitFailedError) as exc:
+        loader.request_slot("creative", catalog.TEST_OVERSIZED_LLM)
+
+    # FAIL fired before any download / disk-space pre-check.
+    assert download_calls == []
+    # SPECIAL pins TEST_OVERSIZED_LLM at 42 GB resident.
+    assert exc.value.estimated_gb >= 30
+    assert "pick a smaller model" in str(exc.value).lower()

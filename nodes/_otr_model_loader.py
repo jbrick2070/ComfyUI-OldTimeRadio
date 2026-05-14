@@ -100,6 +100,7 @@ def load_llm(
     *,
     device: str = "cuda",
     optimization_profile: str = "Standard",
+    context_cap: int | None = None,
 ) -> dict[str, Any]:
     """Load (or reuse cached) LLM via the legacy story_orchestrator path.
 
@@ -120,6 +121,10 @@ def load_llm(
         device:   target device. Defaults "cuda".
         optimization_profile: one of "Standard", "Obsidian", "8-bit",
                   matching the legacy orchestrator's profile names.
+        context_cap: B1d -- optional pre-resolved context cap. request_slot
+                  already calls resolve_context_cap; passing the resolved
+                  value through avoids a second filesystem scan + catalog
+                  walk on the load path. Defaults to None (resolve here).
 
     Returns the cache_entry dict.
 
@@ -145,13 +150,16 @@ def load_llm(
             f"_load_llm failed for model_id={model_id!r}: {exc}"
         ) from exc
 
-    # B1b: dynamic context-cap via the catalog. UI label-suffixes are
+    # B1b/B1d: dynamic context-cap via the catalog. UI label-suffixes are
     # stripped by validate_model_id elsewhere; defensive strip-on-space
     # here keeps the loader path resilient against any caller that
-    # forgets to normalize first.
-    from . import _otr_model_catalog as _otr_catalog
+    # forgets to normalize first. When request_slot has already resolved
+    # the cap, it is forwarded via `context_cap=` to skip the second
+    # catalog walk.
     canonical_id = model_id.split(" ")[0].strip()
-    context_cap = _otr_catalog.resolve_context_cap(canonical_id).value
+    if context_cap is None:
+        from . import _otr_model_catalog as _otr_catalog
+        context_cap = _otr_catalog.resolve_context_cap(canonical_id).value
     is_quantized = (
         "Obsidian" in optimization_profile
         or "8-bit" in optimization_profile
@@ -194,7 +202,6 @@ def unload_llm() -> None:
     rewire those importers to `from ._otr_model_loader import unload_llm`
     directly and delete the orchestrator-side shim.
     """
-    global LLM_CACHE
     import gc
 
     entry = LLM_CACHE.get("cache_entry")
@@ -205,8 +212,12 @@ def unload_llm() -> None:
                 model.to("cpu")
             except Exception as exc:  # noqa: BLE001
                 log.debug("[OTR_ModelLoader] model.to(cpu) failed: %s", exc)
-        # Drop our references; let gc collect the model.
-        LLM_CACHE = {"model_id": None, "slot": None, "cache_entry": None}
+    # B1d: clear + update IN PLACE. Rebinding (LLM_CACHE = {...}) leaves
+    # any `from _otr_model_loader import LLM_CACHE` consumer holding a
+    # stale dict reference, which silently breaks slot transitions. The
+    # `global` keyword is unnecessary now; we only mutate the dict.
+    LLM_CACHE.clear()
+    LLM_CACHE.update({"model_id": None, "slot": None, "cache_entry": None})
 
     gc.collect()
 
@@ -255,22 +266,23 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
     """Slot-aware entry point. Loads (or reuses cached) LLM, handling
     cache reuse vs full teardown automatically.
 
-    Eight-step sequence (mirrors plan section B1c):
+    B1d order (vram-fit BEFORE any network/disk work):
       1. normalize model_id via catalog.validate_model_id (strips
          [NOT DOWNLOADED] suffix, structural rejection, admit-path check).
       2. Cache hit (same model_id resident) -> return entry. Done.
-      3. auto_download_if_missing(model_id) -- pre-flight gated check
-         + disk-space check + snapshot_download. Curated PASS entries
-         skip the model_info pre-fetch.
-      4. resolve_context_cap(model_id) -> tiered ContextCapVerdict.
-      5. check_vram_fit(model_id, ctx_verdict.value) -> tiered VRAMFitVerdict.
-      6. Combined escalation:
-            FAIL                -> raise VRAMFitFailedError.
-            PASS + PASS         -> quiet success path.
-            otherwise           -> log combined caution + proceed.
-      7. unload_llm() (only if a different model was resident),
-         then load_llm(model_id).
-      8. Cache the entry under (slot, model_id).
+      3. resolve_context_cap(model_id) -> tiered ContextCapVerdict.
+      4. check_vram_fit(model_id, ctx_verdict.value) -> tiered VRAMFitVerdict.
+      5. FAIL -> raise VRAMFitFailedError. CRITICAL: this fires BEFORE
+         auto_download so a 70B-on-16GB pick never triggers a network
+         pull or a disk-space pre-check pass on a doomed-to-fail load.
+      6. Combined caution log (anything below PASS/PASS).
+      7. auto_download_if_missing -- gated/disk-space pre-flight +
+         snapshot_download. Local-cache short-circuit fires inside the
+         catalog helper.
+      8. unload_llm() (only if a different model was resident), then
+         load_llm(model_id, context_cap=ctx_verdict.value) -- skips the
+         second catalog walk by forwarding the resolved cap.
+      9. Cache the entry under (slot, model_id).
 
     `slot` is "creative" or "technical" -- used for log lines + cache
     keying. The cache holds at most one resident model regardless of
@@ -294,18 +306,15 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
         LLM_CACHE["slot"] = slot
         return LLM_CACHE["cache_entry"]  # type: ignore[return-value]
 
-    # Step 3: ensure on-disk + handle gating / disk-space pre-flight.
-    # On curated PASS entries this is a no-op when the snapshot is
-    # already present; the catalog logic skips the network call.
-    _otr_catalog.auto_download_if_missing(normalized)
-
-    # Step 4: context cap (never raises).
+    # Step 3: context cap (never raises).
     ctx_verdict = _otr_catalog.resolve_context_cap(normalized)
 
-    # Step 5: VRAM fit (never raises).
+    # Step 4: VRAM fit (never raises).
     fit_verdict = _otr_catalog.check_vram_fit(normalized, ctx_verdict.value)
 
-    # Step 6: combined escalation.
+    # Step 5: FAIL escalates BEFORE any network/disk work. A 70B pick on
+    # a 16 GB card must not trigger snapshot_download or a disk-space
+    # pre-check pass; both waste minutes on a doomed-to-OOM load.
     if fit_verdict.tier == "FAIL":
         raise VRAMFitFailedError(
             f"VRAMFitFailedError: {normalized!r}: {fit_verdict.reason}. "
@@ -313,6 +322,8 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             estimated_gb=fit_verdict.estimated_gb,
             ceiling_gb=fit_verdict.ceiling_gb,
         )
+
+    # Step 6: combined caution log (everything below PASS/PASS).
     if not (fit_verdict.tier == "PASS" and ctx_verdict.tier == "PASS"):
         log.info(
             "[Selector] proceeding with caution: ctx_cap=%s@%d, "
@@ -323,7 +334,12 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
             fit_verdict.estimated_gb,
         )
 
-    # Step 7: if a different model is resident, unload it. Then load.
+    # Step 7: ensure on-disk + handle gating / disk-space pre-flight.
+    # Local-cache short-circuit (B1d) fires inside this helper when the
+    # snapshot is already on disk.
+    _otr_catalog.auto_download_if_missing(normalized)
+
+    # Step 8: if a different model is resident, unload it. Then load.
     if LLM_CACHE.get("model_id") not in (None, normalized):
         log.info(
             "[Selector] slot transition: %s -> %s (full teardown)",
@@ -332,9 +348,9 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
         )
         unload_llm()
 
-    cache_entry = load_llm(normalized)
+    cache_entry = load_llm(normalized, context_cap=ctx_verdict.value)
 
-    # Step 8: cache.
+    # Step 9: cache.
     LLM_CACHE["model_id"] = normalized
     LLM_CACHE["slot"] = slot
     LLM_CACHE["cache_entry"] = cache_entry

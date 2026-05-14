@@ -94,6 +94,90 @@ def test_auto_download_respects_disabled_env_var(tmp_path, monkeypatch):
     snap.assert_not_called()
 
 
+def _seed_fake_snapshot(tmp_path: Path, repo_id: str) -> Path:
+    """Build a minimal HF cache layout under `tmp_path` for `repo_id`,
+    matching the directory shape scan_local_llm_cache expects.
+    """
+    repo_dir_name = "models--" + repo_id.replace("/", "--")
+    snap_dir = tmp_path / repo_dir_name / "snapshots" / "abc123fakehash"
+    snap_dir.mkdir(parents=True)
+    (snap_dir / "config.json").write_text(
+        '{"max_position_embeddings": 8192}', encoding="utf-8"
+    )
+    return snap_dir
+
+
+def test_auto_download_returns_cached_path_without_token(tmp_path, monkeypatch):
+    """B1d: a cached gated repo + missing HF_TOKEN must return the local
+    path immediately. The local-cache short-circuit fires BEFORE the
+    gated-token check; user shouldn't be punished for losing their token
+    after the one-time download landed.
+    """
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    monkeypatch.setattr("nodes._otr_hf_auth.resolve_hf_token", lambda: None)
+    snap_dir = _seed_fake_snapshot(tmp_path, catalog.DEFAULT_LLM)
+
+    snap = MagicMock()
+    api = MagicMock()
+    out = catalog.auto_download_if_missing(
+        catalog.DEFAULT_LLM,
+        hub_root=tmp_path,
+        _snapshot_download=snap,
+        _hf_api=api,
+    )
+
+    snap.assert_not_called()
+    api.model_info.assert_not_called()
+    assert out == str(snap_dir)
+
+
+def test_auto_download_skips_when_on_disk(tmp_path, monkeypatch):
+    """B1d: when scan_local_llm_cache reports the repo on disk, the
+    short-circuit returns its snapshot_path and skips both the gated
+    check and the snapshot_download call.
+    """
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    monkeypatch.setenv("HF_TOKEN", "fake-token")
+    snap_dir = _seed_fake_snapshot(tmp_path, "totally/uncurated-model")
+
+    snap = MagicMock()
+    api = MagicMock()
+    out = catalog.auto_download_if_missing(
+        "totally/uncurated-model",
+        hub_root=tmp_path,
+        _snapshot_download=snap,
+        _hf_api=api,
+    )
+
+    snap.assert_not_called()
+    api.model_info.assert_not_called()
+    assert out == str(snap_dir)
+
+
+def test_estimate_model_size_gb_404_raises_unknown():
+    """B1d: an HfApi.model_info failure (RepositoryNotFoundError, network,
+    HfHubHTTPError, etc.) must surface as UnknownModelError carrying the
+    recovery hint -- not bubble the raw HF exception type out.
+    """
+    class _FakeRepositoryNotFoundError(Exception):
+        """Stand-in for huggingface_hub.errors.RepositoryNotFoundError
+        without importing huggingface_hub at unit-test time."""
+
+    fake_api = MagicMock()
+    fake_api.model_info.side_effect = _FakeRepositoryNotFoundError(
+        "404 Client Error: Repository Not Found for 'totally/nonexistent'"
+    )
+    with pytest.raises(UnknownModelError) as exc:
+        catalog.estimate_model_size_gb(
+            "totally/nonexistent", _hf_api=fake_api
+        )
+    msg = str(exc.value)
+    assert "totally/nonexistent" in msg
+    assert "could not be resolved" in msg.lower()
+    assert "_FakeRepositoryNotFoundError" in msg
+
+
 def test_auto_download_gated_no_token_raises_before_snapshot_download(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
     monkeypatch.delenv("HF_TOKEN", raising=False)
