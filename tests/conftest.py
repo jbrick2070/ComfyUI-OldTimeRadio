@@ -38,6 +38,27 @@ os.environ.setdefault("PYTORCH_NO_CUDA_MEMORY_CACHING", "1")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 
+@pytest.fixture
+def standard_budget():
+    """v2.0 production-shape EpisodeBudget for outline + composer tests.
+
+    Mirrors OTR_LedgerScriptWriter defaults (target_words=350,
+    num_characters=2, include_act_breaks=True, act_count auto-derived)
+    so prompt-shape tests exercise the production code path. S28
+    cleanbreak removed the `budget=None` back-compat — every
+    OutlineRequest now needs a real budget; this fixture is the
+    canonical one for tests that don't pin a specific shape.
+    """
+    from nodes._otr_episode_budget import compute_episode_budget, default_act_count
+    target_words = 350
+    return compute_episode_budget(
+        target_words=target_words,
+        act_count=default_act_count(target_words),
+        include_act_breaks=True,
+        num_characters=2,
+    )
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _otr_no_cuda_during_collection():
     """Autouse session-scope fixture; documents the env-var approach.
