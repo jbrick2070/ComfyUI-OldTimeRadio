@@ -1,4 +1,4 @@
-﻿"""Static workflow link-integrity validator (no ComfyUI boot required).
+"""Static workflow link-integrity validator (no ComfyUI boot required).
 
 Rule set per S26 cleanbreak plan §4:
   - every link ID referenced by a node input MUST exist in workflow["links"]
