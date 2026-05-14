@@ -409,6 +409,128 @@ def _get_substring_stop_class():
     return _SUBSTRING_STOP_CLASS
 
 
+# ---------------------------------------------------------------------------
+# S30 B2b: writer-side LLM slot scheduler.
+#
+# Encapsulates per-slot generate_fn construction + request_slot
+# invocation + transition counting. Two configurable slots:
+#   - creative   (narrative passes: outline, cast, dialogue, polish,
+#                 style picker invention, title regen)
+#   - technical  (structured passes: GBNF / JSON validators,
+#                 reviewer verdicts, news_interpreter, style chooser,
+#                 cast contract schema validation, critic)
+#
+# Each for_slot(slot) call returns a fresh generate_fn closure tied to
+# that slot. The closure invokes _otr_model_loader.request_slot at call
+# time, so when the user picks a different technical_model than the
+# creative_writing_model, crossing a slot boundary transparently
+# triggers the loader's full teardown + reload. When both slots
+# resolve to the same model id (default), every call cache-hits on
+# the resident model -- zero transitions.
+#
+# Polish always routes to the creative slot (the W4 fix exists to keep
+# polish sampling distinct from composer sampling; it has nothing to
+# do with the creative-vs-technical model split).
+# ---------------------------------------------------------------------------
+
+
+class _SlotScheduler:
+    """Writer-side slot scheduler for the S30 two-model selector.
+
+    Holds the resolved per-slot model ids + the writer's sampling
+    config. for_slot(slot) returns a generate_fn closure that lazily
+    request_slot's the right model on every invocation. for_polish()
+    returns a polish-tuned closure that always routes through the
+    creative slot.
+
+    Counts transitions and per-slot calls for forensic meta stamping
+    (meta["slot_transitions"], meta["slot_calls_by_slot"]).
+    """
+
+    _ALLOWED_SLOTS = ("creative", "technical")
+
+    def __init__(
+        self,
+        *,
+        creative_id: str,
+        technical_id: str,
+        top_p: float,
+        min_p: float,
+        repetition_penalty: float,
+    ):
+        self.ids = {
+            "creative": creative_id,
+            "technical": technical_id,
+        }
+        self.sampling = {
+            "top_p": float(top_p),
+            "min_p": float(min_p or 0.0),
+            "repetition_penalty": float(repetition_penalty or 1.0),
+        }
+        self.transitions = 0
+        self.calls_by_slot = {"creative": 0, "technical": 0}
+        self._last_resolved_id: str | None = None
+
+    def _account_and_get_entry(self, slot: str) -> dict:
+        """Acquire the right cache entry for `slot`. Updates transition
+        count + per-slot call count. Lazy import keeps the writer's
+        module-level import surface stdlib-only."""
+        from . import _otr_model_loader as _OTRML
+
+        resolved_id = self.ids[slot]
+        cache_entry = _OTRML.request_slot(slot, resolved_id)
+        if (
+            self._last_resolved_id is not None
+            and self._last_resolved_id != resolved_id
+        ):
+            self.transitions += 1
+        self._last_resolved_id = resolved_id
+        self.calls_by_slot[slot] = self.calls_by_slot.get(slot, 0) + 1
+        return cache_entry
+
+    def for_slot(self, slot: str):
+        """Return a generate_fn closure that targets `slot`. Each call
+        ensures the right model is resident before generation fires."""
+        if slot not in self._ALLOWED_SLOTS:
+            raise ValueError(
+                f"_SlotScheduler.for_slot: slot must be one of "
+                f"{self._ALLOWED_SLOTS!r}; got {slot!r}"
+            )
+        scheduler = self
+
+        def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
+            cache_entry = scheduler._account_and_get_entry(slot)
+            base = _build_truncating_generate_fn(
+                cache_entry, **scheduler.sampling,
+            )
+            return base(
+                messages,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+                stop=stop,
+            )
+
+        return generate_fn
+
+    def for_polish(self):
+        """Return a polish_generate_fn closure. Polish always routes
+        through the creative slot per the S30 routing table."""
+        scheduler = self
+
+        def polish_fn(messages, *, temperature, max_new_tokens):
+            cache_entry = scheduler._account_and_get_entry("creative")
+            from . import _otr_model_loader as _OTRML
+
+            base = _OTRML.make_polish_generate_fn(cache_entry)
+            return base(
+                messages,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+
+        return polish_fn
+
+
 def _build_truncating_generate_fn(
     cache_entry: dict,
     *,
@@ -998,15 +1120,11 @@ def _resolve_inputs(
         "target_words":         target_words,
         "num_characters":       num_characters,
         "episode_title":        (episode_title or "").strip(),
-        # S30 B2a: writer surface broadcasts both ids. Internal generation
-        # still uses one model (creative) in B2a -- B2b adds the routing
-        # split. `model_id` stays in resolved for B2a-era legacy call
-        # sites (still references it via resolved["model_id"]); B2b
-        # deletes it once every consumer has migrated to the per-slot
-        # keys.
+        # S30 B2b: per-slot keys ONLY. The legacy `model_id` key is
+        # deleted outright; consumers route via creative_writing_model
+        # / technical_model. No "stamp both" hedge.
         "creative_writing_model": creative_writing_model,
         "technical_model":        technical_model,
-        "model_id":             creative_writing_model,
         "include_act_breaks":   bool(include_act_breaks),
         "act_count":            int(act_count_int),
         "creativity":           str(creativity),
@@ -1515,12 +1633,14 @@ class OTR_LedgerScriptWriter:
         )
 
         log.info(
-            "[OTR_LedgerScriptWriter] start: model=%r, target_words=%d, "
-            "num_characters=%d, style_source=%s "
-            "(pending=%s, value=%r), creativity=%r (temp=%.2f "
-            "top_p=%.2f), seed_source=%s, episode_title=%r, "
+            "[OTR_LedgerScriptWriter] start: creative_model=%r, "
+            "technical_model=%r, target_words=%d, num_characters=%d, "
+            "style_source=%s (pending=%s, value=%r), creativity=%r "
+            "(temp=%.2f top_p=%.2f), seed_source=%s, episode_title=%r, "
             "perfect_run_spacesaver=%s",
-            resolved["model_id"], resolved["target_words"],
+            resolved["creative_writing_model"],
+            resolved["technical_model"],
+            resolved["target_words"],
             resolved["num_characters"],
             resolved["style_source"], resolved["style_pending"],
             resolved["style"], resolved["creativity"],
@@ -1542,38 +1662,52 @@ class OTR_LedgerScriptWriter:
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
 
-        # --- C. Load LLM + build truncating generate_fn ---------------
-        cache_entry = _OTRML.load_llm(
-            resolved["model_id"], device="cuda",
-            optimization_profile=resolved["optimization_profile"],
-        )
-        generate_fn = _build_truncating_generate_fn(
-            cache_entry,
+        # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
+        # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
+        # + make_polish_generate_fn block. The scheduler exposes per-slot
+        # generate_fn closures that lazily request_slot on each call.
+        # When creative_writing_model == technical_model (default) every
+        # call cache-hits on one resident model and no transitions fire;
+        # when they differ, crossing a slot boundary triggers a full
+        # loader teardown + reload.
+        #
+        # Sub-pass routing (S30 routing table; B2b lands top-level
+        # phases. Per-sub-pass routing inside compose_line / pick_style
+        # / lock_cast / build_news_briefs stays single-fn for now;
+        # the helpers receive whichever slot's fn the writer hands
+        # them):
+        #   Outline             -> creative
+        #   Cast lock           -> creative
+        #   Dialogue composer   -> creative
+        #   Polish              -> creative (via for_polish)
+        #   Title regen         -> creative
+        #   Style picker        -> creative (both passes; pick_style
+        #                          internally fires pass 1 + 2 through
+        #                          one fn).
+        #   News interpreter    -> technical (GBNF + pydantic + V0-V3)
+        #
+        # slot-interleave: when news_interpreter runs after the style
+        # picker (creative -> technical) and before cast lock
+        # (technical -> creative), one transition lands per direction.
+        # Documented at the call sites below.
+        slot_scheduler = _SlotScheduler(
+            creative_id=resolved["creative_writing_model"],
+            technical_id=resolved["technical_model"],
             top_p=resolved["top_p"],
             # Phase 4 v4 (2026-05-11) sampling knobs.
             min_p=resolved["min_p"],
             repetition_penalty=resolved["repetition_penalty"],
         )
-        # LFC sprint commit 12.2 (W4 fix, 2026-05-11): build a
-        # SEPARATE polish_generate_fn off the same cache_entry so
-        # the inline compose_line polish path (when
-        # enable_polish_pass=True) does NOT inherit the writer's
-        # composer-tuned closure (min_p / repetition_penalty /
-        # top_p). Polish is a short low-temperature rewrite;
-        # composer tuning produces awkward substitutions. The
-        # dedicated fn uses polish-conservative sampling
-        # (top_p=0.9, no min_p, no repetition_penalty -- see
-        # _otr_model_loader.make_polish_generate_fn).
-        #
-        # S28 cleanbreak (Phase 3 producer fix): dropped the
-        # `try/except ... polish_generate_fn = None` best-effort
-        # fallback. make_polish_generate_fn is required v2.0
-        # infrastructure; "older builds" without it are extinct.
-        # A factory failure now surfaces as a hard error rather than
-        # silently substituting the composer-tuned generate_fn into
-        # polish (which produced the awkward substitutions this whole
-        # path exists to prevent).
-        polish_generate_fn = _OTRML.make_polish_generate_fn(cache_entry)
+        # LLM slot: creative -- bulk writer path (outline, cast,
+        # dialogue, polish, style picker, title regen).
+        creative_generate_fn = slot_scheduler.for_slot("creative")
+        # LLM slot: technical -- structured passes (news_interpreter
+        # in B2b; B4b adds RSS news rerank).
+        technical_generate_fn = slot_scheduler.for_slot("technical")
+        # LLM slot: creative -- polish always routes here per the
+        # S30 routing table (W4 fix sampling distinct from composer
+        # but model identity is creative).
+        polish_generate_fn = slot_scheduler.for_polish()
 
         # --- D. Cast contract -- LEDGER-FIRST, CAST-LOCKED, OUTLINE-AFTER
         #
@@ -1609,12 +1743,19 @@ class OTR_LedgerScriptWriter:
         # bypass this branch.
         if resolved["style_pending"]:
             picker_rng = _random.Random(int(seed))
+            # LLM slot: creative -- style picker pass 1 (inventor)
+            # recombines seed flavors creatively. Pass 2 (chooser)
+            # in the plan's routing table is technical, but pick_style
+            # currently dispatches both passes through one generate_fn;
+            # routing both to creative keeps the helper's contract
+            # intact in B2b. A future refactor can split pick_style
+            # to accept a separate chooser_generate_fn parameter.
             style_pick = _OTRSP.pick_style(
-                generate_fn,
+                creative_generate_fn,
                 article_text=resolved["news_seed"],
                 seed_pool=list(_STYLE_PICKER_SEED_POOL),
                 rng=picker_rng,
-                model_id=str(resolved["model_id"]),
+                model_id=str(resolved["creative_writing_model"]),
             )
             resolved["style"] = style_pick.chosen
             meta["style_pick"] = style_pick.model_dump()
@@ -1643,8 +1784,13 @@ class OTR_LedgerScriptWriter:
         # a hard fail.
         article = resolved["news_article"]
         try:
+            # LLM slot: technical -- news_interpreter emits GBNF +
+            # pydantic-validated briefs (V0-V3 schema). Structured-
+            # output pass; routes to the technical_model slot.
+            # slot-interleave: creative (style picker) -> technical
+            # (here). One transition when the two slot ids differ.
             briefs = _OTRNI.build_news_briefs(
-                generate_fn,
+                technical_generate_fn,
                 full_text=article.get("full_text", ""),
                 headline=article.get("headline", ""),
                 summary=article.get("summary", ""),
@@ -1652,7 +1798,7 @@ class OTR_LedgerScriptWriter:
                 pub_date=article.get("date", ""),
                 style=resolved["style"],
                 seed=int(seed),
-                model_id=str(resolved["model_id"]),
+                model_id=str(resolved["technical_model"]),
             )
             meta["news"] = briefs.model_dump()
             casting_brief = briefs.casting_brief
@@ -1695,8 +1841,12 @@ class OTR_LedgerScriptWriter:
         # lemmy_hit value -- which is exactly the reproducibility
         # contract C7 requires.
         cast_rng = _random.Random(int(seed))
+        # LLM slot: creative -- cast lock generates per-character
+        # narrative descriptions (gender + character_description).
+        # slot-interleave: technical (news_interpreter) -> creative
+        # (here). One transition when the two slot ids differ.
         cast_rows, cast_meta = _OTRCAST.lock_cast(
-            generate_fn,
+            creative_generate_fn,
             num_characters=resolved["num_characters"],
             news_seed=resolved["news_seed"],
             casting_brief=casting_brief,
@@ -1819,7 +1969,9 @@ class OTR_LedgerScriptWriter:
             include_act_breaks=bool(resolved.get("include_act_breaks", True)),
             budget=episode_budget,
         )
-        outline = _OTRO.generate_outline(generate_fn, outline_req)
+        # LLM slot: creative -- outline drives the episode narrative
+        # arc (beats, characters, structure). Single creative pass.
+        outline = _OTRO.generate_outline(creative_generate_fn, outline_req)
 
         # --- E. Word-budget integration check (WARN, do not fail) -----
         beat_word_sum = sum(b.target_words for b in outline.beats)
@@ -2079,8 +2231,14 @@ class OTR_LedgerScriptWriter:
                 line_req = _build_line_request_for_beat(
                     beat, is_announcer=False,
                 )
+                # LLM slot: creative -- dialogue composer per-beat
+                # narrative pass. Polish (creative; routed through
+                # polish_generate_fn from the scheduler) handles the
+                # narration-leak cleanup pass when enable_polish_pass
+                # is on.
                 line_res = _OTRLC.compose_line(
-                    generate_fn, line_req, base_temperature=base_temp,
+                    creative_generate_fn, line_req,
+                    base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
                     enable_polish_pass=resolved["enable_polish_pass"],
                     polish_generate_fn=polish_generate_fn,
@@ -2098,8 +2256,14 @@ class OTR_LedgerScriptWriter:
                 line_req = _build_line_request_for_beat(
                     beat, is_announcer=True,
                 )
+                # LLM slot: creative -- announcer beats route through
+                # the same composer path as character beats; both are
+                # narrative writes. (The plan's "ANNOUNCER bookends"
+                # technical pass refers to a hypothetical refactor
+                # that doesn't exist in the current code.)
                 line_res = _OTRLC.compose_line(
-                    generate_fn, line_req, base_temperature=base_temp,
+                    creative_generate_fn, line_req,
+                    base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
                     enable_polish_pass=resolved["enable_polish_pass"],
                     polish_generate_fn=polish_generate_fn,
@@ -2302,8 +2466,10 @@ class OTR_LedgerScriptWriter:
             title_source = "user"
         else:
             assembled_script = "\n\n".join(script_text_parts).strip()
+            # LLM slot: creative -- title regen is narrative
+            # (sample 1-4 candidates from the post-composition script).
             regen_title = _generate_title_from_script(
-                generate_fn,
+                creative_generate_fn,
                 assembled_script,
                 temperature=resolved["temperature"],
             )
@@ -2399,11 +2565,10 @@ class OTR_LedgerScriptWriter:
         meta["gen_params_initial"] = {
             "target_words":         resolved["target_words"],
             "num_characters":       resolved["num_characters"],
-            # S30 B2a: stamp both new slot ids. The legacy `model_id`
-            # key stays in B2a for parity with downstream consumers
-            # that still key on it; B2b deletes it after migrating
-            # every reader.
-            "model_id":              resolved["model_id"],
+            # S30 B2b: the legacy `model_id` key is DELETED outright.
+            # Every consumer that previously read meta.gen_params_initial.
+            # model_id now reads creative_writing_model + technical_model
+            # explicitly (B3 onward).
             "creative_writing_model": resolved["creative_writing_model"],
             "technical_model":        resolved["technical_model"],
             "style":                 resolved["style"],
@@ -2418,6 +2583,54 @@ class OTR_LedgerScriptWriter:
             "optimization_profile":  resolved["optimization_profile"],
             "seed_source":           resolved["seed_source"],
         }
+        # S30 B2b: top-level slot stamps + per-phase routing trace.
+        # `gen_params_by_phase` records the slot + resolved model for
+        # each writer-level LLM phase that fired. Critic / cascade
+        # phases that live in B3+ nodes stamp their own entries when
+        # they land.
+        meta["creative_writing_model"] = resolved["creative_writing_model"]
+        meta["technical_model"]        = resolved["technical_model"]
+        meta["slot_transitions"]       = slot_scheduler.transitions
+        meta["slot_calls_by_slot"]     = dict(slot_scheduler.calls_by_slot)
+        # gen_params_by_phase rows track only the phases the writer
+        # invoked. Each row carries the slot + the resolved repo id
+        # consulted at call time + the per-slot sampling profile
+        # (top_p / min_p / repetition_penalty) for the creative
+        # phases. Technical phases use the same closure sampling.
+        gen_params_by_phase: dict[str, dict] = {}
+        if resolved["style_pending"]:
+            gen_params_by_phase["style_picker"] = {
+                "slot":  "creative",
+                "model": resolved["creative_writing_model"],
+            }
+        if meta.get("news") is not None:
+            gen_params_by_phase["news_interpreter"] = {
+                "slot":  "technical",
+                "model": resolved["technical_model"],
+            }
+        gen_params_by_phase["cast_lock"] = {
+            "slot":  "creative",
+            "model": resolved["creative_writing_model"],
+        }
+        gen_params_by_phase["outline"] = {
+            "slot":  "creative",
+            "model": resolved["creative_writing_model"],
+        }
+        gen_params_by_phase["dialogue_composer"] = {
+            "slot":  "creative",
+            "model": resolved["creative_writing_model"],
+        }
+        if resolved["enable_polish_pass"]:
+            gen_params_by_phase["polish"] = {
+                "slot":  "creative",
+                "model": resolved["creative_writing_model"],
+            }
+        if title_source == "llm_post_composition":
+            gen_params_by_phase["title_regen"] = {
+                "slot":  "creative",
+                "model": resolved["creative_writing_model"],
+            }
+        meta["gen_params_by_phase"] = gen_params_by_phase
         # Always stamp the resolved final title (user / LLM regen / outline
         # fallback). title_source records which branch won so downstream
         # consumers and BUG_LOG forensics can tell user-typed from

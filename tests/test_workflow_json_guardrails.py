@@ -721,12 +721,11 @@ class TestWriterB2aSurface:
             f"least twice (once per slot); found {strip_calls}"
         )
 
-    def test_writer_b2a_surface_only(self):
-        """B2a: the writer's surface is the only change. The internal
-        routing change (request_slot("technical", ...) calls inside
-        run()) is B2b's job. Assert ZERO request_slot calls anywhere
-        in OTR_LedgerScriptWriter.run -- B2b's commit will flip this
-        when it lands.
+    def test_writer_uses_slot_scheduler_not_direct_load_llm(self):
+        """B2b clean-break: writer.run must NOT call `.load_llm(...)`
+        directly. The slot scheduler routes every LLM acquisition
+        through request_slot. AST walk over run() looking for
+        forbidden direct-load patterns.
         """
         import ast
 
@@ -734,7 +733,6 @@ class TestWriterB2aSurface:
             PACK_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
         ).read_text(encoding="utf-8")
         tree = ast.parse(writer_src)
-        # Find the OTR_LedgerScriptWriter.run method.
         run_method = None
         for node in ast.walk(tree):
             if (
@@ -756,25 +754,19 @@ class TestWriterB2aSurface:
         for sub in ast.walk(run_method):
             if isinstance(sub, ast.Call):
                 fn = sub.func
-                if (
-                    isinstance(fn, ast.Attribute)
-                    and fn.attr == "request_slot"
-                ):
+                if isinstance(fn, ast.Attribute) and fn.attr == "load_llm":
                     bad_calls.append(
                         f"line {getattr(sub, 'lineno', '?')}: "
-                        f"request_slot(...)"
+                        f".load_llm(...)"
                     )
-                elif (
-                    isinstance(fn, ast.Name)
-                    and fn.id == "request_slot"
-                ):
+                elif isinstance(fn, ast.Name) and fn.id == "load_llm":
                     bad_calls.append(
                         f"line {getattr(sub, 'lineno', '?')}: "
-                        f"request_slot(...)"
+                        f"load_llm(...)"
                     )
         assert not bad_calls, (
-            "B2a surface-only commit must not contain request_slot "
-            "calls inside writer.run; that is B2b's change. Found:\n  "
+            "B2b post-condition: writer.run must not call load_llm "
+            "directly. Route through _SlotScheduler / request_slot:\n  "
             + "\n  ".join(bad_calls)
         )
 
