@@ -8,7 +8,8 @@ Covers (per script-writing-architecture synthesis §3 Phase 2A + §6.C/E/F/G):
   * Outline.beats cap raised 24 -> 32
   * Beat.arc_phase field accepts None + populated
   * validate_outline_against_budget each violator + clean pass
-  * EPISODE BUDGET prompt block renders when budget set, skipped when None
+  * EPISODE BUDGET prompt block renders when budget set (S28: budget
+    is now required — OutlineRequest without budget raises ValueError)
 
 Pure-Python. No GPU. No LLM. Unit-scope only.
 """
@@ -268,14 +269,12 @@ class TestOutlineSchemaChanges:
 
 class TestEpisodeBudgetPromptBlock:
 
-    def test_block_omitted_when_budget_none(self):
-        req = OutlineRequest(
-            news_seed="seed", style="noir",
-            character_cast=("ALICE", "BOB"),
-            target_words=350,
-        )
-        prompt = _build_user_prompt(req)
-        assert "EPISODE BUDGET" not in prompt
+    # S28 cleanbreak (Rule C): removed test_block_omitted_when_budget_none.
+    # Pre-S28 it asserted the prompt omitted the EPISODE BUDGET block when
+    # budget was None. Post-S28 the OutlineRequest __post_init__ rejects a
+    # missing budget — see test_outline_request_rejects_missing_budget in
+    # the next class for the producer-contract enforcement test that
+    # replaces it.
 
     def test_block_renders_when_budget_set(self):
         eb = compute_episode_budget(350, 3, True, 2)
@@ -348,14 +347,12 @@ def _outline_for_350_3_acts():
 
 class TestValidateOutlineAgainstBudget:
 
-    def test_no_budget_no_op(self):
-        req = OutlineRequest(
-            news_seed="seed", style="noir",
-            character_cast=("ALICE", "BOB"),
-            target_words=350,
-        )
-        outline = _outline_for_350_3_acts()
-        assert validate_outline_against_budget(outline, req) is None
+    # S28 cleanbreak (Rule C): removed test_no_budget_no_op. Pre-S28 it
+    # asserted validate_outline_against_budget returned None when budget
+    # was missing. Post-S28 OutlineRequest rejects a missing budget at
+    # construction time, so the validate function never sees req.budget
+    # is None in production. The producer-contract enforcement test in
+    # TestEpisodeBudgetPromptBlock covers the reject case.
 
     def test_clean_outline_passes(self):
         eb = compute_episode_budget(350, 3, True, 2)
