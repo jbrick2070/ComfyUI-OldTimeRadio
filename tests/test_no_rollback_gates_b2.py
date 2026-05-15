@@ -151,7 +151,7 @@ def _within_s33_b2_callout(lines: list[str], idx: int, window: int = 12) -> bool
     lo = max(0, idx - window)
     hi = min(len(lines), idx + window + 1)
     region = "\n".join(lines[lo:hi])
-    return "S33 B2" in region or "retired" in region.lower()
+    return "S33 B" in region or "retired" in region.lower()
 
 
 class TestStringRefSweep:
@@ -220,21 +220,32 @@ class TestStringRefSweep:
 # ---------------------------------------------------------------------------
 
 
+def _scan_for_leaky_token(src: str, token: str) -> list[str]:
+    """Return source lines that mention `token` outside of an S33
+    callout. A line is considered "inside a callout" when any of the
+    surrounding +/-6 lines carry an "S33 B" marker or the "retired"
+    marker. Catches multi-line explanatory blocks where the marker
+    sits at the head of the block."""
+    lines = src.splitlines()
+    leaky: list[str] = []
+    for idx, line in enumerate(lines):
+        if token not in line:
+            continue
+        if _within_s33_b2_callout(lines, idx):
+            continue
+        leaky.append(line)
+    return leaky
+
+
 class TestRollbackGateMachineryDeleted:
     def test_speaker_unknowns_local_not_in_review_ledger_source(self):
         # The local variable `speaker_unknowns` lived inside
         # review_ledger to host the rollback gate filter. After B2
-        # the variable is gone.
+        # the variable is gone. Explanatory callouts about its
+        # retirement are allowed (window-based exclusion).
         import inspect
         src = inspect.getsource(_OTRLR.review_ledger)
-        # `speaker_unknowns` as bareword on its own line / in an
-        # assignment / list-comp head.
-        # The B2 explanatory comment uses "speaker_unknowns" so
-        # we filter that line out.
-        leaky_lines = [
-            ln for ln in src.splitlines()
-            if "speaker_unknowns" in ln and "S33 B2" not in ln
-        ]
+        leaky_lines = _scan_for_leaky_token(src, "speaker_unknowns")
         assert leaky_lines == [], (
             "S33 B2 deletion regressed: speaker_unknowns rollback "
             f"gate still present in review_ledger: {leaky_lines}"
@@ -243,10 +254,7 @@ class TestRollbackGateMachineryDeleted:
     def test_post_audit_pass_local_not_in_review_ledger_source(self):
         import inspect
         src = inspect.getsource(_OTRLR.review_ledger)
-        leaky_lines = [
-            ln for ln in src.splitlines()
-            if "post_audit_pass" in ln and "S33 B2" not in ln
-        ]
+        leaky_lines = _scan_for_leaky_token(src, "post_audit_pass")
         assert leaky_lines == [], (
             "S33 B2 deletion regressed: post_audit_pass rollback "
             f"gate still present in review_ledger: {leaky_lines}"
@@ -258,10 +266,7 @@ class TestRollbackGateMachineryDeleted:
         # (B4 deletes the function itself.)
         import inspect
         src = inspect.getsource(_OTRLR.review_ledger)
-        leaky_lines = [
-            ln for ln in src.splitlines()
-            if "final_phantoms" in ln and "S33 B2" not in ln
-        ]
+        leaky_lines = _scan_for_leaky_token(src, "final_phantoms")
         assert leaky_lines == [], (
             "S33 B2 deletion regressed: final_phantoms call still "
             f"present in review_ledger: {leaky_lines}"

@@ -177,8 +177,12 @@ class TestComputeEditCap:
 
 
 # ---------------------------------------------------------------------------
-# audit_cast_contract -- single function used twice (G4)
+# audit_cast_contract -- single function used once (G4 superseded by S33 B3)
 # ---------------------------------------------------------------------------
+# S33 B3 (2026-05-15): the second call site (label="post", Phase 9)
+# was retired per the refined no-auditors rule. Only Phase 1
+# (label="pre") still invokes this function; its output drives
+# `apply_deterministic_cast_repairs` (editor).
 
 
 class TestAuditCastContract:
@@ -380,11 +384,12 @@ class TestReviewLedgerDispositions:
             _line("b001", "c01", "Hello there.", role="character"),
             _line("b002", "c02", "Likewise.", role="character"),
         ])
-        # Pass 1 clean, Pass 2 clean no edits, Pass 3 clean.
+        # Pass 1 clean, Pass 2 clean no edits.
+        # S33 B3 (2026-05-15): Pass 3 (post-audit) call retired; only
+        # 2 LLM responses needed now.
         fn = _mk_generate_fn(
             _audit_clean_json(),
             _doctor_json(edits=[], verdict="clean"),
-            _audit_clean_json(),
         )
         disp = review_ledger(fn, led)
         assert disp.verdict == "clean_no_edits"
@@ -396,6 +401,8 @@ class TestReviewLedgerDispositions:
             _line("b001", "c01", "yeah I dunno", role="character"),
             _line("b002", "c02", "OK then.", role="character"),
         ])
+        # S33 B3 (2026-05-15): Pass 3 (post-audit) call retired; only
+        # 2 LLM responses needed now.
         fn = _mk_generate_fn(
             _audit_clean_json(),
             _doctor_json(edits=[{
@@ -404,7 +411,6 @@ class TestReviewLedgerDispositions:
                 "payload": "I cannot say for certain.",
                 "rationale": "voice fit",
             }], verdict="improved"),
-            _audit_clean_json(),
         )
         disp = review_ledger(fn, led)
         assert disp.verdict == "improved"

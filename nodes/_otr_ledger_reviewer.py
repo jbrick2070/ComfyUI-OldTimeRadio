@@ -379,20 +379,26 @@ def _extract_json_block(raw: str) -> str:
 def audit_cast_contract(
     generate_fn,
     ledger_data: dict,
-    label: str,
+    label: str = "pre",
 ) -> PreAuditReport:
-    """Run a single Cast Contract Auditor LLM pass.
+    """Run the Cast Contract Auditor LLM pass.
 
-    `label` distinguishes Pass 1 (label="pre") from Pass 3
-    (label="post") in soak logs. Per synthesis G4 this is ONE
-    function called twice; the underlying prompt + schema are
-    identical.
+    `label` is retained in the signature for forensic log clarity
+    (it surfaces in [OTR_LedgerReviewer:%s] messages). S33 B3
+    (2026-05-15) retired the only non-"pre" call site -- the
+    historical Phase 9 `label="post"` post-edit audit. Only Phase 1
+    (label="pre") now invokes this function. The default value
+    matches the only surviving call site.
+
+    Output `PreAuditReport.violations` is consumed by
+    `apply_deterministic_cast_repairs` (an editor that rewrites
+    line text to fix phantom names / bad casing / wrong char_id),
+    so the auditor survives the S33 no-auditors rule -- its output
+    USES the audit to develop the story.
 
     Returns a PreAuditReport. On LLM failure or unparseable JSON,
-    returns an empty clean report and logs a warning -- the
-    Python deterministic-repair pass then runs on whatever
-    violations were found (i.e. none). This is fail-soft on the
-    auditor itself; the downstream Python guards still catch
+    returns `_audit_failed_sentinel()` (pass_clean=False,
+    audit_failed=True). Downstream Python guards still catch
     structural drift.
     """
     cast_rows = ledger_data.get("cast") or []
@@ -1208,17 +1214,16 @@ def review_ledger(
         candidate, cast_roster_upper,
     )
 
-    # ---- Pass 3: Cast Auditor post-check ---------------------
-    # S33 B2 (2026-05-15): `post_audit_pass` rollback gate retired.
-    # The Phase 9 `audit_cast_contract(label="post")` call below still
-    # runs in this commit but its result is unused; B3 removes the
-    # call entirely. The `_final_phantom_check` report-only consumer
-    # was retired together with this rollback gate; B4 removes the
-    # function itself. Per Jeffrey's phantom-ship policy
-    # (2026-05-15): occasional phantoms reaching the audience is the
-    # accepted trade-off vs preserving the rollback gate.
-    post_audit = audit_cast_contract(generate_fn, candidate, label="post")
-    _ = post_audit  # silence linter; result intentionally unused (B3 removes the call)
+    # S33 B3 (2026-05-15): Phase 9 `audit_cast_contract(label="post")`
+    # call retired. Its only consumer was the `post_audit_pass`
+    # rollback gate, which B2 already retired. With the gate gone the
+    # post-edit LLM audit had no editor consumer -- it was a pure
+    # pipeline cut. Per Jeffrey's phantom-ship policy (2026-05-15),
+    # occasional phantoms reaching the audience is the accepted
+    # trade-off. The shared `audit_cast_contract` function is still
+    # called once (label="pre", Phase 1) -- the function survives
+    # because its output feeds `apply_deterministic_cast_repairs`
+    # (an editor).
 
     # ---- Commit candidate to disk ---------------------------
     # Wiring-review #10: clear+update (NOT bare shallow update -- bare

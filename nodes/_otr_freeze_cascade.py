@@ -3,12 +3,19 @@
 Wraps the existing `_otr_ledger_reviewer.review_ledger` 3-pass with
 Phase 0 (gap_audit_pre) at entry and Phase 10 (gap_audit_post +
 freeze) at exit. Subsequent sprint commits decompose the reviewer's
-internal passes into discrete cascade phases (Phase 1 / Phase 2 /
-Phase 9) AND insert the new LLM phases (Phase 3 polish, Phase 4
-scene coherence, Phase 4.5 smart suggestion, Phase 5 voice drift,
-Phase 6 episode arc, Phase 7 audio readiness, Phase 8 video
-readiness). This commit (commit 2 of 14) ships the orchestrator
-skeleton only -- Phase 3/4/4.5/5/6/7/8 are no-op holes for now.
+internal passes into discrete cascade phases (Phase 1 / Phase 2)
+AND insert the new LLM phases (Phase 3 polish, Phase 4 scene
+coherence, Phase 4.5 smart suggestion, Phase 5 voice drift, Phase 6
+episode arc, Phase 7 audio readiness, Phase 8 video readiness).
+This commit (commit 2 of 14) ships the orchestrator skeleton only
+-- Phase 3/4/4.5/5/6/7/8 are no-op holes for now.
+
+S33 B3 (2026-05-15) retired Phase 9 (the post-edit `audit_cast_contract(
+label="post")` LLM call) per the refined no-auditors rule: its only
+consumer was the `post_audit_pass` rollback gate that B2 removed.
+The phase_name string `phase_1_2_9_reviewer_composite` is retained
+for forensic / soak-diagnostic continuity even though the "9"
+component no longer fires.
 
 ADR mapping (`docs/2026-05-11-multi-turn-polish-adr.md`):
 
@@ -25,7 +32,8 @@ ADR mapping (`docs/2026-05-11-multi-turn-polish-adr.md`):
     Phase 6    episode arc                (commit 10, no-op here)
     Phase 7    audio readiness            (commit 5, no-op here)
     Phase 8    video readiness            (commit 5, no-op here)
-    Phase 9    cast audit final           (existing reviewer Pass 3)  <- review_ledger
+    Phase 9    RETIRED in S33 B3 (2026-05-15) -- pipeline cut, no
+               editor consumer; rollback gate B2 retired first.
     Phase 10   gap_audit_post + freeze    (commit 1, deterministic)
         |
         v
@@ -180,14 +188,18 @@ def _hash_lines_text(ledger_data: dict) -> int:
 # Phase 0 + Phase 10 are audit gates -- their own bucket so the
 # semantic split is clean across the four record kinds:
 #   audit_passes      Phase 0 (pre)  + Phase 10 (post + freeze)
-#   cleanup_passes    Phase 1+2+9 (reviewer composite) + Phase 3
-#                     (polish) + Phase 4 (scene coherence) + Phase
-#                     4.5 (smart suggestion) + Phase 5 (voice drift)
-#                     + Phase 6 (episode arc)
+#   cleanup_passes    Phase 1+2 (reviewer composite, Phase 9 retired
+#                     in S33 B3) + Phase 3 (polish) + Phase 4 (scene
+#                     coherence) + Phase 4.5 (smart suggestion) +
+#                     Phase 5 (voice drift) + Phase 6 (episode arc)
 #   readiness_passes  Phase 7 (audio readiness) + Phase 8 (video
 #                     readiness)
 # S30 B4: phase_3 / 4 / 4.5 / 5 / 6 entries DELETED from this table.
 # Those phases were removed from the cascade in the same commit.
+# S33 B3 (2026-05-15): Phase 9 component of the reviewer composite
+# retired. The phase_name string `phase_1_2_9_reviewer_composite`
+# stays for forensic continuity even though only Phase 1 + 2 actually
+# run inside it.
 _PHASE_BUCKETS: dict[str, str] = {
     "phase_0_gap_audit_pre":              "audit_passes",
     "phase_10_gap_audit_post_and_freeze": "audit_passes",
@@ -443,14 +455,16 @@ def run_freeze_cascade(
     enable_phase_8_video_readiness: bool = True,
     vram_ceiling_gb: float = 14.0,
 ) -> FreezeDisposition:
-    """Orchestrate Phase 0 -> reviewer (Phase 1+2+9) -> Phase 10.
+    """Orchestrate Phase 0 -> reviewer (Phase 1+2) -> Phase 10.
 
     Behaviour:
       * Phase 0 always runs first; warn-only. Records to
         meta.cleanup_passes.
-      * Existing review_ledger runs next (Phases 1, 2, 9 are still
-        bundled into this one function; commits 3, 4, 8, 9, 10 split
-        them out).
+      * Existing review_ledger runs next. Only Phases 1 + 2 fire
+        inside it after S33 B3 (Phase 9 retired per refined
+        no-auditors rule). The composite phase_name string
+        `phase_1_2_9_reviewer_composite` is retained for forensic
+        continuity.
       * If the reviewer verdict is a terminal failure
         (too_many_edits / needs_full_rerun), the cascade stops there:
         the ledger has already been restored to its pre-review state,
@@ -529,7 +543,7 @@ def run_freeze_cascade(
     # `enable_polish_pass` widget covers the same surface; the
     # cascade-side second polish opportunity was never exercised.
 
-    # ---- Phase 1 + 2 + 9: existing 3-pass reviewer -------
+    # ---- Phase 1 + 2: reviewer composite (Phase 9 retired S33 B3) ----
     started = _isoformat_utc_now()
     hash_before = _hash_lines_text(ledger_data)
     reviewer_disp = _OTRLR.review_ledger(generate_fn, led)

@@ -88,9 +88,11 @@ class OTR_LedgerFreezeCascade:
       news_used           Passthrough of the writer's news_used slot.
       estimated_minutes   Passthrough of the writer's est_minutes INT.
       model_id            HF model ID for the reviewer LLM passes
-                          (Phase 1 Auditor, Phase 2 Script Doctor,
-                          Phase 9 Auditor). Phase 3/4/4.5/5/6 future
-                          LLM phases reuse the same loader.
+                          (Phase 1 Auditor, Phase 2 Script Doctor).
+                          S33 B3 (2026-05-15) retired Phase 9 per
+                          the refined no-auditors rule. Phase
+                          3/4/4.5/5/6 future LLM phases reuse the
+                          same loader.
 
     Outputs (5 slots):
       script_text         Rebuilt from the post-freeze ledger.
@@ -265,10 +267,11 @@ class OTR_LedgerFreezeCascade:
         # require_model helper. Fail loud (MissingModelInputError) if
         # the input socket is unwired -- the recovery is to connect
         # the writer's broadcast `technical_model` output.
-        # LLM slot: technical -- reviewer Phase 1 (auditor), Phase 2
-        # (Script Doctor), Phase 9 (post-edit auditor) all consume
-        # this entry. Structured verdict-style passes; routes to the
-        # technical slot per the S30 routing table.
+        # LLM slot: technical -- reviewer Phase 1 (auditor) + Phase 2
+        # (Script Doctor) consume this entry. Structured verdict-style
+        # passes; routes to the technical slot per the S30 routing
+        # table. S33 B3 (2026-05-15) retired Phase 9 (post-edit
+        # auditor) per the refined no-auditors rule.
         resolved_technical_id = _OTRMI.require_model(
             technical_model, slot="technical",
         )
