@@ -278,9 +278,10 @@ class _LLMTimeoutWorkflowPause(_LLMTimeout):
     now. New downstream consumers can branch on this class for
     graceful UI handling (e.g., a "rerun" prompt).
 
-    The _LLM_CACHE invalidation in ``_run_with_timeout`` handles the
-    LLM -> LLM case (next LLM phase forces a fresh load from disk).
-    Raising this class handles the LLM -> visual case where the
+    The cache invalidation in ``_run_with_timeout`` (via
+    `_otr_model_loader.invalidate_cache_no_gpu_teardown`) handles
+    the LLM -> LLM case (next LLM phase forces a fresh load from
+    disk). Raising this class handles the LLM -> visual case where the
     next stage is FLUX/LTX/HuMo and would race the orphan's still-
     running CUDA kernels. The only safe move is to halt the workflow
     so the orphan finishes naturally without anything else trying
@@ -329,39 +330,38 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
                         phase_label, timeout_sec)
             vram_snapshot(f"{phase_label}_timeout")
 
-            # 2026-04-29 BUG-LOCAL-111 fix: timeout-recovery cache invalidation.
+            # BUG-LOCAL-111 + BUG-LOCAL-228 fix: timeout-recovery cache
+            # invalidation.
             #
-            # When FuturesTimeout fires, the worker thread is still running an
-            # LLM forward pass on GPU. Python cannot safely terminate threads,
-            # and `executor.shutdown(wait=False)` below does NOT kill the
-            # worker -- it keeps churning until its forward pass completes
-            # naturally (could be 30-60+ more seconds for a 16K prompt).
-            # Result: the GPU has in-flight kernels the main thread doesn't
-            # control. The cached model instance in _LLM_CACHE thinks it's
-            # idle but the orphan is still mutating its tensors. The NEXT
-            # phase that calls model.cpu() / _load_llm() / any CUDA op
-            # collides with the orphan's stale ops and Python aborts with
-            # `cudaErrorIllegalAddress`.
+            # When FuturesTimeout fires, the worker thread is still running
+            # an LLM forward pass on GPU. Python cannot safely terminate
+            # threads, and `executor.shutdown(wait=False)` below does NOT
+            # kill the worker -- it keeps churning until its forward pass
+            # completes naturally (could be 30-60+ more seconds for a 16K
+            # prompt). Result: the GPU has in-flight kernels the main
+            # thread doesn't control. The cached model instance thinks
+            # it's idle but the orphan is still mutating its tensors.
+            # The NEXT phase that calls model.cpu() / any CUDA op
+            # collides with the orphan's stale ops and Python aborts
+            # with `cudaErrorIllegalAddress`.
             #
-            # S30 B4b: route timeout-recovery through the modern slot
-            # scheduler's unload_llm. That helper clears both the
-            # _otr_model_loader.LLM_CACHE (new resident-state dict) and
-            # the legacy _LLM_CACHE here (best-effort fallback inside
-            # unload_llm). Single canonical teardown surface; no more
-            # manual cache-key shuffling at this site.
+            # The recovery path invalidates the canonical
+            # `_otr_model_loader.LLM_CACHE` dict references in-place
+            # via `invalidate_cache_no_gpu_teardown` -- dict-only
+            # invalidator, NO GPU calls. Orphan thread keeps its
+            # model reference in the worker's stack frame and exits
+            # naturally; the next `request_slot` forces a fresh load.
             try:
-                # S31 B4 fix for TIMEOUT_RECOVERY CUDA race: the prior
-                # `_otr_model_loader.unload_llm()` call here moved
-                # `cache_entry.model.to("cpu")` and ran
-                # `torch.cuda.empty_cache()` WHILE the orphan worker
-                # thread was still executing CUDA kernels on the
-                # cached model -- which is exactly what
-                # `cudaErrorIllegalAddress` is. The comment claiming
-                # the unload "avoids" the error was structurally
-                # wrong; the unload CAUSED it. New helper invalidates
-                # the cache dict references WITHOUT touching the
-                # GPU; orphan thread holds the model in its stack
-                # frame and exits naturally. See BUG-LOCAL-228.
+                # `invalidate_cache_no_gpu_teardown` (NOT `unload_llm`)
+                # is the GPU-safe path here. `unload_llm` would call
+                # `model.to("cpu")` + `torch.cuda.empty_cache()` while
+                # the orphan worker thread is still executing CUDA
+                # kernels on the cached model -- which is exactly the
+                # `cudaErrorIllegalAddress` failure mode. The helper
+                # invalidates the cache dict references WITHOUT
+                # touching the GPU; the orphan thread holds the model
+                # in its stack frame and exits naturally.
+                # See BUG-LOCAL-228.
                 from . import _otr_model_loader as _otr_loader_mod
                 _otr_loader_mod.invalidate_cache_no_gpu_teardown()
                 _runtime_log(
@@ -1503,17 +1503,11 @@ def _llm_rank_news_candidates(
             # comma-separated list of indices so any low-temp value
             # produces stable picks.
             #
-            # S31 B3: routed through the canonical
-            # `request_slot("technical", ...) + make_generate_fn` surface
-            # per Hard rule #5 -- the legacy `_generate_with_llm`
-            # wrapper is deleted at S31 B4.
-            #
             # LLM slot: technical -- structured short-output ranking
             # task. Caller composes the chat message; make_generate_fn
-            # bakes top_p=0.92 (RSS caller used top_p=1.0 with the
-            # legacy wrapper; the canonical surface does not expose
-            # per-call top_p override -- the slight delta is acceptable
-            # for a stochastic-argmax ranker at temperature=0.05).
+            # bakes top_p=0.92 (the canonical surface does not expose
+            # per-call top_p override -- acceptable for a stochastic-
+            # argmax ranker at temperature=0.05).
             from . import _otr_model_loader as _OTRML
             cache_entry = _OTRML.request_slot("technical", model_id)
             gen_fn = _OTRML.make_generate_fn(cache_entry)
@@ -1612,10 +1606,7 @@ def _llm_rerank_with_bodies(
             # Same temperature=0.05 trick as headline rank: transformers
             # rejects 0.0; tiny positive value is effectively argmax.
             #
-            # S31 B3: routed through canonical
-            # `request_slot("technical", ...) + make_generate_fn` per
-            # Hard rule #5. LLM slot: technical -- single-index body
-            # rerank.
+            # LLM slot: technical -- single-index body rerank.
             from . import _otr_model_loader as _OTRML
             cache_entry = _OTRML.request_slot("technical", model_id)
             gen_fn = _OTRML.make_generate_fn(cache_entry)
@@ -2495,17 +2486,11 @@ def _extract_all_dialogue(text):
 
 
 # Register the LLM unloader with the VRAM Power Wash system so that
-# force_vram_offload() at node entry points also evicts Gemma.
-# S31 B4: routed through canonical `_otr_model_loader.unload_llm`
-# (the legacy `_unload_llm` was deleted alongside the other 3 legacy
-# LLM symbols).
-# S31.5 B3 audit (Outcome A): `register_vram_cleanup`'s caller
-# (`force_vram_offload` in `_vram_log.py`) already wraps each
-# callback invocation in `try/except: pass`. The cleanup-callback
-# contract is "no-arg callable" only -- a no-raise wrapper is NOT
-# required. The B4 `_vram_cleanup_via_loader` wrapper was pure
-# delegation overhead and is ELIMINATED here. `unload_llm` is
-# passed directly.
+# force_vram_offload() at node entry points also evicts the LLM.
+# `register_vram_cleanup`'s caller (`force_vram_offload` in
+# `_vram_log.py`) already wraps each callback invocation in
+# `try/except: pass`, so the callback contract is "no-arg callable"
+# only -- no wrapper required.
 from ._vram_log import register_vram_cleanup
 from . import _otr_model_loader as _otr_loader_mod
 

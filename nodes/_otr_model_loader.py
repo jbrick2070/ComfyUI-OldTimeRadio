@@ -106,12 +106,12 @@ def load_llm(
     optimization_profile: str = "Standard",
     context_cap: int | None = None,
 ) -> dict[str, Any]:
-    """Load an LLM and return a cache_entry dict. CANONICAL home of the
-    bitsandbytes profile body post S31 B2; post S31 B4 the function
-    holds no internal cache state of its own -- `request_slot` is the
-    canonical entry point that handles cache-hit / cache-miss, and
-    `load_llm` is the always-load primitive that builds and returns a
-    fresh cache_entry.
+    """Load an LLM and return a cache_entry dict.
+
+    The always-load primitive: `request_slot` is the canonical entry
+    point that handles cache-hit / cache-miss; `load_llm` builds and
+    returns a fresh cache_entry every time it's called. Owns the
+    bitsandbytes / NF4 / 8-bit / Standard / Obsidian profile body.
 
     Returns a cache_entry dict shaped for the v2.0 path:
         {
@@ -128,8 +128,7 @@ def load_llm(
         model_id: HF model identifier. UI suffixes like "[BETA]" or
                   "[8-bit]" are tolerated and stripped.
         device:   target device. Defaults "cuda".
-        optimization_profile: one of "Standard", "Obsidian", "8-bit",
-                  matching the legacy orchestrator's profile names.
+        optimization_profile: one of "Standard", "Obsidian", "8-bit".
         context_cap: optional caller-provided context cap that
                   overrides the internal `_MODEL_CONTEXT_CAPS` lookup.
                   `request_slot` pre-resolves via
@@ -140,21 +139,12 @@ def load_llm(
 
     Raises ModelLoaderError on any underlying failure (wraps the
     original exception via __cause__).
-
-    S31 B4 cleanbreak: the legacy `_LLM_CACHE` cache-hit / cache-
-    mismatch logic that this body inherited from
-    `story_orchestrator._load_llm` (at S31 B2 port) is DELETED.
-    `request_slot` handles caching at the outer layer; `load_llm`
-    is the always-load primitive. The `_runtime_log` helper still
-    lives in `story_orchestrator` (only 4 legacy symbols delete
-    at B4: `_load_llm`, `_unload_llm`, `_LLM_CACHE`,
-    `_generate_with_llm`). `_runtime_log` is part of the broader
-    orchestrator logging surface and stays.
     """
     from .story_orchestrator import _runtime_log
 
     try:
-        # Bridge legacy parameter name used by the lifted body:
+        # `model_id_full` is the in-body name for the same value as
+        # the caller-facing `model_id` argument.
         model_id_full = model_id
 
         # Strip [BETA] or [8-bit] labels used in the UI dropdown
