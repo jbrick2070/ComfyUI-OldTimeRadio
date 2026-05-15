@@ -473,6 +473,14 @@ class _SlotScheduler:
         self.transitions = 0
         self.calls_by_slot = {"creative": 0, "technical": 0}
         self._last_resolved_id: str | None = None
+        # S32 B6: per-helper / per-phase accounting for forensic meta
+        # stamping. `slot_calls_by_helper` maps helper-name -> per-slot
+        # call counts; `slot_transitions_by_phase` is the ordered list
+        # of (phase_label, from_slot, to_slot, from_id, to_id) tuples
+        # captured every time a slot transition fires.
+        self.slot_calls_by_helper: dict[str, dict[str, int]] = {}
+        self.slot_transitions_by_phase: list[dict] = []
+        self._current_helper: str | None = None
 
     def _account_and_get_entry(self, slot: str) -> dict:
         """Acquire the right cache entry for `slot`. Updates transition
@@ -487,9 +495,55 @@ class _SlotScheduler:
             and self._last_resolved_id != resolved_id
         ):
             self.transitions += 1
+            # S32 B6: capture the transition with phase context.
+            # `_current_helper` is set by the writer via the
+            # `helper_context()` manager around each helper call.
+            self.slot_transitions_by_phase.append({
+                "phase": self._current_helper or "<unknown>",
+                "from_slot": None,  # populated below from prior id
+                "to_slot": slot,
+                "from_id": self._last_resolved_id,
+                "to_id": resolved_id,
+            })
+            # Backfill from_slot: which slot did `_last_resolved_id`
+            # belong to? Look it up in self.ids.
+            for s, sid in self.ids.items():
+                if sid == self._last_resolved_id:
+                    self.slot_transitions_by_phase[-1]["from_slot"] = s
+                    break
         self._last_resolved_id = resolved_id
         self.calls_by_slot[slot] = self.calls_by_slot.get(slot, 0) + 1
+        # S32 B6: per-helper accounting. When `_current_helper` is
+        # unset (helper context not entered), bucket calls under
+        # `"<unattributed>"` so we still capture totals; in practice
+        # the writer wraps every helper call site so this fallback
+        # bucket should stay at 0 in production.
+        helper = self._current_helper or "<unattributed>"
+        bucket = self.slot_calls_by_helper.setdefault(
+            helper, {"creative": 0, "technical": 0}
+        )
+        bucket[slot] = bucket.get(slot, 0) + 1
         return cache_entry
+
+    def helper_context(self, helper_name: str):
+        """Context manager: attribute slot calls made within `with` to
+        `helper_name`. Used by the writer to wrap each helper call so
+        the per-helper bucket in `slot_calls_by_helper` and the
+        `phase` field on `slot_transitions_by_phase` get populated.
+        """
+        scheduler = self
+
+        class _HelperCtx:
+            def __enter__(self):
+                self._prior = scheduler._current_helper
+                scheduler._current_helper = helper_name
+                return scheduler
+
+            def __exit__(self, exc_type, exc, tb):
+                scheduler._current_helper = self._prior
+                return False
+
+        return _HelperCtx()
 
     def for_slot(self, slot: str):
         """Return a generate_fn closure that targets `slot`. Each call
@@ -1764,15 +1818,18 @@ class OTR_LedgerScriptWriter:
             # intact in B2b. A future refactor can split pick_style
             # to accept a separate chooser_generate_fn parameter.
             # S32 B1 paired-contract wiring: pass BOTH generators.
-            # B1 routes both passes through creative; B2 flips pass 2.
-            style_pick = _OTRSP.pick_style(
-                creative_fn=creative_generate_fn,
-                technical_fn=technical_generate_fn,
-                article_text=resolved["news_seed"],
-                seed_pool=list(_STYLE_PICKER_SEED_POOL),
-                rng=picker_rng,
-                model_id=str(resolved["creative_writing_model"]),
-            )
+            # S32 B6: `helper_context` attributes all slot calls
+            # inside the block to "pick_style" so per-helper /
+            # per-phase meta tracking gets a clean phase label.
+            with slot_scheduler.helper_context("pick_style"):
+                style_pick = _OTRSP.pick_style(
+                    creative_fn=creative_generate_fn,
+                    technical_fn=technical_generate_fn,
+                    article_text=resolved["news_seed"],
+                    seed_pool=list(_STYLE_PICKER_SEED_POOL),
+                    rng=picker_rng,
+                    model_id=str(resolved["creative_writing_model"]),
+                )
             resolved["style"] = style_pick.chosen
             meta["style_pick"] = style_pick.model_dump()
             log.info(
@@ -1808,18 +1865,20 @@ class OTR_LedgerScriptWriter:
             # S32 B1 paired-contract wiring: pass BOTH generators.
             # build_news_briefs internally routes V0-V3 through
             # technical_fn (creative_fn accepted for uniformity).
-            briefs = _OTRNI.build_news_briefs(
-                creative_fn=creative_generate_fn,
-                technical_fn=technical_generate_fn,
-                full_text=article.get("full_text", ""),
-                headline=article.get("headline", ""),
-                summary=article.get("summary", ""),
-                outlet=article.get("source", ""),
-                pub_date=article.get("date", ""),
-                style=resolved["style"],
-                seed=int(seed),
-                model_id=str(resolved["technical_model"]),
-            )
+            # S32 B6: helper_context attribution.
+            with slot_scheduler.helper_context("build_news_briefs"):
+                briefs = _OTRNI.build_news_briefs(
+                    creative_fn=creative_generate_fn,
+                    technical_fn=technical_generate_fn,
+                    full_text=article.get("full_text", ""),
+                    headline=article.get("headline", ""),
+                    summary=article.get("summary", ""),
+                    outlet=article.get("source", ""),
+                    pub_date=article.get("date", ""),
+                    style=resolved["style"],
+                    seed=int(seed),
+                    model_id=str(resolved["technical_model"]),
+                )
             meta["news"] = briefs.model_dump()
             casting_brief = briefs.casting_brief
             script_brief = briefs.script_brief
@@ -1868,15 +1927,17 @@ class OTR_LedgerScriptWriter:
         # S32 B1 paired-contract wiring: pass BOTH generators.
         # B1 routes generation through creative; B3 flips schema
         # validation to technical_fn (fail-fast per D2).
-        cast_rows, cast_meta = _OTRCAST.lock_cast(
-            creative_fn=creative_generate_fn,
-            technical_fn=technical_generate_fn,
-            num_characters=resolved["num_characters"],
-            news_seed=resolved["news_seed"],
-            casting_brief=casting_brief,
-            style=resolved["style"],
-            rng=cast_rng,
-        )
+        # S32 B6: helper_context attribution.
+        with slot_scheduler.helper_context("lock_cast"):
+            cast_rows, cast_meta = _OTRCAST.lock_cast(
+                creative_fn=creative_generate_fn,
+                technical_fn=technical_generate_fn,
+                num_characters=resolved["num_characters"],
+                news_seed=resolved["news_seed"],
+                casting_brief=casting_brief,
+                style=resolved["style"],
+                rng=cast_rng,
+            )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
         meta["cast_locked"]           = True
@@ -2260,15 +2321,20 @@ class OTR_LedgerScriptWriter:
                 # polish_generate_fn from the scheduler) handles the
                 # narration-leak cleanup pass when enable_polish_pass
                 # is on.
-                line_res = _OTRLC.compose_line(
-                    creative_fn=creative_generate_fn,
-                    technical_fn=technical_generate_fn,
-                    req=line_req,
-                    base_temperature=base_temp,
-                    max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                    enable_polish_pass=resolved["enable_polish_pass"],
-                    polish_generate_fn=polish_generate_fn,
-                )
+                # S32 B6: helper_context attribution. Per-beat
+                # invocation; the context-manager overhead is
+                # constant-time and negligible relative to the LLM
+                # call itself.
+                with slot_scheduler.helper_context("compose_line"):
+                    line_res = _OTRLC.compose_line(
+                        creative_fn=creative_generate_fn,
+                        technical_fn=technical_generate_fn,
+                        req=line_req,
+                        base_temperature=base_temp,
+                        max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                        enable_polish_pass=resolved["enable_polish_pass"],
+                        polish_generate_fn=polish_generate_fn,
+                    )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
                 cid = char_id_by_name[beat.speaker]
@@ -2287,15 +2353,20 @@ class OTR_LedgerScriptWriter:
                 # narrative writes. (The plan's "ANNOUNCER bookends"
                 # technical pass refers to a hypothetical refactor
                 # that doesn't exist in the current code.)
-                line_res = _OTRLC.compose_line(
-                    creative_fn=creative_generate_fn,
-                    technical_fn=technical_generate_fn,
-                    req=line_req,
-                    base_temperature=base_temp,
-                    max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                    enable_polish_pass=resolved["enable_polish_pass"],
-                    polish_generate_fn=polish_generate_fn,
-                )
+                # S32 B6: helper_context attribution. Per-beat
+                # invocation; the context-manager overhead is
+                # constant-time and negligible relative to the LLM
+                # call itself.
+                with slot_scheduler.helper_context("compose_line"):
+                    line_res = _OTRLC.compose_line(
+                        creative_fn=creative_generate_fn,
+                        technical_fn=technical_generate_fn,
+                        req=line_req,
+                        base_temperature=base_temp,
+                        max_new_tokens_cap=resolved["max_new_tokens_cap"],
+                        enable_polish_pass=resolved["enable_polish_pass"],
+                        polish_generate_fn=polish_generate_fn,
+                    )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
                 cid = "announcer"
@@ -2620,6 +2691,19 @@ class OTR_LedgerScriptWriter:
         meta["technical_model"]        = resolved["technical_model"]
         meta["slot_transitions"]       = slot_scheduler.transitions
         meta["slot_calls_by_slot"]     = dict(slot_scheduler.calls_by_slot)
+        # S32 B6: per-helper / per-phase forensic stamping. Downstream
+        # consumers + final QA review can audit (a) which helpers
+        # used which slots, and (b) the ordered list of slot
+        # transitions captured during this run. Default-config
+        # (creative == technical) keeps transitions == 0 and the
+        # by-phase list empty; differing-slots populates both.
+        meta["slot_calls_by_helper"] = {
+            helper: dict(buckets)
+            for helper, buckets in slot_scheduler.slot_calls_by_helper.items()
+        }
+        meta["slot_transitions_by_phase"] = [
+            dict(record) for record in slot_scheduler.slot_transitions_by_phase
+        ]
         # gen_params_by_phase rows track only the phases the writer
         # invoked. Each row carries the slot + the resolved repo id
         # consulted at call time + the per-slot sampling profile
