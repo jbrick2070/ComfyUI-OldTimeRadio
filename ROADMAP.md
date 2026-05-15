@@ -75,7 +75,75 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## CURRENT WORK -- S33 Editor-Only Cleanup (COMPLETE 2026-05-15)
+## CURRENT WORK -- S34 P0/P1 Hotfix (COMPLETE 2026-05-15)
+
+**Branch:** `s34-p0-p1-hotfix` (cut from `s33-editor-only-cleanup @ 0297af7`, S33 B6 close).
+**Plan:** `docs/2026-05-15-S34-p0-p1-hotfix-sprint-plan.md` (round-robin reviewed Gemini + ChatGPT 2026-05-15).
+**Final QA:** `docs/2026-05-15-S34-final-qa-review.md`.
+
+**Lean hotfix sprint -- 4 commits total.** Two defects surfaced by S33's post-close round-robin, both verified against actual code state during planning.
+
+**Runtime status:** NOT PROVEN. Pytest-only structural pass; ComfyUI Desktop smoke deferred by explicit operator decision.
+
+**What S34 shipped:**
+
+* **B0:** branch cut + canonical plan landing.
+* **B1 (P0):** `run_script_doctor` in `nodes/_otr_ledger_reviewer.py` no longer silently fail-softs. All three failure paths (LLM exception, JSON parse failure, schema validation failure) now return `ScriptDoctorReport(overall_verdict="needs_full_rerun")` instead of the silent `ScriptDoctorReport()` default. Matches Phase 1's `_audit_failed_sentinel(pass_clean=False)` pattern. Caller (`review_ledger`) now correctly maps doctor failure to `verdict="needs_full_rerun"` and does NOT invoke `apply_doctor_edits`. Cascade orchestrator routes `needs_full_rerun` through `REVIEWER_TO_FREEZE_VERDICT` to the output `freeze_verdict` slot. 7 new tests.
+* **B2 (P1):** `nodes/OTR_LedgerFreezeCascade.py` reserializes `led.data` to `updated_script_json` between the finally block and the return so `meta.freeze_unload_ok` (stamped on `led.data` inside the finally) is visible to downstream JSON consumers. Pre-B2 the cascade's own comment at L374 ("the next visual node can branch on the stamp") was false because the returned JSON didn't contain it. 3 new tests.
+* **B-final:** sprint close (this commit). Final QA filed; Sprint G QUEUED entry filed (see below).
+
+**Gates (final canonical run at sprint close):**
+
+* Wide pytest walk: **2150 passed / 10 skipped / 0 failed** in 18.41s (+10 over S33 close baseline of 2140 / 10 / 0). Exact target hit.
+* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held at every commit boundary).
+* Forbidden-pattern sweep: 0 runtime hits.
+* Audio C7 byte-identical pytest proxy (default config, happy path): held at B1 and B2 boundaries.
+* Sprint C surface guard: file-surface 0 hits, content-surface 0 hits. Sprint C zone is untouched.
+* Audio runtime: DEFERRED per autonomous-run directive (runtime status NOT PROVEN).
+
+**Optional operator action (Jeffrey's discretion):** 5-minute ComfyUI Desktop smoke test on canonical `otr_scifi_16gb_full.json` between S34 B-final and Sprint C kickoff. Hotfix on `s34-p0-p1-hotfix` if anything breaks.
+
+**BUG_LOG entries filed during S34:** none. The two defects were surfaced by S33's post-close round-robin and described in the S34 plan's "Why this sprint exists" section; neither was reproduced in a soak run.
+
+**Next sprint:** Sprint C (`meta.story_brief` v2) opens per the locked B → C → A sequence.
+
+---
+
+## QUEUED SPRINT -- Sprint G -- Comprehensive bug sweep + cosmetic cleanup
+
+**Status:** QUEUED. Position: after Sprint A or whenever Jeffrey calls. May split into G1/G2 if scope warrants. Round-robin reviewed before Cowork execution per established pattern.
+
+**Why deferred rather than fixed during S34:** Sprint C touches the writer's script-finalization area and LTX consumer code. Cosmetic items in that surface get rewritten by Sprint C anyway; fixing them now would be wasted work. Sprint C's plan refresh after S34 close will catch any items in its own blast radius. Sprint G after Sprint C closes can absorb whatever Sprint C didn't touch, cleanly.
+
+**Scope:**
+
+**KNOWN-DEFECT items (from S33 forward-work, verified during S34 planning):**
+
+* `phase_1_2_9_reviewer_composite` phase_name string references retired "9"; resolve via rename-with-consumer-updates OR documented retention with telemetry constraint + regression test.
+* `post_audit_violations` ReviewerDisposition field always 0 post-S33 B2; remove field after AST sweep proves no constructor passes it as kwarg.
+* `OTR_LedgerScriptWriter.py` Phase 3 + Step 2.5 comment refs (non-Sprint-C zone).
+* `_otr_ledger_consumers.py:87` "set by Step 2.5" stale comment.
+
+**AUDIT-DRIVEN items (B1 inventory pass needed to enumerate):**
+
+* Fail-soft pattern audit (find other `try/except` returning `Default()` that may silently swallow failures the way Script Doctor did).
+* Comment/docstring drift for deleted code across S31/S31.5/S32/S33.
+* Stale `__all__` entries across all `nodes/*.py` modules.
+* Stale imports referencing deleted modules.
+* Workflow JSON inventory across all `workflows/*.json` files (beyond `otr_scifi_16gb_full.json` which has been audited).
+* Forbidden-sweep regex coverage gaps + add narrow marker `return\s+ScriptDoctorReport\s*\(\s*\)` to lock S34 B1 against reintroduction.
+* ADR drift (`docs/script-writing-architecture-adr.md` post-S33 accuracy).
+* BUG_LOG hygiene (stale OPEN entries, hash mismatches).
+* ROADMAP CURRENT WORK accuracy.
+* Test name drift (commit-hash-specific test filenames).
+* Stale `# noqa` / `# type: ignore` comments orphaned by deletions.
+* Magic strings (top 3-5 worst offenders only).
+
+**Sequencing:** after Sprint C (which may obsolete some of the above by rewriting the same code).
+
+---
+
+## CLOSED SPRINT -- S33 Editor-Only Cleanup (COMPLETE 2026-05-15)
 
 **Branch:** `s33-editor-only-cleanup` (cut from `s32-helper-per-subpass-routing @ 3261b18`, S32 B8 close).
 **Plan:** `docs/2026-05-14-S33-editor-only-cleanup-sprint-plan.md` (round-robin reviewed Gemini + ChatGPT 2026-05-14; refined no-auditors rule applied at B1.5).
