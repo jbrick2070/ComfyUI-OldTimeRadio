@@ -2,8 +2,12 @@
 
 > **Single deliverable.** All decisions consolidated at the top. All load-bearing code cited inline (§A.1-§A.9). Send-ready for one final review. No attachments needed.
 
-**Status:** READY-TO-CUT v3 (consolidated 2026-05-15, after Cowork code-audit + Jeffrey's pre-build edit pass + round-robin-2 triage + operator directive 2026-05-15 [v2: L-4 override, expanded C2 scope, legacy retirements pulled forward] + round-robin-3 + round-robin-4 synthesis [v3: 12 accepted findings, 2 rejected with named rationale, C2 split for safety per operator sizing directive]).
-**Branch:** `sprint-c-story-brief-v2`. Cut from `s34-p0-p1-hotfix` @ `f758f02`. **NOT YET CUT.**
+## Status
+
+- Phase: execution
+- Current commit: C0a
+- Branch: sprint-c-story-brief-v2
+- Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).
 **Loop per commit (no operator gates between commits — chain runs through to C-final):** review → code → wire → pytest → regression → commit. No ComfyUI runtime gates. Pytest-only acceptance.
 **Commit sizing directive (operator 2026-05-15):** each commit is sized to land cleanly in a single review-code-wire-pytest-regression-commit loop. If a commit's risk surface or test count would exceed a single loop's safe boundary, split it. C2 is split into C2a (visual layer) + C2b (orchestrator layer + `_STYLE_WORLD_BLOCK`) on this basis.
