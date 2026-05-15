@@ -1297,7 +1297,6 @@ def compose_line(
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     enable_polish_pass: bool = False,
     polish_generate_fn=None,
-    use_technical_critic: bool = False,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1331,10 +1330,17 @@ def compose_line(
 
     Raises LineCompositionFailedError after all attempts exhausted.
     """
-    # S32 B1: alias `generate_fn` for the existing body. All
-    # sub-passes (composer, critic, grammarian, polish gate) route
-    # through creative_fn at B1; B4 lands the `use_technical_critic`
-    # opt-in dispatch for the critic sub-pass.
+    # All sub-passes route to creative_fn. The critic check
+    # specifically stays on creative regardless of slot config --
+    # per-beat T-dispatch in differing-slots mode would cost ~3.3 hr
+    # VRAM transition overhead per episode (100 beats x 60s x 2
+    # transitions). Architecturally rejected at S32 design (plan D1).
+    # If a future use case justifies T-side critic, design batched
+    # dispatch instead of per-beat -- see Sprint E enhancer chain
+    # audit forward-work. The originally-planned `use_technical_critic`
+    # opt-in widget was dropped at S32 B4 (no-widget rule: features
+    # that are useful are on; opt-in default-OFF gates on rejected
+    # paths are maintenance debt).
     generate_fn = creative_fn
 
     if max_attempts < 1:

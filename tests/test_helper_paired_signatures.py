@@ -66,9 +66,15 @@ def test_compose_line_accepts_paired_generators():
     assert "technical_fn" in sig.parameters
     assert sig.parameters["creative_fn"].kind == inspect.Parameter.KEYWORD_ONLY
     assert sig.parameters["technical_fn"].kind == inspect.Parameter.KEYWORD_ONLY
-    # `use_technical_critic` opt-in widget present (defaults OFF).
-    assert "use_technical_critic" in sig.parameters
-    assert sig.parameters["use_technical_critic"].default is False
+    # S32 B4 (no-widget drift, plan D1 architectural rejection): the
+    # originally-projected `use_technical_critic` opt-in parameter was
+    # dropped. Critic always routes to creative; the parameter must
+    # NOT exist on the signature.
+    assert "use_technical_critic" not in sig.parameters, (
+        "`use_technical_critic` parameter was rejected at S32 B4 "
+        "(no-widget rule). Re-introducing it brings back the dead "
+        "opt-in surface the rule guards against."
+    )
     assert "generate_fn" not in sig.parameters
 
 
@@ -242,18 +248,17 @@ def test_compose_line_internally_uses_creative_fn_default():
             creative_fn=creative_fn,
             technical_fn=technical_fn,
             req=req,
-            use_technical_critic=False,
         )
     except Exception:
         pass
 
     assert len(creative_calls) >= 1, (
-        "creative_fn must be called at least once at B1"
+        "creative_fn must be called at least once for the composer pass"
     )
     assert len(technical_calls) == 0, (
-        f"technical_fn must NOT be called at B1 with "
-        f"use_technical_critic=False; got {len(technical_calls)} "
-        f"call(s)."
+        f"technical_fn must NEVER be called by compose_line "
+        f"(S32 B4 no-widget decision; critic always routes to "
+        f"creative). Got {len(technical_calls)} call(s)."
     )
 
 

@@ -86,6 +86,12 @@ forbidden = re.compile(
     # locks against reintroduction even though the wrapper name is
     # specific enough that accidental restoration is unlikely.
     r"|\b_vram_cleanup_via_loader\b"        # S31.5 B3: eliminated wrapper
+    # S32 B4 (2026-05-14): widget rejected; critic always routes
+    # creative. Per-beat T-dispatch in differing-slots adds ~3.3 hr
+    # of VRAM transition overhead per episode. No-widget rule
+    # (Jeffrey: features useful are on; default-OFF gates on
+    # architecturally-rejected paths are dead-code maintenance debt).
+    r"|\buse_technical_critic\b"            # S32 B4: widget rejected
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")

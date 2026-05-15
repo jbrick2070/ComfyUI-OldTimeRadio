@@ -776,44 +776,54 @@ One-line dispatch change. Add `CastValidationLLMError` raise on malformed T outp
 
 ---
 
-## B4 — `compose_line` critic opt-in widget (~1 d)
+## B4 — `compose_line` critic: NO-WIDGET drift (~0.25 d)
+
+> **DRIFT FROM ORIGINAL PLAN (2026-05-14):** the canonical plan called
+> for a `use_technical_critic` opt-in widget (default OFF), writer
+> optional widget count bump 15→16, conditional dispatch, and VRAM-
+> warning logging. Per Jeffrey's no-widget rule -- "if a feature is
+> useful, it's on; if not, extract from code" -- the widget was
+> DROPPED at B4. A widget defaulting OFF that gates an architecturally-
+> rejected code path (per-beat T-dispatch per D1) is exactly the
+> maintenance debt that rule guards against. Bake the decision into
+> code instead.
 
 ### Code
 
-**`OTR_LedgerScriptWriter.py` INPUT_TYPES** — add optional widget (count 15 → 16):
-
-```python
-"use_technical_critic": ("BOOLEAN", {
-    "default": False,
-    "tooltip": (
-        "OPT-IN: route compose_line's critic sub-pass to "
-        "technical_model. WARNING: differing-slots mode triggers "
-        "C->T->C VRAM transitions per voiced beat (~30-60s "
-        "overhead per beat on 16GB cards). Default OFF (critic "
-        "on creative slot, no transitions)."
-    ),
-}),
-```
-
-**`_otr_line_composer.py:compose_line`** — accept `use_technical_critic: bool = False`; conditionally dispatch critic to technical_fn.
-
-**Writer** — pass `resolved["use_technical_critic"]` into every `compose_line` call. One-shot warning at run start when `use_technical_critic=True AND creative != technical`.
-
-**Standalone self-test bump** `OTR_LedgerScriptWriter.py:2836`: `assert n_optional == 16` with updated message.
+* `_otr_line_composer.py:compose_line` -- critic stays routed to
+  `creative_fn` unconditionally. The B1-added `use_technical_critic`
+  parameter is REMOVED from the signature (dead opt-in surface).
+  Inline comment at the dispatch site documents the rejection with
+  the ~3.3 hr VRAM-thrash math and points at Sprint E enhancer-chain
+  audit forward-work for the batched-dispatch revisit.
+* `OTR_LedgerScriptWriter.py` INPUT_TYPES -- **no widget added.**
+  Optional widget count stays 15. No `use_technical_critic` key.
+* `OTR_LedgerScriptWriter.py` standalone self-test -- assertion
+  stays `n_optional == 15`. No bump.
+* `OTR_LedgerScriptWriter.py` -- **no VRAM-warning logging.** No
+  opt-in path exists, so no warning is needed.
+* `docs/_s28_forbidden_sweep.py` -- add marker
+  `\buse_technical_critic\b` locking against reintroduction (the
+  S32 B4 extinction marker).
 
 ### Pytest
 
 | Test | File | Asserts |
 |---|---|---|
-| `test_compose_line_critic_default_uses_creative` | `tests/test_compose_line_routing.py` (new) | `use_technical_critic=False`, critic on creative_fn |
-| `test_compose_line_critic_optin_uses_technical_differing_slots` | same | True + distinct fns → critic on technical_fn |
-| `test_compose_line_critic_optin_default_config_no_change` | same | True + same model → byte-identical to default |
-| `test_writer_logs_vram_warning_on_optin_differing_slots` | `tests/test_writer_paired_wiring.py` (extend) | Caplog: warning with overhead estimate |
-| `test_writer_optional_widget_count_16` | (extend existing) | INPUT_TYPES optional == 16 |
+| `test_compose_line_critic_always_creative` | `tests/test_compose_line_routing.py` (new) | Distinct paired fns; zero technical_fn calls |
+| `test_no_use_technical_critic_widget` | same | `OTR_LedgerScriptWriter.INPUT_TYPES` dict does NOT contain a `use_technical_critic` key (optional or required) |
 | `test_audio_c7_byte_identical_b4` | `tests/test_audio_byte_identical.py` | Default holds |
 
+Net: 2 new tests instead of the original 6. Significantly smaller
+commit. The B1 sig test (`test_compose_line_accepts_paired_generators`)
+also flips: was `assert "use_technical_critic" in sig.parameters`,
+now `assert "use_technical_critic" not in sig.parameters` (the
+no-widget rule extends to the helper's parameter list as well --
+the parameter was added at B1 specifically for B4's planned dispatch
+and is dead code without the widget).
+
 ### Commit subject
-`B4: compose_line critic-via-technical opt-in widget (default OFF) + VRAM warning`
+`B4: compose_line critic stays creative-slot; no-widget rule applied (drift from plan, plan D1 architectural rejection baked in)`
 
 ---
 
