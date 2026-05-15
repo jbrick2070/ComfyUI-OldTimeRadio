@@ -75,6 +75,66 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CURRENT WORK -- S33 Editor-Only Cleanup (COMPLETE 2026-05-15)
+
+**Branch:** `s33-editor-only-cleanup` (cut from `s32-helper-per-subpass-routing @ 3261b18`, S32 B8 close).
+**Plan:** `docs/2026-05-14-S33-editor-only-cleanup-sprint-plan.md` (round-robin reviewed Gemini + ChatGPT 2026-05-14; refined no-auditors rule applied at B1.5).
+**Final QA:** `docs/2026-05-15-S33-final-qa-review.md`.
+
+**Refined no-auditors rule (Jeffrey, 2026-05-15):**
+"Audit calls are OK if they USE the audit to develop / edit the story. NOT OK if they just cut the pipeline (gate, halt, fail, rollback, report-only)."
+
+**What S33 shipped (8 commits, B0 -> B6):**
+* **B0:** branch cut + canonical plan landing.
+* **B1:** machine-checkable inventory of cascade Phase 1 + Phase 9 surface. HEADLINE FINDING: plan's mental model mismatched code (no Phase 1/9 cascade-class methods or widgets; the two LLM calls live inside `_otr_ledger_reviewer.review_ledger` as `audit_cast_contract(label="pre"|"post")`). Halted, surfaced to Jeffrey for architectural decision.
+* **B1.5:** phantom-handler classification per refined rule. Outcomes: `auto_remap_phantom` KEEP (helper to editor); `apply_phantom_skip_fallback` DELETE (mute = pipeline cut); `_final_phantom_check` DELETE (report-only).
+* **B2:** rollback gates retired -- `speaker_unknowns` + `post_audit_pass` + verdict literals `cast_unrecoverable` + `post_audit_failed`. `ReviewerVerdict` Literal trimmed 6 -> 4. `REVIEWER_TO_FREEZE_VERDICT` map + `FREEZE_TERMINAL_FAILURE_VERDICTS` set trimmed.
+* **B3:** Phase 9 LLM call retired -- `audit_cast_contract(label="post")` had no editor consumer post-B2. `label` parameter default flipped to "pre" (only remaining call site). Reviewer runs 2 LLM calls/cascade (Phase 1 audit + Phase 2 doctor), down from 3.
+* **B4:** pipeline-cutting phantom handlers retired per B1.5 -- `apply_phantom_skip_fallback` + `_final_phantom_check` deleted (~80 lines). `phantom_skip_count` field deleted from `ReviewerDisposition` dataclass. `auto_remap_phantom` SURVIVES (positive-survival test).
+* **B5:** polish prompt rename + design lock -- `_POLISH_SYSTEM_PROMPT` -> `_POLISH_SYSTEM_PROMPT_CHARACTER` for symmetric naming with `_POLISH_SYSTEM_PROMPT_ANNOUNCER`. 14-line design-lock comment block + 6 forbidden-sweep markers ( `_POLISH_SYSTEM_PROMPT_UNIFIED` / `_UNIFIED_POLISH_PROMPT` plus catch-up markers for the B2 verdicts and B4 phantom handlers).
+* **B6:** sprint close (this commit).
+
+**S33 phantom-ship policy (Jeffrey, 2026-05-15):**
+Occasional phantoms reaching the audience is the accepted trade-off for retiring the rollback gates. Phase 2 Script Doctor + deterministic cast repairs still rewrite phantom names; no Phase 2 hardening required.
+
+**Gates (final canonical run at sprint close):**
+* B5 affected suites: 97 passed / 1 skipped (98 tests total).
+* B4 affected suites: 138 passed / 1 skipped (139 tests total).
+* B3 affected suites: 99 passed / 1 skipped (100 tests total).
+* B2 affected suites: 83 passed (no skips).
+* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held at every commit boundary).
+* Forbidden-pattern sweep: 0 runtime hits (six new S33 markers integrated cleanly).
+* Audio C7 byte-identical pytest proxy (default config): holds B2 -> B5.
+* Audio runtime: DEFERRED per autonomous-run directive.
+
+**Deletions summary:**
+* 2 cascade rollback gates (speaker_unknowns + post_audit_pass)
+* 2 verdict literals (cast_unrecoverable + post_audit_failed)
+* 1 Phase 9 LLM call site (audit_cast_contract label="post")
+* 2 phantom-handler functions (apply_phantom_skip_fallback + _final_phantom_check)
+* 1 dataclass field (ReviewerDisposition.phantom_skip_count)
+* 1 dead-code roster construction block
+* 4 production tests retired (cast_unrecoverable + post_audit_failed verdict cases + 2 phantom-skip-fallback tests)
+* 5 cascade test stub sites trimmed (phantom_skip_count=0 kwarg dropped)
+* 1 polish prompt rename (_POLISH_SYSTEM_PROMPT -> _POLISH_SYSTEM_PROMPT_CHARACTER), behavior-preserving
+
+**Tests landed:**
+* `tests/test_no_rollback_gates_b2.py` (B2 deletion proof, 18 tests)
+* `tests/test_no_phase_9_call_b3.py` (B3 deletion proof, 7 tests)
+* `tests/test_no_phantom_handlers_b4.py` (B4 deletion proof + auto_remap_phantom SURVIVES, 13 tests)
+* `tests/test_polish_speaker_prompts_locked.py` (B5 design-lock behavior tests, 7 tests)
+
+**BUG_LOG entries filed during S33:** no new entries (the B1 plan-vs-code mismatch was an architectural surface, not a bug in shipped code).
+
+**Drift policy outcomes:**
+* B1 architectural halt resolved via Jeffrey's refined no-auditors rule (no need for the plan's original three-path question).
+* `phase_1_2_9_reviewer_composite` phase_name string retained for forensic continuity (rename deferred per drift policy).
+* `post_audit_violations` ReviewerDisposition field retained (always 0 post-B2; removal is adjacent cleanup, deferred to a successor sprint).
+
+**Next sprint:** Sprint C (`meta.story_brief` v2) opens per the locked B -> C -> A sequence.
+
+---
+
 ## CURRENT WORK -- S32 Helper Per-Sub-Pass Routing (COMPLETE 2026-05-14)
 
 **Branch:** `s32-helper-per-subpass-routing` (re-cut from `s31p5-legacy-residue-cleanup @ 7c1a2ea`, S31.5 B7 close. The orphan B0 at `655dd6a` was reverted at S31.5 B0 (`4837ed7`); B0 re-landed fresh at `fcab6e1` against the post-S31.5 baseline).
