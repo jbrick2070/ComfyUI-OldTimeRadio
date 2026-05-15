@@ -68,7 +68,7 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 **Canonical artifacts:**
 - **B** -- `docs/2026-05-13-two-model-selector-scoping.md` (scoping, 14 sections, 6 open decisions).
-- **C** -- `docs/2026-05-12-story-brief-v2-problem-statement.md` + `docs/2026-05-12-story-brief-v2-research.md` + `docs/2026-05-12-story-brief-v2-design-refinements.md` + `docs/2026-05-13-story-brief-v2-go-forward-plan.md`.
+- **C** -- `docs/2026-05-12-story-brief-v2-research.md` + `docs/2026-05-12-story-brief-v2-design-refinements.md` (canonical design surface); `docs/2026-05-13-story-brief-v2-go-forward-plan.md` is historical input only, superseded by the Sprint C plan-v2; `docs/2026-05-15-sprint-c-story-brief-v2-plan-v2.md` is the executable plan. The previously cited `docs/2026-05-12-story-brief-v2-problem-statement.md` never existed in git history -- phantom reference removed 2026-05-15.
 - **A** -- TBD; opens when the sprint starts. Likely lives under `docs/<date>-downstream-ledger-verification/` per the round-robin save discipline (CLAUDE.md round-robin section).
 
 **S24 public-facing polish (already on the roadmap below) gates on A close** -- can't ship a sample episode + README rewrite while downstream is still mid-repair.
@@ -585,11 +585,15 @@ Each consumer's `audit_post_freeze_writeback(..., strict=True)` flip is gated on
 
 ### Canonical artifacts
 
+**Canonical design surface:** research inventory + design refinements. The 2026-05-13 go-forward plan is superseded by the Sprint C plan-v2 except where explicitly cited (historical input only, not locked spec).
+
 | Doc | Purpose |
 |---|---|
-| `docs/2026-05-12-story-brief-v2-problem-statement.md` (Jeffrey, uploaded) | The original ask — schema, scope (FLUX/LTX/HuMo/MusicGen, NOT Bark/Kokoro/AudioGen/ProcSFX), deliverable shape |
 | `docs/2026-05-12-story-brief-v2-research.md` (Cowork R1) | Inventory of every post-script prompt assembly site; provenance of the reintroduced `_GENRE_BY_STYLE`; prior art from the orphan `_LTX_STYLE_BRIEF_PROMPT`; six open questions |
 | `docs/2026-05-12-story-brief-v2-design-refinements.md` (three reviewer passes synthesized) | The locked design surface — brief scope, capped input builder, strict-JSON reflection prompt, validation gate + repair pass, central helpers, per-consumer integration shapes, VRAM envelope discipline |
+| `docs/2026-05-15-sprint-c-story-brief-v2-plan-v2.md` (executable plan, Cowork-revised) | The commit-structured plan composing the above. Post-Cowork-audit; round-robin v2 pending. |
+
+**Forensic note (2026-05-15):** the previously listed `docs/2026-05-12-story-brief-v2-problem-statement.md` never existed in git history. Its supposed scope is covered by the research and design-refinements docs. Verified via `git log --all --diff-filter=A` + `git log --all --diff-filter=D` on the phantom path -- both empty. Phantom reference removed.
 
 ### Pre-flight cleanbreaks (must land before the build sprint, in order)
 

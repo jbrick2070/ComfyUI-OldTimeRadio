@@ -24,9 +24,10 @@
 - One git push attempt max per commit; if it fails, hand a PowerShell block.
 
 **Canonical docs this plan executes against:**
-- `docs/2026-05-12-story-brief-v2-problem-statement.md` (Jeffrey)
 - `docs/2026-05-12-story-brief-v2-research.md` (R1, Cowork)
 - `docs/2026-05-12-story-brief-v2-design-refinements.md` (locked design surface)
+
+> **Phantom-reference removal (2026-05-15):** an earlier revision of this list cited `docs/2026-05-12-story-brief-v2-problem-statement.md`. That file never existed in git history. Verified via `git log --all` on the path — empty. Reference removed. This go-forward plan is itself superseded by `docs/2026-05-15-sprint-c-story-brief-v2-plan-v2.md`; historical input only.
 
 ---
 
