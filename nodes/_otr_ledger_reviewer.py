@@ -69,13 +69,20 @@ __all__ = [
 
 # Pinned reviewer verdicts. Imported everywhere meta.reviewer_verdict
 # is read or written (per synthesis G7).
+#
+# S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
+# removed per refined no-auditors rule. Both verdicts were rollback-
+# gate outputs (pipeline cuts, not story edits). The cast-unrecoverable
+# verdict required the speaker_unknowns rollback gate (deleted same
+# commit); the post_audit_failed verdict required the post_audit_pass
+# rollback gate (also deleted same commit). Per Jeffrey's phantom-ship
+# policy, occasional phantoms reaching the audience is the accepted
+# trade-off vs preserving the rollback gates.
 ReviewerVerdict = Literal[
     "clean_no_edits",
     "improved",
-    "cast_unrecoverable",
     "too_many_edits",
     "needs_full_rerun",
-    "post_audit_failed",
 ]
 
 
@@ -128,11 +135,12 @@ class PreAuditReport(BaseModel):
     # auditor LLM call raises, returns garbage that doesn't parse,
     # or returns JSON that doesn't validate, `audit_cast_contract`
     # constructs a SENTINEL report with audit_failed=True +
-    # pass_clean=False so the caller can branch to needs_full_rerun
-    # / post_audit_failed. The default pass_clean=True is reserved
-    # for "LLM ran cleanly and reported no violations" -- never for
-    # "audit didn't run". Pure pydantic field-only changes; no
-    # downstream rewrite needed beyond branching on these fields.
+    # pass_clean=False so the caller can branch to needs_full_rerun.
+    # (S33 B2: post_audit_failed branch retired with the rollback
+    # gate.) The default pass_clean=True is reserved for "LLM ran
+    # cleanly and reported no violations" -- never for "audit didn't
+    # run". Pure pydantic field-only changes; no downstream rewrite
+    # needed beyond branching on these fields.
     audit_failed: bool = False
     audit_failure_reason: str = ""
 
@@ -140,8 +148,12 @@ class PreAuditReport(BaseModel):
 def _audit_failed_sentinel(reason: str) -> "PreAuditReport":
     """Synthetic PreAuditReport stamped when the auditor LLM path
     failed. pass_clean=False so the caller's `if not pass_clean`
-    branch fires and the verdict maps to needs_full_rerun (pre) or
-    post_audit_failed (post)."""
+    branch fires and the verdict maps to needs_full_rerun.
+
+    S33 B2 (2026-05-15): the historical "post" label path mapped to
+    `post_audit_failed`; that branch was retired together with the
+    `post_audit_pass` rollback gate. Only the "pre" label still
+    consults this sentinel."""
     return PreAuditReport(
         violations=[CastViolation(
             line_id="__audit__",
@@ -398,9 +410,10 @@ def audit_cast_contract(
     ]
     # Wiring-review #8 (2026-05-11): EVERY failure path below returns
     # _audit_failed_sentinel() (pass_clean=False, audit_failed=True),
-    # NOT the bare default PreAuditReport(). The caller maps the
-    # failure to needs_full_rerun / post_audit_failed and skips
-    # downstream LLM calls.
+    # NOT the bare default PreAuditReport(). S33 B2 (2026-05-15) the
+    # caller maps the failure to needs_full_rerun (post_audit_failed
+    # branch retired with the rollback gate); the deterministic
+    # cast repairs still consume the sentinel violations list.
     try:
         raw = generate_fn(
             messages,
@@ -485,8 +498,12 @@ def apply_deterministic_cast_repairs(
         alias_used (any conf)       substitute alias -> canonical
         invented_name (any conf)    auto_remap fuzzy match; on miss,
                                     leave for Script Doctor
-        speaker_unknown (any conf)  STOP; caller stamps
-                                    cast_unrecoverable verdict
+        speaker_unknown (any conf)  no-op here; flows into Phase 2
+                                    Script Doctor as an ordinary
+                                    violation. S33 B2 (2026-05-15)
+                                    retired the speaker_unknowns
+                                    rollback gate per refined
+                                    no-auditors rule.
     """
     cast_names = [
         row.get("name", "") for row in cast_rows
@@ -519,8 +536,9 @@ def apply_deterministic_cast_repairs(
             )
             continue
         if v.kind == "speaker_unknown":
-            # Caller decides outcome (cast_unrecoverable). Do not
-            # patch here.
+            # S33 B2 (2026-05-15): speaker_unknowns rollback gate
+            # retired; nothing to patch here either. Phase 2 Script
+            # Doctor sees this row as an ordinary violation.
             continue
         if v.kind == "bad_casing" and v.confidence >= 0.8:
             text = line.get("text") or ""
@@ -1118,35 +1136,14 @@ def review_ledger(
         led.save()
         return disp
 
-    # If any speaker_unknown shows up at high confidence, that's
-    # unrecoverable: stop, restore original ledger, return.
-    speaker_unknowns = [
-        v for v in pre_audit.violations
-        if v.kind == "speaker_unknown" and v.confidence >= 0.7
-    ]
-    if speaker_unknowns:
-        # Wiring-review #10: clear+update (NOT bare shallow update --
-        # bare update leaks any keys candidate added since the snapshot).
-        led.data.clear()
-        led.data.update(original_snapshot)
-        meta_after = led.data.setdefault("meta", {})
-        meta_after["reviewer_verdict"] = "cast_unrecoverable"
-        disp = ReviewerDisposition(
-            verdict="cast_unrecoverable",
-            pre_audit_violations=pre_audit_violations,
-            pre_audit_repairs_applied=0,
-            doctor_edits_proposed=0,
-            doctor_edits_applied=0,
-            post_audit_violations=0,
-            phantom_skip_count=0,
-        )
-        meta_after["reviewer_disposition"] = disp.__dict__
-        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
-        # commit / restore so meta.character_word_count stays in sync
-        # with whatever is on disk.
-        _stamp_word_counts_safe(led)
-        led.save()
-        return disp
+    # S33 B2 (2026-05-15): `speaker_unknowns` rollback gate retired.
+    # Per refined no-auditors rule, gates that cut the pipeline (halt,
+    # rollback, report-only) are forbidden -- only audit calls that
+    # feed editors survive. The deterministic cast repairs below
+    # still consume `pre_audit.violations` to develop the story;
+    # high-confidence speaker_unknown rows now flow into Phase 2
+    # Script Doctor as ordinary violations rather than triggering an
+    # early `cast_unrecoverable` rollback.
 
     # ---- Python deterministic repairs (between Pass 1 and Pass 2) ----
     repairs_applied = apply_deterministic_cast_repairs(
@@ -1212,43 +1209,16 @@ def review_ledger(
     )
 
     # ---- Pass 3: Cast Auditor post-check ---------------------
+    # S33 B2 (2026-05-15): `post_audit_pass` rollback gate retired.
+    # The Phase 9 `audit_cast_contract(label="post")` call below still
+    # runs in this commit but its result is unused; B3 removes the
+    # call entirely. The `_final_phantom_check` report-only consumer
+    # was retired together with this rollback gate; B4 removes the
+    # function itself. Per Jeffrey's phantom-ship policy
+    # (2026-05-15): occasional phantoms reaching the audience is the
+    # accepted trade-off vs preserving the rollback gate.
     post_audit = audit_cast_contract(generate_fn, candidate, label="post")
-    final_phantoms = _final_phantom_check(candidate, cast_roster_upper)
-
-    post_audit_pass = (
-        post_audit.pass_clean
-        and not post_audit.violations
-        and not final_phantoms
-    )
-    # Wiring-review #8: if Pass 3 itself failed (audit_failed sentinel),
-    # the violations list contains a synthetic entry. Either way (real
-    # violations OR audit_failed), the patch is rejected and the
-    # original ledger is restored.
-    if not post_audit_pass:
-        led.data.clear()
-        led.data.update(original_snapshot)
-        meta_after = led.data.setdefault("meta", {})
-        meta_after["reviewer_verdict"] = "post_audit_failed"
-        if getattr(post_audit, "audit_failed", False):
-            meta_after["reviewer_audit_failure_reason"] = getattr(
-                post_audit, "audit_failure_reason", "unknown",
-            )
-        disp = ReviewerDisposition(
-            verdict="post_audit_failed",
-            pre_audit_violations=pre_audit_violations,
-            pre_audit_repairs_applied=repairs_applied,
-            doctor_edits_proposed=doctor_edits_proposed,
-            doctor_edits_applied=edits_applied,
-            post_audit_violations=len(post_audit.violations) + len(final_phantoms),
-            phantom_skip_count=phantom_skip_count,
-        )
-        meta_after["reviewer_disposition"] = disp.__dict__
-        # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
-        # commit / restore so meta.character_word_count stays in sync
-        # with whatever is on disk.
-        _stamp_word_counts_safe(led)
-        led.save()
-        return disp
+    _ = post_audit  # silence linter; result intentionally unused (B3 removes the call)
 
     # ---- Commit candidate to disk ---------------------------
     # Wiring-review #10: clear+update (NOT bare shallow update -- bare

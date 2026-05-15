@@ -7,15 +7,16 @@ beyond what the writer already loaded.
 Output contract (5 slots):
     script_text, script_json, news_used, estimated_minutes, freeze_verdict
 
-`freeze_verdict` literal set:
+`freeze_verdict` literal set (S33 B2 trim 2026-05-15):
 
     frozen_clean
     frozen_with_warns
     frozen_with_doctor_edits
-    cast_unrecoverable
     too_many_edits
     needs_full_rerun
-    post_audit_failed
+
+`cast_unrecoverable` and `post_audit_failed` retired in S33 B2 with
+their respective rollback gates per the refined no-auditors rule.
 
 Status: LFC v2.0-alpha (2026-05-12 clean-break).
 """

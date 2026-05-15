@@ -9,8 +9,9 @@ Covers (per script-writing-architecture synthesis §3 Phase 3 + §6.A + M2 + G1-
   * apply_phantom_skip_fallback                  M2 deterministic safety net
   * review_ledger disposition for each verdict:
         clean_no_edits / improved /
-        cast_unrecoverable / too_many_edits /
-        needs_full_rerun / post_audit_failed
+        too_many_edits / needs_full_rerun
+    (S33 B2 retired cast_unrecoverable + post_audit_failed with
+    their rollback gates per refined no-auditors rule.)
   * skip_reviewer programmatic bypass            G9
 
 Pure-Python. Mock generate_fn for every LLM call. No GPU. No HF.
@@ -412,27 +413,10 @@ class TestReviewLedgerDispositions:
         b001 = next(r for r in led.data["lines"] if r["line_id"] == "b001")
         assert b001["text"] == "I cannot say for certain."
 
-    def test_cast_unrecoverable(self, tmp_path):
-        """Pass 1 speaker_unknown high-conf -> cast_unrecoverable."""
-        led = _build_ledger(tmp_path, [
-            _line("b001", "c01", "Hello.", role="character"),
-        ])
-        # Pass 1 returns speaker_unknown @ conf 0.95.
-        unrec_json = json.dumps({
-            "violations": [{
-                "line_id": "b001",
-                "kind": "speaker_unknown",
-                "found": "ZARGON",
-                "expected": "",
-                "confidence": 0.95,
-            }],
-            "pass_clean": False,
-        })
-        fn = _mk_generate_fn(unrec_json)
-        disp = review_ledger(fn, led)
-        assert disp.verdict == "cast_unrecoverable"
-        # Original text preserved (no doctor / no post-audit happened).
-        assert led.data["lines"][0]["text"] == "Hello."
+    # S33 B2 (2026-05-15): test_cast_unrecoverable removed --
+    # speaker_unknowns rollback gate retired per refined no-auditors
+    # rule. High-confidence speaker_unknown rows now flow into Phase 2
+    # Script Doctor as ordinary violations.
 
     def test_too_many_edits(self, tmp_path):
         """Doctor proposes > edit_cap edits -> too_many_edits."""
@@ -474,38 +458,11 @@ class TestReviewLedgerDispositions:
         # Original preserved.
         assert led.data["lines"][0]["text"] == "broken structure"
 
-    def test_post_audit_failed(self, tmp_path):
-        """Pass 3 finds violations -> reject patch, keep original."""
-        led = _build_ledger(tmp_path, [
-            _line("b001", "c01", "Hello.", role="character"),
-        ])
-        # Pass 1 clean; doctor rewrites in a NEW phantom; Pass 3
-        # surfaces an invented_name violation that the deterministic
-        # repair couldn't remap.
-        post_audit_dirty = json.dumps({
-            "violations": [{
-                "line_id": "b001",
-                "kind": "invented_name",
-                "found": "ZARGON",
-                "expected": "",
-                "confidence": 0.9,
-            }],
-            "pass_clean": False,
-        })
-        fn = _mk_generate_fn(
-            _audit_clean_json(),
-            _doctor_json(edits=[{
-                "line_id": "b001",
-                "action": "rewrite",
-                "payload": "ZARGON spoke unexpectedly.",
-                "rationale": "test",
-            }], verdict="improved"),
-            post_audit_dirty,
-        )
-        disp = review_ledger(fn, led)
-        assert disp.verdict == "post_audit_failed"
-        # Original ledger preserved on disk.
-        assert led.data["lines"][0]["text"] == "Hello."
+    # S33 B2 (2026-05-15): test_post_audit_failed removed --
+    # post_audit_pass rollback gate retired per refined no-auditors
+    # rule. Per Jeffrey's phantom-ship policy, occasional phantoms
+    # reaching the audience is the accepted trade-off vs preserving
+    # the rollback.
 
     def test_skip_reviewer_bypass(self, tmp_path):
         """meta.skip_reviewer=True short-circuits the reviewer (G9)."""

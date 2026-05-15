@@ -166,11 +166,11 @@ class TestCascadeHappyPath:
 
 
 class TestTerminalReviewerFailures:
+    # S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
+    # retired with their rollback gates per refined no-auditors rule.
     @pytest.mark.parametrize("verdict", [
-        "cast_unrecoverable",
         "too_many_edits",
         "needs_full_rerun",
-        "post_audit_failed",
     ])
     def test_terminal_verdict_skips_phase_10(self, verdict):
         led = _ledger_obj(_clean_ledger_data())
@@ -305,10 +305,13 @@ class TestFreezeDispositionDataclass:
         assert d["gap_audit_post"] is not None
 
     def test_terminal_verdict_to_dict_has_none_post(self):
+        # S33 B2 (2026-05-15): `cast_unrecoverable` retired; use
+        # `too_many_edits` -- still a terminal verdict, still drives
+        # the same gap_audit_post=None branch.
         led = _ledger_obj(_clean_ledger_data())
 
         def fake_review(_fn, _led):
-            return _stub_reviewer_disposition("cast_unrecoverable")
+            return _stub_reviewer_disposition("too_many_edits")
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
                           side_effect=fake_review):
@@ -330,9 +333,11 @@ class TestVerdictMapping:
             assert lit in _LFC_ORCH.REVIEWER_TO_FREEZE_VERDICT
 
     def test_terminal_set_contents(self):
+        # S33 B2 (2026-05-15): `cast_unrecoverable` and
+        # `post_audit_failed` retired with their rollback gates.
         expected = {
-            "cast_unrecoverable", "too_many_edits",
-            "needs_full_rerun", "post_audit_failed",
+            "too_many_edits",
+            "needs_full_rerun",
         }
         assert _LFC_ORCH.FREEZE_TERMINAL_FAILURE_VERDICTS == expected
 

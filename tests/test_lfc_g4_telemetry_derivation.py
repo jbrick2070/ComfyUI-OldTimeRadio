@@ -151,11 +151,14 @@ class TestTelemetryDerivedFromBuckets:
         # On terminal-reviewer-verdict the cascade stamps
         # terminal_skipped records for the downstream phases.
         # Verify the telemetry derivation still matches.
+        # S33 B2 (2026-05-15): `cast_unrecoverable` retired; use
+        # `too_many_edits` -- still a terminal verdict, same
+        # telemetry-derivation path.
         led = _ledger([
             _line("l001", "c01", "character", "Hello."),
         ])
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
-                          side_effect=_stub_reviewer("cast_unrecoverable")):
+                          side_effect=_stub_reviewer("too_many_edits")):
             _LFC_ORCH.run_freeze_cascade(lambda *a, **k: "", led)
 
         meta = led.data["meta"]

@@ -31,18 +31,21 @@ ADR mapping (`docs/2026-05-11-multi-turn-polish-adr.md`):
         v
     [Frozen ledger; meta.cleanup_locked == True]
 
-Verdict mapping (ADR section 9):
+Verdict mapping (ADR section 9, S33 B2 trim 2026-05-15):
 
     Reviewer verdict          Freeze verdict
     ----------------          --------------
     clean_no_edits + clean    -> frozen_clean
     clean_no_edits + warns    -> frozen_with_warns
     improved                  -> frozen_with_doctor_edits
-    cast_unrecoverable        -> cast_unrecoverable
     too_many_edits            -> too_many_edits
     needs_full_rerun          -> needs_full_rerun
-    post_audit_failed         -> post_audit_failed
     Phase 10 raises           -> needs_full_rerun        (gap audit forced)
+
+S33 B2 retired `cast_unrecoverable` (speaker_unknowns rollback gate)
+and `post_audit_failed` (post_audit_pass rollback gate). Both were
+pipeline cuts; the refined no-auditors rule forbids audit calls that
+just gate / halt / rollback without feeding an editor.
 
 Failure cascade (ADR section 8): the cascade is skip-and-continue
 EXCEPT on Phase 10 critical gaps (hard-fail at the freeze gate).
@@ -81,13 +84,14 @@ __all__ = [
 # is conditionally lifted to `frozen_clean` or `frozen_with_warns`
 # depending on Phase 10 warning state -- the table here lists the
 # interim mapping; the final stamp happens in run_freeze_cascade.
+#
+# S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
+# rows retired with the rollback gates that produced them.
 REVIEWER_TO_FREEZE_VERDICT: dict[str, str] = {
     "clean_no_edits":     "frozen_clean",
     "improved":           "frozen_with_doctor_edits",
-    "cast_unrecoverable": "cast_unrecoverable",
     "too_many_edits":     "too_many_edits",
     "needs_full_rerun":   "needs_full_rerun",
-    "post_audit_failed":  "post_audit_failed",
 }
 
 
@@ -96,11 +100,13 @@ REVIEWER_TO_FREEZE_VERDICT: dict[str, str] = {
 # for these; running Phase 10 on the restored ledger would either
 # re-flag the same pre-existing gaps or stamp `frozen_clean` on an
 # unaltered ledger, both of which are misleading.
+#
+# S33 B2 (2026-05-15): `cast_unrecoverable` and `post_audit_failed`
+# removed -- their rollback gates were retired so neither verdict is
+# reachable anymore.
 FREEZE_TERMINAL_FAILURE_VERDICTS: frozenset[str] = frozenset({
-    "cast_unrecoverable",
     "too_many_edits",
     "needs_full_rerun",
-    "post_audit_failed",
 })
 
 
@@ -446,11 +452,13 @@ def run_freeze_cascade(
         bundled into this one function; commits 3, 4, 8, 9, 10 split
         them out).
       * If the reviewer verdict is a terminal failure
-        (cast_unrecoverable / too_many_edits / needs_full_rerun /
-        post_audit_failed), the cascade stops there: the ledger has
-        already been restored to its pre-review state, and Phase 10
-        would either re-flag the same pre-existing gap or stamp
-        frozen_clean on an unaltered ledger -- both misleading.
+        (too_many_edits / needs_full_rerun), the cascade stops there:
+        the ledger has already been restored to its pre-review state,
+        and Phase 10 would either re-flag the same pre-existing gap
+        or stamp frozen_clean on an unaltered ledger -- both
+        misleading. S33 B2 (2026-05-15) retired the two rollback-gate
+        verdicts (cast_unrecoverable, post_audit_failed) per the
+        refined no-auditors rule.
       * On reviewer success (clean_no_edits / improved), Phase 10
         runs and either freezes the ledger or raises
         FreezeAssertionError. The exception is caught and translated
