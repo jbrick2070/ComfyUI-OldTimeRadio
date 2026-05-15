@@ -75,64 +75,52 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## CURRENT WORK -- S32 Helper Per-Sub-Pass Routing (IN FLIGHT 2026-05-14)
+## CURRENT WORK -- S32 Helper Per-Sub-Pass Routing (COMPLETE 2026-05-14)
 
-**Branch:** `s32-helper-per-subpass-routing` (re-cut from `s31p5-legacy-residue-cleanup @ 7c1a2ea`, S31.5 B7 close. The original B0 attempt at `655dd6a` was reverted at S31.5 B0 (`4837ed7`) so S32 could land fresh against the cleaned-up baseline; this is the re-land).
-**Plan:** `docs/2026-05-14-S31-S32-cowork-execution-plan.md` (S32 section).
+**Branch:** `s32-helper-per-subpass-routing` (re-cut from `s31p5-legacy-residue-cleanup @ 7c1a2ea`, S31.5 B7 close. The orphan B0 at `655dd6a` was reverted at S31.5 B0 (`4837ed7`); B0 re-landed fresh at `fcab6e1` against the post-S31.5 baseline).
+**Plan:** `docs/2026-05-14-S31-S32-cowork-execution-plan.md` (S32 section; B4 rewritten at B4 commit to reflect the no-widget drift).
+**Final QA:** `docs/2026-05-14-S32-final-qa-review.md`.
 
-**What S32 will ship:**
-* B1 (ATOMIC HEADLINE, R4): helper signatures `pick_style` / `lock_cast` / `compose_line` / `build_news_briefs` refactored from single `generate_fn` to paired `creative_fn` + `technical_fn` kwargs. Writer wires both end-to-end in the same commit. No partial-port states.
-* B2: `pick_style` pass 2 (chooser) dispatches to `technical_fn`.
-* B3: `lock_cast` schema validation dispatches to `technical_fn`, fail-fast `CastValidationLLMError` (per D2).
-* B4: `compose_line` critic-via-technical opt-in widget `use_technical_critic` (default OFF, per D1). INPUT_TYPES optional count 15 -> 16. One-shot VRAM warning on opt-in + differing-slots.
-* B5: `build_news_briefs` all V0-V3 confirmed on technical_fn; outline retry stays creative (per D3); differing-slots audio baseline established.
-* B6: `meta.slot_calls_by_helper` + `meta.slot_transitions_by_phase` populated; default-config slot_transitions == 0.
+**What S32 shipped:**
+* **B1 ATOMIC HEADLINE (R4):** all 4 helper signatures refactored from single `generate_fn` to paired `creative_fn` + `technical_fn` kwargs. Writer wires both end-to-end same commit. 10 new tests + 36 collateral test refactors. Audio C7 holds (contract-only change, no behavior shift).
+* **B2:** `pick_style` pass 2 (chooser) dispatches to `technical_fn`. `StylePick.pass1_slot` + `pass2_slot` forensic fields added.
+* **B3:** `lock_cast` schema validation (repair attempt) dispatches to `technical_fn`. New `CastValidationLLMError` subclass; fail-fast per D2.
+* **B4 NO-WIDGET DRIFT:** `use_technical_critic` widget DROPPED per Jeffrey's no-widget rule. Critic stays creative permanently. Sweep marker `\buse_technical_critic\b` added. Per-beat T-dispatch architecturally rejected (D1).
+* **B5:** `build_news_briefs` V0-V3 verified all-technical. Outline retry stays creative (D3). Differing-slots audio baseline established (TestDifferingSlotsBaseline class).
+* **B6:** `meta.slot_calls_by_helper` + `meta.slot_transitions_by_phase` populated via new `_SlotScheduler.helper_context()` context manager. Default-config keeps transitions == 0.
 
-**S32 architectural decisions (settled, no re-debate):**
-* D1. `compose_line` critic per-beat dispatch in differing-slots REJECTED for VRAM thrash. Opt-in widget default OFF.
-* D2. `lock_cast` schema validation single-attempt technical, fail-fast `CastValidationLLMError`.
-* D3. Outline retry stays creative (schema validation is pure pydantic).
+**S32 acceptance:** 21 rows checked (2 marked n/a per B4 no-widget drift).
 
-**S32 hard rules (in addition to S31+S32 overall plan rules):**
-* R1. Default config audio C7 byte-identical holds (canary at every commit).
-* R2. Differing-slots audio gets its OWN baseline at B5 close, stable B5..B8.
-* R3. Helper signatures break cleanly -- no back-compat.
-* R4. B1 is ATOMIC: signatures + writer wiring same commit.
-* R5. VRAM thrash budget: per-beat dispatch in `compose_line` REJECTED; critic-via-technical opt-in only.
-* R6. Slot transition accounting extends `meta` with per-helper / per-phase counts.
+**Gates (final canonical run at sprint close):**
+* Wide pytest walk: 2103 passed / 10 skipped / 0 failed / 0 NEW regressions.
+* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held across all 9 commits).
+* Forbidden-pattern sweep: 0 runtime hits at every commit boundary.
+* Audio C7 byte-identical pytest proxy (default config): holds.
+* Differing-slots audio pytest proxy: holds B5 -> B8.
+* Audio runtime: DEFERRED to operator-driven post-feature-set verification.
+
+**Deviations from plan (3 total, full table in final QA doc):**
+* B0 baseline projection drift (plan stale post-S31.5).
+* B4 no-widget drift (major; widget dropped per no-widget rule).
+* Test count drift (~26 new vs ~39 projected).
+
+**S33 pending decision:** `polish_announcer_beats` widget has the same architectural question that S32 B4 resolved no-widget. Decision deferred to S33 kickoff. S31+S32 plan document's S33 section needs drift-pass when S33 opens.
+
+**Next sprint:** S33 (editor-only cleanup passes -- retire cascade Phase 1 + Phase 9 auditors, restore announcer polish). Sequence: S33 -> Sprint C (`meta.story_brief` v2) -> Sprint A (public-facing polish).
+
+---
+
+## CLOSED SPRINT -- S31.5 Legacy Residue Cleanup (COMPLETE 2026-05-14)
+
+**Branch:** `s31p5-legacy-residue-cleanup` @ `7c1a2ea`. Sequenced between S31 close and S32 start to sweep residue revealed by S31's clean break.
+**Final QA:** `docs/2026-05-14-S31p5-final-qa-review.md`.
+
+What S31.5 shipped (one-line summary):
+* BUG-LOCAL-227 closed via 16+19+0 triage (deletions + refactors + skips). Vestigial test files consolidated. `_vram_cleanup_via_loader` wrapper eliminated. Stale comments swept. Sweep marker added. First clean wide pytest walk since S30 B8 (2080/8/0).
 
 **S31.5 close handoff:**
 * S31.5 B7 closed at `7c1a2ea`.
 * BUG-LOCAL-227 [FIXED S31.5 B1 2026-05-14]. Wide pytest walk: 2080 / 8 / 0 -- first clean wide walk since S30 B8.
-
----
-
-## CURRENT WORK -- S31.5 Legacy Residue Cleanup (COMPLETE 2026-05-14)
-
-**Branch:** `s31p5-legacy-residue-cleanup` (cut from `s31-loader-clean-break @ 2b0b6dc`, S31 B8 close). Single linear branch, 8 commits B0 -> B7.
-**Plan:** `docs/2026-05-14-S31p5-legacy-residue-cleanup-sprint-plan.md`.
-**Final QA:** `docs/2026-05-14-S31p5-final-qa-review.md`.
-
-**What S31.5 shipped:**
-* **BUG-LOCAL-227 closed.** 25 LFC test failures latent at S30 B8 (surfaced by wide pytest walk at S31 B1) triaged: 16 Bucket A (DELETE), 9 Bucket B (REFACTOR), 0 Bucket C (SKIP). Plus 10 S31-relocation collateral surfaced at the wide-walk re-run, all refactored Bucket B. Final wide walk: 2080 / 8 / 0.
-* **Vestigial test file consolidation.** `tests/test_b4b_rss_rewire.py` (203 LOC) + `tests/test_unload_synchronize_guard.py` (52 LOC) DELETED. Surviving importer-pattern guards + BUG_LOG status check folded into `tests/test_no_orchestrator_legacy_symbols.py` under labeled sections. 2 sanity guards added asserting the deleted files stay gone.
-* **`_vram_cleanup_via_loader` wrapper eliminated** (Outcome A). `register_vram_cleanup`'s caller already wraps each callback in try/except, so the no-raise wrapper added at S31 B4 was pure delegation overhead. `_otr_model_loader.unload_llm` now registers directly.
-* **Stale comment + docstring sweep** across `nodes/_otr_model_loader.py` and `nodes/story_orchestrator.py`. `load_llm` docstring rewritten in current tense (S31 B2/B4 historical fragments dropped). `_LLM_CACHE`-rebind workaround comments cleared. RSS rerank inline comments trimmed of historical headers.
-* **Sweep marker added:** `\b_vram_cleanup_via_loader\b` locked against reintroduction.
-
-**S31.5 acceptance:** 14 rows green; see final QA review doc.
-
-**Gates (final canonical run at sprint close):**
-* Wide pytest walk: 2080 passed / 8 skipped / 0 failed / 0 NEW regressions. First clean wide walk since S30 B8.
-* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held across all 8 commits).
-* Forbidden-pattern sweep: 0 runtime hits at every commit boundary.
-* Audio C7 byte-identical pytest proxy: holds (no runtime behavior changed; only test infrastructure + documentation + wrapper-elimination).
-* Audio C7 runtime: DEFERRED to operator-driven post-feature-set verification.
-
-**BUG_LOG updates:**
-* BUG-LOCAL-227 [FIXED S31.5 B1 2026-05-14] -- closed via 16 deletions + 19 refactors (9 in-scope + 10 collateral).
-
-**Next sprint:** S32 (`s32-helper-per-subpass-routing`) re-lands B0 fresh against the post-S31.5 baseline. The S32 B0 orphan was reverted at S31.5 B0 (`4837ed7`); S32 resumes from a clean cut.
 
 ---
 
