@@ -305,6 +305,35 @@ class VisualPromptCoercion:
         llm_model: Any = None,
         max_env_words: int = _ENV_WORD_CAP,
     ) -> tuple[str, str]:
+        # S31 B6 Fix 4: defensive check on missing model_id input.
+        # Post-S30 B5 the OTR_VisualLLMSelector node was deleted; the
+        # visual prompt coercion node consumes the writer's
+        # `creative_writing_model` broadcast directly. An unwired
+        # `model_id` input would silently fall back to rule-only
+        # cleanup -- not what the post-S30 workflow expects. Raise
+        # `MissingModelInputError` loud so the workflow author gets
+        # an actionable message instead of degraded output.
+        #
+        # Wired with a real model id OR the explicit "none" sentinel:
+        #   require_model passes; "none" continues to route to the
+        #   rule-only branch below for users who explicitly opt out.
+        # Unwired (None, empty, whitespace):
+        #   require_model raises MissingModelInputError with a
+        #   slot-specific recovery message.
+        if model_id is None or not isinstance(model_id, str) or not model_id.strip():
+            from nodes._otr_model_inputs import MissingModelInputError
+            raise MissingModelInputError(
+                "OTR_VisualPromptCoercion requires the writer's "
+                "`creative_writing_model` broadcast output (S30 B5 "
+                "deleted the local VisualLLMSelector). Wire writer "
+                "output 4 (`creative_writing_model`) to this node's "
+                "`model_id` input. Unwired = silent fallback to "
+                "rule-based-only cleanup, which is not what you want "
+                "post-S30. To intentionally opt out of LLM polish, "
+                "set `model_id` to the literal string \"none\" instead "
+                "of leaving the socket unwired."
+            )
+
         # Temporarily override the module cap for this call
         global _ENV_WORD_CAP
         previous_cap = _ENV_WORD_CAP

@@ -1102,11 +1102,21 @@ def _resolve_inputs(
         # the writer's final style still gets LLM-proposed from the
         # ACTUAL fetched article below.
         rss_style_slug = resolved_style or _LLM_STYLE_FALLBACK
-        # B2a: RSS news re-rank still uses one model (creative). The
-        # B4b rewire moves this call to request_slot("technical", ...)
-        # along with the rest of the orchestrator-side LLM stack.
+        # S31 B6 Fix 1: pass `technical_model`. Post-S31 B3, the RSS
+        # rerank path inside `_fetch_rss_seed_or_die` routes through
+        # `_otr_model_loader.request_slot("technical", model_id)` (both
+        # call sites: `_llm_rank_news_candidates` headline rank and
+        # `_llm_rerank_with_bodies` body rerank). Passing
+        # `creative_writing_model` here would make the slot label
+        # ("technical") and the resolved id (creative model) disagree
+        # in differing-slots mode -- the slot scheduler would load the
+        # creative model under the technical slot label, defeating the
+        # whole point of two-slot routing. In default config (creative
+        # == technical) the two ids are identical so the fix is a
+        # no-op at runtime; in differing-slots config (S32 forward)
+        # this is load-bearing.
         news_article = _fetch_rss_seed_or_die(
-            rss_style_slug, creative_writing_model,
+            rss_style_slug, technical_model,
         )
         news_seed = news_article["seed_text"]
         seed_source = "rss_fetch"
@@ -2833,9 +2843,15 @@ if __name__ == "__main__":
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
         n_optional = len(spec["optional"])
-        assert n_optional == 11, (
+        # S31 B6 Fix 2: self-test count drift. Pre-fix expected 11
+        # (after S30 B2a two-widget split). Actual count is 15 -- the
+        # 4 Phase 4 v4 sampling knobs (added in a subsequent
+        # mini-iteration that didn't update this assertion) bring the
+        # total to 15. Update the assertion to match runtime reality.
+        assert n_optional == 15, (
             f"optional widget count drift: {n_optional} "
-            f"(expected 11 after S30 B2a two-widget split)"
+            f"(expected 15: 11 widget-surface + 4 Phase 4 v4 "
+            f"sampling knobs)"
         )
         # S30 B2a: both model widgets carry the catalog dropdown_choices()
         # output (list of labels). DEFAULT must match catalog.DEFAULT_LLM.
