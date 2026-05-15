@@ -65,6 +65,21 @@ forbidden = re.compile(
     r"|\benable_phase_5_voice_drift\b"      # B3/B4: deleted cascade-toggle widget
     r"|\benable_phase_6_episode_arc\b"      # B3/B4: deleted cascade-toggle widget
     r"|\bPhase3PolishReport\b"              # B4: deleted dataclass
+    # S31 B5 (2026-05-14): extinction markers from the legacy LLM
+    # stack clean break sprint. Each name was a runtime symbol in
+    # `nodes/story_orchestrator.py` deleted at S31 B4 (Hard rule #1A
+    # non-deferrable). Reintroduction trips the sweep loud.
+    r"|\b_load_llm\b"                       # S31 B4: deleted legacy load entrypoint
+    r"|\b_unload_llm\b"                     # S31 B4: deleted legacy teardown
+    r"|\b_LLM_CACHE\b"                      # S31 B4: deleted legacy cache dict
+    r"|\b_generate_with_llm\b"              # S31 B4: deleted legacy generate wrapper
+    # S31 B5: preemptive lock -- one generate surface (Hard rule #5).
+    # Any wrapper-by-another-name on top of `make_generate_fn` is
+    # forbidden. These two literal names cover the "rename to drop the
+    # underscore prefix" and "name it without the verb suffix"
+    # reintroduction paths.
+    r"|\bgenerate_text\b"                   # S31 B5: preemptive lock on Hard rule #5
+    r"|\bgenerate_with_llm\b"               # S31 B5: preemptive lock (no-underscore variant)
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
