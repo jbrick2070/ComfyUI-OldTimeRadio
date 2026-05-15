@@ -75,6 +75,38 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CURRENT WORK -- S32 Helper Per-Sub-Pass Routing (IN FLIGHT 2026-05-14)
+
+**Branch:** `s32-helper-per-subpass-routing` (re-cut from `s31p5-legacy-residue-cleanup @ 7c1a2ea`, S31.5 B7 close. The original B0 attempt at `655dd6a` was reverted at S31.5 B0 (`4837ed7`) so S32 could land fresh against the cleaned-up baseline; this is the re-land).
+**Plan:** `docs/2026-05-14-S31-S32-cowork-execution-plan.md` (S32 section).
+
+**What S32 will ship:**
+* B1 (ATOMIC HEADLINE, R4): helper signatures `pick_style` / `lock_cast` / `compose_line` / `build_news_briefs` refactored from single `generate_fn` to paired `creative_fn` + `technical_fn` kwargs. Writer wires both end-to-end in the same commit. No partial-port states.
+* B2: `pick_style` pass 2 (chooser) dispatches to `technical_fn`.
+* B3: `lock_cast` schema validation dispatches to `technical_fn`, fail-fast `CastValidationLLMError` (per D2).
+* B4: `compose_line` critic-via-technical opt-in widget `use_technical_critic` (default OFF, per D1). INPUT_TYPES optional count 15 -> 16. One-shot VRAM warning on opt-in + differing-slots.
+* B5: `build_news_briefs` all V0-V3 confirmed on technical_fn; outline retry stays creative (per D3); differing-slots audio baseline established.
+* B6: `meta.slot_calls_by_helper` + `meta.slot_transitions_by_phase` populated; default-config slot_transitions == 0.
+
+**S32 architectural decisions (settled, no re-debate):**
+* D1. `compose_line` critic per-beat dispatch in differing-slots REJECTED for VRAM thrash. Opt-in widget default OFF.
+* D2. `lock_cast` schema validation single-attempt technical, fail-fast `CastValidationLLMError`.
+* D3. Outline retry stays creative (schema validation is pure pydantic).
+
+**S32 hard rules (in addition to S31+S32 overall plan rules):**
+* R1. Default config audio C7 byte-identical holds (canary at every commit).
+* R2. Differing-slots audio gets its OWN baseline at B5 close, stable B5..B8.
+* R3. Helper signatures break cleanly -- no back-compat.
+* R4. B1 is ATOMIC: signatures + writer wiring same commit.
+* R5. VRAM thrash budget: per-beat dispatch in `compose_line` REJECTED; critic-via-technical opt-in only.
+* R6. Slot transition accounting extends `meta` with per-helper / per-phase counts.
+
+**S31.5 close handoff:**
+* S31.5 B7 closed at `7c1a2ea`.
+* BUG-LOCAL-227 [FIXED S31.5 B1 2026-05-14]. Wide pytest walk: 2080 / 8 / 0 -- first clean wide walk since S30 B8.
+
+---
+
 ## CURRENT WORK -- S31.5 Legacy Residue Cleanup (COMPLETE 2026-05-14)
 
 **Branch:** `s31p5-legacy-residue-cleanup` (cut from `s31-loader-clean-break @ 2b0b6dc`, S31 B8 close). Single linear branch, 8 commits B0 -> B7.
