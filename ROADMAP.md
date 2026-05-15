@@ -75,6 +75,35 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CURRENT WORK -- S31.5 Legacy Residue Cleanup (COMPLETE 2026-05-14)
+
+**Branch:** `s31p5-legacy-residue-cleanup` (cut from `s31-loader-clean-break @ 2b0b6dc`, S31 B8 close). Single linear branch, 8 commits B0 -> B7.
+**Plan:** `docs/2026-05-14-S31p5-legacy-residue-cleanup-sprint-plan.md`.
+**Final QA:** `docs/2026-05-14-S31p5-final-qa-review.md`.
+
+**What S31.5 shipped:**
+* **BUG-LOCAL-227 closed.** 25 LFC test failures latent at S30 B8 (surfaced by wide pytest walk at S31 B1) triaged: 16 Bucket A (DELETE), 9 Bucket B (REFACTOR), 0 Bucket C (SKIP). Plus 10 S31-relocation collateral surfaced at the wide-walk re-run, all refactored Bucket B. Final wide walk: 2080 / 8 / 0.
+* **Vestigial test file consolidation.** `tests/test_b4b_rss_rewire.py` (203 LOC) + `tests/test_unload_synchronize_guard.py` (52 LOC) DELETED. Surviving importer-pattern guards + BUG_LOG status check folded into `tests/test_no_orchestrator_legacy_symbols.py` under labeled sections. 2 sanity guards added asserting the deleted files stay gone.
+* **`_vram_cleanup_via_loader` wrapper eliminated** (Outcome A). `register_vram_cleanup`'s caller already wraps each callback in try/except, so the no-raise wrapper added at S31 B4 was pure delegation overhead. `_otr_model_loader.unload_llm` now registers directly.
+* **Stale comment + docstring sweep** across `nodes/_otr_model_loader.py` and `nodes/story_orchestrator.py`. `load_llm` docstring rewritten in current tense (S31 B2/B4 historical fragments dropped). `_LLM_CACHE`-rebind workaround comments cleared. RSS rerank inline comments trimmed of historical headers.
+* **Sweep marker added:** `\b_vram_cleanup_via_loader\b` locked against reintroduction.
+
+**S31.5 acceptance:** 14 rows green; see final QA review doc.
+
+**Gates (final canonical run at sprint close):**
+* Wide pytest walk: 2080 passed / 8 skipped / 0 failed / 0 NEW regressions. First clean wide walk since S30 B8.
+* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held across all 8 commits).
+* Forbidden-pattern sweep: 0 runtime hits at every commit boundary.
+* Audio C7 byte-identical pytest proxy: holds (no runtime behavior changed; only test infrastructure + documentation + wrapper-elimination).
+* Audio C7 runtime: DEFERRED to operator-driven post-feature-set verification.
+
+**BUG_LOG updates:**
+* BUG-LOCAL-227 [FIXED S31.5 B1 2026-05-14] -- closed via 16 deletions + 19 refactors (9 in-scope + 10 collateral).
+
+**Next sprint:** S32 (`s32-helper-per-subpass-routing`) re-lands B0 fresh against the post-S31.5 baseline. The S32 B0 orphan was reverted at S31.5 B0 (`4837ed7`); S32 resumes from a clean cut.
+
+---
+
 ## CURRENT WORK -- S31 Legacy LLM Stack Clean Break (COMPLETE 2026-05-14)
 
 **Branch:** `s31-loader-clean-break` (cut from `s30-two-model-selector @ ccf583d`, S30 B8 close). Single linear branch -- no sub-branches.
@@ -2187,6 +2216,67 @@ nodes/production_ledger.py:357:            "sfx": [],
 ```
 
 Only hit is `production_ledger.py:357` -- the empty-list schema scaffold (consumer-side initialization, not a producer). No production code writes a non-empty `ledger.sfx[]`. **Scheduled for deletion in S26.X** (see CURRENT WORK pending items).
+
+---
+
+## External ecosystem addendum — 2026-05-14 (voice + lip sync + diffusion LLM)
+
+Three open-source / open-research releases surfaced this week that touch the OTR pipeline surface. Each item is triaged below against the project gates (Prime Directives 1-5, CLAUDE.md "100% local, open source, offline-first", VRAM ceiling 14.5 GB peak, audio C7 byte-identity baseline). Items are **watchlist-only** until they pass those gates AND a round-robin consult (CLAUDE.md "Round-Robin Consultation") signs off.
+
+### 1. Drama Box — Resemble AI directable TTS
+
+- **What:** Emotional, prompt-directable text-to-speech from Resemble AI. Hugging Face Space: `huggingface.co/spaces/ResembleAI/Dramabox`. Product page: `resemble.ai/learn/models/dramabox`. Pinokio one-click installer surfaced as the recommended local path.
+- **OTR fit:** Directly applies to the **TTS palette expansion** slot already LOCKED under v2.0-beta candidates (ROADMAP §"TTS palette expansion — LOCKED LADDER 2026-04-30"). Directable / emotional TTS is a step beyond the current voice-preset chain; per-line affect tags that already live in the L3 ledger (`schema_version: "l3-2026-05-08"`) would map cleanly onto a directable backend.
+- **Gates before adoption:**
+  1. **License audit.** Confirm the HF Space weights are redistributable for the local-only use case. Resemble has historically licensed commercially; if the Space is service-only or weights are gated, this item drops to "do not pursue".
+  2. **Windows / RTX 5080 / 16 GB VRAM bench.** One-off run in a clean venv, peak measured against the 14.5 GB ceiling with `_flush_vram_keep_llm()` discipline.
+  3. **Audio C7 byte-identity.** Introduction must be **additive** behind a new voice-backend dispatch entry. Current Mistral-Nemo → voice-preset chain stays the default until an explicit A/B accept run.
+- **Sprint placement:** Append to the **Voice Backend Abstraction** candidate list under `Phase 0+ candidates / Voice Model Agnostic Nodes` (ROADMAP §"Voice Model Agnostic Nodes"). NOT a B/C/A sprint touch — lives behind the backend abstraction once that abstraction itself lands. No code change until the abstraction is in.
+
+### 2. LTX LipDub IC-LoRA — dialogue swap preserving original performance
+
+- **What:** IC-LoRA on top of LTX 2.3 that re-dubs spoken lines in any existing video while preserving the underlying performance (head movement, expression, framing). Reddit workflow reference: `r/comfyui` post `lipdub_iclora_from_ltx_23`. Companion timeline editor in Comfy: `github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI` (LTX Director).
+- **OTR fit:** Directly applies to the **Visual Drama Engine (v2.0-alpha)** chain. LTX is already a first-class consumer (FLUX / LTX / HuMo, see Sprint Sequencing B → C → A and S3.1). LipDub closes a real gap: today, any post-write dialogue revision forces a full LTX re-render of the affected shots. LipDub would let OTR re-dub from L3 ledger line edits without touching visual generation at all.
+- **Gates before adoption:**
+  1. **L3 wiring (Prime Directive 3).** Adopt only when the IC-LoRA loader has a node class registered in `__init__.py` AND a slot in the canonical workflow JSON. A LoRA stapled in as a side-script does not satisfy "wire every change into the workflow JSON".
+  2. **Sprint placement.** This is downstream / visual chain — belongs in **Sprint A (Downstream ledger verification + repair)** as a verification target, NOT in B or C. **Gate:** Sprint C3 (`meta.story_brief` v2) must land first so LipDub reads the post-C brief surface, not an interim one. Doing it sooner would force a repair-then-demolish cycle.
+  3. **VRAM ceiling.** LTX 2.3 + LoRA stack on a 16 GB device must be benched against the 14.5 GB peak — `_flush_vram_keep_llm()` between LLM rewrite passes and visual re-dub passes is mandatory.
+  4. **Audio baseline.** Re-dub passes produce video deltas only; audio output stays driven by the existing voice path. No change to Prime Directive 1.
+- **VRAM bench (pre-adoption, UNMEASURED 2026-05-14):**
+  - **Pre-bench estimate:** **10–13 GB peak** at 832x480 (OTR native, ROADMAP §S3.3), short clip (single-shot re-dub), fp8 weights. Base LTX 2.3 inference at 832x480 typically sits 8–12 GB; IC-LoRA itself adds only a few hundred MB; LipDub-specific cost comes from source-video tensor (length-dependent), reference-conditioning pass, and text encoder / audio conditioning held alongside the diffusion stack.
+  - **Hard ceiling:** 14.5 GB peak per Prime Directive 2. If the measured peak crowds the ceiling, drop frame count or step count BEFORE changing precision (precision drops can leak into visible re-dub quality, which would break the visual baseline).
+  - **Bench protocol before adoption:**
+    1. Clean venv, LTX 2.3 + IC-LoRA installed via Pinokio or manual.
+    2. 5-second 832x480 source clip, single line re-dub.
+    3. `nvidia-smi --loop-ms=500` running alongside; capture peak.
+    4. Repeat at 10s and 20s clip lengths to chart VRAM scaling vs source length.
+    5. Log result back into this entry (replacing the estimate with measured numbers). Log to `BUG_LOG.md` if peak crosses 14.5 GB; otherwise add the measured number to the addendum and move forward.
+- **Sprint placement:** Add as a Sprint A acceptance bullet — "LTX consumer accepts a re-dub pass driven by L3 ledger line edits, no full re-render required." Track LipDub-specific bugs in `BUG_LOG.md` as they surface (`Bible candidate: yes` if the symptom is generalizable beyond OTR).
+
+### 3. Mercury 2 — Inception Labs diffusion-based LLM
+
+- **What:** Inception Labs' Mercury 2 — diffusion architecture applied to token generation (non-autoregressive). Public playground: `inceptionlabs.ai`. No open weights surfaced as of 2026-05-14.
+- **OTR fit (theoretical):** Interesting against the **Two-Model Selector (Sprint B)** surface. Diffusion LLMs report different latency / parallelism characteristics from autoregressive GGUF loaders and are reportedly stronger on grammar-constrained / structured output — which is the job description of the `technical_model` slot.
+- **Why it does NOT enter the roadmap yet:**
+  - Playground-only, no local weights. Direct violation of the **"100% local, open source, offline-first"** rule (global CLAUDE.md + project CLAUDE.md).
+  - Sprint B is LOCKED on the two-slot writer surface; any new backend lives behind that surface, not in front of it.
+- **Action:** **Watchlist only.** Re-evaluate if Inception Labs releases open weights or a self-hostable inference path. If/when that happens, candidate slot is the writer's `technical_model` socket. No node-side work, no workflow JSON change, no test fixture work until that gate flips.
+
+### Cross-cutting notes
+
+- None of the three releases override Prime Directive 1 (audio is king, byte-identical baseline) or Prime Directive 2 (14.5 GB VRAM ceiling). Each must pass those gates before any node-side wiring lands.
+- The cleanbreak chain ended at S29 (ROADMAP §"Why this is the FINAL cleanbreak sprint"). These items, when adopted, ship as **forward feature work** behind clean abstractions — they do not justify re-opening cleanbreak posture.
+- Round-robin consult (ChatGPT → Gemini → Claude per CLAUDE.md) is required before any of the three lands in code. Each is a non-trivial architectural call, not a 5-minute pair-programmer fix.
+- Per Prime Directive 6, every new LLM call site introduced as part of any adoption must carry a single-line `# LLM slot: creative` or `# LLM slot: technical` tag and read its model id from the writer's broadcast outputs — not a new widget.
+
+### Source links
+
+- Drama Box (Resemble AI): `resemble.ai/learn/models/dramabox`
+- Drama Box HF Space: `huggingface.co/spaces/ResembleAI/Dramabox`
+- Pinokio installer: `pinokio.co`
+- LTX LipDub IC-LoRA workflow: `reddit.com/r/comfyui/comments/1tc96q0/lipdub_iclora_from_ltx_23`
+- LTX Director (timeline editor in Comfy): `github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI`
+- Mercury 2 playground: `inceptionlabs.ai`
 
 ---
 
