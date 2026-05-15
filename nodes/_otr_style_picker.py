@@ -547,8 +547,9 @@ def _run_chooser(
 
 
 def pick_style(
-    generate_fn: Callable[..., str],
     *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
     article_text: str,
     seed_pool: list[str],
     rng: random.Random,
@@ -556,9 +557,17 @@ def pick_style(
 ) -> StylePick:
     """Top-level two-pass style picker.
 
+    S32 B1 paired-contract: accepts `creative_fn` + `technical_fn`.
+    B1 routes both passes through `creative_fn` (no dispatch yet).
+    B2 will flip pass 2 (chooser) to `technical_fn`.
+
     Args:
-        generate_fn: (messages, *, temperature, max_new_tokens) -> str
-            adapter from the writer's _build_truncating_generate_fn.
+        creative_fn: (messages, *, temperature, max_new_tokens) -> str
+            creative-slot adapter. Used by both inventor (pass 1)
+            and chooser (pass 2) at B1.
+        technical_fn: (messages, *, temperature, max_new_tokens) -> str
+            technical-slot adapter. Accepted but unused at B1; will
+            be wired to pass 2 (chooser) at B2.
         article_text: raw news_seed from the writer's resolve step.
             MUST be non-empty (precondition; caller guarantees).
         seed_pool: list of style descriptor strings to sample seed
@@ -578,6 +587,10 @@ def pick_style(
         StyleGenerationFailedError on any failure path. Caller does
         NOT catch (per Jeffrey 2026-05-10 fail-loud policy).
     """
+    # S32 B1: alias `generate_fn` for the existing body. Both passes
+    # route through creative_fn at B1; B2 flips pass 2 to technical_fn.
+    generate_fn = creative_fn
+
     if not (article_text or "").strip():
         raise StyleGenerationFailedError(
             "article_text is empty at picker entry; upstream "

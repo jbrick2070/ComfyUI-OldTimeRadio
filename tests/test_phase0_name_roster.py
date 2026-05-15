@@ -224,7 +224,7 @@ class TestComposeLineLineResult:
     def test_clean_line_no_flags(self, roster):
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("I found something I cannot explain.")
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert isinstance(res, LineResult)
         assert res.text == "I found something I cannot explain."
         assert res.compose_flags == ()
@@ -232,7 +232,7 @@ class TestComposeLineLineResult:
     def test_phantom_titled_name_flagged(self, roster):
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("Dr. Patel can confirm the readings.")
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert res.text == "Dr. Patel can confirm the readings."
         assert res.compose_flags == ("phantom_name:Dr. Patel",)
 
@@ -246,7 +246,7 @@ class TestComposeLineLineResult:
             return "CARLA insists the signal is real."
 
         req = _req("ALICE", roster=roster)
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert call_count["n"] == 1, (
             f"name violation must NOT reroll (per §6.A); "
             f"got {call_count['n']} generate_fn calls"
@@ -257,14 +257,14 @@ class TestComposeLineLineResult:
         # ALICE referring to BOB by name (both locked) — clean.
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("BOB knows what the signal means.")
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert res.compose_flags == ()
 
     def test_legit_news_term_no_flag(self, roster):
         # CERN is in roster via key_terms.
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("The CERN report changed everything.")
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert res.compose_flags == ()
 
     def test_empty_roster_gate_skipped(self):
@@ -273,7 +273,7 @@ class TestComposeLineLineResult:
         # always empty.
         req = _req("ALICE", roster=frozenset())
         fn = _const_generate_fn("Dr. Patel says hello.")
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert res.compose_flags == ()
 
     def test_empty_response_still_rerolls(self, roster):
@@ -285,7 +285,7 @@ class TestComposeLineLineResult:
             return "" if call_count["n"] == 1 else "OK now I see it."
 
         req = _req("ALICE", roster=roster)
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert call_count["n"] == 2
         assert res.text == "OK now I see it."
 
@@ -300,7 +300,7 @@ class TestComposeLineLineResult:
             return "Short reply."
 
         req = _req("ALICE", roster=roster, target_words=10)
-        res = compose_line(fn, req)
+        res = compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert call_count["n"] == 2
         assert res.text == "Short reply."
 
@@ -308,7 +308,7 @@ class TestComposeLineLineResult:
         req = _req("ALICE", roster=roster)
         fn = _const_generate_fn("")
         with pytest.raises(LineCompositionFailedError) as exc_info:
-            compose_line(fn, req)
+            compose_line(creative_fn=fn, technical_fn=fn, req=req)
         assert exc_info.value.request.speaker == "ALICE"
 
 

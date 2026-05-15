@@ -362,8 +362,7 @@ class TestPickStyle:
         inventor_response = "\n".join(_five_valid_distinct())
         chooser_response = "vacuum_chamber_breach"
         gen = _make_canned_generate_fn([inventor_response, chooser_response])
-        pick = _SP.pick_style(
-            gen,
+        pick = _SP.pick_style(creative_fn=gen, technical_fn=gen,
             article_text="A real news story about black holes.",
             seed_pool=_TEN_PRESETS,
             rng=random.Random("happy"),
@@ -383,8 +382,7 @@ class TestPickStyle:
         good = "\n".join(_five_valid_distinct())
         chosen = "midnight_newsroom_emergency"
         gen = _make_canned_generate_fn([bad, good, chosen])
-        pick = _SP.pick_style(
-            gen,
+        pick = _SP.pick_style(creative_fn=gen, technical_fn=gen,
             article_text="A second test article.",
             seed_pool=_TEN_PRESETS,
             rng=random.Random("retry"),
@@ -397,8 +395,7 @@ class TestPickStyle:
         bad = "only_one_line"
         gen = _make_canned_generate_fn([bad, bad, bad])
         with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(
-                gen,
+            _SP.pick_style(creative_fn=gen, technical_fn=gen,
                 article_text="Article that breaks the inventor.",
                 seed_pool=_TEN_PRESETS,
                 rng=random.Random("allfail"),
@@ -411,8 +408,7 @@ class TestPickStyle:
         chooser_response = "rogue_descriptor_outside_pool"
         gen = _make_canned_generate_fn([inventor_response, chooser_response])
         with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(
-                gen,
+            _SP.pick_style(creative_fn=gen, technical_fn=gen,
                 article_text="Article whose chooser goes rogue.",
                 seed_pool=_TEN_PRESETS,
                 rng=random.Random("chooser-rogue"),
@@ -431,8 +427,7 @@ class TestPickStyle:
             raise RuntimeError("chooser model offline")
 
         with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(
-                _gen,
+            _SP.pick_style(creative_fn=_gen, technical_fn=_gen,
                 article_text="Article whose chooser model dies.",
                 seed_pool=_TEN_PRESETS,
                 rng=random.Random("chooser-offline"),
@@ -444,8 +439,7 @@ class TestPickStyle:
     def test_empty_article_raises_precondition(self):
         gen = _make_canned_generate_fn([])
         with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(
-                gen,
+            _SP.pick_style(creative_fn=gen, technical_fn=gen,
                 article_text="",
                 seed_pool=_TEN_PRESETS,
                 rng=random.Random("empty"),
@@ -456,8 +450,7 @@ class TestPickStyle:
     def test_seed_pool_too_small_raises(self):
         gen = _make_canned_generate_fn([])
         with pytest.raises(_SP.StyleGenerationFailedError) as exc_info:
-            _SP.pick_style(
-                gen,
+            _SP.pick_style(creative_fn=gen, technical_fn=gen,
                 article_text="Article with starved seed pool.",
                 seed_pool=_TEN_PRESETS[:3],
                 rng=random.Random("tiny"),
@@ -472,12 +465,10 @@ class TestPickStyle:
         chosen = "vacuum_chamber_breach"
         gen_a = _make_canned_generate_fn([inv, chosen])
         gen_b = _make_canned_generate_fn([inv, chosen])
-        pick_a = _SP.pick_style(
-            gen_a, article_text="x", seed_pool=_TEN_PRESETS,
+        pick_a = _SP.pick_style(creative_fn=gen_a, technical_fn=gen_a, article_text="x", seed_pool=_TEN_PRESETS,
             rng=random.Random(1234), model_id="m",
         )
-        pick_b = _SP.pick_style(
-            gen_b, article_text="x", seed_pool=_TEN_PRESETS,
+        pick_b = _SP.pick_style(creative_fn=gen_b, technical_fn=gen_b, article_text="x", seed_pool=_TEN_PRESETS,
             rng=random.Random(1234), model_id="m",
         )
         assert pick_a.seed_sample == pick_b.seed_sample

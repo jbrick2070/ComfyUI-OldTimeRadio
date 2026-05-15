@@ -1763,8 +1763,11 @@ class OTR_LedgerScriptWriter:
             # routing both to creative keeps the helper's contract
             # intact in B2b. A future refactor can split pick_style
             # to accept a separate chooser_generate_fn parameter.
+            # S32 B1 paired-contract wiring: pass BOTH generators.
+            # B1 routes both passes through creative; B2 flips pass 2.
             style_pick = _OTRSP.pick_style(
-                creative_generate_fn,
+                creative_fn=creative_generate_fn,
+                technical_fn=technical_generate_fn,
                 article_text=resolved["news_seed"],
                 seed_pool=list(_STYLE_PICKER_SEED_POOL),
                 rng=picker_rng,
@@ -1802,8 +1805,12 @@ class OTR_LedgerScriptWriter:
             # output pass; routes to the technical_model slot.
             # slot-interleave: creative (style picker) -> technical
             # (here). One transition when the two slot ids differ.
+            # S32 B1 paired-contract wiring: pass BOTH generators.
+            # build_news_briefs internally routes V0-V3 through
+            # technical_fn (creative_fn accepted for uniformity).
             briefs = _OTRNI.build_news_briefs(
-                technical_generate_fn,
+                creative_fn=creative_generate_fn,
+                technical_fn=technical_generate_fn,
                 full_text=article.get("full_text", ""),
                 headline=article.get("headline", ""),
                 summary=article.get("summary", ""),
@@ -1858,8 +1865,12 @@ class OTR_LedgerScriptWriter:
         # narrative descriptions (gender + character_description).
         # slot-interleave: technical (news_interpreter) -> creative
         # (here). One transition when the two slot ids differ.
+        # S32 B1 paired-contract wiring: pass BOTH generators.
+        # B1 routes generation through creative; B3 flips schema
+        # validation to technical_fn (fail-fast per D2).
         cast_rows, cast_meta = _OTRCAST.lock_cast(
-            creative_generate_fn,
+            creative_fn=creative_generate_fn,
+            technical_fn=technical_generate_fn,
             num_characters=resolved["num_characters"],
             news_seed=resolved["news_seed"],
             casting_brief=casting_brief,
@@ -2250,7 +2261,9 @@ class OTR_LedgerScriptWriter:
                 # narration-leak cleanup pass when enable_polish_pass
                 # is on.
                 line_res = _OTRLC.compose_line(
-                    creative_generate_fn, line_req,
+                    creative_fn=creative_generate_fn,
+                    technical_fn=technical_generate_fn,
+                    req=line_req,
                     base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
                     enable_polish_pass=resolved["enable_polish_pass"],
@@ -2275,7 +2288,9 @@ class OTR_LedgerScriptWriter:
                 # technical pass refers to a hypothetical refactor
                 # that doesn't exist in the current code.)
                 line_res = _OTRLC.compose_line(
-                    creative_generate_fn, line_req,
+                    creative_fn=creative_generate_fn,
+                    technical_fn=technical_generate_fn,
+                    req=line_req,
                     base_temperature=base_temp,
                     max_new_tokens_cap=resolved["max_new_tokens_cap"],
                     enable_polish_pass=resolved["enable_polish_pass"],
@@ -3011,8 +3026,11 @@ if __name__ == "__main__":
             _idx[0] += 1
             return r
 
+        # S32 B1 paired-contract: smoke test passes the same fn to
+        # both slots since the mock doesn't distinguish.
         pick = _OTRSP_smoke.pick_style(
-            _smoke_gen,
+            creative_fn=_smoke_gen,
+            technical_fn=_smoke_gen,
             article_text="Smoke test article body about a real science story.",
             seed_pool=list(_STYLE_PICKER_SEED_POOL),
             rng=_random_smoke.Random(42),
@@ -3029,7 +3047,8 @@ if __name__ == "__main__":
         # Fail-loud check: empty article precondition raises.
         try:
             _OTRSP_smoke.pick_style(
-                _smoke_gen, article_text="",
+                creative_fn=_smoke_gen, technical_fn=_smoke_gen,
+                article_text="",
                 seed_pool=list(_STYLE_PICKER_SEED_POOL),
                 rng=_random_smoke.Random(0), model_id="smoke",
             )

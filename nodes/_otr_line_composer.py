@@ -1287,15 +1287,17 @@ def polish_line(
 
 
 def compose_line(
-    generate_fn,                # same GenerateFn contract as _otr_outline
-    req: LineRequest,
     *,
+    creative_fn,                # S32 B1 paired-contract: creative slot
+    technical_fn,               # S32 B1 paired-contract: technical slot
+    req: LineRequest,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     enable_polish_pass: bool = False,
     polish_generate_fn=None,
+    use_technical_critic: bool = False,
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1329,6 +1331,12 @@ def compose_line(
 
     Raises LineCompositionFailedError after all attempts exhausted.
     """
+    # S32 B1: alias `generate_fn` for the existing body. All
+    # sub-passes (composer, critic, grammarian, polish gate) route
+    # through creative_fn at B1; B4 lands the `use_technical_critic`
+    # opt-in dispatch for the critic sub-pass.
+    generate_fn = creative_fn
+
     if max_attempts < 1:
         raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
     if not callable(generate_fn):

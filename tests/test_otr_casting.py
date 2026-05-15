@@ -228,8 +228,7 @@ def test_lock_cast_open_character_rows_carry_voice_params_none():
     gen = _make_canned_generate_fn([
         _good_response(voice_preset="v2/en_speaker_3"),
     ])
-    cast, _ = _OTRC.lock_cast(
-        gen,
+    cast, _ = _OTRC.lock_cast(creative_fn=gen, technical_fn=gen,
         num_characters=1,
         news_seed="story", style="noir",
         rng=rng,
@@ -248,8 +247,7 @@ def test_lock_cast_open_character_rows_carry_tts_model_bark():
         _good_response(voice_preset="v2/en_speaker_3"),
         _good_response(voice_preset="v2/en_speaker_5"),
     ])
-    cast, _ = _OTRC.lock_cast(
-        gen,
+    cast, _ = _OTRC.lock_cast(creative_fn=gen, technical_fn=gen,
         num_characters=2,
         news_seed="story", style="noir",
         rng=rng,
@@ -367,8 +365,7 @@ def test_lock_cast_preflight_fails_fast_when_voice_pool_too_small(
 
     rng = random.Random("preflight-test")
     with pytest.raises(_OTRC.CastingFailedError, match="too small"):
-        _OTRC.lock_cast(
-            gen_fn,
+        _OTRC.lock_cast(creative_fn=gen_fn, technical_fn=gen_fn,
             num_characters=3,
             news_seed="story", style="noir",
             rng=rng,
@@ -711,8 +708,7 @@ def test_lock_cast_no_lemmy_end_to_end():
         _good_response(voice_preset="v2/en_speaker_5"),
         _good_response(voice_preset="v2/en_speaker_7"),
     ])
-    cast, meta = _OTRC.lock_cast(
-        gen,
+    cast, meta = _OTRC.lock_cast(creative_fn=gen, technical_fn=gen,
         num_characters=3,
         news_seed="A science article about deep-sea hydrothermal vents.",
         style="noir mystery",
@@ -744,8 +740,7 @@ def test_lock_cast_with_lemmy_end_to_end():
         _good_response(voice_preset="v2/en_speaker_3"),
         _good_response(voice_preset="v2/en_speaker_6"),
     ])
-    cast, meta = _OTRC.lock_cast(
-        gen,
+    cast, meta = _OTRC.lock_cast(creative_fn=gen, technical_fn=gen,
         num_characters=3,
         news_seed="A science article.",
         style="noir mystery",
@@ -778,8 +773,7 @@ def test_lock_cast_open_slots_see_lemmy_in_prior_cast_but_not_announcer():
         return _good_response(voice_preset="v2/en_speaker_6")
 
     rng = random.Random("prior-cast-test")
-    _OTRC.lock_cast(
-        gen_fn,
+    _OTRC.lock_cast(creative_fn=gen_fn, technical_fn=gen_fn,
         num_characters=2,
         news_seed="story", style="noir",
         rng=rng,
@@ -806,8 +800,7 @@ def test_lock_cast_voice_pool_pre_filtered_excludes_lemmy_voice():
         return _good_response(voice_preset="v2/en_speaker_6")
 
     rng = random.Random("voice-filter-test")
-    _OTRC.lock_cast(
-        gen_fn,
+    _OTRC.lock_cast(creative_fn=gen_fn, technical_fn=gen_fn,
         num_characters=2,
         news_seed="story", style="noir",
         rng=rng,
@@ -920,8 +913,7 @@ def test_lock_cast_invariant_fires_at_end_if_voices_collide(
 
     rng = random.Random("invariant-fires")
     with pytest.raises(_OTRC.CastingFailedError) as exc_info:
-        _OTRC.lock_cast(
-            (lambda *_a, **_kw: ""),  # generate_fn unused after stub
+        _OTRC.lock_cast(creative_fn=(lambda *_a, **_kw: ""), technical_fn=(lambda *_a, **_kw: ""),  # generate_fn unused after stub
             num_characters=2,
             news_seed="story", style="noir",
             rng=rng,
@@ -949,8 +941,7 @@ def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
         return _good_response(voice_preset="v2/en_speaker_3")
 
     rng = random.Random("kokoro-bark-separation")
-    _OTRC.lock_cast(
-        gen_fn,
+    _OTRC.lock_cast(creative_fn=gen_fn, technical_fn=gen_fn,
         num_characters=1,
         news_seed="story", style="noir",
         rng=rng,

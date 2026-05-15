@@ -509,8 +509,9 @@ def assemble_pre_locked_rows(
 
 
 def lock_cast(
-    generate_fn: Callable[..., str],
     *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
     num_characters: int,
     news_seed: str,
     style: str,
@@ -534,6 +535,11 @@ def lock_cast(
     meta dict has: lemmy_hit, casting_attempts (list of attempt
     counts per open slot, for telemetry).
     """
+    # S32 B1: alias `generate_fn` for the existing body. Generation
+    # routes through creative_fn at B1; B3 flips schema validation to
+    # technical_fn with fail-fast CastValidationLLMError (D2).
+    generate_fn = creative_fn
+
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
         num_characters=num_characters,
         rng=rng,

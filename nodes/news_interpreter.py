@@ -532,8 +532,9 @@ def _build_user_prompt(
 
 
 def build_news_briefs(
-    generate_fn: Callable[..., str],
     *,
+    creative_fn: Callable[..., str],
+    technical_fn: Callable[..., str],
     full_text: str,
     headline: str = "",
     summary: str = "",
@@ -566,6 +567,13 @@ def build_news_briefs(
     outlines, raw prompt + reroll) -- this module's contract is
     "I send messages + sampling knobs, you return a string."
     """
+    # S32 B1: alias `generate_fn` for the existing body. All
+    # sub-passes (V0 emit, V1-V3 retries) route through technical_fn
+    # -- this is the only helper of the 4 paired-signature surfaces
+    # that does NOT default to creative. `creative_fn` is accepted
+    # for contract uniformity but unused at B1 (future-compatible).
+    generate_fn = technical_fn
+
     if max_attempts < 1:
         raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
 
