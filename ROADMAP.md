@@ -75,6 +75,49 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CURRENT WORK -- S31 Legacy LLM Stack Clean Break (COMPLETE 2026-05-14)
+
+**Branch:** `s31-loader-clean-break` (cut from `s30-two-model-selector @ ccf583d`, S30 B8 close). Single linear branch -- no sub-branches.
+**Plan:** `docs/2026-05-14-S31-S32-cowork-execution-plan.md` (single file covering S31 + S32).
+**Final QA:** `docs/2026-05-14-S31-final-qa-review.md`.
+
+**What S31 shipped:**
+* DELETED 4 legacy LLM symbols from `nodes/story_orchestrator.py` (Hard rule #1A non-deferrable): `_load_llm`, `_unload_llm`, `_LLM_CACHE`, `_generate_with_llm`. Net file delta: -663 LOC.
+* PORTED the ~613-LOC bitsandbytes / NF4 / 8-bit / Standard / Obsidian profile body from `story_orchestrator._load_llm` to `_otr_model_loader.load_llm` (the canonical loader surface). Modern `load_llm` is the always-load primitive; `request_slot` handles caching at the outer layer.
+* SIMPLIFIED `_otr_model_loader.unload_llm` -- dropped the legacy-orchestrator fallback block (`_so._LLM_CACHE` write-through, deleted symbol).
+* ADDED `_otr_model_loader.invalidate_cache_no_gpu_teardown()` lifecycle helper -- clears LLM_CACHE references in-place WITHOUT touching the GPU. Used by `_run_with_timeout` for the safe-invalidation path.
+* FIXED TIMEOUT_RECOVERY CUDA-race regression (BUG-LOCAL-228, introduced at S30 B4b). `_run_with_timeout` no longer calls `unload_llm()` (which raced with the orphan worker thread's CUDA kernels); uses the new GPU-safe helper instead.
+* REFACTORED the two remaining RSS news LLM call sites in `story_orchestrator.py` (`_llm_rank_news_candidates`, `_llm_rerank_with_bodies`) onto the canonical `request_slot + make_generate_fn` surface (Hard rule #5: one generate surface, no wrapper-by-another-name).
+* DELETED dead `_generate_ltx_style_brief` + `_LTX_STYLE_BRIEF_PROMPT` (zero tree-wide callers post-S30 Director deletion).
+* FIXED 4 residuals (B6): (1) RSS path passes `technical_model` not `creative_writing_model` -- slot label / id agreement in differing-slots config; (2) self-test optional-widget count drift 11 -> 15; (3) `workflows/otr_scifi_16gb_full.json` 4 link rows had off-by-one `dst_slot`; (4) `OTR_VisualPromptCoercion` raises `MissingModelInputError` loud on unwired `model_id` (matches cascade post-S30 B3 pattern).
+* ARMED 6 forbidden-pattern sweep markers (B5): 4 deletion guards for the 4 legacy symbols + 2 preemptive locks on `generate_text` / `generate_with_llm` (one generate surface rule).
+
+**S31 acceptance table:** 24 rows green; see final QA review doc.
+
+**Gates (final canonical run at sprint close):**
+* Canonical regression: 243 passed / 7 skipped / 2 xfailed (below plan's projected ~282 target; gap is in projection-vs-actual on new-test counts, not in regressions).
+* Bug Bible regression: 23 passed / 1 skipped / 2 xfailed (held across all 9 commits).
+* Forbidden-pattern sweep: 0 runtime hits at every commit boundary.
+* Audio C7 byte-identical pytest proxy: holds (default config).
+* Audio C7 byte-identical end-to-end: DEFERRED to operator-driven post-feature-set verification per the autonomous-run handoff.
+
+**BUG_LOG updates:**
+* BUG-LOCAL-226 [FIXED `a4fe67a` 2026-05-14] -- legacy `_load_llm` caller chain audit-miss; closed by S31 B4 deletion.
+* BUG-LOCAL-227 (filed at `3c8118e` 2026-05-14) -- 25 LFC test failures latent at S30 B8 (wide pytest walk); PRE-EXISTING, triage carried to post-S31.
+* BUG-LOCAL-228 filed + [FIXED `a4fe67a` 2026-05-14] -- TIMEOUT_RECOVERY CUDA-race regression; closed by `invalidate_cache_no_gpu_teardown` introduction.
+
+**Deviations from plan (6 total, full table in final QA doc):**
+* B2 cache reference re-bind after unload (not in plan; cleared at B4).
+* B4 `load_llm` cache-logic deletion (deeper than plan suggested; was orphaned by `_LLM_CACHE` removal).
+* B4 `register_vram_cleanup(_unload_llm)` rewire to local wrapper.
+* B6 Fix 4 default-string `"none"` sentinel preserved (plan-allowed choice).
+* Test infrastructure churn -- 5 test files updated as legacy symbols moved/deleted.
+* B6 Fix 3 (UNGATED_PASS_RECOMMENDATION) deferred to post-soak per plan.
+
+**Next sprint:** S32 (`s32-helper-per-subpass-routing`) -- per-sub-pass routing inside `pick_style` / `lock_cast` / `compose_line` / `build_news_briefs`. Branch cuts from `s31-loader-clean-break @ B8`.
+
+---
+
 ## CURRENT WORK -- S30 Two-Model Selector (COMPLETE 2026-05-14)
 
 **Branch:** `s30-two-model-selector` (cut from `s29-clean-slate-gate @ a63f3e7`; S29 has not been merged to `v2.0-alpha` yet, so the cut point captures the post-S29 code state without an autonomous merge to `v2.0-alpha`). **Single linear branch — no sub-branches for B1d-B8; commits land here.**
