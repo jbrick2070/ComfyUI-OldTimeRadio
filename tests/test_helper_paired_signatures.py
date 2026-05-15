@@ -303,3 +303,96 @@ def test_build_news_briefs_internally_uses_technical_fn():
         f"build_news_briefs (accepted for contract uniformity but "
         f"unused); got {len(creative_calls)} call(s)."
     )
+
+
+# ---------------------------------------------------------------------------
+# S32 B5: build_news_briefs all retries (V0-V3) on technical_fn
+# ---------------------------------------------------------------------------
+
+
+def test_build_news_briefs_all_retries_use_technical():
+    """Plan B5 verification: V0-V3 sub-passes (V0 emit + V1/V2/V3
+    retries on validation failure) ALL route to technical_fn.
+    Drive `build_news_briefs` with always-malformed responses so
+    every retry tier fires; assert zero creative-side calls
+    across the full retry stack.
+    """
+    from nodes import news_interpreter as ni
+
+    creative_calls: list[float] = []
+    technical_calls: list[float] = []
+
+    def creative_fn(messages, *, temperature, max_new_tokens, **kw):
+        creative_calls.append(temperature)
+        return "should_not_be_called"
+
+    def technical_fn(messages, *, temperature, max_new_tokens, **kw):
+        technical_calls.append(temperature)
+        # Always-malformed so every retry tier fires.
+        return "not-valid-json"
+
+    try:
+        ni.build_news_briefs(
+            creative_fn=creative_fn,
+            technical_fn=technical_fn,
+            full_text="A short news article about radio.",
+            headline="Radio Returns",
+            summary="A summary.",
+            outlet="The Outlet",
+            pub_date="2026-05-14",
+            style="noir",
+            seed=42,
+            max_attempts=3,  # V0 + V1 retry + V2 repair attempt
+        )
+    except Exception:
+        pass
+
+    assert len(technical_calls) >= 1, (
+        "All V0-V3 sub-passes must route to technical_fn. Got 0."
+    )
+    assert len(creative_calls) == 0, (
+        f"creative_fn must NOT be called by build_news_briefs at "
+        f"any retry tier; got {len(creative_calls)} call(s). "
+        f"This would break the structured-output slot routing."
+    )
+
+
+# ---------------------------------------------------------------------------
+# S32 B5: outline retry stays creative (D3)
+# ---------------------------------------------------------------------------
+
+
+def test_outline_retry_uses_creative():
+    """Plan B5 + D3: `_otr_outline.generate_outline` retry stays
+    creative. Schema validation is pure pydantic (no LLM); the retry
+    is CONTENT regeneration (the outline got rejected for structural
+    reasons -- length, missing field -- and we want a fresh creative
+    take, not a technical-slot re-check). No paired-fn refactor
+    needed for the outline.
+
+    Structural assertion: the outline module exposes a
+    `generate_outline` function that takes a single `generate_fn`
+    positional arg (not paired). This pins the D3 decision -- if
+    a future change introduces paired generators to the outline,
+    THIS test breaks first.
+    """
+    from nodes import _otr_outline as outline
+    import inspect
+
+    sig = inspect.signature(outline.generate_outline)
+    params = list(sig.parameters.values())
+    assert len(params) >= 1, "generate_outline must have at least one arg"
+    first = params[0]
+    assert first.name in ("generate_fn", "fn"), (
+        f"generate_outline's first arg should be a single "
+        f"generate_fn (D3: outline stays single-fn creative). "
+        f"Got {first.name!r}."
+    )
+    # Paired-contract surface must NOT have been added.
+    assert "creative_fn" not in sig.parameters, (
+        "D3: outline retry stays creative. The outline must NOT "
+        "have been refactored to paired (creative_fn, technical_fn) "
+        "kwargs -- that would imply per-sub-pass dispatch, which "
+        "the architectural decision rejects."
+    )
+    assert "technical_fn" not in sig.parameters
