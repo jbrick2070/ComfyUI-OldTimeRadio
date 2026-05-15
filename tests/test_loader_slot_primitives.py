@@ -78,7 +78,10 @@ def _hard_mock_loader_paths(monkeypatch, tmp_path):
 
     # story_orchestrator._load_llm seam: patch the attribute directly
     # on whatever module is in sys.modules, so the fake survives across
-    # other tests that imported the real module before mine.
+    # other tests that imported the real module before mine. Still
+    # useful as a back-stop -- post-S31 B2 the body lives in
+    # `_otr_model_loader.load_llm` (see seam below) and the orchestrator's
+    # `_load_llm` is a ~10-line shim that delegates to the loader.
     import nodes.story_orchestrator as _real_so
 
     monkeypatch.setattr(_real_so, "_load_llm", _fake_story_orchestrator_load_llm)
@@ -96,6 +99,26 @@ def _hard_mock_loader_paths(monkeypatch, tmp_path):
         monkeypatch.setitem(
             _real_so._LLM_CACHE, "model_id", None  # type: ignore[union-attr]
         )
+
+    # S31 B2: ported-body seam. `_otr_model_loader.load_llm` is now the
+    # canonical home of the bitsandbytes / NF4 / 8-bit profile body
+    # (PURE COPY out of `story_orchestrator._load_llm`). The legacy
+    # `_so._load_llm` patch above is preserved as a back-stop but the
+    # primary seam tests should drive through is the loader-side one.
+    # Returning a cache_entry dict directly skips the entire transformers
+    # / bitsandbytes path and never touches GPU.
+    def _fake_loader_load_llm(model_id, **kwargs):
+        canonical_id = str(model_id).split(" ")[0].strip()
+        return {
+            "model":       _FakeModel(canonical_id),
+            "tokenizer":   _FakeTokenizer(),
+            "model_id":    canonical_id,
+            "device":      kwargs.get("device", "cpu"),
+            "quantized":   False,
+            "context_cap": kwargs.get("context_cap") or 8192,
+        }
+
+    monkeypatch.setattr(loader, "load_llm", _fake_loader_load_llm)
 
     # CUDA primitives: pretend cuda unavailable so the teardown skips
     # real torch.cuda.* calls and never touches a real GPU.
@@ -258,6 +281,59 @@ def test_request_slot_creative_loads_default_llm():
     assert entry["model_id"] == catalog.DEFAULT_LLM
     assert loader.LLM_CACHE["slot"] == "creative"
     assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM
+
+
+def test_request_slot_uses_ported_body():
+    """S31 B2 architecture: `request_slot` drives the end-to-end load
+    through `_otr_model_loader.load_llm` (the canonical home of the
+    ported ~613-LOC bitsandbytes body). It must NOT route through
+    `story_orchestrator._load_llm` -- the orchestrator's `_load_llm`
+    is a B2-only shim that delegates BACK to the loader and is
+    deleted at S31 B4.
+
+    Structural assertion: AST-walk `request_slot`'s body looking for
+    a `Call` to `load_llm` (the loader's). Reject any `Call` to
+    `_load_llm` (orchestrator-side legacy name)."""
+    import ast
+    from pathlib import Path
+
+    loader_src = Path(loader.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(loader_src)
+    request_slot_fn = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "request_slot":
+            request_slot_fn = node
+            break
+    assert request_slot_fn is not None, "request_slot not found in loader"
+
+    call_to_load_llm = False
+    forbidden_legacy_calls: list[str] = []
+    for sub in ast.walk(request_slot_fn):
+        if not isinstance(sub, ast.Call):
+            continue
+        fn = sub.func
+        # `load_llm(...)` (bare Name) -- loader's local resolution.
+        if isinstance(fn, ast.Name) and fn.id == "load_llm":
+            call_to_load_llm = True
+        # `<x>.load_llm(...)` -- module-qualified loader call.
+        elif isinstance(fn, ast.Attribute) and fn.attr == "load_llm":
+            call_to_load_llm = True
+        # `<x>._load_llm(...)` -- forbidden legacy orchestrator call.
+        elif isinstance(fn, ast.Attribute) and fn.attr == "_load_llm":
+            forbidden_legacy_calls.append(f"line {sub.lineno}: .{fn.attr}")
+        # Bare `_load_llm(...)` after import -- also forbidden.
+        elif isinstance(fn, ast.Name) and fn.id == "_load_llm":
+            forbidden_legacy_calls.append(f"line {sub.lineno}: {fn.id}")
+    assert call_to_load_llm, (
+        "request_slot must call `load_llm(...)` (the ported body in "
+        "this same module). No such call found in the AST."
+    )
+    assert not forbidden_legacy_calls, (
+        "request_slot must NOT call the legacy orchestrator "
+        "`_load_llm` -- post-S31 B2 the body lives here in the loader, "
+        "and the orchestrator surface is a one-commit-deep shim. "
+        "Offenders:\n  " + "\n  ".join(forbidden_legacy_calls)
+    )
 
 
 def test_request_slot_same_model_returns_cached_entry(monkeypatch):

@@ -290,9 +290,29 @@ class TestStoryOrchestratorCodePatterns:
 
     @pytest.fixture(scope="class")
     def src(self):
-        path = os.path.join(os.path.dirname(__file__), "..", "nodes", "story_orchestrator.py")
-        with open(path, encoding="utf-8") as f:
-            return f.read()
+        """Combined source of the LLM stack: orchestrator + loader.
+
+        S31 B2 ported `_load_llm`'s ~613 LOC bitsandbytes body OUT of
+        `story_orchestrator.py` and INTO `_otr_model_loader.load_llm`.
+        The legacy patterns this test class pins
+        (`1024` floor on max_new_tokens, `local_files_only` tokenizer
+        load path, `max_length=None` generate kwarg) now live in the
+        loader file. The orchestrator file is the consumer side
+        (`_generate_with_llm`, `_run_with_timeout`, streamer wiring)
+        plus the ~10-line `_load_llm` shim (deleted at S31 B4).
+
+        Returning both files concatenated keeps the legacy assertions
+        load-bearing across the body-move boundary without splitting
+        every test by file. Each pattern is unique enough that the
+        union assertion is unambiguous (`max_length=None` only appears
+        in the generate path, `1024` `max(` only on the floor, etc).
+        """
+        nodes_dir = os.path.join(os.path.dirname(__file__), "..", "nodes")
+        parts = []
+        for fname in ("story_orchestrator.py", "_otr_model_loader.py"):
+            with open(os.path.join(nodes_dir, fname), encoding="utf-8") as f:
+                parts.append(f.read())
+        return "\n".join(parts)
 
     def test_transformers_import_in_try_block(self, src):
         tree = ast.parse(src)
