@@ -147,7 +147,7 @@ class TestB1UnloadInFinally:
                 verdict="clean_no_edits",
                 pre_audit_violations=0, pre_audit_repairs_applied=0,
                 doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0, phantom_skip_count=0,
+                post_audit_violations=0,
             )
 
         with _LoaderStubContext() as ctx:
@@ -172,7 +172,7 @@ class TestB1UnloadInFinally:
                 verdict="clean_no_edits",
                 pre_audit_violations=0, pre_audit_repairs_applied=0,
                 doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0, phantom_skip_count=0,
+                post_audit_violations=0,
             )
 
         with _LoaderStubContext(unload_raises=True) as ctx:
@@ -207,7 +207,7 @@ class TestB1UnloadInFinally:
                 verdict="clean_no_edits",
                 pre_audit_violations=0, pre_audit_repairs_applied=0,
                 doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0, phantom_skip_count=0,
+                post_audit_violations=0,
             )
 
         with _LoaderStubContext() as ctx:

@@ -65,7 +65,7 @@ def _stub_reviewer(verdict="clean_no_edits"):
             verdict=verdict,
             pre_audit_violations=0, pre_audit_repairs_applied=0,
             doctor_edits_proposed=0, doctor_edits_applied=0,
-            post_audit_violations=0, phantom_skip_count=0,
+            post_audit_violations=0,
         )
     return fake_review
 

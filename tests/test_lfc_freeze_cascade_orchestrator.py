@@ -98,7 +98,6 @@ def _stub_reviewer_disposition(verdict: str = "clean_no_edits",
         doctor_edits_proposed=edits_proposed,
         doctor_edits_applied=edits_applied,
         post_audit_violations=0,
-        phantom_skip_count=0,
     )
 
 

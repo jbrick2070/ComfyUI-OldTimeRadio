@@ -6,7 +6,7 @@ Covers (per script-writing-architecture synthesis §3 Phase 3 + §6.A + M2 + G1-
   * compute_edit_cap scales with voiced beats   G1
   * audit_cast_contract single-fn + label       G4 (Pass 1 + Pass 3 same fn)
   * apply_deterministic_cast_repairs            each repair kind branch
-  * apply_phantom_skip_fallback                  M2 deterministic safety net
+  * (S33 B4 retired apply_phantom_skip_fallback M2 safety net)
   * review_ledger disposition for each verdict:
         clean_no_edits / improved /
         too_many_edits / needs_full_rerun
@@ -33,12 +33,12 @@ from nodes._otr_ledger_reviewer import (  # noqa: E402
     ReviewerEdit,
     ScriptDoctorReport,
     apply_deterministic_cast_repairs,
-    apply_phantom_skip_fallback,
     audit_cast_contract,
     auto_remap_phantom,
     compute_edit_cap,
     review_ledger,
 )
+# S33 B4 (2026-05-15): `apply_phantom_skip_fallback` retired.
 
 
 # ---------------------------------------------------------------------------
@@ -328,47 +328,15 @@ class TestDeterministicCastRepairs:
             led.data, report, led.data["cast"],
         )
         # No remap (too far from any cast name) -- not counted as
-        # repaired; Step 2.5 will catch it later.
+        # repaired; Pass 2 Script Doctor owns the next step.
+        # (S33 B4 retired the Step 2.5 phantom-skip safety net.)
         assert n == 0
         assert "Dr. Patel" in led.data["lines"][0]["text"]
 
 
-# ---------------------------------------------------------------------------
-# apply_phantom_skip_fallback -- M2
-# ---------------------------------------------------------------------------
-
-
-class TestPhantomSkipFallback:
-
-    def test_titled_phantom_skipped(self, tmp_path):
-        led = _build_ledger(tmp_path, [
-            _line("b001", "c01", "Dr. Patel arrives suddenly.", role="character"),
-        ])
-        roster = {"ALICE", "BOB", "ANNOUNCER"}
-        n = apply_phantom_skip_fallback(led.data, roster)
-        assert n == 1
-        assert led.data["lines"][0]["skip"] is True
-        assert "Dr. Patel" in led.data["lines"][0]["tts_skip_reason"]
-
-    def test_clean_line_not_skipped(self, tmp_path):
-        led = _build_ledger(tmp_path, [
-            _line("b001", "c01", "Hello there world.", role="character"),
-        ])
-        n = apply_phantom_skip_fallback(
-            led.data, {"ALICE", "BOB", "ANNOUNCER"},
-        )
-        assert n == 0
-        assert led.data["lines"][0].get("skip") is None or \
-               led.data["lines"][0].get("skip") is False
-
-    def test_already_skipped_line_not_re_skipped(self, tmp_path):
-        line = _line("b001", "c01", "Dr. Patel arrives.", role="character")
-        line["skip"] = True
-        led = _build_ledger(tmp_path, [line])
-        n = apply_phantom_skip_fallback(
-            led.data, {"ALICE", "BOB", "ANNOUNCER"},
-        )
-        assert n == 0
+# S33 B4 (2026-05-15): TestPhantomSkipFallback class deleted.
+# `apply_phantom_skip_fallback` was retired per B1.5 classification
+# (it muted lines via skip=True, a pipeline cut not a story edit).
 
 
 # ---------------------------------------------------------------------------
@@ -506,23 +474,8 @@ class TestReviewLedgerDispositions:
         assert call_count["n"] == 1
         assert led.data["meta"]["reviewer_audit_failure_reason"]
 
-    def test_phantom_skip_clears_text_belt_and_suspenders(self, tmp_path):
-        """Wiring-review #14 (2026-05-11): when Step 2.5 mutes a
-        titled phantom, it sets skip=True AND clears text to ""
-        so any TTS consumer that ignores `skip` still emits nothing."""
-        led = _build_ledger(tmp_path, [
-            _line("b001", "c01", "Dr. Patel arrives suddenly.",
-                  role="character"),
-        ])
-        roster = {"ALICE", "BOB", "ANNOUNCER"}
-        n = apply_phantom_skip_fallback(led.data, roster)
-        assert n == 1
-        row = led.data["lines"][0]
-        assert row["skip"] is True
-        assert row["text"] == ""
-        assert row["char_count"] == 0
-        assert row["word_count"] == 0
-        assert "Dr. Patel" in row["tts_skip_reason"]
+    # S33 B4 (2026-05-15): test_phantom_skip_clears_text_belt_and_suspenders
+    # deleted -- `apply_phantom_skip_fallback` retired per B1.5.
 
     def test_doctor_skip_action_clears_text(self, tmp_path):
         """Wiring-review #14: Script Doctor `skip` action also clears

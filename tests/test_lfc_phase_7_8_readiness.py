@@ -273,7 +273,7 @@ class TestCascadeWiring:
                 verdict="clean_no_edits",
                 pre_audit_violations=0, pre_audit_repairs_applied=0,
                 doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0, phantom_skip_count=0,
+                post_audit_violations=0,
             )
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",
@@ -315,7 +315,7 @@ class TestCascadeWiring:
                 verdict="clean_no_edits",
                 pre_audit_violations=0, pre_audit_repairs_applied=0,
                 doctor_edits_proposed=0, doctor_edits_applied=0,
-                post_audit_violations=0, phantom_skip_count=0,
+                post_audit_violations=0,
             )
 
         with patch.object(_LFC_ORCH._OTRLR, "review_ledger",

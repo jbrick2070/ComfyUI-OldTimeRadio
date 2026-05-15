@@ -18,18 +18,16 @@ Pass 2 (Script Doctor) -- LLM #2
     to a CANDIDATE copy (the original ledger on disk is untouched
     until Pass 3 clears).
 
-Step 2.5 (Deterministic phantom-skip fallback)
-    Catches titled phantoms ("Dr. Patel") that survived Pass 1's
-    Levenshtein auto-remap AND the Script Doctor. Sets line.skip=True
-    + tts_skip_reason. Pure Python; no LLM.
+Step 2.5 RETIRED in S33 B4 (2026-05-15)
+    Phantom-skip fallback was a mute (set line.skip=True), not a
+    story edit; pipeline cut under the refined no-auditors rule.
 
-Pass 3 (Cast Auditor post-check) -- LLM #3 (same function, different
-        label)
-    Confirms the Script Doctor's patch didn't reintroduce cast drift
-    on the candidate. Hard reject -> keep original on disk.
+Pass 3 RETIRED in S33 B3 (2026-05-15)
+    Post-edit auditor LLM call had no editor consumer once the
+    `post_audit_pass` rollback gate was retired in S33 B2.
 
-Final disposition stamped on meta.reviewer_verdict. Original ledger
-preserved exactly on every failure path.
+Final disposition stamped on meta.reviewer_verdict. Only Phase 1
+audit -> deterministic repairs -> Phase 2 Script Doctor remain.
 
 Status: Phase 3 of v2.0 sprint (2026-05-11). New module.
 """
@@ -56,7 +54,6 @@ __all__ = [
     "audit_cast_contract",
     "apply_deterministic_cast_repairs",
     "auto_remap_phantom",
-    "apply_phantom_skip_fallback",
     "compute_edit_cap",
     "review_ledger",
 ]
@@ -93,11 +90,12 @@ _LEVENSHTEIN_THRESHOLD = 3
 
 
 # Post-Phase-3 review Gap 2 follow-up (2026-05-11): `_TITLED_PHANTOM_RE`
-# constant removed. All three call sites (apply_phantom_skip_fallback,
-# _final_phantom_check, _detect_titled_phantoms) now import the
-# canonical `_otr_line_composer.detect_phantom_names` which covers
-# titled names + ALL-CAPS tokens + Title-Case bigrams. One detector,
-# one roster, everywhere — the §7 invariant is now enforced.
+# constant removed. All call sites used the canonical
+# `_otr_line_composer.detect_phantom_names` which covers titled names
+# + ALL-CAPS tokens + Title-Case bigrams. One detector, one roster,
+# everywhere. (S33 B4 retired `apply_phantom_skip_fallback` and
+# `_final_phantom_check`; only `_detect_titled_phantoms` remains as
+# an active call site.)
 
 
 # Generation params for the three LLM calls (kept conservative; the
@@ -191,13 +189,15 @@ class ReviewerDisposition:
     """End-of-review summary. Stamped to meta.reviewer_disposition
     alongside meta.reviewer_verdict."""
 
+    # S33 B4 (2026-05-15): `phantom_skip_count` field retired with
+    # `apply_phantom_skip_fallback`. The dataclass field is gone; no
+    # caller writes it.
     verdict: str  # ReviewerVerdict literal
     pre_audit_violations: int
     pre_audit_repairs_applied: int
     doctor_edits_proposed: int
     doctor_edits_applied: int
     post_audit_violations: int
-    phantom_skip_count: int
 
 
 # ---------------------------------------------------------------------------
@@ -252,8 +252,9 @@ def auto_remap_phantom(
 
     Per §6.A: cast is LOCKED -- no LLM reroll for invented names. If
     auto_remap returns None, the line falls through to the Script
-    Doctor's rewrite/skip step or the deterministic phantom-skip
-    fallback (Step 2.5).
+    Doctor's rewrite/skip step. (S33 B4 retired the Step 2.5
+    deterministic phantom-skip fallback that previously caught
+    residual phantoms.)
     """
     if not phantom:
         return None
@@ -602,10 +603,10 @@ def apply_deterministic_cast_repairs(
                 if v.found and v.found in text:
                     line["text"] = text.replace(v.found, remap)
                     repaired += 1
-                # else: phantom isn't in the visible text; let Pass 2
-                # / Step 2.5 handle.
-            # On no match: leave phantom in place. Pass 2 / Step 2.5
-            # owns the next step.
+                # else: phantom isn't in the visible text; Pass 2
+                # Script Doctor handles. (S33 B4 retired Step 2.5.)
+            # On no match: leave phantom in place. Pass 2 Script
+            # Doctor owns the next step. (S33 B4 retired Step 2.5.)
             continue
     return repaired
 
@@ -781,9 +782,10 @@ def run_script_doctor(
 
     On any LLM / JSON / schema failure, returns a clean report with
     overall_verdict="clean" so the caller commits the post-repair
-    candidate without further edits. This is fail-soft on the doctor;
-    Pass 3 post-audit and Step 2.5 phantom-skip are the structural
-    guarantees.
+    candidate without further edits. This is fail-soft on the doctor.
+    (S33 B3 + B4 retired Pass 3 post-audit and Step 2.5 phantom-skip
+    fallback per the refined no-auditors rule; the doctor is now the
+    final structural pass.)
     """
     # Wiring-review #7 / #9 (2026-05-11): prefer canonical
     # meta.allowed_roster (cast + ANNOUNCER + key_terms). Fallback
@@ -923,93 +925,23 @@ def apply_doctor_edits(
 
 
 # ---------------------------------------------------------------------------
-# Step 2.5 -- deterministic phantom-skip fallback
+# Step 2.5 phantom-skip fallback + final phantom check
 # ---------------------------------------------------------------------------
-
-
-def apply_phantom_skip_fallback(
-    candidate_ledger: dict,
-    cast_roster_upper: set[str],
-) -> int:
-    """Mute any line still carrying a phantom after Pass 2.
-
-    Returns the number of lines newly marked skip=True. Sets
-    `tts_skip_reason` for forensic logging. Per synthesis Step 2.5 +
-    M2.
-
-    Post-Phase-3 review (Fix 2, 2026-05-11): uses the CANONICAL
-    `_otr_line_composer.detect_phantom_names` (three regex passes:
-    titled names, ALL-CAPS tokens, Title-Case bigrams). Previously
-    this used `_TITLED_PHANTOM_RE` only, which would miss CARLA-
-    style ALL-CAPS phantoms or Joe-Smith Title-Case bigrams the
-    composer flagged but Pass 2 didn't address. One detector, one
-    roster, everywhere.
-
-    Wiring-review #14 belt-and-suspenders preserved: when setting
-    skip=True, ALSO clear `text` to "".
-    """
-    # Lazy import keeps the module-load surface stdlib + pydantic
-    # only; _otr_line_composer drags in regex compilation at import.
-    from ._otr_line_composer import detect_phantom_names  # type: ignore
-
-    n_skipped = 0
-    cast_roster_frozen = frozenset(cast_roster_upper)
-    for line in candidate_ledger.get("lines", []) or []:
-        if line.get("skip"):
-            continue
-        text = line.get("text") or ""
-        if not text:
-            continue
-        speaker = (
-            line.get("char_id") or line.get("speaker") or ""
-        )
-        phantoms = detect_phantom_names(text, speaker, cast_roster_frozen)
-        if not phantoms:
-            continue
-        line["skip"] = True
-        # Carry the first phantom as the forensic tag; rare for
-        # there to be more than one per line.
-        line["tts_skip_reason"] = f"phantom:{phantoms[0]}"
-        line["text"] = ""
-        line["char_count"] = 0
-        line["word_count"] = 0
-        n_skipped += 1
-    return n_skipped
-
-
-# ---------------------------------------------------------------------------
-# Final python validation (post-audit safety net)
-# ---------------------------------------------------------------------------
-
-
-def _final_phantom_check(
-    candidate_ledger: dict,
-    cast_roster_upper: set[str],
-) -> list[tuple[str, str]]:
-    """Return [(line_id, phantom_token), ...] for any phantom still
-    present in NON-skipped lines.
-
-    Post-Phase-3 review (Fix 2, 2026-05-11): uses the canonical
-    `_otr_line_composer.detect_phantom_names` (all three regex
-    passes). One detector, one roster, everywhere.
-    """
-    from ._otr_line_composer import detect_phantom_names  # type: ignore
-
-    out: list[tuple[str, str]] = []
-    cast_roster_frozen = frozenset(cast_roster_upper)
-    for line in candidate_ledger.get("lines", []) or []:
-        if line.get("skip"):
-            continue
-        text = line.get("text") or ""
-        if not text:
-            continue
-        speaker = (
-            line.get("char_id") or line.get("speaker") or ""
-        )
-        phantoms = detect_phantom_names(text, speaker, cast_roster_frozen)
-        for tok in phantoms:
-            out.append((line.get("line_id", ""), tok))
-    return out
+#
+# S33 B4 (2026-05-15): both `apply_phantom_skip_fallback` and
+# `_final_phantom_check` retired per B1.5 classification.
+#
+# * `apply_phantom_skip_fallback` mutated `line["skip"] = True` +
+#   cleared text -- a mute, not a story edit. Skipping a line is a
+#   pipeline cut under the refined no-auditors rule.
+# * `_final_phantom_check` was pure report-only; its only consumer
+#   was the `post_audit_pass` rollback gate retired in S33 B2.
+#
+# Per Jeffrey's phantom-ship policy (2026-05-15), occasional
+# phantoms reaching the audience is the accepted trade-off.
+# `apply_deterministic_cast_repairs` + Phase 2 Script Doctor (both
+# editors) still rewrite phantom name violations into real cast
+# names; only the post-Phase-2 mute / report layer is gone.
 
 
 # ---------------------------------------------------------------------------
@@ -1076,27 +1008,15 @@ def review_ledger(
             doctor_edits_proposed=0,
             doctor_edits_applied=0,
             post_audit_violations=0,
-            phantom_skip_count=0,
         )
 
     cast_rows = list(ledger_data.get("cast") or [])
-    # Wiring-review #7 / #9 (2026-05-11): prefer the canonical
-    # meta.allowed_roster (writer-stamped, includes cast + ANNOUNCER
-    # + key_terms). Fall back to cast-only when the field is absent
-    # (e.g. ledger built by a pre-Phase-0 writer). Key_terms inclusion
-    # matters: it stops Step 2.5 phantom-skip from incorrectly muting
-    # lines that legitimately mention "Dr. Hawking" when Hawking is
-    # in news_interpreter's key_terms.
-    canonical_roster_raw = ledger_data.get("meta", {}).get("allowed_roster") or []
-    cast_roster_upper: set[str] = {
-        str(r).strip().upper() for r in canonical_roster_raw if str(r).strip()
-    }
-    if not cast_roster_upper:
-        for row in cast_rows:
-            n = row.get("name", "")
-            if n:
-                cast_roster_upper.add(n.upper())
-        cast_roster_upper.add("ANNOUNCER")
+    # S33 B4 (2026-05-15): the `cast_roster_upper` set construction
+    # block was the input to `apply_phantom_skip_fallback` +
+    # `_final_phantom_check`, both retired this commit. Dead code
+    # removed. Phase 1's audit prompt still consults the cast contract
+    # via `_render_cast_contract_table(cast_rows)`; no production
+    # behavior depends on the upper-case roster set.
 
     voiced_beats = sum(
         1 for ln in ledger_data.get("lines", []) or []
@@ -1132,7 +1052,6 @@ def review_ledger(
             doctor_edits_proposed=0,
             doctor_edits_applied=0,
             post_audit_violations=0,
-            phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
         # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
@@ -1174,7 +1093,6 @@ def review_ledger(
             doctor_edits_proposed=doctor_edits_proposed,
             doctor_edits_applied=0,
             post_audit_violations=0,
-            phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
         # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
@@ -1199,7 +1117,6 @@ def review_ledger(
             doctor_edits_proposed=doctor_edits_proposed,
             doctor_edits_applied=0,
             post_audit_violations=0,
-            phantom_skip_count=0,
         )
         meta_after["reviewer_disposition"] = disp.__dict__
         # Fix 3 (2026-05-11): re-stamp §6.G word counts after every
@@ -1209,10 +1126,12 @@ def review_ledger(
         led.save()
         return disp
 
-    # ---- Step 2.5: Deterministic phantom-skip fallback -------
-    phantom_skip_count = apply_phantom_skip_fallback(
-        candidate, cast_roster_upper,
-    )
+    # S33 B4 (2026-05-15): Step 2.5 phantom-skip fallback retired
+    # together with `apply_phantom_skip_fallback`. Setting `skip=True`
+    # on a line is a pipeline cut (mute), not a story edit, so the
+    # refined no-auditors rule forbids it. Per Jeffrey's phantom-ship
+    # policy, occasional phantoms reaching the audience is the
+    # accepted trade-off.
 
     # S33 B3 (2026-05-15): Phase 9 `audit_cast_contract(label="post")`
     # call retired. Its only consumer was the `post_audit_pass`
@@ -1241,7 +1160,6 @@ def review_ledger(
         doctor_edits_proposed=doctor_edits_proposed,
         doctor_edits_applied=edits_applied,
         post_audit_violations=0,
-        phantom_skip_count=phantom_skip_count,
     )
     meta_after["reviewer_disposition"] = disp.__dict__
     # Fix 3 (2026-05-11): §6.G word counts re-stamped on the commit
