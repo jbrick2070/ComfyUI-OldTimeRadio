@@ -92,6 +92,21 @@ forbidden = re.compile(
     # (Jeffrey: features useful are on; default-OFF gates on
     # architecturally-rejected paths are dead-code maintenance debt).
     r"|\buse_technical_critic\b"            # S32 B4: widget rejected
+    # S33 B2 (2026-05-15): cascade rollback-gate retirements per the
+    # refined no-auditors rule. The two verdict literals are the
+    # surface symptoms of the rollback gates; locking the names
+    # prevents accidental reintroduction.
+    r"|\bcast_unrecoverable\b"              # S33 B2: retired rollback-gate verdict
+    r"|\bpost_audit_failed\b"               # S33 B2: retired rollback-gate verdict
+    # S33 B4 (2026-05-15): pipeline-cutting phantom handlers retired
+    # per B1.5 classification.
+    r"|\bapply_phantom_skip_fallback\b"     # S33 B4: pipeline-cut mute helper
+    r"|\b_final_phantom_check\b"            # S33 B4: report-only helper
+    # S33 B5 (2026-05-15): polish design lock. The two prompts must
+    # stay split (character vs announcer). Lock against accidental
+    # collapse into a unified prompt under any common bad name.
+    r"|\b_POLISH_SYSTEM_PROMPT_UNIFIED\b"   # S33 B5: unify-attempt name #1
+    r"|\b_UNIFIED_POLISH_PROMPT\b"          # S33 B5: unify-attempt name #2
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")

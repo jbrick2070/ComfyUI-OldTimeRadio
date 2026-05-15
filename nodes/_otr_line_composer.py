@@ -1056,7 +1056,25 @@ def needs_polish(line: str) -> bool:
     return any(rx.search(line) for rx in _NARRATION_LEAK_REGEXES)
 
 
-_POLISH_SYSTEM_PROMPT = """\
+# S33 B5 design lock -- DO NOT collapse these into a single prompt.
+# Character and announcer beats need DIFFERENT polish prompts:
+#   - Character beats: forbid narration (it's a leak)
+#   - Announcer beats: allow narration (it IS the announcer voice)
+# A unified prompt regresses one or the other:
+#   - Forbids narration -> breaks announcer (rewrites the third-person
+#     narration that IS the announcer style)
+#   - Allows narration -> breaks character (no longer catches the
+#     narration leaks polish exists to catch)
+# polish_line dispatches by speaker_role to pick the right prompt
+# at runtime. Original design intent: LFC sprint commit 3 section
+# 6.1 (2026-05-11). Forbidden-sweep markers lock obvious bad names;
+# behavior tests at S33 B5 lock the semantics.
+#
+# S33 B5 rename (2026-05-15): `_POLISH_SYSTEM_PROMPT` (the historical
+# character-only name) -> `_POLISH_SYSTEM_PROMPT_CHARACTER` to match
+# the symmetric `_POLISH_SYSTEM_PROMPT_ANNOUNCER`. Behavior-preserving
+# -- only the variable name changes; prompt content is identical.
+_POLISH_SYSTEM_PROMPT_CHARACTER = """\
 You are a script editor cleaning one line of radio drama dialogue.
 The line below leaked narration or stage direction. Rewrite it as
 pure spoken dialogue.
@@ -1216,11 +1234,14 @@ def polish_line(
         return leaked_line
 
     # section 6.1: pick the system prompt based on speaker_role.
+    # S33 B5 (2026-05-15): renamed `_POLISH_SYSTEM_PROMPT` ->
+    # `_POLISH_SYSTEM_PROMPT_CHARACTER` for symmetric naming with
+    # `_POLISH_SYSTEM_PROMPT_ANNOUNCER`. Behavior-preserving.
     is_announcer = (speaker_role or "").strip().lower() == "announcer"
     system_prompt = (
         _POLISH_SYSTEM_PROMPT_ANNOUNCER
         if is_announcer
-        else _POLISH_SYSTEM_PROMPT
+        else _POLISH_SYSTEM_PROMPT_CHARACTER
     )
 
     # section 6.3: extended user prompt body with beat intent + recent

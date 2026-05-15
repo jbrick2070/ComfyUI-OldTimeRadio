@@ -20,7 +20,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes._otr_line_composer import (  # noqa: E402
-    _POLISH_SYSTEM_PROMPT,
+    _POLISH_SYSTEM_PROMPT_CHARACTER,
     _POLISH_SYSTEM_PROMPT_ANNOUNCER,
     is_polish_refusal,
     polish_line,
@@ -35,13 +35,13 @@ from nodes._otr_line_composer import (  # noqa: E402
 class TestAnnouncerGuard:
     def test_announcer_prompt_distinct_from_character_prompt(self):
         assert (
-            _POLISH_SYSTEM_PROMPT_ANNOUNCER != _POLISH_SYSTEM_PROMPT
+            _POLISH_SYSTEM_PROMPT_ANNOUNCER != _POLISH_SYSTEM_PROMPT_CHARACTER
         )
 
     def test_character_prompt_forbids_narration(self):
         # Character path must keep the strict "no narration of any
         # kind" line from the existing prompt.
-        assert "narration of any kind" in _POLISH_SYSTEM_PROMPT
+        assert "narration of any kind" in _POLISH_SYSTEM_PROMPT_CHARACTER
 
     def test_announcer_prompt_allows_narration(self):
         # Announcer path explicitly allows third-person narration.
@@ -86,7 +86,7 @@ class TestAnnouncerGuard:
             speaker_voice_card="ALICE",
             speaker_role="character", polish_generate_fn=capture,
         )
-        assert seen["system"] == _POLISH_SYSTEM_PROMPT
+        assert seen["system"] == _POLISH_SYSTEM_PROMPT_CHARACTER
 
     def test_polish_line_default_role_is_character(self):
         # Back-compat: pre-fix callers that didn't pass speaker_role
@@ -100,7 +100,7 @@ class TestAnnouncerGuard:
             return "Hello there."
 
         polish_line(capture, "x", "ALICE", polish_generate_fn=capture)
-        assert seen["system"] == _POLISH_SYSTEM_PROMPT
+        assert seen["system"] == _POLISH_SYSTEM_PROMPT_CHARACTER
 
     def test_announcer_role_label_in_user_prompt(self):
         seen = {"user": None}
