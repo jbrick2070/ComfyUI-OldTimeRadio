@@ -84,9 +84,11 @@ After the LLM call, validate. Reject if any of:
 
 ### 3.5 Repair pass before failure
 
-If validation rejects, run one cheap repair prompt before giving up:
+If validation rejects, run ONE repair pass at a higher temperature with an explicit critical-failure prefix:
 
 ```text
+CRITICAL: You previously failed validation because: {rejection_reasons_list}.
+
 Rewrite this visual brief to obey the schema. Remove named characters,
 dialogue verbs, plot actions, unsupported dates or locations, extra
 sentences, quotation marks, and Markdown. Return only the JSON object.
@@ -95,19 +97,27 @@ Failed brief: {failed_output}
 Rejection reasons: {validation_errors}
 ```
 
+The repair pass runs at `repair_temperature = min(reflection_temperature + 0.15, 0.55)`. Effective range 0.35-0.55. The clamp keeps repair temperature inside the declared safe range even if a future operator sets `reflection_temperature` above 0.4.
+
+The temperature bump together with the explicit `CRITICAL:` prefix break the deterministic-retry failure loop characteristic of low-temperature local-model JSON output: at temp 0.2-0.4 a literal repeat of the same prompt produces nearly identical output, so the second pass would just fail the same way. The bump introduces enough variance to escape the local minimum; the prefix re-orients the model toward the actual rejection reason rather than re-generating the failed shape.
+
 Validate the repair output. If it also fails, fall through to the empty-string-with-status path (§4.1).
 
-### 3.6 Hard synchronization barrier on timeout
+> **C0b amendment (2026-05-15):** prior text specified a single repair attempt at the same temperature with no critical prefix. Round-robin-2 finding R-06 surfaced the deterministic-retry-loop class. Sprint C E-18 / RR-B5 added the upper-bound clamp at 0.55. See `SPRINT.md` §1.3 R-06 and §1.2 E-18 for full disposition.
 
-The current `_run_with_timeout` in `story_orchestrator.py` abandons worker threads on stall. Under 16 GB the orphan keeps VRAM and continues GPU work; the next node (FreezeCascade → FLUX or LTX) hits OOM.
+### 3.6 Reflection-pass timeout contract (BUG-LOCAL-228)
 
-The reflection pass adds a second LLM call (and repair adds a third potential timeout point), so the orphan-thread risk multiplies. New requirement:
+The current `_run_with_timeout` in `story_orchestrator.py` is non-blocking by design: `executor.shutdown(wait=False)` lets the orphan worker drain naturally rather than blocking the calling thread. The reflection pass MUST follow the same contract.
 
-- Reflection pass MUST clear before the workflow advances. No "drain in the background."
-- On `_LLMTimeout`: cancel the future, force GPU sync, empty cache, verify VRAM headroom before yielding.
-- If the orphan can't be reclaimed deterministically, fall through to empty-string-with-status — but the next node must not start until VRAM is provably free.
+Required behavior on `_LLMTimeout`:
 
-This is non-negotiable on the 16 GB envelope. Detail in §11.4.
+- **Do not block.** No `future.cancel()`, no `torch.cuda.synchronize()`, no busy-wait for the orphan worker to drain.
+- **Invalidate cache dict references** via `_otr_loader_mod.invalidate_cache_no_gpu_teardown()` so the next `request_slot` forces a fresh load when GPU work eventually completes.
+- **Raise `_LLMTimeoutWorkflowPause`** to halt the ComfyUI queue; the operator decides whether to retry or abandon. The orphan worker drains naturally in the background; the next request_slot finds an invalidated cache and reloads cleanly.
+
+This is the BUG-LOCAL-228 contract, shipped in S31 B4 (`a4fe67a`). See `nodes/story_orchestrator.py:336-372` for the canonical implementation. A blocking sync barrier — once attempted — proved unsafe under stalled GPU forward passes that cannot be terminated: `future.cancel()` returns immediately but the kernel continues executing, and a subsequent `cuda.synchronize()` blocks the main thread indefinitely waiting for that uncancellable kernel. Detail in §11.4.
+
+> **C0b amendment (2026-05-15):** prior text specified "Reflection pass MUST clear before the workflow advances. No drain in the background. On `_LLMTimeout`: cancel the future, force GPU sync, empty cache, verify VRAM headroom before yielding." That is the exact anti-pattern BUG-LOCAL-228 was filed against. Sprint C L-3 amends the spec to the BUG-LOCAL-228 contract. See `SPRINT.md` §1.1 L-3 and §A.8 for evidence.
 
 ---
 
@@ -299,34 +309,34 @@ Current threshold was tuned for desktop cards reporting a clean 16 GB. Laptop GP
 
 16K context with unquantized KV caching consumes an additional 2–3 GB dynamically as the prompt fills. The §2 capped input builder produces ~1500-token reflection inputs; 8K is comfortable headroom (5× typical fill) without paying the 16K KV-cache tax. Match Nemo's and Qwen's caps for predictable VRAM budgets across models.
 
-### 11.4 Orphan-thread hard sync barrier on timeout
+### 11.4 Reflection-pass timeout contract (BUG-LOCAL-228)
 
-**Change in:** `story_orchestrator.py` `_run_with_timeout` and every caller.
+**Change in:** none — `_run_with_timeout` already follows the correct contract as of S31 B4 (`a4fe67a`).
 
-Current behavior on `_LLMTimeout`: `executor.shutdown(wait=False)` — worker thread abandoned, continues calculating on the GPU. Cache invalidated for next phase, but VRAM not reclaimed.
-
-Required behavior:
+The current behavior on `_LLMTimeout` IS the correct behavior:
 
 ```python
-def _run_with_timeout(fn, args, timeout_s, ...):
-    future = _executor.submit(fn, *args)
-    try:
-        return future.result(timeout=timeout_s)
-    except FuturesTimeoutError:
-        # Hard sync barrier — block until GPU work drains.
-        future.cancel()
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
-        gc.collect()
-        # Verify VRAM is provably free before returning control.
-        free_gb = torch.cuda.mem_get_info()[0] / (1024**3)
-        if free_gb < REQUIRED_HEADROOM_GB:
-            log.error(f"[Timeout] VRAM not reclaimed: {free_gb:.1f} GB free")
-            raise _LLMTimeout("GPU did not drain after timeout")
-        raise _LLMTimeout(...)
+# nodes/story_orchestrator.py:336-372 (abbreviated)
+except FuturesTimeout:
+    # orphan worker still running GPU forward pass; cannot kill
+    # invalidate cache dict references WITHOUT touching GPU
+    _otr_loader_mod.invalidate_cache_no_gpu_teardown()
+    # raise workflow-pause subclass so ComfyUI halts the queue
+    raise _LLMTimeoutWorkflowPause(...)
+finally:
+    # Do not wait for the orphaned worker -- let it drain in the background.
+    executor.shutdown(wait=False)
 ```
 
-Non-negotiable on the 16 GB envelope. Worst case path is three LLM calls (writer composition → reflection → repair pass) — three potential timeout-orphan opportunities, three OOM risks for the next visual node. The reflection pass cannot ship without this discipline.
+The reflection pass inherits this contract by reusing `_run_with_timeout` on its `technical_fn` calls (writer composition → reflection → repair). Three potential timeout points, all governed by the same non-blocking pattern. VRAM is reclaimed when the orphan worker finishes its forward pass and Python garbage-collects the cache entry that was invalidated above. The next workflow run starts from a clean cache.
+
+A blocking hard sync barrier was once specified here and was an anti-pattern: GPU forward passes cannot be terminated mid-kernel. `future.cancel()` returns immediately but the kernel continues executing; a subsequent `torch.cuda.synchronize()` blocks the main thread indefinitely waiting for that uncancellable kernel; ComfyUI's queue stalls; the operator sees a frozen UI with no way to recover. The non-blocking contract above lets the queue advance to a recoverable state (the workflow-pause exception) while the GPU work drains naturally in the background.
+
+Non-negotiable on the 16 GB envelope. The reflection pass cannot ship with a blocking barrier.
+
+> **C0b amendment (2026-05-15):** prior text specified a blocking hard-sync-barrier with `future.cancel()` + `torch.cuda.synchronize()` + `torch.cuda.empty_cache()` + a VRAM-headroom verification check. That implementation was prototyped, was the root cause of indefinite UI freezes, and was reverted. Sprint C L-3 amends the spec to match the shipped BUG-LOCAL-228 contract. See `SPRINT.md` §1.1 L-3 and §A.8.
+
+> **Forensic footnote (BUG-LOCAL-228):** filed against the original `future.cancel()` + `cuda.synchronize()` implementation. Symptom: indefinite UI freeze on LLM timeout; `cuda.synchronize()` would never return because the orphan kernel was uninterruptible. Fix: S31 B4 commit `a4fe67a` switched to `executor.shutdown(wait=False)` + `invalidate_cache_no_gpu_teardown()` + `_LLMTimeoutWorkflowPause` raise. Implementation lives at `nodes/story_orchestrator.py:336-372`.
 
 ### 11.5 LTX budget reflects VRAM pressure (cross-reference §6.1)
 
@@ -357,7 +367,7 @@ The following Cowork R1 open questions are resolved:
 
 Still open for one focused round-robin before build:
 
-- **6.2 reflection pass position** — inside `OTR_LedgerScriptWriter.execute()` vs new `OTR_StoryBriefReflection` node. The §11.4 hard-sync-barrier requirement applies either way; this question is about where the call site lives.
+- **6.2 reflection pass position** — inside `OTR_LedgerScriptWriter.execute()` vs new `OTR_StoryBriefReflection` node. The §11.4 BUG-LOCAL-228 timeout contract applies either way; this question is about where the call site lives. (Resolved by Sprint C Q1 lock to K.5.5 — see `SPRINT.md` §3.)
 
 ---
 
