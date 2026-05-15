@@ -1490,13 +1490,25 @@ def _llm_rank_news_candidates(
             # but passes the validator. The ranking output is just a
             # comma-separated list of indices so any low-temp value
             # produces stable picks.
-            return _generate_with_llm(
-                prompt,
-                model_id=model_id,
-                max_new_tokens=64,
+            #
+            # S31 B3: routed through the canonical
+            # `request_slot("technical", ...) + make_generate_fn` surface
+            # per Hard rule #5 -- the legacy `_generate_with_llm`
+            # wrapper is deleted at S31 B4.
+            #
+            # LLM slot: technical -- structured short-output ranking
+            # task. Caller composes the chat message; make_generate_fn
+            # bakes top_p=0.92 (RSS caller used top_p=1.0 with the
+            # legacy wrapper; the canonical surface does not expose
+            # per-call top_p override -- the slight delta is acceptable
+            # for a stochastic-argmax ranker at temperature=0.05).
+            from . import _otr_model_loader as _OTRML
+            cache_entry = _OTRML.request_slot("technical", model_id)
+            gen_fn = _OTRML.make_generate_fn(cache_entry)
+            return gen_fn(
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.05,
-                top_p=1.0,
-                optimization_profile=optimization_profile,
+                max_new_tokens=64,
             )
         response = _run_with_timeout(
             _do_rank_call,
@@ -1587,13 +1599,18 @@ def _llm_rerank_with_bodies(
         def _do_rerank_call():
             # Same temperature=0.05 trick as headline rank: transformers
             # rejects 0.0; tiny positive value is effectively argmax.
-            return _generate_with_llm(
-                prompt,
-                model_id=model_id,
-                max_new_tokens=8,
+            #
+            # S31 B3: routed through canonical
+            # `request_slot("technical", ...) + make_generate_fn` per
+            # Hard rule #5. LLM slot: technical -- single-index body
+            # rerank.
+            from . import _otr_model_loader as _OTRML
+            cache_entry = _OTRML.request_slot("technical", model_id)
+            gen_fn = _OTRML.make_generate_fn(cache_entry)
+            return gen_fn(
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.05,
-                top_p=1.0,
-                optimization_profile=optimization_profile,
+                max_new_tokens=8,
             )
 
         response = _run_with_timeout(
@@ -2862,83 +2879,6 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         # -- Beat pause -----------------------------------------------
         if "(beat)" in line.lower():
             return  # beats are too frequent to log individually
-
-
-_LTX_STYLE_BRIEF_PROMPT = """You are writing a single-sentence VISUAL STYLE BRIEF for the broadcast equipment shown on screen during an audio drama. Describe ONLY the equipment / room aesthetic appropriate to this story's setting and style. NO people, NO characters, NO action -- just the look of the broadcasting equipment and the room it sits in.
-
-Story style: {style}
-Story snippet: {story_snippet}
-
-Output ONE sentence (20-40 words) describing the broadcast equipment and its room. The sentence should:
-- Match the story's setting (extract from the snippet: lunar base, deep-space vessel, seabase, mars colony, orbital station, near-future newsroom, industrial-decay site, whatever fits)
-- Use equipment design language that fits the setting AND style -- do not default to any specific era's hardware unless the story explicitly implies it
-- Include lighting and atmosphere cues that fit the style
-- NOT mention people, hands, faces, voices, or anyone speaking
-- Be ONE sentence with no preamble
-
-Examples (one near-future newsroom, one deep-space vessel, one industrial decay -- spanning the style range so no single hardware era dominates):
-- Near-future newsroom broadcast desk, edge-lit glass console with floating waveform overlays, cool overhead daylight, condensation rings on a steel coffee cup, hum of HVAC.
-- Deep-space science vessel comms console, holographic dial readouts, recycled-atmosphere haze, speaker grille mounted into a curved bulkhead, magnetic dust drifting through volumetric beams.
-- Rust-belt repurposed factory broadcast loft, scavenged industrial speaker bolted to a corroded I-beam, sodium-vapor work lamps, oil-stained concrete floor, occasional sparks from exposed wiring.
-
-Visual brief:"""
-
-
-def _generate_ltx_style_brief(style, story_snippet, model_id, optimization_profile):
-    """Generate a per-episode LTX style brief that flavors the radio
-    broadcast set to match the story's sci-fi setting.
-
-    Returns a cleaned single-sentence string (max ~300 chars) suitable
-    for prepending to ``_PROMPT_BY_ROLE`` templates in ``batch_ltx_render``.
-    Returns empty string on any failure -- caller treats empty as
-    "fall back to the role template alone".
-
-    Cost: one short LLM call (~80 tokens output) on the already-loaded
-    Mistral-Nemo. Adds ~5-10s to the LLM phase per episode. Non-fatal
-    on any error.
-
-    BUG-LOCAL-008 alignment: prompt explicitly forbids people / hands /
-    faces in the brief, since the brief gets passed to LTX which (at
-    CFG=1.0) only honors positive prompt content.
-    """
-    prompt = _LTX_STYLE_BRIEF_PROMPT.format(
-        style=(style or "sci-fi").strip()[:80],
-        story_snippet=(story_snippet or "").strip()[:500],
-    )
-    try:
-        raw = _generate_with_llm(
-            prompt,
-            model_id=model_id,
-            max_new_tokens=80,
-            temperature=0.7,
-            top_p=0.9,
-            optimization_profile=optimization_profile,
-            live_ledger=False,
-        )
-    except Exception as exc:  # noqa: BLE001 -- non-fatal; caller falls back
-        log.warning("[LTXStyleBrief] generation failed: %s", exc)
-        return ""
-
-    if not raw:
-        return ""
-
-    # Cleanup: drop any leading "Visual brief:" / quotes / blank lines,
-    # take the first line, hard-cap length.
-    text = raw.strip()
-    for prefix in ("Visual brief:", "VISUAL BRIEF:", "Brief:", "BRIEF:"):
-        if text.startswith(prefix):
-            text = text[len(prefix):].strip()
-    text = text.strip().split("\n")[0].strip()
-    text = text.strip('"').strip("'").strip()
-    # Strip trailing example-list bullets if model echoed them
-    if text.startswith("- "):
-        text = text[2:].strip()
-    # Hard cap so it can't overwhelm the role-template prompt
-    if len(text) > 300:
-        text = text[:300].rsplit(".", 1)[0].strip()
-        if text and not text.endswith("."):
-            text = text + "."
-    return text
 
 
 def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
