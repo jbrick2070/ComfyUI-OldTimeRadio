@@ -95,7 +95,11 @@ def patched_bark_env(tmp_path):
     ), patch(
         "nodes._otr_bark_lib._load_bark", side_effect=_fake_load_bark,
     ), patch(
-        "nodes.story_orchestrator._unload_llm", side_effect=_no_op,
+        # S31.5 B1: post-S31 B4 `story_orchestrator._unload_llm` was
+        # DELETED. The canonical teardown surface is now
+        # `_otr_model_loader.unload_llm`. Mock the new location.
+        # Bucket B in the BUG-LOCAL-227 triage classification.
+        "nodes._otr_model_loader.unload_llm", side_effect=_no_op,
     ), patch(
         "nodes._otr_ledger.in_flight_ledger_path",
         side_effect=_fake_in_flight_path,

@@ -151,7 +151,7 @@ class TestNewsUsedPassthroughParsedEquality:
                     script_json="{}",
                     news_used=incoming_news_used,
                     estimated_minutes=15,
-                    model_id="mistralai/Mistral-Nemo-Instruct-2407",
+                    technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                 )
             finally:
                 _sys.modules["nodes._otr_model_loader"] = saved_loader

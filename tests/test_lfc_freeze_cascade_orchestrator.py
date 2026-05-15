@@ -362,10 +362,15 @@ class TestNodeOutputContract:
             importlib.import_module("nodes.OTR_LedgerScriptReviewer")
 
     def test_class_input_types_schema(self):
+        # S31.5 B1 refactor: post-S30 B3 the cascade's `model_id`
+        # widget was renamed to `technical_model` (input socket from
+        # the writer's broadcast). Update the assertion to match the
+        # current schema. Bucket B in the BUG-LOCAL-227 triage
+        # classification.
         from nodes.OTR_LedgerFreezeCascade import OTR_LedgerFreezeCascade
         schema = OTR_LedgerFreezeCascade.INPUT_TYPES()
         assert "script_text" in schema["required"]
-        assert "model_id" in schema["optional"]
+        assert "technical_model" in schema["optional"]
         assert "script_json" in schema["optional"]
         # All four passthrough sockets keep forceInput=True so the
         # graph wires them by link, not by widget value.

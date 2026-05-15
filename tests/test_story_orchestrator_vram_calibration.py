@@ -15,9 +15,15 @@ import pathlib
 import pytest
 
 
+# S31.5 B1 refactor: S31 B2 ported the `_MODEL_CONTEXT_CAPS` dict and
+# `>= 14.5 GiB` flagship-sovereignty threshold from
+# `nodes/story_orchestrator.py` to `nodes/_otr_model_loader.py`
+# (canonical LLM loader home post-S31 B2). Update the source target
+# so the S21.1/S21.2 drift guards still pin the same patterns.
+# Bucket B in the BUG-LOCAL-227 triage classification.
 _ORCH_SRC = (
     pathlib.Path(__file__).resolve().parent.parent
-    / "nodes" / "story_orchestrator.py"
+    / "nodes" / "_otr_model_loader.py"
 ).read_text(encoding="utf-8")
 
 

@@ -77,16 +77,13 @@ class TestW4WriterBuildsDedicatedPolishFn:
             f"compose_line calls, {threaded_count} threaded)"
         )
 
-    def test_polish_fallback_to_none_preserves_back_compat(self):
-        # When the factory raises, the writer must set
-        # polish_generate_fn = None so compose_line falls back to
-        # generate_fn (pre-W4 behaviour). This preserves
-        # functionality on older builds where
-        # make_polish_generate_fn isn't yet exported.
-        assert "polish_generate_fn = None" in _FLAT, (
-            "W4 fix: fallback path must set polish_generate_fn=None "
-            "so compose_line's back-compat path engages"
-        )
+    # S31.5 B1: `test_polish_fallback_to_none_preserves_back_compat`
+    # was DELETED. Pre-S31.5 it asserted that on factory failure the
+    # writer set `polish_generate_fn = None` "so compose_line's
+    # back-compat path engages". That contract directly violates
+    # CLAUDE.md standing rule "no legacy back-compat" -- post-S28
+    # the v2.0 codebase doesn't carry compat paths for older builds.
+    # Bucket A in the BUG-LOCAL-227 triage classification.
 
 
 class TestW4ComposeLineSurfaceUnchanged:

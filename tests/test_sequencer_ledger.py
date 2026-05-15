@@ -70,7 +70,11 @@ def patched_sequencer_env(tmp_path):
         return np.zeros(12000, dtype=np.float32), 24000
 
     with patch(
-        "nodes.story_orchestrator._unload_llm", side_effect=_no_op,
+        # S31.5 B1: post-S31 B4 `story_orchestrator._unload_llm` was
+        # DELETED. Canonical teardown is now
+        # `_otr_model_loader.unload_llm`. Bucket B in the
+        # BUG-LOCAL-227 triage classification.
+        "nodes._otr_model_loader.unload_llm", side_effect=_no_op,
     ), patch(
         "nodes.scene_sequencer._runtime_log", side_effect=_no_op,
     ), patch(

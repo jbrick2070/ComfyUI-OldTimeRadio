@@ -127,6 +127,7 @@ class TestB1UnloadInFinally:
                     inst.run(
                         script_text="x", script_json="{}",
                         news_used="", estimated_minutes=15,
+ technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                     )
 
         # The B1 invariant: unload ran in the finally block before
@@ -156,6 +157,7 @@ class TestB1UnloadInFinally:
                 inst.run(
                     script_text="x", script_json="{}",
                     news_used="", estimated_minutes=15,
+ technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                 )
 
         assert ctx.led.data["meta"].get("freeze_unload_ok") is True
@@ -180,6 +182,7 @@ class TestB1UnloadInFinally:
                 result = inst.run(
                     script_text="x", script_json="{}",
                     news_used="", estimated_minutes=15,
+ technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                 )
 
         # Unload attempted (raised) -- count is 1.
@@ -218,6 +221,7 @@ class TestB1UnloadInFinally:
                 inst.run(
                     script_text="x", script_json="{}",
                     news_used="", estimated_minutes=15,
+ technical_model="mistralai/Mistral-Nemo-Instruct-2407",
                 )
 
         assert ctx.unload_mock.call_count == 1
