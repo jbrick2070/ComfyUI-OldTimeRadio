@@ -780,12 +780,18 @@ def run_script_doctor(
 ) -> ScriptDoctorReport:
     """One LLM call. Returns ScriptDoctorReport.
 
-    On any LLM / JSON / schema failure, returns a clean report with
-    overall_verdict="clean" so the caller commits the post-repair
-    candidate without further edits. This is fail-soft on the doctor.
-    (S33 B3 + B4 retired Pass 3 post-audit and Step 2.5 phantom-skip
-    fallback per the refined no-auditors rule; the doctor is now the
-    final structural pass.)
+    On LLM / JSON / schema failure, returns a report with
+    overall_verdict="needs_full_rerun" so the caller can branch
+    on the failure (cascade routes to needs_full_rerun verdict;
+    caller decides whether to retry the writer or surface the
+    failure loud).
+
+    S33 B3 + B4 retired Pass 3 post-audit and Step 2.5 phantom-
+    skip fallback. The doctor IS the final structural pass; it
+    must therefore fail loud with needs_full_rerun so downstream
+    commits don't ship corrupted candidates. S34 B1 corrected the
+    prior fail-soft behavior that S33 had assumed was already
+    loud (which it wasn't).
     """
     # Wiring-review #7 / #9 (2026-05-11): prefer canonical
     # meta.allowed_roster (cast + ANNOUNCER + key_terms). Fallback
@@ -817,29 +823,34 @@ def run_script_doctor(
             max_new_tokens=_DOCTOR_MAX_NEW_TOKENS,
         )
     except Exception as exc:  # noqa: BLE001
+        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
+        # Phase 1 already does this via _audit_failed_sentinel;
+        # Phase 2 (this function) now matches.
         log.warning(
             "[OTR_LedgerReviewer:doctor] generate_fn raised: %s; "
-            "returning clean no-op report", exc,
+            "returning needs_full_rerun report", exc,
         )
-        return ScriptDoctorReport()
+        return ScriptDoctorReport(overall_verdict="needs_full_rerun")
     json_str = _extract_json_block(raw or "")
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError as exc:
+        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
         log.warning(
             "[OTR_LedgerReviewer:doctor] JSON parse failed (%s); "
-            "raw=%r; returning clean no-op report",
+            "raw=%r; returning needs_full_rerun report",
             exc, (raw or "")[:200],
         )
-        return ScriptDoctorReport()
+        return ScriptDoctorReport(overall_verdict="needs_full_rerun")
     try:
         report = ScriptDoctorReport.model_validate(data)
     except ValidationError as exc:
+        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
         log.warning(
             "[OTR_LedgerReviewer:doctor] schema validation failed (%s); "
-            "returning clean no-op report", exc,
+            "returning needs_full_rerun report", exc,
         )
-        return ScriptDoctorReport()
+        return ScriptDoctorReport(overall_verdict="needs_full_rerun")
     return report
 
 
