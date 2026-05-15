@@ -148,9 +148,13 @@ def test_pick_style_internally_uses_creative_fn_default():
 
 
 def test_lock_cast_internally_uses_creative_fn_default():
-    """At B1, lock_cast routes generation through creative_fn.
-    technical_fn is accepted but unused; B3 will flip schema
-    validation to technical_fn (fail-fast per D2)."""
+    """lock_cast generation (fresh attempts) routes through
+    creative_fn. After S32 B3, the repair attempt flips to
+    technical_fn (D2 schema-validation slot, single-attempt
+    fail-fast). This test asserts ONLY that creative_fn carries
+    the generation -- the B3-specific routing assertions live in
+    `tests/test_lock_cast_routing.py`.
+    """
     from nodes import _otr_casting as cast
 
     creative_calls: list[dict] = []
@@ -158,13 +162,11 @@ def test_lock_cast_internally_uses_creative_fn_default():
 
     def creative_fn(messages, *, temperature, max_new_tokens):
         creative_calls.append({"temperature": temperature})
-        # Return malformed so the cast fails fast without needing the
-        # full validator -- but we only care about who got called.
         return "not-valid-json"
 
     def technical_fn(messages, *, temperature, max_new_tokens):
         technical_calls.append({"temperature": temperature})
-        return "should_not_be_called"
+        return "not-valid-json"
 
     try:
         cast.lock_cast(
@@ -174,16 +176,20 @@ def test_lock_cast_internally_uses_creative_fn_default():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # Single attempt only -- skips the B3 repair branch so
+            # this test stays focused on creative-slot generation.
+            max_attempts_per_call=1,
         )
     except Exception:
         # Casting will fail validation; we only test routing.
         pass
 
     assert len(creative_calls) >= 1, (
-        "creative_fn must be called at least once at B1"
+        "creative_fn must be called at least once for generation"
     )
     assert len(technical_calls) == 0, (
-        f"technical_fn must NOT be called at B1; got "
+        f"With max_attempts_per_call=1 the B3 repair branch is "
+        f"never reached, so technical_fn should not fire; got "
         f"{len(technical_calls)} call(s)."
     )
 

@@ -129,6 +129,20 @@ class CastingFailedError(RuntimeError):
         )
 
 
+class CastValidationLLMError(CastingFailedError):
+    """S32 B3 (D2) -- schema-validation (repair) pass failed.
+
+    The repair attempt routes to the technical slot (single attempt,
+    fail-fast, no internal retry). When the technical-slot output
+    fails validation, this exception fires instead of the generic
+    `CastingFailedError`. Subclass so existing handlers catching the
+    base class still match; new handlers can branch on this specific
+    type to trigger writer-side creative regen rather than a hard
+    failure.
+    """
+    pass
+
+
 # ---------------------------------------------------------------------------
 # JSON extraction (cross-model normalizer)
 # ---------------------------------------------------------------------------
@@ -283,6 +297,7 @@ def cast_one_character(
     base_temperature: float = 0.7,
     max_new_tokens: int = 250,
     casting_brief: str = "",
+    validation_fn: Optional[Callable[..., str]] = None,
 ) -> CastingResponse:
     """Cast one open character. Returns a validated CastingResponse.
 
@@ -357,8 +372,15 @@ def cast_one_character(
             messages = [{"role": "user", "content": user_prompt}]
             temperature = base_temperature + (0.1 * attempt_idx)
 
+        # S32 B3 (D2): repair attempt routes to `validation_fn`
+        # (technical slot) when provided. Generation attempts
+        # 1..N-1 stay on `generate_fn` (creative slot). When
+        # validation_fn is unset (None), repair falls back to
+        # generate_fn -- preserves the legacy single-fn contract
+        # for any direct caller.
+        active_fn = validation_fn if (is_repair and validation_fn is not None) else generate_fn
         try:
-            raw = generate_fn(
+            raw = active_fn(
                 messages,
                 temperature=float(temperature),
                 max_new_tokens=int(max_new_tokens),
@@ -535,9 +557,11 @@ def lock_cast(
     meta dict has: lemmy_hit, casting_attempts (list of attempt
     counts per open slot, for telemetry).
     """
-    # S32 B1: alias `generate_fn` for the existing body. Generation
-    # routes through creative_fn at B1; B3 flips schema validation to
-    # technical_fn with fail-fast CastValidationLLMError (D2).
+    # S32 B3 (D2): generation runs through creative_fn; schema-
+    # validation repair attempt routes to technical_fn (single
+    # attempt, fail-fast). The body alias `generate_fn` keeps the
+    # call sites readable; `validation_fn` is threaded into
+    # `cast_one_character` as the dedicated repair-slot callable.
     generate_fn = creative_fn
 
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
@@ -596,16 +620,38 @@ def lock_cast(
                 name=slot.name,
             )
 
-        response = cast_one_character(
-            generate_fn,
-            name=slot.name,
-            news_seed=news_seed,
-            style=style,
-            prior_cast=prior_cast_for_llm,
-            available_voices=available_voices,
-            max_attempts=max_attempts_per_call,
-            casting_brief=casting_brief,
-        )
+        try:
+            response = cast_one_character(
+                generate_fn,
+                name=slot.name,
+                news_seed=news_seed,
+                style=style,
+                prior_cast=prior_cast_for_llm,
+                available_voices=available_voices,
+                max_attempts=max_attempts_per_call,
+                casting_brief=casting_brief,
+                validation_fn=technical_fn,
+            )
+        except CastingFailedError as exc:
+            # S32 B3 (D2): if the failure came from the repair-attempt
+            # (technical-slot validation pass), surface it as a
+            # CastValidationLLMError so the writer-side caller can
+            # branch on the more-specific subclass and trigger creative
+            # regen rather than a hard fail. The signal is structural:
+            # the last attempt in `exc.attempts` corresponds to the
+            # repair call when max_attempts_per_call >= 2. Subclass
+            # remains catchable as CastingFailedError for legacy
+            # handlers.
+            attempts_count = len(getattr(exc, "attempts", []) or [])
+            if (
+                max_attempts_per_call >= 2
+                and attempts_count == max_attempts_per_call
+            ):
+                raise CastValidationLLMError(
+                    attempts=exc.attempts,
+                    name=exc.name,
+                ) from exc
+            raise
         new_row = {
             "char_id":               slot.char_id,
             "name":                  slot.name,
