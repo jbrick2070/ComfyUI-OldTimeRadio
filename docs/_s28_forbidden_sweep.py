@@ -80,6 +80,12 @@ forbidden = re.compile(
     # reintroduction paths.
     r"|\bgenerate_text\b"                   # S31 B5: preemptive lock on Hard rule #5
     r"|\bgenerate_with_llm\b"               # S31 B5: preemptive lock (no-underscore variant)
+    # S31.5 B3 (2026-05-14): wrapper eliminated when the
+    # `register_vram_cleanup` contract audit confirmed the caller
+    # already wraps each callback in try/except. Adding the marker
+    # locks against reintroduction even though the wrapper name is
+    # specific enough that accidental restoration is unlikely.
+    r"|\b_vram_cleanup_via_loader\b"        # S31.5 B3: eliminated wrapper
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
