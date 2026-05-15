@@ -133,6 +133,11 @@ class StylePick(BaseModel):
     pass1_attempts: int = Field(..., ge=1, le=len(_INVENTOR_TEMPERATURES))
     pass1_duration_ms: int = Field(..., ge=0)
     pass2_duration_ms: int = Field(..., ge=0)
+    # S32 B2: per-sub-pass slot stamps. Forensic-only; downstream
+    # consumers can audit which slot ran which pass without re-
+    # deriving from the writer's slot scheduler.
+    pass1_slot: str = Field(default="creative")
+    pass2_slot: str = Field(default="technical")
 
     @field_validator("chosen")
     @classmethod
@@ -587,10 +592,6 @@ def pick_style(
         StyleGenerationFailedError on any failure path. Caller does
         NOT catch (per Jeffrey 2026-05-10 fail-loud policy).
     """
-    # S32 B1: alias `generate_fn` for the existing body. Both passes
-    # route through creative_fn at B1; B2 flips pass 2 to technical_fn.
-    generate_fn = creative_fn
-
     if not (article_text or "").strip():
         raise StyleGenerationFailedError(
             "article_text is empty at picker entry; upstream "
@@ -601,9 +602,15 @@ def pick_style(
     article_hash = _compute_article_hash(article_text)
     seed_sample = _sample_seeds(rng, list(seed_pool), _SEED_SAMPLE_SIZE)
 
+    # S32 B2: per-sub-pass routing landed.
+    # Pass 1 (inventor) -- creative slot. Style invention is a
+    #   narrative pass; routes to creative_fn.
+    # Pass 2 (chooser)  -- technical slot. Index/grammar-checked
+    #   chooser is a structured short-output pass; routes to
+    #   technical_fn (S32 routing table flip from S31).
     pass1_t0 = time.perf_counter()
     candidates, pass1_attempts = _run_inventor(
-        generate_fn,
+        creative_fn,
         article_excerpt=article_excerpt,
         seed_sample=seed_sample,
     )
@@ -611,7 +618,7 @@ def pick_style(
 
     pass2_t0 = time.perf_counter()
     chosen = _run_chooser(
-        generate_fn,
+        technical_fn,
         article_excerpt=article_excerpt,
         candidates=candidates,
     )
