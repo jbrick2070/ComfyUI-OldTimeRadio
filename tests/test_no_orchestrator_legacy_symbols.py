@@ -359,6 +359,32 @@ def test_unload_synchronize_guard_file_does_not_exist():
 
 
 # ---------------------------------------------------------------------------
+# S31.5 B3: `_vram_cleanup_via_loader` wrapper elimination (Outcome A)
+# ---------------------------------------------------------------------------
+
+
+def test_no_vram_cleanup_via_loader_wrapper():
+    """`story_orchestrator._vram_cleanup_via_loader` was a thin try/except
+    wrapper added at S31 B4 to satisfy `register_vram_cleanup`'s callback
+    contract. S31.5 B3 audited the contract:
+    `_vram_log.force_vram_offload` already wraps each registered
+    callback in `try/except: pass`, so a no-raise wrapper is NOT
+    required -- the contract is "no-arg callable" only. The wrapper
+    was eliminated; `_otr_model_loader.unload_llm` registers directly.
+    """
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_vram_cleanup_via_loader"), (
+        "`_vram_cleanup_via_loader` was eliminated at S31.5 B3 "
+        "(Outcome A). Reintroduction creates pure delegation "
+        "overhead -- the cleanup-callback contract does not require "
+        "a no-raise wrapper (see `_vram_log.force_vram_offload`). "
+        "If a future signature change forces the wrapper back, "
+        "document the requirement in the new function's docstring."
+    )
+
+
+# ---------------------------------------------------------------------------
 # B4 symbol-deletion guards: the 4 legacy symbols MUST NOT EXIST on
 # `story_orchestrator` at all post-S31 B4. Tripwires against re-introduction.
 # ---------------------------------------------------------------------------

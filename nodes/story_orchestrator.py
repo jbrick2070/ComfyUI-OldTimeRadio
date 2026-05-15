@@ -2496,29 +2496,20 @@ def _extract_all_dialogue(text):
 
 # Register the LLM unloader with the VRAM Power Wash system so that
 # force_vram_offload() at node entry points also evicts Gemma.
-# S31 B4: routed through the canonical `_otr_model_loader.unload_llm`
-# (the legacy `_unload_llm` was deleted in this commit alongside the
-# other 3 legacy LLM symbols). The cleanup callback takes no args
-# and never raises -- delegate plainly.
+# S31 B4: routed through canonical `_otr_model_loader.unload_llm`
+# (the legacy `_unload_llm` was deleted alongside the other 3 legacy
+# LLM symbols).
+# S31.5 B3 audit (Outcome A): `register_vram_cleanup`'s caller
+# (`force_vram_offload` in `_vram_log.py`) already wraps each
+# callback invocation in `try/except: pass`. The cleanup-callback
+# contract is "no-arg callable" only -- a no-raise wrapper is NOT
+# required. The B4 `_vram_cleanup_via_loader` wrapper was pure
+# delegation overhead and is ELIMINATED here. `unload_llm` is
+# passed directly.
 from ._vram_log import register_vram_cleanup
+from . import _otr_model_loader as _otr_loader_mod
 
-
-def _vram_cleanup_via_loader():
-    """Callable wrapper for register_vram_cleanup.
-
-    The loader's `unload_llm` is the canonical teardown surface
-    post-S31 B4. This thin wrapper isolates the cleanup-callback
-    contract (no args, no raise) from any future changes to the
-    loader's signature.
-    """
-    try:
-        from . import _otr_model_loader as _otr_loader_mod
-        _otr_loader_mod.unload_llm()
-    except Exception:  # noqa: BLE001 -- cleanup callbacks never raise
-        pass
-
-
-register_vram_cleanup(_vram_cleanup_via_loader)
+register_vram_cleanup(_otr_loader_mod.unload_llm)
 
 
 class GemmaHeartbeatStreamer(BaseStreamer):
