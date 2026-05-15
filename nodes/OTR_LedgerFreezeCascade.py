@@ -396,6 +396,25 @@ class OTR_LedgerFreezeCascade:
             except Exception:  # noqa: BLE001
                 pass
 
+        # S34 B2 (2026-05-15): reserialize led.data so the
+        # freeze_unload_ok stamp set in the finally block above is
+        # visible to downstream JSON consumers. The earlier
+        # serialization at L346 happened BEFORE the stamp; without
+        # this reserialization, the comment at L374 claiming "the
+        # next visual node can branch on the stamp" is false because
+        # the JSON they receive doesn't contain it.
+        try:
+            updated_script_json = json.dumps(
+                led.data, indent=2, ensure_ascii=False,
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[OTR_LedgerFreezeCascade] failed to reserialize "
+                "post-unload ledger to JSON (%s); freeze_unload_ok "
+                "stamp may not reach downstream consumers.", exc,
+            )
+            # Keep the pre-finally serialization as best-effort fallback.
+
         # Cascade body completed (any exception propagated out of
         # the try/finally above and ComfyUI rendered the node red,
         # which is the correct loud-failure convention -- the
