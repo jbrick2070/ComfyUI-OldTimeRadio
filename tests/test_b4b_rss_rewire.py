@@ -49,72 +49,63 @@ def _find_function(tree: ast.AST, name: str) -> ast.FunctionDef:
     raise RuntimeError(f"function {name!r} not found in {ORCH_PATH}")
 
 
-def test_generate_with_llm_uses_request_slot():
-    """`_generate_with_llm` body must call `request_slot(...)` and
-    must NOT call `_load_llm(...)` directly any more.
+def test_generate_with_llm_deleted_at_s31_b4():
+    """S30 B4b rewired `_generate_with_llm` to route through
+    `request_slot`. S31 B4 took the next step: `_generate_with_llm`
+    itself is DELETED (Hard rule #1A non-deferrable). The two RSS
+    callers (`_llm_rank_news_candidates`, `_llm_rerank_with_bodies`)
+    were refactored onto the canonical `request_slot +
+    make_generate_fn` surface at S31 B3, then `_generate_with_llm`
+    deleted at B4.
+
+    Original B4b assertion: AST scan that `_generate_with_llm`'s body
+    calls `request_slot(...)`. Post-S31 B4: the function doesn't
+    exist; assert deletion instead.
+    """
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_generate_with_llm"), (
+        "`_generate_with_llm` deleted at S31 B4. Canonical generate "
+        "surface is `_otr_model_loader.request_slot(slot, model_id) "
+        "+ make_generate_fn(cache_entry) + fn(messages=..., "
+        "temperature=..., max_new_tokens=...)`."
+    )
+
+
+def test_run_with_timeout_uses_safe_invalidation_post_s31_b4():
+    """S30 B4b assertion was: `_run_with_timeout` calls `unload_llm()`
+    on timeout recovery (replacing a manual `_LLM_CACHE` shuffle).
+    S31 B4 fix: that `unload_llm()` call CAUSED the cudaErrorIllegalAddress
+    race it claimed to avoid (BUG-LOCAL-228); replaced with the new
+    `invalidate_cache_no_gpu_teardown()` helper. This test renames
+    accordingly.
     """
     tree = _orch_tree()
-    func = _find_function(tree, "_generate_with_llm")
-    has_request_slot = False
-    legacy_load_calls: list[str] = []
+    func = _find_function(tree, "_run_with_timeout")
+    has_safe_helper = False
+    forbidden_unload_calls: list[str] = []
     for sub in ast.walk(func):
         if not isinstance(sub, ast.Call):
             continue
         fn = sub.func
-        if isinstance(fn, ast.Attribute) and fn.attr == "request_slot":
-            has_request_slot = True
-        elif isinstance(fn, ast.Name) and fn.id == "request_slot":
-            has_request_slot = True
-        elif isinstance(fn, ast.Name) and fn.id == "_load_llm":
-            legacy_load_calls.append(f"line {sub.lineno}")
-    assert has_request_slot, (
-        "_generate_with_llm must call request_slot(...) to acquire its "
-        "cache entry; no such call found"
+        attr = (
+            fn.attr if isinstance(fn, ast.Attribute)
+            else (fn.id if isinstance(fn, ast.Name) else None)
+        )
+        if attr == "invalidate_cache_no_gpu_teardown":
+            has_safe_helper = True
+        elif attr == "unload_llm":
+            forbidden_unload_calls.append(f"line {sub.lineno}")
+    assert has_safe_helper, (
+        "_run_with_timeout must call "
+        "invalidate_cache_no_gpu_teardown() on timeout recovery "
+        "(S31 B4 fix for BUG-LOCAL-228 CUDA race)."
     )
-    assert not legacy_load_calls, (
-        "_generate_with_llm must not call _load_llm(...) directly any "
-        "more (B4b rewire). Offenders:\n  " + "\n  ".join(legacy_load_calls)
-    )
-
-
-def test_run_with_timeout_uses_unload_llm():
-    """`_run_with_timeout` recovery path must call `unload_llm()` from
-    `_otr_model_loader`; the manual `_LLM_CACHE` shuffle is gone.
-    """
-    tree = _orch_tree()
-    func = _find_function(tree, "_run_with_timeout")
-    has_unload = False
-    manual_cache_assign: list[str] = []
-    for sub in ast.walk(func):
-        if isinstance(sub, ast.Call):
-            fn = sub.func
-            if (
-                isinstance(fn, ast.Attribute)
-                and fn.attr == "unload_llm"
-            ):
-                has_unload = True
-            elif isinstance(fn, ast.Name) and fn.id == "unload_llm":
-                has_unload = True
-        # The deleted block had statements like:
-        #   _LLM_CACHE["model"] = None
-        # Subscript assignment to Name(_LLM_CACHE) signals the legacy
-        # manual-shuffle pattern.
-        if (
-            isinstance(sub, ast.Assign)
-            and len(sub.targets) == 1
-            and isinstance(sub.targets[0], ast.Subscript)
-            and isinstance(sub.targets[0].value, ast.Name)
-            and sub.targets[0].value.id == "_LLM_CACHE"
-        ):
-            manual_cache_assign.append(f"line {sub.lineno}")
-    assert has_unload, (
-        "_run_with_timeout must call unload_llm() on timeout recovery "
-        "(B4b clean-break)"
-    )
-    assert not manual_cache_assign, (
-        "_run_with_timeout must not manually shuffle _LLM_CACHE keys "
-        "(B4b clean-break). Offenders:\n  "
-        + "\n  ".join(manual_cache_assign)
+    assert not forbidden_unload_calls, (
+        "_run_with_timeout must NOT call unload_llm() in any branch "
+        "post-S31 B4. The B4 fix replaced that call with the GPU-safe "
+        "invalidate_cache_no_gpu_teardown helper. See BUG-LOCAL-228."
+        " Offenders:\n  " + "\n  ".join(forbidden_unload_calls)
     )
 
 

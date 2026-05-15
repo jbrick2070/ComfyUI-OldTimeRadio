@@ -209,3 +209,59 @@ def test_no_external_caller_of_legacy_symbols():
             for p, hits in offenders.items()
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# B4 symbol-deletion guards: the 4 legacy symbols MUST NOT EXIST on
+# `story_orchestrator` at all post-S31 B4. Tripwires against re-introduction.
+# ---------------------------------------------------------------------------
+
+
+def test_orchestrator_no_load_llm_symbol():
+    """S31 B4 deletion guard: `_load_llm` removed from
+    `story_orchestrator`."""
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_load_llm"), (
+        "`_load_llm` deleted at S31 B4 (Hard rule #1A non-deferrable). "
+        "Re-introduction is forbidden -- file a new sprint plan if a "
+        "caller emerges. Canonical surface: "
+        "`_otr_model_loader.load_llm`."
+    )
+
+
+def test_orchestrator_no_unload_llm_symbol():
+    """S31 B4 deletion guard: `_unload_llm` removed."""
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_unload_llm"), (
+        "`_unload_llm` deleted at S31 B4. Canonical surface: "
+        "`_otr_model_loader.unload_llm` (or "
+        "`invalidate_cache_no_gpu_teardown` for timeout recovery "
+        "paths where GPU teardown is unsafe)."
+    )
+
+
+def test_orchestrator_no_llm_cache_symbol():
+    """S31 B4 deletion guard: module-level `_LLM_CACHE` dict
+    removed."""
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_LLM_CACHE"), (
+        "`_LLM_CACHE` module-level dict deleted at S31 B4. Canonical "
+        "cache surface: `_otr_model_loader.LLM_CACHE` (modern 3-key "
+        "shape: model_id / slot / cache_entry)."
+    )
+
+
+def test_orchestrator_no_generate_with_llm_symbol():
+    """S31 B4 deletion guard: `_generate_with_llm` legacy wrapper
+    removed."""
+    from nodes import story_orchestrator as _so
+
+    assert not hasattr(_so, "_generate_with_llm"), (
+        "`_generate_with_llm` deleted at S31 B4. Hard rule #5: ONE "
+        "generate surface. Canonical: "
+        "`request_slot(slot, model_id) -> make_generate_fn(cache_entry)"
+        " -> fn(messages, *, temperature, max_new_tokens)`."
+    )

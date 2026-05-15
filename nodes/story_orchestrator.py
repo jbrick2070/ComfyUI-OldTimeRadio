@@ -350,13 +350,25 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
             # unload_llm). Single canonical teardown surface; no more
             # manual cache-key shuffling at this site.
             try:
+                # S31 B4 fix for TIMEOUT_RECOVERY CUDA race: the prior
+                # `_otr_model_loader.unload_llm()` call here moved
+                # `cache_entry.model.to("cpu")` and ran
+                # `torch.cuda.empty_cache()` WHILE the orphan worker
+                # thread was still executing CUDA kernels on the
+                # cached model -- which is exactly what
+                # `cudaErrorIllegalAddress` is. The comment claiming
+                # the unload "avoids" the error was structurally
+                # wrong; the unload CAUSED it. New helper invalidates
+                # the cache dict references WITHOUT touching the
+                # GPU; orphan thread holds the model in its stack
+                # frame and exits naturally. See BUG-LOCAL-228.
                 from . import _otr_model_loader as _otr_loader_mod
-                _otr_loader_mod.unload_llm()
+                _otr_loader_mod.invalidate_cache_no_gpu_teardown()
                 _runtime_log(
-                    f"TIMEOUT_RECOVERY: unload_llm() invoked so next "
-                    f"phase forces a fresh load (avoids "
-                    f"cudaErrorIllegalAddress from orphan {phase_label} "
-                    f"worker still on GPU)"
+                    f"TIMEOUT_RECOVERY: LLM_CACHE invalidated (GPU "
+                    f"untouched; orphan {phase_label} worker keeps "
+                    f"its model reference until natural completion). "
+                    f"Next request_slot forces a fresh load."
                 )
             except Exception as _recovery_exc:  # noqa: BLE001
                 log.warning(
@@ -1980,31 +1992,6 @@ def _fetch_science_news(max_feeds=10, style="mission_control_procedural",  # kep
 # LLM INFERENCE WRAPPER
 # -----------------------------------------------------------------------------
 
-def _load_llm(model_id_full="mistralai/Mistral-Nemo-Instruct-2407", device="cuda", optimization_profile="Standard"):
-    """S31 B2 shim -- body ported to `_otr_model_loader.load_llm`.
-
-    Exists only B2..B3 so internal orchestrator callers (and any
-    in-flight code path that still imports `_load_llm`) keep working
-    until B3 finishes its callsite refactor and B4 deletes the four
-    legacy symbols (`_load_llm`, `_unload_llm`, `_LLM_CACHE`,
-    `_generate_with_llm`) outright.
-
-    Returns the legacy `(model, tokenizer)` tuple shape -- the modern
-    `_otr_model_loader.load_llm` returns a cache_entry dict; this
-    shim extracts the two fields the legacy contract promised.
-
-    Plan rule #2: do NOT make this shim "more robust just in case."
-    Plan rule #1A: this shim DELETES at S31 B4, non-deferrable.
-    """
-    from . import _otr_model_loader as _otr_loader_mod
-    cache_entry = _otr_loader_mod.load_llm(
-        model_id_full,
-        device=device,
-        optimization_profile=optimization_profile,
-    )
-    return cache_entry["model"], cache_entry["tokenizer"]
-
-
 # ── Token Budget Ratios ──────────────────────────────────────────────────────
 # target_words * ratio = max_new_tokens. Different content types tokenize at
 # different rates. Radio drama is dialogue-dominant (~60% character lines),
@@ -2505,108 +2492,33 @@ def _extract_all_dialogue(text):
     return bare + voice
 
 
-# Bounded model cache with device tracking (Section 34)
-_LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None, "budget_profile": None, "VERSION": "v1.5"}
 
-
-def _unload_llm():
-    """Explicitly unload LLM to free VRAM (v1.3.1 OOM FIX).
-
-    The v1.3 version did del + gc.collect() + empty_cache(), but that
-    is a no-op when abandoned worker threads from _run_with_timeout
-    still hold the model as a local variable in their stack frame.
-    Symptom: second load attempt sees VRAM at 31.70 GiB on a 16 GB
-    card because the first model never actually left the GPU.
-
-    The fix is to call model.cpu() BEFORE dropping references. That
-    moves the weights from VRAM to RAM immediately, even when other
-    strong refs exist. Abandoned generate() threads will then error
-    out on device mismatch, which is acceptable because their results
-    are already being discarded by the timeout fallback path.
-
-    Order of operations is load-bearing:
-      1. model.cpu()         - move weights off GPU even with live refs
-      2. del cache entries   - drop the primary reference
-      3. gc.collect()        - destroy the object if no other refs
-      4. empty_cache()       - return freed VRAM to the allocator
-      5. telemetry           - prove VRAM actually dropped
-    """
-    global _LLM_CACHE
-    import gc
-    import torch
-    if _LLM_CACHE["model"] is not None:
-        # 2026-04-26 PM BUG-LOCAL-073 GUARD: synchronize BEFORE cpu().
-        # If a prior CUDA kernel left dirty memory (illegal access pending),
-        # cuda.synchronize() will surface it as a clean Python exception
-        # rather than letting model.cpu() walk dirty memory and zombify
-        # the process. On synchronize failure we skip the cpu() walk and
-        # go straight to dropping references + empty_cache(), which is
-        # safe because torch.cuda.empty_cache() resets the allocator
-        # state without touching individual tensors.
-        sync_ok = True
-        try:
-            torch.cuda.synchronize()
-        except Exception as sync_err:
-            sync_ok = False
-            log.warning("[StoryOrchestrator] cuda.synchronize() before unload failed: %s -- skipping model.cpu() walk", sync_err)
-            _runtime_log(f"VRAM_UNLOAD_GUARD: synchronize failed ({sync_err}); cpu() bypassed")
-        # Step 1: force weights off GPU before dropping the reference.
-        # Only attempt if synchronize succeeded -- otherwise dirty memory
-        # would propagate the fault inside .cpu() and lock the process.
-        if sync_ok:
-            try:
-                _LLM_CACHE["model"].cpu()
-            except Exception as cpu_err:
-                log.warning("[StoryOrchestrator] model.cpu() during unload failed: %s", cpu_err)
-                _runtime_log(f"VRAM_UNLOAD_GUARD: cpu() failed ({cpu_err}); proceeding with empty_cache only")
-        # Step 2: drop references from the module-level cache.
-        del _LLM_CACHE["model"]
-        del _LLM_CACHE["tokenizer"]
-        _LLM_CACHE = {"model": None, "tokenizer": None, "device": None, "quantized": False, "model_id": None}
-        # Step 3 + 4: gc and return VRAM to the allocator. These ALWAYS
-        # run, even after a sync/cpu failure, so the allocator's tracking
-        # state is reset and the next phase starts with a clean budget.
-        gc.collect()
-        try:
-            torch.cuda.empty_cache()
-        except Exception as ec_err:
-            log.warning("[StoryOrchestrator] empty_cache() failed: %s", ec_err)
-        
-        # Evict from ComfyUI's internal cache tracking as well
-        try:
-            import comfy.model_management
-            comfy.model_management.soft_empty_cache()
-        except Exception:
-            pass
-
-        # BUG-LOCAL-098 (2026-05-04 EVENING, Gemini round-robin
-        # suggestion): clear accelerate's device-dispatch cache so the
-        # next _load_llm gets a fresh hook table. Accelerate has been
-        # observed to retain device maps / hooks across model lifetimes
-        # which can confuse bitsandbytes' second-load quantization
-        # path. Defensive; no-op if accelerate isn't installed or the
-        # API name has shifted.
-        try:
-            from accelerate import clear_device_cache as _bug098_clear_dev
-            _bug098_clear_dev()
-        except (ImportError, AttributeError):
-            pass
-        except Exception:  # noqa: BLE001 -- never let cleanup raise
-            pass
-
-        # Step 5: telemetry - prove it worked.
-        allocated_gib = torch.cuda.memory_allocated() / 1e9
-        reserved_gib = torch.cuda.memory_reserved() / 1e9
-        log.info(
-            "LLM unloaded: VRAM allocated=%.2f GiB reserved=%.2f GiB "
-            "(cpu + gc.collect + empty_cache)",
-            allocated_gib, reserved_gib,
-        )
 
 # Register the LLM unloader with the VRAM Power Wash system so that
 # force_vram_offload() at node entry points also evicts Gemma.
+# S31 B4: routed through the canonical `_otr_model_loader.unload_llm`
+# (the legacy `_unload_llm` was deleted in this commit alongside the
+# other 3 legacy LLM symbols). The cleanup callback takes no args
+# and never raises -- delegate plainly.
 from ._vram_log import register_vram_cleanup
-register_vram_cleanup(_unload_llm)
+
+
+def _vram_cleanup_via_loader():
+    """Callable wrapper for register_vram_cleanup.
+
+    The loader's `unload_llm` is the canonical teardown surface
+    post-S31 B4. This thin wrapper isolates the cleanup-callback
+    contract (no args, no raise) from any future changes to the
+    loader's signature.
+    """
+    try:
+        from . import _otr_model_loader as _otr_loader_mod
+        _otr_loader_mod.unload_llm()
+    except Exception:  # noqa: BLE001 -- cleanup callbacks never raise
+        pass
+
+
+register_vram_cleanup(_vram_cleanup_via_loader)
 
 
 class GemmaHeartbeatStreamer(BaseStreamer):
@@ -2879,147 +2791,6 @@ class GemmaHeartbeatStreamer(BaseStreamer):
         # -- Beat pause -----------------------------------------------
         if "(beat)" in line.lower():
             return  # beats are too frequent to log individually
-
-
-def _generate_with_llm(prompt, model_id="mistralai/Mistral-Nemo-Instruct-2407",
-                          max_new_tokens=4096, temperature=0.8, top_p=0.92,
-                          optimization_profile="Standard",
-                          live_ledger=False):
-    """Generate text with LLM.
-
-    live_ledger=True turns on the L1.5 streaming-ledger hook on the
-    underlying GemmaHeartbeatStreamer. Pass it ONLY at the body call site
-    (and any other site whose dialogue you want surfaced live). Spine /
-    critique / revision / grammarian calls leave it False so they don't
-    repeatedly overwrite the singleton ledger with their own intermediate
-    drafts.
-
-    S30 B4b: model acquisition routes through the modern slot
-    scheduler via `_otr_model_loader.request_slot("technical", ...)`.
-    Fixes BUG-LOCAL-226 (the S30 plan section 2b audit claim that
-    `_load_llm` was dead-runtime was wrong -- the RSS news path here
-    keeps it alive). Routing through request_slot tags this surface
-    as a technical-slot consumer in the slot scheduler's transition
-    accounting; under the default config (creative == technical) the
-    cache-hit path is identical to pre-B4b.
-    """
-    import torch
-
-    # LLM slot: technical -- RSS news headline rank + body rerank +
-    # LTX style brief are all structured short-output calls.
-    from . import _otr_model_loader as _otr_loader_mod
-    cache_entry = _otr_loader_mod.request_slot("technical", model_id)
-    model = cache_entry["model"]
-    tokenizer = cache_entry["tokenizer"]
-    is_small_model = any(tag in model_id.lower() for tag in ("2b-it", "2b_it", "small")) or (model_id.lower().endswith("2b"))
-
-    # Multimodal vs Text-Only wrapper
-    is_gemma = "gemma" in model_id.lower()
-    
-    # BUG-011 FIX: Verify tokenizer supports the multimodal list-of-dicts format.
-    supports_multimodal = hasattr(tokenizer, "tokenizer") or hasattr(tokenizer, "image_processor")
-    if is_gemma and supports_multimodal:
-        messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-    else:
-        messages = [{"role": "user", "content": prompt}]
-        
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    
-    if is_gemma and supports_multimodal:
-        inputs = tokenizer(text=text, return_tensors="pt").to(model.device)
-    else:
-        inputs = tokenizer(text, return_tensors="pt").to(model.device)
-
-    # -- v1.5.1: PROMPT LENGTH GUARD -------------------------------------
-    # NeMo 12B has a 128k native context, but we cap max_position_embeddings
-    # to 2048 at load time to limit KV cache VRAM. However, transformers does
-    # NOT enforce this at the input level - it still accepts a 3000-token prompt
-    # and pre-fills the full KV cache, causing the 110s stall and 25GB VRAM spike.
-    # We must truncate the input explicitly to leave room for output tokens.
-    # S30 B4b: pull from the cache_entry returned by request_slot
-    # rather than the legacy _LLM_CACHE module-level dict.
-    _context_cap = int(cache_entry.get("context_cap") or 8192)
-    _max_input_tokens = max(64, _context_cap - max_new_tokens)
-    _input_len = inputs["input_ids"].shape[-1]
-    if _input_len > _max_input_tokens:
-        _trunc = _input_len - _max_input_tokens
-        inputs["input_ids"] = inputs["input_ids"][:, _trunc:]
-        if "attention_mask" in inputs:
-            inputs["attention_mask"] = inputs["attention_mask"][:, _trunc:]
-        _runtime_log(
-            f"PROMPT_GUARD: Truncated {_input_len} -> {_max_input_tokens} tokens "
-            f"(context_cap={_context_cap}, max_new_tokens={max_new_tokens})"
-        )
-        log.info(
-            "[StoryOrchestrator] Prompt truncated: %d -> %d tokens to fit context cap %d",
-            _input_len, _max_input_tokens, _context_cap,
-        )
-
-
-    if "attention_mask" not in inputs and "input_ids" in inputs:
-        inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
-
-    # LLM eos_token_id is a list - extract first element for pad_token_id
-    eos_id = model.generation_config.eos_token_id
-    pad_id = eos_id[0] if isinstance(eos_id, list) else eos_id
-
-    log.info(f"[StoryOrchestrator] Starting inference (max_new_tokens={max_new_tokens})...")
-    log.info("[StoryOrchestrator] Live output will stream below:")
-    start_inference = time.time()
-
-    # Initialize streamer for live feedback in the terminal + heartbeat logs.
-    # Safely access tokenizer if we're using a multimodal processor.
-    raw_tokenizer = getattr(tokenizer, "tokenizer", tokenizer)
-    streamer = GemmaHeartbeatStreamer(
-        raw_tokenizer, skip_prompt=True, skip_special_tokens=True,
-        live_ledger=live_ledger,
-    )
-
-    vram_snapshot("llm_generate_entry")
-
-    try:
-        with torch.no_grad():
-            # v1.4: Tune penalty for 2B models to prevent SFX loops
-            final_penalty = 1.12
-            if "2b" in model_id.lower():
-                final_penalty = 1.25  # Firmer hand for the small model
-                
-            output = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                max_length=None,
-                temperature=temperature,
-                top_p=top_p,
-                do_sample=True,
-                repetition_penalty=final_penalty,
-                pad_token_id=pad_id,
-                streamer=streamer,      # Enable live streaming + granular heartbeats
-            )
-
-        inference_time = time.time() - start_inference
-        log.info(f"[StoryOrchestrator] Inference complete in {inference_time:.1f}s.")
-
-        # Decode only the new tokens (skip the prompt).
-        new_tokens_cpu = output[0][inputs["input_ids"].shape[-1]:].detach().cpu()
-        decoded = tokenizer.decode(new_tokens_cpu, skip_special_tokens=True)
-
-        # Log output token count and snapshot VRAM state after generation
-        output_token_count = new_tokens_cpu.shape[0]
-        _runtime_log(f"llm_generate_exit: generated {output_token_count} tokens in {inference_time:.1f}s")
-        vram_snapshot("llm_generate_exit")
-
-        return decoded
-    finally:
-        # v1.4 Theme B/C: GUARANTEED VRAM RECOVERY
-        # Whether generation completes normally, OOMs, or is aborted by the
-        # streamer's TimeoutError, we MUST clear these tensors so the thread
-        # local variables don't hold the graph and the KV cache captive.
-        if 'new_tokens_cpu' in locals():
-            del new_tokens_cpu
-        if 'output' in locals():
-            del output
-        del inputs, streamer
-        torch.cuda.empty_cache()
 
 
 # -----------------------------------------------------------------------------

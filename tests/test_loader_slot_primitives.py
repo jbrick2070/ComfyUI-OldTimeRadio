@@ -57,11 +57,6 @@ class _FakeModel:
         return [[0, 1, 2, 3, 4, 5, 6, 7]]
 
 
-def _fake_story_orchestrator_load_llm(*args, **kwargs):
-    model_id = kwargs.get("model_id_full") or (args[0] if args else "")
-    return _FakeModel(model_id), _FakeTokenizer()
-
-
 @pytest.fixture(autouse=True)
 def _hard_mock_loader_paths(monkeypatch, tmp_path):
     """Patch every heavy primitive before any test runs.
@@ -76,29 +71,12 @@ def _hard_mock_loader_paths(monkeypatch, tmp_path):
     monkeypatch.setenv("HF_TOKEN", "fake-token-for-tests")
     # No real HF API; for curated entries the catalog skips the call anyway.
 
-    # story_orchestrator._load_llm seam: patch the attribute directly
-    # on whatever module is in sys.modules, so the fake survives across
-    # other tests that imported the real module before mine. Still
-    # useful as a back-stop -- post-S31 B2 the body lives in
-    # `_otr_model_loader.load_llm` (see seam below) and the orchestrator's
-    # `_load_llm` is a ~10-line shim that delegates to the loader.
-    import nodes.story_orchestrator as _real_so
-
-    monkeypatch.setattr(_real_so, "_load_llm", _fake_story_orchestrator_load_llm)
-    monkeypatch.setattr(_real_so, "_unload_llm", lambda: None)
-    if hasattr(_real_so, "_LLM_CACHE"):
-        # Reset orchestrator cache between tests so unload_llm's
-        # legacy-teardown branch is a no-op (we don't want to actually
-        # touch any model objects left behind by earlier suites).
-        monkeypatch.setitem(
-            _real_so._LLM_CACHE, "model", None  # type: ignore[union-attr]
-        )
-        monkeypatch.setitem(
-            _real_so._LLM_CACHE, "tokenizer", None  # type: ignore[union-attr]
-        )
-        monkeypatch.setitem(
-            _real_so._LLM_CACHE, "model_id", None  # type: ignore[union-attr]
-        )
+    # S31 B4: the 4 legacy symbols `_load_llm` / `_unload_llm` /
+    # `_LLM_CACHE` / `_generate_with_llm` are DELETED from
+    # `story_orchestrator`. The legacy `_so._load_llm` patch and the
+    # `_so._LLM_CACHE` reset block that used to live here are gone.
+    # The canonical seam is the loader-side `load_llm` stub installed
+    # below.
 
     # S31 B2: ported-body seam. `_otr_model_loader.load_llm` is now the
     # canonical home of the bitsandbytes / NF4 / 8-bit profile body
@@ -333,6 +311,144 @@ def test_request_slot_uses_ported_body():
         "`_load_llm` -- post-S31 B2 the body lives here in the loader, "
         "and the orchestrator surface is a one-commit-deep shim. "
         "Offenders:\n  " + "\n  ".join(forbidden_legacy_calls)
+    )
+
+
+# ---------------------------------------------------------------------------
+# S31 B4: unload_llm simplified + invalidate_cache_no_gpu_teardown added
+# ---------------------------------------------------------------------------
+
+
+def test_unload_llm_no_orchestrator_fallback_block():
+    """S31 B4 simplification: `_otr_model_loader.unload_llm` MUST NOT
+    import or reference `story_orchestrator._LLM_CACHE` (which was
+    deleted at B4). The legacy-fallback teardown block that touched
+    `_so._LLM_CACHE` is removed."""
+    import ast
+    from pathlib import Path
+
+    loader_src = Path(loader.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(loader_src)
+    unload_fn = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "unload_llm":
+            unload_fn = node
+            break
+    assert unload_fn is not None, "unload_llm not found in loader"
+
+    offenders: list[str] = []
+    for sub in ast.walk(unload_fn):
+        # Import of story_orchestrator inside unload_llm? Forbidden.
+        if isinstance(sub, ast.ImportFrom):
+            mod = sub.module or ""
+            if mod.endswith("story_orchestrator"):
+                offenders.append(
+                    f"line {sub.lineno}: from {mod} import ..."
+                )
+        if isinstance(sub, ast.Import):
+            # `for imp in sub.names`: ast.alias is the AST node type
+            # for each imported name. Local variable named `imp` (not
+            # `alias`) to keep the forbidden-pattern sweep's
+            # `\balias\b` marker clean (S28 _RENAME_ALIASES lock).
+            for imp in sub.names:
+                if imp.name.endswith("story_orchestrator"):
+                    offenders.append(
+                        f"line {sub.lineno}: import {imp.name}"
+                    )
+        # Reference to `_LLM_CACHE` (the legacy orchestrator dict)?
+        # The modern dict is `LLM_CACHE` without underscore prefix.
+        if isinstance(sub, (ast.Attribute, ast.Name)):
+            name = (
+                sub.attr if isinstance(sub, ast.Attribute) else sub.id
+            )
+            if name == "_LLM_CACHE":
+                offenders.append(
+                    f"line {sub.lineno}: reference to _LLM_CACHE"
+                )
+    assert not offenders, (
+        "S31 B4: `_otr_model_loader.unload_llm` must NOT import "
+        "story_orchestrator and must NOT reference `_LLM_CACHE` "
+        "(the legacy orchestrator dict is deleted). Offenders:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def test_invalidate_cache_no_gpu_teardown_clears_dict():
+    """S31 B4: new lifecycle helper clears LLM_CACHE references
+    in-place (id stable, the 3 canonical keys all set back to None)."""
+    original_id = id(loader.LLM_CACHE)
+    # Pre-populate.
+    loader.LLM_CACHE["model_id"] = "some/model"
+    loader.LLM_CACHE["slot"] = "creative"
+    loader.LLM_CACHE["cache_entry"] = {"model": object(), "tokenizer": object()}
+
+    loader.invalidate_cache_no_gpu_teardown()
+
+    assert id(loader.LLM_CACHE) == original_id, (
+        "B1d invariant: invalidate_cache_no_gpu_teardown must clear "
+        "in-place (id stable). Rebinding to a fresh dict breaks any "
+        "`from _otr_model_loader import LLM_CACHE` consumer."
+    )
+    assert loader.LLM_CACHE == {
+        "model_id": None,
+        "slot": None,
+        "cache_entry": None,
+    }, (
+        "post-invalidate dict shape drifted; expected exactly 3 keys "
+        "(model_id / slot / cache_entry) all set to None."
+    )
+
+
+def test_invalidate_cache_no_gpu_teardown_no_gpu_calls():
+    """S31 B4: the WHOLE POINT of this helper is that it must NOT
+    touch the GPU. AST-scan its body for forbidden GPU calls (the
+    timeout-recovery path uses this helper specifically to avoid the
+    `cudaErrorIllegalAddress` race when an orphan worker thread is
+    still executing CUDA kernels on the cached model)."""
+    import ast
+    from pathlib import Path
+
+    loader_src = Path(loader.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(loader_src)
+    helper_fn = None
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "invalidate_cache_no_gpu_teardown"
+        ):
+            helper_fn = node
+            break
+    assert helper_fn is not None, (
+        "invalidate_cache_no_gpu_teardown not found in loader; "
+        "S31 B4 add-helper step did not land."
+    )
+
+    forbidden_calls: list[str] = []
+    forbidden_patterns = {
+        "to": "model.to(cpu)",                  # weight teardown
+        "cpu": "model.cpu()",                   # alias for to(cpu)
+        "empty_cache": "torch.cuda.empty_cache()",
+        "synchronize": "torch.cuda.synchronize()",
+        "ipc_collect": "torch.cuda.ipc_collect()",
+        "collect": "gc.collect()",
+    }
+    for sub in ast.walk(helper_fn):
+        if not isinstance(sub, ast.Call):
+            continue
+        fn = sub.func
+        attr = None
+        if isinstance(fn, ast.Attribute):
+            attr = fn.attr
+        elif isinstance(fn, ast.Name):
+            attr = fn.id
+        if attr in forbidden_patterns:
+            forbidden_calls.append(
+                f"line {sub.lineno}: {forbidden_patterns[attr]}"
+            )
+    assert not forbidden_calls, (
+        "S31 B4 contract: `invalidate_cache_no_gpu_teardown` must "
+        "NOT touch the GPU. Forbidden call sites found:\n  "
+        + "\n  ".join(forbidden_calls)
     )
 
 
