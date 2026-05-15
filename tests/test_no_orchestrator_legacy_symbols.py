@@ -212,6 +212,153 @@ def test_no_external_caller_of_legacy_symbols():
 
 
 # ---------------------------------------------------------------------------
+# Folded in from `tests/test_b4b_rss_rewire.py` @ S31.5 B2
+# ---------------------------------------------------------------------------
+# `test_b4b_rss_rewire.py` was originally the S30 B4b "RSS news LLM
+# path rewire" regression test file. S31 B4 deleted its primary
+# subjects (`_generate_with_llm`, `_unload_llm`, `_LLM_CACHE`,
+# `_load_llm`) wholesale. After S31 B4, only the importer-pattern
+# guards and the BUG_LOG status check remained; those are folded
+# below as the canonical structural pin against re-introducing the
+# `from story_orchestrator import _unload_llm` import path.
+
+
+_IMPORTER_PATHS = (
+    "nodes/batch_bark_generator.py",
+    "nodes/_otr_bark_lib.py",
+    "nodes/scene_sequencer.py",
+)
+
+
+@pytest.mark.parametrize("rel_path", _IMPORTER_PATHS)
+def test_importers_use_new_unload_path(rel_path):
+    """Each of the three production importers must import `unload_llm`
+    from `_otr_model_loader`, NOT `_unload_llm` from `story_orchestrator`.
+    Folded from `test_b4b_rss_rewire.py` at S31.5 B2.
+    """
+    path = PACK_ROOT / rel_path
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    legacy_imports: list[str] = []
+    new_imports: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module = node.module or ""
+        for imp in node.names:
+            if (
+                module.endswith("story_orchestrator")
+                and imp.name == "_unload_llm"
+            ):
+                legacy_imports.append(f"line {node.lineno}")
+            if (
+                module.endswith("_otr_model_loader")
+                and imp.name == "unload_llm"
+            ):
+                new_imports.append(f"line {node.lineno}")
+    assert not legacy_imports, (
+        f"{rel_path} still imports _unload_llm from "
+        f"story_orchestrator. Offenders:\n  "
+        + "\n  ".join(legacy_imports)
+    )
+    assert new_imports, (
+        f"{rel_path} must import `unload_llm` from "
+        f"`_otr_model_loader` to free LLM VRAM; no such import found"
+    )
+
+
+def test_no_orchestrator_unload_llm_import_in_packages():
+    """Broader guarantee: NO module under nodes/, visual/, scripts/
+    pulls `_unload_llm` from `story_orchestrator` after S31 B4. The
+    modern entry point is `_otr_model_loader.unload_llm`. Folded
+    from `test_b4b_rss_rewire.py` at S31.5 B2.
+    """
+    offenders: list[str] = []
+    for d in ("nodes", "visual", "scripts"):
+        root = PACK_ROOT / d
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ImportFrom):
+                    continue
+                module = node.module or ""
+                if not module.endswith("story_orchestrator"):
+                    continue
+                for imp in node.names:
+                    if imp.name == "_unload_llm":
+                        offenders.append(
+                            f"{path.relative_to(PACK_ROOT).as_posix()}"
+                            f":{node.lineno}"
+                        )
+    assert not offenders, (
+        "Production code still imports _unload_llm from "
+        "story_orchestrator:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_bug_local_226_marked_fixed_in_bug_log():
+    """BUG-LOCAL-226 entry header must read `[FIXED ...]` in
+    `BUG_LOG.md` after S31 B4. Folded from `test_b4b_rss_rewire.py`
+    at S31.5 B2.
+    """
+    text = (PACK_ROOT / "BUG_LOG.md").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if line.startswith("### BUG-LOCAL-226"):
+            assert "[FIXED" in line, (
+                f"BUG-LOCAL-226 header must carry "
+                f"`[FIXED <hash> <date>]` after S31 B4; got: {line!r}"
+            )
+            return
+    raise AssertionError("BUG-LOCAL-226 heading not found in BUG_LOG.md")
+
+
+# ---------------------------------------------------------------------------
+# Folded in from `tests/test_unload_synchronize_guard.py` @ S31.5 B2
+# ---------------------------------------------------------------------------
+# `test_unload_synchronize_guard.py` was originally the BUG-LOCAL-073
+# regression test pinning `synchronize` before `model.cpu()` inside
+# the legacy `story_orchestrator._unload_llm` body. After S31 B4
+# deletion of that function the file collapsed to a single deletion
+# guard which is now an exact duplicate of
+# `test_orchestrator_no_unload_llm_symbol` above. Nothing to fold
+# beyond what already exists; the file was DELETED at S31.5 B2.
+
+
+# ---------------------------------------------------------------------------
+# B2 file-deletion sanity guards
+# ---------------------------------------------------------------------------
+
+
+def test_b4b_rss_rewire_file_does_not_exist():
+    """`tests/test_b4b_rss_rewire.py` was DELETED at S31.5 B2.
+    Its surviving assertions live in the section above this one.
+    Tripwire against accidental restoration.
+    """
+    assert not (PACK_ROOT / "tests" / "test_b4b_rss_rewire.py").exists(), (
+        "tests/test_b4b_rss_rewire.py was deleted at S31.5 B2 -- "
+        "surviving assertions folded into this file. Restoration "
+        "would create duplicate tests."
+    )
+
+
+def test_unload_synchronize_guard_file_does_not_exist():
+    """`tests/test_unload_synchronize_guard.py` was DELETED at
+    S31.5 B2. Its single deletion-guard test is already covered by
+    `test_orchestrator_no_unload_llm_symbol` above. Tripwire against
+    accidental restoration.
+    """
+    assert not (PACK_ROOT / "tests" / "test_unload_synchronize_guard.py").exists(), (
+        "tests/test_unload_synchronize_guard.py was deleted at S31.5 "
+        "B2 -- its single deletion guard duplicates "
+        "`test_orchestrator_no_unload_llm_symbol`."
+    )
+
+
+# ---------------------------------------------------------------------------
 # B4 symbol-deletion guards: the 4 legacy symbols MUST NOT EXIST on
 # `story_orchestrator` at all post-S31 B4. Tripwires against re-introduction.
 # ---------------------------------------------------------------------------
