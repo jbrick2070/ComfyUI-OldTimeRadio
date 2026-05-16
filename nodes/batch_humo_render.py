@@ -1140,8 +1140,20 @@ def _concat_clips_via_ffmpeg(
             pass
 
 
-def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
-    """Build a HuMo positive prompt from the ledger line + cast desc."""
+def _build_pos_prompt(
+    speaker: str,
+    ln: dict,
+    cast: list[dict],
+    meta: dict | None = None,
+) -> str:
+    """Build a HuMo positive prompt from the ledger line + cast desc.
+
+    Sprint C C5f (2026-05-15): when meta carries a successful
+    story_brief, the brief-derived lighting + atmosphere terms are
+    appended BEFORE _DEFAULT_POS_SUFFIX so HuMo's lip-sync clip
+    inherits the post-script reflection's mood without losing the
+    composition guidance that _DEFAULT_POS_SUFFIX provides.
+    """
     speaker_desc = ""
     for c in cast:
         if (c.get("name") or "").upper().strip() == (speaker or "").upper().strip():
@@ -1154,6 +1166,12 @@ def _build_pos_prompt(speaker: str, ln: dict, cast: list[dict]) -> str:
             f"A {speaker.lower()} character speaks calmly with subtle facial "
             f"expressions"
         ) if speaker else "A character speaks calmly with subtle facial expressions"
+
+    # Sprint C C5f: brief-derived lighting/atmosphere insertion.
+    from nodes._otr_story_brief_helpers import get_story_brief_lighting
+    lighting = get_story_brief_lighting(meta or {})
+    if lighting:
+        return f"{speaker_desc}, {lighting}, {_DEFAULT_POS_SUFFIX}"
     return f"{speaker_desc}, {_DEFAULT_POS_SUFFIX}"
 
 
@@ -1534,6 +1552,25 @@ class BatchHumoRender:
             )
         cast = ledger.get("cast") or []
         lines = ledger.get("lines") or []
+        # Sprint C C5f (2026-05-15): surface story_brief_status once per
+        # ledger load for E-07 observability. The brief flows into the
+        # per-clip prompt via _build_pos_prompt below.
+        try:
+            from nodes._otr_story_brief_helpers import get_story_brief_status
+            _brief_status = get_story_brief_status(
+                ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
+            )
+            log.info(
+                "[BatchHumoRender] ledger loaded; cast=%d lines=%d "
+                "story_brief_status=%s",
+                len(cast), len(lines), _brief_status,
+            )
+        except Exception as _exc:  # noqa: BLE001 -- diagnostic only
+            log.info(
+                "[BatchHumoRender] ledger loaded; cast=%d lines=%d "
+                "(story_brief_status probe failed: %s)",
+                len(cast), len(lines), _exc,
+            )
 
         # BUG-LOCAL-079 (2026-05-03 EVENING): orphan char_id detection +
         # fuzzy rescue. Historically the legacy LLMDirector could emit
@@ -1988,7 +2025,11 @@ class BatchHumoRender:
                     "start_offset_s": float(spec["start_offset_s"]),
                     "dur_s": float(spec["dur_s"]),
                 })
-            pos_text = _build_pos_prompt(speaker, ln, cast)
+            # Sprint C C5f (2026-05-15): thread meta into the per-clip
+            # prompt builder so brief-derived lighting + atmosphere
+            # terms surface in the HuMo positive prompt.
+            _meta_for_brief = ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
+            pos_text = _build_pos_prompt(speaker, ln, cast, meta=_meta_for_brief)
 
             # BUG-LOCAL-088: log which still each line consumed + source
             # tier + freshness so post-mortem can verify ledger
