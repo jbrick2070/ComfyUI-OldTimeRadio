@@ -1,0 +1,13 @@
+# Sprint D D0b license audit targets
+# One repo_id per line. Comments start with #. Blank lines ignored.
+# Each repo_id must have a corresponding docs/model-license-<sanitized>.md
+# audit file. Sanitization: lowercase the repo_id; replace '/' with '--';
+# strip nothing else. See tools/audit_model_license.py for the canonical
+# sanitizer and validator.
+mistralai/Mistral-Nemo-Instruct-2407
+google/gemma-4-E2B-it
+google/gemma-4-E4B-it
+Qwen/Qwen2.5-14B-Instruct
+Nitral-AI/Captain-Eris_Violet-V0.420-12B
+inflatebot/MN-12B-Mag-Mell-R1
+talkie-lm/talkie-1930-13b-it
