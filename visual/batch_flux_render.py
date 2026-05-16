@@ -130,6 +130,22 @@ def _build_dynamic_radio_prompt(led):
     def _safe_str(x):
         return x.strip() if isinstance(x, str) else ""
 
+    # Sprint C C5c (2026-05-15): pre-fetch meta.story_brief + status.
+    # The brief replaces the weak scenes[0].env Tier 4 fallback when
+    # widget style / style_custom are empty. status is logged for
+    # E-07 observability regardless of whether the brief actually
+    # gets used (operator can see whether reflection succeeded).
+    from nodes._otr_story_brief_helpers import (
+        get_story_brief_full,
+        get_story_brief_status,
+    )
+    _brief = get_story_brief_full(meta)
+    _brief_status = get_story_brief_status(meta)
+    log.info(
+        "[BatchFluxRender] radio prompt: story_brief_status=%s "
+        "(brief_chars=%d)", _brief_status, len(_brief),
+    )
+
     # Tier 1-3: style from widget
     descriptor = _safe_str(gp.get("style"))
     branch = "gen_params_initial.style"
@@ -138,8 +154,13 @@ def _build_dynamic_radio_prompt(led):
         if descriptor:
             branch = "gen_params_initial.style_custom"
 
-    # Tier 4: first scene env / description
-    first_scene_env = ""
+    # Sprint C C5c (2026-05-15): the legacy Tier 4 first-scene-env
+    # tier is replaced by meta.story_brief. The brief is a richer
+    # post-script descriptor; scenes[0].env was a thin fallback that
+    # often surfaced "INT. ROOM -- NIGHT" boilerplate at the bookend.
+    # When the brief is absent / failed, the chain falls through to
+    # Tier 5 (episode_id slug) directly.
+    first_scene_env = ""  # retained for the scene-context hint below
     scenes = led.get("scenes") if isinstance(led, dict) else None
     if isinstance(scenes, list) and scenes:
         first = scenes[0] if isinstance(scenes[0], dict) else {}
@@ -147,9 +168,9 @@ def _build_dynamic_radio_prompt(led):
             _safe_str(first.get("env"))
             or _safe_str(first.get("description"))
         )
-    if not descriptor and first_scene_env:
-        descriptor = first_scene_env
-        branch = "first_scene_env"
+    if not descriptor and _brief:
+        descriptor = _brief
+        branch = "meta.story_brief"
 
     # Tier 5: episode_id slug (last resort before hardcoded fallback)
     if not descriptor:
@@ -231,6 +252,16 @@ def _lazy_nodes():
 
 
 def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
+    # Sprint C C5c (2026-05-15): wires meta.story_brief into the env-
+    # prompt body. The brief is inserted between the env description
+    # and the style_suffix tail per refinement section 6. Status is
+    # logged so a failed reflection surfaces in the render log per
+    # E-07 ("story_brief_status=...").
+    from nodes._otr_story_brief_helpers import (
+        get_story_brief_full,
+        get_story_brief_status,
+    )
+
     if not script_json or not script_json.strip():
         log.info("[BatchFluxRender] empty script_json; using fallback x1")
         return [f"{fallback}, {style_suffix}".rstrip(", ")]
@@ -241,8 +272,10 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
         return [f"{fallback}, {style_suffix}".rstrip(", ")]
     if isinstance(payload, dict):
         tokens = payload.get("tokens") or payload.get("script") or []
+        meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
     elif isinstance(payload, list):
         tokens = payload
+        meta = {}
     else:
         log.warning("[BatchFluxRender] unexpected script_json root %s", type(payload).__name__)
         return [f"{fallback}, {style_suffix}".rstrip(", ")]
@@ -252,16 +285,24 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
         return [f"{fallback}, {style_suffix}".rstrip(", ")]
     limit = max(1, min(batch_limit, len(env_tokens)))
     selected = env_tokens[:limit]
+    brief = get_story_brief_full(meta)
+    brief_status = get_story_brief_status(meta)
     prompts = []
     for token in selected:
         desc = (token.get("description") or "").strip()
         if not desc:
             desc = fallback
         parts = [desc]
+        if brief:
+            parts.append(brief)
         if style_suffix and style_suffix.strip():
             parts.append(style_suffix.strip())
         prompts.append(", ".join(parts))
-    log.info("[BatchFluxRender] queued %d env prompt(s) from %d available", len(prompts), len(env_tokens))
+    log.info(
+        "[BatchFluxRender] queued %d env prompt(s) from %d available "
+        "(story_brief_status=%s; brief_chars=%d)",
+        len(prompts), len(env_tokens), brief_status, len(brief),
+    )
     return prompts
 
 
