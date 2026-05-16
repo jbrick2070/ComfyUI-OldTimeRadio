@@ -117,6 +117,24 @@ forbidden = re.compile(
     # the pre-existing fixture is naturally exempt.
     r"|\b1940s\b"                           # C2a: visual-layer era literal
     r"|1980s broadcast"                     # C2a: video-plan era literal
+    # Sprint C C2b (2026-05-15): era literal cleanbreak -- orchestrator.
+    # The rerank prompt era anchor at line 1596 was rewritten to be
+    # style-neutral. SCAFFOLDING_PREAMBLE + SCRIPT_SYSTEM_PROMPT
+    # constants (which carried OMNI-RETRO 5-pillar / golden-age-radio
+    # era flavor) were orphans from the pre-LPL pipeline and were
+    # deleted entirely (no consumers; no shim). These markers prevent
+    # accidental reintroduction of period-locked language inside any
+    # new orchestrator-layer LLM prompt. Tokenize suppression handles
+    # forensic comment / docstring mentions (e.g. the C2b deletion
+    # forensic note itself, and the still-orphan _load_canon_for_writer
+    # docstring that still names SCAFFOLDING_PREAMBLE as historical
+    # context until the Sprint G orphan sweep).
+    r"|1950s Americana"                     # C2b: 5-pillar era anchor
+    r"|golden.age radio"                    # C2b: dramaturg era anchor
+    r"|\bOmni.Retro\b"                      # C2b: 5-pillar branding
+    r"|\bOrson Welles\b"                    # C2b: dramaturg name-drop
+    r"|\bNorman Corwin\b"                   # C2b: dramaturg name-drop
+    r"|\bLucille Fletcher\b"                # C2b: dramaturg name-drop
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")

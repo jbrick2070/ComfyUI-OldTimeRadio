@@ -5,7 +5,7 @@
 ## Status
 
 - Phase: execution
-- Current commit: C2a
+- Current commit: C2b
 - Branch: sprint-c-story-brief-v2
 - Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).
@@ -53,7 +53,7 @@ All decisions below are **RESOLVED**. There are zero open questions. The plan is
 | E-10 | P2 | "Full autonomous coding" framing replaced with explicit stop-conditions. Dirty-repo / poisoned-index becomes a HARD STOP at C0a. | Applied at header + C0a. |
 | E-11 | P2 | Acceptance row: returned `script_json` socket AND saved-on-disk ledger both contain identical `meta.story_brief*` fields. | Acceptance row 25 (renumbered v2→v3 — was row 21 in pre-v2 numbering; see E-25 repair). |
 | E-12 | P0 | **MusicGen wiring IN sprint at C5g.** L-4 override. `get_story_brief_music_mood` is wired into `nodes/musicgen_theme.py`. Helper no longer ships "implemented-but-not-wired"; it ships wired. R-04 disposition flips from RESOLVED-as-deferred to SUPERSEDED. E-09 no-touch gate is amended (one-commit exception at C5g). Audio C7 baseline resets at C5g. | Specified at C5g; affects L-4, R-04, E-09, §4 hard rule 1. |
-| E-13 | P0 | **C2 scope expanded to all era-locked literals across orchestrator + visual layers** — not just the 4 Python + 2 JSON visual sites. Adds three orchestrator targets: rerank-prompt era anchor (`story_orchestrator.py:1596`), dramaturg-preamble era anchor (`story_orchestrator.py:3003-3004`), and the OMNI-RETRO 5-pillar block (`story_orchestrator.py:3162-3179`). The 5-pillar block is replaced with a style-driven dynamic world block keyed off `meta.style`, so each story carries flavor unique to its chosen style rather than 5-pillar omni-retro on every gen. | Specified at C2. |
+| E-13 | P0 | **C2 scope expanded to all era-locked literals across orchestrator + visual layers** — not just the 4 Python + 2 JSON visual sites. Adds three orchestrator targets: rerank-prompt era anchor (`story_orchestrator.py:1596`), dramaturg-preamble era anchor (`story_orchestrator.py:3003-3004`), and the OMNI-RETRO 5-pillar block (`story_orchestrator.py:3162-3179`). The 5-pillar block is replaced with a style-driven dynamic world block keyed off `meta.style`, so each story carries flavor unique to its chosen style rather than 5-pillar omni-retro on every gen. **PARTIALLY SUPERSEDED at C2b by the RR-A3+RR-B6 path-A audit (see §1.4 row):** the dramaturg-preamble + 5-pillar literals lived inside orphan constants (`SCAFFOLDING_PREAMBLE` + `SCRIPT_SYSTEM_PROMPT`) with no live consumers — so the era-literal removal happens by DELETING the orphan constants, not by refactoring them into a style-driven block. The rerank-prompt fix at line 1596 still ships as originally planned; the `_STYLE_WORLD_BLOCK` machinery is skipped (no consumer = no place to interpolate). | Specified at C2; refined at C2b per Path A discovery. |
 | E-14 | P0 | **All legacy retirements pulled forward.** `meta.ltx_style_brief` retirement moves from C5g to **C3b**, executed BEFORE any new `meta.story_brief` code is built. Order is: cleanbreak (C2a/C2b era literals + C3 `_GENRE_BY_STYLE` + C3b `meta.ltx_style_brief`) → envelope lock-in (C4) → new system (C5a1+). | Specified at C3b; affects §6 commit order. |
 | E-15 | P0 | **C5a2 dual-slot OOM regression guard (RR-A1, revised at C1 audit).** Original specification called for an explicit `evict_model(creative_model)` call before reflection. C1 audit found the loader is implicitly single-slot: `request_slot(model_id)` already calls `unload_llm()` to evict any prior resident model before loading the next. Peak transient VRAM during the swap is `max(creative_size, technical_size)`, not their sum. Explicit pre-eviction is redundant. The OOM scenario cannot occur on this loader architecture. C5a2 ships regression tests that prove the no-OOM property without adding an explicit eviction call. | Specified at C5a2; tests below. |
 | E-16 | P0 | **C5g audio isolation test (RR-A2).** Blessing a new C7 baseline proves determinism but NOT that the audio shift was caused exclusively by the mood prefix. C5g adds `test_c5g_audio_matches_legacy_when_brief_absent`: force `meta.story_brief_status="absent"` (the brief-helper status-gate fall-through), run the full C5g pipeline, assert byte-identical output against the pre-C5g forensic b3sum (`tests/fixtures/audio_c7_baseline_pre_c5g.wav.b3sum`). Closes the smuggled-regression class. | Specified at C5g. |
@@ -92,7 +92,7 @@ Two reviewers, 17 findings total. 12 accepted (lifted to E-15…E-27 above). 2 r
 |---|---|---|---|---|---|
 | RR-A1 | A | HIGH | C5a2 dual-slot OOM | ACCEPT → E-15 | C5a2 |
 | RR-A2 | A | HIGH | C5g audio reset blesses regression | ACCEPT → E-16 | C5g |
-| RR-A3 | A | MED | C2b worldbuilding-vacuum token expansion | ACCEPT → E-23 | C2b |
+| RR-A3 | A | MED | C2b worldbuilding-vacuum token expansion | **SUPERSEDED by C2b path-A discovery (see RR-A3+RR-B6 architecture row below).** Token-stability guard becomes moot once the orphan-prompt deletion path is taken — no runtime worldbuilding string to stabilize. | C2b |
 | RR-A4 | A | MED | git log gate bypass on rename | ACCEPT → E-20 | C-final |
 | RR-A5 | A | LOW | C5a1/C5a2/C5b ordering race | **REJECT.** Schema lives in C5a1 module. C5a2's tests JSON-parse and dict-compare; no helper needed. Helpers (C5b) serve downstream consumers (C5c-C5g), not the writer-wiring layer. Order C5a1 → C5a2 → C5b → C5c–C5g is correct. | (unchanged) |
 | RR-B1 | B | HIGH | C5a1 technical-slot test impossible | ACCEPT → E-21 | C5a1 + C5a2 |
@@ -107,8 +107,9 @@ Two reviewers, 17 findings total. 12 accepted (lifted to E-15…E-27 above). 2 r
 | RR-B10 | B | LOW | `get_story_brief_music_mood` no-production-callers test | **PARTIAL ACCEPT → E-28.** Caller-count test is a stronger mechanical version of the C-final semantic-gate visual inspection. At C5b: assert 0 production callers (helper defined, not yet wired). At C5g: assert exactly 1 production caller (`nodes/musicgen_theme.py`). Covers the C5b→C5f gap where a rogue wiring would otherwise slip through; pins the wiring contract at C5g. | C5b + C5g |
 | RR-B11 | B | LOW | C3 test name suggests shim-allowance | ACCEPT → E-26 | C3 |
 | RR-B12 | B | LOW | Final QA visual-runtime wording | ACCEPT → E-27 | C-final |
+| RR-A3 + RR-B6 architecture | A | HIGH | C2b worldbuilding architecture | **PATH A confirmed by C2b 8-search audit (2026-05-15):** `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` are orphan constants from the `eec4718` LPL extraction sprint — no live consumers across `nodes/`, `visual/`, `scripts/`, or `tests/`. The new `OTR_LedgerScriptWriter` pipeline composes prompts from per-phase modules (`_otr_outline._SYSTEM_PROMPT`, `_otr_line_composer._SYSTEM_PROMPT` + `_POLISH_*`, `_otr_ledger_reviewer._AUDITOR_SYSTEM_PROMPT` + `_DOCTOR_SYSTEM_PROMPT`, `_otr_period_prompts.OTR_PERIOD_SYSTEM_PROMPT`). The OMNI-RETRO 5-pillar block at lines 3160-3179 was therefore forensic, not runtime. C2b reduced to (a) rerank-prompt fix at line 1596 (only live era-literal site), (b) DELETE orphan SCRIPT_SYSTEM_PROMPT + SCAFFOLDING_PREAMBLE per no-legacy rule, (c) skip `_STYLE_WORLD_BLOCK` machinery entirely (no live consumer = no place to interpolate). Token-stability test (E-23 / RR-A3) skipped — no runtime path to stabilize. `test_script_system_prompt_interpolates_style_world_block` skipped — no constant to interpolate. `test_citation_rule_present` in `tests/test_core.py` deleted — pinned substring inside the now-deleted SCRIPT_SYSTEM_PROMPT, no live replacement exists. Broader orphan-constant sweep of `nodes/story_orchestrator.py` (3000+ lines, gutted across LPL / S31 B3 / S34) deferred to Sprint G per the no-scope-creep rule; each candidate gets its own 8-search audit before deletion. | C2b |
 
-**Operator sizing directive applied 2026-05-15:** C2 split into C2a (visual layer) + C2b (orchestrator layer + `_STYLE_WORLD_BLOCK`) to keep each commit inside a single review-code-wire-pytest-regression-commit loop. Total commit count: 16 → 17. No other commits split; they are already sized at ≤0.75 d each. Decreasing further would over-fragment rollback boundaries.
+**Operator sizing directive applied 2026-05-15:** C2 split into C2a (visual layer) + C2b (orchestrator layer + `_STYLE_WORLD_BLOCK`) to keep each commit inside a single review-code-wire-pytest-regression-commit loop. Total commit count: 16 → 17. C2b further reduced at execution time after Path A architectural discovery (RR-A3+RR-B6 row above). No other commits split; they are already sized at ≤0.75 d each. Decreasing further would over-fragment rollback boundaries.
 
 ## §1.5 Open questions
 
@@ -601,91 +602,52 @@ git diff --cached --name-status
 
 **Commit subject.** `C2a: era literal cleanbreak -- visual layer (FLUX portrait fallback/widget/sig + _DEFAULT_STYLE_TAIL + workflow JSON via string-based replace)`
 
-## C2b — Era literal cleanbreak — orchestrator + `_STYLE_WORLD_BLOCK` (~0.5 d)
+## C2b — Era literal cleanbreak — orchestrator (REDUCED SCOPE per C2b path-A audit) (~0.2 d)
 
-**Review.** Targets enumerated in §A.10 (orchestrator layer). C2b is the higher-risk half — script-gen prompt changes feed every downstream artifact through the brief. Token-stability test (E-23 / RR-A3) explicitly guards against worldbuilding-vacuum hallucination expansion.
+**Review.** Path-A architectural discovery at C2b execution time (see §1.4 RR-A3+RR-B6 row): of the three orchestrator-layer targets originally enumerated in §A.10, only one is runtime-live. The dramaturg-preamble + OMNI-RETRO 5-pillar literals lived inside `SCAFFOLDING_PREAMBLE` and `SCRIPT_SYSTEM_PROMPT` — both orphan constants from the `eec4718` LPL extraction sprint with zero live consumers across `nodes/`, `visual/`, `scripts/`, and `tests/`. The new `OTR_LedgerScriptWriter` pipeline composes prompts from per-phase modules. The 8-search audit (getattr / glob-import / substring-content / alt-name / `git log -S` / writer-callsite / `__all__` / tests) returned no hits for either constant outside the definition site and forensic comments. Reduced C2b ships the runtime fix + deletes the orphan constants per the no-legacy-back-compat standing directive; the `_STYLE_WORLD_BLOCK` machinery is skipped (no live consumer = no place to interpolate). The broader orphan-constant sweep of `nodes/story_orchestrator.py` (3000+ lines, gutted across LPL / S31 B3 / S34) deferred to Sprint G per the no-scope-creep rule.
 
-**Code.** Replace 3 era-locked prompt sites in `nodes/story_orchestrator.py`:
+**Code.** Three changes in `nodes/story_orchestrator.py`:
 
-- **`story_orchestrator.py:1596`** — `_llm_rerank_with_bodies` body-rerank prompt. Replace:
-  ```
-  "for a 1940s-style radio drama: specific human stakes, "
-  ```
-  with:
-  ```
-  "for an audio drama: specific human stakes, "
-  ```
-  Style-neutral. The `{genre_human}` interpolation at line 1592 already carries the chosen style into the prompt — no need to bake an era anchor on top.
+1. **`story_orchestrator.py:1596`** — `_llm_rerank_with_bodies` body-rerank prompt. The ONLY runtime-live era-literal site at the orchestrator layer. Replace:
+   ```
+   "for a 1940s-style radio drama: specific human stakes, "
+   ```
+   with:
+   ```
+   "for an audio drama: specific human stakes, "
+   ```
+   Style-neutral. The `{genre_human}` interpolation at line 1592 already carries the chosen style into the prompt.
 
-- **`story_orchestrator.py:3003-3004`** — `SCAFFOLDING_PREAMBLE` dramaturg craft anchor. Replace:
-  ```
-  "a Foley artist could record tonight. You think like the golden age of radio
-   drama: Orson Welles, Norman Corwin, Lucille Fletcher. The page is NEVER prose."
-  ```
-  with:
-  ```
-  "a Foley artist could record tonight. You think in sound: every line earns
-   its place by what it lets the listener hear. The page is NEVER prose."
-  ```
-  Craft anchor stripped of period names; the dramaturg discipline survives, the era lock does not.
+2. **DELETE `SCAFFOLDING_PREAMBLE` constant** (was lines 2999-3046 plus its header comment at 2994-2998). Orphan from `eec4718` LPL extraction; no live consumer. No shim, no alias, no migration. Per `from .story_orchestrator import SCAFFOLDING_PREAMBLE` becomes `AttributeError` — intentional, so dead wirings fail loud.
 
-- **`story_orchestrator.py:3162-3179`** — OMNI-RETRO 5-pillar block. Replace the entire fixed-5-pillar paragraph (`"colliding melting pot of five distinct aesthetics: 1950s Americana Noir, Afrofuturism, Neo-Tokyo Cyberpunk, Thai Street Density, and Russian Dieselpunk"` plus its 5 textural-soundscape bullets and the `"golden-age radio pacing"` line) with a single style-driven world block, interpolated at `.format()` time from the resolved style slug:
+3. **DELETE `SCRIPT_SYSTEM_PROMPT` constant** (was lines 3049-3478). Same rationale. The 5-pillar block + dramaturg name-drops + golden-age-radio pacing lines lived inside this constant; deleting the constant deletes the era literals.
 
-  ```python
-  # nodes/story_orchestrator.py -- new constant added near SCAFFOLDING_PREAMBLE.
-  # Lookup keyed on the same slugs that drive meta.style (the 10 slugs
-  # formerly handled by _GENRE_BY_STYLE, plus a default).
-  _STYLE_WORLD_BLOCK: dict[str, str] = {
-      "closed_room_suspense":       "<2-3 sentence world tone for closed-room suspense; preserves sound-first discipline; uses [ENV:]/[SFX:] tag conventions>",
-      "detective_case_file":        "<2-3 sentence world tone for detective case file; sound-first; tag conventions>",
-      "pulp_serial_cliffhanger":    "<2-3 sentence world tone for pulp serial cliffhanger; sound-first; tag conventions>",
-      "mission_control_procedural": "<2-3 sentence world tone for mission control procedural; sound-first; tag conventions>",
-      "deep_space_distress_call":   "<2-3 sentence world tone for deep space distress call; sound-first; tag conventions>",
-      "noir_interrogation":         "<2-3 sentence world tone for noir interrogation; sound-first; tag conventions>",
-      "small_town_uncanny":         "<2-3 sentence world tone for small-town uncanny; sound-first; tag conventions>",
-      "radio_newsroom_emergency":   "<2-3 sentence world tone for newsroom emergency; sound-first; tag conventions>",
-      "haunted_broadcast_signal":   "<2-3 sentence world tone for haunted broadcast; sound-first; tag conventions>",
-      "laboratory_containment":     "<2-3 sentence world tone for laboratory containment; sound-first; tag conventions>",
-  }
-  _DEFAULT_STYLE_WORLD_BLOCK = (
-      "Build the world implied by the chosen style. Let setting, "
-      "soundscape, and pacing follow from that style. Use [ENV:] "
-      "and [SFX:] tags to paint the setting before anyone speaks. "
-      "Make every textural choice serve THIS story."
-  )
+Both constants are replaced with a single forensic comment block at the deletion site explaining the cleanup, the 8-search audit pointer, and the Sprint G handoff. The pre-existing `_load_canon_for_writer` function (also orphan-pending-Sprint-G-audit) has its docstring updated to note SCAFFOLDING_PREAMBLE is now gone.
 
-  def _resolve_style_world_block(style: str) -> str:
-      return _STYLE_WORLD_BLOCK.get(style, _DEFAULT_STYLE_WORLD_BLOCK)
-  ```
+**Skipped — `_STYLE_WORLD_BLOCK` machinery.** The dict + helper + interpolation wiring described in the v3 plan are not built. Building them would ship dead code to replace dead code. If a future commit wires a per-style world block into one of the live per-phase prompt modules (`_otr_outline._SYSTEM_PROMPT`, `_otr_line_composer._SYSTEM_PROMPT`, `_otr_ledger_reviewer`, `_otr_period_prompts.OTR_PERIOD_SYSTEM_PROMPT`), the dict + helper can be revived from this plan at that time.
 
-  Then in `SCRIPT_SYSTEM_PROMPT` (or wherever the world-building rules section is composed), replace the hardcoded 5-pillar paragraph with `{style_world_block}` and pass `style_world_block=_resolve_style_world_block(resolved["style"])` into the `.format()` call.
+**Skipped — comment cleanup at lines 804 / 874-877.** Out of scope per the lock-it-tight directive. Sprint G's broader orphan/era sweep will handle data-array comment cleanup as part of its single audit pass.
 
-  Concrete prose for the 10 slugs is filled in at C2b commit time. The 2-3 sentence cap keeps the token budget tight; each block must (a) avoid era literals (`1940s`, `1950s`, `golden-age`, etc.), (b) avoid the omni-retro pillar names, AND (c) preserve dramaturg discipline — reference [ENV:]/[SFX:] tag use or sound-first framing so the structural guidance the legacy 5-pillar block enforced is not lost (E-23 / RR-A3 mitigation).
+**Out of scope at C2b.** `_MINCED_OATHS` / `_FIRST_NAMES` / `_LAST_NAMES` data arrays (mixed-pool, randomized — kept). All other orphan candidates in `story_orchestrator.py` (deferred to Sprint G).
 
-- **Optional comment cleanup (cosmetic, no runtime effect):** lines 804 (`# Period-authentic 1940s radio euphemisms ...`) and 874-877 (`# Omni-Retro 5-Pillar Naming Pool ...`) updated to describe the data structures by content rather than by era. Forbidden-sweep tokenize suppression handles forensic mentions.
+**Wire.** None. No graph surface, no widget, no workflow JSON change. The deletion eliminates an import surface; no new one is created.
 
-**Out of scope at C2b.** `_MINCED_OATHS` data array (mixed-pool, randomized — kept). `_FIRST_NAMES`/`_LAST_NAMES` data arrays (mixed-pool, randomized — kept; era tags in comments updated only). These pools are sampled at runtime so no single-era flavor dominates.
-
-**Wire.** `SCRIPT_SYSTEM_PROMPT` `.format()` call signature gets a new `style_world_block` kwarg — confirmed via AST walk in the pytest table below.
+**Test fallout — `tests/test_core.py::test_citation_rule_present` DELETED.** The test pinned the substring `"CITATION RULE"` or `"cite ONLY"` inside the orchestrator+loader source union; both lived ONLY inside the now-deleted SCRIPT_SYSTEM_PROMPT. Per the no-legacy-back-compat rule (delete the old function AND every test that pinned the old contract), the test is removed and a forensic comment is added to the existing test-deletion comment block in `TestStoryOrchestratorCodePatterns` documenting why. No live per-phase prompt currently carries an equivalent citation-rule string; if the LPL pipeline needs one in a future sprint, the replacement test should live alongside whichever per-phase prompt module gets the rule, not as a union-of-files substring scan.
 
 **Pytest.**
 
 | Test | File | Asserts |
 |---|---|---|
-| `test_no_1940s_literal_in_orchestrator_prompt` | `tests/test_era_literals_c2b.py` (new) | AST + string scan of `nodes/story_orchestrator.py`: zero `"1940s"` in any string literal that feeds an LLM prompt. Tokenize-suppressed forensic comments allowed. |
-| `test_no_1950s_omni_retro_block_in_script_prompt` | same | AST + string scan of `nodes/story_orchestrator.py`: zero `"1950s Americana"`, `"Afrofuturism"`, `"Neo-Tokyo"`, `"Thai Street Density"`, `"Russian Dieselpunk"` in any string literal that feeds an LLM prompt. |
-| `test_no_golden_age_anchor_in_dramaturg_preamble` | same | AST + string scan: `SCAFFOLDING_PREAMBLE` constant does NOT contain `"golden age"`, `"Orson Welles"`, `"Norman Corwin"`, or `"Lucille Fletcher"`. |
-| `test_style_world_block_resolver_has_10_slugs` | same | `_STYLE_WORLD_BLOCK` exposes exactly the 10 style slugs formerly tabled in `_GENRE_BY_STYLE`. Default fallback present. |
-| `test_style_world_block_has_no_era_literals` | same | Each of the 10 entries + the default fallback: zero `"1940s"`, `"1950s"`, `"golden-age"`, `"golden age"`, `"Orson Welles"`, `"Norman Corwin"`, `"Lucille Fletcher"`, no pillar names. |
-| `test_style_world_block_each_under_400_chars` | same | Each block ≤ 400 chars (2-3 sentences). Keeps token budget tight. |
-| `test_style_world_block_preserves_sound_first_discipline` | same | Each of the 10 entries + the default fallback: contains at least one of `"[ENV:]"`, `"[SFX:]"`, `"sound-first"`, or `"soundscape"`. Locks the dramaturg discipline preservation (E-23 mitigation). |
-| `test_script_system_prompt_interpolates_style_world_block` | same | AST walk: `SCRIPT_SYSTEM_PROMPT.format(...)` call site passes `style_world_block=_resolve_style_world_block(resolved["style"])`. Locks the wiring against future refactor. |
-| `test_script_token_length_stability_with_dynamic_world_block` (E-23 / RR-A3) | same | Fixture: same news seed, same cast, fixed seed. Generate one script with the legacy 5-pillar block (pre-C2b code path via a temporary monkey-patch fixture); generate one with the new `_STYLE_WORLD_BLOCK`. Token-count both `script_text` outputs. Assert new token count ≤ legacy token count × 1.15 (+15% expansion ceiling). Guards against worldbuilding-vacuum hallucination expansion that could blow the 8192 hard context limit. |
-| `test_audio_c7_byte_identical_c2b` | existing canary | Audio holds against existing baseline. C2b changes script-gen prompts. Mistral-Nemo output at fixed seed COULD shift even with semantically equivalent prompts. If C7 drifts: STOP, capture diagnostic, decide between (a) treating C2b as a planned baseline reset (rare, requires §1.2 amendment + new fixture) or (b) tightening the new prompt to better match Mistral-Nemo's prior token-by-token behavior. Expected outcome: holds — at fixed seed and `_REFLECTION_TEMPERATURE` style temps, semantically equivalent prompts at this length typically produce byte-identical output. |
+| `test_no_1940s_literal_in_rerank_prompt` | `tests/test_era_literals_c2b.py` (new) | The rerank prompt site no longer contains `"1940s-style radio drama"`. |
+| `test_rerank_prompt_audio_drama_anchor_present` | same | The expected replacement text `'"for an audio drama: specific human stakes, "'` is present at the rerank prompt site. Locks against silent reversion. |
+| `test_scaffolding_preamble_constant_deleted` | same | `nodes.story_orchestrator.SCAFFOLDING_PREAMBLE` does NOT exist (`hasattr` is False). Runtime assertion, not source scan — so forensic attribution comments in tests / docstrings remain allowed. |
+| `test_script_system_prompt_constant_deleted` | same | `nodes.story_orchestrator.SCRIPT_SYSTEM_PROMPT` does NOT exist. Same pattern. |
+| `test_literal_not_in_runtime_strings` (parametrized over 10 era literals) | same | For each of `1950s Americana`, `Afrofuturism`, `Neo-Tokyo`, `Thai Street Density`, `Russian Dieselpunk`, `Orson Welles`, `Norman Corwin`, `Lucille Fletcher`, `golden age of radio`, `OMNI-RETRO CULTURAL COLLISION`: zero hits in code-or-string-context of `nodes/story_orchestrator.py` (tokenize-classified comment hits suppressed; the C2b deletion forensic note itself is "comment" so filtered). |
+| `test_audio_c7_byte_identical_c2b` | existing canary | Audio holds. C2b changes only the rerank prompt at line 1596 (used by news rerank, not script gen) and deletes orphan constants. Script-gen prompts are not touched — they live in per-phase modules. Expected to hold cleanly. |
 
-**Commit gate.** All tests green. Bug Bible 23/1/2xf. Audio C7 holds (verify carefully — see audio note above). Forbidden sweep clean. **New markers:** `\b1950s Americana\b`, `\bgolden.age radio\b`, `\bOmni.Retro\b`, `\bOrson Welles\b`, `\bNorman Corwin\b`, `\bLucille Fletcher\b` (tokenize suppression handles forensic mentions).
+**Commit gate.** All tests green. Bug Bible 23/1/2xf. Audio C7 holds. Forbidden sweep clean. **New markers** (armed prospectively; no current hits since the only source instances were deleted with the constants): `1950s Americana`, `golden.age radio`, `\bOmni.Retro\b`, `\bOrson Welles\b`, `\bNorman Corwin\b`, `\bLucille Fletcher\b`. Tokenize suppression handles forensic mentions in comments and docstrings.
 
-**Commit subject.** `C2b: era literal cleanbreak -- orchestrator (rerank prompt + dramaturg preamble + 5-pillar block replaced with style-driven _STYLE_WORLD_BLOCK; sound-first discipline preserved; +15% token-expansion guard)`
+**Commit subject.** `C2b: era literal cleanbreak -- orchestrator (rerank prompt line 1596) + deleted orphan SCRIPT_SYSTEM_PROMPT and SCAFFOLDING_PREAMBLE constants (C1 audit confirmed no live consumers; _STYLE_WORLD_BLOCK machinery skipped as moot)`
 
 ## C3 — `_GENRE_BY_STYLE` deletion (~1 d)
 
@@ -1132,7 +1094,7 @@ QA review doc restatement: "MusicGen integration with `meta.story_brief` was wir
 | 7 | C1 staleness audit complete; FLUX env/bookend file path verified (E-24) | C1 |
 | 8 | Era literals removed — visual layer (4 Python + 2 JSON via string-based replacement per E-19) | C2a |
 | 9 | Era literals removed — orchestrator (rerank + dramaturg preamble + 5-pillar block replaced with `_STYLE_WORLD_BLOCK`) per E-13; `_STYLE_WORLD_BLOCK` preserves sound-first dramaturg discipline | C2b |
-| 10 | Token-length stability: new script-gen path ≤ legacy script-gen path × 1.15 (E-23 / RR-A3 hallucination-expansion guard) | C2b |
+| 10 | Rerank-prompt era literal removed at `nodes/story_orchestrator.py:1596` (`"for a 1940s-style radio drama"` → `"for an audio drama"`); locked by `test_rerank_prompt_audio_drama_anchor_present` | C2b |
 | 11 | `_GENRE_BY_STYLE` table + helpers + stamp + 3 fall-throughs deleted | C3 |
 | 12 | `meta.visual_plan.genre` not stamped | C3 |
 | 13 | Graceful absence: HUD + treatment render when `meta.visual_plan.genre` absent (E-05; renamed per E-26 / RR-B11) | C3 |
@@ -1170,8 +1132,8 @@ QA review doc restatement: "MusicGen integration with `meta.story_brief` was wir
 | 45 | Audio baseline reset note in final QA (both b3sums + E-16 isolation result referenced) | C-final |
 | 46 | `meta.story_brief` persists in saved ledger (`test_story_brief_persists_in_saved_ledger`) | C5a2 |
 | 47 | `_run_with_timeout` non-blocking pattern preserved at every commit boundary | all |
-| 48 | `_STYLE_WORLD_BLOCK` has 10 style entries + default fallback; no era literals in any entry; each preserves sound-first / [ENV:][SFX:] discipline (E-13 + E-23) | C2b |
-| 49 | `SCRIPT_SYSTEM_PROMPT.format(...)` passes `style_world_block=_resolve_style_world_block(resolved["style"])` (E-13) | C2b |
+| 48 | Orphan `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` constants deleted (no live consumers; no-legacy-back-compat rule applied per C2b path-A audit); locked by `test_scaffolding_preamble_constant_deleted` + `test_script_system_prompt_constant_deleted` runtime hasattr assertions | C2b |
+| 49 | Orphan 5-pillar / dramaturg era literals (`1950s Americana`, `Orson Welles`, `Norman Corwin`, `Lucille Fletcher`, `golden age of radio`, `OMNI-RETRO CULTURAL COLLISION`, plus the four other pillar names) absent from runtime strings in `nodes/story_orchestrator.py`; locked by parametrized `test_literal_not_in_runtime_strings` | C2b |
 | 50 | Workflow JSON edits use exact-string recursive replacement, not line numbers (E-19 / RR-B6) | C2a |
 | 51 | `get_story_brief_music_mood` has zero production callers at C5b commit (E-28 / RR-B10) | C5b |
 | 52 | `get_story_brief_music_mood` has exactly one production caller at C5g commit, located in `nodes/musicgen_theme.py` (E-28 / RR-B10) | C5g |

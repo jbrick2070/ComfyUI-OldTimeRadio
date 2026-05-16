@@ -349,9 +349,6 @@ class TestStoryOrchestratorCodePatterns:
             "(transformers default is already None)."
         )
 
-    def test_citation_rule_present(self, src):
-        assert "CITATION RULE" in src or "cite ONLY" in src
-
     # Voice-path-cleanbreak 2026-05-12 (P3): test_gender_words_frozenset,
     # test_voice_tag_example_has_charactername, and test_lemmy_easter_egg
     # were deleted. They pinned source-level strings inside the legacy
@@ -360,6 +357,24 @@ class TestStoryOrchestratorCodePatterns:
     # OTR_LedgerScriptWriter has its own dedicated cast / writer tests;
     # the LEMMY easter-egg framework is tracked in BUG_LOG (orphaned
     # in LPL migration). No replacement assertions needed.
+    #
+    # Sprint C C2b 2026-05-15: test_citation_rule_present was also
+    # deleted. It pinned the substring "CITATION RULE" / "cite ONLY"
+    # inside the orchestrator+loader source union. Those substrings
+    # lived ONLY inside the SCRIPT_SYSTEM_PROMPT constant, which was
+    # itself an orphan from the eec4718 LPL extraction sprint (no live
+    # consumer; verified via 8-search audit recorded in `SPRINT.md` §B).
+    # SCRIPT_SYSTEM_PROMPT + SCAFFOLDING_PREAMBLE were deleted at C2b
+    # per the no-legacy-back-compat standing directive. With the
+    # constant gone, the test's contract is vacuously defunct -- a
+    # deleted constant has no content to pin. No replacement assertion
+    # needed because no live prompt module currently carries an
+    # equivalent citation-rule string; if the LPL pipeline needs one,
+    # the replacement test should live alongside whichever per-phase
+    # prompt module gets the rule (`_otr_outline._SYSTEM_PROMPT`,
+    # `_otr_line_composer._SYSTEM_PROMPT`, `_otr_ledger_reviewer`, or
+    # `_otr_period_prompts.OTR_PERIOD_SYSTEM_PROMPT`), not as a
+    # union-of-files substring scan here.
 
     def test_local_files_only_gemma(self, src):
         assert "local_files_only" in src
