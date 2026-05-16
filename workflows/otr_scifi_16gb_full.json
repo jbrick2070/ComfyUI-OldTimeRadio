@@ -703,7 +703,7 @@
         "(all)",
         4,
         "mission_control_procedural",
-        "cinematic, 35mm film look, 1980s broadcast aesthetic, subtle film grain, volumetric lighting",
+        "cinematic, 35mm film look, subtle film grain, volumetric lighting",
         true
       ],
       "color": "#1E3A5F",
@@ -1912,7 +1912,7 @@
       },
       "widgets_values": [
         "",
-        "1940s noir radio drama style, cinematic",
+        "head-and-shoulders studio portrait, neutral lighting, cinematic",
         1024,
         1024,
         20,

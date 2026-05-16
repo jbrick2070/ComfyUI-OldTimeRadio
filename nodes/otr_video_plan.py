@@ -76,7 +76,7 @@ log = logging.getLogger("OTR.nodes.otr_video_plan")
 # ---------------------------------------------------------------------------
 
 _DEFAULT_STYLE_TAIL = (
-    "cinematic, 35mm film look, 1980s broadcast aesthetic, "
+    "cinematic, 35mm film look, "
     "subtle film grain, volumetric lighting"
 )
 

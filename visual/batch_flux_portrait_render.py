@@ -106,7 +106,7 @@ def _build_portrait_prompt(speaker: str, appearance: str, style_anchor: str) -> 
     """
     speaker = (speaker or "Unnamed character").strip()
     appearance = (appearance or "").strip()
-    style_anchor = (style_anchor or "1940s noir radio drama style").strip()
+    style_anchor = (style_anchor or "head-and-shoulders studio portrait, neutral lighting").strip()
     parts = [
         style_anchor,
         f"head and shoulders portrait of {speaker}",
@@ -167,7 +167,7 @@ class BatchFluxPortraitRender:
             "optional": {
                 "style_anchor": ("STRING", {
                     "multiline": False,
-                    "default": "1940s noir radio drama style, cinematic",
+                    "default": "head-and-shoulders studio portrait, neutral lighting, cinematic",
                     "tooltip": (
                         "Period style anchor prepended to each portrait "
                         "prompt. Keep all cast members visually consistent "
@@ -231,7 +231,7 @@ class BatchFluxPortraitRender:
         clip,
         vae,
         ledger_json: str = "",
-        style_anchor: str = "1940s noir radio drama style, cinematic",
+        style_anchor: str = "head-and-shoulders studio portrait, neutral lighting, cinematic",
         width: int = DEFAULT_PORTRAIT_W,
         height: int = DEFAULT_PORTRAIT_H,
         steps: int = 20,

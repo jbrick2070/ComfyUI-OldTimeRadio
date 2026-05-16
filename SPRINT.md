@@ -5,7 +5,7 @@
 ## Status
 
 - Phase: execution
-- Current commit: C1
+- Current commit: C2a
 - Branch: sprint-c-story-brief-v2
 - Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).

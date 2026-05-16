@@ -107,6 +107,16 @@ forbidden = re.compile(
     # collapse into a unified prompt under any common bad name.
     r"|\b_POLISH_SYSTEM_PROMPT_UNIFIED\b"   # S33 B5: unify-attempt name #1
     r"|\b_UNIFIED_POLISH_PROMPT\b"          # S33 B5: unify-attempt name #2
+    # Sprint C C2a (2026-05-15): era literal cleanbreak -- visual layer.
+    # Production code in visual/ and workflows/ no longer carries era
+    # anchors (1940s noir radio drama style / 1980s broadcast aesthetic).
+    # Tokenize suppression handles forensic mentions in docstrings and
+    # comments. Test fixture at tests/test_musicgen_cache_keys.py:23
+    # retains its noir-literal cache-key payload by design (cache-key
+    # stability) -- the diff-based sweep only flags NEW additions, so
+    # the pre-existing fixture is naturally exempt.
+    r"|\b1940s\b"                           # C2a: visual-layer era literal
+    r"|1980s broadcast"                     # C2a: video-plan era literal
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
