@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 63,
-  "last_link_id": 115,
+  "last_link_id": 116,
   "nodes": [
     {
       "id": 63,
@@ -424,11 +424,7 @@
           "name": "video_path",
           "type": "STRING",
           "links": [
-            47,
-            79,
             80,
-            82,
-            90,
             96
           ],
           "slot_index": 0
@@ -1315,7 +1311,7 @@
         {
           "name": "portraits_dir",
           "type": "STRING",
-          "link": null,
+          "link": 116,
           "widget": {
             "name": "portraits_dir"
           }
@@ -1905,6 +1901,15 @@
           "type": "STRING",
           "links": null,
           "shape": 3
+        },
+        {
+          "name": "portraits_dir",
+          "type": "STRING",
+          "links": [
+            116
+          ],
+          "shape": 3,
+          "label": "portraits_dir"
         }
       ],
       "properties": {
@@ -1989,7 +1994,11 @@
             24,
             21,
             113,
-            114
+            114,
+            47,
+            79,
+            82,
+            90
           ],
           "slot_index": 1
         },
@@ -2184,8 +2193,8 @@
     ],
     [
       47,
-      12,
-      0,
+      62,
+      1,
       20,
       1,
       "STRING"
@@ -2256,8 +2265,8 @@
     ],
     [
       79,
-      12,
-      0,
+      62,
+      1,
       51,
       5,
       "STRING"
@@ -2272,8 +2281,8 @@
     ],
     [
       82,
-      12,
-      0,
+      62,
+      1,
       52,
       2,
       "STRING"
@@ -2328,8 +2337,8 @@
     ],
     [
       90,
-      12,
-      0,
+      62,
+      1,
       55,
       3,
       "STRING"
@@ -2492,6 +2501,14 @@
       5,
       62,
       4,
+      "STRING"
+    ],
+    [
+      116,
+      59,
+      2,
+      51,
+      6,
       "STRING"
     ]
   ],

@@ -157,8 +157,13 @@ class BatchFluxPortraitRender:
     CATEGORY = "OTR/v2/Visual"
     OUTPUT_NODE = True
     FUNCTION = "execute"
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("portrait_batch", "report")
+    # Sprint D D0d (2026-05-16): added third output `portraits_dir` so
+    # downstream HuMo can wire its face-reference input to the actual
+    # write directory instead of falling through to `comfy_output_dir()`.
+    # Sprint C shipped HuMo's `portraits_dir` input unlinked; this
+    # output is the wiring partner so the JSON link can land cleanly.
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING")
+    RETURN_NAMES = ("portrait_batch", "report", "portraits_dir")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -305,6 +310,13 @@ class BatchFluxPortraitRender:
             )
         episode_id = str(led.get("episode_id") or "episode")
         cast = led.get("cast") or []
+        # Sprint D D0d: resolve portraits_dir up here so both the
+        # no-cast early-return path AND the normal return path can
+        # surface a real directory string in the third output socket.
+        # Was previously computed at the per-character render site only.
+        _OTRP_early, _ = _lazy_otr_imports()
+        portraits_dir = _OTRP_early.otr_portraits_dir(episode_id)
+        portraits_dir.mkdir(parents=True, exist_ok=True)
         # Sprint C C5d (2026-05-15): resolve brief lighting + status once
         # per ledger; passed into every per-character portrait prompt.
         # Lighting helper returns lighting + atmosphere terms only
@@ -328,7 +340,7 @@ class BatchFluxPortraitRender:
                 "  no cast members in ledger; nothing to render"
             )
             empty = torch.zeros((1, height, width, 3), dtype=torch.float32)
-            return (empty, "\n".join(report_lines))
+            return (empty, "\n".join(report_lines), str(portraits_dir))
 
         # BUG-LOCAL-094 (2026-05-04 EVENING): build a per-char_id flag
         # of "has at least one character-role line" by walking
@@ -381,10 +393,10 @@ class BatchFluxPortraitRender:
                 f">=1 character-role line"
             )
 
-        # ---- Resolve output dir ----
+        # ---- Output dir already resolved early in execute() per D0d ----
         _OTRP, _OTRL = _lazy_otr_imports()
-        portraits_dir = _OTRP.otr_portraits_dir(episode_id)
-        portraits_dir.mkdir(parents=True, exist_ok=True)
+        # portraits_dir computed near line 308 so the no-cast early
+        # return at line 331 can surface it in the third output socket.
 
         # ---- Build negative cond (shared) ----
         negative = text_enc.encode(
@@ -522,7 +534,7 @@ class BatchFluxPortraitRender:
             f"OTR_BatchFluxPortraitRender done | rendered={len(rendered_imgs)}/"
             f"{len(cast)} | out_dir={portraits_dir}"
         )
-        return (out_batch, "\n".join(report_lines))
+        return (out_batch, "\n".join(report_lines), str(portraits_dir))
 
     # ----- helpers -----
 
