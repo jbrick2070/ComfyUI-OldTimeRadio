@@ -97,22 +97,42 @@ def _slugify_char_id(s: str) -> str:
     return s or "unknown"
 
 
-def _build_portrait_prompt(speaker: str, appearance: str, style_anchor: str) -> str:
+def _build_portrait_prompt(
+    speaker: str,
+    appearance: str,
+    style_anchor: str,
+    lighting: str = "",
+) -> str:
     """Compose the FLUX prompt for one cast member's portrait.
 
-    Period style anchor + character description + composition guidance.
-    Designed to give HuMo a stable, frontal, well-lit reference frame
-    that's NOT a scene shot.
+    Period style anchor + character description + (optional) brief-
+    derived lighting + atmosphere + composition guidance. Designed to
+    give HuMo a stable, frontal, well-lit reference frame that's NOT
+    a scene shot.
+
+    `lighting` is the output of `get_story_brief_lighting(meta)` --
+    a comma-joined string of lighting + atmosphere terms (refinement
+    section 6.2). Setting terms are deliberately excluded since
+    portraits do not want env / prop noise pulling composition toward
+    the scene. Empty string when the brief is absent or failed; the
+    portrait falls through to the legacy composition guidance.
     """
     speaker = (speaker or "Unnamed character").strip()
     appearance = (appearance or "").strip()
     style_anchor = (style_anchor or "head-and-shoulders studio portrait, neutral lighting").strip()
+    lighting = (lighting or "").strip()
     parts = [
         style_anchor,
         f"head and shoulders portrait of {speaker}",
     ]
     if appearance:
         parts.append(appearance)
+    # Sprint C C5d (2026-05-15): brief-derived lighting + atmosphere
+    # inserted after the character appearance, before the fixed
+    # composition guidance. Per refinement section 6.2 the lighting
+    # helper returns lighting + atmosphere terms only (no setting).
+    if lighting:
+        parts.append(lighting)
     parts.extend([
         "neutral expression",
         "centered composition",
@@ -285,10 +305,23 @@ class BatchFluxPortraitRender:
             )
         episode_id = str(led.get("episode_id") or "episode")
         cast = led.get("cast") or []
+        # Sprint C C5d (2026-05-15): resolve brief lighting + status once
+        # per ledger; passed into every per-character portrait prompt.
+        # Lighting helper returns lighting + atmosphere terms only
+        # (refinement section 6.2). Status surfaces in the report for
+        # E-07 observability.
+        from nodes._otr_story_brief_helpers import (
+            get_story_brief_lighting,
+            get_story_brief_status,
+        )
+        _meta = led.get("meta") if isinstance(led.get("meta"), dict) else {}
+        _brief_lighting = get_story_brief_lighting(_meta)
+        _brief_status = get_story_brief_status(_meta)
         report_lines.append(
             f"OTR_BatchFluxPortraitRender: loaded ledger "
             f"{led_path.name if led_path else '<inline>'} "
-            f"episode_id={episode_id} cast={len(cast)}"
+            f"episode_id={episode_id} cast={len(cast)} "
+            f"story_brief_status={_brief_status}"
         )
         if not cast:
             report_lines.append(
@@ -412,7 +445,10 @@ class BatchFluxPortraitRender:
                 or c.get("traits")
                 or ""
             )
-            prompt = _build_portrait_prompt(speaker, appearance, style_anchor)
+            prompt = _build_portrait_prompt(
+                speaker, appearance, style_anchor,
+                lighting=_brief_lighting,
+            )
             t0 = time.time()
             try:
                 positive = text_enc.encode(clip, prompt)[0]
