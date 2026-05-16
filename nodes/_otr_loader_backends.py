@@ -100,6 +100,38 @@ def compute_effective_context_limit(row: Any) -> int:
     )
 
 
+def check_context_window(row: Any) -> None:
+    """Sprint D D4 -- precondition gate for adapter load.
+
+    Raises RuntimeError if `row.context_window < HARD_VRAM_CONTEXT_LIMIT`.
+    The hard limit is the system-wide ceiling; a row whose native
+    window is BELOW it means the loaded model would refuse prompts
+    that are within the system budget but exceed the model's native
+    window. Surface that mismatch loud at load time rather than
+    silently truncating mid-generation.
+
+    Talkie at context_window=4096 trips this by design under the
+    default HARD_VRAM_CONTEXT_LIMIT=8192. The G5 operator gate
+    covers whether to relax (loosen the precondition to a warning),
+    accept (research-lane catalog visibility but load-blocked), or
+    land a D-future compact-mode binding.
+
+    Existing 6 catalog rows all have context_window=8192 which
+    matches the default HARD_VRAM_CONTEXT_LIMIT so they DO NOT
+    trip the precondition under any production setting.
+    """
+    if int(row.context_window) < int(_otr_model_catalog.HARD_VRAM_CONTEXT_LIMIT):
+        raise RuntimeError(
+            f"context_window {row.context_window} for "
+            f"{getattr(row, 'repo_id', '?')!r} is below "
+            f"HARD_VRAM_CONTEXT_LIMIT "
+            f"{_otr_model_catalog.HARD_VRAM_CONTEXT_LIMIT}. Pick a "
+            f"larger-window variant or land a compact-mode binding "
+            f"in D-future. Operator gate G5 covers whether to "
+            f"relax this precondition for research-lane models."
+        )
+
+
 def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
     """Sprint D D2c -- per-backend message encoding dispatch.
 
@@ -179,6 +211,7 @@ def generate_kwargs_for_row(row: Any) -> dict[str, Any]:
 
 __all__ = [
     "LoaderBackend",
+    "check_context_window",
     "compute_effective_context_limit",
     "encode_messages_for_row",
     "stop_strings_for_row",

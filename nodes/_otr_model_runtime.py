@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
 
@@ -52,6 +53,15 @@ class _LegacyTransformersBackendBase:
     """
 
     def load(self, repo_id: str, row: Any) -> dict[str, Any]:
+        # Sprint D D4: precondition gate fires before the legacy
+        # load delegate. Rows whose context_window is below
+        # HARD_VRAM_CONTEXT_LIMIT raise here instead of silently
+        # truncating mid-generation downstream. Existing 6
+        # production rows all have context_window=8192 which
+        # matches the default HARD_VRAM_CONTEXT_LIMIT so this is
+        # a no-op for them; talkie at 4096 is the only row that
+        # would trip the precondition under default settings.
+        _otr_loader_backends.check_context_window(row)
         return _otr_model_loader.load_llm(repo_id)
 
     def generate(
@@ -105,6 +115,11 @@ class TransformersGPTQInt4Backend:
     """
 
     def load(self, repo_id: str, row: Any) -> dict[str, Any]:  # noqa: ARG002
+        # Sprint D D4: precondition fires FIRST. Talkie at 4096 trips
+        # this before the NotImplementedError, surfacing the
+        # context-window mismatch as the dominant error rather than
+        # the deferred-feature one.
+        _otr_loader_backends.check_context_window(row)
         raise NotImplementedError(
             "TransformersGPTQInt4Backend.load is a D1b scaffold; the "
             "AutoGPTQForCausalLM runtime path lands in D1c behind "

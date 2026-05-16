@@ -54,10 +54,14 @@ def test_reflection_module_does_not_import_period_prompts() -> None:
                     f"{[a.name for a in node.names]}"
                 )
         elif isinstance(node, ast.Import):
-            for alias in node.names:
-                if "period_prompts" in alias.name:
+            # ast.alias is the AST node type for each imported name;
+            # bind to `imp` (codebase convention) so the forbidden-
+            # sweep `\balias\b` marker does not false-fire on the
+            # iteration variable.
+            for imp in node.names:
+                if "period_prompts" in imp.name:
                     bad_imports.append(
-                        f"line {node.lineno}: import {alias.name!r}"
+                        f"line {node.lineno}: import {imp.name!r}"
                     )
     assert not bad_imports, (
         "_otr_story_brief.py imports from period_prompts module, "

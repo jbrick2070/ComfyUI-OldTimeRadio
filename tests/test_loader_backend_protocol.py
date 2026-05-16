@@ -136,12 +136,30 @@ def test_existing_multimodal_text_only_backend_signatures_unchanged() -> None:
 def test_gptq_int4_adapter_constructable() -> None:
     """The D1c scaffold is constructable; load/generate/unload each
     raise NotImplementedError with a clear deferral message.
+
+    Sprint D D4 update: load() now calls check_context_window(row)
+    before raising NotImplementedError. Pass a fake row with
+    context_window >= HARD_VRAM_CONTEXT_LIMIT so the precondition
+    passes and the NotImplementedError surfaces as before.
     """
+    from dataclasses import dataclass
+
+    from nodes import _otr_model_catalog as _catalog
+
+    @dataclass
+    class _FakeAdequateRow:
+        context_window: int = 0
+        repo_id: str = "talkie-lm/talkie-1930-13b-it"
+
+    fake_row = _FakeAdequateRow(
+        context_window=int(_catalog.HARD_VRAM_CONTEXT_LIMIT),
+    )
+
     adapter = runtime.TransformersGPTQInt4Backend()
     assert adapter is not None
 
     with pytest.raises(NotImplementedError, match="D1c"):
-        adapter.load("talkie-lm/talkie-1930-13b-it", row=None)
+        adapter.load("talkie-lm/talkie-1930-13b-it", row=fake_row)
 
     with pytest.raises(NotImplementedError, match="D1c"):
         adapter.generate(model=None, messages=[])
