@@ -109,6 +109,50 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
+## CLOSED SPRINT -- Sprint C -- `meta.story_brief` v2 (2026-05-15)
+
+**Status:** CLOSED. 17 commits on `sprint-c-story-brief-v2`, branched from `s34-p0-p1-hotfix @ f758f02`. Pytest-only structural pass; runtime quality NOT PROVEN (visual + audio empirical verification deferred to Sprint A). All 50 active acceptance rows green; 2 deferred to Sprint A (audio C7 baseline reset captures + E-16 absent-brief isolation -- gated on `OTR_REGRESSION_RUNTIME=1`). Final commit hash: see `git log --oneline sprint-c-story-brief-v2`. Detailed close-out lives in `docs/closed-sprints/2026-05-15-sprint-c-story-brief-v2.md` (archived from SPRINT.md after C-final).
+
+**What landed:**
+
+- `meta.story_brief` 8-key contract stamped at writer K.5.5 on every successful run (refinement section 4 schema).
+- Reflection pure module `nodes/_otr_story_brief.py` -- input builder + strict-JSON LLM call + 3-arm scoped try/except + repair pass (temp+0.15 clamped to 0.55 + CRITICAL prefix per R-06) + 8-key fail-loud sentinel.
+- Central helpers `nodes/_otr_story_brief_helpers.py` -- 5 helpers: `get_story_brief_full`, `get_story_brief_ltx(max_chars=90)`, `get_story_brief_lighting`, `get_story_brief_music_mood` (returns list, intersected with 16-term `_MUSIC_MOOD_VOCAB`), `get_story_brief_status`.
+- Six downstream consumers wired: FLUX env (`visual/batch_flux_render.py:_parse_env_prompts`), FLUX radio bookend (`visual/batch_flux_render.py:_build_dynamic_radio_prompt` -- brief replaces weak Tier 4 `scenes[0].env`), FLUX portraits (`visual/batch_flux_portrait_render.py:_build_portrait_prompt` -- lighting helper, no setting noise), LTX motion (`nodes/batch_ltx_render.py:_build_ltx_role_prompt` -- 90-char fragment, motion-first, drop-past-140), HuMo lip-sync (`nodes/batch_humo_render.py:_build_pos_prompt` -- lighting helper before `_DEFAULT_POS_SUFFIX`), MusicGen (`nodes/musicgen_theme.py` -- mood-prefix when `story_brief_status=="ok"` and vocab intersection non-empty).
+- Cleanbreak block (C2a → C3b): visual era literals retired (FLUX portrait + `_DEFAULT_STYLE_TAIL` + workflow JSON via string-based replace per E-19), orchestrator era literals retired (rerank prompt at line 1596 + orphan `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` constants deleted per Path A audit), `_GENRE_BY_STYLE` table + `_resolve_genre` + `_preview_genre` helpers + `meta.visual_plan.genre` stamp + 3 `video_engine.py` `or genre` fall-throughs deleted, `meta.ltx_style_brief` retirement finalized (residual comment cleanup; symbol marker armed).
+- VRAM envelope lock-in (C4): 6 regression-guard tests pinning `DEFAULT_LLM == Mistral-Nemo-Instruct-2407`, `DEFAULT_VRAM_CEILING_GB == 14.5`, `HARD_VRAM_CONTEXT_LIMIT == 8192`, Gemma-4-E4B context override, `_run_with_timeout` non-blocking + cache invalidation pattern.
+- 12 new forbidden-sweep markers armed (era literals + retired symbol names); zero runtime hits at every commit boundary.
+- ~127 new active pytest tests + 7 runtime-gated skips. Final repo pytest count: 2276 passed, 17 skipped, 0 failed. Bug Bible regression baseline (23/1/2) held end-to-end.
+
+**Architectural discoveries handled per pre-spec'd contingencies:**
+
+- C1 audit found `evict_model` symbol absent in `nodes/_otr_model_loader.py`; loader is implicitly single-slot (`request_slot` evicts before loading next). E-15 RR-A1 OOM scenario cannot occur on this loader. Resolution: deleted explicit eviction call from C5a2 plan; replaced with regression tests proving the no-OOM property.
+- C1 audit found `visual/batch_flux_env_render.py` does not exist; C5c retargeted to `visual/batch_flux_render.py` per E-24 contingency.
+- C2b 8-search audit found `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` are orphan constants (zero live consumers; orphaned during `eec4718` LPL extraction). Resolution: deleted both constants per no-legacy-back-compat directive; skipped `_STYLE_WORLD_BLOCK` machinery entirely (no consumer = no place to interpolate).
+
+**What's deferred to Sprint A (handoff):**
+
+- Audio C7 baseline reset captures (E-12). Sprint A's first runtime-verification commit captures pre-C5g forensic b3sum against parent commit `c86db57` and new canonical b3sum post-C5g; commits both fixture files; the three runtime-gated tests in `tests/test_story_brief_musicgen_c5g.py::TestRuntimeOnly` flip live automatically.
+- E-16 absent-brief isolation test (proves audio shift is exclusively mood-prefix code path, not a smuggled regression).
+- Empirical visual + audio render quality verification (FLUX env / portrait, LTX motion, HuMo lip-sync, MusicGen audio) -- all unverified at Sprint C close.
+- Empirical LTX motion fidelity verification (R-05). C5e char-counting tests are structural proxy only.
+
+**What's deferred to Sprint G (parked):**
+
+- `nodes/story_orchestrator.py` orphan-constant sweep (3000+ lines, gutted across LPL / S31 B3 / S34 extraction sprints). Each candidate gets its own 8-search audit before deletion. C2b confirmed `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` were dead and deleted them; broader sweep parked.
+- `_load_canon_for_writer` (`nodes/story_orchestrator.py:2912`) -- orphan function discovered during C2b cleanup; no production callers. Sprint G includes in the broad orphan sweep.
+- Dead-but-harmless `genre` parameter on `nodes/video_engine.py:_parse_hud_data` and `_write_story_treatment` (always passed `""` post-C3 since `meta.visual_plan.genre` is gone).
+- Comment-only era references at `nodes/story_orchestrator.py` lines 804, 874-877 (cosmetic cleanup, no runtime effect).
+- `tests/test_musicgen_style_palette.py` rename to `tests/test_style_palette.py` (strip misleading `musicgen` prefix; the file's actual scope is the shared style palette).
+
+**v2.1+ candidates (deferred decisions):**
+
+- `artokun/comfyui-mcp` evaluation OR custom `/mcp-builder` comfyui-runner. Defer until after v1.9 ships and real iteration friction is measured. Until then: manual ComfyUI Desktop loading is the workflow. Don't build harness infrastructure speculatively.
+
+**Next sprint:** Sprint A (downstream verification + repair through FLUX/LTX/HuMo/MusicGen on real GPU) opens per the B → C → A locked sequence.
+
+---
+
 ## QUEUED SPRINT -- Sprint G -- Comprehensive bug sweep + cosmetic cleanup
 
 **Status:** QUEUED. Position: after Sprint A or whenever Jeffrey calls. May split into G1/G2 if scope warrants. Round-robin reviewed before Cowork execution per established pattern.
@@ -140,6 +184,59 @@ After the current round of cleanbreak validation work closes, the next three spr
 * Magic strings (top 3-5 worst offenders only).
 
 **Sequencing:** after Sprint C (which may obsolete some of the above by rewriting the same code).
+
+---
+
+## ADDENDUM -- LTX 2.3 LipDub IC-LoRA deep-research (2026-05-15)
+
+**Status:** Research addendum, NOT a sprint. Supplements Cross-cutting notes §2 LTX LipDub IC-LoRA with measured/cited findings from the 2026-05-15 architectural evaluation. No sprint number assigned; no branch cut; no phases. Adoption sequencing unchanged from §2 -- LipDub stays a Sprint A acceptance target (or later forward feature work at Jeffrey's discretion), gated on Sprint C close.
+
+**Research surface:** `uploads/LipDub IC-LoRA Research for OTR Pipeline.md` (9 sections + works cited). Replaces §2's pre-bench estimate with concrete numbers and surfaces five issues §2's adoption gates do not yet cover.
+
+### Five issues §2 should fold in before adoption
+
+1. **Audio path is not byte-passthrough.** The LTX-2.3 inference pipeline (`packages/ltx-pipelines/src/ltx_pipelines/lipdub.py`) routes input audio through an Audio VAE -> AudioPatchifier -> joint DiT -> HiFi-GAN vocoder. The output waveform is mathematically distinct from the source -- the integrated vocoder is trained on clean modern speech and will smooth away the 1940s 300 Hz - 4 kHz band-limit, tube saturation, plate reverb, and noise floor that OTR's DSP chain produces. **Directly violates Prime Directive 1 if unhandled.** Required mitigation: surgically disable the AudioDecoder node in the workflow JSON (or null-object the decoder in the pipeline) AND multiplex the pristine DSP audio back over the silent video via FFmpeg post-render. The audio merely conditions phoneme generation; it does not pass through to the output. §2 gate 4 ("audio output stays driven by the existing voice path") is the right intent but does not yet name the AudioDecoder-bypass mechanism that makes it true.
+
+2. **Text prompt must carry the exact dialogue transcription.** The DiT cross-attention maps audio VAE latents to visual phonemes using the text prompt as semantic anchor. Omit the transcription and lip-sync accuracy collapses. The consumer must read `line.text` from the L3 ledger (Sprint C surface) and inject it into the LipDub prompt alongside the existing `meta.story_brief` atmosphere terms. Reinforces §2 gate 2 (Sprint C3 must land first) -- the prompt depends on the post-C brief contract, not an intermediate one.
+
+3. **VRAM peak is at reference-video conditioning, not diffusion.** Latent downscale factor = 1 -- source video is processed at full spatial+temporal resolution before any latent compression. Without tiled VAE decoding the 14.5 GB ceiling is breached before the diffusion sampler initializes. The workflow JSON needs an explicit tiled-VAE path on the source-video ingest socket, not just on the output decode. §2's VRAM bench protocol should add this as an explicit ingest-socket check.
+
+4. **Single-speaker only.** Beta IC-LoRA distributes mouth movements unpredictably on multi-speaker shots. Two-character dialogue shots must route to HuMo (current path) or stay non-LipDub. A routing guard is required, keyed off the script-reflection pass's shot framing. §2 does not currently call out the multi-speaker reject case.
+
+5. **Motion control + LipDub stacking fails catastrophically.** Combining IC-LoRA motion guides (camera dolly, pose tracking) with the LipDub IC-LoRA produces excellent body motion with a completely static mouth -- the motion conditioning out-competes the audio conditioning for the same neural pathways. Routing is binary per shot: dynamic-camera + speaking -> LipDub alone; portrait + speaking -> HuMo; dynamic-camera + non-speaking -> motion stack as today. §2 does not currently call out the motion-stack reject case.
+
+### Updated model-file config (replaces §2's pre-bench estimate)
+
+- Base DiT: `ltx-2.3-22b-distilled-1.1.safetensors` GGUF Q4_K_M (~8.5 GB) or Q4_K_S (~8.2 GB) if Q4_K_M crowds the ceiling.
+- LipDub IC-LoRA: `ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors` (~2.47 GB, keep precision -- quantizing the structural control weights collapses reference-video adherence).
+- Spatial upscaler: `ltx-2.3-spatial-upscaler-x2-1.1.safetensors` (keep precision).
+- Text encoder: `gemma-3-12b-it-qat-q4_0-unquantized` (Gemma 3 12B QAT INT4, ~6.6 GB). **Do NOT use FP8 Gemma 3 12B** -- forces CPU offload across the PCIe bus and inflates a 2-minute render to 12-15 minutes per shot.
+- Source clip frame count must conform to (8n+1) -- 97 frames at 24fps for a ~4s baseline bench, 193 frames for an ~8s scaling check.
+- Optimal-config render time at 832x480, 5s clip: ~2.5 to 4 minutes per shot. CPU-offload-triggered render time: ~12 to 15 minutes per shot (avoid).
+
+### Routing matrix (informs §2 adoption gates)
+
+| Shot type | Path | Rationale |
+| --- | --- | --- |
+| Tight portrait + speaking | HuMo (current) | HuMo wins on portrait fidelity under quantization on 16 GB; faster too. |
+| Dynamic camera + speaking | LipDub | HuMo's facial tracking fails when background/camera translates significantly. |
+| Two-character dialogue | HuMo or skip | LipDub beta is single-speaker only; multi-speaker distributes mouth movements unpredictably. |
+| Dynamic camera + non-speaking | LTX motion stack (today) | Motion control + LipDub on the same pass = static mouth. Pick one. |
+| Character moving while speaking | LipDub | Superior temporal momentum + environmental physics handling. |
+
+### Non-determinism note
+
+Quantized GGUF inference at sub-8-bit precision uses split-K parallelization in GeMM kernels; floating-point accumulation order is non-associative across thread blocks, so byte-deterministic visual output across re-renders at the same seed is **not achievable** without batch-invariant compute flags that may not override custom GGUF kernels. When LipDub adoption lands, the workflow JSON's notes block should document the drift; audio byte-identity (via the FFmpeg multiplex path) is the non-negotiable -- visual byte-identity across re-renders is not.
+
+### License posture (carry forward to adoption)
+
+LTX-2 Community License Agreement -- **not MIT-equivalent**. Commercial use permitted under $10M USD gross annual revenue with an explicit Acceptable Use prohibition clause. OTR core stays MIT (per `feedback_otr_stays_mit` memory); LipDub adoption is an optional bolt-on visual path, license bar per backend, matching the existing voice-backend abstraction policy. The HuggingFace weights are gated behind a registration wall -- developer must accept the terms before automated download works.
+
+### What this addendum does NOT do
+
+- Does not open a new sprint slot. §2's "Sprint A acceptance bullet" placement stands; adoption sequencing is unchanged.
+- Does not change §2's VRAM ceiling rule, audio-baseline rule, or L3-wiring rule.
+- Does not require a workflow JSON edit today. The five issues above are inputs to whatever pass eventually picks up LipDub adoption, whether that is a Sprint A bullet, a later forward feature commit, or a future numbered sprint at Jeffrey's discretion.
 
 ---
 

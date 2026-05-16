@@ -4,8 +4,8 @@
 
 ## Status
 
-- Phase: execution
-- Current commit: C5g
+- Phase: closing
+- Current commit: C-final
 - Branch: sprint-c-story-brief-v2
 - Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).
@@ -1182,3 +1182,113 @@ QA review doc restatement: "MusicGen integration with `meta.story_brief` was wir
 - `docs/2026-05-15-S34-final-qa-review.md` — parent sprint close.
 - `ROADMAP.md` — Sprint C scope section + S21.1 close + S30 close + S31 close + S34 close.
 - BUG-LOCAL-228 entry in `docs/BUG_LOG.md` — the timeout-recovery contract referenced by L-3 and §A.8.
+
+---
+
+# §C-final. Sprint close (2026-05-15)
+
+## §C-final.1 What shipped
+
+17 commits on `sprint-c-story-brief-v2`, branched from `s34-p0-p1-hotfix @ f758f02`, all gates green at every commit boundary:
+
+| # | Commit | Subject (compressed) |
+|---|---|---|
+| C0a | `a5f9e3e` | branch cut + status update |
+| C0b | `f953cd5` | refinement 3.5 + 3.6 + 11.4 amended (BUG-LOCAL-228 contract) |
+| C1 | `b01feda` | staleness audit -- 2 contingencies activated (evict_model absent → single-slot loader, FLUX env path retargeted) |
+| C2a | `851f54e` | era literal cleanbreak -- visual layer (FLUX portrait + video_plan tail + workflow JSON via string-based replace) |
+| C2b | `b39a298` | era literal cleanbreak -- orchestrator (rerank prompt + orphan SCRIPT_SYSTEM_PROMPT + SCAFFOLDING_PREAMBLE deleted; `_STYLE_WORLD_BLOCK` machinery skipped per Path A audit) |
+| C3 | `7e9a1df` | _GENRE_BY_STYLE deleted (table + helpers + stamp + 3 video_engine fall-throughs + projection) |
+| C3b | `ccbc12a` | meta.ltx_style_brief retirement -- stale comment removed, forbidden marker armed |
+| C4 | `293c6e0` | VRAM envelope lock-in -- S21.1 + S30 B1b + S31 B4 baseline regression-guarded |
+| C5a1 | `87f01bd` | reflection pure module -- input builder + strict-JSON prompt + scoped try/except + repair (temp+0.15 clamped to 0.55, CRITICAL prefix) + 8-key sentinel |
+| C5a2 | `793d499` | writer wires reflection at K.5.5 + module-level import; dual-slot OOM regression-guarded (E-15 revised at C1 -- loader is single-slot) |
+| C5b | `01086ac` | central story_brief helpers (5 per refinement §5; music_mood pure here, wired at C5g) |
+| C5c | `a073002` | FLUX env + radio bookend read brief via get_story_brief_full |
+| C5d | `7f9fc62` | FLUX portraits read brief via get_story_brief_lighting |
+| C5e | `61dea94` | LTX motion reads brief via get_story_brief_ltx (motion-first, drop-past-140; structural proxy per R-05) |
+| C5f | `c86db57` | HuMo lip-sync reads brief via get_story_brief_lighting |
+| C5g | `600d0de` | MusicGen wired structurally; audio C7 baseline reset captures DEFERRED to Sprint A per Option 2 path |
+| C-final | this commit | Sprint close, QA inline, post-state contract for Sprint A |
+
+**Pytest count:** 2276 passed, 17 skipped, 0 failed at every commit boundary post-C5a1. **Bug Bible regression:** 23 passed / 1 skipped / 2 xfailed at every commit boundary -- baseline held end-to-end. **Workflow link validator:** 0 violations end-to-end. **Forbidden-pattern sweep:** 0 runtime hits at every commit boundary (5 new markers armed at C2a/C2b/C3/C3b: `1940s`, `1980s broadcast`, `1950s Americana`, `golden.age radio`, `Omni.Retro`, `Orson Welles`, `Norman Corwin`, `Lucille Fletcher`, `_GENRE_BY_STYLE`, `meta.ltx_style_brief`, `_LTX_STYLE_BRIEF_PROMPT`, `_generate_ltx_style_brief`).
+
+## §C-final.2 What's broken / known issues
+
+**Runtime status: NOT PROVEN.** Pytest-only structural pass. No ComfyUI Desktop run; no FLUX, LTX, HuMo, or MusicGen visual / audio render quality verified in Sprint C. Sprint A is the empirical-verification pass for downstream artifact quality.
+
+**Audio C7 baseline reset deferred to Sprint A** per C5g revised scope (Option 2 path, operator directive 2026-05-15). The pre-C5g forensic b3sum (capture against parent commit `c86db57`) and the new canonical baseline b3sum (post-C5g) are NOT yet in the repo. Three runtime-gated tests in `tests/test_story_brief_musicgen_c5g.py::TestRuntimeOnly` stage the assertions and skip without `OTR_REGRESSION_RUNTIME=1`. Sprint A's first runtime-verification commit captures both fixture files and unblocks the gated tests.
+
+**Acceptance rows 38, 39 marked DEFERRED** to Sprint A (audio C7 baseline reset event + E-16 absent-brief isolation test). All other 50 acceptance rows green.
+
+## §C-final.3 E-20 MusicGen one-commit-exception gate
+
+**Mechanical gate (rename-immune `git diff --name-only ... | grep -i musicgen`):** three musicgen-named files appear in the Sprint C diff:
+
+```
+nodes/musicgen_theme.py        -- touched by C5g (600d0de) ONLY                             ✓ OK
+tests/test_story_brief_musicgen_c5g.py  -- created by C5g (600d0de) ONLY                   ✓ OK
+tests/test_musicgen_style_palette.py    -- touched by C3 (7e9a1df), NOT C5g                ⚠ literal-rule mismatch
+```
+
+The C3 touch on `tests/test_musicgen_style_palette.py` is the literal-rule mismatch. It deleted the six legacy `_GENRE_BY_STYLE` / `_resolve_genre` / `_preview_genre` tests that lived at lines 227-331 of that file. None of the six tests covered MusicGen audio behavior; they covered the now-deleted writer-side genre derivation. The MusicGen-specific tests in the same file (style palette equality with `_STYLE_PICKER_SEED_POOL`, etc.) were preserved.
+
+**Semantic gate (E-20 / RR-B7 partial-accept visual inspection):** the C3 touch did NOT change MusicGen prompt text, model arguments, output duration, cache-key composition, or audio routing. Confirmed via `git diff s34-p0-p1-hotfix...HEAD -- tests/test_musicgen_style_palette.py` -- the diff is six function deletions plus a forensic-attribution comment block; zero changes to MusicGen audio-pipeline assertions.
+
+**Disposition:** semantic gate PASSES. The literal-rule mismatch is a path-naming coincidence (the file's `musicgen` prefix reflects its dual coverage of style-palette tests, which historically happened to live alongside genre-derivation tests). The C3 deletion of pure genre-derivation tests is the kind of cross-cutting cleanup that the E-20 semantic-gate carve-out was designed to cover. No revert required.
+
+**Recommendation (Sprint G candidate):** rename `tests/test_musicgen_style_palette.py` → `tests/test_style_palette.py` (strip the now-misleading `musicgen` prefix). The file currently tests the shared `_STYLE_PICKER_SEED_POOL` against multiple consumers; the `musicgen` prefix was an artifact of the original consumer pair.
+
+## §C-final.4 Architectural discoveries (handled at C1 + C2b)
+
+Two structural surprises surfaced during execution that were not visible to the v3 plan author and were resolved per pre-spec'd contingencies:
+
+1. **`evict_model` symbol absent; loader is implicitly single-slot** (C1 audit, dispositioned operator 2026-05-15). The v3 plan called for an explicit `evict_model(creative_model)` call at K.5.5. C1's 8-search audit found no `evict_model` symbol in `nodes/_otr_model_loader.py`. Deeper finding: the loader exposes `unload_llm()` + `request_slot(model_id)` and is single-slot by architecture -- `request_slot` already calls `unload_llm()` to evict any prior resident model BEFORE loading the next. Peak transient VRAM during the swap is `max(creative_size, technical_size)`, NOT their sum. The OOM scenario E-15 / RR-A1 was concerned about cannot occur on this loader. **Resolution:** delete the explicit eviction call; replace with regression tests that prove the no-OOM property and verify `request_slot`'s swap order. E-15 / §1.2 / §6 C5a2 spec / §7 acceptance row 28 / §2 precondition row 14 all revised inline.
+
+2. **`SCRIPT_SYSTEM_PROMPT` and `SCAFFOLDING_PREAMBLE` are orphan constants** (C2b 8-search audit, dispositioned operator 2026-05-15 Path A). The v3 plan called for replacing the OMNI-RETRO 5-pillar block (lines 3160-3179 of `nodes/story_orchestrator.py`) with a `_STYLE_WORLD_BLOCK` per-style dict. C2b's audit (getattr / glob-import / substring-content / alt-name / `git log -S` / writer-callsite / `__all__` / tests) found that both `SCRIPT_SYSTEM_PROMPT` and `SCAFFOLDING_PREAMBLE` -- which contained the era literals -- have ZERO live consumers across `nodes/`, `visual/`, `scripts/`, and `tests/`. Both were orphaned during the `eec4718` LPL extraction sprint. **Resolution:** delete both orphan constants per the no-legacy-back-compat standing directive; skip the `_STYLE_WORLD_BLOCK` machinery entirely (no consumer = no place to interpolate). Also deleted `tests/test_core.py::test_citation_rule_present` (pinned a substring inside the now-deleted SCRIPT_SYSTEM_PROMPT). E-13 / §1.4 RR-A3+RR-B6 architecture row / §6 C2b spec / §7 acceptance rows 10/48/49 all revised inline. Broader orphan-sweep of the 3000+ line `story_orchestrator.py` deferred to Sprint G per the no-scope-creep rule.
+
+Both discoveries followed the staleness-audit-then-execute pattern and are exactly what the C1 audit gate was designed to catch.
+
+## §C-final.5 Post-state contract for next sprint (Sprint A scope)
+
+**Sprint A inherits the following gates / open work:**
+
+- **Audio C7 baseline reset captures (DEFERRED from C5g per Option 2 path).** Sprint A's first runtime-verification commit must:
+  1. Check out parent commit `c86db57` (C5f, the last commit before MusicGen wiring).
+  2. Run the audio pipeline under `OTR_REGRESSION_RUNTIME=1` with the FIXED_SEEDS from `tests/test_audio_byte_identical.py`.
+  3. Capture the output WAV's b3sum to `tests/fixtures/audio_c7_baseline_pre_c5g.wav.b3sum` (forensic).
+  4. Check out C5g (`600d0de`).
+  5. Re-run the same audio pipeline under the same seeds.
+  6. Capture the output WAV's b3sum to `tests/fixtures/audio_c7_baseline.wav.b3sum` (NEW canonical).
+  7. Run the E-16 absent-brief isolation test: force `meta.story_brief_status="absent"`, render audio, assert byte-identical match to the pre-C5g forensic b3sum from step 3. This proves the audio shift is exclusively the mood-prefix code path.
+  8. Commit both fixture files; the three runtime-gated tests in `tests/test_story_brief_musicgen_c5g.py::TestRuntimeOnly` flip from `skip` to `pass` automatically.
+- **Empirical visual + audio render quality verification.** All FLUX env + portrait, LTX motion, HuMo lip-sync, and MusicGen audio output quality is unverified at Sprint C close. Sprint A runs each through ComfyUI Desktop with real GPU, captures sample renders, eyeballs / ear-balls quality.
+- **Empirical LTX motion fidelity verification** (R-05). The C5e char-counting tests are structural proxy only.
+- **Sprint G handoff (parked):**
+  - `nodes/story_orchestrator.py` orphan-constant sweep. C2b audit confirmed `SCRIPT_SYSTEM_PROMPT` + `SCAFFOLDING_PREAMBLE` were dead (deleted at C2b). The 3000+ line file likely contains additional orphans from LPL / S31 B3 / S34 extraction sprints. Each candidate gets its own 8-search audit (getattr / glob-import / substring-content / alt-name / git log -S / writer-callsite / `__all__` / tests) before deletion.
+  - `tests/test_musicgen_style_palette.py` rename to `tests/test_style_palette.py` (strip the misleading `musicgen` prefix; see §C-final.3).
+  - Dead-but-harmless `genre` parameter on `nodes/video_engine.py:_parse_hud_data` and `_write_story_treatment` (always passed `""` post-C3 since the `meta.visual_plan.genre` stamp is gone; Sprint G drops the parameter from the signatures).
+  - `_load_canon_for_writer` in `nodes/story_orchestrator.py:2912` -- orphan function discovered during C2b cleanup; no production callers, only its own definition. Sprint G includes in the broad orphan sweep.
+  - Comment-only era references at `nodes/story_orchestrator.py` lines 804, 874-877 -- cosmetic cleanup deferred from C2b's scope-tight directive.
+
+**Sprint A audio C7 baseline state:** the canary at `tests/test_audio_byte_identical.py::TestAudioRegressionGate::test_audio_byte_identical_to_baseline` is gated on `OTR_REGRESSION_RUNTIME=1` and skipped throughout Sprint C. The existing fixture pair (`tests/fixtures/baseline_v1.5.wav` + `.sha256`) is a v1.5 baseline that pre-dates Sprint C entirely; Sprint A's first runtime commit re-baselines against the new MusicGen-wired audio path per the steps above.
+
+**Sprint A forbidden-sweep markers added by Sprint C:** `\b1940s\b`, `1980s broadcast`, `1950s Americana`, `golden.age radio`, `\bOmni.Retro\b`, `\bOrson Welles\b`, `\bNorman Corwin\b`, `\bLucille Fletcher\b`, `\b_GENRE_BY_STYLE\b`, `\bmeta\.ltx_style_brief\b`, `\b_LTX_STYLE_BRIEF_PROMPT\b`, `\b_generate_ltx_style_brief\b`. All armed at zero runtime hits.
+
+**New tests added by Sprint C (count + categories):**
+
+- C2a era literals (visual): 6 tests
+- C2b era literals (orchestrator): 14 tests (signature + AST + parametrized)
+- C3 _GENRE_BY_STYLE deletion: 9 tests
+- C3b meta.ltx_style_brief: 6 tests
+- C4 VRAM envelope lock-in: 6 tests
+- C5a1 reflection pure module: 23 tests (validation + repair + sentinel + AST)
+- C5a2 writer wiring: 9 active + 4 runtime-gated skips
+- C5b helpers: 21 tests
+- C5c FLUX env + bookend: 9 tests
+- C5d FLUX portraits: 6 tests
+- C5e LTX motion: 8 tests
+- C5f HuMo lip-sync: 6 tests
+- C5g MusicGen wiring: 11 active + 3 runtime-gated skips
+
+**Total new tests: ~127 active + 7 runtime-gated.** Final pytest count: 2276 passed, 17 skipped (C5g + C5a2 runtime-gated + pre-existing skips), 0 failed.
