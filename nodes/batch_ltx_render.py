@@ -393,14 +393,15 @@ _PROMPT_BY_ROLE = {
 # aesthetic in the LTX prompt is wasted bandwidth that throttles motion.
 #
 # What still happens to the deferred context:
-#   - ledger.meta.ltx_style_brief: still stamped by OTR_LedgerScriptWriter,
-#     used by BUG-LOCAL-111 (FLUX bookend integration, future commit)
-#     so the bookend still itself reflects the per-episode setting.
 #   - line scene_env / episode style: not consumed by LTX anymore;
 #     they remain available in the ledger for future per-line FLUX
 #     anchoring or post-process color grading work. Removing them
 #     here is reversible -- if motion lands clean and we want to
 #     re-introduce minimal context, we can append a <40-char tail.
+# (The former second bullet describing the legacy ltx_style_brief stamp
+# was deleted at Sprint C C3b -- the stamp itself was retired in S31 B3
+# and the new per-episode style brief lands via meta.story_brief at
+# Sprint C C5a2 / C5e.)
 def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
     """Return the per-role LTX motion prompt verbatim.
 

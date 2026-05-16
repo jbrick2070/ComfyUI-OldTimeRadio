@@ -143,6 +143,17 @@ forbidden = re.compile(
     # deletion comment and in the test_musicgen_style_palette.py
     # historical comment block that documents what got removed.
     r"|\b_GENRE_BY_STYLE\b"                 # C3: deleted genre table
+    # Sprint C C3b (2026-05-15): meta.ltx_style_brief stamp retirement
+    # pulled forward per E-14. The heavy retire happened at S31 B3
+    # (_generate_ltx_style_brief + _LTX_STYLE_BRIEF_PROMPT deleted);
+    # C3b cleans up the last stale comment block in batch_ltx_render.py
+    # and arms the marker so the symbol cannot be reintroduced. New
+    # per-episode style brief lands via meta.story_brief at C5a2 / C5e.
+    # Tokenize suppression handles forensic mentions in commit history,
+    # the C3b deletion comment, and historical test-deletion comments.
+    r"|\bmeta\.ltx_style_brief\b"           # C3b: retired stamp
+    r"|\b_LTX_STYLE_BRIEF_PROMPT\b"         # C3b: retired prompt constant
+    r"|\b_generate_ltx_style_brief\b"       # C3b: retired generator
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
