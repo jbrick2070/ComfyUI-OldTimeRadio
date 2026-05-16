@@ -5,7 +5,7 @@
 ## Status
 
 - Phase: execution
-- Current commit: C0a
+- Current commit: C1
 - Branch: sprint-c-story-brief-v2
 - Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).
@@ -55,7 +55,7 @@ All decisions below are **RESOLVED**. There are zero open questions. The plan is
 | E-12 | P0 | **MusicGen wiring IN sprint at C5g.** L-4 override. `get_story_brief_music_mood` is wired into `nodes/musicgen_theme.py`. Helper no longer ships "implemented-but-not-wired"; it ships wired. R-04 disposition flips from RESOLVED-as-deferred to SUPERSEDED. E-09 no-touch gate is amended (one-commit exception at C5g). Audio C7 baseline resets at C5g. | Specified at C5g; affects L-4, R-04, E-09, §4 hard rule 1. |
 | E-13 | P0 | **C2 scope expanded to all era-locked literals across orchestrator + visual layers** — not just the 4 Python + 2 JSON visual sites. Adds three orchestrator targets: rerank-prompt era anchor (`story_orchestrator.py:1596`), dramaturg-preamble era anchor (`story_orchestrator.py:3003-3004`), and the OMNI-RETRO 5-pillar block (`story_orchestrator.py:3162-3179`). The 5-pillar block is replaced with a style-driven dynamic world block keyed off `meta.style`, so each story carries flavor unique to its chosen style rather than 5-pillar omni-retro on every gen. | Specified at C2. |
 | E-14 | P0 | **All legacy retirements pulled forward.** `meta.ltx_style_brief` retirement moves from C5g to **C3b**, executed BEFORE any new `meta.story_brief` code is built. Order is: cleanbreak (C2a/C2b era literals + C3 `_GENRE_BY_STYLE` + C3b `meta.ltx_style_brief`) → envelope lock-in (C4) → new system (C5a1+). | Specified at C3b; affects §6 commit order. |
-| E-15 | P0 | **C5a2 dual-slot eviction guard (RR-A1).** Two-model selector (creative=Mistral-Nemo ~12 GB + technical=Gemma-4-E4B-it ~3 GB) sums to ~15 GB > 14.5 GB ceiling. If technical_fn is invoked while creative model is still resident, OOM crashes before BUG-LOCAL-228's timeout-recovery path can trigger. C5a2 inserts an explicit eviction call: if `resolved["creative_writing_model"] != resolved["technical_model"]`, force-unload the creative slot via `_otr_model_loader.evict_model(resolved["creative_writing_model"])` BEFORE the reflection call. Single-slot config (the default) skips the eviction — same model, same cache entry, no swap. | Specified at C5a2; new test `test_c5a2_evicts_creative_model_in_dual_slot_config`. |
+| E-15 | P0 | **C5a2 dual-slot OOM regression guard (RR-A1, revised at C1 audit).** Original specification called for an explicit `evict_model(creative_model)` call before reflection. C1 audit found the loader is implicitly single-slot: `request_slot(model_id)` already calls `unload_llm()` to evict any prior resident model before loading the next. Peak transient VRAM during the swap is `max(creative_size, technical_size)`, not their sum. Explicit pre-eviction is redundant. The OOM scenario cannot occur on this loader architecture. C5a2 ships regression tests that prove the no-OOM property without adding an explicit eviction call. | Specified at C5a2; tests below. |
 | E-16 | P0 | **C5g audio isolation test (RR-A2).** Blessing a new C7 baseline proves determinism but NOT that the audio shift was caused exclusively by the mood prefix. C5g adds `test_c5g_audio_matches_legacy_when_brief_absent`: force `meta.story_brief_status="absent"` (the brief-helper status-gate fall-through), run the full C5g pipeline, assert byte-identical output against the pre-C5g forensic b3sum (`tests/fixtures/audio_c7_baseline_pre_c5g.wav.b3sum`). Closes the smuggled-regression class. | Specified at C5g. |
 | E-17 | P1 | **Scoped try/except blocks (RR-B3).** C5a1 reflection function uses three NARROW try/except blocks (not one wrapping the whole function): one around `technical_fn(...)` catching broad Exception; one around `json.loads(...)` catching `json.JSONDecodeError`; one around schema validation catching `ValidationError`. Matches §A.5 `run_script_doctor` precedent. Prevents specific failure classes from being swallowed into the generic arm. | Specified at C5a1; new test asserts AST structure. |
 | E-18 | P1 | **Repair temperature clamp (RR-B5).** `repair_temperature = min(reflection_temperature + 0.15, 0.55)`. Keeps repair temperature inside the declared 0.35-0.55 effective range even if a future operator sets reflection_temperature above 0.4. | Specified at C5a1; new test `test_repair_temperature_clamped_to_055`. |
@@ -135,11 +135,11 @@ The branch does NOT cut until every row below is satisfied. C0a will not land ot
 | 11 | C2 split into C2a (visual layer, string-based JSON replace) + C2b (orchestrator + `_STYLE_WORLD_BLOCK`, sound-first discipline preserved) per E-13/E-19/E-23 | §6 C2a + C2b |
 | 12 | C3b: `meta.ltx_style_brief` retirement pulled forward (was C5g) | §6 C3b, E-14 |
 | 13 | C5g: MusicGen wiring + new audio C7 baseline capture + canary-fixture refresh specified | §6 C5g, E-12 |
-| 14 | C5a2 dual-slot eviction guard specified (RR-A1) | §6 C5a2, E-15 |
+| 14 | C5a2 dual-slot OOM regression tests specified (RR-A1 — C1 audit revised to regression-test approach after loader-architecture discovery) | §6 C5a2, E-15 |
 | 15 | C5g absent-brief isolation test specified (RR-A2) | §6 C5g, E-16 |
 | 16 | C5a1 scoped try/except spec + repair-temperature clamp specified (RR-B3, RR-B5) | §6 C5a1, E-17 + E-18 |
 | 17 | C5a1/C5a2 test reassignments specified (technical-slot test → C5a2; LLM-cache spy → C5a2) (RR-B1, RR-B2) | §6 C5a1 + C5a2, E-21 |
-| 18 | C1 confirms FLUX env/bookend file path before C5c codes (RR-B8) | §6 C1, E-24 |
+| 18 | C1 audit retargeted C5c to `visual/batch_flux_render.py` (E-24 / RR-B8 contingency activated — `batch_flux_env_render.py` does not exist at HEAD) | §6 C1, E-24 |
 | 19 | C-final gate rename-immune + semantic-gate visual-inspection note (RR-A4, RR-B7) | §6 C-final, E-20 |
 | 20 | Windows-side `git status --short` empty; `git branch --show-current` reports `s34-p0-p1-hotfix`; `git rev-parse HEAD` reports `f758f02`; no `AU "\a\al}"` or any other unmerged path | OPERATOR action on Windows checkout before C0a queues |
 
@@ -459,6 +459,50 @@ This entire `OMNI-RETRO CULTURAL COLLISION` paragraph + its 5 textural-soundscap
 - `nodes/story_orchestrator.py:918+` — `_LAST_NAMES` array (same pattern).
 
 Comment-only era references at lines 804 and 874-877 are cosmetically updated at C2b (optional, no runtime effect).
+
+---
+
+# §B. C1 staleness audit (2026-05-15)
+
+Audit completed at C1 against `f758f02` HEAD on branch `s34-p0-p1-hotfix` (parent of `sprint-c-story-brief-v2`). Verification commands documented inline. Two contingencies activated; both have in-spec resolution paths and are encoded above (E-15 row, E-24 file-path retarget, §6 C5a2 + §6 C5c spec edits).
+
+## §B.1 Audit table — verified state
+
+| Locked-plan claim | Verification command (cmd, run from repo root) | C1-verified state |
+|---|---|---|
+| `_GENRE_BY_STYLE` table at `OTR_LedgerScriptWriter.py:254-265` | `findstr /n /c:"_GENRE_BY_STYLE: dict" nodes\OTR_LedgerScriptWriter.py` | Confirmed line 254. §A.1 holds. |
+| `_resolve_genre` + `_preview_genre` helpers | `findstr /n /c:"def _resolve_genre" /c:"def _preview_genre" nodes\OTR_LedgerScriptWriter.py` | Confirmed lines 268, 296. §A.1 holds. |
+| `DEFAULT_LLM = "mistralai/Mistral-Nemo-Instruct-2407"` (audio C7 baseline) | `findstr /n /c:"DEFAULT_LLM = " nodes\_otr_model_catalog.py` | Confirmed line 32. §A.7 holds. L-1 holds. |
+| `meta.visual_plan.genre` stamp at K.5 (claim: line 2801) | (line-number drift tolerated; constant referenced via §A.2) | Spot-checked — `_resolve_genre` is called from K.5; stamp present. §A.2 holds within line-number drift. |
+| Three `video_engine.py` genre fall-throughs | (claim: lines 711, 836, 1075 per §A.3) | Spot-checked via §A.3 quoted excerpts; expressions present. §A.3 holds. |
+| `_DEFAULT_STYLE_TAIL` at `otr_video_plan.py:78-81` | (claim per §A.4) | Spot-checked; constant present. §A.4 holds. |
+| `"1940s noir radio drama style"` at `batch_flux_portrait_render.py:109/170/234` + 2 workflow JSON sites | (claim per §A.4) | Spot-checked; literals present. §A.4 holds. |
+| `DEFAULT_VRAM_CEILING_GB == 14.5` | (claim per §A.9) | Confirmed via S21.1 history; §A.9 holds. |
+| `HARD_VRAM_CONTEXT_LIMIT == 8192` + Gemma-4-E4B override == 8192 | (claim per §A.9) | Confirmed via S21.1 + S30 B1b history; §A.9 holds. |
+| `_run_with_timeout` non-blocking + `invalidate_cache_no_gpu_teardown` recovery | `findstr /n /i /c:"invalidate_cache_no_gpu_teardown" nodes\_otr_model_loader.py` | Confirmed at line 623; non-blocking contract present. §A.8 holds. L-3 holds. |
+| MusicGen → EpisodeAssembler → `episode_audio` routing | (claim per §A.6) | Workflow JSON routing present. §A.6 holds. L-4 override at C5g remains valid. |
+| FLUX env/bookend implementation file path (E-24): `visual/batch_flux_env_render.py` OR `visual/batch_flux_render.py` | `dir /b visual\batch*.py` returned `batch_flux_portrait_render.py`, `batch_flux_render.py` | **CONTINGENCY ACTIVATED.** `batch_flux_env_render.py` does not exist. `batch_flux_render.py` is the actual env/bookend implementation. C5c retargeted (§6 C5c, §2 row 18, E-24). |
+| `evict_model` symbol in `_otr_model_loader.py` (precondition for E-15 explicit eviction) | `findstr /n /c:"def evict_model" nodes\_otr_model_loader.py` | Symbol absent. **DEEPER FINDING:** `_otr_model_loader.py` exposes `unload_llm()` (line 555), `invalidate_cache_no_gpu_teardown()` (line 623), and `request_slot(model_id)` (load-or-reuse with auto-unload at lines 732-739). The loader is single-slot by architecture — only one LLM is resident at a time. `request_slot` already handles eviction implicitly: if a different model is currently resident, it calls `unload_llm()` before loading the next. Peak transient VRAM during a model swap is `max(creative_size, technical_size)`, NOT their sum. The OOM scenario E-15 / RR-A1 originally guarded against (creative + technical concurrently resident summing to ~15 GB) cannot occur on this loader architecture. **Resolution per operator directive 2026-05-15:** delete the explicit `evict_model` call; replace with regression tests that prove the no-OOM property and verify `request_slot`'s swap order. E-15 row revised, §6 C5a2 spec/code/tests/commit-subject revised, §2 row 14 revised, §7 row 28 revised. |
+
+## §B.2 Findings summary
+
+**Finding F1 — FLUX env/bookend file path mismatch (E-24 / RR-B8 contingency activated).**
+
+- v3 plan claim: `visual/batch_flux_env_render.py` is the FLUX env/bookend implementation file.
+- HEAD reality: `visual/batch_flux_render.py` is the actual file. `batch_flux_env_render.py` does not exist.
+- Resolution: C5c spec retargeted to `visual/batch_flux_render.py` per the C5c spec contingency. No deviation from plan intent — the contingency was authored for exactly this case.
+
+**Finding F2 — `evict_model` symbol absent; loader is implicitly single-slot.**
+
+- v3 plan claim: `_otr_model_loader.evict_model(model_id)` exists; C5a2 calls it explicitly to evict the creative model before reflection.
+- HEAD reality: no `evict_model` symbol. The loader is single-slot by architecture: `request_slot(model_id)` calls `unload_llm()` to evict any prior resident model BEFORE loading the next.
+- Implication: peak transient VRAM during a model swap = `max(creative_size, technical_size)`, not their sum. The OOM scenario RR-A1 was concerned about (both models concurrently resident → ~15 GB > 14.5 GB ceiling) cannot occur on this loader.
+- Resolution per operator directive: delete the explicit eviction call. Replace with regression tests (a) proving total resident VRAM never exceeds 14.5 GB during composition→reflection in dual-slot config, (b) verifying `request_slot`'s swap order calls `unload_llm(creative)` BEFORE the technical-model load, (c) confirming single-slot config emits no spurious unload.
+- E-15 row revised; §6 C5a2 imports (`evict_model` removed), code (eviction block removed), wire paragraph (contingency closed), pytest table (3 new regression tests), and commit subject all revised. §2 precondition row 14 and §7 acceptance row 28 also revised.
+
+## §B.3 Disposition authority
+
+Both findings disposed by operator directive in this conversation, 2026-05-15. F1 invokes the v3-plan contingency for E-24 / RR-B8 verbatim. F2 deletes the explicit-eviction approach in favor of regression tests, on the grounds that the original OOM concern was framed for a hypothetical multi-slot loader and does not apply to this codebase's single-slot architecture.
 
 ---
 
@@ -788,15 +832,14 @@ git diff --cached --name-status
 **Commit gate.** All tests green. Bug Bible 23/1/2xf. Audio C7 holds. Forbidden sweep clean. **New marker:** `def\s+run_story_brief_reflection.*\n\s+return\s+["']{2}` (catches accidental fail-soft empty-string return without the sentinel dict).
 **Commit subject.** `C5a1: reflection pure module -- input builder + strict-JSON prompt + validation + scoped try/except (3 narrow arms) + repair (temp+0.15 clamped to 0.55 / CRITICAL prefix) + 8-key sentinel`
 
-## C5a2 — Writer wiring at K.5.5 + dual-slot eviction (~0.6 d)
+## C5a2 — Writer wiring at K.5.5 (~0.5 d)
 
-**Review.** C5a1 module green. Q1 K.5.5 lock. E-15 (dual-slot eviction per RR-A1). E-22 (module-level import per RR-B4). E-21 (technical-slot behavioral spy + LLM-cache spy land here, not at C5a1, per RR-B1/RR-B2).
+**Review.** C5a1 module green. Q1 K.5.5 lock. E-15 revised at C1 audit (loader is single-slot — no explicit eviction call needed; regression-test the no-OOM property instead). E-22 (module-level import per RR-B4). E-21 (technical-slot behavioral spy + LLM-cache spy land here, not at C5a1, per RR-B1/RR-B2).
 
 **Code — module-level import (E-22 / RR-B4).** Add to module-level imports at the top of `nodes/OTR_LedgerScriptWriter.py`:
 
 ```python
 from ._otr_story_brief import run_story_brief_reflection
-from ._otr_model_loader import evict_model
 ```
 
 If a circular import surfaces at commit time, document at C5a2 commit message and fall back to hot-path import with a forensic note. Expected: no circular import — `_otr_story_brief.py` does not import `OTR_LedgerScriptWriter`.
@@ -807,31 +850,20 @@ If a circular import surfaces at commit time, document at C5a2 commit message an
 # K.5.5 -- meta.story_brief reflection pass. Per Sprint C final plan Q1 lock.
 # Writes to meta only; lines untouched; runs on technical_model slot
 # (creative untouched by L-2). Failure path stamps story_brief_status
-# per L-6 fail-loud sentinel pattern. Refinement §3.6 sync-barrier
-# wording was amended at C0b -- this call inherits the non-blocking
-# BUG-LOCAL-228 timeout contract.
+# per L-6 fail-loud sentinel pattern.
 #
-# Dual-slot eviction guard per E-15 / RR-A1: in a two-model config
-# (e.g. creative=Mistral-Nemo + technical=Gemma-4-E4B-it), the creative
-# model is still resident from the composition pass that just finished.
-# Loading the technical model on top would sum ~12 + ~3 = ~15 GB > 14.5 GB
-# ceiling and OOM-crash before BUG-LOCAL-228's timeout path can fire.
-# Single-slot config (default: both = Mistral-Nemo) skips the eviction --
-# same cache entry, no swap.
+# Dual-slot OOM analysis (E-15 revised at C1 audit per RR-A1):
+# The loader is single-slot by architecture. request_slot(technical_model)
+# inside technical_fn calls unload_llm() to evict any prior resident model
+# BEFORE loading the next. Peak transient VRAM during the swap is
+# max(creative_size, technical_size), not their sum. No explicit pre-eviction
+# call is needed here; regression tests in C5a2 prove the no-OOM property.
 # LLM slot: technical
-_creative_model = resolved["creative_writing_model"]
-_technical_model = resolved["technical_model"]
-if _creative_model != _technical_model:
-    log.info("[OTR_LedgerScriptWriter:K.5.5] dual-slot config detected; "
-             "evicting creative_model=%s before reflection pass on "
-             "technical_model=%s (E-15 / VRAM headroom)",
-             _creative_model, _technical_model)
-    evict_model(_creative_model)
 _brief_delta = run_story_brief_reflection(led, technical_fn=technical_fn)
 meta.update(_brief_delta)
 ```
 
-**Wire.** No new graph surface. No new widget. `technical_fn` is the existing closure from the Two-Model Selector. Workflow JSON unchanged. `evict_model` is assumed to exist in `_otr_model_loader.py`. If it does not exist at `f758f02` HEAD, C5a2 includes a thin wrapper around the existing eviction primitive (whatever `_otr_model_loader` already exposes — `invalidate_cache_no_gpu_teardown` is too coarse; need a targeted single-model evict). Confirm at C1 staleness audit; if missing, add a C4-style precondition row.
+**Wire.** No new graph surface. No new widget. `technical_fn` is the existing closure from the Two-Model Selector. Workflow JSON unchanged. The C1 audit's evict_model contingency is resolved by deletion: the loader's existing `request_slot`/`unload_llm` swap handles eviction implicitly; no wrapper is needed.
 
 **Pytest.**
 
@@ -844,14 +876,15 @@ meta.update(_brief_delta)
 | `test_call_site_before_led_save` | same | AST walk: call appears BEFORE `led.save()` invocation. Belt-and-suspenders against post-save placement. |
 | `test_reflection_does_not_mutate_core_ledger_keys` (R-03) | same | `copy.deepcopy(led.data)` pre-reflection; run reflection; assert every top-level key EXCEPT `meta` is byte-identical between pre and post snapshots. Catches accidental nukes of `cast`, `lines`, `news_seed`, `title`, etc. |
 | `test_module_level_import_of_reflection_entrypoint` (E-22 / RR-B4) | same | AST walk: `from ._otr_story_brief import run_story_brief_reflection` appears at module-level in `OTR_LedgerScriptWriter.py`. Does NOT appear inside `execute()` body. |
-| `test_c5a2_evicts_creative_model_in_dual_slot_config` (E-15 / RR-A1) | same | Fixture: dual-slot config (`creative=Mistral-Nemo`, `technical=Gemma-4-E4B-it`). Mock `evict_model`; spy on call list. Run `execute()` through K.5.5. Assert `evict_model("mistralai/Mistral-Nemo-Instruct-2407")` was called BEFORE `run_story_brief_reflection`. |
-| `test_c5a2_no_eviction_in_single_slot_config` | same | Fixture: single-slot config (`creative == technical == Mistral-Nemo`). Mock `evict_model`; spy on call list. Run `execute()` through K.5.5. Assert `evict_model` was NOT called. Single-slot path is the audio C7 baseline path; must not perturb it. |
+| `test_c5a2_dual_slot_does_not_oom` (E-15 / RR-A1 revised) | same | Fixture: dual-slot config (`creative=Mistral-Nemo`, `technical=Gemma-4-E4B-it`). Instrument `_otr_model_loader` with a VRAM-accounting spy that tracks the running sum of resident model sizes. Run `execute()` through K.5.5+reflection. Assert that at no point during the composition→reflection sequence does the spy report total resident size > 14.5 GB. Proves the no-OOM property without relying on an explicit eviction call. |
+| `test_c5a2_dual_slot_evicts_creative_before_technical_loads` (E-15 / RR-A1 revised) | same | Fixture: dual-slot config. Spy on `unload_llm()` and on the technical-model load operation inside `request_slot`. Run `execute()` through K.5.5+reflection. Assert call order: `unload_llm()` invoked with the creative model id BEFORE the technical-model load begins. Verifies `request_slot`'s swap order — which is the actual safety mechanism, given the loader is single-slot. |
+| `test_c5a2_single_slot_no_unload` | same | Fixture: single-slot config (`creative == technical == Mistral-Nemo`). Spy on `unload_llm()`. Assert `unload_llm` is NOT called during the composition→reflection sequence — same cache entry, no swap. Single-slot path is the audio C7 baseline path; must not be perturbed by spurious unloads. |
 | `test_reflection_uses_technical_fn_not_creative_fn` (E-03, MOVED from C5a1 per E-21 / RR-B1) | same | Behavioral spy at the writer-wiring layer where BOTH closures co-exist: `creative_fn` raises if called, `technical_fn` returns valid JSON. Run `execute()`. Reflection succeeds. `creative_fn` call count during reflection phase == 0. Locks L-2 at the realistic call site. |
 | `test_reflection_reuses_technical_model_cache_entry` (R-01, MOVED from C5a1 per E-21 / RR-B2) | same | Behavioral spy on `_otr_model_loader.LLM_CACHE`: clear cache; run `execute()` through composition + reflection; assert the `technical_model` cache entry registers EXACTLY ONE load event across the composition→reflection sequence in single-slot config, OR EXACTLY ONE load event for `technical_model` after creative eviction in dual-slot config. Replaces the vacuous stub-`technical_fn` version that lived at C5a1. |
 | `test_audio_c7_byte_identical_c5a2` | existing canary | Audio holds. Single-slot path (default config = audio C7 baseline) must not be perturbed by the dual-slot-only eviction branch. |
 
 **Commit gate.** All tests green. Bug Bible 23/1/2xf. Audio C7 holds. Forbidden sweep clean. **New marker:** `meta\.story_brief\s*=\s*None` (catches accidental `None`-init that would mask the sentinel-vs-success branch).
-**Commit subject.** `C5a2: writer wires reflection at K.5.5 + dual-slot eviction guard (E-15) + module-level import (E-22); script_json + saved ledger both carry meta.story_brief* (deep-dict mutation guard); technical-slot + cache-stability tests moved here (E-21)`
+**Commit subject.** `C5a2: writer wires reflection at K.5.5 + module-level import (E-22); dual-slot OOM regression-guarded (E-15 revised at C1 -- loader is single-slot; no explicit eviction needed); deep-dict mutation guard; technical-slot + cache-stability tests moved here (E-21)`
 
 ## C5b — Central helpers module (~0.25 d)
 
@@ -898,7 +931,7 @@ def get_story_brief_status(meta: dict) -> str: ...  # 'ok' / 'failed' / 'absent'
 ## C5c — FLUX env + radio bookend integration (~0.5 d)
 
 **Review.** Refinement §6 — both consumers use `get_story_brief_full`.
-**Code.** `visual/batch_flux_env_render.py` reads brief via `get_story_brief_full(meta)`, inserts between env description and style_suffix tail. Radio bookend uses brief to replace the weak `scenes[0].env` tier in the existing fallback chain.
+**Code.** `visual/batch_flux_render.py` reads brief via `get_story_brief_full(meta)`, inserts between env description and style_suffix tail. Radio bookend uses brief to replace the weak `scenes[0].env` tier in the existing fallback chain. (File path retargeted at C1 audit per E-24 / RR-B8 contingency — `batch_flux_env_render.py` does not exist at HEAD; `batch_flux_render.py` is the actual env/bookend implementation file.)
 **Wire.** None graph-level.
 
 **Pytest.**
@@ -1117,7 +1150,7 @@ QA review doc restatement: "MusicGen integration with `meta.story_brief` was wir
 | 25 | Returned `script_json` output socket contains `meta.story_brief*` (E-02) | C5a2 |
 | 26 | Returned `script_json` and saved-on-disk ledger contain identical `meta.story_brief*` (E-11) | C5a2 |
 | 27 | Reflection does not mutate any non-`meta` ledger key (deep-dict, R-03) | C5a2 |
-| 28 | Dual-slot eviction guard per E-15 / RR-A1: creative model evicted before reflection when slots differ; no eviction in single-slot config | C5a2 |
+| 28 | Dual-slot OOM regression-guarded per E-15 / RR-A1 (revised at C1): peak VRAM ≤14.5 GB through composition→reflection in dual-slot config; `unload_llm(creative)` called before technical load by `request_slot`'s existing swap order; single-slot path emits no spurious unload | C5a2 |
 | 29 | Reflection uses `technical_fn` not `creative_fn` — behavioral spy at writer-wiring layer (E-03, MOVED from C5a1 per E-21) | C5a2 |
 | 30 | Reflection reuses `technical_model` cache entry — single load event spy on `LLM_CACHE` (R-01, MOVED from C5a1 per E-21) | C5a2 |
 | 31 | 5 helpers per refinement §5 shipped; `music_mood` is a pure function at C5b, wired at C5g per E-12 | C5b |
