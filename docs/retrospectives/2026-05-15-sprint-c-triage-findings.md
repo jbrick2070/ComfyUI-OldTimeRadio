@@ -372,6 +372,25 @@ Captured in detail at `docs/retrospectives/UNEXPECTED_FINDING_nul_padding.md` (c
 
 ---
 
+## §6 Adjudication (2026-05-16)
+
+Triage findings adjudicated by independent Claude session. Final dispositions:
+
+| Section | Original framing | Verdict | Disposition |
+|---|---|---|---|
+| §1 Null-state padding | Reject zero-length string arrays as dummy values | REFUTED | ACCEPT corrected framing: wire `scripts/_schema_sweep.py` to enforce BUG-LOCAL-032 canonical shape. Rejected original would have torn out the canonical-shape fix and re-introduced widget drift class. -> SA-100 |
+| §2 Silent temp clamp | Mid-recovery temperature clamp emits no log | PARTIAL (real mechanism, "exception" framing was prompt-string artifact) | ACCEPT: add `log.info` line at `_otr_story_brief.py:487-494` + 2 pytest tests. -> SA-101 |
+| §3 Hardware snapshot | Cross-hardware determinism gap | REAL (same-machine time-axis drift is the actual failure mode) | ACCEPT: `tools/capture_hardware_snapshot.py` + fixture baseline at first Sprint A runtime commit. -> SA-102 |
+| §3 supplement (SA-104) | Perceptual hash via Chromaprint fallback ladder | OVERENGINEERED | DEFER to v2.x watch-list. SA-102 already covers env-drift detection; perceptual fallback is dragon-chasing for solo-developer single-machine reality. |
+| §4 VRAM telemetry | Surface metric bias in S-A.4 multi-model regression | REAL | ACCEPT: per-cycle `torch.cuda.memory_summary()` artifact + 14.5 GB strict-fail + >20% fragmentation advisory. -> SA-103 |
+| §5 NUL padding | Sprint C introduced 21735 bytes of NUL padding | REFUTED (sandbox/mount artifact, not on-disk corruption; pre-Sprint-C natural growth in `068bf54` and `af4e655`) | REJECT as Sprint A row. Forensic capture in `UNEXPECTED_FINDING_nul_padding.md` is sufficient closure. Commit-hygiene of the two pre-Sprint-C growth commits -> Sprint G's broad cleanup sweep. |
+
+### Adjudication workflow note for future sprints
+
+Deep-research retrospectives are observation-only signal. They notice; they should not prescribe. Future retrospective deep-research passes should be constrained to "here is what I noticed" output -- no recommended remediations, no severity labels, no schema validators proposed in-line. A structured triage pass (separate Claude session, no anchor on the deep-research framing) decides what becomes an acceptance row. This pattern caught the SA-100 hallucination before it could become a destructive Sprint A commit.
+
+---
+
 ## Sources cited (in-repo, read-only)
 
 - `workflows/otr_scifi_16gb_full.json`
