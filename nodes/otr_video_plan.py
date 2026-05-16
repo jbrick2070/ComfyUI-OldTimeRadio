@@ -303,12 +303,14 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
         return {}
     meta = led.get("meta") or {}
     visual_plan = meta.get("visual_plan") or {}
+    # Sprint C C3 (2026-05-15): `meta.visual_plan.genre` stamp retired
+    # at the writer; the projection here no longer surfaces it. The new
+    # ledger schema has `characters / scenes / style` only.
     return {
         "characters":        visual_plan.get("characters") or {},
         "scenes":            visual_plan.get("scenes")     or [],
         "voice_assignments": _OTRLC.voice_assignments_from_cast(led),
         "style":             meta.get("style") or "",
-        "genre":             visual_plan.get("genre") or "",
     }
 
 

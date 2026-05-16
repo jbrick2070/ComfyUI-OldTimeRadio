@@ -224,108 +224,14 @@ def test_canonical_slugs_in_test_match_writer_pool(musicgen_mod):
     )
 
 
-def test_genre_table_strict_equality_with_style_pool():
-    """Voice-path-cleanbreak Sprint 10.2 (2026-05-12). Strict drift
-    guard: _GENRE_BY_STYLE keys must EQUAL _STYLE_PICKER_SEED_POOL
-    contents -- no missing entries (writer would raise) and no
-    orphaned entries (table drifted past the palette).
-    """
-    from nodes.OTR_LedgerScriptWriter import (
-        _GENRE_BY_STYLE,
-        _STYLE_PICKER_SEED_POOL,
-    )
-    missing  = set(_STYLE_PICKER_SEED_POOL) - set(_GENRE_BY_STYLE)
-    orphaned = set(_GENRE_BY_STYLE) - set(_STYLE_PICKER_SEED_POOL)
-    assert not missing and not orphaned, (
-        f"Genre table drift. "
-        f"In palette only (writer will raise on these): {sorted(missing)}. "
-        f"In table only (orphaned -- pool removed but table didn't): "
-        f"{sorted(orphaned)}."
-    )
-
-
-def test_resolve_genre_known_styles_use_table():
-    """_resolve_genre returns the curated table value for every known slug."""
-    from nodes.OTR_LedgerScriptWriter import _GENRE_BY_STYLE, _resolve_genre
-    for slug, expected in _GENRE_BY_STYLE.items():
-        assert _resolve_genre(slug) == expected, (
-            f"_resolve_genre({slug!r}) returned {_resolve_genre(slug)!r}; "
-            f"expected {expected!r} from _GENRE_BY_STYLE."
-        )
-
-
-def test_resolve_genre_empty_raises():
-    """Empty style means the picker contract broke upstream -- raise
-    loudly per standing directive #1."""
-    from nodes.OTR_LedgerScriptWriter import _resolve_genre
-    with pytest.raises(ValueError, match="empty style"):
-        _resolve_genre("")
-    with pytest.raises(ValueError, match="empty style"):
-        _resolve_genre("   ")
-
-
-def test_resolve_genre_unknown_raises():
-    """Unknown slug means _GENRE_BY_STYLE has drifted from
-    _STYLE_PICKER_SEED_POOL -- raise loudly per standing directive #1.
-    The error message names the slug AND lists the known set."""
-    from nodes.OTR_LedgerScriptWriter import _resolve_genre
-    with pytest.raises(ValueError) as excinfo:
-        _resolve_genre("totally_made_up_slug")
-    assert "totally_made_up_slug" in str(excinfo.value)
-    assert "Known:" in str(excinfo.value)
-
-
-def test_preview_genre_is_isolated_from_writer_path():
-    """``_preview_genre`` is the best-effort UI helper. It MUST NOT
-    be CALLED from the writer (OTR_LedgerScriptWriter.py) or from the
-    freeze cascade. AST-based: walks Call nodes to find actual call
-    sites; ignores docstring mentions and comments.
-    """
-    import ast
-    import inspect
-    from nodes import OTR_LedgerScriptWriter as writer_mod
-    from nodes import _otr_ledger_freeze as freeze_mod
-
-    def _call_sites(src: str, name: str) -> list[int]:
-        """Return line numbers of Call sites where the callable's
-        bare name matches ``name``. Catches both `name(...)` and
-        `module.name(...)` shapes."""
-        tree = ast.parse(src)
-        hits = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if isinstance(func, ast.Name) and func.id == name:
-                hits.append(node.lineno)
-            elif isinstance(func, ast.Attribute) and func.attr == name:
-                hits.append(node.lineno)
-        return hits
-
-    writer_src = inspect.getsource(writer_mod)
-    freeze_src = inspect.getsource(freeze_mod)
-
-    writer_calls = _call_sites(writer_src, "_preview_genre")
-    assert not writer_calls, (
-        f"_preview_genre called at line(s) {writer_calls} in "
-        f"OTR_LedgerScriptWriter.py -- directive #1 violation. The writer "
-        "path must use _resolve_genre and let invalid input raise."
-    )
-
-    freeze_calls = _call_sites(freeze_src, "_preview_genre")
-    assert not freeze_calls, (
-        f"_preview_genre called at line(s) {freeze_calls} in "
-        f"_otr_ledger_freeze.py -- directive #1 violation. Freeze "
-        "cascade is a production surface."
-    )
-
-
-def test_preview_genre_keeps_legacy_fallback_behavior():
-    """Sanity check: _preview_genre still returns a string for empty,
-    known, and unknown inputs (the pre-S10.2 _resolve_genre semantics).
-    UI/demo callers need this behavior."""
-    from nodes.OTR_LedgerScriptWriter import _GENRE_BY_STYLE, _preview_genre
-    assert _preview_genre("") == "audio drama"
-    assert _preview_genre("totally_made_up_slug") == "totally made up slug audio drama"
-    sample = next(iter(_GENRE_BY_STYLE))
-    assert _preview_genre(sample) == _GENRE_BY_STYLE[sample]
+# Sprint C C3 (2026-05-15): the six genre-table tests that previously
+# lived here -- test_genre_table_strict_equality_with_style_pool,
+# test_resolve_genre_known_styles_use_table, test_resolve_genre_empty_raises,
+# test_resolve_genre_unknown_raises, test_preview_genre_is_isolated_from_writer_path,
+# test_preview_genre_keeps_legacy_fallback_behavior -- were deleted alongside
+# the _GENRE_BY_STYLE / _resolve_genre / _preview_genre symbols they pinned.
+# The `meta.visual_plan.genre` stamp is retired; downstream consumers fall
+# back to `meta.style` directly. Per the no-legacy-back-compat standing
+# directive: tests for deleted contracts are deleted, not preserved.
+# Replacement deletion-locked assertions live in
+# `tests/test_no_genre_by_style_c3.py`.

@@ -704,11 +704,12 @@ def _parse_hud_data(episode_title, led, voice_assignments, style, genre,
     return {
         "title":      episode_title,
         # Master style key. Sprint 6.3 (2026-05-12): explicit `style`
-        # parameter from the caller; the legacy `plan.get("genre")`
-        # fallback chain is gone (genre is now its own parameter, used
-        # downstream where the HUD wants a human-readable genre string
-        # rather than a slug).
-        "style":      style or genre or "sci-fi",
+        # parameter from the caller. Sprint C C3 (2026-05-15): the
+        # `or genre` fall-through is deleted alongside the retirement of
+        # the `meta.visual_plan.genre` stamp. The `genre` parameter on
+        # this signature is now dead-but-harmless (always "" from the
+        # caller); Sprint G's orphan-parameter sweep will drop it.
+        "style":      style or "sci-fi",
         "produced":   _t.strftime("%Y-%m-%d  %H:%M"),
         "duration_s": duration_s,
         "resolution": f"{W}x{H}",
@@ -830,10 +831,12 @@ class _TelemetryHUDRenderer:
         lbl_w = _fw("DATE  ", self.f_body)
         for lbl, val in [
             ("TITLE", self.data.get("title", "?")),
-            # Backward-compat: read "style" first (canonical post-2026-05-02
-            # cleanup), fall back to "genre" key for HUD frames built from
-            # an older cached plan.
-            ("STYLE", self.data.get("style", self.data.get("genre", "?"))),
+            # Sprint C C3 (2026-05-15): the `genre` fallback is deleted
+            # alongside the retirement of the `meta.visual_plan.genre`
+            # stamp. New plans always carry `style`; older cached plans
+            # without it now display "?" -- intentional, per the
+            # no-legacy-back-compat directive.
+            ("STYLE", self.data.get("style", "?")),
             ("LEN",   f'{self.data.get("duration_s", 0) / 60:.1f} min'),
             ("RES",   self.data.get("resolution", "?")),
             ("DATE",  self.data.get("produced", "")[:10]),
@@ -1070,9 +1073,13 @@ def _write_story_treatment(out_path, episode_title, led,
             return voices.get(char_name) or led_cast_lookup.get(char_name, "")
 
         # Sprint 6.3: explicit `style` + `genre` parameters; no plan.get
-        # chain. Treatment text uses style first, falls back to genre,
-        # then to a generic descriptor.
-        style = style or genre or "audio drama"
+        # chain. Sprint C C3 (2026-05-15): the `or genre` fall-through is
+        # deleted alongside the retirement of the `meta.visual_plan.genre`
+        # stamp; treatment text now uses style first, generic descriptor
+        # otherwise. The `genre` parameter on this function is now
+        # dead-but-harmless (caller passes ""); Sprint G's orphan-parameter
+        # sweep will drop it.
+        style = style or "audio drama"
         ts     = _t.strftime("%Y-%m-%d  %H:%M:%S")
         BAR    = "\u2500" * 64
         DBAR   = "\u2550" * 64

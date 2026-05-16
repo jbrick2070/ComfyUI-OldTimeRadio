@@ -241,72 +241,18 @@ _STYLE_PICKER_SEED_POOL: tuple[str, ...] = (
 )
 
 
-# Voice-path-cleanbreak Sprint 6.1 (2026-05-12). Genre table for the
-# meta.visual_plan.genre stamp. Replaces the hardcoded "audio drama"
-# fallback Sprint 2 used. The genre string surfaces in:
-#   - SignalLostVideo HUD overlay
-#   - FLUX scene-prompt composition (style_tail + genre)
-#   - episode metadata (treatment txt, video info card)
-#
-# Drift guard: tests/test_musicgen_style_palette.py asserts every
-# entry in _STYLE_PICKER_SEED_POOL has an explicit row in this table
-# (mechanical fallback below is a safety net, not the contract).
-_GENRE_BY_STYLE: dict[str, str] = {
-    "closed_room_suspense":       "thriller audio drama",
-    "detective_case_file":        "detective audio drama",
-    "pulp_serial_cliffhanger":    "pulp serial audio drama",
-    "mission_control_procedural": "procedural audio drama",
-    "deep_space_distress_call":   "sci-fi audio drama",
-    "noir_interrogation":         "noir audio drama",
-    "small_town_uncanny":         "uncanny audio drama",
-    "radio_newsroom_emergency":   "newsroom audio drama",
-    "haunted_broadcast_signal":   "horror audio drama",
-    "laboratory_containment":     "containment audio drama",
-}
-
-
-def _resolve_genre(style: str) -> str:
-    """Resolve a style slug to a HUD/FLUX-friendly genre string.
-
-    Per standing directive #1 (no silent fallbacks on production
-    surfaces) -- raises on contract violations:
-      - empty style means the picker contract broke upstream
-      - unknown slug means _GENRE_BY_STYLE has drifted from
-        _STYLE_PICKER_SEED_POOL
-
-    Both conditions surface at the writer surface where they can be
-    diagnosed, instead of silently degrading downstream. Use
-    ``_preview_genre`` for any UI/demo path that legitimately needs
-    a best-effort string for an arbitrary or partial slug.
-    """
-    if not (style or "").strip():
-        raise ValueError(
-            "_resolve_genre: empty style; picker contract violation. "
-            "Check _STYLE_PICKER_SEED_POOL stamping in the writer."
-        )
-    if style not in _GENRE_BY_STYLE:
-        raise ValueError(
-            f"_resolve_genre: unknown style {style!r}. "
-            f"Add to _GENRE_BY_STYLE or fix the palette drift. "
-            f"Known: {sorted(_GENRE_BY_STYLE)}"
-        )
-    return _GENRE_BY_STYLE[style]
-
-
-def _preview_genre(style: str) -> str:
-    """Best-effort genre rendering for UI / demo / preview surfaces.
-
-    Mirrors the pre-S10.2 ``_resolve_genre`` behavior (mechanical
-    "<words> audio drama" fallback, generic default on empty). NEVER
-    invoke from the production writer or freeze cascade -- those
-    paths must use ``_resolve_genre`` and let invalid input raise.
-    Standing directive #1 explicitly carves out this isolation.
-    """
-    if not style:
-        return "audio drama"
-    if style in _GENRE_BY_STYLE:
-        return _GENRE_BY_STYLE[style]
-    return style.replace("_", " ") + " audio drama"
+# Sprint C C3 (2026-05-15): _GENRE_BY_STYLE table + _resolve_genre +
+# _preview_genre helpers deleted. The meta.visual_plan.genre stamp they
+# fed (formerly emitted by section K.5 below) is retired. Downstream
+# consumers (HUD overlay, FLUX scene-prompt composition, treatment txt,
+# video info card) fall back to `meta.style` directly -- the slug
+# carries enough information for those surfaces, and the parallel
+# "genre" string was a derived denormalization that needed a separate
+# keep-in-sync contract for no real win. Per the no-legacy-back-compat
+# standing directive: deleted outright, no shim, no alias. Any caller
+# that still imports `_resolve_genre` / `_preview_genre` /
+# `_GENRE_BY_STYLE` from OTR_LedgerScriptWriter will get
+# AttributeError -- intentional, so dead wirings fail loud.
 
 
 # ---------------------------------------------------------------------------
@@ -2798,7 +2744,6 @@ class OTR_LedgerScriptWriter:
             "characters": _visual_chars,
             "scenes":     [],
             "style":      resolved["style"],
-            "genre":      _resolve_genre(resolved["style"]),
         }
         meta["style"] = resolved["style"]
 

@@ -5,7 +5,7 @@
 ## Status
 
 - Phase: execution
-- Current commit: C2b
+- Current commit: C3
 - Branch: sprint-c-story-brief-v2
 - Cut from: s34-p0-p1-hotfix @ f758f02
 **Sequencing:** S34 closed → **Sprint C (this plan, 17 commits)** → Sprint A (downstream verification, queued) → Sprint G (comprehensive bug sweep, queued).
@@ -1151,6 +1151,7 @@ QA review doc restatement: "MusicGen integration with `meta.story_brief` was wir
 - **Empirical MusicGen audio quality validation** — out per E-12. Structural tests in C5g prove the helper-to-callsite plumbing is wired; subjective audio quality is Sprint A scope.
 - **Migration shim for old `meta.ltx_style_brief` ledgers** — out per R-07. Hard rule 2 + locked §6.6 forbid shims. Old ledgers fall through to `story_brief_status='absent'` gracefully; re-rendering regenerates the brief on the new path.
 - **`_MINCED_OATHS` / `_FIRST_NAMES` / `_LAST_NAMES` data-pool restructuring** — out. Mixed-pool randomization at runtime keeps no single era dominant. Era-tag comments updated for clarity at C2; data arrays untouched.
+- **v2.1+ candidate (deferred decision):** `artokun/comfyui-mcp` evaluation OR custom `/mcp-builder` comfyui-runner. Defer until after v1.9 ships and real iteration friction is measured. Until then: manual ComfyUI Desktop loading is the workflow. Don't build harness infrastructure speculatively.
 
 ---
 

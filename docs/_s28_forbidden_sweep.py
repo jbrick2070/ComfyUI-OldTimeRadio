@@ -135,6 +135,14 @@ forbidden = re.compile(
     r"|\bOrson Welles\b"                    # C2b: dramaturg name-drop
     r"|\bNorman Corwin\b"                   # C2b: dramaturg name-drop
     r"|\bLucille Fletcher\b"                # C2b: dramaturg name-drop
+    # Sprint C C3 (2026-05-15): _GENRE_BY_STYLE table + _resolve_genre +
+    # _preview_genre helpers deleted; meta.visual_plan.genre stamp
+    # retired. Downstream consumers fall back to meta.style directly.
+    # Marker prevents accidental reintroduction of the symbol. Tokenize
+    # suppression handles forensic mentions in this commit's own
+    # deletion comment and in the test_musicgen_style_palette.py
+    # historical comment block that documents what got removed.
+    r"|\b_GENRE_BY_STYLE\b"                 # C3: deleted genre table
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
