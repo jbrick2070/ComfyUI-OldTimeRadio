@@ -1,11 +1,12 @@
-# Sprint D -- Period LLM Wire-up
+# Sprint D -- period-LLM CATEGORY -- in progress
 
 ## Status
 
-- Phase: planning
-- Current commit: <none>
-- Branch: <to-be-cut>
-- Cut from: main@0aa6d6e
+- Phase: in progress
+- Current commit: D0a (branch cut + plan landing)
+- Branch: sprint-d-period-llm
+- Cut from: sprint-c-story-brief-v2@a125a35
+- Canonical plan: docs/closed-sprints/2026-05-16-sprint-d-period-llm.md (v3, round-robin approved)
 
 ## Plan (commit chain)
 
