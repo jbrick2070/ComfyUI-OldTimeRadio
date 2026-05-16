@@ -54,6 +54,10 @@ import torch
 
 from . import _otr_ledger as _OTRL_PATHS
 from ._otr_style_palette import STYLE_PALETTE as _STYLE_PALETTE, KNOWN_STYLE_SLUGS
+from ._otr_story_brief_helpers import (
+    get_story_brief_music_mood,
+    get_story_brief_status,
+)
 from ._vram_log import force_vram_offload
 
 log = logging.getLogger("OTR")
@@ -284,6 +288,33 @@ def _mood_suffix(script_brief: str) -> str:
     return (", " + ", ".join(tags)) if tags else ""
 
 
+def _apply_story_brief_mood_prefix(prompt: str, meta: dict) -> tuple[str, str, list[str]]:
+    """Sprint C C5g (2026-05-15): apply meta.story_brief mood prefix
+    to a MusicGen cue prompt.
+
+    Per refinement section 6.3 + E-12 / RR-A2: when the reflection
+    pass succeeded AND its atmosphere terms intersect the declared
+    MusicGen mood vocabulary (the C5b helper's `_MUSIC_MOOD_VOCAB`),
+    prepend the intersected terms as a comma-joined prefix:
+
+        "tense, ominous, " + original_prompt
+
+    Status 'absent' (old ledgers per refinement section 8.2) or
+    'failed' (reflection-pass crashed) or empty-intersection
+    (atmosphere terms were all outside MusicGen's vocab) -> prompt
+    is returned unchanged.
+
+    Returns (possibly-prefixed prompt, status, mood_terms) so the
+    caller can log story_brief_status + mood_terms per E-07.
+    """
+    status = get_story_brief_status(meta)
+    mood_terms = get_story_brief_music_mood(meta)
+    if status == "ok" and mood_terms:
+        prefix = ", ".join(mood_terms) + ", "
+        return prefix + prompt, status, mood_terms
+    return prompt, status, mood_terms
+
+
 def _resolve_cue_from_style(cue_id: str, style: str,
                             mood_suffix: str) -> tuple[str, int]:
     """Resolve a single cue from the style palette.
@@ -422,12 +453,30 @@ class MusicGenTheme:
             if seed_from_ledger is not None:
                 episode_seed = str(seed_from_ledger)
 
+        # Sprint C C5g (2026-05-15): meta.story_brief mood prefix.
+        # LLM slot: N/A -- MusicGen is an audio model, not an LLM call.
+        # Per refinement section 6.3 + E-12 / RR-A2: when the reflection
+        # pass succeeded AND its atmosphere terms intersect the declared
+        # MusicGen mood vocabulary, prepend the intersection to every
+        # cue prompt. Helpers imported module-level above. Status +
+        # selected mood terms logged once per render for E-07.
         # ---- Resolve all three cues from the style palette ----
         cues: dict[str, dict] = {}
+        _brief_status_logged = False
         for cue_id in CUE_IDS:
             prompt, duration = _resolve_cue_from_style(
                 cue_id, style, mood_suffix
             )
+            prompt, _brief_status, _brief_mood_terms = (
+                _apply_story_brief_mood_prefix(prompt, meta)
+            )
+            if not _brief_status_logged:
+                log.info(
+                    "[OTR_MusicGenTheme] story_brief_status=%s "
+                    "mood_terms=%s",
+                    _brief_status, _brief_mood_terms,
+                )
+                _brief_status_logged = True
             cues[cue_id] = {"prompt": prompt, "duration_sec": duration}
 
         cache_dir = _cache_dir()

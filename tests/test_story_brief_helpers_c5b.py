@@ -287,15 +287,8 @@ def _count_production_callers_of(symbol: str) -> list[str]:
     return hits
 
 
-def test_get_music_mood_has_zero_production_callers_at_c5b():
-    """E-28 / RR-B10: at C5b commit boundary, `get_story_brief_music_mood`
-    has ZERO production callers. The helper is defined here; the
-    consumer wires at C5g. This test will flip to "exactly one
-    production caller in nodes/musicgen_theme.py" at C5g."""
-    hits = _count_production_callers_of("get_story_brief_music_mood")
-    assert hits == [], (
-        "C5b violation -- `get_story_brief_music_mood` already has "
-        f"production callers at C5b: {hits}. The helper is defined "
-        "at C5b; the consumer wiring lands at C5g via "
-        "nodes/musicgen_theme.py."
-    )
+# Sprint C C5g (2026-05-15): the C5b zero-callers test was deleted
+# when C5g wired `get_story_brief_music_mood` into
+# `nodes/musicgen_theme.py`. The forward-looking assertion (exactly
+# one production caller, in musicgen_theme.py) lives in
+# `tests/test_story_brief_musicgen_c5g.py::test_get_music_mood_caller_is_musicgen_theme`.
