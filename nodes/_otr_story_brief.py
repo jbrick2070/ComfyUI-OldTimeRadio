@@ -488,6 +488,17 @@ def _repair_pass(
         reflection_temperature + _REPAIR_TEMPERATURE_BUMP,
         _REPAIR_TEMPERATURE_CEILING,
     )
+    # SA-101 (Sprint D D0c): surface the silent clamp. Logs the
+    # temperature math plus the validator rejection reasons in scope
+    # so Sprint A inspectors can tell a 0.55-ceilinged retry from a
+    # 0.35 retry from a pre-clamp failure. Purely additive emission;
+    # no existing log string modified.
+    log.info(
+        "[OTR_StoryBrief] repair pass clamped: base=%.3f bump=%.3f "
+        "ceiling=%.3f -> repair_temperature=%.3f reasons=%s",
+        reflection_temperature, _REPAIR_TEMPERATURE_BUMP,
+        _REPAIR_TEMPERATURE_CEILING, repair_temperature, rejection_reasons,
+    )
     messages = _build_repair_messages(
         failed_output, rejection_reasons, base_user_message,
     )
