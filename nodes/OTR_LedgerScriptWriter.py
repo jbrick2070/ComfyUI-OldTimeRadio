@@ -101,6 +101,13 @@ from pathlib import Path
 # transformers / GPU work -- safe at module-import time.
 from . import _otr_model_catalog as _otr_model_catalog  # noqa: E501
 
+# Sprint C C5a2 (2026-05-15) module-level import per E-22 / RR-B4. The
+# reflection pure module is wired into execute() at K.5.5 -- see the
+# reflection call site below the K.5 visual_plan stamp. Module-level
+# import (not hot-path) so a typo / refactor surfaces at module load
+# time rather than during the first script generation.
+from ._otr_story_brief import run_story_brief_reflection
+
 log = logging.getLogger("OTR")
 
 
@@ -2746,6 +2753,30 @@ class OTR_LedgerScriptWriter:
             "style":      resolved["style"],
         }
         meta["style"] = resolved["style"]
+
+        # --- K.5.5. meta.story_brief reflection pass ------------------
+        # Per Sprint C final plan Q1 lock (K.5.5, E-01). Writes to meta
+        # only; lines untouched; runs on technical_model slot per L-2.
+        # Failure path stamps story_brief_status per L-6 fail-loud
+        # sentinel pattern. Refinement section 3.6 sync-barrier wording
+        # was amended at C0b -- this call inherits the non-blocking
+        # BUG-LOCAL-228 timeout contract via technical_generate_fn.
+        #
+        # Dual-slot OOM analysis (E-15 revised at C1 audit per RR-A1):
+        # the loader is single-slot by architecture. request_slot(
+        # technical_model) inside technical_generate_fn calls
+        # unload_llm() to evict any prior resident model BEFORE loading
+        # the next. Peak transient VRAM during the swap is max(
+        # creative_size, technical_size), not their sum. No explicit
+        # pre-eviction call is needed; regression tests in C5a2 prove
+        # the no-OOM property.
+        # LLM slot: technical
+        _brief_delta = run_story_brief_reflection(
+            led,
+            technical_generate_fn,
+            technical_model_id=resolved["technical_model"],
+        )
+        meta.update(_brief_delta)
 
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
