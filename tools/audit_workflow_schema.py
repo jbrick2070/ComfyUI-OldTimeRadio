@@ -141,6 +141,78 @@ def audit_file(p: Path, fix: bool = False) -> tuple[list[str], bool]:
     return issues, fixed
 
 
+# ---------------------------------------------------------------------------
+# Sprint D D3 -- default-workflow creative-binding license-equivalence gate
+# ---------------------------------------------------------------------------
+
+
+class WorkflowSchemaError(RuntimeError):
+    """Raised when a default-shipped workflow JSON violates a
+    Sprint D D3 license-equivalence or prompt-profile gate."""
+
+
+def check_default_workflow_creative_binding(
+    workflow_json: dict, catalog_module=None,
+) -> list[str]:
+    """Sprint D D3 hard-fail validator.
+
+    Walks every `OTR_LedgerScriptWriter` node in `workflow_json` and
+    checks the `creative_writing_model` widget value against the
+    catalog. Returns a list of violation messages (empty on pass).
+    Calling code (or the audit_file flow) decides whether to raise
+    `WorkflowSchemaError` or warn.
+
+    Two contracts enforced per row bound to the creative slot:
+
+      1. `license_audit_status == "mit_equivalent"`. Research-lane
+         (talkie) or pending (Gemma) rows cannot ship default-bound.
+
+      2. `prompt_profile == "modern"`. The default workflow should
+         not silently route through the period system prompt; period
+         routing is opt-in via the dropdown.
+
+    `catalog_module` is a parameter so unit tests can inject a fake
+    catalog; defaults to the real `nodes._otr_model_catalog`.
+    """
+    if catalog_module is None:
+        import sys as _sys
+        repo_root = Path(__file__).resolve().parent.parent
+        if str(repo_root) not in _sys.path:
+            _sys.path.insert(0, str(repo_root))
+        from nodes import _otr_model_catalog as catalog_module  # noqa: PLC0415
+
+    rows_by_id = {m.repo_id: m for m in catalog_module.CURATED_LLM_MODELS}
+    violations: list[str] = []
+    for n in workflow_json.get("nodes") or []:
+        if n.get("type") != "OTR_LedgerScriptWriter":
+            continue
+        widgets = n.get("widgets_values") or []
+        # Inspect every widget value that matches a curated repo_id.
+        # We don't try to be clever about widget-index -- if it's a
+        # repo_id, it's bound to a slot (creative or technical).
+        for v in widgets:
+            if not (isinstance(v, str) and v in rows_by_id):
+                continue
+            row = rows_by_id[v]
+            if row.license_audit_status != "mit_equivalent":
+                violations.append(
+                    f"writer node id={n.get('id')} binds {v!r} "
+                    f"(license_audit_status="
+                    f"{row.license_audit_status!r}); expected "
+                    f"'mit_equivalent' for any default-shipped "
+                    f"workflow binding"
+                )
+            if row.prompt_profile != "modern":
+                violations.append(
+                    f"writer node id={n.get('id')} binds {v!r} "
+                    f"(prompt_profile={row.prompt_profile!r}); "
+                    f"expected 'modern' for any default-shipped "
+                    f"workflow binding -- period routing is "
+                    f"opt-in not default-shipped"
+                )
+    return violations
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
