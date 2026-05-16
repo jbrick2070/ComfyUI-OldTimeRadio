@@ -127,8 +127,11 @@ def test_module_level_import_of_reflection_entrypoint(writer_ast):
             continue
         if node.module != "_otr_story_brief":
             continue
-        for alias in node.names:
-            if alias.name == "run_story_brief_reflection":
+        # Note: loop variable is `imp` (not the forbidden-pattern name
+        # `alias`) per the S28 cleanup; ast.alias is still the node
+        # type, this just renames the binding.
+        for imp in node.names:
+            if imp.name == "run_story_brief_reflection":
                 saw_module_level_import = True
     assert saw_module_level_import, (
         "Module-level `from ._otr_story_brief import "
