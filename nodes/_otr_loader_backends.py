@@ -100,7 +100,87 @@ def compute_effective_context_limit(row: Any) -> int:
     )
 
 
+def encode_messages_for_row(tokenizer, messages: list[dict], row: Any):
+    """Sprint D D2c -- per-backend message encoding dispatch.
+
+    Dispatches on the catalog row's `chat_template_kind` Literal:
+
+      "transformers_default"  -> tokenizer.apply_chat_template(
+                                     messages, return_tensors="pt",
+                                     add_generation_prompt=True,
+                                 )
+      "raw_completion"        -> tokenizer(
+                                     "\\n".join(m["content"] for m in messages),
+                                     return_tensors="pt",
+                                 )
+      "manual"                -> NotImplementedError. The row-level
+                                 manual template field is not in
+                                 the v1 schema; deferred to D-future.
+
+    Returns the encoded inputs ready to pass into model.generate().
+    Raises ValueError on an unknown chat_template_kind.
+
+    The dispatch is metadata-driven only. No `repo_id` substring
+    matching, no per-row special cases. Adding a new tokenizer
+    family means classifying it via chat_template_kind on the
+    catalog row -- no edits here.
+    """
+    kind = row.chat_template_kind
+    if kind == "transformers_default":
+        return tokenizer.apply_chat_template(
+            messages,
+            return_tensors="pt",
+            add_generation_prompt=True,
+        )
+    if kind == "raw_completion":
+        joined = "\n".join(m.get("content", "") for m in messages)
+        return tokenizer(joined, return_tensors="pt")
+    if kind == "manual":
+        raise NotImplementedError(
+            f"chat_template_kind='manual' requires a row-level "
+            f"manual_chat_template field not present in the v1 "
+            f"CuratedModel schema (D1a). Deferred to D-future for "
+            f"tokenizers that ship without chat_template AND need "
+            f"a non-raw template. Affected row: "
+            f"repo_id={getattr(row, 'repo_id', '?')!r}"
+        )
+    raise ValueError(
+        f"unknown chat_template_kind {kind!r}; expected one of "
+        f"('transformers_default', 'raw_completion', 'manual')"
+    )
+
+
+def stop_strings_for_row(row: Any) -> list[str]:
+    """Return the row's stop_tokens as a list (the shape generate()
+    expects via stop_strings= kwarg). Empty tuple -> empty list,
+    meaning "use the tokenizer's default EOS handling".
+    """
+    return list(getattr(row, "stop_tokens", ()) or ())
+
+
+def generate_kwargs_for_row(row: Any) -> dict[str, Any]:
+    """Return per-row kwargs to thread into the model.generate()
+    call. At D2c this is just:
+
+        {
+            "max_new_tokens": <caller-controlled, NOT set here>,
+            "stop_strings": list(row.stop_tokens),
+        }
+
+    The effective context limit (D1b helper) caps the PROMPT side
+    of the budget. The caller decides max_new_tokens for the
+    OUTPUT side. This helper assembles the stop_strings half so
+    every adapter dispatches stop tokens identically.
+    """
+    return {
+        "stop_strings": stop_strings_for_row(row),
+    }
+
+
 __all__ = [
     "LoaderBackend",
     "compute_effective_context_limit",
+    "encode_messages_for_row",
+    "stop_strings_for_row",
+    "generate_kwargs_for_row",
 ]
