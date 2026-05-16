@@ -402,17 +402,108 @@ _PROMPT_BY_ROLE = {
 # was deleted at Sprint C C3b -- the stamp itself was retired in S31 B3
 # and the new per-episode style brief lands via meta.story_brief at
 # Sprint C C5a2 / C5e.)
-def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
-    """Return the per-role LTX motion prompt verbatim.
+_LTX_TOTAL_CHAR_BUDGET: int = 240
+_LTX_MOTION_VERB_POSITION_CEILING: int = 140
 
-    Intentionally minimal -- see BUG-LOCAL-112 comment block above.
-    The ``line`` and ``ledger`` arguments are accepted for API stability
-    with the prior signature (callers pass them) but are deliberately
-    unused by this implementation. Re-introducing per-episode context
-    is a one-line append change if motion measurement on the next run
-    shows the brutally-short prompt is too generic.
+
+def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
+    """Return the per-role LTX motion prompt verbatim, optionally with
+    the meta.story_brief LTX fragment appended.
+
+    Sprint C C5e (2026-05-15): per refinement section 6.1 the LTX
+    prompt carries a 80-100 char brief fragment derived from the
+    post-script reflection pass. The fragment is appended AFTER the
+    motion-centric role template so the motion verbs stay in the
+    first 140 chars (motion-first rule). The brief is dropped if:
+
+      * total prompt exceeds 240 chars (LTX budget), OR
+      * the brief would push the first motion verb past char 140
+        (degenerate template-growth case; structural proxy only).
+
+    Structural proxy only per R-05: char-counting proves the prompt
+    is well-formed, NOT that LTX actually renders better motion.
+    Empirical LTX motion fidelity verification is Sprint A scope per
+    ROADMAP.
+
+    The ``line`` argument is accepted for API stability with the prior
+    signature and is currently unused -- the brief is per-episode
+    (ledger-meta) not per-line. Re-introducing per-line context is a
+    one-line append change.
     """
-    return _PROMPT_BY_ROLE.get(role, _PROMPT_BY_ROLE["sfx"])
+    template = _PROMPT_BY_ROLE.get(role, _PROMPT_BY_ROLE["sfx"])
+
+    # Resolve brief fragment via the C5b helper (max 90 chars, trimmed
+    # at sentence/clause boundary, never mid-word).
+    from nodes._otr_story_brief_helpers import (
+        get_story_brief_ltx,
+        get_story_brief_status,
+    )
+    meta = ledger.get("meta") if isinstance(ledger, dict) else None
+    if not isinstance(meta, dict):
+        meta = {}
+    brief_fragment = get_story_brief_ltx(meta, max_chars=90)
+    brief_status = get_story_brief_status(meta)
+
+    if not brief_fragment:
+        log.info(
+            "[BatchLTXRender] role=%s story_brief_status=%s "
+            "(no brief fragment; legacy prompt)",
+            role, brief_status,
+        )
+        return template
+
+    candidate = f"{template} {brief_fragment}".strip()
+    if len(candidate) > _LTX_TOTAL_CHAR_BUDGET:
+        log.info(
+            "[BatchLTXRender] role=%s story_brief_status=%s "
+            "(brief dropped: combined %d > %d budget)",
+            role, brief_status, len(candidate), _LTX_TOTAL_CHAR_BUDGET,
+        )
+        return template
+
+    # Motion-first check: confirm at least one motion-class verb appears
+    # in the first 140 chars. The role templates all start with motion
+    # ("Continuous shot ...", "Dynamic dolly ..."); this guard catches
+    # degenerate future template growth.
+    first_motion_idx = _first_motion_verb_index(candidate)
+    if first_motion_idx > _LTX_MOTION_VERB_POSITION_CEILING:
+        log.info(
+            "[BatchLTXRender] role=%s story_brief_status=%s "
+            "(brief dropped: motion verb at char %d > %d ceiling)",
+            role, brief_status, first_motion_idx,
+            _LTX_MOTION_VERB_POSITION_CEILING,
+        )
+        return template
+
+    log.info(
+        "[BatchLTXRender] role=%s story_brief_status=%s "
+        "(brief appended; %d total chars; motion@%d)",
+        role, brief_status, len(candidate), first_motion_idx,
+    )
+    return candidate
+
+
+# Sprint C C5e motion-verb list. Small fixed set covering the verbs
+# used in _PROMPT_BY_ROLE so the position check is deterministic.
+_LTX_MOTION_VERBS: tuple[str, ...] = (
+    "shot", "sweeps", "pulse", "pulses", "trembles", "drift", "drifts",
+    "dolly", "whip-pans", "settle", "settles", "cool", "cools",
+    "ignite", "ignites", "bounce", "bounces", "orbit", "orbits",
+    "zoom", "zooms", "vibrate", "vibrates", "rattle", "rattles",
+    "spike", "spikes", "surge", "surges", "dance", "dances",
+)
+
+
+def _first_motion_verb_index(text: str) -> int:
+    """Return the lowest character index at which any motion verb
+    appears in ``text`` (case-insensitive), or len(text) if none."""
+    lower = text.lower()
+    best = len(text)
+    for verb in _LTX_MOTION_VERBS:
+        idx = lower.find(verb)
+        if idx != -1 and idx < best:
+            best = idx
+    return best
 
 
 # Negative prompt: aggressively suppress face hallucination. LTX is
