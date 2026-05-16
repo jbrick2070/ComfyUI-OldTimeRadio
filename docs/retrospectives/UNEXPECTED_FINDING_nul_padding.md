@@ -132,3 +132,7 @@ The file size oscillates across the history as nodes were added, removed, and re
 4. If bloat: a Sprint A or Sprint G cleanup commit could pretty-print the JSON to canonical form and re-baseline.
 
 Out of scope for this retrospective-triage. Waiting on operator review.
+
+## Resolution (2026-05-16)
+
+Operator review: false alarm. Sandbox NUL observation was a mount artifact, not on-disk corruption. Sprint C did not introduce the size delta. The growth lives in pre-Sprint-C commits `068bf54` and `af4e655` whose subjects do not clearly explain the JSON growth -- DEFERRED to Sprint G's broad cleanup sweep for commit-hygiene verification (10-minute diff inspection). Not a Sprint A blocker.
