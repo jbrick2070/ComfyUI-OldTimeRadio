@@ -2009,7 +2009,15 @@ class OTR_LedgerScriptWriter:
         )
         # LLM slot: creative -- outline drives the episode narrative
         # arc (beats, characters, structure). Single creative pass.
-        outline = _OTRO.generate_outline(creative_generate_fn, outline_req)
+        # Sprint D D2b: thread creative_repo_id so the outline phase
+        # prompt routes via _otr_creative_prompt_router. At default
+        # config (Mistral-Nemo) the resolver returns _SYSTEM_PROMPT
+        # by object identity so audio C7 holds.
+        outline = _OTRO.generate_outline(
+            creative_generate_fn,
+            outline_req,
+            creative_repo_id=resolved["creative_writing_model"],
+        )
 
         # --- E. Word-budget integration check (WARN, do not fail) -----
         beat_word_sum = sum(b.target_words for b in outline.beats)
@@ -2287,6 +2295,7 @@ class OTR_LedgerScriptWriter:
                         max_new_tokens_cap=resolved["max_new_tokens_cap"],
                         enable_polish_pass=resolved["enable_polish_pass"],
                         polish_generate_fn=polish_generate_fn,
+                        creative_repo_id=resolved["creative_writing_model"],
                     )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
@@ -2319,6 +2328,7 @@ class OTR_LedgerScriptWriter:
                         max_new_tokens_cap=resolved["max_new_tokens_cap"],
                         enable_polish_pass=resolved["enable_polish_pass"],
                         polish_generate_fn=polish_generate_fn,
+                        creative_repo_id=resolved["creative_writing_model"],
                     )
                 cleaned = line_res.text
                 beat_compose_flags = line_res.compose_flags
@@ -2777,6 +2787,25 @@ class OTR_LedgerScriptWriter:
             technical_model_id=resolved["technical_model"],
         )
         meta.update(_brief_delta)
+
+        # Sprint D D2b: stamp creative slot identity into meta so
+        # FreezeCascade preserves it via the existing script_json
+        # plumb. Sprint C gotcha #4 -- writer was the source of
+        # truth for the creative model but never put it into the
+        # frozen ledger, so post-freeze diagnostics were blind to
+        # which creative model produced the script. The two new
+        # meta keys are additive; audio path reads only
+        # meta.story_brief so byte identity holds.
+        meta["creative_model"] = resolved["creative_writing_model"]
+        try:
+            _creative_row = _otr_model_catalog._by_repo_id().get(
+                resolved["creative_writing_model"],
+            )
+            meta["creative_prompt_profile"] = (
+                _creative_row.prompt_profile if _creative_row else "modern"
+            )
+        except Exception:  # noqa: BLE001
+            meta["creative_prompt_profile"] = "modern"
 
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the

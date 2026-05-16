@@ -902,6 +902,7 @@ def generate_outline(
     max_attempts: int = 3,
     base_temperature: float = 0.7,
     max_new_tokens: int = 1500,
+    creative_repo_id: str | None = None,  # Sprint D D2b: routes via resolver
 ) -> Outline:
     """Generate a validated Outline. Reroll-then-repair on validation failure.
 
@@ -945,7 +946,20 @@ def generate_outline(
 
     _check_speaker_role_alignment()
 
-    system = _SYSTEM_PROMPT
+    # Sprint D D2b: creative-phase prompt routes via the resolver.
+    # When creative_repo_id is None (legacy callers, tests with
+    # default-everything mocks) or maps to a modern-profile row,
+    # the resolver returns _SYSTEM_PROMPT by object identity --
+    # default-config byte identity preserved for the audio C7
+    # contract. When the row is otr_1940s_v1 (talkie), the resolver
+    # returns OTR_PERIOD_SYSTEM_PROMPT.
+    if creative_repo_id is None:
+        system = _SYSTEM_PROMPT
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        system = resolve_creative_system_prompt(
+            creative_repo_id, phase="outline",
+        )
     user = _build_user_prompt(req)
     base_messages = [
         {"role": "system", "content": system},

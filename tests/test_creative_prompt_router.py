@@ -149,19 +149,26 @@ def _count_callers(symbol_name: str, exclude_path: Path) -> tuple[int, list[str]
     return len(hits), hits
 
 
-def test_router_zero_production_callers_at_d2a_boundary() -> None:
-    """`resolve_creative_system_prompt` must have ZERO production
-    call-site references at the D2a boundary. D2b wires it into
-    exactly 4 phase sites.
+def test_router_has_exactly_4_production_callers_at_d2b_boundary() -> None:
+    """`resolve_creative_system_prompt` has EXACTLY 4 production
+    call-site references at the D2b boundary -- one per creative
+    phase. Catches both under-wiring (missed phase) and over-wiring
+    (accidental extra call site).
+
+    D2a shipped with 0 callers. D2b wired:
+      _otr_outline.generate_outline      (phase="outline")
+      _otr_line_composer.compose_line    (phase="line_composer_system")
+      _otr_line_composer.polish_line     (phase="polish_announcer")
+      _otr_line_composer.polish_line     (phase="polish_character")
 
     The router module's own definition file is excluded -- this
     test counts CALL sites, not definitions or imports.
     """
     router_src = REPO_ROOT / "nodes" / "_otr_creative_prompt_router.py"
     count, hits = _count_callers("resolve_creative_system_prompt", router_src)
-    assert count == 0, (
+    assert count == 4, (
         f"resolve_creative_system_prompt has {count} production "
-        f"caller(s) at the D2a boundary; expected 0. Hits:\n  "
+        f"caller(s) at the D2b boundary; expected exactly 4. Hits:\n  "
         + "\n  ".join(hits)
     )
 

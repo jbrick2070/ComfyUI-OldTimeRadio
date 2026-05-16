@@ -1183,6 +1183,7 @@ def polish_line(
     speaker_role: str = "character",
     beat_intent: str = "",
     previous_lines: tuple[str, ...] = (),
+    creative_repo_id: str | None = None,  # Sprint D D2b
 ) -> str:
     """Run ONE polish LLM call against `leaked_line`.
 
@@ -1238,11 +1239,29 @@ def polish_line(
     # `_POLISH_SYSTEM_PROMPT_CHARACTER` for symmetric naming with
     # `_POLISH_SYSTEM_PROMPT_ANNOUNCER`. Behavior-preserving.
     is_announcer = (speaker_role or "").strip().lower() == "announcer"
-    system_prompt = (
-        _POLISH_SYSTEM_PROMPT_ANNOUNCER
-        if is_announcer
-        else _POLISH_SYSTEM_PROMPT_CHARACTER
-    )
+    # Sprint D D2b: route via resolver. The polish_announcer vs
+    # polish_character distinction maps onto two separate phase
+    # identifiers in the router, preserving the speaker-role pick
+    # logic but unifying the dispatch surface. At creative_repo_id
+    # is None (legacy callers + tests) the resolver is bypassed and
+    # the legacy constant references are returned by object
+    # identity -- audio C7 holds at default config.
+    if creative_repo_id is None:
+        system_prompt = (
+            _POLISH_SYSTEM_PROMPT_ANNOUNCER
+            if is_announcer
+            else _POLISH_SYSTEM_PROMPT_CHARACTER
+        )
+    elif is_announcer:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        system_prompt = resolve_creative_system_prompt(
+            creative_repo_id, phase="polish_announcer",
+        )
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        system_prompt = resolve_creative_system_prompt(
+            creative_repo_id, phase="polish_character",
+        )
 
     # section 6.3: extended user prompt body with beat intent + recent
     # dialogue when provided. Cap previous_lines at 2 entries (ADR
@@ -1318,6 +1337,7 @@ def compose_line(
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     enable_polish_pass: bool = False,
     polish_generate_fn=None,
+    creative_repo_id: str | None = None,  # Sprint D D2b
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1369,7 +1389,16 @@ def compose_line(
     if not callable(generate_fn):
         raise ValueError("generate_fn must be callable")
 
-    system = _SYSTEM_PROMPT
+    # Sprint D D2b: route via resolver. creative_repo_id is None for
+    # legacy callers + tests; resolver returns _SYSTEM_PROMPT by
+    # object identity at default config so audio C7 holds.
+    if creative_repo_id is None:
+        system = _SYSTEM_PROMPT
+    else:
+        from ._otr_creative_prompt_router import resolve_creative_system_prompt
+        system = resolve_creative_system_prompt(
+            creative_repo_id, phase="line_composer_system",
+        )
     user = _build_user_prompt(req)
     messages = [
         {"role": "system", "content": system},
@@ -1526,6 +1555,7 @@ def compose_line(
                     txt for _spk, txt in (req.last_lines or [])
                 ),
                 polish_generate_fn=polish_generate_fn,
+                creative_repo_id=creative_repo_id,  # Sprint D D2b
             )
             # Re-strip in case the polish prompt produced a fresh
             # speaker tag at the head (defensive — polish's prompt
