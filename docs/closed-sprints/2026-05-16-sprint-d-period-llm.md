@@ -807,3 +807,137 @@ Mandatory pauses. Cowork halts and surfaces the gate question before opening the
 ---
 
 **End of Sprint D Cowork action plan v3 -- 2026-05-16.**
+
+---
+
+## §D-final shipped state -- 2026-05-16
+
+Sprint D closed at commit `<this-commit>` on branch `sprint-d-period-llm`.
+12 substantive commits + this D-final close. All gates green at every
+commit boundary. Audio C7 byte-identical pytest proxy HELD against
+`tests/fixtures/baseline_v1.5.wav` end-to-end. Bug Bible regression
+23/1/2 held end-to-end. Forbidden-pattern sweep 0 runtime hits at every
+commit boundary.
+
+### Commit chain as actually shipped
+
+| # | Commit | Subject |
+|---|---|---|
+| D0a | `f7dfe5d` | branch cut + plan landing |
+| D0b | `92a69eb` | license audit framework + 7 flat audit files |
+| D0c | `d00450f` | SA-101 silent clamp log carryover |
+| D0d | `19a99d2` | workflow rewires + portraits_dir output + validator activation |
+| D1a | `78adf58` | CuratedModel extended (6 new fields) + talkie row |
+| D1b | `87d7b93` | loader-backend protocol + GPTQ scaffold + context helper |
+| D1c | `56dc6d9` | talkie dropdown + dispatch + chat-template guard |
+| D2a | `747a376` | creative prompt router (defined, not wired) |
+| D2b | `0e6d50b` | wire resolver into 4 phase sites + writer meta stamping |
+| D2c | `bc11788` | chat-template + stop-token dispatch helpers |
+| D3 | `2cf2333` | reflection boundary + sweep scope + validator + news_interpreter |
+| D4 | `c876714` | runtime-gated period creative + context-window precondition |
+| D-final | `<this-commit>` | sprint close + workflow title rename + Sprint G handoff |
+
+### Deviations from v3 plan -- documented
+
+Five deviations from the v3 plan as written. All endorsed by the
+operator at the corresponding gates during execution. Recorded
+here so future maintainers see immediately what shipped vs what
+the planning artifact says.
+
+1. **D0b flat docs structure.** Per operator G1 Q1 directive, the
+   plan's `docs/model-licenses/` subfolder was flattened into 7
+   files at `docs/model-license-<sanitized>.md` plus
+   `docs/model-license-audit-targets.txt` in the docs root.
+   Sanitization: lowercase repo_id, replace `/` with `--`, strip
+   nothing else. Framework adapted to read the flat layout.
+
+2. **D0c triage-doc canonical log line.** The v3 plan D0c snippet
+   showed `str(e)` interpolation inside `_repair_pass`, but `e` is
+   not in scope inside that function. The shipped log line is the
+   canonical SA-101 patch from
+   `docs/retrospectives/2026-05-15-sprint-c-triage-findings.md`
+   which is in-scope and mathematically complete:
+   `log.info("[OTR_StoryBrief] repair pass clamped: base=%.3f ...")`.
+   Same effect (Sprint A inspectors can distinguish a
+   0.55-ceilinged retry from a 0.35 retry from a pre-clamp
+   failure), correct semantics. v3 snippet was illustrative not
+   literal.
+
+3. **D0d scope expansion.** The v3 plan called D0d "JSON edits
+   only." The HuMo `portraits_dir` wire could not land cleanly
+   because `BatchFluxPortraitRender` shipped with
+   `RETURN_TYPES = ("IMAGE", "STRING")` -- no `portraits_dir`
+   output existed. Per operator G1 (a) "wire it" decision, D0d
+   added a 3rd STRING output to BatchFluxPortraitRender (small
+   source change: extended RETURN_TYPES + RETURN_NAMES, hoisted
+   portraits_dir computation from line 386 to line 308 so both
+   early-return and normal-return surface the directory string,
+   updated both return sites). 13/13 Sprint C portrait tests
+   stayed green; 130/130 wider workflow tests stayed green.
+
+4. **D3 forbidden-sweep carve-out simplified.** The v3 plan
+   called for an explicit AST-node-scoped carve-out for
+   `OTR_PERIOD_SYSTEM_PROMPT` + `PERIOD_EXEMPLARS`. Discovery
+   during D3 execution: the existing tokenize-based suppression
+   in `docs/_s28_forbidden_sweep.py` already covers period
+   prompts (triple-quoted string body classified as "string" ->
+   forensic-suppressed). The `.py`-only file extension scope is
+   already enforced by `tests/test_b7_forbidden_sweep.py`'s git
+   diff `-- "*.py"` filter. D3 shipped PIN tests for both
+   properties rather than re-architecting the sweep.
+
+5. **D4 runtime tests use double-skip.** The 4 D4 runtime-gated
+   tests use `@pytest.mark.skipif(not OTR_REGRESSION_RUNTIME)`
+   PLUS an internal `pytest.skip(...)` because the writer
+   runtime harness for end-to-end fixture-based generation does
+   not yet exist (Sprint A precondition). The test surfaces ship
+   now so Sprint A unblocks them by wiring the harness, not by
+   writing new tests from scratch.
+
+### Sprint A backlog adjustment
+
+`docs/sprint-a-backlog.md` does not exist at Sprint D close. The
+v3 plan D-final "drop SA-101" instruction is captured here
+forensically: **SA-101 is subsumed by D0c commit `d00450f`** and
+should be omitted from any future Sprint A backlog that lands.
+SA-100 (schema-positive gate), SA-102 (hardware snapshot), SA-103
+(VRAM telemetry) remain Sprint A's scope per the triage doc.
+
+### Sprint G handoff
+
+Added per operator B + 1 tweak at D-final.
+
+**`_LegacyTransformersBackendBase` orphan-candidate review (Sprint G).**
+The base class at `nodes/_otr_model_runtime.py:34-58` is currently
+the shared implementation for `TransformersSafetensorsBackend` and
+`TransformersMultimodalTextOnlyBackend`, both of which delegate
+to the legacy monolithic `nodes/_otr_model_loader.load_llm`. If a
+future sprint splits `load_llm` per-backend (separating the
+multimodal-text-only branch from the safetensors branch into their
+own concrete implementations), `_LegacyTransformersBackendBase`
+becomes an unnecessary intermediate -- the two concrete adapters
+would each carry their own `load`/`generate`/`unload`. Sprint G's
+orphan-constant sweep should include this case-by-case judgment
+call after Sprint A's empirical pass validates the per-backend
+split is needed.
+
+### Sprint D test counts
+
+Approximately 70 new active pytest tests across the 12 substantive
+commits plus 1 at D-final, totaling ~71 new active tests.
+Approximately 7 runtime-staged-skip tests waiting for Sprint A
+unblock (D1c: 3 HF-required tokenizer/loader smokes; D4: 4
+fixture-harness-required period-creative pipeline tests).
+
+### v1.9 tag readiness
+
+Sprint D is ready for v1.9 release-tag preparation. Per
+CLAUDE.md "Only Jeffrey merges to main and tags releases" -- the
+operator runs `git tag` directly. Suggested label per the v3 plan
+intent: `v1.9.0-rc1` or `v1.9.0` at operator discretion.
+Memorial Day weekend 2026-05-24/25 target preserved (Sprint D
+closed 2026-05-16 with comfortable slack).
+
+---
+
+**End of Sprint D shipped-state record -- 2026-05-16.**

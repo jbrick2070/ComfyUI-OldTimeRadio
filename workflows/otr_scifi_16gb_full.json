@@ -1940,7 +1940,7 @@
         380,
         320
       ],
-      "title": "1b. Ledger Freeze Cascade (Phase 0..10)",
+      "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
       "properties": {
         "Node name for S&R": "OTR_LedgerFreezeCascade"
       },
