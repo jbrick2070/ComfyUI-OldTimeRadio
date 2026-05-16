@@ -52,17 +52,43 @@ NOT_DOWNLOADED_SUFFIX = " [NOT DOWNLOADED]"
 
 @dataclass(frozen=True)
 class CuratedModel:
-    """A curated LLM the OTR catalog ships with explicit honesty fields."""
+    """A curated LLM the OTR catalog ships with explicit honesty fields.
+
+    Sprint D D1a (2026-05-16): extended with 6 fields to support the
+    period-LLM CATEGORY. `prompt_profile` routes the writer's creative
+    slot to the period system prompt when set to `otr_1940s_v1`.
+    `license` + `license_audit_status` mirror the per-repo audit at
+    `docs/model-license-<sanitized>.md`. `chat_template_kind` +
+    `stop_tokens` + `context_window` carry the per-backend dispatch
+    hints that loader adapters consume. Existing rows backfill with
+    `prompt_profile="modern"`; talkie is the first non-modern row.
+    """
 
     repo_id: str
     requires_auth: bool  # gated repo -> True
     loader_backend: Literal[
         "transformers_safetensors",
         "transformers_multimodal_text_only",
+        "transformers_gptq_int4",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
     notes: str = ""
+    # Sprint D D1a fields with safe defaults so any future row written
+    # against the pre-D1a schema (or any test fixture that omits these)
+    # still constructs cleanly. Production rows below set them explicitly.
+    prompt_profile: Literal["modern", "otr_1940s_v1"] = "modern"
+    chat_template_kind: Literal[
+        "transformers_default", "manual", "raw_completion",
+    ] = "transformers_default"
+    stop_tokens: tuple[str, ...] = ()
+    context_window: int = 8192
+    license: Literal[
+        "mit", "apache_2_0", "non_commercial", "community", "gated_terms",
+    ] = "mit"
+    license_audit_status: Literal[
+        "mit_equivalent", "research_lane", "pending",
+    ] = "pending"
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -73,6 +99,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="PASS",
         approx_safetensors_gb=24.0,
         notes="Audio C7 regression baseline -- soak-tested. Default for both slots.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
     ),
     CuratedModel(
         repo_id="google/gemma-4-E2B-it",
@@ -82,6 +114,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         approx_safetensors_gb=6.0,
         notes="Multimodal architecture (matformer / Gemma-3n family) used "
         "in text-only mode. Compact technical-slot option.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="gated_terms",
+        license_audit_status="pending",
     ),
     CuratedModel(
         repo_id="google/gemma-4-E4B-it",
@@ -90,6 +128,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="PASS",
         approx_safetensors_gb=9.0,
         notes="Slightly larger technical option, same backend.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="gated_terms",
+        license_audit_status="pending",
     ),
     CuratedModel(
         repo_id="Qwen/Qwen2.5-14B-Instruct",
@@ -100,6 +144,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         notes="Ungated; 14B safetensors needs quantization or offload to fit "
         "16 GB -- not soak-tested as PASS yet. Available for users with bigger "
         "rigs; NOT advertised in gated-error recovery hint.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
     ),
     CuratedModel(
         repo_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
@@ -108,6 +158,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="WARN",
         approx_safetensors_gb=24.0,
         notes="Ungated community; 12B at the edge, not soak-tested.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="community",
+        license_audit_status="pending",
     ),
     CuratedModel(
         repo_id="inflatebot/MN-12B-Mag-Mell-R1",
@@ -116,6 +172,39 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="WARN",
         approx_safetensors_gb=24.0,
         notes="Ungated community; same caveat.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="community",
+        license_audit_status="pending",
+    ),
+    # Sprint D D1a (2026-05-16): first non-modern row. Period-trained
+    # 13B model at GPTQ int4 quantization. license_audit_status =
+    # research_lane pending G2 operator verdict (placeholder per
+    # docs/model-license-talkie-lm--talkie-1930-13b-it.md). Training
+    # corpus is pre-1930; OTR_PERIOD_SYSTEM_PROMPT targets 1938-1952.
+    # Era mismatch documented as research-lane caveat.
+    CuratedModel(
+        repo_id="talkie-lm/talkie-1930-13b-it",
+        requires_auth=True,
+        loader_backend="transformers_gptq_int4",
+        vram_fit_tier="UNKNOWN",
+        approx_safetensors_gb=7.5,
+        notes=(
+            "Period trained 13B at GPTQ int4. Training corpus pre 1930 "
+            "may mismatch OTR_PERIOD_SYSTEM_PROMPT 1938-1952 target era. "
+            "Modern news with post 1952 references produces era "
+            "anachronistic dialogue. Research lane not eligible for "
+            "default workflow JSON until license_audit_status flips "
+            "to mit_equivalent."
+        ),
+        prompt_profile="otr_1940s_v1",
+        chat_template_kind="transformers_default",
+        stop_tokens=("</s>",),
+        context_window=4096,
+        license="non_commercial",
+        license_audit_status="research_lane",
     ),
 )
 
