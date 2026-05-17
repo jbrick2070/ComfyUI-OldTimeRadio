@@ -123,6 +123,49 @@ def get_story_brief_lighting(meta: Any) -> str:
     return ", ".join(lighting + atmosphere)
 
 
+def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
+    """Sprint E E3 / H4: uniform one-line disposition log for every
+    visual + audio consumer.
+
+    Returns the resolved status string so the caller can branch on it
+    if needed. Each consumer calls this exactly ONCE per run with its
+    own `log` (logging.Logger) and a string consumer_id from the
+    canonical set:
+
+        flux_env       OTR_BatchFluxRender
+        flux_portrait  OTR_BatchFluxPortraitRender
+        ltx            OTR_BatchLTXRender
+        humo           OTR_BatchHumoRender
+        musicgen       OTR_MusicGenTheme
+
+    The log line format is uniform across consumers so soak diagnostics
+    can grep one canonical pattern instead of N consumer-specific log
+    formats. Per refinement E-07 / Sprint E E3 plan H4 fix:
+
+        [story_brief:<consumer_id>] status=<status> brief_chars=<N> terms=<counts>
+
+    Where <counts> is a compact `setting=N lighting=N atmosphere=N`
+    summary. status="absent" or "failed" yields brief_chars=0 terms=0/0/0
+    and the consumer's subsequent helper calls return safe empty values.
+    """
+    status = get_story_brief_status(meta)
+    m = _meta(meta)
+    brief = (m.get("story_brief") or "") if status == "ok" else ""
+    terms = m.get("story_brief_terms") or {} if status == "ok" else {}
+    if not isinstance(terms, dict):
+        terms = {}
+    n_setting = len(terms.get("setting") or [])
+    n_lighting = len(terms.get("lighting") or [])
+    n_atmosphere = len(terms.get("atmosphere") or [])
+    log.info(
+        "[story_brief:%s] status=%s brief_chars=%d "
+        "terms=setting=%d/lighting=%d/atmosphere=%d",
+        consumer_id, status, len(brief),
+        n_setting, n_lighting, n_atmosphere,
+    )
+    return status
+
+
 def get_story_brief_music_mood(meta: Any) -> list[str]:
     """Mood keywords from atmosphere_terms, intersected with the
     MusicGen mood vocabulary.
