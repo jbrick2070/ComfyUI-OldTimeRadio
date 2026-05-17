@@ -310,7 +310,7 @@ def test_compose_shot_prompt_cleans_trailing_commas():
 
 
 # ------------------------------------------------------------------
-# build_shot_plan — the core integration
+# build_shot_plan -- the core integration
 # ------------------------------------------------------------------
 
 
@@ -784,28 +784,28 @@ def test_plan_method_multi_char_default():
     assert "all cast" in summary.lower() or "2" in summary
 
 
-def test_plan_method_accepts_audio_gate_and_ignores_value():
-    """audio_gate is a topsort-dependency input only; value must not affect output."""
+def test_plan_method_accepts_freeze_done_gate_and_ignores_value():
+    """freeze_done_gate is a topsort-dependency input only; value must not affect output."""
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
     script_json = _ledger_wrap(_sample_director())
 
-    # Without audio_gate
+    # Without freeze_done_gate
     out_a = node.plan(
         script_json=script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="mission_control_procedural",
     )
-    # With audio_gate wired (arbitrary string value)
+    # With freeze_done_gate wired (arbitrary string value)
     out_b = node.plan(
         script_json=script_json,
         focus_character="BABA",
         shots_per_scene=1,
         style="mission_control_procedural",
-        audio_gate="C:/path/to/final_episode.mp4",
+        freeze_done_gate="sentinel_dependency_value",
     )
-    # Parse the JSON envelopes and compare — audio_gate should not affect output
+    # Parse the JSON envelopes and compare -- freeze_done_gate should not affect output
     # (we compare the parsed dicts to avoid JSON whitespace differences)
     assert json.loads(out_a[0]) == json.loads(out_b[0])
     assert json.loads(out_a[1]) == json.loads(out_b[1])
@@ -813,14 +813,14 @@ def test_plan_method_accepts_audio_gate_and_ignores_value():
     assert out_a[3] == out_b[3]
 
 
-def test_input_types_has_audio_gate_optional():
+def test_input_types_has_freeze_done_gate_optional():
     from nodes.otr_video_plan import OTRVideoPlan
     schema = OTRVideoPlan.INPUT_TYPES()
     assert "optional" in schema
-    assert "audio_gate" in schema["optional"]
-    assert schema["optional"]["audio_gate"][0] == "STRING"
+    assert "freeze_done_gate" in schema["optional"]
+    assert schema["optional"]["freeze_done_gate"][0] == "STRING"
     # forceInput ensures the widget is replaced with an input socket
-    assert schema["optional"]["audio_gate"][1].get("forceInput") is True
+    assert schema["optional"]["freeze_done_gate"][1].get("forceInput") is True
 
 
 def test_plan_method_single_char_when_focus_set():

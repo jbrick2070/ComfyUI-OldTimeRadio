@@ -296,15 +296,15 @@ def test_expand_does_not_mutate_input():
 
 def test_node_registered():
     from nodes.otr_shot_duration_calculator import (
-        NODE_CLASS_MAPPINGS, OTRShotDurationCalculator,
+        NODE_CLASS_MAPPINGS, OTRFixedShotDurationStub,
     )
-    assert "OTR_ShotDurationCalculator" in NODE_CLASS_MAPPINGS
-    assert NODE_CLASS_MAPPINGS["OTR_ShotDurationCalculator"] is OTRShotDurationCalculator
+    assert "OTR_FixedShotDurationStub" in NODE_CLASS_MAPPINGS
+    assert NODE_CLASS_MAPPINGS["OTR_FixedShotDurationStub"] is OTRFixedShotDurationStub
 
 
 def test_input_types_schema():
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    schema = OTRShotDurationCalculator.INPUT_TYPES()
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    schema = OTRFixedShotDurationStub.INPUT_TYPES()
     assert "pass3_compose_prompts_json" in schema["required"]
     assert "shot_durations_json" in schema["required"]
     assert schema["required"]["pass3_compose_prompts_json"][0] == "STRING"
@@ -312,17 +312,17 @@ def test_input_types_schema():
 
 
 def test_return_types():
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    assert OTRShotDurationCalculator.RETURN_TYPES == ("STRING", "INT", "INT", "STRING")
-    assert OTRShotDurationCalculator.RETURN_NAMES == (
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    assert OTRFixedShotDurationStub.RETURN_TYPES == ("STRING", "INT", "INT", "STRING")
+    assert OTRFixedShotDurationStub.RETURN_NAMES == (
         "expanded_pass3_json", "total_clips", "total_frames", "debug_summary"
     )
 
 
 def test_calculate_method_end_to_end():
     """Feed a minimal plan + durations, get expanded output back."""
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    node = OTRShotDurationCalculator()
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    node = OTRFixedShotDurationStub()
     plan = _minimal_plan(3)
     plan_json = json.dumps(plan)
     durations_json = json.dumps([6.0, 15.0, 27.0])
@@ -344,8 +344,8 @@ def test_calculate_method_end_to_end():
 
 def test_calculate_method_empty_durations_defaults():
     """Empty durations_json -> default 8.0s per shot."""
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    node = OTRShotDurationCalculator()
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    node = OTRFixedShotDurationStub()
     plan = _minimal_plan(3)
     out_json, total_clips, total_frames, _ = node.calculate(
         pass3_compose_prompts_json=json.dumps(plan),
@@ -358,8 +358,8 @@ def test_calculate_method_empty_durations_defaults():
 
 def test_calculate_method_output_batchfluxrender_shaped():
     """Smoke: output must match the schema BatchFluxRender reads."""
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    node = OTRShotDurationCalculator()
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    node = OTRFixedShotDurationStub()
     plan = _minimal_plan(2)
     out_json, _, _, _ = node.calculate(
         pass3_compose_prompts_json=json.dumps(plan),
@@ -374,8 +374,8 @@ def test_calculate_method_output_batchfluxrender_shaped():
 
 def test_calculate_method_custom_target_and_cap():
     """Caller can override segment target and hard cap."""
-    from nodes.otr_shot_duration_calculator import OTRShotDurationCalculator
-    node = OTRShotDurationCalculator()
+    from nodes.otr_shot_duration_calculator import OTRFixedShotDurationStub
+    node = OTRFixedShotDurationStub()
     plan = _minimal_plan(1)
     # With target=5 cap=6, a 10s shot becomes 2 clips (ceil(10/5))
     out_json, total_clips, _, _ = node.calculate(

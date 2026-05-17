@@ -92,9 +92,13 @@ def test_curated_set_is_a_tuple_of_curated_model():
         assert isinstance(entry, catalog.CuratedModel)
         assert "/" in entry.repo_id
         assert entry.vram_fit_tier in ("PASS", "WARN", "UNKNOWN", "FAIL")
+        # Sprint D D1b added transformers_gptq_int4 for the talkie row;
+        # this assertion missed updating at Sprint D close. Sprint E E17
+        # triage adds the third backend.
         assert entry.loader_backend in (
             "transformers_safetensors",
             "transformers_multimodal_text_only",
+            "transformers_gptq_int4",
         )
         assert entry.approx_safetensors_gb > 0
 
