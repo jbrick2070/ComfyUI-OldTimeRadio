@@ -1651,9 +1651,46 @@ class BatchHumoRender:
         # User-supplied input wins if non-empty.
         if not portraits_dir or not portraits_dir.strip():
             portraits_dir_path = comfy_output_dir()
+            # Sprint E E10 / M7: D0d wired BatchFluxPortraitRender's
+            # new portraits_dir STRING output to HuMo's portraits_dir
+            # input (L116 in workflow JSON). The empty-string branch
+            # below is the auto-resolve FALLBACK that fires when the
+            # wire is missing or upstream FluxPortrait did not run.
+            # Pre-E10 this fallback was silent; post-E10 it logs WARN
+            # so soak diagnostics surface the missing-wire case
+            # explicitly.
+            log.warning(
+                "[BatchHumoRender] portraits_dir input is empty; "
+                "auto-resolved to %s. This is the D0d fallback path; "
+                "wire FluxPortrait.portraits_dir output to HuMo's "
+                "portraits_dir input for the explicit D0d contract.",
+                portraits_dir_path,
+            )
         else:
             portraits_dir_path = Path(portraits_dir)
         log.info("[BatchHumoRender] portraits_dir=%s", portraits_dir_path)
+
+        # Sprint E E10 / M6: pre-batch wall-time estimate. Operator
+        # planning a soak needs to see the projected total before the
+        # render starts. Reference: ~10-12 min per character line on
+        # RTX 5080. We log the lower bound (10 min) since the upper
+        # depends on per-line audio length and chunk count.
+        _character_lines_count = sum(
+            1 for _ln in lines
+            if (_ln.get("speaker_role") or "").lower() == "character"
+        )
+        if max_clips > 0:
+            _character_lines_count = min(_character_lines_count, max_clips)
+        _est_min_low = _character_lines_count * 10
+        _est_min_high = _character_lines_count * 12
+        log.info(
+            "[BatchHumoRender] PRE-BATCH ESTIMATE: %d character "
+            "line(s) -> ~%d-%d minutes total HuMo wall time on RTX "
+            "5080 (Sprint C-era reference; re-time on Sprint A "
+            "before quoting). Non-character lines route to radio "
+            "still and are excluded from this estimate.",
+            _character_lines_count, _est_min_low, _est_min_high,
+        )
 
         # ---- 3. Resolve clips output_dir (canonical OTR tree) ----
         # output_dir = ComfyUI/output/otr/videos/<episode_id>/
