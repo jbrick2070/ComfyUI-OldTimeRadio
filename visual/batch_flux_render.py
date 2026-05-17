@@ -507,6 +507,37 @@ class BatchFluxRender:
         t_start = time.time()
         prompts = _parse_env_prompts(script_json, batch_limit, fallback_prompt, style_suffix)
 
+        # Sprint E E9 / M2: check meta.freeze_unload_ok. The cascade
+        # stamps False if its finally-block unload_llm raised; that
+        # means Mistral-Nemo may still be holding ~8 GB on the GPU.
+        # FLUX FP8 needs ~12 GB free, so attempt one defensive unload
+        # before pinning the FLUX MODEL to dodge OOM. Logged at WARN
+        # so the soak tail surfaces the recovery attempt.
+        try:
+            import json as _json
+            _meta_flag = None
+            if script_json and script_json.strip().startswith("{"):
+                _meta = (_json.loads(script_json).get("meta") or {})
+                _meta_flag = _meta.get("freeze_unload_ok")
+            if _meta_flag is False:
+                log.warning(
+                    "[BatchFluxRender] meta.freeze_unload_ok=False -- "
+                    "cascade teardown reported unload_llm failure; "
+                    "attempting defensive unload before FLUX MODEL pin"
+                )
+                try:
+                    from nodes._otr_model_loader import unload_llm as _du
+                    _du()
+                except Exception as _exc:
+                    log.warning(
+                        "[BatchFluxRender] defensive unload_llm raised %r; "
+                        "proceeding to FLUX load anyway (may OOM)", _exc,
+                    )
+        except Exception as _exc:
+            # Reading meta is best-effort. A malformed script_json
+            # surface (legacy list form) should not block FLUX render.
+            log.debug("[BatchFluxRender] freeze_unload_ok read failed: %r", _exc)
+
         # Pin MODEL on GPU so per-KSampler load_models_gpu calls are cheap.
         try:
             import comfy.model_management as mm  # type: ignore

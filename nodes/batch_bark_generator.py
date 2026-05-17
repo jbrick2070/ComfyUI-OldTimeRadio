@@ -385,6 +385,29 @@ class BatchBarkGenerator:
         from . import _otr_ledger_consumers as _OTRLC
         led = _OTRLC.load_ledger(script_json)
 
+        # Sprint E E9 / M2: check meta.freeze_unload_ok. The cascade
+        # stamps this at the finally block of run_freeze_cascade; False
+        # means unload_llm() raised inside the cascade's teardown and
+        # the Mistral-Nemo cache may still be holding ~8 GB on the GPU.
+        # Bark needs ~6 GB headroom, so attempt one defensive unload
+        # here to avoid OOM on this node's torch.load. Logged at WARN
+        # so the soak tail surfaces the recovery attempt.
+        _meta = led.get("meta") or {}
+        if _meta.get("freeze_unload_ok") is False:
+            log.warning(
+                "[BatchBark] meta.freeze_unload_ok=False -- cascade "
+                "teardown reported unload_llm failure; attempting "
+                "defensive unload before loading Bark to avoid OOM"
+            )
+            try:
+                from ._otr_model_loader import unload_llm as _defensive_unload
+                _defensive_unload()
+            except Exception as _exc:
+                log.warning(
+                    "[BatchBark] defensive unload_llm raised %r; "
+                    "proceeding to Bark load anyway (may OOM)", _exc,
+                )
+
         # -- Step 1: Walk character lines from the ledger ------------------
         # ANNOUNCER lines (speaker_role == "announcer") are intentionally
         # skipped here - they are rendered by the dedicated KokoroAnnouncer
