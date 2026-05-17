@@ -154,6 +154,25 @@ forbidden = re.compile(
     r"|\bmeta\.ltx_style_brief\b"           # C3b: retired stamp
     r"|\b_LTX_STYLE_BRIEF_PROMPT\b"         # C3b: retired prompt constant
     r"|\b_generate_ltx_style_brief\b"       # C3b: retired generator
+    # Sprint E E13 (2026-05-16): E12 retired the misleading "Directory
+    # of per-line HuMo clips" tooltip on VideoComposite.clips_dir
+    # (the wire actually sources from LTX, HuMo lookup goes via
+    # ledger.clips[]). Marker locks the legacy framing out so a
+    # comment-restore commit cannot silently reintroduce the
+    # comment-code disagreement (cold-read finding M5).
+    r"|Directory of per-line HuMo clips"    # E12 / M5: retired tooltip
+    # Sprint E E13: router substring-dispatch guard. E4's drift test
+    # already enforces this at the AST level, but the sweep marker
+    # gives a regex-level second line of defense. The router's
+    # exact-match implementation (D2a) is the only allowed dispatch.
+    r"|if.+talkie.+in repo_id"              # E4 / M1: router substring guard
+    # Sprint E E13: validator path widget hardcoded operator path
+    # guard. The S29 Phase 1 cleanbreak removed `C:/Users/jeffr/...`
+    # from the Node 63 widget; the existing C:/Users/jeffr marker
+    # already locks .py files. This adds a redundant token so a
+    # commit that re-introduces a hardcoded path under a different
+    # path prefix (e.g. a future operator machine) still trips here.
+    r"|workflow_json_path.+default.+C:"     # E5 / H5: validator hardcoded-path guard
 )
 diff_file_re = re.compile(r"^\+\+\+ b/(.+)$")
 hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
