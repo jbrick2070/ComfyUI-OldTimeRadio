@@ -18,10 +18,10 @@ This is a pre-Sprint-A cold-read QA artifact for the OTR v2.0 workflow. The revi
 
 The graph has eight functional lanes plus the validator. Mermaid block first for visual scan; ASCII tree below for precise wire walking. The Mermaid is grouped by lane subgraph to keep it readable; the ASCII tree is the authoritative source if Mermaid disagrees with itself.
 
-**Sprint D D0d rewires** that the reviewer should pay extra attention to are flagged inline with `[D0d]`. Three rewires landed at D0d:
+**Sprint D D0d rewires** that the reviewer should pay extra attention to are flagged inline with `[D0d]`. Five wire changes landed at D0d:
 
-1. **Three new `ledger_json` fanout sources** from FreezeCascade (node 62, slot 1). The cascade now broadcasts its post-freeze JSON to FLUX-portrait (59), VideoPlan (20 second wire), and the HuMo lip-sync gate (51, slot 5). Pre-D0d HuMo received `ledger_json` only as a side-effect via `slot 5` from the writer, not from the freeze contract.
-2. **Audio-gate decoupling.** The VideoPlan `audio_gate` (slot 3, optional, dead-but-load-bearing for topsort) is no longer wired in the canonical workflow JSON; sequencing now relies on the IMAGE-edge chain through FLUX/UnloadAll/HuMo.
+1. **Three `ledger_json` source rewires** -- HuMo (51.5), VideoComposite (52.2), and LTX (55.3) ledger_json inputs previously sourced from SignalLostVideo.video_path or other duck-typed paths; D0d rewires all three to FreezeCascade.script_json so consumers read the post-freeze L3 contract.
+2. **VideoPlan audio_gate dependency wire.** VideoPlan input slot 1 is named `audio_gate` (forceInput STRING). Pre-D0d it sat unwired (topsort relied on the IMAGE-edge chain through FLUX/UnloadAll/HuMo); post-D0d it IS wired via L47 from FreezeCascade.script_json as a pure dependency edge so VideoPlan cannot run before the freeze stamps meta.story_brief. The socket name `audio_gate` is misleading post-D0d and is queued for rename to `freeze_done_gate` in Sprint E.
 3. **`portraits_dir` wire (59.2 -> 51.6).** BatchFluxPortraitRender (59) emits a new third STRING output `portraits_dir`; HuMo (51) consumes it on its `portraits_dir` input. Pre-D0d HuMo fell through to `output/otr/portraits/<ep_id>/` via auto-resolve; post-D0d the wire is explicit so a renamed portrait directory cannot silently miss the face-reference lookup.
 
 ```mermaid
@@ -244,7 +244,13 @@ Lane: HUMO DIALOGUE (Wan 2.1 stack, lightx2v, Whisper)
    49.0  wan_2.1 VAE  -> 51.2 HuMo.vae   (L76   VAE)
    50.0  Whisper AUDIO_ENCODER -> 51.3 HuMo.audio_encoder (L77 AUDIO_ENCODER)
    51.0  HuMo clips_dir -> 55.4 LTX.humo_clips_dir (L91   STRING)  -- DAG seq
-   51.2  HuMo.report    -> 54.0 LowVRAMCheckpointLoader.ckpt_name (L86 STRING) -- DAG seq
+   51.2  HuMo.report    -> 54.0 LowVRAMCheckpointLoader.<input> (L86 *) -- DAG seq
+                  L86 edge type is `*` (ComfyUI dependency type),
+                  NOT STRING. Source slot is HuMo report STRING but
+                  target slot accepts the * dependency wire. Pure
+                  topsort edge; value ignored at execute(). Sprint E
+                  E6 renames the target input to `sequence_gate` to
+                  drop the misleading `ckpt_name` framing.
 
 Lane: LTX MOTION (22B-distilled stack)
    54.0  LTX 22B MODEL  -> 60.0 LoraLoader (L87   MODEL)
@@ -282,7 +288,7 @@ Lane: VALIDATOR (opt-in, first-node placement)
 
 - **L78** (EpisodeAssembler `7.0` audio -> HuMo `51.4`). The HuMo audio gate consumes the FINAL composed episode audio (post-Bark + Kokoro + MusicGen + SFX through SceneSequencer + AudioEnhance + Assembler), not the per-line Bark output. This is the Prime Directive 1 audio-passthrough contract: the same bytes the audience hears drive HuMo's lip phoneme conditioning, and the same bytes get FFmpeg-muxed back onto the silent HuMo video. Any topology change that re-routes HuMo to listen to a pre-Assembler audio is an audio C7 risk.
 - **L91** (HuMo `51.0` clips_dir -> LTX `55.4` humo_clips_dir). This is a pure DAG sequencing edge -- the value is ignored at LTX execute(). The wire exists so ComfyUI's topsort runs HuMo's render + teardown before LTX claims the 22B model VRAM. Removing this wire is an OOM hazard. The `del humo_clips_dir` line at `batch_ltx_render.py:998` documents that the value is intentionally consumed and unused.
-- **L86** (HuMo `51.2` report STRING -> LowVRAMCheckpointLoader `54.0` ckpt_name). HuMo emits a STRING report; that report flows into the LTX checkpoint loader's ckpt_name slot. This is another pure DAG sequencing edge -- the LTX loader does not actually accept arbitrary report text as a checkpoint name. ComfyUI's permissive STRING binding lets this work; a stricter type check would flag it. **Flag for reviewer: WORK-BY-ACCIDENT candidate.**
+- **L86** (HuMo `51.2` report -> LowVRAMCheckpointLoader `54.0`). Edge type `*` (ComfyUI dependency type), not STRING. Source is HuMo's `report` STRING slot but the target accepts the `*` dependency wire as a pure topological-sort gate -- the LTX checkpoint loader does not consume the value. The misleading framing was the target slot being named `ckpt_name` while functioning as a dependency port. Sprint E E6 renames the target input to `sequence_gate` so the contract matches the use.
 - **L105** (MusicGen `14.1` closing_audio -> SignalLost `12.3`). The procgen video receives the closing music for its post-roll credits-blend. SignalLost lazy-feathers the episode audio into the closing music if the closing_audio socket is connected; otherwise it does an exponential decay of the main audio. Sprint A should verify both paths.
 - **L83 + L101 + L45** form the FLUX -> Portrait -> Unload -> HuMo dependency chain. L101 (BatchFluxRender IMAGE -> FluxPortrait flux_done_gate) sequences FluxPortrait after BatchFluxRender. L45 (FluxPortrait IMAGE -> UnloadAll IMAGE) sequences UnloadAll after FluxPortrait. L83 (UnloadAll IMAGE -> HuMo flux_done_gate) sequences HuMo after FLUX VRAM is released. All three edges are value-ignored.
 - **Sage patch node 42** is in the graph but DISABLED per BUG-LOCAL-070. L42 (22 -> 42) and L69 (42 -> 23) form a bypass: MODEL flows 22.0 -> 42.0 -> 23.0 with the Sage patch node acting as a passthrough. Sprint A should verify the bypass does not silently re-enable Sage on a code change.
@@ -356,6 +362,11 @@ Notes:
 - Two-model selector (S30 / B sprint) replaced the single legacy `model_id` widget.
 - Sprint D D1a extended `CuratedModel` with 6 new fields and added a `talkie` row; see `_otr_model_catalog.py` for the talkie dropdown values.
 - `creative_writing_model` and `technical_model` are dropdown choices populated by `_otr_model_catalog.dropdown_choices()` -- the function scans the local HuggingFace cache at INPUT_TYPES() registration time and applies `[NOT DOWNLOADED]` suffixes to curated rows missing from disk. Suffix is stripped before any HF lookup.
+
+**JSON-shipped widget values that differ from schema defaults** (pre-Sprint-E-E2 audit):
+- `seed`: schema default 42 (audio C7 baseline reference). JSON-shipped value 0 + control widget `randomize`. Runtime baseline reproduction requires the operator to flip the control to `fixed` and set seed=42, OR for Sprint E E2 to write the canonical values into the JSON.
+- `act_count`: schema default 0 (auto-derive from `target_words`). JSON-shipped value 3 (overrides auto-derive). Sprint A should decide whether the JSON-shipped 3 is canonical or whether auto-derive should be the shipping default.
+- All other widgets ship at their schema defaults.
 
 ### Core method body (writer.run spine)
 
@@ -1126,7 +1137,7 @@ See §1 ASCII tree. Highlights:
 ### Sprint D touches
 
 - D0d: portrait `RETURN_TYPES` extended to 3 outputs; new `portraits_dir` STRING. Wiring partner for HuMo's pre-existing but unlinked `portraits_dir` input.
-- D2b: creative prompt router wired at portrait_prompt site (one of the 4 wire sites). Portrait prompt now branches on `meta.creative_prompt_profile`.
+- D2b: None direct. Portrait prompt builder is deterministic Python composition with no LLM call (see core method body comment `LLM slot: N/A`). The creative prompt router operates on writer-internal LLM phases only -- the 4 D2b wire sites live inside `OTR_LedgerScriptWriter` (outline, line composer, polish character, polish announcer per §2). `meta.creative_prompt_profile` is consumed in §4 only as a forensic field that the portrait prompt does NOT branch on.
 
 ---
 
@@ -1270,7 +1281,7 @@ See §1 ASCII tree:
 - **BUG-LOCAL-117 (engine selector unset).** Default `v0_9` against a v2.3 checkpoint -> garbage or shape crash. Mitigation is the env-var WARNING; Sprint A should set `OTR_LTX_ENGINE=v2_3` permanently.
 - **BUG-LOCAL-097 (widget vector position drift).** `clip_length` was inserted at the END of optional to preserve back-compat with saved workflow JSONs. A future widget added at any position other than END will shift saved values.
 - **VRAM contention with HuMo (L91 / L86 DAG seq).** Both edges are essential -- removing either lets LTX claim the 22B model VRAM before HuMo's 16.5 GB MODEL is unloaded. Round-robin consult 2026-05-02 endorsed this pattern as acceptable ComfyUI sequencing.
-- **L86 work-by-accident risk.** HuMo's `report` STRING is wired to LowVRAMCheckpointLoader's `ckpt_name` STRING -- the value is ignored but ComfyUI's permissive STRING binding doesn't enforce that. A code change that starts honoring `ckpt_name` would break the graph. **Flag for reviewer: WORK-BY-ACCIDENT candidate.**
+- **L86 typed-dependency clarity.** L86 is a `*` dependency wire (not STRING) from HuMo's `report` source slot to LowVRAMCheckpointLoader's target. The value is ignored at execute(). Sprint E E6 renames the target input to `sequence_gate` to remove the original misleading `ckpt_name` framing and locks the dependency-only contract with a regression test.
 - **LTX 2B v0.9 cannot produce motion (BUG-LOCAL-117 supersedes BUG-LOCAL-112).** Regardless of prompt quality; the 2B engine is smoke-test only. Production target is 22B-distilled.
 - **GGUF Q4 non-determinism (Sprint A unproven).** Sub-8-bit quantization uses split-K parallelization; floating-point accumulation order is non-associative across thread blocks. Byte-deterministic visual output across re-renders at the same seed is NOT achievable without batch-invariant compute flags. Sprint A should soak-verify visual coherence rather than byte-identity.
 
@@ -2283,6 +2294,10 @@ Gate:     pytest tests/test_audio_byte_identical.py  (proxy)
 
 Any code change that drifts the b3sum is a Prime Directive 1 violation. The audio pytest proxy passes at every commit boundary in Sprint D; the true runtime gate is deferred to Sprint A.
 
+**Default-config baseline reproduction precondition (Sprint E E2 target).** The shipped `workflows/otr_scifi_16gb_full.json` has writer Node 1 widget seed=0 with control=`randomize`, which rerolls on every ComfyUI Queue Prompt. Runtime b3sum reproduction requires the operator to (a) flip the control widget to `fixed`, AND (b) set seed=42, AND (c) keep both writer slots on `mistralai/Mistral-Nemo-Instruct-2407`. Sprint E E2 commits these widget values into the canonical workflow JSON so default-config runs reproduce by construction; a validator drift guard pins the values going forward.
+
+**Talkie + C7 mutual exclusion.** The audio C7 baseline holds ONLY when both writer slots resolve to `mistralai/Mistral-Nemo-Instruct-2407`. Selecting the talkie row (Sprint D D1a curated period model) on the creative slot drifts the audio baseline by construction -- talkie produces different dialogue prose, which produces different Bark + Kokoro + MusicGen outputs. Talkie is the period-research lane and lives outside the canonical workflow's C7 contract.
+
 ### Prime Directive 1 (verbatim from CLAUDE.md)
 
 ```
@@ -2354,7 +2369,7 @@ The 14.5 GB ceiling is verified per-stage in isolation. Sustained swap across a 
 
 ### HuMo per-clip wall time at default config
 
-Reference memory pins ~10-12 min per character line on RTX 5080. A 6-line ledger projects ~40-48 minutes HuMo wait. Sprint A should re-time at default config to confirm no regression from Sprint C/D code changes.
+Reference memory pins ~10-12 min per character line on RTX 5080. A 6-line ledger projects ~40-48 minutes HuMo wait. The 10-12 min reference was captured Sprint C-era; Sprint D's writer meta-stamping (D2b creative_model + creative_prompt_profile) and the D0d portraits_dir explicit wire may shift this slightly. Sprint A re-times at default config and replaces the reference before quoting wall-time to anyone planning a soak run. Sprint E E10 surfaces a pre-batch estimate in the HuMo log so operators see the projected wait before queueing.
 
 ### GPTQ int4 non-determinism under split-K (Sprint D D1b risk)
 
