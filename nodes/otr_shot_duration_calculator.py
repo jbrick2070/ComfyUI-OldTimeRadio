@@ -115,11 +115,11 @@ def total_frames_for_clip_counts(clip_counts: list[int]) -> int:
 
 def _load_plan(plan_json: str) -> dict:
     if not plan_json or not plan_json.strip():
-        raise ValueError("ShotDurationCalculator: empty plan JSON")
+        raise ValueError("FixedShotDurationStub: empty plan JSON")
     plan = json.loads(plan_json)
     if not isinstance(plan, dict):
         raise ValueError(
-            f"ShotDurationCalculator: plan JSON root must be dict, got {type(plan).__name__}"
+            f"FixedShotDurationStub: plan JSON root must be dict, got {type(plan).__name__}"
         )
     return plan
 
@@ -128,7 +128,7 @@ def _load_durations(durations_json: str, expected_count: int) -> list[float]:
     if not durations_json or not durations_json.strip():
         # Empty => default all shots to 8s (mid-range single-clip)
         log.info(
-            "ShotDurationCalculator: empty durations, defaulting %d shots to 8.0s",
+            "FixedShotDurationStub: empty durations, defaulting %d shots to 8.0s",
             expected_count,
         )
         return [8.0] * expected_count
@@ -313,9 +313,18 @@ def expand_plan_with_durations(
 # ---------------------------------------------------------------------------
 
 
-class OTRShotDurationCalculator:
-    """OTR_ShotDurationCalculator  --  expand 1-clip-per-shot plan into
-    correct multi-clip structure based on real shot durations."""
+class OTRFixedShotDurationStub:
+    """OTR_FixedShotDurationStub  --  expand 1-clip-per-shot plan into
+    correct multi-clip structure based on real shot durations.
+
+    Sprint E E8 rename from OTR_ShotDurationCalculator (M10). The old
+    name implied dynamic computation; the current implementation
+    operates on a hand-crafted JSON array of durations until the Bark
+    audio-timeline wiring lands. The rename makes the stub-nature of
+    the current behavior surface-visible. Per CLAUDE.md no-back-compat
+    directive: no alias for the old name; pre-Sprint-E saved workflow
+    JSONs must be rewritten.
+    """
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -411,7 +420,7 @@ class OTRShotDurationCalculator:
         ])
 
         log.info(
-            "OTR_ShotDurationCalculator READY: shots=%d clips=%d frames=%d",
+            "OTR_FixedShotDurationStub READY: shots=%d clips=%d frames=%d",
             len(original_shots),
             total_clips,
             total_frames,
@@ -431,14 +440,14 @@ class OTRShotDurationCalculator:
 
 
 NODE_CLASS_MAPPINGS = {
-    "OTR_ShotDurationCalculator": OTRShotDurationCalculator,
+    "OTR_FixedShotDurationStub": OTRFixedShotDurationStub,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "OTR_ShotDurationCalculator": " OTR Shot Duration Calculator",
+    "OTR_FixedShotDurationStub": " OTR Fixed Shot Duration Stub",
 }
 
 __all__ = [
-    "OTRShotDurationCalculator",
+    "OTRFixedShotDurationStub",
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
     "clips_per_shot",

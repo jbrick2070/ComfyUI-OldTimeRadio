@@ -175,8 +175,13 @@ _NODE_MODULES = {
     # v2.0 read-only ledger/script adapter for multi-pass FLUX rendering
     # (legacy "Director" naming retired in voice-path-cleanbreak S23.9).
     "OTR_VideoPlan":               (".nodes.otr_video_plan",           "OTRVideoPlan",          " OTR Video Plan"),
-    # v2.0 multi-clip shot expansion (needs shot durations from audio timeline)
-    "OTR_ShotDurationCalculator":  (".nodes.otr_shot_duration_calculator", "OTRShotDurationCalculator", " OTR Shot Duration Calculator"),
+    # v2.0 multi-clip shot expansion (needs shot durations from audio
+    # timeline). Sprint E E8 rename: was OTR_ShotDurationCalculator;
+    # the new name surfaces the stub-nature of the current implementation
+    # (hand-crafted JSON array of durations until Bark audio-timeline
+    # wiring lands). Per CLAUDE.md no-back-compat: no alias for the old
+    # name.
+    "OTR_FixedShotDurationStub":  (".nodes.otr_shot_duration_calculator", "OTRFixedShotDurationStub", " OTR Fixed Shot Duration Stub"),
     # OTR_PostAudioVideoPipeline -- DELETED S27 (commit lands in s27-
     # cleanbreak-tail). The class was a subprocess trigger for the
     # pre-2026-04-27 HuMo batch + concat pipeline; it was superseded

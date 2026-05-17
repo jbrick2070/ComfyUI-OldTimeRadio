@@ -707,7 +707,7 @@
     },
     {
       "id": 21,
-      "type": "OTR_ShotDurationCalculator",
+      "type": "OTR_FixedShotDurationStub",
       "pos": [
         600,
         1200
@@ -763,7 +763,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "OTR_ShotDurationCalculator"
+        "Node name for S&R": "OTR_FixedShotDurationStub"
       },
       "widgets_values": [
         "",
