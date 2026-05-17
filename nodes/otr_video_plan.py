@@ -417,7 +417,7 @@ def build_pass2_scene_prompts(
                 scene.get("shot_description") or f"{scene_id} environment"
             ).strip()
 
-        # Compose without character, without era, without action —
+        # Compose without character, without era, without action --
         # just the scene visual + style tail.
         composed = compose_shot_prompt(
             portrait="",
@@ -612,7 +612,7 @@ def build_shot_plan(
         scene_id = bound_shot["scene_id"]
         scene_visual = bound_shot["scene_visual"]
 
-        # Shot-progression hint — "opening", "mid", "closing":
+        # Shot-progression hint -- "opening", "mid", "closing":
         # first frame of the episode = opening establishing shot
         # last frame of the episode = final closing
         # bridge frames = "transition frame" (end of one, start of next)
@@ -780,20 +780,25 @@ class OTRVideoPlan:
                     "BOOLEAN",
                     {"default": True},
                 ),
-                "audio_gate": (
+                "freeze_done_gate": (
                     "STRING",
                     {
                         "default": "",
                         "forceInput": True,
                         "tooltip": (
-                            "Optional sequencing gate. Wire a downstream audio "
-                            "node's output here (e.g. OTR_VisualRenderer."
-                            "final_mp4_path) to force ComfyUI's topsort to run "
-                            "audio + POC video + ffmpeg chain to completion "
-                            "BEFORE starting the FLUX video branch. "
-                            "The value itself is ignored — presence of the link "
-                            "is what creates the dependency. Prevents VRAM "
-                            "contention when Bark / MusicGen / FLUX compete."
+                            "Required dependency gate. Wire "
+                            "OTR_LedgerFreezeCascade.script_json here "
+                            "so VideoPlan runs ONLY after the freeze "
+                            "stamps meta.story_brief. The value is "
+                            "ignored at execute(); presence of the "
+                            "link is what creates the topsort "
+                            "dependency. Sprint E E7 rename: was "
+                            "'audio_gate' pre-E7, which mis-described "
+                            "the post-D0d wiring as audio-sourced "
+                            "when it actually sources from the "
+                            "cascade. An unwired gate now fails early "
+                            "with a sentinel error JSON instead of "
+                            "silently emitting stale-ledger plans."
                         ),
                     },
                 ),
@@ -819,12 +824,34 @@ class OTRVideoPlan:
         style: str,
         style_tail: str = "",
         include_final_end_frame: bool = True,
-        audio_gate: str = "",
+        freeze_done_gate: str = "",
     ):
-        # audio_gate is deliberately ignored — its only purpose is to create
-        # a topsort dependency so this node fires AFTER the upstream audio
-        # pipeline completes. Never read or log the value.
-        _ = audio_gate
+        # freeze_done_gate is deliberately ignored at execute(); its only
+        # purpose is to create a topsort dependency so this node fires AFTER
+        # OTR_LedgerFreezeCascade stamps meta.story_brief. Sprint E E7
+        # renamed from audio_gate; the post-D0d wiring sources from the
+        # cascade (script_json output), not from an audio node.
+        _ = freeze_done_gate
+
+        # Sprint E E7 fail-early guard. If the gate is unwired (empty
+        # string after coercion) AND script_json itself is empty/stub,
+        # there is no upstream contract to plan against. Return a
+        # sentinel error JSON for all 3 pass outputs so downstream
+        # nodes consuming the plan see a structured error instead of
+        # silently emitting empty prompt arrays.
+        if not script_json or script_json.strip() in ("", "{}", "[]"):
+            import json as _json
+            _err = _json.dumps({
+                "error": (
+                    "VideoPlan: script_json input is empty and "
+                    "freeze_done_gate is unwired. Wire "
+                    "OTR_LedgerFreezeCascade.script_json to both "
+                    "the script_json input AND the freeze_done_gate "
+                    "input for the post-D0d dependency contract."
+                ),
+                "pass_count": 0,
+            })
+            return (_err, _err, _err, 0, "VideoPlan: missing upstream cascade")
 
         if style == "(none)":
             style = ""
@@ -880,7 +907,7 @@ class OTRVideoPlan:
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
             f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"
-            f"{' — all cast' if not resolved_focus else ' — focus only'}",
+            f"{' -- all cast' if not resolved_focus else ' -- focus only'}",
             f"PASS 2 (scene envs):       {pass2['total_prompts']} prompt(s)",
             f"PASS 3 (composite shots):  {pass3['total_prompts']} prompt(s) "
             f"({pass3['shots_per_scene']} per scene + "

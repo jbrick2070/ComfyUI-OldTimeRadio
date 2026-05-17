@@ -644,11 +644,11 @@
           }
         },
         {
-          "name": "audio_gate",
+          "name": "freeze_done_gate",
           "type": "STRING",
           "link": 47,
           "widget": {
-            "name": "audio_gate"
+            "name": "freeze_done_gate"
           }
         }
       ],
