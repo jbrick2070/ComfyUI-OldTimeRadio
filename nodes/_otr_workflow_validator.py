@@ -49,7 +49,24 @@ _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_scifi_16gb_full.json"
 
 
 def _load_workflow(path: str) -> dict[str, Any]:
-    p = Path(path) if path else _DEFAULT_WORKFLOW_PATH
+    # Sprint E E5 / H5: explicit empty-string fallback. The shipped
+    # workflow JSON ships the validator widget as "" (per the S29
+    # Phase 1 cleanbreak that removed hardcoded `C:/Users/jeffr/...`
+    # operator paths from the JSON surface). Pre-E5 this fell through
+    # to `_DEFAULT_WORKFLOW_PATH` silently with no log line, leaving
+    # soak diagnostics unable to tell whether the empty widget was
+    # intentional or a wiring error. Post-E5 the fallback is explicit
+    # and the resolved path is logged at INFO so the operator sees
+    # which file actually got validated.
+    if not path:
+        log.info(
+            "OTR_WorkflowValidator: workflow_json_path widget empty; "
+            "resolved to canonical _DEFAULT_WORKFLOW_PATH=%s",
+            _DEFAULT_WORKFLOW_PATH,
+        )
+        p = _DEFAULT_WORKFLOW_PATH
+    else:
+        p = Path(path)
     if not p.is_file():
         raise FileNotFoundError(
             f"OTR_WorkflowValidator: workflow JSON not found at {p!r}"

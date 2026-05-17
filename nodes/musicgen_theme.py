@@ -578,12 +578,19 @@ class MusicGenTheme:
                 # (audio is king). The allow_silence_fallback widget
                 # opts into the prior silence-fill path for smoke
                 # tests where transformers/MusicGen isn't installed.
+                # Sprint E E5 / M9: name the install command explicitly.
+                # Pre-E5 the message said "install the MusicGen optional
+                # deps" which gave the operator no actionable handle on
+                # WHICH deps. The transformers package handles MusicGen
+                # natively; the audiocraft extra is required for some
+                # alternate generation paths and pinned weights.
                 msg = (
                     f"MusicGen ImportError: transformers MusicGen not "
                     f"available: {exc}. This is a production surface; "
                     f"silent silence is a Directive 1 breach. Install "
-                    f"the MusicGen optional deps or set "
-                    f"allow_silence_fallback=True for smoke tests only."
+                    f"with: pip install transformers audiocraft "
+                    f"(or set allow_silence_fallback=True for smoke "
+                    f"tests only)."
                 )
                 if not allow_silence_fallback:
                     log.error(f"[MusicGenTheme] {msg}")
