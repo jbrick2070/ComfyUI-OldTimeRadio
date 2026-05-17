@@ -1,17 +1,20 @@
-"""queue_smoke.py -- one-shot smoke queue for v2.0-beta verification.
+"""queue_smoke.py -- one-shot smoke queue for v2.0-alpha bug-hunt loop.
 
 POSTs `workflows/otr_scifi_16gb_full.json` to ComfyUI /prompt with the
 30-word ultra-smoke configuration:
 
     target_words   = 30
     num_characters = 2
-    target_length  = "30 words (smoke, 1 act)"
+    act_count      = 1
 
 Returns the prompt_id on stdout. Polling lives in `smoke_watcher.py`.
 
-Replaces the old supersoaker.py-based path. Built on `scripts/otr_api.py`,
-which patches widgets BY NAME using live /object_info schemas (no fragile
-positional WV_* indices).
+Built on `scripts/otr_api.py`, which patches widgets BY NAME using live
+/object_info schemas (no fragile positional WV_* indices).
+
+History note (2026-05-17 H bug-hunt iter 1): the original
+`target_length = "30 words (smoke, 1 act)"` widget was retired in favor
+of the numeric `act_count` widget. Smoke config now uses act_count=1.
 """
 
 from __future__ import annotations
@@ -52,7 +55,7 @@ def main() -> int:
     # Patch by NAME -- robust against future widget reorders.
     patch_widget_by_name(wf, 1, "target_words", 30, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "target_length", "30 words (smoke, 1 act)", schemas)
+    patch_widget_by_name(wf, 1, "act_count", 1, schemas)
 
     api = workflow_to_api_prompt(wf, schemas)
     prompt_id = submit_prompt(api)
