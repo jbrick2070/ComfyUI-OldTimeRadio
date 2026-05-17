@@ -213,6 +213,12 @@ def _ordered_widget_names(node_type: str, schemas: dict) -> list[str]:
 
     Order matches `widgets_values` slot mapping: required-then-optional, only
     widget-backed entries.
+
+    Note: this returns ONLY schema-declared widgets. It does NOT include
+    ComfyUI's client-side `control_after_generate` companion that the UI
+    auto-injects next to seed widgets. For the actual stored slot layout in
+    `widgets_values`, use `_serialized_slot_names` instead. Other introspection
+    consumers (tests, schema audits) keep using this pure-schema variant.
     """
     if node_type not in schemas:
         raise KeyError(
@@ -224,6 +230,80 @@ def _ordered_widget_names(node_type: str, schemas: dict) -> list[str]:
     optional = schema.get("optional", {}) or {}
     ordered = list(required.items()) + list(optional.items())
     return [name for name, spec in ordered if _is_widget_backed(spec)]
+
+
+# Companion-bearing widget names. ComfyUI's UI auto-injects a
+# `control_after_generate` companion widget IMMEDIATELY after any INT
+# widget whose schema name is one of these. The companion is a hidden
+# COMBO (choices = ["fixed", "increment", "decrement", "randomize"]) and
+# its saved value lives at slot `<widget>_idx + 1` in widgets_values.
+# It is NOT declared in /object_info, so `_ordered_widget_names` does
+# not see it -- but `widgets_values` saved by the editor always
+# includes it.
+_COMPANION_INT_WIDGETS = ("seed", "noise_seed")
+
+
+def _serialized_slot_names(node_type: str, schemas: dict) -> list[str]:
+    """Return the widget-name list that maps to the SAVED `widgets_values`
+    layout 1-to-1, including ComfyUI's `control_after_generate` companion
+    next to each seed widget.
+
+    Mapping:
+        For each declared widget-backed input in declaration order:
+            * Yield the widget's name.
+            * If the widget is an INT and its name is one of
+              `_COMPANION_INT_WIDGETS`, yield a synthetic companion
+              entry named `f"{widget_name}__control_after_generate"`
+              immediately after.
+
+    The synthetic companion name is NEVER a real schema name -- it is a
+    deliberate fabrication so callers can talk about the slot
+    unambiguously (e.g. tests pinning the saved `"fixed"` value).
+
+    Result: for a clean-saved workflow JSON, `len(_serialized_slot_names)`
+    equals `len(node.widgets_values)` exactly. Drift between this list
+    length and the saved array length is a structural problem; the
+    patcher raises rather than silently misalign.
+
+    Background (Jeffrey 2026-05-17 round-robin Reading C): the original
+    `_ordered_widget_names` returned ONLY schema-declared widgets, so a
+    workflow that saved the companion at slot N + 1 looked "one slot
+    too long" to the patcher and got refused with a length mismatch.
+    Modeling the companion explicitly resolves the §3.7 bug-hunt
+    blocker without mutating either workflow JSON or globally loosening
+    the length check.
+    """
+    if node_type not in schemas:
+        raise KeyError(
+            f"node_type {node_type!r} not present in /object_info schemas. "
+            f"Is the custom node loaded?"
+        )
+    schema = schemas[node_type].get("input", {}) or {}
+    required = schema.get("required", {}) or {}
+    optional = schema.get("optional", {}) or {}
+    ordered = list(required.items()) + list(optional.items())
+
+    slots: list[str] = []
+    for name, spec in ordered:
+        if not _is_widget_backed(spec):
+            continue
+        slots.append(name)
+        # Companion injection: INT seed widgets carry a hidden
+        # control_after_generate COMBO. Type lookup is the same shape
+        # used by `_is_widget_backed` -- spec is (type, opts) tuple or
+        # bare type.
+        type_def = (
+            spec[0]
+            if isinstance(spec, (list, tuple)) and len(spec) > 0
+            else spec
+        )
+        if (
+            isinstance(type_def, str)
+            and type_def.upper() == "INT"
+            and name in _COMPANION_INT_WIDGETS
+        ):
+            slots.append(f"{name}__control_after_generate")
+    return slots
 
 
 # ---------------------------------------------------------------------------
@@ -283,12 +363,13 @@ def patch_widget_by_name(
         return
 
     # ComfyUI's UI saves widgets_values in either "stripped" or "preserved"
-    # mode depending on which widgets were converted to sockets. For pure
-    # widget patching (no socket conversion on this node), the index in the
-    # stored array equals the index in widget_names. If this node has any
-    # widget converted to a socket (`linked_names` is non-empty for that
-    # widget), the stored array may be one slot shorter per linked widget.
-    # We probe the actual length and pick the simplest correct mapping.
+    # mode depending on which widgets were converted to sockets. The SAVED
+    # layout also includes ComfyUI's auto-injected `control_after_generate`
+    # companion next to any seed widget (see `_serialized_slot_names`).
+    # We map widget_name -> slot index against the serialized layout so the
+    # companion slot is correctly skipped over.
+    serialized_slots = _serialized_slot_names(node_type, schemas)
+
     linked_names = {
         inp["name"]
         for inp in target_node.get("inputs", []) or []
@@ -296,7 +377,7 @@ def patch_widget_by_name(
     }
 
     wv = target_node.setdefault("widgets_values", [])
-    target_idx = widget_names.index(widget_name)
+    target_idx = serialized_slots.index(widget_name)
 
     if widget_name in linked_names:
         # Trying to patch a widget that's been converted to an input socket
@@ -311,23 +392,31 @@ def patch_widget_by_name(
     # If linked widgets keep placeholder slots, our positional index is
     # already correct (slots include the placeholders). If they're stripped,
     # subtract the count of linked widgets that come before our target.
+    # Companions are NEVER socketed, so they are NEVER in linked_names; the
+    # linked-count math is keyed to widget_names regardless of companion
+    # presence.
     linked_widget_count = sum(1 for n in widget_names if n in linked_names)
-    if len(wv) == len(widget_names):
-        # "preserved" mode -- use index as-is
+    if len(wv) == len(serialized_slots):
+        # "preserved" mode (companion-aware) -- use serialized index as-is
         slot = target_idx
-    elif len(wv) == len(widget_names) - linked_widget_count:
-        # "stripped" mode -- subtract leading linked widgets
+    elif len(wv) == len(serialized_slots) - linked_widget_count:
+        # "stripped" mode (companion-aware) -- subtract leading linked widgets
+        # encountered before the target in the SERIALIZED layout. Companions
+        # are skipped during this count because they are not in linked_names.
         leading_linked = sum(
-            1 for n in widget_names[:target_idx] if n in linked_names
+            1 for n in serialized_slots[:target_idx] if n in linked_names
         )
         slot = target_idx - leading_linked
     else:
-        # Ambiguous (trailing unset optionals, manual edits). Bail with a
+        # Ambiguous (trailing unset optionals, manual edits, unexpected
+        # extra slots outside the seed-companion position). Bail with a
         # clear error rather than silently writing to the wrong slot.
+        # The narrow loosening over the historical check accepts ONLY the
+        # +1-per-seed companion model; anything else still rejects.
         raise ValueError(
             f"widgets_values length mismatch on node {node_id} ({node_type}): "
             f"len(wv)={len(wv)} vs "
-            f"len(widget_names)={len(widget_names)} "
+            f"len(serialized_slots)={len(serialized_slots)} "
             f"(linked={linked_widget_count}). Refusing to patch by name."
         )
 
