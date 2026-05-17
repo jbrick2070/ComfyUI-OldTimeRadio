@@ -547,6 +547,53 @@ def load_llm(
     except ModelLoaderError:
         raise
     except Exception as exc:  # noqa: BLE001
+        # Sprint H Commit B1 layer 2 (2026-05-17): inner failure-path
+        # cleanup. AutoModelForCausalLM.from_pretrained, the warmup
+        # generate pass, the BUG-LOCAL-098 tripwire, and the post-load
+        # .to(device) call all run AFTER `model` is bound to GPU
+        # weights but BEFORE this function returns. If any of them
+        # raise, the cache_entry never gets stored in LLM_CACHE, so
+        # downstream `unload_llm()` (which reads LLM_CACHE) can't find
+        # the orphan to drop. The retry in
+        # `_otr_style_picker._run_inventor` then cache-misses and a
+        # second copy gets loaded on top of the orphan -> "Currently
+        # allocated 29.97 GiB" OOM seen in Sprint H iter 1 logs.
+        #
+        # Pair with the layer-1 wrapper in `request_slot()`: layer 1
+        # catches load_llm raising as a whole; layer 2 catches in-body
+        # failures so the orphan is dropped at first opportunity.
+        # Belt-and-braces -- both layers are idempotent.
+        try:
+            _orphan = locals().get("model")
+            if _orphan is not None and hasattr(_orphan, "to"):
+                try:
+                    _orphan.to("cpu")
+                except Exception:  # noqa: BLE001
+                    pass
+            try:
+                del _orphan
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                # Drop the local binding too so gc can reap.
+                del model  # noqa: F821
+            except Exception:  # noqa: BLE001
+                pass
+            import gc as _gc
+            _gc.collect()
+            try:
+                import torch as _torch
+                if _torch.cuda.is_available():
+                    _torch.cuda.empty_cache()
+                    try:
+                        _torch.cuda.ipc_collect()
+                    except Exception:  # noqa: BLE001
+                        pass
+            except Exception:  # noqa: BLE001
+                pass
+        except Exception:  # noqa: BLE001
+            # Cleanup must never mask the real load failure.
+            pass
         raise ModelLoaderError(
             f"load_llm failed for model_id={model_id!r}: {exc}"
         ) from exc
@@ -738,7 +785,32 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
         )
         unload_llm()
 
-    cache_entry = load_llm(normalized, context_cap=ctx_verdict.value)
+    # Sprint H iter 3 (2026-05-17): orphan-model guard. load_llm may
+    # raise AFTER AutoModelForCausalLM.from_pretrained successfully
+    # allocates the weights on GPU (e.g. BNB quantization, warmup pass,
+    # tripwire). If we re-raise without cleaning up, the LLM_CACHE is
+    # never populated (line 744+ is bypassed) AND the orphan model
+    # remains resident on GPU. The next request_slot call cache-misses
+    # and a SECOND copy gets loaded on top -- producing the
+    # "Currently allocated 29.97 GiB" OOM on the retry inside
+    # _otr_style_picker._run_inventor's 3-attempt loop. Wrap with
+    # try/except + unload_llm() to guarantee the retry starts from a
+    # clean slate. unload_llm()'s entry-is-None branch is a safe no-op
+    # for the dict update; the empty_cache + ipc_collect + synchronize
+    # still fire and drop the orphan.
+    try:
+        cache_entry = load_llm(normalized, context_cap=ctx_verdict.value)
+    except Exception:
+        log.warning(
+            "[Selector] load_llm raised for %s; running unload_llm() "
+            "to drop any orphan VRAM before retry",
+            normalized,
+        )
+        try:
+            unload_llm()
+        except Exception:  # noqa: BLE001
+            log.exception("[Selector] unload_llm() also raised; continuing")
+        raise
 
     # Step 9: cache.
     LLM_CACHE["model_id"] = normalized
