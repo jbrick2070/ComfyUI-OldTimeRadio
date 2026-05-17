@@ -135,13 +135,49 @@ def _pick_free_port(start: int = PORT_BASE, attempts: int = PORT_PROBE_MAX) -> i
     )
 
 
-def _run_between_iter_sweep(supervisor_pid: int) -> None:
+def _wmi_cmdline_for(pid: int) -> str | None:
+    """Look up a PID's CommandLine via WMI. Returns None on miss."""
+    try:
+        proc = subprocess.run(
+            [
+                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-Command",
+                (
+                    f"$p = Get-CimInstance Win32_Process -Filter "
+                    f"'ProcessId={int(pid)}'; "
+                    "if ($p -and $p.CommandLine) { Write-Output $p.CommandLine } "
+                    "else { Write-Output '' }"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
+        out = (proc.stdout or "").strip()
+        return out or None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
+def _run_between_iter_sweep(keep_pids: list[int]) -> None:
+    """Synthesis section 2 supervisor step 2 + Jeffrey 2026-05-17 round-
+    robin §B. The keep-list is a variadic list of PIDs to exclude from
+    the sweep -- under the uv launcher-stub model both the stub PID
+    (os.getppid() in most cases) and the real cpython PID (os.getpid())
+    are running python.exe, and BOTH have to survive.
+    """
     if not SWEEP_EXCLUDE_BAT.is_file():
         _log(f"WARN sweep bat missing: {SWEEP_EXCLUDE_BAT}")
         return
+    if not keep_pids:
+        _log("WARN sweep called with empty keep_pids list; skipping")
+        return
+    args = ["cmd", "/c", str(SWEEP_EXCLUDE_BAT)] + [str(int(p)) for p in keep_pids]
     try:
         proc = subprocess.run(
-            ["cmd", "/c", str(SWEEP_EXCLUDE_BAT), str(supervisor_pid)],
+            args,
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -240,10 +276,36 @@ def main() -> int:
     args = parser.parse_args()
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    supervisor_pid = os.getpid()
+
+    # B1 fix (Jeffrey 2026-05-17 round-robin): capture BOTH the real-
+    # cpython PID (os.getpid()) AND the launcher-stub PID
+    # (os.getppid() under the uv stub model). Both are running
+    # `python.exe` to WMI; both must survive the between-iter sweep
+    # or the supervisor gets killed by its own cleanup.
+    #
+    # Sanity canary: if the parent's WMI cmdline doesn't reference
+    # this script, the uv-stub assumption may have changed (e.g.
+    # uv updated to a non-stub launch model, or the bat now wraps
+    # in cmd /c). Log a WARN and proceed -- the keep-list pass is
+    # still correct as a safety net, the warning surfaces a model
+    # drift for the next round-robin to consider.
+    real_pid = os.getpid()
+    parent_pid = os.getppid()
+    parent_cmd = _wmi_cmdline_for(parent_pid)
+    if parent_cmd and "overnight_bug_hunt.py" not in parent_cmd:
+        _log(
+            f"WARN parent_pid={parent_pid} cmdline does not match "
+            f"supervisor; got {parent_cmd!r}. uv-stub assumption may "
+            f"have changed; passing both PIDs to sweep keep-list as "
+            f"safety net"
+        )
+    keep_pids: list[int] = [int(real_pid), int(parent_pid)]
+    # Dedup (in case the parent IS this python).
+    keep_pids = sorted({p for p in keep_pids if p > 0})
 
     _log("=== overnight bug-hunt SUPERVISOR START ===")
-    _log(f"supervisor_pid={supervisor_pid} iters={args.iters} "
+    _log(f"real_pid={real_pid} parent_pid={parent_pid} "
+         f"keep_pids={keep_pids} iters={args.iters} "
          f"inter_iter_sec={args.inter_iter_sec} "
          f"worker_wait_s={args.worker_wait_s} "
          f"until_iso={args.until_iso}")
@@ -290,7 +352,7 @@ def main() -> int:
             # Step 1: between-iter sweep (skipped on iter 1 because
             # sweep_and_launch.bat already ran a pre-launch sweep).
             if i > 1:
-                _run_between_iter_sweep(supervisor_pid)
+                _run_between_iter_sweep(keep_pids)
 
             # Step 2: pick a free port.
             try:

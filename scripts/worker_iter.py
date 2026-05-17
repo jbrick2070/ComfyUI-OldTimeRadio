@@ -65,7 +65,6 @@ import atexit
 import datetime as dt
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -155,43 +154,90 @@ def _vram_used_gb_via_comfy(url: str) -> float | None:
         return None
 
 
-def _port_in_use(port: int) -> tuple[bool, str | None]:
-    """Synthesis section 2 step 2: pre-flight port check.
+def _port_is_free(port: int) -> bool:
+    """Synthesis section 2 step 2: pre-flight port check (A2 fix).
 
-    Returns (in_use, owning_pid_str|None). Uses netstat -ano to
-    find any LISTENING binding on the target port; owning PID is
-    the second tab-separated column.
+    Pre-fix: netstat-based check + PID-equality readiness check
+    failed under the uv launcher-stub model -- the stub holds the
+    Popen-returned PID, the real cpython holds the TCP socket,
+    netstat reports the real cpython, the equality check returned
+    False against a healthy ComfyUI. False-positive `comfyui_startup`
+    rejection on every iter.
+
+    Post-fix (Jeffrey 2026-05-17 round-robin §A2):
+        socket.bind(('127.0.0.1', port)) and immediately release.
+        Bind succeeds -> port is free.
+        Bind raises OSError -> port is held by something else
+        (orphan ComfyUI, stale supervisor, another service).
+
+    No netstat, no PID lookup, no stub vs real-cpython ambiguity.
+    Combined with the post-launch shape check
+    (`_comfyui_responding_with_real_shape`), stale orphans surface
+    as `port_occupied` rather than masquerading as healthy ComfyUI.
     """
+    import socket
     try:
-        proc = subprocess.run(
-            ["netstat", "-ano", "-p", "TCP"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if proc.returncode != 0:
-            return False, None
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False, None
-    pat = re.compile(
-        rf"^\s*TCP\s+\S*:({port})\s+\S+\s+LISTENING\s+(\d+)",
-        re.MULTILINE,
-    )
-    m = pat.search(proc.stdout or "")
-    if m:
-        return True, m.group(2)
-    return False, None
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+            s.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
 
 
-def _confirm_port_owner(port: int, expected_pid: int) -> bool:
-    """Synthesis section 2 step 4: verify PID owns port."""
-    in_use, owner = _port_in_use(port)
-    if not in_use or not owner:
+# Required JSON-shape keys for a healthy ComfyUI /system_stats body.
+# Picked from the live response in iter-1 evidence so we know they're
+# present; broad enough that a stale orphan returning {} or a stub
+# HTTP server returning {"status": "ok"} cannot impersonate.
+_SYSTEM_STATS_REQUIRED_PATHS = (
+    ("system",),
+    ("system", "comfyui_version"),
+    ("system", "pytorch_version"),
+    ("devices",),
+)
+
+
+def _comfyui_responding_with_real_shape(url: str) -> bool:
+    """Synthesis section 2 step 4: post-launch readiness gate
+    (A1 fix). Replaces the strict PID-owns-port check.
+
+    Pre-fix: confirm that comfy_proc.pid == netstat owner of the
+    port. Broke under the uv launcher-stub model (see _port_is_free
+    docstring).
+
+    Post-fix (Jeffrey 2026-05-17 round-robin §A1): trust that
+    `/system_stats` returns a body shaped like real ComfyUI, not a
+    spoofer. Required shape:
+        body is a dict
+        body.system is a dict containing comfyui_version + pytorch_version
+        body.devices is a non-empty list
+        body.devices[0] is a dict containing vram_total
+    """
+    j = _http_get_json(url + "/system_stats", timeout=3)
+    if not isinstance(j, dict):
         return False
-    try:
-        return int(owner) == int(expected_pid)
-    except ValueError:
+    # Top-level shape: a real ComfyUI returns "system" dict and a
+    # non-empty "devices" list. A stub HTTP server / spoofer almost
+    # never assembles both.
+    sys_block = j.get("system")
+    if not isinstance(sys_block, dict):
         return False
+    if not isinstance(sys_block.get("comfyui_version"), str):
+        return False
+    if not isinstance(sys_block.get("pytorch_version"), str):
+        return False
+    devices = j.get("devices")
+    if not isinstance(devices, list) or not devices:
+        return False
+    d0 = devices[0]
+    if not isinstance(d0, dict):
+        return False
+    # vram_total is an int (bytes). 0 / None is suspect; ComfyUI on
+    # the 5080 always reports the full board.
+    vt = d0.get("vram_total")
+    if not isinstance(vt, int) or vt <= 0:
+        return False
+    return True
 
 
 def _classify_failure(
@@ -516,14 +562,15 @@ def main() -> int:
     url = f"http://127.0.0.1:{port}"
 
     try:
-        # Step 2: port preflight.
-        in_use, owner = _port_in_use(port)
-        if in_use:
+        # Step 2: port preflight via socket.bind (A2 fix).
+        # Pre-fix used netstat; broke under uv stub model.
+        if not _port_is_free(port):
             result.update(
                 status="port_occupied",
                 failure_class="port_occupied",
                 exception_message=(
-                    f"port {port} already bound by PID={owner} at preflight"
+                    f"port {port} bind failed at preflight (orphan ComfyUI "
+                    "or another service is holding the port)"
                 ),
             )
             return 2
@@ -532,11 +579,15 @@ def main() -> int:
         comfy_proc, log_path = _launch_comfyui(iter_idx, port)
         result.update(comfyui_pid=int(comfy_proc.pid))
 
-        # Step 4: poll /system_stats + verify PID owns port.
+        # Step 4: poll /system_stats and confirm body shape matches
+        # real ComfyUI (A1 fix). Pre-fix gated on PID-owns-port via
+        # netstat; broke under uv stub model. Post-fix: shape-check
+        # the JSON response so a stub HTTP server / spoofer can't
+        # masquerade as ComfyUI.
         startup_deadline = time.time() + STARTUP_TIMEOUT_S
         ready = False
         while time.time() < startup_deadline:
-            if _http_get_json(url + "/system_stats", timeout=3) is not None:
+            if _comfyui_responding_with_real_shape(url):
                 ready = True
                 break
             # ComfyUI died before becoming ready -> classify and bail.
@@ -548,18 +599,9 @@ def main() -> int:
                 status="comfyui_startup",
                 failure_class="comfyui_startup",
                 exception_message=(
-                    f"/system_stats did not respond within "
-                    f"{STARTUP_TIMEOUT_S}s (comfy exit={comfy_proc.poll()})"
-                ),
-            )
-            return 3
-        if not _confirm_port_owner(port, comfy_proc.pid):
-            result.update(
-                status="comfyui_startup",
-                failure_class="comfyui_startup",
-                exception_message=(
-                    f"PID mismatch on port {port}: expected "
-                    f"{comfy_proc.pid}, see netstat for actual owner"
+                    f"/system_stats did not return a real-ComfyUI-shaped "
+                    f"body within {STARTUP_TIMEOUT_S}s "
+                    f"(comfy exit={comfy_proc.poll()})"
                 ),
             )
             return 3
