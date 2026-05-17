@@ -62,8 +62,13 @@ if str(_SCRIPTS) not in sys.path:
 
 from otr_api import (  # noqa: E402
     _serialized_slot_names,
+    load_workflow,
     patch_widget_by_name,
+    workflow_to_api_prompt,
 )
+
+_REPO = Path(__file__).resolve().parent.parent
+_BUGHUNT_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_bughunt.json"
 
 
 def _writer_schemas() -> dict:
@@ -354,3 +359,203 @@ def test_extra_slot_count_exceeds_companions_rejected():
         patch_widget_by_name(
             workflow, 9, "title", "new_title", schemas,
         )
+
+
+# ---------------------------------------------------------------------------
+# Round-trip: workflow_to_api_prompt honors companion + does not bleed "fixed"
+# ---------------------------------------------------------------------------
+def _dump_bughunt_node1() -> list:
+    """Read _bughunt.json node 1 widgets_values verbatim.
+
+    Per Jeffrey 2026-05-17 directive: do NOT trust prose recollection;
+    inspect the on-disk dump first, then build the assertions.
+    """
+    wf = load_workflow(str(_BUGHUNT_WORKFLOW))
+    for n in wf["nodes"]:
+        if n["id"] == 1:
+            return list(n["widgets_values"])
+    raise AssertionError("node id=1 missing from _bughunt.json")
+
+
+def test_round_trip_bughunt_node1_inputs_correct():
+    """Round-trip the real bughunt workflow through the API converter
+    and assert declared inputs land on the right slots, with the
+    companion "fixed" NEVER reaching a declared input.
+
+    Asserts derived from on-disk dump of node 1 widgets_values:
+        wv[3]   seed value  -> inputs["seed"]
+        wv[5]   creative_writing_model
+        wv[6]   technical_model
+        wv[4]   "fixed" companion (NOT mapped anywhere)
+    """
+    dump = _dump_bughunt_node1()
+    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
+    expected_seed = dump[3]
+    expected_companion = dump[4]
+    expected_creative = dump[5]
+    expected_technical = dump[6]
+    assert expected_companion == "fixed", (
+        f"node 1 widgets_values[4] expected 'fixed' companion; "
+        f"got {expected_companion!r}"
+    )
+
+    schemas = _writer_schemas()
+    workflow = load_workflow(str(_BUGHUNT_WORKFLOW))
+    prompt = workflow_to_api_prompt(workflow, schemas)
+
+    n1_inputs = prompt["1"]["inputs"]
+
+    assert n1_inputs["seed"] == expected_seed, (
+        f"inputs['seed'] expected {expected_seed!r}; "
+        f"got {n1_inputs['seed']!r}"
+    )
+    assert n1_inputs["creative_writing_model"] == expected_creative, (
+        f"inputs['creative_writing_model'] expected {expected_creative!r}; "
+        f"got {n1_inputs['creative_writing_model']!r}"
+    )
+    assert n1_inputs["technical_model"] == expected_technical, (
+        f"inputs['technical_model'] expected {expected_technical!r}; "
+        f"got {n1_inputs['technical_model']!r}"
+    )
+
+    # "fixed" must NOT appear in any declared input on node 1. The
+    # companion vocabulary {fixed, randomize, increment, decrement}
+    # is never a legitimate declared-input value for this writer.
+    for field in (
+        "creative_writing_model",
+        "technical_model",
+        "seed",
+        "target_words",
+        "num_characters",
+        "act_count",
+        "min_p",
+        "repetition_penalty",
+        "max_new_tokens",
+    ):
+        if field in n1_inputs:
+            assert n1_inputs[field] != "fixed", (
+                f"inputs[{field!r}] = 'fixed' -- companion bled into "
+                f"declared input. Conversion regressed."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Misplaced companion -- value-at-companion-slot vocabulary check
+# ---------------------------------------------------------------------------
+def test_misplaced_companion_value_rejected():
+    """A workflow whose schema declares a seed widget but whose saved
+    widgets_values has a non-vocabulary value at the companion slot
+    indicates widget drift. The converter must refuse rather than
+    silently propagate the stray value.
+
+    Schema: [a STRING, seed INT, b STRING] -> serialized slots 4:
+        [a, seed, seed__control_after_generate, b]
+    widgets_values: ["a_val", 42, "TYPO_NOT_FIXED", "b_val"] -- length 4
+    matches; but slot 2 has "TYPO_NOT_FIXED" not in the companion
+    vocabulary. Reject.
+    """
+    schemas = {
+        "MisplacedSeedNode": {
+            "input": {
+                "required": {
+                    "a": ("STRING", {"default": ""}),
+                    "seed": ("INT", {"default": 0}),
+                    "b": ("STRING", {"default": ""}),
+                },
+                "optional": {},
+            }
+        }
+    }
+    workflow = {
+        "nodes": [
+            {
+                "id": 11,
+                "type": "MisplacedSeedNode",
+                "inputs": [],
+                "widgets_values": ["a_val", 42, "TYPO_NOT_FIXED", "b_val"],
+            }
+        ],
+        "links": [],
+    }
+
+    with pytest.raises(ValueError, match="companion slot"):
+        workflow_to_api_prompt(workflow, schemas)
+
+
+# ---------------------------------------------------------------------------
+# Unrelated extra slot rejected by API converter
+# ---------------------------------------------------------------------------
+def test_converter_unrelated_extra_slot_rejected():
+    """No seed widget -> no companion licensed. A workflow with one
+    extra slot beyond the declared count must reject during API
+    conversion.
+    """
+    schemas = {
+        "NoSeedNode": {
+            "input": {
+                "required": {
+                    "title": ("STRING", {"default": ""}),
+                    "factor": ("FLOAT", {"default": 1.0}),
+                },
+                "optional": {},
+            }
+        }
+    }
+    workflow = {
+        "nodes": [
+            {
+                "id": 13,
+                "type": "NoSeedNode",
+                "inputs": [],
+                "widgets_values": ["title_val", 2.5, "phantom"],
+            }
+        ],
+        "links": [],
+    }
+
+    with pytest.raises(ValueError, match="length mismatch"):
+        workflow_to_api_prompt(workflow, schemas)
+
+
+# ---------------------------------------------------------------------------
+# Companion vocabulary acceptance
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "companion_value",
+    ["fixed", "randomize", "increment", "decrement"],
+)
+def test_converter_accepts_each_companion_vocab_value(companion_value):
+    """Each value in the ComfyUI control_after_generate vocabulary
+    must be accepted at a companion slot without raising. Round-robin
+    risk callout (Reading C section): if a future ComfyUI release
+    renames any of these, the mapper needs extension; this test pins
+    the current four.
+    """
+    schemas = {
+        "SeedNode": {
+            "input": {
+                "required": {
+                    "title": ("STRING", {"default": ""}),
+                    "seed": ("INT", {"default": 0}),
+                },
+                "optional": {},
+            }
+        }
+    }
+    workflow = {
+        "nodes": [
+            {
+                "id": 21,
+                "type": "SeedNode",
+                "inputs": [],
+                "widgets_values": ["title_val", 42, companion_value],
+            }
+        ],
+        "links": [],
+    }
+
+    prompt = workflow_to_api_prompt(workflow, schemas)
+    assert prompt["21"]["inputs"]["seed"] == 42
+    assert prompt["21"]["inputs"]["title"] == "title_val"
+    # Companion never appears as a declared input.
+    assert "seed__control_after_generate" not in prompt["21"]["inputs"]

@@ -242,6 +242,12 @@ def _ordered_widget_names(node_type: str, schemas: dict) -> list[str]:
 # includes it.
 _COMPANION_INT_WIDGETS = ("seed", "noise_seed")
 
+# Acceptable saved values for the `control_after_generate` companion
+# widget. Anything else at a companion position is widget drift, NOT a
+# legitimate companion -- the converter raises rather than silently
+# pushing the stray value into a downstream declared input.
+_COMPANION_VALUES = frozenset({"fixed", "randomize", "increment", "decrement"})
+
 
 def _serialized_slot_names(node_type: str, schemas: dict) -> list[str]:
     """Return the widget-name list that maps to the SAVED `widgets_values`
@@ -434,9 +440,19 @@ def patch_widget_by_name(
 def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
     """Convert ComfyUI UI-format workflow JSON to the API prompt dict.
 
-    Ported verbatim (with comments) from soak_operator's working converter,
-    which carries the BUG-LOCAL-027 + BUG-LOCAL-029 fixes for socket-only
+    Ported (with comments) from soak_operator's working converter, which
+    carries the BUG-LOCAL-027 + BUG-LOCAL-029 fixes for socket-only
     inputs and "stripped" vs "preserved" widgets_values shapes.
+
+    Sprint H §3.7 sibling fix (Jeffrey 2026-05-17): walk the SERIALIZED
+    slot layout from `_serialized_slot_names` rather than the bare
+    declared widget list. Companion slots auto-injected next to seed
+    widgets are recognised, validated against the
+    `control_after_generate` vocabulary, and skipped -- they MUST NOT
+    map into a downstream declared input. Pre-fix the companion's
+    `"fixed"` value bled into the next declared widget and produced
+    `inputs["creative_writing_model"]="fixed"`,
+    `inputs["seed"]=""`, `inputs["clip_length"]="fixed"`, etc.
     """
     # Build link map: link_id -> [source_node_id, source_slot]
     link_map: dict[int, list] = {}
@@ -457,44 +473,79 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
                 linked_names.add(inp["name"])
 
         if ntype in schemas:
-            schema = schemas[ntype].get("input", {}) or {}
-            required = schema.get("required", {}) or {}
-            optional = schema.get("optional", {}) or {}
-            ordered_params = list(required.items()) + list(optional.items())
+            widget_names = _ordered_widget_names(ntype, schemas)
+            serialized_slots = _serialized_slot_names(ntype, schemas)
+            companion_slot_names = {
+                n for n in serialized_slots
+                if n.endswith("__control_after_generate")
+            }
 
             wv = node.get("widgets_values", []) or []
 
-            widget_backed_params = [
-                (p, spec) for p, spec in ordered_params
-                if _is_widget_backed(spec)
-            ]
             linked_widget_count = sum(
-                1 for p, _ in widget_backed_params if p in linked_names
+                1 for n in widget_names if n in linked_names
             )
-            unlinked_widget_count = len(widget_backed_params) - linked_widget_count
-
-            if len(wv) == len(widget_backed_params) and linked_widget_count > 0:
+            if len(wv) == len(serialized_slots):
+                # Preserved mode: companion slots present + all
+                # widget-backed declared inputs occupy their slots
+                # (linked widgets keep placeholders).
                 linked_keeps_slot = True
-            elif len(wv) == unlinked_widget_count:
+            elif len(wv) == len(serialized_slots) - linked_widget_count:
+                # Stripped mode: linked widgets had their slot dropped
+                # at save time. Companions remain.
+                linked_keeps_slot = False
+            elif len(wv) == 0:
+                # Pure-socket node with no widget-backed inputs (or all
+                # widgets converted to sockets and stripped). Nothing
+                # to assign from widgets_values; links already supplied
+                # via the link_map walk above.
                 linked_keeps_slot = False
             else:
-                linked_keeps_slot = False  # safer default
+                # Fail loud per Jeffrey 2026-05-17 spec: unexpected
+                # extra slot, missing non-linked slot, or other length
+                # drift. Refuse to silently misalign the API prompt.
+                raise ValueError(
+                    f"widgets_values length mismatch on node {nid} "
+                    f"({ntype}): len(wv)={len(wv)} vs "
+                    f"len(serialized_slots)={len(serialized_slots)} "
+                    f"(linked={linked_widget_count}). Refusing API prompt "
+                    f"conversion."
+                )
 
             wv_idx = 0
-            for param, spec in ordered_params:
-                widget_backed = _is_widget_backed(spec)
-
-                if param in linked_names:
-                    if linked_keeps_slot and widget_backed:
-                        if wv_idx < len(wv):
-                            wv_idx += 1
+            for slot_name in serialized_slots:
+                if slot_name in companion_slot_names:
+                    # Companion slot. Validate value vocabulary so a
+                    # misplaced/drifted companion does not silently
+                    # propagate. Consume the slot but DO NOT write to
+                    # inputs -- companions are not declared inputs.
+                    if wv_idx < len(wv):
+                        val = wv[wv_idx]
+                        if val not in _COMPANION_VALUES:
+                            raise ValueError(
+                                f"node {nid} ({ntype}) companion slot at "
+                                f"position {wv_idx} expected a "
+                                f"control_after_generate value "
+                                f"(one of "
+                                f"{sorted(_COMPANION_VALUES)!r}); got "
+                                f"{val!r}. Workflow widget drift; refusing "
+                                f"API prompt conversion."
+                            )
+                        wv_idx += 1
                     continue
 
-                if not widget_backed:
+                if slot_name in linked_names:
+                    # Linked widget. Value comes from the upstream node
+                    # via the link, NOT from widgets_values. If the
+                    # save preserved the placeholder slot, advance past
+                    # it; otherwise stripped mode already collapsed
+                    # the array length.
+                    if linked_keeps_slot and wv_idx < len(wv):
+                        wv_idx += 1
                     continue
 
                 if wv_idx < len(wv):
-                    inputs[param] = wv[wv_idx]
+                    inputs[slot_name] = wv[wv_idx]
                     wv_idx += 1
 
         prompt[nid] = {"class_type": ntype, "inputs": inputs}
@@ -505,7 +556,18 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 # Submit + poll
 # ---------------------------------------------------------------------------
 def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
-    """POST the API prompt to /prompt and return the prompt_id."""
+    """POST the API prompt to /prompt and return the prompt_id.
+
+    Sprint H §3.7 hardening (Jeffrey 2026-05-17): ComfyUI returns
+    HTTP 200 even when the prompt has validation errors -- it accepts
+    the POST, refuses to execute the invalid nodes, and the resulting
+    history entry returns status_str='success' with zero outputs. That
+    looks like a success to a naive caller. Inspect the response body
+    BEFORE returning a prompt_id:
+        * truthy `error` field -> raise.
+        * non-empty `node_errors` dict -> raise.
+          (Empty `node_errors: {}` is the success shape and accepted.)
+    """
     if client_id is None:
         client_id = str(uuid.uuid4())
     resp = requests.post(
@@ -518,6 +580,21 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
             f"POST /prompt -> HTTP {resp.status_code}: {resp.text[:500]}"
         )
     body = resp.json()
+
+    error = body.get("error")
+    if error:
+        raise RuntimeError(
+            f"submit_prompt: ComfyUI returned error: {error!r}"
+        )
+    node_errors = body.get("node_errors")
+    if node_errors:
+        # `node_errors` is a non-empty dict only when at least one node
+        # failed validation. Surface at POST time so the caller
+        # classifies as graph_widget without polling a zombie prompt_id.
+        raise RuntimeError(
+            f"submit_prompt: ComfyUI returned node_errors: {node_errors!r}"
+        )
+
     prompt_id = body.get("prompt_id")
     if not prompt_id:
         raise RuntimeError(

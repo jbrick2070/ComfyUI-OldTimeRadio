@@ -246,11 +246,28 @@ def _classify_failure(
     exception_message: str | None,
     exception_type: str | None,
     status: str,
+    executed_count: int = 0,
 ) -> str:
-    """Map a (log tail + exception) pair to a synthesis section 2
-    failure class. Pure dispatch on string content; no I/O here.
+    """Map a (log tail + exception + execution counters) tuple to a
+    synthesis section 2 failure class. Pure dispatch on string content;
+    no I/O here.
+
+    Sprint H §3.7 hardening (Jeffrey 2026-05-17): ComfyUI's /history
+    returns `status_str='success'` (lowercase) when the prompt was
+    accepted by the queue but had validation errors that produced
+    zero executed nodes -- the prompt got "executed" only insofar as
+    ComfyUI processed the rejection. Map that case to `graph_widget`
+    instead of `unknown`. Plain executed prompts retain `success`.
     """
-    if status == "SUCCESS":
+    status_lower = (status or "").lower()
+    if status_lower == "success":
+        if executed_count == 0:
+            # ComfyUI accepted the POST, rejected all outputs during
+            # validation. submit_prompt's node_errors guard should have
+            # caught this at POST time; if it didn't (e.g. a future
+            # ComfyUI release omits node_errors from the response),
+            # this branch is the second-line classifier.
+            return "graph_widget"
         return "success"
 
     msg_l = ((exception_message or "") + "\n" + (exception_type or "")).lower()
@@ -668,7 +685,11 @@ def main() -> int:
             exception_message=exc_msg,
             exception_type=exc_type,
             status=status,
+            executed_count=exec_count,
         )
+        # Diagnostic: surface raw history shape so future drift of the
+        # status/executed/outputs triple is immediately diagnosable from
+        # the result file alone -- no log-tail forensics required.
         result.update(
             status=status,
             failure_class=failure_class,
@@ -676,6 +697,9 @@ def main() -> int:
             exception_type=exc_type,
             executed_count=exec_count,
             outputs_count=out_count,
+            history_status_raw=status,
+            history_executed_count=exec_count,
+            history_outputs_count=out_count,
             peak_vram_gb=round(peak, 2) if peak else None,
         )
         return 0
