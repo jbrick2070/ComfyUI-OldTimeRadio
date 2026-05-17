@@ -1852,9 +1852,14 @@ class VideoComposite:
                     "multiline": False,
                     "default": "",
                     "tooltip": (
-                        "Directory of per-line HuMo clips "
-                        "(<line_id>.mp4). Output of "
-                        "OTR_BatchHumoRender."
+                        "LTX clips directory (DAG sequencing only; "
+                        "value unused at execute()). HuMo per-line "
+                        "clips are resolved via ledger.clips[] "
+                        "mp4_path entries, NOT from this directory. "
+                        "Sprint E E12 (M5): tooltip rewritten to "
+                        "match actual wire source from L92 "
+                        "(LTX.clips_dir -> 52.1) in the canonical "
+                        "workflow JSON."
                     ),
                 }),
                 "ledger_json": ("STRING", {
