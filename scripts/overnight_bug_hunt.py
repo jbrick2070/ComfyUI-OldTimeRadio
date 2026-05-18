@@ -100,10 +100,13 @@ PORT_BASE = 8000
 PORT_PROBE_MAX = 32
 
 # Failure classes (synthesis section 2 fixed dictionary +
-# 2026-05-18 retest #8 follow-up: writer_outline added for
-# OutlineFailedError / OutlineBudgetViolation routing).
+# 2026-05-18 retest #8/#9 follow-ups: writer_outline for
+# OutlineFailedError / OutlineBudgetViolation, writer_budget for
+# InvalidEpisodeBudgetError + sibling _otr_episode_budget
+# exceptions).
 FAILURE_CLASSES = {
-    "graph_widget", "missing_model", "writer_outline",
+    "graph_widget", "missing_model",
+    "writer_budget", "writer_outline",
     "llm_oom", "video_oom",
     "ffmpeg_composite", "comfyui_startup", "port_occupied",
     "orphan_detected", "vram_contaminated", "worker_crash",

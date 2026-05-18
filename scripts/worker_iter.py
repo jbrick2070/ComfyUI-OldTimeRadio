@@ -55,11 +55,11 @@ Result file shape:
   }
 
 Failure classes (fixed dictionary, synthesis section 2 +
-2026-05-18 retest #8 follow-up):
-  graph_widget, missing_model, writer_outline, llm_oom,
-  video_oom, ffmpeg_composite, comfyui_startup, port_occupied,
-  orphan_detected, vram_contaminated, crash_process,
-  worker_crash, timeout, unknown.
+2026-05-18 retest #8/#9 follow-ups):
+  graph_widget, missing_model, writer_budget, writer_outline,
+  llm_oom, video_oom, ffmpeg_composite, comfyui_startup,
+  port_occupied, orphan_detected, vram_contaminated,
+  crash_process, worker_crash, timeout, unknown.
 """
 from __future__ import annotations
 
@@ -340,6 +340,23 @@ def _classify_failure(
     if any(m in msg_l for m in missing_markers):
         return "missing_model"
 
+    # writer_budget: EpisodeBudget preflight validator rejected the
+    # widget combo BEFORE any LLM call. Surfaced 2026-05-18 §3.7
+    # retest #9 -- when smoke target_words rose 30 -> 300, the
+    # smoke act_count=1 fell below the new default_act_count(300)=3.
+    # The defect is in the harness's smoke override profile, NOT a
+    # topology, VRAM, or writer issue. Module-level marker catches
+    # any future sibling exception types from _otr_episode_budget.
+    budget_markers = (
+        "invalidepisodebudgeterror",
+        "_otr_episode_budget",
+        "below default ",
+        "exceeds max ",
+        "below minimum of 30",
+    )
+    if any(m in msg_l for m in budget_markers):
+        return "writer_budget"
+
     # writer_outline: outline phase produced an outline that fails
     # validation. Surfaced 2026-05-18 §3.7 retest #8 -- Mistral-Nemo
     # on tight smoke budgets generated beats with target_words=0
@@ -353,6 +370,7 @@ def _classify_failure(
         "outlinefailederror",
         "outlinebudgetviolation",
         "outline generation failed after",
+        "_otr_outline",
     )
     if any(m in msg_l for m in outline_markers):
         return "writer_outline"
@@ -570,11 +588,27 @@ def _post_workflow(url: str) -> str | None:
     # chosen port for this call.
     os.environ["COMFYUI_URL"] = url
 
+    # Smoke profile overrides aligned to the EpisodeBudget validator
+    # constraint set (see nodes/_otr_episode_budget.py
+    # compute_episode_budget). For target_words=300:
+    #     constraint                              smoke value  ok?
+    #     target_words >= 30                      300          yes
+    #     1 <= act_count <= 7                     3            yes
+    #     num_characters >= 1                     2            yes
+    #     act_count >= default_act_count(tw)      3 (==dflt)   yes
+    #         default_act_count(300) = 3
+    #     act_count <= max_act_count(tw)          3 (<=6)      yes
+    #         max_act_count(300) = 6
+    # act_count history: was 1 until 2026-05-18 §3.7 retest #10.
+    # When target_words rose from 30 -> 300 (retest #9), the
+    # EpisodeBudget validator's act_count >= default rule started
+    # firing because default_act_count(300) = 3 but smoke shipped 1.
+    # Raised to 3 (the conservative default for tw=300).
     schemas = fetch_schemas()
     wf = load_workflow(str(WORKFLOW_PATH))
     patch_widget_by_name(wf, 1, "target_words", 300, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
-    patch_widget_by_name(wf, 1, "act_count", 1, schemas)
+    patch_widget_by_name(wf, 1, "act_count", 3, schemas)
     api = workflow_to_api_prompt(wf, schemas)
     return submit_prompt(api)
 
