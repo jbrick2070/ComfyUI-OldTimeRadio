@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 63,
-  "last_link_id": 116,
+  "last_node_id": 70,
+  "last_link_id": 201,
   "nodes": [
     {
       "id": 63,
@@ -937,7 +937,8 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            83
+            83,
+            200
           ],
           "shape": 3,
           "slot_index": 0
@@ -1619,7 +1620,7 @@
         {
           "name": "clip",
           "type": "CLIP",
-          "link": 94
+          "link": 201
         },
         {
           "name": "vae",
@@ -2025,6 +2026,49 @@
       "mode": 0,
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
+    },
+    {
+      "id": 70,
+      "type": "OTR_LtxBranchGate",
+      "pos": [
+        3710,
+        1715
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "title": "LTX Branch Gate (topology)",
+      "inputs": [
+        {
+          "name": "gate_image",
+          "type": "IMAGE",
+          "link": 200
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 94
+        }
+      ],
+      "outputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            201
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_LtxBranchGate"
+      },
+      "widgets_values": []
     }
   ],
   "links": [
@@ -2368,7 +2412,7 @@
       94,
       57,
       0,
-      55,
+      70,
       1,
       "CLIP"
     ],
@@ -2507,6 +2551,22 @@
       51,
       6,
       "STRING"
+    ],
+    [
+      200,
+      24,
+      0,
+      70,
+      0,
+      "IMAGE"
+    ],
+    [
+      201,
+      70,
+      0,
+      55,
+      1,
+      "CLIP"
     ]
   ],
   "groups": [],

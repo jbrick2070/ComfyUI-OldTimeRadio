@@ -258,21 +258,41 @@ class UnloadAll:
         except Exception:  # noqa: BLE001
             pass
 
+        # Sprint H §3.7 telemetry (Jeffrey 2026-05-17 round-robin
+        # Step 2): explicit delta line so the next iter's comfy log
+        # immediately answers "did mm.unload_all_models() actually
+        # evict FLUX?". If delta is small (< 5 GiB), FLUX survived
+        # as a user-managed CheckpointLoaderSimple patcher outside
+        # `mm.loaded_models()` and the follow-up commit needs
+        # explicit MODEL/CLIP/VAE patcher dereference before this
+        # chain. If delta is large (>= 20 GiB), the chain did its
+        # job and the gate node was the missing piece.
+        try:
+            alloc_delta_gib = before_allocated_gib - after_allocated_gib
+        except Exception:  # noqa: BLE001
+            alloc_delta_gib = float("nan")
+        try:
+            reserved_delta_gib = before_reserved_gib - after_reserved_gib
+        except Exception:  # noqa: BLE001
+            reserved_delta_gib = float("nan")
+
         if steps_failed:
             log.warning(
                 "[UnloadAll] partial: ran=%s; failed=%s; "
-                "allocated %.2f -> %.2f GiB, reserved %.2f -> %.2f GiB",
+                "allocated %.2f -> %.2f GiB (delta=%.2f), "
+                "reserved %.2f -> %.2f GiB (delta=%.2f)",
                 steps_run, steps_failed,
-                before_allocated_gib, after_allocated_gib,
-                before_reserved_gib, after_reserved_gib,
+                before_allocated_gib, after_allocated_gib, alloc_delta_gib,
+                before_reserved_gib, after_reserved_gib, reserved_delta_gib,
             )
         else:
             log.info(
-                "[UnloadAll] OK: %s; allocated %.2f -> %.2f GiB, "
-                "reserved %.2f -> %.2f GiB",
+                "[UnloadAll] OK: %s; "
+                "allocated %.2f -> %.2f GiB (delta=%.2f), "
+                "reserved %.2f -> %.2f GiB (delta=%.2f)",
                 ", ".join(steps_run),
-                before_allocated_gib, after_allocated_gib,
-                before_reserved_gib, after_reserved_gib,
+                before_allocated_gib, after_allocated_gib, alloc_delta_gib,
+                before_reserved_gib, after_reserved_gib, reserved_delta_gib,
             )
 
         return (image,)

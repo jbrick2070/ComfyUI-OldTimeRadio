@@ -162,6 +162,10 @@ _NODE_MODULES = {
     "OTR_VisualExtractFluxPrompt": (".visual.flux_prompt_extractor", "VisualExtractFluxPrompt", " Visual Extract FLUX Prompt"),
     "OTR_CheckpointLoaderGated":   (".visual.checkpoint_loader_gated", "CheckpointLoaderGated", " Checkpoint Loader (gated)"),
     "OTR_UnloadAll":               (".visual.unload_all",              "UnloadAll",             " Unload All (VRAM release)"),
+    # Sprint H §3.7 topology gate (Jeffrey 2026-05-17): forces
+    # LTXAVTextEncoderLoader's downstream consumer to wait for
+    # OTR_UnloadAll completion. Passthrough, no logic.
+    "OTR_LtxBranchGate":           (".visual.ltx_branch_gate",         "LtxBranchGate",         " LTX Branch Gate (topology)"),
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
     # BUG-LOCAL-078 fix (2026-05-03 EVENING). Per-cast portrait render.
     # Generates one clean head-and-shoulders FLUX portrait for each
