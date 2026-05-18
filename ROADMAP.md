@@ -1,6 +1,6 @@
 ﻿# OTR Roadmap
 
-**Branch:** `v2.0-alpha` (merged from s28-cleaner-break at `aad568c`) | **Active branch:** `s29-clean-slate-gate` (autonomous Cowork swim-run 2026-05-14, code-only no Desktop boot) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-14 (S29 Clean-Slate Gate complete; ends the voice-path-cleanbreak chain at literal 100%; ComfyUI Desktop runtime pass is now forward feature work, NOT a gate)
+**Branch:** `v2.0-alpha` (HEAD `5b44e65` 2026-05-17 -- Sprint H §3.7 closed GREEN) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-17 (Sprint H §3.7 closure -- workflow widget drift, ComfyUI client-side serialization rules, uv-stub PID split; ready for §3.8 attended 3-iter walk)
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -72,6 +72,47 @@ After the current round of cleanbreak validation work closes, the next three spr
 - **A** -- TBD; opens when the sprint starts. Likely lives under `docs/<date>-downstream-ledger-verification/` per the round-robin save discipline (CLAUDE.md round-robin section).
 
 **S24 public-facing polish (already on the roadmap below) gates on A close** -- can't ship a sample episode + README rewrite while downstream is still mid-repair.
+
+---
+
+## SPRINT H -- §3.7 CLOSED GREEN, §3.8 NEXT (Jeffrey, 2026-05-17)
+
+Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5b44e65`. All four §3.7 attended-validation checks GREEN within the bounds of what Windows physically permits:
+
+| Check | Status |
+|---|---|
+| Worker reaches mid-execution | GREEN (iter-1 wall=112.5s, ComfyUI received `got prompt` mid-graph) |
+| `taskkill /F /T <worker>` drops ComfyUI tree | GREEN (no ffmpeg orphans; tree-walk succeeded because ComfyUI is a direct `subprocess.Popen(shell=False)` child of the worker) |
+| Supervisor survives between-iter sweep | GREEN, 7th confirmation (`keep_pids=<stub>,<real_cpython>` preserves both halves of the uv launcher-stub pair) |
+| Atexit writes result file under forced kill | OPERATIONAL GREEN (strict atexit is unenforceable under Windows `/F`; supervisor's missing-file fallback synthesizes a `worker_crash` row -- the design that survives every forced-death class: segfault, OOMKill, BSOD) |
+
+**Inventory locked:** workflow widget vectors clean on both `_full.json` and `_bughunt.json` per the unblinded mini-audit (folder_paths-stub for the 3 runtime-only OTR nodes + runtime-walk replication of the converter, all 34 OTR classes auditable, zero mismatches in both length-only and runtime-walk passes).
+
+| Node | Type | Fix | Commit |
+|---:|---|---|---|
+| 1 | OTR_LedgerScriptWriter | companion-aware mapper (Reading C) | c2c06e9 + 8df3d0a |
+| 3 | OTR_SceneSequencer | stale `{}` orphan drop | cead3eb |
+| 11 | OTR_BatchBarkGenerator | stale `{}` orphan drop | 5d78335 |
+| 12 | OTR_SignalLostVideo | stale `{}` orphan drop (Commit A) | 51a8f56 |
+| 14 | OTR_MusicGenTheme | forceInput-added-post-save placeholder drop | 9310213 |
+| 20 | OTR_VideoPlan | forceInput mapper filter (Reading D) | 7ecbd53 |
+| 59 | OTR_BatchFluxPortraitRender | missing seed companion insert | 5b44e65 |
+| 15 | OTR_BatchAudioGenGenerator | CLEAN (verified by unblinded audit -- index-0 `{}` is a legitimate STRING widget default, no drift) | -- |
+
+**Harness state:**
+
+- Two-process supervisor (`scripts/overnight_bug_hunt.py`) spawns `scripts/worker_iter.py` per iter via `subprocess.Popen` (direct child, no .bat / no PowerShell wrapper -- `taskkill /T` tree walks correctly).
+- Worker launches ComfyUI as its OWN direct `subprocess.Popen(shell=False)` child with inline env+args copied from `scripts/start_comfy_h0_baseline.bat`. ComfyUI inherits the worker's stdin/stdout/stderr (redirected to per-iter logfile).
+- Outer pre-launch python sweep (`scripts/sweep_and_launch.bat`) blankets all `python.exe` before the supervisor starts; between-iter filtered sweep (`scripts/sweep_python_excluding.bat <SUPERVISOR_REAL_PID> <SUPERVISOR_STUB_PID>`) excludes the variadic keep-list via `[int]`-cast PowerShell array semantics.
+- Worker readiness: `socket.bind(('127.0.0.1', port))` port preflight + `/system_stats` JSON-shape check (system.comfyui_version + system.pytorch_version + devices[0].vram_total all required as positive-typed values). No more PID-owns-port equality check (broke under uv stub model).
+- API converter (`scripts/otr_api.py`): companion-aware (Reading C) + forceInput-aware (Reading D) + fail-loud on length drift + misplaced-companion vocabulary guard.
+- Classifier: case-insensitive `status.lower() == "success"` + `executed_count == 0 -> graph_widget`. `submit_prompt` raises on truthy `error` or non-empty `node_errors` before returning prompt_id (no zombie prompts polled in /history).
+
+**Next:** §3.8 attended 3-iter walk. Iter 2 is currently in flight from the §3.7 retest -- either clean completion (becomes data point 2 of 3) or classified failure (next bug-hunt surface). After iter 2 lands, spawn the third attended iter under the same supervisor invocation. GREEN on three attended iters -> §3.9 overnight 12-iter.
+
+**Heartbeat-snapshot worker forensics (deferred):** Skip for §3.8 / §3.9. Revisit only if a real overnight run produces ambiguous worker-death forensics; the supervisor's missing-file fallback covers every forced-death class today.
+
+**No mapper / converter changes for §3.8.** Same supervisor invocation, same rubric, same posture: GREEN advances, specific failure-mode halts.
 
 ---
 
