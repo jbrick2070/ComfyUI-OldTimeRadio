@@ -166,6 +166,12 @@ _NODE_MODULES = {
     # LTXAVTextEncoderLoader's downstream consumer to wait for
     # OTR_UnloadAll completion. Passthrough, no logic.
     "OTR_LtxBranchGate":           (".visual.ltx_branch_gate",         "LtxBranchGate",         " LTX Branch Gate (topology)"),
+    # Sprint H §3.7 follow-up gate (Jeffrey 2026-05-17, mirror of
+    # OTR_LtxBranchGate after b5c1441 proved the pattern): forces
+    # every FLUX consumer to wait until OTR_LedgerFreezeCascade
+    # has emitted its script_json (writer fully done + Gemma
+    # evicted via the cascade's finally-block unload_llm).
+    "OTR_FluxBranchGate":          (".visual.flux_branch_gate",        "FluxBranchGate",        " FLUX Branch Gate (topology)"),
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
     # BUG-LOCAL-078 fix (2026-05-03 EVENING). Per-cast portrait render.
     # Generates one clean head-and-shoulders FLUX portrait for each

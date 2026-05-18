@@ -1,8 +1,8 @@
 {
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
-  "last_node_id": 70,
-  "last_link_id": 201,
+  "last_node_id": 71,
+  "last_link_id": 208,
   "nodes": [
     {
       "id": 63,
@@ -791,8 +791,7 @@
           "name": "MODEL",
           "type": "MODEL",
           "links": [
-            42,
-            97
+            42
           ],
           "shape": 3,
           "slot_index": 0
@@ -801,8 +800,7 @@
           "name": "CLIP",
           "type": "CLIP",
           "links": [
-            43,
-            98
+            43
           ],
           "shape": 3,
           "slot_index": 1
@@ -811,8 +809,7 @@
           "name": "VAE",
           "type": "VAE",
           "links": [
-            44,
-            99
+            44
           ],
           "shape": 3,
           "slot_index": 2
@@ -849,12 +846,12 @@
         {
           "name": "clip",
           "type": "CLIP",
-          "link": 43
+          "link": 205
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 44
+          "link": 207
         },
         {
           "name": "script_json",
@@ -1007,7 +1004,7 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 42
+          "link": 203
         }
       ],
       "outputs": [
@@ -1857,17 +1854,17 @@
         {
           "name": "model",
           "type": "MODEL",
-          "link": 97
+          "link": 204
         },
         {
           "name": "clip",
           "type": "CLIP",
-          "link": 98
+          "link": 206
         },
         {
           "name": "vae",
           "type": "VAE",
-          "link": 99
+          "link": 208
         },
         {
           "name": "ledger_json",
@@ -1996,7 +1993,8 @@
             47,
             79,
             82,
-            90
+            90,
+            202
           ],
           "slot_index": 1
         },
@@ -2067,6 +2065,83 @@
       ],
       "properties": {
         "Node name for S&R": "OTR_LtxBranchGate"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 71,
+      "type": "OTR_FluxBranchGate",
+      "pos": [
+        1145,
+        1000
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "title": "FLUX Branch Gate (topology)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 202,
+          "widget": {
+            "name": "gate_signal"
+          }
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 42
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 43
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            203,
+            204
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            205,
+            206
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            207,
+            208
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "OTR_FluxBranchGate"
       },
       "widgets_values": []
     }
@@ -2204,24 +2279,24 @@
       42,
       22,
       0,
-      42,
-      0,
+      71,
+      1,
       "MODEL"
     ],
     [
       43,
       22,
       1,
-      23,
-      1,
+      71,
+      2,
       "CLIP"
     ],
     [
       44,
       22,
       2,
-      23,
-      2,
+      71,
+      3,
       "VAE"
     ],
     [
@@ -2433,30 +2508,6 @@
       "STRING"
     ],
     [
-      97,
-      22,
-      0,
-      59,
-      0,
-      "MODEL"
-    ],
-    [
-      98,
-      22,
-      1,
-      59,
-      1,
-      "CLIP"
-    ],
-    [
-      99,
-      22,
-      2,
-      59,
-      2,
-      "VAE"
-    ],
-    [
       101,
       23,
       0,
@@ -2567,6 +2618,62 @@
       55,
       1,
       "CLIP"
+    ],
+    [
+      202,
+      62,
+      1,
+      71,
+      0,
+      "STRING"
+    ],
+    [
+      203,
+      71,
+      0,
+      42,
+      0,
+      "MODEL"
+    ],
+    [
+      204,
+      71,
+      0,
+      59,
+      0,
+      "MODEL"
+    ],
+    [
+      205,
+      71,
+      1,
+      23,
+      1,
+      "CLIP"
+    ],
+    [
+      206,
+      71,
+      1,
+      59,
+      1,
+      "CLIP"
+    ],
+    [
+      207,
+      71,
+      2,
+      23,
+      2,
+      "VAE"
+    ],
+    [
+      208,
+      71,
+      2,
+      59,
+      2,
+      "VAE"
     ]
   ],
   "groups": [],
