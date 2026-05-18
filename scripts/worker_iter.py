@@ -604,11 +604,23 @@ def _post_workflow(url: str) -> str | None:
     # EpisodeBudget validator's act_count >= default rule started
     # firing because default_act_count(300) = 3 but smoke shipped 1.
     # Raised to 3 (the conservative default for tw=300).
+    #
+    # include_act_breaks=False history: was the workflow default
+    # (True) until 2026-05-18 §3.7 retest #11. With include_act_breaks
+    # =True the budget records `music_inter_count = act_count - 1`
+    # (= 2 at act_count=3). The outline LLM then emits music-interlude
+    # beats inline (beat_id='m001', 'm002') which violate the outline
+    # schema's beat_id pattern `^b\d{3}$` plus lack required intent /
+    # target_words / mood fields. Setting include_act_breaks=False
+    # zeros music_inter_count so the outline never asks for music
+    # beats. Independent of writer model choice (was hit on both
+    # Mistral-Nemo and the Gemma-4 destination -- belt-and-braces).
     schemas = fetch_schemas()
     wf = load_workflow(str(WORKFLOW_PATH))
     patch_widget_by_name(wf, 1, "target_words", 300, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
     patch_widget_by_name(wf, 1, "act_count", 3, schemas)
+    patch_widget_by_name(wf, 1, "include_act_breaks", False, schemas)
     api = workflow_to_api_prompt(wf, schemas)
     return submit_prompt(api)
 

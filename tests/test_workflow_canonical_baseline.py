@@ -71,20 +71,29 @@ class TestWriterCanonicalSeed:
             "and blocks runtime b3sum reproduction."
         )
 
-    def test_writer_both_slots_mistral_nemo(self):
+    def test_writer_both_slots_gemma_4(self):
+        """Sprint C3 destination + 2026-05-18 retest #11 flip:
+        canonical writer model is google/gemma-4-E4B-it on both
+        creative and technical slots. The Mistral-Nemo baseline
+        was the pre-Sprint-C3 default; reconcile commit 0ce8d2b
+        repointed the harness at _full.json but did NOT flip the
+        writer widgets, so Mistral-Nemo was reactivated as a
+        side effect of the workflow consolidation. This test
+        guards the Sprint C3 destination.
+        """
         n = _node_by_id(_load_canonical_workflow(), 1)
         widgets = n.get("widgets_values", [])
         # Widget order:
         #   [5] creative_writing_model
         #   [6] technical_model
-        expected = "mistralai/Mistral-Nemo-Instruct-2407"
+        expected = "google/gemma-4-E4B-it"
         assert widgets[5] == expected, (
             f"writer creative_writing_model must be {expected!r} for C7 "
-            f"baseline; got {widgets[5]!r}."
+            f"baseline (Sprint C3 destination); got {widgets[5]!r}."
         )
         assert widgets[6] == expected, (
             f"writer technical_model must be {expected!r} for C7 "
-            f"baseline; got {widgets[6]!r}."
+            f"baseline (Sprint C3 destination); got {widgets[6]!r}."
         )
 
 
