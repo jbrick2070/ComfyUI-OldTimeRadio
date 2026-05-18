@@ -51,12 +51,28 @@ log = logging.getLogger("OTR.visual.unload_all")
 
 
 class UnloadAll:
-    """IMAGE passthrough that evicts all loaded models from VRAM."""
+    """IMAGE passthrough that evicts all loaded models from VRAM.
+
+    Sprint H 3.7 Path G follow-up (Jeffrey 2026-05-18, Option A,
+    after retest #14): the node now emits a second STRING output
+    `unload_done` carrying the post-chain VRAM state. The IMAGE
+    passthrough is unchanged. The STRING is the gating signal for
+    downstream deferred loaders that MUST wait until this chain
+    has finished evicting the prior phase's GPU residents.
+
+    Concrete use: OTR_DeferredLtxTextEncoderLoader's `gate_signal`
+    is sourced from this output so the LTX text encoder loader
+    cannot fire until OTR_UnloadAll has evicted FLUX. Without this
+    re-sourcing, both deferred loaders shared a single gate
+    (OTR_LedgerFreezeCascade.script_json) and fired in parallel,
+    recreating the FLUX/LTX co-residence at the loader-fire moment
+    (retest #14 evidence).
+    """
 
     CATEGORY = "OTR/v2/Visual"
     FUNCTION = "execute"
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "unload_done")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -184,7 +200,19 @@ class UnloadAll:
                 "[UnloadAll] chain SKIPPED: %s; image passthrough only",
                 "; ".join(steps_failed),
             )
-            return (image,)
+            # Path G follow-up: emit the unload_done signal even when
+            # the chain skipped. Downstream gating consumers care
+            # about ORDERING (have we passed the OTR_UnloadAll
+            # boundary?), not strict success. The payload string
+            # carries the failure state for diagnostics.
+            unload_done = (
+                "unload_done:chain_skipped:"
+                + ";".join(steps_failed)
+            )
+            log.info(
+                "[UnloadAll] emit unload_done signal: %s", unload_done,
+            )
+            return (image, unload_done)
 
         # Telemetry: capture before-state so the log answers
         # "did the cleanup chain actually reclaim VRAM, or did it
@@ -295,7 +323,25 @@ class UnloadAll:
                 before_reserved_gib, after_reserved_gib, reserved_delta_gib,
             )
 
-        return (image,)
+        # Path G follow-up (Jeffrey 2026-05-18 Option A, after
+        # retest #14): emit the unload_done signal. Content is
+        # informational -- post-chain VRAM allocated/reserved snapshot
+        # so downstream consumers (OTR_DeferredLtxTextEncoderLoader's
+        # gate_signal, primarily) can log + sanity-check the state at
+        # gate fire. Presence is what gates dependency: ComfyUI's
+        # executor cannot fire any node taking this STRING as
+        # forceInput until OTR_UnloadAll.execute() has returned.
+        unload_done = (
+            f"unload_done:vram_after_allocated_gib={after_allocated_gib:.2f};"
+            f"vram_after_reserved_gib={after_reserved_gib:.2f};"
+            f"alloc_delta_gib={alloc_delta_gib:.2f};"
+            f"ran_steps={len(steps_run)};"
+            f"failed_steps={len(steps_failed)}"
+        )
+        log.info(
+            "[UnloadAll] emit unload_done signal: %s", unload_done,
+        )
+        return (image, unload_done)
 
 
 __all__ = ["UnloadAll"]
