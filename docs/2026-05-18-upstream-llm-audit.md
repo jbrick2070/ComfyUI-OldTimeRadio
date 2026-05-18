@@ -147,6 +147,44 @@ Schema is the StoryBriefModel (~5 fields). Not exercised in
    exercises these stages so the failure flavors are observable
    first.
 
+## Update 2026-05-18 (Path F)
+
+Retest #12 surfaced a separate defect class: MusicGenTheme
+crashed on LLM-invented style slug `'station_supply_arrival_protocol'`
+because its hardcoded `_STYLE_PALETTE` only carried the 10
+canonical preset slugs. Style picker's "let the story decide"
+invent design and the palette lookup were structurally
+incompatible.
+
+Path F refactor (commit landed in this audit's next commit):
+**MusicGenTheme reads the meta brief, not the style slug.** The
+new `_compose_music_prompt(meta, cue_id)` pulls
+`story_brief_terms.atmosphere` (mood), `story_brief_terms.setting`
+(scene), and `gen_params_initial.period_voice` (if present) and
+combines them with cue-specific musical-character templates
+(opening / closing / interstitial). The style slug is logged
+diagnostically but no longer drives the prompt.
+
+Retired surfaces (per no-legacy-back-compat):
+- `musicgen_theme._STYLE_PALETTE` import (still exists at
+  `_otr_style_palette.STYLE_PALETTE` for the freeze cascade's
+  writer-slug drift validation)
+- `musicgen_theme._resolve_cue_from_style`
+- `musicgen_theme._apply_story_brief_mood_prefix`
+- `tests/test_musicgen_news_brief_used.py` (deleted)
+- `tests/test_musicgen_style_palette.py` (deleted)
+- `tests/test_story_brief_musicgen_c5g.py` (deleted)
+
+MusicGenTheme is NOT an LLM call (audio model, not text model)
+so it doesn't appear in the upstream LLM audit table above. The
+refactor is included here because it falls in the same Path
+C/F family: each LLM (or LLM-like) consumer should pull
+narrative signal from the meta brief, not from thin abstraction
+layers that drift.
+
+The audit table above for the writer pipeline is unchanged --
+this update is downstream of the writer.
+
 ## What this audit does NOT recommend
 
 - Do NOT break down `news_interpreter`, `casting`, `style_picker`,

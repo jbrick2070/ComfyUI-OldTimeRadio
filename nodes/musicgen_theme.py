@@ -53,7 +53,12 @@ import numpy as np
 import torch
 
 from . import _otr_ledger as _OTRL_PATHS
-from ._otr_style_palette import STYLE_PALETTE as _STYLE_PALETTE, KNOWN_STYLE_SLUGS
+# Path F (2026-05-18): _STYLE_PALETTE retired from this module.
+# Cue prompts are now composed from meta brief fields directly
+# (see _compose_music_prompt). KNOWN_STYLE_SLUGS still imported by
+# the freeze cascade for writer-slug drift validation; that import
+# lives there, not here. Per Jeffrey no-legacy-back-compat:
+# delete the dead import rather than keep as a shim.
 from ._otr_story_brief_helpers import (
     get_story_brief_music_mood,
     get_story_brief_status,
@@ -288,54 +293,128 @@ def _mood_suffix(script_brief: str) -> str:
     return (", " + ", ".join(tags)) if tags else ""
 
 
-def _apply_story_brief_mood_prefix(prompt: str, meta: dict) -> tuple[str, str, list[str]]:
-    """Sprint C C5g (2026-05-15): apply meta.story_brief mood prefix
-    to a MusicGen cue prompt.
+# _apply_story_brief_mood_prefix retired 2026-05-18 (Path F).
+# Mood prefix is now integrated into the prompt body by
+# _compose_music_prompt directly (it pulls mood terms from
+# atmosphere FIRST, with a script_brief keyword-mining fallback).
+# Per Jeffrey no-legacy-back-compat: dead function deleted, not
+# kept as a shim.
 
-    Per refinement section 6.3 + E-12 / RR-A2: when the reflection
-    pass succeeded AND its atmosphere terms intersect the declared
-    MusicGen mood vocabulary (the C5b helper's `_MUSIC_MOOD_VOCAB`),
-    prepend the intersected terms as a comma-joined prefix:
 
-        "tense, ominous, " + original_prompt
+# Path F (2026-05-18): cue-specific musical character templates.
+# Each cue gets a fixed template describing its musical shape
+# (intro / outro / bridge). The narrative content -- mood, setting,
+# theme -- is supplied by the meta brief at render time.
+#
+# These templates replace the per-slug entries in _STYLE_PALETTE.
+# The old palette had 10 slugs x 3 cues = 30 prompts that needed to
+# stay in lockstep with the style_picker's invent path; the invent
+# path explicitly produces NEW slugs that have no palette entry
+# ("let the story decide" design intent per memory entry
+# reference_style_auto_sentinel_label). Pulling music prompts
+# directly from the meta brief makes that collision structurally
+# impossible.
+_CUE_CHARACTER: dict[str, str] = {
+    "opening":      "slow atmospheric build, introduces the scene, "
+                    "ends on a sustained chord, instrumental intro",
+    "closing":      "resolving cadence, gentle decay into silence, "
+                    "instrumental outro",
+    "interstitial": "brief textural bridge, unresolved, short "
+                    "instrumental transition",
+}
 
-    Status 'absent' (old ledgers per refinement section 8.2) or
-    'failed' (reflection-pass crashed) or empty-intersection
-    (atmosphere terms were all outside MusicGen's vocab) -> prompt
-    is returned unchanged.
 
-    Returns (possibly-prefixed prompt, status, mood_terms) so the
-    caller can log story_brief_status + mood_terms per E-07.
+def _compose_music_prompt(
+    meta: dict, cue_id: str,
+) -> tuple[str, int]:
+    """Synthesize a MusicGen cue prompt from the meta brief.
+
+    Pulls from L3 ledger meta (already passed via script_json
+    linked input to node 14):
+      - meta.story_brief_terms.atmosphere  -> mood adjectives
+      - meta.story_brief_terms.setting     -> scene context
+      - meta.news.script_brief             -> keyword-mined mood
+        tags (existing _MOOD_TAGS helper)
+      - meta.gen_params_initial            -> period_voice (if
+        present)
+
+    Combines with the cue-specific musical character template
+    (opening / closing / interstitial) and the prompt tail
+    ("instrumental only, no vocals").
+
+    Returns (prompt, duration_sec). Never raises on unknown slug
+    -- there is no slug lookup. Falls back to a neutral
+    atmospheric prompt when meta is absent or sparse.
     """
-    status = get_story_brief_status(meta)
-    mood_terms = get_story_brief_music_mood(meta)
-    if status == "ok" and mood_terms:
-        prefix = ", ".join(mood_terms) + ", "
-        return prefix + prompt, status, mood_terms
-    return prompt, status, mood_terms
+    terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
+    if not isinstance(terms, dict):
+        terms = {}
 
+    atmosphere_raw = terms.get("atmosphere") or []
+    setting_raw = terms.get("setting") or []
+    if not isinstance(atmosphere_raw, list):
+        atmosphere_raw = []
+    if not isinstance(setting_raw, list):
+        setting_raw = []
 
-def _resolve_cue_from_style(cue_id: str, style: str,
-                            mood_suffix: str) -> tuple[str, int]:
-    """Resolve a single cue from the style palette.
+    atmosphere = [str(t).strip() for t in atmosphere_raw if str(t).strip()]
+    setting_terms = [str(t).strip() for t in setting_raw if str(t).strip()]
 
-    Returns (prompt, duration_sec). Loud-fails on unknown style slug -
-    no default palette, no fallback. The writer's gen_params_initial.style
-    is the canonical source; an unknown value indicates a writer-side or
-    palette-coverage bug that must be fixed, not papered over.
-    """
-    palette = _STYLE_PALETTE.get(style)
-    if palette is None:
-        known = ", ".join(sorted(_STYLE_PALETTE.keys()))
-        raise ValueError(
-            f"MusicGenTheme: unknown style slug {style!r}. "
-            f"Add an entry to _STYLE_PALETTE. Known slugs: {known}"
+    # Mood: prefer atmosphere terms from the reflection pass. Top 3
+    # to keep the prompt under MusicGen's effective context window.
+    # If the reflection pass produced nothing, fall back to keyword
+    # mining of news.script_brief via the legacy _MOOD_TAGS helper
+    # (we already had that signal path; reusing it here keeps the
+    # fallback graceful when story_brief_status='absent' on legacy
+    # ledgers).
+    if atmosphere:
+        mood_terms = atmosphere[:3]
+    else:
+        news_meta = (meta.get("news") or {}) if isinstance(meta, dict) else {}
+        if not isinstance(news_meta, dict):
+            news_meta = {}
+        keyword_suffix = _mood_suffix(
+            news_meta.get("script_brief") or ""
         )
-    base_prompt = palette[cue_id]
-    return (
-        f"{base_prompt}{mood_suffix}{_PROMPT_TAIL}",
-        CUE_DURATIONS[cue_id],
-    )
+        # _mood_suffix returns ", tag1, tag2" or ""; strip and split.
+        kw_str = keyword_suffix.lstrip(", ").strip()
+        mood_terms = [t.strip() for t in kw_str.split(",") if t.strip()] if kw_str else []
+
+    # Setting: top 2 terms keeps the prompt readable.
+    setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""
+
+    # Period overlay: the writer's gen_params_initial may carry a
+    # period_voice descriptor when the talkie 1940s row is active.
+    # Layer it into the prompt as a register cue so MusicGen leans
+    # toward period instrumentation (brass / strings / etc.) rather
+    # than a modern synth bed. Modern profile = no descriptor = no
+    # overlay.
+    gen_params = meta.get("gen_params_initial") if isinstance(meta, dict) else None
+    period_descriptor = ""
+    if isinstance(gen_params, dict):
+        pv = gen_params.get("period_voice")
+        if isinstance(pv, dict):
+            descriptor = pv.get("descriptor") or pv.get("music_descriptor")
+            if isinstance(descriptor, str) and descriptor.strip():
+                period_descriptor = descriptor.strip()
+
+    # Compose: mood -> setting -> period -> cue character -> tail.
+    parts: list[str] = []
+    if mood_terms:
+        parts.append(", ".join(mood_terms))
+    else:
+        # Graceful default when both atmosphere AND script_brief are
+        # empty. "atmospheric" is the safest one-word seed for
+        # MusicGen and matches the closing fallback in the legacy
+        # path.
+        parts.append("atmospheric")
+    if setting_str:
+        parts.append(f"evokes {setting_str}")
+    if period_descriptor:
+        parts.append(period_descriptor)
+    parts.append(_CUE_CHARACTER[cue_id])
+    prompt = ", ".join(parts) + _PROMPT_TAIL
+    return prompt, CUE_DURATIONS[cue_id]
 
 
 def _silent_audio_dict(duration_sec: float,
@@ -436,45 +515,38 @@ class MusicGenTheme:
         meta = led.get("meta", {}) or {}
         gen_params = meta.get("gen_params_initial", {}) or {}
 
-        style = (gen_params.get("style") or "").strip()
-        if not style:
-            raise ValueError(
-                "MusicGenTheme: meta.gen_params_initial.style missing "
-                "from ledger. Writer cast-lock contract violation - "
-                "every L3 ledger must stamp a style slug."
-            )
-
-        news_meta = meta.get("news", {}) or {}
-        script_brief = (news_meta.get("script_brief") or "")
-        mood_suffix = _mood_suffix(script_brief)
+        # Path F (2026-05-18): style slug is no longer the music
+        # prompt source. Read it ONLY for diagnostic logging; the
+        # cue prompts are composed from the meta brief directly via
+        # _compose_music_prompt. Missing style is no longer a fatal
+        # error -- MusicGen synthesizes from atmosphere + setting
+        # terms regardless of what the writer stamped.
+        style_for_log = (gen_params.get("style") or "").strip() or "<absent>"
 
         if not episode_seed:
             seed_from_ledger = gen_params.get("seed")
             if seed_from_ledger is not None:
                 episode_seed = str(seed_from_ledger)
 
-        # Sprint C C5g (2026-05-15): meta.story_brief mood prefix.
-        # LLM slot: N/A -- MusicGen is an audio model, not an LLM call.
-        # Per refinement section 6.3 + E-12 / RR-A2: when the reflection
-        # pass succeeded AND its atmosphere terms intersect the declared
-        # MusicGen mood vocabulary, prepend the intersection to every
-        # cue prompt. Helpers imported module-level above. Status +
-        # selected mood terms logged once per render for E-07.
-        # ---- Resolve all three cues from the style palette ----
+        # ---- Compose all three cue prompts from the meta brief ----
+        # Sprint H 3.7 Path F (2026-05-18): _compose_music_prompt
+        # replaces _resolve_cue_from_style + _apply_story_brief_mood_prefix
+        # as a single meta-brief-driven synthesis. Per Jeffrey:
+        # "MusicGen is downstream of story gen. The meta brief / story
+        # script is the canonical source. Style slug was a thin
+        # abstraction." Removes the structural collision with the
+        # style_picker's let-the-story-decide invent path.
         cues: dict[str, dict] = {}
         _brief_status_logged = False
         for cue_id in CUE_IDS:
-            prompt, duration = _resolve_cue_from_style(
-                cue_id, style, mood_suffix
-            )
-            prompt, _brief_status, _brief_mood_terms = (
-                _apply_story_brief_mood_prefix(prompt, meta)
-            )
+            prompt, duration = _compose_music_prompt(meta, cue_id)
             if not _brief_status_logged:
+                _brief_status = get_story_brief_status(meta)
+                _brief_mood_terms = get_story_brief_music_mood(meta)
                 log.info(
                     "[OTR_MusicGenTheme] story_brief_status=%s "
-                    "mood_terms=%s",
-                    _brief_status, _brief_mood_terms,
+                    "mood_terms=%s style_slug_diag=%s",
+                    _brief_status, _brief_mood_terms, style_for_log,
                 )
                 _brief_status_logged = True
             cues[cue_id] = {"prompt": prompt, "duration_sec": duration}
@@ -483,8 +555,7 @@ class MusicGenTheme:
         render_log = [
             "=== MusicGen Theme (medium) ===",
             f"cache dir: {cache_dir}",
-            f"style: {style}",
-            f"mood suffix: {mood_suffix or '<none>'}",
+            f"style (diagnostic only): {style_for_log}",
             f"episode seed: {episode_seed or '<none>'}",
         ]
 

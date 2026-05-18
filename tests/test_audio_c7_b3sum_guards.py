@@ -106,11 +106,20 @@ class TestMusicGenC7Baseline:
         )
 
     def test_musicgen_consumes_mood_prefix_helper(self):
+        """Path F (2026-05-18): MusicGen now composes prompts directly
+        from meta brief fields (atmosphere + setting + period overlay)
+        via _compose_music_prompt. The old C5g `_apply_story_brief_mood_prefix`
+        helper was retired -- mood terms are now integrated into the
+        prompt body, not prepended as a prefix. The
+        get_story_brief_music_mood helper is still called for the
+        diagnostic log line (story_brief_status + mood_terms), so the
+        consumer-helper wire stays pinned here.
+        """
         src = _read_src("nodes/musicgen_theme.py")
-        # The C5g wire pulls the helper.
+        # The diagnostic log still uses the helper.
         assert "get_story_brief_music_mood" in src
-        # The application path is `_apply_story_brief_mood_prefix`.
-        assert "_apply_story_brief_mood_prefix" in src
+        # The composer function pulls atmosphere terms directly:
+        assert "_compose_music_prompt" in src
 
     def test_musicgen_logs_status_for_observability(self):
         """The mood-prefix application path must log story_brief_status
