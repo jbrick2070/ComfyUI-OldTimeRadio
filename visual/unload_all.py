@@ -107,54 +107,173 @@ class UnloadAll:
         unload_llm_polish: bool = True,
         empty_cache: bool = True,
     ):
+        """Unload models + clean CUDA, with the full chain ported from
+        `nodes/batch_humo_render.py::_hard_reset_cuda_context`.
+
+        Sprint H §3.7 fix (Jeffrey 2026-05-17 round-robin Track B
+        verdict): the pre-fix `execute()` ran a 3-step subset of the
+        cleanup chain BatchHumoRender uses for VRAM-pressure recovery.
+        Track B isolation test proved the LTXAVTextEncoderLoader +
+        Gemma 3 12B + LTX 2.3 22B path works correctly on cold VRAM
+        (15.92 GB peak, 9.71s encode wall, no access violation), and
+        the production crash was FLUX co-residence + dynamic
+        offloader fragmentation. Beefing up `OTR_UnloadAll.execute()`
+        to match the BatchHumoRender hard-reset chain gives the
+        workflow's existing unload-between-phases node enough
+        cleanup power to clear FLUX before the LTX text encoder
+        load at order 26.
+
+        Full chain (order matters -- model patches release VRAM
+        FIRST so the allocator's free-block coalesce runs against
+        actually-free pages):
+
+            1. llm_polish.unload()              [gated by unload_llm_polish]
+            2. mm.unload_all_models()           [gated by unload_checkpoint]
+            3. gc.collect()                     [gated by empty_cache]
+            4. mm.soft_empty_cache(force=True)  [gated by empty_cache]
+            5. torch.cuda.synchronize()         [gated by empty_cache]
+            6. torch.cuda.empty_cache()         [gated by empty_cache]
+            7. torch.cuda.ipc_collect()         [gated by empty_cache]
+
+        Plus before/after VRAM telemetry (allocated + reserved) so
+        the operator can see whether the chain actually reclaimed
+        VRAM or just ran in place -- mirrors BatchHumoRender's
+        round-robin Item H telemetry.
+
+        Best-effort throughout: every step is wrapped so a missing
+        API on an older torch/Comfy combo doesn't escalate cleanup
+        into a second crash. The image passthrough at end is
+        unconditional -- the downstream SaveImage / consumer
+        always receives the tensor regardless of cleanup outcome.
+        """
+        import gc
+
+        steps_run: list[str] = []
+        steps_failed: list[str] = []
+
         # Step 1: release the prompt-polish LLM (idempotent if unloaded).
         if unload_llm_polish:
             try:
                 from . import llm_polish  # type: ignore
                 llm_polish.unload()
-                log.info("[UnloadAll] llm_polish.unload() called")
+                steps_run.append("llm_polish.unload")
             except ImportError:
                 try:
                     import llm_polish  # type: ignore
                     llm_polish.unload()
-                    log.info("[UnloadAll] llm_polish.unload() called (flat import)")
+                    steps_run.append("llm_polish.unload (flat)")
                 except ImportError:
-                    log.debug("[UnloadAll] llm_polish module unavailable")
+                    pass  # module unavailable -- not an error
             except Exception as exc:  # noqa: BLE001
-                log.warning("[UnloadAll] llm_polish.unload() errored: %s", exc)
+                steps_failed.append(f"llm_polish.unload ({exc})")
+
+        # Import the CUDA-side helpers once; treat their absence as a
+        # soft skip rather than a hard fail. The image passthrough
+        # still fires below.
+        try:
+            import comfy.model_management as mm  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            steps_failed.append(f"import comfy.model_management ({exc})")
+            mm = None  # type: ignore[assignment]
+
+        try:
+            import torch  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            steps_failed.append(f"import torch ({exc})")
+            log.warning(
+                "[UnloadAll] chain SKIPPED: %s; image passthrough only",
+                "; ".join(steps_failed),
+            )
+            return (image,)
+
+        # Telemetry: capture before-state so the log answers
+        # "did the cleanup chain actually reclaim VRAM, or did it
+        # just run cleanly while the pool stayed fragmented?".
+        before_allocated_gib = float("nan")
+        before_reserved_gib = float("nan")
+        try:
+            if torch.cuda.is_available():
+                before_allocated_gib = torch.cuda.memory_allocated() / (1024 ** 3)
+                before_reserved_gib = torch.cuda.memory_reserved() / (1024 ** 3)
+        except Exception:  # noqa: BLE001
+            pass
 
         # Step 2: release the checkpoint (MODEL + CLIP + VAE) via
-        # ComfyUI's own model_management API.
-        if unload_checkpoint:
+        # ComfyUI's own model_management API. mm.unload_all_models
+        # internally calls free_memory(1e30, get_torch_device()),
+        # which drops every currently-loaded-model patcher from GPU
+        # to CPU.
+        if unload_checkpoint and mm is not None:
             try:
-                import comfy.model_management as mm  # type: ignore
                 mm.unload_all_models()
-                log.info("[UnloadAll] comfy.model_management.unload_all_models() called")
+                steps_run.append("mm.unload_all_models")
             except Exception as exc:  # noqa: BLE001
-                log.warning("[UnloadAll] unload_all_models() errored: %s", exc)
+                steps_failed.append(f"mm.unload_all_models ({exc})")
 
-        # Step 3: hand freed pages back to the CUDA allocator so
-        # external monitors (LHM / nvidia-smi) see the drop.
+        # Steps 3-7: chain ported from BatchHumoRender hard-reset.
+        # All gated by `empty_cache` widget so the operator can
+        # selectively run just the unload portion if needed.
         if empty_cache:
             try:
-                import comfy.model_management as mm  # type: ignore
-                mm.soft_empty_cache(force=True)
-                log.info("[UnloadAll] soft_empty_cache(force=True) called")
+                gc.collect()
+                steps_run.append("gc.collect")
             except Exception as exc:  # noqa: BLE001
-                # Fall back to raw torch if comfy module path changes
+                steps_failed.append(f"gc.collect ({exc})")
+
+            if mm is not None:
                 try:
-                    import gc
-                    import torch
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                    log.info("[UnloadAll] torch.cuda.empty_cache() fallback")
-                except Exception as exc2:  # noqa: BLE001
-                    log.warning(
-                        "[UnloadAll] cache cleanup errored: %s / %s",
-                        exc,
-                        exc2,
-                    )
+                    mm.soft_empty_cache(force=True)
+                    steps_run.append("mm.soft_empty_cache")
+                except Exception as exc:  # noqa: BLE001
+                    steps_failed.append(f"mm.soft_empty_cache ({exc})")
+
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                    steps_run.append("torch.cuda.synchronize")
+            except Exception as exc:  # noqa: BLE001
+                steps_failed.append(f"torch.cuda.synchronize ({exc})")
+
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    steps_run.append("torch.cuda.empty_cache")
+            except Exception as exc:  # noqa: BLE001
+                steps_failed.append(f"torch.cuda.empty_cache ({exc})")
+
+            try:
+                if torch.cuda.is_available():
+                    torch.cuda.ipc_collect()
+                    steps_run.append("torch.cuda.ipc_collect")
+            except Exception as exc:  # noqa: BLE001
+                steps_failed.append(f"torch.cuda.ipc_collect ({exc})")
+
+        # Telemetry: capture after-state + log reclaim delta.
+        after_allocated_gib = float("nan")
+        after_reserved_gib = float("nan")
+        try:
+            if torch.cuda.is_available():
+                after_allocated_gib = torch.cuda.memory_allocated() / (1024 ** 3)
+                after_reserved_gib = torch.cuda.memory_reserved() / (1024 ** 3)
+        except Exception:  # noqa: BLE001
+            pass
+
+        if steps_failed:
+            log.warning(
+                "[UnloadAll] partial: ran=%s; failed=%s; "
+                "allocated %.2f -> %.2f GiB, reserved %.2f -> %.2f GiB",
+                steps_run, steps_failed,
+                before_allocated_gib, after_allocated_gib,
+                before_reserved_gib, after_reserved_gib,
+            )
+        else:
+            log.info(
+                "[UnloadAll] OK: %s; allocated %.2f -> %.2f GiB, "
+                "reserved %.2f -> %.2f GiB",
+                ", ".join(steps_run),
+                before_allocated_gib, after_allocated_gib,
+                before_reserved_gib, after_reserved_gib,
+            )
 
         return (image,)
 
