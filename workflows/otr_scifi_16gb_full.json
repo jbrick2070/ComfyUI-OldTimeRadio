@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 71,
-  "last_link_id": 208,
+  "last_link_id": 210,
   "nodes": [
     {
       "id": 63,
@@ -772,23 +772,29 @@
     },
     {
       "id": 22,
-      "type": "CheckpointLoaderSimple",
+      "type": "OTR_DeferredCheckpointLoader",
       "pos": [
         1020,
         1200
       ],
       "size": [
         340,
-        100
+        130
       ],
       "flags": {},
       "order": 12,
       "mode": 0,
-      "title": "Load FLUX.1-dev-fp8 (video branch)",
-      "inputs": [],
+      "title": "Load FLUX.1-dev-fp8 (deferred -- gate-bound)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 209
+        }
+      ],
       "outputs": [
         {
-          "name": "MODEL",
+          "name": "model",
           "type": "MODEL",
           "links": [
             42
@@ -797,7 +803,7 @@
           "slot_index": 0
         },
         {
-          "name": "CLIP",
+          "name": "clip",
           "type": "CLIP",
           "links": [
             43
@@ -806,7 +812,7 @@
           "slot_index": 1
         },
         {
-          "name": "VAE",
+          "name": "vae",
           "type": "VAE",
           "links": [
             44
@@ -816,7 +822,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "CheckpointLoaderSimple"
+        "Node name for S&R": "OTR_DeferredCheckpointLoader"
       },
       "widgets_values": [
         "flux1-dev-fp8.safetensors"
@@ -1735,23 +1741,29 @@
     },
     {
       "id": 57,
-      "type": "LTXAVTextEncoderLoader",
+      "type": "OTR_DeferredLtxTextEncoderLoader",
       "pos": [
         3500,
         1850
       ],
       "size": [
         400,
-        100
+        130
       ],
       "flags": {},
       "order": 26,
       "mode": 0,
-      "title": "Gemma encoder (LTX 2.3)",
-      "inputs": [],
+      "title": "Gemma encoder (LTX 2.3, deferred -- gate-bound)",
+      "inputs": [
+        {
+          "name": "gate_signal",
+          "type": "STRING",
+          "link": 210
+        }
+      ],
       "outputs": [
         {
-          "name": "CLIP",
+          "name": "clip",
           "type": "CLIP",
           "links": [
             94
@@ -1761,7 +1773,7 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "LTXAVTextEncoderLoader"
+        "Node name for S&R": "OTR_DeferredLtxTextEncoderLoader"
       },
       "widgets_values": [
         "gemma_3_12B_it_fp4_mixed.safetensors",
@@ -1994,7 +2006,9 @@
             79,
             82,
             90,
-            202
+            202,
+            209,
+            210
           ],
           "slot_index": 1
         },
@@ -2674,6 +2688,22 @@
       59,
       2,
       "VAE"
+    ],
+    [
+      209,
+      62,
+      1,
+      22,
+      0,
+      "STRING"
+    ],
+    [
+      210,
+      62,
+      1,
+      57,
+      0,
+      "STRING"
     ]
   ],
   "groups": [],

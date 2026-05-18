@@ -172,6 +172,18 @@ _NODE_MODULES = {
     # has emitted its script_json (writer fully done + Gemma
     # evicted via the cascade's finally-block unload_llm).
     "OTR_FluxBranchGate":          (".visual.flux_branch_gate",        "FluxBranchGate",        " FLUX Branch Gate (topology)"),
+    # Sprint H §3.7 Path G (Jeffrey 2026-05-18): deferred-loader
+    # wrappers. Retest #13 produced the campaign's core finding:
+    # ComfyUI's executor pre-loads CheckpointLoaderSimple +
+    # LTXAVTextEncoderLoader at graph-start regardless of any
+    # downstream gate ([FluxBranchGate] fire reading 22.18 GiB
+    # confirmed the worst-case scenario). Gates defer consumer
+    # execution; deferred loaders defer the loader's GPU
+    # materialization itself by adding gate_signal (STRING,
+    # forceInput=True) as a required input. ComfyUI topo-sorts
+    # them downstream of OTR_LedgerFreezeCascade.script_json.
+    "OTR_DeferredCheckpointLoader": (".nodes._otr_deferred_loaders",   "DeferredCheckpointLoader", " Deferred Checkpoint Loader (gate-bound)"),
+    "OTR_DeferredLtxTextEncoderLoader": (".nodes._otr_deferred_loaders", "DeferredLtxTextEncoderLoader", " Deferred LTX Text Encoder Loader (gate-bound)"),
     "OTR_BatchFluxRender":         (".visual.batch_flux_render",       "BatchFluxRender",       " Batch FLUX Render"),
     # BUG-LOCAL-078 fix (2026-05-03 EVENING). Per-cast portrait render.
     # Generates one clean head-and-shoulders FLUX portrait for each
