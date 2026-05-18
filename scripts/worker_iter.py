@@ -240,6 +240,37 @@ def _comfyui_responding_with_real_shape(url: str) -> bool:
     return True
 
 
+def _detect_crash_subclass(comfy_log_text: str) -> str | None:
+    """Identify a crash subclass from the ComfyUI log tail.
+
+    Sprint H §3.7 Commit 1 (Jeffrey 2026-05-17 round-robin): when
+    failure_class is 'crash_process', the subclass is metadata that
+    helps operators triage without re-reading the log. The class
+    itself stays 'crash_process'; subclass is None or one of:
+        - 'access_violation': Windows fatal access violation /
+          segfault triggered by torch storage / unmarshal / native ext
+        - 'safetensors_load': load_torch_file or safetensors header
+          failures (often pair with access_violation when shape
+          mismatches make torch.storage read invalid memory)
+        - 'cuda': cudaError / CUDA kernel launch / device-side assert
+        - None: no recognizable subclass marker found in tail
+    """
+    if not comfy_log_text:
+        return None
+    text = comfy_log_text.lower()
+    if "windows fatal exception: access violation" in text:
+        return "access_violation"
+    if "cudaerror" in text or "cuda error" in text or "device-side assert" in text:
+        return "cuda"
+    if (
+        "load_torch_file" in text
+        or "safetensors" in text
+        and ("header" in text or "could not load" in text or "load_clip" in text)
+    ):
+        return "safetensors_load"
+    return None
+
+
 def _classify_failure(
     *,
     comfy_log_text: str,
@@ -258,7 +289,15 @@ def _classify_failure(
     zero executed nodes -- the prompt got "executed" only insofar as
     ComfyUI processed the rejection. Map that case to `graph_widget`
     instead of `unknown`. Plain executed prompts retain `success`.
+
+    Sprint H §3.7 Commit 1: 'CRASH_PROCESS' status (synthesized by
+    `_poll_until_done` on ComfyUI process death) maps to
+    'crash_process' class. Subclass detection runs separately via
+    `_detect_crash_subclass` and lands in the result file as
+    metadata; failure_class stays 'crash_process'.
     """
+    if status == "CRASH_PROCESS":
+        return "crash_process"
     status_lower = (status or "").lower()
     if status_lower == "success":
         if executed_count == 0:
@@ -399,6 +438,7 @@ class WorkerResult:
             "prompt_id": None,
             "status": "worker_crash",
             "failure_class": "worker_crash",
+            "crash_subclass": None,
             "exception_message": None,
             "exception_type": None,
             "executed_count": 0,
@@ -512,14 +552,48 @@ def _poll_until_done(
     deadline_s: float,
     *,
     on_vram: callable | None = None,
+    comfy_proc: subprocess.Popen | None = None,
 ) -> tuple[str, str | None, str | None, int, int]:
-    """Poll /history until status_str != PENDING or deadline hit.
+    """Poll /history until status_str != PENDING, ComfyUI process death,
+    or deadline hit.
 
     Returns
         (status, exception_message, exception_type,
          executed_count, outputs_count).
+
+    Status values produced by this poll loop:
+        - <status_str from /history>: normal resolution path
+        - 'CRASH_PROCESS': ComfyUI died before /history resolved.
+          comfy_proc.poll() is checked each tick; a non-None returncode
+          BEFORE the prompt resolves means the process is gone (fatal
+          access violation, OOMKill, segfault, etc.). The exit code
+          surfaces as exception_type 'comfyui_exit_<rc>' so the
+          classifier can log it without further log-scraping.
+        - 'TIMEOUT': /history poll deadline elapsed with ComfyUI still
+          alive but the prompt unresolved.
+
+    Sprint H §3.7 Commit 1 (Jeffrey 2026-05-17 round-robin): pre-fix
+    the worker spun the full EXEC_TIMEOUT_S deadline on every fatal
+    ComfyUI crash because /history can't resolve a prompt for a dead
+    server. The crash class (safetensors load access violation,
+    cudaError, OOMKill) needs to be classified within seconds, not
+    fifteen minutes. Track comfy_proc aliveness each tick to bound
+    the worst-case worker_wall for crash classes.
     """
     while time.time() < deadline_s:
+        # Crash detection BEFORE /history poll. A dead ComfyUI cannot
+        # produce a /history entry; spinning the deadline is wasteful.
+        if comfy_proc is not None:
+            rc = comfy_proc.poll()
+            if rc is not None:
+                return (
+                    "CRASH_PROCESS",
+                    f"ComfyUI process exited (rc={rc}) before /history "
+                    "resolved the prompt",
+                    f"comfyui_exit_{rc}",
+                    0,
+                    0,
+                )
         h = _http_get_json(f"{url}/history/{prompt_id}", timeout=5)
         if on_vram is not None:
             v = _vram_used_gb_via_comfy(url)
@@ -677,9 +751,17 @@ def main() -> int:
 
         deadline = time.time() + EXEC_TIMEOUT_S
         status, exc_msg, exc_type, exec_count, out_count = _poll_until_done(
-            url, prompt_id, deadline, on_vram=_peak,
+            url, prompt_id, deadline,
+            on_vram=_peak,
+            comfy_proc=comfy_proc,
         )
-        log_tail = _tail_file(log_path, n_lines=200)
+        # Sprint H §3.7 Commit 1: on process-death classification,
+        # tail more log lines (250 vs 200) so the operator has enough
+        # context to spot the fatal frame + preceding load_torch_file
+        # / load_clip / quantization warnings without re-reading the
+        # raw log.
+        tail_lines = 250 if status == "CRASH_PROCESS" else 200
+        log_tail = _tail_file(log_path, n_lines=tail_lines)
         failure_class = _classify_failure(
             comfy_log_text=log_tail,
             exception_message=exc_msg,
@@ -687,12 +769,19 @@ def main() -> int:
             status=status,
             executed_count=exec_count,
         )
+        # Subclass metadata only fires when failure_class is
+        # crash_process. Stays None otherwise so existing rows are
+        # unchanged.
+        crash_subclass = None
+        if failure_class == "crash_process":
+            crash_subclass = _detect_crash_subclass(log_tail)
         # Diagnostic: surface raw history shape so future drift of the
         # status/executed/outputs triple is immediately diagnosable from
         # the result file alone -- no log-tail forensics required.
         result.update(
             status=status,
             failure_class=failure_class,
+            crash_subclass=crash_subclass,
             exception_message=exc_msg,
             exception_type=exc_type,
             executed_count=exec_count,

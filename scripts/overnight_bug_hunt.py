@@ -104,7 +104,7 @@ FAILURE_CLASSES = {
     "graph_widget", "missing_model", "llm_oom", "video_oom",
     "ffmpeg_composite", "comfyui_startup", "port_occupied",
     "orphan_detected", "vram_contaminated", "worker_crash",
-    "timeout", "unknown",
+    "crash_process", "timeout", "unknown",
 }
 
 
