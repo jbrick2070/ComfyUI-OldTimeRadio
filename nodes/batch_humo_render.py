@@ -1168,7 +1168,7 @@ def _build_pos_prompt(
         ) if speaker else "A character speaks calmly with subtle facial expressions"
 
     # Sprint C C5f: brief-derived lighting/atmosphere insertion.
-    from nodes._otr_story_brief_helpers import get_story_brief_lighting
+    from ._otr_story_brief_helpers import get_story_brief_lighting
     lighting = get_story_brief_lighting(meta or {})
     if lighting:
         return f"{speaker_desc}, {lighting}, {_DEFAULT_POS_SUFFIX}"
@@ -1556,7 +1556,7 @@ class BatchHumoRender:
         # ledger load for E-07 observability. The brief flows into the
         # per-clip prompt via _build_pos_prompt below.
         try:
-            from nodes._otr_story_brief_helpers import get_story_brief_status
+            from ._otr_story_brief_helpers import get_story_brief_status
             _brief_status = get_story_brief_status(
                 ledger.get("meta") if isinstance(ledger.get("meta"), dict) else {}
             )

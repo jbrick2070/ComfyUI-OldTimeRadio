@@ -434,7 +434,7 @@ def _build_ltx_role_prompt(role: str, line: dict, ledger: dict) -> str:
 
     # Resolve brief fragment via the C5b helper (max 90 chars, trimmed
     # at sentence/clause boundary, never mid-word).
-    from nodes._otr_story_brief_helpers import (
+    from ._otr_story_brief_helpers import (
         get_story_brief_ltx,
         get_story_brief_status,
     )

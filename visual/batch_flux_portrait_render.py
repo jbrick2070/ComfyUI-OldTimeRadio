@@ -322,7 +322,7 @@ class BatchFluxPortraitRender:
         # Lighting helper returns lighting + atmosphere terms only
         # (refinement section 6.2). Status surfaces in the report for
         # E-07 observability.
-        from nodes._otr_story_brief_helpers import (
+        from ..nodes._otr_story_brief_helpers import (
             get_story_brief_lighting,
             get_story_brief_status,
         )

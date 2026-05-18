@@ -135,7 +135,7 @@ def _build_dynamic_radio_prompt(led):
     # widget style / style_custom are empty. status is logged for
     # E-07 observability regardless of whether the brief actually
     # gets used (operator can see whether reflection succeeded).
-    from nodes._otr_story_brief_helpers import (
+    from ..nodes._otr_story_brief_helpers import (
         get_story_brief_full,
         get_story_brief_status,
     )
@@ -257,7 +257,7 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
     # and the style_suffix tail per refinement section 6. Status is
     # logged so a failed reflection surfaces in the render log per
     # E-07 ("story_brief_status=...").
-    from nodes._otr_story_brief_helpers import (
+    from ..nodes._otr_story_brief_helpers import (
         get_story_brief_full,
         get_story_brief_status,
     )

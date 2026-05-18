@@ -947,13 +947,32 @@ class SceneSequencer:
 
 
 class EpisodeAssembler:
-    """Assemble multiple scenes into a complete episode with intro/outro."""
+    """Assemble multiple scenes into a complete episode with intro/outro.
+
+    Sprint H 3.7 Path G Option D follow-up (Jeffrey 2026-05-18,
+    after retest #15 hung at Bark + FLUX co-residence): this is the
+    canonical audio-branch sink. It emits a STRING output
+    `audio_done` carrying the final episode metadata (length,
+    sample rate, segment count). The IMAGE/AUDIO outputs are
+    unchanged; the new STRING is a topological gate signal for
+    downstream consumers that MUST wait for the audio branch to
+    complete.
+
+    Concrete use: OTR_DeferredCheckpointLoader (FLUX) sources its
+    `gate_signal` from this output. ComfyUI's executor then
+    topologically defers the FLUX 22-GiB GPU load until the audio
+    branch (Bark dialogue + Kokoro announcer + MusicGen cues) has
+    finished. Audio-is-king prime directive (CLAUDE.md) honored
+    structurally: audio runs FIRST and FULLY at low VRAM (Bark
+    ~4 GiB, MusicGen ~3 GiB, Kokoro ~1 GiB) before video phase
+    starts. No more Bark-vs-FLUX VRAM contention.
+    """
 
     CATEGORY = "OldTimeRadio"
     FUNCTION = "assemble"
     OUTPUT_NODE = True
-    RETURN_TYPES = ("AUDIO", "STRING", "STRING")
-    RETURN_NAMES = ("episode_audio", "output_path", "episode_info")
+    RETURN_TYPES = ("AUDIO", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("episode_audio", "output_path", "episode_info", "audio_done")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -1488,7 +1507,42 @@ class EpisodeAssembler:
                 "[EpisodeAssembler] schema-l3 ledger update failed: %s", _meta_exc
             )
 
-        return (audio_out, output_path, info)
+        # Path G Option D (Jeffrey 2026-05-18 follow-up to retest
+        # #15): emit audio_done signal. Content is informational --
+        # the final episode's length + sample rate + segment count
+        # so downstream consumers (FLUX deferred loader's
+        # gate_signal, primarily) can log the audio-branch outcome
+        # at gate fire. Presence is what gates dependency: ComfyUI's
+        # executor cannot fire any node taking this STRING as
+        # forceInput until EpisodeAssembler.assemble() has returned.
+        try:
+            _final_waveform = audio_out.get("waveform") if isinstance(audio_out, dict) else None
+            if _final_waveform is not None:
+                _final_length_samples = int(_final_waveform.shape[-1])
+            else:
+                _final_length_samples = 0
+            _final_sr = (
+                audio_out.get("sample_rate")
+                if isinstance(audio_out, dict)
+                else sample_rate
+            )
+            _final_length_sec = _final_length_samples / max(1, int(_final_sr or 1))
+        except Exception:  # noqa: BLE001
+            _final_length_samples = 0
+            _final_sr = sample_rate
+            _final_length_sec = 0.0
+
+        audio_done = (
+            f"audio_done:"
+            f"length_sec={_final_length_sec:.2f};"
+            f"sample_rate={int(_final_sr or 0)};"
+            f"length_samples={_final_length_samples};"
+            f"segments={len(segments)}"
+        )
+        log.info(
+            "[EpisodeAssembler] emit audio_done signal: %s", audio_done,
+        )
+        return (audio_out, output_path, info, audio_done)
 
     def _extract_waveform(self, audio, target_sr=None):
         """Extract waveform tensor from AUDIO input, resampling to target_sr if needed.
