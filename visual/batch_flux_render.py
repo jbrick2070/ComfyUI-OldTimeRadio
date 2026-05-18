@@ -898,8 +898,14 @@ class BatchFluxRender:
                     "not exist on disk; falling back to mtime walker",
                     ledger_p,
                 )
+                # S28 cleanbreak (completed 2026-05-18 retest #17
+                # follow-up): otr_legacy_audio_dir() was removed in
+                # S28 Phase 1; this call site was missed in the
+                # original sweep. Per-episode workspace is now the
+                # only contract; the walker just scans
+                # otr_episodes_root() for *_ledger.json.
                 ledger_p = _OTRL.find_most_recent_ledger(
-                    [_OTRP.otr_episodes_root(), _OTRP.otr_legacy_audio_dir()]
+                    [_OTRP.otr_episodes_root()]
                 )
         except Exception as _exc:
             log.warning(
@@ -907,7 +913,7 @@ class BatchFluxRender:
                 "falling back to mtime walker", _exc,
             )
             ledger_p = _OTRL.find_most_recent_ledger(
-                [_OTRP.otr_episodes_root(), _OTRP.otr_legacy_audio_dir()]
+                [_OTRP.otr_episodes_root()]
             )
         led = None
         episode_id = "episode"

@@ -38,15 +38,19 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from nodes._otr_paths import otr_audio_dir, otr_legacy_audio_dir  # noqa: E402
+from nodes._otr_paths import otr_audio_dir  # noqa: E402
 
 POLL_SECONDS = 30
 SAFETY_STOP_HOURS = 6
 
 
 def find_most_recent_ledger() -> Path | None:
+    # S28 cleanbreak (completed 2026-05-18 retest #17 follow-up):
+    # otr_legacy_audio_dir() was removed; this script's dual-dir
+    # walker was missed in the original sweep. Per-episode workspace
+    # is now the only contract.
     cands: list[Path] = []
-    for d in (otr_audio_dir(), otr_legacy_audio_dir()):
+    for d in (otr_audio_dir(),):
         if d.exists():
             cands.extend(
                 p for p in d.glob("*_ledger.json")
@@ -54,7 +58,7 @@ def find_most_recent_ledger() -> Path | None:
             )
     if not cands:
         # also look for pending_* during early phases of a fresh run
-        for d in (otr_audio_dir(), otr_legacy_audio_dir()):
+        for d in (otr_audio_dir(),):
             if d.exists():
                 cands.extend(d.glob("pending_*_ledger.json"))
     if not cands:
