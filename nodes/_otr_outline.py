@@ -1538,26 +1538,31 @@ def generate_outline(
                     attempts=all_attempts, request=req,
                 )
 
-            # Python overrides target_words to land in the budget's
-            # per-beat window if the LLM picked outside the local
-            # range. The Beat pydantic schema only enforces 3..80;
-            # the budget's window is tighter and is what validator #4
-            # checks. This eliminates one of the two highest-frequency
-            # outline failure modes from retests #8-#11 (per-beat
-            # target_words out of budget range).
-            tw = detail.target_words
-            if not (words_lo <= tw <= words_hi):
+            # Python is authoritative for target_words. LLMs (both
+            # Mistral and Gemma in retests #8-#11) cannot reliably
+            # satisfy the multi-level constraint:
+            #     per-beat:   target_words in words_per_beat_range
+            #     per-phase:  sum(target_words) ~= per_phase_words
+            #     per-episode: sum(target_words) ~= target_words
+            # all at once. _allocate_phase_target_words() produces
+            # an allocation that satisfies all three by construction.
+            # Keep the LLM's intent + mood; substitute Python's
+            # target_words verbatim. Retest #12 iter 1 surfaced the
+            # need: LLM produced (28, 28, 28, 28) -- each in [20,35]
+            # per-beat range, but sum=112 > 101 phase budget.
+            llm_tw = detail.target_words
+            if llm_tw != allocation:
                 log.info(
-                    "[OTR_Outline.beat[%s.%d]] LLM target_words=%d "
-                    "outside [%d,%d]; overriding to allocation=%d",
-                    phase_name, beat_idx + 1, tw,
-                    words_lo, words_hi, allocation,
+                    "[OTR_Outline.beat[%s.%d]] LLM target_words=%d; "
+                    "Python-authoritative allocation=%d (preserves "
+                    "per-phase sum vs budget)",
+                    phase_name, beat_idx + 1, llm_tw, allocation,
                 )
-                detail = _BeatFleshout(
-                    intent=detail.intent,
-                    target_words=allocation,
-                    mood=detail.mood,
-                )
+            detail = _BeatFleshout(
+                intent=detail.intent,
+                target_words=allocation,
+                mood=detail.mood,
+            )
             phase_details.append(detail)
         beat_details.append(phase_details)
 
