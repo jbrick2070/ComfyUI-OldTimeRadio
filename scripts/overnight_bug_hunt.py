@@ -99,9 +99,12 @@ WORKER_WAIT_S = 1200
 PORT_BASE = 8000
 PORT_PROBE_MAX = 32
 
-# Failure classes (synthesis section 2 fixed dictionary).
+# Failure classes (synthesis section 2 fixed dictionary +
+# 2026-05-18 retest #8 follow-up: writer_outline added for
+# OutlineFailedError / OutlineBudgetViolation routing).
 FAILURE_CLASSES = {
-    "graph_widget", "missing_model", "llm_oom", "video_oom",
+    "graph_widget", "missing_model", "writer_outline",
+    "llm_oom", "video_oom",
     "ffmpeg_composite", "comfyui_startup", "port_occupied",
     "orphan_detected", "vram_contaminated", "worker_crash",
     "crash_process", "timeout", "unknown",

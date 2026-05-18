@@ -54,11 +54,12 @@ Result file shape:
     "sweep_log_basename": <str|null>,
   }
 
-Failure classes (fixed dictionary, synthesis section 2):
-  graph_widget, missing_model, llm_oom, video_oom,
-  ffmpeg_composite, comfyui_startup, port_occupied,
-  orphan_detected, vram_contaminated, worker_crash, timeout,
-  unknown.
+Failure classes (fixed dictionary, synthesis section 2 +
+2026-05-18 retest #8 follow-up):
+  graph_widget, missing_model, writer_outline, llm_oom,
+  video_oom, ffmpeg_composite, comfyui_startup, port_occupied,
+  orphan_detected, vram_contaminated, crash_process,
+  worker_crash, timeout, unknown.
 """
 from __future__ import annotations
 
@@ -339,6 +340,23 @@ def _classify_failure(
     if any(m in msg_l for m in missing_markers):
         return "missing_model"
 
+    # writer_outline: outline phase produced an outline that fails
+    # validation. Surfaced 2026-05-18 §3.7 retest #8 -- Mistral-Nemo
+    # on tight smoke budgets generated beats with target_words=0
+    # (pydantic >=3 floor) or arc_phase mismatches against the
+    # configured arc_phases budget. The defect is in the outline
+    # generator's compliance with the schema, NOT a topology or
+    # VRAM issue. Routes here so the supervisor's same-class halt
+    # rule reports the real defect instead of treating it as
+    # `unknown`.
+    outline_markers = (
+        "outlinefailederror",
+        "outlinebudgetviolation",
+        "outline generation failed after",
+    )
+    if any(m in msg_l for m in outline_markers):
+        return "writer_outline"
+
     # OOM split into LLM phase vs video phase by which node-class
     # appears in the log tail above the OOM line.
     if "outofmemoryerror" in msg_l or "cuda out of memory" in log_l:
@@ -521,10 +539,22 @@ def _post_workflow(url: str) -> str | None:
     """Patch + POST the canonical _full.json workflow. Returns
     prompt_id on SUCCESS, None on schema / submit error.
 
-    Smoke patches mirror scripts/queue_smoke.py: 30 words, 2
-    characters, 1 act. _full.json carries the canonical writer
-    model on widgets[5]/[6] -- no model patch is needed; the
-    patch path is just the smoke profile.
+    Smoke patches: 300 words, 2 characters, 1 act. _full.json
+    carries the canonical writer model on widgets[5]/[6] -- no
+    model patch is needed; the patch path is just the smoke
+    profile.
+
+    target_words history: was 30 (mirrored scripts/queue_smoke.py)
+    until 2026-05-18 §3.7 retest #8. With target_words=30 the
+    outline budget allocator drove per-beat target_words to 0 on
+    some beats (schema requires >=3), and Mistral-Nemo on a tight
+    total budget routinely produced arc_phase mismatches against
+    a single-phase ['scene'] budget. Raising to 300 gives the
+    outline ~30-50 words per beat, well inside Mistral-Nemo's
+    reliable zone, and still inside the §3.7 wall-time budget.
+    Production-size scripts (target_words=350 default on the
+    node 1 widget) were never affected -- this was a smoke-config
+    artifact, not a writer defect.
     """
     # Lazy import so a /prompt URL failure surfaces from the right
     # frame rather than at module import time.
@@ -542,7 +572,7 @@ def _post_workflow(url: str) -> str | None:
 
     schemas = fetch_schemas()
     wf = load_workflow(str(WORKFLOW_PATH))
-    patch_widget_by_name(wf, 1, "target_words", 30, schemas)
+    patch_widget_by_name(wf, 1, "target_words", 300, schemas)
     patch_widget_by_name(wf, 1, "num_characters", 2, schemas)
     patch_widget_by_name(wf, 1, "act_count", 1, schemas)
     api = workflow_to_api_prompt(wf, schemas)
