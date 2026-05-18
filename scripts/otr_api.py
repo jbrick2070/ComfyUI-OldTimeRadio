@@ -249,14 +249,40 @@ _COMPANION_INT_WIDGETS = ("seed", "noise_seed")
 _COMPANION_VALUES = frozenset({"fixed", "randomize", "increment", "decrement"})
 
 
+def _spec_has_force_input(spec: Any) -> bool:
+    """Return True if a schema spec carries `forceInput: True` in its opts.
+
+    Background (Jeffrey 2026-05-17 round-robin Reading D / node 20):
+    ComfyUI treats widget-backed inputs with `forceInput=True` as
+    socket-only -- the UI never renders them as a widget, and
+    `widgets_values` never carries a slot for them, regardless of
+    whether the input is linked. This is symmetric to the
+    `control_after_generate` companion: it's a ComfyUI client-side
+    serialization rule that `/object_info` does not encode visibly
+    (the flag is reachable but the slot-omission consequence is not).
+
+    Surfaced on `OTR_VideoPlan` node 20 where `freeze_done_gate` is
+    declared STRING + forceInput=True. Live save: 6 slots. Mapper
+    pre-fix said 7. Conversion refused at length mismatch.
+    """
+    if not isinstance(spec, (list, tuple)) or len(spec) < 2:
+        return False
+    opts = spec[1]
+    if not isinstance(opts, dict):
+        return False
+    return bool(opts.get("forceInput"))
+
+
 def _serialized_slot_names(node_type: str, schemas: dict) -> list[str]:
     """Return the widget-name list that maps to the SAVED `widgets_values`
     layout 1-to-1, including ComfyUI's `control_after_generate` companion
-    next to each seed widget.
+    next to each seed widget AND excluding inputs flagged `forceInput=True`.
 
     Mapping:
         For each declared widget-backed input in declaration order:
-            * Yield the widget's name.
+            * If the input is flagged `forceInput=True`, SKIP -- never
+              occupies a `widgets_values` slot.
+            * Otherwise yield the widget's name.
             * If the widget is an INT and its name is one of
               `_COMPANION_INT_WIDGETS`, yield a synthetic companion
               entry named `f"{widget_name}__control_after_generate"`
@@ -271,13 +297,16 @@ def _serialized_slot_names(node_type: str, schemas: dict) -> list[str]:
     length and the saved array length is a structural problem; the
     patcher raises rather than silently misalign.
 
-    Background (Jeffrey 2026-05-17 round-robin Reading C): the original
-    `_ordered_widget_names` returned ONLY schema-declared widgets, so a
-    workflow that saved the companion at slot N + 1 looked "one slot
-    too long" to the patcher and got refused with a length mismatch.
-    Modeling the companion explicitly resolves the §3.7 bug-hunt
-    blocker without mutating either workflow JSON or globally loosening
-    the length check.
+    Background (Jeffrey 2026-05-17 round-robin Reading C + D): two
+    ComfyUI client-side serialization rules that the live
+    `/object_info` schemas do not encode visibly. The mapper inverts
+    BOTH against the declared widget set to recover the actual saved
+    layout 1-to-1:
+        - INT `seed` / `noise_seed` widgets gain a hidden
+          `control_after_generate` companion slot (Reading C, commit
+          c2c06e9 + 8df3d0a).
+        - `forceInput=True` widget-backed inputs LOSE their widget
+          slot entirely (Reading D, this revision).
     """
     if node_type not in schemas:
         raise KeyError(
@@ -292,6 +321,13 @@ def _serialized_slot_names(node_type: str, schemas: dict) -> list[str]:
     slots: list[str] = []
     for name, spec in ordered:
         if not _is_widget_backed(spec):
+            continue
+        # Reading D (Jeffrey 2026-05-17 round-robin section 2):
+        # forceInput=True declarations are socket-only; never occupy
+        # a widgets_values slot. Applied BEFORE companion expansion so
+        # a hypothetical forceInput-flagged seed widget wouldn't drag
+        # in a phantom companion slot either.
+        if _spec_has_force_input(spec):
             continue
         slots.append(name)
         # Companion injection: INT seed widgets carry a hidden
@@ -399,9 +435,15 @@ def patch_widget_by_name(
     # already correct (slots include the placeholders). If they're stripped,
     # subtract the count of linked widgets that come before our target.
     # Companions are NEVER socketed, so they are NEVER in linked_names; the
-    # linked-count math is keyed to widget_names regardless of companion
-    # presence.
-    linked_widget_count = sum(1 for n in widget_names if n in linked_names)
+    # linked-count math is keyed to slot-occupying widgets only.
+    #
+    # Reading D fix (Jeffrey 2026-05-17, node 20): count only linked widgets
+    # that survive the serialized_slots filter -- forceInput=True declarations
+    # are linked-only by design but never occupy a slot, so they must NOT
+    # reduce the expected length in either preserved or stripped mode.
+    linked_widget_count = sum(
+        1 for n in serialized_slots if n in linked_names
+    )
     if len(wv) == len(serialized_slots):
         # "preserved" mode (companion-aware) -- use serialized index as-is
         slot = target_idx
@@ -482,8 +524,12 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 
             wv = node.get("widgets_values", []) or []
 
+            # Reading D fix (Jeffrey 2026-05-17, node 20): count only
+            # linked widgets that survive the serialized_slots filter --
+            # forceInput=True inputs never occupy a slot, so they must
+            # NOT reduce the expected length.
             linked_widget_count = sum(
-                1 for n in widget_names if n in linked_names
+                1 for n in serialized_slots if n in linked_names
             )
             if len(wv) == len(serialized_slots):
                 # Preserved mode: companion slots present + all

@@ -520,6 +520,245 @@ def test_converter_unrelated_extra_slot_rejected():
 # ---------------------------------------------------------------------------
 # Companion vocabulary acceptance
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Reading D: forceInput=True widget-backed inputs are socket-only.
+# They never occupy a widgets_values slot, even when their TYPE is
+# widget-backed and even when they are linked.
+# ---------------------------------------------------------------------------
+def test_serialized_slots_skips_forceInput_widgets():
+    """A STRING widget marked `forceInput=True` must NOT appear in the
+    serialized slot list. ComfyUI never renders it as a widget and
+    never serializes a slot for it -- regardless of declaration order.
+    """
+    from otr_api import _serialized_slot_names  # local import for clarity
+
+    schemas = {
+        "ForceInputNode": {
+            "input": {
+                "required": {
+                    "a": ("STRING", {"default": ""}),
+                    "gate": ("STRING", {"default": "", "forceInput": True}),
+                    "b": ("STRING", {"default": ""}),
+                },
+                "optional": {},
+            }
+        }
+    }
+    slots = _serialized_slot_names("ForceInputNode", schemas)
+    assert slots == ["a", "b"], (
+        f"forceInput-flagged widget must be filtered out of "
+        f"serialized_slots; got {slots!r}"
+    )
+
+
+def test_converter_handles_forceInput_link_without_widget_slot():
+    """A node with one normal-linked widget (preserved placeholder slot)
+    AND one forceInput-linked widget (no slot) must convert cleanly.
+    Both linked names should resolve via the link map; widgets_values
+    indices must NOT be consumed for the forceInput entry.
+    """
+    schemas = {
+        "MixedLinkNode": {
+            "input": {
+                "required": {
+                    "normal_widget": (
+                        "STRING", {"multiline": True, "default": "[]"},
+                    ),
+                    "extra": ("STRING", {"default": "fill"}),
+                    "gate": (
+                        "STRING",
+                        {"default": "", "forceInput": True},
+                    ),
+                },
+                "optional": {},
+            }
+        }
+    }
+    workflow = {
+        "nodes": [
+            # Upstream source node #99 (no schema needed; its outputs
+            # are referenced by link).
+            {"id": 99, "type": "UpstreamA", "inputs": [],
+             "widgets_values": []},
+            {"id": 100, "type": "UpstreamB", "inputs": [],
+             "widgets_values": []},
+            {
+                "id": 30,
+                "type": "MixedLinkNode",
+                "inputs": [
+                    {
+                        "name": "normal_widget",
+                        "type": "STRING",
+                        "link": 501,
+                        "widget": {"name": "normal_widget"},
+                    },
+                    {
+                        "name": "gate",
+                        "type": "STRING",
+                        "link": 502,
+                        "widget": {"name": "gate"},
+                    },
+                ],
+                # Preserved-mode save: normal_widget's placeholder slot
+                # is kept (`"[]"`), extra is its real value, gate has
+                # NO slot because forceInput.
+                "widgets_values": ["[]", "extra_val"],
+            },
+        ],
+        "links": [
+            # link_id, src_node, src_slot, dst_node, dst_slot, type
+            [501, 99, 0, 30, 0, "STRING"],
+            [502, 100, 0, 30, 1, "STRING"],
+        ],
+    }
+
+    prompt = workflow_to_api_prompt(workflow, schemas)
+
+    n_inputs = prompt["30"]["inputs"]
+    # normal_widget resolves to its link source via the link map.
+    assert n_inputs["normal_widget"] == ["99", 0], (
+        f"normal_widget should resolve to link source; got "
+        f"{n_inputs.get('normal_widget')!r}"
+    )
+    # forceInput gate ALSO resolves to its link source -- and does
+    # NOT consume the "extra_val" slot.
+    assert n_inputs["gate"] == ["100", 0], (
+        f"forceInput gate should resolve to link source; got "
+        f"{n_inputs.get('gate')!r}"
+    )
+    # The "extra" widget gets its actual saved value.
+    assert n_inputs["extra"] == "extra_val", (
+        f"extra widget should receive 'extra_val'; got "
+        f"{n_inputs.get('extra')!r}"
+    )
+
+
+def test_regression_node20_actual_workflow():
+    """Round-trip the real bughunt workflow through the API converter
+    and assert node 20 (OTR_VideoPlan) converts cleanly. Verifies the
+    forceInput fix on the actual schema shape that surfaced the
+    blocker (freeze_done_gate forceInput=True).
+
+    Assertions are derived from the on-disk node 20 dump on 2026-05-17:
+        widgets_values[0]  '{}'    script_json placeholder (linked)
+        widgets_values[1]  '(all)'  focus_character
+        widgets_values[2]  4        shots_per_scene
+        widgets_values[3]  'mission_control_procedural'  style
+        widgets_values[4]  'cinematic, 35mm film look...'  style_tail
+        widgets_values[5]  True    include_final_end_frame
+        (no slot 6 -- freeze_done_gate has forceInput=True)
+    """
+    # Stub schema mirroring nodes/otr_video_plan.py:734-810.
+    schemas = {
+        "OTR_VideoPlan": {
+            "input": {
+                "required": {
+                    "script_json": (
+                        "STRING", {"multiline": True, "default": ""},
+                    ),
+                    "focus_character": (
+                        "STRING", {"default": "(all)"},
+                    ),
+                    "shots_per_scene": (
+                        "INT", {"default": 3, "min": 1, "max": 40},
+                    ),
+                    "style": (
+                        ["mission_control_procedural", "noir_interrogation"],
+                        {"default": "mission_control_procedural"},
+                    ),
+                },
+                "optional": {
+                    "style_tail": (
+                        "STRING",
+                        {"default": "cinematic, 35mm film look"},
+                    ),
+                    "include_final_end_frame": (
+                        "BOOLEAN", {"default": True},
+                    ),
+                    "freeze_done_gate": (
+                        "STRING",
+                        {"default": "", "forceInput": True},
+                    ),
+                },
+            }
+        }
+    }
+
+    workflow = load_workflow(str(_BUGHUNT_WORKFLOW))
+    # Should NOT raise (was raising
+    # "widgets_values length mismatch on node 20" before the fix).
+    prompt = workflow_to_api_prompt(workflow, schemas)
+
+    n20 = prompt["20"]["inputs"]
+    assert n20.get("focus_character") == "(all)", (
+        f"focus_character should be '(all)'; got "
+        f"{n20.get('focus_character')!r}. '{{}}' must NOT bleed in here."
+    )
+    assert n20.get("shots_per_scene") == 4, (
+        f"shots_per_scene should be 4; got {n20.get('shots_per_scene')!r}"
+    )
+    assert n20.get("style") == "mission_control_procedural", (
+        f"style should be 'mission_control_procedural'; got "
+        f"{n20.get('style')!r}"
+    )
+    assert n20.get("include_final_end_frame") is True, (
+        f"include_final_end_frame should be True; got "
+        f"{n20.get('include_final_end_frame')!r}"
+    )
+    # Companion / orphan / forceInput-bleed guard: "{}" must NOT
+    # propagate into any declared input. It's the preserved-mode
+    # placeholder for the linked script_json, consumed correctly.
+    for key, value in n20.items():
+        assert value != "{}", (
+            f"node 20 inputs[{key!r}] = '{{}}' -- placeholder bled into "
+            f"a declared input. forceInput / linked-slot accounting "
+            f"regressed."
+        )
+
+
+def test_forceInput_filter_does_not_reduce_unfiltered_count():
+    """When three widget-backed inputs exist and only ONE has
+    forceInput=True, linked_widget_count must reflect ONLY the two
+    non-forceInput inputs that ARE linked -- the forceInput one was
+    never a slot, so it must not be counted as a stripped slot either.
+
+    This verifies the symmetric application of the forceInput filter
+    to `linked_widget_count` calculation in patch_widget_by_name +
+    workflow_to_api_prompt.
+    """
+    from otr_api import _serialized_slot_names
+
+    schemas = {
+        "ThreeLinkedNode": {
+            "input": {
+                "required": {
+                    "a": ("STRING", {"default": ""}),
+                    "b": ("STRING", {"default": ""}),
+                    "c": (
+                        "STRING",
+                        {"default": "", "forceInput": True},
+                    ),
+                },
+                "optional": {},
+            }
+        }
+    }
+    slots = _serialized_slot_names("ThreeLinkedNode", schemas)
+    # The forceInput slot is filtered, leaving only 'a' and 'b'.
+    assert slots == ["a", "b"], (
+        f"forceInput slot must be filtered before slot counting; "
+        f"got {slots!r}"
+    )
+    # Simulate a node where all three are linked.
+    linked_names = {"a", "b", "c"}
+    linked_widget_count = sum(1 for n in slots if n in linked_names)
+    assert linked_widget_count == 2, (
+        f"linked_widget_count should count only slot-occupying "
+        f"linked widgets ('a' + 'b'), not the forceInput 'c'. "
+        f"Got {linked_widget_count}."
+    )
+
+
 @pytest.mark.parametrize(
     "companion_value",
     ["fixed", "randomize", "increment", "decrement"],
