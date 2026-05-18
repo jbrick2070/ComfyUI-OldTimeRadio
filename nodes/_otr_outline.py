@@ -872,86 +872,288 @@ def validate_outline_against_budget(
 
 
 # ---------------------------------------------------------------------------
-# generate_outline -- main entrypoint
+# Path C tree-style outline -- per-stage schemas + prompts + helpers
 # ---------------------------------------------------------------------------
+#
+# Sprint H 3.7 retest #11 (2026-05-18) confirmed the outline failure
+# family is model-agnostic (Mistral over-produces, Gemma under-then-
+# over-corrects). Root cause: the legacy single mega-call asked the
+# LLM to satisfy N independent sub-problems (logline + per-phase
+# allocation + N beats + N moods + N target_words + N intents) in
+# one 1500-token structured pass under pydantic strict validation.
+#
+# Path C breaks the single call into a tree of small calls following
+# Jeffrey 2026-05-18 lean-prompt rule:
+#
+#   Stage 1 (1 call):              macro shape -- title, premise,
+#                                  setting, time_of_day. Under 250
+#                                  tokens output, 4 string fields.
+#   Stage 2 (act_count calls):     per-phase beat skeleton --
+#                                  speaker (from cast) per beat. Under
+#                                  200 tokens output, schema:
+#                                  list of {speaker} entries.
+#   Stage 3 (num_voiced_beats):    per-beat fleshout -- intent, mood,
+#                                  target_words for one beat. Under
+#                                  150 tokens output, 3 fields.
+#   Python combiner:               Stamp beat_id (b001..), arc_phase
+#                                  from budget, speaker_role
+#                                  (character / announcer /
+#                                  music_inter), and inject the open /
+#                                  close announcer + music_inter
+#                                  beats. Final Outline validates
+#                                  against the existing pydantic +
+#                                  budget validators.
+#
+# Total LLM calls per outline: 1 + act_count + num_voiced_beats.
+# Smoke (target_words=300, act_count=3, include_act_breaks=False):
+# 1 + 3 + 14 = 18 calls, each <= 250 tokens output.
+#
+# Each call has its own 3-attempt retry. Failures localize to one
+# stage / one phase / one beat instead of poisoning the whole
+# outline. The legacy single-call generate_outline + _SYSTEM_PROMPT +
+# _build_user_prompt remain exported for back-compat (test imports,
+# creative_prompt_router byte-identity check) but are no longer the
+# main path.
+
+# Stage 1 schema -- macro shape.
+class _MacroShape(BaseModel):
+    title: str = Field(..., min_length=3, max_length=80)
+    premise: str = Field(..., min_length=10, max_length=400)
+    setting: str = Field(..., min_length=4, max_length=120)
+    time_of_day: str = Field(..., min_length=3, max_length=40)
 
 
-def generate_outline(
-    generate_fn,             # (messages, *, temperature, max_new_tokens) -> str
-    req: OutlineRequest,
-    *,
-    max_attempts: int = 3,
-    base_temperature: float = 0.7,
-    max_new_tokens: int = 1500,
-    creative_repo_id: str | None = None,  # Sprint D D2b: routes via resolver
-) -> Outline:
-    """Generate a validated Outline. Reroll-then-repair on validation failure.
+# Stage 2 schema -- per-phase speaker assignments only. Each beat is
+# just a speaker name. beat_id, arc_phase, and speaker_role are
+# stamped by Python in the combiner.
+class _PhaseBeatSeed(BaseModel):
+    speaker: str = Field(..., min_length=1, max_length=40)
 
-    Retry strategy:
-      Attempt 1: fresh generation, temperature = base_temperature (0.7).
-      Attempt 2: fresh generation, temperature = base_temperature + 0.1 (0.8).
-      Attempt 3: REPAIR call, temperature 0.3, prompt includes the LAST raw
-                 response and the exact ValidationError message.
+    @field_validator("speaker")
+    @classmethod
+    def _speaker_uppercase(cls, v: str) -> str:
+        return v.strip().upper()
 
-    Caller adapter (lives in OTR_LedgerScriptWriter, NOT this module):
 
-        def _make_generate_fn(llm_cache_entry):
-            model = llm_cache_entry["model"]
-            tokenizer = llm_cache_entry["tokenizer"]
-            def generate_fn(messages, *, temperature, max_new_tokens):
-                prompt = tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
-                )
-                inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-                out = model.generate(
-                    **inputs,
-                    do_sample=True,
-                    temperature=temperature,
-                    top_p=0.92,
-                    max_new_tokens=max_new_tokens,
-                )
-                return tokenizer.decode(
-                    out[0][inputs.input_ids.shape[1]:],
-                    skip_special_tokens=True,
-                )
-            return generate_fn
+class _PhaseSkeleton(BaseModel):
+    beats: list[_PhaseBeatSeed] = Field(..., min_length=1, max_length=10)
 
-    Raises:
-        OutlineFailedError: if all attempts fail validation.
-        ValueError: if max_attempts < 1 or generate_fn is not callable.
+
+# Stage 3 schema -- per-beat fleshout. intent + mood + target_words.
+# target_words bounds match the Beat schema (3..80); the per-call
+# prompt narrows the live range to the budget's words_per_beat_range
+# so the LLM sees the actual operating window for THIS beat.
+class _BeatFleshout(BaseModel):
+    intent: str = Field(..., min_length=4, max_length=200)
+    target_words: int = Field(..., ge=3, le=80)
+    mood: str = Field(..., min_length=2, max_length=40)
+
+
+_MACRO_SYSTEM_PROMPT = """\
+You plan short science-fiction audio dramas. Return one JSON object only -- no prose, no fences.
+
+Schema:
+{
+  "title":       3-80 chars,
+  "premise":     10-400 chars; one sentence that extrapolates dramatically from the story,
+  "setting":     4-120 chars; concrete place,
+  "time_of_day": 3-40 chars; e.g. "midnight", "pre-dawn", "after first contact".
+}
+"""
+
+_PHASE_SYSTEM_PROMPT = """\
+You plan one phase of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
+
+Schema:
+{
+  "beats": array of 1-10 objects, each:
+    { "speaker": one ALL-CAPS name from the Cast block }
+}
+
+Rules:
+- Use ONLY names from the Cast. Never invent.
+- Vary speakers across beats so dialogue feels like a real exchange.
+- The number of beats you return MUST equal the requested count.
+"""
+
+_BEAT_SYSTEM_PROMPT = """\
+You flesh out one beat of a science-fiction audio drama. Return one JSON object only -- no prose, no fences.
+
+Schema:
+{
+  "intent":       4-200 chars; one sentence on what this beat accomplishes narratively. NOT dialogue text.
+  "target_words": integer within the per-beat range given below,
+  "mood":         2-40 chars; one tone descriptor.
+}
+"""
+
+
+def _build_macro_user_prompt(req: OutlineRequest) -> str:
+    """Stage 1 user prompt -- ask for title + premise + setting + time_of_day.
+
+    Lean prompt (target <250 tokens). No beat / phase information --
+    that lands in the Stage 2 / 3 prompts.
     """
-    if max_attempts < 1:
-        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
-    if not callable(generate_fn):
-        raise ValueError("generate_fn must be callable")
-
-    _check_speaker_role_alignment()
-
-    # Sprint D D2b: creative-phase prompt routes via the resolver.
-    # When creative_repo_id is None (legacy callers, tests with
-    # default-everything mocks) or maps to a modern-profile row,
-    # the resolver returns _SYSTEM_PROMPT by object identity --
-    # default-config byte identity preserved for the audio C7
-    # contract. When the row is otr_1940s_v1 (talkie), the resolver
-    # returns OTR_PERIOD_SYSTEM_PROMPT.
-    if creative_repo_id is None:
-        system = _SYSTEM_PROMPT
+    brief = req.script_brief.strip()
+    if brief:
+        source_line = f"Story brief: {brief}"
+        verb = "develop this brief"
     else:
-        from ._otr_creative_prompt_router import resolve_creative_system_prompt
-        system = resolve_creative_system_prompt(
-            creative_repo_id, phase="outline",
-        )
-    user = _build_user_prompt(req)
+        source_line = f"Science story: {req.news_seed}"
+        verb = "extrapolate dramatically from this story"
+    parts = [
+        "Plan the macro shape of a short audio drama.",
+        "",
+        source_line,
+        f"Style: {req.style}",
+        "",
+        f"Task: {verb}. Return only the JSON object.",
+    ]
+    return "\n".join(parts)
+
+
+def _build_phase_user_prompt(
+    req: OutlineRequest,
+    macro: _MacroShape,
+    phase_name: str,
+    phase_beat_count: int,
+    arc_phases: tuple[str, ...],
+    phase_index: int,
+) -> str:
+    """Stage 2 user prompt -- ask for speaker assignment per beat in one phase.
+
+    Lean prompt (target <200 tokens). Includes only what the LLM needs:
+    title + premise + cast + which phase we're on + how many beats.
+    """
+    parts = [
+        f"Title: {macro.title}",
+        f"Premise: {macro.premise}",
+        f"Setting: {macro.setting}",
+        "",
+        _format_cast_block(req),
+        "",
+        f"Arc phases in order: {', '.join(arc_phases)}",
+        f"This phase: {phase_name} (phase {phase_index + 1} of {len(arc_phases)})",
+        f"Beats to plan in this phase: {phase_beat_count}",
+        "",
+        f"Task: assign a speaker to each of the {phase_beat_count} beats "
+        f"in the {phase_name!r} phase. Return only the JSON object "
+        f"with a `beats` array containing exactly {phase_beat_count} "
+        f"entries, each with a `speaker` field.",
+    ]
+    return "\n".join(parts)
+
+
+def _build_beat_user_prompt(
+    req: OutlineRequest,
+    macro: _MacroShape,
+    phase_name: str,
+    beat_speaker: str,
+    beat_position: tuple[int, int],
+    words_lo: int,
+    words_hi: int,
+) -> str:
+    """Stage 3 user prompt -- ask for intent + mood + target_words for one beat.
+
+    Lean prompt (target <250 tokens). Beat-localized: the LLM sees
+    title + premise + phase + this beat's speaker + position +
+    target_words range. NO other beat context -- the combiner
+    handles cross-beat coherence via the cast-membership + budget
+    validators downstream.
+    """
+    beat_idx, beat_total = beat_position
+    parts = [
+        f"Title: {macro.title}",
+        f"Premise: {macro.premise}",
+        f"Setting: {macro.setting}",
+        "",
+        f"Phase: {phase_name}",
+        f"Beat {beat_idx + 1} of {beat_total} in this phase",
+        f"Speaker: {beat_speaker}",
+        f"target_words must be an integer between {words_lo} and "
+        f"{words_hi} (inclusive).",
+        "",
+        f"Task: write the intent (one sentence, NOT dialogue), a "
+        f"mood descriptor, and a target_words integer in the range "
+        f"above. Return only the JSON object.",
+    ]
+    return "\n".join(parts)
+
+
+def _allocate_phase_target_words(
+    phase_total_words: int,
+    n_beats: int,
+    words_per_beat_range: tuple[int, int],
+) -> list[int]:
+    """Default per-beat target_words allocation for a single phase.
+
+    Used as the seed for Stage 3 prompts (each beat is told a
+    `[lo, hi]` window centered on its allocation) AND as the
+    fallback when Stage 3 produces a value out-of-range. The Stage 3
+    pydantic schema enforces the absolute Beat bounds (3..80); this
+    function enforces the budget's local window.
+
+    Greedy fill so the sum lands on phase_total_words and every entry
+    stays in [words_per_beat_range].
+    """
+    lo, hi = words_per_beat_range
+    if n_beats <= 0:
+        return []
+    base = phase_total_words // n_beats
+    base = max(lo, min(hi, base))
+    arr = [base] * n_beats
+    delta = phase_total_words - sum(arr)
+    idx = 0
+    safety = n_beats * 6  # bounded; can't loop forever
+    while delta != 0 and safety > 0:
+        i = idx % n_beats
+        if delta > 0 and arr[i] < hi:
+            arr[i] += 1
+            delta -= 1
+        elif delta < 0 and arr[i] > lo:
+            arr[i] -= 1
+            delta += 1
+        idx += 1
+        safety -= 1
+    return arr
+
+
+def _run_call_with_retry(
+    generate_fn,
+    *,
+    system: str,
+    user: str,
+    schema_cls,
+    label: str,
+    max_attempts: int,
+    base_temperature: float,
+    max_new_tokens: int,
+    extra_check=None,
+) -> tuple[object, list[tuple[str, str]]]:
+    """Single LLM call wrapped in a 3-attempt retry. Returns (parsed,
+    attempts_history). Raises the last error wrapped in a tuple so
+    the caller can decide whether to escalate to OutlineFailedError.
+
+    Each attempt: fresh generation at base_temperature + 0.1 *
+    attempt_idx, with the final attempt switching to a repair call
+    at temp 0.3 carrying the previous raw + validation error in the
+    user prompt.
+
+    extra_check is an optional callable (parsed, raw) -> str|None
+    used to apply cross-call invariants (e.g. cast-membership check
+    on Stage 2 outputs). Return None on pass, error string on fail
+    and the loop retries.
+    """
     base_messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
-
     attempts: list[tuple[str, str]] = []
+    last_raw = ""
+    last_err = ""
 
     for attempt_idx in range(max_attempts):
         is_repair = (attempt_idx == max_attempts - 1) and attempt_idx >= 2
-
         if is_repair and attempts:
             prev_raw, prev_err = attempts[-1]
             repair_user = _REPAIR_PROMPT_TEMPLATE.format(
@@ -964,15 +1166,15 @@ def generate_outline(
             ]
             temp = 0.3
             log.info(
-                "[OTR_Outline] attempt %d/%d: repair call (temp=%.2f)",
-                attempt_idx + 1, max_attempts, temp,
+                "[OTR_Outline.%s] attempt %d/%d: repair call (temp=%.2f)",
+                label, attempt_idx + 1, max_attempts, temp,
             )
         else:
             messages = base_messages
             temp = base_temperature + (0.1 * attempt_idx)
             log.info(
-                "[OTR_Outline] attempt %d/%d: fresh generation (temp=%.2f)",
-                attempt_idx + 1, max_attempts, temp,
+                "[OTR_Outline.%s] attempt %d/%d: fresh (temp=%.2f)",
+                label, attempt_idx + 1, max_attempts, temp,
             )
 
         try:
@@ -982,97 +1184,428 @@ def generate_outline(
                 max_new_tokens=max_new_tokens,
             )
         except Exception as exc:  # noqa: BLE001
-            err_msg = f"generate_fn raised: {type(exc).__name__}: {exc}"
-            log.warning("[OTR_Outline] %s", err_msg)
-            attempts.append(("", err_msg))
+            last_err = f"generate_fn raised: {type(exc).__name__}: {exc}"
+            log.warning("[OTR_Outline.%s] %s", label, last_err)
+            attempts.append(("", last_err))
             continue
 
         last_raw = raw or ""
         json_str = _extract_json_block(last_raw)
-
         try:
             data = json.loads(json_str)
         except json.JSONDecodeError as exc:
-            err_msg = f"json.JSONDecodeError: {exc}"
-            log.warning("[OTR_Outline] attempt %d failed: %s", attempt_idx + 1, err_msg)
-            attempts.append((last_raw, err_msg))
+            last_err = f"json.JSONDecodeError: {exc}"
+            log.warning(
+                "[OTR_Outline.%s] attempt %d failed: %s",
+                label, attempt_idx + 1, last_err,
+            )
+            attempts.append((last_raw, last_err))
             continue
 
         try:
-            outline = Outline.model_validate(data)
+            parsed = schema_cls.model_validate(data)
         except ValidationError as exc:
-            err_msg = f"ValidationError: {exc}"
-            log.warning("[OTR_Outline] attempt %d failed: %s", attempt_idx + 1, err_msg)
-            attempts.append((last_raw, err_msg))
+            last_err = f"ValidationError: {exc}"
+            log.warning(
+                "[OTR_Outline.%s] attempt %d failed: %s",
+                label, attempt_idx + 1, last_err,
+            )
+            attempts.append((last_raw, last_err))
             continue
 
-        # Post-pydantic cast-membership check (replaces the prior
-        # outline.cast drift check 2026-05-10): walk character-role
-        # beats and verify each beat.speaker is in the LOCKED
-        # character_cast. Per Jeffrey: "outline needs to ingest the
-        # cast not create it" + "less for the small LLM to lift at
-        # one time the better." Outline schema no longer has a cast
-        # field; cast lives entirely outside.
-        #
-        # Diagnostics preserved (extra / missing / duplicates) so
-        # the reroll-then-repair loop produces useful repair-call
-        # context. Order check is per-beat now (each beat's speaker
-        # must be in the locked set); ordering across beats is
-        # narrative choice, not a contract violation.
-        locked_cast_set = set(req.character_cast)
-        used_speakers = [
-            b.speaker for b in outline.beats
-            if b.speaker_role == "character"
-        ]
-        used_speakers_set = set(used_speakers)
-        invented = used_speakers_set - locked_cast_set
-        if invented:
-            unused = locked_cast_set - used_speakers_set
-            dups = sorted({
-                n for n in used_speakers
-                if used_speakers.count(n) > 1 and n in invented
-            })
-            err_msg = (
-                "CastContractError: outline beats reference characters "
-                "outside the locked cast. invented (must remove): "
-                f"{sorted(invented)!r}, locked (allowed): "
-                f"{sorted(locked_cast_set)!r}, "
-                f"locked-but-unused: {sorted(unused)!r}, "
-                f"invented-and-repeated: {dups!r}"
-            )
-            log.warning(
-                "[OTR_Outline] attempt %d failed: %s",
-                attempt_idx + 1, err_msg,
-            )
-            attempts.append((last_raw, err_msg))
-            continue
-
-        # Phase 2A (2026-05-11): budget validators. Always runs —
-        # S28 cleanbreak retired the `req.budget is None` no-op
-        # branch (budget is required at OutlineRequest construction
-        # time). On hard failure, push the structured error onto
-        # attempts and retry; the next attempt's repair-call (when
-        # applicable) sees the exact violation message and can
-        # correct.
-        budget_violation = validate_outline_against_budget(outline, req)
-        if budget_violation is not None:
-            err_msg = f"OutlineBudgetViolation: {budget_violation}"
-            log.warning(
-                "[OTR_Outline] attempt %d failed: %s",
-                attempt_idx + 1, err_msg,
-            )
-            attempts.append((last_raw, err_msg))
-            continue
+        if extra_check is not None:
+            check_err = extra_check(parsed, last_raw)
+            if check_err is not None:
+                last_err = check_err
+                log.warning(
+                    "[OTR_Outline.%s] attempt %d failed: %s",
+                    label, attempt_idx + 1, last_err,
+                )
+                attempts.append((last_raw, last_err))
+                continue
 
         log.info(
-            "[OTR_Outline] success on attempt %d/%d: %d beats, "
-            "characters used: %s",
-            attempt_idx + 1, max_attempts,
-            len(outline.beats), sorted(used_speakers_set),
+            "[OTR_Outline.%s] success on attempt %d/%d",
+            label, attempt_idx + 1, max_attempts,
         )
-        return outline
+        return parsed, attempts
 
-    raise OutlineFailedError(attempts=attempts, request=req)
+    # All attempts failed. Caller decides escalation.
+    return None, attempts
+
+
+def _assemble_outline(
+    macro: _MacroShape,
+    phase_skeletons: list[_PhaseSkeleton],
+    beat_details: list[list[_BeatFleshout]],
+    req: OutlineRequest,
+    budget,
+) -> Outline:
+    """Combine stage outputs into the final Outline pydantic object.
+
+    Python is authoritative for: beat_id sequence, speaker_role
+    assignment, arc_phase tagging, announcer + music_inter beat
+    insertion. The LLM contributes: macro shape (Stage 1), speaker
+    selection per voiced beat (Stage 2), intent / mood / target_words
+    per voiced beat (Stage 3).
+    """
+    arc_phases = tuple(budget.arc_phases)
+    per_phase_beats_target = tuple(budget.per_phase_beats)
+    bid_counter = 1
+
+    def _next_bid() -> str:
+        nonlocal bid_counter
+        out = f"b{bid_counter:03d}"
+        bid_counter += 1
+        return out
+
+    beats: list[Beat] = []
+
+    # Announcer open. arc_phase is the first arc_phase to satisfy the
+    # validator's "every voiced beat has a known arc_phase" rule; for
+    # announcer beats validator only checks count (#7), but pydantic
+    # requires arc_phase to be a non-empty string with the right
+    # ordering, so we pin it to the first phase.
+    beats.append(Beat(
+        beat_id=_next_bid(),
+        speaker="ANNOUNCER",
+        speaker_role="announcer",
+        intent="Open the episode and orient the listener.",
+        target_words=15,
+        mood="welcoming",
+        sfx_cue=None,
+        arc_phase=arc_phases[0],
+    ))
+
+    # Per-phase voiced beats.
+    for phase_idx, (phase_name, skeleton, fleshouts) in enumerate(
+        zip(arc_phases, phase_skeletons, beat_details)
+    ):
+        for beat_seed, detail in zip(skeleton.beats, fleshouts):
+            beats.append(Beat(
+                beat_id=_next_bid(),
+                speaker=beat_seed.speaker,
+                speaker_role="character",
+                intent=detail.intent,
+                target_words=detail.target_words,
+                mood=detail.mood,
+                sfx_cue=None,
+                arc_phase=phase_name,
+            ))
+
+        # Insert music_inter beat between phases when budget asks.
+        # music_inter_count is (act_count - 1) when include_act_breaks
+        # is True, else 0. By construction we insert exactly that
+        # many beats: one after every phase EXCEPT the last.
+        if (
+            budget.music_inter_count > 0
+            and phase_idx < len(arc_phases) - 1
+        ):
+            beats.append(Beat(
+                beat_id=_next_bid(),
+                speaker="NARRATOR",
+                speaker_role="music_inter",
+                intent=(
+                    f"Musical interlude bridging {phase_name} "
+                    f"into the next phase."
+                ),
+                target_words=5,
+                mood="transitional",
+                sfx_cue=None,
+                arc_phase=phase_name,
+            ))
+
+    # Announcer close.
+    beats.append(Beat(
+        beat_id=_next_bid(),
+        speaker="ANNOUNCER",
+        speaker_role="announcer",
+        intent="Close the episode and tag the broadcast.",
+        target_words=15,
+        mood="reflective",
+        sfx_cue=None,
+        arc_phase=arc_phases[-1],
+    ))
+
+    outline = Outline(
+        title=macro.title,
+        premise=macro.premise,
+        setting=macro.setting,
+        time_of_day=macro.time_of_day,
+        beats=beats,
+    )
+    return outline
+
+
+# ---------------------------------------------------------------------------
+# generate_outline -- main entrypoint (Path C tree-style as of 2026-05-18)
+# ---------------------------------------------------------------------------
+
+
+def generate_outline(
+    generate_fn,             # (messages, *, temperature, max_new_tokens) -> str
+    req: OutlineRequest,
+    *,
+    max_attempts: int = 3,
+    base_temperature: float = 0.7,
+    max_new_tokens: int = 1500,   # legacy parameter; ignored under Path C
+    creative_repo_id: str | None = None,  # Sprint D D2b: routes via resolver
+) -> Outline:
+    """Generate a validated Outline via a tree of small LLM calls.
+
+    Path C (Sprint H 3.7 retest #11 follow-up, 2026-05-18):
+      Stage 1 (1 call):              macro shape (title, premise,
+                                     setting, time_of_day).
+      Stage 2 (act_count calls):     per-phase speaker assignments.
+      Stage 3 (num_voiced_beats):    per-beat intent + mood +
+                                     target_words.
+      Python combiner:               beat_id, arc_phase, speaker_role
+                                     stamping; announcer + music_inter
+                                     beat insertion.
+
+    Total LLM calls per outline: 1 + act_count + num_voiced_beats.
+    Each call is independently retried (max_attempts each). Failures
+    localize to one stage / phase / beat instead of poisoning the
+    whole outline.
+
+    Public surface UNCHANGED from the legacy single-mega-call
+    implementation -- same arguments, same return type, same
+    exceptions. The legacy `max_new_tokens` parameter is accepted but
+    ignored (per-call max_new_tokens are stage-local).
+
+    Raises:
+        OutlineFailedError: if any stage exhausts its retry budget.
+        ValueError: if max_attempts < 1 or generate_fn is not callable.
+    """
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
+    if not callable(generate_fn):
+        raise ValueError("generate_fn must be callable")
+
+    _check_speaker_role_alignment()
+
+    budget = _get_budget(req)
+    if budget is None:
+        # S28 cleanbreak: budget required at OutlineRequest
+        # construction. _get_budget() returning None here would mean
+        # the dataclass was bypassed -- treat as a programmer error.
+        raise OutlineFailedError(
+            attempts=[("", "OutlineRequest is missing a valid budget")],
+            request=req,
+        )
+
+    arc_phases = tuple(budget.arc_phases)
+    per_phase_words = tuple(budget.per_phase_words)
+    per_phase_beats = tuple(budget.per_phase_beats)
+    words_per_beat_range = tuple(budget.words_per_beat_range)
+    locked_cast_set = set(req.character_cast)
+
+    # Sprint D D2b: creative-phase prompt routes via the resolver.
+    # The new per-stage prompts replace the legacy _SYSTEM_PROMPT
+    # for default config. The resolver still owns the period-prompt
+    # branch for the talkie 1940s row; under that row, the system
+    # prompt is OTR_PERIOD_SYSTEM_PROMPT and is layered onto every
+    # stage as a register / vocabulary nudge (NOT a schema override).
+    if creative_repo_id is None:
+        period_system_overlay = None
+    else:
+        try:
+            from ._otr_creative_prompt_router import (
+                resolve_creative_system_prompt,
+            )
+            resolved = resolve_creative_system_prompt(
+                creative_repo_id, phase="outline",
+            )
+            # If the resolver returned the legacy _SYSTEM_PROMPT
+            # verbatim (object identity), no overlay -- modern
+            # profile. Otherwise the period row is active and we
+            # surface its preamble at the start of every stage
+            # system prompt.
+            if resolved is _SYSTEM_PROMPT:
+                period_system_overlay = None
+            else:
+                period_system_overlay = resolved
+        except Exception:  # noqa: BLE001
+            period_system_overlay = None
+
+    def _make_system(stage_system: str) -> str:
+        if period_system_overlay is None:
+            return stage_system
+        return period_system_overlay + "\n\n" + stage_system
+
+    all_attempts: list[tuple[str, str]] = []
+
+    # ----------------------------- Stage 1 ---------------------------------
+    macro_user = _build_macro_user_prompt(req)
+    macro, macro_attempts = _run_call_with_retry(
+        generate_fn,
+        system=_make_system(_MACRO_SYSTEM_PROMPT),
+        user=macro_user,
+        schema_cls=_MacroShape,
+        label="macro",
+        max_attempts=max_attempts,
+        base_temperature=base_temperature,
+        max_new_tokens=250,
+    )
+    all_attempts.extend(macro_attempts)
+    if macro is None:
+        raise OutlineFailedError(attempts=all_attempts, request=req)
+
+    # ----------------------------- Stage 2 ---------------------------------
+    phase_skeletons: list[_PhaseSkeleton] = []
+    for phase_idx, (phase_name, phase_beat_count) in enumerate(
+        zip(arc_phases, per_phase_beats)
+    ):
+        phase_user = _build_phase_user_prompt(
+            req, macro, phase_name, phase_beat_count,
+            arc_phases, phase_idx,
+        )
+
+        def _phase_check(parsed: _PhaseSkeleton, raw: str) -> str | None:
+            # Cast membership AND beat count match.
+            if len(parsed.beats) != phase_beat_count:
+                return (
+                    f"phase {phase_name!r} beat count mismatch: "
+                    f"got {len(parsed.beats)}, expected "
+                    f"{phase_beat_count}"
+                )
+            for b in parsed.beats:
+                if b.speaker not in locked_cast_set:
+                    return (
+                        f"phase {phase_name!r} beat speaker "
+                        f"{b.speaker!r} is not in locked cast "
+                        f"{sorted(locked_cast_set)!r}"
+                    )
+            return None
+
+        skeleton, phase_attempts = _run_call_with_retry(
+            generate_fn,
+            system=_make_system(_PHASE_SYSTEM_PROMPT),
+            user=phase_user,
+            schema_cls=_PhaseSkeleton,
+            label=f"phase[{phase_name}]",
+            max_attempts=max_attempts,
+            base_temperature=base_temperature,
+            max_new_tokens=200,
+            extra_check=_phase_check,
+        )
+        all_attempts.extend(phase_attempts)
+        if skeleton is None:
+            raise OutlineFailedError(attempts=all_attempts, request=req)
+        phase_skeletons.append(skeleton)
+
+    # ----------------------------- Stage 3 ---------------------------------
+    # Per-beat fleshout. Each call sees the budget's words_per_beat_range
+    # so the LLM has the live integer window. Default allocations are
+    # also computed per phase so we can substitute Python's allocation
+    # if a beat's pydantic validation passes (>=3) but the value lands
+    # outside the budget's words_per_beat_range. Path: Python keeps
+    # the LLM's intent + mood but overrides target_words to the
+    # allocation. This is a strict improvement over the legacy
+    # mega-call where the entire outline got rejected on a single
+    # out-of-range beat.
+    beat_details: list[list[_BeatFleshout]] = []
+    words_lo, words_hi = words_per_beat_range
+    for phase_idx, (phase_name, phase_skel, phase_total_words) in enumerate(
+        zip(arc_phases, phase_skeletons, per_phase_words)
+    ):
+        n_beats = len(phase_skel.beats)
+        allocations = _allocate_phase_target_words(
+            phase_total_words, n_beats, words_per_beat_range,
+        )
+        phase_details: list[_BeatFleshout] = []
+        for beat_idx, (beat_seed, allocation) in enumerate(
+            zip(phase_skel.beats, allocations)
+        ):
+            beat_user = _build_beat_user_prompt(
+                req, macro, phase_name, beat_seed.speaker,
+                (beat_idx, n_beats),
+                words_lo, words_hi,
+            )
+            detail, beat_attempts = _run_call_with_retry(
+                generate_fn,
+                system=_make_system(_BEAT_SYSTEM_PROMPT),
+                user=beat_user,
+                schema_cls=_BeatFleshout,
+                label=f"beat[{phase_name}.{beat_idx + 1}]",
+                max_attempts=max_attempts,
+                base_temperature=base_temperature,
+                max_new_tokens=150,
+            )
+            all_attempts.extend(beat_attempts)
+            if detail is None:
+                raise OutlineFailedError(
+                    attempts=all_attempts, request=req,
+                )
+
+            # Python overrides target_words to land in the budget's
+            # per-beat window if the LLM picked outside the local
+            # range. The Beat pydantic schema only enforces 3..80;
+            # the budget's window is tighter and is what validator #4
+            # checks. This eliminates one of the two highest-frequency
+            # outline failure modes from retests #8-#11 (per-beat
+            # target_words out of budget range).
+            tw = detail.target_words
+            if not (words_lo <= tw <= words_hi):
+                log.info(
+                    "[OTR_Outline.beat[%s.%d]] LLM target_words=%d "
+                    "outside [%d,%d]; overriding to allocation=%d",
+                    phase_name, beat_idx + 1, tw,
+                    words_lo, words_hi, allocation,
+                )
+                detail = _BeatFleshout(
+                    intent=detail.intent,
+                    target_words=allocation,
+                    mood=detail.mood,
+                )
+            phase_details.append(detail)
+        beat_details.append(phase_details)
+
+    # ----------------------------- Combine ---------------------------------
+    outline = _assemble_outline(
+        macro, phase_skeletons, beat_details, req, budget,
+    )
+
+    # Cross-call invariants. Path C's per-stage retries already
+    # enforce cast membership at the source (Stage 2 extra_check)
+    # so the assembled outline should pass downstream validators
+    # cleanly. This is a final belt-and-braces sweep matching the
+    # legacy validator chain.
+    used_speakers = [
+        b.speaker for b in outline.beats
+        if b.speaker_role == "character"
+    ]
+    invented = set(used_speakers) - locked_cast_set
+    if invented:
+        all_attempts.append(
+            (
+                "",
+                "CastContractError (post-combine): invented speakers "
+                f"{sorted(invented)!r} leaked past Stage 2 filter. "
+                f"Locked cast: {sorted(locked_cast_set)!r}.",
+            )
+        )
+        raise OutlineFailedError(attempts=all_attempts, request=req)
+
+    budget_violation = validate_outline_against_budget(outline, req)
+    if budget_violation is not None:
+        all_attempts.append(
+            ("", f"OutlineBudgetViolation: {budget_violation}")
+        )
+        raise OutlineFailedError(attempts=all_attempts, request=req)
+
+    log.info(
+        "[OTR_Outline] success: %d beats (%d voiced, %d announcer, "
+        "%d music_inter); calls used: 1 macro + %d phase + %d beat "
+        "= %d total",
+        len(outline.beats), len(used_speakers),
+        sum(1 for b in outline.beats if b.speaker_role == "announcer"),
+        sum(1 for b in outline.beats if b.speaker_role == "music_inter"),
+        len(phase_skeletons),
+        sum(len(pd) for pd in beat_details),
+        1 + len(phase_skeletons) + sum(len(pd) for pd in beat_details),
+    )
+    return outline
 
 
 # ---------------------------------------------------------------------------
