@@ -11,7 +11,7 @@ These tests exercise:
   1. The synthesis: declaration order + companion injection produces a
      slot list whose length equals `widgets_values` for a clean-saved
      workflow.
-  2. The bughunt workflow shape (19-entry widgets_values on node 1):
+  2. The canonical workflow shape (19-entry widgets_values on node 1):
      a `creative_writing_model` patch lands at slot 5, NOT slot 4 (which
      is the `"fixed"` companion). The companion value is preserved.
   3. Same for `technical_model` patch -> slot 6.
@@ -21,7 +21,7 @@ These tests exercise:
      count still rejects.
 
 The OTR_LedgerScriptWriter schema in the fixtures mirrors node 1's
-widgets_values dump from `workflows/otr_scifi_16gb_bughunt.json`:
+widgets_values dump from `workflows/otr_scifi_16gb_full.json`:
 
   0  episode_title           STRING        ''
   1  target_words            INT           350
@@ -68,7 +68,10 @@ from otr_api import (  # noqa: E402
 )
 
 _REPO = Path(__file__).resolve().parent.parent
-_BUGHUNT_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_bughunt.json"
+# Jeffrey 2026-05-18 overnight reconcile: single workflow source of
+# truth -- _bughunt.json sibling deleted. Round-trip fixture now reads
+# the canonical _full.json directly.
+_CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_scifi_16gb_full.json"
 
 
 def _writer_schemas() -> dict:
@@ -123,7 +126,7 @@ def _writer_schemas() -> dict:
 
 def _writer_node_fixture() -> dict:
     """Workflow fixture with node 1 carrying the 19-entry widgets_values
-    layout dumped from workflows/otr_scifi_16gb_bughunt.json on 2026-05-17.
+    layout dumped from workflows/otr_scifi_16gb_full.json on 2026-05-17.
     """
     return {
         "nodes": [
@@ -364,21 +367,21 @@ def test_extra_slot_count_exceeds_companions_rejected():
 # ---------------------------------------------------------------------------
 # Round-trip: workflow_to_api_prompt honors companion + does not bleed "fixed"
 # ---------------------------------------------------------------------------
-def _dump_bughunt_node1() -> list:
-    """Read _bughunt.json node 1 widgets_values verbatim.
+def _dump_canonical_node1() -> list:
+    """Read _full.json node 1 widgets_values verbatim.
 
     Per Jeffrey 2026-05-17 directive: do NOT trust prose recollection;
     inspect the on-disk dump first, then build the assertions.
     """
-    wf = load_workflow(str(_BUGHUNT_WORKFLOW))
+    wf = load_workflow(str(_CANONICAL_WORKFLOW))
     for n in wf["nodes"]:
         if n["id"] == 1:
             return list(n["widgets_values"])
-    raise AssertionError("node id=1 missing from _bughunt.json")
+    raise AssertionError("node id=1 missing from _full.json")
 
 
-def test_round_trip_bughunt_node1_inputs_correct():
-    """Round-trip the real bughunt workflow through the API converter
+def test_round_trip_canonical_node1_inputs_correct():
+    """Round-trip the canonical workflow through the API converter
     and assert declared inputs land on the right slots, with the
     companion "fixed" NEVER reaching a declared input.
 
@@ -388,7 +391,7 @@ def test_round_trip_bughunt_node1_inputs_correct():
         wv[6]   technical_model
         wv[4]   "fixed" companion (NOT mapped anywhere)
     """
-    dump = _dump_bughunt_node1()
+    dump = _dump_canonical_node1()
     assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
     expected_seed = dump[3]
     expected_companion = dump[4]
@@ -400,7 +403,7 @@ def test_round_trip_bughunt_node1_inputs_correct():
     )
 
     schemas = _writer_schemas()
-    workflow = load_workflow(str(_BUGHUNT_WORKFLOW))
+    workflow = load_workflow(str(_CANONICAL_WORKFLOW))
     prompt = workflow_to_api_prompt(workflow, schemas)
 
     n1_inputs = prompt["1"]["inputs"]
@@ -634,7 +637,7 @@ def test_converter_handles_forceInput_link_without_widget_slot():
 
 
 def test_regression_node20_actual_workflow():
-    """Round-trip the real bughunt workflow through the API converter
+    """Round-trip the canonical workflow through the API converter
     and assert node 20 (OTR_VideoPlan) converts cleanly. Verifies the
     forceInput fix on the actual schema shape that surfaced the
     blocker (freeze_done_gate forceInput=True).
@@ -684,7 +687,7 @@ def test_regression_node20_actual_workflow():
         }
     }
 
-    workflow = load_workflow(str(_BUGHUNT_WORKFLOW))
+    workflow = load_workflow(str(_CANONICAL_WORKFLOW))
     # Should NOT raise (was raising
     # "widgets_values length mismatch on node 20" before the fix).
     prompt = workflow_to_api_prompt(workflow, schemas)

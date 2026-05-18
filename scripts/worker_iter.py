@@ -19,10 +19,12 @@ the entire iter:
   5. OTR_WorkflowValidator live pass (optional, skipped if the
      validator subgraph isn't present in the target workflow).
   6. Pre-flight VRAM check via nvidia-smi.
-  7. POST workflows/otr_scifi_16gb_bughunt.json (NOT _full.json --
-     the bughunt workflow targets Gemma-4-E4B-it so the loop
-     does NOT mutate the C7 byte-identical baseline. Per synthesis
-     section 3.6 + B3 commit e5d5105).
+  7. POST workflows/otr_scifi_16gb_full.json -- the single
+     canonical workflow file. Jeffrey 2026-05-17 round-robin:
+     "One workflow file. No bughunt sibling." The harness is now
+     reconciled to the single source of truth; iters will be
+     slower per the Mistral-Nemo writer default, which overnight
+     tolerates.
   8. Poll /history with 15-min timeout.
   9. Classify outcome, overwrite result file.
  10. Unconditional teardown (synthesis section 2 step 10):
@@ -81,12 +83,13 @@ REPO = Path(r"C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
 COMFY_DIR = Path(r"C:\Users\jeffr\Documents\ComfyUI")
 LOGS_DIR = COMFY_DIR / "logs"
 
-# Per synthesis section 3.6 + B3 commit e5d5105: the autonomous
-# loop POSTs the bughunt clone, NOT the C7 byte-identical _full.json.
-# Future operator note: do NOT flip this pointer back to _full.json
-# without round-robin sign-off; the loop mutates run state in ways
-# that would invalidate the C7 audio baseline.
-WORKFLOW_PATH = REPO / "workflows" / "otr_scifi_16gb_bughunt.json"
+# Jeffrey 2026-05-17 overnight directive: reconcile harness to a
+# single workflow source of truth. The bughunt sibling has been
+# deleted; the loop POSTs the canonical _full.json. Iters run
+# slower per the Mistral-Nemo writer default -- overnight tolerates
+# this. C7 byte-identity is owned by the audio pipeline, not the
+# writer-side workflow file.
+WORKFLOW_PATH = REPO / "workflows" / "otr_scifi_16gb_full.json"
 
 PY = Path(r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe")
 COMFY_MAIN = Path(
@@ -515,13 +518,13 @@ def _launch_comfyui(
 
 
 def _post_workflow(url: str) -> str | None:
-    """Patch + POST the bughunt workflow. Returns prompt_id on
-    SUCCESS, None on schema / submit error.
+    """Patch + POST the canonical _full.json workflow. Returns
+    prompt_id on SUCCESS, None on schema / submit error.
 
     Smoke patches mirror scripts/queue_smoke.py: 30 words, 2
-    characters, 1 act. The bughunt workflow ALREADY carries Gemma
-    on widgets[5]/[6] (B3 commit e5d5105), so no model patch is
-    needed -- the patch path is just the smoke profile.
+    characters, 1 act. _full.json carries the canonical writer
+    model on widgets[5]/[6] -- no model patch is needed; the
+    patch path is just the smoke profile.
     """
     # Lazy import so a /prompt URL failure surfaces from the right
     # frame rather than at module import time.
@@ -701,7 +704,7 @@ def main() -> int:
         # at this revision; the worker leans on ComfyUI's own
         # /prompt validation pass to surface graph_widget class.
         # When OTR_WorkflowValidator wiring is finalized in the
-        # bughunt workflow, this is where the validator-only
+        # canonical _full.json workflow, this is where the validator-only
         # subgraph submit would go (synthesis section 2 step 5).
 
         # Step 6: pre-flight VRAM gate.
@@ -721,7 +724,7 @@ def main() -> int:
             )
             return 4
 
-        # Step 7: POST the bughunt workflow.
+        # Step 7: POST the canonical _full.json workflow.
         try:
             prompt_id = _post_workflow(url)
         except Exception as exc:  # noqa: BLE001
