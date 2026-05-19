@@ -818,38 +818,65 @@ class BatchFluxRender:
         # everything. Then load_models_gpu pins MODEL freshly, alone,
         # with full VRAM headroom for the sampler. The 0.5-1 s of
         # re-load tax is amortized across all 20 sampler steps.
-        try:
-            import comfy.model_management as mm  # type: ignore
-            import gc as _gc
-            import torch as _torch  # type: ignore
+        #
+        # BUG-LOCAL-231 step 6 round-robin A/B (Jeffrey 2026-05-19 15:30):
+        # this entire pre-pin block is now reversibly disabled when
+        # OTR_DISABLE_FLUX_PREPIN=1 is set in the env. The minimal-
+        # workflow bisect (commit 4811bfc) proved OTR-graph causes
+        # the 134x regression; pre-flight 3 identified this block's
+        # `mm.load_models_gpu([model])` (NO memory_required arg) as
+        # the prime suspect vs stock sampler_helpers.py L154-157
+        # which passes memory_required + minimum_memory_required +
+        # force_full_load AFTER estimate_memory(). When the env var
+        # is set, this block is skipped entirely; stock comfy's
+        # sampler_helpers path takes over with proper memory
+        # reservation. If pace recovers to 1-15 s/it: this block IS
+        # the cause and the permanent fix removes or rewrites it.
+        # If pace stays at 150-190 s/it: this block is not the cause
+        # and suspicion moves elsewhere. Single-axis diagnostic,
+        # reversible.
+        import os as _os_prepin
+        if _os_prepin.environ.get("OTR_DISABLE_FLUX_PREPIN") == "1":
+            log.info(
+                "[BatchFluxRender] pre-pin block SKIPPED "
+                "(OTR_DISABLE_FLUX_PREPIN=1, BUG-LOCAL-231 A/B "
+                "diagnostic). Stock comfy sampler_helpers.py will "
+                "call load_models_gpu with memory_required when "
+                "KSampler fires."
+            )
+        else:
             try:
-                mm.unload_all_models()
-                # BUG-07.03 invariant (Bug Bible regression): every
-                # unload_all_models() call must be paired with
-                # gc.collect() + torch.cuda.empty_cache(). Dereferencing
-                # the model registry does NOT free VRAM; PyTorch's
-                # caching allocator holds reserved blocks until
-                # empty_cache() returns them. Without this pairing,
-                # unload_all_models() is cosmetic only and the next
-                # load_models_gpu() will see the SAME memory pressure.
-                _gc.collect()
-                _torch.cuda.empty_cache()
-                log.info(
-                    "[BatchFluxRender] unload_all_models() + "
-                    "gc.collect() + empty_cache() complete (nuclear "
-                    "eviction before MODEL pin, BUG-LOCAL-231 Option "
-                    "B escalation)"
-                )
+                import comfy.model_management as mm  # type: ignore
+                import gc as _gc
+                import torch as _torch  # type: ignore
+                try:
+                    mm.unload_all_models()
+                    # BUG-07.03 invariant (Bug Bible regression): every
+                    # unload_all_models() call must be paired with
+                    # gc.collect() + torch.cuda.empty_cache(). Dereferencing
+                    # the model registry does NOT free VRAM; PyTorch's
+                    # caching allocator holds reserved blocks until
+                    # empty_cache() returns them. Without this pairing,
+                    # unload_all_models() is cosmetic only and the next
+                    # load_models_gpu() will see the SAME memory pressure.
+                    _gc.collect()
+                    _torch.cuda.empty_cache()
+                    log.info(
+                        "[BatchFluxRender] unload_all_models() + "
+                        "gc.collect() + empty_cache() complete (nuclear "
+                        "eviction before MODEL pin, BUG-LOCAL-231 Option "
+                        "B escalation)"
+                    )
+                except Exception as exc:
+                    log.warning(
+                        "[BatchFluxRender] mm.unload_all_models() raised %r; "
+                        "proceeding to load_models_gpu without explicit "
+                        "eviction (sampler may thrash)", exc,
+                    )
+                mm.load_models_gpu([model])
+                log.info("[BatchFluxRender] pinned MODEL via load_models_gpu")
             except Exception as exc:
-                log.warning(
-                    "[BatchFluxRender] mm.unload_all_models() raised %r; "
-                    "proceeding to load_models_gpu without explicit "
-                    "eviction (sampler may thrash)", exc,
-                )
-            mm.load_models_gpu([model])
-            log.info("[BatchFluxRender] pinned MODEL via load_models_gpu")
-        except Exception as exc:
-            log.debug("[BatchFluxRender] pre-pin skipped: %s", exc)
+                log.debug("[BatchFluxRender] pre-pin skipped: %s", exc)
 
         report_lines = [
             f"BatchFluxRender: {len(prompts)} shot(s) @ {width}x{height}, "
