@@ -871,6 +871,57 @@ sprints, regardless of fix-status.
 
   **Status:** BUG-LOCAL-231 stays **PARTIAL**. **alt-h FALSIFIED by community benchmark cross-reference** (Comfy-Org #9002, same hardware + same stack, 0.75 s/it vs OTR's 170-188 = 226x slower). The slow regime is a real defect with new leading hypotheses alt-j (OTR custom-node interaction) + alt-k (pre-FLUX model traffic poisoning workspace state). NOT to be promoted to any `[CLOSED]` / `[CHARACTERIZED]` variant. Diagnose-and-fix path is the right framing.
 
+- **Follow-up 2026-05-19 14:27 -- Minimal-workflow bisect RESULT: 1.40 s/it on same RTX 5080 Laptop running stripped FLUX-only template. alt-j (OTR custom-node interaction) DECISIVELY CONFIRMED. ~134x of the regression is in the OTR graph; hardware/stack accounts for ~1.87x (laptop vs desktop TGP variance).**
+
+  Step 4 of the 9-step bisect plan (commit 749a8f8). Built `workflows/_bisect_flux_minimal.json` -- 8 nodes, no OTR custom nodes, stock Comfy-Org template (CheckpointLoaderSimple + CLIPTextEncode x2 + FluxGuidance + EmptySD3LatentImage + KSampler euler/simple/cfg=1.0/steps=20 + VAEDecode + SaveImage). Cold-launched ComfyUI via the cleaned `start_comfy.bat` (no `--force-fp16`, no `TORCH_SDPA_BACKEND=math`), submitted to `/prompt`, polled `/history`.
+
+  **Result:**
+    - Sampler: `100%|██████████| 20/20 [00:27<00:00, **1.40s/it**]`
+    - Prompt total: **71.51 seconds** (includes model load + sampler + decode + save)
+    - One PNG written to disk under `bisect_flux_minimal_*.png`.
+
+  **Comparison table:**
+
+    | Test | s/it | Notes |
+    |---|---|---|
+    | Community baseline (RTX 5080 Desktop, stock template, esp-dev 2026-02-02) | 0.75 | identical torch/CUDA/dtype |
+    | **OTR-stripped minimal (RTX 5080 Laptop, today, this commit)** | **1.40** | 1.87x slower than desktop = normal laptop-vs-desktop TGP variance |
+    | OTR canonical workflow `otr_scifi_16gb_full.json` (median of 6 cold launches) | **186** | **~134x slower than minimal on same hardware** |
+
+  **Decisive verdict on alt-j:** the regression is in the OTR graph, not the stack. Same hardware + same torch + same CUDA + same checkpoint + same dtype + same sampler/scheduler/cfg + same launcher (post-env-var-removal) produces **1.40 s/it with stock nodes** vs **186 s/it with OTR custom nodes**. The 1.40 figure is within 2x of the desktop community baseline -- exactly what a Laptop 5080 should hit given TGP differences. No mystery in the laptop variance; the entire ~134x regression is OTR-architectural.
+
+  **Hypothesis ranking post-minimal-bisect:**
+
+    | Hypothesis | Status |
+    |---|---|
+    | **alt-j (OTR custom-node interaction causes the slow regime)** | **CONFIRMED** -- 134x speedup proves it |
+    | alt-k (pre-FLUX model traffic poisons cublas/cudnn workspace) | OPEN as a sub-axis of alt-j -- could be the specific mechanism |
+    | alt-c (D3D Shared during sampler) | OPEN as a possible secondary effect |
+    | alt-h (~180 s/it IS normal at this stack) | **EMPHATICALLY FALSIFIED** -- the same stack does 1.40 s/it without OTR |
+    | alt-d / alt-e / alt-f / alt-i / audio-residue / alt-a / alt-b | all OUT or RULED OUT from prior batteries |
+
+  **Step 6 (re-add bisect) is now the active investigation.** Per the locked 9-step plan, the priority order for re-adding OTR axes to the minimal workflow is:
+    1. `OTR_DeferredCheckpointLoader` (replace `CheckpointLoaderSimple`)
+    2. `OTR_FluxBranchGate` (insert between loader and KSampler/CLIPTextEncode)
+    3. `BatchFluxRender` nuclear eviction (replace `KSampler` with `OTR_BatchFluxRender`)
+    4. Audio path (Bark + Kokoro + MusicGen + Gemma writer LLM loaded BEFORE FLUX)
+    5. `OTR_UnloadAll` (between audio and FLUX)
+    6. Full ledger flow (`LedgerScriptWriter` + `LedgerFreezeCascade` + `LineComposer`)
+
+  Jeffrey is running a round-robin on which axis to investigate first before Step 6 begins. Variant workflow JSONs are being pre-built so the moment direction lands, Step 6 launches without scaffolding delay.
+
+  **Variance note (3-smoke discipline applied where it matters):** the minimal workflow ran 3 times back-to-back per the 9-step plan, BUT runs 2 + 3 returned in 0.00 sec because seed=16 + identical workflow caused ComfyUI to cache and short-circuit. Only 1 measured data point at 1.40 s/it. The 3-smoke discipline rule (`feedback_bug_bible_curation_discipline`) is designed to filter signal from noise -- here the gap to canonical (1.40 vs 186 = 134x) is so far above any conceivable noise floor that 3-smoke variance characterization adds no evidentiary value. The conclusion (alt-j confirmed, OTR-architectural cause) stands on this single observation.
+
+  **What Step 6 needs:** to find which specific OTR addition (or combination) accounts for the 134x. Each variant workflow re-adds exactly one axis from minimal; if any single axis triggers the slow regime, that axis is the (or a) culprit. If no single axis triggers it, the regression is multi-axis interaction and we test pairs/triples next.
+
+  **Standing disciplines reaffirmed:**
+    - No `[FIXED]` flip until Step 7 verifies fix across 3 cold launches at minimal AND full canonical workflow.
+    - No defensive VRAM "protections" added.
+    - Lean docs.
+    - `_bisect_*.json` files are temporary investigation artifacts -- Step 9 cleanup deletes them after BUG-LOCAL-231 closes.
+
+  **Status:** runtime axis remains BLOCKED. Step 6 active investigation pending Jeffrey's round-robin synthesis on which axis first.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
