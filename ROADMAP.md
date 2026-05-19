@@ -166,6 +166,8 @@ LHM live during sampler step 1: GPU Core 100%, D3D 3D 96.4%, GPU Memory Used 158
 | alt-b (Comfy allocator reserve across sweep) | NEUTRAL -- sweep was clean, reserved at fire only 2.44 GiB |
 | alt-c (driver/D3D Shared spillover) | WEAKLY CONSISTENT -- D3D Shared Memory Used 727 MB at probe, small fraction but non-zero |
 
+**[HISTORICAL -- superseded by battery v1 (08:41-09:26) and battery v2 (10:15-11:03). Retained for audit trail. Skip to 2026-05-19 11:10 Battery v2 post-pushback corrections subsection for current state.]**
+
 **Verification gate for BUG-LOCAL-231 closure (per Jeffrey 2026-05-19 directive -- 3-smoke discipline, NOT 1):**
 
 1. Close non-essential GPU apps: browser, Discord, Steam, any DXVK / CUDA-using app outside ComfyUI.
@@ -177,6 +179,8 @@ LHM live during sampler step 1: GPU Core 100%, D3D 3D 96.4%, GPU Memory Used 158
    - **All 3 still hit slow regime even with everything closed** → alt-a FALSIFIED. Escalate to alt-b (Comfy state) / alt-c (driver). OTR-side fixes won't help. Stay PARTIAL.
 
 **Do NOT flip to `[FIXED]` on next session's first smoke.** 3-smoke minimum from this point forward (per `feedback_bug_bible_curation_discipline`).
+
+**[End of historical block. Battery v1 executed this plan -- alt-a falsified. Battery v2 ran subsequent investigation -- alt-e + alt-f falsified. See 11:10 Battery v2 post-pushback corrections for current state.]**
 
 ### 2026-05-19 09:26 -- 3-smoke clean-state battery COMPLETE. alt-a FALSIFIED. Variance is NOT in fire-time state.
 
@@ -244,6 +248,8 @@ Jeffrey 09:30 directive pushed back on the 09:26 follow-up with four corrections
 - Bug Bible regression: 23 passed, 1 skipped, 2 xfailed (baseline held).
 - Audio byte-identical: 9 passed, 1 skipped (audio path sealed).
 
+**[HISTORICAL -- next-battery design executed as battery v2 2026-05-19 10:15-11:03; results in 11:03 subsection below. cudnn.benchmark=False (alt-e falsified), clocks stable (alt-f falsified), D3D Shared open but not pace-correlated. Pushback corrections recorded in 11:10 subsection.]**
+
 **Next battery design:**
 
 1. Re-run `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions` with new telemetry in place.
@@ -258,6 +264,8 @@ Jeffrey 09:30 directive pushed back on the 09:26 follow-up with four corrections
 **Order locked:** (1) commit telemetry + this doc sync as one atomic change (code-and-doc), (2) push, (3) run 3-smoke battery with corrected autokiller, (4) tabulate, (5) apply decision tree, (6) report.
 
 No `[FIXED]` flip until cause is identified AND mitigation verifies across 3 clean smokes.
+
+**[End historical block. See 11:03 + 11:10 subsections below for current state.]**
 
 ### 2026-05-19 11:03 -- Battery v2 COMPLETE. alt-e + alt-f FALSIFIED. New leading hypothesis: 180 s/it IS the normal pace on this hardware/config.
 
@@ -277,27 +285,44 @@ Battery v2 ran 10:15:26 -> 11:03:31 PT with sampler-time telemetry (commit 6df78
 
 | Hypothesis | Status |
 |---|---|
-| **alt-h (NEW): 180 s/it IS normal at this hardware/config** | **LEADING** -- 6 of 6 telemetered cold-launches across 2 batteries show this regime (only outlier: today battery v1 iter 1 at 42 s/it, likely warm-cache windfall) |
-| alt-c D3D Shared during sampler | PARTIAL but NOT CORRELATED: iter 3 had highest D3D (771-808 MB) and FASTEST pace (177); iter 1 had lower baseline D3D and was SLOWEST. Opposite of alt-c's prediction. |
+| **alt-h (NEW): ~180 s/it IS the slow-regime baseline at this hardware/config** | **LEADING for the slow regime** -- 5 of 6 current-battery cold-launches landed at 177-188 s/it. Does NOT explain the fast outliers. |
+| alt-c D3D Shared during sampler | **STILL OPEN** -- not pace-correlated WITHIN the slow cluster's 7% spread (iter 3 had highest D3D and was fastest; opposite of alt-c's prediction within battery). BUT all three iters were already near VRAM ceiling, high-noise floor. Sampler-time paging across the fast/slow REGIME SPLIT remains a possible alt-c signal not yet captured. |
 | alt-e non-deterministic kernel | **FALSIFIED** -- `cudnn.benchmark=False` across all 3 iters; autotuner not running; kernel selection deterministic |
 | alt-f thermal / clock throttle | **FALSIFIED** -- `clocks.gr` stable 2977 MHz (full boost) across 35-41 polls per iter; temps 52-55 C (throttle threshold ~85 C); single 2970 MHz tick on iter 3 = transient noise |
 | audio-residue / alt-a / alt-b / alt-d | all OUT or RULED OUT from prior batteries |
 
-**What this means for BUG-LOCAL-231:**
+**[The "11:03 reframe to NOT A BUG" subsection that previously sat here is superseded by 11:10 pushback corrections below. Reframe paused for per-step timing + config fingerprint capture.]**
 
-Jeffrey's pushback #4 was correct. **The "10-15 s/it target" was aspirational without empirical baseline.** Today's data sets the actual baseline at ~180 s/it for FLUX-dev fp8 + bf16 cast + 1024x1024 + 20 steps on RTX 5080 Laptop. The faster runs observed earlier (1.22 s/it yesterday 23:30, 42 s/it today battery v1) were warm-cache windfalls -- likely from cudnn kernel selections / D3D Shared layouts inherited from a previous identical inference call.
+### 2026-05-19 11:10 -- Battery v2 post-pushback corrections (Jeffrey 10-point review)
 
-This is NOT an OTR code bug. It is the hardware ceiling. Mitigation is operator-level: accept 60-min FLUX bookend per episode (workflow renders one bookend, so total FLUX cost ~60 min per episode, not 3.5 hr).
+Jeffrey 11:10 reviewed the 11:03 reframe proposal and pushed back on 10 items. Recorded for audit + action:
 
-**Proposed status reframe for BUG-LOCAL-231:** `[NOT A BUG / HARDWARE BASELINE CHARACTERIZED]` -- not `[FIXED]` (there is no fix), not `[VERIFIED CLOSED with operator-checklist mitigation]` (no operator action changes the pace).
+1. **Math correction**: 5 of 6 cold-launches landed slow (~177-188 s/it). One fast outlier remains: battery v1 iter 1 at 42.38 s/it (telemetry captured). The earlier 1.22 s/it run from 2026-05-18 ~23:30 PT predates the sampler-time telemetry block, so its precheck/poll-time state is unrecoverable. Two distinct fast outliers, not one.
+2. **Speed-up ratios**: 42.38 vs ~180 = **4.3x** (NOT 100x). 1.22 vs ~180 = **150x** (separate event).
+3. **Status reframe corrected**: proposed `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]`, NOT `[NOT A BUG / HARDWARE BASELINE CHARACTERIZED]`. Data supports a current baseline; does NOT support "no fix exists." Fast outliers prove the hardware CAN go faster under unknown conditions.
+4. **Step-1 timing is incomplete**: step 1 includes lazy GPU alloc + fp8 dequant kernel JIT + cudnn workspace warmup + possibly cublas tuning cache priming. Step 1 timing biases HIGH vs steady-state. **180 s/it figure may be high.** Need per-step timestamps across full 20-step run before closure.
+5. **Fast-path outliers are NOT noise** -- they're the most valuable clue. Open separate tracker BUG-LOCAL-244 (FLUX fast-path mechanism unidentified) covering both 42.38 s/it and 1.22 s/it events. Do not close 231 until fast-path is either reproduced+explained OR formally split.
+6. **ROADMAP stale text labeled** as `[HISTORICAL]` -- battery v1 verification gate + battery v2 next-design subsections clearly marked superseded.
+7. **alt-c is NOT ruled out**: 3 samples within 7% spread don't disambiguate sampler-time paging when all are near the VRAM ceiling. Sampler-time paging across the fast/slow regime split remains a possible alt-c signal. Keep alt-c OPEN.
+8. **Config fingerprint required** before touching README / CLAUDE.md pace targets. Capture: NVIDIA driver, CUDA runtime, PyTorch version+hash, ComfyUI commit, FLUX ckpt sha256, sampler, scheduler, resolution, steps, cfg, precision flags, launch args, Windows power plan, NVIDIA performance state. Without fingerprint, "180 s/it baseline" is non-portable.
+9. **Unblock 234/235 carefully**: operational unblock fine. Frame as "Proceeding with 234/235 verification under known slow FLUX baseline (~180 s/it); expect 2-3 hr wall time per pipeline smoke." Do NOT make 234/235 verification contingent on closing 231 as `[NOT A BUG]`.
+10. **Bible candidate postponed** for 231. Not ready for promotion until status language corrected, fast outliers handled, config fingerprint captured. Remove from any pending Bible promotion list.
 
-**Pending Jeffrey's concurrence on the reframe:**
-- If concurred: promote 231; update CLAUDE.md / README to reflect actual pace baseline; unblock BUG-LOCAL-234 + 235 verification (they were parked behind 231).
-- If pushed back: continue investigation into the warm-cache mechanism (why does the second sampler run after a warm one go 100x faster?).
+**Order of operations (locked):**
 
-**Telemetry retained:** `_log_flux_sampler_precheck()` + `_FluxSamplerPoller` stay in `visual/batch_flux_render.py`. If a fast run ever reappears, the telemetry will catch what's different.
+1. Update BUG_LOG 231 entry with corrections 1, 2, 3, 5, 7 (done in this commit).
+2. Update ROADMAP §3.7 with correction 6 (done in this commit).
+3. Capture config fingerprint per correction 8 (pending; one bash run: nvidia-smi + python imports + git rev-parse + checkpoint sha + workflow widgets).
+4. Extend telemetry block per correction 4 (per-step timestamps via tqdm callback or KSampler wrapper).
+5. Re-run battery v3: ONE smoke through full 20-step bookend (~60 min) -- no autokiller -- to get per-step distribution.
+6. THEN propose final BUG-LOCAL-231 status reframe.
+7. In parallel: kick a full-pipeline smoke for 234/235 verification under known slow baseline (~2-3 hr).
 
-**Standing disciplines reaffirmed:** No defensive VRAM "protections". No `[FIXED]` flip on single observations. 6-iter empirical foundation supports today's reframe.
+**Standing disciplines reaffirmed:** No defensive VRAM protections. No `[FIXED]` or `[NOT A BUG]` flip on single observations or incomplete data. 6-iter foundation supports SLOW-REGIME baseline only -- fast-path remains an open scientific question, not closed.
+
+**BUG-LOCAL-231 status:** PARTIAL. Proposed reframe is `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]` AFTER per-step timing + config fingerprint land. Fast-path mystery split into BUG-LOCAL-244.
+
+**Telemetry retained:** `_log_flux_sampler_precheck()` + `_FluxSamplerPoller` stay. To be extended with per-step timestamps before battery v3.
 
 ### Consolidated go-forward queue (Jeffrey 2026-05-19 directive)
 
