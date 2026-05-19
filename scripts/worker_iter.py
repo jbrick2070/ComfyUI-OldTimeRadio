@@ -546,7 +546,6 @@ def _launch_comfyui(
         str(COMFY_MAIN),
         "--port", str(port),
         "--highvram",
-        "--force-fp16",
         "--cuda-malloc",
         "--user-directory", str(COMFY_DIR),
     ]
