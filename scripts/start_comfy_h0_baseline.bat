@@ -13,7 +13,7 @@ REM upcast flux1-dev-fp8.safetensors from ~11 GiB (fp8) to ~22 GiB
 REM (fp16), forcing the dynamic offloader to thrash per sampler step
 REM at ~9-15 minutes per step. With the flag removed FLUX loads at
 REM native fp8 weight dtype and the sampler runs at ~10-15 sec/step.
-REM See docs/2026-05-19-flux-fp8-dtype-fix.md.
+REM See BUG_LOG.md::BUG-LOCAL-230.
 REM
 REM Sprint H iter 2 fix (2026-05-17): HF_HOME explicitly set so the
 REM OTR model catalog scan finds the curated cache at

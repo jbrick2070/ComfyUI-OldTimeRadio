@@ -1,6 +1,8 @@
 ﻿# OTR Roadmap
 
-**Branch:** `v2.0-alpha` (HEAD `5b44e65` 2026-05-17 -- Sprint H §3.7 closed GREEN) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-17 (Sprint H §3.7 closure -- workflow widget drift, ComfyUI client-side serialization rules, uv-stub PID split; ready for §3.8 attended 3-iter walk)
+**Branch:** `v2.0-alpha` (HEAD `16ce225` 2026-05-18 -- Sprint H §3.7 harness structurally GREEN, FLUX runtime verification BLOCKED on BUG-LOCAL-230 pending local smoke) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-18 (BUG-LOCAL-230 `--force-fp16` dtype-upcast fix across 4 launcher sites; verification gate open)
+
+**Current gate:** Sprint H §3.7 harness closure is structurally GREEN, but FLUX runtime verification is blocked by BUG-LOCAL-230 pending local smoke. The `--force-fp16` dtype-upcast fix landed across launcher sites (`start_comfy.bat`, `scripts/worker_iter.py`, `scripts/start_comfy_h0_baseline.bat`, `scripts/_start_comfyui.ps1`); next required step is a clean one-iter smoke proving FLUX fp8 loads at ~13 GiB (not 24.30 GiB) and samples at ~10-15 sec/step (not 564.99 s/it). §3.8 does NOT proceed until that telemetry lands. BUG-LOCAL-230 stays in pending-verification posture in BUG_LOG.md; promote to [FIXED] only after the smoke proves the load delta + sampler pace + active ComfyUI command line free of `--force-fp16`.
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -75,9 +77,9 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## SPRINT H -- §3.7 CLOSED GREEN, §3.8 NEXT (Jeffrey, 2026-05-17)
+## SPRINT H -- §3.7 HARNESS GREEN, FLUX RUNTIME BLOCKED ON BUG-LOCAL-230 (Jeffrey, 2026-05-18)
 
-Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5b44e65`. All four §3.7 attended-validation checks GREEN within the bounds of what Windows physically permits:
+Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5b44e65` (Sprint H §3.7 close, 2026-05-17). All four §3.7 attended-validation checks GREEN within the bounds of what Windows physically permits. **§3.7 closure-run telemetry (2026-05-18) then surfaced BUG-LOCAL-230: FLUX1-dev-fp8 was being upcast to fp16 by the `--force-fp16` launch arg, doubling the checkpoint footprint to ~22 GiB on a 16 GB card and forcing the dynamic offloader to thrash at ~9.4 min/sampler-step. Fix landed across 4 launcher sites at HEAD `16ce225`; verification of the post-fix VRAM (~13 GiB) and sampler pace (~10-15 s/step) is pending the next local smoke. §3.8 does NOT advance until that telemetry lands.**
 
 | Check | Status |
 |---|---|
@@ -108,7 +110,21 @@ Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5
 - API converter (`scripts/otr_api.py`): companion-aware (Reading C) + forceInput-aware (Reading D) + fail-loud on length drift + misplaced-companion vocabulary guard.
 - Classifier: case-insensitive `status.lower() == "success"` + `executed_count == 0 -> graph_widget`. `submit_prompt` raises on truthy `error` or non-empty `node_errors` before returning prompt_id (no zombie prompts polled in /history).
 
-**Next:** §3.8 attended 3-iter walk. Iter 2 is currently in flight from the §3.7 retest -- either clean completion (becomes data point 2 of 3) or classified failure (next bug-hunt surface). After iter 2 lands, spawn the third attended iter under the same supervisor invocation. GREEN on three attended iters -> §3.9 overnight 12-iter.
+**Next (BUG-LOCAL-230 verification gate, BLOCKING):** one-iter local smoke (`scripts/sweep_and_launch.bat --iters 1 --inter-iter-sec 0`) to prove the post-fix telemetry. Acceptance criteria for promoting BUG-LOCAL-230 to [FIXED] and unblocking §3.8:
+
+| # | Required telemetry | Failure mode if absent |
+|---:|---|---|
+| 1 | Active :8000 owner is the newly launched ComfyUI process (not a pre-fix orphan) | False-green from a stale process binding the port |
+| 2 | Active ComfyUI command line contains no `--force-fp16` | Fix didn't reach the runtime launcher path |
+| 3 | `OTR_DeferredCheckpointLoader` actually fires for `flux1-dev-fp8.safetensors` (node 22 titled "Load FLUX.1-dev-fp8") -- audio-only success is NOT enough | Pipeline didn't reach the FLUX render gate |
+| 4 | `[DeferredCheckpointLoader] load complete: 2.13 -> ~13 GiB` (NOT 24.30 GiB) | Another dtype-upcast surface beyond the 4 launchers (investigate ComfyUI Desktop registry / settings.json, model loader node widget overrides, environment variables) |
+| 5 | FLUX sampler pace ~10-15 sec/step (NOT ~9.4 min/step) | Either upcast still happening or another non-fp8 bottleneck |
+| 6 | VRAM peak <14.5 GiB (CLAUDE.md ceiling) | Cap violation; even with fp8 loaded correctly something else is bloating VRAM |
+| 7 | No SageAttention involvement in failures (workflow's `PathchSageAttentionKJ` is disabled; widget value `"disabled"`) | Don't chase SageAttention unless logs prove involvement |
+
+If all 7 land, BUG-LOCAL-230 -> [FIXED] in BUG_LOG.md, this ROADMAP entry moves from "FLUX runtime BLOCKED" to "FLUX runtime VERIFIED CLOSED", and §3.8 attended 3-iter walk begins under the same supervisor invocation. GREEN on three attended iters -> §3.9 overnight 12-iter.
+
+If load delta is still ~22 GiB, stop and investigate another dtype-upcast surface (per the §1 fallback list in BUG-LOCAL-230's Fix section).
 
 **Heartbeat-snapshot worker forensics (deferred):** Skip for §3.8 / §3.9. Revisit only if a real overnight run produces ambiguous worker-death forensics; the supervisor's missing-file fallback covers every forced-death class today.
 
