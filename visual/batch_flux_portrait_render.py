@@ -405,24 +405,29 @@ class BatchFluxPortraitRender:
             "extra limbs, deformed, watermark, text",
         )[0]
 
-        # ---- Render each cast portrait ----
-        rendered_imgs: list[torch.Tensor] = []
+        # ---- BUG-LOCAL-231 fix (2026-05-18) ----
+        # Two-pass refactor: pre-encode ALL non-skipped cast positives
+        # BEFORE pinning MODEL. Pre-fix the encode happened inside the
+        # render loop at each iteration, AFTER the previous iteration's
+        # sampler.sample() had loaded MODEL onto GPU. ComfyUI's
+        # model_management then had to evict MODEL each time CLIP
+        # needed to encode the next prompt, causing per-portrait
+        # MODEL-unload + MODEL-reload cycles. Pre-encoding all
+        # positives upfront lets CLIP get evicted ONCE before MODEL
+        # is pinned for the whole sampling pass.
+
+        # ---- PRE-PASS: skip checks + per-prompt encode ----
+        prepared = []  # list of (i, c, char_id, speaker, positive)
         for i, c in enumerate(cast):
             char_id = _slugify_char_id(
                 c.get("char_id") or c.get("name") or f"c{i+1:02d}"
             )
             speaker = (c.get("name") or c.get("speaker") or char_id).strip()
             # BUG-LOCAL-094 (2026-05-04 EVENING): two-tier skip.
-            # Tier 1 (line-driven): if we have line-block visibility
-            # AND skip_announcer is on AND this char_id has zero
-            # character-role lines, skip. This is the canonical check.
-            # Tier 2 (legacy name-match fallback): if the lines block
-            # was empty/missing AND skip_announcer is on AND the cast
-            # name is the literal "ANNOUNCER", skip. Pre-094 the only
-            # check was `c.get("speaker_role") or c.get("role")` which
-            # always returned empty (cast dict doesn't carry role) so
-            # the guard never fired and ANNOUNCER got a wasted ~30s
-            # FLUX portrait that HuMo never used.
+            # Tier 1 (line-driven): line-block visibility AND
+            # skip_announcer AND char_id has zero character-role lines.
+            # Tier 2 (legacy name-match): no lines block AND
+            # skip_announcer AND name == "ANNOUNCER".
             cast_char_id_for_filter = (c.get("char_id") or "").strip()
             line_visible = bool(char_id_has_character_line)
             if (
@@ -461,11 +466,64 @@ class BatchFluxPortraitRender:
                 speaker, appearance, style_anchor,
                 lighting=_brief_lighting,
             )
-            t0 = time.time()
             try:
                 positive = text_enc.encode(clip, prompt)[0]
                 if guidance_node is not None:
                     positive = guidance_node.append(positive, guidance)[0]
+            except Exception as exc:  # noqa: BLE001
+                msg = (
+                    f"  cast[{i}] {speaker} ({char_id}) PRE-ENCODE FAILED: "
+                    f"{exc}; HuMo will fall back to env-still tier"
+                )
+                log.warning("[OTR_BatchFluxPortraitRender] %s", msg)
+                report_lines.append(msg)
+                continue
+            prepared.append((i, c, char_id, speaker, positive))
+        log.info(
+            "[OTR_BatchFluxPortraitRender] pre-encoded %d portrait "
+            "positive(s) from %d cast member(s)",
+            len(prepared), len(cast),
+        )
+
+        # ---- BUG-LOCAL-231 fix: explicit eviction + pin ----
+        # mm.free_memory forces ComfyUI's model_management to evict
+        # CLIP (and any other resident models from the audio phase)
+        # BEFORE MODEL is pinned for the sampling pass. force_full_load
+        # is NOT used (per Jeffrey 2026-05-18: ComfyUI ignores it
+        # during T5XXL load anyway, and normal offload behavior is
+        # preferable if VRAM tightens elsewhere).
+        try:
+            import comfy.model_management as mm  # type: ignore
+            try:
+                mm.free_memory(
+                    11500 * 1024 * 1024,
+                    [model.load_device],
+                )
+                log.info(
+                    "[OTR_BatchFluxPortraitRender] requested 11.5 GB free "
+                    "on model.load_device before MODEL pin"
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_BatchFluxPortraitRender] mm.free_memory raised "
+                    "%r; proceeding to load_models_gpu without explicit "
+                    "eviction (sampler may thrash)", exc,
+                )
+            mm.load_models_gpu([model])
+            log.info(
+                "[OTR_BatchFluxPortraitRender] pinned MODEL via "
+                "load_models_gpu"
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.debug(
+                "[OTR_BatchFluxPortraitRender] pin skipped: %s", exc
+            )
+
+        # ---- RENDER PASS: sampler + decoder + save per prepared portrait ----
+        rendered_imgs: list[torch.Tensor] = []
+        for i, c, char_id, speaker, positive in prepared:
+            t0 = time.time()
+            try:
                 latent = empty_latent_cls.generate(width, height, 1)[0]
                 samples = sampler.sample(
                     model, seed + i, steps, cfg, sampler_name, scheduler,

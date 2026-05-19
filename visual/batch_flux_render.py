@@ -351,31 +351,38 @@ def _expand_conditioning(cond, batch_size):
         return None
 
 
-def _try_fast_batch(*, prompts, model, clip, vae, text_enc, guidance_node,
+def _try_fast_batch(*, positive_conds, prompts, model, vae,
                     empty_latent_cls, sampler, decoder, negative, seed, steps,
-                    cfg, sampler_name, scheduler, width, height, guidance,
+                    cfg, sampler_name, scheduler, width, height,
                     report_lines):
+    """BUG-LOCAL-231 fix (2026-05-18): accept PRE-ENCODED
+    ``positive_conds`` (already including guidance) instead of raw
+    ``prompts + text_enc + clip + guidance_node + guidance``. Pre-fix
+    the encoding happened here, AFTER ``execute()`` had already
+    pinned the MODEL, which forced ComfyUI's model_management to
+    partial-unload the pinned MODEL to fit T5XXL CLIP. Moving the
+    encode into ``execute()`` before the pin lets CLIP get evicted
+    before MODEL is pinned with full headroom. ``prompts`` is kept
+    purely for logging (shot preview lines).
+    """
     t0 = time.time()
-    N = len(prompts)
-    try:
-        log.info("[BatchFluxRender] fast_batch: encoding %d prompt(s) before single KSampler call", N)
-        raw_conds = []
-        for i, pt in enumerate(prompts):
-            preview = pt[:120] + ("..." if len(pt) > 120 else "")
-            log.info("[BatchFluxRender] shot %d/%d seed=%d: %s", i + 1, N, seed + i, preview)
-            raw_conds.append(text_enc.encode(clip, pt)[0])
-    except Exception as exc:
-        log.warning("[BatchFluxRender] fast_batch encode failed: %s", exc)
+    N = len(positive_conds)
+    if N == 0:
         return None
-    batched_pos = _stack_conditioning(raw_conds)
+    try:
+        for i, pt in enumerate(prompts[:N]):
+            preview = pt[:120] + ("..." if len(pt) > 120 else "")
+            log.info("[BatchFluxRender] shot %d/%d seed=%d: %s",
+                     i + 1, N, seed + i, preview)
+        log.info(
+            "[BatchFluxRender] fast_batch: using %d pre-encoded "
+            "positive(s) for single KSampler call", N,
+        )
+    except Exception as exc:
+        log.warning("[BatchFluxRender] fast_batch logging failed: %s", exc)
+    batched_pos = _stack_conditioning(positive_conds)
     if batched_pos is None:
         return None
-    if guidance_node is not None:
-        try:
-            batched_pos = guidance_node.append(batched_pos, guidance)[0]
-        except Exception as exc:
-            log.warning("[BatchFluxRender] fast_batch FluxGuidance failed: %s", exc)
-            return None
     batched_neg = _expand_conditioning(negative, N)
     if batched_neg is None:
         log.warning("[BatchFluxRender] could not expand negative to batch=%d", N)
@@ -538,17 +545,25 @@ class BatchFluxRender:
             # surface (legacy list form) should not block FLUX render.
             log.debug("[BatchFluxRender] freeze_unload_ok read failed: %r", _exc)
 
-        # Pin MODEL on GPU so per-KSampler load_models_gpu calls are cheap.
-        try:
-            import comfy.model_management as mm  # type: ignore
-            try:
-                mm.load_models_gpu([model], force_full_load=True)
-            except TypeError:
-                mm.load_models_gpu([model])
-            log.info("[BatchFluxRender] pinned MODEL via load_models_gpu")
-        except Exception as exc:
-            log.debug("[BatchFluxRender] pre-pin skipped: %s", exc)
-
+        # BUG-LOCAL-231 fix (2026-05-18): the old "pin MODEL on GPU"
+        # block that used to live here pinned BEFORE any CLIPTextEncode
+        # ran. ComfyUI's model_management then had to partial-unload
+        # the pinned MODEL to fit T5XXL CLIP (per-shot ~8.5 GB freed +
+        # ~11 GB MODEL re-load before sampler, at 154 s/step). The new
+        # order is:
+        #   1. Encode negative
+        #   2. Resolve bookend prompt + encode bookend positive
+        #      (unless DISABLED widget sentinel)
+        #   3. If NOT skip_env_stills: pre-encode the N per-shot
+        #      positive conditionings
+        #   4. mm.free_memory(...) -- explicit eviction so CLIP gets
+        #      freed before MODEL pin (the "natural offload" assumption
+        #      isn't reliable; pin alone may not free CLIP, see Jeffrey
+        #      2026-05-18 push-back)
+        #   5. mm.load_models_gpu([model]) -- pin MODEL with full
+        #      headroom (force_full_load dropped per Jeffrey 2026-05-18:
+        #      ComfyUI ignores it during T5XXL load anyway, and normal
+        #      offload behavior is preferable if VRAM tightens elsewhere)
         refs = _lazy_nodes()
         CLIPTextEncode = refs["CLIPTextEncode"]
         KSampler = refs["KSampler"]
@@ -572,6 +587,101 @@ class BatchFluxRender:
             negative = text_enc.encode(clip, "")[0]
         except Exception as exc:
             raise RuntimeError(f"BatchFluxRender: negative CLIPTextEncode failed: {exc}")
+
+        # ---- BUG-LOCAL-231 fix step 2: pre-encode bookend positive ----
+        # Resolve the bookend prompt + encode now, BEFORE the pin, so
+        # CLIP gets evicted naturally and the explicit free_memory()
+        # below releases its VRAM. DISABLED widget yields a None
+        # `bookend_positive` and the bookend render is skipped later.
+        widget_str = (radio_bookend_prompt or "").strip()
+        bookend_positive = None
+        bookend_resolved = None
+        bookend_prompt_source = None
+        bookend_ledger_p = None
+        bookend_episode_id = None
+        bookend_led = None
+        if widget_str.upper() == "DISABLED":
+            log.info(
+                "[BatchFluxRender] radio bookend DISABLED via widget "
+                "sentinel (no render attempted)"
+            )
+        else:
+            (bookend_resolved, bookend_prompt_source, bookend_ledger_p,
+             bookend_episode_id, bookend_led) = (
+                self._resolve_radio_bookend_prompt(widget_str)
+            )
+            if bookend_resolved is not None:
+                try:
+                    bookend_positive = text_enc.encode(clip, bookend_resolved)[0]
+                    if guidance_node is not None:
+                        bookend_positive = (
+                            guidance_node.append(bookend_positive, guidance)[0]
+                        )
+                except Exception as exc:
+                    log.warning(
+                        "[BatchFluxRender] bookend pre-encode failed (%s); "
+                        "bookend render will be skipped", exc,
+                    )
+                    bookend_positive = None
+
+        # ---- BUG-LOCAL-231 fix step 3: pre-encode per-shot positives ----
+        # When skip_env_stills=True, the N prompts are NOT rendered, so
+        # we don't need to pre-encode them. Otherwise pre-encode them
+        # all upfront so CLIP can be evicted before the MODEL pin.
+        positive_conds = []
+        if not skip_env_stills and prompts:
+            try:
+                for i, pt in enumerate(prompts):
+                    pc = text_enc.encode(clip, pt)[0]
+                    if guidance_node is not None:
+                        pc = guidance_node.append(pc, guidance)[0]
+                    positive_conds.append(pc)
+                log.info(
+                    "[BatchFluxRender] pre-encoded %d per-shot positive(s)",
+                    len(positive_conds),
+                )
+            except Exception as exc:
+                log.warning(
+                    "[BatchFluxRender] per-shot pre-encode failed at i=%d "
+                    "(%s); falling back to per-shot encode inside serial loop",
+                    len(positive_conds), exc,
+                )
+                positive_conds = []  # fall back to per-shot encoding
+
+        # ---- BUG-LOCAL-231 fix step 4: explicit eviction + pin ----
+        # mm.free_memory requests N bytes free on the model's load_device,
+        # which forces ComfyUI's model_management to evict resident
+        # models (CLIP/T5XXL, leftover audio cache, anything else) to
+        # satisfy the request. THEN load_models_gpu pins the MODEL with
+        # full headroom. Without the explicit free_memory, the pin alone
+        # may not evict CLIP -- ComfyUI's evict-on-request policy only
+        # fires when something else REQUESTS VRAM, and load_models_gpu
+        # checks-and-shares rather than demanding eviction.
+        try:
+            import comfy.model_management as mm  # type: ignore
+            try:
+                # 11.5 GB headroom request -- FLUX-fp8 needs ~11 GB to
+                # load + ~3 GB activation working set on the bf16 cast
+                # path. CLIP/T5XXL (~4.8 GB) eviction satisfies this on
+                # a 16 GB card.
+                mm.free_memory(
+                    11500 * 1024 * 1024,
+                    [model.load_device],
+                )
+                log.info(
+                    "[BatchFluxRender] requested 11.5 GB free on "
+                    "model.load_device before MODEL pin"
+                )
+            except Exception as exc:
+                log.warning(
+                    "[BatchFluxRender] mm.free_memory raised %r; "
+                    "proceeding to load_models_gpu without explicit "
+                    "eviction (sampler may thrash)", exc,
+                )
+            mm.load_models_gpu([model])
+            log.info("[BatchFluxRender] pinned MODEL via load_models_gpu")
+        except Exception as exc:
+            log.debug("[BatchFluxRender] pre-pin skipped: %s", exc)
 
         report_lines = [
             f"BatchFluxRender: {len(prompts)} shot(s) @ {width}x{height}, "
@@ -598,29 +708,38 @@ class BatchFluxRender:
                 "skip_env_stills=True; bypassed env-still pass "
                 "(saved ~2-3 min FLUX time)"
             )
-            try:
-                _RADIO_BOOKEND_W = 1248
-                _RADIO_BOOKEND_H = 720
-                self._render_and_save_radio_bookend(
-                    prompt_text=str(radio_bookend_prompt or ""),
-                    model=model, clip=clip, vae=vae,
-                    text_enc=text_enc, guidance_node=guidance_node,
-                    empty_latent_cls=empty_latent_cls, sampler=sampler,
-                    decoder=decoder, negative=negative,
-                    seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
-                    sampler_name=sampler_name, scheduler=scheduler,
-                    width=_RADIO_BOOKEND_W, height=_RADIO_BOOKEND_H,
-                    guidance=guidance,
-                    report_lines=report_lines,
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.exception(
-                    "[BatchFluxRender] radio bookend render failed in "
-                    "skip_env_stills mode: %s", exc,
-                )
-                report_lines.append(
-                    f"  radio bookend FAILED in skip mode: {exc}"
-                )
+            if bookend_positive is None:
+                # DISABLED widget OR pre-encode failed -- skip the
+                # bookend render entirely (matches pre-fix behavior of
+                # _render_radio_bookend_step's DISABLED short-circuit).
+                report_lines.append("  radio_bookend: DISABLED (widget)")
+            else:
+                try:
+                    _RADIO_BOOKEND_W = 1248
+                    _RADIO_BOOKEND_H = 720
+                    self._render_and_save_radio_bookend(
+                        positive=bookend_positive,
+                        resolved_prompt=bookend_resolved,
+                        prompt_source=bookend_prompt_source,
+                        ledger_p=bookend_ledger_p,
+                        episode_id=bookend_episode_id,
+                        led=bookend_led,
+                        model=model, vae=vae,
+                        empty_latent_cls=empty_latent_cls, sampler=sampler,
+                        decoder=decoder, negative=negative,
+                        seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
+                        sampler_name=sampler_name, scheduler=scheduler,
+                        width=_RADIO_BOOKEND_W, height=_RADIO_BOOKEND_H,
+                        report_lines=report_lines,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.exception(
+                        "[BatchFluxRender] radio bookend render failed in "
+                        "skip_env_stills mode: %s", exc,
+                    )
+                    report_lines.append(
+                        f"  radio bookend FAILED in skip mode: {exc}"
+                    )
             import torch as _torch  # type: ignore
             placeholder = _torch.zeros((1, 16, 16, 3), dtype=_torch.float32)
             elapsed_ms = int((time.time() - t_start) * 1000)
@@ -630,14 +749,18 @@ class BatchFluxRender:
             return (placeholder, "\n".join(report_lines))
 
         # FAST BATCH PATH
-        if fast_batch and len(prompts) > 1:
+        # BUG-LOCAL-231 fix: only run fast_batch if pre-encoding
+        # succeeded; otherwise fall through to the serial loop
+        # (which has its own per-shot encode fallback).
+        if (fast_batch and len(prompts) > 1
+                and len(positive_conds) == len(prompts)):
             batched_result = _try_fast_batch(
-                prompts=prompts, model=model, clip=clip, vae=vae,
-                text_enc=text_enc, guidance_node=guidance_node,
+                positive_conds=positive_conds, prompts=prompts,
+                model=model, vae=vae,
                 empty_latent_cls=empty_latent_cls, sampler=sampler,
                 decoder=decoder, negative=negative, seed=seed, steps=steps,
                 cfg=cfg, sampler_name=sampler_name, scheduler=scheduler,
-                width=width, height=height, guidance=guidance,
+                width=width, height=height,
                 report_lines=report_lines,
             )
             if batched_result is not None:
@@ -656,15 +779,18 @@ class BatchFluxRender:
                 # now invoked before BOTH this fast_batch return and
                 # the serial-loop return below.
                 self._render_radio_bookend_step(
-                    radio_bookend_prompt=radio_bookend_prompt,
+                    bookend_positive=bookend_positive,
+                    bookend_resolved=bookend_resolved,
+                    bookend_prompt_source=bookend_prompt_source,
+                    bookend_ledger_p=bookend_ledger_p,
+                    bookend_episode_id=bookend_episode_id,
+                    bookend_led=bookend_led,
                     radio_bookend_seed=radio_bookend_seed,
-                    model=model, clip=clip, vae=vae,
-                    text_enc=text_enc, guidance_node=guidance_node,
+                    model=model, vae=vae,
                     empty_latent_cls=empty_latent_cls, sampler=sampler,
                     decoder=decoder, negative=negative,
                     steps=steps, cfg=cfg,
                     sampler_name=sampler_name, scheduler=scheduler,
-                    width=width, height=height, guidance=guidance,
                     report_lines=report_lines,
                 )
                 return (image_batch, "\n".join(report_lines))
@@ -672,6 +798,9 @@ class BatchFluxRender:
             report_lines.append("  fast_batch failed -- fell through to serial loop")
 
         # SERIAL LOOP PATH
+        # BUG-LOCAL-231 fix: use pre-encoded positive_conds[i] when
+        # available (the new path). Fall back to per-shot encode if
+        # pre-encoding failed earlier (positive_conds is empty).
         images = []
         for shot_index, prompt_text in enumerate(prompts):
             shot_t0 = time.time()
@@ -680,9 +809,21 @@ class BatchFluxRender:
             log.info("[BatchFluxRender] shot %d/%d seed=%d: %s",
                      shot_index + 1, len(prompts), shot_seed, preview)
             try:
-                positive = text_enc.encode(clip, prompt_text)[0]
-                if guidance_node is not None:
-                    positive = guidance_node.append(positive, guidance)[0]
+                if shot_index < len(positive_conds):
+                    positive = positive_conds[shot_index]
+                else:
+                    # Fallback path (pre-encode failed) -- per-shot
+                    # encode happens AFTER the MODEL pin; expect a
+                    # CLIP/MODEL swap cycle here. Logged at WARN so
+                    # the soak tail surfaces the degraded path.
+                    log.warning(
+                        "[BatchFluxRender] shot %d: pre-encode missing, "
+                        "encoding inside loop (sampler may thrash)",
+                        shot_index + 1,
+                    )
+                    positive = text_enc.encode(clip, prompt_text)[0]
+                    if guidance_node is not None:
+                        positive = guidance_node.append(positive, guidance)[0]
                 latent = empty_latent_cls.generate(width, height, 1)[0]
                 samples = sampler.sample(model, shot_seed, steps, cfg, sampler_name,
                                          scheduler, positive, negative, latent, 1.0)[0]
@@ -725,49 +866,46 @@ class BatchFluxRender:
 
     def _render_radio_bookend_step(
         self,
-        radio_bookend_prompt,
+        bookend_positive,
+        bookend_resolved,
+        bookend_prompt_source,
+        bookend_ledger_p,
+        bookend_episode_id,
+        bookend_led,
         radio_bookend_seed,
-        model, clip, vae,
-        text_enc, guidance_node,
+        model, vae,
         empty_latent_cls, sampler,
         decoder, negative,
         steps, cfg,
         sampler_name, scheduler,
-        width, height, guidance,
         report_lines,
     ):
         """Render + stamp the radio still.  Called from BOTH the
         fast_batch return path and the serial-loop return path
         (BUG-LOCAL-127 fix 2026-05-01).
 
-        Three modes (widget value):
-          - ``"DISABLED"`` (case-insensitive): skip rendering.
-          - non-empty otherwise: use as verbatim override.
-          - empty (default): build dynamically from ledger context
-            (style + style).
-
-        The radio still is consumed by BatchHumoRender as the I2V
-        reference for all non-dialogue HuMo clips (announcer,
-        music_*, sfx).  Rendering ALWAYS attempts under the new
-        default so wall-to-wall HuMo coverage has its non-dialogue
-        reference image ready.
+        BUG-LOCAL-231 fix (2026-05-18): accepts the pre-encoded
+        ``bookend_positive`` + already-resolved data instead of the
+        old ``radio_bookend_prompt`` widget value + ``text_enc + clip``
+        + ``guidance_node + guidance``. Resolution + encode happen in
+        ``execute()`` BEFORE the MODEL pin so CLIP gets evicted
+        cleanly. ``bookend_positive=None`` means DISABLED widget OR
+        pre-encode failed; we skip the render in that case.
 
         Never raises -- a render failure is logged with full
         traceback (log.exception) and noted in report_lines, but the
         outer execute() always returns the main image batch.
         """
-        widget_str = (radio_bookend_prompt or "").strip()
-        if widget_str.upper() == "DISABLED":
+        if bookend_positive is None:
             log.info(
                 "[BatchFluxRender] radio bookend DISABLED via widget "
-                "sentinel (no render attempted)"
+                "sentinel OR pre-encode failed (no render attempted)"
             )
             report_lines.append("  radio_bookend: DISABLED (widget)")
             return
-        mode = "OVERRIDE" if widget_str else "DYNAMIC"
         log.info(
-            "[BatchFluxRender] radio bookend %s mode (seed=%d)",
-            mode, int(radio_bookend_seed),
+            "[BatchFluxRender] radio bookend render (seed=%d, source=%s)",
+            int(radio_bookend_seed), bookend_prompt_source,
         )
         # 2026-05-01 EVENING (Jeffrey, post round-robin pixel-policy
         # synthesis): render the radio still at FLUX-native ~1MP, then
@@ -796,17 +934,18 @@ class BatchFluxRender:
         _RADIO_BOOKEND_H = 720
         try:
             self._render_and_save_radio_bookend(
-                # widget_str is "" in DYNAMIC mode -- callee detects
-                # the empty string and builds dynamically.
-                prompt_text=widget_str,
-                model=model, clip=clip, vae=vae,
-                text_enc=text_enc, guidance_node=guidance_node,
+                positive=bookend_positive,
+                resolved_prompt=bookend_resolved,
+                prompt_source=bookend_prompt_source,
+                ledger_p=bookend_ledger_p,
+                episode_id=bookend_episode_id,
+                led=bookend_led,
+                model=model, vae=vae,
                 empty_latent_cls=empty_latent_cls, sampler=sampler,
                 decoder=decoder, negative=negative,
                 seed=int(radio_bookend_seed), steps=steps, cfg=cfg,
                 sampler_name=sampler_name, scheduler=scheduler,
                 width=_RADIO_BOOKEND_W, height=_RADIO_BOOKEND_H,
-                guidance=guidance,
                 report_lines=report_lines,
             )
         except Exception as exc:
@@ -824,37 +963,25 @@ class BatchFluxRender:
             )
 
     @staticmethod
-    def _render_and_save_radio_bookend(
-        prompt_text, model, clip, vae, text_enc, guidance_node,
-        empty_latent_cls, sampler, decoder, negative,
-        seed, steps, cfg, sampler_name, scheduler,
-        width, height, guidance, report_lines,
-    ):
-        """Step 1: render the radio still (one extra FLUX call) and
-        save it to ``output/otr/stills/radio_bookend_<ep_id>.png``.
+    def _resolve_radio_bookend_prompt(prompt_text):
+        """BUG-LOCAL-231 fix (2026-05-18): split out the bookend
+        prompt-resolution path so execute() can resolve + pre-encode
+        BEFORE pinning the MODEL. Pre-fix this work happened inside
+        _render_and_save_radio_bookend AFTER the pin was held, which
+        forced ComfyUI's model_management to partial-unload the
+        pinned MODEL to fit T5XXL CLIP (~8.5 GB freed + ~11 GB re-load
+        per shot at 154 s/step). Resolving + encoding before the pin
+        lets CLIP load, encode, and yield naturally; the explicit
+        free_memory + load_models_gpu in execute() then pins MODEL
+        with full headroom.
 
-        ``prompt_text``:
-          - Empty string  -> build dynamically from ledger context
-                             (style + style); falls
-                             back to ``_RADIO_FALLBACK_PROMPT`` if
-                             ledger is unavailable.
-          - Non-empty     -> use verbatim as override.
-
-        Stamps both ``ledger.radio_bookend_path`` (top-level) AND
-        ``ledger.meta.radio_bookend_path`` for belt-and-suspenders.
-        Downstream (BatchHumoRender) reads the radio still as the
-        I2V reference image for any non-dialogue HuMo clip
-        (announcer, music_*, sfx).  Per Jeffrey 2026-04-30: every
-        audio second is a HuMo clip; people speaking get people
-        lip-syncing, everything else gets the radio lip-syncing.
+        Returns:
+          (resolved_prompt, prompt_source, ledger_p, episode_id, led)
+          or (None, None, None, None, None) on helper-import failure
+          (caller should skip the bookend render).
         """
-        import numpy as np  # type: ignore
         from pathlib import Path
-        from PIL import Image  # type: ignore
 
-        # Lazily import path + ledger helpers from nodes/.  Done up
-        # front (BEFORE FLUX render) so dynamic-prompt mode can pull
-        # genre/style from the ledger before the render kicks off.
         try:
             import sys as _sys
             _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
@@ -868,42 +995,18 @@ class BatchFluxRender:
                 "[BatchFluxRender] radio still: helper import failed (%s)",
                 exc,
             )
-            return
+            return (None, None, None, None, None)
 
-        # BUG-LOCAL-021 (Phase G, 2026-05-03): use the in-flight Ledger
-        # singleton to identify the current episode, NOT the global
-        # mtime walker. Prior to this fix, `find_most_recent_ledger`
-        # picked whichever `*_ledger.json` had the newest mtime under
-        # `otr/episodes/` -- that could be a leftover from a prior
-        # episode, causing the radio bookend to be stamped to the
-        # WRONG ledger (proven in soak run 2026-05-02 where a May 2
-        # run stamped to an April 26 episode_id).
-        #
-        # Same bug shape as BUG-LOCAL-014 (spacesaver wrong-episode
-        # wipe). Phase A fixed it for rtx_upscale; this site was
-        # missed. The singleton's `path` property advances correctly
-        # through Ledger.rename_episode (Phase B), so it tracks the
-        # in-flight episode by construction. ComfyUI sequential queue
-        # + LLMScriptWriter's IS_CHANGED=time.time() prevent the
-        # singleton from ever going stale across queued runs.
+        # BUG-LOCAL-021 (Phase G, 2026-05-03) singleton lookup.
         try:
             _led_singleton = _PROD_LEDGER.get_ledger()
             ledger_p = Path(_led_singleton.path)
             if not ledger_p.exists():
-                # Fall back to mtime walker as last resort -- shouldn't
-                # happen in normal pipeline order but defends against
-                # standalone test invocations of this node.
                 log.warning(
                     "[BatchFluxRender] radio still: singleton path %s does "
                     "not exist on disk; falling back to mtime walker",
                     ledger_p,
                 )
-                # S28 cleanbreak (completed 2026-05-18 retest #17
-                # follow-up): otr_legacy_audio_dir() was removed in
-                # S28 Phase 1; this call site was missed in the
-                # original sweep. Per-episode workspace is now the
-                # only contract; the walker just scans
-                # otr_episodes_root() for *_ledger.json.
                 ledger_p = _OTRL.find_most_recent_ledger(
                     [_OTRP.otr_episodes_root()]
                 )
@@ -921,13 +1024,6 @@ class BatchFluxRender:
             led = _OTRL.load_ledger_safe(ledger_p)
             if led is not None:
                 episode_id = (led.get("episode_id") or "episode").strip()
-        # BUG-LOCAL-121 diagnostic hardening (2026-05-01,
-        # round-robin Q3 Symptom 2 hypothesis (c)):
-        # Stamp the episode_id we're about to write into the bookend
-        # filename so a downstream "wanted radio still but it's
-        # missing" warning in BatchHumoRender can be compared
-        # directly. If the two episode_ids differ, the ledger was
-        # renamed/swapped between FLUX and HuMo phases.
         log.info(
             "[BatchFluxRender] radio bookend stage: ledger=%s "
             "episode_id=%s (will save as radio_bookend_%s.png)",
@@ -936,18 +1032,13 @@ class BatchFluxRender:
             episode_id,
         )
 
-        # Resolve the prompt: empty widget -> dynamic build; non-empty
-        # widget -> verbatim override.
+        # Resolve prompt: empty widget -> dynamic; non-empty -> verbatim.
         widget_prompt = (prompt_text or "").strip()
         if widget_prompt:
             resolved_prompt = widget_prompt
             prompt_source = "override"
         else:
             resolved_prompt = _build_dynamic_radio_prompt(led)
-            # Diagnose which branch the dynamic builder took.  Post
-            # 2026-04-30 consolidation: free-text style is
-            # the single tonal knob; either we have it (dynamic) or
-            # we don't (fallback).  No genre-vs-style split.
             if led is None:
                 prompt_source = "fallback (no ledger)"
             else:
@@ -967,12 +1058,65 @@ class BatchFluxRender:
             "first 80 chars: %s",
             prompt_source, len(resolved_prompt), resolved_prompt[:80],
         )
+        return (resolved_prompt, prompt_source, ledger_p, episode_id, led)
 
-        # Now run the FLUX render with the resolved prompt.
+    @staticmethod
+    def _render_and_save_radio_bookend(
+        positive, resolved_prompt, prompt_source, ledger_p, episode_id, led,
+        model, vae,
+        empty_latent_cls, sampler, decoder, negative,
+        seed, steps, cfg, sampler_name, scheduler,
+        width, height, report_lines,
+    ):
+        """Step 1: render the radio still (one extra FLUX call) and
+        save it to ``output/otr/stills/radio_bookend_<ep_id>.png``.
+
+        BUG-LOCAL-231 fix (2026-05-18): prompt resolution + CLIP
+        encode moved into ``_resolve_radio_bookend_prompt`` and
+        ``execute()`` respectively; this function now receives a
+        pre-encoded ``positive`` conditioning + already-resolved
+        ledger data and runs sampler + decoder + save only. Pre-fix
+        the resolution + encode happened here AFTER ``execute()``
+        had already pinned the MODEL via ``load_models_gpu``, which
+        forced ComfyUI's ``model_management`` to partial-unload the
+        pinned MODEL to fit T5XXL CLIP (per-shot ~8.5 GB free +
+        ~11 GB re-load cycle at 154 s/step). Resolving + encoding
+        in ``execute()`` before the explicit free_memory + pin
+        breaks that cycle.
+
+        Stamps both ``ledger.radio_bookend_path`` (top-level) AND
+        ``ledger.meta.radio_bookend_path`` for belt-and-suspenders.
+        Downstream (BatchHumoRender) reads the radio still as the
+        I2V reference image for any non-dialogue HuMo clip
+        (announcer, music_*, sfx).
+        """
+        import numpy as np  # type: ignore
+        from pathlib import Path
+        from PIL import Image  # type: ignore
+
+        # _otr_paths is needed for the save-path lookup below;
+        # _otr_ledger is needed for the stamp at the end. Both are
+        # imported on the sys.path that _resolve_radio_bookend_prompt
+        # already extended, so this is a cheap re-import.
+        try:
+            import sys as _sys
+            _NODES_DIR = Path(__file__).resolve().parents[1] / "nodes"
+            if str(_NODES_DIR) not in _sys.path:
+                _sys.path.insert(0, str(_NODES_DIR))
+            import _otr_paths as _OTRP  # type: ignore
+            import _otr_ledger as _OTRL  # type: ignore
+        except Exception as exc:
+            log.warning(
+                "[BatchFluxRender] radio still: helper import failed "
+                "in save path (%s)", exc,
+            )
+            return
+
+        # Pre-resolved data + pre-encoded positive are passed in by
+        # the caller (execute() in skip_env_stills mode, or
+        # _render_radio_bookend_step in fast_batch / serial mode).
+        # We just sample + decode + save here.
         t0 = time.time()
-        positive = text_enc.encode(clip, resolved_prompt)[0]
-        if guidance_node is not None:
-            positive = guidance_node.append(positive, guidance)[0]
         latent = empty_latent_cls.generate(width, height, 1)[0]
         samples = sampler.sample(
             model, seed, steps, cfg, sampler_name, scheduler,
