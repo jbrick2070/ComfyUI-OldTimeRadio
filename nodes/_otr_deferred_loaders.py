@@ -76,6 +76,76 @@ def _vram_allocated_gib() -> float:
     return float("nan")
 
 
+def _vram_telemetry_snapshot() -> dict:
+    """BUG-LOCAL-231 PARTIAL investigation (2026-05-19): capture
+    a richer VRAM snapshot at deferred-loader fire/complete moments
+    to disambiguate the audio-residue hypothesis from the alt-a/b/c
+    hypotheses. Returns a dict with:
+
+      - allocated_gib:  torch.cuda.memory_allocated() in GiB.
+                        Python-side, doesn't include allocator-held
+                        reserved blocks.
+      - reserved_gib:   torch.cuda.memory_reserved() in GiB.
+                        Caching allocator's reserved blocks --
+                        closer to what LHM sees as physically used.
+      - lhm_used_mb:    GPU Memory Used from LHM HTTP endpoint.
+                        Driver-side truth; includes any non-torch
+                        allocations (browser WebGL, Comfy Electron,
+                        Steam shader cache, etc.). NaN if LHM is
+                        not running or unreachable.
+
+    All three are best-effort. Pure telemetry. No exceptions
+    propagated -- a failed LHM fetch returns NaN for that field,
+    not a raise. Per Jeffrey 2026-05-19 directive: this telemetry
+    is what disambiguates the BUG-LOCAL-231 audio-residue hypothesis
+    across cold-launch smokes.
+    """
+    snap = {
+        "allocated_gib": float("nan"),
+        "reserved_gib":  float("nan"),
+        "lhm_used_mb":   float("nan"),
+    }
+    try:
+        import torch
+        if torch.cuda.is_available():
+            snap["allocated_gib"] = torch.cuda.memory_allocated() / (1024 ** 3)
+            snap["reserved_gib"]  = torch.cuda.memory_reserved()  / (1024 ** 3)
+    except Exception:  # noqa: BLE001
+        pass
+    # LHM HTTP fetch -- Jeffrey runs LibreHardwareMonitor at
+    # localhost:8085. Single shallow GPU Memory Used probe;
+    # 1.5s timeout keeps this off the hot path if LHM is down.
+    try:
+        import json as _json
+        import urllib.request
+        with urllib.request.urlopen(
+            "http://localhost:8085/data.json", timeout=1.5,
+        ) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        # LHM returns a recursive {Children: [...]} tree.
+        # Walk it iteratively looking for "GPU Memory Used"
+        # leaf -- typically reports like "15921.0 MB".
+        stack = [data]
+        while stack:
+            node = stack.pop()
+            if not isinstance(node, dict):
+                continue
+            if (node.get("Text") == "GPU Memory Used"
+                    and isinstance(node.get("Value"), str)):
+                val = node["Value"].strip()
+                if val.endswith(" MB"):
+                    try:
+                        snap["lhm_used_mb"] = float(val[:-3])
+                        break
+                    except ValueError:
+                        pass
+            for child in (node.get("Children") or []):
+                stack.append(child)
+    except Exception:  # noqa: BLE001
+        pass
+    return snap
+
+
 # ---------------------------------------------------------------------------
 # OTR_DeferredCheckpointLoader -- FLUX checkpoint with gate_signal dependency
 # ---------------------------------------------------------------------------
@@ -134,11 +204,22 @@ class DeferredCheckpointLoader:
         }
 
     def load(self, gate_signal, ckpt_name):
-        before_gib = _vram_allocated_gib()
+        # BUG-LOCAL-231 PARTIAL investigation (2026-05-19): the
+        # original `VRAM allocated=X.XX GiB` only captures
+        # torch.cuda.memory_allocated() -- Python's live tensor
+        # bytes. To disambiguate the audio-residue hypothesis from
+        # alt-a/b/c (browser/Comfy reserve/D3D spillover), also log
+        # torch.cuda.memory_reserved() (caching allocator reserve --
+        # closer to LHM physical use) AND LibreHardwareMonitor's
+        # GPU Memory Used (true driver-side state). One log line
+        # per fire/complete moment; LHM fetch is 1.5s-timeout
+        # best-effort so a missing LHM doesn't slow the load.
+        before = _vram_telemetry_snapshot()
         log.info(
-            "[DeferredCheckpointLoader] fire: VRAM allocated=%.2f GiB; "
-            "gate_signal len=%d; ckpt=%s",
-            before_gib,
+            "[DeferredCheckpointLoader] fire: VRAM allocated=%.2f GiB "
+            "reserved=%.2f GiB lhm_used=%.0f MB; gate_signal len=%d; ckpt=%s",
+            before["allocated_gib"], before["reserved_gib"],
+            before["lhm_used_mb"],
             len(gate_signal) if gate_signal else 0,
             ckpt_name,
         )
@@ -160,11 +241,19 @@ class DeferredCheckpointLoader:
             ),
         )
 
-        after_gib = _vram_allocated_gib()
+        after = _vram_telemetry_snapshot()
         log.info(
             "[DeferredCheckpointLoader] load complete: "
-            "VRAM allocated=%.2f -> %.2f GiB (delta=%.2f); ckpt=%s",
-            before_gib, after_gib, after_gib - before_gib, ckpt_name,
+            "VRAM allocated=%.2f -> %.2f GiB (delta=%.2f) "
+            "reserved=%.2f -> %.2f GiB (delta=%.2f) "
+            "lhm_used=%.0f -> %.0f MB (delta=%.0f); ckpt=%s",
+            before["allocated_gib"], after["allocated_gib"],
+            after["allocated_gib"] - before["allocated_gib"],
+            before["reserved_gib"], after["reserved_gib"],
+            after["reserved_gib"] - before["reserved_gib"],
+            before["lhm_used_mb"], after["lhm_used_mb"],
+            after["lhm_used_mb"] - before["lhm_used_mb"],
+            ckpt_name,
         )
         return out[:3]
 
