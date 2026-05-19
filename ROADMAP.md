@@ -1,8 +1,8 @@
 ﻿# OTR Roadmap
 
-**Branch:** `v2.0-alpha` (HEAD `16ce225` 2026-05-18 -- Sprint H §3.7 harness structurally GREEN, FLUX runtime verification BLOCKED on BUG-LOCAL-230 pending local smoke) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-18 (BUG-LOCAL-230 `--force-fp16` dtype-upcast fix across 4 launcher sites; verification gate open)
+**Branch:** `v2.0-alpha` (HEAD `1adce21` 2026-05-18 -- Sprint H §3.7 harness GREEN, BUG-LOCAL-230 architectural axis PROVEN by 2026-05-18 21:10 smoke, runtime axis BLOCKED on BUG-LOCAL-231 residual VRAM pressure) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-18 21:10 (BUG-LOCAL-230 verification smoke; gates #1-#4 + #7 PASS, gates #5 + #6 FAIL on a separate defect now tracked as BUG-LOCAL-231)
 
-**Current gate:** Sprint H §3.7 harness closure is structurally GREEN, but FLUX runtime verification is blocked by BUG-LOCAL-230 pending local smoke. The `--force-fp16` dtype-upcast fix landed across launcher sites (`start_comfy.bat`, `scripts/worker_iter.py`, `scripts/start_comfy_h0_baseline.bat`, `scripts/_start_comfyui.ps1`); next required step is a clean one-iter smoke proving FLUX fp8 loads at ~13 GiB (not 24.30 GiB) and samples at ~10-15 sec/step (not 564.99 s/it). §3.8 does NOT proceed until that telemetry lands. BUG-LOCAL-230 stays in pending-verification posture in BUG_LOG.md; promote to [FIXED] only after the smoke proves the load delta + sampler pace + active ComfyUI command line free of `--force-fp16`.
+**Current gate:** Sprint H §3.7 harness closure is structurally GREEN. **BUG-LOCAL-230 architectural axis PROVEN** by the 2026-05-18 21:10 smoke run: gates #1-#4 + #7 all PASS (load delta 11.08 GiB vs predicted ~11 GiB; weight dtype `torch.float8_e4m3fn` with bf16 cast vs pre-fix `torch.float16` upcast; no `--force-fp16` in any runtime cmdline; sweep_prelaunch killed pre-fix process before fresh chain came up; PathchSageAttentionKJ disabled, no SageAttention chase). **Runtime axis BLOCKED on BUG-LOCAL-231** -- gates #5 (sampler at 154 s/step vs target 10-15 s/step) + #6 (VRAM peak 15911 MB / 1098 MB D3D Shared paging vs the 14.5 GiB CLAUDE.md ceiling) FAIL on a separate defect that surfaced after the dtype upcast was removed. BUG-LOCAL-230 stays at pending-verification posture in BUG_LOG.md (no `[FIXED]` marker) until BUG-LOCAL-231 closes and a fresh 7-criteria smoke passes cleanly. §3.8 does NOT proceed until both close. **No code change on BUG-LOCAL-231 until ChatGPT + Gemini round-robin converges on candidate ordering per the CLAUDE.md round-robin protocol -- this is a VRAM budgeting decision, exactly the round-robin trigger.** Transcript to save under `docs/2026-05-18-flux-vram-pressure/`.
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
@@ -77,9 +77,11 @@ After the current round of cleanbreak validation work closes, the next three spr
 
 ---
 
-## SPRINT H -- §3.7 HARNESS GREEN, FLUX RUNTIME BLOCKED ON BUG-LOCAL-230 (Jeffrey, 2026-05-18)
+## SPRINT H -- §3.7 ARCHITECTURAL PROVEN, RUNTIME BLOCKED ON BUG-LOCAL-231 (Jeffrey, 2026-05-18 21:30)
 
-Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5b44e65` (Sprint H §3.7 close, 2026-05-17). All four §3.7 attended-validation checks GREEN within the bounds of what Windows physically permits. **§3.7 closure-run telemetry (2026-05-18) then surfaced BUG-LOCAL-230: FLUX1-dev-fp8 was being upcast to fp16 by the `--force-fp16` launch arg, doubling the checkpoint footprint to ~22 GiB on a 16 GB card and forcing the dynamic offloader to thrash at ~9.4 min/sampler-step. Fix landed across 4 launcher sites at HEAD `16ce225`; verification of the post-fix VRAM (~13 GiB) and sampler pace (~10-15 s/step) is pending the next local smoke. §3.8 does NOT advance until that telemetry lands.**
+Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5b44e65` (Sprint H §3.7 close, 2026-05-17). All four §3.7 attended-validation checks GREEN within the bounds of what Windows physically permits. **§3.7 closure-run telemetry (2026-05-18) then surfaced BUG-LOCAL-230: FLUX1-dev-fp8 was being upcast to fp16 by the `--force-fp16` launch arg, doubling the checkpoint footprint to ~22 GiB on a 16 GB card and forcing the dynamic offloader to thrash at ~9.4 min/sampler-step. Fix landed across 4 launcher sites at HEAD `16ce225` / `1adce21`. The 2026-05-18 21:10 verification smoke PROVED the architectural axis (gates #1-#4 + #7 PASS: weights now load as native fp8_e4m3fn at 11.08 GiB delta vs the pre-fix 22.17 GiB upcast). BUT the smoke also surfaced BUG-LOCAL-231: sampler still runs at 154 s/step (vs target 10-15 s/step) with VRAM peak 15911 MB + 1098 MB D3D Shared paging. The dtype upcast is gone (10x less D3D Shared spill vs the pre-fix 10445 MB), but residual VRAM pressure on a 16 GB card still throttles the sampler ~10x off-target. BUG-LOCAL-231 is NOT a dtype-upcast surface; it's a separate VRAM-budgeting defect.**
+
+**Smoke kill posture (2026-05-18 21:24):** Smoke killed cleanly at sampler step 1/20 after gate #4 PASS proved the architectural axis. Continuing the run for another ~3.5 hr through completion would not have changed the BUG-LOCAL-230 verdict; the tqdm s/it projection at step 1 is conclusive evidence of pace. Kill path: `POST /interrupt` (HTTP 200, sampler canceled) -> `taskkill /F /PID 50236` (worker .venv stub; uv child 35232 already gone via propagation) -> supervisor (47560 / 37396) auto-exited on worker death -> ComfyUI (PID 65268 / 18444) re-parented to System, still bound at :8000 for the next iteration without paying a fresh model-load tax.
 
 | Check | Status |
 |---|---|
@@ -110,25 +112,32 @@ Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5
 - API converter (`scripts/otr_api.py`): companion-aware (Reading C) + forceInput-aware (Reading D) + fail-loud on length drift + misplaced-companion vocabulary guard.
 - Classifier: case-insensitive `status.lower() == "success"` + `executed_count == 0 -> graph_widget`. `submit_prompt` raises on truthy `error` or non-empty `node_errors` before returning prompt_id (no zombie prompts polled in /history).
 
-**Next (BUG-LOCAL-230 verification gate, BLOCKING):** one-iter local smoke (`scripts/sweep_and_launch.bat --iters 1 --inter-iter-sec 0`) to prove the post-fix telemetry. Acceptance criteria for promoting BUG-LOCAL-230 to [FIXED] and unblocking §3.8:
+**2026-05-18 21:10 verification smoke -- 7-point gate results:**
 
-| # | Required telemetry | Failure mode if absent |
-|---:|---|---|
-| 1 | Active :8000 owner is the newly launched ComfyUI process (not a pre-fix orphan) | False-green from a stale process binding the port |
-| 2 | Active ComfyUI command line contains no `--force-fp16` | Fix didn't reach the runtime launcher path |
-| 3 | `OTR_DeferredCheckpointLoader` actually fires for `flux1-dev-fp8.safetensors` (node 22 titled "Load FLUX.1-dev-fp8") -- audio-only success is NOT enough | Pipeline didn't reach the FLUX render gate |
-| 4 | `[DeferredCheckpointLoader] load complete: 2.13 -> ~13 GiB` (NOT 24.30 GiB) | Another dtype-upcast surface beyond the 4 launchers (investigate ComfyUI Desktop registry / settings.json, model loader node widget overrides, environment variables) |
-| 5 | FLUX sampler pace ~10-15 sec/step (NOT ~9.4 min/step) | Either upcast still happening or another non-fp8 bottleneck |
-| 6 | VRAM peak <14.5 GiB (CLAUDE.md ceiling) | Cap violation; even with fp8 loaded correctly something else is bloating VRAM |
-| 7 | No SageAttention involvement in failures (workflow's `PathchSageAttentionKJ` is disabled; widget value `"disabled"`) | Don't chase SageAttention unless logs prove involvement |
+| # | Required telemetry | Observed | Verdict |
+|---:|---|---|---|
+| 1 | Active :8000 owner is the newly launched ComfyUI process | PID 18444 uv-child of fresh chain owns :8000; sweep_prelaunch killed pre-fix PIDs 23760/39688 at 21:10:27 before fresh chain at 21:10:32 | **PASS** |
+| 2 | Active ComfyUI command line contains no `--force-fp16` | Confirmed across all 6 chain processes (supervisor .venv+uv, worker .venv+uv, comfy .venv+uv) | **PASS** |
+| 3 | `OTR_DeferredCheckpointLoader` fires for `flux1-dev-fp8.safetensors` | L573 fire, L574 dtype log, L584 load complete, L585 FluxBranchGate fire | **PASS** |
+| 4 | `[DeferredCheckpointLoader] load complete: 2.13 -> ~13 GiB` (NOT 24.30 GiB) | **L584: `2.13 -> 13.21 GiB (delta=11.08); ckpt=flux1-dev-fp8.safetensors`** + **L574: `model weight dtype torch.float8_e4m3fn, manual cast: torch.bfloat16`** (pre-fix had `torch.float16, manual cast: None` and delta=22.17) | **PASS -- architectural axis proven** |
+| 5 | FLUX sampler pace ~10-15 sec/step | **L610: `5%|1/20 [02:34<48:46, 154.02s/it]`** -- step 1 = 154 s. 3.6x faster than pre-fix 564.99 s/it, ~10x slower than target | **FAIL -> BUG-LOCAL-231** |
+| 6 | VRAM peak <14.5 GiB (CLAUDE.md ceiling) | LHM during sampler step 1: GPU Memory Used **15911 MB** / 16303 MB (over 14.5 GiB ceiling by ~756 MB) + D3D Shared Memory Used **1098 MB** (offloader paging; vs pre-fix 10445 MB, 10x less spill but still nonzero) | **FAIL -> BUG-LOCAL-231** |
+| 7 | No SageAttention chase needed | Workflow's `PathchSageAttentionKJ` widget value `"disabled"`; no failure-path involvement | **PASS** |
 
-If all 7 land, BUG-LOCAL-230 -> [FIXED] in BUG_LOG.md, this ROADMAP entry moves from "FLUX runtime BLOCKED" to "FLUX runtime VERIFIED CLOSED", and §3.8 attended 3-iter walk begins under the same supervisor invocation. GREEN on three attended iters -> §3.9 overnight 12-iter.
+**Verdict on BUG-LOCAL-230:** Architectural axis PROVEN by gate #4. The `--force-fp16` removal works exactly as designed. Promotion to `[FIXED]` is BLOCKED until BUG-LOCAL-231 closes AND a clean 7-criteria re-run smoke passes (gates #5 + #6 currently failing on the residual VRAM-pressure defect).
 
-If load delta is still ~22 GiB, stop and investigate another dtype-upcast surface (per the §1 fallback list in BUG-LOCAL-230's Fix section).
+**Next (BUG-LOCAL-231 round-robin gate, BLOCKING):** ChatGPT + Gemini round-robin on the four candidate causes for the residual VRAM pressure / slow sampler. NO code change until round-robin convergence. Transcript saved under `docs/2026-05-18-flux-vram-pressure/`. Per Jeffrey 2026-05-18:
+
+- **Candidate (a) -- stale writer-LLM cache residency at FLUX entry.** Strongest first read. Probe first.
+- **Candidate (b) -- sampler-time launch flag (`--fast`, `--fast fp8_matrix_mult`).** REJECTED at first read. BUG-LOCAL-230 was caused by a launch flag added without proof; don't reach for another launch flag as the first fix. Re-evaluate only after (a) and (c) are ruled out.
+- **Candidate (c) -- FLUX CLIP text encoder footprint.** Secondary probe after (a).
+- **Candidate (d) -- FLUX-schnell fallback at 4 steps.** Status-12 explicitly retracted schnell as the recommended primary fix in favor of the dtype removal; schnell is a fallback, not a status-12 recommendation. Listed last.
+
+**Separate axis (reconciled 2026-05-18, no bug):** Writer LLM identity in the 21:10 smoke -- L443+ shows `Selector slot=creative reuse cache for google/gemma-4-E4B-it`, NOT Mistral-Nemo as the older memory `reference_default_llm_mistral_nemo.md` (2026-04-26) claimed. Reconciled against `workflows/otr_scifi_16gb_full.json` node 1 widgets_values[2..3] -- both `creative_writing_model` and `technical_model` widget values = `"google/gemma-4-E4B-it"`. The Sprint C C3 (2026-05-15) baseline shift to Gemma-4 for VRAM headroom is the canonical default; memory was 22 days stale, now updated. No widget drift bug. Writer model identity confirmed for BUG-LOCAL-231 (a)'s "stale LLM cache residency at FLUX entry" diagnostic.
 
 **Heartbeat-snapshot worker forensics (deferred):** Skip for §3.8 / §3.9. Revisit only if a real overnight run produces ambiguous worker-death forensics; the supervisor's missing-file fallback covers every forced-death class today.
 
-**No mapper / converter changes for §3.8.** Same supervisor invocation, same rubric, same posture: GREEN advances, specific failure-mode halts.
+**No mapper / converter changes for §3.8.** Same supervisor invocation, same rubric, same posture: GREEN advances, specific failure-mode halts. §3.8 stays BLOCKED until BUG-LOCAL-231 closes and BUG-LOCAL-230 promotes to `[FIXED]` via a clean 7-criteria smoke.
 
 ---
 
