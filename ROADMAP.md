@@ -212,6 +212,53 @@ Battery ran 08:41 → 09:26, 3 cold-launch iters back-to-back via `sweep_and_lau
 
 **BUG-LOCAL-231 stays PARTIAL.** alt-a FALSIFIED is a verified empirical finding from 3 independent cold-launches; no `[FIXED]` flip. No `[VERIFIED CLOSED with operator-checklist mitigation]` either -- that branch was contingent on alt-a confirming, and it did not.
 
+### 2026-05-19 10:11 -- 4 pushback corrections from Jeffrey + sampler-time telemetry block landed
+
+Jeffrey 09:30 directive pushed back on the 09:26 follow-up with four corrections. Recorded for future-self.
+
+1. **iter 2 is INVALID, not "slow".** Autokiller fired at +90s before tqdm flushed step 1 -> iter 2's pace is UNKNOWN, not >90 s/it. The 09:26 battery had 2 clean data points (iter 1 = 42.38 s/it, iter 3 = 158.86 s/it), not 3.
+2. **alt-e (non-deterministic kernel) is LEADING, not co-equal with c/d.** Same fire-time state + 4x sampler variance = canonical signature of cudnn / cublas autotuner picking different kernels per cold launch.
+3. **alt-d (sageattention) RULED OUT** by workflow inspection. Node id=42 `PathchSageAttentionKJ` widgets `['disabled', False]` title `Patch Sage Attention (FLUX) -- DISABLED, BUG-LOCAL-070`. SDPA is active.
+4. **"10-15 s/it target" may be wrong** for RTX 5080 Laptop / FLUX-dev fp8 / 1024x1024 / 20 steps / bf16 cast. 42 s/it might be normal pace; the 1.22 s/it lucky run might have been an outlier. Need verified Comfy-Org / community benchmark before calling iter 1 "off target".
+
+**Updated hypothesis ranking:**
+
+| Hypothesis | Status |
+|---|---|
+| alt-e (cudnn / cublas autotuner non-determinism) | LEADING |
+| alt-c (D3D Shared spillover during sampler) | OPEN -- need step-time telemetry |
+| **alt-f (NEW: thermal / clock throttling)** | OPEN -- nvsmi snapshot at sampler entry catches this |
+| alt-d (sageattention / Blackwell fp8 path) | RULED OUT (workflow has sage disabled, BUG-LOCAL-070) |
+| audio-residue / alt-a / alt-b | OUT |
+
+**Code change landed in `visual/batch_flux_render.py`** (pure telemetry, no behavior change):
+
+- Module-level `_log_flux_sampler_precheck()`: logs `cudnn.benchmark / cudnn.deterministic / cudnn.allow_tf32 / matmul.allow_tf32 / cuda.is_initialized` + `nvidia-smi` snapshot `clocks.gr / clocks.mem / power.draw / power.state / temperature.gpu / utilization.gpu / utilization.memory` at sampler entry.
+- Module-level `_FluxSamplerPoller` daemon thread: polls LHM `GPU Memory Used` + `D3D Shared Memory Used` and `nvidia-smi clocks.gr / power.draw / temperature.gpu / utilization.gpu` every 5 sec during `sampler.sample`. One `[OTR-FLUX-SAMPLER-POLL] tick=N` line per poll. No `.join()` on stop (avoids hang on HTTP urlopen); daemon dies with process.
+- Wrapped at `_render_and_save_radio_bookend` (L1136) -- the only sampler.sample call that fires in the canonical workflow (skip_env_stills=True bypasses the other two).
+- All best-effort with broad except; never raises into sampler. Per `feedback_no_defensive_vram_protections`.
+
+**Pre-commit verification (all green):**
+
+- AST parse `visual/batch_flux_render.py`: OK (64695 bytes, 1407 lines).
+- Bug Bible regression: 23 passed, 1 skipped, 2 xfailed (baseline held).
+- Audio byte-identical: 9 passed, 1 skipped (audio path sealed).
+
+**Next battery design:**
+
+1. Re-run `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions` with new telemetry in place.
+2. Autokiller wait extended to 240-300s post-load_complete so iter 2's true sampler pace IS captured even in the slow regime.
+3. Per-iter capture: cudnn flags + nvsmi at sampler entry; per-step LHM + nvsmi via the poller; sampler step 1 s/it.
+4. Apply decision tree:
+   - `cudnn.benchmark=True` across all iters AND poll-time D3D Shared similar AND nvsmi clocks similar -> **alt-e confirmed** -> consider `cudnn.deterministic=True` for FLUX path OR document expected variance.
+   - D3D Shared spikes in slow iters but not fast -> **alt-c confirmed** -> investigate offloader / smaller batch / explicit eviction.
+   - GPU clock throttling (lower `clocks.gr` or higher `temperature.gpu` in slow iters) -> **alt-f confirmed** -> operator-level mitigation.
+   - All telemetry similar but pace varies -> **alt-g (unknown)** -> torch 2.10 / CUDA 13 stack issue, escalate.
+
+**Order locked:** (1) commit telemetry + this doc sync as one atomic change (code-and-doc), (2) push, (3) run 3-smoke battery with corrected autokiller, (4) tabulate, (5) apply decision tree, (6) report.
+
+No `[FIXED]` flip until cause is identified AND mitigation verifies across 3 clean smokes.
+
 ### Consolidated go-forward queue (Jeffrey 2026-05-19 directive)
 
 Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/etc until 231 + 234 + 235 verify together.

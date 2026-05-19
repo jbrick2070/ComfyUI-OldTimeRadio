@@ -27,6 +27,159 @@ from typing import Any
 log = logging.getLogger("OTR.visual.batch_flux_render")
 
 
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-231 alt-c/e/f telemetry helpers (Jeffrey 2026-05-19 09:30
+# directive). 3-smoke clean-state battery falsified alt-a: fire-time
+# state was essentially identical across 3 cold-launch iters that spanned
+# 4x in sampler step 1 s/it. The variance is downstream of fire. These
+# helpers add three new signals at sampler entry / during sampler:
+#   - cudnn / cublas determinism flags (alt-e signal: if benchmark=True
+#     the cudnn autotuner picks different kernels per cold launch ->
+#     run-to-run variance is expected).
+#   - nvidia-smi snapshot at sampler entry (alt-f signal: GPU clock /
+#     power state / thermal -- a slow iter at lower clock than a fast
+#     iter implies hardware throttling).
+#   - background poller that captures LHM + nvsmi every 5 sec during
+#     sampler.sample (alt-c signal: D3D Shared spillover spike during
+#     the sampler in slow iters but not fast iters would confirm
+#     offloader thrash).
+# All best-effort with broad except; never raises into the sampler path.
+# Pure logging -- no behavior change.
+# ---------------------------------------------------------------------------
+
+def _log_flux_sampler_precheck() -> None:
+    """One-line snapshot of cudnn/cublas determinism + nvsmi clocks at
+    sampler entry. Disambiguates alt-e (kernel non-determinism) and
+    alt-f (thermal throttling) per BUG-LOCAL-231 2026-05-19 09:30
+    decision tree. Best-effort; never raises.
+    """
+    try:
+        import torch  # local import; harmless if absent
+        cudnn_bench = getattr(torch.backends.cudnn, "benchmark", "?")
+        cudnn_det = getattr(torch.backends.cudnn, "deterministic", "?")
+        cudnn_tf32 = getattr(torch.backends.cudnn, "allow_tf32", "?")
+        matmul_tf32 = getattr(torch.backends.cuda.matmul, "allow_tf32", "?")
+        cuda_init = bool(torch.cuda.is_initialized())
+        log.info(
+            "[OTR-FLUX-SAMPLER-PRECHECK] cudnn.benchmark=%s "
+            "cudnn.deterministic=%s cudnn.allow_tf32=%s "
+            "matmul.allow_tf32=%s cuda.is_initialized=%s",
+            cudnn_bench, cudnn_det, cudnn_tf32, matmul_tf32, cuda_init,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[OTR-FLUX-SAMPLER-PRECHECK] flags log failed: %s", exc)
+
+    try:
+        import subprocess
+        nvsmi = subprocess.check_output(
+            ["nvidia-smi",
+             "--query-gpu=clocks.gr,clocks.mem,power.draw,power.state,"
+             "temperature.gpu,utilization.gpu,utilization.memory",
+             "--format=csv,noheader"],
+            text=True, timeout=3.0,
+        ).strip()
+        log.info("[OTR-FLUX-NVSMI] at sampler entry: %s", nvsmi)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("[OTR-FLUX-NVSMI] snapshot failed: %s", exc)
+
+
+class _FluxSamplerPoller:
+    """Background thread polling LHM + nvsmi every interval_s seconds
+    during sampler.sample(). Captures alt-c (D3D Shared spillover
+    during sampler) signal. Logs one line per poll. Daemon thread; no
+    cleanup needed if it lingers a tick after stop().
+
+    Usage:
+        p = _FluxSamplerPoller(interval_s=5.0)
+        p.start()
+        try:
+            samples = sampler.sample(...)
+        finally:
+            p.stop()
+    """
+
+    def __init__(self, interval_s: float = 5.0):
+        import threading
+        self.interval_s = interval_s
+        self._stop_event = threading.Event()
+        self._thread = None
+        self._tick = 0
+
+    def start(self):
+        import threading
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="OTR-FluxSamplerPoller",
+        )
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        # Do NOT join; if the thread is blocked on HTTP urlopen we
+        # would hang the sampler return. Daemon thread dies with the
+        # process if it lingers a tick.
+
+    def _run(self):
+        import json as _json
+        import subprocess
+        import urllib.request
+        while not self._stop_event.wait(self.interval_s):
+            self._tick += 1
+            lhm_used = float("nan")
+            d3d_shared = float("nan")
+            try:
+                with urllib.request.urlopen(
+                    "http://localhost:8085/data.json", timeout=2.0,
+                ) as r:
+                    data = _json.loads(r.read().decode("utf-8"))
+                stack = [data]
+                while stack:
+                    n = stack.pop()
+                    if not isinstance(n, dict):
+                        continue
+                    txt = n.get("Text", "")
+                    val = n.get("Value", "")
+                    if (
+                        txt == "GPU Memory Used"
+                        and isinstance(val, str)
+                        and val.endswith(" MB")
+                    ):
+                        try:
+                            lhm_used = float(val[:-3])
+                        except ValueError:
+                            pass
+                    elif (
+                        txt == "D3D Shared Memory Used"
+                        and isinstance(val, str)
+                        and val.endswith(" MB")
+                    ):
+                        try:
+                            d3d_shared = float(val[:-3])
+                        except ValueError:
+                            pass
+                    for c in (n.get("Children") or []):
+                        stack.append(c)
+            except Exception:  # noqa: BLE001
+                pass
+
+            nvsmi = ""
+            try:
+                nvsmi = subprocess.check_output(
+                    ["nvidia-smi",
+                     "--query-gpu=clocks.gr,power.draw,temperature.gpu,"
+                     "utilization.gpu",
+                     "--format=csv,noheader"],
+                    text=True, timeout=2.0,
+                ).strip()
+            except Exception:  # noqa: BLE001
+                pass
+
+            log.info(
+                "[OTR-FLUX-SAMPLER-POLL] tick=%d lhm_used=%.0f MB "
+                "d3d_shared=%.0f MB nvsmi=%s",
+                self._tick, lhm_used, d3d_shared, nvsmi,
+            )
+
+
 _DEFAULT_FALLBACK = (
     "cinematic 35mm film still, dimly lit starship bridge, red alert "
     "lighting, holographic console glow, tense crew silhouettes, "
@@ -1133,10 +1286,25 @@ class BatchFluxRender:
         # We just sample + decode + save here.
         t0 = time.time()
         latent = empty_latent_cls.generate(width, height, 1)[0]
-        samples = sampler.sample(
-            model, seed, steps, cfg, sampler_name, scheduler,
-            positive, negative, latent, 1.0,
-        )[0]
+
+        # BUG-LOCAL-231 alt-c/e/f telemetry (Jeffrey 2026-05-19 09:30):
+        # snapshot cudnn / cublas / nvsmi state at sampler entry and
+        # start a background poller that logs LHM + nvsmi every 5s
+        # during sampler.sample. The 3-smoke clean-state battery
+        # (08:41-09:26 today) falsified alt-a -- fire-time tuples were
+        # identical across 3 cold launches but sampler step 1 spanned
+        # 4x (42.38 / >90 / 158.86 s/it). The variance is downstream
+        # of fire; these signals catch it where it manifests.
+        _log_flux_sampler_precheck()
+        _poller = _FluxSamplerPoller(interval_s=5.0)
+        _poller.start()
+        try:
+            samples = sampler.sample(
+                model, seed, steps, cfg, sampler_name, scheduler,
+                positive, negative, latent, 1.0,
+            )[0]
+        finally:
+            _poller.stop()
         img = decoder.decode(vae, samples)[0]
         # img shape: [B, H, W, C] in 0..1 float
 

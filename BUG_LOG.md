@@ -568,6 +568,43 @@ sprints, regardless of fix-status.
   - **Per `feedback_bug_bible_curation_discipline`:** 3-smoke battery executed cleanly. Status stays PARTIAL. **alt-a FALSIFIED** is a verified empirical finding (3 independent cold-launch runs in clean state, identical fire-time tuples, 4x sampler variance). NO `[FIXED]` flip. NO `[VERIFIED CLOSED with operator-checklist mitigation]` either -- that branch was contingent on alt-a confirming, which it did not.
   - **Status:** runtime axis still BLOCKED. Audio-residue OUT. alt-a OUT. alt-b OUT. alt-c / alt-d / alt-e remaining. Need step-1-time telemetry + cudnn determinism check to disambiguate further. BUG-LOCAL-234 + 235 still unverifiable while FLUX thrashes.
 
+- **Follow-up 2026-05-19 10:11 -- 4 corrections to the prior follow-up + sampler-time telemetry block landed.**
+
+  Jeffrey 2026-05-19 09:30 directive pushed back on four items from the 09:26 follow-up. Recording the corrections:
+
+  1. **iter 2 is INVALID data, not "slow."** The autokiller fired at +90s post-load_complete -- BEFORE tqdm flushed step 1. Iter 2's true sampler pace is UNKNOWN (could be 95 s/it or 250 s/it). The earlier "iter 2 = >90 s/it slow" label was treating absence of data as evidence. Correct reading of the battery: 2 clean data points (iter 1 = 42.38 s/it, iter 3 = 158.86 s/it), not 3. iter 2 is "captured fire-time only, sampler unknown".
+
+  2. **alt-e (kernel non-determinism) is the strongest remaining candidate, not co-equal with c and d.** Same fire-time state plus 4x sampler variance = something non-deterministic between fire and step 1. cudnn / cublas autotuner picks different kernel implementations across runs based on transient timing. iter 1 got a fast kernel; iter 3 got a slow one. This is the canonical signature of non-determinism, not memory pressure.
+
+  3. **alt-d (sageattention) is RULED OUT by workflow inspection.** Workflow `otr_scifi_16gb_full.json` has node id=42 type `PathchSageAttentionKJ` widgets `['disabled', False]` title `'Patch Sage Attention (FLUX) -- DISABLED, BUG-LOCAL-070'`. SDPA is the active attention path. Drop alt-d from the candidate list. (Verified via `outputs/check_sage.py` 2026-05-19 10:06.)
+
+  4. **The "10-15 s/it target" may be wrong for this hardware.** Iter 1's 42 s/it was labeled "intermediate" but 42 s/it on FLUX-dev fp8 on RTX 5080 Laptop might actually be normal pace at 1024x1024 / 20 steps / bf16 cast. The earlier 1.22 s/it lucky run might have been an outlier (or a different image size / step count). Sanity check needed: Comfy-Org or community benchmarks for FLUX-dev fp8 pace on RTX 5080 Laptop at this configuration. Without a verified target, "off target" is conjecture.
+
+  **Corrected hypothesis ranking (post-pushbacks):**
+    - **alt-e (non-deterministic kernel scheduling):** LEADING. Direct fit for the data.
+    - **alt-c (D3D Shared spillover during sampler):** OPEN. Need step-time telemetry.
+    - **alt-f (NEW: thermal / clock throttling):** OPEN. Jeffrey added this candidate. If GPU clock drops or temperature spikes between cold launches, hardware throttling explains run-to-run variance. nvidia-smi snapshot at sampler entry catches this.
+    - **alt-d (sageattention / Blackwell fp8 path):** RULED OUT (workflow has sage disabled).
+    - **audio-residue / alt-a / alt-b:** still OUT.
+
+  **Code change landed (commit pending after BUG_LOG + ROADMAP edits):** `visual/batch_flux_render.py` adds two new module-level helpers and wraps the radio bookend sampler.sample call with them.
+    - `_log_flux_sampler_precheck()` -- one-line log of `cudnn.benchmark` / `cudnn.deterministic` / `cudnn.allow_tf32` / `matmul.allow_tf32` / `cuda.is_initialized` at sampler entry; one-line nvidia-smi snapshot of `clocks.gr` / `clocks.mem` / `power.draw` / `power.state` / `temperature.gpu` / `utilization.gpu` / `utilization.memory` at sampler entry.
+    - `_FluxSamplerPoller` daemon thread polling LHM `GPU Memory Used` + `D3D Shared Memory Used` and `nvidia-smi clocks.gr / power.draw / temperature.gpu / utilization.gpu` every 5 sec during sampler.sample. Logs one `[OTR-FLUX-SAMPLER-POLL] tick=N` line per poll. No `.join()` on stop (avoids hang on HTTP urlopen); daemon thread dies with process if lingering.
+    - Wrapping at `_render_and_save_radio_bookend` L1136 -- the only sampler.sample call that fires in the canonical workflow (skip_env_stills=True bypasses the other two).
+    - All best-effort with broad except; never raises into sampler. Pure logging -- no behavior change. Per `feedback_no_defensive_vram_protections`.
+
+  **Pre-commit verification (all green):**
+    - AST parse `visual/batch_flux_render.py`: OK (64695 bytes, 1407 lines).
+    - Bug Bible regression: 23 passed, 1 skipped, 2 xfailed (baseline held).
+    - Audio byte-identical: 9 passed, 1 skipped (audio path sealed).
+
+  **Next battery (post-commit):** Re-run `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions` with the new telemetry. Autokiller wait extended to 240-300s post-load_complete so iter 2's true sampler pace is captured even in the slow regime. Then apply decision tree:
+    - `cudnn.benchmark=True` across iters AND step-5 D3D similar AND nvsmi clocks similar -> **alt-e confirmed** -> pin `cudnn.deterministic=True` for FLUX path or document the variance as expected.
+    - D3D Shared spikes in slow iters but not fast -> **alt-c confirmed** -> investigate offloader / explicit eviction / smaller batch.
+    - GPU clock throttling in slow iters -> **alt-f confirmed** -> operator mitigation (laptop cooling pad, ambient temp, throttling-aware re-roll).
+    - All telemetry similar across iters but pace still varies -> **alt-g (unknown)** -> deeper investigation, possibly torch 2.10 / CUDA 13 stack issue.
+  **Status:** runtime axis still BLOCKED. Sampler-time telemetry block landed. Awaiting next 3-smoke battery.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
