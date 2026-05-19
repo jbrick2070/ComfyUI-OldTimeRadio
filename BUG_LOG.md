@@ -807,6 +807,70 @@ sprints, regardless of fix-status.
 
   **Status:** BUG-LOCAL-231 stays **PARTIAL**. Math SDPA hypothesis FALSIFIED. Reframe to `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]` still proposed and still pending Jeffrey's call. BUG-LOCAL-244 fast-path tracker stays open. Per-step telemetry extension (correction #4) now warranted as the next concrete step.
 
+- **Follow-up 2026-05-19 13:55 -- Community benchmark cross-reference: alt-h EMPHATICALLY FALSIFIED. OTR is running ~226x slower than community baseline on IDENTICAL stack. The slow regime is a REAL defect, not hardware ceiling.**
+
+  Per Jeffrey 2026-05-19 13:00 directive (path 2: community benchmark lookup): fetched `https://github.com/Comfy-Org/ComfyUI/discussions/9002` "GPU Benchmark Flux DEV fp8 5090 4090 3090". The thread is the official Comfy-Org benchmark for the canonical FLUX.1-dev fp8 workflow template at 1024x1024 / 20 steps.
+
+  **Bullseye comparison datapoint (user `esp-dev` 2026-02-02):**
+  - **RTX 5080** (Total VRAM **16303 MB**) -- IDENTICAL VRAM to OTR's 5080 Laptop
+  - **pytorch version: 2.10.0+cu130** -- IDENTICAL to OTR fingerprint
+  - **Windows 11** -- IDENTICAL OS
+  - **model weight dtype torch.float8_e4m3fn, manual cast: torch.bfloat16** -- IDENTICAL to OTR's load_complete log
+  - **1024x1024, 20 steps, euler / simple** (default ComfyUI workflow template) -- IDENTICAL to OTR's workflow widgets
+  - **Result: `20/20 [00:15<00:00, 1.33it/s]` = 0.75 s/it** -- prompt total 16.70 seconds.
+  - With BF16 conversion + optimizations: 2.21 it/s (0.45 s/it); with further optimization: 3.23 it/s (0.31 s/it).
+
+  **Other community datapoints in same thread:**
+  - RTX 5090: 5.46s prompt total -> ~0.27 s/it
+  - RTX 4090: 11.28s prompt total (`1.85 it/s = 0.54 s/it`, torch 2.9.1+cu128, 2025-12-28)
+  - RTX 5060 Ti: 1.20 s/it (sage attention + `--fast`)
+  - RTX 3090: ~1.3 s/it (26s total)
+  - Intel A770: 2.33-2.61 s/it (CPU-class accelerator, not even a discrete NVIDIA GPU, still ~70-80x faster than OTR)
+
+  **OTR baseline: 170-188 s/it.**
+
+  **Ratio: OTR is 226-250x slower than the closest community datapoint on EXACTLY the same hardware + software stack.** Even compared to the slowest discrete GPU in the thread (RTX 3090 at 1.3 s/it), OTR is ~130x slower. Compared to the Intel A770 integrated-class accelerator, OTR is ~70x slower. **alt-h ("~180 s/it IS the normal pace at this stack") is EMPHATICALLY FALSIFIED.** The slow regime is a REAL defect, not hardware ceiling, not normal pace, not anything explainable as "this stack is just slow."
+
+  **What does this confirm:**
+  - **BUG-LOCAL-231 is a real, fixable defect** -- there is some OTR-side surface causing ~200x slowdown vs the same stack running the default Comfy workflow template.
+  - The 1.22 s/it (yesterday 23:30) and 42.38 s/it (today battery v1 iter 1) outliers tracked in BUG-LOCAL-244 are now in a different light: 1.22 s/it is actually ~1.5x slower than community baseline (0.75); 42.38 s/it is **57x slower**. Even the OTR "fast" cases are slow, just less catastrophically so.
+  - The hardware can demonstrably do 0.75 s/it on this exact stack. Our 170-188 s/it cluster represents a ~200-250x regression from achievable.
+
+  **What does this NOT explain:**
+  - The mechanism of the 226x slowdown. Identical hardware + software + dtype + cast + resolution + steps + sampler / scheduler should produce identical pace IF the rest of the process is similar. Differences between OTR's process and `esp-dev`'s 2026-02-02 test:
+    - **OTR uses `OTR_DeferredCheckpointLoader`** (custom deferred-load pattern). Community uses default `CheckpointLoaderSimple` (eager load).
+    - **OTR has 30+ other custom nodes registered in the process** (writer, audio, ledger, video, etc).
+    - **OTR loads other models in same process BEFORE FLUX** (Bark / Kokoro / MusicGen / Gemma writer LLM). Community loads only FLUX.
+    - **OTR's workflow has `LowVRAMCheckpointLoader` (id=54) for LTX 2.3** loaded in the SAME graph as FLUX. Community workflow doesn't.
+    - **OTR's `BatchFluxRender.execute()` does `mm.unload_all_models() + gc.collect() + empty_cache() + mm.load_models_gpu([model])`** (Option B nuclear eviction). Community doesn't do this.
+    - **OTR has CLIP T5XXL load via `CLIPLoader` (id=48)** as a separate node, plus the deferred FLUX checkpoint that includes its own CLIP. Possibly double-loaded.
+
+  **New leading hypotheses (post-community-benchmark falsification):**
+
+    | Hypothesis | Status | Why |
+    |---|---|---|
+    | **alt-j (NEW): OTR custom-node interaction is the cause -- something in the OTR graph (deferred loader, double-CLIP, pre-FLUX model traffic, Option B nuclear eviction, etc.) disrupts FLUX dispatch** | LEADING | Same hardware + stack runs 226x faster with the default template. The delta must be in the OTR-specific graph or process state. |
+    | **alt-k (NEW): pre-FLUX model traffic (Bark/Kokoro/MusicGen/Gemma) leaves cudnn / cublas / allocator state in a degraded mode that FLUX inherits** | OPEN | Plausible if cuBLAS workspace caches or cudnn convolution plans get poisoned by transformer LLM traffic prior to FLUX's sampler. Battery v2 telemetry showed `cudnn.benchmark=False` so this isn't autotuner-related, but other workspace state could matter. |
+    | alt-c (D3D Shared spillover during sampler) | STILL OPEN as secondary | Doesn't explain 226x by itself, but the offloader partial-unload behavior we see in our logs (Unloaded partially: 7010.66 MB freed... loaded completely 11350.07 MB) is NOT in the community workflow. The community test loads FLUX once and keeps it; OTR cycles through unload/reload/pin. |
+    | alt-h (~180 s/it IS normal at this stack) | **FALSIFIED EMPHATICALLY** | Identical stack hits 0.75 s/it in default workflow. |
+    | audio-residue / alt-a / alt-b / alt-d / alt-e / alt-f / alt-i (env-var TORCH_SDPA_BACKEND=math) | all OUT or RULED OUT | -- |
+
+  **Revised reframe proposal:** **withdraw the `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]` proposal.** That label assumed the slow regime might be normal-for-this-stack. The community benchmark falsifies that assumption. BUG-LOCAL-231 is a REAL defect with a real cause to find, not a baseline characterization. **Status stays PARTIAL but the framing shifts from "characterize and accept" to "diagnose and fix."**
+
+  **Bible candidate posture:** stays POSTPONED -- now even more clearly. This is an active defect with leads (alt-j / alt-k), not a hardware characterization.
+
+  **Recommended next investigation directions (post-community-benchmark, pre-path-4-result):**
+  1. **Strip-down repro:** run the OTR workflow with everything except DeferredCheckpointLoader + BatchFluxRender bookend ELIMINATED. No writer, no audio, no ledger, no video, no LTX. Just the FLUX bookend in isolation. See if pace drops to community baseline (0.75-1.0 s/it). If yes -> the cause is in the OTR-graph-around-FLUX. If no -> the cause is in the DeferredCheckpointLoader vs CheckpointLoaderSimple difference itself.
+  2. **Compare DeferredCheckpointLoader's load path against CheckpointLoaderSimple's.** Specifically: does the deferred loader correctly populate the comfy model_management registry such that mm.load_models_gpu picks the right load path? Or does it bypass some critical comfy state that the standard loader sets up?
+  3. **Pre-FLUX teardown sweep:** between LLM/audio/Bark phase and FLUX entry, force `_otr_model_loader.unload_llm() + per-audio-node .cpu()+del + gc + empty_cache` and see if FLUX pace recovers. This is the "audio-residue" candidate (i) from the very-early hypothesis list -- still warrants empirical test now that we know the slow regime is a defect.
+  4. **Profile cublas / cudnn workspace state at FLUX entry** vs at the end of an OTR pre-FLUX phase: does the workspace get filled with non-FLUX-shaped plans that miss-cache on the FLUX matmul/conv calls?
+
+  **What this means for path 4 (full-pipeline smoke):** keep running. End-to-end .mp4 + BUG-LOCAL-234/235 verification is still the deliverable. Pace will be slow, but the pipeline closes. Result lands in ~3.5 more hours (estimated 4 hr total wall from 13:51 PT start).
+
+  **What this means for the env-var removal (commit e2ca6d6):** **stays landed.** Even though it didn't help, removing an unjustified defensive guard is architecturally correct. Per `feedback_no_defensive_vram_protections`.
+
+  **Status:** BUG-LOCAL-231 stays **PARTIAL**. **alt-h FALSIFIED by community benchmark cross-reference** (Comfy-Org #9002, same hardware + same stack, 0.75 s/it vs OTR's 170-188 = 226x slower). The slow regime is a real defect with new leading hypotheses alt-j (OTR custom-node interaction) + alt-k (pre-FLUX model traffic poisoning workspace state). NOT to be promoted to any `[CLOSED]` / `[CHARACTERIZED]` variant. Diagnose-and-fix path is the right framing.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
