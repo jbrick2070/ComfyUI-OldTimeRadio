@@ -751,6 +751,62 @@ sprints, regardless of fix-status.
 
   **Bible candidate status:** still POSTPONED until single-smoke verification reports. If `[FIXED]` confirmed, this would be a strong Bible candidate parallel to BUG-LOCAL-230 -- the same "defensive env var added without benchmark" pattern generalizes broadly.
 
+- **Follow-up 2026-05-19 12:18 -- Verification smoke RESULT: 170.82 s/it. Math SDPA was NOT the cause. Decision-tree "step 1 stays ~180 s/it" branch taken.**
+
+  Verification smoke ran 2026-05-19 11:59:41 -> ~12:17:48 PT via `sweep_and_launch.bat --iters 1 --no-stop-conditions` at HEAD `e2ca6d6` (with `TORCH_SDPA_BACKEND=math` removed from all 3 launcher sites). Cold-launch; new operator-tree start_comfy.bat (no env var); worker_iter.py (env var removed at L541); start_comfy_h0_baseline.bat (env var removed at L25).
+
+  **Telemetry captured:**
+    - L865 fire: `VRAM allocated=2.13 GiB reserved=2.44 GiB lhm_used=5455 MB; ckpt=flux1-dev-fp8.safetensors`
+    - L876 load complete: `2.13 -> 13.21 (delta=11.08), 2.44 -> 13.25 (delta=10.81), 5455 -> 15863 MB (delta=10408)`
+    - L877 FluxBranchGate fire: `VRAM allocated=13.21 GiB`
+    - L890 Option B nuclear eviction fired
+    - L894 MODEL pinned via load_models_gpu
+    - L896 OTR-FLUX-SAMPLER-PRECHECK: `cudnn.benchmark=False cudnn.deterministic=False cudnn.allow_tf32=True matmul.allow_tf32=True cuda.is_initialized=True` (unchanged from battery v2)
+    - L900 sampler started 0/20
+    - Poll ticks 1-31 (155s of telemetry): clocks.gr **stable at 2977 MHz**, temps 53-54 C, util 100%, power 63-65 W, D3D Shared **495-689 MB** (slightly LOWER than battery v2's 559-808 MB baseline)
+    - **L927 step 1 = `5%|1/20 [02:50<54:05, 170.82s/it]`**
+
+  **Decision-tree result:** step 1 = 170.82 s/it falls squarely in the "stays ~180 s/it" branch. **Math SDPA was NOT the slow-regime cause.** Removing the env var did not unlock the fast regime.
+
+  **Sanity-check comparison vs battery v2 (same workflow, same code modulo the env-var removal):**
+    - battery v2 iter 1: 188.35 s/it; iter 2: 186.77; iter 3: 177.16; **median 186.77**
+    - battery v3 (this smoke): **170.82 s/it**
+    - Difference: -16 s/it (-8.5%) vs the median. **Within the slow-cluster's 7% noise floor.** The env-var removal produced ZERO statistically meaningful improvement.
+    - D3D Shared during sampler: battery v2 ~559-808 MB; battery v3 ~495-689 MB. About 15% lower in v3, but the pace is unchanged. Reinforces alt-c (D3D Shared spillover) is not the direct pace driver either.
+
+  **What this rules out:**
+    - **`TORCH_SDPA_BACKEND=math` was NOT the slow-regime cause.** The hypothesis was logically tight: math SDPA is the slowest backend, the env var was added with no benchmark, removing it should restore default dispatch. The empirical evidence FALSIFIES the hypothesis. Either PyTorch's default SDPA dispatch on Blackwell sm_120 fp8 + bf16 cast is ITSELF slow (not just math), or some other process-level state (cudnn workspace, allocator fragmentation, kernel dispatch in a different layer) is the real driver.
+
+  **Code change disposition (env var removal):**
+    - Keep the removal landed. Reason: the env var had no benchmark backing it. Stable predates these scripts. Removing defensive guards without empirical evidence is consistent with `feedback_no_defensive_vram_protections`. Even though it didn't fix the pace, leaving them removed is the right architectural state.
+    - Operator (start_comfy.bat in user tree) edit stays. The .bak file remains at `start_comfy.bat.bak-bug-local-231-2026-05-19` for rollback if anything else regresses.
+    - Future operator note: if a regression appears that points back at SDPA backend, the .bak file is the recovery source.
+
+  **Hypothesis status post-verification:**
+
+    | Hypothesis | Status |
+    |---|---|
+    | audio-residue | OUT (battery v1 iter 1) |
+    | alt-a external VRAM pressure | OUT (battery v1 + v2) |
+    | alt-b Comfy allocator reserve | OUT (battery v1 + v2) |
+    | alt-c D3D Shared during sampler | **STILL OPEN** but weakening -- v3 had lower D3D and same pace, so D3D level alone is not the pace driver. Sampler-time paging direction (not level) still uninvestigated. |
+    | alt-d sageattention | RULED OUT (workflow audit, sage disabled BUG-LOCAL-070) |
+    | alt-e cudnn autotuner non-determinism | FALSIFIED (battery v2; cudnn.benchmark=False persistent) |
+    | alt-f thermal / clock throttling | FALSIFIED (clocks stable 2977 MHz across 7 cold launches) |
+    | **alt-i (env-var TORCH_SDPA_BACKEND=math forcing slow attention)** | **NEW + FALSIFIED** (this verification smoke; pace unchanged after removal) |
+    | alt-h (~180 s/it IS normal at this hardware/config) | LEADING (now even stronger; the math-SDPA explanation is also gone) |
+
+  **Reframe still proposed (per pushback #3):** `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]`. The data continues to support a current baseline (~180 s/it = 6 of 7 telemetered cold-launches now); fast outliers (42.38 + 1.22) remain in BUG-LOCAL-244 as the open optimization surface. NOT `[NOT A BUG]` -- per Jeffrey's pushback the door stays open.
+
+  **Next investigation surface (the slow regime is empirically the default on this stack; what now?):**
+    1. **Per-step timing (correction #4, previously held)** -- now warranted. Need average + variance across steps 2-20. The 170.82 / 188.35 / 186.77 / 177.16 figures are ALL step 1, which biases high.
+    2. **Investigate BUG-LOCAL-244 fast-path mechanism independently** -- the 1.22 s/it (yesterday) and 42.38 s/it (today battery v1 iter 1) are now even more interesting. Whatever made those fast, it's not env-var dispatch.
+    3. **Comfy / fp8 / Blackwell community benchmark** -- per Jeffrey's pushback #4, find published numbers for FLUX-dev fp8 1024x1024 / 20 steps on RTX 5080 Laptop. If community average is ~10-20 s/it, this is still an OTR-specific defect; if community average is ~100-200 s/it, ~180 IS normal.
+
+  **BUG-LOCAL-234 / 235 operational unblock:** PROCEED -- per Jeffrey pushback #9 framing. Now confirmed: full-pipeline smoke under known slow FLUX baseline (~180 s/it × ~80 steps total for portraits + bookend = ~4 hr just for FLUX, then HuMo + LTX). Frame as: "Proceeding with 234/235 verification under known slow FLUX baseline; expect long wall time per pipeline smoke."
+
+  **Status:** BUG-LOCAL-231 stays **PARTIAL**. Math SDPA hypothesis FALSIFIED. Reframe to `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]` still proposed and still pending Jeffrey's call. BUG-LOCAL-244 fast-path tracker stays open. Per-step telemetry extension (correction #4) now warranted as the next concrete step.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
