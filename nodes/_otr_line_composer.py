@@ -969,15 +969,32 @@ def _build_user_prompt(req: LineRequest) -> str:
 
     parts.append("")
     parts.append("WRITE LINE")
-    # Role induction one block above the generation target. Empty
-    # prev_speaker drops the "responding to" clause cleanly (first
-    # line of a scene / post-music marker / first line of episode).
+    # BUG-LOCAL-232 fix (Jeffrey 2026-05-18 23:50): strengthen the
+    # role induction to "Here, you are now <SPEAKER>. Produce one
+    # line/section of dialogue for <SPEAKER>." The pre-fix prompt
+    # ("You are <SPEAKER>.") was too weak; the LLM sometimes
+    # produced character-line text that mentioned OTHER cast
+    # members by name (vocative or 3rd-person address), which a
+    # downstream post-composer text-scan then used to re-map the
+    # line's char_id to the wrong cast row. Example from episode
+    # pending_20260518_233216, line b004 (LEMMY): "It's bigger than
+    # any NIST measurement, ANNOUNCER." -> re-mapped char_id from
+    # c02 (LEMMY) to c01 (ANNOUNCER) -> BatchBark contract violation.
+    # Explicit "Produce one line/section of dialogue for <SPEAKER>"
+    # plus "Speak now." below leaves no room for the LLM to address
+    # the OTHER cast member by name -- it must speak AS the named
+    # speaker.
     if req.prev_speaker and req.prev_speaker.strip().upper() != req.speaker.strip().upper():
         parts.append(
-            f"You are {req.speaker}. You are responding to {req.prev_speaker}."
+            f"Here, you are now {req.speaker}. Produce one "
+            f"line/section of dialogue for {req.speaker}. You are "
+            f"responding to {req.prev_speaker}."
         )
     else:
-        parts.append(f"You are {req.speaker}.")
+        parts.append(
+            f"Here, you are now {req.speaker}. Produce one "
+            f"line/section of dialogue for {req.speaker}."
+        )
     parts.append(f"Mood: {req.mood}.")
     parts.append(f"Beat: {req.intent}.")
     parts.append(f"Word count target: {req.target_words}.")
