@@ -141,6 +141,69 @@ Two-process bug-hunt supervisor + worker harness reached steady state at HEAD `5
 
 ---
 
+### 2026-05-19 08:02 -- iter 1 LHM-at-fire telemetry captured (commit 3691317); audio-residue hypothesis FALSIFIED, alt-a leading
+
+Cold-launched ComfyUI via `scripts/sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions` at 07:44:20. Iter 1 captured before operator early-stop; iter 2 was in writer phase at kill time; iter 3 not started.
+
+**Iter 1 fire-time telemetry (`logs/comfy_session_iter_001.log`):**
+
+| Marker | torch allocated | torch reserved | LHM GPU used | Verdict |
+|---|---|---|---|---|
+| `[DeferredCheckpointLoader] fire` | 2.13 GiB | 2.44 GiB | 5217 MB | matches commit-message "clean lucky" profile exactly |
+| `[DeferredCheckpointLoader] load complete` | 13.21 GiB | 13.25 GiB | 15790 MB | load delta +11.08 / +10.81 / +10573 MB |
+| sampler step 1 | -- | -- | -- | **172.99 s/it = SLOW REGIME REPRODUCED** |
+
+LHM live during sampler step 1: GPU Core 100%, D3D 3D 96.4%, GPU Memory Used 15855 MB / 16303 MB, Free 447 MB. Driver-side ground truth: saturation.
+
+**Non-torch VRAM at fire (disambiguating number):** 5217 MB lhm_used minus ~2620 MB torch reserved = **~2.6 GiB of non-torch consumption** at FLUX fire. Torch view is clean; the system around it is not.
+
+**Hypothesis update:**
+
+| Hypothesis | Status after iter 1 |
+|---|---|
+| Audio-residue (was strongest) | **FALSIFIED** -- allocated_at_fire = 2.13 GiB is the clean profile, yet sampler still thrashes. Option B nuclear eviction at L587 fired correctly. Audio teardown not needed. |
+| alt-a (browser/Discord/Steam/driver baseline) | **LEADING** -- 2.6 GiB non-torch VRAM at fire is exactly the headroom hole this hypothesis predicts |
+| alt-b (Comfy allocator reserve across sweep) | NEUTRAL -- sweep was clean, reserved at fire only 2.44 GiB |
+| alt-c (driver/D3D Shared spillover) | WEAKLY CONSISTENT -- D3D Shared Memory Used 727 MB at probe, small fraction but non-zero |
+
+**Verification gate for BUG-LOCAL-231 closure (per Jeffrey 2026-05-19 directive -- 3-smoke discipline, NOT 1):**
+
+1. Close non-essential GPU apps: browser, Discord, Steam, any DXVK / CUDA-using app outside ComfyUI.
+2. Cold-launch `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions`.
+3. Run **3 smokes back-to-back** under this clean state. Capture per-iter (allocated, reserved, lhm_used) at fire + sampler step 1 s/it.
+4. Decision tree:
+   - **All 3 sub-3 GiB lhm_used at fire AND all 3 at 10-15 s/it (or faster)** → alt-a CONFIRMED. Land `OTR-VRAM-PREFLIGHT` soft warning in `OTR_FluxBranchGate` / `BatchFluxRender` pre-load hook (threshold: non_torch_mb > 1500 → `log.warning`) + CLAUDE.md "Pre-FLUX checklist" operator note. BUG-LOCAL-231 promotes to `[VERIFIED CLOSED with operator-checklist mitigation]`, **NOT `[FIXED]`** -- no code-level fix exists, only measurement + operator discipline.
+   - **Mixed (1 or 2 hit slow regime)** → external apps not the sole cause. Reopen candidate (i) audio-side teardown OR alt-b/c. Stay PARTIAL.
+   - **All 3 still hit slow regime even with everything closed** → alt-a FALSIFIED. Escalate to alt-b (Comfy state) / alt-c (driver). OTR-side fixes won't help. Stay PARTIAL.
+
+**Do NOT flip to `[FIXED]` on next session's first smoke.** 3-smoke minimum from this point forward (per `feedback_bug_bible_curation_discipline`).
+
+### Consolidated go-forward queue (Jeffrey 2026-05-19 directive)
+
+Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/etc until 231 + 234 + 235 verify together.
+
+| # | Item | Status / Next action |
+|---:|---|---|
+| 1 | **BUG-LOCAL-231 verification** (this gate) | Next session: close non-essential apps, cold-launch ComfyUI, run 3 smokes back-to-back, capture LHM-at-fire each + sampler step 1 s/it each. Report telemetry table. |
+| 2 | Decision tree after 3 smokes | All clean → alt-a confirmed → add preflight warning + CLAUDE.md checklist. Mixed → audio teardown OR alt-b/c. All slow → escalate. |
+| 3 | BUG-LOCAL-234 + 235 | **UNVERIFIABLE** while 231 thrashes. Wait until 231 verifies + HuMo reaches cleanly. |
+| 4 | Legacy workflow JSON audit | Quick `findstr` for dead-class refs in `workflows/`. Prune per `feedback_minimum_json_files`. |
+| 5 | BUG-LOCAL-236 title write-back | One-line fix after pipeline closes. |
+| 6 | BUG-LOCAL-243 line-composer logging | One-line `log.info` after pipeline closes. |
+| 7 | BUG-LOCAL-233 reframe + post-compose vocative-strip | Design needed; defer. |
+| 8 | BUG-LOCAL-240 cascade validator | Verify auto-repair behavior on out-of-palette slugs FIRST (could escalate severity if it doesn't auto-repair). |
+| 9 | BUG-LOCAL-237/238/239/241/242 | Hygiene/design queue. |
+| 10 | BUG-LOCAL-232 cast generator + Gates 1+2 | Round-robin territory. Schedule its own session. |
+
+**Standing disciplines (still in effect):**
+- No `[FIXED]` promotion on one run. 3-smoke minimum.
+- Pipeline-closes-first: 236/243/etc wait until 231 + 234 + 235 all verify.
+- Audio path sealed (Prime Directive 1).
+- One commit per fix axis.
+- No defensive VRAM "protections" (per `feedback_no_defensive_vram_protections`).
+
+---
+
 ## CURRENT WORK -- S34 P0/P1 Hotfix (COMPLETE 2026-05-15)
 
 **Branch:** `s34-p0-p1-hotfix` (cut from `s33-editor-only-cleanup @ 0297af7`, S33 B6 close).
