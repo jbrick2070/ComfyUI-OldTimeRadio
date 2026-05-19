@@ -667,12 +667,25 @@ class BatchFluxRender:
         # re-load tax is amortized across all 20 sampler steps.
         try:
             import comfy.model_management as mm  # type: ignore
+            import gc as _gc
+            import torch as _torch  # type: ignore
             try:
                 mm.unload_all_models()
+                # BUG-07.03 invariant (Bug Bible regression): every
+                # unload_all_models() call must be paired with
+                # gc.collect() + torch.cuda.empty_cache(). Dereferencing
+                # the model registry does NOT free VRAM; PyTorch's
+                # caching allocator holds reserved blocks until
+                # empty_cache() returns them. Without this pairing,
+                # unload_all_models() is cosmetic only and the next
+                # load_models_gpu() will see the SAME memory pressure.
+                _gc.collect()
+                _torch.cuda.empty_cache()
                 log.info(
-                    "[BatchFluxRender] unload_all_models() complete "
-                    "(nuclear eviction before MODEL pin, BUG-LOCAL-231 "
-                    "Option B escalation)"
+                    "[BatchFluxRender] unload_all_models() + "
+                    "gc.collect() + empty_cache() complete (nuclear "
+                    "eviction before MODEL pin, BUG-LOCAL-231 Option "
+                    "B escalation)"
                 )
             except Exception as exc:
                 log.warning(

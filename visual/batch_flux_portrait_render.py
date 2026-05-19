@@ -495,12 +495,23 @@ class BatchFluxPortraitRender:
         # B (unload_all_models)."
         try:
             import comfy.model_management as mm  # type: ignore
+            import gc as _gc
+            import torch as _torch  # type: ignore
             try:
                 mm.unload_all_models()
+                # BUG-07.03 invariant (Bug Bible regression): every
+                # unload_all_models() call must be paired with
+                # gc.collect() + torch.cuda.empty_cache() to actually
+                # release VRAM (the model registry can be cleared
+                # without freeing the caching allocator's reserved
+                # blocks).
+                _gc.collect()
+                _torch.cuda.empty_cache()
                 log.info(
                     "[OTR_BatchFluxPortraitRender] unload_all_models() "
-                    "complete (nuclear eviction before MODEL pin, "
-                    "BUG-LOCAL-231 Option B escalation)"
+                    "+ gc.collect() + empty_cache() complete (nuclear "
+                    "eviction before MODEL pin, BUG-LOCAL-231 Option "
+                    "B escalation)"
                 )
             except Exception as exc:  # noqa: BLE001
                 log.warning(
