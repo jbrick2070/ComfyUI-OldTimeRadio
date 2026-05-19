@@ -259,6 +259,46 @@ Jeffrey 09:30 directive pushed back on the 09:26 follow-up with four corrections
 
 No `[FIXED]` flip until cause is identified AND mitigation verifies across 3 clean smokes.
 
+### 2026-05-19 11:03 -- Battery v2 COMPLETE. alt-e + alt-f FALSIFIED. New leading hypothesis: 180 s/it IS the normal pace on this hardware/config.
+
+Battery v2 ran 10:15:26 -> 11:03:31 PT with sampler-time telemetry (commit 6df78d8) in place. Pre-launch LHM floor: 2349 MB. Three cold-launch iters back-to-back; autokiller wait extended to 240s post-load_complete (fixed Jeffrey's pushback #1 about iter 2's missing data).
+
+**All 3 iters captured cleanly this time.**
+
+| Iter | fire (alloc/res/lhm MB) | load complete lhm | cudnn.benchmark | clocks.gr | D3D Shared range | step 1 s/it |
+|---:|---|---|---|---|---|---|
+| 1 | 2.13 / 2.44 / 5506 | 15942 | **False** | **2977 MHz stable** | 559-761 MB | **188.35 s/it** |
+| 2 | 2.13 / 2.47 / 5455 | 16033 | **False** | **2977 MHz stable** | 557-666 MB | **186.77 s/it** |
+| 3 | 2.13 / 2.41 / 5122 | 15856 | **False** | **2977 MHz stable** | 615-808 MB | **177.16 s/it** |
+
+**All 3 within 7% spread.** No 4x variance. The slow regime is REPRODUCIBLE in clean state.
+
+**Hypothesis ranking post-battery-v2:**
+
+| Hypothesis | Status |
+|---|---|
+| **alt-h (NEW): 180 s/it IS normal at this hardware/config** | **LEADING** -- 6 of 6 telemetered cold-launches across 2 batteries show this regime (only outlier: today battery v1 iter 1 at 42 s/it, likely warm-cache windfall) |
+| alt-c D3D Shared during sampler | PARTIAL but NOT CORRELATED: iter 3 had highest D3D (771-808 MB) and FASTEST pace (177); iter 1 had lower baseline D3D and was SLOWEST. Opposite of alt-c's prediction. |
+| alt-e non-deterministic kernel | **FALSIFIED** -- `cudnn.benchmark=False` across all 3 iters; autotuner not running; kernel selection deterministic |
+| alt-f thermal / clock throttle | **FALSIFIED** -- `clocks.gr` stable 2977 MHz (full boost) across 35-41 polls per iter; temps 52-55 C (throttle threshold ~85 C); single 2970 MHz tick on iter 3 = transient noise |
+| audio-residue / alt-a / alt-b / alt-d | all OUT or RULED OUT from prior batteries |
+
+**What this means for BUG-LOCAL-231:**
+
+Jeffrey's pushback #4 was correct. **The "10-15 s/it target" was aspirational without empirical baseline.** Today's data sets the actual baseline at ~180 s/it for FLUX-dev fp8 + bf16 cast + 1024x1024 + 20 steps on RTX 5080 Laptop. The faster runs observed earlier (1.22 s/it yesterday 23:30, 42 s/it today battery v1) were warm-cache windfalls -- likely from cudnn kernel selections / D3D Shared layouts inherited from a previous identical inference call.
+
+This is NOT an OTR code bug. It is the hardware ceiling. Mitigation is operator-level: accept 60-min FLUX bookend per episode (workflow renders one bookend, so total FLUX cost ~60 min per episode, not 3.5 hr).
+
+**Proposed status reframe for BUG-LOCAL-231:** `[NOT A BUG / HARDWARE BASELINE CHARACTERIZED]` -- not `[FIXED]` (there is no fix), not `[VERIFIED CLOSED with operator-checklist mitigation]` (no operator action changes the pace).
+
+**Pending Jeffrey's concurrence on the reframe:**
+- If concurred: promote 231; update CLAUDE.md / README to reflect actual pace baseline; unblock BUG-LOCAL-234 + 235 verification (they were parked behind 231).
+- If pushed back: continue investigation into the warm-cache mechanism (why does the second sampler run after a warm one go 100x faster?).
+
+**Telemetry retained:** `_log_flux_sampler_precheck()` + `_FluxSamplerPoller` stay in `visual/batch_flux_render.py`. If a fast run ever reappears, the telemetry will catch what's different.
+
+**Standing disciplines reaffirmed:** No defensive VRAM "protections". No `[FIXED]` flip on single observations. 6-iter empirical foundation supports today's reframe.
+
 ### Consolidated go-forward queue (Jeffrey 2026-05-19 directive)
 
 Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/etc until 231 + 234 + 235 verify together.

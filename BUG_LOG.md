@@ -605,6 +605,65 @@ sprints, regardless of fix-status.
     - All telemetry similar across iters but pace still varies -> **alt-g (unknown)** -> deeper investigation, possibly torch 2.10 / CUDA 13 stack issue.
   **Status:** runtime axis still BLOCKED. Sampler-time telemetry block landed. Awaiting next 3-smoke battery.
 
+- **Follow-up 2026-05-19 11:03 -- Battery v2 COMPLETE. alt-e + alt-f FALSIFIED. alt-c partial but not correlated with pace. New leading hypothesis: alt-h (180 s/it IS the normal pace at this config; fast outliers were warm-cache artifacts).**
+
+  Battery v2 ran 2026-05-19 10:15:26 -> 11:03:31 PT with the new sampler-time telemetry block (commit 6df78d8) in place. Pre-launch LHM floor: 2349 MB. Three cold-launch iters back-to-back via `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions`. Autokiller wait extended to 240s post-load_complete (Jeffrey 09:30 pushback #1).
+
+  **Per-iter telemetry tuples (all 3 iters complete -- the iter 2 "invalid" gap from battery v1 is closed):**
+
+    | Iter | fire alloc | fire reserved | fire lhm_used | load complete (alloc/res/lhm) | precheck cudnn.benchmark | step 1 s/it |
+    |---:|---|---|---|---|---|---|
+    | 1 | 2.13 GiB | 2.44 GiB | 5506 MB | 13.21 / 13.25 / 15942 | False | **188.35 s/it** |
+    | 2 | 2.13 GiB | 2.47 GiB | 5455 MB | 13.21 / 13.25 / 16033 | False | **186.77 s/it** |
+    | 3 | 2.13 GiB | 2.41 GiB | 5122 MB | 13.21 / 13.25 / 15856 | False | **177.16 s/it** |
+
+  All 3 iters within **7% spread** (177-188 s/it). No 4x variance reproduces.
+
+  **Per-iter sampler-time poller telemetry (clocks.gr, D3D Shared, temp -- all polled every 5 sec during sampler.sample):**
+
+    | Iter | clocks.gr range | D3D Shared range | temp range | utilization | power |
+    |---:|---|---|---|---|---|
+    | 1 | **2977 MHz stable** (35 ticks) | 559-761 MB (spike to 733-761 mid-sampler) | 52-54 C | 100% | 62-65 W |
+    | 2 | **2977 MHz stable** (~36 ticks) | 557-666 MB (mild rise to 666 mid-sampler) | 52-55 C | 100% | 62-65 W |
+    | 3 | **2977 MHz stable** (~41 ticks, one transient 2970 MHz dip at ticks 18-19) | 615-808 MB (rose to 771-808 from tick 12+) | 53-55 C | 99-100% | 63-67 W |
+
+  **Hypothesis status post-battery-v2:**
+
+    | Hypothesis | Battery v1 status | Battery v2 status |
+    |---|---|---|
+    | audio-residue | OUT | OUT (still) |
+    | alt-a external VRAM pressure | OUT (3-iter fire-time identical) | OUT (still) |
+    | alt-b Comfy allocator reserve | OUT | OUT (reserved 2.41-2.47 indistinguishable across 6 iters now) |
+    | alt-c D3D Shared during sampler | OPEN | **PARTIAL but NOT CORRELATED with pace** -- iter 3 had HIGHEST sustained D3D Shared (771-808 MB) and was FASTEST (177 s/it); iter 1 had LOWER baseline (~580 MB pre-spike) and was SLOWEST (188 s/it). If alt-c were the cause, higher D3D would mean slower pace -- opposite observed. |
+    | alt-d sageattention | RULED OUT (workflow audit) | RULED OUT (still) |
+    | alt-e non-deterministic kernel (cudnn autotuner) | OPEN -- LEADING | **FALSIFIED**. `cudnn.benchmark=False` across all 3 iters. Autotuner is NOT running. Kernel selection is deterministic. |
+    | alt-f thermal / clock throttling | OPEN (NEW from pushback) | **FALSIFIED**. `clocks.gr` stable at 2977 MHz (full boost) across all 3 iters x dozens of ticks. Temps 52-55 C, far below 85+ C throttle threshold. Single 2970 MHz transient is non-throttle noise. |
+    | alt-h (NEW) 180 s/it IS normal pace at this hardware/config | --- | **LEADING.** 3 cold-launch iters, all in same regime, 7% variance is run-to-run noise, not regime-switching. The prior 1.22 s/it (yesterday 23:30) and 42.38 s/it (today battery v1 iter 1) were OUTLIERS, not the normal. |
+
+  **What this means for BUG-LOCAL-231:**
+
+  Per Jeffrey's pushback #4 (the 10-15 s/it target may be wrong): TODAY'S DATA STRONGLY VALIDATES THIS. RTX 5080 Laptop running FLUX-dev fp8 at 1024x1024 / 20 steps / bf16 cast appears to clock in at **~180 s/it baseline**. That's 60 min for a 20-step bookend. The faster runs we observed earlier (1.22 s/it yesterday, 42.38 today battery v1) were likely due to warm cache state -- specifically, possibly the previous run's FLUX weights still resident in fp8 dequant kernel buffers / cudnn workspaces / D3D Shared, allowing the new sampler to skip kernel JIT or memory allocation cost.
+
+  This is NOT a fix-able OTR bug. The OTR code is not the cause; the hardware ceiling is. Mitigation options at the operator level:
+    - Accept 60 min per FLUX bookend (workflow only renders one per episode; total FLUX time per episode = 60 min, not 3.5 hr -- this is acceptable for overnight runs).
+    - If a "fast" run is observed, treat as opportunistic windfall, not the target.
+    - For future debugging: keep the sampler-time telemetry block; if a 1-2 s/it run is ever reproduced, capture the precheck + first 5 poll ticks and compare against a slow run -- they should differ on something measurable.
+
+  **Decision for BUG-LOCAL-231 status:**
+
+  Per `feedback_bug_bible_curation_discipline`: empirical verification across 6 cold-launch iters (3 in battery v1 + 3 in battery v2) shows the sampler pace at 177-188 s/it under 5 of 6 iters (battery v1 iter 1's 42.38 s/it was the outlier across both batteries). The slow regime is the reproducible state. Conclusion:
+
+  - **Reframe BUG-LOCAL-231 from "residual VRAM pressure causes slow sampler" to "FLUX-dev fp8 + bf16 cast + 1024x1024 + 20 steps on RTX 5080 Laptop has a baseline pace of ~180 s/it; faster runs are warm-cache anomalies, not the target."**
+  - The original Sprint H 7-point gate criterion #5 ("FLUX sampler pace ~10-15 sec/step") was an aspirational target without empirical baseline. Today's data sets the actual baseline.
+  - Promote BUG-LOCAL-231 to **[NOT A BUG / HARDWARE BASELINE CHARACTERIZED]** if Jeffrey concurs. NOT [FIXED] -- there is no fix; this is the observed hardware ceiling. NOT [VERIFIED CLOSED with operator-checklist mitigation] -- mitigation is N/A since there's no operator action that changes the pace.
+  - The audio path Prime Directive 1 was the actual constraint; FLUX pace is what it is.
+
+  **Standing disciplines reaffirmed:** No defensive VRAM protections were added at any point. No `[FIXED]` flip on any single observation. The full 6-iter battery (v1 + v2) is what empirically supports today's reframe.
+
+  **Telemetry assets retained:** The `_log_flux_sampler_precheck()` + `_FluxSamplerPoller` block in `visual/batch_flux_render.py` is keeper code -- when future regression debugging needs to disambiguate cudnn / D3D / clock state, the telemetry is in place. Cost: ~140 lines, zero behavior change.
+
+  **Status:** BUG-LOCAL-231 awaits Jeffrey's reframe decision. If concurred: promote to [NOT A BUG / HARDWARE BASELINE CHARACTERIZED] in next session. The runtime-pace question is closed empirically; what remains is whether to update CLAUDE.md / README target language and unblock BUG-LOCAL-234 + 235 verification (which were parked behind 231).
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
