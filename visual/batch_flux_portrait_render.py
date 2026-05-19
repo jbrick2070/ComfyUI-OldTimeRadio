@@ -485,29 +485,28 @@ class BatchFluxPortraitRender:
             len(prepared), len(cast),
         )
 
-        # ---- BUG-LOCAL-231 fix: explicit eviction + pin ----
-        # mm.free_memory forces ComfyUI's model_management to evict
-        # CLIP (and any other resident models from the audio phase)
-        # BEFORE MODEL is pinned for the sampling pass. force_full_load
-        # is NOT used (per Jeffrey 2026-05-18: ComfyUI ignores it
-        # during T5XXL load anyway, and normal offload behavior is
-        # preferable if VRAM tightens elsewhere).
+        # ---- BUG-LOCAL-231 fix: nuclear eviction + pin ----
+        # Original fix used mm.free_memory(11.5 GB, [model.load_device]).
+        # 2026-05-18 post-fix smoke (HEAD 36bcfc0) showed mm.free_memory
+        # was NOT sufficient. Jeffrey's pre-authorized escalation: swap
+        # to Option B mm.unload_all_models() per the acceptance gate
+        # rule "if LHM shows D3D Shared > 200 MB during sampler the
+        # eviction didn't work and the fix needs to escalate to option
+        # B (unload_all_models)."
         try:
             import comfy.model_management as mm  # type: ignore
             try:
-                mm.free_memory(
-                    11500 * 1024 * 1024,
-                    [model.load_device],
-                )
+                mm.unload_all_models()
                 log.info(
-                    "[OTR_BatchFluxPortraitRender] requested 11.5 GB free "
-                    "on model.load_device before MODEL pin"
+                    "[OTR_BatchFluxPortraitRender] unload_all_models() "
+                    "complete (nuclear eviction before MODEL pin, "
+                    "BUG-LOCAL-231 Option B escalation)"
                 )
             except Exception as exc:  # noqa: BLE001
                 log.warning(
-                    "[OTR_BatchFluxPortraitRender] mm.free_memory raised "
-                    "%r; proceeding to load_models_gpu without explicit "
-                    "eviction (sampler may thrash)", exc,
+                    "[OTR_BatchFluxPortraitRender] mm.unload_all_models() "
+                    "raised %r; proceeding to load_models_gpu without "
+                    "explicit eviction (sampler may thrash)", exc,
                 )
             mm.load_models_gpu([model])
             log.info(

@@ -648,33 +648,35 @@ class BatchFluxRender:
                 )
                 positive_conds = []  # fall back to per-shot encoding
 
-        # ---- BUG-LOCAL-231 fix step 4: explicit eviction + pin ----
-        # mm.free_memory requests N bytes free on the model's load_device,
-        # which forces ComfyUI's model_management to evict resident
-        # models (CLIP/T5XXL, leftover audio cache, anything else) to
-        # satisfy the request. THEN load_models_gpu pins the MODEL with
-        # full headroom. Without the explicit free_memory, the pin alone
-        # may not evict CLIP -- ComfyUI's evict-on-request policy only
-        # fires when something else REQUESTS VRAM, and load_models_gpu
-        # checks-and-shares rather than demanding eviction.
+        # ---- BUG-LOCAL-231 fix step 4: nuclear eviction + pin ----
+        # Original fix used mm.free_memory(11.5 GB, [model.load_device]).
+        # 2026-05-18 post-fix smoke (HEAD 36bcfc0) showed mm.free_memory
+        # was NOT sufficient: sampler step 1 still at 139 s/it (vs target
+        # 10-15 s/step), LHM D3D Shared 974 MB during sampler (vs <200 MB
+        # target). Jeffrey's pre-authorized escalation: swap to Option B
+        # mm.unload_all_models() per the acceptance gate rule "if LHM
+        # shows D3D Shared > 200 MB during sampler the eviction didn't
+        # work and the fix needs to escalate to option B
+        # (unload_all_models)."
+        #
+        # unload_all_models() unconditionally evicts every model from
+        # the model_management registry -- CLIP, T5XXL, FLUX MODEL
+        # (which we re-load in the next line), residual audio caches,
+        # everything. Then load_models_gpu pins MODEL freshly, alone,
+        # with full VRAM headroom for the sampler. The 0.5-1 s of
+        # re-load tax is amortized across all 20 sampler steps.
         try:
             import comfy.model_management as mm  # type: ignore
             try:
-                # 11.5 GB headroom request -- FLUX-fp8 needs ~11 GB to
-                # load + ~3 GB activation working set on the bf16 cast
-                # path. CLIP/T5XXL (~4.8 GB) eviction satisfies this on
-                # a 16 GB card.
-                mm.free_memory(
-                    11500 * 1024 * 1024,
-                    [model.load_device],
-                )
+                mm.unload_all_models()
                 log.info(
-                    "[BatchFluxRender] requested 11.5 GB free on "
-                    "model.load_device before MODEL pin"
+                    "[BatchFluxRender] unload_all_models() complete "
+                    "(nuclear eviction before MODEL pin, BUG-LOCAL-231 "
+                    "Option B escalation)"
                 )
             except Exception as exc:
                 log.warning(
-                    "[BatchFluxRender] mm.free_memory raised %r; "
+                    "[BatchFluxRender] mm.unload_all_models() raised %r; "
                     "proceeding to load_models_gpu without explicit "
                     "eviction (sampler may thrash)", exc,
                 )
