@@ -178,6 +178,40 @@ LHM live during sampler step 1: GPU Core 100%, D3D 3D 96.4%, GPU Memory Used 158
 
 **Do NOT flip to `[FIXED]` on next session's first smoke.** 3-smoke minimum from this point forward (per `feedback_bug_bible_curation_discipline`).
 
+### 2026-05-19 09:26 -- 3-smoke clean-state battery COMPLETE. alt-a FALSIFIED. Variance is NOT in fire-time state.
+
+Battery ran 08:41 → 09:26, 3 cold-launch iters back-to-back via `sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions`. Pre-launch LHM floor (ComfyUI fully down): 2276 MB.
+
+| Iter | fire alloc | fire reserved | fire lhm_used | step 1 s/it |
+|---:|---|---|---|---|
+| 1 | 2.13 GiB | 2.44 GiB | 5289 MB | **42.38 s/it** |
+| 2 | 2.13 GiB | 2.47 GiB | 5364 MB | **>90 s/it** (killed pre-flush) |
+| 3 | 2.13 GiB | 2.44 GiB | 5371 MB | **158.86 s/it** |
+
+**Fire-time tuples are essentially identical** (alloc identical, reserved within 30 MB, lhm_used within 82 MB) -- yet sampler pace spans 4x. Decision-tree verdict: **alt-a FALSIFIED**. The variance is downstream of fire -- in the sampler / driver / kernel layer, not in the headroom hole at fire time.
+
+**Hypothesis status post-battery:**
+
+| Hypothesis | Status |
+|---|---|
+| audio-residue | OUT (yesterday + today) |
+| alt-a external VRAM pressure | OUT (3-iter battery, same fire-time, 4x variance) |
+| alt-b Comfy allocator reserve | OUT (reserved 2.44/2.47/2.44 indistinguishable) |
+| alt-c driver / D3D Shared spillover during sampler | OPEN -- not in fire-time snapshot |
+| alt-d sageattention / Blackwell sm_120 fp8 path | OPEN |
+| alt-e (new) non-deterministic FLUX kernel scheduling (cublas autotuner / cudnn benchmark) | OPEN |
+
+**OTR-VRAM-PREFLIGHT soft warning design is HELD** -- it would have over-triggered (all 3 iters > 5 GiB at fire, only one ran at intermediate-pace). Not landing the warning until alt-c/d/e tell us what to gate on.
+
+**Next investigation surface (post-alt-a-falsification):**
+
+1. **Add LHM-at-sampler-step-1 telemetry** to `visual/batch_flux_render.py`. tqdm callback that logs lhm_used + torch_reserved + D3D Shared after KSampler step 1 completes. Catches the spillover signature exactly when slow regime manifests.
+2. **Add cudnn / cublas determinism state logging** at FLUX entry: `torch.backends.cudnn.benchmark`, `torch.backends.cudnn.deterministic`, autotuner state. If benchmark is True it explains run-to-run kernel selection variance directly.
+3. **(Only after #1 + #2)** If alt-c data shows D3D Shared spike during slow-regime step 1: investigate ComfyUI's offloader behavior under fp8 → bf16 cast on Blackwell sm_120.
+4. **(Parking lot)** Production tolerance: iter 1's 42 s/it × 20 × 4 renders ≈ 56 min for FLUX (borderline tolerable); iter 3's 158 s/it × 20 × 4 ≈ 3.5 hr (not). Cold-launch re-roll heuristic possible.
+
+**BUG-LOCAL-231 stays PARTIAL.** alt-a FALSIFIED is a verified empirical finding from 3 independent cold-launches; no `[FIXED]` flip. No `[VERIFIED CLOSED with operator-checklist mitigation]` either -- that branch was contingent on alt-a confirming, and it did not.
+
 ### Consolidated go-forward queue (Jeffrey 2026-05-19 directive)
 
 Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/etc until 231 + 234 + 235 verify together.

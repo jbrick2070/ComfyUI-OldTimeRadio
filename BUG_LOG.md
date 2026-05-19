@@ -530,6 +530,44 @@ sprints, regardless of fix-status.
   - **Per `feedback_bug_bible_curation_discipline` and `feedback_no_defensive_vram_protections`:** Still PARTIAL. One slow iter under controlled cold-launch + Option B in place + audio-residue ruled out = strong update to the cause model, but not enough to close. NO code change proposed today. Status stays BLOCKED until the 3-smoke alt-a verification test is run. **Do NOT flip to [FIXED] on next session's first smoke either** -- 3-smoke minimum from this point forward.
   - **Status:** runtime axis remains BLOCKED. Audio-residue hypothesis now strongly disfavored (was leading); alt-a now leading. No teardown code added. 3-smoke clean-state battery is the verification gate.
 
+- **Follow-up 2026-05-19 09:26 -- 3-smoke clean-state battery COMPLETE. alt-a FALSIFIED. Variance is not in fire-time state -- it's downstream in the sampler / driver / kernel layer.**
+  - **Setup:** Pre-launch LHM floor with ComfyUI fully down: GPU Memory Used = **2276 MB**. That's the headroom hole from browser / Discord / driver / Windows compositor / shader cache before ComfyUI loads anything. Used as the "floor" reference per Jeffrey's directive: any fire-time lhm_used above floor + 2 GiB = unusual external load.
+  - **Launch:** `scripts\sweep_and_launch.bat --iters 3 --inter-iter-sec 0 --no-stop-conditions` at 08:41:17. Each iter cold-launched ComfyUI as a direct subprocess.Popen child of the worker (no .bat / no PowerShell wrapper). Workflow: `workflows/otr_scifi_16gb_full.json` (canonical; renders radio bookend only -- per-shot env-stills and per-character portraits are skipped via skip_env_stills=True per BUG-LOCAL-078 follow-up).
+  - **Per-iter telemetry table:**
+
+    | Iter | start | fire alloc | fire reserved | fire lhm_used | non-torch above floor | step 1 s/it | verdict |
+    |---:|---|---|---|---|---|---|---|
+    | 1 | 08:41:17 | 2.13 GiB | 2.44 GiB | 5289 MB | 393 MB | **42.38 s/it** | INTERMEDIATE (3-4x off target) |
+    | 2 | 08:56:31 | 2.13 GiB | 2.47 GiB | 5364 MB | 468 MB | **>90 s/it** (autokiller fired @+90s before tqdm flushed step 1) | SLOW (regime confirmed by no-flush) |
+    | 3 | 09:11:18 | 2.13 GiB | 2.44 GiB | 5371 MB | 475 MB | **158.86 s/it** | SLOW (matches yesterday's 172.99 / 176.62) |
+
+    Non-torch above floor = lhm_used at fire minus torch_reserved minus baseline floor (2276 MB). Captures how much ABOVE baseline external apps the GPU is holding when FLUX is about to load. All three runs ~400-470 MB above floor -- essentially indistinguishable.
+  - **Disambiguation decision tree applied (from prior follow-up):**
+    - "All 3 sub-3 GiB lhm_used at fire AND all 3 at 10-15 s/it" -- **NO**. All 3 were 5.2-5.4 GiB at fire (well above 3 GiB), AND none were at 10-15 s/it (best was 42 s/it).
+    - "Mixed (1 or 2 hit slow regime)" -- **PARTIAL FIT**. iter 1 was intermediate (42 s/it, 3-4x off target), iter 2 + 3 were clearly slow (>90 / 158 s/it).
+    - "All 3 still hit slow regime even with everything closed" -- **CLOSEST FIT**. iter 1 was the best of the 3 but still off target; iter 2 + 3 hit the slow regime; none reached the 10-15 s/it target. Decision-tree verdict: **alt-a FALSIFIED**.
+  - **The new headline finding -- variance is NOT in the fire-time state:**
+    - Iter 1, 2, 3 fire-time tuples (alloc, reserved, lhm_used): **(2.13, 2.44, 5289), (2.13, 2.47, 5364), (2.13, 2.44, 5371)** -- within 82 MB of each other on lhm_used, identical on allocated, within 30 MB on reserved.
+    - Yet step 1 s/it varied **42.38 / >90 / 158.86** -- a 4x spread on essentially identical fire-time state.
+    - This rules out audio-residue (iter 1 follow-up already did this), alt-a (today's battery), AND alt-b (allocator reserve was 2.44/2.47/2.44, indistinguishable). The variance must come from somewhere NOT captured in the fire-time snapshot.
+  - **Remaining candidate hypotheses (no longer ordered "leading" -- ranked by what the data is consistent with):**
+    - **(alt-c) Driver / D3D Shared spillover during sampler execution.** Not captured in our fire-time snapshot. D3D Shared Memory Used in prior yesterday's iter 1 slow run was 808-1098 MB DURING sampler step 1 (post-load, post-pin). If today's fast iter 1 had clean D3D Shared during sampler vs iter 3's spillover during sampler, that explains the 42 vs 158 split. **MISSING TELEMETRY:** we don't capture LHM at sampler step 1 -- only at fire (pre-load) and at load complete (post-load, pre-sampler). Need a third snapshot inside `BatchFluxRender` after `KSamplerAdvanced.sample` first step returns.
+    - **(alt-e -- new) Non-deterministic FLUX kernel scheduling on Blackwell sm_120.** comfy_kitchen backend exposes eager / cuda / triton with capabilities `dequantize_per_tensor_fp8 / scaled_mm_mxfp8 / quantize_per_tensor_fp8 / apply_rope` (per startup L45-47). If the dispatch picks different kernel variants per cold launch (kernel auto-tuner, cublas heuristics, cudnn benchmark mode), per-step pace could vary 4x at the same VRAM occupancy. **CHECK:** is `torch.backends.cudnn.benchmark` True? Does `cublas` use heuristic-selected kernels for fp8 matmul? Either would produce run-to-run variance.
+    - **(alt-d) sageattention pin / Blackwell-specific fp8 path** (from prior next-investigation list). Workflow's `PathchSageAttentionKJ` is disabled, but SDPA's fp8_e4m3fn -> bf16 cast path on Blackwell may itself be unstable across runs.
+  - **What the data clearly rules OUT:**
+    - audio-residue (cleared by iter 1 yesterday + reproduced today)
+    - alt-a / external app pressure (cleared by 3-iter clean-state battery today: same fire-time state, 4x variance)
+    - alt-b / Comfy allocator reserve (cleared by 3-iter battery: reserved 2.44/2.47/2.44 within 30 MB)
+  - **Mitigation status:** OTR-VRAM-PREFLIGHT soft warning design from the prior follow-up is now LESS WARRANTED. It would have warned on all 3 of today's iters (lhm_used > 5 GiB at fire) but only one had the catastrophic slow regime. The warning would have over-triggered. **HOLD on landing the preflight warning** until alt-c/d/e investigation tells us what to gate on.
+  - **Operator state for this battery:** Jeffrey was in flight closing non-essential apps per directive but the baseline floor of 2276 MB suggests apps were already minimal (closing a heavy browser session typically drops floor by 800-2000 MB). The 3-iter battery had similar floor conditions throughout (5289 / 5364 / 5371 MB at fire = within 82 MB).
+  - **Next investigation surface (post-3-smoke alt-a falsification):**
+    1. **Add LHM-at-sampler-step-1 telemetry.** Modify `visual/batch_flux_render.py` to log lhm_used + torch_reserved AFTER KSampler returns step 1 (e.g., a tqdm callback that fires on the 5%/20 progress). This catches D3D Shared spillover signature during the diffusion math -- exactly when the slow regime manifests.
+    2. **Add cudnn/cublas determinism check.** Log `torch.backends.cudnn.benchmark`, `torch.backends.cudnn.deterministic`, and the autotuner state at FLUX entry. If benchmark mode is True, that explains run-to-run variance directly.
+    3. **(only after #1 + #2 land)** If alt-c data shows D3D Shared spike during slow-regime sampler step 1: investigate ComfyUI's offloader behavior under fp8 fp16/bf16 cast on Blackwell sm_120 (may be paging activation tensors to system RAM despite 0.4 GiB of free VRAM headroom).
+    4. **(parking lot)** Consider whether the slow regime is acceptable for production. Iter 1 (42 s/it × 20 steps × 4 renders = ~56 min just for FLUX) is borderline tolerable; iter 3 (158 s/it × 20 steps × 4 renders = ~3.5 hr) is not. If we can predict run regime, we could re-roll cold launches that hit the slow profile.
+  - **Per `feedback_bug_bible_curation_discipline`:** 3-smoke battery executed cleanly. Status stays PARTIAL. **alt-a FALSIFIED** is a verified empirical finding (3 independent cold-launch runs in clean state, identical fire-time tuples, 4x sampler variance). NO `[FIXED]` flip. NO `[VERIFIED CLOSED with operator-checklist mitigation]` either -- that branch was contingent on alt-a confirming, which it did not.
+  - **Status:** runtime axis still BLOCKED. Audio-residue OUT. alt-a OUT. alt-b OUT. alt-c / alt-d / alt-e remaining. Need step-1-time telemetry + cudnn determinism check to disambiguate further. BUG-LOCAL-234 + 235 still unverifiable while FLUX thrashes.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
