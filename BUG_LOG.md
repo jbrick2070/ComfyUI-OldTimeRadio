@@ -706,6 +706,51 @@ sprints, regardless of fix-status.
 
   **Status:** BUG-LOCAL-231 stays **PARTIAL**. Reframe to `[CURRENT-CONFIG BASELINE CHARACTERIZED / OPTIMIZATION OPEN]` proposed (Jeffrey to confirm). Config fingerprint captured. Awaiting: (1) per-step timing data via extended telemetry; (2) Jeffrey's decision on reframe label; (3) BUG-LOCAL-244 verification gate; (4) consider whether `TORCH_SDPA_BACKEND=math` is the slow-regime cause and the fast outliers correspond to a different attention dispatch.
 
+- **Follow-up 2026-05-19 11:55 -- Jeffrey 11:30 critical redirect: TORCH_SDPA_BACKEND=math bisected + REMOVED. Smoking-gun fix candidate, parallel to BUG-LOCAL-230's --force-fp16 strip. Single smoke pending to verify.**
+
+  **Bisect (read-only, ~10 min):**
+
+  - `findstr /N /I "TORCH_SDPA_BACKEND" ...` across the 4 launcher sites:
+    - `C:\Users\jeffr\Documents\ComfyUI\start_comfy.bat` L2: `set TORCH_SDPA_BACKEND=math`
+    - `scripts/worker_iter.py` L541: `env["TORCH_SDPA_BACKEND"] = "math"`
+    - `scripts/start_comfy_h0_baseline.bat` L7 (REM) + L25 (set)
+    - `scripts/_start_comfyui.ps1`: NO MATCH (one launcher already clean)
+  - Wider sweep of OTR repo + ComfyUI install dirs: no other occurrences beyond the 3 sites above (and their duplicate copies via Comfy install path symlink).
+  - `git log --all -S 'TORCH_SDPA_BACKEND'` (OTR repo): the env var was introduced in commit **`1f7240f`** (2026-05-17, "H bug-hunt C1: ship four manual-operator scripts"). Same commit that introduced `--force-fp16` (later removed by BUG-LOCAL-230 fix at 16ce225). 1f7240f's commit-message motivation: *"Tested Blackwell settings carried over verbatim: TORCH_SDPA_BACKEND=math + --highvram + --force-fp16 + --cuda-malloc"*. **No empirical benchmark cited.** Just carried over from operator's working start_comfy.bat (which had `set TORCH_SDPA_BACKEND=math` in turn, with no separate provenance).
+  - `git show v2.0-alpha-stable-2026-05-05:scripts/start_comfy_h0_baseline.bat` → `fatal: path ... exists on disk, but not in 'v2.0-alpha-stable-2026-05-05'`. Same for `scripts/_start_comfyui.ps1`. **Stable predates these scripts entirely.** Stable's worker_iter.py SDPA grep was empty -- worker_iter.py didn't exist in stable.
+
+  **Verdict: Outcome 1 confirmed -- smoking gun.** Stable ran with PyTorch's default SDPA dispatch (efficient/flash auto-pick on Blackwell sm_120). Sprint H 1f7240f added `TORCH_SDPA_BACKEND=math` as a defensive override with no benchmark. Math SDPA is the slowest backend; on FLUX's 38 attention blocks at 1024x1024 / 20 steps it produced the ~180 s/it baseline. The 1.22 s/it lucky run from yesterday likely corresponds to the env var failing to propagate to a worker process for some reason (the most plausible mechanism for the fast outlier within this hypothesis).
+
+  **Fix landed (this commit):**
+
+  1. `scripts/worker_iter.py` L541: `env["TORCH_SDPA_BACKEND"] = "math"` -> removed; comment block above retained with 2026-05-19 BUG-LOCAL-231 explanation, mirrors BUG-LOCAL-230 fix pattern at 16ce225.
+  2. `scripts/start_comfy_h0_baseline.bat`: L25 `set TORCH_SDPA_BACKEND=math` removed; L7 (REM comment in the "tested Blackwell settings" block) updated to remove the reference; new BUG-LOCAL-231 comment block added next to the existing BUG-LOCAL-230 comment block.
+  3. `C:\Users\jeffr\Documents\ComfyUI\start_comfy.bat` (operator's manual launcher, NOT in OTR repo): `set TORCH_SDPA_BACKEND=math` line removed. Backup at `start_comfy.bat.bak-bug-local-231-2026-05-19`.
+  4. `scripts/_start_comfyui.ps1`: untouched (was already clean).
+
+  **Pre-commit verification (all green):**
+
+  - AST parse `scripts/worker_iter.py`: OK (35540 bytes, 920 lines).
+  - AST parse `visual/batch_flux_render.py`: OK (64695 bytes, 1407 lines) -- telemetry block from prior commit untouched.
+  - Bug Bible regression: 23 passed, 1 skipped, 2 xfailed (baseline held).
+  - Audio byte-identical: 9 passed, 1 skipped (audio path sealed).
+
+  **Verification gate (pending after commit + push):**
+
+  1. Cold-launch ComfyUI via `sweep_and_launch.bat --iters 1 --inter-iter-sec 0 --no-stop-conditions`.
+  2. Wait for FLUX bookend sampler step 1 to flush in the comfy log.
+  3. **Capture step 1 s/it.**
+  4. **Decision tree:**
+     - **step 1 < 50 s/it (i.e. sub-1000s for the 20-step bookend):** BUG-LOCAL-231 fix CONFIRMED. Promote to `[FIXED commit-sha 2026-05-19]`. Update CLAUDE.md / README pace target language. **BUG-LOCAL-244 also collapses** -- same root cause for both fast and slow regimes (math SDPA forced when env propagated; efficient SDPA picked when env failed to propagate). Unblock BUG-LOCAL-234 + 235 verification with full-pipeline smoke under fast FLUX baseline.
+     - **step 1 stays ~180 s/it:** math SDPA was NOT the cause. Restore default-ish SDPA dispatch state. Resume per-step telemetry + battery v3 plan. BUG-LOCAL-244 stays open. Reframe 231 status per current PARTIAL trajectory.
+     - **step 1 anywhere else:** report the value + new poller telemetry; new hypothesis branch.
+
+  **Per-step timing extension (correction #4) is HELD** pending this single-smoke verification. If math SDPA was the cause, per-step data on the unfixed slow path is irrelevant. If math SDPA was NOT the cause, we resume the per-step plan.
+
+  **BUG-LOCAL-234/235 operational unblock (correction #9) is also HELD** pending this verification. If FLUX drops to 20-50 s/it, a full-pipeline smoke becomes 30-45 min instead of 2-3 hr -- worth waiting 30 min for that gain.
+
+  **Bible candidate status:** still POSTPONED until single-smoke verification reports. If `[FIXED]` confirmed, this would be a strong Bible candidate parallel to BUG-LOCAL-230 -- the same "defensive env var added without benchmark" pattern generalizes broadly.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:

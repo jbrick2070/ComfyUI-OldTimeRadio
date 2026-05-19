@@ -538,7 +538,14 @@ def _launch_comfyui(
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
-    env["TORCH_SDPA_BACKEND"] = "math"
+    # BUG-LOCAL-231 fix (2026-05-19): TORCH_SDPA_BACKEND=math was a
+    # defensive carry-over from Sprint H commit 1f7240f's "tested
+    # Blackwell settings". No empirical benchmark justified it. Math
+    # SDPA is the slowest backend; on RTX 5080 Laptop FLUX-dev fp8 +
+    # bf16 cast it gave ~180 s/it baseline. Removing -> PyTorch
+    # default SDPA dispatch picks efficient/flash on Blackwell sm_120
+    # (much faster). Same defensive-guard removal pattern as
+    # BUG-LOCAL-230's --force-fp16 strip at 16ce225.
     env["HF_HOME"] = r"C:\ComfyUI-Models\huggingface"
 
     args = [
