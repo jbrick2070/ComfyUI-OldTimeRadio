@@ -587,6 +587,22 @@ def _find_portrait(
             p = c.get("portrait_path")
             if p and Path(p).exists():
                 return Path(p)
+            # BUG-LOCAL-235 fix (2026-05-19): Tier 1.5 deterministic
+            # filename fallback. If the cast row's `portrait_path`
+            # stamp is missing OR points to a stale path (e.g. the
+            # BUG-LOCAL-234 rename-stale chain), fall back to looking
+            # up `{char_id}_portrait.png` directly in portraits_dir.
+            # PortraitRender's BUG-LOCAL-078 naming contract guarantees
+            # this filename for every rendered cast portrait. The
+            # legacy Tier 2 `pass1_portrait_*.png` glob below was
+            # never updated when PortraitRender renamed its output
+            # convention 2026-05-04, so this Tier 1.5 layer is what
+            # actually closes the naming-contract drift.
+            char_id = (c.get("char_id") or "").strip()
+            if char_id:
+                candidate = portraits_dir / f"{char_id}_portrait.png"
+                if candidate.exists():
+                    return candidate
 
     cast_names = [(c.get("name") or "").upper().strip() for c in cast]
 
@@ -1530,7 +1546,77 @@ class BatchHumoRender:
         warmup_pad_ms = max(0, min(500, int(humo_warmup_pad_ms)))
 
         # ---- 1. Parse ledger ----
-        ledger, ledger_path = self._load_ledger_with_path(ledger_json)
+        # BUG-LOCAL-234 fix (2026-05-19): rename-safe ledger refresh.
+        # Mirrors visual/batch_flux_render.py:1015-1041 verbatim. The
+        # in-flight Ledger singleton's `path` property advances through
+        # `Ledger.rename_episode` (BUG-LOCAL-015 Phase B 2026-05-02),
+        # so reading from the singleton always tracks the post-rename
+        # location. The wired `ledger_json` socket may carry a
+        # PRE-rename serialization from an upstream node whose output
+        # was captured before SignalLostVideo ran the rename --
+        # trusting that string would land path resolution in the
+        # renamed-away dir (cf. BUG-LOCAL-234 surfaced 2026-05-18 23:42).
+        # Fall back to the legacy wired-input loader only when the
+        # singleton lookup AND mtime-walker both fail (standalone test
+        # invocations).
+        ledger = None
+        ledger_path = None
+        try:
+            try:
+                from . import production_ledger as _PROD_LEDGER  # type: ignore
+                from . import _otr_ledger as _OTRL_LD  # type: ignore
+            except ImportError:
+                import production_ledger as _PROD_LEDGER  # type: ignore
+                import _otr_ledger as _OTRL_LD  # type: ignore
+            _led_singleton = _PROD_LEDGER.get_ledger()
+            ledger_path = Path(_led_singleton.path)
+            if not ledger_path.exists():
+                log.warning(
+                    "[BatchHumoRender] singleton path %s does not exist "
+                    "on disk; falling back to mtime walker",
+                    ledger_path,
+                )
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+        except Exception as _exc:  # noqa: BLE001
+            log.warning(
+                "[BatchHumoRender] singleton lookup failed (%s); "
+                "falling back to mtime walker", _exc,
+            )
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+            except Exception:  # noqa: BLE001
+                ledger_path = None
+        if ledger_path is not None:
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger = _OTRL_LD.load_ledger_safe(ledger_path)
+            except Exception as _exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchHumoRender] load_ledger_safe(%s) raised %r; "
+                    "falling back to wired ledger_json", ledger_path, _exc,
+                )
+                ledger = None
+        if ledger is None:
+            # Last-resort: parse the wired socket. This is the legacy
+            # standalone-test path -- production runs always succeed
+            # via the singleton-fallback above.
+            log.warning(
+                "[BatchHumoRender] singleton refresh produced no ledger; "
+                "falling back to wired ledger_json socket (may be stale "
+                "if upstream serialized before episode rename)"
+            )
+            ledger, ledger_path = self._load_ledger_with_path(ledger_json)
 
         # l3-2026-05-08 telemetry: expose this process's ledger to
         # `_hard_reset_cuda_context` so cuda_hard_reset_count bumps
