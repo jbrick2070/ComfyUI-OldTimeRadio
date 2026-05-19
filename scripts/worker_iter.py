@@ -99,8 +99,24 @@ COMFY_MAIN = Path(
 
 # Synthesis section 2 step 4: 60s startup timeout.
 STARTUP_TIMEOUT_S = 60
-# Synthesis section 2 step 8: 15-min workflow execution timeout.
-EXEC_TIMEOUT_S = 900
+# Sprint H 3.7 closure run (Jeffrey 2026-05-18): exec budget
+# raised from 900s (15 min, calibrated for the writer phase
+# alone) to 12600s (3.5 hr) for the full v2.0-alpha pipeline.
+# Wall-time decomposition from memory project_humo_procgen_
+# verified_2026-05-05 (commit ab4c8cf, sirens_print 36 min for
+# 2 character lines + 1 announcer = ~12-18 min/clip):
+#     audio branch       ~10 min  (writer + outline + MusicGen
+#                                  + Kokoro + Bark + Assembler)
+#     FLUX env + portraits  ~5 min   (radio bookend + PASS1=3)
+#     LTX text encoder      ~2 min
+#     LTX env motion         ~5 min   (per shot, PASS3 dependent)
+#     HuMo Phase A/B/main  ~145 min  (12 character lines
+#                                     x ~12 min each)
+#     ffmpeg composite      ~3 min
+#     total                ~170 min  (call it 3 hr)
+# 3.5 hr gives ~30 min headroom for the dynamic offloader
+# pageflush + ComfyUI's executor inter-node coordination.
+EXEC_TIMEOUT_S = 12600
 # Pre-flight VRAM thresholds per synthesis section 2 step 6.
 VRAM_IDLE_TARGET_GB = 2.0
 VRAM_WARN_GB = 4.0

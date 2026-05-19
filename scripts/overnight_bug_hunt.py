@@ -93,8 +93,14 @@ WORKER_PY = REPO / "scripts" / "worker_iter.py"
 SWEEP_EXCLUDE_BAT = REPO / "scripts" / "sweep_python_excluding.bat"
 PY = Path(r"C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe")
 
-# Synthesis section 2 step 5: 20-min outer wait on each worker.
-WORKER_WAIT_S = 1200
+# Sprint H 3.7 closure run (Jeffrey 2026-05-18): supervisor
+# outer wait raised from 1200s (20 min) to 14400s (4 hr) to give
+# headroom above the worker's inner EXEC_TIMEOUT_S = 12600 (3.5 hr).
+# See scripts/worker_iter.py for the wall-time decomposition that
+# justified the inner budget; the supervisor wait sits 30 min
+# above so a clean exec timeout fires inside the worker rather
+# than a forced supervisor tear-down.
+WORKER_WAIT_S = 14400
 # Port probe starts here.
 PORT_BASE = 8000
 PORT_PROBE_MAX = 32
