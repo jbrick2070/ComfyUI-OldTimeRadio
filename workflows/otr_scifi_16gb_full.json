@@ -63,7 +63,7 @@
         "google/gemma-4-E4B-it",
         "",
         true,
-        3,
+        "auto",
         "let the story decide",
         "",
         "balanced",

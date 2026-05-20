@@ -384,18 +384,7 @@ try:
 except Exception as _otr_route_err:
     print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
 
-# Phase 2A (2026-05-11): expose web/ for the act_count widget JS
-# extension. ComfyUI auto-serves anything under WEB_DIRECTORY at
-# /extensions/<custom-node>/ on server start; the JS file at
-# web/js/otr_act_count_widget.js registers an `OTR.ActCountWidget`
-# extension that lives-updates the act_count dropdown's valid range
-# whenever target_words changes on OTR_LedgerScriptWriter nodes.
-# Python validator (compute_episode_budget) is still authoritative;
-# this JS is purely UI feedback.
-WEB_DIRECTORY = "./web"
-
 __all__ = [
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
-    "WEB_DIRECTORY",
 ]

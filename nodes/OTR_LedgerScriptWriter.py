@@ -62,10 +62,8 @@ Widget surface (post-Phase-3 cleanup 2026-05-11):
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
         include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
                                     beats between acts; False -> continuous)
-        act_count         INT     (1-7 acts; 0 = auto-derive default from
-                                   target_words. Live-clamped to
-                                   [default..max] by the JS extension at
-                                   web/js/otr_act_count_widget.js)
+        act_count         combo   ('auto' derives the act count from
+                                   target_words; '1'-'7' set it explicitly)
         style             combo   (tonal preset; "let the story decide"
                                    defers to two-pass LLM picker)
         style_custom      STRING  (free-text override; empty falls back
@@ -182,10 +180,10 @@ _CREATIVITY_CHOICES = list(_CREATIVITY_TEMP_MAP.keys())
 
 # target_length widget removed 2026-05-11 (post-Phase-3 cleanup pass).
 # The old "short (3 acts)" / "medium (5 acts)" / "long (7-8 acts)" combo
-# is replaced by the typed `act_count` widget + `target_words` (driven
-# by web/js/otr_act_count_widget.js). Smoke presets are gone with it --
-# for a 30-word smoke run, type target_words=30 directly. Cleaner UX,
-# one source of truth for episode shape.
+# is replaced by the `act_count` combo widget + `target_words`. Smoke
+# presets are gone with it -- for a 30-word smoke run, type
+# target_words=30 directly. Cleaner UX, one source of truth for
+# episode shape.
 
 
 # ---------------------------------------------------------------------------
@@ -998,7 +996,7 @@ def _resolve_inputs(
     technical_model: str = _otr_model_catalog.DEFAULT_LLM,
     custom_premise: str = "",
     include_act_breaks: bool = True,
-    act_count: int = 0,
+    act_count: str = "auto",
     style: str = _STYLE_AUTO_SENTINEL,
     style_custom: str = "",
     creativity: str = "balanced",
@@ -1050,11 +1048,19 @@ def _resolve_inputs(
     target_words = _resolve_target_words(target_words)
     num_characters = max(1, min(6, int(num_characters)))
 
-    # Phase 2A (2026-05-11): act_count resolution. 0 (default) means
-    # auto-derive via _otr_episode_budget.default_act_count. Any
-    # non-zero value gets validated by compute_episode_budget in
-    # run() -- including the [default..max] band check.
-    act_count_int = max(0, min(7, int(act_count or 0)))
+    # Phase 2A: act_count resolution. The widget is a combo --
+    # "auto" (the default) means auto-derive via
+    # _otr_episode_budget.default_act_count; "1".."7" set it
+    # explicitly. An explicit pick is validated against the
+    # [default..max] band by compute_episode_budget in run().
+    _act_count_raw = str(act_count).strip().lower()
+    if _act_count_raw in ("", "auto"):
+        act_count_int = 0
+    else:
+        try:
+            act_count_int = max(1, min(7, int(_act_count_raw)))
+        except (TypeError, ValueError):
+            act_count_int = 0
     if act_count_int == 0:
         try:
             from . import _otr_episode_budget as _OTRB  # type: ignore
@@ -1409,30 +1415,29 @@ class OTR_LedgerScriptWriter:
                 }),
                 # act_count sits where target_length used to be in the
                 # widget order. Replaced the legacy target_length combo
-                # (post-Phase-3 cleanup 2026-05-11) with the typed,
-                # JS-clamped integer dropdown that the synthesis §3
-                # Phase 2A specified as the authoritative act-count
-                # control. Driven live from target_words by
-                # web/js/otr_act_count_widget.js.
-                "act_count": ("INT", {
-                    "default": 0, "min": 0, "max": 7, "step": 1,
-                    "tooltip": (
-                        "Number of acts (1-7). 0 (default) = "
-                        "auto-derive from target_words via "
-                        "_otr_episode_budget.default_act_count.\n\n"
-                        "Default-act thresholds (target_words floor):\n"
-                        "  30   -> default 1 act\n"
-                        "  150  -> default 2 acts\n"
-                        "  300  -> default 3 acts (and all higher words)\n\n"
-                        "Maximum cap per target_words: target_words // 50, "
-                        "hard ceiling 7. The user can pick UP from the "
-                        "default but not below.\n\n"
-                        "The JS extension at web/js/otr_act_count_widget.js "
-                        "live-updates the valid dropdown choices when "
-                        "target_words changes; the Python validator is "
-                        "authoritative (rejects any out-of-band combo)."
-                    ),
-                }),
+                # (post-Phase-3 cleanup 2026-05-11) with this act_count
+                # combo: "auto" derives the act count from target_words,
+                # "1".."7" set it explicitly. compute_episode_budget is
+                # the authoritative validator.
+                "act_count": (
+                    ["auto", "1", "2", "3", "4", "5", "6", "7"],
+                    {
+                        "default": "auto",
+                        "tooltip": (
+                            "Number of acts. 'auto' (the default) sizes "
+                            "the act count from target_words via "
+                            "_otr_episode_budget.default_act_count; pick "
+                            "1-7 to set it explicitly.\n\n"
+                            "Auto thresholds (target_words floor):\n"
+                            "  30   -> 1 act\n"
+                            "  150  -> 2 acts\n"
+                            "  300  -> 3 acts (and all higher word counts)\n\n"
+                            "compute_episode_budget is authoritative and "
+                            "rejects an out-of-band explicit pick at run "
+                            "time (cap = target_words // 50, ceiling 7)."
+                        ),
+                    },
+                ),
                 "style": (_STYLE_CHOICES, {
                     "default": _STYLE_AUTO_SENTINEL,
                     "tooltip": (
@@ -2963,11 +2968,12 @@ if __name__ == "__main__":
         cr_choices, _ = spec["optional"]["creativity"]
         assert cr_choices == _CREATIVITY_CHOICES, \
             f"creativity dropdown drift: {cr_choices}"
-        # act_count INT (0 = auto-derive sentinel; JS clamps to
-        # [default..max] at the UI layer per target_words).
-        ac_type, ac_meta = spec["optional"]["act_count"]
-        assert ac_type == "INT", f"act_count type drift: {ac_type!r}"
-        assert ac_meta["min"] == 0 and ac_meta["max"] == 7
+        # act_count combo: "auto" sentinel + explicit "1".."7".
+        ac_choices, ac_meta = spec["optional"]["act_count"]
+        assert ac_choices == ["auto", "1", "2", "3", "4", "5", "6", "7"], \
+            f"act_count combo drift: {ac_choices!r}"
+        assert ac_meta["default"] == "auto", \
+            f"act_count default drift: {ac_meta['default']!r}"
         # style combo: first entry is the LLM-auto sentinel.
         st_choices, st_meta = spec["optional"]["style"]
         assert isinstance(st_choices, list) and len(st_choices) >= 4

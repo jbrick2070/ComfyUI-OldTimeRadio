@@ -61,8 +61,9 @@ class InvalidEpisodeBudgetError(ValueError):
 # ---------------------------------------------------------------------------
 
 # (target_words floor, default act_count) tuples. Walked in order so
-# the LAST matching floor wins. Keep this in sync with the JS mirror
-# in web/js/otr_act_count_widget.js — Python is authoritative.
+# the LAST matching floor wins. Single source of truth for the
+# auto-derived act count (the act_count widget's "auto" option
+# resolves through default_act_count below).
 _DEFAULT_ACT_BREAKPOINTS: tuple[tuple[int, int], ...] = (
     (30,  1),   # 30-149   → default 1 act
     (150, 2),   # 150-299  → default 2 acts
