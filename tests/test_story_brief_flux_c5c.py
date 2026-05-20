@@ -8,8 +8,10 @@ Both wirings use `get_story_brief_full(meta)`:
 
   * `_parse_env_prompts`: brief is inserted between the env
     description and the style_suffix tail.
-  * `_build_dynamic_radio_prompt`: brief replaces the weak Tier 4
-    scenes[0].env fallback in the existing fallback chain.
+  * `_build_dynamic_radio_prompt`: brief is the PRIMARY radio
+    descriptor (BUG-LOCAL-249). The upstream style preset is not
+    read; an absent/failed brief falls through to the episode_id
+    slug tier.
 
 Behavioral tests use a unique sentinel token `zebra_lantern_atmosphere_731`
 (per E-06 meta-threading canary) so a regression that bypasses the
@@ -149,9 +151,8 @@ def _ledger_with_brief(brief: str | None, *, style: str = "") -> dict:
     return {"meta": meta, "scenes": [], "episode_id": "ep_test"}
 
 
-def test_flux_radio_bookend_uses_brief_when_widget_style_empty():
-    """Per spec: brief replaces the weak Tier 4 (scenes[0].env)
-    fallback. With widget style empty, the brief becomes the
+def test_flux_radio_bookend_uses_brief():
+    """BUG-LOCAL-249: meta.story_brief is the primary radio-prompt
     descriptor."""
     led = _ledger_with_brief(
         brief=f"a tight detective room with {_CANARY} and rain",
@@ -163,18 +164,22 @@ def test_flux_radio_bookend_uses_brief_when_widget_style_empty():
     )
 
 
-def test_flux_radio_bookend_respects_widget_style_over_brief():
-    """Spec: brief replaces the weak Tier 4 fallback. Widget style
-    (Tier 1) still wins if the user explicitly set it."""
+def test_flux_radio_bookend_brief_wins_over_style():
+    """BUG-LOCAL-249: the radio prompt is downstream of story
+    creation, so meta.story_brief drives it. The upstream style
+    preset is NOT read -- even when the user set one, the brief
+    wins and the style string never reaches the radio prompt."""
     led = _ledger_with_brief(
         brief=f"a tight detective room with {_CANARY}",
         style="noir mystery",
     )
     prompt = bfr._build_dynamic_radio_prompt(led)
-    # Widget style takes priority -- the canary should NOT appear
-    # because the brief isn't used when widget style is set.
-    assert "noir mystery" in prompt
-    assert _CANARY not in prompt
+    assert _CANARY in prompt, (
+        f"brief should drive the radio prompt; got: {prompt[:200]}"
+    )
+    assert "noir mystery" not in prompt, (
+        "upstream style preset must NOT appear in the radio prompt"
+    )
 
 
 def test_flux_radio_bookend_falls_through_on_absent_brief():

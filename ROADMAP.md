@@ -505,13 +505,15 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ## QUEUED (design) -- story_brief as the primary downstream visual driver (Jeffrey, 2026-05-20)
 
-**Status:** QUEUED. Design pass, round-robin before any build -- NOT a tier reorder.
+**Status:** PARTIALLY DONE. Radio bookend prompt landed 2026-05-20 (BUG-LOCAL-249). LTX / HuMo / portrait consumer audit still open.
 
-**Why:** The radio bookend still is the visual anchor for every announcer line, music cue, and SFX second of an episode. Yet `_build_dynamic_radio_prompt` resolves its FLUX descriptor from the 3-word style slug (tier 1, e.g. `satellite_ocean_watch`) on almost every run; `meta.story_brief` (tier 3) rarely fires because the style picker nearly always produces a style. The radio image therefore reflects a thin tonal label, not the finished story. Jeffrey 2026-05-20: everything downstream of `meta.story_brief` should be driven by the brief so the visuals actually relate to the real script.
+**Decision (Jeffrey 2026-05-20):** the style preset is an UPSTREAM input -- it shapes the story-writing LLM only. Everything downstream of story creation derives from `meta.story_brief` so the visuals relate to the real script. Round-robin waived; Jeffrey gave the call directly ("build it now").
 
-**Why it is NOT a one-line tier bump:** the radio prompt is structured `<descriptor> radio broadcast unit, <suffix>` -- the descriptor slot expects a short tonal phrase. `meta.story_brief` is a plot/character/setting paragraph; dropped raw into `<X> radio broadcast unit` it produces a mangled prompt. Making the brief genuinely drive the visuals means designing how it shapes the radio prompt AND the LTX / HuMo / portrait prompts (the Sprint C C5c-C5f consumers) -- what to extract, how it combines with the radio-object framing, and whether the style slug demotes to a secondary tonal modifier.
+**Done -- radio bookend (BUG-LOCAL-249):** `_build_dynamic_radio_prompt` rewritten brief-first -- resolution chain `meta.story_brief` -> `episode_id` slug -> hardcoded fallback. The style preset + `scenes[0].env` reads were deleted. Body reshaped to `radio broadcast unit, <context>, <suffix>` -- the radio is the subject and the brief sets the world, which sidesteps the "mangled `<paragraph> radio broadcast unit`" concern from the original design note. Sprint C C5c had wired the brief as a never-firing Tier-3 fallback behind the style preset, so it never reached the radio prompt. 60 tests green (`tests/test_radio_prompt_builder.py` + `tests/test_story_brief_flux_c5c.py`).
 
-**Scope:** `visual/batch_flux_render.py::_build_dynamic_radio_prompt` + the LTX / HuMo / portrait story_brief consumers. Reverses a deliberate Sprint C tier ordering -- round-robin the design first.
+**Still open -- LTX / HuMo / portrait consumers:** Sprint C C5d/C5e/C5f wired `meta.story_brief` into these via `_otr_story_brief_helpers`, but they have not been audited for the same C5c defect (brief used only as a fallback behind a style / legacy read). Audit each against the directive: the brief is the primary driver; the style preset must not gate it.
+
+**Scope:** `visual/batch_flux_portrait_render.py`, `nodes/batch_ltx_render.py`, `nodes/batch_humo_render.py` story_brief consumers.
 
 ---
 
@@ -2063,7 +2065,7 @@ Confirmation items, not new design work:
   - `character` lines ONLY: `BatchHumoRender` dispatches HuMo with the cast portrait. Log line: `ref=full_env_NNNNN_.png source=ledger-cast-fresh` (or composite/portrait fallback).
   - `announcer` / `music_*` / standalone `sfx` lines: `BatchHumoRender` log line shows `SKIP HuMo (role=<role>, covered by VideoComposite static-radio fill)`. `is_never_humo_role()` short-circuits before any portrait lookup. No HuMo render fires for these.
   - NO log line should ever show `source=radio-still (...)` -- if one does, BUG-129 has regressed (`_RADIO_ROLES` was re-populated in `_otr_speaker_role.py`).
-- `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (style='space opera epic')"`).
+- `ledger.meta.radio_bookend_prompt_source` populated with the dynamic-build branch tag (e.g. `"dynamic (story_brief_status=ok)"`).
 - BUG-129a static-fill fires for any line with no clip on disk. VideoComposite report includes `[<n_humo> humo + <n_static> static]` summary; expect static count > 0 if any music_*/sfx lines exist.
 - BUG-128 tail-pad: VideoComposite report shows `tail-pad: +0.500s on <line_id>` after the pillarbox loop completes. The line_id matches the actual surviving last clip, not necessarily the last in the original timeline.
 - Music tracks > 7s show up as multiple chunked entries (`music_open_001`, `music_open_002`, ...) — chunking math fired.

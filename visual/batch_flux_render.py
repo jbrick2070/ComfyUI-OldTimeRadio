@@ -199,11 +199,11 @@ _DEFAULT_STYLE_SUFFIX = (
 # lip-syncing, sfx + music + announcer all get the radio
 # lip-syncing -- the radio is the performer, not a static prop.
 #
-# Prompt is built DYNAMICALLY per episode from story context
-# (ledger.meta.gen_params.style + style) so the
-# radio's aesthetic matches the episode's tone.  See
-# `_build_dynamic_radio_prompt()` below.  This constant is the
-# safety fallback used only when ledger context is unavailable.
+# Prompt is built DYNAMICALLY per episode from the story brief
+# (ledger.meta.story_brief) so the radio's aesthetic matches the
+# finished episode.  See `_build_dynamic_radio_prompt()` below.
+# This constant is the safety fallback used only when the brief
+# and ledger context are both unavailable.
 _RADIO_FALLBACK_PROMPT = (
     "sci-fi retrofuturistic radio broadcast unit, glowing CRT "
     "frequency display, copper vacuum tubes haloed in plasma, "
@@ -223,156 +223,154 @@ _RADIO_PROMPT_SUFFIX = (
 )
 
 
+# Upper bound on the story-brief / slug context spliced into the
+# radio prompt.  Briefs run ~60-90 chars; this is a safety net so a
+# pathologically long brief cannot dilute FLUX composition focus.
+_RADIO_CONTEXT_MAX_CHARS = 200
+
+
+def _story_brief_helpers():
+    """Import the story_brief consumer helpers from ``nodes/``.
+
+    Importing via the nodes-dir-on-sys.path pattern -- the same
+    pattern ``_resolve_radio_bookend_prompt`` uses for ``_otr_ledger``
+    / ``_otr_paths`` -- resolves cleanly both in the ComfyUI runtime
+    AND standalone / pytest. A ``from ..nodes`` relative import fails
+    "beyond top-level package" whenever ``visual/`` is imported as a
+    top-level package, which is every pytest run (BUG-LOCAL-249).
+
+    Returns ``(get_story_brief_full, get_story_brief_status)``.
+    """
+    import os as _os
+    import sys as _sys
+    _nodes_dir = _os.path.join(
+        _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+        "nodes",
+    )
+    if _nodes_dir not in _sys.path:
+        _sys.path.insert(0, _nodes_dir)
+    from _otr_story_brief_helpers import (
+        get_story_brief_full,
+        get_story_brief_status,
+    )
+    return get_story_brief_full, get_story_brief_status
+
+
 def _build_dynamic_radio_prompt(led):
-    """Build a radio still FLUX prompt from story context.
+    """Build a radio still FLUX prompt from the episode's story brief.
 
     BUG-LOCAL-024 (Phase H, 2026-05-03): the radio is the visual
-    anchor for the announcer, music cues, and SFX — every audio
+    anchor for the announcer, music cues, and SFX -- every audio
     second that isn't a HuMo lip-sync clip falls back to this
     image. Jeffrey: "we always need flux to look at the story
     and render that radio for the music, announcer and sfx."
 
-    Resolution order, each field tried until one yields a non-empty
-    descriptor (logged at INFO so the runtime tail shows which
-    branch fired):
-      1. ``ledger.meta.gen_params_initial.style``     (primary; the
-         widget the user picked, e.g. "noir mystery")
-      2. ``ledger.meta.gen_params.style``             (back-compat
-         for ledgers that used the spine-ledger schema)
-      3. ``ledger.meta.gen_params_initial.style_custom``  (free-text
-         override the user typed when style="custom")
-      4. First scene's environment hint from
-         ``ledger.scenes[0].env`` or ``ledger.scenes[0].description``
-         — gives the radio a setting-aware tone even when style
-         is empty
-      5. ``ledger.episode_id`` (slug) — last resort before the
-         hardcoded fallback, so the radio at least reflects the
-         episode title vibe instead of a generic sci-fi prop
-      6. ``_RADIO_FALLBACK_PROMPT`` — true last resort
+    BUG-LOCAL-249 (2026-05-20): the radio prompt is DOWNSTREAM of
+    story creation, so it is driven by ``meta.story_brief`` -- the
+    post-script reflection that carries the finished episode's tone
+    forward. The widget style preset is an UPSTREAM input: it shapes
+    the story-writing LLM only and is deliberately NOT read here.
+    Every downstream visual derives from the brief, not the preset
+    (Jeffrey 2026-05-20: "style preset is only used for the story
+    writing, all downstream should be the meta brief"). Sprint C C5c
+    wired the brief in as a never-firing fallback tier behind the
+    style preset; this builder makes the brief the primary descriptor
+    and drops the style preset + scenes[0].env from the radio path.
 
-    A scene-context hint (first scene's env/description, truncated)
-    is APPENDED to the resolved descriptor whenever it's available
-    AND distinct from the resolved descriptor itself, so the radio
-    composition picks up specific episode atmosphere on top of the
-    general style. Bounded length: scene-context hint capped at 60
-    chars, total prompt body capped before the universal suffix.
+    Resolution order, each tried until one yields a non-empty context
+    string (logged at INFO so the runtime tail shows which branch
+    fired):
+      1. ``meta.story_brief``   (primary; via get_story_brief_full,
+         which returns "" unless story_brief_status == "ok")
+      2. ``ledger.episode_id``  (slug; last resort before the
+         hardcoded fallback, so the radio at least reflects the
+         episode title vibe instead of a generic sci-fi prop)
+      3. ``_RADIO_FALLBACK_PROMPT``  (true last resort)
+
+    Body shape: ``radio broadcast unit, <context>, <suffix>`` -- the
+    radio is the subject, the brief (or slug) sets the world, and the
+    SIGNAL LOST suffix locks the broadcast-distress identity.
 
     Hostile-input safe: any wrong type lands on the safe default.
 
     Examples:
-      style="noir mystery", first_scene_env="rain-slicked alley"
-        -> "noir mystery radio broadcast unit, set in rain-slicked
-            alley, 35mm film grain, ..."
-      style empty, first_scene_env="cramped cargo bay vibrating"
-        -> "cramped cargo bay vibrating radio broadcast unit, ..."
+      story_brief="A silent world reveals ancient life beneath a
+        vast, lonely sky."
+        -> "radio broadcast unit, A silent world reveals ancient
+            life beneath a vast, lonely sky, 35mm film grain, ..."
+      brief absent, episode_id="signal_lost_haunted_signal_2026..."
+        -> "radio broadcast unit, haunted signal, 35mm film grain, ..."
       everything empty
         -> _RADIO_FALLBACK_PROMPT
     """
     if not led or not isinstance(led, dict):
         log.info("[BatchFluxRender] radio prompt: led missing -> fallback")
         return _RADIO_FALLBACK_PROMPT
-    meta = led.get("meta") if isinstance(led, dict) else None
+    meta = led.get("meta")
     if not isinstance(meta, dict):
         meta = {}
-    gp = meta.get("gen_params_initial")
-    if not isinstance(gp, dict):
-        gp = meta.get("gen_params")
-    if not isinstance(gp, dict):
-        gp = {}
 
-    def _safe_str(x):
-        return x.strip() if isinstance(x, str) else ""
-
-    # Sprint C C5c (2026-05-15): pre-fetch meta.story_brief + status.
-    # The brief replaces the weak scenes[0].env Tier 4 fallback when
-    # widget style / style_custom are empty. status is logged for
-    # E-07 observability regardless of whether the brief actually
-    # gets used (operator can see whether reflection succeeded).
-    from ..nodes._otr_story_brief_helpers import (
-        get_story_brief_full,
-        get_story_brief_status,
-    )
-    _brief = get_story_brief_full(meta)
-    _brief_status = get_story_brief_status(meta)
+    # meta.story_brief is the single downstream driver. get_story_brief_
+    # full returns "" unless story_brief_status == "ok", so a failed or
+    # absent brief falls through cleanly to the episode_id slug tier.
+    # status is logged for E-07 observability regardless of outcome.
+    try:
+        get_story_brief_full, get_story_brief_status = _story_brief_helpers()
+        brief = get_story_brief_full(meta)
+        brief_status = get_story_brief_status(meta)
+    except Exception as exc:
+        log.warning(
+            "[BatchFluxRender] radio prompt: story_brief helper "
+            "unavailable (%s) -> fallback", exc,
+        )
+        return _RADIO_FALLBACK_PROMPT
     log.info(
         "[BatchFluxRender] radio prompt: story_brief_status=%s "
-        "(brief_chars=%d)", _brief_status, len(_brief),
+        "(brief_chars=%d)", brief_status, len(brief),
     )
 
-    # Tier 1-3: style from widget
-    descriptor = _safe_str(gp.get("style"))
-    branch = "gen_params_initial.style"
-    if not descriptor:
-        descriptor = _safe_str(gp.get("style_custom"))
-        if descriptor:
-            branch = "gen_params_initial.style_custom"
+    # Tier 1: meta.story_brief -- primary, story-driven descriptor.
+    context = brief
+    branch = "meta.story_brief"
 
-    # Sprint C C5c (2026-05-15): the legacy Tier 4 first-scene-env
-    # tier is replaced by meta.story_brief. The brief is a richer
-    # post-script descriptor; scenes[0].env was a thin fallback that
-    # often surfaced "INT. ROOM -- NIGHT" boilerplate at the bookend.
-    # When the brief is absent / failed, the chain falls through to
-    # Tier 5 (episode_id slug) directly.
-    first_scene_env = ""  # retained for the scene-context hint below
-    scenes = led.get("scenes") if isinstance(led, dict) else None
-    if isinstance(scenes, list) and scenes:
-        first = scenes[0] if isinstance(scenes[0], dict) else {}
-        first_scene_env = (
-            _safe_str(first.get("env"))
-            or _safe_str(first.get("description"))
-        )
-    if not descriptor and _brief:
-        descriptor = _brief
-        branch = "meta.story_brief"
-
-    # Tier 5: episode_id slug (last resort before hardcoded fallback)
-    if not descriptor:
-        ep_id = _safe_str(led.get("episode_id"))
+    # Tier 2: episode_id slug -- last resort before the hardcoded
+    # fallback, so the radio at least reflects the episode title vibe.
+    if not context:
+        ep_id = led.get("episode_id")
+        ep_id = ep_id.strip() if isinstance(ep_id, str) else ""
         if ep_id and not ep_id.startswith("pending_"):
-            # Strip the "signal_lost_" prefix and trailing timestamp
-            # for a more natural descriptor
             slug = ep_id
             if slug.startswith("signal_lost_"):
                 slug = slug[len("signal_lost_"):]
-            # Strip trailing _<8digits>_<6digits> timestamp if present
+            # Strip a trailing _<8digits>_<6digits> timestamp if present.
             import re as _re
             slug = _re.sub(r"_\d{8}_\d{6}$", "", slug)
             slug = slug.replace("_", " ").strip()
             if slug:
-                descriptor = slug
+                context = slug
                 branch = "episode_id_slug"
 
-    # Tier 6: hardcoded fallback
-    if not descriptor:
-        log.info("[BatchFluxRender] radio prompt: all tiers empty -> "
+    # Tier 3: hardcoded fallback.
+    if not context:
+        log.info("[BatchFluxRender] radio prompt: no brief, no slug -> "
                  "hardcoded fallback")
         return _RADIO_FALLBACK_PROMPT
 
-    # Bounded scene-context hint, only when distinct from descriptor
-    scene_hint = ""
-    if (first_scene_env
-            and first_scene_env != descriptor
-            and branch != "first_scene_env"):
-        scene_hint = first_scene_env[:60].strip().rstrip(",")
+    # Cap the context so a pathologically long brief cannot dilute
+    # FLUX composition focus. Trim on a word boundary, never mid-word.
+    if len(context) > _RADIO_CONTEXT_MAX_CHARS:
+        context = context[:_RADIO_CONTEXT_MAX_CHARS].rsplit(" ", 1)[0]
+    context = context.strip().rstrip(" .,;:")
+    if not context:
+        log.info("[BatchFluxRender] radio prompt: context empty after "
+                 "cleanup -> hardcoded fallback")
+        return _RADIO_FALLBACK_PROMPT
 
-    # Cap descriptor to keep total prompt body reasonable. FLUX prompts
-    # past ~200 tokens lose composition focus; 80 chars is a sane bound.
-    descriptor_capped = descriptor[:80].strip().rstrip(",")
-
-    if scene_hint:
-        body = f"{descriptor_capped} radio broadcast unit, set in {scene_hint}"
-        log.info(
-            "[BatchFluxRender] radio prompt: branch=%s + scene_hint=%r "
-            "-> %s ...",
-            branch, scene_hint[:40], body[:60],
-        )
-    else:
-        body = f"{descriptor_capped} radio broadcast unit"
-        log.info(
-            "[BatchFluxRender] radio prompt: branch=%s -> %s ...",
-            branch, body[:60],
-        )
-
+    body = f"radio broadcast unit, {context}"
+    log.info(
+        "[BatchFluxRender] radio prompt: branch=%s -> %s ...",
+        branch, body[:70],
+    )
     return f"{body}, {_RADIO_PROMPT_SUFFIX}"
 
 
@@ -410,10 +408,7 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
     # and the style_suffix tail per refinement section 6. Status is
     # logged so a failed reflection surfaces in the render log per
     # E-07 ("story_brief_status=...").
-    from ..nodes._otr_story_brief_helpers import (
-        get_story_brief_full,
-        get_story_brief_status,
-    )
+    get_story_brief_full, get_story_brief_status = _story_brief_helpers()
 
     if not script_json or not script_json.strip():
         log.info("[BatchFluxRender] empty script_json; using fallback x1")
@@ -609,11 +604,11 @@ class BatchFluxRender:
                     "default": "",
                     "tooltip": (
                         "Radio still FLUX prompt. Default (empty) "
-                        "builds dynamically from ledger.meta.gen_params "
-                        "(style + style) so each "
-                        "episode's radio matches its tone. Set this "
-                        "field to a non-empty string to override the "
-                        "dynamic builder with your verbatim prompt. "
+                        "builds dynamically from ledger.meta.story_brief "
+                        "so each episode's radio matches the finished "
+                        "story. Set this field to a non-empty string to "
+                        "override the dynamic builder with your verbatim "
+                        "prompt. "
                         "Set to literal 'DISABLED' (case-insensitive) "
                         "to skip rendering entirely. Output saved to "
                         "output/otr/stills/radio_bookend_<ep_id>.png "
@@ -1237,16 +1232,16 @@ class BatchFluxRender:
             if led is None:
                 prompt_source = "fallback (no ledger)"
             else:
-                meta = led.get("meta") or {}
-                gp = meta.get("gen_params_initial") or meta.get("gen_params") or {}
-                if not isinstance(gp, dict):
-                    gp = {}
-                raw_style = gp.get("style")
-                style = raw_style.strip() if isinstance(raw_style, str) else ""
-                if style:
-                    prompt_source = f"dynamic (style={style!r})"
-                else:
-                    prompt_source = "fallback (no style)"
+                # The radio prompt is brief-driven (BUG-LOCAL-249), so
+                # report story_brief_status, not the upstream style.
+                try:
+                    import _otr_story_brief_helpers as _OTRSB  # type: ignore
+                    _status = _OTRSB.get_story_brief_status(
+                        led.get("meta") or {}
+                    )
+                except Exception:
+                    _status = "unknown"
+                prompt_source = f"dynamic (story_brief_status={_status})"
 
         log.info(
             "[BatchFluxRender] radio still prompt source=%s, len=%d, "

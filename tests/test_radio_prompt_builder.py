@@ -4,21 +4,23 @@ test_radio_prompt_builder.py
 
 Regression coverage for the dynamic radio still FLUX prompt builder.
 
-Post 2026-04-30 consolidation: ``style`` is the single
-free-text tonal knob.  Whatever the user types is used VERBATIM as
-the radio's leading aesthetic descriptor; the SIGNAL LOST universal
-suffix is appended for broadcast-distress identity.  No more genre
-presets, no more style mood map -- the LLM widget is the source of
-truth, the FLUX prompt builder just consumes it.
+BUG-LOCAL-249 (2026-05-20): the radio prompt is DOWNSTREAM of story
+creation, so it is driven by ``meta.story_brief`` -- the post-script
+reflection. The widget style preset is an UPSTREAM input (it shapes
+the story-writing LLM only) and is NOT read by the radio prompt
+builder. Every downstream visual derives from the brief, not the
+preset.
 
 Coverage:
-  - empty / None / unknown ledger -> fallback prompt
-  - any non-empty style -> verbatim incorporation
-  - missing / blank / non-string style -> fallback
-  - field resolution: gen_params_initial > gen_params (forward-compat)
+  - empty / None / hostile ledger -> fallback prompt
+  - story_brief (status ok) -> brief is the descriptor, the
+    "radio broadcast unit" anchor + SIGNAL LOST suffix present
+  - style preset present but no brief -> style is IGNORED; the chain
+    falls to the episode_id slug or the hardcoded fallback
+  - episode_id slug used as last resort before the hardcoded fallback
   - SIGNAL LOST suffix appended in every non-fallback case
-  - Builder NEVER returns empty string
-  - Hostile input safety
+  - builder NEVER returns an empty string
+  - hostile-input safety
 """
 
 from __future__ import annotations
@@ -42,12 +44,43 @@ from visual.batch_flux_render import (  # noqa: E402  -- after sys.path tweak
 
 
 # ---------------------------------------------------------------------------
+# Ledger fixture builder
+# ---------------------------------------------------------------------------
+
+def _ledger(*, brief=None, status=None, episode_id=None, style=None):
+    """Construct a ledger dict for the radio prompt builder.
+
+    brief=None   -> no story_brief key at all (legacy ledger)
+    brief=""     -> story_brief present but empty
+    status=None  -> derived: "ok" if brief truthy else "absent"
+    style=...    -> stamped into gen_params_initial.style; the builder
+                    must IGNORE it (upstream-only input).
+    """
+    meta: dict = {}
+    if style is not None:
+        meta["gen_params_initial"] = {"style": style}
+    if brief is not None:
+        meta["story_brief"] = brief
+        meta["story_brief_status"] = (
+            status if status is not None
+            else ("ok" if brief else "absent")
+        )
+        meta["story_brief_terms"] = {
+            "setting": [], "lighting": [], "atmosphere": [],
+        }
+    led: dict = {"meta": meta}
+    if episode_id is not None:
+        led["episode_id"] = episode_id
+    return led
+
+
+# ---------------------------------------------------------------------------
 # Fallback path
 # ---------------------------------------------------------------------------
 
 class TestFallback:
-    """When ledger is missing / unusable / has no style, builder
-    returns the safety fallback unchanged."""
+    """When the ledger has no usable brief and no usable episode_id,
+    the builder returns the safety fallback unchanged."""
 
     def test_none_ledger_returns_fallback(self):
         assert _build_dynamic_radio_prompt(None) == _RADIO_FALLBACK_PROMPT
@@ -55,19 +88,18 @@ class TestFallback:
     def test_empty_dict_returns_fallback(self):
         assert _build_dynamic_radio_prompt({}) == _RADIO_FALLBACK_PROMPT
 
-    def test_meta_present_but_no_gen_params(self):
-        assert _build_dynamic_radio_prompt({"meta": {}}) == _RADIO_FALLBACK_PROMPT
+    def test_meta_present_but_no_brief(self):
+        assert (
+            _build_dynamic_radio_prompt({"meta": {}})
+            == _RADIO_FALLBACK_PROMPT
+        )
 
-    def test_gen_params_present_but_no_style(self):
-        led = {"meta": {"gen_params_initial": {}}}
+    def test_failed_brief_no_episode_id_returns_fallback(self):
+        led = _ledger(brief="", status="failed")
         assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
 
-    def test_blank_style(self):
-        led = {"meta": {"gen_params_initial": {"style": ""}}}
-        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
-
-    def test_whitespace_only_style(self):
-        led = {"meta": {"gen_params_initial": {"style": "   "}}}
+    def test_absent_brief_no_episode_id_returns_fallback(self):
+        led = _ledger(brief=None)
         assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
 
     @pytest.mark.parametrize("falsy", [None, False, 0, ""])
@@ -76,96 +108,148 @@ class TestFallback:
 
 
 # ---------------------------------------------------------------------------
-# Verbatim style incorporation
+# Brief-driven path -- the primary contract
 # ---------------------------------------------------------------------------
 
-class TestStyleVariantVerbatim:
-    """Whatever the user typed is the radio's leading descriptor.
-    No transformation, no preset lookup -- just verbatim use."""
+class TestBriefDriven:
+    """meta.story_brief (status ok) is the radio prompt's descriptor."""
+
+    @pytest.mark.parametrize("brief", [
+        "A silent world reveals ancient life beneath a vast, lonely sky.",
+        "A salvage crew hears their own distress call from the future.",
+        "A lighthouse keeper logs a tide that never goes back out.",
+        "Two researchers trade places with their reflections.",
+    ])
+    def test_brief_appears_in_prompt(self, brief):
+        led = _ledger(brief=brief)
+        result = _build_dynamic_radio_prompt(led)
+        # Trailing sentence punctuation is stripped; the body of the
+        # brief must survive verbatim.
+        assert brief.rstrip(" .,;:") in result
+
+    def test_radio_anchor_present(self):
+        led = _ledger(brief="a quiet town under a copper sky")
+        result = _build_dynamic_radio_prompt(led)
+        assert result.startswith("radio broadcast unit, ")
+
+    def test_trailing_period_stripped(self):
+        led = _ledger(brief="a quiet town under a copper sky.")
+        result = _build_dynamic_radio_prompt(led)
+        assert "copper sky." not in result
+        assert "copper sky," in result
+
+    def test_suffix_present_with_brief(self):
+        led = _ledger(brief="a derelict station drifting silent")
+        result = _build_dynamic_radio_prompt(led)
+        assert _RADIO_PROMPT_SUFFIX in result
+
+    def test_long_brief_capped(self):
+        # A pathologically long brief is word-boundary trimmed; the
+        # prompt stays bounded and still carries the suffix.
+        long_brief = ("word " * 200).strip()
+        led = _ledger(brief=long_brief)
+        result = _build_dynamic_radio_prompt(led)
+        assert _RADIO_PROMPT_SUFFIX in result
+        assert len(result) < 400
+        assert " wor " not in result  # no mid-word cut
+
+    def test_failed_status_brief_not_used(self):
+        # story_brief text present but status=failed -> get_story_brief
+        # _full returns "", so the brief text is NOT used; the chain
+        # falls through to the episode_id slug.
+        led = _ledger(
+            brief="this brief text must not appear",
+            status="failed",
+            episode_id="signal_lost_back_channel_20260519_120000",
+        )
+        result = _build_dynamic_radio_prompt(led)
+        assert "this brief text must not appear" not in result
+        assert "back channel" in result
+
+
+# ---------------------------------------------------------------------------
+# Style preset is ignored -- the BUG-LOCAL-249 contract
+# ---------------------------------------------------------------------------
+
+class TestStylePresetIgnored:
+    """The upstream style preset must never reach the radio prompt."""
 
     @pytest.mark.parametrize("style", [
-        "tense claustrophobic",
-        "space opera epic",
-        "psychological slow-burn",
-        "hard-sci-fi procedural",
-        "noir mystery",
-        "chaotic black-mirror",
-        "neon-drenched cyber-noir",
-        "rust-belt post-apocalyptic",
-        "cosmic dread, fog-bound coast",
-        "1970s soviet brutalism",
+        "noir mystery", "space opera epic", "noir_interrogation",
+        "deep_space_distress_call", "1970s soviet brutalism",
     ])
-    def test_style_appears_at_prompt_start(self, style):
-        led = {"meta": {"gen_params_initial": {"style": style}}}
-        result = _build_dynamic_radio_prompt(led)
-        assert result.startswith(f"{style} radio broadcast unit"), (
-            f"style {style!r} should be the leading descriptor; "
-            f"got prompt: {result!r}"
+    def test_style_preset_never_in_prompt(self, style):
+        led = _ledger(
+            brief="a tense room with rain on the tin roof",
+            style=style,
         )
-
-    def test_strips_surrounding_whitespace(self):
-        led = {"meta": {"gen_params_initial": {"style": "  noir mystery  "}}}
         result = _build_dynamic_radio_prompt(led)
-        assert result.startswith("noir mystery radio broadcast unit")
-        assert "  noir" not in result  # no double-space
-
-    def test_internal_whitespace_preserved(self):
-        # Multi-word descriptors with internal commas / spaces should
-        # pass through verbatim.
-        led = {"meta": {"gen_params_initial": {
-            "style": "neon-drenched cyber noir, rain-streaked plexi housing",
-        }}}
-        result = _build_dynamic_radio_prompt(led)
-        assert result.startswith(
-            "neon-drenched cyber noir, rain-streaked plexi housing "
-            "radio broadcast unit"
+        assert style not in result, (
+            f"upstream style preset {style!r} leaked into the radio "
+            f"prompt: {result!r}"
         )
+        assert "a tense room with rain on the tin roof" in result
 
-    def test_preserves_user_case(self):
-        # Free-text means we don't .lower() anything -- the FLUX model
-        # may interpret CamelCase or ALL CAPS as emphasis.
-        led = {"meta": {"gen_params_initial": {"style": "Mid-Century Atomic Modernism"}}}
+    def test_style_alone_does_not_drive_prompt(self):
+        # Style set, but NO brief and NO episode_id -> the style is
+        # ignored and the builder lands on the hardcoded fallback.
+        led = _ledger(brief=None, style="noir mystery")
+        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
+
+    def test_style_alone_falls_to_episode_slug(self):
+        # Style set, no brief, but an episode_id exists -> the slug is
+        # used; the style is still ignored.
+        led = _ledger(
+            brief=None,
+            style="noir mystery",
+            episode_id="signal_lost_amber_signal_20260519_120000",
+        )
         result = _build_dynamic_radio_prompt(led)
-        assert "Mid-Century Atomic Modernism" in result
+        assert "noir mystery" not in result
+        assert "amber signal" in result
 
 
 # ---------------------------------------------------------------------------
-# Forward-compat: gen_params_initial > gen_params
+# episode_id slug fallback
 # ---------------------------------------------------------------------------
 
-class TestForwardCompat:
-    """gen_params_initial is the canonical phase-0 stamp.  gen_params
-    is the spine-ledger forward-compat field.  Builder reads initial
-    first, then falls back to plain gen_params."""
+class TestEpisodeSlugFallback:
+    """When the brief is unusable, the episode_id slug is the last
+    resort before the hardcoded fallback."""
 
-    def test_initial_takes_precedence(self):
-        led = {"meta": {
-            "gen_params_initial": {"style": "noir mystery"},
-            "gen_params":         {"style": "space opera epic"},
-        }}
+    def test_slug_used_when_no_brief(self):
+        led = _ledger(
+            brief=None,
+            episode_id="signal_lost_haunted_signal_20260519_120000",
+        )
         result = _build_dynamic_radio_prompt(led)
-        assert "noir mystery" in result
-        assert "space opera epic" not in result
+        assert "haunted signal" in result
+        assert result.startswith("radio broadcast unit, ")
+        assert _RADIO_PROMPT_SUFFIX in result
 
-    def test_falls_back_to_gen_params_when_initial_missing(self):
-        led = {"meta": {"gen_params": {"style": "horror cosmic"}}}
+    def test_signal_lost_prefix_and_timestamp_stripped(self):
+        led = _ledger(
+            brief=None,
+            episode_id="signal_lost_orbital_decay_20260519_153000",
+        )
         result = _build_dynamic_radio_prompt(led)
-        assert result.startswith("horror cosmic radio broadcast unit")
+        assert "signal_lost" not in result
+        assert "20260519" not in result
+        assert "orbital decay" in result
 
-    def test_initial_present_but_empty_uses_gen_params(self):
-        # If gen_params_initial is present but its style is
-        # blank, we should fall through (the post-resolution check
-        # is on the string itself, not which bag it came from).
-        led = {"meta": {
-            "gen_params_initial": {"style": ""},
-            "gen_params":         {"style": "western frontier"},
-        }}
+    def test_pending_episode_id_skipped(self):
+        # A pre-rename pending_* id is not a meaningful descriptor.
+        led = _ledger(brief=None, episode_id="pending_20260519_120000")
+        assert _build_dynamic_radio_prompt(led) == _RADIO_FALLBACK_PROMPT
+
+    def test_brief_wins_over_episode_slug(self):
+        led = _ledger(
+            brief="a flooded archive lit by failing bulbs",
+            episode_id="signal_lost_other_thing_20260519_120000",
+        )
         result = _build_dynamic_radio_prompt(led)
-        # Per the current implementation, gen_params_initial wins
-        # the dict lookup race; if its style is empty, the
-        # builder lands on fallback (does NOT cascade through to
-        # gen_params).  This test pins that behavior.
-        assert result == _RADIO_FALLBACK_PROMPT
+        assert "a flooded archive lit by failing bulbs" in result
+        assert "other thing" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -179,12 +263,13 @@ class TestUniversalSuffix:
     def test_suffix_in_fallback(self):
         assert _RADIO_PROMPT_SUFFIX in _RADIO_FALLBACK_PROMPT
 
-    @pytest.mark.parametrize("style", [
-        "noir", "space opera", "cyber noir",
-        "1970s brutalism", "fog-bound horror",
+    @pytest.mark.parametrize("brief", [
+        "a cold mission control room",
+        "a fog-bound coastal station",
+        "a cramped cargo bay vibrating",
     ])
-    def test_suffix_in_dynamic(self, style):
-        led = {"meta": {"gen_params_initial": {"style": style}}}
+    def test_suffix_in_dynamic(self, brief):
+        led = _ledger(brief=brief)
         result = _build_dynamic_radio_prompt(led)
         assert _RADIO_PROMPT_SUFFIX in result
 
@@ -198,14 +283,13 @@ class TestNeverEmpty:
         None,
         {},
         {"meta": {}},
-        {"meta": {"gen_params_initial": {}}},
-        {"meta": {"gen_params_initial": {"style": ""}}},
-        {"meta": {"gen_params_initial": {"style": "   "}}},
-        {"meta": {"gen_params_initial": {"style": None}}},
-        {"meta": {"gen_params_initial": {"style": 42}}},
-        {"meta": {"gen_params_initial": {"style": []}}},
+        {"meta": {"story_brief": "", "story_brief_status": "absent"}},
+        {"meta": {"story_brief": "", "story_brief_status": "failed"}},
+        {"meta": {"story_brief": None, "story_brief_status": "ok"}},
+        {"meta": {"story_brief": 42, "story_brief_status": "ok"}},
+        {"meta": {"gen_params_initial": {"style": "noir"}}},
         {"meta": "not a dict"},
-        {"meta": {"gen_params_initial": "not a dict"}},
+        {"meta": {"story_brief": "ok brief", "story_brief_status": "ok"}},
         # Hostile-type ledger:
         "string instead of dict",
         42,
@@ -222,29 +306,40 @@ class TestNeverEmpty:
 # ---------------------------------------------------------------------------
 
 class TestRealisticLedger:
-    """Smoke-test against the actual ledger shape that
-    story_orchestrator stamps in `gen_params_initial`."""
+    """Smoke-test against the first-stable-run ledger shape
+    (docs/2026-05-19-first-stable-run-ledger.json)."""
 
-    def test_typical_run_ledger(self):
+    def test_first_stable_run_ledger(self):
         led = {
-            "episode_id": "signal_lost_smoke_20260430_120000",
+            "episode_id": (
+                "signal_lost_orbital_panorama_reveal_20260519_120000"
+            ),
             "meta": {
                 "gen_params_initial": {
-                    "model_id": "mistralai/Mistral-Nemo-Instruct-2407",
+                    "model_id": "google/gemma-4-E4B-it",
                     "target_words": 350,
                     "num_characters": 2,
-                    "target_length": "short (3 acts)",
-                    "style": "tense claustrophobic",
-                    "creativity": "balanced",
-                    "optimization_profile": "Standard",
+                    "style": "orbital_panorama_reveal",
                 },
-                "news_seed": {
-                    "headline": "Mysterious signals detected from deep space",
+                "style": "orbital_panorama_reveal",
+                "story_brief": (
+                    "A silent world reveals ancient life beneath a "
+                    "vast, lonely sky."
+                ),
+                "story_brief_status": "ok",
+                "story_brief_terms": {
+                    "setting": ["crater"],
+                    "lighting": [],
+                    "atmosphere": [],
                 },
             },
         }
         result = _build_dynamic_radio_prompt(led)
-        assert result.startswith("tense claustrophobic radio broadcast unit")
+        assert "A silent world reveals ancient life" in result
+        assert "orbital_panorama_reveal" not in result, (
+            "the style preset must not appear in the radio prompt"
+        )
+        assert result.startswith("radio broadcast unit, ")
         assert _RADIO_PROMPT_SUFFIX in result
 
 
