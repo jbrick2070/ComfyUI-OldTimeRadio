@@ -922,6 +922,107 @@ sprints, regardless of fix-status.
 
   **Status:** runtime axis remains BLOCKED. Step 6 active investigation pending Jeffrey's round-robin synthesis on which axis first.
 
+- **Follow-up 2026-05-19 16:40 -- Step 6 A/B iter 1 captured FAST REGIME with `OTR_DISABLE_FLUX_PREPIN=1`. STRONG SIGNAL, one of three data points needed for confirmation.**
+
+  Env-var guard around `BatchFluxRender` pre-pin block landed at commit **b9d2f76**. Verification gates: AST OK; Bug Bible 23 passed / 1 skipped / 2 xfailed (baseline held); audio byte-identical 9 passed / 1 skipped. Pushed to origin/v2.0-alpha.
+
+  **Iter 1 cold-launch result, env var SET to "1":**
+
+  Radio bookend (BatchFluxRender, pre-pin SKIPPED per env var):
+  ```
+   10%  2/20 [00:04<00:38, 2.16s/it]
+   30%  6/20 [00:09<00:17, 1.27s/it]
+   50% 10/20 [00:14<00:12, 1.30s/it]
+   70% 14/20 [00:19<00:07, 1.27s/it]
+   90% 18/20 [00:24<00:02, 1.28s/it]
+  100% 20/20 [00:27<00:00, 1.36s/it]   <-- 27 s total, 1.36 s/it average
+  ```
+
+  Speedup vs slow-regime baseline: **186 s/it -> 1.36 s/it = ~137x faster.** Same hardware, same fp8 checkpoint, same dtype cast, same workflow body, same `--force-fp16` removal, same `TORCH_SDPA_BACKEND` removal -- the ONLY axis changed since the 186 s/it baseline is the BatchFluxRender pre-pin SKIPPED.
+
+  Sampler poller telemetry (additional confidence):
+  ```
+  tick=1 lhm_used=14784 MB d3d_shared=218 MB nvsmi=1815 MHz, 52.67 W, 54C, 27%
+  tick=2 lhm_used=11185 MB d3d_shared=717 MB nvsmi=2707 MHz, 73.39 W, 54C, 95%
+  tick=3 lhm_used=12743 MB d3d_shared=6855 MB nvsmi=2332 MHz, 100.34 W, 60C, 100%
+  tick=4 lhm_used=12755 MB d3d_shared=7712 MB nvsmi=2452 MHz, 156.41 W, 64C, 100%
+  tick=5 lhm_used=12749 MB d3d_shared=7713 MB nvsmi=2445 MHz, 154.45 W, 66C, 100%
+  tick=6 lhm_used=12749 MB d3d_shared=7712 MB nvsmi=2412 MHz, 156.58 W, 67C, 100%
+  tick=7 lhm_used=12749 MB d3d_shared=7712 MB nvsmi=2452 MHz, 156.34 W, 68C, 100%
+  ```
+  GPU clocks reach 2.4 GHz, power draw 156 W, GPU util 100% during sampler. D3D Shared 7.7 GB during sampler IS still spilling, but the sampler is FAST despite the spill -- which itself is a useful finding: D3D Shared spill is NOT the per-step slowdown mechanism. The previous 154 s/it runs ALSO showed similar D3D Shared values; the slowdown is happening elsewhere (pre-pin's eviction + reload tax? caching allocator state? cudnn workspace cache?).
+
+  **Surprise observation -- BatchFluxPortraitRender ALSO ran fast despite still having pre-pin:**
+
+  Portrait FLUX (BatchFluxPortraitRender, pre-pin block STILL ACTIVE since env-var guard only applies to BatchFluxRender):
+  ```
+  [OTR_BatchFluxPortraitRender] unload_all_models() + gc.collect() + empty_cache() complete (nuclear eviction before MODEL pin, BUG-LOCAL-231 Option B escalation)
+  [OTR_BatchFluxPortraitRender] pinned MODEL via load_models_gpu
+  100% 20/20 [00:31<00:00, 1.58s/it]   <-- c02_portrait, 31 s total, 1.58 s/it
+  100% 20/20 [00:28<00:00, 1.44s/it]   <-- c03_portrait, 28 s total, 1.44 s/it
+  ```
+  Both portraits ran fast (~1.4-1.6 s/it) with the pre-pin block STILL FIRING. This challenges the simplistic "pre-pin call IS the cause" hypothesis. Two refined possibilities:
+
+  - **(h1) Cold-launch state matters more than the pre-pin call itself.** The radio bookend FLUX (BatchFluxRender) runs first when VRAM is clean. Disabling its pre-pin avoids the eviction+reload tax on the first FLUX call. Portrait FLUX inherits a clean-ish state from the prior pass (model still warm), so the pre-pin's eviction is cheap and the subsequent re-load is fast. The slowdown mechanism might be: **pre-pin's eviction is slow only when something heavy is already pinned** (writer + audio path residue at cold-launch first FLUX). After the first fast FLUX, the residue is gone and subsequent pre-pins are inexpensive.
+
+  - **(h2) The fix axis is the eviction itself, not the pin.** Without OTR_DISABLE_FLUX_PREPIN, BatchFluxRender's eviction blew away the FLUX model (just loaded), then re-loaded it, paying double load tax. The portrait pre-pin evicts already-evicted models, so it costs less.
+
+  Either way: the right fix shape is likely **delete the pre-pin block from BatchFluxRender and BatchFluxPortraitRender entirely**, letting stock `comfy.sampler_helpers.py` handle the load via `estimate_memory() + load_models_gpu(memory_required=X)` -- the same proper-headroom path used by stock KSampler.
+
+  **3-smoke discipline status:** iter 1 of 3 captured. Per `feedback_bug_bible_curation_discipline`, one observation is not enough to flip [FIXED]. Need iter 2 + iter 3 (cold-launches with same env var set) to confirm. If all three land in 1-15 s/it: pre-pin disable IS the diagnostic axis; Step 7 fix proceeds. If 2/3 fast and 1/3 slow: variance characterization needed.
+
+  HuMo phase observation: post-FLUX, HuMo Phase A/B/C started normally (3/4 inner denoise steps at 111 s/it pace, healthy tqdm). Verifies the pipeline didn't catastrophically break elsewhere. Iter 1 will continue through HuMo (~2.5-3 hours) or be killed post-FLUX-capture per Jeffrey's call.
+
+  **Status:** BUG-LOCAL-231 stays **ACTIVE REGRESSION CONFIRMED** but a fix-shape hypothesis is now strongly load-bearing. Pending iter 2 + iter 3 confirmation.
+
+- **Follow-up 2026-05-19 18:50 -- HYPOTHESIS FALSIFIED. env var did NOT take effect; FLUX still ran FAST regime with pre-pin block firing as before. Reframe required.**
+
+  Full pipeline ran 2:38:05 end-to-end. HuMo Phase C completed 14/14 character clips in 142.5 minutes. Then BUG-LOCAL-248 (rtx_upscale ffprobe '.' crash) terminated the run. Evidence captured at `logs/BUG-LOCAL-231-fast-regime-evidence-2026-05-19_comfyui.log` (184 KB) + `logs/BUG-LOCAL-231-fast-regime-evidence-2026-05-19_comfyui_8001.log` (160 KB).
+
+  **FLUX pace, all three calls fast regime:**
+
+  Radio bookend (BatchFluxRender):
+  ```
+  100% 20/20 [00:27<00:00, 1.36s/it]   <-- 27s total, 1.36 s/it average
+  ```
+  Portrait c02 (BatchFluxPortraitRender):
+  ```
+  100% 20/20 [00:31<00:00, 1.58s/it]   <-- 31s total, 1.58 s/it average
+  ```
+  Portrait c03 (BatchFluxPortraitRender):
+  ```
+  100% 20/20 [00:28<00:00, 1.44s/it]   <-- 28s total, 1.44 s/it average
+  ```
+
+  vs 154-188 s/it slow-regime baseline = **~130-140x faster.** This is the same speedup tier as community baseline (Comfy-Org #9002 esp-dev 0.75 s/it).
+
+  **Critical falsification:**
+
+  The log line `[BatchFluxRender] unload_all_models() + gc.collect() + empty_cache() complete (nuclear eviction before MODEL pin, BUG-LOCAL-231 Option B escalation)` fired at L981 + L987 (`[BatchFluxRender] pinned MODEL via load_models_gpu`). There is **NO** `[BatchFluxRender] pre-pin block SKIPPED (OTR_DISABLE_FLUX_PREPIN=1...)` line. The `else` branch of the env-var guard fired. The env var did NOT propagate to ComfyUI's Python process (possible cause: PowerShell Start-Process env inheritance failed; ComfyUI launched via a different shell that did not have the env var; or the variable name was set but not exported correctly).
+
+  **The pre-pin block fired AND FLUX ran fast.** This empirically falsifies the "pre-pin IS the cause" hypothesis. Whatever determines fast vs slow regime, it is **NOT** BatchFluxRender's pre-pin call.
+
+  **What this means:**
+
+  - The 130-140x speedup observed today is REAL, but it is NOT because of the env-var guard. The env-var guard is currently DEAD CODE in this run.
+  - The actual cause of the regime difference is unidentified. Candidates:
+    - **(k1) Cold-process / warm-process state.** Today's ComfyUI launch was fully cold (no prior session in this Windows session). Prior slow runs may have inherited warm-cache residue from earlier ComfyUI processes that affected cudnn / cublas workspace / PyTorch caching allocator state.
+    - **(k2) Some other environmental axis** not yet fingerprinted (Windows session uptime, driver state, GPU clock state from prior workloads).
+    - **(k3) Identical-prompt cache hit** in cudnn forward-conv plan SASS cache (per BUG-LOCAL-244's "fp8 dequant kernel SASS cache" hypothesis).
+
+  **BUG-LOCAL-231 reframe:** the slow regime is a state-dependent intermittent, not a deterministic OTR-architectural defect. The fast outliers tracked under BUG-LOCAL-244 are the same phenomenon -- today's run is another fast observation. The minimal-workflow 1.40 s/it bisect is also a fast observation. The 134x "OTR graph causes the slowdown" framing from commit 4811bfc is partially wrong: OTR graph can run FAST too, it just has a higher probability of hitting the slow regime under some unidentified state-axis condition.
+
+  **DO NOT** flip BUG-LOCAL-231 to `[FIXED]`. The env-var-guard commit (b9d2f76) stays as a diagnostic switch but is not load-bearing. The real investigation moves to BUG-LOCAL-244 (state-axis fingerprinting): what changes between cold-process and warm-process runs that flips the regime?
+
+  **Adjacent findings from this run (each gets its own entry below):**
+
+  - **BUG-LOCAL-234/235 EMPIRICALLY VERIFIED for HuMo.** 14/14 HuMo clips rendered, ledger stamped to post-rename dir `signal_lost_signal_lost_20260519_161708_20260519_161708_ledger.json`. Real workload, not synthetic. Promotion to `[FIXED]` still requires 3-smoke discipline -- but the architectural evidence is strong.
+  - **BUG-LOCAL-246 SURFACED -- LTX rename-stale episode_id.** Log: `[BatchLTXRender] no radio bookend resolved for episode pending_20260519_160545 -- skipping LTX render entirely`. Same shape as BUG-LOCAL-234, same fix shape: port BatchFluxRender's singleton-fallback + mtime-walker pattern to `nodes/batch_ltx_render.py`. Was deferred from original BUG-LOCAL-234 plan.
+  - **BUG-LOCAL-247 SURFACED -- VideoComposite end-of-run cleanup fired from failure branch.** Log: `[VideoComposite] end-of-run cleanup: unloading all models` followed by no final mp4. Cause likely BUG-LOCAL-234 sibling (rename-stale episode_id), OR a downstream condition. Needs investigation.
+  - **BUG-LOCAL-248 SURFACED -- rtx_upscale.py ffprobe crash on `'.'` path.** Stack trace shows `subprocess.CalledProcessError: Command '['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,r_frame_rate', '-of', 'default=nw=1:nk=1', '.']' returned non-zero exit status 1`. Upstream produced empty/dot `src_mp4` because VideoComposite failed; rtx_upscale ran anyway with no input validation. One-line fix: validate `Path(src_mp4).is_file()` before calling ffprobe.
+
+  **Status:** BUG-LOCAL-231 stays **ACTIVE REGRESSION**, reframed as state-dependent intermittent. Env-var-guard hypothesis FALSIFIED. Real axis is whatever determines cold-process vs warm-process FLUX pace (consolidate with BUG-LOCAL-244). MuseTalk swap candidate (memory `project_musetalk_swap_candidate`) becomes more attractive given that HuMo wall-time dominates the pipeline and the FLUX investigation is now state-axis territory.
+
 Promotion target: `comfyui-custom-node-survival-guide/BUG_BIBLE.yaml`.
 Per CLAUDE.md "Bug Log Pipeline" section, when `Bible candidate: yes`
 and the fix is verified:
