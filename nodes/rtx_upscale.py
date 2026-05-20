@@ -139,6 +139,20 @@ def _chunked_upscale(
     import numpy as np  # type: ignore
     import torch  # type: ignore
 
+    # BUG-LOCAL-248 fix (2026-05-19): fail loud with an OTR-level error
+    # pointing upstream when src_mp4 is missing. Upstream VideoComposite
+    # early-returns ("", ...) on a rename-stale path (BUG-LOCAL-247); an
+    # empty string resolves to Path('.'), and ffprobe then crashes with
+    # an opaque subprocess.CalledProcessError on '.'. This guard turns
+    # that into a clear diagnosis instead of a deep-stack ffprobe crash.
+    if not Path(src_mp4).is_file():
+        raise ValueError(
+            f"OTR_RTXUpscale: src_mp4 does not exist or is not a file: "
+            f"{str(src_mp4)!r}. Upstream VideoComposite likely failed or "
+            f"emitted an empty path -- check the VideoComposite report "
+            f"output and logs for the root cause (cf. BUG-LOCAL-247)."
+        )
+
     src_w, src_h, src_fps = _probe_video_dims(ffprobe, src_mp4)
     log.info(
         "[OTR_RTXUpscale] source dims=%dx%d fps=%.3f -> target %dx%d quality=%s",
