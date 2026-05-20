@@ -86,9 +86,11 @@ if str(_NODES_DIR) not in _sys.path:
     _sys.path.insert(0, str(_NODES_DIR))
 from _otr_paths import (  # noqa: E402
     episodes_for_obs_dir,
+    otr_audio_dir,
     otr_episodes_root,
     # S28 cleanbreak: dropped otr_legacy_audio_dir.
     otr_stills_dir,
+    otr_videos_dir,
 )
 
 log = logging.getLogger("OTR.video_composite")
@@ -2131,18 +2133,121 @@ class VideoComposite:
         t_start = time.time()
         ffprobe = ffmpeg.replace("ffmpeg", "ffprobe") if ffmpeg.endswith("ffmpeg") else "ffprobe"
 
-        # ---- Validate inputs ----
-        procgen = Path(procgen_video_path.strip())
-        if not procgen.exists():
-            return ("", f"error: procgen_video_path not found: {procgen}")
-        clips = Path(clips_dir.strip())
-        if not clips.exists():
-            return ("", f"error: clips_dir not found: {clips}")
+        # ---- Load ledger (rename-safe) + validate inputs ----
+        # BUG-LOCAL-247 fix (2026-05-19): the procgen_video_path and
+        # clips_dir sockets can carry PRE-rename path strings captured by
+        # an upstream node before SignalLostVideo renamed the episode dir
+        # (pending_* -> signal_lost_*). The old code validated those raw
+        # strings FIRST and early-returned ("", "error: ... not found");
+        # the empty string flowed into the downstream OTR_RTXUpscale
+        # src_mp4 socket, which then crashed ffprobe on the empty path
+        # resolved to '.' (BUG-LOCAL-248). Fix: resolve the ledger via
+        # the singleton-fallback + mtime-walker pattern (ports
+        # BUG-LOCAL-234 / 246 from batch_humo_render / batch_ltx_render),
+        # then re-derive any stale procgen / clips path from the live
+        # post-rename episode workspace before validating. Path
+        # resolution only -- audio bytes are untouched.
+        ledger = None
+        ledger_path = None
+        try:
+            try:
+                from . import production_ledger as _PROD_LEDGER  # type: ignore
+                from . import _otr_ledger as _OTRL_LD  # type: ignore
+            except ImportError:
+                import production_ledger as _PROD_LEDGER  # type: ignore
+                import _otr_ledger as _OTRL_LD  # type: ignore
+            _led_singleton = _PROD_LEDGER.get_ledger()
+            ledger_path = Path(_led_singleton.path)
+            if not ledger_path.exists():
+                log.warning(
+                    "[VideoComposite] singleton path %s does not exist "
+                    "on disk; falling back to mtime walker",
+                    ledger_path,
+                )
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+        except Exception as _exc:  # noqa: BLE001
+            log.warning(
+                "[VideoComposite] singleton lookup failed (%s); "
+                "falling back to mtime walker", _exc,
+            )
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+            except Exception:  # noqa: BLE001
+                ledger_path = None
+        if ledger_path is not None:
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger = _OTRL_LD.load_ledger_safe(ledger_path)
+            except Exception as _exc:  # noqa: BLE001
+                log.warning(
+                    "[VideoComposite] load_ledger_safe(%s) raised %r; "
+                    "falling back to wired ledger_json", ledger_path, _exc,
+                )
+                ledger = None
+        if ledger is None:
+            # Last-resort: parse the wired socket. This is the legacy
+            # standalone-test path -- production runs succeed via the
+            # singleton-fallback above.
+            log.warning(
+                "[VideoComposite] singleton refresh produced no ledger; "
+                "falling back to wired ledger_json socket (may be stale "
+                "if upstream serialized before episode rename)"
+            )
+            ledger, ledger_path = _load_ledger_with_path(ledger_json)
+        episode_id = ledger.get("episode_id", "episode")
+
+        # ---- Validate inputs (rename-safe) ----
+        procgen = (
+            Path(procgen_video_path.strip())
+            if procgen_video_path.strip() else None
+        )
+        if procgen is None or not procgen.exists():
+            _derived_procgen = otr_audio_dir(episode_id) / f"{episode_id}.mp4"
+            if _derived_procgen.is_file():
+                log.warning(
+                    "[VideoComposite] procgen_video_path %r not on disk; "
+                    "re-derived from post-rename ledger: %s",
+                    procgen_video_path, _derived_procgen,
+                )
+                procgen = _derived_procgen
+            else:
+                return (
+                    "",
+                    f"error: procgen_video_path not found: "
+                    f"{procgen_video_path!r} (post-rename re-derive "
+                    f"{_derived_procgen} also missing)",
+                )
+        clips = (
+            Path(clips_dir.strip()) if clips_dir.strip() else None
+        )
+        if clips is None or not clips.exists():
+            _derived_clips = otr_videos_dir(episode_id)
+            if _derived_clips.is_dir():
+                log.warning(
+                    "[VideoComposite] clips_dir %r not on disk; "
+                    "re-derived from post-rename ledger: %s",
+                    clips_dir, _derived_clips,
+                )
+                clips = _derived_clips
+            else:
+                return (
+                    "",
+                    f"error: clips_dir not found: {clips_dir!r} "
+                    f"(post-rename re-derive {_derived_clips} also missing)",
+                )
         if not (shutil.which(ffmpeg) or Path(ffmpeg).exists()):
             return ("", f"error: ffmpeg not found at {ffmpeg!r}")
-
-        ledger, ledger_path = _load_ledger_with_path(ledger_json)
-        episode_id = ledger.get("episode_id", "episode")
 
         # ---- Resolve output_dir (intermediate composite, per-episode) ----
         # output_dir = ComfyUI/output/otr/episodes/<episode_id>/composited/
