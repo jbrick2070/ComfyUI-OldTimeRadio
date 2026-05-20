@@ -323,10 +323,8 @@ else:
 try:
     import json as _otr_json
     import os as _otr_os
-    from glob import glob as _otr_glob
     from server import PromptServer as _otr_PromptServer  # type: ignore
     from aiohttp import web as _otr_web  # type: ignore
-    import folder_paths as _otr_folder_paths  # type: ignore
 
     _OTR_CORS_HEADERS = {
         "Access-Control-Allow-Origin": "*",
@@ -338,23 +336,29 @@ try:
     @_otr_PromptServer.instance.routes.get("/otr/latest_ledger")
     async def _otr_latest_ledger(request):
         try:
-            output_dir = _otr_folder_paths.get_output_directory()
-            search_dirs = [
-                _otr_os.path.join(output_dir, "otr", "audio"),
-                _otr_os.path.join(output_dir, "old_time_radio"),
-            ]
-            candidates = []
-            for d in search_dirs:
-                if _otr_os.path.isdir(d):
-                    candidates.extend(_otr_glob(_otr_os.path.join(d, "*_ledger.json")))
-            if not candidates:
+            # Ledger durability P1 (2026-05-19): the old discovery scanned
+            # hardcoded legacy-flat dirs (output/otr/audio +
+            # output/old_time_radio) that have been extinct since the S28
+            # per-episode workspace reorg, so this endpoint returned stale
+            # pre-S28 ledgers and never saw a live run. Delegate to the
+            # canonical resolver in_flight_ledger_path() -- it returns the
+            # in-flight Ledger singleton's path during a run and falls back
+            # to the per-episode mtime walker headless. Same resolver every
+            # node uses, so the endpoint can no longer desync from the real
+            # on-disk layout.
+            try:
+                from .nodes._otr_ledger import in_flight_ledger_path
+            except Exception:  # noqa: BLE001
+                import _otr_ledger as _otr_led_mod  # type: ignore
+                in_flight_ledger_path = _otr_led_mod.in_flight_ledger_path
+            latest_p = in_flight_ledger_path()
+            if latest_p is None:
                 return _otr_web.json_response({
                     "ok": False,
-                    "reason": "no ledger files found",
-                    "searched": search_dirs,
+                    "reason": "no ledger found: no in-flight singleton "
+                              "and no ledger under output/otr/episodes/",
                 }, headers=_OTR_CORS_HEADERS)
-            candidates.sort(key=lambda p: _otr_os.path.getmtime(p), reverse=True)
-            latest = candidates[0]
+            latest = str(latest_p)
             with open(latest, "r", encoding="utf-8") as f:
                 ledger = _otr_json.load(f)
             return _otr_web.json_response({
