@@ -1750,6 +1750,22 @@ class OTR_LedgerScriptWriter:
         meta["requested_num_characters"] = resolved["num_characters"]
         meta["episode_seed"] = int(seed)
 
+        # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
+        # disk NOW, before the style-picker / news-interpreter / cast /
+        # outline LLM phases run. Those phases are several minutes and the
+        # most failure-prone part of the writer; pre-fix the first
+        # led.save() was not until the Phase 2B outline stamp far below,
+        # so a crash in any earlier phase left zero ledger on disk for the
+        # run. The skeleton is a valid sparse ledger (episode_id, meta
+        # seed, cast_status="building"); every later led.save() overwrites
+        # it with real progress. Goal: a ledger on disk for every run,
+        # regardless of how far it gets.
+        _skeleton_path = led.save()
+        log.info(
+            "[OTR_LedgerScriptWriter] skeleton ledger saved up front: %s",
+            _skeleton_path,
+        )
+
         # D.2 Two-pass style picker (when "let the story decide" is
         # selected or combo is blank AND no style_custom override).
         # Pass 1 inventor produces 5 distinct snake_case style
