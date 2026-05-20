@@ -1,0 +1,3 @@
+tests/test_musicgen_style_palette.py:232 [missing-file] +# the _GENRE_BY_STYLE / _resolve_genre / _preview_genre symbols they pinned.
+tests/test_musicgen_style_palette.py:234 [missing-file] +# back to `meta.style` directly. Per the no-legacy-back-compat standing
+tests/test_workflow_canonical_baseline.py:129 [code] +    `C:/Users/jeffr` marker) fails here first.
