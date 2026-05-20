@@ -462,6 +462,28 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
+## NEXT SPRINT -- Story Writer UI simplification (Jeffrey, 2026-05-19)
+
+**Status:** PRIORITIZED as the next sprint (Jeffrey, 2026-05-19). Rationale: the Story Writer (`OTR_LedgerScriptWriter`) is the most upstream node in the pipeline, so it leads under the project's upstream-to-downstream sprint discipline. Opens once the in-flight tail-bug closure re-run lands a final mp4 (the 246 + 247 + 248 fixes verified alongside 234 + 235). Design work, not a defect -- round-robin the design before any node-surface edit.
+
+**Why:** Operator review of the `1. Story Writer (LPL v2.0)` node (`OTR_LedgerScriptWriter`) in `otr_scifi_16gb_full.json` (screenshot 2026-05-19): the node exposes ~18 widgets, several of them cryptic LLM-internals with no human-readable meaning. Jeffrey's directive: "a real simple UI that is human-understandable -- no seed, etc." Widgets flagged by operator arrows: `technical_model`, `act_count` (min bound 1), `min_p`, `repetition_penalty`, `max_new_tokens_cap`; `seed` is also called out as something a human should not have to see.
+
+**Goal:** Surface only the human-meaningful controls (episode title, length, character count, premise, style, creativity, act breaks). Move the LLM-internal knobs (`min_p`, `repetition_penalty`, `max_new_tokens_cap`) behind an "advanced" affordance or sensible hidden defaults. Every widget that stays visible gets a plain-language tooltip.
+
+**HARD CONSTRAINT -- do NOT delete these (architecturally load-bearing):**
+
+- `seed` -- C7 byte-identity depends on the writer-seed RNG (cast contract C7). May be hidden / collapsed / defaulted, never removed.
+- `creative_writing_model` + `technical_model` -- the two-model selector (CLAUDE.md Prime Directive #6). They are the only model picks in the whole workflow; every other node reads the writer's broadcast outputs. May be relabeled or grouped, never removed, and no `model_id` widget may be reintroduced elsewhere.
+
+**Open design questions (round-robin before build):**
+
+- ComfyUI mechanism for "advanced" hiding: collapsible group, a `show_advanced` boolean toggle, or a basic node + advanced sidecar.
+- Safe hidden defaults for `min_p` / `repetition_penalty` / `max_new_tokens_cap`.
+- Whether `include_act_breaks` + `act_count` collapse into one human-readable control.
+- Wire every surface change into `otr_scifi_16gb_full.json` (Prime Directive #3) and re-run the workflow-JSON guardrail tests.
+
+---
+
 ## ADDENDUM -- LTX 2.3 LipDub IC-LoRA deep-research (2026-05-15)
 
 **Status:** Research addendum, NOT a sprint. Supplements Cross-cutting notes §2 LTX LipDub IC-LoRA with measured/cited findings from the 2026-05-15 architectural evaluation. No sprint number assigned; no branch cut; no phases. Adoption sequencing unchanged from §2 -- LipDub stays a Sprint A acceptance target (or later forward feature work at Jeffrey's discretion), gated on Sprint C close.
