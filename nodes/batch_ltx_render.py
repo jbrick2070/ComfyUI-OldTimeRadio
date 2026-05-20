@@ -80,6 +80,7 @@ except ImportError:
 from _otr_paths import (  # noqa: E402
     otr_audio_dir,
     # S28 cleanbreak: dropped otr_legacy_audio_dir.
+    otr_episodes_root,
     otr_stills_dir,
     otr_videos_dir,
 )
@@ -1189,7 +1190,79 @@ class BatchLTXRender:
         # ----------------------------------------------------------------
         # 1. Load the ledger + resolve the radio bookend png
         # ----------------------------------------------------------------
-        ledger, ledger_path = self._load_ledger(ledger_json)
+        # BUG-LOCAL-246 fix (2026-05-19): rename-safe ledger refresh.
+        # Ports the BUG-LOCAL-234 singleton-fallback + mtime-walker
+        # pattern from batch_humo_render.execute(). The in-flight Ledger
+        # singleton's `path` property advances through
+        # `Ledger.rename_episode` (BUG-LOCAL-015 Phase B 2026-05-02), so
+        # reading from the singleton always tracks the post-rename
+        # location. The wired `ledger_json` socket may carry a PRE-rename
+        # serialization from an upstream node whose output was captured
+        # before SignalLostVideo ran the rename -- trusting that string
+        # lands radio-bookend resolution in the renamed-away dir, so the
+        # node logs `no radio bookend resolved for episode pending_...`
+        # and skips the LTX render entirely (BUG-LOCAL-246 surfaced
+        # 2026-05-19). Fall back to the legacy wired-input loader only
+        # when the singleton lookup AND mtime-walker both fail (standalone
+        # test invocations).
+        ledger = None
+        ledger_path = None
+        try:
+            try:
+                from . import production_ledger as _PROD_LEDGER  # type: ignore
+                from . import _otr_ledger as _OTRL_LD  # type: ignore
+            except ImportError:
+                import production_ledger as _PROD_LEDGER  # type: ignore
+                import _otr_ledger as _OTRL_LD  # type: ignore
+            _led_singleton = _PROD_LEDGER.get_ledger()
+            ledger_path = Path(_led_singleton.path)
+            if not ledger_path.exists():
+                log.warning(
+                    "[BatchLTXRender] singleton path %s does not exist "
+                    "on disk; falling back to mtime walker",
+                    ledger_path,
+                )
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+        except Exception as _exc:  # noqa: BLE001
+            log.warning(
+                "[BatchLTXRender] singleton lookup failed (%s); "
+                "falling back to mtime walker", _exc,
+            )
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger_path = _OTRL_LD.find_most_recent_ledger(
+                    [otr_episodes_root()]
+                )
+            except Exception:  # noqa: BLE001
+                ledger_path = None
+        if ledger_path is not None:
+            try:
+                try:
+                    from . import _otr_ledger as _OTRL_LD  # type: ignore
+                except ImportError:
+                    import _otr_ledger as _OTRL_LD  # type: ignore
+                ledger = _OTRL_LD.load_ledger_safe(ledger_path)
+            except Exception as _exc:  # noqa: BLE001
+                log.warning(
+                    "[BatchLTXRender] load_ledger_safe(%s) raised %r; "
+                    "falling back to wired ledger_json", ledger_path, _exc,
+                )
+                ledger = None
+        if ledger is None:
+            # Last-resort: parse the wired socket. This is the legacy
+            # standalone-test path -- production runs always succeed via
+            # the singleton-fallback above.
+            log.warning(
+                "[BatchLTXRender] singleton refresh produced no ledger; "
+                "falling back to wired ledger_json socket (may be stale "
+                "if upstream serialized before episode rename)"
+            )
+            ledger, ledger_path = self._load_ledger(ledger_json)
         if ledger is None:
             raise RuntimeError(
                 "BatchLTXRender: ledger could not be loaded from inline "
