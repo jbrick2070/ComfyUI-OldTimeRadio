@@ -2828,22 +2828,14 @@ class OTR_LedgerScriptWriter:
         except Exception:  # noqa: BLE001
             meta["creative_prompt_profile"] = "modern"
 
-        # --- K.5.7: stamp meta.episode_title from widget (Sprint E E11) ----
-        # Closes M11 from the Sprint E plan. SignalLost's title chain
-        # documents Tier 1 as `meta.episode_title` but pre-E11 the
-        # writer never stamped it, so the chain fell through to Tier 4
-        # (widget at SignalLost) or Tier 5 (TIMESTAMP_LASTRESORT).
-        # Post-E11 the writer stamps the widget value at the ledger
-        # surface so Tier 1 fires correctly. A later LLM-generated
-        # title pass can OVERWRITE this key without breaking the
-        # chain. Empty widget -> stamp empty string explicitly so
-        # downstream `meta.get("episode_title")` returns "" rather
-        # than KeyError.
-        try:
-            _widget_title = (episode_title or "").strip()
-            meta["episode_title"] = _widget_title
-        except Exception:  # noqa: BLE001
-            meta["episode_title"] = ""
+        # NOTE: meta.episode_title is stamped once, by the J.5
+        # post-composition title pass (meta["episode_title"] = final_title
+        # above). A Sprint-E "K.5.7" block used to re-stamp it here from
+        # the raw episode_title widget value -- which ran AFTER J.5 and
+        # clobbered the LLM-generated title with "" whenever the widget
+        # was left blank, so the video title chain fell to the timestamp
+        # last-resort (BUG-LOCAL-236). K.5.7 deleted 2026-05-20; J.5 is
+        # the single authority for the title.
 
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
