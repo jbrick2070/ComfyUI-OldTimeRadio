@@ -462,9 +462,28 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
-## NEXT SPRINT -- Story Writer UI simplification (Jeffrey, 2026-05-19)
+## PRIORITY 1 -- Ledger durability: save + discovery for every run (Jeffrey, 2026-05-19)
 
-**Status:** PRIORITIZED as the next sprint (Jeffrey, 2026-05-19). Rationale: the Story Writer (`OTR_LedgerScriptWriter`) is the most upstream node in the pipeline, so it leads under the project's upstream-to-downstream sprint discipline. Opens once the in-flight tail-bug closure re-run lands a final mp4 (the 246 + 247 + 248 fixes verified alongside 234 + 235). Design work, not a defect -- round-robin the design before any node-surface edit.
+**Status:** PRIORITY 1 of the forward queue (Jeffrey, 2026-05-19). Rationale: the production ledger is the most upstream artifact in the whole pipeline -- the writer creates it and every downstream stage (FLUX, HuMo, LTX, VideoComposite, rtx_upscale) depends on finding and trusting it. Run-record reliability is foundational, so it leads. Opens once the in-flight tail-bug closure re-run lands a final mp4. Architecture work -- round-robin before any build.
+
+**Goal (Jeffrey's words):** a ledger saved for every runtime, regardless of how far the run progresses.
+
+**Why:** the ledger is not consistently saved or discoverable. BUG-LOCAL-234 / 246 / 247 were each an instance of this -- a consumer could not find the live ledger after the episode rename. Concrete symptom observed 2026-05-19: the `/otr/latest_ledger` endpoint returned a two-week-stale episode (`..._20260502_170555`, legacy-flat `output/otr/audio/`) instead of the live run's ledger under `output/otr/episodes/<ep>/audio/`. The files exist; discovery and per-stage consistency are the failure surface. This item is the general fix for the whole rename-stale family.
+
+**Design sketch (round-robin to confirm):**
+
+- The writer writes a skeleton ledger to disk the instant it starts -- before anything downstream can fail.
+- Every stage after that does a durable write-back, so a crash leaves the on-disk ledger reflecting everything up to the last completed stage.
+- Discovery (`find_most_recent_ledger`, `/otr/latest_ledger`) is rename-proof and scans the per-episode tree only -- never the legacy-flat `output/otr/audio/` dir (consistent with the no-legacy-back-compat standing directive).
+- The only genuinely unsaveable run is one that dies before the writer runs; skeleton-on-start covers most of that.
+
+**Scope notes:** touches the ledger and is audio-adjacent -- Prime Directive 1 (audio sealed) applies; any edit that drifts audio is reverted. Round-robin the architecture before code. First scoping step: read the writer's current first-save point and every `save_ledger_safe` / `patch_line_fields` write-back site.
+
+---
+
+## PRIORITY 2 -- Story Writer UI simplification (Jeffrey, 2026-05-19)
+
+**Status:** PRIORITY 2 of the forward queue (Jeffrey, 2026-05-19) -- opens after the Priority 1 ledger-durability sprint. Rationale: the Story Writer (`OTR_LedgerScriptWriter`) is the most upstream node, so it leads the UI work under the upstream-to-downstream discipline; it sits behind ledger durability because run-record reliability outranks UI polish. Design work, not a defect -- round-robin the design before any node-surface edit.
 
 **Why:** Operator review of the `1. Story Writer (LPL v2.0)` node (`OTR_LedgerScriptWriter`) in `otr_scifi_16gb_full.json` (screenshot 2026-05-19): the node exposes ~18 widgets, several of them cryptic LLM-internals with no human-readable meaning. Jeffrey's directive: "a real simple UI that is human-understandable -- no seed, etc." Widgets flagged by operator arrows: `technical_model`, `act_count` (min bound 1), `min_p`, `repetition_penalty`, `max_new_tokens_cap`; `seed` is also called out as something a human should not have to see.
 
