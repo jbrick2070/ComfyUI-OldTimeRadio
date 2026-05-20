@@ -503,6 +503,18 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
+## QUEUED (design) -- story_brief as the primary downstream visual driver (Jeffrey, 2026-05-20)
+
+**Status:** QUEUED. Design pass, round-robin before any build -- NOT a tier reorder.
+
+**Why:** The radio bookend still is the visual anchor for every announcer line, music cue, and SFX second of an episode. Yet `_build_dynamic_radio_prompt` resolves its FLUX descriptor from the 3-word style slug (tier 1, e.g. `satellite_ocean_watch`) on almost every run; `meta.story_brief` (tier 3) rarely fires because the style picker nearly always produces a style. The radio image therefore reflects a thin tonal label, not the finished story. Jeffrey 2026-05-20: everything downstream of `meta.story_brief` should be driven by the brief so the visuals actually relate to the real script.
+
+**Why it is NOT a one-line tier bump:** the radio prompt is structured `<descriptor> radio broadcast unit, <suffix>` -- the descriptor slot expects a short tonal phrase. `meta.story_brief` is a plot/character/setting paragraph; dropped raw into `<X> radio broadcast unit` it produces a mangled prompt. Making the brief genuinely drive the visuals means designing how it shapes the radio prompt AND the LTX / HuMo / portrait prompts (the Sprint C C5c-C5f consumers) -- what to extract, how it combines with the radio-object framing, and whether the style slug demotes to a secondary tonal modifier.
+
+**Scope:** `visual/batch_flux_render.py::_build_dynamic_radio_prompt` + the LTX / HuMo / portrait story_brief consumers. Reverses a deliberate Sprint C tier ordering -- round-robin the design first.
+
+---
+
 ## ADDENDUM -- LTX 2.3 LipDub IC-LoRA deep-research (2026-05-15)
 
 **Status:** Research addendum, NOT a sprint. Supplements Cross-cutting notes §2 LTX LipDub IC-LoRA with measured/cited findings from the 2026-05-15 architectural evaluation. No sprint number assigned; no branch cut; no phases. Adoption sequencing unchanged from §2 -- LipDub stays a Sprint A acceptance target (or later forward feature work at Jeffrey's discretion), gated on Sprint C close.
