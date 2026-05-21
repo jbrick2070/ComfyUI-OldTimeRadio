@@ -1301,11 +1301,12 @@ class SignalLostVideoRenderer:
         style = _meta.get("style") or ""
         genre = (_meta.get("visual_plan") or {}).get("genre") or ""
 
-        # Title chain (Path B confirmed 2026-05-09):
-        #   1. led["meta"]["episode_title"]   (architect primary; today
-        #      not stamped by OTR_LedgerScriptWriter -- forward-compat
-        #      slot for the post-soak B1+B2 follow-up: post-script
-        #      title generation pass + meta.episode_title stamp)
+        # Title chain (Path B; slot 1 live since the J.5 title pass):
+        #   1. led["meta"]["episode_title"]   (primary -- stamped on
+        #      every run by OTR_LedgerScriptWriter's J.5 post-composition
+        #      title pass, which LLM-regenerates the title from the
+        #      finished script, or uses the typed widget value, or
+        #      falls back to outline.title)
         #   2. led["meta"]["title"]           (forward-compat slot)
         #   3. led["title"]                   (top-level; not stamped
         #      by OTR_LedgerScriptWriter -- pre-LPL legacy slot kept
@@ -1315,9 +1316,10 @@ class SignalLostVideoRenderer:
         #
         # news_used[0].headline and meta.news_seed.headline are
         # intentionally NOT in this chain -- both surface news/outline
-        # content as titles, neither is what we want on screen. Today's
-        # new-writer flow without the widget falls through to TIMESTAMP
-        # truthfully; the B1+B2 follow-up resolves slot 1.
+        # content as titles, neither is what we want on screen. With
+        # the J.5 title pass live, slot 1 is populated on every writer
+        # run; the timestamp last-resort fires only on a degenerate run
+        # where the writer produced no title at all.
         _STUCK_TITLE_DEFAULTS = {
             "", "the last frequency", "untitled", "episode",
             "signal lost", "custom episode",
@@ -1353,9 +1355,10 @@ class SignalLostVideoRenderer:
                 "[Video] TITLE LAST-RESORT: meta.episode_title='%s', "
                 "meta.title='%s', led.title='%s', widget='%s' -- ALL "
                 "EMPTY/STUCK. Using timestamp fallback %r so the run "
-                "can finish. Resolution: ROADMAP B1+B2 follow-up adds "
-                "a post-script title-generation pass that stamps "
-                "led.meta.episode_title cleanly.",
+                "can finish. This should not happen on a normal run: "
+                "OTR_LedgerScriptWriter's J.5 title pass stamps "
+                "led.meta.episode_title every time. Reaching here means "
+                "the writer produced no title at all.",
                 _meta_episode_title, _meta_title, _led_title,
                 _widget_title, episode_title,
             )
