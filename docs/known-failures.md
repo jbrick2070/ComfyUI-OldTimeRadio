@@ -1,8 +1,8 @@
 # Known Test Failures — Quarantine List
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
-**Last reconciled:** 2026-05-21 (full-walk 27-failure triage: 25 fixed, 2 quarantined)
-**Baseline pytest:** **2 failed** (KNOWN-FAIL-007/008, quarantined below), 2460 passed/skipped of 2462 collected
+**Last reconciled:** 2026-05-21 (KNOWN-FAIL-007/008 promoted -- Gemma-4 license re-audit; quarantine set now empty)
+**Baseline pytest:** **0 failed**, all 2462 collected pass or skip
 **Enforcement:** `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (S15.1
 hook) tracks the failure SET, not just the count. Adding a failure
 not in that set fires `[KNOWN-FAIL-GUARD] NEW failures (REGRESSION)`
@@ -41,60 +41,12 @@ matches by exact string against pytest's collected `item.nodeid`.
 
 ---
 
-## Active known failures (2)
+## Active known failures (0)
 
-KNOWN-FAIL-001 through 006 were promoted on 2026-05-13 (see the
-Resolution log below). KNOWN-FAIL-007 + 008 were added 2026-05-21
-during the full-walk 27-failure triage: 25 of the 27 failures were
-real fixes; these last 2 are a product/licensing decision and are
-quarantined pending that decision.
-
-```
-KNOWN-FAIL-007
-  Nodeid:        tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default
-  First seen:    2026-05-21 full-walk triage; failure predates 6a525f8
-                 (present at clean HEAD 02fde67).
-  Expected mode: AssertionError -- check_default_workflow_creative_binding
-                 reports the shipped workflow's writer node (id=1)
-                 binds 'google/gemma-4-E4B-it' (license_audit_status=
-                 'pending'); the Sprint D / D3 creative-binding gate
-                 requires 'mit_equivalent' for any default-shipped
-                 binding.
-  Owner:         Jeffrey
-  Removal cond:  Resolve the writer-model licensing question, then
-                 promote. Either (a) complete the google/gemma-4-E4B-it
-                 license audit and update that row's
-                 license_audit_status in nodes/_otr_model_catalog.py,
-                 or (b) rebind the default workflow's
-                 OTR_LedgerScriptWriter (node id=1) creative + technical
-                 model slots to a mit_equivalent catalog row (the
-                 catalog DEFAULT_LLM is mistralai/Mistral-Nemo-
-                 Instruct-2407, which this test's docstring already
-                 expects) and re-verify. NOTE: pyproject.toml still
-                 describes the project as "Gemma 4 scripts" -- this is
-                 a genuine product-direction call, not a drift fix.
-  Reproduce:     pytest "tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default"
-```
-
-```
-KNOWN-FAIL-008
-  Nodeid:        tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot
-  First seen:    2026-05-21 full-walk triage; failure predates 6a525f8
-                 (present at clean HEAD 02fde67).
-  Expected mode: AssertionError -- same root cause as KNOWN-FAIL-007:
-                 the shipped default workflow binds
-                 'google/gemma-4-E4B-it' (license_audit_status=
-                 'pending') to the creative slot; the gate requires
-                 'mit_equivalent'. This test asserts the gate from the
-                 model-catalog-schema entry point rather than the
-                 workflow-validator one.
-  Owner:         Jeffrey
-  Removal cond:  Same as KNOWN-FAIL-007. Both tests assert the same
-                 creative-binding gate and will go green together once
-                 the licensing question is resolved -- promote both in
-                 the same commit.
-  Reproduce:     pytest "tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot"
-```
+There are no quarantined failures. KNOWN-FAIL-001 through 008 have all
+been promoted -- see the Resolution log below. The full `tests/` walk
+is expected to report 0 failures; any failure is a regression that the
+`tests/conftest.py` KNOWN-FAIL-GUARD will surface with exit code 2.
 
 Adding a new known failure requires updating both this file and
 `tests/conftest.py::EXPECTED_FAILED_NODEIDS` in the same commit, and the
@@ -180,6 +132,49 @@ KNOWN-FAIL-006  [RESOLVED 8181950 2026-05-13]
                  humo_target_height moved 480 -> 832 in lockstep.
                  Test was renamed and assertions updated to the
                  current contract. 8181950.
+```
+
+```
+KNOWN-FAIL-007  [RESOLVED 2026-05-21]
+  Nodeid:        tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default
+  First seen:    2026-05-21 full-walk 27-failure triage; failure
+                 predated 6a525f8 (present at clean HEAD 02fde67).
+  Expected mode: AssertionError -- check_default_workflow_creative_binding
+                 reported the shipped workflow's writer node (id=1)
+                 binding 'google/gemma-4-E4B-it' as
+                 license_audit_status='pending'; the D3 gate requires
+                 'mit_equivalent'.
+  Resolution:    Gemma-4 license re-audit (option (a) of the original
+                 removal condition). The catalog tagged the two
+                 google/gemma-4-E{2,4}B-it rows license=gated_terms /
+                 license_audit_status=pending, written 2026-05-16 on
+                 the assumption that Gemma 4 inherited the older
+                 restricted Google "Gemma Terms of Use". That was
+                 wrong: the Gemma 4 family ships under Apache 2.0 --
+                 confirmed on the official Google HuggingFace model
+                 cards (License: apache-2.0). The catalog rows and the
+                 docs/model-license-google--gemma-4-e{2,4}b-it.md audit
+                 files were corrected to apache_2_0 / mit_equivalent,
+                 which the D3 creative-binding gate accepts. No
+                 product or workflow change -- the shipped default
+                 still binds gemma-4-E4B-it to both writer slots.
+```
+
+```
+KNOWN-FAIL-008  [RESOLVED 2026-05-21]
+  Nodeid:        tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot
+  First seen:    2026-05-21 full-walk 27-failure triage; failure
+                 predated 6a525f8 (present at clean HEAD 02fde67).
+  Expected mode: AssertionError -- same root cause as KNOWN-FAIL-007:
+                 the shipped default workflow bound
+                 'google/gemma-4-E4B-it' (license_audit_status=
+                 'pending'); the gate requires 'mit_equivalent'. This
+                 test asserts the gate from the model-catalog-schema
+                 entry point rather than the workflow-validator one.
+  Resolution:    Same root cause and same fix as KNOWN-FAIL-007 --
+                 the Gemma-4 license re-audit. Promoted in the same
+                 commit; the audit file + catalog row corrections were
+                 a single lockstep pass covering both Gemma-4 rows.
 ```
 
 Keep resolution entries forever -- deletion erases the history this

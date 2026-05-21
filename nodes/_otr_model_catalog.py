@@ -118,8 +118,8 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         chat_template_kind="transformers_default",
         stop_tokens=(),
         context_window=8192,
-        license="gated_terms",
-        license_audit_status="pending",
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
     ),
     CuratedModel(
         repo_id="google/gemma-4-E4B-it",
@@ -132,8 +132,8 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         chat_template_kind="transformers_default",
         stop_tokens=(),
         context_window=8192,
-        license="gated_terms",
-        license_audit_status="pending",
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
     ),
     CuratedModel(
         repo_id="Qwen/Qwen2.5-14B-Instruct",

@@ -164,33 +164,34 @@ def pytest_sessionstart(session):
 # ---------------------------------------------------------------------------
 
 
-EXPECTED_FAILED_NODEIDS = frozenset({
-    # KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
-    # (s26-downstream missed-regression sweep). The 5 BUG-108 + save
-    # workspace entries went green when the test fixtures + the
-    # production_ledger meta-merge bug got fixed; KNOWN-FAIL-006 was
-    # renamed in lockstep with the BUG-LOCAL-030 canvas geometry bump
-    # and now passes under the new name
-    # (test_default_canvas_is_layered_1472x832_at_25fps). See commits
-    # ba8a02e (meta merge), a70aeb8 (fixture size), 8181950 (canvas
-    # rename) for the migration trail.
-    #
-    # KNOWN-FAIL-007 + KNOWN-FAIL-008 (added 2026-05-21, full-walk
-    # 27-failure triage). The shipped default workflow's
-    # OTR_LedgerScriptWriter (node id=1) binds 'google/gemma-4-E4B-it'
-    # to both model slots, but that catalog row carries
-    # license_audit_status='pending' -- the Sprint D / D3
-    # creative-binding gate requires 'mit_equivalent'. The two tests
-    # assert that gate from different entry points. Resolution is a
-    # product/licensing decision for Jeffrey (Gemma-4 vs Mistral-Nemo
-    # for the shipped default, plus whether to complete the
-    # gemma-4-E4B-it license audit) -- NOT a mechanical drift fix, so
-    # it is quarantined here rather than force-fixed. See
-    # docs/known-failures.md KNOWN-FAIL-007/008 for the removal
-    # condition. This set must stay in lockstep with that file.
-    "tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default",
-    "tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot",
-})
+EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
+# KNOWN-FAIL-001 through KNOWN-FAIL-006 all promoted 2026-05-13
+# (s26-downstream missed-regression sweep). The 5 BUG-108 + save
+# workspace entries went green when the test fixtures + the
+# production_ledger meta-merge bug got fixed; KNOWN-FAIL-006 was
+# renamed in lockstep with the BUG-LOCAL-030 canvas geometry bump
+# and now passes under the new name
+# (test_default_canvas_is_layered_1472x832_at_25fps). See commits
+# ba8a02e (meta merge), a70aeb8 (fixture size), 8181950 (canvas
+# rename) for the migration trail.
+#
+# KNOWN-FAIL-007 + KNOWN-FAIL-008 (added 2026-05-21, full-walk
+# 27-failure triage; promoted 2026-05-21, same day). Both asserted the
+# Sprint D / D3 creative-binding gate, which rejected the shipped
+# workflow's 'google/gemma-4-E4B-it' binding because that catalog row
+# carried license_audit_status='pending'. Resolved by a license
+# re-audit: the Gemma 4 family ships under Apache 2.0 -- confirmed on
+# the official Google HuggingFace model card -- not the older
+# restricted Gemma Terms of Use. The catalog rows and the
+# docs/model-license-google--gemma-4-e{2,4}b-it.md audit files were
+# corrected in lockstep to apache_2_0 / mit_equivalent, so the gate
+# now passes. See docs/known-failures.md Resolution log
+# KNOWN-FAIL-007/008.
+#
+# The quarantine set is now empty -- there are no known failures. The
+# pytest_sessionfinish guard below still runs (an empty set does not
+# trigger the subset-run early return), so any new failure is caught
+# as a regression.
 
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
