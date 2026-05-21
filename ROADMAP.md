@@ -503,9 +503,9 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
-## QUEUED (design) -- story_brief as the primary downstream visual driver (Jeffrey, 2026-05-20)
+## CLOSED -- story_brief as the primary downstream visual driver (Jeffrey, 2026-05-20)
 
-**Status:** PARTIALLY DONE. Radio bookend prompt landed 2026-05-20 (BUG-LOCAL-249). LTX / HuMo / portrait consumer audit still open.
+**Status:** DONE 2026-05-20. Radio bookend landed via BUG-LOCAL-249; the `otr_video_plan` era tail + FLUX env/portrait prompt ordering landed via BUG-LOCAL-250. Every downstream visual consumer now derives from `meta.story_brief`; the style preset is upstream-only (it shapes the story-writing LLM and nothing else).
 
 **Decision (Jeffrey 2026-05-20):** the style preset is an UPSTREAM input -- it shapes the story-writing LLM only. Everything downstream of story creation derives from `meta.story_brief` so the visuals relate to the real script. Round-robin waived; Jeffrey gave the call directly ("build it now").
 
@@ -513,11 +513,11 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 **Downstream audit complete (2026-05-20).** Every downstream prompt consumer was checked against the directive (brief is the primary driver; the style preset must not gate it). Findings:
 
-- **`nodes/otr_video_plan.py` -- BRIEF-ABSENT (real violation, fix pending).** The era-tail descriptor resolves from `_ERA_TAIL_BY_STYLE`, a dict keyed by style-preset slugs, off a `style` widget. `meta.story_brief` is not read at all. This is the same defect class as BUG-LOCAL-249 (radio bookend) -- the style preset is steering a downstream visual. Fix: drive the era tail from `meta.story_brief` via `_otr_story_brief_helpers`; the style preset read goes away.
-- **`visual/batch_flux_render.py::_parse_env_prompts` and `visual/batch_flux_portrait_render.py::_build_portrait_prompt` -- BRIEF-GATED (reorder pending).** Both compose `meta.story_brief` into the prompt but it does not lead. Their other terms (`style_suffix` / `style_anchor`) are generic cinematic / composition literals, NOT the style preset, so this is a brief-leads reorder, not a violation. Lower priority than `otr_video_plan.py`.
+- **`nodes/otr_video_plan.py` -- BRIEF-ABSENT -> FIXED (BUG-LOCAL-250, 2026-05-20).** The era-tail descriptor used to resolve from `_ERA_TAIL_BY_STYLE`, a dict keyed by style-preset slugs, off a `style` widget; `meta.story_brief` was never read. Fixed: `_ERA_TAIL_BY_STYLE` + `resolve_era_tail()` deleted; new `_resolve_era_tail(meta)` derives the era tail from `meta.story_brief` via `get_story_brief_lighting`. The `style` widget was REMOVED (not kept inert -- per the no-legacy-back-compat directive) from `INPUT_TYPES` / `plan()` / `build_shot_plan()`; the dead `meta.style` projection key dropped. Workflow JSON node 20 widget vector trimmed 6 -> 5.
+- **`visual/batch_flux_render.py::_parse_env_prompts` and `visual/batch_flux_portrait_render.py::_build_portrait_prompt` -- BRIEF-GATED -> FIXED (BUG-LOCAL-250, 2026-05-20).** The brief now LEADS the composed prompt (was appended mid-body, behind the env description / generic `style_suffix` / `style_anchor` cinematic literals). The generic literals follow. No style-preset read was involved -- this was an ordering fix, not a violation.
 - **`nodes/batch_ltx_render.py`, `nodes/batch_humo_render.py`, MusicGen -- clean (BRIEF-PRIMARY).** Sprint C C5d/C5e/C5f wired these correctly; the brief is already the primary driver. No change needed.
 
-**Fix scope (next session):** primary -- `nodes/otr_video_plan.py` (brief-first rewrite, style read deleted). Secondary -- `_parse_env_prompts` + `_build_portrait_prompt` brief-leads reorder. Jeffrey chose "audit and fix in one pass"; the fixes were NOT started this session (scope handed off). Workflow JSON re-wiring needed only if `otr_video_plan.py`'s `style` widget is removed -- decide widget removal vs keep-as-inert at fix time.
+**Resolution (2026-05-20):** both fixes shipped in one pass as BUG-LOCAL-250. Widget-removal was chosen over keep-as-inert (an inert widget is exactly the legacy surface the no-legacy-back-compat directive prunes); the workflow JSON was re-wired accordingly. 223 affected-suite tests pass; Bug Bible regression baseline held.
 
 ---
 

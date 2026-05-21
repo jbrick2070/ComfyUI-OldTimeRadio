@@ -404,10 +404,13 @@ def _lazy_nodes():
 
 def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
     # Sprint C C5c (2026-05-15): wires meta.story_brief into the env-
-    # prompt body. The brief is inserted between the env description
-    # and the style_suffix tail per refinement section 6. Status is
-    # logged so a failed reflection surfaces in the render log per
-    # E-07 ("story_brief_status=...").
+    # prompt body. BUG-LOCAL-250 follow-up (2026-05-20): the brief now
+    # LEADS the composed prompt -- it used to be inserted mid-body
+    # between the env description and the style_suffix tail, but
+    # meta.story_brief is the primary downstream visual driver so it
+    # takes the highest-weighted leading position. Status is logged so
+    # a failed reflection surfaces in the render log per E-07
+    # ("story_brief_status=...").
     get_story_brief_full, get_story_brief_status = _story_brief_helpers()
 
     if not script_json or not script_json.strip():
@@ -440,9 +443,12 @@ def _parse_env_prompts(script_json, batch_limit, fallback, style_suffix):
         desc = (token.get("description") or "").strip()
         if not desc:
             desc = fallback
-        parts = [desc]
+        # BUG-LOCAL-250 follow-up: meta.story_brief LEADS, then the env
+        # description, then the generic cinematic style_suffix tail.
+        parts = []
         if brief:
             parts.append(brief)
+        parts.append(desc)
         if style_suffix and style_suffix.strip():
             parts.append(style_suffix.strip())
         prompts.append(", ".join(parts))

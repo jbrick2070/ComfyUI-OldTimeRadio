@@ -90,7 +90,6 @@ class TestFailEarlyGuard:
             script_json="",
             focus_character="(all)",
             shots_per_scene=3,
-            style="mission_control_procedural",
         )
         assert len(outs) == 5
         # All 3 prompt outputs carry the sentinel error JSON.
@@ -111,7 +110,6 @@ class TestFailEarlyGuard:
                 script_json=stub,
                 focus_character="(all)",
                 shots_per_scene=3,
-                style="mission_control_procedural",
             )
             err = json.loads(outs[0])
             assert "error" in err

@@ -105,10 +105,12 @@ def _build_portrait_prompt(
 ) -> str:
     """Compose the FLUX prompt for one cast member's portrait.
 
-    Period style anchor + character description + (optional) brief-
-    derived lighting + atmosphere + composition guidance. Designed to
-    give HuMo a stable, frontal, well-lit reference frame that's NOT
-    a scene shot.
+    BUG-LOCAL-250 follow-up (2026-05-20): the brief-derived lighting +
+    atmosphere LEADS the prompt -- meta.story_brief is the primary
+    downstream visual driver. The period style anchor, the character
+    description, and the fixed composition guidance follow. Designed
+    to give HuMo a stable, frontal, well-lit reference frame that's
+    NOT a scene shot.
 
     `lighting` is the output of `get_story_brief_lighting(meta)` --
     a comma-joined string of lighting + atmosphere terms (refinement
@@ -121,18 +123,21 @@ def _build_portrait_prompt(
     appearance = (appearance or "").strip()
     style_anchor = (style_anchor or "head-and-shoulders studio portrait, neutral lighting").strip()
     lighting = (lighting or "").strip()
-    parts = [
-        style_anchor,
-        f"head and shoulders portrait of {speaker}",
-    ]
-    if appearance:
-        parts.append(appearance)
-    # Sprint C C5d (2026-05-15): brief-derived lighting + atmosphere
-    # inserted after the character appearance, before the fixed
-    # composition guidance. Per refinement section 6.2 the lighting
-    # helper returns lighting + atmosphere terms only (no setting).
+    # Sprint C C5d (2026-05-15): brief-derived lighting + atmosphere,
+    # via get_story_brief_lighting (lighting + atmosphere terms only,
+    # no setting; refinement section 6.2). BUG-LOCAL-250 follow-up
+    # (2026-05-20): the brief now LEADS the prompt -- it used to sit
+    # mid-body after the character appearance; meta.story_brief is the
+    # primary downstream visual driver so it takes the leading slot.
+    parts: list[str] = []
     if lighting:
         parts.append(lighting)
+    parts.extend([
+        style_anchor,
+        f"head and shoulders portrait of {speaker}",
+    ])
+    if appearance:
+        parts.append(appearance)
     parts.extend([
         "neutral expression",
         "centered composition",

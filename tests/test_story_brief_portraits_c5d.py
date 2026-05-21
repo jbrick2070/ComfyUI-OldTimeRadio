@@ -80,8 +80,10 @@ def test_portraits_log_story_brief_status():
 
 
 def test_portrait_prompt_includes_lighting_when_supplied():
-    """When the helper output is non-empty, the prompt includes it
-    after the appearance and before the composition guidance."""
+    """BUG-LOCAL-250 follow-up: when the helper output is non-empty
+    the brief-derived lighting LEADS the prompt -- ahead of the
+    generic style anchor, the speaker subject, the appearance, and
+    the fixed composition guidance."""
     prompt = bfpr._build_portrait_prompt(
         speaker="Jones",
         appearance="tall detective, weathered face",
@@ -92,14 +94,18 @@ def test_portrait_prompt_includes_lighting_when_supplied():
         "E-06 canary token missing from portrait prompt; "
         "lighting parameter not threaded through _build_portrait_prompt"
     )
-    # Insertion site: lighting must come AFTER the appearance and
-    # BEFORE the "neutral expression" composition-guidance block.
-    appearance_idx = prompt.find("weathered face")
+    # Brief-leads order: the lighting block is FIRST -- before the
+    # style anchor, the appearance, and the "neutral expression"
+    # composition-guidance block.
     canary_idx = prompt.find(_CANARY)
+    anchor_idx = prompt.find("head-and-shoulders studio portrait")
+    appearance_idx = prompt.find("weathered face")
     composition_idx = prompt.find("neutral expression")
-    assert -1 < appearance_idx < canary_idx < composition_idx, (
-        f"insertion order wrong: appearance@{appearance_idx} "
-        f"canary@{canary_idx} composition@{composition_idx}"
+    assert canary_idx > -1
+    assert canary_idx < anchor_idx < appearance_idx < composition_idx, (
+        f"brief-leads order wrong: canary@{canary_idx} "
+        f"anchor@{anchor_idx} appearance@{appearance_idx} "
+        f"composition@{composition_idx}"
     )
 
 

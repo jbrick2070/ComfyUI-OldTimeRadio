@@ -642,14 +642,14 @@ def test_regression_node20_actual_workflow():
     forceInput fix on the actual schema shape that surfaced the
     blocker (freeze_done_gate forceInput=True).
 
-    Assertions are derived from the on-disk node 20 dump on 2026-05-17:
+    Assertions are derived from the on-disk node 20 dump (BUG-LOCAL-250
+    removed the style preset widget):
         widgets_values[0]  '{}'    script_json placeholder (linked)
         widgets_values[1]  '(all)'  focus_character
         widgets_values[2]  4        shots_per_scene
-        widgets_values[3]  'mission_control_procedural'  style
-        widgets_values[4]  'cinematic, 35mm film look...'  style_tail
-        widgets_values[5]  True    include_final_end_frame
-        (no slot 6 -- freeze_done_gate has forceInput=True)
+        widgets_values[3]  'cinematic, 35mm film look...'  style_tail
+        widgets_values[4]  True    include_final_end_frame
+        (no slot 5 -- freeze_done_gate has forceInput=True)
     """
     # Stub schema mirroring nodes/otr_video_plan.py:734-810.
     schemas = {
@@ -664,10 +664,6 @@ def test_regression_node20_actual_workflow():
                     ),
                     "shots_per_scene": (
                         "INT", {"default": 3, "min": 1, "max": 40},
-                    ),
-                    "style": (
-                        ["mission_control_procedural", "noir_interrogation"],
-                        {"default": "mission_control_procedural"},
                     ),
                 },
                 "optional": {
@@ -700,9 +696,10 @@ def test_regression_node20_actual_workflow():
     assert n20.get("shots_per_scene") == 4, (
         f"shots_per_scene should be 4; got {n20.get('shots_per_scene')!r}"
     )
-    assert n20.get("style") == "mission_control_procedural", (
-        f"style should be 'mission_control_procedural'; got "
-        f"{n20.get('style')!r}"
+    # BUG-LOCAL-250: the style preset widget was removed from VideoPlan.
+    assert "style" not in n20, (
+        f"node 20 should carry no 'style' input post-BUG-LOCAL-250; "
+        f"got {n20.get('style')!r}"
     )
     assert n20.get("include_final_end_frame") is True, (
         f"include_final_end_frame should be True; got "

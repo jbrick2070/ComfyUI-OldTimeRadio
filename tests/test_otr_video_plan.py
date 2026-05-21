@@ -20,22 +20,33 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
-def _ledger_wrap(director_dict):
+def _ledger_wrap(director_dict, *, story_brief=None, story_brief_terms=None):
     """Voice-path-cleanbreak Sprint 2 helper: wrap a director-shape
     dict (the legacy OTR_LLMDirector output shape) inside an L3 ledger
     JSON so OTRVideoPlan.plan() can read it via the new script_json
     socket. Mirrors the writer's K.5 stamp pattern: meta.visual_plan +
     meta.voice_assignments + meta.style.
+
+    BUG-LOCAL-250: pass story_brief (+ optional story_brief_terms) to
+    stamp a reflected brief so the era tail resolves brief-driven;
+    omit it for a legacy ledger (era tail falls to the default).
     """
+    meta = {
+        "visual_plan":       director_dict.get("visual_plan") or {},
+        "voice_assignments": director_dict.get("voice_assignments") or {},
+        "style":             director_dict.get("style") or "",
+    }
+    if story_brief is not None:
+        meta["story_brief"] = story_brief
+        meta["story_brief_status"] = "ok" if story_brief else "absent"
+        meta["story_brief_terms"] = story_brief_terms or {
+            "setting": [], "lighting": [], "atmosphere": [],
+        }
     return json.dumps({
         "schema_version": "l3-2026-05-14",
         "cast":  [],
         "lines": [],
-        "meta": {
-            "visual_plan":       director_dict.get("visual_plan") or {},
-            "voice_assignments": director_dict.get("voice_assignments") or {},
-            "style":             director_dict.get("style") or "",
-        },
+        "meta": meta,
     })
 
 
@@ -53,7 +64,6 @@ def test_module_imports_cleanly():
         "compose_shot_prompt",
         "extract_scenes",
         "resolve_character_portrait",
-        "resolve_era_tail",
         "slugify",
         "NODE_CLASS_MAPPINGS",
         "NODE_DISPLAY_NAME_MAPPINGS",
@@ -98,40 +108,71 @@ def test_slugify_length_limit():
 
 
 # ------------------------------------------------------------------
-# resolve_era_tail
+# _resolve_era_tail -- BUG-LOCAL-250: the era tail derives from
+# meta.story_brief (the brief's lighting + atmosphere terms), NOT a
+# style preset. The style-preset _ERA_TAIL_BY_STYLE lookup is gone.
 # ------------------------------------------------------------------
 
 
-def test_resolve_era_tail_known_genres():
-    from nodes.otr_video_plan import resolve_era_tail
-    # Each assertion picks one distinctive keyword from the era-tail
-    # descriptor so the test catches both the lookup AND the
-    # descriptor wording in one shot. New 10-preset set landed
-    # 2026-05-10; era-tail strings are visual aesthetics only --
-    # no era literals.
-    assert "cathode-tube" in resolve_era_tail("haunted_broadcast_signal").lower()
-    assert "vessel" in resolve_era_tail("deep_space_distress_call").lower()
-    assert "smoke-filtered" in resolve_era_tail("noir_interrogation").lower()
-    assert "instrument-panel" in resolve_era_tail("mission_control_procedural").lower()
+def test_resolve_era_tail_from_brief_lighting():
+    """The era tail is the brief's lighting + atmosphere terms;
+    setting terms are excluded so the tail does not pull composition
+    toward env prose."""
+    from nodes.otr_video_plan import _resolve_era_tail
+    meta = {
+        "story_brief": "A salvage crew hears their own distress call.",
+        "story_brief_status": "ok",
+        "story_brief_terms": {
+            "setting": ["derelict freighter"],
+            "lighting": ["red emergency glow", "hard rim light"],
+            "atmosphere": ["claustrophobic", "tense"],
+        },
+    }
+    tail = _resolve_era_tail(meta)
+    assert "red emergency glow" in tail
+    assert "claustrophobic" in tail
+    assert "derelict freighter" not in tail  # setting excluded
 
 
-def test_resolve_era_tail_empty_and_unknown():
-    from nodes.otr_video_plan import resolve_era_tail
-    default = resolve_era_tail("")
-    assert default
-    assert resolve_era_tail("gothic_romance") == default
-    assert resolve_era_tail("nonexistent_genre") == default
+def test_resolve_era_tail_absent_brief_uses_default():
+    """No story_brief -> the neutral default tail, no crash."""
+    from nodes.otr_video_plan import _resolve_era_tail, _DEFAULT_ERA_TAIL
+    assert _resolve_era_tail({}) == _DEFAULT_ERA_TAIL
+    assert (
+        _resolve_era_tail({"story_brief_status": "absent"})
+        == _DEFAULT_ERA_TAIL
+    )
 
 
-def test_resolve_era_tail_normalizes_case_and_punctuation():
-    from nodes.otr_video_plan import resolve_era_tail
-    # All five spellings of the same preset must hit the same era tail.
-    r1 = resolve_era_tail("mission control procedural")
-    r2 = resolve_era_tail("MISSION CONTROL PROCEDURAL")
-    r3 = resolve_era_tail("Mission Control Procedural")
-    r4 = resolve_era_tail("mission_control_procedural")
-    r5 = resolve_era_tail("mission-control-procedural")
-    assert r1 == r2 == r3 == r4 == r5
+def test_resolve_era_tail_failed_brief_uses_default():
+    """A failed reflection pass -> the default tail (brief not trusted)."""
+    from nodes.otr_video_plan import _resolve_era_tail, _DEFAULT_ERA_TAIL
+    meta = {
+        "story_brief": "",
+        "story_brief_status": "failed",
+        "story_brief_terms": {"lighting": [], "atmosphere": []},
+    }
+    assert _resolve_era_tail(meta) == _DEFAULT_ERA_TAIL
+
+
+def test_resolve_era_tail_accepts_whole_ledger():
+    """meta arg may be the whole ledger -- the helper's _meta()
+    coercion accepts either a meta dict or a parent ledger dict."""
+    from nodes.otr_video_plan import _resolve_era_tail
+    led = {
+        "meta": {
+            "story_brief": "x",
+            "story_brief_status": "ok",
+            "story_brief_terms": {
+                "setting": [],
+                "lighting": ["amber console light"],
+                "atmosphere": ["eerie"],
+            },
+        }
+    }
+    tail = _resolve_era_tail(led)
+    assert "amber console light" in tail
+    assert "eerie" in tail
 
 
 # ------------------------------------------------------------------
@@ -357,9 +398,7 @@ def test_build_shot_plan_basic_counts():
     plan = build_shot_plan(
         script_json,
         focus_character="BABA",
-        shots_per_scene=3,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=3,    )
     # 2 scenes * 3 shots + 1 final end = 7
     assert plan["total_prompts"] == 7
     assert plan["scenes_covered"] == 2
@@ -374,9 +413,7 @@ def test_build_shot_plan_tokens_are_env_shaped():
     plan = build_shot_plan(
         script_json,
         focus_character="BABA",
-        shots_per_scene=2,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=2,    )
     for tok in plan["tokens"]:
         assert tok["type"] == "environment"
         assert tok["description"]
@@ -390,12 +427,19 @@ def test_build_shot_plan_tokens_are_env_shaped():
 
 def test_build_shot_plan_compose_includes_portrait_and_scene():
     from nodes.otr_video_plan import build_shot_plan
-    script_json = _ledger_wrap(_sample_director())
+    script_json = _ledger_wrap(
+        _sample_director(),
+        story_brief="A crew tracks a signal through a dim station.",
+        story_brief_terms={
+            "setting": ["orbital station"],
+            "lighting": ["blue console glow"],
+            "atmosphere": ["tense"],
+        },
+    )
     plan = build_shot_plan(
         script_json,
         focus_character="BABA",
         shots_per_scene=1,
-        style="mission_control_procedural",
     )
     first = plan["tokens"][0]
     desc = first["description"]
@@ -403,8 +447,8 @@ def test_build_shot_plan_compose_includes_portrait_and_scene():
     assert "silver braids" in desc
     # Should contain scene_1's visual_prompt text
     assert "dim comms bay" in desc or "red alert pulse" in desc
-    # Should contain era tail (mission_control_procedural keyword)
-    assert "instrument-panel" in desc.lower() or "console" in desc.lower()
+    # Should contain the brief-derived era tail (BUG-LOCAL-250)
+    assert "tense" in desc.lower()
 
 
 def test_build_shot_plan_empty_portrait_falls_to_generic():
@@ -473,14 +517,33 @@ def test_build_shot_plan_invalid_shots_per_scene_raises():
         build_shot_plan("{}", "BABA", shots_per_scene=-1)
 
 
-def test_build_shot_plan_unknown_genre_uses_default_era():
+def test_build_shot_plan_no_brief_uses_default_era():
+    """BUG-LOCAL-250: with no meta.story_brief the era tail falls back
+    to the neutral default descriptor (no style-preset lookup)."""
+    from nodes.otr_video_plan import build_shot_plan, _DEFAULT_ERA_TAIL
+    script_json = _ledger_wrap(_sample_director())  # no story_brief
+    plan = build_shot_plan(script_json, "BABA", shots_per_scene=1)
+    assert plan["era_tail"] == _DEFAULT_ERA_TAIL
+
+
+def test_build_shot_plan_brief_drives_era_tail():
+    """BUG-LOCAL-250: meta.story_brief lighting + atmosphere terms
+    become the PASS 3 era tail."""
     from nodes.otr_video_plan import build_shot_plan
-    script_json = _ledger_wrap(_sample_director())
-    plan = build_shot_plan(
-        script_json, "BABA", shots_per_scene=1,
-        style="gothic_romance",  # not in dict
+    script_json = _ledger_wrap(
+        _sample_director(),
+        story_brief="A lighthouse keeper logs a tide that never ebbs.",
+        story_brief_terms={
+            "setting": ["coastal lighthouse"],
+            "lighting": ["sweeping lamp beam"],
+            "atmosphere": ["ominous", "lonely"],
+        },
     )
-    assert "timeless" in plan["era_tail"].lower()
+    plan = build_shot_plan(script_json, "BABA", shots_per_scene=1)
+    assert "sweeping lamp beam" in plan["era_tail"]
+    assert "ominous" in plan["era_tail"]
+    # setting terms are excluded from the tail
+    assert "coastal lighthouse" not in plan["era_tail"]
 
 
 def test_build_shot_plan_frame_ids_unique():
@@ -586,7 +649,9 @@ def test_input_types_schema():
     assert "director_json" not in schema["required"]  # legacy name
     assert "focus_character" in schema["required"]
     assert "shots_per_scene" in schema["required"]
-    assert "style" in schema["required"]
+    # BUG-LOCAL-250: the style preset widget was removed -- the era
+    # tail derives from meta.story_brief, not an upstream preset.
+    assert "style" not in schema["required"]
     assert schema["required"]["script_json"][0] == "STRING"
     assert schema["required"]["shots_per_scene"][0] == "INT"
 
@@ -623,9 +688,7 @@ def test_plan_method_end_to_end():
     pass1_json, pass2_json, pass3_json, pass3_count, summary = node.plan(
         script_json=script_json,
         focus_character="BABA",
-        shots_per_scene=3,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=3,    )
     pass3 = json.loads(pass3_json)
     assert pass3["total_prompts"] == pass3_count
     assert pass3["focus_character"] == "BABA"
@@ -647,20 +710,6 @@ def test_plan_method_end_to_end():
     assert pass2["tokens"][0]["role"] == "scene_env"
 
 
-def test_plan_method_handles_none_genre():
-    from nodes.otr_video_plan import OTRVideoPlan
-    node = OTRVideoPlan()
-    script_json = _ledger_wrap(_sample_director())
-    _p1, _p2, pass3_json, _count, _summary = node.plan(
-        script_json=script_json,
-        focus_character="BABA",
-        shots_per_scene=1,
-        style="(none)",
-    )
-    payload = json.loads(pass3_json)
-    assert payload["style"] == ""
-
-
 def test_plan_method_empty_scenes_still_returns_envelope():
     from nodes.otr_video_plan import OTRVideoPlan
     node = OTRVideoPlan()
@@ -671,9 +720,7 @@ def test_plan_method_empty_scenes_still_returns_envelope():
     _p1, _p2, pass3_json, count, _summary = node.plan(
         script_json=script_json,
         focus_character="BABA",
-        shots_per_scene=3,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=3,    )
     assert count == 0
     payload = json.loads(pass3_json)
     assert payload["tokens"] == []
@@ -746,7 +793,7 @@ def test_pass3_multi_char_includes_all_portraits():
     # Empty focus_character => include all chars
     plan = build_shot_plan(
         script_json, focus_character="",
-        shots_per_scene=1, style="mission_control_procedural",
+        shots_per_scene=1,
     )
     first_desc = plan["tokens"][0]["description"]
     # Both character portraits should appear
@@ -759,7 +806,7 @@ def test_pass3_single_char_mode_only_focus_character():
     script_json = _ledger_wrap(_multi_char_director())
     plan = build_shot_plan(
         script_json, focus_character="LEMMY",
-        shots_per_scene=1, style="mission_control_procedural",
+        shots_per_scene=1,
     )
     first_desc = plan["tokens"][0]["description"]
     # Only LEMMY's portrait in compose, not KENJI's
@@ -775,9 +822,7 @@ def test_plan_method_multi_char_default():
     pass1_json, _p2, _p3, _count, summary = node.plan(
         script_json=script_json,
         focus_character="(all)",
-        shots_per_scene=1,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=1,    )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 2
     # Summary should say "all cast"
@@ -794,16 +839,12 @@ def test_plan_method_accepts_freeze_done_gate_and_ignores_value():
     out_a = node.plan(
         script_json=script_json,
         focus_character="BABA",
-        shots_per_scene=1,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=1,    )
     # With freeze_done_gate wired (arbitrary string value)
     out_b = node.plan(
         script_json=script_json,
         focus_character="BABA",
-        shots_per_scene=1,
-        style="mission_control_procedural",
-        freeze_done_gate="sentinel_dependency_value",
+        shots_per_scene=1,        freeze_done_gate="sentinel_dependency_value",
     )
     # Parse the JSON envelopes and compare -- freeze_done_gate should not affect output
     # (we compare the parsed dicts to avoid JSON whitespace differences)
@@ -830,9 +871,7 @@ def test_plan_method_single_char_when_focus_set():
     pass1_json, _p2, pass3_json, _count, _summary = node.plan(
         script_json=script_json,
         focus_character="LEMMY",
-        shots_per_scene=1,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=1,    )
     pass1 = json.loads(pass1_json)
     assert pass1["character_count"] == 1
     assert pass1["characters"] == ["LEMMY"]
@@ -847,9 +886,7 @@ def test_plan_output_consumable_by_batch_flux_render_parser():
     pass1_json, pass2_json, pass3_json, _count, _summary = node.plan(
         script_json=script_json,
         focus_character="BABA",
-        shots_per_scene=2,
-        style="mission_control_procedural",
-    )
+        shots_per_scene=2,    )
     # Every pass output must match BatchFluxRender contract:
     # dict with "tokens" list where each token has type="environment"
     # and a non-empty description string.

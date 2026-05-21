@@ -6,8 +6,9 @@ not exist at HEAD).
 
 Both wirings use `get_story_brief_full(meta)`:
 
-  * `_parse_env_prompts`: brief is inserted between the env
-    description and the style_suffix tail.
+  * `_parse_env_prompts`: the brief LEADS the composed env prompt
+    (BUG-LOCAL-250 follow-up); the env description and the generic
+    style_suffix tail follow.
   * `_build_dynamic_radio_prompt`: brief is the PRIMARY radio
     descriptor (BUG-LOCAL-249). The upstream style preset is not
     read; an absent/failed brief falls through to the episode_id

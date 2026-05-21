@@ -180,8 +180,10 @@ class TestHudAndTreatmentRenderWhenVisualPlanGenreAbsent:
 
     def test_otr_video_plan_projection_has_no_genre_key(self):
         # AST walk on otr_video_plan.py: find the return-dict that
-        # carries `characters` / `scenes` / `voice_assignments` / `style`,
-        # confirm it does NOT carry `genre`.
+        # carries `characters` / `scenes` / `voice_assignments`,
+        # confirm it does NOT carry `genre`. BUG-LOCAL-250 retired the
+        # `style` projection key (the style preset is upstream-only),
+        # so the anchor now keys off characters/scenes/voice_assignments.
         tree = ast.parse(_VIDEO_PLAN_PATH.read_text(encoding="utf-8"))
         violations: list[str] = []
         found_projection = False
@@ -195,19 +197,22 @@ class TestHudAndTreatmentRenderWhenVisualPlanGenreAbsent:
                 for k in node.value.keys
                 if isinstance(k, ast.Constant) and isinstance(k.value, str)
             }
-            # Identify the projection by its characters/scenes/style trio.
-            if not {"characters", "scenes", "style"}.issubset(string_keys):
+            # Identify the projection by its characters/scenes/
+            # voice_assignments trio.
+            if not {"characters", "scenes", "voice_assignments"}.issubset(string_keys):
                 continue
             found_projection = True
             if "genre" in string_keys:
                 violations.append(
                     f"line {node.lineno}: return dict carrying "
-                    f"characters/scenes/style still contains 'genre' key"
+                    f"characters/scenes/voice_assignments still "
+                    f"contains 'genre' key"
                 )
         assert found_projection, (
             "Could not locate the otr_video_plan.py projection dict "
-            "(characters/scenes/style triple); the test's anchor pattern "
-            "may have drifted -- investigate before assuming pass."
+            "(characters/scenes/voice_assignments triple); the test's "
+            "anchor pattern may have drifted -- investigate before "
+            "assuming pass."
         )
         assert not violations, "\n  " + "\n  ".join(violations)
 

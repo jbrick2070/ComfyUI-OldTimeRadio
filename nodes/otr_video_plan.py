@@ -46,7 +46,9 @@ frames for a whole episode" thin slice:
   end frame = S*K+1 prompts total
 * Pre-composes each prompt as:
       portrait_prompt + ", " + scene.visual_prompt + ", "
-      + era_tail[style] + ", " + style_tail
+      + era_tail + ", " + style_tail
+  where era_tail derives from meta.story_brief (the brief's
+  lighting + atmosphere terms), NOT a style preset (BUG-LOCAL-250)
 * Each prompt carries a ``shot_id`` so downstream save can name
   output files meaningfully when that's wired in
 
@@ -80,31 +82,20 @@ _DEFAULT_STYLE_TAIL = (
     "subtle film grain, volumetric lighting"
 )
 
-# Visual aesthetic tails keyed by OTR's style dropdown options.
-# Fed into every composed prompt so FLUX dresses scenes for the
-# chosen style without requiring per-scene costume prose.
+# Visual aesthetic tail for the PASS 3 composite prompt.
 #
-# Slug convention: lowercase snake_case. The writer's style widget
-# emits human-readable labels (e.g. "Closed Room Suspense") which the
-# resolve_era_tail helper normalizes to the slug via lower / space-
-# and-hyphen-to-underscore. New 10-preset set landed 2026-05-10 per
-# Jeffrey; no era literals in the descriptor strings -- visual flavor
-# only.
-_ERA_TAIL_BY_STYLE: dict[str, str] = {
-    "closed_room_suspense":       "intimate close interior, dim ambient lighting, claustrophobic framing, careful composition on faces",
-    "detective_case_file":        "evidence-board flat lighting, paper-strewn desk, procedural utility, neutral institutional palette",
-    "pulp_serial_cliffhanger":    "high-contrast theatrical lighting, dramatic cast shadows, bold composition, saturated key colors",
-    "mission_control_procedural": "instrument-panel glow, blue-tinted console banks, focused workspace, clean institutional aesthetic",
-    "deep_space_distress_call":   "vessel interior, red emergency lighting, vacuum-isolation aesthetic, hard rim light on consoles",
-    "noir_interrogation":         "single overhead lamp, deep cast shadows, smoke-filtered air, hard contrast on the subject",
-    "small_town_uncanny":         "diffuse overcast daylight, mid-century domestic detail, quiet wrongness in the framing, muted palette",
-    "radio_newsroom_emergency":   "newsroom set, fluorescent overhead, urgent paperwork clutter, telephones and monitors lit",
-    "haunted_broadcast_signal":   "cathode-tube glow, signal-degraded haze, vacant studio interior, dust motes in dim beams",
-    "laboratory_containment":     "clean-room sterile light, hazmat-yellow accents, isolation-ward composition, glass barriers reflecting",
-}
+# BUG-LOCAL-250 (2026-05-20): the era tail used to resolve from a
+# style-preset slug via a `_ERA_TAIL_BY_STYLE` lookup keyed off a
+# `style` widget. Per Jeffrey 2026-05-20 (same directive as
+# BUG-LOCAL-249's radio bookend fix) the style preset is an UPSTREAM
+# input: it shapes the story-writing LLM only. Every downstream
+# visual derives from `meta.story_brief`. The era tail is now the
+# brief's lighting + atmosphere terms (the visual-aesthetic slice),
+# resolved via `_otr_story_brief_helpers.get_story_brief_lighting`.
+# See `_resolve_era_tail` below.
 
-# Fallback era tail used when style is empty, unknown, or
-# when the caller explicitly passes an override.
+# Fallback era tail, used when meta.story_brief is absent or failed.
+# Neutral cinematic descriptor -- no era literals (C2a sweep).
 _DEFAULT_ERA_TAIL = "timeless cinematic aesthetic"
 
 # Vocabulary
@@ -153,12 +144,43 @@ def slugify(name: str, max_len: int = 40) -> str:
     return slug[:max_len]
 
 
-def resolve_era_tail(style: str) -> str:
-    """Return the era tail for a given style, or the default."""
-    if not style:
+def _resolve_era_tail(meta: Any) -> str:
+    """Visual aesthetic tail for the PASS 3 composite, from meta.story_brief.
+
+    The tail is the brief's lighting + atmosphere terms -- the
+    visual-aesthetic slice of the post-script reflection pass,
+    resolved via the C5b helper ``get_story_brief_lighting`` (setting
+    terms are excluded by that helper so the tail does not pull FLUX
+    composition toward env prose). Returns ``_DEFAULT_ERA_TAIL`` when
+    the brief is absent, failed, or carries no lighting / atmosphere
+    terms.
+
+    BUG-LOCAL-250 (2026-05-20): replaces the style-preset
+    ``_ERA_TAIL_BY_STYLE`` lookup. The style preset shapes the
+    story-writing LLM only; all downstream visuals derive from the
+    brief (Jeffrey 2026-05-20, same directive as BUG-LOCAL-249).
+
+    ``meta`` may be the ledger meta dict OR the whole ledger -- the
+    helper's own ``_meta()`` coercion accepts either.
+    """
+    try:
+        from ._otr_story_brief_helpers import (
+            get_story_brief_lighting,
+            get_story_brief_status,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "OTR_VideoPlan: story_brief helper unavailable (%s); "
+            "using default era tail", exc,
+        )
         return _DEFAULT_ERA_TAIL
-    key = style.strip().lower().replace(" ", "_").replace("-", "_")
-    return _ERA_TAIL_BY_STYLE.get(key, _DEFAULT_ERA_TAIL)
+    tail = (get_story_brief_lighting(meta) or "").strip()
+    status = get_story_brief_status(meta)
+    log.info(
+        "OTR_VideoPlan: era tail story_brief_status=%s (chars=%d)",
+        status, len(tail),
+    )
+    return tail or _DEFAULT_ERA_TAIL
 
 
 def resolve_character_portrait(
@@ -274,7 +296,7 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
     """Single derivation seam from L3 ledger to per-character +
     per-scene projection consumed by the three build_* helpers.
 
-    Returns a flat 5-key dict -- no nested ``visual_plan`` envelope,
+    Returns a flat 4-key dict -- no nested ``visual_plan`` envelope,
     no legacy Director-shape mirror. S11.6 closed the last surface where
     the deleted Director's key set was anchored in active code.
 
@@ -282,8 +304,8 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
       characters         -- dict (from led.meta.visual_plan.characters)
       scenes             -- list (from led.meta.visual_plan.scenes)
       voice_assignments  -- dict (from led.cast at render time)
-      style              -- str (from led.meta.style)
-      genre              -- str (from led.meta.visual_plan.genre)
+      era_tail           -- str (visual aesthetic tail derived from
+                            led.meta.story_brief; see _resolve_era_tail)
 
     Returns an empty dict on any parse / shape failure -- the helpers'
     downstream graceful-empty paths handle the empty case.
@@ -304,13 +326,15 @@ def _visual_plan_from_script_json(script_json: str) -> dict:
     meta = led.get("meta") or {}
     visual_plan = meta.get("visual_plan") or {}
     # Sprint C C3 (2026-05-15): `meta.visual_plan.genre` stamp retired
-    # at the writer; the projection here no longer surfaces it. The new
-    # ledger schema has `characters / scenes / style` only.
+    # at the writer. BUG-LOCAL-250 (2026-05-20): the `style` projection
+    # key was retired too -- the style preset is an upstream-only input
+    # and no downstream consumer reads it. `era_tail` is now derived
+    # from meta.story_brief here, at the single derivation seam.
     return {
         "characters":        visual_plan.get("characters") or {},
         "scenes":            visual_plan.get("scenes")     or [],
         "voice_assignments": _OTRLC.voice_assignments_from_cast(led),
-        "style":             meta.get("style") or "",
+        "era_tail":          _resolve_era_tail(meta),
     }
 
 
@@ -449,7 +473,6 @@ def build_shot_plan(
     focus_character: str,
     *,
     shots_per_scene: int = 3,
-    style: str = "",
     style_tail: str = "",
     include_final_end_frame: bool = True,
 ) -> dict:
@@ -474,8 +497,7 @@ def build_shot_plan(
           "shots_per_scene": 3,
           "scenes_covered": 5,
           "total_prompts": 16,
-          "style": "mission_control_procedural",
-          "era_tail": "near-future industrial sci-fi, clean lines, utilitarian",
+          "era_tail": "<lighting + atmosphere terms from meta.story_brief>",
           "style_tail": "cinematic, 35mm film look, ..."
         }
 
@@ -498,7 +520,9 @@ def build_shot_plan(
         derived = {}
 
     resolved_style_tail = (style_tail or _DEFAULT_STYLE_TAIL).strip()
-    era_tail = resolve_era_tail(style)
+    # BUG-LOCAL-250: era tail derives from meta.story_brief (resolved at
+    # the _visual_plan_from_script_json seam), not a style preset.
+    era_tail = derived.get("era_tail") or _DEFAULT_ERA_TAIL
 
     # Multi-character compose: concatenate portraits for every character
     # in derived.characters (the whole cast). Single-character mode
@@ -716,7 +740,6 @@ def build_shot_plan(
         "total_shots": len(shots),
         "total_segments": total_segments,
         "total_prompts": len(tokens),
-        "style": style,
         "era_tail": era_tail,
         "style_tail": resolved_style_tail,
     }
@@ -732,8 +755,6 @@ class OTRVideoPlan:
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Style values matched to OTR_LedgerScriptWriter dropdown
-        style_choices = list(_ERA_TAIL_BY_STYLE.keys()) + ["(none)"]
         return {
             "required": {
                 "script_json": (
@@ -765,10 +786,6 @@ class OTRVideoPlan:
                 "shots_per_scene": (
                     "INT",
                     {"default": 3, "min": 1, "max": 40, "step": 1},
-                ),
-                "style": (
-                    style_choices,
-                    {"default": "mission_control_procedural"},
                 ),
             },
             "optional": {
@@ -821,7 +838,6 @@ class OTRVideoPlan:
         script_json: str,
         focus_character: str,
         shots_per_scene: int,
-        style: str,
         style_tail: str = "",
         include_final_end_frame: bool = True,
         freeze_done_gate: str = "",
@@ -853,9 +869,6 @@ class OTRVideoPlan:
             })
             return (_err, _err, _err, 0, "VideoPlan: missing upstream cascade")
 
-        if style == "(none)":
-            style = ""
-
         # Treat the "(all)" sentinel as unset so downstream helpers
         # switch into multi-character mode.
         resolved_focus = focus_character
@@ -886,7 +899,6 @@ class OTRVideoPlan:
             script_json=script_json,
             focus_character=resolved_focus,
             shots_per_scene=shots_per_scene,
-            style=style,
             style_tail=style_tail,
             include_final_end_frame=include_final_end_frame,
         )
@@ -903,7 +915,7 @@ class OTRVideoPlan:
 
         summary_lines = [
             cast_line,
-            f"style:           {pass3['style'] or '(none)'}",
+            f"era tail:        {pass3['era_tail']}",
             f"scenes covered:  {pass3['scenes_covered']}",
             "",
             f"PASS 1 (char portraits):   {pass1['total_prompts']} prompt(s)"
@@ -1000,6 +1012,5 @@ __all__ = [
     "compose_shot_prompt",
     "extract_scenes",
     "resolve_character_portrait",
-    "resolve_era_tail",
     "slugify",
 ]
