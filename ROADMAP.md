@@ -511,9 +511,13 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 **Done -- radio bookend (BUG-LOCAL-249):** `_build_dynamic_radio_prompt` rewritten brief-first -- resolution chain `meta.story_brief` -> `episode_id` slug -> hardcoded fallback. The style preset + `scenes[0].env` reads were deleted. Body reshaped to `radio broadcast unit, <context>, <suffix>` -- the radio is the subject and the brief sets the world, which sidesteps the "mangled `<paragraph> radio broadcast unit`" concern from the original design note. Sprint C C5c had wired the brief as a never-firing Tier-3 fallback behind the style preset, so it never reached the radio prompt. 60 tests green (`tests/test_radio_prompt_builder.py` + `tests/test_story_brief_flux_c5c.py`).
 
-**Still open -- LTX / HuMo / portrait consumers:** Sprint C C5d/C5e/C5f wired `meta.story_brief` into these via `_otr_story_brief_helpers`, but they have not been audited for the same C5c defect (brief used only as a fallback behind a style / legacy read). Audit each against the directive: the brief is the primary driver; the style preset must not gate it.
+**Downstream audit complete (2026-05-20).** Every downstream prompt consumer was checked against the directive (brief is the primary driver; the style preset must not gate it). Findings:
 
-**Scope:** `visual/batch_flux_portrait_render.py`, `nodes/batch_ltx_render.py`, `nodes/batch_humo_render.py` story_brief consumers.
+- **`nodes/otr_video_plan.py` -- BRIEF-ABSENT (real violation, fix pending).** The era-tail descriptor resolves from `_ERA_TAIL_BY_STYLE`, a dict keyed by style-preset slugs, off a `style` widget. `meta.story_brief` is not read at all. This is the same defect class as BUG-LOCAL-249 (radio bookend) -- the style preset is steering a downstream visual. Fix: drive the era tail from `meta.story_brief` via `_otr_story_brief_helpers`; the style preset read goes away.
+- **`visual/batch_flux_render.py::_parse_env_prompts` and `visual/batch_flux_portrait_render.py::_build_portrait_prompt` -- BRIEF-GATED (reorder pending).** Both compose `meta.story_brief` into the prompt but it does not lead. Their other terms (`style_suffix` / `style_anchor`) are generic cinematic / composition literals, NOT the style preset, so this is a brief-leads reorder, not a violation. Lower priority than `otr_video_plan.py`.
+- **`nodes/batch_ltx_render.py`, `nodes/batch_humo_render.py`, MusicGen -- clean (BRIEF-PRIMARY).** Sprint C C5d/C5e/C5f wired these correctly; the brief is already the primary driver. No change needed.
+
+**Fix scope (next session):** primary -- `nodes/otr_video_plan.py` (brief-first rewrite, style read deleted). Secondary -- `_parse_env_prompts` + `_build_portrait_prompt` brief-leads reorder. Jeffrey chose "audit and fix in one pass"; the fixes were NOT started this session (scope handed off). Workflow JSON re-wiring needed only if `otr_video_plan.py`'s `style` widget is removed -- decide widget removal vs keep-as-inert at fix time.
 
 ---
 
