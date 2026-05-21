@@ -43,6 +43,7 @@ __all__ = [
     "strip_line_formatting",
     "build_allowed_roster",
     "detect_phantom_names",
+    "strip_announcer_vocative",
     "aggregate_compose_flags",
     # Phase 1 (2026-05-11)
     "render_outline_spine",
@@ -424,6 +425,68 @@ def detect_phantom_names(
             found.setdefault(tok, None)
 
     return list(found.keys())
+
+
+# ---------------------------------------------------------------------------
+# Vocative-drift strip (BUG-LOCAL-233)
+# ---------------------------------------------------------------------------
+#
+# detect_phantom_names whitelists every roster name, so "ANNOUNCER" --
+# the narration role label, always on the roster -- is never flagged
+# even when a CHARACTER line addresses it ("It wasn't just geology,
+# ANNOUNCER."). A character never speaks the narrator's production
+# label aloud; treat it as drift, detect it, and strip it.
+#
+# The three direct-address shapes below are each anchored on a comma
+# or a sentence boundary, so a plain noun reference ("the announcer")
+# -- which carries no such delimiter -- is never matched. Only the
+# label "ANNOUNCER" is targeted; real cast names are left untouched,
+# because characters addressing each other by name is normal dialogue.
+_ANNOUNCER_NAME = "ANNOUNCER"
+_VOCATIVE_MID_RE = re.compile(r",\s*announcer\s*,", re.IGNORECASE)
+_VOCATIVE_TRAILING_RE = re.compile(
+    r",\s*announcer\b\s*(?=[.!?]|$)", re.IGNORECASE,
+)
+_VOCATIVE_LEADING_RE = re.compile(
+    r"(^|(?<=[.!?])\s+)announcer\s*[,!]+\s*([a-zA-Z])", re.IGNORECASE,
+)
+
+
+def strip_announcer_vocative(text: str) -> tuple[str, int]:
+    """Remove vocative addresses of the narration label "ANNOUNCER".
+
+    Returns ``(cleaned_text, n_removed)``. Only direct-address shapes
+    are removed -- the label set off by a comma or sitting at a
+    sentence boundary:
+
+      * mid-sentence   "..., ANNOUNCER, ..."  -> "..., ..."
+      * trailing       "..., ANNOUNCER."      -> "..."
+      * leading        "ANNOUNCER, ..."       -> "..." (next word
+                                                 re-capitalized)
+
+    A noun reference such as "the announcer" carries no comma/boundary
+    delimiter and is left untouched. Never raises; never returns an
+    empty string from stripping alone. See BUG-LOCAL-233.
+    """
+    if not text or "announcer" not in text.lower():
+        return text, 0
+    removed = 0
+    out, n = _VOCATIVE_MID_RE.subn(", ", text)
+    removed += n
+    out, n = _VOCATIVE_TRAILING_RE.subn("", out)
+    removed += n
+    out, n = _VOCATIVE_LEADING_RE.subn(
+        lambda m: f"{m.group(1)}{m.group(2).upper()}", out,
+    )
+    removed += n
+    if not removed:
+        return text, 0
+    out = re.sub(r"\s+", " ", out).strip()
+    if not out:
+        # Stripping consumed the whole line -- keep the original and
+        # let the compose_flags marker carry the drift signal.
+        return text, 0
+    return out, removed
 
 
 def aggregate_compose_flags(ledger_data: dict) -> dict[str, int]:
@@ -823,7 +886,20 @@ def _format_last_lines(last_lines: list[tuple[str, str]]) -> str:
     """
     if not last_lines:
         return "(scene just opened - no one has spoken yet)"
-    rows = [f"[{spk}]: {txt}" for spk, txt in last_lines]
+    # BUG-LOCAL-233: the announcer is a narration role, not a
+    # character. Render its window entries as [narration] so the
+    # composing LLM does not see the literal "ANNOUNCER" token as an
+    # addressable speaker and echo it into character dialogue. Same
+    # 9-char width as "ANNOUNCER", so the rendered prompt is unchanged
+    # in size.
+    rows: list[str] = []
+    for spk, txt in last_lines:
+        label = (
+            "narration"
+            if (spk or "").strip().upper() == _ANNOUNCER_NAME
+            else spk
+        )
+        rows.append(f"[{label}]: {txt}")
     return "\n".join(rows)
 
 
@@ -1639,6 +1715,24 @@ def compose_line(
                 log.warning(
                     "[OTR_LineComposer] %d phantom name(s) on %s line: %s",
                     len(phantoms), req.speaker, phantoms,
+                )
+
+        # BUG-LOCAL-233 vocative-drift gate. The phantom gate above
+        # whitelists every roster name, so "ANNOUNCER" -- the
+        # narration label, always on the roster -- slips through even
+        # when a CHARACTER line addresses it ("..., ANNOUNCER."). The
+        # announcer is exempt (it may reference its own role); every
+        # other speaker gets the vocative stripped + a flag stamped.
+        if req.speaker.strip().upper() != _ANNOUNCER_NAME:
+            devocalized, n_vocative = strip_announcer_vocative(cleaned)
+            if n_vocative > 0:
+                cleaned = devocalized
+                word_count = len(cleaned.split())
+                compose_flags = compose_flags + ("vocative_drift:ANNOUNCER",)
+                log.warning(
+                    "[OTR_LineComposer] vocative drift on %s line: "
+                    "stripped %d 'ANNOUNCER' address(es)",
+                    req.speaker, n_vocative,
                 )
 
         log.info(
