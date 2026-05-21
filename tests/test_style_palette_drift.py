@@ -8,9 +8,11 @@ mid-pipeline -- after the writer + freeze cascade had already spent
 time and tokens.
 
 Hoisting to nodes/_otr_style_palette.py fixed the root cause. This
-test pins all three downstream surfaces (palette, writer pool, freeze
-validator) to set-equality with KNOWN_STYLE_SLUGS so any future drift
-fires at unit-test time, not soak time.
+test pins the palette and the writer seed pool to set-equality with
+KNOWN_STYLE_SLUGS so any future drift fires at unit-test time, not
+soak time. The freeze validator is no longer set-pinned: BUG-LOCAL-240
+relaxed it to validate slug SHAPE (snake_case) rather than membership,
+because the style picker invents new slugs by design.
 """
 from __future__ import annotations
 
@@ -42,32 +44,54 @@ def test_every_palette_entry_has_all_three_cues():
         )
 
 
-def test_freeze_validator_rejects_unknown_slug():
-    """Freeze-time slug validation pins drift to a single error path
-    instead of halting in musicgen. S25/MG-6."""
+def test_freeze_validator_rejects_malformed_slug():
+    """BUG-LOCAL-240 relaxed the freeze slug check from KNOWN_STYLE_SLUGS
+    membership to snake_case SHAPE. A genuinely malformed slug
+    (uppercase, spaces) is still real writer drift and must still be
+    rejected."""
     from nodes._otr_ledger_freeze import _check_meta_invariants
 
-    # Build a minimal ledger-data shape that hits the meta-invariants
-    # path with a known-bad slug at meta.gen_params_initial.style.
-    bad_slug = "not_a_real_style_anywhere"
-    assert bad_slug not in KNOWN_STYLE_SLUGS  # guard against future name collision
-
+    malformed = "Mission Control Procedural"  # spaces + capitals
     ledger_data = {
         "schema_version": "l3-2026-05-14",
         "meta": {
-            "gen_params_initial": {"style": bad_slug},
+            "gen_params_initial": {"style": malformed},
         },
     }
     errors: list[str] = []
     warnings: list[str] = []
     _check_meta_invariants(ledger_data, errors, warnings)
-    assert any("KNOWN_STYLE_SLUGS" in e for e in errors), (
-        f"freeze validator did not reject unknown slug; errors={errors!r}"
+    assert any("well-formed snake_case" in e for e in errors), (
+        f"freeze validator did not reject malformed slug; errors={errors!r}"
+    )
+
+
+def test_freeze_validator_accepts_invented_snake_case_slug():
+    """BUG-LOCAL-240: the style picker's "let the story decide" sentinel
+    invents NEW snake_case slugs from the story content. A well-formed
+    invented slug that is NOT in the seed palette must NOT be flagged as
+    writer drift -- inventing slugs is the intended feature."""
+    from nodes._otr_ledger_freeze import _check_meta_invariants
+
+    invented = "geosynchronous_orbital_rivalry"
+    assert invented not in KNOWN_STYLE_SLUGS  # genuinely outside the palette
+    ledger_data = {
+        "schema_version": "l3-2026-05-14",
+        "meta": {
+            "gen_params_initial": {"style": invented},
+        },
+    }
+    errors: list[str] = []
+    warnings: list[str] = []
+    _check_meta_invariants(ledger_data, errors, warnings)
+    assert not any("snake_case" in e for e in errors), (
+        f"freeze validator falsely rejected invented snake_case slug "
+        f"{invented!r}; errors={errors!r}"
     )
 
 
 def test_freeze_validator_accepts_known_slug():
-    """Sanity: a slug that IS in the palette must NOT trigger the
+    """Sanity: a slug that IS in the seed palette must NOT trigger the
     style-slug error path."""
     from nodes._otr_ledger_freeze import _check_meta_invariants
 
@@ -81,7 +105,7 @@ def test_freeze_validator_accepts_known_slug():
     errors: list[str] = []
     warnings: list[str] = []
     _check_meta_invariants(ledger_data, errors, warnings)
-    assert not any("KNOWN_STYLE_SLUGS" in e for e in errors), (
+    assert not any("snake_case" in e for e in errors), (
         f"freeze validator falsely rejected known slug {good_slug!r}; "
         f"errors={errors!r}"
     )

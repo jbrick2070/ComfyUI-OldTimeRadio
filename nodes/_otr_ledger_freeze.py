@@ -45,11 +45,10 @@ Status: Phase 0 + Phase 10 of the Multi-Turn Polish sprint (2026-05-11).
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, List, Literal, Optional
-
-from ._otr_style_palette import KNOWN_STYLE_SLUGS
 
 log = logging.getLogger("OTR.ledger_freeze")
 
@@ -529,6 +528,32 @@ def _check_per_cast_invariants(
             )
 
 
+# BUG-LOCAL-240: style-slug well-formedness. The style picker's "let the
+# story decide" sentinel invents NEW snake_case slugs from the story
+# content by design (memory: reference_style_auto_sentinel_label); they
+# are not in the 10-slug seed palette and that is intended. The freeze
+# check validates slug SHAPE, not membership. musicgen_theme stopped
+# consuming the slug as a palette key at Path F (2026-05-18) -- an
+# unknown-but-well-formed slug halts nothing downstream.
+_STYLE_SLUG_RE = re.compile(r"^[a-z]+(_[a-z]+)*$")
+_STYLE_SLUG_MAX_LEN = 64
+
+
+def _is_well_formed_style_slug(slug: str) -> bool:
+    """True when `slug` is a well-formed snake_case style slug.
+
+    Accepts the 10 seed-palette slugs AND any LLM-invented slug from the
+    style picker's invent path. Rejects genuinely malformed drift:
+    uppercase, spaces, digits, leading / trailing / doubled underscores,
+    or runaway length. See BUG-LOCAL-240.
+    """
+    return (
+        bool(slug)
+        and len(slug) <= _STYLE_SLUG_MAX_LEN
+        and _STYLE_SLUG_RE.match(slug) is not None
+    )
+
+
 def _check_meta_invariants(
     ledger_data: dict,
     errors: List[str],
@@ -564,20 +589,28 @@ def _check_meta_invariants(
         elif val == "":
             warnings.append(f"meta.{key} is empty string")
 
-    # S25 / MG-6 (BUG-LOCAL-216). Freeze-time slug validation.
-    # meta.gen_params_initial.style is the writer-stamped slug consumed
-    # by musicgen_theme to look up the cue palette. If it drifts from
-    # KNOWN_STYLE_SLUGS the consumer halts mid-pipeline -- after the
-    # script writer + freeze have already spent time / tokens. Catch the
-    # drift here instead.
+    # S25 / MG-6 (BUG-LOCAL-216), relaxed by BUG-LOCAL-240.
+    # meta.gen_params_initial.style is the writer-stamped style slug.
+    # The original check rejected any slug outside the 10-slug seed
+    # palette, but the style picker's "let the story decide" sentinel
+    # invents new snake_case slugs by design -- those are NOT drift.
+    # The check now validates slug SHAPE only (well-formed snake_case,
+    # bounded length); a malformed slug is still real writer drift and
+    # is still caught here before downstream consumers see it.
     gp_initial = meta.get("gen_params_initial")
     if isinstance(gp_initial, dict):
         gp_style = gp_initial.get("style")
-        if isinstance(gp_style, str) and gp_style and gp_style not in KNOWN_STYLE_SLUGS:
+        if (
+            isinstance(gp_style, str)
+            and gp_style
+            and not _is_well_formed_style_slug(gp_style)
+        ):
             errors.append(
                 f"FreezeCascade: meta.gen_params_initial.style="
-                f"{gp_style!r} not in KNOWN_STYLE_SLUGS. Writer drift "
-                f"from palette. Known: {sorted(KNOWN_STYLE_SLUGS)}"
+                f"{gp_style!r} is not a well-formed snake_case style "
+                f"slug (expected lowercase words joined by single "
+                f"underscores, <= {_STYLE_SLUG_MAX_LEN} chars). "
+                f"Writer drift."
             )
 
     # Phase-history bucket lists (B6 split, 2026-05-12). Optional
