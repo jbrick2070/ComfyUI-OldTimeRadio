@@ -2,7 +2,8 @@
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick
-**Last entry:** BUG-LOCAL-244 (2026-05-19 11:10) -- **FLUX fast-path mechanism UNIDENTIFIED.** Split off from BUG-LOCAL-231 per Jeffrey 11:10 pushback #5: "do not close 231 until the fast-path is either reproduced+explained or formally split." Two outliers observed against the ~180 s/it slow-regime baseline established by batteries v1 + v2: (1) **42.38 s/it** today 2026-05-19 ~08:55 (battery v1 iter 1) with precheck + 1 sampler-poll tick captured at start (precheck logged `cudnn.benchmark=False`, poll tick 1 logged 15954 MB lhm + 618 MB D3D Shared + 2977 MHz clocks); (2) **1.22 s/it** yesterday 2026-05-18 ~23:30 with NO sampler-time telemetry (predates commit 3691317). Speed-up ratios vs ~180 s/it slow cluster: 4.3x (42.38) and 150x (1.22). The 4.3x and 150x differ by 35x -- likely DIFFERENT mechanisms, not the same warm-cache cause. **Verification gate:** reproduce ≥1 fast run with the full battery v3 telemetry (per-step timestamps + precheck + poller across ≥5 steps) AND identify which signal differs between fast and slow runs, OR mark UNREPRODUCIBLE if no fast run captured in next N batteries. Hypothesis seed: cudnn / cublas kernel cache hit from an immediately-prior identical inference (process-local for 42.38, possibly cross-process / persistent for 1.22) -- but `cudnn.benchmark=False` rules out the autotuner; the 4.3x speed-up may be from a different cache layer (workspace allocator? cudnn forward conv plan? fp8 dequant kernel SASS cache?). **NOT a fix-it bug** -- a phenomenon-investigation bug. Pending: battery v3 with per-step timing + config fingerprint, then targeted attempt to reproduce.
+**Last entry:** BUG-LOCAL-251..254 (2026-05-21) -- full `tests/` walk 27-failure triage. 251 partial `folder_paths` stub poisons `sys.modules` (9 order-dependent contract-validator failures that passed in isolation); 252 `batch_humo_render.py` relative imports break standalone loads (BUG-249 missed these two sites); 253 `OTR_MusicGenTheme` workflow widget vector short by one (`episode_seed` slot missing); 254 the 5 `_bisect_flux_*.json` workflows carry slug `id`s the ComfyUI Zod validator rejects. 25 of the 27 failures fixed + verified; the remaining 2 quarantined as KNOWN-FAIL-007/008 (`google/gemma-4-E4B-it` default-workflow license gate -- a product/licensing decision for Jeffrey). `EXPECTED_FAILED_NODEIDS` + `docs/known-failures.md` reconciled in lockstep. Full entries in the body below.
+**Prior (FLUX investigation) entry:** BUG-LOCAL-244 (2026-05-19 11:10) -- **FLUX fast-path mechanism UNIDENTIFIED.** Split off from BUG-LOCAL-231 per Jeffrey 11:10 pushback #5: "do not close 231 until the fast-path is either reproduced+explained or formally split." Two outliers observed against the ~180 s/it slow-regime baseline established by batteries v1 + v2: (1) **42.38 s/it** today 2026-05-19 ~08:55 (battery v1 iter 1) with precheck + 1 sampler-poll tick captured at start (precheck logged `cudnn.benchmark=False`, poll tick 1 logged 15954 MB lhm + 618 MB D3D Shared + 2977 MHz clocks); (2) **1.22 s/it** yesterday 2026-05-18 ~23:30 with NO sampler-time telemetry (predates commit 3691317). Speed-up ratios vs ~180 s/it slow cluster: 4.3x (42.38) and 150x (1.22). The 4.3x and 150x differ by 35x -- likely DIFFERENT mechanisms, not the same warm-cache cause. **Verification gate:** reproduce ≥1 fast run with the full battery v3 telemetry (per-step timestamps + precheck + poller across ≥5 steps) AND identify which signal differs between fast and slow runs, OR mark UNREPRODUCIBLE if no fast run captured in next N batteries. Hypothesis seed: cudnn / cublas kernel cache hit from an immediately-prior identical inference (process-local for 42.38, possibly cross-process / persistent for 1.22) -- but `cudnn.benchmark=False` rules out the autotuner; the 4.3x speed-up may be from a different cache layer (workspace allocator? cudnn forward conv plan? fp8 dequant kernel SASS cache?). **NOT a fix-it bug** -- a phenomenon-investigation bug. Pending: battery v3 with per-step timing + config fingerprint, then targeted attempt to reproduce.
 **Prior 1 entry:** BUG-LOCAL-243 (2026-05-19) -- Live dialogue-line visibility regression in LFC writer. The legacy `OTR_LLMScriptWriter` streamed each composed dialogue line to ComfyUI console as the LLM produced it -- operator could watch the script unfold in real time, catch bad output early (vocative drift, hallucinated names, tone misses), and tell whether the LLM was making progress vs hung. The current `OTR_LedgerScriptWriter` writes silently to the ledger file and only emits `[Ledger] saved pending_..._ledger.json (N lines, M words)` at the end of the entire writer phase. No mid-composition visibility. Confirmed by Jeffrey 2026-05-19: would have caught BUG-LOCAL-233 vocative drift IMMEDIATELY ("Hold tight there, GULLIVER REEVES" would have streamed to console; operator could kill the run) instead of finding it in the saved ledger after the fact. **Fix shape:** add `log.info("[LineComposer] line_id=%s speaker=%s text=%s", line_id, speaker, text)` (or equivalent INFO-level emission) after each successful `compose_line` return in `nodes/_otr_line_composer.py`. Cheap, additive, no behavior change. Pending until pipeline closes end-to-end per pipeline-closes-first rule.
 **Prior 2 entry:** BUG-LOCAL-242 (2026-05-19) -- Word/char count audit too permissive on text-vs-count drift. Recent ledgers show b007 word=18 / actual text words=19 (the inserted GULLIVER REEVES vocative); b007 char=112 / actual=121; b015 word=24 / actual=23. The §6.G word_counts audit only logs WARNING on drift, never blocks. **Decision needed:** tighten audit OR formally relax it. Hygiene, low priority. Pending design.
 **Prior 3 entry:** BUG-LOCAL-241 (2026-05-19) -- `freeze_verdict='needs_full_rerun'` ignored by downstream. Cascade explicitly signals the run shouldn't proceed but the pipeline continues to audio + FLUX phases anyway. **Design clarification needed:** is the verdict advisory or supposed to block? If supposed to block, current ignore-and-continue is a bug. If advisory, the verdict label is misleading. Pending design.
@@ -66,12 +67,19 @@ is verified, promote to the survival guide repo per CLAUDE.md
 
 ## Active known failures (S15 quarantine)
 
-The 6 entries in `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (and
-mirrored in `docs/known-failures.md`) are NOT bugs in this file's
-sense -- they are failing tests under quarantine, not unfixed
-production runtime bugs. The `pytest_sessionfinish` hook
-(S15.1+S15.2 / commit `f813b37`) enforces that the failure SET
-stays exactly that 6.
+The entries in `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (mirrored
+in `docs/known-failures.md`) are NOT bugs in this file's sense -- they
+are failing tests under quarantine, not unfixed production runtime
+bugs. The `pytest_sessionfinish` hook (S15.1+S15.2 / commit `f813b37`)
+enforces that the actual-failure SET stays exactly the quarantine set.
+
+As of 2026-05-21 the set holds **2 entries** -- KNOWN-FAIL-007 and
+KNOWN-FAIL-008, both the `google/gemma-4-E4B-it` default-workflow
+license-gate failure (see `docs/known-failures.md` for the removal
+condition; resolution is a product/licensing decision for Jeffrey,
+not a mechanical fix). The 6 entries this section previously named
+were all promoted 2026-05-13 (s26-downstream sweep); the set was
+empty from then until the 2026-05-21 full-walk triage.
 
 Entries below are bugs found in production logic during S6-S15
 sprints, regardless of fix-status.
@@ -79,6 +87,38 @@ sprints, regardless of fix-status.
 ---
 
 ## Voice-path-cleanbreak era (BUG-LOCAL-200+)
+
+### BUG-LOCAL-254: BUG-231 `_bisect_flux_*.json` workflows carry slug `id`s -- ComfyUI Zod rejects on UI load [FIXED 2026-05-21]
+- **Date:** 2026-05-21 | **Phase:** regression-triage | **Bible candidate:** no (same class as BUG-LOCAL-012)
+- **Symptom:** `test_workflow_zod_shape.py::test_root_id_is_uuid` -- 5 parametrized cases failed (`_bisect_flux_minimal / v1_deferred_loader / v2_branch_gate / v3_batchflux_nuclear / v5_unload_all .json`): the root `id` is a slug like `bisect-flux-minimal-bug-local-231`, not a UUID. ComfyUI's Vue frontend Zod validator rejects such a workflow with `Invalid uuid at "id"` on canvas load (same failure class as BUG-LOCAL-012).
+- **Cause:** The 5 BUG-LOCAL-231 FLUX-pace bisect workflows were hand-built with human-readable slug `id`s. They are meant to be drag-loaded into ComfyUI Desktop for the minimal-workflow bisect, so they must satisfy the Zod UUID contract -- the canonical `otr_scifi_16gb_full.json` already does (its `id` is a UUID).
+- **Fix:** Each `_bisect_flux_*.json` root `id` replaced with a fresh UUID4. The descriptive label is preserved in the filename, so no information is lost.
+- **Verify:** `pytest tests/test_workflow_zod_shape.py` -- all 5 `test_root_id_is_uuid` cases pass; the bisect workflows load cleanly in the ComfyUI frontend.
+- **Tags:** json-wiring, workflow-json, zod-shape, uuid, bug-231-followup, bug-012-class
+
+### BUG-LOCAL-253: `OTR_MusicGenTheme` workflow widget vector short by one -- `episode_seed` slot missing [FIXED 2026-05-21]
+- **Date:** 2026-05-21 | **Phase:** regression-triage | **Bible candidate:** no (widget-drift class already covered, e.g. BUG-LOCAL-210)
+- **Symptom:** `test_workflow_audio_widget_vectors.py` -- 3 tests failed: `test_musicgen_widget_vector_length_matches_input_types` (got 4 values, expected 5), `test_musicgen_allow_silence_fallback_pinned_false` (`IndexError: list index out of range`), `test_no_stale_dict_residue_in_widget_vector[OTR_MusicGenTheme-...]` (widget[2] model_id declared STRING but value is `3.0` float -- shifted slots).
+- **Cause:** `workflows/otr_scifi_16gb_full.json` node id=14 (`OTR_MusicGenTheme`) `widgets_values` was `["", "facebook/musicgen-medium", 3.0, false]` (4 entries). `MusicGenTheme.INPUT_TYPES()` declares 5 widget slots in order `script_json, episode_seed, model_id, guidance_scale, allow_silence_fallback`. The `episode_seed` slot (STRING, default `""`) was missing, shifting model_id / guidance_scale / allow_silence_fallback one position left.
+- **Fix:** `workflows/otr_scifi_16gb_full.json` node 14 `widgets_values` -> `["", "", "facebook/musicgen-medium", 3.0, false]` (inserted the `episode_seed` default `""` at index 1).
+- **Verify:** `pytest tests/test_workflow_audio_widget_vectors.py` -- all MusicGen tests pass; each widget[i] type now matches the INPUT_TYPES declared order.
+- **Tags:** json-wiring, widget-drift, musicgen, workflow-json
+
+### BUG-LOCAL-252: `nodes/batch_humo_render.py` relative imports of `_otr_story_brief_helpers` break standalone module loads [FIXED 2026-05-21]
+- **Date:** 2026-05-21 | **Phase:** regression-triage | **Bible candidate:** no (BUG-LOCAL-249 followup)
+- **Symptom:** `test_batch_humo_render.py::test_build_pos_prompt_*` (3 tests) failed with `ImportError: attempted relative import with no known parent package` at `nodes/batch_humo_render.py:1187` (`from ._otr_story_brief_helpers import get_story_brief_lighting`).
+- **Cause:** `batch_humo_render.py` is loaded as a top-level module (no parent package) by the test harness. Its documented import strategy (top-of-file docstring + the `_otr_paths` / `_otr_speaker_role` imports at lines 61/69) is: sys.path-prepend `_NODES_DIR`, then ABSOLUTE imports. Two later additions (Sprint C C5f, lines 1187 + 1645) used relative imports `from ._otr_story_brief_helpers import ...`, which require a parent package. This is the same defect class BUG-LOCAL-249 fixed in `visual/batch_flux_render.py` -- 249 missed these two sibling sites in the HuMo node.
+- **Fix:** Lines 1187 + 1645 changed from `from ._otr_story_brief_helpers import` to `from _otr_story_brief_helpers import`, matching the file's documented sys.path-prepend + absolute-import pattern. Both sites fixed (only 1187 had a test exercising it; 1645 is the identical defect on the `get_story_brief_status` path).
+- **Verify:** `pytest tests/test_batch_humo_render.py` -- the 3 `_build_pos_prompt` tests pass; full walk shows no regression.
+- **Tags:** relative-import, batch-humo-render, story-brief, bug-249-followup
+
+### BUG-LOCAL-251: Partial `folder_paths` stub installed at import time poisons `sys.modules` -- 9 order-dependent contract-validator failures [FIXED 2026-05-21]
+- **Date:** 2026-05-21 | **Phase:** regression-triage | **Bible candidate:** no (test-infra, not a node-runtime defect -- but the "one complete stub in conftest, never partial stubs at import time" lesson is worth remembering)
+- **Symptom:** In the full `tests/` walk, 8 `test_workflow_contract_validation.py` tests + `test_workflow_live_passes_validator.py::test_production_workflow_passes_default_validation` failed with `nodes._workflow_validation.WorkflowValidationError: OTR_DeferredCheckpointLoader(id=22): INPUT_TYPES() raised AttributeError: module 'folder_paths' has no attribute 'get_filename_list'`. All 9 PASSED when their files were run in isolation -- order-dependent.
+- **Cause:** Three test modules (`test_story_brief_humo_c5f.py`, `test_story_brief_ltx_c5e.py`, `test_story_brief_portraits_c5d.py`) each install a PARTIAL `folder_paths` stub (only `get_output_directory`) into `sys.modules` at module-import time, guarded by `if "folder_paths" not in sys.modules`. Whichever pytest collects first wins; none carry `get_filename_list`. `nodes/_otr_deferred_loaders.py` hard-imports `folder_paths`; `OTR_DeferredCheckpointLoader.INPUT_TYPES()` calls `folder_paths.get_filename_list("checkpoints")`. In isolation no stub is installed -> the deferred-loader module fails to import -> the class is skipped by the contract validator's mapping builder -> no error. In the full walk the partial stub makes the import succeed, so the validator reaches `INPUT_TYPES()` and the missing attribute raises.
+- **Fix:** `tests/conftest.py` installs ONE complete `folder_paths` stub (`get_output_directory` + `get_filename_list`) at conftest-import time, before any test module is collected. Every downstream `if "folder_paths" not in sys.modules` guard then becomes a no-op, so the whole suite shares one consistent complete stub and the order-dependence is gone. The three partial stubs are left in place as harmless no-ops (defensive fallback if a file is run without the conftest).
+- **Verify:** Full `tests/` walk -- the 9 failures clear with zero regressions (27 -> 2 over the triage). `OTR_DeferredCheckpointLoader` node id=22 validates clean against the contract validator's socket + widget-drift checks.
+- **Tags:** test-infra, sys-modules-pollution, folder_paths, contract-validator, order-dependent, stub
 
 ### BUG-LOCAL-250: otr_video_plan era tail + FLUX env/portrait prompts driven by the style preset, not meta.story_brief [FIXED 2026-05-20]
 - **Date:** 2026-05-20 | **Phase:** 4 | **Bible candidate:** no

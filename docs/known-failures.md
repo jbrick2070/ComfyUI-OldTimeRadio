@@ -1,8 +1,8 @@
 # Known Test Failures — Quarantine List
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
-**Last reconciled:** 2026-05-13 (s26-downstream missed-regression sweep)
-**Baseline pytest:** **0 failed**, 2160+ passed, 8 skipped (clean baseline)
+**Last reconciled:** 2026-05-21 (full-walk 27-failure triage: 25 fixed, 2 quarantined)
+**Baseline pytest:** **2 failed** (KNOWN-FAIL-007/008, quarantined below), 2460 passed/skipped of 2462 collected
 **Enforcement:** `tests/conftest.py::EXPECTED_FAILED_NODEIDS` (S15.1
 hook) tracks the failure SET, not just the count. Adding a failure
 not in that set fires `[KNOWN-FAIL-GUARD] NEW failures (REGRESSION)`
@@ -41,13 +41,62 @@ matches by exact string against pytest's collected `item.nodeid`.
 
 ---
 
-## Active known failures (none)
+## Active known failures (2)
 
-All 6 prior known failures were promoted on 2026-05-13 during the
-s26-downstream missed-regression sweep. See the Resolution log below.
+KNOWN-FAIL-001 through 006 were promoted on 2026-05-13 (see the
+Resolution log below). KNOWN-FAIL-007 + 008 were added 2026-05-21
+during the full-walk 27-failure triage: 25 of the 27 failures were
+real fixes; these last 2 are a product/licensing decision and are
+quarantined pending that decision.
 
-The quarantine list is currently empty -- the baseline is clean. Adding
-a new known failure requires updating both this file and
+```
+KNOWN-FAIL-007
+  Nodeid:        tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default
+  First seen:    2026-05-21 full-walk triage; failure predates 6a525f8
+                 (present at clean HEAD 02fde67).
+  Expected mode: AssertionError -- check_default_workflow_creative_binding
+                 reports the shipped workflow's writer node (id=1)
+                 binds 'google/gemma-4-E4B-it' (license_audit_status=
+                 'pending'); the Sprint D / D3 creative-binding gate
+                 requires 'mit_equivalent' for any default-shipped
+                 binding.
+  Owner:         Jeffrey
+  Removal cond:  Resolve the writer-model licensing question, then
+                 promote. Either (a) complete the google/gemma-4-E4B-it
+                 license audit and update that row's
+                 license_audit_status in nodes/_otr_model_catalog.py,
+                 or (b) rebind the default workflow's
+                 OTR_LedgerScriptWriter (node id=1) creative + technical
+                 model slots to a mit_equivalent catalog row (the
+                 catalog DEFAULT_LLM is mistralai/Mistral-Nemo-
+                 Instruct-2407, which this test's docstring already
+                 expects) and re-verify. NOTE: pyproject.toml still
+                 describes the project as "Gemma 4 scripts" -- this is
+                 a genuine product-direction call, not a drift fix.
+  Reproduce:     pytest "tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default"
+```
+
+```
+KNOWN-FAIL-008
+  Nodeid:        tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot
+  First seen:    2026-05-21 full-walk triage; failure predates 6a525f8
+                 (present at clean HEAD 02fde67).
+  Expected mode: AssertionError -- same root cause as KNOWN-FAIL-007:
+                 the shipped default workflow binds
+                 'google/gemma-4-E4B-it' (license_audit_status=
+                 'pending') to the creative slot; the gate requires
+                 'mit_equivalent'. This test asserts the gate from the
+                 model-catalog-schema entry point rather than the
+                 workflow-validator one.
+  Owner:         Jeffrey
+  Removal cond:  Same as KNOWN-FAIL-007. Both tests assert the same
+                 creative-binding gate and will go green together once
+                 the licensing question is resolved -- promote both in
+                 the same commit.
+  Reproduce:     pytest "tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot"
+```
+
+Adding a new known failure requires updating both this file and
 `tests/conftest.py::EXPECTED_FAILED_NODEIDS` in the same commit, and the
 fix's removal-condition must be specific enough that the next reviewer
 can independently judge whether the condition has been met.

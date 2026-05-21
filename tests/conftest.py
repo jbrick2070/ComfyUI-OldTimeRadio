@@ -38,6 +38,46 @@ os.environ.setdefault("PYTORCH_NO_CUDA_MEMORY_CACHING", "1")
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 
+# ---------------------------------------------------------------------------
+# Shared `folder_paths` stub (2026-05-21).
+#
+# `folder_paths` is a ComfyUI-runtime module, absent in the bare pytest
+# sandbox. Node modules import it at module level (e.g.
+# `nodes/_otr_deferred_loaders.py`), and a few node INPUT_TYPES() bodies
+# call `folder_paths.get_filename_list(...)`.
+#
+# Before this block, three test modules
+# (test_story_brief_{humo_c5f,ltx_c5e,portraits_c5d}.py) each installed
+# their own PARTIAL stub (`get_output_directory` only) at import time,
+# each guarded by `if "folder_paths" not in sys.modules`. Whichever
+# pytest collected first won -- and none carried `get_filename_list`.
+# In the full `tests/` walk that made
+# `OTR_DeferredCheckpointLoader.INPUT_TYPES()` raise
+# `AttributeError: module 'folder_paths' has no attribute
+# 'get_filename_list'`, which the workflow contract validator wrapped
+# into a `WorkflowValidationError`. Result: 9 order-dependent failures
+# that PASSED in isolation (no stub installed -> deferred-loader import
+# skipped) but FAILED in the walk (partial stub present -> import
+# succeeds -> INPUT_TYPES blows up).
+#
+# Installing ONE complete stub here -- before any test module is
+# collected -- makes every downstream `if "folder_paths" not in
+# sys.modules` guard a no-op, so the whole suite sees a single
+# consistent stub and the order-dependence is gone.
+if "folder_paths" not in sys.modules:
+    import types as _types
+    from pathlib import Path as _Path
+
+    _fp_stub = _types.ModuleType("folder_paths")
+    # Matches the attribute the prior partial stubs provided.
+    _fp_stub.get_output_directory = lambda: str(_Path.cwd())  # noqa: E731
+    # The missing piece: node INPUT_TYPES() bodies call this to build
+    # checkpoint / text-encoder pickers. An empty list is a valid combo
+    # spec -- the contract validator introspects key NAMES, not members.
+    _fp_stub.get_filename_list = lambda *args, **kwargs: []  # noqa: E731
+    sys.modules["folder_paths"] = _fp_stub
+
+
 @pytest.fixture
 def standard_budget():
     """v2.0 production-shape EpisodeBudget for outline + composer tests.
@@ -133,9 +173,23 @@ EXPECTED_FAILED_NODEIDS = frozenset({
     # and now passes under the new name
     # (test_default_canvas_is_layered_1472x832_at_25fps). See commits
     # ba8a02e (meta merge), a70aeb8 (fixture size), 8181950 (canvas
-    # rename) for the migration trail. Empty set is the durable clean
-    # baseline state -- the known-fail-guard hook still runs and will
-    # fail loud on any new regression.
+    # rename) for the migration trail.
+    #
+    # KNOWN-FAIL-007 + KNOWN-FAIL-008 (added 2026-05-21, full-walk
+    # 27-failure triage). The shipped default workflow's
+    # OTR_LedgerScriptWriter (node id=1) binds 'google/gemma-4-E4B-it'
+    # to both model slots, but that catalog row carries
+    # license_audit_status='pending' -- the Sprint D / D3
+    # creative-binding gate requires 'mit_equivalent'. The two tests
+    # assert that gate from different entry points. Resolution is a
+    # product/licensing decision for Jeffrey (Gemma-4 vs Mistral-Nemo
+    # for the shipped default, plus whether to complete the
+    # gemma-4-E4B-it license audit) -- NOT a mechanical drift fix, so
+    # it is quarantined here rather than force-fixed. See
+    # docs/known-failures.md KNOWN-FAIL-007/008 for the removal
+    # condition. This set must stay in lockstep with that file.
+    "tests/test_default_workflow_validator.py::test_default_workflow_validator_passes_on_shipped_default",
+    "tests/test_model_catalog_schema.py::test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot",
 })
 
 

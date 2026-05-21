@@ -235,7 +235,7 @@ class TestBuildUserPrompt:
         assert "LAST SPOKEN (this scene):" in prompt
         assert "WRITE LINE" in prompt
         # v4: role induction replaces "Speaker: ALICE" label.
-        assert "You are ALICE." in prompt
+        assert "Produce one line/section of dialogue for ALICE." in prompt
         assert "Speak now." in prompt
 
     def test_style_block_renders_when_set(self):
@@ -383,7 +383,10 @@ class TestBuildUserPrompt:
             prev_speaker="BOB",
         )
         prompt = _build_user_prompt(req)
-        assert "You are ALICE. You are responding to BOB." in prompt
+        assert (
+            "Produce one line/section of dialogue for ALICE. "
+            "You are responding to BOB." in prompt
+        )
 
     def test_role_induction_no_responding_clause_when_prev_speaker_empty(self):
         req = LineRequest(
@@ -392,20 +395,20 @@ class TestBuildUserPrompt:
             prev_speaker="",
         )
         prompt = _build_user_prompt(req)
-        assert "You are ALICE." in prompt
+        assert "Produce one line/section of dialogue for ALICE." in prompt
         assert "responding to" not in prompt
 
     def test_role_induction_drops_responding_clause_when_prev_is_self(self):
         # Edge case: rolling window's last entry is the same speaker
         # (two-line monologue). Drop the "responding to" clause to
-        # avoid "You are ALICE. You are responding to ALICE."
+        # avoid "...dialogue for ALICE. You are responding to ALICE."
         req = LineRequest(
             speaker="ALICE", intent="reveal", mood="tense", target_words=15,
             canon_header="x", last_lines=[("ALICE", "I started.")],
             prev_speaker="ALICE",
         )
         prompt = _build_user_prompt(req)
-        assert "You are ALICE." in prompt
+        assert "Produce one line/section of dialogue for ALICE." in prompt
         assert "responding to" not in prompt
 
     def test_static_blocks_precede_variable_blocks_for_kv_cache(self):
@@ -695,7 +698,10 @@ class TestTier1Regressions:
             last_lines=last_lines, prev_speaker=prev,
         )
         prompt = _build_user_prompt(req)
-        assert "You are BOB. You are responding to ALICE." in prompt
+        assert (
+            "Produce one line/section of dialogue for BOB. "
+            "You are responding to ALICE." in prompt
+        )
         assert "responding to ANNOUNCER" not in prompt
 
     # Tier 1 fix #1 + #2: assemble_script_text_from_ledger rebuilds
