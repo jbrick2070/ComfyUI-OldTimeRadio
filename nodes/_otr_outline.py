@@ -1385,15 +1385,13 @@ def generate_outline(
     _check_speaker_role_alignment()
 
     budget = _get_budget(req)
-    if budget is None:
-        # S28 cleanbreak: budget required at OutlineRequest
-        # construction. _get_budget() returning None here would mean
-        # the dataclass was bypassed -- treat as a programmer error.
-        raise OutlineFailedError(
-            attempts=[("", "OutlineRequest is missing a valid budget")],
-            request=req,
-        )
-
+    # S28 cleanbreak: budget is required at OutlineRequest construction
+    # (OutlineRequest.__post_init__ raises ValueError on a missing or
+    # wrong-typed budget), so _get_budget always returns a populated
+    # EpisodeBudget here. The pre-S28 missing-budget guard is extinct --
+    # a bypassed dataclass is a producer defect and surfaces as an
+    # AttributeError on the next line. Mirrors the same S28 cleanup in
+    # validate_outline_against_budget.
     arc_phases = tuple(budget.arc_phases)
     per_phase_words = tuple(budget.per_phase_words)
     per_phase_beats = tuple(budget.per_phase_beats)
