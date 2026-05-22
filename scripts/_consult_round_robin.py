@@ -96,6 +96,7 @@ OPENAI_MODELS = [
 GEMINI_MODELS = [
     "gemini-3.1-pro-preview-customtools",
     "gemini-3.1-pro-preview",
+    "gemini-3.5-flash",  # added 2026-05-22 -- new flash tier (released 2026-05-19, free API tier, ~1500 req/day)
     "gemini-3-flash-preview",
 ]
 
