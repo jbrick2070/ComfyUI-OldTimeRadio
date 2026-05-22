@@ -60,6 +60,25 @@ class TestStripAnnouncerVocative:
         assert out == "We're close, very close now."
         assert n == 1
 
+    def test_mid_sentence_vocative_semicolon_delimiter(self):
+        # BUG-LOCAL-233 b003: a mid-sentence vocative can close on a
+        # semicolon, not just a comma. Episode
+        # signal_lost_singing_asteroid_language_20260521_120244 line
+        # b003 reached the ledger unstripped because the MID regex
+        # accepted only a comma as the closing delimiter.
+        out, n = strip_announcer_vocative(
+            "This isn't some old rock, ANNOUNCER; this thing has a cadence."
+        )
+        assert out == "This isn't some old rock; this thing has a cadence."
+        assert n == 1
+
+    def test_mid_sentence_vocative_colon_delimiter(self):
+        out, n = strip_announcer_vocative(
+            "We're nearly there, ANNOUNCER: the lock is holding."
+        )
+        assert out == "We're nearly there: the lock is holding."
+        assert n == 1
+
     def test_leading_vocative_recapitalizes_next_word(self):
         out, n = strip_announcer_vocative("ANNOUNCER, we did it.")
         assert out == "We did it."
@@ -186,6 +205,25 @@ class TestComposeLineVocativeGate:
         assert not any(
             f.startswith("vocative_drift") for f in res.compose_flags
         )
+
+    def test_semicolon_address_is_stripped_and_flagged(self):
+        # BUG-LOCAL-233 b003 at the gate layer: the character line
+        # reached the ledger with empty compose_flags. The gate must
+        # now both strip the ";" address and stamp the drift flag.
+        def mock(messages, *, temperature, max_new_tokens, stop=None):
+            return (
+                "This isn't some old rock, ANNOUNCER; "
+                "this thing has a cadence."
+            )
+        req = LineRequest(
+            speaker="LEMMY", intent="reveal", mood="awe", target_words=11,
+            canon_header="x", last_lines=[],
+            allowed_roster=frozenset({"LEMMY", "ANNOUNCER"}),
+        )
+        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        assert "ANNOUNCER" not in res.text
+        assert res.text == "This isn't some old rock; this thing has a cadence."
+        assert "vocative_drift:ANNOUNCER" in res.compose_flags
 
 
 if __name__ == "__main__":

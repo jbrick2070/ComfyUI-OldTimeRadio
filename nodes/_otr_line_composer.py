@@ -443,7 +443,7 @@ def detect_phantom_names(
 # label "ANNOUNCER" is targeted; real cast names are left untouched,
 # because characters addressing each other by name is normal dialogue.
 _ANNOUNCER_NAME = "ANNOUNCER"
-_VOCATIVE_MID_RE = re.compile(r",\s*announcer\s*,", re.IGNORECASE)
+_VOCATIVE_MID_RE = re.compile(r",\s*announcer\s*([,;:])", re.IGNORECASE)
 _VOCATIVE_TRAILING_RE = re.compile(
     r",\s*announcer\b\s*(?=[.!?]|$)", re.IGNORECASE,
 )
@@ -460,6 +460,8 @@ def strip_announcer_vocative(text: str) -> tuple[str, int]:
     sentence boundary:
 
       * mid-sentence   "..., ANNOUNCER, ..."  -> "..., ..."
+                       (closing delimiter , ; or : is preserved;
+                       BUG-LOCAL-233 b003)
       * trailing       "..., ANNOUNCER."      -> "..."
       * leading        "ANNOUNCER, ..."       -> "..." (next word
                                                  re-capitalized)
@@ -471,7 +473,7 @@ def strip_announcer_vocative(text: str) -> tuple[str, int]:
     if not text or "announcer" not in text.lower():
         return text, 0
     removed = 0
-    out, n = _VOCATIVE_MID_RE.subn(", ", text)
+    out, n = _VOCATIVE_MID_RE.subn(r"\1 ", text)
     removed += n
     out, n = _VOCATIVE_TRAILING_RE.subn("", out)
     removed += n
