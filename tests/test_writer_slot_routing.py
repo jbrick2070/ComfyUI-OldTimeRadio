@@ -131,9 +131,10 @@ def test_writer_has_slot_tag_comments_at_every_llm_call_site():
     # "# LLM slot: technical" must appear at every LLM call site.
     creative_hits = src.count("# LLM slot: creative")
     technical_hits = src.count("# LLM slot: technical")
-    assert creative_hits >= 5, (
-        f"expected >=5 '# LLM slot: creative' tags (style picker, "
-        f"cast lock, outline, compose, polish, title regen); found "
+    assert creative_hits >= 8, (
+        f"expected >=8 '# LLM slot: creative' tags (style picker, "
+        f"cast lock, outline, dialogue composer, announcer intro, "
+        f"announcer outro, polish, title regen); found "
         f"{creative_hits}"
     )
     assert technical_hits >= 1, (

@@ -1,18 +1,6 @@
 """nodes/_otr_news_wiring.py -- writer-side glue for news_interpreter
 briefs.
 
-Two helpers, both pure (no I/O, no LLM calls). They land in commit 4
-of the news_interpreter sprint (ADR docs/news_interpreter_adr.md
-section 5).
-
-  override_announcer_close(line_rows, news_close_brief)
-      Stamp the news_close_brief verbatim onto the LAST announcer
-      line in the per-beat output. The line composer already wrote
-      something there from the outline's beat.intent; we replace it
-      with the news_interpreter's purpose-specific closing read so
-      the announcer's final beat carries the actual journalistic
-      content from the source article.
-
   post_assembly_keyterm_check(line_rows, key_terms, min_required=2)
       Walk every voiced line (speaker_role in {character, announcer}),
       concatenate their text, and verify each key_term landed via the
@@ -20,14 +8,21 @@ section 5).
       Returns (landed, missing) lists; the caller decides whether to
       log + proceed, warn, or hard-fail. Per ADR section 4.4.
 
-Both helpers live in their own small module so tests can exercise
-them without importing the heavy OTR_LedgerScriptWriter module
-(which pulls in comfy.utils + the LLM loader).
+This helper lives in its own small module so tests can exercise it
+without importing the heavy OTR_LedgerScriptWriter module (which
+pulls in comfy.utils + the LLM loader).
+
+History: `override_announcer_close` also lived here -- it stamped
+`news_close_brief` onto the last announcer line. It was retired
+2026-05-22 (BUG-LOCAL-255): it matched a private `_speaker_role`
+key absent from the ledger's `lines[]` rows, so the close was
+silently never applied. The announcer closing line is now written
+by `_otr_line_composer.compose_announcer_outro`, a dedicated
+creative pass run post-loop in OTR_LedgerScriptWriter.
 """
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 
 # Voiced roles that count for the post-assembly key_terms check.
@@ -43,37 +38,6 @@ def _word_boundary_pattern(term: str) -> str:
         + re.escape(term)
         + r"(?![A-Za-z0-9])"
     )
-
-
-def override_announcer_close(
-    line_rows: list[dict],
-    news_close_brief: str,
-) -> Optional[dict]:
-    """Stamp news_close_brief onto the LAST announcer line.
-
-    Returns the line_row that was mutated, or ``None`` if no announcer
-    line was found in ``line_rows`` or ``news_close_brief`` is empty
-    (whitespace-only counts as empty).
-
-    ``line_rows`` is the writer's pre-set_lines() in-flight list. Each
-    row carries a private ``_speaker_role`` key (set by the per-beat
-    loop, stripped before set_lines). The override mutates the row's
-    ``text`` field in place. ``char_count`` and ``word_count`` are
-    recomputed at set_lines time, so we don't touch them here.
-
-    Idempotent: calling twice with the same brief is a no-op.
-    """
-    brief = (news_close_brief or "").strip()
-    if not brief:
-        return None
-    last_idx = -1
-    for i, row in enumerate(line_rows):
-        if row.get("_speaker_role") == "announcer":
-            last_idx = i
-    if last_idx < 0:
-        return None
-    line_rows[last_idx]["text"] = brief
-    return line_rows[last_idx]
 
 
 def post_assembly_keyterm_check(

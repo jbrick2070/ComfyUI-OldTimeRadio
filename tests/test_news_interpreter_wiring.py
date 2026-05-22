@@ -2,8 +2,12 @@
 side news-wiring helpers (commit 4 of the news_interpreter sprint).
 
 Targets ``nodes/_otr_news_wiring.py``:
-  - override_announcer_close
   - post_assembly_keyterm_check
+
+(``override_announcer_close`` was retired 2026-05-22 -- BUG-LOCAL-255;
+its tests were removed with it. The announcer closing line is now
+written by ``_otr_line_composer.compose_announcer_outro`` and covered
+by ``tests/test_announcer_passes.py``.)
 
 Hermetic: no GPU, no I/O, no LLM. Just exercises the pure helpers
 on in-memory line_rows fixtures. The helpers themselves live in
@@ -43,73 +47,6 @@ def _line(line_id: str, role: str, text: str) -> dict:
         "dur_s":         None,
         "_speaker_role": role,
     }
-
-
-# ---------------------------------------------------------------------------
-# override_announcer_close
-# ---------------------------------------------------------------------------
-
-
-def test_override_announcer_close_stamps_last_announcer():
-    rows = [
-        _line("b001", "announcer", "Tonight on Signal Lost..."),
-        _line("b002", "character", "Did you see that?"),
-        _line("b003", "character", "I saw it."),
-        _line("b004", "announcer", "Stay tuned for more after this."),
-    ]
-    brief = (
-        "Tonight researchers reported an unexplained signal from a "
-        "nearby star system, with verification pending peer review."
-    )
-    result = _NW.override_announcer_close(rows, brief)
-    assert result is not None
-    assert result is rows[3], (
-        "override must mutate the LAST announcer line, not an earlier one"
-    )
-    assert rows[3]["text"] == brief
-    # Earlier announcer line is untouched.
-    assert rows[0]["text"] == "Tonight on Signal Lost..."
-
-
-def test_override_announcer_close_empty_brief_is_noop():
-    rows = [
-        _line("b001", "announcer", "Open"),
-        _line("b002", "character", "Mid"),
-        _line("b003", "announcer", "Close"),
-    ]
-    original_close = rows[2]["text"]
-    result = _NW.override_announcer_close(rows, "")
-    assert result is None
-    assert rows[2]["text"] == original_close
-
-
-def test_override_announcer_close_whitespace_brief_is_noop():
-    rows = [_line("b001", "announcer", "Close")]
-    result = _NW.override_announcer_close(rows, "   \n\t  ")
-    assert result is None
-    assert rows[0]["text"] == "Close"
-
-
-def test_override_announcer_close_no_announcer_lines():
-    rows = [
-        _line("b001", "character", "Hello"),
-        _line("b002", "character", "Goodbye"),
-    ]
-    result = _NW.override_announcer_close(rows, "would-be close")
-    assert result is None
-    # Character lines untouched.
-    assert rows[0]["text"] == "Hello"
-    assert rows[1]["text"] == "Goodbye"
-
-
-def test_override_announcer_close_idempotent():
-    rows = [_line("b001", "announcer", "Original")]
-    brief = "Replacement close text."
-    first = _NW.override_announcer_close(rows, brief)
-    second = _NW.override_announcer_close(rows, brief)
-    assert first is rows[0]
-    assert second is rows[0]
-    assert rows[0]["text"] == brief
 
 
 # ---------------------------------------------------------------------------

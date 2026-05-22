@@ -52,6 +52,13 @@ __all__ = [
     "render_current_beat",
     "needs_polish",
     "polish_line",
+    # Announcer dedicated passes (2026-05-22, BUG-LOCAL-255)
+    "clean_one_line",
+    "validate_announcer_line",
+    "fallback_announcer_intro",
+    "fallback_announcer_outro",
+    "compose_announcer_intro",
+    "compose_announcer_outro",
 ]
 
 
@@ -1746,6 +1753,353 @@ def compose_line(
         return LineResult(text=cleaned, compose_flags=compose_flags)
 
     raise LineCompositionFailedError(attempts=attempts, request=req)
+
+
+# ---------------------------------------------------------------------------
+# Announcer dedicated passes (2026-05-22) -- BUG-LOCAL-255
+# ---------------------------------------------------------------------------
+#
+# The announcer's opening (first beat) and closing (last beat) lines
+# frame the episode -- they are a narration bookend, not character
+# dialogue. Before this section both routed through the shared
+# `compose_line` with the character-dialogue prompt; the closing line
+# was then supposed to be overwritten with the news interpreter's
+# `news_close_brief` by `_otr_news_wiring.override_announcer_close`,
+# but that overlay matched a private `_speaker_role` key absent from
+# the ledger's `lines[]` rows, so the close was silently never stamped
+# (BUG-LOCAL-255).
+#
+# Two purpose-built creative-slot passes replace both surfaces:
+#   compose_announcer_intro  -- in-loop on the first announcer beat;
+#                               a framing prompt from script_brief.
+#   compose_announcer_outro  -- post-loop on the last announcer beat;
+#                               a closing prompt from script_brief +
+#                               news_close_brief + the intro text.
+# Both bypass `compose_line` (so they are never re-polished -- correct
+# by construction) and emit plain text, not JSON: a one-line output
+# does not need a JSON envelope, and the envelope only adds a
+# broken-JSON failure mode. Each pass has a deterministic SIGNAL LOST
+# fallback so the narrative bookend can never be missing.
+
+# Generation params for the announcer passes. One creative call each,
+# no reroll ladder -- on any failure the deterministic fallback fires.
+_ANNOUNCER_MAX_NEW_TOKENS = 160
+_ANNOUNCER_INTRO_MIN_CHARS = 24
+_ANNOUNCER_INTRO_MAX_CHARS = 300
+_ANNOUNCER_OUTRO_MIN_CHARS = 28
+_ANNOUNCER_OUTRO_MAX_CHARS = 340
+
+# Speaker-label prefixes that must never lead an announcer line.
+_ANNOUNCER_BAD_PREFIXES: tuple[str, ...] = (
+    "ANNOUNCER:", "ANNOUNCER -", "HOST:", "NARRATOR:", "NARRATION:",
+    "SFX:", "MUSIC:", "VOICE:",
+)
+
+_ANNOUNCER_INTRO_SYSTEM = """\
+You are the radio announcer for SIGNAL LOST, an old-time radio drama.
+Write exactly ONE spoken opening line that frames tonight's story.
+
+OUTPUT - strict:
+- Only the words the announcer says out loud.
+- One line. No line breaks.
+- No speaker name, no colon, no quotation marks.
+- No stage directions, no brackets, no sound cues.
+- One or two sentences, roughly 12 to 30 words.
+
+VOICE:
+- A period radio host: warm, measured, a little mysterious.
+- Orient the listener -- hint at the story, do not summarize it.
+- Use only proper names that appear in the brief. Invent none.
+"""
+
+_ANNOUNCER_OUTRO_SYSTEM = """\
+You are the radio announcer for SIGNAL LOST, an old-time radio drama.
+Write exactly ONE spoken closing line that ends tonight's broadcast.
+
+OUTPUT - strict:
+- Only the words the announcer says out loud.
+- One line. No line breaks.
+- No speaker name, no colon, no quotation marks.
+- No stage directions, no brackets, no sound cues.
+- One or two sentences, roughly 14 to 34 words.
+
+VOICE:
+- A period radio host: warm, measured, reflective.
+- Land the journalistic note from the closing brief.
+- Lightly echo the opening line's tone; do not repeat its words.
+- Use only proper names that appear in the briefs. Invent none.
+"""
+
+
+def clean_one_line(text: str, max_chars: int) -> str:
+    """Collapse a raw string into a single clean line.
+
+    Collapses every run of whitespace (newlines included) to one
+    space, strips wrapping straight/smart quotes, and -- when
+    ``max_chars > 0`` -- hard-caps the length on a word boundary,
+    re-terminating with a period if the cut left a bare word.
+
+    ``max_chars <= 0`` disables truncation (hygiene only). Pure and
+    deterministic: no timestamps, no randomness. Never raises.
+    """
+    if not text:
+        return ""
+    s = " ".join(str(text).split())
+    # Strip leading/trailing straight + smart quotes.
+    s = s.strip(" \t\"'“”‘’").strip()
+    if max_chars and max_chars > 0 and len(s) > max_chars:
+        s = s[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;:-")
+        if s and s[-1] not in ".!?":
+            s += "."
+    return s
+
+
+def validate_announcer_line(
+    text: str,
+    *,
+    min_chars: int,
+    max_chars: int,
+) -> tuple[bool, str]:
+    """Validate one announcer line. Returns ``(ok, cleaned)``.
+
+    Rejects (``ok=False``, ``cleaned=""``): empty text, multi-line
+    output, a leading speaker label (``ANNOUNCER:`` etc.), bracket or
+    brace stage directions, and text outside the
+    ``[min_chars, max_chars]`` band. On success returns the cleaned,
+    whitespace-collapsed line. Never raises.
+    """
+    raw = text or ""
+    # Multi-line output is a framing failure for a one-line read --
+    # catch it before clean_one_line collapses the breaks away. A
+    # bare trailing newline is not multi-line, so strip first.
+    if "\n" in raw.strip():
+        return False, ""
+    cleaned = clean_one_line(raw, max_chars=0)
+    if not cleaned:
+        return False, ""
+    upper = cleaned.upper()
+    if any(upper.startswith(p) for p in _ANNOUNCER_BAD_PREFIXES):
+        return False, ""
+    if any(ch in cleaned for ch in "[]{}"):
+        return False, ""
+    if len(cleaned) < min_chars or len(cleaned) > max_chars:
+        return False, ""
+    return True, cleaned
+
+
+def fallback_announcer_intro(script_brief: str) -> str:
+    """Deterministic SIGNAL LOST opening line built from script_brief.
+
+    Fires when the intro LLM pass fails validation or has no brief to
+    work from. Pure string template -- the narrative frame must never
+    be missing. Never raises.
+    """
+    brief = clean_one_line(script_brief or "", max_chars=200)
+    if brief:
+        if brief[-1] not in ".!?":
+            brief += "."
+        return (
+            f"Good evening. This is SIGNAL LOST. Tonight: {brief} "
+            f"Stay with us."
+        )
+    return (
+        "Good evening. This is SIGNAL LOST. Tonight, a signal breaks "
+        "through the static. Stay with us."
+    )
+
+
+def fallback_announcer_outro(news_close_brief: str) -> str:
+    """Deterministic SIGNAL LOST closing line built from the close brief.
+
+    Fires when the outro LLM pass fails validation or has no brief to
+    work from. Pure string template -- the narrative frame must never
+    be missing. Never raises.
+    """
+    close = clean_one_line(news_close_brief or "", max_chars=240)
+    if close:
+        if close[-1] not in ".!?":
+            close += "."
+        return f"This has been SIGNAL LOST. {close} Good night."
+    return (
+        "This has been SIGNAL LOST. The report ends, but the signal "
+        "remains. Good night."
+    )
+
+
+def _announcer_generate(creative_fn, messages) -> Optional[str]:
+    """Run one creative-slot LLM call for an announcer pass.
+
+    Mirrors `compose_line`'s call convention: try the `stop=` kwarg
+    form first, fall back to the no-`stop=` form for loaders that do
+    not accept it. Returns the raw string, or ``None`` if the call
+    raised (the caller then drops to the deterministic fallback).
+    """
+    try:
+        try:
+            return creative_fn(
+                messages,
+                temperature=_BASE_TEMPERATURE,
+                max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
+                stop=list(_DEFAULT_STOP_STRINGS),
+            )
+        except TypeError:
+            return creative_fn(
+                messages,
+                temperature=_BASE_TEMPERATURE,
+                max_new_tokens=_ANNOUNCER_MAX_NEW_TOKENS,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_AnnouncerPass] creative_fn raised: %s: %s",
+            type(exc).__name__, exc,
+        )
+        return None
+
+
+def compose_announcer_intro(
+    *,
+    creative_fn,
+    script_brief: str,
+    creative_repo_id: str | None = None,
+) -> LineResult:
+    """Compose the episode's opening announcer line.
+
+    A dedicated creative-slot pass: a purpose-built framing prompt
+    from `script_brief`, plain-text output, one LLM call, no reroll.
+    On any failure (no brief, call raised, validation rejected) the
+    deterministic `fallback_announcer_intro` fires.
+
+    `creative_repo_id` is the writer's resolved creative-slot model id
+    -- accepted for call-signature parity with `compose_line` and
+    surfaced in the log line; the announcer framing prompt itself is
+    model-agnostic by design.
+
+    Returns a `LineResult`; `compose_flags` is ``("announcer_intro",)``
+    on the LLM path or ``("announcer_intro_fallback",)`` on fallback.
+    """
+    # LLM slot: creative -- announcer intro is a narrative framing
+    # pass; routed through the writer's creative_writing_model slot.
+    brief = clean_one_line(script_brief or "", max_chars=0)
+    if not brief:
+        log.warning(
+            "[OTR_AnnouncerPass] intro: empty script_brief; "
+            "using deterministic fallback",
+        )
+        return LineResult(
+            text=fallback_announcer_intro(""),
+            compose_flags=("announcer_intro_fallback",),
+        )
+    messages = [
+        {"role": "system", "content": _ANNOUNCER_INTRO_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"Tonight's story brief:\n{brief}\n\n"
+                f"Write the announcer's opening line now."
+            ),
+        },
+    ]
+    raw = _announcer_generate(creative_fn, messages)
+    cleaned = strip_line_formatting(raw or "")
+    ok, validated = validate_announcer_line(
+        cleaned,
+        min_chars=_ANNOUNCER_INTRO_MIN_CHARS,
+        max_chars=_ANNOUNCER_INTRO_MAX_CHARS,
+    )
+    if ok:
+        log.info(
+            "[OTR_AnnouncerPass] intro pass ok (model=%s, %d chars)",
+            creative_repo_id, len(validated),
+        )
+        return LineResult(
+            text=validated, compose_flags=("announcer_intro",),
+        )
+    log.warning(
+        "[OTR_AnnouncerPass] intro pass failed validation "
+        "(model=%s, raw=%r); using deterministic fallback",
+        creative_repo_id, raw,
+    )
+    return LineResult(
+        text=fallback_announcer_intro(brief),
+        compose_flags=("announcer_intro_fallback",),
+    )
+
+
+def compose_announcer_outro(
+    *,
+    creative_fn,
+    script_brief: str,
+    news_close_brief: str,
+    intro_text: str,
+    creative_repo_id: str | None = None,
+) -> LineResult:
+    """Compose the episode's closing announcer line.
+
+    A dedicated creative-slot pass run post-loop, once the script and
+    the intro line both exist. Context is `script_brief` +
+    `news_close_brief` + `intro_text` only -- never the full script (a
+    tight prompt yields a tight close, and it keeps the KV cache
+    small). Plain-text output, one LLM call, no reroll. On any failure
+    the deterministic `fallback_announcer_outro` fires.
+
+    `creative_repo_id` is accepted for call-signature parity with
+    `compose_line` (see `compose_announcer_intro`).
+
+    Returns a `LineResult`; `compose_flags` is ``("announcer_outro",)``
+    on the LLM path or ``("announcer_outro_fallback",)`` on fallback.
+    """
+    # LLM slot: creative -- announcer outro is a narrative framing
+    # pass; routed through the writer's creative_writing_model slot.
+    brief = clean_one_line(script_brief or "", max_chars=0)
+    close = clean_one_line(news_close_brief or "", max_chars=0)
+    intro = clean_one_line(intro_text or "", max_chars=0)
+    if not brief and not close:
+        log.warning(
+            "[OTR_AnnouncerPass] outro: empty script_brief and "
+            "news_close_brief; using deterministic fallback",
+        )
+        return LineResult(
+            text=fallback_announcer_outro(close),
+            compose_flags=("announcer_outro_fallback",),
+        )
+    user_parts: list[str] = []
+    if brief:
+        user_parts.append(f"Tonight's story brief:\n{brief}")
+    if close:
+        user_parts.append(
+            f"Closing brief (the journalistic note to land):\n{close}"
+        )
+    if intro:
+        user_parts.append(f"The announcer's opening line was:\n{intro}")
+    user_parts.append("Write the announcer's closing line now.")
+    messages = [
+        {"role": "system", "content": _ANNOUNCER_OUTRO_SYSTEM},
+        {"role": "user", "content": "\n\n".join(user_parts)},
+    ]
+    raw = _announcer_generate(creative_fn, messages)
+    cleaned = strip_line_formatting(raw or "")
+    ok, validated = validate_announcer_line(
+        cleaned,
+        min_chars=_ANNOUNCER_OUTRO_MIN_CHARS,
+        max_chars=_ANNOUNCER_OUTRO_MAX_CHARS,
+    )
+    if ok:
+        log.info(
+            "[OTR_AnnouncerPass] outro pass ok (model=%s, %d chars)",
+            creative_repo_id, len(validated),
+        )
+        return LineResult(
+            text=validated, compose_flags=("announcer_outro",),
+        )
+    log.warning(
+        "[OTR_AnnouncerPass] outro pass failed validation "
+        "(model=%s, raw=%r); using deterministic fallback",
+        creative_repo_id, raw,
+    )
+    return LineResult(
+        text=fallback_announcer_outro(close),
+        compose_flags=("announcer_outro_fallback",),
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -133,7 +133,7 @@ Routing decisions (from Jeffrey's "Creative = everything narrative; Technical = 
 | `OTR_LedgerScriptWriter` FORMAT_NORM        | technical    | structured                                   |
 | `OTR_LedgerScriptWriter` Grammarian         | technical    | structured                                   |
 | `OTR_LedgerScriptWriter` LLM_RESCUE         | technical    | structured                                   |
-| `OTR_LedgerScriptWriter` ANNOUNCER bookends | technical    | structured                                   |
+| `OTR_LedgerScriptWriter` announcer intro/outro | creative  | narrative framing pass (BUG-LOCAL-255, 2026-05-22) |
 | `OTR_LedgerFreezeCascade` (Phase 1/2/9)     | technical    | reviewer verdicts                            |
 | `OTR_LFCPhase4Scene`                        | creative     | narrative coherence                          |
 | `OTR_LFCPhase5Voice`                        | technical    | per-line targeted rewrites                   |

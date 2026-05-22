@@ -2240,6 +2240,28 @@ class OTR_LedgerScriptWriter:
         # back-compat for callers without a style picked yet.
         style_descriptor = str(resolved.get("style") or "").strip()
 
+        # Announcer dedicated-pass bookend ids (2026-05-22,
+        # BUG-LOCAL-255). `_otr_outline._synthesize_outline` always
+        # stamps the FIRST and LAST beats as announcer; those two get
+        # purpose-built creative passes -- compose_announcer_intro
+        # in-loop on the first, compose_announcer_outro post-loop on
+        # the last. Any other announcer beat (none today; act-breaks
+        # insert music_inter, not announcer) keeps the shared
+        # compose_line path. first==last and the empty list are both
+        # guarded at the use sites.
+        _announcer_ids = [
+            b.beat_id for b in outline.beats
+            if b.speaker_role == "announcer"
+        ]
+        first_announcer_id = _announcer_ids[0] if _announcer_ids else None
+        last_announcer_id = _announcer_ids[-1] if _announcer_ids else None
+        # news_close_brief drives the outro pass + its deterministic
+        # fallback. Hoisted above the loop so the in-loop placeholder
+        # for the final announcer beat can use it too.
+        nc_brief = str(
+            (meta.get("news") or {}).get("news_close_brief") or ""
+        ).strip()
+
         # Tier 3 fix #19 (2026-05-11): single LineRequest construction
         # site for both character and announcer beats. Pre-Tier-3 the
         # body was duplicated twice across ~25 fields each; adding a
@@ -2328,32 +2350,71 @@ class OTR_LedgerScriptWriter:
                     last_lines.pop(0)
 
             elif beat.speaker_role == "announcer":
-                line_req = _build_line_request_for_beat(
-                    beat, is_announcer=True,
-                )
-                # LLM slot: creative -- announcer beats route through
-                # the same composer path as character beats; both are
-                # narrative writes. (The plan's "ANNOUNCER bookends"
-                # technical pass refers to a hypothetical refactor
-                # that doesn't exist in the current code.)
-                # S32 B6: helper_context attribution. Per-beat
-                # invocation; the context-manager overhead is
-                # constant-time and negligible relative to the LLM
-                # call itself.
-                with slot_scheduler.helper_context("compose_line"):
-                    line_res = _OTRLC.compose_line(
-                        creative_fn=creative_generate_fn,
-                        technical_fn=technical_generate_fn,
-                        req=line_req,
-                        base_temperature=base_temp,
-                        max_new_tokens_cap=resolved["max_new_tokens_cap"],
-                        enable_polish_pass=resolved["enable_polish_pass"],
-                        polish_generate_fn=polish_generate_fn,
-                        creative_repo_id=resolved["creative_writing_model"],
-                    )
-                cleaned = line_res.text
-                beat_compose_flags = line_res.compose_flags
+                # Announcer dedicated passes (2026-05-22, BUG-LOCAL-255).
+                # The first announcer beat gets compose_announcer_intro
+                # in-loop; the last gets no in-loop LLM call -- the
+                # post-loop compose_announcer_outro pass overwrites it
+                # once the script + the intro text both exist. Any
+                # other announcer beat (none in the current outline)
+                # falls back to the shared compose_line path.
                 cid = "announcer"
+                if (
+                    first_announcer_id is not None
+                    and beat.beat_id == first_announcer_id
+                ):
+                    # LLM slot: creative -- dedicated announcer intro,
+                    # a narrative framing pass. Routed through the
+                    # writer's creative_writing_model slot; no widget.
+                    with slot_scheduler.helper_context(
+                        "compose_announcer_intro"
+                    ):
+                        line_res = _OTRLC.compose_announcer_intro(
+                            creative_fn=creative_generate_fn,
+                            script_brief=script_brief,
+                            creative_repo_id=resolved[
+                                "creative_writing_model"
+                            ],
+                        )
+                    cleaned = line_res.text
+                    beat_compose_flags = line_res.compose_flags
+                elif (
+                    last_announcer_id is not None
+                    and beat.beat_id == last_announcer_id
+                    and last_announcer_id != first_announcer_id
+                ):
+                    # No in-loop LLM call. Drop in the deterministic
+                    # outro fallback as the placeholder so a mid-loop
+                    # crash still leaves a valid closing bookend; the
+                    # post-loop outro pass overwrites this row.
+                    cleaned = _OTRLC.fallback_announcer_outro(nc_brief)
+                    beat_compose_flags = ()
+                else:
+                    line_req = _build_line_request_for_beat(
+                        beat, is_announcer=True,
+                    )
+                    # LLM slot: creative -- a mid-episode announcer
+                    # beat is a narrative write; keep the shared
+                    # composer path. S32 B6: helper_context
+                    # attribution; constant-time overhead.
+                    with slot_scheduler.helper_context("compose_line"):
+                        line_res = _OTRLC.compose_line(
+                            creative_fn=creative_generate_fn,
+                            technical_fn=technical_generate_fn,
+                            req=line_req,
+                            base_temperature=base_temp,
+                            max_new_tokens_cap=resolved[
+                                "max_new_tokens_cap"
+                            ],
+                            enable_polish_pass=resolved[
+                                "enable_polish_pass"
+                            ],
+                            polish_generate_fn=polish_generate_fn,
+                            creative_repo_id=resolved[
+                                "creative_writing_model"
+                            ],
+                        )
+                    cleaned = line_res.text
+                    beat_compose_flags = line_res.compose_flags
                 token = f"[VOICE: ANNOUNCER, {traits}] {cleaned}"
 
                 last_lines.append(("ANNOUNCER", cleaned))
@@ -2417,45 +2478,64 @@ class OTR_LedgerScriptWriter:
             script_text_parts.append(token)
 
         # --- I.5. News-wiring overlay (Phase 2B: operates on ledger) --
-        # Two pure operations on `led.data["lines"]` AFTER the
-        # progressive composer loop completes. Both no-op when
-        # meta["news"] is None (graceful-degrade path).
+        # Two operations on `led.data["lines"]` AFTER the progressive
+        # composer loop completes.
         #
-        # 1. Announcer closing-line override. The line composer wrote
-        #    something at every announcer beat from beat.intent. For
-        #    the LAST announcer beat we substitute news_close_brief
-        #    so the listener actually hears the journalistic content
-        #    from the source article (era-neutral, news_interpreter-
-        #    distilled).
+        # 1. Announcer closing-line pass. The per-beat loop left a
+        #    deterministic placeholder on the final announcer beat.
+        #    Now that the full script + the intro line both exist,
+        #    compose_announcer_outro writes the purpose-built close
+        #    (script_brief + news_close_brief + the intro text) and
+        #    overwrites that row. This replaces the retired
+        #    `override_announcer_close` verbatim stamp -- that helper
+        #    matched a private `_speaker_role` key absent from the
+        #    ledger's `lines[]` rows, so the close was silently never
+        #    applied (BUG-LOCAL-255). Skipped only on a degenerate
+        #    outline where the first and last announcer beat coincide
+        #    (the intro pass already filled it).
         #
         # 2. Post-assembly key_terms audit. Walk every voiced line,
         #    check each key_term landed via word-boundary regex.
         #    Stamp the result on meta["post_assembly_key_terms"].
         news_meta = meta.get("news") or {}
-        nc_brief = (news_meta.get("news_close_brief") or "").strip()
-        if nc_brief:
-            overridden = _OTRNW.override_announcer_close(
-                led.data["lines"], nc_brief,
+        if (
+            last_announcer_id is not None
+            and last_announcer_id != first_announcer_id
+        ):
+            # Read the composed intro line back from the ledger so the
+            # outro prompt can lightly echo its tone.
+            intro_text = ""
+            for _ln in led.data.get("lines") or []:
+                if _ln.get("line_id") == first_announcer_id:
+                    intro_text = str(_ln.get("text") or "")
+                    break
+            # LLM slot: creative -- dedicated announcer outro, a
+            # narrative framing pass. Routed through the writer's
+            # creative_writing_model slot; no widget.
+            with slot_scheduler.helper_context("compose_announcer_outro"):
+                outro_res = _OTRLC.compose_announcer_outro(
+                    creative_fn=creative_generate_fn,
+                    script_brief=script_brief,
+                    news_close_brief=nc_brief,
+                    intro_text=intro_text,
+                    creative_repo_id=resolved["creative_writing_model"],
+                )
+            # patch_line_text recomputes char_count + word_count in
+            # lockstep; patch_line_fields stamps the outro compose_flags
+            # so aggregate_compose_flags + soak see the pass result.
+            _OTRL.patch_line_text(
+                led.data, last_announcer_id, outro_res.text,
             )
-            if overridden is not None:
-                # Recompute char_count + word_count after the in-place
-                # text override so downstream consumers see fresh
-                # counts (override_announcer_close only touches `text`).
-                _OTRL.patch_line_text(
-                    led.data, overridden["line_id"], overridden["text"],
-                )
-                log.info(
-                    "[OTR_LedgerScriptWriter] news_close_brief stamped "
-                    "onto closing announcer line %s",
-                    overridden.get("line_id"),
-                )
-            else:
-                log.warning(
-                    "[OTR_LedgerScriptWriter] news_close_brief present "
-                    "but no announcer line found in led.data['lines'] "
-                    "to stamp onto; closing read will use the line "
-                    "composer's original text"
-                )
+            _OTRL.patch_line_fields(
+                led.data, last_announcer_id,
+                {"compose_flags": list(outro_res.compose_flags)},
+            )
+            led.save()
+            log.info(
+                "[OTR_LedgerScriptWriter] announcer outro pass wrote "
+                "closing line %s (flags=%s)",
+                last_announcer_id, outro_res.compose_flags,
+            )
 
         nc_key_terms = tuple(news_meta.get("key_terms") or ())
         if nc_key_terms:
