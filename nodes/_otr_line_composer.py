@@ -337,10 +337,13 @@ def detect_phantom_names(
       3. Title-Case bigrams (mid-sentence only — sentence-start skipped)
 
     A candidate is a phantom iff its UPPERCASE form is NOT in
-    `allowed_roster` and NOT the speaker's own name (the composer is
-    told not to say its own name, but if it slips through,
-    `strip_line_formatting` already removes it; flagging it as a
-    phantom would be a false positive).
+    `allowed_roster`, NOT a whole-word component of a multi-word
+    roster entry ("Gulliver" clears when "GULLIVER REEVES" is cast,
+    "Big" / "Bang" clear when "Big Bang" is a key_term -- BUG-LOCAL-256),
+    and NOT the speaker's own name (the composer is told not to say
+    its own name, but if it slips through, `strip_line_formatting`
+    already removes it; flagging it as a phantom would be a false
+    positive).
 
     Returns a list of phantoms in first-seen order, de-duplicated.
     Never raises.
@@ -350,6 +353,21 @@ def detect_phantom_names(
     speaker_u = (speaker or "").strip().upper()
     found: dict[str, None] = {}
 
+    # BUG-LOCAL-256: a candidate is allowed when its uppercase form is
+    # a roster entry OR a whole-word component of a multi-word roster
+    # entry. Full cast names ("GULLIVER REEVES") and multi-word
+    # key_terms ("BIG BANG") otherwise leave their individual words
+    # ("Gulliver", "Big", "Bang") unrecognized, so the single-word and
+    # bigram passes flag them as phantoms even though the entity is on
+    # the roster. Component words are low-risk to allow: the gate is
+    # detect-and-flag-only, and a word that belongs to a known entity
+    # is by definition not an invented name.
+    allowed: set[str] = set(allowed_roster)
+    for _entry in allowed_roster:
+        for _word in str(_entry).split():
+            if _word:
+                allowed.add(_word)
+
     # 1. ALL-CAPS tokens — anywhere in text.
     for m in _ALL_CAPS_TOKEN_RE.finditer(text):
         tok = m.group(0).strip()
@@ -358,7 +376,7 @@ def detect_phantom_names(
         tok_u = tok.upper()
         if tok_u == speaker_u:
             continue
-        if tok_u in allowed_roster:
+        if tok_u in allowed:
             continue
         if tok_u in _COMMON_ALLCAPS_NON_NAMES:
             continue
@@ -372,7 +390,7 @@ def detect_phantom_names(
         tok_u = tok.upper()
         if tok_u == speaker_u:
             continue
-        if tok_u in allowed_roster:
+        if tok_u in allowed:
             continue
         found.setdefault(tok, None)
 
@@ -387,7 +405,7 @@ def detect_phantom_names(
             tok_u = tok.upper()
             if tok_u == speaker_u:
                 continue
-            if tok_u in allowed_roster:
+            if tok_u in allowed:
                 continue
             # Skip if the bigram is itself a titled name already
             # caught by pass 2 (avoid double-reporting "Dr. Patel"
@@ -412,7 +430,7 @@ def detect_phantom_names(
             tok_u = tok.upper()
             if tok_u == speaker_u:
                 continue
-            if tok_u in allowed_roster:
+            if tok_u in allowed:
                 continue
             if tok in _COMMON_TITLE_CASE_WORDS:
                 continue

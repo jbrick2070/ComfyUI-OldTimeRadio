@@ -213,6 +213,70 @@ class TestDetectPhantomNames:
         assert detect_phantom_names("\n\n\n", "ALICE", roster) == []
         assert detect_phantom_names("!!!", "ALICE", roster) == []
 
+    # --- BUG-LOCAL-256: multi-word roster entries -----------------------
+    # A full cast name ("GULLIVER REEVES") or a multi-word key_term
+    # ("Big Bang") must clear its individual component words. Before the
+    # fix the single-word / bigram passes flagged "Gulliver", "Big" and
+    # "Bang" as phantoms even though the entity was on the roster.
+
+    def test_component_of_multiword_cast_name_not_flagged(self):
+        roster = build_allowed_roster(
+            cast_rows=[{"name": "LEMMY"}, {"name": "GULLIVER REEVES"}],
+        )
+        # First name used alone, mid-sentence.
+        assert detect_phantom_names(
+            "Hold on, Gulliver, we are close.", "LEMMY", roster,
+        ) == []
+        # Surname used alone, mid-sentence.
+        assert detect_phantom_names(
+            "I think Reeves already checked the panel.", "LEMMY", roster,
+        ) == []
+        # Full name used as the bigram.
+        assert detect_phantom_names(
+            "I trust Gulliver Reeves with the readings.", "LEMMY", roster,
+        ) == []
+
+    def test_component_of_multiword_key_term_not_flagged(self):
+        roster = build_allowed_roster(
+            cast_rows=[{"name": "LEMMY"}],
+            key_terms=("Einstein", "Big Bang"),
+        )
+        # The multi-word key_term and each of its component words clear.
+        assert detect_phantom_names(
+            "The resonance holds out here near the Big Bang.",
+            "LEMMY", roster,
+        ) == []
+        assert detect_phantom_names(
+            "I keep circling back to that Big idea of his.",
+            "LEMMY", roster,
+        ) == []
+
+    def test_bug256_episode_scenario(self):
+        # Exact shape from episode signal_lost_temporal_mirror_echoes_
+        # 20260522_150549, line b007: cast LEMMY + GULLIVER REEVES,
+        # key_term "Big Bang". Pre-fix this flagged phantom_name:Gulliver
+        # + phantom_name:Big + phantom_name:Bang.
+        roster = build_allowed_roster(
+            cast_rows=[{"name": "LEMMY"}, {"name": "GULLIVER REEVES"}],
+            key_terms=("Einstein", "wormhole", "quantum physics", "Big Bang"),
+        )
+        assert detect_phantom_names(
+            "The resonance hum holds, Gulliver, defying every known "
+            "decay rate out here near the Big Bang.",
+            "LEMMY", roster,
+        ) == []
+
+    def test_genuine_phantom_still_flagged_with_multiword_roster(self):
+        # The component-word allowance must not disable detection: an
+        # invented name unrelated to any roster entry still flags.
+        roster = build_allowed_roster(
+            cast_rows=[{"name": "LEMMY"}, {"name": "GULLIVER REEVES"}],
+            key_terms=("Big Bang",),
+        )
+        assert detect_phantom_names(
+            "I never once trusted Marcus with the panel.", "LEMMY", roster,
+        ) == ["Marcus"]
+
 
 # ---------------------------------------------------------------------------
 # compose_line + LineResult contract
