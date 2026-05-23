@@ -462,6 +462,30 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
+## HOTFIX -- Outline cast-drift crash: forward plan (Jeffrey, 2026-05-23)
+
+**Status:** preempts the PRIORITY 1-3 queue. This is a crash, not a polish item -- the writer's outline Stage 2 hard-crashes the whole ComfyUI run when the creative LLM assigns a beat speaker outside the locked cast (`OutlineFailedError`, uncaught, ~112 s in). No episode can complete until this lands. Plan synthesized from a round-robin consult; full context in `docs/2026-05-23-outline-cast-drift-problem-statement.md` and `-claude-analysis.md`.
+
+**Two independent defects:** (a) the creative LLM emits off-cast speaker names; (b) the pipeline hard-crashes when it does. Both get fixed. Steps are ordered -- 1-2 are the hotfix, 3-5 ship with it or right after, 6-7 are later hardening.
+
+1. **Singleton-cast bypass.** When the locked cast has exactly one character, skip the Stage 2 speaker LLM call entirely -- there is no decision to make. Build the `_PhaseSkeleton` directly with the sole cast name on every character beat. This alone prevents the observed crash (`num_characters=1`, cast `['LEMMY']`, model invented `LEMMEY` / `CAPTAIN`).
+
+2. **Deterministic no-crash fallback (multi-character casts).** At the Stage 2 failure point in `generate_outline()` -- where `skeleton is None` after the retry budget exhausts -- replace the `raise OutlineFailedError` with a deterministic speaker assignment: round-robin the locked cast names across the phase's beats. Fix it here, at the failure point, not by catching `OutlineFailedError` downstream in `OTR_LedgerScriptWriter` -- by then there is no clean outline object to repair. A cast-membership miss must never crash a run; the valid speaker set is always known.
+
+3. **Invert and lower the Stage 2 retry temperature.** Stage 2 is structured routing, not prose, and must not be sampled like creative text. Replace the current rising schedule (0.70 -> 0.80 -> 0.30) with a low, monotonically falling one -- roughly attempt 1 = 0.35, attempt 2 = 0.25, attempt 3 (repair) = 0.15.
+
+4. **Remove the prompt contradiction.** The Stage 2 system prompt currently pushes "vary speakers so dialogue feels like a real exchange" -- active pressure to invent speakers, and poison for a singleton cast. Make speaker variation explicitly optional for multi-character casts ("Use only these exact cast names; speaker variation is optional, not required"). The singleton case is covered by step 1's bypass.
+
+5. **Minimal speaker normalization -- not broad fuzzy matching.** Always normalize an emitted speaker before the cast-membership check: strip whitespace, uppercase, drop stray surrounding punctuation (`" LEMMY "`, `"LEMMY:"` -> `"LEMMY"`). Do NOT add broad edit-distance fuzzy matching for multi-character casts -- it can silently assign the wrong actor. The singleton typo case (`LEMMEY`) is already removed by step 1.
+
+6. **GBNF dynamic cast-enum -- long-term hardening, after 1-5 land.** Constrain the Stage 2 `speaker` field with a GBNF grammar whose enum is built per-episode from the locked cast, so an off-cast name is impossible to emit. This is hardening, not the hotfix -- the deterministic fallback (step 2) must be working first.
+
+7. **Consider routing Stage 2 to the technical slot -- last, and only if step 6 warrants it.** Speaker assignment is structured, so the technical slot + GBNF is its natural home. But weigh the cost: when the creative and technical models differ, crossing the slot boundary forces a full model teardown/reload. Do not move it unless GBNF makes the move clearly worth that cost.
+
+**Done when:** an operator episode run completes the writer outline with valid in-cast speakers and zero `OutlineFailedError`, for both a 1-character and a multi-character cast. Regression: `tests/` coverage for the singleton bypass, the deterministic fallback (no raise, valid skeleton produced), the new temperature schedule, and speaker normalization.
+
+---
+
 ## PRIORITY 1 -- Ledger durability: save + discovery for every run (Jeffrey, 2026-05-19)
 
 **Status:** PRIORITY 1 of the forward queue (Jeffrey, 2026-05-19). Rationale: the production ledger is the most upstream artifact in the whole pipeline -- the writer creates it and every downstream stage (FLUX, HuMo, LTX, VideoComposite, rtx_upscale) depends on finding and trusting it. Run-record reliability is foundational, so it leads. Opens once the in-flight tail-bug closure re-run lands a final mp4. Architecture work -- round-robin before any build.
