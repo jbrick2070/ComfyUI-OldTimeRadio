@@ -1,4 +1,4 @@
-﻿# S27 Cleanbreak Tail — Final QA Review
+# S27 Cleanbreak Tail — Final QA Review
 
 ## Verdict
 

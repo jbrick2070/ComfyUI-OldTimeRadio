@@ -1,4 +1,4 @@
-﻿# S26 Cleanbreak — Audit & Per-Item Results
+# S26 Cleanbreak — Audit & Per-Item Results
 
 Run start: 2026-05-13. Branch `s26-cleanbreak` cut from `s25-musicgen-parity` (HEAD `3393b39` — includes planning carry-along commit `3393b39` on top of `5369da4` cleanbreak audit addendum).
 

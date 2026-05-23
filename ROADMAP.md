@@ -1,4 +1,4 @@
-﻿# OTR Roadmap
+# OTR Roadmap
 
 **Branch:** `v2.0-alpha` (HEAD `1adce21` 2026-05-18 -- Sprint H §3.7 harness GREEN, BUG-LOCAL-230 architectural axis PROVEN by 2026-05-18 21:10 smoke, runtime axis BLOCKED on BUG-LOCAL-231 residual VRAM pressure) | **Active branch:** `v2.0-alpha` (no sub-branch; supervisor + worker bug-hunt harness wired clean) | **Owner:** Jeffrey A. Brick | **Last refactored:** 2026-05-18 21:10 (BUG-LOCAL-230 verification smoke; gates #1-#4 + #7 PASS, gates #5 + #6 FAIL on a separate defect now tracked as BUG-LOCAL-231)
 

@@ -1,4 +1,4 @@
-﻿# OTR Bug Log
+# OTR Bug Log
 
 **Repo:** `ComfyUI-OldTimeRadio` @ `v2.0-alpha`
 **Owner:** Jeffrey A. Brick

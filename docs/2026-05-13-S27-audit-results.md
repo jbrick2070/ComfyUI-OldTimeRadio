@@ -1,4 +1,4 @@
-﻿# S27 Cleanbreak Tail — audit results
+# S27 Cleanbreak Tail — audit results
 
 **Branch:** `s27-cleanbreak-tail` cut from `s26-cleanbreak` HEAD `19cf286`
 **Posture:** DELETE NOW. THE NEW LEDGER IS THE ONLY LEDGER. NO BACK-COMPAT FOR OLD JSON, NO BACK-COMPAT FOR OLD ON-DISK LEDGERS.

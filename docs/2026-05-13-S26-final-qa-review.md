@@ -1,4 +1,4 @@
-﻿# S26 Cleanbreak + Chained Sprints — Swim-Return QA Review
+# S26 Cleanbreak + Chained Sprints — Swim-Return QA Review
 
 **Branch:** `s26-cleanbreak` (cut from `s25-musicgen-parity` HEAD `3393b39`; planning carry committed before sprint open)
 **Run date:** 2026-05-13 (autonomous Cowork execution)

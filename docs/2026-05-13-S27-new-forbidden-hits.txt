@@ -1,4 +1,4 @@
-﻿FORBIDDEN-PATTERN SWEEP -- cross-diff s26-cleanbreak..HEAD
+FORBIDDEN-PATTERN SWEEP -- cross-diff s26-cleanbreak..HEAD
 =========================================================
 
 Raw line count: 23 added lines match the forbidden-pattern regex

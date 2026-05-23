@@ -1,4 +1,4 @@
-﻿# S26 Cleanbreak -- Independent Adversarial QA Review
+# S26 Cleanbreak -- Independent Adversarial QA Review
 
 **Verdict:** CLEANBREAK COMPLETE -- 7 issues (1 cleanup on internally-inconsistent SFX contract, 2 cleanup on sibling-pattern audit misses, 2 cleanup on sweep-pattern gap + downstream of deferred B6, 2 nits)
 **Reviewer:** Independent QA pass, adversarial framing
