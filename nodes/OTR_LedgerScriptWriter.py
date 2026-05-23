@@ -69,8 +69,6 @@ Widget surface (post-Phase-3 cleanup 2026-05-11):
         style_custom      STRING  (free-text override; empty falls back
                                    to style combo)
         creativity        combo   (maps to temperature + top_p preset)
-        optimization_profile combo (VRAM-tier; only Standard validated
-                                    today, others fall back to Standard)
         perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for
                                         RTXUpscale spacesaver)
 
@@ -294,6 +292,12 @@ _TITLE_PREFIX_RE = None  # compiled lazily inside the helper to keep
 # ---------------------------------------------------------------------------
 
 
+# The optimization_profile widget was removed from INPUT_TYPES on
+# 2026-05-23 (UI simplification, ROADMAP PRIORITY 2): of its VRAM tiers
+# only "Standard" was ever validated. This tier list is retained --
+# _resolve_inputs keeps its "Standard" default and the meta plumbing,
+# so re-exposing the widget when the v2 loader's profile branches land
+# is a one-line INPUT_TYPES add against this list.
 _OPTIMIZATION_PROFILE_CHOICES = [
     "Standard",
     "Pro (Ultra Quality)",
@@ -1480,16 +1484,6 @@ class OTR_LedgerScriptWriter:
                         "  maximum chaos  -> temp 0.95, top_p 0.99\n"
                         "(BUG-014: temp > 1.0 caused format collapse, "
                         "so 'maximum chaos' caps at 0.95.)"
-                    ),
-                }),
-                "optimization_profile": (_OPTIMIZATION_PROFILE_CHOICES, {
-                    "default": "Standard",
-                    "tooltip": (
-                        "[v2.0 MVP forward-compat] Plumbed through to "
-                        "_otr_model_loader for VRAM-tier selection. "
-                        "Today only 'Standard' is fully validated; "
-                        "the other tiers fall back to Standard until "
-                        "the v2 loader's profile branches land."
                     ),
                 }),
                 "perfect_run_spacesaver": ("BOOLEAN", {
@@ -3000,7 +2994,7 @@ if __name__ == "__main__":
         for k in ("seed", "creative_writing_model", "technical_model",
                   "custom_premise", "include_act_breaks", "act_count",
                   "style", "style_custom", "creativity",
-                  "optimization_profile", "perfect_run_spacesaver"):
+                  "perfect_run_spacesaver"):
             assert k in spec["optional"], f"optional missing key: {k}"
         # Legacy widgets MUST be absent post-cleanup. `model_id` joins
         # the legacy list at B2a (replaced by the two slot widgets).
@@ -3058,14 +3052,15 @@ if __name__ == "__main__":
         assert sc_meta.get("multiline") is True
         assert sc_meta.get("default") == ""
         n_optional = len(spec["optional"])
-        # S31 B6 Fix 2: self-test count drift. Pre-fix expected 11
-        # (after S30 B2a two-widget split). Actual count is 15 -- the
-        # 4 Phase 4 v4 sampling knobs (added in a subsequent
-        # mini-iteration that didn't update this assertion) bring the
-        # total to 15. Update the assertion to match runtime reality.
-        assert n_optional == 15, (
+        # optimization_profile widget removed 2026-05-23 (UI
+        # simplification, ROADMAP PRIORITY 2): of its VRAM tiers only
+        # "Standard" was ever validated. _resolve_inputs keeps its
+        # "Standard" default + meta plumbing, so the value still flows.
+        # Optional count 15 -> 14: 10 widget-surface + 4 Phase 4 v4
+        # sampling knobs.
+        assert n_optional == 14, (
             f"optional widget count drift: {n_optional} "
-            f"(expected 15: 11 widget-surface + 4 Phase 4 v4 "
+            f"(expected 14: 10 widget-surface + 4 Phase 4 v4 "
             f"sampling knobs)"
         )
         # S30 B2a: both model widgets carry the catalog dropdown_choices()

@@ -349,8 +349,9 @@ _WRITER_STYLE_SENTINEL = "let the story decide"
 #   0 episode_title / 1 target_words / 2 num_characters / 3 seed
 #   4 seed_mode / 5 model_id / 6 custom_premise / 7 include_act_breaks
 #   8 act_count / 9 style  <- this slot / 10 style_custom
-#   11 creativity / 12 optimization_profile / 13 perfect_run_spacesaver
-#   14 min_p / 15 repetition_penalty / 16 max_new_tokens_cap
+#   11 creativity / 12 perfect_run_spacesaver / 13 min_p
+#   14 repetition_penalty / 15 max_new_tokens_cap
+#   (optimization_profile widget removed 2026-05-23, ROADMAP PRIORITY 2)
 # If the writer's INPUT_TYPES order changes, update this constant
 # in lockstep so the drift guard keeps catching the real regression.
 # S30 B2a: writer widgets_values vector grew by 1 (technical_model
@@ -650,15 +651,17 @@ class TestWriterB2aSurface:
         #  10  style                   "let the story decide"
         #  11  style_custom            ""
         #  12  creativity              "balanced"
-        #  13  optimization_profile    "Standard"
-        #  14  perfect_run_spacesaver  False
-        #  15  min_p                   0.05
-        #  16  repetition_penalty      1.03
-        #  17  max_new_tokens_cap      200
-        #  18  enable_polish_pass      False
-        assert len(wv) == 19, (
+        #  13  perfect_run_spacesaver  False
+        #  14  min_p                   0.05
+        #  15  repetition_penalty      1.03
+        #  16  max_new_tokens_cap      200
+        #  17  enable_polish_pass      False
+        # optimization_profile widget removed 2026-05-23 (ROADMAP
+        # PRIORITY 2); vector 19 -> 18, slots 14..18 shifted down to
+        # 13..17.
+        assert len(wv) == 18, (
             f"writer widgets_values length drift: {len(wv)} "
-            f"(expected 19 post-B2a)"
+            f"(expected 18 post-B2a, optimization_profile removed)"
         )
         # Creative + technical slots both bound to a string repo id
         # (default = catalog DEFAULT_LLM but any non-empty STRING is
@@ -678,8 +681,9 @@ class TestWriterB2aSurface:
         assert wv[12] == "balanced", (
             f"creativity widget drifted: {wv[12]!r}"
         )
-        assert wv[13] == "Standard", (
-            f"optimization_profile widget drifted: {wv[13]!r}"
+        assert wv[13] is False, (
+            f"perfect_run_spacesaver widget drifted from slot 13 "
+            f"(optimization_profile removed): {wv[13]!r}"
         )
 
     def test_writer_broadcasts_normalized_model_ids(self):

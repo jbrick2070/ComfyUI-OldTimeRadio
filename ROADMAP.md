@@ -489,6 +489,8 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 **Goal:** Surface only the human-meaningful controls (episode title, length, character count, premise, style, creativity, act breaks). Move the LLM-internal knobs (`min_p`, `repetition_penalty`, `max_new_tokens_cap`) behind an "advanced" affordance or sensible hidden defaults. Every widget that stays visible gets a plain-language tooltip.
 
+**Progress (2026-05-23):** `optimization_profile` hidden as a standalone change ahead of the full sprint -- the combo offered VRAM tiers only "Standard" ever validated. Widget removed from `OTR_LedgerScriptWriter` INPUT_TYPES; `_resolve_inputs` keeps its `"Standard"` default + `_OPTIMIZATION_PROFILE_CHOICES` + the `_otr_model_loader` meta plumbing, so re-exposing it is a one-line add when the v2 loader's profile branches land. Writer optional widget count 15 -> 14; workflow JSON node 1 `widgets_values` 19 -> 18; writer self-check + `test_otr_api_companions` + `test_workflow_json_guardrails` updated in lockstep; full `tests/` walk 2491 passed / 17 skipped / 0 failed.
+
 **HARD CONSTRAINT -- do NOT delete these (architecturally load-bearing):**
 
 - `seed` -- C7 byte-identity depends on the writer-seed RNG (cast contract C7). May be hidden / collapsed / defaulted, never removed.

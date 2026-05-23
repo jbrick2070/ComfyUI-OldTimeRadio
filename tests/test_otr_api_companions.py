@@ -11,7 +11,7 @@ These tests exercise:
   1. The synthesis: declaration order + companion injection produces a
      slot list whose length equals `widgets_values` for a clean-saved
      workflow.
-  2. The canonical workflow shape (19-entry widgets_values on node 1):
+  2. The canonical workflow shape (18-entry widgets_values on node 1):
      a `creative_writing_model` patch lands at slot 5, NOT slot 4 (which
      is the `"fixed"` companion). The companion value is preserved.
   3. Same for `technical_model` patch -> slot 6.
@@ -21,7 +21,8 @@ These tests exercise:
      count still rejects.
 
 The OTR_LedgerScriptWriter schema in the fixtures mirrors node 1's
-widgets_values dump from `workflows/otr_scifi_16gb_full.json`:
+widgets_values dump from `workflows/otr_scifi_16gb_full.json`
+(optimization_profile widget removed 2026-05-23, ROADMAP PRIORITY 2):
 
   0  episode_title           STRING        ''
   1  target_words            INT           350
@@ -36,12 +37,11 @@ widgets_values dump from `workflows/otr_scifi_16gb_full.json`:
   10 style                   COMBO         'let the story decide'
   11 style_custom            STRING        ''
   12 creativity              COMBO         'balanced'
-  13 optimization_profile    COMBO         'Standard'
-  14 perfect_run_spacesaver  BOOL          False
-  15 min_p                   FLOAT         0.05
-  16 repetition_penalty      FLOAT         1.03
-  17 (extra INT widget)      INT           200
-  18 (extra BOOL widget)     BOOL          False
+  13 perfect_run_spacesaver  BOOL          False
+  14 min_p                   FLOAT         0.05
+  15 repetition_penalty      FLOAT         1.03
+  16 (extra INT widget)      INT           200
+  17 (extra BOOL widget)     BOOL          False
 
 The `target_words` + `num_characters` + `act_count` INT widgets are
 NOT named "seed" or "noise_seed" -- they do NOT trigger companion
@@ -106,10 +106,6 @@ def _writer_schemas() -> dict:
                         ["balanced", "high", "low"],
                         {"default": "balanced"},
                     ),
-                    "optimization_profile": (
-                        ["Standard", "Obsidian", "8-bit"],
-                        {"default": "Standard"},
-                    ),
                     "perfect_run_spacesaver": (
                         "BOOLEAN", {"default": False},
                     ),
@@ -125,8 +121,9 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 19-entry widgets_values
-    layout dumped from workflows/otr_scifi_16gb_full.json on 2026-05-17.
+    """Workflow fixture with node 1 carrying the 18-entry widgets_values
+    layout dumped from workflows/otr_scifi_16gb_full.json (optimization_
+    profile widget removed 2026-05-23, ROADMAP PRIORITY 2).
     """
     return {
         "nodes": [
@@ -148,12 +145,11 @@ def _writer_node_fixture() -> dict:
                     "let the story decide",      # 10 style
                     "",                          # 11 style_custom
                     "balanced",                  # 12 creativity
-                    "Standard",                  # 13 optimization_profile
-                    False,                       # 14 perfect_run_spacesaver
-                    0.05,                        # 15 min_p
-                    1.03,                        # 16 repetition_penalty
-                    200,                         # 17 max_new_tokens
-                    False,                       # 18 stream
+                    False,                       # 13 perfect_run_spacesaver
+                    0.05,                        # 14 min_p
+                    1.03,                        # 15 repetition_penalty
+                    200,                         # 16 max_new_tokens
+                    False,                       # 17 stream
                 ],
             }
         ],
@@ -223,7 +219,7 @@ def test_serialized_slots_no_companion_for_non_seed_int():
 # Test 2 -- creative_writing_model patch lands past the companion
 # ---------------------------------------------------------------------------
 def test_patch_skips_companion_and_lands_on_correct_index():
-    """Using node 1's actual 19-entry fixture, patch
+    """Using node 1's actual 18-entry fixture, patch
     creative_writing_model and assert widgets_values[5] changes
     (NOT widgets_values[4], which is the companion).
     """
@@ -392,7 +388,7 @@ def test_round_trip_canonical_node1_inputs_correct():
         wv[4]   "fixed" companion (NOT mapped anywhere)
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 18, f"node 1 widgets_values length drift: {len(dump)}"
     expected_seed = dump[3]
     expected_companion = dump[4]
     expected_creative = dump[5]
