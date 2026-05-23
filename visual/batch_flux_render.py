@@ -589,7 +589,7 @@ class BatchFluxRender:
                 "model": ("MODEL",),
                 "clip": ("CLIP",),
                 "vae": ("VAE",),
-                "script_json": ("STRING", {"multiline": True, "default": "", "forceInput": True}),
+                "script_json": ("STRING", {"multiline": True, "default": ""}),
                 "batch_limit": ("INT", {"default": 4, "min": 1, "max": 16, "step": 1}),
                 "seed": ("INT", {"default": 1, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
                 "steps": ("INT", {"default": 20, "min": 1, "max": 100, "step": 1}),

@@ -1222,11 +1222,11 @@ class SignalLostVideoRenderer:
             "required": {
                 "audio": ("AUDIO",),
                 "script_json": ("STRING", {
-                    "multiline": True, "default": "[]", "forceInput": True,
+                    "multiline": True, "default": "[]",
                     "tooltip": "Parsed script JSON (pipeline compat)"
                 }),
                 "news_used": ("STRING", {
-                    "multiline": True, "default": "[]", "forceInput": True,
+                    "multiline": True, "default": "[]",
                     "tooltip": "News JSON (pipeline compat)"
                 }),
             },

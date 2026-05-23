@@ -762,7 +762,6 @@ class OTRVideoPlan:
                     {
                         "multiline": True,
                         "default": "",
-                        "forceInput": True,
                         "tooltip": (
                             "L3 ledger JSON from OTR_LedgerFreezeCascade. "
                             "Reads meta.visual_plan.characters + scenes + "
