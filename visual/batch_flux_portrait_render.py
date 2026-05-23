@@ -186,6 +186,7 @@ class BatchFluxPortraitRender:
                 "ledger_json": ("STRING", {
                     "multiline": False,
                     "default": "",
+                    "forceInput": True,
                     "tooltip": (
                         "Ledger source. Empty -> auto-pick most recent "
                         "from disk via in_flight_ledger_path. String "

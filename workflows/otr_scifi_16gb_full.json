@@ -390,8 +390,6 @@
         "Node name for S&R": "OTR_SignalLostVideo"
       },
       "widgets_values": [
-        "[]",
-        "[]",
         24,
         "1920x1080",
         ""
@@ -405,18 +403,12 @@
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 16,
-          "widget": {
-            "name": "script_json"
-          }
+          "link": 16
         },
         {
           "name": "news_used",
           "type": "STRING",
-          "link": 110,
-          "widget": {
-            "name": "news_used"
-          }
+          "link": 110
         },
         {
           "name": "closing_audio",
@@ -643,10 +635,7 @@
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 113,
-          "widget": {
-            "name": "script_json"
-          }
+          "link": 113
         },
         {
           "name": "freeze_done_gate",
@@ -700,7 +689,6 @@
         "Node name for S&R": "OTR_VideoPlan"
       },
       "widgets_values": [
-        "{}",
         "(all)",
         4,
         "cinematic, 35mm film look, subtle film grain, volumetric lighting",
@@ -870,10 +858,7 @@
         {
           "name": "script_json",
           "type": "STRING",
-          "link": 41,
-          "widget": {
-            "name": "script_json"
-          }
+          "link": 41
         }
       ],
       "outputs": [
@@ -899,7 +884,6 @@
         "Node name for S&R": "OTR_BatchFluxRender"
       },
       "widgets_values": [
-        "",
         16,
         1,
         "randomize",
@@ -1898,10 +1882,7 @@
         {
           "name": "ledger_json",
           "type": "STRING",
-          "link": 114,
-          "widget": {
-            "name": "ledger_json"
-          }
+          "link": 114
         },
         {
           "name": "flux_done_gate",
@@ -1939,7 +1920,6 @@
         "Node name for S&R": "OTR_BatchFluxPortraitRender"
       },
       "widgets_values": [
-        "",
         "head-and-shoulders studio portrait, neutral lighting, cinematic",
         1024,
         1024,

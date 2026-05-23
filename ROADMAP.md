@@ -513,7 +513,7 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 **Three cross-cutting quick wins (highest declutter per edit -- do these first):**
 
-1. **Convert always-wired STRING inputs to input sockets.** ~15 `script_json` / `ledger_json` / `*_mp4_path` widgets are fed by a wire yet still render a multiline textbox. Converting widget -> input socket deletes the box, keeps the wire.
+1. **Convert always-wired STRING inputs to input sockets.** ~15 `script_json` / `ledger_json` / `*_mp4_path` widgets are fed by a wire yet still render a multiline textbox. Converting widget -> input socket deletes the box, keeps the wire. **Progress 2026-05-23:** 4 upstream video-stage nodes done -- `OTR_SignalLostVideo` (script_json + news_used), `OTR_VideoPlan` (script_json), `OTR_BatchFluxRender` (script_json), `OTR_BatchFluxPortraitRender` (ledger_json) converted to `forceInput` sockets, JSON re-wired (slot + `inputs[].widget` sub-key dropped), `test_workflow_canonical_baseline.py` skip_env_stills index shifted 17->16 in lockstep; full `tests/` walk 2491 passed / 17 skipped / 0 failed. Remaining socket candidates: `OTR_SceneSequencer` / `OTR_BatchBarkGenerator` / `OTR_KokoroAnnouncer` / `OTR_BatchAudioGenGenerator` (script_json -- audio-domain, deferred to keep Prime Directive 1 clear), `OTR_BatchHumoRender` (ledger_json), `OTR_VideoComposite` (procgen_video_path + clips_dir + ledger_json), `OTR_BatchLTXRender` (ledger_json + humo_clips_dir), `OTR_RTXUpscale` (source_mp4_path), `OTR_PostUpscaleProcgenBlend` (source_mp4_path + procgen_mp4_path).
 2. **Bake the BUG-fix constants.** One correct value each, discovered through a bug fix: `humo_warmup_pad_ms`, `min_speech_rms_db`, `shadow_crush_threshold`, `green_only_overlay`, `chunk_frames`, `vram_ceiling_gb`, the `ffmpeg` path widgets. Hardcode them; moving one later is a code change anyway.
 3. **Collapse the pure-plumbing nodes** on the canvas (ComfyUI node-collapse, no code): `OTR_WorkflowValidator`, `OTR_FixedShotDurationStub`, `OTR_UnloadAll`, `OTR_LtxBranchGate`, `OTR_FluxBranchGate` -- zero user-meaningful widgets each.
 
@@ -534,16 +534,16 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 - `OTR_KokoroAnnouncer` -- ADV: voice_override, speed. HIDE: script_json (socket), episode_seed.
 - `OTR_MusicGenTheme` -- ADV: guidance_scale, allow_silence_fallback. HIDE: episode_seed, model_id (fixed musicgen-medium).
 - `OTR_BatchAudioGenGenerator` -- ADV: guidance_scale, default_duration, allow_silence_fallback. HIDE: script_json (socket), episode_seed, model_id.
-- `OTR_SignalLostVideo` -- ADV: fps, resolution. HIDE: script_json (socket), news_used (socket), episode_title.
-- `OTR_VideoPlan` -- ADV: focus_character, shots_per_scene, style_tail, include_final_end_frame. HIDE: script_json (socket).
+- `OTR_SignalLostVideo` -- ADV: fps, resolution. HIDE: script_json (socket -- DONE 2026-05-23), news_used (socket -- DONE 2026-05-23), episode_title.
+- `OTR_VideoPlan` -- ADV: focus_character, shots_per_scene, style_tail, include_final_end_frame. HIDE: script_json (socket -- DONE 2026-05-23).
 - `OTR_FixedShotDurationStub` -- HIDE all 4 (stub node; collapse it).
-- `OTR_BatchFluxRender` -- ADV: batch_limit, seed, steps, cfg, sampler_name, scheduler, width, height, guidance, freeze_seed, fast_batch, radio_bookend_prompt, radio_bookend_seed, style_suffix. HIDE: script_json (socket), fallback_prompt, skip_env_stills.
+- `OTR_BatchFluxRender` -- ADV: batch_limit, seed, steps, cfg, sampler_name, scheduler, width, height, guidance, freeze_seed, fast_batch, radio_bookend_prompt, radio_bookend_seed, style_suffix. HIDE: script_json (socket -- DONE 2026-05-23), fallback_prompt, skip_env_stills.
 - `OTR_BatchHumoRender` -- ADV: clip_length, max_clips, seed, steps, cfg, sampler_name, scheduler, width, height, resume_from_ledger, stop_workflow_on_soak_cap. HIDE: ledger_json (socket), portraits_dir, humo_warmup_pad_ms, min_speech_rms_db, humo_max_lines_per_process, cuda_hard_reset_on_oom.
 - `OTR_VideoComposite` -- ADV: blend_mode, blend_opacity, cleanup_clips_after_assembly. HIDE: procgen_video_path (socket), clips_dir (socket), ledger_json (socket), canvas_width, canvas_height, canvas_fps, humo_target_height, fallback_clip_length, ffmpeg, humo_pillar_width, audio_source + strict_c7 (C7 -- bake, see HARD CONSTRAINTS).
 - `OTR_BatchLTXRender` -- ADV: seed, clip_length. HIDE: ledger_json (socket), ffmpeg, humo_clips_dir (socket).
 - `OTR_RTXUpscale` -- ADV: bypass, target_width, target_height, quality. HIDE: source_mp4_path (socket), chunk_frames, ffmpeg.
 - `OTR_PostUpscaleProcgenBlend` -- ADV: blend_mode, blend_opacity, bypass. HIDE: source_mp4_path (socket), procgen_mp4_path (socket), ffmpeg, out_suffix, shadow_crush_threshold, green_only_overlay.
-- `OTR_BatchFluxPortraitRender` -- ADV: style_anchor, width, height, steps, cfg, guidance, seed. HIDE: ledger_json (socket), sampler_name, scheduler, skip_announcer.
+- `OTR_BatchFluxPortraitRender` -- ADV: style_anchor, width, height, steps, cfg, guidance, seed. HIDE: ledger_json (socket -- DONE 2026-05-23), sampler_name, scheduler, skip_announcer.
 - `OTR_SaveToEpisodeWorkspace` -- HIDE both: role_kind, filename_pattern.
 - `OTR_UnloadAll` -- HIDE all 3 (unload_checkpoint, unload_llm_polish, empty_cache; collapse node).
 - `OTR_WorkflowValidator` -- HIDE all 3 (workflow_json_path, validate_anyway, strict_unknown_types; collapse node).
