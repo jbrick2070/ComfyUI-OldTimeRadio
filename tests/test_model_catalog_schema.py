@@ -58,13 +58,14 @@ def test_existing_rows_default_to_prompt_profile_modern() -> None:
     `prompt_profile = "modern"`. Catches accidental flips of a modern
     model into the period-routing slot.
     """
+    # 2026-05-23: catalog pruned -- the two WARN-tier 12B community
+    # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
+    # removed. These four are the survivors.
     PRE_D1A_REPO_IDS = {
         "mistralai/Mistral-Nemo-Instruct-2407",
         "google/gemma-4-E2B-it",
         "google/gemma-4-E4B-it",
         "Qwen/Qwen2.5-14B-Instruct",
-        "Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-        "inflatebot/MN-12B-Mag-Mell-R1",
     }
     rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
     failures: list[str] = []

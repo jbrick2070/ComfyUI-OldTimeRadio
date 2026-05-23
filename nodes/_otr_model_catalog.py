@@ -153,34 +153,10 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license="apache_2_0",
         license_audit_status="mit_equivalent",
     ),
-    CuratedModel(
-        repo_id="Nitral-AI/Captain-Eris_Violet-V0.420-12B",
-        requires_auth=False,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="WARN",
-        approx_safetensors_gb=24.0,
-        notes="Ungated community; 12B at the edge, not soak-tested.",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="community",
-        license_audit_status="pending",
-    ),
-    CuratedModel(
-        repo_id="inflatebot/MN-12B-Mag-Mell-R1",
-        requires_auth=False,
-        loader_backend="transformers_safetensors",
-        vram_fit_tier="WARN",
-        approx_safetensors_gb=24.0,
-        notes="Ungated community; same caveat.",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="community",
-        license_audit_status="pending",
-    ),
+    # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
+    # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
+    # removed. The curated set is Mistral-Nemo + gemma-4-E2B +
+    # gemma-4-E4B + Qwen2.5-14B-Instruct.
     # No otr_1940s_v1 period row is curated at present. The broken
     # talkie-lm/talkie-1930-13b-it row was removed 2026-05-22 (raw
     # research checkpoint -- no config.json / tokenizer -- crashed the
