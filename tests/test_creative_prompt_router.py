@@ -6,11 +6,6 @@ Five assertions per v3 plan:
       The default writer slot (Mistral-Nemo) resolves to the modern
       phase prompt for every phase.
 
-  test_router_returns_period_for_talkie_otr_1940s_v1
-      Talkie's row resolves to OTR_PERIOD_SYSTEM_PROMPT for every
-      phase (one prompt covers all four creative phases under the
-      otr_1940s_v1 profile).
-
   test_router_zero_production_callers_at_d2a_boundary
       `resolve_creative_system_prompt` has zero production callers
       at D2a. D2b will flip to exactly 4 (one per phase site).
@@ -36,11 +31,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from nodes import _otr_creative_prompt_router as router  # noqa: E402
 from nodes import _otr_line_composer  # noqa: E402
+from nodes import _otr_model_catalog  # noqa: E402
 from nodes import _otr_outline  # noqa: E402
 from nodes import _otr_period_prompts  # noqa: E402
 
 MISTRAL_NEMO = "mistralai/Mistral-Nemo-Instruct-2407"
-TALKIE = "talkie-lm/talkie-1930-13b-it"
 
 PHASES: tuple[str, ...] = (
     "outline",
@@ -75,18 +70,23 @@ def test_router_returns_modern_for_default_mistral_nemo() -> None:
         )
 
 
-def test_router_returns_period_for_talkie_otr_1940s_v1() -> None:
-    """Every phase under talkie returns OTR_PERIOD_SYSTEM_PROMPT
-    (one prompt covers all four creative phases under the
-    otr_1940s_v1 profile -- the period system prompt is a full
-    voice anchor, not phase-specific).
+def test_router_returns_modern_for_every_curated_row() -> None:
+    """With no curated otr_1940s_v1 period row at present, the router
+    resolves EVERY curated repo_id to a modern phase prompt. Pins the
+    parked state of the period-routing branch -- adding a period model
+    later should be a deliberate change that updates this test.
     """
-    for phase in PHASES:
-        out = router.resolve_creative_system_prompt(TALKIE, phase)
-        assert out is _otr_period_prompts.OTR_PERIOD_SYSTEM_PROMPT, (
-            f"router({TALKIE!r}, {phase!r}) did NOT return "
-            f"OTR_PERIOD_SYSTEM_PROMPT by object identity"
+    for m in _otr_model_catalog.CURATED_LLM_MODELS:
+        assert m.prompt_profile == "modern", (
+            f"curated row {m.repo_id!r} has prompt_profile "
+            f"{m.prompt_profile!r}; no period row is expected at present"
         )
+        for phase in PHASES:
+            out = router.resolve_creative_system_prompt(m.repo_id, phase)
+            assert out is not _otr_period_prompts.OTR_PERIOD_SYSTEM_PROMPT, (
+                f"router({m.repo_id!r}, {phase!r}) returned the period "
+                f"system prompt for a modern-profile row"
+            )
 
 
 def test_router_raises_on_unknown_phase() -> None:

@@ -5,8 +5,9 @@ from `nodes/_otr_loader_backends`:
 
   TransformersSafetensorsBackend          (existing path, delegates)
   TransformersMultimodalTextOnlyBackend   (existing path, delegates)
-  TransformersGPTQInt4Backend             (NEW for talkie; D1c lands
-                                           the runtime execution path)
+  TransformersGPTQInt4Backend             (parked for a future period
+                                           model; D1c reserves the
+                                           runtime execution path)
 
 Dispatch table `BACKENDS_BY_KEY` keys on the `loader_backend` Literal
 value declared on the catalog row. `get_backend_for_row(row)` looks
@@ -56,11 +57,10 @@ class _LegacyTransformersBackendBase:
         # Sprint D D4: precondition gate fires before the legacy
         # load delegate. Rows whose context_window is below
         # HARD_VRAM_CONTEXT_LIMIT raise here instead of silently
-        # truncating mid-generation downstream. Existing 6
-        # production rows all have context_window=8192 which
-        # matches the default HARD_VRAM_CONTEXT_LIMIT so this is
-        # a no-op for them; talkie at 4096 is the only row that
-        # would trip the precondition under default settings.
+        # truncating mid-generation downstream. All 6 curated rows
+        # have context_window=8192 which matches the default
+        # HARD_VRAM_CONTEXT_LIMIT so this is a no-op for them; a
+        # sub-limit period model would trip the precondition.
         _otr_loader_backends.check_context_window(row)
         return _otr_model_loader.load_llm(repo_id)
 
@@ -105,9 +105,10 @@ class TransformersGPTQInt4Backend:
 
     Sprint D D1b ships this class as a constructable stub so the
     dispatch table at this commit boundary includes all three
-    backends. Sprint D D1c wires the actual `AutoGPTQForCausalLM`
-    load path behind `OTR_REGRESSION_RUNTIME=1` and runs the talkie
-    1-token warmup smoke.
+    backends. The `AutoGPTQForCausalLM` runtime load path is
+    reserved for a future period model behind
+    `OTR_REGRESSION_RUNTIME=1`; no curated row uses this backend at
+    present (the talkie row that did was removed 2026-05-22).
 
     Until D1c lands, every callable raises a clear NotImplementedError
     so a structural-pytest invocation does not accidentally try to
@@ -115,10 +116,11 @@ class TransformersGPTQInt4Backend:
     """
 
     def load(self, repo_id: str, row: Any) -> dict[str, Any]:  # noqa: ARG002
-        # Sprint D D4: precondition fires FIRST. Talkie at 4096 trips
-        # this before the NotImplementedError, surfacing the
-        # context-window mismatch as the dominant error rather than
-        # the deferred-feature one.
+        # Sprint D D4: precondition fires FIRST. A row whose
+        # context_window is below HARD_VRAM_CONTEXT_LIMIT trips this
+        # before the NotImplementedError, surfacing the context-
+        # window mismatch as the dominant error rather than the
+        # deferred-feature one.
         _otr_loader_backends.check_context_window(row)
         raise NotImplementedError(
             "TransformersGPTQInt4Backend.load is a D1b scaffold; the "

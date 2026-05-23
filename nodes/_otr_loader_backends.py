@@ -17,9 +17,9 @@ Protocol shape (duck-typed):
 Three concrete adapters in `nodes/_otr_model_runtime.py`:
     transformers_safetensors        -> existing load_llm path
     transformers_multimodal_text_only -> same load_llm path
-    transformers_gptq_int4          -> NEW for talkie; D1c lands
-                                       the runtime-gated execution
-                                       path; D1b ships the scaffold
+    transformers_gptq_int4          -> parked for a future period
+                                       model; D1b ships the scaffold,
+                                       D1c reserves the runtime path
 
 Why duck-typed not ABC: Cowork plan v3 picked duck-typing for shape
 flexibility. The protocol acts as documentation + type-check hint;
@@ -31,8 +31,8 @@ BACKENDS_BY_KEY dispatch table.
 `compute_effective_context_limit(row)` is the helper D2c will use to
 cap prompt budget per backend. Mirror of CURATED_CONTEXT_OVERRIDES /
 HARD_VRAM_CONTEXT_LIMIT but reads from the new row-level
-context_window field (D1a) so per-row variance (talkie at 4096) is
-respected without touching the legacy override dict.
+context_window field (D1a) so per-row variance (a sub-limit native
+window) is respected without touching the legacy override dict.
 """
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ def compute_effective_context_limit(row: Any) -> int:
     row.context_window field (D1a) carries the per-model native
     context window. Effective limit is the smaller of the two so:
       * Mistral-Nemo at 8192 native + 8192 limit = 8192 (no clamp).
-      * Talkie at 4096 native + 8192 limit = 4096 (row wins, smaller).
+      * A 4096-native row + 8192 limit = 4096 (row wins, smaller).
       * Hypothetical 16384-native model + 8192 limit = 8192 (limit wins).
 
     Always returns int >= 0. Reading the field on a row constructed
@@ -110,13 +110,13 @@ def check_context_window(row: Any) -> None:
     window. Surface that mismatch loud at load time rather than
     silently truncating mid-generation.
 
-    Talkie at context_window=4096 trips this by design under the
-    default HARD_VRAM_CONTEXT_LIMIT=8192. The G5 operator gate
-    covers whether to relax (loosen the precondition to a warning),
-    accept (research-lane catalog visibility but load-blocked), or
-    land a D-future compact-mode binding.
+    A row at context_window=4096 would trip this under the default
+    HARD_VRAM_CONTEXT_LIMIT=8192. The G5 operator gate covers
+    whether to relax (loosen the precondition to a warning), accept
+    (research-lane catalog visibility but load-blocked), or land a
+    D-future compact-mode binding.
 
-    Existing 6 catalog rows all have context_window=8192 which
+    All 6 curated catalog rows have context_window=8192 which
     matches the default HARD_VRAM_CONTEXT_LIMIT so they DO NOT
     trip the precondition under any production setting.
     """

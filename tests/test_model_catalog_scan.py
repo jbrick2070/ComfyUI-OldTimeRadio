@@ -92,9 +92,10 @@ def test_curated_set_is_a_tuple_of_curated_model():
         assert isinstance(entry, catalog.CuratedModel)
         assert "/" in entry.repo_id
         assert entry.vram_fit_tier in ("PASS", "WARN", "UNKNOWN", "FAIL")
-        # Sprint D D1b added transformers_gptq_int4 for the talkie row;
-        # this assertion missed updating at Sprint D close. Sprint E E17
-        # triage adds the third backend.
+        # transformers_gptq_int4 stays in the accepted set even though
+        # no curated row uses it at present -- the GPTQ backend is
+        # parked for a future period model (the talkie row that used
+        # it was removed 2026-05-22).
         assert entry.loader_backend in (
             "transformers_safetensors",
             "transformers_multimodal_text_only",

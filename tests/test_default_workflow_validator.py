@@ -10,15 +10,17 @@ Two assertions:
       validator returns zero violations.
 
   test_default_workflow_validator_hard_fails_on_non_mit_equivalent_creative_binding
-      Inject a fake workflow that binds talkie (research_lane) to
-      the creative slot. The validator returns a violation that
-      names the offending repo_id and the disallowed
-      license_audit_status.
+      Inject a fake workflow that binds a synthetic research_lane +
+      otr_1940s_v1 row to the creative slot, plus a fake catalog
+      module carrying that row. The validator returns a violation
+      that names the offending repo_id and both the disallowed
+      license_audit_status and the disallowed prompt_profile.
 """
 from __future__ import annotations
 
 import json
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -48,37 +50,60 @@ def test_default_workflow_validator_passes_on_shipped_default() -> None:
 
 
 def test_default_workflow_validator_hard_fails_on_non_mit_equivalent_creative_binding() -> None:
-    """Inject a fake workflow JSON that binds talkie (research_lane,
-    otr_1940s_v1) to a writer slot. The validator returns at least
-    one violation for the license_audit_status AND one for the
+    """Inject a fake workflow JSON that binds a synthetic
+    research_lane + otr_1940s_v1 row to a writer slot, plus a fake
+    catalog module carrying only that row. The validator returns at
+    least one violation for the license_audit_status AND one for the
     prompt_profile.
+
+    The synthetic row stands in for the talkie-lm/talkie-1930-13b-it
+    row removed 2026-05-22: with no curated non-mit_equivalent period
+    row to point at, the validator's two-contract logic is exercised
+    via the catalog_module injection seam the function already
+    exposes for unit tests.
     """
+    synthetic_repo_id = "period-lm/synthetic-period-13b"
+    synthetic_row = catalog.CuratedModel(
+        repo_id=synthetic_repo_id,
+        requires_auth=True,
+        loader_backend="transformers_gptq_int4",
+        vram_fit_tier="UNKNOWN",
+        approx_safetensors_gb=7.5,
+        prompt_profile="otr_1940s_v1",
+        license="non_commercial",
+        license_audit_status="research_lane",
+    )
+    fake_catalog = types.SimpleNamespace(
+        CURATED_LLM_MODELS=(synthetic_row,),
+    )
     fake_workflow = {
         "nodes": [
             {
                 "id": 999,
                 "type": "OTR_LedgerScriptWriter",
                 "widgets_values": [
-                    "",                                  # episode_title
-                    350,                                 # target_words
-                    2,                                   # num_characters
-                    42,                                  # seed
-                    "talkie-lm/talkie-1930-13b-it",      # creative -> talkie
-                    "mistralai/Mistral-Nemo-Instruct-2407",  # technical -> nemo
+                    "",                  # episode_title
+                    350,                 # target_words
+                    2,                   # num_characters
+                    42,                  # seed
+                    synthetic_repo_id,   # creative -> synthetic period row
+                    synthetic_repo_id,   # technical (same row, also flagged)
                 ],
             },
         ],
     }
-    violations = check_default_workflow_creative_binding(fake_workflow, catalog)
-    assert violations, (
-        "fake workflow binding talkie to writer slot produced ZERO "
-        "violations; validator failed to catch the research_lane "
-        "binding"
+    violations = check_default_workflow_creative_binding(
+        fake_workflow, fake_catalog,
     )
-    # The talkie binding should trip BOTH the license_audit_status
+    assert violations, (
+        "fake workflow binding a research_lane otr_1940s_v1 row to a "
+        "writer slot produced ZERO violations; validator failed to "
+        "catch the binding"
+    )
+    # The synthetic binding should trip BOTH the license_audit_status
     # check AND the prompt_profile check.
     license_violation = any(
-        "license_audit_status" in v and "talkie" in v.lower()
+        "license_audit_status" in v and synthetic_repo_id in v
         for v in violations
     )
     profile_violation = any(
@@ -86,11 +111,11 @@ def test_default_workflow_validator_hard_fails_on_non_mit_equivalent_creative_bi
         for v in violations
     )
     assert license_violation, (
-        f"validator did not flag talkie's license_audit_status "
+        f"validator did not flag the row's license_audit_status "
         f"violation. Got:\n  " + "\n  ".join(violations)
     )
     assert profile_violation, (
-        f"validator did not flag talkie's prompt_profile "
+        f"validator did not flag the row's prompt_profile "
         f"violation. Got:\n  " + "\n  ".join(violations)
     )
 

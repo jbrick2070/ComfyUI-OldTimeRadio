@@ -1401,9 +1401,10 @@ def generate_outline(
     # Sprint D D2b: creative-phase prompt routes via the resolver.
     # The new per-stage prompts replace the legacy _SYSTEM_PROMPT
     # for default config. The resolver still owns the period-prompt
-    # branch for the talkie 1940s row; under that row, the system
-    # prompt is OTR_PERIOD_SYSTEM_PROMPT and is layered onto every
-    # stage as a register / vocabulary nudge (NOT a schema override).
+    # branch for any period (otr_1940s_v1) row; under such a row the
+    # system prompt is OTR_PERIOD_SYSTEM_PROMPT and is layered onto
+    # every stage as a register / vocabulary nudge (NOT a schema
+    # override). No curated row uses that branch at present.
     if creative_repo_id is None:
         period_system_overlay = None
     else:

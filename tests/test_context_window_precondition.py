@@ -10,9 +10,8 @@ Two structural assertions. No HF auth no GPU.
       A row whose context_window is at or above HARD_VRAM_CONTEXT_LIMIT
       passes silently (no return value, no raise).
 
-Plus a real-row smoke for talkie: under default
-HARD_VRAM_CONTEXT_LIMIT=8192 talkie at context_window=4096 trips
-the precondition by design (research-lane disposition per G5).
+Plus a real-row smoke for Mistral-Nemo: at context_window=8192 it
+matches the default HARD_VRAM_CONTEXT_LIMIT and does not trip.
 """
 from __future__ import annotations
 
@@ -71,26 +70,6 @@ def test_context_window_precondition_above_hard_limit_passes() -> None:
     """
     row = _FakeRow(context_window=catalog.HARD_VRAM_CONTEXT_LIMIT + 100_000)
     backends_proto.check_context_window(row)  # no raise
-
-
-def test_context_window_precondition_talkie_real_row_trips() -> None:
-    """The talkie catalog row at context_window=4096 trips the
-    precondition under the default HARD_VRAM_CONTEXT_LIMIT=8192.
-    This is the by-design "research lane" disposition.
-    """
-    rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
-    talkie = rows_by_id.get("talkie-lm/talkie-1930-13b-it")
-    assert talkie is not None, "talkie row missing from CURATED_LLM_MODELS"
-    # Talkie's 4096 < 8192 default hard limit -> raises.
-    if catalog.HARD_VRAM_CONTEXT_LIMIT > talkie.context_window:
-        with pytest.raises(RuntimeError, match="talkie-lm"):
-            backends_proto.check_context_window(talkie)
-    else:
-        pytest.skip(
-            f"HARD_VRAM_CONTEXT_LIMIT={catalog.HARD_VRAM_CONTEXT_LIMIT} "
-            f"is not greater than talkie.context_window={talkie.context_window}; "
-            f"precondition does not trip under current env settings"
-        )
 
 
 def test_context_window_precondition_mistral_nemo_real_row_passes() -> None:

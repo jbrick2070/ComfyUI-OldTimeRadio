@@ -8,8 +8,9 @@ Four assertions per v3 plan:
   test_existing_rows_default_to_prompt_profile_modern
       Every pre-D1a row backfills with prompt_profile = "modern".
 
-  test_talkie_row_uses_otr_1940s_v1_profile
-      The first non-modern row uses the explicit target-era profile.
+  test_no_curated_row_uses_otr_1940s_v1_profile
+      No curated row uses the period profile (the talkie row was
+      removed 2026-05-22; the period-routing surface stays parked).
 
   test_default_workflow_only_binds_mit_equivalent_rows_to_creative_slot
       The shipped default workflow JSON's writer-node widgets_values
@@ -80,36 +81,22 @@ def test_existing_rows_default_to_prompt_profile_modern() -> None:
     assert not failures, "\n  " + "\n  ".join(failures)
 
 
-def test_talkie_row_uses_otr_1940s_v1_profile() -> None:
-    rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
-    talkie = rows_by_id.get("talkie-lm/talkie-1930-13b-it")
-    assert talkie is not None, (
-        "talkie row missing from CURATED_LLM_MODELS at D1a landing; "
-        "expected appended per v3 plan"
-    )
-    assert talkie.prompt_profile == "otr_1940s_v1", (
-        f"talkie prompt_profile = {talkie.prompt_profile!r}; "
-        f"expected 'otr_1940s_v1' (explicit target-era binding -- "
-        f"decouples 1938-1952 OTR convention from talkie's "
-        f"pre-1930 training corpus per v3 plan rationale)"
-    )
-    assert talkie.loader_backend == "transformers_gptq_int4", (
-        f"talkie loader_backend = {talkie.loader_backend!r}; "
-        f"expected 'transformers_gptq_int4'"
-    )
-    assert talkie.license == "non_commercial", (
-        f"talkie license = {talkie.license!r}; "
-        f"expected 'non_commercial' (placeholder pending G2 review)"
-    )
-    assert talkie.license_audit_status == "research_lane", (
-        f"talkie license_audit_status = {talkie.license_audit_status!r}; "
-        f"expected 'research_lane' (catalog-selectable but workflow-"
-        f"validator-blocked from default binding)"
-    )
-    assert talkie.context_window == 4096, (
-        f"talkie context_window = {talkie.context_window}; "
-        f"expected 4096 (smaller than HARD_VRAM_CONTEXT_LIMIT 8192 "
-        f"so the D1b compute_effective_context_limit clamps it)"
+def test_no_curated_row_uses_otr_1940s_v1_profile() -> None:
+    """No curated row carries prompt_profile = "otr_1940s_v1" at
+    present. The broken talkie-lm/talkie-1930-13b-it row (the only
+    period row ever curated) was removed 2026-05-22. The period-
+    routing surface stays parked; this test pins the empty state so
+    a future period model is added deliberately, not silently.
+    """
+    period_rows = [
+        m.repo_id
+        for m in catalog.CURATED_LLM_MODELS
+        if m.prompt_profile == "otr_1940s_v1"
+    ]
+    assert period_rows == [], (
+        f"unexpected curated otr_1940s_v1 period row(s): {period_rows}. "
+        f"If a period model was added deliberately, update this test "
+        f"to assert its expected schema."
     )
 
 

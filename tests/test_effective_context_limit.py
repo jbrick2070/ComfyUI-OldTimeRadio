@@ -9,7 +9,7 @@ together resolve to an effective per-row cap via:
 This is the helper D2c's adapter dispatch uses to cap prompt budget
 per backend. Mirror of the legacy CURATED_CONTEXT_OVERRIDES /
 resolve_context_cap path; reads the new row field so per-row
-variance (talkie at 4096) is respected.
+context_window variance is respected.
 """
 from __future__ import annotations
 
@@ -70,20 +70,6 @@ def test_compute_effective_context_limit_returns_row_value_when_equal() -> None:
     row = _FakeRow(context_window=hard_limit)
     out = backends_proto.compute_effective_context_limit(row)
     assert out == hard_limit
-
-
-def test_compute_effective_context_limit_against_talkie_real_row() -> None:
-    """The actual talkie row in the catalog clamps to 4096 (smaller
-    than the 8192 hard limit). End-to-end smoke against the real D1a
-    surface, not a fake row.
-    """
-    rows_by_id = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
-    talkie = rows_by_id.get("talkie-lm/talkie-1930-13b-it")
-    assert talkie is not None, "talkie row missing from CURATED_LLM_MODELS"
-    out = backends_proto.compute_effective_context_limit(talkie)
-    assert out == 4096, (
-        f"talkie effective context limit = {out}; expected 4096"
-    )
 
 
 def test_compute_effective_context_limit_against_mistral_nemo_real_row() -> None:

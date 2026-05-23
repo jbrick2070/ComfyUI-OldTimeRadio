@@ -149,7 +149,7 @@ def test_gptq_int4_adapter_constructable() -> None:
     @dataclass
     class _FakeAdequateRow:
         context_window: int = 0
-        repo_id: str = "talkie-lm/talkie-1930-13b-it"
+        repo_id: str = "period-lm/placeholder-gptq-13b"
 
     fake_row = _FakeAdequateRow(
         context_window=int(_catalog.HARD_VRAM_CONTEXT_LIMIT),
@@ -159,7 +159,7 @@ def test_gptq_int4_adapter_constructable() -> None:
     assert adapter is not None
 
     with pytest.raises(NotImplementedError, match="D1c"):
-        adapter.load("talkie-lm/talkie-1930-13b-it", row=fake_row)
+        adapter.load("period-lm/placeholder-gptq-13b", row=fake_row)
 
     with pytest.raises(NotImplementedError, match="D1c"):
         adapter.generate(model=None, messages=[])

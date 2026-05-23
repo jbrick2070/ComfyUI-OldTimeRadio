@@ -10,4 +10,3 @@ google/gemma-4-E4B-it
 Qwen/Qwen2.5-14B-Instruct
 Nitral-AI/Captain-Eris_Violet-V0.420-12B
 inflatebot/MN-12B-Mag-Mell-R1
-talkie-lm/talkie-1930-13b-it

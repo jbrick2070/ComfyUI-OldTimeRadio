@@ -384,8 +384,8 @@ def _compose_music_prompt(
     setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""
 
     # Period overlay: the writer's gen_params_initial may carry a
-    # period_voice descriptor when the talkie 1940s row is active.
-    # Layer it into the prompt as a register cue so MusicGen leans
+    # period_voice descriptor when a period (otr_1940s_v1) row is
+    # active. Layer it into the prompt as a register cue so MusicGen leans
     # toward period instrumentation (brass / strings / etc.) rather
     # than a modern synth bed. Modern profile = no descriptor = no
     # overlay.

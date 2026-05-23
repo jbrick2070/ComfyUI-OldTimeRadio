@@ -96,7 +96,7 @@ def test_writer_stamps_meta_creative_prompt_profile_from_catalog_row() -> None:
     """`meta["creative_prompt_profile"] = ...` appears in writer
     source AND the assigned value path involves a catalog row
     lookup (catches a hardcoded "modern" stamp that would lie about
-    talkie's actual otr_1940s_v1 profile).
+    a period row's actual otr_1940s_v1 profile).
     """
     assigns = _meta_assignments("creative_prompt_profile")
     assert assigns, (

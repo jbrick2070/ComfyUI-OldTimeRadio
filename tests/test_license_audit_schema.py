@@ -1,11 +1,15 @@
 """Sprint D D0b -- license audit framework schema-positive gate.
 
-Four required pytest assertions per v3 plan:
+Required pytest assertions per v3 plan:
 
 1. Every audit_target has a corresponding markdown file.
 2. Every audit file's YAML frontmatter has the required keys.
 3. Every audit file's frontmatter repo_id matches the sanitized filename.
-4. Talkie's audit row is research_lane (placeholder verdict pending G2).
+4. audit_all() returns no errors and one record per target.
+
+(The talkie-specific research_lane assertion was retired 2026-05-22
+when the broken talkie-lm/talkie-1930-13b-it row + its audit file
+were removed.)
 """
 from __future__ import annotations
 
@@ -22,7 +26,6 @@ from tools.audit_model_license import (  # noqa: E402
     AUDIT_FILENAME_TEMPLATE,
     REQUIRED_KEYS,
     audit_all,
-    load_audit_record,
     parse_frontmatter,
     read_targets,
     sanitize_repo_id,
@@ -80,18 +83,6 @@ def test_audit_repo_id_matches_filename() -> None:
             )
     assert not failures, (
         "frontmatter repo_id mismatch:\n  " + "\n  ".join(failures)
-    )
-
-
-def test_talkie_audit_status_is_research_lane() -> None:
-    record = load_audit_record("talkie-lm/talkie-1930-13b-it")
-    assert record.frontmatter["license_audit_status"] == "research_lane", (
-        f"talkie audit_status is {record.frontmatter['license_audit_status']!r}; "
-        f"expected 'research_lane' as the placeholder verdict pending G2 review."
-    )
-    assert record.frontmatter["license"] == "non_commercial", (
-        f"talkie license is {record.frontmatter['license']!r}; "
-        f"expected 'non_commercial' as the placeholder pending G2."
     )
 
 

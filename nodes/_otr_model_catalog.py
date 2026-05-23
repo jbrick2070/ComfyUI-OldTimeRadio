@@ -60,8 +60,10 @@ class CuratedModel:
     `license` + `license_audit_status` mirror the per-repo audit at
     `docs/model-license-<sanitized>.md`. `chat_template_kind` +
     `stop_tokens` + `context_window` carry the per-backend dispatch
-    hints that loader adapters consume. Existing rows backfill with
-    `prompt_profile="modern"`; talkie is the first non-modern row.
+    hints that loader adapters consume. All curated rows currently
+    carry `prompt_profile="modern"`; the `otr_1940s_v1` profile is
+    reserved for a period model and is not bound to any curated row
+    at present.
     """
 
     repo_id: str
@@ -179,33 +181,13 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license="community",
         license_audit_status="pending",
     ),
-    # Sprint D D1a (2026-05-16): first non-modern row. Period-trained
-    # 13B model at GPTQ int4 quantization. license_audit_status =
-    # research_lane pending G2 operator verdict (placeholder per
-    # docs/model-license-talkie-lm--talkie-1930-13b-it.md). Training
-    # corpus is pre-1930; OTR_PERIOD_SYSTEM_PROMPT targets 1938-1952.
-    # Era mismatch documented as research-lane caveat.
-    CuratedModel(
-        repo_id="talkie-lm/talkie-1930-13b-it",
-        requires_auth=True,
-        loader_backend="transformers_gptq_int4",
-        vram_fit_tier="UNKNOWN",
-        approx_safetensors_gb=7.5,
-        notes=(
-            "Period trained 13B at GPTQ int4. Training corpus pre 1930 "
-            "may mismatch OTR_PERIOD_SYSTEM_PROMPT 1938-1952 target era. "
-            "Modern news with post 1952 references produces era "
-            "anachronistic dialogue. Research lane not eligible for "
-            "default workflow JSON until license_audit_status flips "
-            "to mit_equivalent."
-        ),
-        prompt_profile="otr_1940s_v1",
-        chat_template_kind="transformers_default",
-        stop_tokens=("</s>",),
-        context_window=4096,
-        license="non_commercial",
-        license_audit_status="research_lane",
-    ),
+    # No otr_1940s_v1 period row is curated at present. The broken
+    # talkie-lm/talkie-1930-13b-it row was removed 2026-05-22 (raw
+    # research checkpoint -- no config.json / tokenizer -- crashed the
+    # writer at the style picker). The period-routing surface
+    # (otr_1940s_v1 profile, GPTQ-int4 backend, _otr_period_prompts)
+    # stays parked for a future period model; see the ROADMAP
+    # period-model strategy section.
 )
 
 

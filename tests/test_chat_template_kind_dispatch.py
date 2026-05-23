@@ -173,14 +173,17 @@ def test_stop_tokens_threaded_to_generate_kwargs() -> None:
     assert kwargs_multi == {"stop_strings": ["<|end|>", "<|im_end|>"]}
 
 
-def test_stop_tokens_against_real_talkie_row() -> None:
-    """End-to-end smoke against the real catalog talkie row.
-    Talkie's stop_tokens is ('</s>',) per D1a.
+def test_stop_tokens_against_real_curated_rows() -> None:
+    """End-to-end smoke against the real catalog. Every curated row
+    carries stop_tokens=() at present, so generate_kwargs_for_row
+    yields an empty stop_strings list for each.
     """
-    rows = {m.repo_id: m for m in catalog.CURATED_LLM_MODELS}
-    talkie = rows["talkie-lm/talkie-1930-13b-it"]
-    kwargs = backends_proto.generate_kwargs_for_row(talkie)
-    assert kwargs == {"stop_strings": ["</s>"]}
+    for m in catalog.CURATED_LLM_MODELS:
+        kwargs = backends_proto.generate_kwargs_for_row(m)
+        assert kwargs == {"stop_strings": list(m.stop_tokens)}, (
+            f"generate_kwargs_for_row({m.repo_id!r}) = {kwargs}; "
+            f"expected stop_strings = {list(m.stop_tokens)}"
+        )
 
 
 # ---------------------------------------------------------------------------

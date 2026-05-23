@@ -1,7 +1,7 @@
 """Sprint D D3 -- reflection boundary tests.
 
-When the writer's creative slot is set to a period model (talkie,
-prompt_profile=otr_1940s_v1) the script `lines` produced carry
+When the writer's creative slot is set to a period model
+(prompt_profile=otr_1940s_v1) the script `lines` produced carry
 period-flavored dialogue. The technical slot's reflection pass
 (run_story_brief_reflection) reads those lines and produces
 meta.story_brief in MODERN ENGLISH. The boundary contract:
