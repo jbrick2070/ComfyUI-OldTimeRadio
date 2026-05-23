@@ -171,19 +171,18 @@ class TestSkipEnvStillsDefault:
         # BatchFluxRender.INPUT_TYPES. If the widget vector reaches
         # that position, the value must be True.
         # Widget positions documented at visual/batch_flux_render.py
-        # INPUT_TYPES (model/clip/vae are typed inputs not widgets;
-        # script_json is a forceInput socket post-PRIORITY-3 quick-win
-        # #1 -- 2026-05-23 -- so it is NOT a widget either and the
-        # vector shifted left by one):
-        #   required: [0..9] = batch_limit, seed, ctrl, steps, cfg,
-        #             sampler_name, scheduler, width, height, guidance
-        #   optional: [10..16] = fallback_prompt, style_suffix,
+        # INPUT_TYPES (script_json is widget [0] since model/clip/vae
+        # are typed inputs not widgets):
+        #   required: [0..10] = script_json, batch_limit, seed, ctrl,
+        #             steps, cfg, sampler_name, scheduler, width,
+        #             height, guidance
+        #   optional: [11..17] = fallback_prompt, style_suffix,
         #             freeze_seed, fast_batch, radio_bookend_prompt,
         #             radio_bookend_seed, skip_env_stills
-        if len(widgets) >= 17:
-            assert widgets[16] is True, (
+        if len(widgets) >= 18:
+            assert widgets[17] is True, (
                 f"BatchFluxRender skip_env_stills must be True per "
-                f"BUG-LOCAL-078 follow-up; got {widgets[16]!r}. "
+                f"BUG-LOCAL-078 follow-up; got {widgets[17]!r}. "
                 "False re-enables the dead env-still pass and burns "
                 "2-3 minutes of FLUX time per episode."
             )
