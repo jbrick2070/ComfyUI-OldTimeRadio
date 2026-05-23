@@ -503,6 +503,54 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
+## CANDIDATE OPTIONS -- longer episodes + HuMo quality-first path (Jeffrey, 2026-05-22)
+
+**Status:** Candidate options, NOT a scheduled sprint. Captured at Jeffrey's request 2026-05-22. Sits behind Priority 1 (ledger durability) and Priority 2 (Story Writer UI) in the forward queue; promote to a numbered priority only when Jeffrey decides. Round-robin the design before any build.
+
+### A. Longer episodes -- raise the story-length floor
+
+**Why (Jeffrey, 2026-05-22):** "~30-word stories seem like nonsense." Episodes currently run very short -- a ~5-beat episode with announcer beats at `target_words=15` lands near 150 words total, and a single beat can read as a 30-word fragment rather than a story. The narrative arc (beginning / middle / end, Prime Directive #4) needs more room.
+
+**Knobs that move it (all on `OTR_LedgerScriptWriter`):**
+
+- `target_words` -- the per-episode word budget; the episode-budget allocator distributes it across beats.
+- `act_count` + `include_act_breaks` -- more acts produce more beats and more dialogue (also a Priority-2 UI item, line 501).
+- Per-beat `target_words` floors in the episode-budget allocator -- a 15-word announcer beat or a sub-20-word character beat is the "fragment" symptom.
+
+**Open decision (round-robin):** what is the target episode length -- short (~150 w, current), medium (~400-600 w), or long (~1000 w+)? The choice sets the `target_words` default and the minimum viable beat count.
+
+**Coupling to HuMo (this is why it is filed as a HuMo-improvement item):** every character line becomes a HuMo lip-sync clip at ~10-12 min wall time on the RTX 5080. A longer episode with more character lines scales HuMo wall time proportionally. Longer stories are only practical if the HuMo path in part B (chunking, resume-from-ledger, fewer-lines-per-process) is solid -- the two items ship together or not at all.
+
+### B. HuMo quality-first go-forward path (Jeffrey's recipe, 2026-05-22)
+
+**Intent:** if OTR keeps HuMo, commit to ONE quality preset and protect the 16 GB laptop with throughput discipline rather than chasing speed presets.
+
+Architecture (unchanged -- already the workflow's shape): FLUX portraits/stills -> hard VRAM unload -> HuMo lip-sync (`OTR_BatchHumoRender`) -> video composite -> final upscale.
+
+Proposed single quality preset:
+
+- HuMo model `Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ`; audio encoder Whisper Large v3 fp16; VAE `wan_2.1_vae`.
+- Resolution 480x832; FPS 25; **steps 8** (the key change -- the recipe assumes the current setting is 4); CFG 1.0; sampler `uni_pc`; scheduler `simple`.
+- Clip length 7.0 s; warmup pad 200 ms; silent skip -28 dBFS.
+- `resume_from_ledger: true`; `skip_existing_clips: true`.
+
+Throughput discipline (guards against long-run VRAM drift):
+
+- `humo_max_lines_per_process: 2-3` fresh HuMo lines per process, then resume from the ledger until the episode is complete.
+- Long dialogue: keep the existing even-split chunking -- max 7 s per HuMo chunk, same portrait per chunk, ffmpeg-concat chunks back into one line clip. Even splitting avoids weak tiny tail chunks.
+
+Source-image quality (quality starts before HuMo): portrait pass 1024x1024, 20 steps, CFG 3.5, prompt "head-and-shoulders studio portrait, neutral lighting, cinematic", feeding `portraits_dir`.
+
+Finish: HuMo renders at 480x832; composite the whole episode once; single final upscale to 1920x1080. One composite + one upscale = least mismatch.
+
+**Quality-vs-time tradeoff to weigh:** steps 4 -> 8 roughly doubles HuMo sampler time per clip. The recipe accepts this and offsets it with fewer-lines-per-process + resume. Confirm the wall-time budget is acceptable before adopting.
+
+**Verify before acting (do NOT trust the recipe's "already uses X" claims blind):** the recipe asserts the current workflow already uses 480x832 / 25 fps / Whisper Large v3 / 200 ms warmup / even-split chunking, and that HuMo steps are currently 4. Re-confirm every value against `workflows/otr_scifi_16gb_full.json` + `nodes/batch_humo_render.py` when this item is scoped -- per the verify-the-premise discipline.
+
+**Relation to the MuseTalk swap candidate:** a separate, competing direction exists -- swap HuMo for MuseTalk for portrait-mode lip-sync (claimed 15-30x faster, far lower VRAM). That swap and this quality-tune are mutually exclusive go-forward paths for the lip-sync stage. Round-robin should evaluate them head-to-head, not in isolation.
+
+---
+
 ## CLOSED -- story_brief as the primary downstream visual driver (Jeffrey, 2026-05-20)
 
 **Status:** DONE 2026-05-20. Radio bookend landed via BUG-LOCAL-249; the `otr_video_plan` era tail + FLUX env/portrait prompt ordering landed via BUG-LOCAL-250. Every downstream visual consumer now derives from `meta.story_brief`; the style preset is upstream-only (it shapes the story-writing LLM and nothing else).
