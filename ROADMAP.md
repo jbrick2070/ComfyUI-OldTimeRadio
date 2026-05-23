@@ -505,6 +505,56 @@ Priority order; complete top-down. Pipeline-closes-first: do NOT touch 236/243/e
 
 ---
 
+## PRIORITY 3 -- workflow-wide widget simplification (audit 2026-05-23)
+
+**Status:** Queued next, after the PRIORITY 2 node-1 pilot. Same gate -- round-robin the "advanced" hiding mechanism before any node-surface edit; same upstream-to-downstream order. Captured from the 2026-05-23 widget audit of `otr_scifi_16gb_full.json` so the map is not lost to chat history.
+
+**Why:** the audit found the whole graph has node 1's problem -- ~163 widgets across 24 OTR custom nodes, only ~11 of them controls a user should ever touch. Every extra visible widget is also a misconfiguration surface and a widget-vector-drift risk. Same three-bucket framework as PRIORITY 2: KEEP (stays visible, plain-language tooltip) / ADV (collapsed "advanced" group) / HIDE (convert a wired input to a socket, bake a true constant, or collapse the whole node on the canvas).
+
+**Three cross-cutting quick wins (highest declutter per edit -- do these first):**
+
+1. **Convert always-wired STRING inputs to input sockets.** ~15 `script_json` / `ledger_json` / `*_mp4_path` widgets are fed by a wire yet still render a multiline textbox. Converting widget -> input socket deletes the box, keeps the wire.
+2. **Bake the BUG-fix constants.** One correct value each, discovered through a bug fix: `humo_warmup_pad_ms`, `min_speech_rms_db`, `shadow_crush_threshold`, `green_only_overlay`, `chunk_frames`, `vram_ceiling_gb`, the `ffmpeg` path widgets. Hardcode them; moving one later is a code change anyway.
+3. **Collapse the pure-plumbing nodes** on the canvas (ComfyUI node-collapse, no code): `OTR_WorkflowValidator`, `OTR_FixedShotDurationStub`, `OTR_UnloadAll`, `OTR_LtxBranchGate`, `OTR_FluxBranchGate` -- zero user-meaningful widgets each.
+
+**HARD CONSTRAINTS -- hide, never delete or expose as a user choice:**
+
+- `OTR_VideoComposite` `audio_source` + `strict_c7` -- C7 byte-identity. Bake to current defaults, never surface as a user pick.
+- Loader file-pickers (`OTR_DeferredCheckpointLoader.ckpt_name`, `OTR_DeferredLtxTextEncoderLoader.text_encoder` / `ckpt_name`) -- machine-specific paths, must stay visible.
+- ~8 stock / community nodes (UNETLoader, CLIPLoader, VAELoader, LoraLoaderModelOnly x3, ModelSamplingSD3, AudioEncoderLoader, LowVRAMCheckpointLoader, PathchSageAttentionKJ) are not OTR code -- the only lever is node-collapse on the canvas.
+
+**Per-node disposition (every widget bucketed):**
+
+- Node 1 `OTR_LedgerScriptWriter` -- see PRIORITY 2 (in progress; `optimization_profile` hidden 2026-05-23).
+- `OTR_LedgerFreezeCascade` -- ADV: enable_phase_7_audio_readiness, enable_phase_8_video_readiness. HIDE: vram_ceiling_gb.
+- `OTR_SceneSequencer` -- ADV: start_line, end_line, dialogue_offset_ms, sfx_offset_ms. HIDE: script_json (socket), output_dir, default_tts.
+- `OTR_AudioEnhance` -- ADV: all 7 (target_sample_rate, spatial_width, haas_delay_ms, bass_warmth, lpf_cutoff_hz, tape_emulation, normalize_dbfs). Opportunity: collapse the 7 into one `audio_profile` preset combo, the way `creativity` collapses temp/top_p on node 1.
+- `OTR_EpisodeAssembler` -- ADV: opening_duration_sec, closing_duration_sec, crossfade_ms. HIDE: episode_title (duplicate of the writer's; resolve from ledger).
+- `OTR_BatchBarkGenerator` -- ADV: temperature. HIDE: script_json (socket).
+- `OTR_KokoroAnnouncer` -- ADV: voice_override, speed. HIDE: script_json (socket), episode_seed.
+- `OTR_MusicGenTheme` -- ADV: guidance_scale, allow_silence_fallback. HIDE: episode_seed, model_id (fixed musicgen-medium).
+- `OTR_BatchAudioGenGenerator` -- ADV: guidance_scale, default_duration, allow_silence_fallback. HIDE: script_json (socket), episode_seed, model_id.
+- `OTR_SignalLostVideo` -- ADV: fps, resolution. HIDE: script_json (socket), news_used (socket), episode_title.
+- `OTR_VideoPlan` -- ADV: focus_character, shots_per_scene, style_tail, include_final_end_frame. HIDE: script_json (socket).
+- `OTR_FixedShotDurationStub` -- HIDE all 4 (stub node; collapse it).
+- `OTR_BatchFluxRender` -- ADV: batch_limit, seed, steps, cfg, sampler_name, scheduler, width, height, guidance, freeze_seed, fast_batch, radio_bookend_prompt, radio_bookend_seed, style_suffix. HIDE: script_json (socket), fallback_prompt, skip_env_stills.
+- `OTR_BatchHumoRender` -- ADV: clip_length, max_clips, seed, steps, cfg, sampler_name, scheduler, width, height, resume_from_ledger, stop_workflow_on_soak_cap. HIDE: ledger_json (socket), portraits_dir, humo_warmup_pad_ms, min_speech_rms_db, humo_max_lines_per_process, cuda_hard_reset_on_oom.
+- `OTR_VideoComposite` -- ADV: blend_mode, blend_opacity, cleanup_clips_after_assembly. HIDE: procgen_video_path (socket), clips_dir (socket), ledger_json (socket), canvas_width, canvas_height, canvas_fps, humo_target_height, fallback_clip_length, ffmpeg, humo_pillar_width, audio_source + strict_c7 (C7 -- bake, see HARD CONSTRAINTS).
+- `OTR_BatchLTXRender` -- ADV: seed, clip_length. HIDE: ledger_json (socket), ffmpeg, humo_clips_dir (socket).
+- `OTR_RTXUpscale` -- ADV: bypass, target_width, target_height, quality. HIDE: source_mp4_path (socket), chunk_frames, ffmpeg.
+- `OTR_PostUpscaleProcgenBlend` -- ADV: blend_mode, blend_opacity, bypass. HIDE: source_mp4_path (socket), procgen_mp4_path (socket), ffmpeg, out_suffix, shadow_crush_threshold, green_only_overlay.
+- `OTR_BatchFluxPortraitRender` -- ADV: style_anchor, width, height, steps, cfg, guidance, seed. HIDE: ledger_json (socket), sampler_name, scheduler, skip_announcer.
+- `OTR_SaveToEpisodeWorkspace` -- HIDE both: role_kind, filename_pattern.
+- `OTR_UnloadAll` -- HIDE all 3 (unload_checkpoint, unload_llm_polish, empty_cache; collapse node).
+- `OTR_WorkflowValidator` -- HIDE all 3 (workflow_json_path, validate_anyway, strict_unknown_types; collapse node).
+- `OTR_DeferredCheckpointLoader` -- KEEP: ckpt_name (loader file pick).
+- `OTR_DeferredLtxTextEncoderLoader` -- KEEP: text_encoder, ckpt_name. HIDE: device.
+- `OTR_LtxBranchGate` / `OTR_FluxBranchGate` -- 0 widgets; collapse node.
+
+**Per-edit discipline:** every surface change is wired into `otr_scifi_16gb_full.json` (Prime Directive #3) in the same unit of work; re-run the workflow-JSON guardrail tests + full `tests/` walk after each node. The widget-vector guards in `test_workflow_json_guardrails.py` + `test_otr_api_companions.py` catch positional drift -- update them in lockstep.
+
+---
+
 ## CANDIDATE OPTIONS -- longer episodes + HuMo quality-first path (Jeffrey, 2026-05-22)
 
 **Status:** Candidate options, NOT a scheduled sprint. Captured at Jeffrey's request 2026-05-22. Sits behind Priority 1 (ledger durability) and Priority 2 (Story Writer UI) in the forward queue; promote to a numbered priority only when Jeffrey decides. Round-robin the design before any build.
