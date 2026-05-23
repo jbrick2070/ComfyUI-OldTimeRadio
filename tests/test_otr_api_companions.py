@@ -40,8 +40,8 @@ widgets_values dump from `workflows/otr_scifi_16gb_full.json`
   13 perfect_run_spacesaver  BOOL          False
   14 min_p                   FLOAT         0.05
   15 repetition_penalty      FLOAT         1.03
-  16 (extra INT widget)      INT           200
-  17 (extra BOOL widget)     BOOL          False
+  16 max_new_tokens_cap      INT           200
+  17 enable_polish_pass      BOOL          False
 
 The `target_words` + `num_characters` + `act_count` INT widgets are
 NOT named "seed" or "noise_seed" -- they do NOT trigger companion
@@ -111,8 +111,8 @@ def _writer_schemas() -> dict:
                     ),
                     "min_p": ("FLOAT", {"default": 0.05}),
                     "repetition_penalty": ("FLOAT", {"default": 1.03}),
-                    "max_new_tokens": ("INT", {"default": 200}),
-                    "stream": ("BOOLEAN", {"default": False}),
+                    "max_new_tokens_cap": ("INT", {"default": 200}),
+                    "enable_polish_pass": ("BOOLEAN", {"default": False}),
                 },
                 "optional": {},
             }
@@ -148,8 +148,8 @@ def _writer_node_fixture() -> dict:
                     False,                       # 13 perfect_run_spacesaver
                     0.05,                        # 14 min_p
                     1.03,                        # 15 repetition_penalty
-                    200,                         # 16 max_new_tokens
-                    False,                       # 17 stream
+                    200,                         # 16 max_new_tokens_cap
+                    False,                       # 17 enable_polish_pass
                 ],
             }
         ],
@@ -195,7 +195,7 @@ def test_serialized_slots_includes_seed_companion():
 def test_serialized_slots_no_companion_for_non_seed_int():
     """Defense-in-depth: an INT widget not named seed / noise_seed
     must NOT trigger companion injection. Most OTR INT widgets
-    (target_words, num_characters, act_count, max_new_tokens) are
+    (target_words, num_characters, act_count, max_new_tokens_cap) are
     declared and rely on this behavior.
     """
     schemas = {
@@ -429,7 +429,7 @@ def test_round_trip_canonical_node1_inputs_correct():
         "act_count",
         "min_p",
         "repetition_penalty",
-        "max_new_tokens",
+        "max_new_tokens_cap",
     ):
         if field in n1_inputs:
             assert n1_inputs[field] != "fixed", (

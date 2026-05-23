@@ -47,7 +47,7 @@ Output contract (UNCHANGED from prior v2.0):
     RETURN_NAMES = ("script_text", "script_json", "news_used",
                     "estimated_minutes")
 
-Widget surface (post-Phase-3 cleanup 2026-05-11):
+Widget surface (current as of 2026-05-23):
     required:
         episode_title     STRING  (optional override; empty -> LLM regen
                                    from final dialogue post-composition)
@@ -58,7 +58,11 @@ Widget surface (post-Phase-3 cleanup 2026-05-11):
     optional:
         seed              INT     (C7 byte-identity seed; shuffle-on
                                    randomizes per Queue Prompt)
-        model_id          combo   (HF model -- story LLM)
+        creative_writing_model combo (HF LLM -- narrative passes: outline,
+                                      cast, dialogue, polish, style picker)
+        technical_model   combo   (HF LLM -- structured passes: JSON
+                                   validators, GBNF grammar, reviewer,
+                                   cast contract, format normalization)
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
         include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
                                     beats between acts; False -> continuous)
@@ -71,6 +75,16 @@ Widget surface (post-Phase-3 cleanup 2026-05-11):
         creativity        combo   (maps to temperature + top_p preset)
         perfect_run_spacesaver BOOLEAN (stamped on ledger.meta for
                                         RTXUpscale spacesaver)
+        min_p             FLOAT   (sampling tail cut; 0.0 disables)
+        repetition_penalty FLOAT  (anti-loop penalty; 1.0 disables)
+        max_new_tokens_cap INT    (per-line composer token ceiling)
+        enable_polish_pass BOOLEAN (optional post-compose narration-leak
+                                    check)
+
+    The optimization_profile combo was a widget here until 2026-05-23;
+    removed in the ROADMAP PRIORITY 2 UI simplification (only "Standard"
+    was ever validated). _resolve_inputs still defaults it to "Standard"
+    and stamps it to meta, so the loader plumbing is intact.
 
 Notes:
     - news_seed RSS fetch lifted from story_orchestrator._fetch_science_news.
