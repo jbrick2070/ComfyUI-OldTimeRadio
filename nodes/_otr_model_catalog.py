@@ -251,6 +251,43 @@ def _read_advertised_context(snapshot_path: Path) -> int | None:
     return None
 
 
+def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
+    """True only if the snapshot's config.json declares a decoder-only
+    causal-LM architecture (an `architectures` entry ending in
+    `ForCausalLM`).
+
+    The HF hub cache is shared by every model type OTR pulls -- writer
+    LLMs, FLUX, LTX-Video, Depth-Anything all resolve into the same
+    HF_HOME/hub. A bare directory walk cannot tell a story-writer LLM
+    from a diffusion or vision checkpoint, so the non-curated dropdown
+    discovery path uses this gate to admit only text-generation models.
+
+    Diffusion pipelines (FLUX, LTX-Video) ship a model_index.json and
+    carry no root config.json, so they fail the `is_file` check.
+    Vision / depth transformers models carry a root config.json whose
+    `architectures` is not `*ForCausalLM`. Both are excluded. Returns
+    False on a missing path or any read failure -- fail closed, since
+    the curated set is added to the dropdown unconditionally and never
+    depends on this gate.
+    """
+    if not snapshot_path:
+        return False
+    cfg = Path(snapshot_path) / "config.json"
+    if not cfg.is_file():
+        return False
+    try:
+        import json
+
+        with cfg.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return False
+    archs = data.get("architectures")
+    if not isinstance(archs, list):
+        return False
+    return any(isinstance(a, str) and a.endswith("ForCausalLM") for a in archs)
+
+
 def scan_local_llm_cache(hub_root: Path | None = None) -> list[ScanResult]:
     """Walk HF_HOME/hub/models--*/snapshots/* and return one ScanResult
     per resolved snapshot. Offline-only -- no HF API calls.
@@ -313,6 +350,15 @@ def build_dropdown_choices(
         if repo_id in curated_ids:
             continue
         if not result.on_disk:
+            continue
+        # The HF hub cache mixes every model type OTR downloads, so a
+        # non-curated cache hit is not necessarily a text-generation
+        # LLM. Admit it to the writer dropdown only if its config.json
+        # declares a `*ForCausalLM` architecture; this keeps diffusion
+        # (FLUX, LTX-Video) and vision (Depth-Anything) checkpoints out
+        # of the model picker. The curated rows above are exempt -- they
+        # are the explicit writer set. See BUG-LOCAL-257.
+        if not _snapshot_is_causal_lm(result.snapshot_path):
             continue
         entries.append(DropdownEntry(repo_id, repo_id, True, curated=False))
     return entries

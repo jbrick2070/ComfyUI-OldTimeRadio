@@ -36,22 +36,29 @@ def _make_snapshot(
     name: str,
     *,
     advertised_context: int | None = 8192,
+    architectures: tuple[str, ...] | None = ("LlamaForCausalLM",),
 ) -> Path:
     """Create a fake HF cache snapshot directory structure under `hub_root`.
 
     Layout matches the real HuggingFace hub cache:
         hub_root/models--<org>--<name>/snapshots/<commit_sha>/config.json
     Returns the snapshot path.
+
+    A config.json is written when `advertised_context` or `architectures`
+    is non-None. Pass both as None to model a diffusers pipeline repo,
+    which ships a model_index.json and carries no root config.json.
     """
     repo_dir = hub_root / f"models--{org}--{name}"
     snapshot = repo_dir / "snapshots" / "fakecommit0001"
     snapshot.mkdir(parents=True, exist_ok=True)
-    if advertised_context is not None:
+    if advertised_context is not None or architectures is not None:
+        cfg_data: dict = {}
+        if advertised_context is not None:
+            cfg_data["max_position_embeddings"] = advertised_context
+        if architectures is not None:
+            cfg_data["architectures"] = list(architectures)
         cfg = snapshot / "config.json"
-        cfg.write_text(
-            json.dumps({"max_position_embeddings": advertised_context}),
-            encoding="utf-8",
-        )
+        cfg.write_text(json.dumps(cfg_data), encoding="utf-8")
     return snapshot
 
 
@@ -199,6 +206,112 @@ def test_dropdown_appends_uncurated_locally_scanned_at_end(hub_root_with_uncurat
     assert uncurated_entry.on_disk is True
     assert uncurated_entry.curated is False
     assert uncurated_entry.label == "meta-llama/Llama-3-8B-Instruct"
+
+
+# ---------------------------------------------------------------------------
+# Dropdown builder -- non-LLM cache filter (BUG-LOCAL-257)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def hub_root_mixed_model_types(tmp_path: Path) -> Path:
+    """The real-world HF_HOME layout: a non-curated writer LLM sharing
+    the hub cache with diffusion pipelines and a vision model. OTR's
+    HF_HOME consolidates every model type into one hub/, so the cache
+    walk sees FLUX / LTX-Video / Depth-Anything next to the LLMs."""
+    root = tmp_path / "hub"
+    root.mkdir()
+    # Non-curated causal LM -- belongs in the writer dropdown.
+    _make_snapshot(
+        root, "meta-llama", "Llama-3-8B-Instruct",
+        architectures=("LlamaForCausalLM",),
+    )
+    # Diffusion pipelines -- model_index.json, no root config.json.
+    flux = _make_snapshot(
+        root, "black-forest-labs", "FLUX.1-dev",
+        advertised_context=None, architectures=None,
+    )
+    (flux / "model_index.json").write_text("{}", encoding="utf-8")
+    ltx = _make_snapshot(
+        root, "diffusers", "LTX-Video-0.9.0",
+        advertised_context=None, architectures=None,
+    )
+    (ltx / "model_index.json").write_text("{}", encoding="utf-8")
+    # Vision model -- root config.json present, architecture not *ForCausalLM.
+    _make_snapshot(
+        root, "depth-anything", "Depth-Anything-V2-Large-hf",
+        advertised_context=None,
+        architectures=("DepthAnythingForDepthEstimation",),
+    )
+    return root
+
+
+def test_dropdown_excludes_diffusion_pipelines(hub_root_mixed_model_types):
+    """FLUX and LTX-Video (diffusers repos: model_index.json, no root
+    config.json) must not appear in the writer model dropdown."""
+    entries = catalog.build_dropdown_choices(hub_root=hub_root_mixed_model_types)
+    repo_ids = {e.repo_id for e in entries}
+    assert "black-forest-labs/FLUX.1-dev" not in repo_ids
+    assert "diffusers/LTX-Video-0.9.0" not in repo_ids
+
+
+def test_dropdown_excludes_vision_model(hub_root_mixed_model_types):
+    """A transformers vision model (config.json present, architecture
+    not *ForCausalLM) must not appear in the writer model dropdown."""
+    entries = catalog.build_dropdown_choices(hub_root=hub_root_mixed_model_types)
+    repo_ids = {e.repo_id for e in entries}
+    assert "depth-anything/Depth-Anything-V2-Large-hf" not in repo_ids
+
+
+def test_dropdown_keeps_uncurated_causal_lm_amid_mixed_cache(hub_root_mixed_model_types):
+    """A non-curated causal LM sharing the cache with diffusion / vision
+    checkpoints still appears -- the filter narrows by model type, not
+    by curation."""
+    entries = catalog.build_dropdown_choices(hub_root=hub_root_mixed_model_types)
+    entry = next(
+        (e for e in entries if e.repo_id == "meta-llama/Llama-3-8B-Instruct"), None
+    )
+    assert entry is not None
+    assert entry.curated is False
+    assert entry.on_disk is True
+
+
+def test_dropdown_curated_set_exempt_from_cache_filter(hub_root_mixed_model_types):
+    """The curated rows are the explicit writer set -- always present,
+    never subject to the causal-LM cache filter."""
+    entries = catalog.build_dropdown_choices(hub_root=hub_root_mixed_model_types)
+    repo_ids = {e.repo_id for e in entries}
+    curated_ids = {m.repo_id for m in catalog.CURATED_LLM_MODELS}
+    assert curated_ids <= repo_ids
+
+
+def test_snapshot_is_causal_lm_true_for_causal_config(tmp_path):
+    snap = _make_snapshot(
+        tmp_path, "x", "writer-lm", architectures=("MistralForCausalLM",)
+    )
+    assert catalog._snapshot_is_causal_lm(str(snap)) is True
+
+
+def test_snapshot_is_causal_lm_false_for_missing_config(tmp_path):
+    """Diffusers pipeline case: no root config.json."""
+    snap = _make_snapshot(
+        tmp_path, "x", "diffusion-repo",
+        advertised_context=None, architectures=None,
+    )
+    assert catalog._snapshot_is_causal_lm(str(snap)) is False
+
+
+def test_snapshot_is_causal_lm_false_for_non_causal_architecture(tmp_path):
+    """Vision model case: config.json present, architecture not causal."""
+    snap = _make_snapshot(
+        tmp_path, "x", "vision-model",
+        advertised_context=None, architectures=("CLIPModel",),
+    )
+    assert catalog._snapshot_is_causal_lm(str(snap)) is False
+
+
+def test_snapshot_is_causal_lm_false_for_none_path():
+    assert catalog._snapshot_is_causal_lm(None) is False
 
 
 # ---------------------------------------------------------------------------
