@@ -956,3 +956,95 @@ def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
         assert preset in p, \
             f"Bark preset {preset!r} missing from open-slot prompt -- " \
             f"announcer's Kokoro voice was wrongly excluding Bark voices"
+
+
+# ---------------------------------------------------------------------------
+# BUG-LOCAL-260: LEMMY cameo decoupled from the seed
+#
+# A 2026-05-10 change routed the 11% LEMMY roll through the cast
+# contract's seeded random.Random. The writer's seed widget ships a
+# fixed value, and a fixed seed reproduces ONE roll forever -- so a
+# LEMMY-positive seed (42 was one) cast LEMMY on 100% of runs. The
+# roll is decoupled again: cast_pools.roll_lemmy() always uses OS
+# entropy. force_lemmy stays as the deterministic override.
+# ---------------------------------------------------------------------------
+
+
+class _FixedRandom:
+    """Stand-in RNG whose .random() always returns a fixed value."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def random(self):
+        return self._value
+
+
+def test_roll_lemmy_takes_no_seed_argument():
+    """roll_lemmy() no longer accepts an rng -- a caller cannot
+    re-couple the cameo to a seed by passing one (BUG-LOCAL-260)."""
+    import inspect
+    assert list(inspect.signature(_POOLS.roll_lemmy).parameters) == [], (
+        "roll_lemmy must take no arguments so the cameo cannot be "
+        "re-tied to a seeded RNG"
+    )
+
+
+def test_roll_lemmy_uses_os_entropy(monkeypatch):
+    """roll_lemmy() rolls against the module-level SystemRandom."""
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.05))
+    assert _POOLS.roll_lemmy() is True   # 0.05 < 0.11
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.50))
+    assert _POOLS.roll_lemmy() is False  # 0.50 >= 0.11
+
+
+def test_assemble_lemmy_hit_independent_of_the_cast_seed(monkeypatch):
+    """assemble_pre_locked_rows with the natural roll: the SAME cast
+    seed yields a DIFFERENT lemmy_hit when OS entropy differs --
+    proof the cameo is decoupled from the seed (BUG-LOCAL-260)."""
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.05))
+    _pre_a, _open_a, hit_a = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=random.Random(42),
+    )
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.90))
+    _pre_b, _open_b, hit_b = _OTRC.assemble_pre_locked_rows(
+        num_characters=3, rng=random.Random(42),
+    )
+    assert hit_a is True and hit_b is False, (
+        "same cast seed must NOT determine lemmy_hit -- the cameo "
+        "roll is decoupled from the seed (BUG-LOCAL-260)"
+    )
+
+
+def test_assemble_cast_names_still_seed_deterministic(monkeypatch):
+    """Decoupling LEMMY must NOT weaken C7 for the rest of the cast:
+    the announcer pick and open-slot names stay seed-deterministic."""
+    # Pin OS entropy to a miss so the LEMMY cameo never perturbs the
+    # comparison.
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.90))
+    pre_a, open_a, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=4, rng=random.Random("c7-seed"),
+    )
+    pre_b, open_b, _ = _OTRC.assemble_pre_locked_rows(
+        num_characters=4, rng=random.Random("c7-seed"),
+    )
+    assert [r["name"] for r in pre_a] == [r["name"] for r in pre_b]
+    assert pre_a[0]["voice_preset"] == pre_b[0]["voice_preset"]
+    assert [s.name for s in open_a] == [s.name for s in open_b]
+
+
+def test_force_lemmy_still_overrides_the_os_entropy_roll(monkeypatch):
+    """force_lemmy must still win over the OS-entropy roll, so tests
+    and the lemmy_cameo writer widget keep deterministic control."""
+    # OS entropy pinned to a guaranteed hit -- force_lemmy=False wins.
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.0))
+    _pre, _open, hit = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=random.Random(1), force_lemmy=False,
+    )
+    assert hit is False, "force_lemmy=False must override an entropy hit"
+    # OS entropy pinned to a guaranteed miss -- force_lemmy=True wins.
+    monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.99))
+    _pre2, _open2, hit2 = _OTRC.assemble_pre_locked_rows(
+        num_characters=2, rng=random.Random(1), force_lemmy=True,
+    )
+    assert hit2 is True, "force_lemmy=True must override an entropy miss"

@@ -656,12 +656,13 @@ class TestWriterB2aSurface:
         #  15  repetition_penalty      1.03
         #  16  max_new_tokens_cap      200
         #  17  enable_polish_pass      False
+        #  18  lemmy_cameo             "roll (~11% chance)"
         # optimization_profile widget removed 2026-05-23 (ROADMAP
-        # PRIORITY 2); vector 19 -> 18, slots 14..18 shifted down to
-        # 13..17.
-        assert len(wv) == 18, (
+        # PRIORITY 2); vector 19 -> 18. lemmy_cameo appended at the
+        # end 2026-05-23 (BUG-LOCAL-260); vector 18 -> 19.
+        assert len(wv) == 19, (
             f"writer widgets_values length drift: {len(wv)} "
-            f"(expected 18 post-B2a, optimization_profile removed)"
+            f"(expected 19: 18 post-B2a + lemmy_cameo, BUG-LOCAL-260)"
         )
         # Creative + technical slots both bound to a string repo id
         # (default = catalog DEFAULT_LLM but any non-empty STRING is

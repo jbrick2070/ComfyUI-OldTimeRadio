@@ -11,7 +11,7 @@ These tests exercise:
   1. The synthesis: declaration order + companion injection produces a
      slot list whose length equals `widgets_values` for a clean-saved
      workflow.
-  2. The canonical workflow shape (18-entry widgets_values on node 1):
+  2. The canonical workflow shape (19-entry widgets_values on node 1):
      a `creative_writing_model` patch lands at slot 5, NOT slot 4 (which
      is the `"fixed"` companion). The companion value is preserved.
   3. Same for `technical_model` patch -> slot 6.
@@ -42,6 +42,7 @@ widgets_values dump from `workflows/otr_scifi_16gb_full.json`
   15 repetition_penalty      FLOAT         1.03
   16 max_new_tokens_cap      INT           200
   17 enable_polish_pass      BOOL          False
+  18 lemmy_cameo             COMBO         'roll (~11% chance)'
 
 The `target_words` + `num_characters` + `act_count` INT widgets are
 NOT named "seed" or "noise_seed" -- they do NOT trigger companion
@@ -113,6 +114,11 @@ def _writer_schemas() -> dict:
                     "repetition_penalty": ("FLOAT", {"default": 1.03}),
                     "max_new_tokens_cap": ("INT", {"default": 200}),
                     "enable_polish_pass": ("BOOLEAN", {"default": False}),
+                    "lemmy_cameo": (
+                        ["roll (~11% chance)", "always include",
+                         "never include"],
+                        {"default": "roll (~11% chance)"},
+                    ),
                 },
                 "optional": {},
             }
@@ -121,7 +127,7 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 18-entry widgets_values
+    """Workflow fixture with node 1 carrying the 19-entry widgets_values
     layout dumped from workflows/otr_scifi_16gb_full.json (optimization_
     profile widget removed 2026-05-23, ROADMAP PRIORITY 2).
     """
@@ -150,6 +156,7 @@ def _writer_node_fixture() -> dict:
                     1.03,                        # 15 repetition_penalty
                     200,                         # 16 max_new_tokens_cap
                     False,                       # 17 enable_polish_pass
+                    "roll (~11% chance)",        # 18 lemmy_cameo
                 ],
             }
         ],
@@ -219,7 +226,7 @@ def test_serialized_slots_no_companion_for_non_seed_int():
 # Test 2 -- creative_writing_model patch lands past the companion
 # ---------------------------------------------------------------------------
 def test_patch_skips_companion_and_lands_on_correct_index():
-    """Using node 1's actual 18-entry fixture, patch
+    """Using node 1's actual 19-entry fixture, patch
     creative_writing_model and assert widgets_values[5] changes
     (NOT widgets_values[4], which is the companion).
     """
@@ -388,7 +395,7 @@ def test_round_trip_canonical_node1_inputs_correct():
         wv[4]   "fixed" companion (NOT mapped anywhere)
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 18, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
     expected_seed = dump[3]
     expected_companion = dump[4]
     expected_creative = dump[5]

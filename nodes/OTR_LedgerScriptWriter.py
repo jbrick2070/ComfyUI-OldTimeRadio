@@ -189,6 +189,16 @@ _CREATIVITY_TOP_P_MAP = {
 
 _CREATIVITY_CHOICES = list(_CREATIVITY_TEMP_MAP.keys())
 
+# BUG-LOCAL-260: operator control for the LEMMY easter-egg cameo. The
+# roll itself is OS-entropy (cast_pools.roll_lemmy, decoupled from the
+# C7 seed); this widget lets the operator override the ~11% chance.
+_LEMMY_CAMEO_CHOICES = ["roll (~11% chance)", "always include", "never include"]
+_LEMMY_CAMEO_FORCE = {
+    "roll (~11% chance)": None,    # natural ~11% OS-entropy roll
+    "always include": True,         # force the cameo into the cast
+    "never include": False,         # keep the cameo out of the cast
+}
+
 
 # target_length widget removed 2026-05-11 (post-Phase-3 cleanup pass).
 # The old "short (3 acts)" / "medium (5 acts)" / "long (7-8 acts)" combo
@@ -1345,8 +1355,10 @@ class OTR_LedgerScriptWriter:
                         "Random seed for the C7 byte-identity contract. "
                         "Drives cast lock RNG (announcer voice + open-"
                         "character name rolls), style picker (two-pass "
-                        "inventor + chooser samples), LEMMY's 11% roll, "
-                        "and the reviewer's seed_for_reviewer derivation.\n\n"
+                        "inventor + chooser samples), and the reviewer's "
+                        "seed_for_reviewer derivation. LEMMY's 11% cameo "
+                        "roll is NOT seed-driven -- it uses OS entropy; "
+                        "use the lemmy_cameo widget to force it.\n\n"
                         "Default is 42 (cosmetic; replaces the previous "
                         "default of 0). When the ComfyUI 'shuffle' icon "
                         "next to the seed value is ON, ComfyUI generates "
@@ -1583,6 +1595,31 @@ class OTR_LedgerScriptWriter:
                         "are written."
                     ),
                 }),
+                # BUG-LOCAL-260: operator control for the LEMMY cameo.
+                # The natural roll is OS-entropy (~11%, decoupled from
+                # the seed); this widget lets the operator force it.
+                "lemmy_cameo": (
+                    _LEMMY_CAMEO_CHOICES,
+                    {
+                        "default": "roll (~11% chance)",
+                        "tooltip": (
+                            "LEMMY easter-egg cameo -- the gravelly "
+                            "engineer who occasionally joins the cast.\n\n"
+                            "  roll (~11% chance) -- default; LEMMY may "
+                            "appear at random. The roll uses OS entropy "
+                            "and is NOT tied to the seed (BUG-LOCAL-260), "
+                            "so a fixed seed no longer pins him on or "
+                            "off.\n"
+                            "  always include -- force LEMMY into the "
+                            "cast this run.\n"
+                            "  never include -- keep LEMMY out this "
+                            "run.\n\n"
+                            "'always' / 'never' consume one of the "
+                            "num_characters slots, exactly as a natural "
+                            "roll does."
+                        ),
+                    },
+                ),
             },
         }
 
@@ -1640,6 +1677,9 @@ class OTR_LedgerScriptWriter:
         repetition_penalty=1.03,
         max_new_tokens_cap=200,
         enable_polish_pass=False,
+        # BUG-LOCAL-260: operator control for the LEMMY cameo. Maps to
+        # force_lemmy (None = natural ~11% OS-entropy roll).
+        lemmy_cameo="roll (~11% chance)",
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1892,15 +1932,15 @@ class OTR_LedgerScriptWriter:
         # as non-deterministic and silently violate the contract
         # (round-robin 2026-05-10).
         #
-        # LEMMY's 11% roll now also runs against this same RNG so
-        # the seed fully determines whether the cameo hits. Prior
-        # design routed LEMMY through SystemRandom for OS entropy,
-        # but that defeated C7 even for explicitly-seeded runs.
-        # The 11% rate remains statistically intact across many
-        # runs (still tested by tests/lemmy_rng_check.py); what
-        # changes is that with seed=42, every run gets the SAME
-        # lemmy_hit value -- which is exactly the reproducibility
-        # contract C7 requires.
+        # LEMMY's 11% cameo roll is deliberately NOT tied to this
+        # seed -- cast_pools.roll_lemmy() always uses OS entropy
+        # (BUG-LOCAL-260). A fixed seed reproduces one roll forever,
+        # which pinned LEMMY to 100% (or 0%) instead of ~11%. The
+        # seed still fully determines the announcer pick, the open-
+        # character name rolls, the style picker, and the reviewer
+        # derivation; only the LEMMY cameo is decoupled. The
+        # lemmy_cameo widget below maps to force_lemmy when the
+        # operator wants to force the cameo in or out.
         cast_rng = _random.Random(int(seed))
         # LLM slot: creative -- cast lock generates per-character
         # narrative descriptions (gender + character_description).
@@ -1910,6 +1950,10 @@ class OTR_LedgerScriptWriter:
         # B1 routes generation through creative; B3 flips schema
         # validation to technical_fn (fail-fast per D2).
         # S32 B6: helper_context attribution.
+        # lemmy_cameo widget -> force_lemmy override (BUG-LOCAL-260).
+        # None lets cast_pools.roll_lemmy's OS-entropy ~11% decide;
+        # True / False force the cameo into / out of the cast.
+        lemmy_force = _LEMMY_CAMEO_FORCE.get(lemmy_cameo)
         with slot_scheduler.helper_context("lock_cast"):
             cast_rows, cast_meta = _OTRCAST.lock_cast(
                 creative_fn=creative_generate_fn,
@@ -1919,6 +1963,7 @@ class OTR_LedgerScriptWriter:
                 casting_brief=casting_brief,
                 style=resolved["style"],
                 rng=cast_rng,
+                force_lemmy=lemmy_force,
             )
         led.set_cast(cast_rows)
         meta["cast_status"]           = "locked"
@@ -3008,7 +3053,7 @@ if __name__ == "__main__":
         for k in ("seed", "creative_writing_model", "technical_model",
                   "custom_premise", "include_act_breaks", "act_count",
                   "style", "style_custom", "creativity",
-                  "perfect_run_spacesaver"):
+                  "perfect_run_spacesaver", "lemmy_cameo"):
             assert k in spec["optional"], f"optional missing key: {k}"
         # Legacy widgets MUST be absent post-cleanup. `model_id` joins
         # the legacy list at B2a (replaced by the two slot widgets).

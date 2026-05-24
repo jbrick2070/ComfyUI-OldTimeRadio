@@ -237,29 +237,34 @@ KNOWN_TTS_MODELS: tuple[str, ...] = tuple(VOICE_REGISTRY.keys())
 # LEMMY 11% cameo rate. Statistically held by tests/lemmy_rng_check.py.
 LEMMY_RATE = 0.11
 
-# Module-level SystemRandom retained for callers that want pure OS
-# entropy (the v1.7 design). The seeded path now takes precedence in
-# the cast contract writer (rolled into roll_lemmy(rng) below) so
-# explicit-seed runs produce deterministic LEMMY hits for C7. Per
-# round-robin synthesis 2026-05-10: a seeded run with seed=42 that
-# could randomly hit LEMMY on one run and miss on another defeats
-# C7 byte-identity, which is the whole point of having a seed.
+# Module-level SystemRandom (OS entropy). The LEMMY cameo roll ALWAYS
+# uses this -- never a seeded RNG -- so the easter egg stays a genuine
+# ~11% surprise, decoupled from the C7 byte-identity seed. See
+# roll_lemmy() and BUG-LOCAL-260.
 _LEMMY_RNG_SYSTEM = SystemRandom()
 
 
-def roll_lemmy(rng: random.Random | None = None) -> bool:
+def roll_lemmy() -> bool:
     """Return True with probability LEMMY_RATE (~11%), False otherwise.
 
-    When `rng` is provided (the cast contract path -- the writer
-    passes its seeded random.Random instance), the roll is
-    deterministic against the seed. C7 byte-identity holds.
+    Always rolls against the module-level SystemRandom (OS entropy),
+    never a seeded RNG -- the LEMMY cameo is a genuine surprise,
+    decoupled from the C7 byte-identity seed.
 
-    When `rng` is None (legacy callers or anywhere the caller wants
-    OS-entropy randomness), falls back to the module-level
-    SystemRandom -- the v1.7 behavior.
+    History (BUG-LOCAL-260, 2026-05-23): a 2026-05-10 change routed
+    this roll through the cast contract's seeded random.Random so an
+    explicitly-seeded run was byte-reproducible end to end. But the
+    writer's `seed` widget ships a fixed value, and a fixed seed
+    reproduces ONE roll forever -- so a LEMMY-positive seed (42 was
+    one) cast LEMMY on 100% of runs and a LEMMY-negative seed on 0%.
+    A fixed seed can never yield the intended ~11%. Decoupling the
+    roll from the seed restores the rare cameo; the deliberate
+    trade-off is that LEMMY's hit is no longer reproducible from the
+    seed. Cast names, the announcer pick, and the style picker stay
+    fully seed-deterministic. Tests force a deterministic LEMMY via
+    the `force_lemmy` knob on assemble_pre_locked_rows.
     """
-    source = rng if rng is not None else _LEMMY_RNG_SYSTEM
-    return source.random() < LEMMY_RATE
+    return _LEMMY_RNG_SYSTEM.random() < LEMMY_RATE
 
 
 # Back-compat alias: some code expects `_LEMMY_RNG` as a module
