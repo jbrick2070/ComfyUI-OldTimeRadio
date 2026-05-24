@@ -610,9 +610,24 @@ def _build_truncating_generate_fn(
     # disable persists across calls within one run without spamming
     # the warning more than once.
     _min_p_unsupported = [False]
+    # BUG-LOCAL-262: probe the tokenizer's chat template once per model
+    # residency. None = not yet probed; True/False = supports a system
+    # role or not. Gemma-2's template hard-rejects the system role, so
+    # normalize_messages_for_tokenizer folds system content into the
+    # first user turn. Closure-cell idiom matches `_min_p_unsupported`.
+    _system_role_supported = [None]
 
     def generate_fn(messages, *, temperature, max_new_tokens, stop=None):
         import torch  # local import; never load torch at module import
+        from . import _otr_loader_backends as _OTRLB
+        if _system_role_supported[0] is None:
+            _system_role_supported[0] = (
+                _OTRLB.tokenizer_supports_system_role(tokenizer)
+            )
+        if not _system_role_supported[0]:
+            messages = _OTRLB.normalize_messages_for_tokenizer(
+                tokenizer, messages,
+            )
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True,
         )

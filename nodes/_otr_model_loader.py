@@ -824,6 +824,33 @@ def request_slot(slot: str, model_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _normalize_messages_for_cache_entry(
+    cache_entry: dict[str, Any], messages: list[dict],
+) -> list[dict]:
+    """BUG-LOCAL-262: fold system messages into the first user turn
+    for tokenizers whose chat template rejects the system role.
+
+    Probes the tokenizer once and caches the verdict on the
+    cache_entry under `_system_role_supported`, so the probe runs
+    once per model residency rather than per generate call (both
+    make_generate_fn and make_polish_generate_fn share the entry).
+    """
+    from . import _otr_loader_backends as _otr_loader_backends
+
+    tokenizer = cache_entry["tokenizer"]
+    supported = cache_entry.get("_system_role_supported")
+    if supported is None:
+        supported = _otr_loader_backends.tokenizer_supports_system_role(
+            tokenizer,
+        )
+        cache_entry["_system_role_supported"] = supported
+    if supported:
+        return messages
+    return _otr_loader_backends.normalize_messages_for_tokenizer(
+        tokenizer, messages,
+    )
+
+
 def make_generate_fn(cache_entry: dict[str, Any]):
     """Wrap a cache_entry into the GenerateFn callable.
 
@@ -862,6 +889,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
+        messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
@@ -939,6 +967,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
+        messages = _normalize_messages_for_cache_entry(cache_entry, messages)
         prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )

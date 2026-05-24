@@ -5,6 +5,7 @@
 # strip nothing else. See tools/audit_model_license.py for the canonical
 # sanitizer and validator.
 mistralai/Mistral-Nemo-Instruct-2407
+google/gemma-2-2b-it
 google/gemma-4-E2B-it
 google/gemma-4-E4B-it
 Qwen/Qwen2.5-14B-Instruct

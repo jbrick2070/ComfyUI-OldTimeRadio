@@ -127,6 +127,17 @@ def _build_prompt(env_description: str, tokenizer: Any) -> str:
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": user_msg},
     ]
+    # BUG-LOCAL-262: fold the system message into the first user turn
+    # for tokenizers whose chat template rejects the system role
+    # (Gemma-2 and similar) before calling apply_chat_template.
+    try:
+        from nodes import _otr_loader_backends as _OTRLB  # type: ignore
+
+        messages = _OTRLB.normalize_messages_for_tokenizer(
+            tokenizer, messages,
+        )
+    except Exception:  # noqa: BLE001 -- normalization is best-effort
+        pass
     try:
         return tokenizer.apply_chat_template(
             messages,

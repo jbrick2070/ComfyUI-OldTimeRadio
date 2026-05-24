@@ -138,6 +138,27 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         license_audit_status="mit_equivalent",
     ),
     CuratedModel(
+        repo_id="google/gemma-2-2b-it",
+        requires_auth=True,
+        loader_backend="transformers_safetensors",
+        vram_fit_tier="PASS",
+        approx_safetensors_gb=5.2,
+        notes="Smallest curated technical-slot pick (2B, NF4 -- tiny "
+        "VRAM). Gemma-2 has no system role by design; the writer "
+        "generate path folds system content into the first user "
+        "turn via normalize_messages_for_tokenizer (BUG-LOCAL-262). "
+        "Gemma-2 ships under the restricted Gemma Terms of Use "
+        "(NOT Apache 2.0 -- only Gemma 4 is) so the row is "
+        "research-lane: technical-slot use only, not bound in the "
+        "default creative-binding workflow JSON.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="gated_terms",
+        license_audit_status="research_lane",
+    ),
+    CuratedModel(
         repo_id="Qwen/Qwen2.5-14B-Instruct",
         requires_auth=False,
         loader_backend="transformers_safetensors",
@@ -157,6 +178,10 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
     # removed. The curated set is Mistral-Nemo + gemma-4-E2B +
     # gemma-4-E4B + Qwen2.5-14B-Instruct.
+    # 2026-05-24: gemma-2-2b-it added as the smallest technical-slot
+    # pick (BUG-LOCAL-262). Gemma-2's chat template rejects the system
+    # role; the generate path normalizes system messages before
+    # apply_chat_template so the row is a clean technical pick.
     # No otr_1940s_v1 period row is curated at present. The broken
     # talkie-lm/talkie-1930-13b-it row was removed 2026-05-22 (raw
     # research checkpoint -- no config.json / tokenizer -- crashed the
@@ -521,6 +546,7 @@ HARD_VRAM_CONTEXT_LIMIT = _hard_vram_context_limit()
 # Holding that here keeps audio byte-identity across B1b.
 CURATED_CONTEXT_OVERRIDES: dict[str, int] = {
     "mistralai/Mistral-Nemo-Instruct-2407": 8192,
+    "google/gemma-2-2b-it": 8192,
     "google/gemma-4-E2B-it": 8192,
     "google/gemma-4-E4B-it": 8192,
     "Qwen/Qwen2.5-14B-Instruct": 8192,
