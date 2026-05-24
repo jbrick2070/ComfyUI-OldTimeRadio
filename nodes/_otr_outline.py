@@ -971,8 +971,8 @@ Schema:
 }
 
 Rules:
-- Use ONLY names from the Cast. Never invent.
-- Vary speakers across beats so dialogue feels like a real exchange.
+- Use ONLY the exact ALL-CAPS names from the Cast block. Never invent a name or alter its spelling.
+- Speaker variation across beats is optional, not required. Vary speakers only when it serves the scene; repeating the same speaker on consecutive beats is fine.
 - The number of beats you return MUST equal the requested count.
 """
 
@@ -1118,6 +1118,83 @@ def _allocate_phase_target_words(
     return arr
 
 
+# ---------------------------------------------------------------------------
+# HOTFIX 2026-05-23 (BUG-LOCAL-259) -- outline cast-drift crash
+#
+# The Stage 2 speaker-assignment call could raise OutlineFailedError
+# uncaught when the creative LLM assigned a beat speaker outside the
+# locked cast, vaporizing a ~112 s ComfyUI run. The constant + helpers
+# below back the locked HOTFIX plan (ROADMAP.md "## HOTFIX -- Outline
+# cast-drift crash"): a deterministic, no-LLM phase skeleton (steps 1
+# and 2), a low falling Stage 2 temperature schedule (step 3), and
+# minimal speaker normalization (step 5).
+# ---------------------------------------------------------------------------
+
+# Step 3: Stage 2 (speaker routing) temperature schedule -- low and
+# monotonically FALLING. Stage 2 assigns speakers from a fixed locked
+# cast; it is structured routing, not creative prose, so each retry
+# must sample MORE conservatively. attempt 1 = 0.35, attempt 2 = 0.25,
+# attempt 3 (repair) = 0.15. Replaces the legacy RISING schedule
+# (base_temperature + 0.1*attempt_idx -> 0.70 / 0.80, repair 0.30),
+# which raised temperature on exactly the constraint-adherence retries
+# that needed it lowered.
+_STAGE2_TEMPERATURE_SCHEDULE: tuple[float, ...] = (0.35, 0.25, 0.15)
+
+# Step 5: characters an LLM strays around a speaker name -- a trailing
+# colon ("LEMMY:"), surrounding quotes / brackets, stray dashes or
+# whitespace. Stripped from BOTH ends only, so internal punctuation
+# (e.g. "DR. LEMMY") is preserved.
+_SPEAKER_EDGE_PUNCTUATION = " \t\r\n\"'`.,;:!?*_-()[]{}<>"
+
+
+def _normalize_speaker(name: str) -> str:
+    """Normalize an LLM-emitted speaker name for the cast-membership
+    check: uppercase, strip whitespace, and drop stray surrounding
+    punctuation (' LEMMY ', 'LEMMY:', '"LEMMY"' -> 'LEMMY').
+
+    HOTFIX step 5 (2026-05-23). Deliberately NOT fuzzy matching --
+    there is no edit-distance snap here. Broad fuzzy matching can
+    silently assign the wrong actor in a multi-character cast; only an
+    exact match AFTER this normalization is accepted by _phase_check.
+    """
+    return name.strip(_SPEAKER_EDGE_PUNCTUATION).upper()
+
+
+def _deterministic_phase_skeleton(
+    phase_beat_count: int,
+    locked_cast: tuple[str, ...],
+) -> _PhaseSkeleton:
+    """Build a Stage 2 phase skeleton WITHOUT an LLM call: assign
+    speakers by cycling the sorted locked cast across the beat
+    positions.
+
+    Backs two HOTFIX steps:
+      * Step 1 -- singleton-cast bypass: a 1-character cast cycles to
+        the sole name on every beat, so the Stage 2 LLM call (which
+        has no decision to make) is skipped entirely.
+      * Step 2 -- deterministic no-crash fallback: when the Stage 2
+        retry budget is exhausted for a multi-character cast, this
+        replaces `raise OutlineFailedError` so a recoverable
+        cast-membership miss never vaporizes the run.
+
+    Fully deterministic -- sorted cast cycled by beat position, no RNG
+    -- so it is safe under the writer's seed / repro contract. Every
+    emitted speaker is a member of locked_cast by construction, so the
+    post-combine cast-leak check and the budget validators pass.
+    """
+    cast = sorted(locked_cast)
+    # Defensive lower bound: a phase budget of 0 voiced beats should
+    # never occur (compute_episode_budget allocates >= 1), but max(1,
+    # ...) keeps this builder non-crashing against _PhaseSkeleton's
+    # min_length=1 if it ever did.
+    n = max(1, phase_beat_count)
+    beats = [
+        _PhaseBeatSeed(speaker=cast[i % len(cast)])
+        for i in range(n)
+    ]
+    return _PhaseSkeleton(beats=beats)
+
+
 def _run_call_with_retry(
     generate_fn,
     *,
@@ -1129,6 +1206,7 @@ def _run_call_with_retry(
     base_temperature: float,
     max_new_tokens: int,
     extra_check=None,
+    temperature_schedule: Optional[tuple[float, ...]] = None,
 ) -> tuple[object, list[tuple[str, str]]]:
     """Single LLM call wrapped in a 3-attempt retry. Returns (parsed,
     attempts_history). Raises the last error wrapped in a tuple so
@@ -1138,6 +1216,14 @@ def _run_call_with_retry(
     attempt_idx, with the final attempt switching to a repair call
     at temp 0.3 carrying the previous raw + validation error in the
     user prompt.
+
+    HOTFIX step 3 (2026-05-23): when `temperature_schedule` is given,
+    it overrides the rising base_temperature schedule -- attempt i
+    uses temperature_schedule[min(i, len-1)] for BOTH fresh and repair
+    calls. Stage 2 (speaker routing) passes the low, monotonically
+    falling _STAGE2_TEMPERATURE_SCHEDULE so a constraint-adherence
+    retry samples more conservatively, not less. Stages 1 and 3 leave
+    it None and keep the legacy rising schedule.
 
     extra_check is an optional callable (parsed, raw) -> str|None
     used to apply cross-call invariants (e.g. cast-membership check
@@ -1154,6 +1240,17 @@ def _run_call_with_retry(
 
     for attempt_idx in range(max_attempts):
         is_repair = (attempt_idx == max_attempts - 1) and attempt_idx >= 2
+        # HOTFIX step 3: an explicit temperature_schedule (Stage 2)
+        # overrides both the rising fresh schedule and the fixed 0.3
+        # repair temp. The index is clamped to the last entry so a
+        # longer retry budget keeps sampling at the final (lowest)
+        # value rather than running off the end of the schedule.
+        if temperature_schedule is not None:
+            scheduled_temp = temperature_schedule[
+                min(attempt_idx, len(temperature_schedule) - 1)
+            ]
+        else:
+            scheduled_temp = None
         if is_repair and attempts:
             prev_raw, prev_err = attempts[-1]
             repair_user = _REPAIR_PROMPT_TEMPLATE.format(
@@ -1164,14 +1261,17 @@ def _run_call_with_retry(
                 {"role": "system", "content": system},
                 {"role": "user", "content": repair_user},
             ]
-            temp = 0.3
+            temp = scheduled_temp if scheduled_temp is not None else 0.3
             log.info(
                 "[OTR_Outline.%s] attempt %d/%d: repair call (temp=%.2f)",
                 label, attempt_idx + 1, max_attempts, temp,
             )
         else:
             messages = base_messages
-            temp = base_temperature + (0.1 * attempt_idx)
+            if scheduled_temp is not None:
+                temp = scheduled_temp
+            else:
+                temp = base_temperature + (0.1 * attempt_idx)
             log.info(
                 "[OTR_Outline.%s] attempt %d/%d: fresh (temp=%.2f)",
                 label, attempt_idx + 1, max_attempts, temp,
@@ -1451,10 +1551,37 @@ def generate_outline(
         raise OutlineFailedError(attempts=all_attempts, request=req)
 
     # ----------------------------- Stage 2 ---------------------------------
+    # HOTFIX 2026-05-23 (BUG-LOCAL-259): the Stage 2 speaker call no
+    # longer crashes the run on a cast-membership miss. Step 1 skips
+    # the LLM call entirely for a singleton cast; step 2 replaces the
+    # exhausted-retry `raise OutlineFailedError` with a deterministic
+    # round-robin skeleton; step 3 routes the call through a low,
+    # falling temperature schedule; step 5 normalizes emitted speakers
+    # before the cast-membership check.
     phase_skeletons: list[_PhaseSkeleton] = []
+    singleton_cast = len(req.character_cast) == 1
+
     for phase_idx, (phase_name, phase_beat_count) in enumerate(
         zip(arc_phases, per_phase_beats)
     ):
+        # Step 1: singleton-cast bypass. With one locked character
+        # there is no speaker decision to make -- the sole name is the
+        # only legal value for every beat. Skip the Stage 2 LLM call
+        # and build the skeleton deterministically. This removes the
+        # observed crash (num_characters=1, cast ['LEMMY'], the LLM
+        # invented 'LEMMEY' / 'CAPTAIN' and raised OutlineFailedError).
+        if singleton_cast:
+            skeleton = _deterministic_phase_skeleton(
+                phase_beat_count, req.character_cast,
+            )
+            log.info(
+                "[OTR_Outline.phase[%s]] singleton-cast bypass: "
+                "skipped Stage 2 LLM call, assigned %r to all %d beats",
+                phase_name, req.character_cast[0], len(skeleton.beats),
+            )
+            phase_skeletons.append(skeleton)
+            continue
+
         phase_user = _build_phase_user_prompt(
             req, macro, phase_name, phase_beat_count,
             arc_phases, phase_idx,
@@ -1468,13 +1595,25 @@ def generate_outline(
                     f"got {len(parsed.beats)}, expected "
                     f"{phase_beat_count}"
                 )
+            # Step 5: normalize each emitted speaker before the
+            # cast-membership check -- uppercase, strip whitespace,
+            # drop stray surrounding punctuation ('ALICE:' -> 'ALICE').
+            # If a beat normalizes cleanly into the locked cast, mutate
+            # it to the canonical spelling so the assembled outline
+            # carries the clean name. NOT fuzzy matching: a genuine
+            # hallucination still fails and triggers the retry.
             for b in parsed.beats:
-                if b.speaker not in locked_cast_set:
-                    return (
-                        f"phase {phase_name!r} beat speaker "
-                        f"{b.speaker!r} is not in locked cast "
-                        f"{sorted(locked_cast_set)!r}"
-                    )
+                if b.speaker in locked_cast_set:
+                    continue
+                normalized = _normalize_speaker(b.speaker)
+                if normalized in locked_cast_set:
+                    b.speaker = normalized
+                    continue
+                return (
+                    f"phase {phase_name!r} beat speaker "
+                    f"{b.speaker!r} is not in locked cast "
+                    f"{sorted(locked_cast_set)!r}"
+                )
             return None
 
         skeleton, phase_attempts = _run_call_with_retry(
@@ -1487,10 +1626,30 @@ def generate_outline(
             base_temperature=base_temperature,
             max_new_tokens=200,
             extra_check=_phase_check,
+            temperature_schedule=_STAGE2_TEMPERATURE_SCHEDULE,
         )
         all_attempts.extend(phase_attempts)
         if skeleton is None:
-            raise OutlineFailedError(attempts=all_attempts, request=req)
+            # Step 2: deterministic no-crash fallback. The Stage 2
+            # retry budget is exhausted -- almost always a
+            # cast-membership miss the creative LLM would not stop
+            # making. A cast-membership failure is ALWAYS
+            # deterministically recoverable (the legal speaker set is
+            # known), so it must never vaporize the run. Build the
+            # phase skeleton by round-robining the locked cast instead
+            # of raising OutlineFailedError. The failed attempts stay
+            # recorded in all_attempts for diagnostics.
+            skeleton = _deterministic_phase_skeleton(
+                phase_beat_count, req.character_cast,
+            )
+            log.warning(
+                "[OTR_Outline.phase[%s]] Stage 2 retries exhausted; "
+                "fell back to deterministic round-robin speaker "
+                "assignment across %d beats. The outline will "
+                "complete with a plainer speaker pattern for this "
+                "phase.",
+                phase_name, len(skeleton.beats),
+            )
         phase_skeletons.append(skeleton)
 
     # ----------------------------- Stage 3 ---------------------------------
@@ -1633,6 +1792,13 @@ if __name__ == "__main__":
     _HARNESS_BUDGET_200 = _ceb(200, 3, True, 2)
     _HARNESS_BUDGET_150 = _ceb(150, 3, True, 2)
     _HARNESS_BUDGET_200_1CHAR = _ceb(200, 3, True, 1)
+    # 350 words at the matching default act count (3) is the proven-
+    # satisfiable budget shape -- a complete outline validates against
+    # it. Test 10 runs generate_outline to completion, so it needs a
+    # consistent budget (unlike _HARNESS_BUDGET_150, where 150 words
+    # forced into 3 acts is internally unsatisfiable -- fine for the
+    # Tests 9/11/12 that never assemble a full outline).
+    _HARNESS_BUDGET_350 = _ceb(350, 3, True, 2)
 
     # Test 1: Beat schema rejects bad inputs.
     print("\n[Test 1] Beat schema validation")
@@ -1772,53 +1938,63 @@ if __name__ == "__main__":
     assert "2 attempts" in str(err)
     print("  PASS")
 
-    # Test 10: cast-contract drift check rejects mismatched outlines.
-    # Architecture (post-2026-05-10): outline schema no longer carries
-    # a `cast` field. The check walks character-role beats and
-    # verifies each beat.speaker is in req.character_cast (the LOCKED
-    # cast). LLM "invents CAROL" -> beat.speaker=CAROL not in
-    # locked {ALICE, BOB} -> reroll.
-    print("\n[Test 10] generate_outline rejects cast drift")
-    drift_outline_json = json.dumps({
-        "title": "Test", "premise": "A test premise about science.",
-        "setting": "A lab", "time_of_day": "Morning",
-        "beats": [
-            {"beat_id": "b001", "speaker": "NARRATOR",
-             "speaker_role": "music_open",
-             "intent": "open", "target_words": 5, "mood": "bold"},
-            {"beat_id": "b002", "speaker": "ALICE",
-             "speaker_role": "character",
-             "intent": "speak", "target_words": 10, "mood": "wry"},
-            # request will lock ("ALICE", "BOB") -- LLM beat invents CAROL
-            {"beat_id": "b003", "speaker": "CAROL",
-             "speaker_role": "character",
-             "intent": "speak", "target_words": 10, "mood": "wry"},
-            {"beat_id": "b004", "speaker": "NARRATOR",
-             "speaker_role": "music_close",
-             "intent": "close", "target_words": 5, "mood": "resolute"},
-        ],
+    # Test 10: generate_outline RECOVERS from Stage 2 cast drift
+    # (HOTFIX 2026-05-23, BUG-LOCAL-259). Before the hotfix an
+    # off-cast speaker from the Stage 2 LLM raised OutlineFailedError
+    # and vaporized a ~112 s run. Now the exhausted-retry path builds
+    # a deterministic round-robin skeleton instead, so the outline
+    # completes with every speaker inside the locked cast. Full
+    # behavioural coverage: tests/test_outline_cast_drift_hotfix.py.
+    print("\n[Test 10] generate_outline recovers from Stage 2 cast drift")
+
+    _T10_MACRO_JSON = json.dumps({
+        "title": "Drift Recovery Test",
+        "premise": "A premise about a faint science signal and its cost.",
+        "setting": "A quiet observatory lab",
+        "time_of_day": "midnight",
+    })
+    _T10_BEAT_JSON = json.dumps({
+        "intent": "advance the scene toward the next turn",
+        "target_words": 18,
+        "mood": "tense",
     })
 
-    def _drift_gen_fn(messages, *, temperature, max_new_tokens):
-        return drift_outline_json
+    def _drift_stage_gen(messages, *, temperature, max_new_tokens):
+        system = messages[0]["content"]
+        if "You plan one phase" in system:
+            user = messages[1]["content"]
+            m = re.search(r"Beats to plan in this phase: (\d+)", user)
+            n = int(m.group(1)) if m else 1
+            # CAROL is NOT in the locked ("ALICE", "BOB") cast -- every
+            # Stage 2 attempt drifts and exhausts the retry budget.
+            return json.dumps(
+                {"beats": [{"speaker": "CAROL"} for _ in range(n)]}
+            )
+        if "You flesh out one beat" in system:
+            return _T10_BEAT_JSON
+        return _T10_MACRO_JSON
 
-    try:
-        generate_outline(
-            _drift_gen_fn,
-            OutlineRequest(
-                news_seed="x", style="y",
-                character_cast=("ALICE", "BOB"),
-                target_words=150,
-                budget=_HARNESS_BUDGET_150,
-            ),
-            max_attempts=2,
-        )
-        print("  FAIL: cast drift was silently accepted")
-    except OutlineFailedError as exc:
-        last_err = exc.attempts[-1][1]
-        assert "CastContractError" in last_err, \
-            f"expected CastContractError in error, got: {last_err!r}"
-        print("  PASS: cast drift rejected with CastContractError")
+    _t10_outline = generate_outline(
+        _drift_stage_gen,
+        OutlineRequest(
+            news_seed="x", style="y",
+            character_cast=("ALICE", "BOB"),
+            target_words=350,
+            budget=_HARNESS_BUDGET_350,
+        ),
+        max_attempts=2,
+    )
+    _t10_speakers = {
+        b.speaker for b in _t10_outline.beats
+        if b.speaker_role == "character"
+    }
+    assert _t10_speakers, "Test 10: outline has no character beats"
+    assert _t10_speakers <= {"ALICE", "BOB"}, (
+        f"Test 10: drift recovery leaked off-cast speakers: "
+        f"{_t10_speakers!r}"
+    )
+    print("  PASS: Stage 2 cast drift recovered via deterministic "
+          "round-robin; all speakers in locked cast")
 
     # Test 11: cast_descriptions field — rich render + validation
     # (length mismatch + name mismatch). S28 cleanbreak: dropped 11a
