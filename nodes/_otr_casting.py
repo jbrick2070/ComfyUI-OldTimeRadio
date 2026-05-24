@@ -84,7 +84,14 @@ class CastingResponse(BaseModel):
     and rerolls if the response picks a voice outside the pool.
     """
 
-    character_description: str = Field(..., min_length=10, max_length=200)
+    # BUG-LOCAL-263 (2026-05-24): max_length 200 -> 750. The casting
+    # prompt only ever showed the model the placeholder "<short>" --
+    # it never stated a character count -- so a normal 1-2 sentence
+    # description routinely overran the old 200 cap and aborted the
+    # run. 750 is a generous runaway guard, not a content target;
+    # _format_prior_entry already trims the echoed description to
+    # 60 chars, so the stored length never touches prompt budget.
+    character_description: str = Field(..., min_length=10, max_length=750)
     gender: str = Field(..., min_length=3, max_length=12)
     voice_preset: str = Field(..., min_length=3, max_length=80)
 
@@ -197,7 +204,7 @@ def _build_user_prompt(
       Aim ~40% male, ~40% female, ~20% other.
 
       JSON only:
-      {"character_description":"<short>","gender":"male|female|other","voice_preset":"<id>"}
+      {"character_description":"<vivid, 1-2 sentences>","gender":"male|female|other","voice_preset":"<id>"}
 
     casting_brief (added in commit 3 of the news_interpreter sprint,
     ADR docs/news_interpreter_adr.md) is the purpose-specific
@@ -238,7 +245,7 @@ def _build_user_prompt(
     parts.append("")
     parts.append("JSON only:")
     parts.append(
-        '{"character_description":"<short>",'
+        '{"character_description":"<vivid, 1-2 sentences>",'
         '"gender":"male|female|other",'
         '"voice_preset":"<id>"}'
     )
