@@ -402,53 +402,17 @@ def compute_cache_key(
 # ---------------------------------------------------------------------------
 
 
-_FENCE_RE = re.compile(
-    r"```(?:json)?\s*(\{.*?\})\s*```",
-    re.DOTALL | re.IGNORECASE,
-)
+# JSON extraction lives in the shared _otr_json module (BUG-LOCAL-261
+# consolidation). ``extract_json_block`` is re-exported here under its
+# historical name so existing importers keep working; new code should
+# call ``_otr_json.parse_first_json_object`` directly. Package import in
+# production; flat import when loaded standalone / under test.
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_json  # type: ignore
 
-
-def extract_json_block(raw: str) -> str:
-    """Return the first valid top-level JSON object in `raw`.
-
-    Tolerates ```json ... ``` fences as a primary form; falls back to
-    a brace-walk + ``json.JSONDecoder.raw_decode`` to find the first
-    decodable object when no fence is present.
-
-    Multiple top-level objects -> returns only the first (per ADR
-    test plan case 9; the rest is hallucination and should not feed
-    the validator layer).
-
-    Returns "" on no match.
-    """
-    if not raw:
-        return ""
-    text = raw.strip()
-
-    # Primary: look for a fenced JSON block first. Non-greedy capture
-    # picks the first balanced `{...}` between fences.
-    fence_match = _FENCE_RE.search(text)
-    if fence_match:
-        candidate = fence_match.group(1).strip()
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            parsed = None
-        if isinstance(parsed, dict):
-            return candidate
-
-    # Fallback: walk for the first `{` and try raw_decode.
-    decoder = json.JSONDecoder()
-    for i in range(len(text)):
-        if text[i] != "{":
-            continue
-        try:
-            obj, end = decoder.raw_decode(text[i:])
-        except json.JSONDecodeError:
-            continue
-        if isinstance(obj, dict):
-            return text[i:i + end]
-    return ""
+extract_json_block = _otr_json.extract_first_json_block
 
 
 # ---------------------------------------------------------------------------
@@ -644,15 +608,11 @@ def build_news_briefs(
             continue
 
         last_raw = raw or ""
-        block = extract_json_block(last_raw)
-        if not block:
-            attempt_records.append((last_raw, "no JSON block found"))
-            continue
         try:
-            parsed = json.loads(block)
+            parsed = _otr_json.parse_first_json_object(last_raw)
         except json.JSONDecodeError as exc:
             attempt_records.append(
-                (last_raw, f"json.loads failed: {exc!r}"),
+                (last_raw, f"json parse failed: {exc!r}"),
             )
             continue
 

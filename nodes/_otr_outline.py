@@ -564,29 +564,14 @@ Return ONLY corrected JSON that matches the schema. Do not explain. Do not add p
 # ---------------------------------------------------------------------------
 # JSON extraction
 # ---------------------------------------------------------------------------
-
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
-
-
-def _extract_json_block(raw: str) -> str:
-    """Try three strategies in order:
-       1. Strip ```json ... ``` or ``` ... ``` markdown fences if present.
-       2. Slice from first '{' to last '}' (handles preambles like
-          "Here's the JSON: { ... }").
-       3. Return raw stripped (let json.loads raise the error).
-    Always returns a string; never raises.
-    """
-    if not raw:
-        return ""
-    s = raw.strip()
-    m = _FENCE_RE.search(s)
-    if m:
-        return m.group(1).strip()
-    first = s.find("{")
-    last = s.rfind("}")
-    if first != -1 and last != -1 and last > first:
-        return s[first : last + 1]
-    return s
+# The naive first-'{'-to-last-'}' extractor was removed in the
+# BUG-LOCAL-261 consolidation; outline JSON is now parsed via the shared
+# _otr_json.parse_first_json_object. Package import in production; flat
+# import when loaded standalone / under test.
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_json  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -1290,9 +1275,8 @@ def _run_call_with_retry(
             continue
 
         last_raw = raw or ""
-        json_str = _extract_json_block(last_raw)
         try:
-            data = json.loads(json_str)
+            data = _otr_json.parse_first_json_object(last_raw)
         except json.JSONDecodeError as exc:
             last_err = f"json.JSONDecodeError: {exc}"
             log.warning(
@@ -1873,18 +1857,19 @@ if __name__ == "__main__":
     assert not hasattr(o, "cast"), "Outline schema must NOT carry a cast field"
     print("  PASS: schema accepts beats; no cast field on model")
 
-    # Test 5: JSON extraction handles fences, preambles, raw.
-    print("\n[Test 5] _extract_json_block strategies")
+    # Test 5: JSON extraction handles fences, preambles, trailing data.
+    print("\n[Test 5] _otr_json.extract_first_json_block strategies")
     cases = [
         ('```json\n{"a": 1}\n```', '{"a": 1}'),
         ('```\n{"a": 1}\n```', '{"a": 1}'),
         ('Here is the JSON: {"a": 1} hope this helps', '{"a": 1}'),
         ('{"a": 1}', '{"a": 1}'),
-        ('not json at all', 'not json at all'),
+        ('{"a": 1}{"b": 2}', '{"a": 1}'),
+        ('not json at all', ''),
         ('', ''),
     ]
     for raw, expected in cases:
-        got = _extract_json_block(raw)
+        got = _otr_json.extract_first_json_block(raw)
         marker = "PASS" if got == expected else "FAIL"
         print(f"  {marker}: {raw!r:50} -> {got!r}")
 

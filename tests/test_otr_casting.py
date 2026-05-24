@@ -521,6 +521,43 @@ def test_cast_one_character_rerolls_on_invalid_json():
     assert r.voice_preset == "v2/en_speaker_4"
 
 
+def test_cast_one_character_survives_trailing_object_after_json():
+    """BUG-LOCAL-261: the casting LLM emits a valid cast object, then a
+    SECOND top-level JSON object after it. The old first-'{'-to-last-'}'
+    extractor concatenated both into {...}{...} and json.loads rejected
+    the result as 'Extra data'. The shared _otr_json extractor takes the
+    first complete object and ignores the trailing one -- attempt 1
+    succeeds, no reroll needed."""
+    first = _good_response(voice_preset="v2/en_speaker_4")
+    trailing = (
+        '\n{"character_description":"a stray hallucinated second cast",'
+        '"gender":"other","voice_preset":"v2/en_speaker_9"}'
+    )
+    gen = _make_canned_generate_fn([first + trailing])
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+    )
+    # The FIRST object wins; the trailing object is ignored.
+    assert r.voice_preset == "v2/en_speaker_4"
+
+
+def test_cast_one_character_survives_trailing_prose_after_json():
+    """Trailing prose with no braces after the cast object is tolerated
+    too -- the first complete object parses, the chatter is ignored."""
+    gen = _make_canned_generate_fn([
+        _good_response(voice_preset="v2/en_speaker_6")
+        + "\n\nHope this casting fits your radio drama!",
+    ])
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+    )
+    assert r.voice_preset == "v2/en_speaker_6"
+
+
 def test_cast_one_character_rerolls_on_voice_not_in_pool():
     """Attempt 1 picks a voice not in the available list; attempt 2 fixes it."""
     gen = _make_canned_generate_fn([

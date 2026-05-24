@@ -415,27 +415,16 @@ def _validate_brief(brief: str, ledger: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# JSON extraction (copy of the pattern in _otr_ledger_reviewer)
+# JSON extraction
 # ---------------------------------------------------------------------------
-
-
-_JSON_FENCE_RE: re.Pattern[str] = re.compile(
-    r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL,
-)
-
-
-def _extract_json_block(raw: str) -> str:
-    if not raw:
-        return ""
-    s = raw.strip()
-    m = _JSON_FENCE_RE.search(s)
-    if m:
-        return m.group(1).strip()
-    first = s.find("{")
-    last = s.rfind("}")
-    if first != -1 and last != -1 and last > first:
-        return s[first : last + 1]
-    return s
+# The naive first-'{'-to-last-'}' extractor was removed in the
+# BUG-LOCAL-261 consolidation; story-brief JSON is now parsed via the
+# shared _otr_json.parse_first_json_object. Package import in production;
+# flat import when loaded standalone / under test.
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_json  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -628,11 +617,9 @@ def run_story_brief_reflection(
             prompt_version=prompt_version,
         )
 
-    json_str = _extract_json_block(raw or "")
-
     # Block 2 -- JSON parse only. Catches malformed-JSON LLM output.
     try:
-        data = json.loads(json_str)
+        data = _otr_json.parse_first_json_object(raw or "")
     except json.JSONDecodeError as exc:
         log.warning(
             "[OTR_StoryBrief] JSON parse failed (%s); raw=%r; "
@@ -665,7 +652,7 @@ def run_story_brief_reflection(
                 reflection_temperature=_REFLECTION_TEMPERATURE,
             )
             brief_model = StoryBriefModel.model_validate(
-                json.loads(_extract_json_block(repaired or "")),
+                _otr_json.parse_first_json_object(repaired or ""),
             )
         except (Exception, ValidationError) as exc2:  # noqa: BLE001
             log.warning(
@@ -696,7 +683,7 @@ def run_story_brief_reflection(
                 reflection_temperature=_REFLECTION_TEMPERATURE,
             )
             repaired_model = StoryBriefModel.model_validate(
-                json.loads(_extract_json_block(repaired or "")),
+                _otr_json.parse_first_json_object(repaired or ""),
             )
             repaired_reasons = _validate_brief(
                 repaired_model.story_brief, ledger,

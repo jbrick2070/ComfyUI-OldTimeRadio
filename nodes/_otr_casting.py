@@ -46,6 +46,13 @@ from typing import Any, Callable, List, Optional
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+# Shared tolerant JSON extractor (BUG-LOCAL-261 consolidation). Package
+# import in production; flat import when loaded standalone / under test.
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_json  # type: ignore
+
 # Import the cast pools. Try relative first (production: ComfyUI loads
 # this as part of the ComfyUI-OldTimeRadio package); fall back to
 # absolute (tests: tests/ adds nodes/'s parent to sys.path).
@@ -144,28 +151,12 @@ class CastValidationLLMError(CastingFailedError):
 
 
 # ---------------------------------------------------------------------------
-# JSON extraction (cross-model normalizer)
+# JSON extraction
 # ---------------------------------------------------------------------------
-
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
-
-
-def _extract_json_block(raw: str) -> str:
-    """Same shape as `_otr_outline._extract_json_block`. Strip
-    markdown fences, then slice from first '{' to last '}'. Always
-    returns a string; never raises.
-    """
-    if not raw:
-        return ""
-    s = raw.strip()
-    m = _FENCE_RE.search(s)
-    if m:
-        return m.group(1).strip()
-    first = s.find("{")
-    last = s.rfind("}")
-    if first != -1 and last != -1 and last > first:
-        return s[first : last + 1]
-    return s
+# The naive first-'{'-to-last-'}' extractor was removed in the
+# BUG-LOCAL-261 consolidation. Cast JSON is now parsed via the shared
+# _otr_json.parse_first_json_object, which takes the first complete
+# object and tolerates a trailing second object / prose.
 
 
 # ---------------------------------------------------------------------------
@@ -390,14 +381,10 @@ def cast_one_character(
             continue
 
         last_raw = raw or ""
-        block = _extract_json_block(last_raw)
-        if not block:
-            attempts.append((last_raw, "could not locate a JSON block"))
-            continue
         try:
-            parsed = json.loads(block)
-        except Exception as exc:  # noqa: BLE001
-            attempts.append((last_raw, f"json.loads failed: {exc!r}"))
+            parsed = _otr_json.parse_first_json_object(last_raw)
+        except json.JSONDecodeError as exc:
+            attempts.append((last_raw, f"json parse failed: {exc!r}"))
             continue
 
         try:

@@ -360,21 +360,14 @@ No prose before or after the JSON. No markdown fences.
 """
 
 
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
-
-
-def _extract_json_block(raw: str) -> str:
-    if not raw:
-        return ""
-    s = raw.strip()
-    m = _FENCE_RE.search(s)
-    if m:
-        return m.group(1).strip()
-    first = s.find("{")
-    last = s.rfind("}")
-    if first != -1 and last != -1 and last > first:
-        return s[first:last + 1]
-    return s
+# JSON extraction: the naive first-'{'-to-last-'}' extractor was removed
+# in the BUG-LOCAL-261 consolidation; reviewer JSON is now parsed via the
+# shared _otr_json.parse_first_json_object. Package import in production;
+# flat import when loaded standalone / under test.
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - standalone / test load
+    import _otr_json  # type: ignore
 
 
 def audit_cast_contract(
@@ -435,9 +428,8 @@ def audit_cast_contract(
         return _audit_failed_sentinel(
             f"generate_fn raised: {type(exc).__name__}: {exc}"
         )
-    json_str = _extract_json_block(raw or "")
     try:
-        data = json.loads(json_str)
+        data = _otr_json.parse_first_json_object(raw or "")
     except json.JSONDecodeError as exc:
         log.warning(
             "[OTR_LedgerReviewer:%s] JSON parse failed (%s); "
@@ -831,9 +823,8 @@ def run_script_doctor(
             "returning needs_full_rerun report", exc,
         )
         return ScriptDoctorReport(overall_verdict="needs_full_rerun")
-    json_str = _extract_json_block(raw or "")
     try:
-        data = json.loads(json_str)
+        data = _otr_json.parse_first_json_object(raw or "")
     except json.JSONDecodeError as exc:
         # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
         log.warning(
