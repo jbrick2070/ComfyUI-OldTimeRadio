@@ -6,6 +6,38 @@
 
 This file is the **canonical going-forward plan**. Forward-only. Historical session logs and "what shipped" archives are in `docs/ROADMAP_HISTORY.md`.
 
+---
+
+## 2026-05-24 SESSION — LLM-JSON + GEMMA-2 WRITER FIXES LANDED (HEAD `83f2980`)
+
+Two writer-path defects fixed and pushed to `v2.0-alpha` this session.
+
+- **BUG-LOCAL-261 [FIX LANDED] — casting crash on trailing JSON.** Commit `90c2025`. `_otr_casting._extract_json_block` sliced first `{` to last `}`, so a casting LLM emitting two objects at `creativity='maximum chaos'` produced a concatenation strict `json.loads` rejected ("Extra data"). Consolidated the four duplicated naive `_extract_json_block` extractors (`_otr_casting`, `_otr_outline`, `_otr_ledger_reviewer`, `_otr_story_brief`) onto one shared brace-walk + `raw_decode` helper in `nodes/_otr_json.py`; `news_interpreter.extract_json_block` kept as a re-export alias. The BUG-259 outline `temp=0.35` pin was left in place (now removable as a separate change).
+- **BUG-LOCAL-262 [FIX LANDED] — style picker aborts on Gemma-2.** Commit `83f2980`. Gemma-2's chat template hard-rejects the `system` role; the writer generate path passed a system message straight into `apply_chat_template`. Added `tokenizer_supports_system_role` + `normalize_messages_for_tokenizer` to `nodes/_otr_loader_backends.py` (probe once per model residency, fold system content into the first user turn when unsupported). Routed every live `apply_chat_template` call site through it (writer `generate_fn`, loader `make_generate_fn` + `make_polish_generate_fn`, `encode_messages_for_row` `transformers_default` branch, `visual/llm_polish.py`). Added `google/gemma-2-2b-it` as a curated technical-slot model — this makes Gemma-2 (cheapest technical model) usable.
+
+**2026-05-24 follow-up — all three writer fixes VERIFIED.** The operator run (`creativity='maximum chaos'`, `google/gemma-2-2b-it`) cleared the style picker (**BUG-262 [FIXED]**) but surfaced a third defect: casting aborted because `CastingResponse.character_description` overran a hard 200-char schema cap the prompt never stated (placeholder `"<short>"` vs `max_length=200`). Fixed as **BUG-LOCAL-263 [FIXED 2026-05-24, commit `65793c1`]** — `_otr_casting.py` raised the cap to 750 and the prompt placeholder now states a target. A clean re-run verified BUG-261 + BUG-263 (cast lock completes, zero `CastValidationLLMError`, writer ran end-to-end). **BUG-LOCAL-264 [LOGGED]** — non-fatal: `news_interpreter` overruns `NewsBriefs` schema caps with gemma-2-2b and falls back to the raw `news_seed`, degrading the announcer intro/outro to generic text.
+
+**Parked items, ready to resume:**
+- **GGUF workflow rewire** — `workflows/otr_scifi_16gb_full.json` carries an uncommitted `UNETLoader → UnetLoaderGGUF` edit, pending the HuMo soak. While uncommitted it is the sole cause of `test_core.py::test_node_types_otr_or_known` failing; committing it also requires adding `UnetLoaderGGUF` to that test's node-type allowlist.
+- **Flaky `test_lock_cast_generation_uses_creative`** — pre-existing (BUG-260 routed the LEMMY roll to OS entropy, defeating the test's seeded RNG; ~11% false-red). Fix: pass `force_lemmy=False` to `lock_cast` in the test.
+- **ROADMAP staleness audit** — 8 stale-actionable items previously identified; edits not yet applied.
+
+### HuMo VRAM-thrash track — investigated 2026-05-24, fix pending (round-robin gated)
+
+The OTR HuMo render phase thrashes: `BatchHumoRender` Phase C loads HuMo (14B/17B fp8) ~88% offloaded on the 16 GB card (`loaded partially; 1744 MB usable ... 10813 MB offloaded`) and renders at 140-279 s/it. Bracketed this session with bare native-workflow smokes — the stock official ComfyUI HuMo demo, zero OTR code (`workflows/humo_smoke_{14b,gguf,q3,1p7b}.json`):
+
+- 14B fp8 bare: **46 s/it** — the same model OTR runs, ~6x faster outside the pipeline.
+- 17B Q3_K_M GGUF bare: 145 s/it — loads smaller (2.1 GB offload) but pays a per-step dequant tax; net slower than fp8.
+- HuMo-1.7B fp16 bare: 4 s/it, 3.3 GB fully resident, zero offload — rough at the smoke's 6 steps, but acceptable at a proper ~20 steps + cfg.
+
+**Conclusion: it is not the HuMo model — it is the pipeline.** The 14B fp8 runs clean bare; inside the OTR pipeline it thrashes because the writer LLM / MusicGen / FLUX are still resident (~14 GB) when Phase C loads HuMo — loaded via OTR's own loaders, outside `comfy.model_management`, so `BatchHumoRender`'s inter-phase `unload_all_models()` cannot evict them. Same out-of-band-loader mechanism BUG-LOCAL-231 hypothesizes for the FLUX phase.
+
+**Two live paths (round-robin call):** **A —** adopt HuMo-1.7B: it fully fits the card (3.3 GB, zero offload), 4 s/it, and at ~20 steps + cfg with real FLUX reference portraits the output looked acceptable to the operator — sidesteps the VRAM problem outright. **B —** keep the 14B/17B fp8 model (maximum quality) and free the pipeline VRAM residue before Phase C (lever 1).
+
+**Next:** a `PHASE-C-VRAM-PROBE` log line was added to `nodes/batch_humo_render.py` (diagnostic, no behavior change). Capture it from a real episode to confirm exactly what holds the ~14 GB, then round-robin the freeing fix (VRAM-budget change). Tracked as **BUG-LOCAL-265**; see also `docs/2026-05-23-humo-vram-thrash-problem-statement.md`.
+
+---
+
 **Sprint planning surface:** `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` -- consolidated tier-organized view of every outstanding item across all batches with suggested S25+ sprint packaging. Update on every batch close.
 
 **Batch QA docs:**

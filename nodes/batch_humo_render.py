@@ -2328,6 +2328,40 @@ class BatchHumoRender:
         except Exception as exc:
             log.warning("[BatchHumoRender] inter-phase VRAM cleanup failed: %s", exc)
 
+        # HuMo VRAM-thrash instrumentation (2026-05-24). The bare-
+        # workflow smoke proved HuMo-14B runs ~6x faster outside the
+        # OTR pipeline (~47 s/it vs 140-279 s/it in-pipeline), so
+        # something the pipeline leaves resident is starving HuMo's
+        # VRAM budget at Phase C entry. This probe logs the real card
+        # state right after the inter-phase cleanup so an operator run
+        # shows exactly how much that cleanup reclaimed -- and whether
+        # the occupant is tracked by ComfyUI's model manager (so
+        # unload_all_models would catch it) or held out-of-band by
+        # OTR's own loaders (writer LLM / MusicGen / FLUX), which it
+        # would not. Diagnostic only -- no behavior change.
+        try:
+            import torch  # type: ignore
+            import comfy.model_management as mm  # type: ignore
+            _alloc_mb = torch.cuda.memory_allocated() / (1024 ** 2)
+            _reserved_mb = torch.cuda.memory_reserved() / (1024 ** 2)
+            _free_b, _total_b = torch.cuda.mem_get_info()
+            _tracked = [
+                type(getattr(m, "model", m)).__name__
+                for m in (getattr(mm, "current_loaded_models", None) or [])
+            ]
+            log.info(
+                "[BatchHumoRender] PHASE-C-VRAM-PROBE: torch allocated=%.0f MB "
+                "reserved=%.0f MB | cuda free=%.0f MB total=%.0f MB | "
+                "comfy-tracked models=%d %s",
+                _alloc_mb, _reserved_mb,
+                _free_b / (1024 ** 2), _total_b / (1024 ** 2),
+                len(_tracked), _tracked,
+            )
+        except Exception as probe_exc:  # noqa: BLE001
+            log.warning(
+                "[BatchHumoRender] Phase C VRAM probe failed: %s", probe_exc
+            )
+
         # ---- 9. Phase C: HuMo render loop (model stays warm) ----
         # Round-robin v3 (2026-05-08, Fix 1.5): the pre-fix
         # ``e.get("audio_emb") is not None`` check always evaluated
