@@ -858,7 +858,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
         # Lazy torch import. Raised as ModelLoaderError to match the
         # facade's exception contract.
         try:
-            import torch  # noqa: F401
+            import torch
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
@@ -866,7 +866,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        with __import__("torch").no_grad():
+        with torch.no_grad():
             out = model.generate(
                 **inputs,
                 do_sample=True,
@@ -935,7 +935,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
 
     def polish_generate_fn(messages, *, temperature, max_new_tokens):
         try:
-            import torch  # noqa: F401
+            import torch
         except ImportError as exc:
             raise ModelLoaderError("torch not available") from exc
 
@@ -943,7 +943,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        with __import__("torch").no_grad():
+        with torch.no_grad():
             out = model.generate(
                 **inputs,
                 do_sample=_POLISH_DO_SAMPLE,
