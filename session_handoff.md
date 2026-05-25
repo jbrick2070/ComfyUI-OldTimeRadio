@@ -1,50 +1,58 @@
 # Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-24
 
 ## Core goal
-This session verified the BUG-LOCAL-265 HuMo VRAM-thrash fix (it works), then traced the resulting episode's poor quality to its root cause and fixed the load-bearing defect. Throughline: the HuMo render path is now healthy, but the *script* the pipeline produces is weak -- so the work pivoted to diagnosing the story-quality problems, fixing the one clear bug, and parking the rest. All session work is committed and pushed; HEAD is `bc1acc1` on `v2.0-alpha`.
+Execute the **Story Pipeline Ledger Writer Hardening Plan v4** (`story_pipeline_sprint_plan_v4_audited.md`) -- decompose the overloaded LLM calls in the story-writing + cleanup pipeline so the writer produces good scripts regardless of which small model holds a slot. Sprint 0 and Sprint 1 are done; Sprint 2A's shared helper module is built. The next session runs **Wave 2**: convert the structured-call sites onto the new helper, dispatched as parallel file-disjoint subagents.
 
 ## Tech stack & constraints
-OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LOG.md auto-load -- not repeated here. Operational notes that bite:
-- **ComfyUI writes its live console to `C:\Users\jeffr\Documents\ComfyUI\user\comfyui_8000.log`** (port 8000). Desktop Commander `read_file` with a negative offset tails it directly -- no need to ask the operator to paste console output. (Discovered this session.)
-- Git: Desktop Commander cmd shell only; commit message via the file tool to `.git\COMMIT_EDITMSG`, then `git commit -F`. Every session commit was verified local HEAD == origin.
-- `docs/s28_diff_tmp.txt` is parked-dirty -- do NOT commit it.
-- DC `interact_with_process` / `start_process` blocking on a long pytest can drop the session at the ~120 s MCP timeout. Run pytest via `start_process` with a short timeout, then poll `read_process_output`.
+OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LOG.md auto-load -- not repeated here. Live operational notes:
+- **Build Tracking Protocol.** `story_pipeline_sprint_plan_v4_audited.md` is the single source of truth for build PROGRESS (Sprint Status Board, checkboxes, dated Build Progress Log at the bottom). `BUG_LOG.md` is the single source of truth for BUGS. Link by pointer only. After every work session: append a dated Build Progress Log entry + update the Status Board in the same edit. ROADMAP untouched until the whole build lands.
+- **Subagent build pattern (this is what "agents optimized" means).** Partition work by **file ownership** -- never by fix. Two agents must NEVER write the same file. Brief each agent with exact file paths, line numbers, and the precise change; do not delegate understanding. After agents return, the lead verifies every diff on the REAL files with the Read tool, then runs regression + commits itself.
+- **Stale workspace-bash mount.** `mcp__workspace__bash` serves stale / null-padded copies of files. Trust the **Read tool** for real file content. Run tests, git, and byte-checks through **Desktop Commander**. `py_compile` via the bash sandbox throws false "unterminated string" errors far from edits -- ignore those, re-verify on the real file.
+- **Tests + git via Desktop Commander**, `shell: "cmd"` (NOT powershell -- powershell can't find `cmd`, and `%` chars break `python -c`). Venv python: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. Bug Bible regression: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py`. Commit message via the file tool to `.git\COMMIT_EDITMSG`, then `git commit -F`. Per work batch: code commit(s) then a separate plan-tracking commit that references the code hash. Verify `local HEAD == origin HEAD` after push.
+- `docs/s28_diff_tmp.txt` is parked-dirty -- never commit it. `session_handoff.md` also shows `M` (this file).
+- Run Bug Bible + core + audio-byte-identical regression after every code change, unprompted (CLAUDE.md).
+- Round-robin consultation required for the gated sprints (2E, 3A-G, 5, 6).
 
 ## What's done & decided
-
-**BUG-LOCAL-265 -- VERIFIED (not yet Bible-promoted).** The HuMo-1.7B tier + Lever-1 residue-free fix works. Operator re-run `signal_lost_ozempics_glitch_20260524_174200` completed end-to-end in 35:53: clean `PHASE-C-VRAM-PROBE` (14849 MB free, comfy-tracked models=0), HuMo fully resident every clip (3321 MB, zero offload), 10-20 s/it (not the 140-279 s/it thrash). The ~14 GB residue concern is settled. `Bible candidate: yes` -- ready for promotion (was deferred pending exactly this probe).
-
-**BUG-LOCAL-266 [FIXED, `00bf9de`].** The BUG-265 verification run first crashed at `OTR_HuMoTierLoader`: ComfyUI 0.22.2 migrated the core `AudioEncoderLoader` node to its V3 API, which returns a `comfy_api` `NodeOutput` wrapper, not a tuple; `_otr_humo_tier_loader._invoke` validated `isinstance(tuple|list)` and raised. Fix: `_invoke` now unwraps a V3 `NodeOutput` via `.result`. +4 `TestInvokeNodeOutputUnwrap` tests in `tests/test_humo_tier_loader.py`. `Bible candidate: yes`.
-
-**BUG-LOCAL-267 [FIXED, `2183397`].** Speaker labels leaked into dialogue `text` / `text_for_tts` (b002 "HAYES VANCE: ...", b004 "HAYES VANCE not right.") -- Bark voiced the character's name aloud. Root cause: the composer strips a leading "SPEAKER:" via `strip_line_formatting`, but the Phase 3 ScriptDoctor reviewer runs after composition and `apply_doctor_edits` (`nodes/_otr_ledger_reviewer.py`) wrote its rewrite payload verbatim with no strip. Fix: `apply_doctor_edits` rewrite branch now routes through `strip_line_formatting`. `Bible candidate: yes`. **Parked gap:** the strip regexes all require a separator (`: - --`); a bare "NAME " prefix with no punctuation is still uncaught in every path -- parked in ROADMAP "SFX + CLEAN-LEDGER TRACK" workstream 2 (closing it carries a false-positive tradeoff).
-
-**LEMMY reskin [`29a07dd`, `ff13563`].** `config/cast_pools.py` `LEMMY_PROFILE.character_description` changed from "grizzled wrench-wielding engineer" to "Genial communications officer, 50s, broad friendly Cockney accent ... brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica". Voice preset `v2/en_speaker_8` unchanged -- Bark has no Cockney voice; description / dialogue-flavor change only. **Rejected:** routing LEMMY to a Kokoro British voice -- would break the character->Bark cast contract (BUG-232 territory).
-
-**ozempics_glitch diagnosis.** Run completed but the video was near-static portrait stills with thin dialogue. Ledger root causes: the speaker-label leak (BUG-267, now fixed); the protagonist speaks ~12 words total across 3 lines; b003 was reviewer-skipped; b004's 2-word line was Bark-hallucinated into 14.6 s of audio; `freeze_verdict: needs_full_rerun` was produced and ignored (BUG-LOCAL-241, already logged). Conclusion: structural, not a bad-luck 30-word run -- the 30-word budget is the detonator. Config was Gemma-2-2b in both slots at "maximum chaos".
-
-**ROADMAP additions (all committed):**
-- "AUDIO QUALITY TRACK" -- parked; first item is per-clip loudness normalization.
-- "SFX + CLEAN-LEDGER TRACK" -- workstream 1 = a whole-script SFX "spotting" LLM pass; workstream 2 = speaker-label hygiene (BUG-267 landed; no-separator gap parked).
-- "VOICE ABSTRACTION + AUDIO NORMALIZATION -- three-sprint plan" -- synthesized from the operator's uploaded consolidated plan directly into ROADMAP (no standalone doc file, by operator request); the old "Voice Model Agnostic Nodes" RFC marked superseded.
-
-**New docs (committed):**
-- `docs/2026-05-24-per-clip-audio-normalization__00_question.md` -- round-robin question doc for per-clip LUFS normalization. Consultation NOT yet run.
-- `docs/2026-05-24-story-pipeline-llm-audit.md` -- audit of all 16 story+cleanup LLM calls. Headline: **no LLM pass anywhere judges story quality** (every gate is deterministic or structural cast-contract); GBNF grammar files ship but are never wired into the loader; the two cleanup passes have no retry.
+- **HEAD `cde08b9` on `v2.0-alpha`, local == origin.** 7 commits this session.
+- **Sprint 0 -- 4 of 5 items done** (`e7a8eb6`, `2dd8d1b`, `51f7226`, `8d9064e`):
+  - `json_str` -> `raw` at `_otr_story_brief.py:648` -- the schema-repair `NameError` that silently killed every repair pass. Logged + fixed as **BUG-LOCAL-268**.
+  - Three `helper_context(...)` wraps at the `OTR_LedgerScriptWriter.py` call sites (generate_outline / title regen / run_story_brief_reflection).
+  - Two stale `pick_style` routing comments corrected.
+  - New `tests/test_story_brief_repair_pass.py` (4 tests).
+  - Refreshed the stale `test_pick_style_internally_uses_creative_fn_default` -> `test_pick_style_routes_inventor_creative_and_chooser_technical` in `tests/test_helper_paired_signatures.py`.
+  - NOT done: the 5th item, a CI AST-level `# LLM slot:` sweep -- deferred, out of scope. Sprint 0 cannot formally close until it lands or is dropped.
+- **Sprint 1 -- COMPLETE** (`df7f9b1`): HuMo tier renamed `high_quality` -> `high_quality_unsafe_on_16gb` in `_otr_humo_tier_loader.py`, `tests/test_humo_tier_loader.py`, one `__init__.py` comment. No workflow JSON wires the tier value, so no JSON re-wire.
+- **Sprint 2A step 1 -- LANDED** (`61f8cfa`): new `nodes/_otr_structured_call.py` -- the shared 4-attempt structured-JSON retry ladder. `tests/test_structured_call.py` (11 tests). The module is NOT yet imported by any node. Converting the 6 call sites is Wave 2.
+- **Decisions resolved this session:**
+  - D1 `humo_max_lines_per_process` -> stays `0` (no change).
+  - D2 `clip_length` -> stays an editable widget, default `7.0` (no lock, no code change).
+  - D3 `experimental_gguf` tier -> NOT renamed.
+  - D6 `technical_fn` on `compose_line` -> **KEEP it.** It is test-enforced paired-contract surface (`tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators`), not dead weight. The Sprint 0 "drop technical_fn" item is PULLED -- **do not reopen this.**
+- **Rejected:** dropping `technical_fn`; renaming `experimental_gguf`; `humo_max_lines_per_process = 6`; locking `clip_length`; re-auditing the v4 plan.
 
 ## State of the art
-Branch `v2.0-alpha`, HEAD `bc1acc1`, local == origin. Session commits in order: `00bf9de` (BUG-266 fix) -> `29a07dd` + `ff13563` (LEMMY) -> `a91d4ef` (per-clip-norm doc + AUDIO QUALITY TRACK) -> `8b42679` (SFX + CLEAN-LEDGER TRACK) -> `2183397` (BUG-267 fix) -> `5b93eba` (LLM-call audit doc) -> `bc1acc1` (voice-backend plan synthesized into ROADMAP). Regression stayed green throughout (reviewer + core + audio-byte-identical + Bug Bible, 0 failed). No code is mid-edit -- all work is committed and pushed.
+- `nodes/_otr_structured_call.py` -- complete + tested. Public API: `structured_call(*, prompt, schema, slot_fn, base_temperature, structural_retry_temperature, repair_prompt_factory, grammar_path, max_attempts, helper_name) -> T`; raises `StructuredCallFailedError`; `RepairPromptFactory` Protocol + `default_repair_prompt_factory`. 4-attempt ladder; the 2B principle (structural retry temperature strictly LOWER than base) is asserted at entry. This is what Wave 2 call sites adopt.
+- `story_pipeline_sprint_plan_v4_audited.md` -- committed, tracking current. Status Board: Sprint 0 IN PROGRESS (CI sweep only), Sprint 1 COMPLETE, Sprint 2A IN PROGRESS. Decisions 1-3 + 6 marked RESOLVED. Build Progress Log has dated entries through Wave 1.
+- Working tree clean except parked `docs/s28_diff_tmp.txt` + `session_handoff.md`. No code mid-edit.
 
 ## Immediate next steps
-1. **Operator runs the Gemma-4 / 90-word test episode.** In the ComfyUI UI, on node 1 (`OTR_LedgerScriptWriter`) set the `creative_writing_model` + `technical_model` dropdowns to a Gemma-4 model and `target_words` to 90, then run. This disambiguates whether Gemma-2-2b was the script-quality bottleneck or the problem is structural. BUG-267 fixed the colon-form label leak so the read is cleaner; the bare-"NAME " no-separator leak is still possible. Next session: tail `comfyui_8000.log`, then read the new episode ledger and assess script coherence.
-2. **Promote BUG-LOCAL-265 to the Bug Bible** via the Three-File Contract (`BUG_BIBLE.yaml` + `README.md` entry count + a regression test in the survival-guide repo `comfyui-custom-node-survival-guide`). It is operator-verified now. BUG-266 and BUG-267 are also `Bible candidate: yes` and verified -- promote all three in the same pass.
-3. **Resolve the parked roadmap decisions with the operator:** whether to roadmap a story-quality LLM critic pass (audit recommendation 1 -- offered, not yet answered); whether to run the per-clip-normalization round-robin consultation; the GBNF wire-or-delete call.
+**Wave 2 -- convert the 6 structured-call sites onto `structured_call`, folding in 2C (typed repair factories) + 2D (cleanup-pass retries). Five file-disjoint subagents, safe to run in parallel:**
+1. **Agent 1 -- `nodes/_otr_story_brief.py`:** convert `run_story_brief_reflection` to use `structured_call`; add the 2C typed repair factory for the story brief. (2B repair-temp behaviour is already embodied in `structured_call`.)
+2. **Agent 2 -- `nodes/_otr_ledger_reviewer.py`:** convert `audit_cast_contract` + `run_script_doctor` (both currently single-shot) to `structured_call` with `max_attempts=4` (Sprint 2D) + 2C typed factory. REUSE the existing `_levenshtein` + `auto_remap_phantom` (threshold 3) for cast-membership repair -- do not write a second matcher.
+3. **Agent 3 -- `nodes/news_interpreter.py`:** convert `build_news_briefs` (currently 3 attempts incl. repair).
+4. **Agent 4 -- `nodes/_otr_casting.py`:** convert `cast_one_character` (3 attempts; attempt 3 repair routes technical slot).
+5. **Agent 5 -- `nodes/_otr_outline.py`:** convert the 3 inline outline stages (macro / phase / beat, currently via `_run_call_with_retry` inside `generate_outline()`). **AUDIT WARNING:** do NOT flatten Stage 2 (phase) -- it has a falling-temp schedule `(0.35, 0.25, 0.15)`, a deterministic `_deterministic_phase_skeleton` fallback, and a singleton-cast skip. Preserve all three.
+- Each agent: convert + run regression. Lead verifies diffs on real files, runs full regression (Bug Bible + core + audio-byte-identical + the touched suites), commits per the two-commit pattern, updates the plan Status Board + Build Progress Log.
+- After Wave 2: run the round-robin consultation -- it unlocks 2E (GBNF wire/delete) and 3A-3G. Note 3C and 3F BOTH touch `_otr_ledger_reviewer.py` -- a collision; sequence them, don't parallelize.
 
 ## Open questions
-- Is Gemma-2-2b the script-quality bottleneck, or is the problem structural (no story-quality gate)? The Gemma-4 90-word test is the disambiguator.
-- Should the story-quality LLM critic pass (audit doc recommendation 1) get its own roadmap track? Offered to the operator; undecided.
-- The bare-"NAME " no-separator label strip -- close it (accepting a small false-positive risk on a line that legitimately opens with the speaker's own name) or leave parked? Currently parked in ROADMAP SFX+CLEAN-LEDGER workstream 2.
+- Sprint 0's CI AST `# LLM slot:` sweep -- deferred. Decide: implement it, or formally close Sprint 0 without it.
+- Carried from the prior handoff, still unaddressed: the Gemma-4 / 90-word test episode (operator-gated run); Bible-promotion of BUG-LOCAL-265 / -266 / -267 via the Three-File Contract.
+- 2E GBNF (wire vs delete) and all of 3A-3G are round-robin-gated -- the consultation must run before they can be dispatched.
 
 ---
 ## Resume instructions
 Open a fresh window, attach this file, and say:
-"Read this handoff file and prepare to execute the immediate next steps. Acknowledge when you're ready to start."
+"Read this handoff file and prepare to execute the immediate next steps.
+Acknowledge when you're ready to start."
