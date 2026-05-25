@@ -27,9 +27,10 @@ Key rules:
     integration (Gemma 4 + MTP, llama.cpp + GBNF, vLLM, HF Trans-
     formers) is opaque to this module.
   - No hardcoded period literals. Era flavor lives in `style` only.
-  - Validator + reroll is the safety net. Three attempts with a
-    temperature ladder (0.7 / 0.8 / 0.3-repair), mirroring
-    `_otr_casting.cast_one_character`.
+  - Validator + reroll is the safety net. The V0-V3 LLM call routes
+    through the shared `structured_call` retry ladder (base ->
+    structural retry -> typed repair); a structural re-roll LOWERS
+    temperature rather than raising it (the Sprint 2B principle).
   - Determinism contract narrowed (ADR section 3.5): byte-identity
     is a fixture-test claim only (mocked generate_fn). Live model
     runs assert schema validity + contract preservation, not byte
@@ -57,16 +58,15 @@ Public surface
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from pathlib import Path
 from typing import Callable
 
 try:
     # Pydantic v2 (project default; see cast contract memory).
-    from pydantic import BaseModel, Field, ValidationError, field_validator
+    from pydantic import BaseModel, Field, field_validator
 except ImportError:  # pragma: no cover -- v1 fallback if ever needed.
-    from pydantic import BaseModel, Field, ValidationError  # type: ignore
+    from pydantic import BaseModel, Field  # type: ignore
     from pydantic import validator as field_validator  # type: ignore
 
 
@@ -107,13 +107,6 @@ FORBIDDEN_ERA_TERMS: tuple[str, ...] = (
     "radio drama", "radio play", "radio hour",
     "brass speaker",
 )
-
-# Maximum chars of prior raw output passed into the repair attempt's
-# assistant message. Same rationale as _otr_casting._REPAIR_RAW_CAP_CHARS:
-# protect VRAM ceiling when a small model babbles 4000+ tokens of
-# malformed garbage. 1200 chars is plenty for the LLM to see "what it
-# tried last time" without OOM risk.
-_REPAIR_RAW_CAP_CHARS = 1200
 
 # Grammar file path. Optional / loader-side. The news_interpreter
 # module does NOT pass this to generate_fn -- staying agnostic to
@@ -414,6 +407,21 @@ except ImportError:  # pragma: no cover - standalone / test load
 
 extract_json_block = _otr_json.extract_first_json_block
 
+# Sprint 2A/2D: the shared structured-JSON retry ladder. build_news_briefs
+# routes its V0-V3 LLM call through it -- the ladder subsumes the former
+# hand-rolled 3-attempt loop + repair branch. Package import in
+# production; flat import when loaded standalone / under test.
+try:
+    from ._otr_structured_call import (
+        structured_call,
+        StructuredCallFailedError,
+    )
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_structured_call import (  # type: ignore
+        structured_call,
+        StructuredCallFailedError,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -514,22 +522,33 @@ def build_news_briefs(
 ) -> NewsBriefs:
     """End-to-end caller.
 
-    Retry strategy mirrors _otr_casting.cast_one_character:
-      Attempt 1: fresh, base_temperature (0.7).
-      Attempt 2: fresh, base_temperature + 0.1 (0.8).
-      Attempt 3: REPAIR call -- prior raw (truncated) + last error
-                 fed back to the LLM, temp 0.3.
+    Sprint 2A/2D: the V0-V3 LLM call routes through the shared
+    `structured_call` retry ladder (base -> structural retry -> typed
+    repair). The ladder subsumes the former hand-rolled 3-attempt loop
+    and bespoke repair branch. Two responsibilities stay in this
+    function:
 
-    Raises NewsInterpreterError if all attempts fail.
+      * `post_validator` carries the V0 production key-term floor plus
+        the V1/V2/V3 content validators. A content rejection re-rolls
+        the ladder exactly like a JSON / schema failure.
+      * Python stamps the nine metadata fields on the validated
+        instance AFTER the ladder returns -- the LLM never authors
+        metadata it could hallucinate. `model_validate` runs against
+        the full parsed dict (NewsBriefs uses pydantic's default
+        extra="ignore", so non-content keys are dropped) and every
+        metadata field is re-stamped here regardless.
 
-    NOTE on agnostic surface: this function calls
-    ``generate_fn(messages, temperature=..., max_new_tokens=...)``
-    only. It does NOT pass model-specific kwargs (grammar_file,
-    chat_template, response_format, etc.). The loader behind
-    generate_fn is free to use whatever structured-output mechanism
-    it wants (GBNF in llama.cpp, LogitsProcessor in HF Transformers,
-    outlines, raw prompt + reroll) -- this module's contract is
-    "I send messages + sampling knobs, you return a string."
+    Raises NewsInterpreterError if the ladder is exhausted or the slot
+    fn itself raises (structured_call does not catch slot-fn failures).
+
+    NOTE on agnostic surface: this function drives the slot fn via
+    ``slot_fn(messages, temperature=..., max_new_tokens=...)`` only. It
+    does NOT pass model-specific kwargs (grammar_file, chat_template,
+    response_format, etc.). The loader behind the slot fn is free to
+    use whatever structured-output mechanism it wants (GBNF in
+    llama.cpp, LogitsProcessor in HF Transformers, outlines, raw
+    prompt + reroll) -- this module's contract is "I send messages +
+    sampling knobs, you return a string."
     """
     # S32 B1: alias `generate_fn` for the existing body. All
     # sub-passes (V0 emit, V1-V3 retries) route through technical_fn
@@ -558,127 +577,91 @@ def build_news_briefs(
         cleaned_body=cleaned_body,
         style=style,
     )
+    messages = [{"role": "user", "content": user_prompt}]
 
-    attempt_records: list[tuple[str, str]] = []
-    last_raw: str | None = None
-
-    for attempt_idx in range(max_attempts):
-        # Repair branch fires only on the final attempt, only when a
-        # prior attempt produced raw output we can hand back. Use
-        # `is not None` so an empty-string prior does not change
-        # branch semantics (same nit as _otr_casting per 2026-05-10
-        # round-robin).
-        is_repair = (
-            attempt_idx == max_attempts - 1
-            and attempt_idx > 0
-            and last_raw is not None
-        )
-        if is_repair:
-            last_err = (
-                attempt_records[-1][1]
-                if attempt_records else "validation failed"
-            )
-            truncated_raw = last_raw[:_REPAIR_RAW_CAP_CHARS]
-            messages = [
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": truncated_raw},
-                {
-                    "role": "user",
-                    "content": (
-                        "That response did not validate. Error:\n"
-                        f"{last_err}\n\n"
-                        "Return ONLY corrected JSON matching the "
-                        "schema. No prose. No code fences."
-                    ),
-                },
-            ]
-            temperature = 0.3
-        else:
-            messages = [{"role": "user", "content": user_prompt}]
-            temperature = base_temperature + (0.1 * attempt_idx)
-
-        try:
-            raw = generate_fn(
-                messages,
-                temperature=float(temperature),
-                max_new_tokens=int(max_new_tokens),
-            )
-        except Exception as exc:  # noqa: BLE001 -- loaders raise varied types
-            attempt_records.append(("", f"generate_fn raised: {exc!r}"))
-            continue
-
-        last_raw = raw or ""
-        try:
-            parsed = _otr_json.parse_first_json_object(last_raw)
-        except json.JSONDecodeError as exc:
-            attempt_records.append(
-                (last_raw, f"json parse failed: {exc!r}"),
-            )
-            continue
-
-        # Construct NewsBriefs from LLM-authored fields ONLY. Python-
-        # stamped fields are filled below; they are not parsed off
-        # the LLM response because the LLM cannot hallucinate what it
-        # isn't asked to produce.
-        try:
-            content_only = {
-                k: parsed[k]
-                for k in (
-                    "casting_brief",
-                    "script_brief",
-                    "news_close_brief",
-                    "key_terms",
-                )
-                if k in parsed
-            }
-            brief = NewsBriefs(**content_only)
-        except ValidationError as exc:
-            attempt_records.append(
-                (last_raw, f"schema validation failed: {exc!r}"),
-            )
-            continue
-
-        # V0: production-bound check on key_terms count. The schema
-        # accepts 1-6 (for unit-test isolation); the production
-        # contract is 2-6. <2 terms means the LLM failed to surface
-        # enough journalistic anchors; reroll.
+    # Content gate: V0 production key-term floor + V1/V2/V3 validators.
+    # structured_call runs this on every schema-valid instance; a non-
+    # None return is a content rejection that re-rolls the ladder.
+    # The schema accepts 1-6 key_terms (unit-test isolation); the
+    # production contract is 2-6, enforced here as V0 -- <2 terms means
+    # the LLM failed to surface enough journalistic anchors.
+    def _content_validator(brief: NewsBriefs) -> str | None:
         if len(brief.key_terms) < _MIN_KEY_TERMS:
-            attempt_records.append((
-                last_raw,
+            return (
                 f"V0: key_terms below production minimum "
-                f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})",
-            ))
-            continue
-
+                f"({len(brief.key_terms)} < {_MIN_KEY_TERMS})"
+            )
         v_failures: list[str] = []
         v_failures.extend(v1_validate(brief, source_text=source_text_full))
         v_failures.extend(v2_validate(brief, source_text=source_text_full))
         v_failures.extend(v3_validate(brief, style=style))
         if v_failures:
-            attempt_records.append((last_raw, "; ".join(v_failures)))
-            continue
+            return "; ".join(v_failures)
+        return None
 
-        # SUCCESS. Python-stamp metadata. NOT non-deterministic --
-        # all values derive from the inputs or from attempt_records
-        # already populated this run.
-        brief.source_hash = source_hash
-        brief.source_chars = len(cleaned_body)
-        brief.prompt_version = PROMPT_VERSION
-        brief.schema_version = SCHEMA_VERSION
-        brief.model_id = model_id
-        brief.decoder_profile = decoder_profile
-        brief.seed = int(seed)
-        brief.attempts = attempt_idx + 1
-        brief.attempt_failures = [r[1] for r in attempt_records]
-        return brief
+    # structured_call returns only the validated instance, not its
+    # attempt count. Count slot-fn invocations so the success path can
+    # stamp an accurate `attempts` telemetry value -- one slot call per
+    # ladder attempt; the writer logs this number.
+    slot_calls = 0
 
-    raise NewsInterpreterError(
-        attempts=attempt_records,
-        reason=(
-            f"all {max_attempts} attempts failed; last error: "
-            + (
-                attempt_records[-1][1]
-                if attempt_records else "no attempts recorded"
-            )
-        ),
-    )
+    def _counting_slot_fn(msgs, *, temperature, max_new_tokens):
+        nonlocal slot_calls
+        slot_calls += 1
+        return generate_fn(
+            msgs, temperature=temperature, max_new_tokens=max_new_tokens,
+        )
+
+    # LLM slot: technical -- structured JSON briefs (V0-V3 schema),
+    # routed through the shared ladder. The structural retry runs at
+    # half the base temperature: strictly below base, never above (the
+    # Sprint 2B principle; the old loop RAISED it to base + 0.1).
+    try:
+        brief = structured_call(
+            prompt=messages,
+            schema=NewsBriefs,
+            slot_fn=_counting_slot_fn,
+            base_temperature=float(base_temperature),
+            structural_retry_temperature=float(base_temperature) / 2.0,
+            post_validator=_content_validator,
+            max_new_tokens=int(max_new_tokens),
+            max_attempts=int(max_attempts),
+            helper_name="build_news_briefs",
+        )
+    except StructuredCallFailedError as exc:
+        # Ladder exhausted -- the converted form of the prior
+        # all-attempts-failed raise.
+        raise NewsInterpreterError(
+            attempts=[],
+            reason=(
+                f"all {exc.attempts} attempt(s) failed; last error: "
+                + (
+                    f"{type(exc.last_error).__name__}: {exc.last_error}"
+                    if exc.last_error is not None
+                    else "no error captured"
+                )
+            ),
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM loader) varies
+        # structured_call does not catch slot-fn exceptions: a loader /
+        # VRAM / framework failure inside the slot fn lands here. Map
+        # it to the function's existing failure contract.
+        raise NewsInterpreterError(
+            attempts=[],
+            reason=f"slot fn raised: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    # SUCCESS. Python-stamp metadata. NOT non-deterministic -- all
+    # values derive from the inputs. Per-attempt failure records live
+    # inside the ladder and are not surfaced on success: `attempts` is
+    # the slot-call count, `attempt_failures` is left empty.
+    brief.source_hash = source_hash
+    brief.source_chars = len(cleaned_body)
+    brief.prompt_version = PROMPT_VERSION
+    brief.schema_version = SCHEMA_VERSION
+    brief.model_id = model_id
+    brief.decoder_profile = decoder_profile
+    brief.seed = int(seed)
+    brief.attempts = slot_calls
+    brief.attempt_failures = []
+    return brief
