@@ -19,7 +19,9 @@ Public surface:
     LineRequest                   -- frozen dataclass: per-line input
     LineResult                    -- frozen dataclass: (text, compose_flags)
     LineCompositionFailedError    -- raised after 2 failed attempts
-    compose_line(...)             -- main entrypoint, returns LineResult
+    compose_line(...)             -- orchestrator: draft -> polish -> strips
+    compose_line_draft(...)       -- Sprint 3A: the creative job, returns str
+    cast_strip(...)               -- Sprint 3A: near-miss phantom remap
     strip_line_formatting(...)    -- public for testing / one-shot use
     build_allowed_roster(...)     -- assemble UPPERCASE roster for the gate
     detect_phantom_names(...)     -- proper-noun extractor + roster check
@@ -45,6 +47,9 @@ __all__ = [
     "detect_phantom_names",
     "strip_announcer_vocative",
     "aggregate_compose_flags",
+    # Sprint 3A (2026-05-25) -- compose_line split into single-job stages
+    "compose_line_draft",
+    "cast_strip",
     # Phase 1 (2026-05-11)
     "render_outline_spine",
     "build_voice_card",
@@ -1449,61 +1454,184 @@ def polish_line(
     return cleaned
 
 
-def compose_line(
+def _word_bands(target_words: int) -> tuple[int, int, int]:
+    """Return ``(word_cap, min_words, max_words)`` for a target length.
+
+    ``word_cap`` is the legacy 3x runaway ceiling; ``min_words`` /
+    ``max_words`` are the two-sided drift band (Tier 2 fix #12,
+    2026-05-11: 0.5x..1.7x of target_words, clamped to a 3-word floor).
+    Pure and deterministic -- the single source of truth shared by
+    ``compose_line_draft`` (retry gating) and ``compose_line``'s
+    post-polish word-cap recheck. Never raises.
+    """
+    word_cap = max(15, int(target_words * _MAX_OVERSIZE_RATIO))
+    min_words = max(3, int(target_words * 0.5))
+    max_words = max(min_words + 1, int(target_words * 1.7))
+    return word_cap, min_words, max_words
+
+
+def _strip_named_prefix(cleaned: str, req: LineRequest) -> str:
+    """Strip a leading mixed-case cast-name prefix from a draft line.
+
+    Tier 1 fix #6 (2026-05-11): the uppercase-anchored
+    ``_PREFIX_SPEAKER_COLON_RE`` inside ``strip_line_formatting`` misses
+    mixed-case speaker prefixes ("Alice:", "Bob -"). A dynamic
+    alternation built from ``req.allowed_people`` + ANNOUNCER + the
+    speaker catches those, and is false-positive-safe because it only
+    strips a prefix that literally matches a roster name. Only fires
+    when a named roster is available; legacy callers without one rely
+    on the static regex. Returns ``cleaned`` unchanged when the strip
+    would empty the line. Never raises.
+    """
+    if not cleaned:
+        return cleaned
+    roster_names = set(req.allowed_people or ())
+    roster_names.add("ANNOUNCER")
+    if req.speaker:
+        roster_names.add(req.speaker)
+    named_re = _build_named_prefix_re(roster_names)
+    if named_re is not None:
+        stripped = named_re.sub("", cleaned, count=1).strip()
+        if stripped:
+            return stripped
+    return cleaned
+
+
+def _replace_phantom_token(text: str, phantom: str, canonical: str) -> str:
+    """Whole-word, case-insensitive replace of ``phantom`` with
+    ``canonical`` in ``text``.
+
+    Used by ``cast_strip``. The match is boundary-anchored (``\\w`` and
+    apostrophe on both sides) so a phantom that is a substring of a
+    longer word is left alone. Never raises -- returns ``text``
+    unchanged on any regex error.
+    """
+    if not text or not phantom:
+        return text
+    try:
+        pattern = re.compile(
+            r"(?<![\w'])" + re.escape(phantom) + r"(?![\w'])",
+            re.IGNORECASE,
+        )
+        return pattern.sub(lambda _m: canonical, text)
+    except re.error:
+        return text
+
+
+def cast_strip(
+    text: str, req: LineRequest,
+) -> tuple[str, tuple[str, ...]]:
+    """Deterministically remap a near-miss phantom name to its cast spelling.
+
+    Sprint 3A: ``cast_strip`` is the strip-pipeline step that wraps the
+    project's existing ``auto_remap_phantom`` matcher
+    (``_otr_ledger_reviewer``). Every proper-noun candidate that
+    ``detect_phantom_names`` flags is run through ``auto_remap_phantom``
+    against the locked cast: a phantom that resolves to a cast member --
+    a single-character typo or casing slip, "Gulliver Reaves" for
+    "GULLIVER REEVES" -- is rewritten in place; a phantom that does not
+    resolve is left untouched for the downstream phantom-name gate to
+    flag.
+
+    The Levenshtein cap here is tight (``threshold=1``), deliberately
+    tighter than the reviewer's default of 3. ``cast_strip`` mutates
+    dialogue text at compose time with no story context, so it must
+    only fire on slam-dunk typos -- a looser cap produces false remaps
+    (a distance-3 match silently renamed "CARLA" to the news term
+    "CERN"). Multi-edit near-misses are left for the downstream
+    cast-contract reviewer, which has the full ledger as context and
+    keeps the threshold-3 pass.
+
+    Running this BEFORE ``compose_line`` returns means the corrected
+    line, never the typo, is what the caller appends to the rolling
+    ``last_lines`` window -- so the next beat's prompt cannot inherit a
+    misspelled name (Operating Philosophy 2: deterministic strips run
+    before LLM output re-enters context).
+
+    Returns ``(text, flags)`` where ``flags`` is a tuple of
+    ``"cast_remap:<phantom>-><canonical>"`` strings, empty when nothing
+    was remapped. Never raises -- on any failure the input text is
+    returned unchanged.
+    """
+    if not text or not req.allowed_roster:
+        return text, ()
+    phantoms = detect_phantom_names(text, req.speaker, req.allowed_roster)
+    if not phantoms:
+        return text, ()
+    try:
+        # Lazy import keeps _otr_line_composer off the reviewer's
+        # module-load import graph (same pattern as Sprint 2C).
+        from ._otr_ledger_reviewer import auto_remap_phantom
+    except Exception:  # noqa: BLE001
+        # Reviewer module unavailable -- skip the remap, leave the
+        # phantoms for the detect-and-flag gate.
+        return text, ()
+    # The remap target is the locked cast (allowed_people). Legacy
+    # callers that populate only the combined allowed_roster fall back
+    # to it.
+    remap_roster = list(req.allowed_people or req.allowed_roster)
+    out = text
+    flags: list[str] = []
+    for phantom in phantoms:
+        try:
+            # threshold=1: compose-time mutation fires on slam-dunk
+            # typos only. The reviewer keeps the wider threshold-3 pass.
+            canonical = auto_remap_phantom(
+                phantom, remap_roster, threshold=1,
+            )
+        except Exception:  # noqa: BLE001
+            canonical = None
+        if not canonical:
+            continue
+        if canonical.strip().upper() == phantom.strip().upper():
+            continue
+        remapped = _replace_phantom_token(out, phantom, canonical)
+        if remapped != out:
+            out = remapped
+            flags.append(f"cast_remap:{phantom}->{canonical}")
+    return out, tuple(flags)
+
+
+def compose_line_draft(
     *,
-    creative_fn,                # the generation slot -- all sub-passes
+    creative_fn,
     req: LineRequest,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
-    enable_polish_pass: bool = False,
-    polish_generate_fn=None,
-    creative_repo_id: str | None = None,  # Sprint D D2b
-) -> LineResult:
-    """Compose one cleaned dialogue line for a beat.
+    creative_repo_id: str | None = None,
+) -> str:
+    """Run the creative retry ladder and return ONE draft dialogue line.
 
-    Retry strategy (UNCHANGED in Phase 0 -- name-violation does NOT
-    trigger reroll, per §6.A):
-      Attempt 1: temperature = base_temperature (0.8).
-      Attempt 2: temperature = base_temperature + 0.1 (0.9).
+    Sprint 3A: this is the single creative job extracted out of the old
+    monolithic ``compose_line``. It generates a line, applies the
+    deterministic format strips the retry gates depend on
+    (``strip_line_formatting`` + the mixed-case named-prefix strip), and
+    enforces the size band. It returns the format-stripped,
+    size-checked draft STRING. It does NOT run the polish pass,
+    ``cast_strip``, the phantom-name gate, or ``vocative_strip`` --
+    those belong to the ``compose_line`` orchestrator.
 
-    Phase 4 v4 (2026-05-11): max_new_tokens scales with target_words
-    on attempt 1 (`min(max_new_tokens_cap, target_words * 4)`) so a
-    short line does not get a profligate token budget that invites
-    drift. Attempt 2 uses the full cap as retry headroom.
+    Retry strategy (unchanged): attempt 1 at ``base_temperature``,
+    attempt 2 at ``base_temperature + 0.1``. ``max_new_tokens`` scales
+    with ``target_words`` on attempt 1 (``min(cap, target_words * 4)``)
+    and uses the full cap on attempt 2. Stop strings pass through to
+    ``creative_fn`` via the optional ``stop=`` kwarg; loaders without
+    it fall back to the no-``stop=`` path.
 
-    Stop strings are passed through to generate_fn via the optional
-    `stop=` kwarg. Loaders that don't accept `stop=` swallow the
-    kwarg silently (the writer's _build_truncating_generate_fn does).
+    Failure conditions that trigger a retry: ``creative_fn`` raises, the
+    cleaned response is empty, or it exceeds the runaway ``word_cap``.
+    A response outside the two-sided drift band retries except on the
+    final attempt, where the drifty line ships with a WARNING.
 
-    Failure conditions that trigger retry:
-      - generate_fn raises.
-      - cleaned response is empty.
-      - cleaned response is more than _MAX_OVERSIZE_RATIO * target_words long.
-
-    Phase 0 (2026-05-11): on success, before returning, run
-    `detect_phantom_names` against `req.allowed_roster`. Any matched
-    phantom is recorded on the returned LineResult.compose_flags as
-    `"phantom_name:<token>"`. The line is committed unchanged; Phase 3
-    auditor + deterministic Step 2.5 fallback own repair.
-
-    Return:
-      LineResult(text=<cleaned dialogue>, compose_flags=<tuple of flags>)
-
-    Raises LineCompositionFailedError after all attempts exhausted.
+    Raises ``LineCompositionFailedError`` after all attempts exhausted.
     """
-    # All sub-passes route to creative_fn. The critic check
-    # specifically stays on creative regardless of slot config --
-    # per-beat T-dispatch in differing-slots mode would cost ~3.3 hr
-    # VRAM transition overhead per episode (100 beats x 60s x 2
-    # transitions). Architecturally rejected at S32 design (plan D1).
-    # If a future use case justifies T-side critic, design batched
-    # dispatch instead of per-beat -- see Sprint E enhancer chain
-    # audit forward-work. The originally-planned `use_technical_critic`
-    # opt-in widget was dropped at S32 B4 (no-widget rule: features
-    # that are useful are on; opt-in default-OFF gates on rejected
-    # paths are maintenance debt).
+    # All sub-passes route to creative_fn. Per-beat technical-slot
+    # dispatch in differing-slots mode would cost ~3.3 hr VRAM
+    # transition overhead per episode -- architecturally rejected at
+    # S32 design (plan D1). If a future use case justifies a T-side
+    # critic, design batched dispatch, not per-beat.
     # LLM slot: creative -- dialogue composition per-beat
     generate_fn = creative_fn
 
@@ -1529,17 +1657,7 @@ def compose_line(
     ]
 
     attempts: list[tuple[str, str]] = []
-    # Tier 2 fix #12 (2026-05-11): two-sided word-count enforcement.
-    # System prompt promises +/-30%; pre-Tier-2 the only ceiling was
-    # 3x and there was NO floor — short stunted outputs ("Yes.")
-    # passed silently. New bounds: 0.5x..1.7x of target_words,
-    # clamped to a 3-word minimum to leave room for "Yes, I will."
-    # type short-but-valid replies. The legacy 3x cap is retained as
-    # word_cap so the existing oversize-error message keeps its
-    # semantics for runaway responses.
-    word_cap = max(15, int(req.target_words * _MAX_OVERSIZE_RATIO))
-    min_words = max(3, int(req.target_words * 0.5))
-    max_words = max(min_words + 1, int(req.target_words * 1.7))
+    word_cap, min_words, max_words = _word_bands(req.target_words)
     # Attempt-1 max_new_tokens scaled to target line length; attempt 2
     # uses the full cap. ~4 tokens per English word is the textbook
     # transformers heuristic.
@@ -1591,20 +1709,8 @@ def compose_line(
 
         # Tier 1 fix #6 (2026-05-11): strip any leading mixed-case
         # cast-name prefix that survived the uppercase-anchored
-        # `_PREFIX_SPEAKER_COLON_RE` pass. Dynamic alternation built
-        # from `req.allowed_people` + ANNOUNCER. Only fires when a
-        # named roster is available; legacy callers without one
-        # rely on the static regex inside `strip_line_formatting`.
-        if cleaned:
-            roster_names = set(req.allowed_people or ())
-            roster_names.add("ANNOUNCER")
-            if req.speaker:
-                roster_names.add(req.speaker)
-            named_re = _build_named_prefix_re(roster_names)
-            if named_re is not None:
-                stripped = named_re.sub("", cleaned, count=1).strip()
-                if stripped:
-                    cleaned = stripped
+        # `_PREFIX_SPEAKER_COLON_RE` pass.
+        cleaned = _strip_named_prefix(cleaned, req)
 
         if not cleaned:
             err_msg = "empty after format-strip"
@@ -1644,138 +1750,205 @@ def compose_line(
                 attempt_idx + 1, err_msg,
             )
 
-        # Phase 4 v4 (2026-05-11): optional polish pass. Regex-gated
-        # so polish only fires on lines that actually leaked narration
-        # / stage direction. Default OFF; per-episode opt-in via the
-        # `enable_polish_pass` widget on OTR_LedgerScriptWriter.
-        #
-        # Tier 3 fix #20 (2026-05-11): polish MUST run BEFORE the
-        # phantom-name gate below. Polish output is treated as the
-        # final text for this beat; the phantom gate runs over it so
-        # any new proper noun the polish prompt might have introduced
-        # gets flagged on compose_flags. If a future refactor swaps
-        # this order — polish second — phantom-name flags will
-        # silently disappear from polished lines. The test
-        # `TestPolishBeforePhantom::test_polished_phantom_still_flagged`
-        # pins this contract.
-        if enable_polish_pass and needs_polish(cleaned):
-            log.info(
-                "[OTR_LineComposer] polish_line firing on %s "
-                "(narration-leak detected)",
-                req.speaker,
-            )
-            # LFC sprint commit 3 (2026-05-11): thread context fields
-            # through. polish_generate_fn is required — the producer
-            # (OTR_LedgerScriptWriter) builds it unconditionally via
-            # make_polish_generate_fn so the composer-tuned sampling
-            # never leaks into a polish rewrite (Tier 3 #22 regression).
-            polished = polish_line(
-                generate_fn,
-                cleaned,
-                req.character_voice_card,
-                stop_strings=stop_strings,
-                speaker_role=req.speaker_role,
-                beat_intent=req.intent,
-                previous_lines=tuple(
-                    txt for _spk, txt in (req.last_lines or [])
-                ),
-                polish_generate_fn=polish_generate_fn,
-                creative_repo_id=creative_repo_id,  # Sprint D D2b
-            )
-            # Re-strip in case the polish prompt produced a fresh
-            # speaker tag at the head (defensive — polish's prompt
-            # forbids it but small models occasionally slip).
-            polished_clean = strip_line_formatting(polished or "")
-            if polished_clean:
-                # Tier 1 fix #11 (2026-05-11): re-run needs_polish()
-                # on the polish output. If the polish ALSO trips the
-                # narration-leak regex, keep the pre-polish cleaned
-                # text and log `polish_still_leaky` at INFO so soak
-                # surfaces it. Shipping a "polished" line that still
-                # leaks is worse than shipping the original — at
-                # least the original has the composer's full attempt
-                # ladder behind it.
-                if needs_polish(polished_clean):
-                    log.info(
-                        "[OTR_LineComposer] polish_still_leaky on "
-                        "%s (polish output retripped the regex); "
-                        "keeping pre-polish text",
-                        req.speaker,
-                    )
-                else:
-                    # Tier 2 fix #14 (2026-05-11): polish word-cap
-                    # recheck. Polish at temp 0.4 can still produce
-                    # a substantially longer / shorter rewrite than
-                    # the original. Revert to pre-polish if the new
-                    # text exceeds the runaway cap OR falls below
-                    # the drift floor (mirrors the composer's
-                    # Tier-2-#12 enforcement). Pre-polish text has
-                    # the retry ladder behind it; "polished but
-                    # drifty" is a regression.
-                    p_words = len(polished_clean.split())
-                    if (
-                        p_words > word_cap
-                        or p_words < min_words
-                        or p_words > max_words
-                    ):
-                        log.info(
-                            "[OTR_LineComposer] polish overshoot on "
-                            "%s: polish=%d words outside band "
-                            "[%d..%d] (cap=%d); reverting to "
-                            "pre-polish text",
-                            req.speaker, p_words, min_words,
-                            max_words, word_cap,
-                        )
-                    else:
-                        cleaned = polished_clean
-                        # Update word_count for the success log below.
-                        word_count = p_words
-
-        # Phase 0 name-roster gate. Detect-and-flag only -- the line
-        # commits regardless. Empty roster skips the gate entirely so
-        # early-stage callers / unit tests that don't populate it pay
-        # zero cost.
-        compose_flags: tuple[str, ...] = ()
-        if req.allowed_roster:
-            phantoms = detect_phantom_names(
-                cleaned, req.speaker, req.allowed_roster,
-            )
-            if phantoms:
-                compose_flags = tuple(
-                    f"phantom_name:{p}" for p in phantoms
-                )
-                log.warning(
-                    "[OTR_LineComposer] %d phantom name(s) on %s line: %s",
-                    len(phantoms), req.speaker, phantoms,
-                )
-
-        # BUG-LOCAL-233 vocative-drift gate. The phantom gate above
-        # whitelists every roster name, so "ANNOUNCER" -- the
-        # narration label, always on the roster -- slips through even
-        # when a CHARACTER line addresses it ("..., ANNOUNCER."). The
-        # announcer is exempt (it may reference its own role); every
-        # other speaker gets the vocative stripped + a flag stamped.
-        if req.speaker.strip().upper() != _ANNOUNCER_NAME:
-            devocalized, n_vocative = strip_announcer_vocative(cleaned)
-            if n_vocative > 0:
-                cleaned = devocalized
-                word_count = len(cleaned.split())
-                compose_flags = compose_flags + ("vocative_drift:ANNOUNCER",)
-                log.warning(
-                    "[OTR_LineComposer] vocative drift on %s line: "
-                    "stripped %d 'ANNOUNCER' address(es)",
-                    req.speaker, n_vocative,
-                )
-
         log.info(
-            "[OTR_LineComposer] success on attempt %d/%d: %d words for %s "
-            "(flags=%d)",
+            "[OTR_LineComposer] draft ready on attempt %d/%d: %d words "
+            "for %s",
             attempt_idx + 1, max_attempts, word_count, req.speaker,
-            len(compose_flags),
         )
-        return LineResult(text=cleaned, compose_flags=compose_flags)
+        return cleaned
 
     raise LineCompositionFailedError(attempts=attempts, request=req)
+
+
+def compose_line(
+    *,
+    creative_fn,                # the generation slot -- all sub-passes
+    req: LineRequest,
+    max_attempts: int = 2,
+    base_temperature: float = _BASE_TEMPERATURE,
+    max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
+    stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
+    enable_polish_pass: bool = False,
+    polish_generate_fn=None,
+    creative_repo_id: str | None = None,  # Sprint D D2b
+) -> LineResult:
+    """Compose one cleaned dialogue line for a beat.
+
+    Sprint 3A: ``compose_line`` is now a thin orchestrator over the
+    single-job stages the overloaded monolith was split into:
+
+      1. ``compose_line_draft`` -- the creative job: generate + format
+         strip + size band, with the retry ladder.
+      2. optional polish -- regex-gated narration-leak cleanup.
+      3. the deterministic strip pipeline -- ``cast_strip`` (near-miss
+         phantom remap), the phantom-name gate, ``vocative_strip``.
+      4. assemble the ``LineResult``.
+
+    Critical ordering: every deterministic strip runs INSIDE this
+    function, before it returns -- so the corrected line, never a raw
+    hallucination, is what the caller appends to its rolling
+    ``last_lines`` window. Polish runs before the phantom gate so a
+    proper noun the polish prompt introduces is still flagged
+    (pinned by ``TestPolishBeforePhantom``).
+
+    Return:
+      ``LineResult(text=<cleaned dialogue>, compose_flags=<tuple>)`` --
+      ``compose_flags`` carries ``cast_remap:`` / ``phantom_name:`` /
+      ``vocative_drift:`` entries, empty when the line had no
+      detections.
+
+    Raises ``LineCompositionFailedError`` if the draft stage exhausts
+    its attempts.
+    """
+    # Stage 1 -- draft. The one creative job. Raises
+    # LineCompositionFailedError on exhaustion (propagated unchanged).
+    cleaned = compose_line_draft(
+        creative_fn=creative_fn,
+        req=req,
+        max_attempts=max_attempts,
+        base_temperature=base_temperature,
+        max_new_tokens_cap=max_new_tokens_cap,
+        stop_strings=stop_strings,
+        creative_repo_id=creative_repo_id,
+    )
+    word_count = len(cleaned.split())
+    word_cap, min_words, max_words = _word_bands(req.target_words)
+
+    # Stage 2 -- optional polish pass. Regex-gated so polish only fires
+    # on lines that actually leaked narration / stage direction.
+    # Default OFF; per-episode opt-in via the `enable_polish_pass`
+    # widget on OTR_LedgerScriptWriter.
+    #
+    # Tier 3 fix #20 (2026-05-11): polish MUST run BEFORE the phantom-
+    # name gate below. Polish output is the final text for this beat;
+    # the phantom gate runs over it so any new proper noun the polish
+    # prompt might introduce gets flagged on compose_flags. The test
+    # `TestPolishBeforePhantom::test_polished_phantom_still_flagged`
+    # pins this contract.
+    if enable_polish_pass and needs_polish(cleaned):
+        log.info(
+            "[OTR_LineComposer] polish_line firing on %s "
+            "(narration-leak detected)",
+            req.speaker,
+        )
+        # LFC sprint commit 3 (2026-05-11): thread context fields
+        # through. polish_generate_fn is required — the producer
+        # (OTR_LedgerScriptWriter) builds it unconditionally via
+        # make_polish_generate_fn so the composer-tuned sampling
+        # never leaks into a polish rewrite (Tier 3 #22 regression).
+        polished = polish_line(
+            creative_fn,
+            cleaned,
+            req.character_voice_card,
+            stop_strings=stop_strings,
+            speaker_role=req.speaker_role,
+            beat_intent=req.intent,
+            previous_lines=tuple(
+                txt for _spk, txt in (req.last_lines or [])
+            ),
+            polish_generate_fn=polish_generate_fn,
+            creative_repo_id=creative_repo_id,  # Sprint D D2b
+        )
+        # Re-strip in case the polish prompt produced a fresh speaker
+        # tag at the head (defensive — polish's prompt forbids it but
+        # small models occasionally slip).
+        polished_clean = strip_line_formatting(polished or "")
+        if polished_clean:
+            # Tier 1 fix #11 (2026-05-11): re-run needs_polish() on the
+            # polish output. If the polish ALSO trips the narration-leak
+            # regex, keep the pre-polish text and log `polish_still_leaky`
+            # at INFO so soak surfaces it. Shipping a "polished" line
+            # that still leaks is worse than shipping the original.
+            if needs_polish(polished_clean):
+                log.info(
+                    "[OTR_LineComposer] polish_still_leaky on %s "
+                    "(polish output retripped the regex); keeping "
+                    "pre-polish text",
+                    req.speaker,
+                )
+            else:
+                # Tier 2 fix #14 (2026-05-11): polish word-cap recheck.
+                # Polish at temp 0.4 can still produce a substantially
+                # longer / shorter rewrite. Revert to pre-polish if the
+                # new text exceeds the runaway cap OR falls outside the
+                # drift band -- pre-polish text has the retry ladder
+                # behind it; "polished but drifty" is a regression.
+                p_words = len(polished_clean.split())
+                if (
+                    p_words > word_cap
+                    or p_words < min_words
+                    or p_words > max_words
+                ):
+                    log.info(
+                        "[OTR_LineComposer] polish overshoot on %s: "
+                        "polish=%d words outside band [%d..%d] "
+                        "(cap=%d); reverting to pre-polish text",
+                        req.speaker, p_words, min_words, max_words,
+                        word_cap,
+                    )
+                else:
+                    cleaned = polished_clean
+                    word_count = p_words
+
+    # Stage 3 -- deterministic strip pipeline. Every strip below runs
+    # before this function returns, so the caller appends the corrected
+    # line (not a raw hallucination) to its rolling window.
+    compose_flags: tuple[str, ...] = ()
+
+    # 3a. cast_strip -- remap near-miss phantom names to the locked
+    # cast spelling (Levenshtein via auto_remap_phantom). Runs before
+    # the phantom gate so a resolvable typo becomes a `cast_remap:`
+    # flag, not a `phantom_name:` flag, and the corrected name is what
+    # later beats inherit through the rolling window.
+    cleaned, cast_flags = cast_strip(cleaned, req)
+    if cast_flags:
+        compose_flags = compose_flags + cast_flags
+        word_count = len(cleaned.split())
+        log.warning(
+            "[OTR_LineComposer] cast_strip remapped %d phantom(s) on "
+            "%s line: %s",
+            len(cast_flags), req.speaker, list(cast_flags),
+        )
+
+    # 3b. Phantom-name gate. Detect-and-flag only -- the line commits
+    # regardless. Empty roster skips the gate entirely so early-stage
+    # callers / unit tests that don't populate it pay zero cost.
+    if req.allowed_roster:
+        phantoms = detect_phantom_names(
+            cleaned, req.speaker, req.allowed_roster,
+        )
+        if phantoms:
+            compose_flags = compose_flags + tuple(
+                f"phantom_name:{p}" for p in phantoms
+            )
+            log.warning(
+                "[OTR_LineComposer] %d phantom name(s) on %s line: %s",
+                len(phantoms), req.speaker, phantoms,
+            )
+
+    # 3c. BUG-LOCAL-233 vocative-drift gate. The phantom gate above
+    # whitelists every roster name, so "ANNOUNCER" -- the narration
+    # label, always on the roster -- slips through even when a CHARACTER
+    # line addresses it ("..., ANNOUNCER."). The announcer is exempt
+    # (it may reference its own role); every other speaker gets the
+    # vocative stripped + a flag stamped.
+    if req.speaker.strip().upper() != _ANNOUNCER_NAME:
+        devocalized, n_vocative = strip_announcer_vocative(cleaned)
+        if n_vocative > 0:
+            cleaned = devocalized
+            word_count = len(cleaned.split())
+            compose_flags = compose_flags + ("vocative_drift:ANNOUNCER",)
+            log.warning(
+                "[OTR_LineComposer] vocative drift on %s line: "
+                "stripped %d 'ANNOUNCER' address(es)",
+                req.speaker, n_vocative,
+            )
+
+    log.info(
+        "[OTR_LineComposer] composed line for %s: %d words (flags=%d)",
+        req.speaker, word_count, len(compose_flags),
+    )
+    return LineResult(text=cleaned, compose_flags=compose_flags)
 
 
 # ---------------------------------------------------------------------------
