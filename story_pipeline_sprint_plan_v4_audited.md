@@ -60,7 +60,7 @@
 
 | Sprint | Status | Bug pointers | Notes |
 |---|---|---|---|
-| 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); `technical_fn` drop PULLED (Decision 6 -- keep); only the deferred CI AST sweep remains |
+| 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); unused paired params (incl. `technical_fn`) now DROPPED in `6940209` -- Decision 6 reversed (ship clean code); only the deferred CI AST sweep remains |
 | 1 -- render seatbelts | COMPLETE | -- | tier rename landed `df7f9b1`; decisions 1-2 resolved to no-change; render-flag defaults already on |
 | 2A -- structured_call helper | COMPLETE | -- | helper `61f8cfa`; extensions `fed6327`; all call sites converted -- ledger `7f3b65f`, story_brief `3f41fc8`, news `b4c6e83`, casting `6e2950d`, outline `476eabc` |
 | 2B -- repair temp fix | COMPLETE | -- | baked into `structured_call` (structural retry < base, asserted at entry) `61f8cfa` |
@@ -395,4 +395,14 @@ gbnf_enforcement: wired                               # decision 4: wire
 - No node `INPUT_TYPES` / widget / socket changed -- all five are internal helpers -- so no workflow JSON re-wire (Prime Directive 3 N/A).
 - **Regression after each file:** full OTR suite green (2637-2639 passed / 21 skipped across the four runs; collected count drops 2 as obsolete outline tests were pruned); Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green. 0 failed.
 - **New bug ids:** none.
-- **Follow-up queued:** Jeffrey 2026-05-24 -- remove the S32 B1 unused paired-signature params (`lock_cast.technical_fn`, `build_news_briefs.creative_fn`, `compose_line.technical_fn`) as a dedicated commit. Reverses Sprint 0 Decision 6 (keep `technical_fn`).
+- **Follow-up queued:** Jeffrey 2026-05-24 -- remove the S32 B1 unused paired-signature params (`lock_cast.technical_fn`, `build_news_briefs.creative_fn`, `compose_line.technical_fn`) as a dedicated commit. Reverses Sprint 0 Decision 6 (keep `technical_fn`). [DONE -- see entry below.]
+
+### 2026-05-25 -- S32 B1 unused paired-signature params removed
+
+- Commit `6940209` on `v2.0-alpha` -- 13 files, +168/-341.
+- The S32 B1 "paired contract" handed all four writer helpers both `creative_fn` + `technical_fn` for call-site uniformity, even where a helper never used one slot. With Wave 2 done and S32 B3 reversed, three params were dead weight and are removed: `lock_cast.technical_fn`, `build_news_briefs.creative_fn`, `compose_line.technical_fn`. `pick_style` keeps both -- inventor runs creative, chooser runs technical.
+- **Reverses Sprint 0 Decision 6** (keep `lock_cast.technical_fn`). The decision is superseded: the slot it fed -- `cast_one_character`'s `validation_fn` -- was removed with the casting structured_call conversion (`6e2950d`), so the param fed nothing.
+- Writer: the four helper call sites in `OTR_LedgerScriptWriter.py` now pass only the slot kwargs each helper accepts. `test_writer_paired_wiring.py`'s AST tripwire was updated to check per-helper expected kwargs.
+- No node `INPUT_TYPES` / widget / socket changed -- no workflow JSON re-wire (Prime Directive 3 N/A).
+- **Regression:** full OTR suite 2636 passed / 21 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green. 0 failed. (The first sweep run surfaced 21 failures in three `compose_line` caller test files -- `test_phase0_name_roster`, `test_phase1_composer_prompt`, `test_vocative_drift` -- all fixed in the same commit.)
+- **New bug ids:** none.
