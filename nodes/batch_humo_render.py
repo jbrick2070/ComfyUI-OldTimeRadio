@@ -72,6 +72,7 @@ from _otr_speaker_role import (  # noqa: E402
     is_radio_role,
     resolve_speaker_role,
 )
+from _otr_vram_levers import free_otr_pipeline_residue  # noqa: E402
 
 log = logging.getLogger("OTR.batch_humo_render")
 
@@ -1762,25 +1763,34 @@ class BatchHumoRender:
             portraits_dir_path = Path(portraits_dir)
         log.info("[BatchHumoRender] portraits_dir=%s", portraits_dir_path)
 
-        # Sprint E E10 / M6: pre-batch wall-time estimate. Operator
-        # planning a soak needs to see the projected total before the
-        # render starts. Reference: ~10-12 min per character line on
-        # RTX 5080. We log the lower bound (10 min) since the upper
-        # depends on per-line audio length and chunk count.
+        # Pre-batch wall-time estimate. Operator planning a soak needs
+        # the projected total before the render starts. Reference: the
+        # 2026-05-24 bracket test (BUG-LOCAL-265) timed a tuned per-clip
+        # render at ~4:23 for BOTH HuMo-1.7B (20 steps) and HuMo-14B
+        # (6 steps + distill LoRA) -- essentially identical. A character
+        # line whose audio fits one clip_length window is one clip
+        # (~4-5 min); a longer line splits into N chunks (BUG-LOCAL-086),
+        # each its own ~4-5 min clip -- hence the low/high spread. The
+        # pre-2026-05-24 "10-12 min/line" figure was a stale Sprint
+        # C-era reference that made the pipeline look far slower than it
+        # actually is.
         _character_lines_count = sum(
             1 for _ln in lines
             if (_ln.get("speaker_role") or "").lower() == "character"
         )
         if max_clips > 0:
             _character_lines_count = min(_character_lines_count, max_clips)
-        _est_min_low = _character_lines_count * 10
-        _est_min_high = _character_lines_count * 12
+        # ~4 min for a single-clip line; ~9 min for a line long enough
+        # to split into two chunks (typical for 7-14 s Bark dialogue at
+        # the default 7.0 s clip_length).
+        _est_min_low = _character_lines_count * 4
+        _est_min_high = _character_lines_count * 9
         log.info(
             "[BatchHumoRender] PRE-BATCH ESTIMATE: %d character "
-            "line(s) -> ~%d-%d minutes total HuMo wall time on RTX "
-            "5080 (Sprint C-era reference; re-time on Sprint A "
-            "before quoting). Non-character lines route to radio "
-            "still and are excluded from this estimate.",
+            "line(s) -> ~%d-%d minutes total HuMo wall time "
+            "(~4:23 per clip, 2026-05-24 bracket test; long lines "
+            "split into multiple clips). Non-character lines route to "
+            "radio still and are excluded from this estimate.",
             _character_lines_count, _est_min_low, _est_min_high,
         )
 
@@ -2320,13 +2330,32 @@ class BatchHumoRender:
         except Exception as exc:
             log.warning("[BatchHumoRender] CPU offload failed: %s", exc)
 
+        # Inter-phase VRAM cleanup -- Lever 1 (BUG-LOCAL-265). The bare
+        # mm.unload_all_models() that used to live here only evicted
+        # ComfyUI-tracked models; the writer LLM and Bark are out-of-band
+        # transformers caches it cannot see, so they stayed resident and
+        # starved HuMo's VRAM budget at Phase C entry. free_otr_pipeline_
+        # residue drains those OTR-owned caches too (unload_llm +
+        # _unload_bark) before the unload_all_models + cache flush. The
+        # audio is already mixed and assembled by this point -- freeing
+        # the LLM / Bark model weights does not touch audio data.
         try:
-            import comfy.model_management as mm  # type: ignore
-            log.info("[BatchHumoRender] Inter-phase VRAM cleanup: unload_all_models + soft_empty_cache")
-            mm.unload_all_models()
-            mm.soft_empty_cache(force=True)
-        except Exception as exc:
-            log.warning("[BatchHumoRender] inter-phase VRAM cleanup failed: %s", exc)
+            log.info(
+                "[BatchHumoRender] Inter-phase VRAM cleanup: "
+                "free_otr_pipeline_residue (Lever 1)"
+            )
+            _residue = free_otr_pipeline_residue(
+                reason="BatchHumoRender inter-phase",
+            )
+            if _residue.get("steps_failed"):
+                log.warning(
+                    "[BatchHumoRender] inter-phase residue free partial: %s",
+                    _residue["steps_failed"],
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "[BatchHumoRender] inter-phase VRAM cleanup failed: %s", exc
+            )
 
         # HuMo VRAM-thrash instrumentation (2026-05-24). The bare-
         # workflow smoke proved HuMo-14B runs ~6x faster outside the

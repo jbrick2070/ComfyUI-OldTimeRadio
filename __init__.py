@@ -219,6 +219,17 @@ _NODE_MODULES = {
     # as the first node in a workflow to catch contract drift at queue
     # time. ADR: docs/2026-05-13-S14_2-active-validation-ADR.md.
     "OTR_WorkflowValidator":       (".nodes._otr_workflow_validator", "WorkflowValidator", " Workflow Validator (opt-in, S14.2)"),
+    # HuMo model-tier loader (BUG-LOCAL-265, round-robin 2026-05-24,
+    # Option C). One node loads the full HuMo stack (diffusion model +
+    # umt5 + wan VAE + Whisper) for one of three tiers:
+    # low_vram_default (HuMo-1.7B, the shipped default), high_quality
+    # (HuMo-17B/14B fp8 + distill LoRA, opt-in), experimental_gguf.
+    # Carries the Lever-1 pipeline-residue free + the hard
+    # auto-downgrade rule so a 16 GB card never silently hits the HuMo
+    # in-pipeline thrash path. Feeds OTR_BatchHumoRender; tiering lives
+    # here, upstream, so BatchHumoRender keeps its pre-loaded-inputs
+    # surface.
+    "OTR_HuMoTierLoader":          (".nodes._otr_humo_tier_loader", "HuMoTierLoader", " HuMo Tier Loader (1.7B default / 17B opt-in)"),
     # v2.0 in-graph batch HuMo lip-sync renderer. Loads HuMo + Lora +
     # CLIP + VAE + Whisper once, loops every ledger line internally,
     # writes per-line clips at output/otr/videos/<ep_id>/<line_id>.mp4.

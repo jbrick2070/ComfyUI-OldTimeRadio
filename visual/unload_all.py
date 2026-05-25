@@ -183,6 +183,24 @@ class UnloadAll:
             except Exception as exc:  # noqa: BLE001
                 steps_failed.append(f"llm_polish.unload ({exc})")
 
+        # Step 1b: release the Bark TTS cache (BUG-LOCAL-265 Lever 1).
+        # Bark is an out-of-band transformers cache that
+        # mm.unload_all_models() below cannot see; without an explicit
+        # call it survives every FLUX / LTX / HuMo phase boundary.
+        # Gated by the same unload_llm_polish flag -- Bark is an
+        # auxiliary model in the same family as the prompt-polish LLM.
+        # Idempotent when Bark was never loaded.
+        if unload_llm_polish:
+            try:
+                try:
+                    from ..nodes._otr_bark_lib import _unload_bark  # type: ignore
+                except ImportError:
+                    from _otr_bark_lib import _unload_bark  # type: ignore
+                _unload_bark()
+                steps_run.append("_unload_bark")
+            except Exception as exc:  # noqa: BLE001
+                steps_failed.append(f"_unload_bark ({exc})")
+
         # Import the CUDA-side helpers once; treat their absence as a
         # soft skip rather than a hard fail. The image passthrough
         # still fires below.

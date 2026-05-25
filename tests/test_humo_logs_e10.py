@@ -6,8 +6,9 @@ silent; post-E10 it logs explicitly so soak diagnostics see the
 missing-wire case.
 
 R-13: BatchHumoRender must log a pre-batch wall-time estimate so the
-operator sees the projected total before queueing. Reference: ~10-12
-min per character line on RTX 5080 (Sprint C-era).
+operator sees the projected total before queueing. Post-2026-05-24
+(BUG-LOCAL-265) the basis is the per-clip bracket test (~4:23/clip);
+the stale "~10-12 min/line, Sprint C-era" reference was retired.
 
 Both tests AST-walk the source for the log line shapes; they do not
 exercise the full render path (which requires GPU + real model load).
@@ -54,7 +55,7 @@ class TestWallTimeEstimateLogged:
     def test_wall_time_estimate_log_present(self):
         src = _read_source()
         assert "PRE-BATCH ESTIMATE" in src
-        # Sprint C-era reference numbers per cold-read finding L3.
+        # The estimate still reports a total-minutes projection.
         assert "minutes total HuMo wall time" in src or "minutes total HuMo" in src
 
     def test_estimate_excludes_non_character_lines(self):
@@ -70,10 +71,12 @@ class TestWallTimeEstimateLogged:
         assert '"character"' in src or "'character'" in src
 
     def test_estimate_caveats_documented(self):
-        """The log message must caveat that the 10-12 min reference is
-        Sprint C-era so an operator does not over-trust it on Sprint D
-        runs (which may have shifted wall time per D2b meta-stamping
-        + D0d portraits_dir wire)."""
+        """The estimate log must caveat its basis so an operator does
+        not over-trust it. Post-2026-05-24 (BUG-LOCAL-265) the basis is
+        the per-clip bracket test (~4:23/clip) and the caveat is that
+        long lines split into multiple clips -- so the projected total
+        is a range, not a point estimate. The pre-2026-05-24 stale
+        '~10-12 min/line' figure was retired."""
         src = _read_source()
-        assert "Sprint C-era reference" in src
-        assert "re-time on Sprint A" in src
+        assert "2026-05-24 bracket test" in src
+        assert "split into multiple clips" in src
