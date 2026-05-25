@@ -1,7 +1,7 @@
 # Story-Writing + Cleanup Pipeline -- LLM-Call Audit
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
-- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `d0ea595`)
+- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `3d6ad91`)
 - **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: 3A, 4, 5, 6. BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`) -- see the punch list. See the "Multi-agent execution plan" section for the lane map.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
@@ -11,8 +11,12 @@
 
 ## Next-sprint punch list (added 2026-05-25 -- READ FIRST)
 
-The 3B-3E wave is shipped and live-validated. What the next sprint must
-close, in priority order:
+**Status 2026-05-25:** punch-list items 1-3 (BUG-LOCAL-271, the 3C
+Doctor-row enrichment, WORD_BUDGET_DRIFT) are **RESOLVED and pushed**
+(commits `3e120df` / `14818bb` / `dfd63ee`). **Open work to move this
+audit to completion: item 4 (live-validation) + items 5-8 (Sprints
+3A / 4 / 5 / 6).** Items below stay in priority order; resolved items
+keep their detail inline for the build record.
 
 **Bugs to fix**
 
@@ -63,10 +67,14 @@ close, in priority order:
    (`speaker_role == "character"`) beats only, mirroring
    `validate_outline_against_budget` validator #1. No `_otr_outline.py`
    change was needed.
-4. **Live-validate the cast/style/seed batch.** BUG-LOCAL-269/270 + the
-   `seed`-widget removal (HEAD `d0ea595`) are NOT yet live-validated --
-   one ComfyUI episode on `d0ea595` to confirm the cast now varies and
-   the writer node has no `seed` widget.
+4. **Live-validate the open batch (now also covers BUG-271).** One
+   ComfyUI episode on current HEAD `3d6ad91` confirms, in a single run:
+   BUG-LOCAL-269/270 + the `seed`-widget removal (the cast now varies,
+   the writer node has no `seed` widget); BUG-LOCAL-271
+   (`audit_cast_contract:pre` repairs `wrong_char_id` violations instead
+   of escalating all to the Script Doctor); WORD_BUDGET_DRIFT no longer
+   false-fires; the episode completes + freezes clean. **This is the
+   immediate next action.**
 
 **Remaining build -- to "complete" this audit**
 
