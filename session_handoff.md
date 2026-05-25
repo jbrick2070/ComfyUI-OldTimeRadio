@@ -1,32 +1,34 @@
-# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-25 (Wave 1 + seed work)
+# Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-25 (LLM-audit punch list)
 
 ## Core goal
 The Story Pipeline Ledger Writer Hardening build, tracked in
 `story_pipeline_sprint_plan_v4_audited.md`. Decompose every LLM call in
 the script-writing + cleanup pipeline into single-job passes with
 deterministic guards, so a structurally valid script can no longer ship
-dramatically empty. This session shipped the **Sprint 3B-3E wave**,
-**live-validated 3B-3E**, then on Jeffrey's direction decoupled the cast
-and style-picker RNGs from the `seed` widget and **removed the `seed`
-widget entirely**. The build is NOT finished: 3A, 4, 5, 6 remain, plus
-BUG-LOCAL-271. ROADMAP stays parked until the whole build lands.
+dramatically empty. This session closed the three actionable items on
+the LLM-audit punch list (`docs/2026-05-24-story-pipeline-llm-audit.md`):
+BUG-LOCAL-271, the 3C Doctor-row enrichment, and WORD_BUDGET_DRIFT. The
+build is NOT finished: Sprints 3A, 4, 5, 6 remain. ROADMAP stays parked
+until the whole build lands.
 
 ## Tech stack & constraints
 OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md
 + BUG_LOG.md auto-load -- not repeated here. Live operational notes:
-- **HEAD = `d0ea595`, pushed; `origin/v2.0-alpha` == HEAD.** Working
-  tree clean except the parked `docs/s28_diff_tmp.txt` (never commit it).
+- **HEAD after this session = the `docs:` commit that carries this
+  file.** Substantive code commits: `14818bb` (3C enrichment),
+  `3e120df` (BUG-LOCAL-271), `dfd63ee` (WORD_BUDGET_DRIFT). Predecessor
+  HEAD was `a294297`. Working tree clean except the parked
+  `docs/s28_diff_tmp.txt` (never commit it).
 - **Build tracking.** `story_pipeline_sprint_plan_v4_audited.md` is the
   single source of truth for PROGRESS; `BUG_LOG.md` owns BUGS. After a
   work session: append a dated Build Progress Log entry + update the
-  Status Board in the same edit. One code commit per sprint, one `docs:`
-  commit for the plan.
+  Status Board in the same edit.
 - **LLM backend is HF Transformers 5.5.0** (`model.generate()`). No
   llama.cpp, no GBNF. Sprint 2E deleted that scaffolding -- do not reopen.
 - **Tests + git via Desktop Commander, `shell: "cmd"`.** Venv python:
   `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. Full OTR
-  suite: `cd /d <repo> && <venv python> -m pytest tests -q` (~30s, ~2806
-  tests). Bug Bible: `cd /d C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide && <venv python> -m pytest tests/bug_bible_regression.py -q`.
+  suite: `cd /d <repo> && <venv python> -m pytest tests -q` (~28s, 2808
+  collected). Bug Bible: `cd /d C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide && <venv python> -m pytest tests/bug_bible_regression.py -q`.
 - **The Cowork Linux sandbox `Bash` mount is STALE for this repo.** Use
   Desktop Commander (real Windows FS) for tests + git. The Read/Write/
   Edit file tools DO write the real Windows file correctly.
@@ -34,91 +36,73 @@ OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md
   or `%H%n%s`); no inline `python -c "..."` through cmd; commit messages
   via the file tool to `.git\COMMIT_EDITMSG`, then `git commit -F`.
 - Run Bug Bible + full OTR suite after every code change, unprompted.
-- **The ComfyUI console log file `comfyui_8000.log` is STALE (May 19)** --
-  today's runs are NOT in it. Episode ledgers under
-  `output\otr\episodes\<ep>\audio\<ep>_ledger.json` are the on-disk
-  record; for console-output analysis, Jeffrey must paste it.
+- For console-output analysis, Jeffrey must paste it -- the AI has no
+  real-time ComfyUI log access and `comfyui_8000.log` is stale.
 
 ## What's done & decided
-- **Sprint 3B-3E wave COMPLETE + pushed** -- four parallel subagents on
-  disjoint files, lead-integrated:
-  - `3992607` 3B -- outline Stage 3: adjacency context in the beat
-    prompt; `target_words` dropped from `_BeatFleshout`. (Plan asked for
-    `next_beat_intent`; Stage 3 is sequential so a later beat's intent
-    does not exist yet -- shipped `next_beat_speaker` instead.)
-  - `74438ff` 3C -- Script Doctor split into `run_script_doctor_diagnosis`
-    + `run_script_doctor_edits`; +1 LLM call (technical, tagged; sweep
-    21/21). Doctor rows enriched 5/7 fields -- `beat_intent`/`target_words`
-    are NOT on the ledger (follow-up: stamp them).
-  - `5fe9931` 3D -- casting split: `precompute_ensemble_slots` /
-    `llm_write_description` / `python_assign_voice_preset`. Python owns
-    gender + voice; the LLM writes the description only.
-  - `d230cd6` 3E -- title scratchpad + `EPISODE_TITLE: TBD` late binding;
-    post-hoc title substitution removed.
-  - `1514e11` docs commit (plan board + Build Progress Log + LLM audit).
-- **3B-3E LIVE-VALIDATED.** Episode `signal_lost_vances_promise_20260525_125401`
-  (id `pending_20260525_125025`, commit `1514e11`) ran end-to-end --
-  froze `frozen_with_warns`, full episode produced. 3B/3C/3D/3E all
-  confirmed working (3C's undiagnosed-edit drop fired correctly). See
-  the "Live-run validation" section in
-  `docs/2026-05-24-story-pipeline-llm-audit.md`.
-- **BUG-LOCAL-269 + 270 -- cast + style RNG decoupled from the seed.**
-  `61dda9c` (cast) + `906a57f` (style): the fixed `seed` widget pinned
-  the cast (`HAYES VANCE / GULLIVER REEVES / JIMBO BLACK` every episode)
-  and the style-picker's 5 sampled seed-flavors. Both now draw OS
-  entropy per episode; `OTR_CAST_SEED` / `OTR_STYLE_SEED` env vars are
-  the C7 reproducibility override. Twins of BUG-LOCAL-260.
-- **Seed widget REMOVED.** `d0ea595`: with cast/style/LEMMY all decoupled,
-  the `seed` widget drove nothing -- removed from `OTR_LedgerScriptWriter`
-  INPUT_TYPES + the workflow JSON (`widgets_values` 19 -> 17). 6
-  widget-vector tests re-aligned. Not a bug -- a cleanup.
-- **Sprints 0, 1, 2A-2E, 3F, 3G COMPLETE** (earlier sessions).
-- **Build method: parallel subagents on disjoint file sets** -- validated
-  again this session (3B/3C/3D/3E ran as four concurrent subagents).
+- **LLM-audit punch list -- three items closed, three parallel subagents
+  on disjoint files, lead-integrated:**
+  - `14818bb` -- **3C Doctor-row enrichment 5/7 -> 7/7.**
+    `production_ledger.py` (`init_lines_from_outline` + `set_lines`)
+    now stamps `beat_intent` (from `Beat.intent`) and `target_words`
+    (from `Beat.target_words`) onto every per-line record. The Script
+    Doctor renderer `_render_lines_for_doctor` was already pre-wired to
+    emit both when present -- no renderer logic change, comment refresh
+    only. `OTR_LedgerScriptWriter.py` needed no change.
+  - `3e120df` -- **BUG-LOCAL-271 FIXED.** The `wrong_char_id` cast
+    auto-repair was dead: auditor emitted `expected`=char_id, repair
+    resolved `expected` as a NAME. Fix (approach b): repair now accepts
+    a char_id, validated against a case-fold `valid_char_ids` map from
+    `cast_rows`; a line already on the right char_id counts as repaired
+    (kills the small-model over-flagging); `_AUDITOR_SYSTEM_PROMPT`
+    updated to document `wrong_char_id.expected` as a char_id.
+  - `dfd63ee` -- **WORD_BUDGET_DRIFT FIXED.** The writer's word-budget
+    check summed ALL beats vs a voiced-only target; announcer beats'
+    fixed ~15-word overhead forced ratio 2.00 on small targets. Now
+    sums voiced (`speaker_role == "character"`) beats only. The outline
+    allocator was correct -- no `_otr_outline.py` change.
+- **Regression green** (authoritative combined-tree run by the lead):
+  full OTR suite 2787 passed / 21 skipped (2808 collected); Bug Bible
+  16 passed / 7 skipped / 3 xfailed. 0 failed.
+- No node `INPUT_TYPES` / widget / socket touched -> no workflow JSON
+  re-wire. No LLM call added or removed.
+- **Sprints 0, 1, 2A-2E, 3B-3G COMPLETE** (earlier sessions).
+- **Build method: parallel subagents on disjoint file sets** -- used
+  again this session (3 lanes).
 
 ## State of the art
 - Build tracker `story_pipeline_sprint_plan_v4_audited.md` Status Board:
   Sprints 0, 1, 2A-2E, 3B-3G COMPLETE; 3A, 4, 5, 6 NOT STARTED.
-- **BUG-LOCAL-271 OPEN (fix pending).** The live run surfaced it: the
-  cast auditor flags `wrong_char_id` with `expected` = a char_id, but
-  `apply_deterministic_cast_repairs` resolves `expected` as a NAME --
-  contract mismatch, every `wrong_char_id` violation goes unrepaired.
-  Benign on the validated episode; the auto-repair is non-functional.
-- **Finding C still open.** The validated episode is structurally clean
-  but THIN -- 21 words of character dialogue, one phantom name -- exactly
-  the `ozempics_glitch`-class gap. 3B-3E hardened the *structure*; the
-  *quality* critic is Sprint 5, not yet built.
-- Last regression (2026-05-25, post-seed-removal `d0ea595`): full OTR
-  suite 2787 passed / 21 skipped; Bug Bible 16 passed / 7 skipped /
-  3 xfailed. 0 failed.
-- The cast/style/seed-removal commits (`61dda9c` / `906a57f` / `d0ea595`)
-  are NOT yet live-validated. The runs after `vances_promise` on commit
-  `906a57f` (`pending_20260525_133637..134632`) left empty-cast ledgers
-  -- likely aborted operator iterations, not analyzed; no console output.
+- **BUG-LOCAL-271 is FIXED in code** but NOT yet live-verified -- a
+  ComfyUI episode whose `audit_cast_contract:pre` resolves
+  `wrong_char_id` violations (`repaired` count > 0) instead of
+  escalating all to the Script Doctor. Bible promotion (Three-File
+  Contract) waits on that live verification.
+- **Finding C still open.** The pipeline can still ship a structurally
+  clean but THIN episode -- the `ozempics_glitch`-class gap. The quality
+  critic is Sprint 5, not yet built.
+- The cast/style/seed-removal commits (`61dda9c` / `906a57f` /
+  `d0ea595`) are still NOT live-validated.
 
 ## Immediate next steps
-1. **Fix BUG-LOCAL-271** -- align the cast auditor's `wrong_char_id.expected`
-   with what `apply_deterministic_cast_repairs` consumes (auditor emits
-   a NAME, or the repair accepts a char_id), and tighten the auditor
-   prompt so it stops over-flagging already-correct char_ids.
-2. **Live-validate the cast/style/seed-removal batch** -- one ComfyUI
-   episode on HEAD `d0ea595`: confirm the cast varies (not HAYES VANCE),
-   the writer node has no `seed` widget, the episode completes + freezes.
-3. **Sprint 3A** -- rewrite `compose_line` (`nodes/_otr_line_composer.py`,
+1. **Live-validate the open batch in ONE ComfyUI run on current HEAD:**
+   confirm (a) BUG-271 -- `wrong_char_id` violations now repair instead
+   of escalating; (b) the cast varies (not the pinned `HAYES VANCE`)
+   and the writer node has no `seed` widget; (c) WORD_BUDGET_DRIFT no
+   longer false-fires; (d) the episode completes + freezes clean.
+   Operator-gated -- Jeffrey starts the run and pastes the console.
+2. **Sprint 3A** -- rewrite `compose_line` (`nodes/_otr_line_composer.py`,
    ~1660 lines). Lead-driven, NOT a one-shot subagent. 2-3 days.
-4. Then Sprint 4 (VRAM verify, live-hardware gated), then 5 (continuity
-   ledger + story critic + targeted reroll -- the Finding C fix), then 6.
+3. Then Sprint 4 (VRAM verify, live-hardware gated), then 5 (continuity
+   ledger + story critic + targeted reroll -- the Finding C fix; depends
+   on 3A), then 6 (critic -> render coupling, ships with 5).
 
 ## Open questions
-- BUG-LOCAL-271 fix direction (auditor prompt vs repair branch) -- pick one.
-- The 4 empty-ledger `906a57f` runs -- aborted iterations, or a real
-  writer failure on the cast/style commits? Needs their console output
-  to tell. The `1514e11` validation run was clean.
-- 3C's `beat_intent` / `target_words` Doctor-row enrichment is deferred
-  -- those fields are not on the production ledger; stamping them is a
-  follow-up in `OTR_LedgerScriptWriter.py` / `production_ledger.py`.
-- Carried: BUG-LOCAL-265/-266/-267 Bible-promotion via the Three-File
-  Contract.
+- The 4 empty-ledger `906a57f` runs (`pending_20260525_133637..134632`)
+  -- aborted operator iterations, or a real writer failure on the
+  cast/style commits? Needs their console output to tell.
+- Carried: BUG-LOCAL-265/-266/-267 + now -271 Bible-promotion via the
+  Three-File Contract (all await live verification).
 
 ---
 ## Resume instructions

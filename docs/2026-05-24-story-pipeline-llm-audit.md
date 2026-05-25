@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
 - **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `d0ea595`)
-- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: 3A, 4, 5, 6, plus BUG-LOCAL-271 (cast-auditor `wrong_char_id` repair, fix pending). See the "Multi-agent execution plan" section for the lane map.
+- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: 3A, 4, 5, 6. BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`) -- see the punch list. See the "Multi-agent execution plan" section for the lane map.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -27,6 +27,14 @@ close, in priority order:
    lines that already carry the correct char_id. Full detail in
    `BUG_LOG.md` -> `### BUG-LOCAL-271`.
 
+   **RESOLVED 2026-05-25 (commit `3e120df`).** Approach (b): the
+   `wrong_char_id` repair branch now accepts a char_id in `expected`
+   (validated against a case-fold `valid_char_ids` map built from
+   `cast_rows`), and the auditor prompt no longer over-flags lines that
+   already carry the correct char_id. A line already on the right
+   char_id counts as `repaired`, not escalated. Live-run verification
+   still pending (operator-gated).
+
 **Follow-ups surfaced by the wave**
 
 2. **3C Doctor-row enrichment is 5/7.** `_render_lines_for_doctor` feeds
@@ -34,9 +42,27 @@ close, in priority order:
    `beat_intent` + `target_words` were deferred -- they are not on the
    production ledger. Stamping them needs a change in
    `OTR_LedgerScriptWriter.py` / `production_ledger.py`.
+
+   **RESOLVED 2026-05-25 (commit `14818bb`).** `Ledger.init_lines_from_outline`
+   + `Ledger.set_lines` (`production_ledger.py`) now stamp `beat_intent`
+   (from `Beat.intent`) and `target_words` (from `Beat.target_words`)
+   onto every per-line record. `_render_lines_for_doctor` was already
+   pre-wired to render both when present, so the Doctor rows are now
+   7/7. `OTR_LedgerScriptWriter.py` needed no change -- the writer
+   already hands the full outline to the ledger.
 3. **WORD_BUDGET_DRIFT.** The validation run's outline allocated 60
    words against a 30-word target (ratio 2.00). Non-fatal warn -- check
    the Sprint 3B word-budget path.
+
+   **RESOLVED 2026-05-25 (commit `dfd63ee`).** Not an allocator bug --
+   the Sprint 3B path in `_otr_outline.py` is correct. Root cause: the
+   word-budget check in `OTR_LedgerScriptWriter.py` summed `target_words`
+   over ALL beats but compared against a voiced-dialogue-only target;
+   announcer beats' fixed ~15-word overhead each forced `ratio=2.00` on
+   the 30-word smoke target. The check now sums voiced
+   (`speaker_role == "character"`) beats only, mirroring
+   `validate_outline_against_budget` validator #1. No `_otr_outline.py`
+   change was needed.
 4. **Live-validate the cast/style/seed batch.** BUG-LOCAL-269/270 + the
    `seed`-widget removal (HEAD `d0ea595`) are NOT yet live-validated --
    one ComfyUI episode on `d0ea595` to confirm the cast now varies and
