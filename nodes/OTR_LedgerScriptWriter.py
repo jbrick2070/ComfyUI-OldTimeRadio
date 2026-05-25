@@ -1058,6 +1058,27 @@ def _resolve_cast_rng_seed() -> tuple[int, str]:
     return random.SystemRandom().getrandbits(32), "OS entropy"
 
 
+def _resolve_style_rng_seed() -> tuple[int, str]:
+    """Return (seed, source) for the per-episode style-picker RNG.
+
+    BUG-LOCAL-270 (twin of BUG-LOCAL-269): the style picker's Pass-1
+    inventor samples 5 "seed flavors" from the inspiration pool; that
+    sampling RNG was seeded from the `seed` widget, so a fixed seed
+    sampled the identical 5 flavors every episode. Production now draws
+    a fresh OS-entropy seed each episode so the sampled flavors vary.
+
+    The OTR_STYLE_SEED environment variable forces a fixed seed -- the
+    C7 audio byte-identity reproducibility path. Set it in ComfyUI's
+    environment before a baseline-capture or regression run.
+    """
+    import os
+    import random
+    env = os.environ.get("OTR_STYLE_SEED", "").strip()
+    if env:
+        return int(env), "OTR_STYLE_SEED override"
+    return random.SystemRandom().getrandbits(32), "OS entropy"
+
+
 def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
@@ -1486,22 +1507,18 @@ class OTR_LedgerScriptWriter:
                 "seed": ("INT", {
                     "default": 42, "min": 0, "max": 2**32 - 1, "step": 1,
                     "tooltip": (
-                        "Random seed for the style picker (two-pass "
-                        "inventor + chooser samples) and the reviewer's "
-                        "seed_for_reviewer derivation. The CAST -- "
-                        "character names + announcer voice -- is NOT "
-                        "seed-driven: it is randomized fresh every "
-                        "episode from OS entropy (BUG-LOCAL-269). Set "
-                        "the OTR_CAST_SEED environment variable to force "
-                        "a fixed cast for a byte-identical re-run. "
-                        "LEMMY's 11% cameo roll is likewise not "
-                        "seed-driven (BUG-LOCAL-260); use the "
-                        "lemmy_cameo widget to force it.\n\n"
-                        "Default is 42. When the ComfyUI 'shuffle' icon "
-                        "next to the seed value is ON, ComfyUI generates "
-                        "a fresh integer on every Queue Prompt; OFF plus "
-                        "a fixed integer locks the style picker + "
-                        "reviewer derivation for re-queueing."
+                        "Telemetry / cache seed. Stamped to "
+                        "meta.episode_seed and folded into the "
+                        "news-interpreter cache key. It does NOT drive "
+                        "episode variety -- the CAST (character names + "
+                        "announcer voice, BUG-LOCAL-269), the STYLE "
+                        "picker's seed-flavor sampling (BUG-LOCAL-270), "
+                        "and LEMMY's 11% cameo (BUG-LOCAL-260) are each "
+                        "randomized fresh every episode from OS entropy. "
+                        "Leave it at the default for normal runs.\n\n"
+                        "For a byte-identical C7 audio regression only, "
+                        "set the OTR_CAST_SEED and OTR_STYLE_SEED "
+                        "environment variables in ComfyUI's environment."
                     ),
                 }),
                 # S30 B2a: single model_id widget replaced by two slots.
@@ -1959,15 +1976,27 @@ class OTR_LedgerScriptWriter:
         # selected or combo is blank AND no style_custom override).
         # Pass 1 inventor produces 5 distinct snake_case style
         # descriptors grounded in the news article + 5 sampled seed
-        # flavors. Pass 2 chooser picks the single best one. The
-        # writer's seed widget seeds the sample RNG so same seed +
-        # same article = same sample = same picks (C7 byte-identity).
+        # flavors. Pass 2 chooser picks the single best one.
+        #
+        # BUG-LOCAL-270 (twin of BUG-LOCAL-269): the seed-flavor sample
+        # RNG is NO LONGER tied to the `seed` widget -- a fixed seed
+        # sampled the identical 5 inspiration flavors every episode.
+        # _resolve_style_rng_seed() draws a fresh OS-entropy seed per
+        # episode; set OTR_STYLE_SEED to force a fixed sample for the
+        # C7 audio byte-identity regression.
         # See nodes/_otr_style_picker.py for full design.
         #
         # The widget-typed style_custom and the verbatim combo entries
         # bypass this branch.
         if resolved["style_pending"]:
-            picker_rng = _random.Random(int(seed))
+            style_rng_seed, style_rng_source = _resolve_style_rng_seed()
+            picker_rng = _random.Random(style_rng_seed)
+            log.info(
+                "[OTR_LedgerScriptWriter] style picker RNG seed=%d (%s) "
+                "-- seed-flavor sampling randomized per episode "
+                "(BUG-LOCAL-270)",
+                style_rng_seed, style_rng_source,
+            )
             # LLM slot: per-sub-pass -- style picker pass 1 (inventor)
             # -> creative_fn (style invention is a narrative pass that
             # recombines seed flavors creatively); pass 2 (chooser)
@@ -2070,9 +2099,11 @@ class OTR_LedgerScriptWriter:
         # decoupling to the cast names + announcer pick: random in
         # production, with an explicit force path for the C7 gate.
         #
-        # The `seed` widget still drives the style picker and the
-        # reviewer's seed_for_reviewer derivation -- only the cast and
-        # the LEMMY cameo are decoupled from it.
+        # The `seed` widget no longer drives any per-episode creative
+        # RNG: the cast (here), the style picker (BUG-LOCAL-270), and
+        # the LEMMY cameo (BUG-LOCAL-260) are all decoupled. The seed
+        # now only feeds meta.episode_seed telemetry + the
+        # news-interpreter cache key.
         cast_seed, cast_seed_source = _resolve_cast_rng_seed()
         cast_rng = _random.Random(cast_seed)
         log.info(
