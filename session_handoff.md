@@ -1,114 +1,50 @@
 # Session Handoff -- ComfyUI-OldTimeRadio -- 2026-05-24
 
 ## Core goal
-The HuMo VRAM-thrash (BUG-LOCAL-265) is fixed and shipped -- Option C: HuMo-1.7B
-as the default, HuMo-17B/14B kept opt-in, via a new `OTR_HuMoTierLoader` node,
-plus the Lever-1 pipeline-residue free. The next session's job is to support the
-operator running ONE real episode to capture the `PHASE-C-VRAM-PROBE` telemetry
-that confirms Lever-1 actually reclaims VRAM, and to act on whatever that run
-surfaces.
+This session verified the BUG-LOCAL-265 HuMo VRAM-thrash fix (it works), then traced the resulting episode's poor quality to its root cause and fixed the load-bearing defect. Throughline: the HuMo render path is now healthy, but the *script* the pipeline produces is weak -- so the work pivoted to diagnosing the story-quality problems, fixing the one clear bug, and parking the rest. All session work is committed and pushed; HEAD is `bc1acc1` on `v2.0-alpha`.
 
 ## Tech stack & constraints
-OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP + BUG_LOG
-auto-load -- not repeated here. Operational rules that bite:
-- **Git: Desktop Commander cmd shell only.** Commit message via the file tool to
-  `.git\COMMIT_EDITMSG`, then `git commit -F`. Never PowerShell for git.
-- **The Linux sandbox (`mcp__workspace__bash`) serves a STALE copy of existing
-  repo files** -- this session it served an outdated `batch_humo_render.py` with
-  a phantom syntax error. Use Desktop Commander (Windows FS) for all
-  `py_compile` / pytest / git / file-state checks. The Read/Write/Edit file
-  tools hit the real FS and are fine.
-- **pytest:** `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe -m
-  pytest`, run via Desktop Commander cmd with output redirected to a log
-  (`> log 2>&1`), then read the log. Note: cmd expands `%ERRORLEVEL%` at parse
-  time, so `& echo %ERRORLEVEL%` after a redirect is meaningless -- read the
-  log's summary line instead.
-- VRAM-budget / model-choice changes are round-robin gated per CLAUDE.md.
+OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LOG.md auto-load -- not repeated here. Operational notes that bite:
+- **ComfyUI writes its live console to `C:\Users\jeffr\Documents\ComfyUI\user\comfyui_8000.log`** (port 8000). Desktop Commander `read_file` with a negative offset tails it directly -- no need to ask the operator to paste console output. (Discovered this session.)
+- Git: Desktop Commander cmd shell only; commit message via the file tool to `.git\COMMIT_EDITMSG`, then `git commit -F`. Every session commit was verified local HEAD == origin.
+- `docs/s28_diff_tmp.txt` is parked-dirty -- do NOT commit it.
+- DC `interact_with_process` / `start_process` blocking on a long pytest can drop the session at the ~120 s MCP timeout. Run pytest via `start_process` with a short timeout, then poll `read_process_output`.
 
 ## What's done & decided
-- **BUG-LOCAL-265 RESOLVED -- Option C shipped.** HEAD `e619ebb`, `v2.0-alpha`,
-  local == origin. Three commits this session:
-  - `e981db0` -- smoke-workflow ratio edits + the round-robin problem-statement
-    doc (`docs/2026-05-24-humo-model-choice__00_question.md`).
-  - `09c2d49` -- the feature: `OTR_HuMoTierLoader` + Lever-1 + workflow rewire +
-    estimate-text update + `BUG_LOG.md`.
-  - `e619ebb` -- flaky cast-routing test fix (`force_lemmy=False`).
-- **New node `OTR_HuMoTierLoader`** (`nodes/_otr_humo_tier_loader.py`, registered
-  in `__init__.py`): one upstream loader, three tiers -- `low_vram_default`
-  (HuMo-1.7B fp16, 20 steps, cfg 5.0, no distill LoRA -- the shipped default),
-  `high_quality` (17B/14B fp8, 6 steps, cfg 1.0, lightx2v distill LoRA -- opt-in),
-  `experimental_gguf` (advanced only). Hard auto-downgrade rule: a high tier with
-  free VRAM below `vram_safety_threshold_gb` (default 10 GB) downgrades to 1.7B
-  or stops with a clear error.
-- **Lever 1** (`nodes/_otr_vram_levers.py::free_otr_pipeline_residue`): frees the
-  writer-LLM + Bark out-of-band caches `unload_all_models()` cannot see, then the
-  ComfyUI unload + CUDA flush. Wired into `BatchHumoRender`'s inter-phase cleanup
-  and `OTR_HuMoTierLoader` pre-load. `OTR_UnloadAll` extended to drop Bark.
-- **`workflows/otr_scifi_16gb_full.json` rewired:** the 6-node HuMo loader chain
-  (nodes 45-50) collapsed into one `OTR_HuMoTierLoader` (node 72) feeding
-  `OTR_BatchHumoRender` (node 51); steps/cfg socket-driven; default tier
-  `low_vram_default`. The FLUX->UnloadAll->HuMo gate is intact and extended --
-  `OTR_UnloadAll.unload_done` (node 24) also gates node 72.
-- `batch_humo_render.py` pre-batch estimate updated ~10-12 min -> ~4:23/clip.
-- Regression GREEN: full `tests/` walk 2617 passed / 21 skipped / 0 failed;
-  Bug Bible 23 passed / 1 skipped / 2 xfailed; `tests/test_humo_tier_loader.py`
-  20 passed.
-- **Rejected:** 17B-as-default (thrashes in-pipeline); GGUF-as-default (per-step
-  dequant tax made it slower than fp8); a model-tier widget *inside*
-  `OTR_BatchHumoRender` (tiering goes upstream in the loader -- the renderer
-  keeps its clean pre-loaded-inputs surface).
+
+**BUG-LOCAL-265 -- VERIFIED (not yet Bible-promoted).** The HuMo-1.7B tier + Lever-1 residue-free fix works. Operator re-run `signal_lost_ozempics_glitch_20260524_174200` completed end-to-end in 35:53: clean `PHASE-C-VRAM-PROBE` (14849 MB free, comfy-tracked models=0), HuMo fully resident every clip (3321 MB, zero offload), 10-20 s/it (not the 140-279 s/it thrash). The ~14 GB residue concern is settled. `Bible candidate: yes` -- ready for promotion (was deferred pending exactly this probe).
+
+**BUG-LOCAL-266 [FIXED, `00bf9de`].** The BUG-265 verification run first crashed at `OTR_HuMoTierLoader`: ComfyUI 0.22.2 migrated the core `AudioEncoderLoader` node to its V3 API, which returns a `comfy_api` `NodeOutput` wrapper, not a tuple; `_otr_humo_tier_loader._invoke` validated `isinstance(tuple|list)` and raised. Fix: `_invoke` now unwraps a V3 `NodeOutput` via `.result`. +4 `TestInvokeNodeOutputUnwrap` tests in `tests/test_humo_tier_loader.py`. `Bible candidate: yes`.
+
+**BUG-LOCAL-267 [FIXED, `2183397`].** Speaker labels leaked into dialogue `text` / `text_for_tts` (b002 "HAYES VANCE: ...", b004 "HAYES VANCE not right.") -- Bark voiced the character's name aloud. Root cause: the composer strips a leading "SPEAKER:" via `strip_line_formatting`, but the Phase 3 ScriptDoctor reviewer runs after composition and `apply_doctor_edits` (`nodes/_otr_ledger_reviewer.py`) wrote its rewrite payload verbatim with no strip. Fix: `apply_doctor_edits` rewrite branch now routes through `strip_line_formatting`. `Bible candidate: yes`. **Parked gap:** the strip regexes all require a separator (`: - --`); a bare "NAME " prefix with no punctuation is still uncaught in every path -- parked in ROADMAP "SFX + CLEAN-LEDGER TRACK" workstream 2 (closing it carries a false-positive tradeoff).
+
+**LEMMY reskin [`29a07dd`, `ff13563`].** `config/cast_pools.py` `LEMMY_PROFILE.character_description` changed from "grizzled wrench-wielding engineer" to "Genial communications officer, 50s, broad friendly Cockney accent ... brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica". Voice preset `v2/en_speaker_8` unchanged -- Bark has no Cockney voice; description / dialogue-flavor change only. **Rejected:** routing LEMMY to a Kokoro British voice -- would break the character->Bark cast contract (BUG-232 territory).
+
+**ozempics_glitch diagnosis.** Run completed but the video was near-static portrait stills with thin dialogue. Ledger root causes: the speaker-label leak (BUG-267, now fixed); the protagonist speaks ~12 words total across 3 lines; b003 was reviewer-skipped; b004's 2-word line was Bark-hallucinated into 14.6 s of audio; `freeze_verdict: needs_full_rerun` was produced and ignored (BUG-LOCAL-241, already logged). Conclusion: structural, not a bad-luck 30-word run -- the 30-word budget is the detonator. Config was Gemma-2-2b in both slots at "maximum chaos".
+
+**ROADMAP additions (all committed):**
+- "AUDIO QUALITY TRACK" -- parked; first item is per-clip loudness normalization.
+- "SFX + CLEAN-LEDGER TRACK" -- workstream 1 = a whole-script SFX "spotting" LLM pass; workstream 2 = speaker-label hygiene (BUG-267 landed; no-separator gap parked).
+- "VOICE ABSTRACTION + AUDIO NORMALIZATION -- three-sprint plan" -- synthesized from the operator's uploaded consolidated plan directly into ROADMAP (no standalone doc file, by operator request); the old "Voice Model Agnostic Nodes" RFC marked superseded.
+
+**New docs (committed):**
+- `docs/2026-05-24-per-clip-audio-normalization__00_question.md` -- round-robin question doc for per-clip LUFS normalization. Consultation NOT yet run.
+- `docs/2026-05-24-story-pipeline-llm-audit.md` -- audit of all 16 story+cleanup LLM calls. Headline: **no LLM pass anywhere judges story quality** (every gate is deterministic or structural cast-contract); GBNF grammar files ship but are never wired into the loader; the two cleanup passes have no retry.
 
 ## State of the art
-- New files: `nodes/_otr_humo_tier_loader.py`, `nodes/_otr_vram_levers.py`,
-  `tests/test_humo_tier_loader.py` -- all committed.
-- Modified + committed: `__init__.py`, `nodes/batch_humo_render.py`,
-  `visual/unload_all.py`, `workflows/otr_scifi_16gb_full.json`,
-  `tests/test_humo_logs_e10.py`, `tests/test_helper_paired_signatures.py`,
-  `tests/test_lock_cast_routing.py`, `BUG_LOG.md`, `ROADMAP.md`.
-- Production workflow `otr_scifi_16gb_full.json`: 31 nodes / 69 links;
-  `last_node_id=72`, `last_link_id=217`. HuMo branch:
-  `OTR_HuMoTierLoader` (node 72, `tier=low_vram_default`) -> `OTR_BatchHumoRender`
-  (node 51). No `UnetLoaderGGUF` node remains in the JSON.
-- `PHASE-C-VRAM-PROBE` telemetry is in `nodes/batch_humo_render.py` -- logs torch
-  allocated/reserved, real CUDA free/total, and the ComfyUI-tracked model list
-  right after the inter-phase free, before HuMo Phase C. `[VRAMLevers]
-  free_otr_pipeline_residue ...` logs the residue free itself.
-- **Parked-dirty, do NOT commit:** `docs/s28_diff_tmp.txt` (left over from a
-  prior session). `session_handoff.md` is untracked by design.
+Branch `v2.0-alpha`, HEAD `bc1acc1`, local == origin. Session commits in order: `00bf9de` (BUG-266 fix) -> `29a07dd` + `ff13563` (LEMMY) -> `a91d4ef` (per-clip-norm doc + AUDIO QUALITY TRACK) -> `8b42679` (SFX + CLEAN-LEDGER TRACK) -> `2183397` (BUG-267 fix) -> `5b93eba` (LLM-call audit doc) -> `bc1acc1` (voice-backend plan synthesized into ROADMAP). Regression stayed green throughout (reviewer + core + audio-byte-identical + Bug Bible, 0 failed). No code is mid-edit -- all work is committed and pushed.
 
 ## Immediate next steps
-1. Operator runs ONE real OTR episode end-to-end on the default workflow
-   (`workflows/otr_scifi_16gb_full.json`, `OTR_HuMoTierLoader` tier
-   `low_vram_default`). This is the BUG-265 verification run. Operator pastes the
-   full ComfyUI console output covering the HuMo phase.
-2. In that console, find the `[VRAMLevers] free_otr_pipeline_residue
-   (BatchHumoRender inter-phase)` line and the `[BatchHumoRender]
-   PHASE-C-VRAM-PROBE` line. Confirm: (a) `free_otr_pipeline_residue` ran every
-   step (unload_llm, _unload_bark, unload_all_models, soft_empty_cache, cuda
-   flush) with no `steps_failed`; (b) the probe shows HuMo getting a clean VRAM
-   budget at Phase C entry; (c) the 1.7B HuMo phase renders near the bare-smoke
-   pace, not 140-279 s/it.
-3. If the probe confirms the ~14 GB residue is actually reclaimed: mark
-   BUG-LOCAL-265 fully verified in `BUG_LOG.md` and promote it to the Bug Bible
-   (Three-File Contract -- `BUG_BIBLE.yaml` + `README.md` + a regression test in
-   the survival-guide repo). If the residue persists (CUDA allocator holding
-   reserved blocks despite the unload): that is a separate follow-up VRAM fix,
-   and it only affects the 17B opt-in tier -- the 1.7B default is unaffected.
-4. (Optional, separate) operator A/B quality call: HuMo-1.7B 20-step output vs
-   14B -- `clip_00003_.mp4` vs `clip_00004_.mp4` in the
-   `output/old_time_radio/humo_test/` folder.
+1. **Operator runs the Gemma-4 / 90-word test episode.** In the ComfyUI UI, on node 1 (`OTR_LedgerScriptWriter`) set the `creative_writing_model` + `technical_model` dropdowns to a Gemma-4 model and `target_words` to 90, then run. This disambiguates whether Gemma-2-2b was the script-quality bottleneck or the problem is structural. BUG-267 fixed the colon-form label leak so the read is cleaner; the bare-"NAME " no-separator leak is still possible. Next session: tail `comfyui_8000.log`, then read the new episode ledger and assess script coherence.
+2. **Promote BUG-LOCAL-265 to the Bug Bible** via the Three-File Contract (`BUG_BIBLE.yaml` + `README.md` entry count + a regression test in the survival-guide repo `comfyui-custom-node-survival-guide`). It is operator-verified now. BUG-266 and BUG-267 are also `Bible candidate: yes` and verified -- promote all three in the same pass.
+3. **Resolve the parked roadmap decisions with the operator:** whether to roadmap a story-quality LLM critic pass (audit recommendation 1 -- offered, not yet answered); whether to run the per-clip-normalization round-robin consultation; the GBNF wire-or-delete call.
 
 ## Open questions
-- Does `free_otr_pipeline_residue` actually reclaim the ~14 GB residue, or does
-  the CUDA allocator hold reserved blocks after the unload? Only a real-episode
-  `PHASE-C-VRAM-PROBE` answers it. Relevant only to the 17B opt-in tier.
-- HuMo-1.7B lip-sync quality with real FLUX reference portraits (the smoke used a
-  generic test image) -- expected to improve, unverified.
-- BUG-LOCAL-264 (`news_interpreter` `NewsBriefs` schema overrun with gemma-2-2b)
-  remains open, unrelated to HuMo -- see BUG_LOG.
+- Is Gemma-2-2b the script-quality bottleneck, or is the problem structural (no story-quality gate)? The Gemma-4 90-word test is the disambiguator.
+- Should the story-quality LLM critic pass (audit doc recommendation 1) get its own roadmap track? Offered to the operator; undecided.
+- The bare-"NAME " no-separator label strip -- close it (accepting a small false-positive risk on a line that legitimately opens with the speaker's own name) or leave parked? Currently parked in ROADMAP SFX+CLEAN-LEDGER workstream 2.
 
 ---
 ## Resume instructions
 Open a fresh window, attach this file, and say:
-"Read this handoff file and prepare to execute the immediate next steps.
-Acknowledge when you're ready to start."
+"Read this handoff file and prepare to execute the immediate next steps. Acknowledge when you're ready to start."
