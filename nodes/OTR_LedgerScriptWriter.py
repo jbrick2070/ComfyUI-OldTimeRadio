@@ -1769,9 +1769,10 @@ class OTR_LedgerScriptWriter:
         #   Dialogue composer   -> creative
         #   Polish              -> creative (via for_polish)
         #   Title regen         -> creative
-        #   Style picker        -> creative (both passes; pick_style
-        #                          internally fires pass 1 + 2 through
-        #                          one fn).
+        #   Style picker        -> per-sub-pass (S32 B2): pass 1
+        #                          inventor -> creative, pass 2
+        #                          chooser -> technical; pick_style
+        #                          dispatches each pass internally.
         #   News interpreter    -> technical (GBNF + pydantic + V0-V3)
         #
         # slot-interleave: when news_interpreter runs after the style
@@ -1847,13 +1848,13 @@ class OTR_LedgerScriptWriter:
         # bypass this branch.
         if resolved["style_pending"]:
             picker_rng = _random.Random(int(seed))
-            # LLM slot: creative -- style picker pass 1 (inventor)
-            # recombines seed flavors creatively. Pass 2 (chooser)
-            # in the plan's routing table is technical, but pick_style
-            # currently dispatches both passes through one generate_fn;
-            # routing both to creative keeps the helper's contract
-            # intact in B2b. A future refactor can split pick_style
-            # to accept a separate chooser_generate_fn parameter.
+            # LLM slot: per-sub-pass -- style picker pass 1 (inventor)
+            # -> creative_fn (style invention is a narrative pass that
+            # recombines seed flavors creatively); pass 2 (chooser)
+            # -> technical_fn (index/grammar-checked short-output
+            # structured pass). This per-sub-pass routing landed in
+            # S32 B2 inside pick_style itself (nodes/_otr_style_picker.py);
+            # the writer no longer routes both passes through one fn.
             # S32 B1 paired-contract wiring: pass BOTH generators.
             # S32 B6: `helper_context` attributes all slot calls
             # inside the block to "pick_style" so per-helper /
@@ -2102,11 +2103,13 @@ class OTR_LedgerScriptWriter:
         # prompt routes via _otr_creative_prompt_router. At default
         # config (Mistral-Nemo) the resolver returns _SYSTEM_PROMPT
         # by object identity so audio C7 holds.
-        outline = _OTRO.generate_outline(
-            creative_generate_fn,
-            outline_req,
-            creative_repo_id=resolved["creative_writing_model"],
-        )
+        # Sprint 0 (v4 plan): helper_context attribution.
+        with slot_scheduler.helper_context("generate_outline"):
+            outline = _OTRO.generate_outline(
+                creative_generate_fn,
+                outline_req,
+                creative_repo_id=resolved["creative_writing_model"],
+            )
 
         # --- E. Word-budget integration check (WARN, do not fail) -----
         beat_word_sum = sum(b.target_words for b in outline.beats)
@@ -2699,11 +2702,13 @@ class OTR_LedgerScriptWriter:
             assembled_script = "\n\n".join(script_text_parts).strip()
             # LLM slot: creative -- title regen is narrative
             # (sample 1-4 candidates from the post-composition script).
-            regen_title = _generate_title_from_script(
-                creative_generate_fn,
-                assembled_script,
-                temperature=resolved["temperature"],
-            )
+            # Sprint 0 (v4 plan): helper_context attribution.
+            with slot_scheduler.helper_context("generate_title"):
+                regen_title = _generate_title_from_script(
+                    creative_generate_fn,
+                    assembled_script,
+                    temperature=resolved["temperature"],
+                )
             if regen_title:
                 final_title = regen_title
                 title_source = "llm_post_composition"
@@ -2950,11 +2955,13 @@ class OTR_LedgerScriptWriter:
         # pre-eviction call is needed; regression tests in C5a2 prove
         # the no-OOM property.
         # LLM slot: technical
-        _brief_delta = run_story_brief_reflection(
-            led,
-            technical_generate_fn,
-            technical_model_id=resolved["technical_model"],
-        )
+        # Sprint 0 (v4 plan): helper_context attribution.
+        with slot_scheduler.helper_context("story_brief_reflection"):
+            _brief_delta = run_story_brief_reflection(
+                led,
+                technical_generate_fn,
+                technical_model_id=resolved["technical_model"],
+            )
         meta.update(_brief_delta)
 
         # Sprint D D2b: stamp creative slot identity into meta so

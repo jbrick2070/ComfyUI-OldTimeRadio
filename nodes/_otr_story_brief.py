@@ -645,7 +645,7 @@ def run_story_brief_reflection(
         rejection_reasons = [REJECT_SCHEMA]
         try:
             repaired = _repair_pass(
-                failed_output=json_str,
+                failed_output=raw,
                 rejection_reasons=rejection_reasons,
                 technical_fn=technical_fn,
                 base_user_message=user_message,
