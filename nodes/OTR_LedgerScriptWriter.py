@@ -23,23 +23,34 @@ Pipeline (unchanged from v2.0 LPL):
     7. set_lines + speaker_role post-patch.
     8. Post-composition title regen (Jeffrey 2026-05-10): when the user
        left episode_title blank, ask the LLM to title the episode from
-       the FINAL assembled dialogue. The prompt sees ONLY the composed
-       dialogue -- not news_seed, not style, not outline metadata.
+       the FINAL assembled story material. The prompt sees ONLY the
+       composed dialogue excerpts + the outline premise -- not
+       news_seed, not style, not RSS metadata.
+
+       Sprint 3E (2026-05-25) -- scratchpad + late binding:
+        - Title generation is a forced scratchpad pass: the model
+          extracts 3 concrete physical details from the script,
+          drafts 3 candidate titles, then emits a final TITLE: line;
+          Python parses the title from the last TITLE: line. The
+          excerpt set spans the whole arc (opening / middle / ending
+          lines + premise) so the title is not titled off the
+          opening act alone.
+        - Late binding: the per-line composer in step 6 ran with the
+          literal `EPISODE_TITLE: TBD` in canon_header, so NO
+          provisional / outline title is ever spoken in dialogue.
+          Because the real title is bound late (after the script
+          exists), the fragile post-hoc verbatim string substitution
+          of the old title in spoken lines is removed entirely -- it
+          only ever caught verbatim quotes and let paraphrases slip
+          through, and with `TBD` in the header there is no old
+          title to substitute.
+
        User-typed title still wins; outline.title is the last-resort
        fallback if the LLM call fails or its output is rejected by the
        guardrails. canon.title is updated and episode_canon.json is
        written here (deferred from step 5 specifically for this).
-    8b. Spoken-title substitution: the per-line composer ran in step 6
-        with canon_header containing the outline TITLE, so the
-        announcer / character lines may have baked the OLD title into
-        spoken dialogue ("Tonight on: <outline.title>"). When the regen
-        produced a different final title, substitute case-insensitive
-        whole-phrase occurrences of the old title with the new title
-        across ledger.lines[].text AND script_text_parts. Stamps
-        meta.title_substitution for forensics.
     9. Stamp meta block (gen_params_initial, episode_title, title_source,
-       title_substitution, perfect_run_spacesaver, creativity,
-       optimization_profile).
+       perfect_run_spacesaver, creativity, optimization_profile).
    10. Save ledger.
 
 Output contract (UNCHANGED from prior v2.0):
@@ -748,23 +759,103 @@ def _build_truncating_generate_fn(
 # workflow. See the picker module for design rationale.
 
 
+def _build_title_excerpt_set(
+    assembled_script: str,
+    *,
+    head_lines: int = 6,
+    mid_lines: int = 6,
+    tail_lines: int = 6,
+) -> dict:
+    """Slice the assembled script into opening / middle / ending excerpts.
+
+    Sprint 3E (2026-05-25): the title pass used to receive one thin
+    head-of-script slice (`assembled_script[:3000]`), which on a long
+    episode is the opening act only -- the model titled the show off
+    the setup and never saw the climax or the ending. This helper
+    splits the script into three windows so the title prompt sees the
+    whole arc: how the episode opens, what happens in its middle, and
+    how it lands.
+
+    Splits on the blank-line-delimited token blocks produced by the
+    per-beat loop (each `[VOICE: ...]` / `[SFX: ...]` block is one
+    item joined by "\\n\\n"). Returns a dict with `opening_lines`,
+    `middle_lines`, `ending_lines` strings; empty strings when the
+    script is empty. Pure stdlib, never raises.
+    """
+    text = (assembled_script or "").strip()
+    if not text:
+        return {
+            "opening_lines": "",
+            "middle_lines":  "",
+            "ending_lines":  "",
+        }
+    blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+    n = len(blocks)
+    if n == 0:
+        return {
+            "opening_lines": "",
+            "middle_lines":  "",
+            "ending_lines":  "",
+        }
+    opening = blocks[:head_lines]
+    ending = blocks[-tail_lines:] if n > tail_lines else []
+    # Middle window centred on the script's midpoint, excluding any
+    # block already claimed by the opening or ending window so the
+    # three excerpts do not overlap on a short episode.
+    mid_center = n // 2
+    mid_start = max(0, mid_center - mid_lines // 2)
+    middle = blocks[mid_start:mid_start + mid_lines]
+    claimed = set(range(0, len(opening)))
+    if ending:
+        claimed |= set(range(n - len(ending), n))
+    middle = [
+        b for i, b in enumerate(blocks[mid_start:mid_start + mid_lines])
+        if (mid_start + i) not in claimed
+    ]
+    return {
+        "opening_lines": "\n".join(opening),
+        "middle_lines":  "\n".join(middle),
+        "ending_lines":  "\n".join(ending),
+    }
+
+
 def _generate_title_from_script(
     generate_fn,
     assembled_script: str,
     *,
     temperature: float = 0.85,
+    premise: str = "",
+    arc_verdict: str = "",
 ) -> str:
-    """Generate a 2-5 word episode title from the FINAL composed dialogue.
+    """Generate a 2-5 word episode title via a forced scratchpad pass.
 
     Per Jeffrey 2026-05-10: "title should generate only AFTER the whole
-    story is done via the LLM, nothing with the news seed". So the prompt
-    sees ONLY the assembled dialogue. No news_seed, no style hint, no
-    outline metadata. The intent is a title grounded purely in what the
-    listener will actually hear.
+    story is done via the LLM, nothing with the news seed". The prompt
+    sees ONLY the finished story material -- the assembled dialogue
+    excerpts plus the outline premise (which is the story spine the
+    listener experiences, not the news article). No news_seed, no style
+    hint, no RSS metadata.
 
-    Returns the cleaned title, or empty string on any failure (LLM raise,
-    stuck-default rejection, overlong leak, smart-quote-only wrappers
-    that strip to nothing). Caller falls back to outline.title on "".
+    Sprint 3E (2026-05-25): single-shot -> forced scratchpad. The model
+    must first extract 3 concrete physical details from the script,
+    draft 3 candidate titles, then emit a final `TITLE:` line. Python
+    parses the title from the LAST `TITLE:` line in the output. The
+    scratchpad makes the model ground the title in concrete imagery
+    rather than free-associating off the opening act. The whole
+    scratchpad + final `TITLE:` line is produced by ONE LLM call.
+
+    The excerpt set (opening / middle / ending lines, premise, and an
+    optional `arc_verdict`) is built by `_build_title_excerpt_set` +
+    passed in by the writer so the model titles the whole arc, not just
+    the head of the transcript. `arc_verdict` is optional -- the
+    Sprint 5B whole-script critic that emits it is not built yet, so
+    today the writer passes ""; the ARC block flips off cleanly when
+    empty.
+
+    Returns the cleaned title, or empty string on any failure (LLM
+    raise, no parseable `TITLE:` line, stuck-default rejection, overlong
+    leak, smart-quote-only wrappers that strip to nothing). Caller falls
+    back to outline.title on "".
 
     `generate_fn` matches the (messages, *, temperature, max_new_tokens)
     contract returned by `_build_truncating_generate_fn`.
@@ -779,25 +870,58 @@ def _generate_title_from_script(
     if not text:
         return ""
 
-    # Cap the dialogue excerpt. Title-generation only needs broad strokes
-    # of the story; full transcripts blow the context budget on long runs.
-    excerpt = text[:3000]
+    excerpts = _build_title_excerpt_set(text)
+    premise_str = (premise or "").strip()
+    arc_str = (arc_verdict or "").strip()
+
+    # Assemble the story-material block. Each window is capped so the
+    # combined prompt stays inside the composer token budget on long
+    # episodes; title generation only needs broad strokes per window.
+    parts: list[str] = []
+    if excerpts["opening_lines"]:
+        parts.append(
+            f"HOW IT OPENS:\n{excerpts['opening_lines'][:1200]}"
+        )
+    if excerpts["middle_lines"]:
+        parts.append(
+            f"THE MIDDLE:\n{excerpts['middle_lines'][:1200]}"
+        )
+    if excerpts["ending_lines"]:
+        parts.append(
+            f"HOW IT ENDS:\n{excerpts['ending_lines'][:1200]}"
+        )
+    if premise_str:
+        parts.append(f"PREMISE:\n{premise_str[:600]}")
+    if arc_str:
+        parts.append(f"ARC:\n{arc_str[:300]}")
+    story_block = "\n\n".join(parts)
 
     sys_msg = (
         "You are titling a single episode of a sci-fi radio drama. "
-        "You receive the final dialogue transcript and propose an "
-        "evocative 2-5 word episode title."
+        "You receive the finished story material and propose an "
+        "evocative 2-5 word episode title. You work on a scratchpad "
+        "first, then commit to a final answer."
     )
     user_msg = (
-        f"Final episode dialogue:\n{excerpt}\n\n"
-        "Write ONE evocative episode title in 2 to 5 words. The title must:\n"
-        " - draw from a vivid image, key object, character, or thematic "
-        "tension actually present in the dialogue\n"
+        f"{story_block}\n\n"
+        "Title this episode. Work through these steps in order:\n\n"
+        "DETAILS: list 3 concrete physical details actually present "
+        "in the story above -- a specific object, place, sound, or "
+        "image, one per line.\n"
+        "CANDIDATES: draft 3 candidate episode titles, each 2 to 5 "
+        "words, each drawing on one of those details, one per line.\n"
+        "TITLE: on the final line, write the single best title from "
+        "your candidates.\n\n"
+        "Rules for the final title:\n"
+        " - 2 to 5 words\n"
+        " - draw from a vivid image, key object, character, or "
+        "thematic tension actually present in the story\n"
         " - feel specific and memorable, not generic\n"
         " - avoid cliches like \"The Beginning\", \"Final Chapter\", "
         "\"Untitled\", or \"Episode X\"\n\n"
-        "Output ONLY the title text on a single line. No quotes. No "
-        "preamble. No explanation."
+        "Output the DETAILS, CANDIDATES, and TITLE sections. The final "
+        "line MUST begin with \"TITLE:\" followed by the chosen title "
+        "and nothing else."
     )
 
     clamped_temp = max(0.4, min(1.0, float(temperature)))
@@ -809,7 +933,10 @@ def _generate_title_from_script(
                 {"role": "user",   "content": user_msg},
             ],
             temperature=clamped_temp,
-            max_new_tokens=24,
+            # Scratchpad needs room for 3 details + 3 candidates + the
+            # final TITLE: line. 24 tokens (the pre-scratchpad budget)
+            # would truncate before the model ever reached TITLE:.
+            max_new_tokens=160,
         )
     except Exception as exc:  # noqa: BLE001
         log.warning(
@@ -822,21 +949,25 @@ def _generate_title_from_script(
     if not raw:
         return ""
 
-    # Take first non-empty line.
-    candidate = ""
-    for ln in raw.strip().splitlines():
-        ln = ln.strip()
-        if ln:
-            candidate = ln
-            break
-    if not candidate:
-        return ""
-
-    # Strip "Title:" / "**Title:**" / "TITLE:" wrappers.
-    candidate = re.sub(
-        r'^\s*(?:\*\*)?\s*(?:TITLE|Title|title)\s*:\s*(?:\*\*)?\s*',
-        '', candidate,
+    # Parse the title from the LAST line that begins with TITLE:. The
+    # scratchpad's CANDIDATES block does not use the TITLE: prefix, so
+    # the last TITLE: line is unambiguously the model's committed pick.
+    title_re = re.compile(
+        r'^\s*(?:\*\*)?\s*(?:TITLE|Title|title)\s*:\s*(?:\*\*)?\s*(.+?)\s*$'
     )
+    candidate = ""
+    for ln in raw.splitlines():
+        m = title_re.match(ln)
+        if m and m.group(1).strip():
+            candidate = m.group(1).strip()
+    if not candidate:
+        log.info(
+            "[OTR_LedgerScriptWriter] title scratchpad produced no "
+            "parseable TITLE: line; caller will fall back to "
+            "outline.title (raw head: %r)",
+            raw.strip()[:160],
+        )
+        return ""
 
     # Iteratively strip ASCII + smart quotes, asterisks, whitespace.
     _wrap_chars = '"“”‘’*\' \t'
@@ -877,46 +1008,11 @@ def _generate_title_from_script(
         candidate = candidate[:80].rstrip()
 
     log.info(
-        "[OTR_LedgerScriptWriter] title regen -> %r (from %d-char script)",
+        "[OTR_LedgerScriptWriter] title regen -> %r (scratchpad pass, "
+        "from %d-char script)",
         candidate, len(text),
     )
     return candidate
-
-
-_TITLE_SUB_MIN_LEN = 4
-"""Minimum length of old title to attempt substitution. Guards against
-false matches on tiny outline titles like "ICE" or "Sun" hitting
-unrelated dialogue words."""
-
-
-def _substitute_title_in_text(
-    text: str,
-    old_title: str,
-    new_title: str,
-) -> tuple[str, int]:
-    """Case-insensitive whole-phrase substitution of ``old_title`` with
-    ``new_title`` in ``text``. Returns ``(new_text, n_subs)``.
-
-    Whole-phrase: anchored with negative-lookbehind / negative-lookahead
-    on word characters so "Pulse" doesn't match "Pulsewave". Min-length
-    guard prevents short common-word titles from spuriously matching.
-    No-ops when old_title == new_title or either is empty.
-    """
-    import re as _re
-
-    if not text or not old_title or not new_title:
-        return (text or "", 0)
-    if old_title == new_title:
-        return (text, 0)
-    if len(old_title) < _TITLE_SUB_MIN_LEN:
-        return (text, 0)
-
-    patt = _re.compile(
-        r"(?<!\w)" + _re.escape(old_title) + r"(?!\w)",
-        flags=_re.IGNORECASE,
-    )
-    new_text, n_subs = patt.subn(new_title, text)
-    return (new_text, n_subs)
 
 
 def _resolve_creativity(creativity: str) -> tuple[float, float]:
@@ -2125,16 +2221,51 @@ class OTR_LedgerScriptWriter:
         # ever touches disk. Header rendering still happens here because
         # the per-line composer (section I) needs canon_header on every
         # beat.
+        #
+        # Sprint 3E (2026-05-25) -- LATE TITLE BINDING. The per-line
+        # composer in section I is given a canon_header whose title
+        # field is the literal `EPISODE_TITLE: TBD`, NOT a provisional
+        # outline / widget title. Reason: any title placed in the
+        # header can be baked verbatim into spoken dialogue by a beat
+        # whose intent is "open the show by naming the episode". The
+        # real title is not chosen until J.5 (after the script
+        # exists), so before that point there is no correct title to
+        # show -- `TBD` guarantees no provisional title is ever
+        # spoken. The old fix for this was a fragile post-hoc verbatim
+        # substitution in J.6; with `TBD` in the header there is
+        # nothing to substitute and J.6 is gone entirely.
+        #
+        # `canon` keeps the real title intent (resolved widget title
+        # else outline.title) so the J.5 disk write has a sane
+        # last-resort value if title regen fails; only the COMPOSITION
+        # header is forced to TBD.
         canon = _OTRC.episode_canon_from_outline_dict({
             "title":       resolved["episode_title"] or outline.title,
             "premise":     outline.premise,
             "setting":     outline.setting,
             "time_of_day": outline.time_of_day,
         })
-        canon_header = _OTRC.render_episode_canon_header(canon)
+        # Build the composition header from a TBD-titled canon so the
+        # composer never sees a real or provisional title. The canon
+        # module renders the title field as `TITLE: <value>`; swap
+        # that one line to the explicit `EPISODE_TITLE: TBD` literal
+        # the Sprint 3E plan specifies (and which downstream prompt
+        # readers can scan for unambiguously).
+        _tbd_canon = _OTRC.episode_canon_from_outline_dict({
+            "title":       "TBD",
+            "premise":     outline.premise,
+            "setting":     outline.setting,
+            "time_of_day": outline.time_of_day,
+        })
+        canon_header = _OTRC.render_episode_canon_header(_tbd_canon)
+        canon_header = canon_header.replace(
+            "TITLE: TBD", "EPISODE_TITLE: TBD", 1,
+        )
         log.info(
-            "[OTR_LedgerScriptWriter] episode_canon built (disk write "
-            "deferred to post-composition title regen)"
+            "[OTR_LedgerScriptWriter] episode_canon built; composition "
+            "header carries EPISODE_TITLE: TBD (late title binding, "
+            "Sprint 3E); disk write deferred to post-composition title "
+            "regen"
         )
 
         # --- H. Phase 2B (2026-05-11): pre-stamp skeleton ledger -------
@@ -2665,44 +2796,51 @@ class OTR_LedgerScriptWriter:
         )
         led.save()
 
-        # --- J.5. Post-composition title regen ------------------------
+        # --- J.5. Post-composition title regen (late binding) ---------
         # Per Jeffrey 2026-05-10: when the user leaves episode_title
-        # blank, regenerate the title from the FINAL composed dialogue
-        # via the LLM. The prompt does NOT see the news_seed -- the title
-        # is grounded purely in what the listener will hear. User-typed
+        # blank, regenerate the title from the FINAL story material via
+        # the LLM. The prompt does NOT see the news_seed -- the title is
+        # grounded purely in the finished episode. User-typed
         # episode_title still wins; LLM only fires on blank input;
         # outline.title is the last-resort fallback when the LLM call
         # fails or its output is rejected by the guardrails.
         #
-        # Why we capture old_title BEFORE deciding final_title:
-        # the per-line composer's canon_header included the outline title
-        # as the TITLE: field. If a beat's intent was "open the show by
-        # naming the episode" the LLM likely baked the OUTLINE title
-        # verbatim into the announcer/character spoken text. When the
-        # title regen produces a different final title, the audio
-        # consumers (Bark / Kokoro) would otherwise speak the old
-        # placeholder title at the top of the episode. So after regen
-        # we substitute the new title back into any line text that
-        # quoted the old one, before audio rendering runs downstream.
-        old_title_in_lines = (outline.title or "").strip()
-
+        # Sprint 3E (2026-05-25) -- scratchpad + late binding:
+        #  - The title is bound LATE, here, after the script exists.
+        #    The per-line composer (section I) ran with `EPISODE_TITLE:
+        #    TBD` in canon_header, so no provisional / outline title was
+        #    ever placed where a beat could speak it. There is no "old
+        #    title" baked into dialogue, so the fragile post-hoc
+        #    verbatim string substitution (the former section J.6) is
+        #    removed entirely -- it only caught verbatim quotes anyway
+        #    and let paraphrases slip through.
+        #  - `_generate_title_from_script` is now a forced-scratchpad
+        #    pass (3 physical details -> 3 candidate titles -> final
+        #    TITLE: line) reading the whole-arc excerpt set, not a thin
+        #    head-of-script slice. The writer passes the outline
+        #    premise as additional grounding (the story spine, not the
+        #    news article). `arc_verdict` is left "" -- the Sprint 5B
+        #    whole-script critic that would emit it is not built yet.
         title_source = "outline_fallback"
         if resolved["episode_title"]:
-            # User typed a value; respect it verbatim. The composer saw
-            # this same value in canon_header (section G), so no
-            # substitution is needed.
+            # User typed a value; respect it verbatim.
             final_title = resolved["episode_title"]
             title_source = "user"
         else:
             assembled_script = "\n\n".join(script_text_parts).strip()
-            # LLM slot: creative -- title regen is narrative
-            # (sample 1-4 candidates from the post-composition script).
+            # LLM slot: creative -- title regen is a narrative pass
+            # (scratchpad: extract physical details, draft candidates,
+            # commit a final title). One LLM call produces the whole
+            # scratchpad + the parsed TITLE: line. Routed through the
+            # writer's creative_writing_model slot; no widget.
             # Sprint 0 (v4 plan): helper_context attribution.
             with slot_scheduler.helper_context("generate_title"):
                 regen_title = _generate_title_from_script(
                     creative_generate_fn,
                     assembled_script,
                     temperature=resolved["temperature"],
+                    premise=outline.premise,
+                    arc_verdict="",
                 )
             if regen_title:
                 final_title = regen_title
@@ -2718,7 +2856,8 @@ class OTR_LedgerScriptWriter:
 
         # Update canon with the final title and write to disk. canon.title
         # is now what downstream video consumers (SignalLostVideo, episode
-        # canon readers) will see.
+        # canon readers) will see. No spoken-line patching is needed:
+        # late binding means dialogue never carried a provisional title.
         canon.title = final_title
         _OTRC.write_episode_canon(episode_root, canon)
         log.info(
@@ -2727,66 +2866,6 @@ class OTR_LedgerScriptWriter:
             final_title, title_source,
             episode_root / _OTRC.EPISODE_CANON_FILENAME,
         )
-
-        # --- J.6. Substitute regenerated title into spoken line text --
-        # When the title changed post-composition AND the composer baked
-        # the old (outline) title into any spoken line, swap to the new
-        # title so the announcer / characters actually say the
-        # regenerated title aloud. Helper enforces case-insensitive
-        # whole-phrase match + the _TITLE_SUB_MIN_LEN guard.
-        #
-        # Phase 2B (2026-05-11) -- the writer no longer accumulates
-        # `line_rows` in memory; all rows live on `led.data["lines"]`
-        # progressively. This loop must walk the ledger directly.
-        # Wiring-review #1 fix: replaced stale `for r in line_rows:`
-        # with `for r in led.data.get("lines", []) or []:` so the
-        # title-substitution branch no longer NameError's the moment
-        # the LLM regenerates a different title.
-        _title_sub_meta = None
-        if (
-            final_title
-            and old_title_in_lines
-            and final_title != old_title_in_lines
-        ):
-            n_lines_patched = 0
-            n_subs_total = 0
-            for r in led.data.get("lines", []) or []:
-                new_text, n_subs = _substitute_title_in_text(
-                    r.get("text", "") or "",
-                    old_title_in_lines,
-                    final_title,
-                )
-                if n_subs > 0:
-                    _OTRL.patch_line_text(
-                        led.data, r.get("line_id"), new_text,
-                    )
-                    n_lines_patched += 1
-                    n_subs_total += n_subs
-            # Mirror substitutions into script_text_parts so the slot-0
-            # STRING output and the script_text_parts join stay
-            # consistent with the patched ledger.
-            for idx, part in enumerate(script_text_parts):
-                new_part, _ = _substitute_title_in_text(
-                    part, old_title_in_lines, final_title,
-                )
-                script_text_parts[idx] = new_part
-            if n_lines_patched > 0:
-                log.info(
-                    "[OTR_LedgerScriptWriter] title substitution: "
-                    "replaced %d occurrence(s) of %r with %r across "
-                    "%d line(s)",
-                    n_subs_total, old_title_in_lines, final_title,
-                    n_lines_patched,
-                )
-            # Always stamp the meta record when we attempted substitution
-            # (even with 0 matches) so audits can tell "no occurrences
-            # found" from "no regen happened at all".
-            _title_sub_meta = {
-                "old_title":         old_title_in_lines,
-                "new_title":         final_title,
-                "lines_patched":     n_lines_patched,
-                "substitutions":     n_subs_total,
-            }
 
         # --- K. Stamp meta block --------------------------------------
         # Stamps the run parameters into meta.gen_params_initial for
@@ -2881,8 +2960,11 @@ class OTR_LedgerScriptWriter:
         # LLM-regenerated runs without inspecting widget state.
         meta["episode_title"] = final_title
         meta["title_source"] = title_source
-        if _title_sub_meta is not None:
-            meta["title_substitution"] = _title_sub_meta
+        # Sprint 3E (2026-05-25): meta.title_substitution is retired.
+        # Late title binding means dialogue never carried a provisional
+        # title, so there is no post-hoc substitution to record. The
+        # former J.6 verbatim-substitution block and its title-swap
+        # helper were both removed in this sprint.
         if resolved["perfect_run_spacesaver"]:
             meta["perfect_run_spacesaver"] = True
 
@@ -2990,11 +3072,14 @@ class OTR_LedgerScriptWriter:
         # --- L. Assemble return values --------------------------------
         # Tier 1 fix #2 (2026-05-11): derive final script_text from the
         # CANONICAL ledger rows, not from the in-flight script_text_parts
-        # list. Post-loop mutations (news_close_brief announcer override
-        # in I.5, title substitution in J.6) write to led.data["lines"]
-        # but were not always mirrored back into script_text_parts. The
+        # list. Post-loop mutations (the news_close_brief announcer
+        # override in I.5) write to led.data["lines"] but were not
+        # always mirrored back into script_text_parts. The
         # script_text_parts list is now diagnostic-only; the ledger is
         # the source of truth for the slot-0 STRING output.
+        # Sprint 3E (2026-05-25): the former J.6 post-hoc title
+        # substitution -- another such ledger-only mutation -- is gone
+        # (late title binding means no provisional title in dialogue).
         script_text = _PL.assemble_script_text_from_ledger(led.data)
         script_json = json.dumps(led.data, indent=2, ensure_ascii=False)
         news_json = _build_news_payload(
@@ -3334,7 +3419,7 @@ if __name__ == "__main__":
         failures.append(("7/9 _otr_style_picker integration smoke", traceback.format_exc()))
         print("[7/9] FAIL: _otr_style_picker integration smoke")
 
-    # 8. _generate_title_from_script post-composition title regen.
+    # 8. _generate_title_from_script -- Sprint 3E scratchpad title pass.
     try:
         SAMPLE_SCRIPT = (
             "[VOICE: ANNOUNCER, neutral] Tonight, on Tales From Beyond.\n\n"
@@ -3343,6 +3428,14 @@ if __name__ == "__main__":
             "decommissioned six years ago.\n\n"
             "[SFX: low rumble of static]"
         )
+
+        # The scratchpad pass parses the title from the LAST line that
+        # begins with "TITLE:". Helper for canned scratchpad output.
+        def _scratch(details, candidates, final):
+            body = "DETAILS:\n" + "\n".join(details)
+            body += "\nCANDIDATES:\n" + "\n".join(candidates)
+            body += f"\nTITLE: {final}"
+            return body
 
         # 8a. Empty script -> "" (no LLM call attempted).
         def _trap(*a, **kw):
@@ -3355,38 +3448,57 @@ if __name__ == "__main__":
             raise RuntimeError("LLM offline")
         assert _generate_title_from_script(_raises, SAMPLE_SCRIPT) == ""
 
-        # 8c. Clean 3-word title -> verbatim.
+        # 8c. Scratchpad with a clean final TITLE: line -> parsed title.
         def _clean(*a, **kw):
-            return "The Echo Below"
-        assert _generate_title_from_script(_clean, SAMPLE_SCRIPT) == "The Echo Below"
+            return _scratch(
+                ["a decommissioned dish", "a repeating signal", "static"],
+                ["The Echo Below", "Repeating Static", "Dead Dish Signal"],
+                "The Echo Below",
+            )
+        assert _generate_title_from_script(_clean, SAMPLE_SCRIPT) == \
+            "The Echo Below"
 
-        # 8d. Wrapped "**Title:** \"Pulse\"" -> "Pulse".
+        # 8d. Last TITLE: line wins; markdown / quote wrappers stripped.
         def _wrapped(*a, **kw):
-            return '**Title:** "Pulse"'
+            return (
+                "DETAILS:\n- a dish\n- a signal\n- static\n"
+                "CANDIDATES:\nThe Dish\nThe Signal\nPulse\n"
+                '**TITLE:** "Pulse"'
+            )
         assert _generate_title_from_script(_wrapped, SAMPLE_SCRIPT) == "Pulse"
 
-        # 8e. Smart quotes -> stripped.
+        # 8e. Smart-quote wrappers on the final title stripped.
         def _smart(*a, **kw):
-            return "“Agri-Crash”"
-        assert _generate_title_from_script(_smart, SAMPLE_SCRIPT) == "Agri-Crash"
+            return _scratch(
+                ["crop", "crash", "field"],
+                ["Agri-Crash", "Crop Failure", "The Field"],
+                "“Agri-Crash”",
+            )
+        assert _generate_title_from_script(_smart, SAMPLE_SCRIPT) == \
+            "Agri-Crash"
 
-        # 8f. Multi-line: only first non-empty line, drop explanation.
-        def _explain(*a, **kw):
-            return "Pulse Out\n\nThis title evokes the magnetic pulse."
-        assert _generate_title_from_script(_explain, SAMPLE_SCRIPT) == "Pulse Out"
+        # 8f. No parseable TITLE: line -> "" (caller falls back).
+        def _no_title(*a, **kw):
+            return (
+                "DETAILS:\n- a dish\n- a signal\n- static\n"
+                "CANDIDATES:\nThe Dish\nThe Signal\nPulse\n"
+                "I could not decide on a single title."
+            )
+        assert _generate_title_from_script(_no_title, SAMPLE_SCRIPT) == ""
 
-        # 8g. Stuck defaults rejected.
+        # 8g. Stuck defaults rejected even when emitted on a TITLE: line.
         for stuck in ("Untitled", "Signal Lost", "Episode", "the last frequency"):
-            def _stuck(*a, **kw):
-                return stuck
+            def _stuck(*a, _s=stuck, **kw):
+                return _scratch(["a", "b", "c"], ["x", "y", "z"], _s)
             assert _generate_title_from_script(_stuck, SAMPLE_SCRIPT) == "", \
                 f"stuck default {stuck!r} should be rejected"
 
-        # 8h. Full-sentence leak (>10 words) rejected.
+        # 8h. Full-sentence leak on the TITLE: line (>10 words) rejected.
         def _leak(*a, **kw):
-            return (
+            return _scratch(
+                ["a", "b", "c"], ["x", "y", "z"],
                 "Here is a title that the model leaked as a complete "
-                "English sentence well over ten words long indeed"
+                "English sentence well over ten words long indeed",
             )
         assert _generate_title_from_script(_leak, SAMPLE_SCRIPT) == ""
 
@@ -3395,121 +3507,127 @@ if __name__ == "__main__":
             return ""
         assert _generate_title_from_script(_empty, SAMPLE_SCRIPT) == ""
 
-        # 8j. 80+ char title gets truncated to 80.
+        # 8j. 80+ char title on the TITLE: line gets truncated to 80.
         def _long(*a, **kw):
-            return "X" * 90 + " A Title"
+            return _scratch(
+                ["a", "b", "c"], ["x", "y", "z"], "X" * 90 + " A Title",
+            )
         result_long = _generate_title_from_script(_long, SAMPLE_SCRIPT)
-        # The full output is "XXX..." (~98 chars, 2 words). Words count
-        # <= 10 so it passes the overlong-sentence gate; length cap then
-        # trims to 80.
-        assert len(result_long) <= 80, f"title truncation failed: len={len(result_long)}"
+        assert len(result_long) <= 80, \
+            f"title truncation failed: len={len(result_long)}"
 
-        # 8k. Trailing punctuation stripped.
+        # 8k. Trailing punctuation on the TITLE: line stripped.
         def _punct(*a, **kw):
-            return "Final Frequency."
-        assert _generate_title_from_script(_punct, SAMPLE_SCRIPT) == "Final Frequency"
+            return _scratch(
+                ["a", "b", "c"],
+                ["Final Frequency", "Dead Air", "Last Signal"],
+                "Final Frequency.",
+            )
+        assert _generate_title_from_script(_punct, SAMPLE_SCRIPT) == \
+            "Final Frequency"
 
-        # 8l. News seed must NOT be in the prompt the helper builds.
-        # We capture what generate_fn receives and assert news_seed-like
-        # tokens never appear. This is the Jeffrey 2026-05-10 contract.
+        # 8l. News seed must NOT be in the prompt the helper builds, and
+        # the prompt MUST drive a scratchpad (DETAILS / CANDIDATES /
+        # TITLE). The premise IS passed through (story spine, not the
+        # news article) so it is allowed to appear.
         captured: dict = {}
         def _capture(messages, **kw):
             captured["messages"] = messages
-            return "Clean Title"
-        _generate_title_from_script(_capture, SAMPLE_SCRIPT)
+            captured["kw"] = kw
+            return _scratch(["a", "b", "c"], ["x", "y", "z"], "Clean Title")
+        out_title = _generate_title_from_script(
+            _capture, SAMPLE_SCRIPT, premise="A lonely dish hears itself.",
+        )
+        assert out_title == "Clean Title", out_title
         full_prompt_text = " ".join(
             m.get("content", "") for m in captured["messages"]
         )
-        # The sample script DOES appear (that's the whole point); but
-        # nothing news-seed-flavored should leak. Assert the system msg
-        # and user msg do not mention "news", "headline", "article",
-        # "RSS", or the word "seed".
-        for forbidden in ("news", "headline", "article", "RSS", "seed"):
+        # Nothing news-seed-flavored should leak.
+        for forbidden in ("news", "headline", "article", "RSS"):
             assert forbidden.lower() not in full_prompt_text.lower(), (
                 f"title-regen prompt leaked forbidden token {forbidden!r}: "
                 f"{full_prompt_text[:200]}..."
             )
+        # The scratchpad must be forced.
+        for required in ("DETAILS", "CANDIDATES", "TITLE:"):
+            assert required in full_prompt_text, (
+                f"title-regen prompt missing scratchpad marker {required!r}"
+            )
+        # Scratchpad needs a real token budget, not the old 24.
+        assert captured["kw"].get("max_new_tokens", 0) >= 100, (
+            "scratchpad pass must request enough tokens to reach the "
+            f"final TITLE: line; got {captured['kw'].get('max_new_tokens')}"
+        )
 
-        print("[8/9] PASS: _generate_title_from_script (12 paths + news-seed-free contract)")
+        print("[8/9] PASS: _generate_title_from_script (Sprint 3E scratchpad)")
     except Exception:
         failures.append(("8/9 _generate_title_from_script", traceback.format_exc()))
         print("[8/9] FAIL: _generate_title_from_script")
 
-    # 9. _substitute_title_in_text — spoken-title swap for J.6.
+    # 9. _build_title_excerpt_set + Sprint 3E late-binding source check.
     try:
-        # 9a. Exact whole-phrase swap.
-        out, n = _substitute_title_in_text(
-            "Tonight on Tales From Beyond: The Echo Below. Listen close.",
-            "The Echo Below", "Pulse Out",
+        # 9a. Empty / blank script -> all-empty excerpt dict.
+        for blank in ("", "   \n\n  "):
+            ex = _build_title_excerpt_set(blank)
+            assert ex == {
+                "opening_lines": "", "middle_lines": "", "ending_lines": "",
+            }, f"blank script excerpt drift: {ex!r}"
+
+        # 9b. Long script: opening / middle / ending windows are non-empty
+        # and do not overlap on the head / tail blocks.
+        blocks = [f"[VOICE: C, neutral] line {i}" for i in range(40)]
+        long_script = "\n\n".join(blocks)
+        ex = _build_title_excerpt_set(long_script)
+        assert ex["opening_lines"], "opening window empty on long script"
+        assert ex["middle_lines"], "middle window empty on long script"
+        assert ex["ending_lines"], "ending window empty on long script"
+        # The opening window must contain block 0; the ending window the
+        # last block; the title pass therefore sees the whole arc.
+        assert "line 0" in ex["opening_lines"]
+        assert "line 39" in ex["ending_lines"]
+        # Whole-arc proof: the ending excerpt carries content the old
+        # head-only [:3000] slice would have missed -- on a 40-line
+        # script the tail blocks are far past any short head slice.
+        assert "line 39" not in ex["opening_lines"], (
+            "ending content leaked into opening window"
         )
-        assert out == "Tonight on Tales From Beyond: Pulse Out. Listen close.", out
-        assert n == 1
 
-        # 9b. Case-insensitive match preserves new-title casing.
-        out, n = _substitute_title_in_text(
-            "the echo below is closing.", "The Echo Below", "Pulse Out",
+        # 9c. Short script: windows still resolve, no crash, no overlap
+        # explosion (ending excluded when fewer blocks than tail window).
+        short = "\n\n".join(blocks[:3])
+        ex = _build_title_excerpt_set(short)
+        assert ex["opening_lines"], "short script opening empty"
+
+        # 9d. Sprint 3E source contract: the writer uses the literal
+        # EPISODE_TITLE: TBD in the composition header, and the fragile
+        # post-hoc verbatim substitution is gone.
+        from pathlib import Path as _P
+        _writer_src = _P(__file__).read_text(encoding="utf-8")
+        assert "EPISODE_TITLE: TBD" in _writer_src, (
+            "composition header must carry the EPISODE_TITLE: TBD literal"
         )
-        assert out == "Pulse Out is closing.", out
-        assert n == 1
-
-        # 9c. Multiple occurrences in one string.
-        out, n = _substitute_title_in_text(
-            "The Echo Below opens. Stay with us for The Echo Below.",
-            "The Echo Below", "Pulse Out",
+        # Needles assembled from fragments so the assertion strings
+        # themselves do not count as occurrences in the writer source.
+        _sub_helper_def = "def _substitute" + "_title_in_text"
+        assert _sub_helper_def not in _writer_src, (
+            "post-hoc verbatim title substitution helper must be removed"
         )
-        assert n == 2
-        assert "The Echo Below" not in out
-
-        # 9d. Whole-phrase boundary: substring inside a longer word stays put.
-        out, n = _substitute_title_in_text(
-            "Pulseware engineering at the Pulse station.",
-            "Pulse", "Surge",
+        _sub_min_guard = "_TITLE_SUB" + "_MIN_LEN"
+        assert _sub_min_guard not in _writer_src, (
+            "the title-substitution min-length guard must be removed"
         )
-        # Min-length guard kicks in here (len("Pulse")=5 >= 4), and the
-        # word-boundary regex must NOT replace "Pulse" inside "Pulseware".
-        assert "Pulseware" in out, f"word-boundary broken: {out!r}"
-        assert "Surge station" in out, f"standalone word missed: {out!r}"
-        assert n == 1
-
-        # 9e. Min-length guard rejects too-short titles.
-        out, n = _substitute_title_in_text(
-            "ICE forms on the dome.", "ICE", "GLASS",
+        _j6_header = "--- J." + "6."
+        assert _j6_header not in _writer_src, (
+            "the post-hoc title-substitution section header must be removed"
         )
-        assert n == 0, f"min-length guard failed: out={out!r} n={n}"
-        assert out == "ICE forms on the dome."
+        # The scratchpad helper must exist and be wired into the title
+        # call as the whole-arc excerpt source.
+        assert "_build_title_excerpt_set" in _writer_src
 
-        # 9f. Same-title no-op (saves regex compile).
-        out, n = _substitute_title_in_text(
-            "The Echo Below.", "The Echo Below", "The Echo Below",
-        )
-        assert out == "The Echo Below."
-        assert n == 0
-
-        # 9g. Empty inputs return safely.
-        assert _substitute_title_in_text("", "old", "new") == ("", 0)
-        assert _substitute_title_in_text("text", "", "new") == ("text", 0)
-        assert _substitute_title_in_text("text", "old", "") == ("text", 0)
-
-        # 9h. Regex-special chars in old title are escaped.
-        out, n = _substitute_title_in_text(
-            "Tonight: The Frequency (Lost). End.",
-            "The Frequency (Lost)", "Pulse",
-        )
-        assert "Pulse" in out and "(Lost)" not in out, out
-        assert n == 1
-
-        # 9i. No match (title not present) returns text unchanged.
-        out, n = _substitute_title_in_text(
-            "Nothing to see here, move along.",
-            "The Echo Below", "Pulse Out",
-        )
-        assert out == "Nothing to see here, move along."
-        assert n == 0
-
-        print("[9/9] PASS: _substitute_title_in_text (9 paths)")
+        print("[9/9] PASS: _build_title_excerpt_set + late-binding source check")
     except Exception:
-        failures.append(("9/9 _substitute_title_in_text", traceback.format_exc()))
-        print("[9/9] FAIL: _substitute_title_in_text")
+        failures.append(("9/9 _build_title_excerpt_set", traceback.format_exc()))
+        print("[9/9] FAIL: _build_title_excerpt_set")
 
     # Summary.
     if not failures:
