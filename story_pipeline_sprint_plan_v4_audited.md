@@ -72,8 +72,8 @@
 | 3C -- split Script Doctor | NOT STARTED | -- | -- |
 | 3D -- split Casting | NOT STARTED | -- | -- |
 | 3E -- title scratchpad | NOT STARTED | -- | -- |
-| 3F -- cast auditor confidence | NOT STARTED | -- | -- |
-| 3G -- reflection sanitize | NOT STARTED | -- | -- |
+| 3F -- cast auditor confidence | COMPLETE | -- | `e14d364` -- `confidence` field removed from `CastViolation`; `apply_deterministic_cast_repairs` resolves via exact case-fold / Levenshtein (`_resolve_cast_member` reuses `auto_remap_phantom`), ambiguous ties escalate |
+| 3G -- reflection sanitize | COMPLETE | -- | `088aba1` -- `_build_reflection_input` pre-sanitizes cast names + proper nouns to neutral tokens; `_REFLECTION_PROMPT` suppression list trimmed; output reject-list safety net untouched |
 | 4 -- VRAM hardening | NOT STARTED | -- | VRAM gate already exists -- verify only |
 | 5 -- continuity + critic + reroll | NOT STARTED | -- | -- |
 | 6 -- critic->render coupling | NOT STARTED | -- | ships with Sprint 5 |
@@ -446,3 +446,15 @@ gbnf_enforcement: removed                             # 2026-05-25: deleted -- l
 - **Regression:** sweep CLI 20/20 tagged, 0 parse failures, exit 0; `test_llm_slot_sweep` 6 passed; full OTR suite 2662 passed / 21 skipped (baseline 2660; +2 = the new hardening tests); Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed across every suite.
 - **New bug ids:** none.
 - **Sprint state:** Sprints 0, 1, 2A-2E all COMPLETE. Remaining: Sprints 3A-3G, 4, 5, 6.
+
+### 2026-05-25 -- Sprints 3F + 3G (parallel subagents)
+
+- Commits `e14d364` (3F -- 2 files, +446/-55) and `088aba1` (3G -- 2 files, +481/-19) on `v2.0-alpha`. Predecessor HEAD `bdb2333`.
+- Built with **two parallel subagents on disjoint file sets** -- 3F on `nodes/_otr_ledger_reviewer.py` + `tests/test_phase3_ledger_reviewer.py`; 3G on `nodes/_otr_story_brief.py` + `tests/test_story_brief_c5a1.py`. Zero file overlap. Neither subagent committed; the lead ran the authoritative combined-tree regression and committed each sprint separately.
+- **Sprint 3F COMPLETE.** Removed the `confidence: float` field from `CastViolation` -- small models cannot reliably distinguish 0.7/0.8 or 0.8/0.9, so the auditor's self-score was noise driving a real gate. The auditor now does pure anomaly extraction (`found` / `expected` / `kind`); `_AUDITOR_SYSTEM_PROMPT` dropped all confidence instructions. New `_resolve_cast_member` resolves the auditor's `expected` deterministically -- exact case-fold match first (returns the canonical roster spelling), then the EXISTING `auto_remap_phantom` / `_levenshtein` (threshold 3); ambiguous ties return `None`. No second Levenshtein. `apply_deterministic_cast_repairs` -- `bad_casing` / `wrong_char_id` / `alias_used` no longer gate on confidence; each applies the repair only on a unique resolution and escalates an unresolved or ambiguous-tie row to the Script Doctor. `role_mismatch` keeps its allowed-role enum check. The never-raises contract + `# LLM slot: technical` tag preserved.
+- **Sprint 3G COMPLETE.** `_build_reflection_input` now runs a deterministic strip BEFORE the LLM sees the text -- every cast-name surface form maps to a neutral `character_*` token (all forms of one character collapse onto one token); proper nouns map to `source_entity_*` tokens; the mapping is stable within one call. The proper-noun sweep is conservative (multi-word Title Case always; lone capitalized words only mid-sentence) so descriptive prose keeps its visual signal. `_REFLECTION_PROMPT` -- the now-redundant "No cast names. No proper nouns." line collapses to a concise positive "use no names" instruction; the dialogue/plot-verb + invented-period guidance stays. The OUTPUT safety net (`_validate_brief` reject lists) is untouched and proven still live by new tests.
+- No node `INPUT_TYPES` / widget / socket changed in either sprint -- both touch internal helpers / a pure module -- so no workflow JSON re-wire (Prime Directive 3 N/A). No LLM call added or removed (Prime Directive 6 N/A).
+- **Regression (authoritative combined-tree run by the lead):** full OTR suite 2692 passed / 21 skipped (2713 collected; +30 vs the 2662 baseline = the new 3F+3G tests); Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green; LLM-slot sweep 6 passed. 0 failed.
+- **New bug ids:** none.
+- **Minor follow-up nit (not blocking):** 3G's `_PROPER_NOUN_STOPWORDS` frozenset lists `"interior"` twice -- harmless (set dedupes), cosmetic cleanup only.
+- **Sprint state:** Sprints 0, 1, 2A-2E, 3F, 3G COMPLETE. Remaining: 3A (compose_line rewrite -- 2-3 days), 3B/3C/3D/3E (node-surface refactors, operator-gated -- need a live ComfyUI episode run to validate), 4 (VRAM -- live-hardware-gated), 5, 6.
