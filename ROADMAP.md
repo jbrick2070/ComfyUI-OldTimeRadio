@@ -55,6 +55,22 @@ A batch of audio-quality work, parked to be tackled together rather than pieceme
 
 ---
 
+## SFX + CLEAN-LEDGER TRACK — dedicated LLM passes per content type (Jeffrey, 2026-05-24)
+
+Principle: every content type — dialogue, announcer, music, SFX — belongs in its own cleanly-typed ledger rows/fields, never blended into another type's `text`. Surfaced by the 2026-05-24 `signal_lost_ozempics_glitch` run, whose ledger showed two separation failures.
+
+**Evidence (ozempics_glitch ledger):**
+- Speaker labels leaked into dialogue `text` AND `text_for_tts` — b002 = `"HAYES VANCE: I'm worried about what this could mean."`, b004 = `"HAYES VANCE not right."`. `text_for_tts` is `_clean_text_for_bark(text)`, which does not strip a speaker prefix, so Bark voiced the character's name aloud before each line.
+- SFX has no generation path. The outline schema's `sfx_cue` field is the legacy "Optional [SFX:] hint for the surrounding line" design (a hint *attached to a beat*, max 80 chars) — and every beat-construction site in `_otr_outline.py` hardcodes `sfx_cue=None`. SFX cues are not generated today; the only design on the books is the mixed-into-a-line one.
+
+**Workstream 1 — SFX dedicated LLM pass [feature; round-robin gated].** Generate SFX cues in a dedicated `technical_model`-slot pass that runs after the script is composed, reads it as context, and emits clean `speaker_role="sfx"` ledger rows — the row type `batch_procedural_sfx` / `batch_audiogen` already consume via `roles={"sfx"}`. Retire the `sfx_cue`-on-a-beat field. Mirrors the announcer dedicated-pass pattern (`compose_announcer_intro` / `compose_announcer_outro`). New LLM call → Prime Directive 6 applies (tag `# LLM slot: technical`, wire the model id from the writer broadcast, update the routing table). Pairs with the Stable Audio 3 SFX cue→audio decision — cue generation + cue→audio model are the two halves of the full SFX feature; batch them.
+
+**Workstream 2 — speaker-label hygiene [bug; not gated].** Dialogue `text` / `text_for_tts` must never carry the speaker name — the speaker is already in `char_id` + `speaker_role`. Add a strip pass at the composer that detects and removes a leading `"SPEAKER:"` / `"SPEAKER "` prefix before the line is committed. Mechanical text hygiene, not a new LLM call. It contaminates every run — including any model A/B test — so it should land before the next clean test pass.
+
+**Status:** PARKED. Workstream 2 is a small fix worth doing before the Gemma-4 test run (otherwise the leaked labels pollute the result). Workstream 1 is feature work — batch it with the Stable Audio 3 SFX work.
+
+---
+
 **Sprint planning surface:** `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` -- consolidated tier-organized view of every outstanding item across all batches with suggested S25+ sprint packaging. Update on every batch close.
 
 **Batch QA docs:**
