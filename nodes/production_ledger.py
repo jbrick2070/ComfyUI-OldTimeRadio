@@ -713,6 +713,27 @@ class Ledger:
             sfx_cue = _safe_str(_g("sfx_cue"))
             intent = _safe_str(_g("intent"))
             arc_phase = _safe_str(_g("arc_phase"))
+            # Script Doctor row fields (Sprint 3E, 2026-05-25): persist
+            # the owning beat's narrative `intent` and Python-allocated
+            # per-beat `target_words` on each line record so the
+            # downstream Script Doctor cleanup pass receives the full
+            # 7-field row. Both ride on the validated outline Beat
+            # objects (`intent` Field + `target_words` Field; the
+            # latter is stamped by the outline combiner's
+            # `_allocate_phase_target_words` allocation). A genuinely
+            # absent value stays None rather than being fabricated.
+            _beat_intent_raw = _g("intent", None)
+            beat_intent = (
+                _safe_str(_beat_intent_raw) or None
+                if _beat_intent_raw is not None
+                else None
+            )
+            _target_words_raw = _g("target_words", None)
+            target_words = (
+                _safe_int(_target_words_raw)
+                if _target_words_raw is not None
+                else None
+            )
             if role == "character":
                 cid = char_id_by_name.get(speaker, "")
             elif role == "announcer":
@@ -740,6 +761,12 @@ class Ledger:
                 "speaker_role":  role,
                 "arc_phase":     arc_phase or None,
                 "compose_flags": [],
+                # Script Doctor row fields (Sprint 3E): the owning
+                # beat's narrative intent + Python-allocated per-beat
+                # target word count. None when the source beat does
+                # not carry the value.
+                "beat_intent":   beat_intent,
+                "target_words":  target_words,
             })
         self.data["lines"] = rows
         self._recompute_totals()
@@ -789,6 +816,19 @@ class Ledger:
         rows: List[Dict[str, Any]] = []
         for r in line_rows or []:
             text = _safe_str(r.get("text"))
+            # Script Doctor row fields (Sprint 3E, 2026-05-25): keep the
+            # lines[] schema uniform with init_lines_from_outline. Pre-
+            # Phase-2B callers that supply these keys have them
+            # preserved; callers that omit them store None rather than
+            # a fabricated value.
+            _bi_raw = r.get("beat_intent")
+            beat_intent = (
+                _safe_str(_bi_raw) or None if _bi_raw is not None else None
+            )
+            _tw_raw = r.get("target_words")
+            target_words = (
+                _safe_int(_tw_raw) if _tw_raw is not None else None
+            )
             rows.append({
                 "line_id":        _safe_str(r.get("line_id")),
                 "shot_id":        _safe_str(r.get("shot_id")) or None,
@@ -802,6 +842,8 @@ class Ledger:
                 "bark_wav_path":  _safe_str(r.get("bark_wav_path")) or None,
                 "start_s":        _safe_float(r.get("start_s")),
                 "dur_s":          _safe_float(r.get("dur_s")),
+                "beat_intent":    beat_intent,
+                "target_words":   target_words,
             })
         self.data["lines"] = rows
         self._recompute_totals()
