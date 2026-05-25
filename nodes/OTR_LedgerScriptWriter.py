@@ -1035,6 +1035,29 @@ def _resolve_target_words(target_words) -> int:
     return max(5, int(target_words))
 
 
+def _resolve_cast_rng_seed() -> tuple[int, str]:
+    """Return (seed, source) for the per-episode cast RNG.
+
+    BUG-LOCAL-269: the cast is no longer pinned by the `seed` widget.
+    A fixed `seed` reproduced ONE cast forever -- every episode opened
+    with the identical characters (seed 42 always rolled HAYES VANCE /
+    GULLIVER REEVES / JIMBO BLACK). Production now draws a fresh
+    OS-entropy seed each episode so the cast genuinely varies.
+
+    The OTR_CAST_SEED environment variable forces a fixed seed -- used
+    by the C7 audio byte-identity regression, which needs a
+    reproducible cast. Set it in ComfyUI's environment before a
+    baseline-capture or regression run. This mirrors BUG-LOCAL-260's
+    LEMMY decoupling: random in production, explicit force path for C7.
+    """
+    import os
+    import random
+    env = os.environ.get("OTR_CAST_SEED", "").strip()
+    if env:
+        return int(env), "OTR_CAST_SEED override"
+    return random.SystemRandom().getrandbits(32), "OS entropy"
+
+
 def _fetch_rss_seed_or_die(style: str, model_id: str) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
 
@@ -1463,21 +1486,22 @@ class OTR_LedgerScriptWriter:
                 "seed": ("INT", {
                     "default": 42, "min": 0, "max": 2**32 - 1, "step": 1,
                     "tooltip": (
-                        "Random seed for the C7 byte-identity contract. "
-                        "Drives cast lock RNG (announcer voice + open-"
-                        "character name rolls), style picker (two-pass "
-                        "inventor + chooser samples), and the reviewer's "
-                        "seed_for_reviewer derivation. LEMMY's 11% cameo "
-                        "roll is NOT seed-driven -- it uses OS entropy; "
-                        "use the lemmy_cameo widget to force it.\n\n"
-                        "Default is 42 (cosmetic; replaces the previous "
-                        "default of 0). When the ComfyUI 'shuffle' icon "
+                        "Random seed for the style picker (two-pass "
+                        "inventor + chooser samples) and the reviewer's "
+                        "seed_for_reviewer derivation. The CAST -- "
+                        "character names + announcer voice -- is NOT "
+                        "seed-driven: it is randomized fresh every "
+                        "episode from OS entropy (BUG-LOCAL-269). Set "
+                        "the OTR_CAST_SEED environment variable to force "
+                        "a fixed cast for a byte-identical re-run. "
+                        "LEMMY's 11% cameo roll is likewise not "
+                        "seed-driven (BUG-LOCAL-260); use the "
+                        "lemmy_cameo widget to force it.\n\n"
+                        "Default is 42. When the ComfyUI 'shuffle' icon "
                         "next to the seed value is ON, ComfyUI generates "
-                        "a fresh random 64-bit integer on every Queue "
-                        "Prompt and the displayed default is ignored. "
-                        "Click the shuffle icon OFF and type a specific "
-                        "integer to lock the run for byte-identical "
-                        "re-queueing."
+                        "a fresh integer on every Queue Prompt; OFF plus "
+                        "a fixed integer locks the style picker + "
+                        "reviewer derivation for re-queueing."
                     ),
                 }),
                 # S30 B2a: single model_id widget replaced by two slots.
@@ -2034,24 +2058,28 @@ class OTR_LedgerScriptWriter:
 
         # D.3 Lock the cast.
         #
-        # Seed: ALWAYS used to seed random.Random (no zero sentinel).
-        # ComfyUI's frontend handles "randomize" mode by sending a
-        # real 64-bit integer to the backend; the backend should
-        # trust that integer for C7 byte-identity. Branching on
-        # seed==0 would treat a legitimate user choice ("seed 0")
-        # as non-deterministic and silently violate the contract
-        # (round-robin 2026-05-10).
+        # Cast RNG: TRUE per-episode randomization (BUG-LOCAL-269).
+        # The cast is NO LONGER pinned by the `seed` widget. A fixed
+        # seed reproduced ONE cast forever -- every episode opened with
+        # the identical characters (seed 42 always rolled HAYES VANCE /
+        # GULLIVER REEVES / JIMBO BLACK, out of a ~5,500-combo name
+        # pool). _resolve_cast_rng_seed() now draws a fresh OS-entropy
+        # seed each episode so the cast genuinely varies; set the
+        # OTR_CAST_SEED env var to force a fixed cast for the C7 audio
+        # byte-identity regression. This extends BUG-LOCAL-260's LEMMY
+        # decoupling to the cast names + announcer pick: random in
+        # production, with an explicit force path for the C7 gate.
         #
-        # LEMMY's 11% cameo roll is deliberately NOT tied to this
-        # seed -- cast_pools.roll_lemmy() always uses OS entropy
-        # (BUG-LOCAL-260). A fixed seed reproduces one roll forever,
-        # which pinned LEMMY to 100% (or 0%) instead of ~11%. The
-        # seed still fully determines the announcer pick, the open-
-        # character name rolls, the style picker, and the reviewer
-        # derivation; only the LEMMY cameo is decoupled. The
-        # lemmy_cameo widget below maps to force_lemmy when the
-        # operator wants to force the cameo in or out.
-        cast_rng = _random.Random(int(seed))
+        # The `seed` widget still drives the style picker and the
+        # reviewer's seed_for_reviewer derivation -- only the cast and
+        # the LEMMY cameo are decoupled from it.
+        cast_seed, cast_seed_source = _resolve_cast_rng_seed()
+        cast_rng = _random.Random(cast_seed)
+        log.info(
+            "[OTR_LedgerScriptWriter] cast RNG seed=%d (%s) -- cast "
+            "randomized per episode (BUG-LOCAL-269)",
+            cast_seed, cast_seed_source,
+        )
         # LLM slot: creative -- cast lock generates per-character
         # narrative descriptions (gender + character_description).
         # slot-interleave: technical (news_interpreter) -> creative

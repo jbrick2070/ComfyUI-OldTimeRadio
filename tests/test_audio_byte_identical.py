@@ -55,6 +55,13 @@ FIXED_SEEDS = {
     "OTR_MusicGenTheme": 42,
 }
 
+# BUG-LOCAL-269: the writer's CAST (character names + announcer voice)
+# is decoupled from the `seed` widget -- it is randomized per episode
+# from OS entropy. For a byte-identical C7 run, ComfyUI must be started
+# with the OTR_CAST_SEED environment variable set (e.g. OTR_CAST_SEED=42)
+# so the cast is reproducible. Injecting the writer `seed` above no
+# longer pins the cast on its own.
+
 
 def sha256_file(path):
     """Compute SHA-256 of a file in 64 KB chunks."""
