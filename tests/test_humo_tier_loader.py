@@ -81,7 +81,8 @@ class TestNodeContract:
         it = H.INPUT_TYPES()
         choices = it["required"]["tier"][0]
         assert choices == [
-            "low_vram_default", "high_quality", "experimental_gguf"]
+            "low_vram_default", "high_quality_unsafe_on_16gb",
+            "experimental_gguf"]
         # The shipped default is the low-VRAM tier.
         assert it["required"]["tier"][1]["default"] == "low_vram_default"
 
@@ -116,8 +117,8 @@ class TestTierConfig:
         assert spec["steps"] == 20
         assert spec["cfg"] == 5.0
 
-    def test_high_quality_is_fp8_6_steps_with_lora(self, H):
-        spec = H._tier_config("high_quality")
+    def test_high_quality_unsafe_on_16gb_is_fp8_6_steps_with_lora(self, H):
+        spec = H._tier_config("high_quality_unsafe_on_16gb")
         assert spec["use_gguf"] is False
         assert spec["use_lora"] is True
         assert spec["steps"] == 6
@@ -147,15 +148,18 @@ class TestAutoDowngrade:
         assert resolved == "low_vram_default"
 
     def test_high_tier_clears_with_enough_vram(self, H):
-        resolved, _ = H._resolve_tier("high_quality", True, 10.0, 14.0)
-        assert resolved == "high_quality"
+        resolved, _ = H._resolve_tier(
+            "high_quality_unsafe_on_16gb", True, 10.0, 14.0)
+        assert resolved == "high_quality_unsafe_on_16gb"
 
     def test_high_tier_clears_exactly_at_threshold(self, H):
-        resolved, _ = H._resolve_tier("high_quality", True, 10.0, 10.0)
-        assert resolved == "high_quality"
+        resolved, _ = H._resolve_tier(
+            "high_quality_unsafe_on_16gb", True, 10.0, 10.0)
+        assert resolved == "high_quality_unsafe_on_16gb"
 
     def test_high_tier_downgrades_when_vram_low(self, H):
-        resolved, note = H._resolve_tier("high_quality", True, 10.0, 3.0)
+        resolved, note = H._resolve_tier(
+            "high_quality_unsafe_on_16gb", True, 10.0, 3.0)
         assert resolved == "low_vram_default"
         assert "AUTO-DOWNGRADE" in note
 
@@ -167,19 +171,21 @@ class TestAutoDowngrade:
         """auto_downgrade OFF + insufficient VRAM = hard stop, never a
         silent thrash."""
         with pytest.raises(RuntimeError):
-            H._resolve_tier("high_quality", False, 10.0, 3.0)
+            H._resolve_tier(
+                "high_quality_unsafe_on_16gb", False, 10.0, 3.0)
 
     def test_unknown_vram_loads_as_requested(self, H):
         """No CUDA / headless: probe returns NaN -> load the requested
         tier rather than guess."""
         resolved, note = H._resolve_tier(
-            "high_quality", True, 10.0, float("nan"))
-        assert resolved == "high_quality"
+            "high_quality_unsafe_on_16gb", True, 10.0, float("nan"))
+        assert resolved == "high_quality_unsafe_on_16gb"
         assert "probe unavailable" in note.lower()
 
     def test_unknown_vram_none_loads_as_requested(self, H):
-        resolved, _ = H._resolve_tier("high_quality", True, 10.0, None)
-        assert resolved == "high_quality"
+        resolved, _ = H._resolve_tier(
+            "high_quality_unsafe_on_16gb", True, 10.0, None)
+        assert resolved == "high_quality_unsafe_on_16gb"
 
 
 # ---------------------------------------------------------------------------

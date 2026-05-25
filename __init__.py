@@ -222,8 +222,9 @@ _NODE_MODULES = {
     # HuMo model-tier loader (BUG-LOCAL-265, round-robin 2026-05-24,
     # Option C). One node loads the full HuMo stack (diffusion model +
     # umt5 + wan VAE + Whisper) for one of three tiers:
-    # low_vram_default (HuMo-1.7B, the shipped default), high_quality
-    # (HuMo-17B/14B fp8 + distill LoRA, opt-in), experimental_gguf.
+    # low_vram_default (HuMo-1.7B, the shipped default),
+    # high_quality_unsafe_on_16gb (HuMo-17B/14B fp8 + distill LoRA,
+    # opt-in), experimental_gguf.
     # Carries the Lever-1 pipeline-residue free + the hard
     # auto-downgrade rule so a 16 GB card never silently hits the HuMo
     # in-pipeline thrash path. Feeds OTR_BatchHumoRender; tiering lives

@@ -16,9 +16,10 @@ So OTR ships HuMo-1.7B as the default and keeps the big model opt-in:
                        LoRA (the lightx2v distill LoRA is 14B-only).
                        The shipped default; broad hardware compat,
                        no thrash in or out of the pipeline.
-  high_quality      -- HuMo-17B/14B fp8, 6 steps, cfg 1.0, lightx2v
-                       14B distill LoRA. Best quality; needs a 16 GB+
-                       card AND large system RAM for the ~10 GB offload.
+  high_quality_unsafe_on_16gb -- HuMo-17B/14B fp8, 6 steps, cfg 1.0,
+                       lightx2v 14B distill LoRA. Best quality; needs a
+                       16 GB+ card AND large system RAM for the ~10 GB
+                       offload.
   experimental_gguf -- HuMo-17B GGUF, 6 steps, cfg 1.0, distill LoRA.
                        Advanced only -- the GGUF per-step dequant tax
                        made it SLOWER than fp8 in the bracket test and
@@ -106,7 +107,7 @@ _TIER_TABLE = {
         "cfg": 5.0,
         "label": "HuMo-1.7B fp16 (low-VRAM default)",
     },
-    "high_quality": {
+    "high_quality_unsafe_on_16gb": {
         "use_gguf": False,
         "use_lora": True,
         "steps": 6,
@@ -122,7 +123,7 @@ _TIER_TABLE = {
     },
 }
 
-_TIER_CHOICES = ["low_vram_default", "high_quality", "experimental_gguf"]
+_TIER_CHOICES = ["low_vram_default", "high_quality_unsafe_on_16gb", "experimental_gguf"]
 
 
 def _file_list(folder_key: str, default_name: str) -> list:
@@ -170,9 +171,10 @@ class HuMoTierLoader:
                         "  low_vram_default -- HuMo-1.7B fp16, 20 steps, "
                         "no distill LoRA. Fully resident on a 16 GB card, "
                         "zero offload, no thrash. The shipped default.\n"
-                        "  high_quality -- HuMo-17B/14B fp8, 6 steps, "
-                        "lightx2v distill LoRA. Best quality; needs a "
-                        "16 GB+ card AND large system RAM.\n"
+                        "  high_quality_unsafe_on_16gb -- HuMo-17B/14B "
+                        "fp8, 6 steps, lightx2v distill LoRA. Best "
+                        "quality; needs a 16 GB+ card AND large system "
+                        "RAM.\n"
                         "  experimental_gguf -- HuMo-17B GGUF. Advanced "
                         "only: GGUF dequant tax made it slower than fp8 "
                         "in the bracket test; quality unjudged."
@@ -188,7 +190,7 @@ class HuMoTierLoader:
                     _file_list("diffusion_models", _DEFAULT_HUMO_HIGHQ),
                     {"default": _DEFAULT_HUMO_HIGHQ,
                      "tooltip": "HuMo-17B/14B fp8 diffusion model "
-                                "(high_quality tier)."},
+                                "(high_quality_unsafe_on_16gb tier)."},
                 ),
                 "humo_gguf_model": (
                     _file_list("diffusion_models", _DEFAULT_HUMO_GGUF),
@@ -218,9 +220,10 @@ class HuMoTierLoader:
                     _file_list("loras", _DEFAULT_DISTILL_LORA),
                     {"default": _DEFAULT_DISTILL_LORA,
                      "tooltip": "lightx2v 14B distill LoRA. Applied on the "
-                                "high_quality + experimental_gguf tiers "
-                                "only -- it is 14B-only and is NOT applied "
-                                "on the 1.7B low_vram_default tier."},
+                                "high_quality_unsafe_on_16gb + "
+                                "experimental_gguf tiers only -- it is "
+                                "14B-only and is NOT applied on the 1.7B "
+                                "low_vram_default tier."},
                 ),
                 "auto_downgrade": ("BOOLEAN", {
                     "default": True,
@@ -307,7 +310,8 @@ class HuMoTierLoader:
                 f"of {_TIER_CHOICES}."
             )
 
-        # High tier (high_quality / experimental_gguf): gate on VRAM.
+        # High tier (high_quality_unsafe_on_16gb / experimental_gguf):
+        # gate on VRAM.
         try:
             free_val = float(free_vram_gb)
         except (TypeError, ValueError):
@@ -476,7 +480,7 @@ class HuMoTierLoader:
         spec = self._tier_config(resolved_tier)
         model_file = {
             "low_vram_default": humo_1p7b_model,
-            "high_quality": humo_highq_model,
+            "high_quality_unsafe_on_16gb": humo_highq_model,
             "experimental_gguf": humo_gguf_model,
         }[resolved_tier]
 
