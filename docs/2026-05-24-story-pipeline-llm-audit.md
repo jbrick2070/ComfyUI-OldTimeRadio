@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
 - **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `bb53870`)
-- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3F, 3G COMPLETE and pushed. Remaining: 3A, 3B, 3C, 3D, 3E, 4, 5, 6. See the "Multi-agent execution plan" section at the foot of this file for the parallel-subagent lane map for the remaining work.
+- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. Remaining: 3A, 4, 5, 6. The Sprint 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files; next is one operator-gated live ComfyUI episode run to validate the batch. See the "Multi-agent execution plan" section at the foot of this file for the lane map.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -48,6 +48,12 @@ Between Pass 1 and Pass 2, `apply_deterministic_cast_repairs` runs -- a non-LLM 
 > - Row 13 (`run_story_brief_reflection`) now runs on the `structured_call` ladder (Sprint 2A); Sprint 3G additionally pre-sanitizes its input (cast names + proper nouns -> neutral tokens before the LLM sees them).
 > - Row 14 (`audit_cast_contract`): Sprint 3F removed the per-violation `confidence` field -- the auditor now does pure anomaly extraction; Python resolves repairs deterministically (case-fold / Levenshtein).
 > - Row 4 (`cast_one_character`): the technical-slot repair routing was removed when casting moved onto `structured_call` (its single `slot_fn` cannot switch slots per attempt).
+>
+> **UPDATE 2026-05-25 -- the Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) further changed the call inventory:**
+> - **Sprint 3C (`74438ff`):** Row 15 (`run_script_doctor`) is now an orchestrator over two passes. `run_script_doctor_diagnosis` is a **NEW LLM call site** (`# LLM slot: technical` -- names the per-line failure, emits no edits); `run_script_doctor_edits` (`# LLM slot: technical` -- strict JSON edit array) is the second. The AST sweep now finds **21** call sites (was 20), all 21 tagged. The model id for the new call is reused from the in-scope technical slot -- no new widget. Doctor input rows enriched via the new `_render_lines_for_doctor` (`beat_id, arc_phase, mood, actual_words` added; `beat_intent` / `target_words` deferred -- not persisted on the ledger).
+> - **Sprint 3D (`5fe9931`):** Row 4 (`cast_one_character`) -- the LLM call is now `llm_write_description`, writing only the prose description; gender + voice selection moved to Python (`precompute_ensemble_slots` + `python_assign_voice_preset`). Slot unchanged (creative).
+> - **Sprint 3B (`3992607`):** Rows 5-7 (`_otr_outline` outline stages) -- the beat-stage prompt gains adjacency context; `target_words` dropped from `_BeatFleshout`. Slots unchanged (creative).
+> - **Sprint 3E (`d230cd6`):** Row 12 (`_generate_title_from_script`) -- now a forced-scratchpad pass, still one LLM call (`# LLM slot: creative`); late title binding removes the post-hoc substitution.
 
 ---
 
@@ -99,7 +105,7 @@ Recommendation 1 is the story-quality critic -- it is **Sprint 5** in `story_pip
 
 ## Multi-agent execution plan (remaining sprints)
 
-As of HEAD `bb53870` (2026-05-25), Sprints 0, 1, 2A-2E, 3F, 3G are COMPLETE and pushed. The remaining audited work is Sprints 3A-3E, 4, 5, 6. This section is the lane map for running them as parallel subagents.
+As of 2026-05-25, Sprints 0, 1, 2A-2E, 3B-3G are COMPLETE and pushed -- the 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files, validating this method again. The remaining audited work is Sprints 3A, 4, 5, 6. This section's lane map is retained for Sprint 3A and as the build-pattern record.
 
 ### The method
 
@@ -124,8 +130,8 @@ Each lane is one parallel subagent. The primary files are mutually disjoint, so 
 | D | 3D -- split Casting | `nodes/_otr_casting.py` | ~1 day | net **fewer** | `precompute_ensemble_slots` (Python owns gender/timbre/role balance) -> `llm_write_description` (LLM writes one slot's description) -> `python_assign_voice_preset` (Python picks the voice). Voice selection leaves the LLM. Do not duplicate the existing `_assert_unique_bark_voices` uniqueness check. |
 | E | 3E -- title scratchpad | `OTR_LedgerScriptWriter.py` + title path | ~1 day | no | Scratchpad before the final title; `EPISODE_TITLE: TBD` in the canon header during composition; late binding removes the fragile post-hoc string substitution. **WARNING:** `OTR_LedgerScriptWriter.py` is EXEMPT from the CI sweep -- a new untagged LLM call here is NOT auto-caught; tag manually. |
 
-**Wave 1 (parallel):** Lanes B + C + D + E -- four disjoint files, four subagents at once.
-**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave.
+**Wave 1 (parallel):** Lanes B + C + D + E -- four disjoint files, four subagents at once. **[COMPLETE 2026-05-25 -- `3992607` / `74438ff` / `5fe9931` / `d230cd6`.]**
+**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave. **[NOT STARTED -- next after the live-run validation of the 3B-3E batch.]**
 
 ### Dependencies and gating
 
