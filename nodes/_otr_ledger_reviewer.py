@@ -481,13 +481,14 @@ def _render_lines_for_audit(lines: list[dict]) -> str:
 #                     by production_ledger.update_line_text)
 #   * text         -- line["text"]
 #
-# `beat_intent` and `target_words` are NOT carried on the ledger's
-# per-line state (production_ledger normalises beats/lines without
-# them) -- they live only on the transient `outline` object the writer
-# holds at compose time. They are rendered here ONLY when a future
-# stamping change makes them present on the line dict; until then the
-# renderer omits them rather than fabricating a value. See the Sprint
-# 3C report note for the lead.
+# `beat_intent` and `target_words` are stamped onto each per-line
+# record by production_ledger.init_lines_from_outline / set_lines
+# (2026-05-25 follow-up) -- sourced from Beat.intent and
+# Beat.target_words on the outline. The renderer still guards each with
+# a presence check: a line whose stamping left the field None (the
+# value was genuinely unavailable) is rendered without it rather than
+# with a fabricated value. With this in place the Doctor rows carry the
+# full 7-field context (was 5/7 at the Sprint 3C report).
 def _render_lines_for_doctor(lines: list[dict]) -> str:
     """One enriched row per line for the SCRIPT DOCTOR prompt.
 
@@ -511,9 +512,10 @@ def _render_lines_for_doctor(lines: list[dict]) -> str:
             f"arc_phase={ln.get('arc_phase') or '(unset)'}",
             f"mood={mood or '(unset)'}",
         ]
-        # beat_intent / target_words are only rendered when a stamping
-        # change has put them on the line dict; omitted otherwise so
-        # the Doctor is never shown a fabricated value.
+        # beat_intent / target_words are stamped on the line dict by
+        # production_ledger; rendered when present, omitted when a
+        # stamping left the field None so the Doctor is never shown a
+        # fabricated value.
         beat_intent = (ln.get("beat_intent") or "").strip()
         if beat_intent:
             parts.append(f"beat_intent={beat_intent!r}")
@@ -542,8 +544,11 @@ VIOLATION TYPES:
   but the canonical name should appear.
 - invented_name: dialogue text references a proper noun that is
   neither in cast_contract nor in meta.key_terms.
-- wrong_char_id: lines[k].char_id does not correspond to the speaker
-  name in cast_contract.
+- wrong_char_id: lines[k].char_id does not match the char_id of the
+  speaker the line clearly belongs to in cast_contract. ONLY flag a
+  line when its current char_id is genuinely wrong. If the line
+  already carries the correct char_id for its speaker, it is NOT a
+  violation -- do not report it.
 - role_mismatch: lines[k].speaker_role does not match the speaker's
   role in cast_contract.
 - speaker_unknown: speaker field is not in cast_contract at all.
@@ -551,14 +556,18 @@ VIOLATION TYPES:
 For every violation you find, output one anomaly object:
 - found: the exact literal in the ledger that drifted (the misspelled
   name, the alias, the invented proper noun, the wrong char_id, etc.).
-- expected: the cast member or canonical value it should have been.
-  Leave it "" when you cannot name one (e.g. an invented_name with no
-  obvious cast match) -- Python resolves it.
+- expected: the canonical value it should have been. For wrong_char_id
+  this is the CORRECT char_id from cast_contract (e.g. "c01"), not a
+  name. For bad_casing / alias_used / invented_name it is the canonical
+  cast-member NAME. Leave it "" when you cannot name one (e.g. an
+  invented_name with no obvious cast match) -- Python resolves it.
 - kind: one of the six violation types above.
 
 Report only anomalies that are real drift from the locked cast
-contract. Do not score, rank, or weight your findings -- emit the
-anomaly facts only and let the downstream step decide the repair.
+contract. A line whose char_id and casing already match the contract
+is clean -- emit nothing for it. Do not score, rank, or weight your
+findings -- emit the anomaly facts only and let the downstream step
+decide the repair.
 
 Return EXACTLY one JSON object matching this schema:
 {
@@ -702,12 +711,14 @@ def audit_cast_contract(
 
 # Wiring-review #11 (2026-05-11): structural fields are locked from
 # the LLM. Deterministic repair NEVER writes a raw LLM-provided
-# `violation.expected` to char_id or speaker_role. For wrong_char_id:
-# look up `expected` (LLM-suggested name) in the locked cast_contract
-# and use the canonical char_id from that lookup only if exact match.
-# For role_mismatch: validate `expected` against the allowed-role
-# enum. On any miss, leave the row unrepaired -- Pass 2 Script Doctor
-# decides.
+# `violation.expected` to char_id or speaker_role -- it must validate
+# against the locked cast_contract first. For wrong_char_id
+# (BUG-LOCAL-271, 2026-05-25): the auditor emits the correct char_id
+# in `expected`, so validate it against the locked cast's char_id set
+# and write only on an exact (case-fold) match; a legacy / name-shaped
+# `expected` falls back to a cast-name lookup. For role_mismatch:
+# validate `expected` against the allowed-role enum. On any miss,
+# leave the row unrepaired -- Pass 2 Script Doctor decides.
 _ALLOWED_SPEAKER_ROLES: frozenset[str] = frozenset({
     "character", "announcer",
     "music_open", "music_close", "music_inter",
@@ -737,10 +748,14 @@ def apply_deterministic_cast_repairs(
         `auto_remap_phantom`). If the auditor's `expected` does not
         resolve to a cast member, the repair is NOT applied -- the row
         falls through to the Script Doctor.
-      * wrong_char_id: resolve `expected` (auditor-suggested NAME) to
-        a cast member by exact case-fold match, then Levenshtein. On a
-        unique resolution, write the canonical char_id. On no match or
-        an ambiguous tie, leave the row for the Script Doctor.
+      * wrong_char_id: validate `expected` against the locked cast's
+        char_id set (case-fold). BUG-LOCAL-271 (2026-05-25): the
+        auditor emits the correct char_id in `expected`, so the
+        primary path matches it directly; a legacy / name-shaped
+        `expected` falls back to `_resolve_cast_member`. On a valid
+        char_id, write it (or count the row already-correct when the
+        auditor over-flagged a line that already had it). On no match
+        or an ambiguous tie, leave the row for the Script Doctor.
       * role_mismatch: validate `expected` against the allowed-role
         enum. On match, write. On miss, leave for the Script Doctor.
         (Roles are a fixed enum, not a fuzzy-matched name space, so
@@ -766,13 +781,23 @@ def apply_deterministic_cast_repairs(
     # (wiring-review #11). Build once; ANNOUNCER routes to the
     # writer's hardcoded "announcer" cid.
     char_id_by_name: dict[str, str] = {}
+    # Locked set of valid char_ids (case-fold keyed) for the
+    # wrong_char_id repair. BUG-LOCAL-271: the auditor emits a char_id
+    # in `expected` (the field is literally about lines[k].char_id and
+    # the auditor sees the cast table keyed by char_id), so the repair
+    # validates `expected` directly against this set rather than
+    # re-resolving it as a name.
+    valid_char_ids: dict[str, str] = {}
     for row in cast_rows or []:
         name = row.get("name") or ""
         cid = row.get("char_id") or ""
         if name and cid:
             char_id_by_name[name] = cid
             char_id_by_name[name.upper()] = cid
+        if cid:
+            valid_char_ids[cid.casefold()] = cid
     char_id_by_name.setdefault("ANNOUNCER", "announcer")
+    valid_char_ids.setdefault("announcer", "announcer")
     repaired = 0
     lines_by_id: dict[str, dict] = {
         ln.get("line_id", ""): ln
@@ -813,27 +838,41 @@ def apply_deterministic_cast_repairs(
                 )
             continue
         if v.kind == "wrong_char_id":
-            # Wiring-review #11: NEVER write violation.expected raw.
-            # Sprint 3F: resolve `expected` (auditor-suggested NAME)
-            # to a real cast member deterministically (exact case-fold
-            # then Levenshtein <= 3), then write that member's
-            # canonical char_id. On no match or an ambiguous tie,
-            # leave the row unchanged -- Pass 2 doctor decides.
-            target_name = _resolve_cast_member(v.expected, full_roster)
-            cid = None
-            if target_name:
-                cid = char_id_by_name.get(target_name)
-                if cid is None:
-                    cid = char_id_by_name.get(target_name.upper())
+            # Wiring-review #11: NEVER write violation.expected raw --
+            # it must validate against the locked cast contract first.
+            # BUG-LOCAL-271 (2026-05-25): the auditor emits a char_id
+            # in `expected` (the violation is about lines[k].char_id and
+            # the cast table the auditor sees is keyed by char_id), so
+            # the primary path validates `expected` directly against
+            # the locked cast's char_id set (case-fold). The prior code
+            # only resolved `expected` as a NAME, so every char_id-shaped
+            # `expected` missed and the repair was dead. The name path
+            # is kept as a fallback for a legacy / name-shaped `expected`.
+            expected_raw = (v.expected or "").strip()
+            cid = valid_char_ids.get(expected_raw.casefold())
+            if cid is None and expected_raw:
+                # Fallback: treat `expected` as a cast-member name.
+                target_name = _resolve_cast_member(expected_raw, full_roster)
+                if target_name:
+                    cid = char_id_by_name.get(target_name)
+                    if cid is None:
+                        cid = char_id_by_name.get(target_name.upper())
             if cid:
-                line["char_id"] = cid
-                repaired += 1
+                # Over-flagging guard (BUG-LOCAL-271): if the line
+                # already carries the correct char_id, the auditor
+                # over-flagged it -- nothing to repair, nothing to
+                # escalate. Count it as resolved and move on.
+                if (line.get("char_id") or "").casefold() == cid.casefold():
+                    repaired += 1
+                else:
+                    line["char_id"] = cid
+                    repaired += 1
             else:
                 log.warning(
                     "[OTR_LedgerReviewer] wrong_char_id violation on "
-                    "line_id=%s suggested expected=%r but no cast "
-                    "member resolves; leaving row unrepaired for the "
-                    "Script Doctor.",
+                    "line_id=%s suggested expected=%r but it is neither "
+                    "a valid char_id nor resolves to a cast member; "
+                    "leaving row unrepaired for the Script Doctor.",
                     v.line_id, v.expected,
                 )
             continue
