@@ -105,6 +105,13 @@ _AUDIT_MAX_NEW_TOKENS = 2000
 _DOCTOR_TEMPERATURE = 0.5
 _DOCTOR_MAX_NEW_TOKENS = 3500
 
+# Structural-retry temperatures for the structured_call ladder (Sprint
+# 2A/2B). Attempt 2 re-rolls at a temperature STRICTLY BELOW the base
+# attempt -- lowering entropy during a JSON-schema retry, never raising
+# it. structured_call asserts this invariant at entry.
+_AUDIT_RETRY_TEMPERATURE = 0.1
+_DOCTOR_RETRY_TEMPERATURE = 0.3
+
 
 # ---------------------------------------------------------------------------
 # Pydantic models
@@ -369,6 +376,20 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
 
+# Sprint 2A: the shared structured-JSON retry ladder. Both LLM passes
+# in this module (audit_cast_contract, run_script_doctor) route through
+# it. Package import in production; flat import under standalone test.
+try:
+    from ._otr_structured_call import (
+        structured_call,
+        StructuredCallFailedError,
+    )
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_structured_call import (  # type: ignore
+        structured_call,
+        StructuredCallFailedError,
+    )
+
 
 def audit_cast_contract(
     generate_fn,
@@ -414,37 +435,42 @@ def audit_cast_contract(
     # caller maps the failure to needs_full_rerun (post_audit_failed
     # branch retired with the rollback gate); the deterministic
     # cast repairs still consume the sentinel violations list.
+    # Sprint 2A/2D: the single-shot call + parse + validate is now the
+    # shared structured_call 4-attempt ladder (base -> structural retry
+    # -> typed repair -> grammar; grammar Attempt 4 activates once
+    # Sprint 2E wires a grammar_path). An exhausted ladder raises
+    # StructuredCallFailedError -- the converted form of the prior
+    # three failure arms. The slot fn (the LLM call) can still raise
+    # arbitrary loader exceptions, which structured_call does not catch;
+    # the broad `except Exception` below keeps this function's
+    # never-raises contract (every failure -> _audit_failed_sentinel).
     try:
-        raw = generate_fn(
-            messages,
-            temperature=_AUDIT_TEMPERATURE,
+        report = structured_call(
+            prompt=messages,
+            schema=PreAuditReport,
+            slot_fn=generate_fn,
+            base_temperature=_AUDIT_TEMPERATURE,
+            structural_retry_temperature=_AUDIT_RETRY_TEMPERATURE,
             max_new_tokens=_AUDIT_MAX_NEW_TOKENS,
+            max_attempts=4,
+            helper_name=f"audit_cast_contract:{label}",
         )
-    except Exception as exc:  # noqa: BLE001
+    except StructuredCallFailedError as exc:
         log.warning(
-            "[OTR_LedgerReviewer:%s] generate_fn raised: %s; "
-            "returning audit_failed sentinel", label, exc,
+            "[OTR_LedgerReviewer:%s] structured_call exhausted the retry "
+            "ladder after %d attempt(s) (last error: %s); returning "
+            "audit_failed sentinel", label, exc.attempts, exc.last_error,
+        )
+        return _audit_failed_sentinel(f"structured_call failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+        log.warning(
+            "[OTR_LedgerReviewer:%s] structured_call raised %s: %s; "
+            "returning audit_failed sentinel",
+            label, type(exc).__name__, exc,
         )
         return _audit_failed_sentinel(
-            f"generate_fn raised: {type(exc).__name__}: {exc}"
+            f"structured_call raised: {type(exc).__name__}: {exc}"
         )
-    try:
-        data = _otr_json.parse_first_json_object(raw or "")
-    except json.JSONDecodeError as exc:
-        log.warning(
-            "[OTR_LedgerReviewer:%s] JSON parse failed (%s); "
-            "raw=%r; returning audit_failed sentinel",
-            label, exc, (raw or "")[:200],
-        )
-        return _audit_failed_sentinel(f"json.JSONDecodeError: {exc}")
-    try:
-        report = PreAuditReport.model_validate(data)
-    except ValidationError as exc:
-        log.warning(
-            "[OTR_LedgerReviewer:%s] schema validation failed (%s); "
-            "returning audit_failed sentinel", label, exc,
-        )
-        return _audit_failed_sentinel(f"ValidationError: {exc}")
     log.info(
         "[OTR_LedgerReviewer:%s] audit complete: %d violation(s), "
         "pass_clean=%s",
@@ -808,38 +834,37 @@ def run_script_doctor(
         {"role": "system", "content": _DOCTOR_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
+    # Sprint 2A/2D: the single-shot call + parse + validate is now the
+    # shared structured_call 4-attempt ladder (base -> structural retry
+    # -> typed repair -> grammar; Attempt 4 activates once Sprint 2E
+    # wires a grammar_path). S34 B1 (2026-05-15) requires this pass to
+    # fail loud with needs_full_rerun: an exhausted ladder
+    # (StructuredCallFailedError) and a raising slot fn -- which
+    # structured_call does not catch -- both map to that verdict,
+    # preserving the loud-failure contract S33 B3/B4 depend on.
     try:
-        raw = generate_fn(
-            messages,
-            temperature=_DOCTOR_TEMPERATURE,
+        report = structured_call(
+            prompt=messages,
+            schema=ScriptDoctorReport,
+            slot_fn=generate_fn,
+            base_temperature=_DOCTOR_TEMPERATURE,
+            structural_retry_temperature=_DOCTOR_RETRY_TEMPERATURE,
             max_new_tokens=_DOCTOR_MAX_NEW_TOKENS,
+            max_attempts=4,
+            helper_name="run_script_doctor",
         )
-    except Exception as exc:  # noqa: BLE001
-        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
-        # Phase 1 already does this via _audit_failed_sentinel;
-        # Phase 2 (this function) now matches.
+    except StructuredCallFailedError as exc:
         log.warning(
-            "[OTR_LedgerReviewer:doctor] generate_fn raised: %s; "
-            "returning needs_full_rerun report", exc,
-        )
-        return ScriptDoctorReport(overall_verdict="needs_full_rerun")
-    try:
-        data = _otr_json.parse_first_json_object(raw or "")
-    except json.JSONDecodeError as exc:
-        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
-        log.warning(
-            "[OTR_LedgerReviewer:doctor] JSON parse failed (%s); "
-            "raw=%r; returning needs_full_rerun report",
-            exc, (raw or "")[:200],
+            "[OTR_LedgerReviewer:doctor] structured_call exhausted the "
+            "retry ladder after %d attempt(s) (last error: %s); "
+            "returning needs_full_rerun report",
+            exc.attempts, exc.last_error,
         )
         return ScriptDoctorReport(overall_verdict="needs_full_rerun")
-    try:
-        report = ScriptDoctorReport.model_validate(data)
-    except ValidationError as exc:
-        # S34 B1 (2026-05-15): fail loud with needs_full_rerun.
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
         log.warning(
-            "[OTR_LedgerReviewer:doctor] schema validation failed (%s); "
-            "returning needs_full_rerun report", exc,
+            "[OTR_LedgerReviewer:doctor] structured_call raised %s: %s; "
+            "returning needs_full_rerun report", type(exc).__name__, exc,
         )
         return ScriptDoctorReport(overall_verdict="needs_full_rerun")
     return report
