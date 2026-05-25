@@ -10,9 +10,14 @@ sub-passes through `creative_fn` (or `technical_fn` for
 Tests:
   1-4. Signature acceptance: each helper exposes `creative_fn` +
        `technical_fn` as keyword-only parameters.
-  5-8. Internal routing at B1: when called with distinct mock
-       generators, each helper routes its calls to the
-       configured default slot (creative for 1-3, technical for 4).
+  5-8. Internal routing: when called with distinct mock generators,
+       each helper routes its calls to the expected slot.
+       - `pick_style` (test 5) is per-sub-pass post-S32 B2:
+         pass 1 (inventor) routes to `creative_fn`, pass 2
+         (chooser) routes to `technical_fn`.
+       - `lock_cast` and `compose_line` (tests 6-7) route their
+         generation to `creative_fn` by default.
+       - `build_news_briefs` (test 8) routes to `technical_fn`.
 """
 
 from __future__ import annotations
@@ -90,43 +95,51 @@ def test_build_news_briefs_accepts_paired_generators():
 
 
 # ---------------------------------------------------------------------------
-# 5-8: Internal routing at B1
+# 5-8: Internal routing
 # ---------------------------------------------------------------------------
 
 
-def _fake_inventor_response(messages, *, temperature, max_new_tokens):
-    """Return a valid Pass-1 inventor response."""
-    # Pass 1 inventor expects a numbered list of style candidates.
-    return "1. test_style_alpha\n2. test_style_beta\n3. test_style_gamma\n4. test_style_delta\n5. test_style_epsilon\n"
+# Five distinct real snake_case style slugs that pass the inventor
+# grammar (DESCRIPTOR_RE) AND the distinctness / mode-collapse rule
+# (no two share more than one root word). Same proven fixture as
+# `tests/test_pick_style_routing.py::_VALID_INVENTOR_RESPONSE`. Using
+# valid data makes the inventor pass genuinely succeed so the chooser
+# (pass 2) pass is actually exercised.
+_VALID_INVENTOR_RESPONSE = (
+    "1. closed_room_suspense\n"
+    "2. noir_interrogation\n"
+    "3. arctic_research_horror\n"
+    "4. desert_outpost_thriller\n"
+    "5. jungle_expedition_mystery\n"
+)
 
 
-def _fake_chooser_response(messages, *, temperature, max_new_tokens):
-    """Return a valid Pass-2 chooser response."""
-    return "1"
+def test_pick_style_routes_inventor_creative_and_chooser_technical():
+    """S32 B2 per-sub-pass routing: pick_style dispatches each pass
+    to its own slot. Pass 1 (inventor -- a narrative style-invention
+    pass) routes to `creative_fn`; pass 2 (chooser -- a structured
+    short-output index pick) routes to `technical_fn`.
 
-
-def test_pick_style_internally_uses_creative_fn_default():
-    """At B1 both passes route through creative_fn; technical_fn is
-    accepted but unused. After B2 lands, the chooser pass flips to
-    technical_fn -- this test will need updating then (the B2 test
-    expects that flip)."""
+    The mock `creative_fn` returns five distinct valid snake_case
+    descriptors so the inventor pass genuinely succeeds -- only then
+    does control reach the chooser, letting us confirm pass 2 lands
+    on `technical_fn`. With both fns call-tracked independently, the
+    assertions below pin that the B2 flip is live.
+    """
     from nodes import _otr_style_picker as sp
 
     creative_calls: list[dict] = []
     technical_calls: list[dict] = []
 
     def creative_fn(messages, *, temperature, max_new_tokens):
-        creative_calls.append({"messages": messages, "temperature": temperature, "max_new_tokens": max_new_tokens})
-        # Need to return a response that varies by call. Heuristic:
-        # the first call (inventor) needs a list of 5 candidates; the
-        # second (chooser) needs an index.
-        if len(creative_calls) == 1:
-            return _fake_inventor_response(messages, temperature=temperature, max_new_tokens=max_new_tokens)
-        return _fake_chooser_response(messages, temperature=temperature, max_new_tokens=max_new_tokens)
+        creative_calls.append({"temperature": temperature, "max_new_tokens": max_new_tokens})
+        # Pass 1 inventor: five distinct valid descriptors.
+        return _VALID_INVENTOR_RESPONSE
 
     def technical_fn(messages, *, temperature, max_new_tokens):
-        technical_calls.append({"messages": messages, "temperature": temperature, "max_new_tokens": max_new_tokens})
-        return "should_not_be_called"
+        technical_calls.append({"temperature": temperature, "max_new_tokens": max_new_tokens})
+        # Pass 2 chooser: returns one candidate STRING (not an index).
+        return "closed_room_suspense"
 
     rng = random.Random(42)
     try:
@@ -140,16 +153,19 @@ def test_pick_style_internally_uses_creative_fn_default():
         )
     except Exception:
         # The picker may fail validation downstream of our mocks;
-        # that's OK -- the routing assertion below is what we test.
+        # that's OK -- the routing assertions below are what we test.
         pass
 
     assert len(creative_calls) >= 1, (
-        "creative_fn must be called at least once (inventor pass) at B1"
+        "Pass 1 (inventor) must call creative_fn at least once "
+        f"(S32 B2 per-sub-pass routing); got {len(creative_calls)} "
+        f"creative call(s)."
     )
-    assert len(technical_calls) == 0, (
-        f"technical_fn must NOT be called at B1 (routes to "
-        f"creative_fn at this commit); got {len(technical_calls)} "
-        f"call(s) to technical_fn."
+    assert len(technical_calls) >= 1, (
+        "Pass 2 (chooser) must call technical_fn at least once "
+        f"after the S32 B2 flip; got {len(technical_calls)} "
+        f"technical call(s). The inventor pass must succeed first "
+        f"so the chooser is actually reached."
     )
 
 
