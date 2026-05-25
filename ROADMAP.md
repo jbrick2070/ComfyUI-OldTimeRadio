@@ -46,6 +46,15 @@ Commits `e981db0` / `09c2d49` / `e619ebb` on `v2.0-alpha`. Regression: full `tes
 
 ---
 
+## AUDIO QUALITY TRACK — queued audio updates (Jeffrey, 2026-05-24)
+
+A batch of audio-quality work, parked to be tackled together rather than piecemeal — the operator has further audio updates upcoming. Everything in this track touches the audio path: Prime Directive 1 (audio byte-identical to baseline) applies, and each item is round-robin gated per CLAUDE.md.
+
+- **Per-clip loudness normalization — PARKED 2026-05-24. Round-robin question doc ready; consultation not yet run.** Operator noticed Bark dialogue clips are audibly uneven line-to-line. Not a missing-normalization bug: `BatchBark` (`nodes/batch_bark_generator.py` ~L611) already normalizes every clip — but to a **peak** target (−3 dBFS), and peak normalization cannot equalize *perceived* loudness (Bark's variable crest factor means two clips at the same −3 dBFS peak can sound very different). Fix direction: per-clip **loudness** (RMS/LUFS) normalization, in addition to — not instead of — the final `EpisodeAssembler` −1 dBFS ceiling pass. Full problem statement, the confirmed three-point normalization architecture, constraints (byte-identical baseline, the BUG-031 silent-clip guardrail, crossfade clipping, the separate Kokoro announcer bus), and six consultation questions are in `docs/2026-05-24-per-clip-audio-normalization__00_question.md`. When this track is picked up: run the round-robin (ChatGPT → Gemini → synthesis), then implement gated on a re-blessed `tests/test_audio_byte_identical.py` baseline.
+- **(Further audio updates — to be added by Jeffrey.)**
+
+---
+
 **Sprint planning surface:** `docs/2026-05-13-S25-plus-sprint-planning-tracker.md` -- consolidated tier-organized view of every outstanding item across all batches with suggested S25+ sprint packaging. Update on every batch close.
 
 **Batch QA docs:**
