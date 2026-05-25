@@ -61,8 +61,8 @@
 | Sprint | Status | Bug pointers | Notes |
 |---|---|---|---|
 | 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); `technical_fn` drop PULLED (Decision 6 -- keep); only the deferred CI AST sweep remains |
-| 1 -- render seatbelts | NOT STARTED | -- | ~half already done; blocked on decisions 1-3 |
-| 2A -- structured_call helper | NOT STARTED | -- | |
+| 1 -- render seatbelts | COMPLETE | -- | tier rename landed `df7f9b1`; decisions 1-2 resolved to no-change; render-flag defaults already on |
+| 2A -- structured_call helper | IN PROGRESS | -- | step 1 (module + 11 tests) landed `61f8cfa`; 6 call-site conversions pending |
 | 2B -- repair temp fix | NOT STARTED | -- | folds into 2A |
 | 2C -- typed repair prompts | NOT STARTED | -- | |
 | 2D -- cleanup pass retries | NOT STARTED | -- | |
@@ -124,17 +124,17 @@
 
 ## Sprint 1 -- Render-Side Seatbelts (Config Only, Not Gated)
 
-- [ ] Rename HuMo high tier `high_quality` -> `high_quality_unsafe_on_16gb` **everywhere**: `_TIER_TABLE` + `_TIER_CHOICES` in `_otr_humo_tier_loader.py:101-125`, and every workflow JSON that wires the tier widget (`workflows/otr_scifi_16gb_full.json` and any siblings). Per CLAUDE.md Prime Directive 3, the JSON re-wire is part of "done."
-  > AUDIT: `experimental_gguf` is a real third tier v3 never mentioned. Decide whether it gets a parallel rename or stays.
+- [x] **[DONE df7f9b1 2026-05-24]** Rename HuMo high tier `high_quality` -> `high_quality_unsafe_on_16gb` **everywhere**: `_TIER_TABLE` + `_TIER_CHOICES` in `_otr_humo_tier_loader.py:101-125`, and every workflow JSON that wires the tier widget (`workflows/otr_scifi_16gb_full.json` and any siblings). Per CLAUDE.md Prime Directive 3, the JSON re-wire is part of "done."
+  > AUDIT: `experimental_gguf` is a real third tier v3 never mentioned. **Decision 3 RESOLVED 2026-05-24: stays -- not renamed.**
 - [x] ~~Defaults on: `resume_from_ledger`, `cuda_cleanup_on_oom`, `stop_on_soak_cap`.~~ **ALREADY DONE.** All three exist and default `True` -- real names are `resume_from_ledger`, `cuda_hard_reset_on_oom`, `stop_workflow_on_soak_cap`. No edit needed; just verify the workflow JSON doesn't override them to `False`.
-- [ ] **DECISION NEEDED -- `humo_max_lines_per_process`.** Currently `0` (disabled) by a deliberate change logged at `BUG_LOG.md:210` (bumped 3 -> 0). v3 wants `6`. This reverts a logged decision -- do not apply without confirming. If 6 is wanted, log the reversal in `BUG_LOG.md` with the reason.
-- [ ] `clip_length` (real widget name; not `clip_length_seconds`) already defaults `7.0`. To "lock" it you must change the widget to a fixed value or remove operator editability -- a code change, not a default flip. Decide: lock, or leave editable with 7.0 default.
+- [x] **DECISION 1 RESOLVED 2026-05-24 -- `humo_max_lines_per_process` stays `0`.** No change. The logged `BUG_LOG.md:210` decision (bumped 3 -> 0) stands; v3's request for `6` was declined, so no reversal entry is needed.
+- [x] **DECISION 2 RESOLVED 2026-05-24 -- `clip_length` stays editable, default `7.0`.** No lock, no code change; the operator keeps the editable widget.
 
 ---
 
 ## Sprint 2 -- Retry Discipline + GBNF
 
-### 2A. One shared structured-call helper (not gated)
+### 2A. One shared structured-call helper (not gated) -- **[STEP 1 LANDED 61f8cfa 2026-05-24: `nodes/_otr_structured_call.py` + 11 tests. The 6 call-site conversions below are pending.]**
 
 New module `nodes/_otr_structured_call.py`. Single retry ladder for every structured JSON pass. Signature per v3 (a `structured_call(*, prompt, schema, slot_fn, base_temperature, structural_retry_temperature, repair_prompt_factory, grammar_path, max_attempts, helper_name) -> T`).
 
@@ -288,9 +288,9 @@ Round-robin gating: 2E, 3A-G, 5A-C, 6.
 
 ## Open Decisions for Jeffrey (must answer before the relevant sprint)
 
-1. **`humo_max_lines_per_process`** -- leave at `0` (current, logged decision) or set to `6` (v3 request, reverts `BUG_LOG.md:210`)?
-2. **`clip_length`** -- truly lock at 7.0 (code change, removes operator editability) or leave editable with the existing 7.0 default?
-3. **`experimental_gguf` tier** -- rename in parallel with the high-tier rename, or leave untouched?
+1. **`humo_max_lines_per_process`** -- **RESOLVED 2026-05-24: stays `0`** (logged `BUG_LOG.md:210` decision not reverted; v3's `6` declined).
+2. **`clip_length`** -- **RESOLVED 2026-05-24: leave editable, default `7.0`** (no lock, no code change).
+3. **`experimental_gguf` tier** -- **RESOLVED 2026-05-24: leave untouched** (not renamed).
 4. **GBNF (2E)** -- wire or delete? (round-robin gated)
 5. **Story-quality critic track (5B)** -- confirm it gets its own roadmap track once this batch lands.
 6. **`technical_fn` on `compose_line` (Sprint 0)** -- **RESOLVED 2026-05-24: option (a) -- keep `technical_fn`; item pulled from Sprint 0.** Background: the v4 audit called it dead weight, but `tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` asserts `technical_fn` MUST exist as a keyword-only param, and the paired `creative_fn`+`technical_fn` contract is deliberate uniformity across 4 sibling helpers, kept for the planned B2/B3/B4 per-sub-pass dispatch. Options: **(a)** keep `technical_fn` -- skip this Sprint 0 item, accept that `compose_line` carries an unused-but-contractual param (recommended -- it stays consistent with its 3 sibling helpers and B2/B3/B4 will need the slot again); **(b)** drop it AND update/retire `test_compose_line_accepts_paired_generators` plus ~21 test call sites across 5 test files, reversing the S32 B1 decision.
@@ -303,14 +303,14 @@ Round-robin gating: 2E, 3A-G, 5A-C, 6.
 # HuMo tiers (real names)
 humo_tier_default: low_vram_default
 humo_high_tier_alias: high_quality_unsafe_on_16gb     # rename of `high_quality`
-humo_third_tier: experimental_gguf                    # exists; rename TBD
+humo_third_tier: experimental_gguf                    # exists; left as-is (Decision 3 -- not renamed)
 
 # Render flags (real widget names; all three already default True)
 resume_from_ledger: true
 cuda_hard_reset_on_oom: true                          # NOT cuda_cleanup_on_oom
 stop_workflow_on_soak_cap: true                       # NOT stop_on_soak_cap
-humo_max_lines_per_process: 0                         # DECISION PENDING (v3 wanted 6)
-clip_length: 7.0                                      # widget default; "lock" = code change
+humo_max_lines_per_process: 0                         # Decision 1 RESOLVED: stays 0
+clip_length: 7.0                                      # Decision 2 RESOLVED: stays editable, 7.0
 
 # HuMo render widget defaults (BatchHumoRender) -- distinct from tier-table values
 resolution: 480x832                                   # confirmed
@@ -371,3 +371,12 @@ gbnf_enforcement: wired                               # pending round-robin
 - **New bug ids:** none.
 - **Sprint 0 state:** 4/5 items landed; `technical_fn` drop pulled (not a defect); only the deferred CI AST sweep remains before Sprint 0 can formally close.
 - Built with one subagent on `tests/test_helper_paired_signatures.py`.
+
+### 2026-05-24 -- Wave 1: Sprint 1 (HuMo tier rename) + Sprint 2A step 1 (structured_call helper)
+- Commits `df7f9b1` (Sprint 1 -- 3 files, +40/-29) and `61f8cfa` (Sprint 2A -- 2 new files, +869) on `v2.0-alpha`.
+- **Open Decisions 1-3 resolved (Jeffrey):** (1) `humo_max_lines_per_process` stays `0` -- no change; (2) `clip_length` stays an editable widget, default `7.0` -- no lock, no code change; (3) `experimental_gguf` tier NOT renamed -- left as-is.
+- **Sprint 1 COMPLETE:** HuMo tier `high_quality` -> `high_quality_unsafe_on_16gb` across `_otr_humo_tier_loader.py`, `tests/test_humo_tier_loader.py`, and one `__init__.py` comment. No workflow JSON wires the tier value (verified -- zero occurrences in `workflows/*.json`), so no JSON re-wire was needed. The other Sprint 1 items resolved to no-change per decisions 1-2; the three render-flag defaults were already on.
+- **Sprint 2A step 1 LANDED:** new `nodes/_otr_structured_call.py` -- the shared 4-attempt structured-call retry ladder (`structured_call(...)`, `StructuredCallFailedError`, `RepairPromptFactory` Protocol, `default_repair_prompt_factory`). The 2B temperature principle is baked in: the structural retry is LOWER than base, asserted at entry (fails loud). `tests/test_structured_call.py` -- 11 tests over every ladder rung. Still pending in 2A: converting the 6 call sites, the typed repair factories (2C), and GBNF wiring (2E).
+- **Regression:** green 2026-05-24 -- `test_humo_tier_loader` 24 + `test_structured_call` 11 + `test_core` 59 + `test_audio_byte_identical` 9 (1 skipped) = 103 passed / 1 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed.
+- **New bug ids:** none.
+- Built with two parallel subagents on disjoint file sets (humo loader + its test + `__init__.py`; new `_otr_structured_call.py` + new test).
