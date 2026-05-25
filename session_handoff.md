@@ -11,7 +11,7 @@ OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LO
 - **Tests + git via Desktop Commander**, `shell: "cmd"` (NOT powershell -- powershell can't find `cmd`, and `%` chars break `python -c`). Venv python: `C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe`. Bug Bible regression: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\tests\bug_bible_regression.py`. Commit message via the file tool to `.git\COMMIT_EDITMSG`, then `git commit -F`. Per work batch: code commit(s) then a separate plan-tracking commit that references the code hash. Verify `local HEAD == origin HEAD` after push.
 - `docs/s28_diff_tmp.txt` is parked-dirty -- never commit it. `session_handoff.md` also shows `M` (this file).
 - Run Bug Bible + core + audio-byte-identical regression after every code change, unprompted (CLAUDE.md).
-- Round-robin consultation required for the gated sprints (2E, 3A-G, 5, 6).
+- Round-robin consultation is WAIVED (Jeffrey, 2026-05-24) -- no sprint is gated; the build runs sprint-after-sprint. (CLAUDE.md still carries a general "Round-Robin Consultation" section; it is not a gate on this build's sprint sequencing.)
 
 ## What's done & decided
 - **HEAD `cde08b9` on `v2.0-alpha`, local == origin.** 7 commits this session.
@@ -29,6 +29,7 @@ OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LO
   - D2 `clip_length` -> stays an editable widget, default `7.0` (no lock, no code change).
   - D3 `experimental_gguf` tier -> NOT renamed.
   - D6 `technical_fn` on `compose_line` -> **KEEP it.** It is test-enforced paired-contract surface (`tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators`), not dead weight. The Sprint 0 "drop technical_fn" item is PULLED -- **do not reopen this.**
+- **Round-robin consultation WAIVED** (Jeffrey, 2026-05-24): these changes were round-robined in earlier sessions. The v4 plan's round-robin gating is fully removed -- the build runs sprint-after-sprint, no consultation gate.
 - **Rejected:** dropping `technical_fn`; renaming `experimental_gguf`; `humo_max_lines_per_process = 6`; locking `clip_length`; re-auditing the v4 plan.
 
 ## State of the art
@@ -44,12 +45,12 @@ OTR `ComfyUI-OldTimeRadio`, branch `v2.0-alpha`. CLAUDE.md + ROADMAP.md + BUG_LO
 4. **Agent 4 -- `nodes/_otr_casting.py`:** convert `cast_one_character` (3 attempts; attempt 3 repair routes technical slot).
 5. **Agent 5 -- `nodes/_otr_outline.py`:** convert the 3 inline outline stages (macro / phase / beat, currently via `_run_call_with_retry` inside `generate_outline()`). **AUDIT WARNING:** do NOT flatten Stage 2 (phase) -- it has a falling-temp schedule `(0.35, 0.25, 0.15)`, a deterministic `_deterministic_phase_skeleton` fallback, and a singleton-cast skip. Preserve all three.
 - Each agent: convert + run regression. Lead verifies diffs on real files, runs full regression (Bug Bible + core + audio-byte-identical + the touched suites), commits per the two-commit pattern, updates the plan Status Board + Build Progress Log.
-- After Wave 2: run the round-robin consultation -- it unlocks 2E (GBNF wire/delete) and 3A-3G. Note 3C and 3F BOTH touch `_otr_ledger_reviewer.py` -- a collision; sequence them, don't parallelize.
+- After Wave 2: Sprints 2E (GBNF -- wire) and 3A-3G run straight through -- no consultation gate. **File collision to sequence:** 3C and 3F BOTH touch `_otr_ledger_reviewer.py` -- never put them in the same parallel wave.
 
 ## Open questions
 - Sprint 0's CI AST `# LLM slot:` sweep -- deferred. Decide: implement it, or formally close Sprint 0 without it.
 - Carried from the prior handoff, still unaddressed: the Gemma-4 / 90-word test episode (operator-gated run); Bible-promotion of BUG-LOCAL-265 / -266 / -267 via the Three-File Contract.
-- 2E GBNF (wire vs delete) and all of 3A-3G are round-robin-gated -- the consultation must run before they can be dispatched.
+- All six v4 Open Decisions are resolved and round-robin gating is removed (2026-05-24) -- nothing in the plan is gated; Wave 2 onward runs continuously.
 
 ---
 ## Resume instructions

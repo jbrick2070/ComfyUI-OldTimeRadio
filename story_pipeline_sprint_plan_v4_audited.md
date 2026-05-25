@@ -66,19 +66,19 @@
 | 2B -- repair temp fix | NOT STARTED | -- | folds into 2A |
 | 2C -- typed repair prompts | NOT STARTED | -- | |
 | 2D -- cleanup pass retries | NOT STARTED | -- | |
-| 2E -- GBNF wire/delete | BLOCKED | -- | round-robin + decision 4 |
-| 3A -- split compose_line | BLOCKED | -- | round-robin gated |
-| 3B -- outline Stage 3 | BLOCKED | -- | round-robin gated |
-| 3C -- split Script Doctor | BLOCKED | -- | round-robin gated |
-| 3D -- split Casting | BLOCKED | -- | round-robin gated |
-| 3E -- title scratchpad | BLOCKED | -- | round-robin gated |
-| 3F -- cast auditor confidence | BLOCKED | -- | round-robin gated |
-| 3G -- reflection sanitize | BLOCKED | -- | round-robin gated |
+| 2E -- GBNF wire | NOT STARTED | -- | decision 4 resolved -- wire |
+| 3A -- split compose_line | NOT STARTED | -- | -- |
+| 3B -- outline Stage 3 | NOT STARTED | -- | -- |
+| 3C -- split Script Doctor | NOT STARTED | -- | -- |
+| 3D -- split Casting | NOT STARTED | -- | -- |
+| 3E -- title scratchpad | NOT STARTED | -- | -- |
+| 3F -- cast auditor confidence | NOT STARTED | -- | -- |
+| 3G -- reflection sanitize | NOT STARTED | -- | -- |
 | 4 -- VRAM hardening | NOT STARTED | -- | VRAM gate already exists -- verify only |
-| 5 -- continuity + critic + reroll | BLOCKED | -- | round-robin gated |
-| 6 -- critic->render coupling | BLOCKED | -- | ships with Sprint 5 |
+| 5 -- continuity + critic + reroll | NOT STARTED | -- | -- |
+| 6 -- critic->render coupling | NOT STARTED | -- | ships with Sprint 5 |
 
-`BLOCKED` here means "gated on a round-robin consultation or an operator decision," not "broken." Sprint 0 and the ungated Sprint 2 items can start now.
+**Round-robin consultation WAIVED 2026-05-24 (Jeffrey):** these changes were round-robined in earlier sessions, so no sprint carries a consultation gate -- the build runs sprint-after-sprint. No sprint is `BLOCKED`; that status is now reserved for a genuine hard dependency only.
 
 ---
 
@@ -162,55 +162,47 @@ Repair factory dispatches by class: `json_syntax_repair`, `schema_field_repair`,
 
 - [ ] `audit_cast_contract` and `run_script_doctor` (post-split): single-shot -> `structured_call` with `max_attempts=4`. Confirmed both are currently one call with failure-to-sentinel.
 
-### 2E. GBNF -- wire or delete (round-robin gated)
-
+### 2E. GBNF -- wire or delete
 Confirmed dead scaffolding: `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf` ship, `news_interpreter.py` defines `GRAMMAR_PATH`, the loader never enforces it. Wiring it into `structured_call` Attempt 4 makes every structured pass near-invulnerable to JSON-format failure.
-- [ ] Round-robin decision: **wire** (preferred). Delete only if loader work is blocking.
+- [ ] **GBNF: wire** into `structured_call` Attempt 4 (decision 4 -- round-robin waived 2026-05-24; wire was already the chosen path). Delete only if loader work proves blocking.
 
 ---
 
 ## Sprint 3 -- Task Decomposition (Headline)
 
-### 3A. Split `compose_line` (round-robin gated)
-
+### 3A. Split `compose_line`
 Confirmed overloaded: `_build_user_prompt` (`_otr_line_composer.py:933-1105`) assembles all 17 v3-listed context blocks (style, theme, canon header, named entities split into people/things, cast/character voice cards, outline spine, current beat, position-or-arc-phase, SFX, last-spoken window, role induction, mood, beat intent, word target). That is not one job.
 > AUDIT: `_otr_line_composer.py` already exists (~1660 lines) -- 3A is a **rewrite of an existing file**, effort ~2-3 days, not 1-2. `technical_fn` is a dead param (drop in Sprint 0). The combined `allowed_roster` is *not* rendered into the prompt today -- it feeds the downstream phantom gate only; keep that separation.
 
 New design (`compose_line_draft` does the one creative job; `compose_line` orchestrates draft -> strip -> polish). Critical ordering: deterministic strips run **before** the stripped line is appended to the rolling window, so the next line never inherits a hallucinated name.
 > AUDIT: there is **no `LAST_LINES_WINDOW` constant** -- the composer never trims; the caller hands it a pre-trimmed `last_lines` list. If you want a named window size, that is *new* work -- define the constant in the composer and move trimming in, or keep trimming caller-side and drop the v3 reference. `cast_strip` should wrap the existing `auto_remap_phantom` Levenshtein path from `_otr_ledger_reviewer.py`; `vocative_strip` is regex-only.
 
-### 3B. Outline Stage 3 -- adjacency + Python-owned budgets (round-robin gated)
-
+### 3B. Outline Stage 3 -- adjacency + Python-owned budgets
 1. **Inject adjacency context** -- CONFIRMED useful. `_build_beat_user_prompt` (`_otr_outline.py:1032-1065`) today gives the beat *no* neighbour context (docstring: "Beat-localized... NO other beat context"). Add `previous_beat_intent` + `next_beat_intent` + phase summary.
 2. ~~**Drop `target_words` from the LLM schema** as a functional fix~~ -- **already non-functional.** `_BeatFleshout` carries `target_words`, but `_allocate_phase_target_words` (`_otr_outline.py:1683-1707`) rebuilds the object with Python's allocation and discards the LLM number. Removing the field is still worth doing as **token-budget cleanup**, but it changes no behaviour -- reclassify it from "fix" to "cleanup."
 
 `BeatFleshOut` becomes `intent / mood / dramatic_function` (drop `target_words`).
 
-### 3C. Split Script Doctor -- Diagnosis then Edit (round-robin gated)
-
+### 3C. Split Script Doctor -- Diagnosis then Edit
 CONFIRMED: `_DOCTOR_SYSTEM_PROMPT` (`_otr_ledger_reviewer.py:626-655`) asks pacing + voice consistency + arc adherence + a strict JSON `edits` array in one call. CONFIRMED: Doctor input rows (`_render_lines_for_audit:311-323`) carry only `line_id, speaker_role, char_id, text` (text truncated to 200 chars) -- it is asked to judge pacing with no `beat_intent`, `arc_phase`, `mood`, or word counts per row.
 
 Two fixes, both required: (1) feed enriched rows (`beat_id, arc_phase, beat_intent, mood, target_words, actual_words, text`); (2) split into `run_script_doctor_diagnosis` (free/structured-prose, names the failure per line, no edits) then `run_script_doctor_edits` (strict JSON edit array, takes diagnostics as input, cannot rewrite a line whose diagnostics named no failure). `run_script_doctor` becomes the orchestrator. +1 LLM call per episode.
 
-### 3D. Split Casting -- Python owns the ensemble (round-robin gated)
-
+### 3D. Split Casting -- Python owns the ensemble
 CONFIRMED: `cast_one_character` -> `CastingResponse` = `character_description + gender + voice_preset`; the LLM picks `voice_preset` from a Python-narrowed pool. CONFIRMED: no Python global gender/timbre balance -- only a static prompt line "~40% male, ~40% female, ~20% other" plus a "cast so far" block.
 
 New design: `precompute_ensemble_slots` (Python decides gender/timbre/role balance up front), `llm_write_description` (LLM writes the description for one slot only), `python_assign_voice_preset` (Python picks from the pool by timbre). Net LLM call count lower -- voice selection leaves the LLM.
 > AUDIT: Python already enforces voice *uniqueness* (`_assert_unique_bark_voices`, pool pre-filter). The new code owns *distribution* too; don't duplicate the uniqueness check.
 
-### 3E. Title -- scratchpad + late binding (round-robin gated)
-
+### 3E. Title -- scratchpad + late binding
 CONFIRMED: `_generate_title_from_script` is single-shot; after regen, `OTR_LedgerScriptWriter.py:2687` substitutes the new title into any line text quoting the old outline title -- a **verbatim string match**, so paraphrased/conceptual references to the old title slip through.
 
 Two fixes: (1) force a scratchpad before the final title (extract 3 physical details -> draft 3 candidates -> `TITLE:` line, Python parses the last line); (2) use `EPISODE_TITLE: TBD` in the canon header during composition so no provisional title is ever spoken, and generate the final title from a richer excerpt set (`opening_lines`, `middle_lines`, `ending_lines`, `premise`, `arc_verdict`). Late binding removes the fragile post-hoc substitution entirely.
 
-### 3F. Cast Auditor -- strip floating-point confidence (round-robin gated)
-
+### 3F. Cast Auditor -- strip floating-point confidence
 CONFIRMED: `CastViolation` carries `confidence: float`. CONFIRMED but **imprecise in v3**: the gate is **not** a flat `>= 0.8`. `apply_deterministic_cast_repairs` uses `>= 0.8` for `bad_casing`, `>= 0.9` for `wrong_char_id` and `role_mismatch`, and **no** confidence gate for `alias_used` / `invented_name` / `speaker_unknown`. Small models cannot reliably distinguish 0.7 from 0.8 *or* 0.8 from 0.9 -- the argument holds for both thresholds. Remove confidence scoring from the auditor's job; auditor emits pure anomaly extraction (`found / expected_in_cast / violation_type`); Python decides replacement via exact case-fold match or Levenshtein <= 3, escalating ambiguous ties.
 
-### 3G. Reflection Brief -- sanitize input, drop suppression instructions (round-robin gated)
-
+### 3G. Reflection Brief -- sanitize input, drop suppression instructions
 CONFIRMED: `_build_reflection_input` (`_otr_story_brief.py:270-280`) emits a `CAST:` block with every character name + description, then `_REFLECTION_PROMPT` (L196-204) tells the model: no cast names, no proper nouns, no dialogue/plot verbs, no invented dates/places. The model is staring at names it is told to suppress.
 
 Pre-sanitize: replace cast names + known proper nouns with neutral tokens (`character_a`, `source_entity`) before the LLM sees them. Prompt collapses to "write a visual atmosphere brief, use no names." Schema-side reject lists stay as a safety net.
@@ -230,8 +222,7 @@ Pre-sanitize: replace cast names + known proper nouns with neutral tokens (`char
 
 ---
 
-## Sprint 5 -- Continuity Ledger + Story Critic + Targeted Reroll (Round-Robin Gated)
-
+## Sprint 5 -- Continuity Ledger + Story Critic + Targeted Reroll
 Justification confirmed by the 2026-05-24 LLM-call audit: **no LLM pass anywhere judges story quality** -- every gate is deterministic or structural. This is the direct fix for the `ozempics_glitch`-class failure.
 
 ### 5A. Continuity ledger -- BEFORE line composition
@@ -250,8 +241,7 @@ One pass post-Script-Doctor. Structured rubric, one dimension at a time: §1 con
 
 ---
 
-## Sprint 6 -- Critic -> Render Coupling (Round-Robin Gated)
-
+## Sprint 6 -- Critic -> Render Coupling
 - [ ] `render_selection: dramatic_peaks_only` reads `render_priority[]` from 5B.
 - [ ] `flat_lines[]` excluded from render unless rerolled.
 - [ ] `arc_verdict in [mid_collapse, flat]` blocks render until critic cycle 2 clears.
@@ -269,29 +259,29 @@ One pass post-Script-Doctor. Structured rubric, one dimension at a time: §1 con
 | 2B | Repair temperature fix | No | Folded into 2A |
 | 2C | Typed repair prompts (reuse existing Levenshtein) | No | 1 day |
 | 2D | Cleanup pass retries via 2A | No | Hours |
-| 2E | GBNF wire | **Yes** | Days |
-| 3A | Rewrite `compose_line` (~1660-line file) + strips-before-window | **Yes** | 2-3 days |
-| 3B | Outline Stage 3 adjacency (+ `target_words` token cleanup) | **Yes** | 1 day |
-| 3C | Split Script Doctor (Diagnosis + Edit) + enrich rows | **Yes** | 1-2 days |
-| 3D | Split Casting (Python owns ensemble + voice) | **Yes** | 1 day |
-| 3E | Title scratchpad + late binding | **Yes** | 1 day |
-| 3F | Cast Auditor: strip confidence (note dual 0.8/0.9 thresholds) | **Yes** | Hours |
-| 3G | Reflection: sanitize input, drop suppression | **Yes** | Hours |
+| 2E | GBNF wire | No | Days |
+| 3A | Rewrite `compose_line` (~1660-line file) + strips-before-window | No | 2-3 days |
+| 3B | Outline Stage 3 adjacency (+ `target_words` token cleanup) | No | 1 day |
+| 3C | Split Script Doctor (Diagnosis + Edit) + enrich rows | No | 1-2 days |
+| 3D | Split Casting (Python owns ensemble + voice) | No | 1 day |
+| 3E | Title scratchpad + late binding | No | 1 day |
+| 3F | Cast Auditor: strip confidence (note dual 0.8/0.9 thresholds) | No | Hours |
+| 3G | Reflection: sanitize input, drop suppression | No | Hours |
 | 4 | Zero-Prime Wash + Sovereignty + attention fallback (VRAM gate already exists -- verify only) | No | 2-3 days |
-| 5 | Continuity ledger + critic + targeted reroll | **Yes** | Week |
-| 6 | Critic->render coupling | **Yes (with 5)** | Days |
+| 5 | Continuity ledger + critic + targeted reroll | No | Week |
+| 6 | Critic->render coupling | No (ships with 5) | Days |
 | Appendix A | Optional model additions | No | As needed |
 
-Round-robin gating: 2E, 3A-G, 5A-C, 6.
+Round-robin consultation: WAIVED 2026-05-24 (Jeffrey) -- already done in earlier sessions. No sprint is gated; the build proceeds sprint-after-sprint.
 
 ---
 
-## Open Decisions for Jeffrey (must answer before the relevant sprint)
+## Open Decisions for Jeffrey -- ALL RESOLVED (2026-05-24)
 
 1. **`humo_max_lines_per_process`** -- **RESOLVED 2026-05-24: stays `0`** (logged `BUG_LOG.md:210` decision not reverted; v3's `6` declined).
 2. **`clip_length`** -- **RESOLVED 2026-05-24: leave editable, default `7.0`** (no lock, no code change).
 3. **`experimental_gguf` tier** -- **RESOLVED 2026-05-24: leave untouched** (not renamed).
-4. **GBNF (2E)** -- wire or delete? (round-robin gated)
+4. **GBNF (2E)** -- **RESOLVED 2026-05-24: wire** into `structured_call` Attempt 4 (already the preferred path; round-robin waived).
 5. **Story-quality critic track (5B)** -- confirm it gets its own roadmap track once this batch lands.
 6. **`technical_fn` on `compose_line` (Sprint 0)** -- **RESOLVED 2026-05-24: option (a) -- keep `technical_fn`; item pulled from Sprint 0.** Background: the v4 audit called it dead weight, but `tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` asserts `technical_fn` MUST exist as a keyword-only param, and the paired `creative_fn`+`technical_fn` contract is deliberate uniformity across 4 sibling helpers, kept for the planned B2/B3/B4 per-sub-pass dispatch. Options: **(a)** keep `technical_fn` -- skip this Sprint 0 item, accept that `compose_line` carries an unused-but-contractual param (recommended -- it stays consistent with its 3 sibling helpers and B2/B3/B4 will need the slot again); **(b)** drop it AND update/retire `test_compose_line_accepts_paired_generators` plus ~21 test call sites across 5 test files, reversing the S32 B1 decision.
 
@@ -338,8 +328,8 @@ cast_auditor_confidence_scoring: off
 reflection_input_sanitization: on
 critic_rubric_mode: dimension_walk
 
-# GBNF (Sprint 2E -- gated)
-gbnf_enforcement: wired                               # pending round-robin
+# GBNF (Sprint 2E)
+gbnf_enforcement: wired                               # decision 4: wire
 ```
 
 ---
@@ -380,3 +370,8 @@ gbnf_enforcement: wired                               # pending round-robin
 - **Regression:** green 2026-05-24 -- `test_humo_tier_loader` 24 + `test_structured_call` 11 + `test_core` 59 + `test_audio_byte_identical` 9 (1 skipped) = 103 passed / 1 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed.
 - **New bug ids:** none.
 - Built with two parallel subagents on disjoint file sets (humo loader + its test + `__init__.py`; new `_otr_structured_call.py` + new test).
+
+### 2026-05-24 -- round-robin gating removed from the plan
+- Jeffrey waived the round-robin consultation requirement -- these changes were round-robined in earlier sessions. Every "round-robin gated" / round-robin-`BLOCKED` marker is removed from this plan: Status Board (2E + 3A-3G + 5 + 6 -> NOT STARTED), the sprint section headers, the Implementation Order "Gated" column (all No), Open Decision 4 (GBNF -> RESOLVED: wire), and the config block. The build now runs sprint-after-sprint with no consultation gate.
+- Plan-only edit; no code touched.
+- Note: `CLAUDE.md` still carries a "## Round-Robin Consultation" section as a general project rule. Not edited here -- the instruction scoped to the sprint plan. Flag for Jeffrey if he wants CLAUDE.md amended to match.
