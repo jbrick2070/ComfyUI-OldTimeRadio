@@ -188,8 +188,8 @@ LEMMY_PROFILE = {
     "demeanor": "gravelly",
     "accent": "neutral",
     "voice_preset": "v2/en_speaker_8",  # English native - gravelly, confident, 40s-50s. Avoids Bark hallucination from de_speaker
-    "character_description": "Grizzled wrench-wielding engineer, 50s, gravelly voice, gruff mechanic, anxious-confident demeanor",
-    "notes": "Male, gravelly/raspy, 50s, gruff mechanic voice, iconic",
+    "character_description": "Genial communications officer, 50s, gravelly voice, quick-witted with a warm grin, brandishing a handheld brass communicator that looks like a polycorder crossed with a harmonica",
+    "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
 }
 
 # -----------------------------------------------------------------------------
