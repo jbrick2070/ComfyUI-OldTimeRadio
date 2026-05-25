@@ -62,10 +62,10 @@
 |---|---|---|---|
 | 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); `technical_fn` drop PULLED (Decision 6 -- keep); only the deferred CI AST sweep remains |
 | 1 -- render seatbelts | COMPLETE | -- | tier rename landed `df7f9b1`; decisions 1-2 resolved to no-change; render-flag defaults already on |
-| 2A -- structured_call helper | IN PROGRESS | -- | step 1 `61f8cfa`; post_validator + max_new_tokens extensions `fed6327`; `_otr_ledger_reviewer` converted `7f3b65f`; 4 call-site files pending (story_brief, news, casting, outline) |
+| 2A -- structured_call helper | COMPLETE | -- | helper `61f8cfa`; extensions `fed6327`; all call sites converted -- ledger `7f3b65f`, story_brief `3f41fc8`, news `b4c6e83`, casting `6e2950d`, outline `476eabc` |
 | 2B -- repair temp fix | COMPLETE | -- | baked into `structured_call` (structural retry < base, asserted at entry) `61f8cfa` |
 | 2C -- typed repair prompts | NOT STARTED | -- | ledger conversion uses `default_repair_prompt_factory`; bespoke per-failure-class factories still pending |
-| 2D -- cleanup pass retries | IN PROGRESS | -- | `audit_cast_contract` + `run_script_doctor` -> `structured_call(max_attempts=4)` `7f3b65f` |
+| 2D -- cleanup pass retries | COMPLETE | -- | `audit_cast_contract` + `run_script_doctor` -> `structured_call(max_attempts=4)` `7f3b65f` |
 | 2E -- GBNF wire | NOT STARTED | -- | decision 4 resolved -- wire |
 | 3A -- split compose_line | NOT STARTED | -- | -- |
 | 3B -- outline Stage 3 | NOT STARTED | -- | -- |
@@ -384,3 +384,15 @@ gbnf_enforcement: wired                               # decision 4: wire
 - **New bug ids:** none.
 - **Wave 2 state:** 1 of 5 files converted (`_otr_ledger_reviewer.py` -- 2 of 6 call sites). Remaining: `_otr_story_brief.py`, `news_interpreter.py`, `_otr_casting.py`, `_otr_outline.py`. Per-file conversion notes + the two open wrinkles (casting's `validation_fn` repair-slot routing, which `structured_call`'s single `slot_fn` cannot express; news's `NewsBriefs` subset-key construction) are recorded in `session_handoff.md`.
 - Built lead-only (no subagents): the `structured_call` extension is a shared-module change (not file-disjoint, must be serial), and the ledger conversion establishes the conversion pattern for the remaining four files.
+
+### 2026-05-24 -- Wave 2: four structured_call call-site conversions
+
+- Commits on `v2.0-alpha`: `3f41fc8` (`_otr_story_brief` -- 5 files, +234/-474), `b4c6e83` (`news_interpreter` -- 1 file, +129/-146), `6e2950d` (`_otr_casting` -- 3 files, +144/-151), `476eabc` (`_otr_outline` -- 2 files, +139/-271). Predecessor HEAD `f996544`.
+- **All four remaining structured-JSON call sites converted onto the shared `structured_call` retry ladder.** Each helper's hand-rolled call -> parse -> validate -> repair loop is replaced by one `structured_call`; the content validation that drove each loop's retry moves onto `post_validator`; `StructuredCallFailedError` plus a broad `except` (structured_call does not catch slot-fn exceptions) map to each function's existing failure contract. Every converted pass's structural retry now LOWERS temperature (Sprint 2B) -- story_brief / news / casting / outline Stages 1+3 previously RAISED it.
+- `run_story_brief_reflection`: never-raises / 8-key meta-delta contract preserved. `build_news_briefs`: full-dict `model_validate` (`NewsBriefs` extra="ignore"), a slot-call counter preserves the `attempts` telemetry the writer logs. `cast_one_character`: voice-pool check on `post_validator`; the `attempts`-list length is rebuilt so `lock_cast`'s `CastValidationLLMError` promotion still fires on a full exhaustion. `generate_outline`: 3 stages converted, `_run_call_with_retry` + `_REPAIR_PROMPT_TEMPLATE` deleted, the BUG-LOCAL-259 deterministic Stage 2 fallback + singleton-cast skip preserved.
+- **S32 B3 reversed.** casting's `validation_fn` (technical-slot repair routing) removed -- `structured_call`'s single `slot_fn` cannot switch slots per attempt. Resolves the casting wrinkle from the Wave 2 handoff (Jeffrey 2026-05-24: full convert).
+- Dead code removed: story_brief `_repair_pass` / `_build_repair_messages` / repair-temp constants; news + casting `_REPAIR_RAW_CAP_CHARS`; outline `_run_call_with_retry` / `_REPAIR_PROMPT_TEMPLATE`. Obsolete tests pruned / rewritten to the ladder contract; `tests/test_story_brief_clamp_logging.py` removed (its SA-101 repair-pass clamp log no longer exists).
+- No node `INPUT_TYPES` / widget / socket changed -- all five are internal helpers -- so no workflow JSON re-wire (Prime Directive 3 N/A).
+- **Regression after each file:** full OTR suite green (2637-2639 passed / 21 skipped across the four runs; collected count drops 2 as obsolete outline tests were pruned); Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green. 0 failed.
+- **New bug ids:** none.
+- **Follow-up queued:** Jeffrey 2026-05-24 -- remove the S32 B1 unused paired-signature params (`lock_cast.technical_fn`, `build_news_briefs.creative_fn`, `compose_line.technical_fn`) as a dedicated commit. Reverses Sprint 0 Decision 6 (keep `technical_fn`).
