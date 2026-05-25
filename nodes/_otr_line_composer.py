@@ -664,6 +664,14 @@ class LineRequest:
     # directions and asterisk action. Default "character" so legacy
     # callers / tests see the original prompt unchanged.
     speaker_role: str = "character"
+    # Sprint 5A (2026-05-25) -- continuity slice. The writer renders a
+    # per-speaker, per-beat hard-constraint block from the episode
+    # ContinuityState (_otr_continuity.render_continuity_slice) and
+    # threads the prompt-ready string here. Empty string means no
+    # continuity signal for this speaker/beat -- `_build_user_prompt`
+    # drops the block entirely. Default "" keeps every existing caller
+    # and test working unchanged.
+    continuity_slice: str = ""
 
 
 @dataclass(frozen=True)
@@ -1035,6 +1043,20 @@ def _build_user_prompt(req: LineRequest) -> str:
     if req.current_beat_block:
         parts.append("")
         parts.append(req.current_beat_block)
+
+    # CONTINUITY CONSTRAINTS -- Sprint 5A (2026-05-25). A per-speaker,
+    # per-beat hard-constraint block the writer renders from the episode
+    # ContinuityState (who knows what, by which beat -- see
+    # `_otr_continuity.render_continuity_slice`). Lives in the per-beat
+    # tail because it changes per call, and sits ABOVE POSITION /
+    # WRITE LINE so the constraint frames the beat before the model
+    # writes. The slice string already carries its own
+    # "CONTINUITY CONSTRAINTS ..." header. Empty string -> block dropped
+    # (no continuity signal for this speaker at this beat), so every
+    # caller / test that omits the field is unaffected.
+    if req.continuity_slice:
+        parts.append("")
+        parts.append(req.continuity_slice)
 
     # POSITION supersedes the old generic ARC PHASE block (Commit 4
     # in the v4 plan). Emits the position string verbatim. Legacy

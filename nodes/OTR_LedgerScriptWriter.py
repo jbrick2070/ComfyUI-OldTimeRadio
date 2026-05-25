@@ -1868,6 +1868,7 @@ class OTR_LedgerScriptWriter:
         from . import news_interpreter as _OTRNI
         from . import _otr_news_wiring as _OTRNW
         from . import production_ledger as _PL
+        from . import _otr_continuity as _OTRCONT
 
         # --- C. Slot scheduler -- B2b two-slot LLM routing -------------
         # Replaces the single _OTRML.load_llm + _build_truncating_generate_fn
@@ -2335,6 +2336,46 @@ class OTR_LedgerScriptWriter:
             "%d line rows", len(led.data.get("lines", []) or []),
         )
 
+        # --- H.5. Sprint 5A: continuity ledger -------------------------
+        # One structured LLM call that reads the finished outline + the
+        # locked cast and extracts the episode's ContinuityState -- the
+        # narrative facts, each tagged with who knows it and who must not
+        # reference it yet, plus the beat index where it becomes true.
+        # The per-beat loop below renders a per-speaker continuity slice
+        # from this state into every LineRequest, so a character cannot
+        # reference a fact they should not yet know. The builder NEVER
+        # raises -- on any LLM/schema failure it degrades to a neutral
+        # state and the slice renders empty (Prime Directive 1).
+        #
+        # LLM slot: technical -- structured fact extraction from the
+        # outline (JSON object validated against a pydantic schema), not
+        # creative prose. The model id arrives via the technical slot
+        # callable; no new widget, no model_id parameter (Prime
+        # Directive 6). OTR_LedgerScriptWriter.py is exempt from the CI
+        # `# LLM slot:` sweep, so this tag is verified by eye.
+        with slot_scheduler.helper_context("build_continuity_ledger"):
+            continuity_state = _OTRCONT.build_continuity_ledger(
+                technical_generate_fn,
+                outline,
+                cast_rows,
+                technical_repo_id=resolved["technical_model"],
+            )
+        meta["continuity"] = continuity_state.model_dump()
+        led.save()
+        log.info(
+            "[OTR_LedgerScriptWriter] Sprint 5A continuity ledger: "
+            "%d fact(s), location=%r, %d active prop(s)",
+            len(continuity_state.facts), continuity_state.location,
+            len(continuity_state.active_props),
+        )
+        # render_continuity_slice keys facts to the 0-based beat
+        # position in outline.beats -- the same coordinate
+        # build_continuity_ledger used for `established_beat`. Build the
+        # id -> index map once for the per-beat closure below.
+        beat_index_by_id = {
+            b.beat_id: i for i, b in enumerate(outline.beats)
+        }
+
         # --- I. Per-beat loop ------------------------------------------
         script_text_parts: list = []
         last_lines: list = []  # rolling window of LAST_LINES_WINDOW
@@ -2560,6 +2601,15 @@ class OTR_LedgerScriptWriter:
                 all_voice_cards=all_voice_cards_str,
                 sfx_cue=(beat.sfx_cue or "").strip(),
                 position=_position_for(beat),
+                # Sprint 5A (2026-05-25) -- per-speaker continuity slice
+                # rendered from the episode ContinuityState. Empty string
+                # when this speaker has no continuity signal at this beat;
+                # _build_user_prompt drops the block on an empty value.
+                continuity_slice=_OTRCONT.render_continuity_slice(
+                    continuity_state,
+                    speaker,
+                    beat_index_by_id.get(beat.beat_id, 0),
+                ),
             )
 
         for beat in outline.beats:
