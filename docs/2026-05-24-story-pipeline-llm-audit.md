@@ -2,7 +2,7 @@
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
 - **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `3d6ad91`)
-- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: 3A, 4, 5, 6. BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`) -- see the punch list. See the "Multi-agent execution plan" section for the lane map.
+- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: Sprint 4 close-out, 5, 6 -- Sprint 3A landed 2026-05-25 (`e24b327`, compose_line split + cast_strip) and Sprint 4's code-side verify landed (`6b9300e`). BUG-LOCAL-271 + the 3C Doctor-row enrichment + WORD_BUDGET_DRIFT were fixed 2026-05-25 (commits `3e120df` / `14818bb` / `dfd63ee`) -- see the punch list. See the "Multi-agent execution plan" section for the lane map.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -13,10 +13,16 @@
 
 **Status 2026-05-25:** punch-list items 1-3 (BUG-LOCAL-271, the 3C
 Doctor-row enrichment, WORD_BUDGET_DRIFT) are **RESOLVED and pushed**
-(commits `3e120df` / `14818bb` / `dfd63ee`). **Open work to move this
-audit to completion: item 4 (live-validation) + items 5-8 (Sprints
-3A / 4 / 5 / 6).** Items below stay in priority order; resolved items
-keep their detail inline for the build record.
+(commits `3e120df` / `14818bb` / `dfd63ee`). **Sprint 3A is DONE**
+(`e24b327` -- compose_line split into compose_line_draft + a thin
+orchestrator + the new cast_strip step) and **Sprint 4's code-side
+verify is DONE** (`6b9300e` -- VRAM bullets confirmed present +
+BUG-LOCAL-272 fixed). **Open work to move this audit to completion:
+item 4 (the live-run, which now also validates Sprint 3A) + Sprint 4
+close-out (the 14B VRAM-cap decision + the prompt-cache bullet + the
+operator RTX-5080 confirmation) + Sprints 5 and 6.** Items below stay
+in priority order; resolved items keep their detail inline for the
+build record.
 
 **Bugs to fix**
 
@@ -67,14 +73,18 @@ keep their detail inline for the build record.
    (`speaker_role == "character"`) beats only, mirroring
    `validate_outline_against_budget` validator #1. No `_otr_outline.py`
    change was needed.
-4. **Live-validate the open batch (now also covers BUG-271).** One
-   ComfyUI episode on current HEAD `3d6ad91` confirms, in a single run:
-   BUG-LOCAL-269/270 + the `seed`-widget removal (the cast now varies,
-   the writer node has no `seed` widget); BUG-LOCAL-271
-   (`audit_cast_contract:pre` repairs `wrong_char_id` violations instead
-   of escalating all to the Script Doctor); WORD_BUDGET_DRIFT no longer
-   false-fires; the episode completes + freezes clean. **This is the
-   immediate next action.**
+4. **Live-validate the open batch (now also covers Sprint 3A +
+   BUG-271).** One ComfyUI episode on current HEAD `ca6a727` confirms,
+   in a single run: **Sprint 3A** -- the episode composes + freezes
+   clean via the new `compose_line_draft` path and the final mp4 is
+   produced (Prime Directive 1 -- audio is king), and if a `cast_strip`
+   remap fires the console shows `cast_strip remapped N phantom(s)`
+   onto a real cast member; BUG-LOCAL-269/270 + the `seed`-widget
+   removal (the cast now varies, the writer node has no `seed` widget);
+   BUG-LOCAL-271 (`audit_cast_contract:pre` repairs `wrong_char_id`
+   violations instead of escalating all to the Script Doctor);
+   WORD_BUDGET_DRIFT no longer false-fires; the episode completes +
+   freezes clean. **This is the immediate next action.**
 
 **Remaining build -- to "complete" this audit**
 
@@ -215,7 +225,7 @@ Episode `signal_lost_vances_promise_20260525_125401` (episode id `pending_202605
 
 ## Multi-agent execution plan (remaining sprints)
 
-As of 2026-05-25, Sprints 0, 1, 2A-2E, 3B-3G are COMPLETE and pushed -- the 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files, validating this method again. The remaining audited work is Sprints 3A, 4, 5, 6. This section's lane map is retained for Sprint 3A and as the build-pattern record.
+As of 2026-05-25, Sprints 0, 1, 2A-2E, 3B-3G are COMPLETE and pushed -- the 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files, validating this method again. The remaining audited work is Sprint 4 close-out, 5, 6 -- Sprint 3A landed 2026-05-25 (`e24b327`). This section's lane map is retained as the build-pattern record.
 
 ### The method
 
@@ -241,7 +251,7 @@ Each lane is one parallel subagent. The primary files are mutually disjoint, so 
 | E | 3E -- title scratchpad | `OTR_LedgerScriptWriter.py` + title path | ~1 day | no | Scratchpad before the final title; `EPISODE_TITLE: TBD` in the canon header during composition; late binding removes the fragile post-hoc string substitution. **WARNING:** `OTR_LedgerScriptWriter.py` is EXEMPT from the CI sweep -- a new untagged LLM call here is NOT auto-caught; tag manually. |
 
 **Wave 1 (parallel):** Lanes B + C + D + E -- four disjoint files, four subagents at once. **[COMPLETE 2026-05-25 -- `3992607` / `74438ff` / `5fe9931` / `d230cd6`.]**
-**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave. **[NOT STARTED -- the 3B-3E live-run validation is done (2026-05-25); 3A is the next build lane.]**
+**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave. **[COMPLETE 2026-05-25 -- `e24b327`. compose_line split into compose_line_draft + a thin orchestrator + the new cast_strip step; lead-driven. Operator live-run pending (Prime Directive 1).]**
 
 ### Dependencies and gating
 
