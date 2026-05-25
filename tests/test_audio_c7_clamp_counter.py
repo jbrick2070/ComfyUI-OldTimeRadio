@@ -67,10 +67,14 @@ def test_clamp_counter_zero_during_basic_resolver_calls(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The D0c clamp log line ("[OTR_StoryBrief] repair pass clamped")
-    must NOT fire while the resolver runs at default config. The
-    resolver does not invoke the story-brief reflection pass; the
-    only path that emits the clamp log is `_otr_story_brief
-    ._repair_pass` which only runs on validator-rejection retry.
+    must NOT fire while the resolver runs at default config.
+
+    Sprint 2A/2D removed the hand-rolled story-brief repair pass (and
+    its clamp log) when `run_story_brief_reflection` was converted onto
+    the shared `structured_call` ladder, so this count is now a
+    structural zero. The assertion stands as a regression guard that
+    no future change re-introduces a story-brief repair-clamp log on
+    the resolver's modern path.
     """
     caplog.set_level(logging.INFO, logger="OTR")
     for phase in PHASES:

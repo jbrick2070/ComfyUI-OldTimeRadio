@@ -27,6 +27,16 @@ These tests PROVE the schema-repair arm executes:
 The module is pure (no I/O, no GPU, no ComfyUI imports), so every test
 runs against a plain dict ledger and a call-counting `technical_fn`
 stand-in -- matching the fixture style of `tests/test_story_brief_c5a1.py`.
+
+Sprint 2A/2D update: `run_story_brief_reflection` was converted onto the
+shared `structured_call` retry ladder; the hand-rolled `_repair_pass`
+was removed. The BUG-LOCAL-268 concern -- a schema-invalid first
+response MUST trigger a recovering retry -- is unchanged and is now
+served by the ladder's Attempt 2 (structural retry). The two tests
+below that previously asserted the old raised repair temperature and
+spied the removed `_repair_pass` were rewritten to assert the ladder
+contract: the retry runs, it lowers temperature, and it goes through
+`structured_call`.
 """
 
 from __future__ import annotations
@@ -197,68 +207,71 @@ def test_schema_repair_arm_invokes_technical_fn_a_second_time():
     assert result["story_brief_status"] == "ok"
 
 
-def test_schema_repair_arm_uses_clamped_repair_temperature():
-    """The second `technical_fn` call (the repair pass) must run at the
-    clamped repair temperature, not the base reflection temperature.
+def test_schema_retry_lowers_temperature():
+    """The second `technical_fn` call (the structural retry) must run
+    at a temperature STRICTLY BELOW the base reflection temperature.
 
-    base 0.30 + bump 0.15 = 0.45 (under the 0.55 ceiling). This is
-    extra proof the call really went through `_repair_pass` rather than
-    being a stray re-entry of Block 1."""
+    Sprint 2A/2D: `run_story_brief_reflection` routes through the shared
+    `structured_call` ladder. Per the Sprint 2B principle a JSON-schema
+    re-roll LOWERS entropy -- the old hand-rolled repair pass raised it
+    by +0.15, which this conversion corrects. This also proves the
+    second call really is the ladder's Attempt 2, not a stray
+    re-entry."""
     led = _mk_ledger()
     spy = _make_spy_fn(responses=[_schema_invalid_json(), _valid_brief_json()])
 
     sb.run_story_brief_reflection(led, spy)
 
-    assert len(spy.calls) >= 2, "repair pass did not run"
+    assert len(spy.calls) >= 2, "structural retry did not run"
     # Call #1 is the base reflection pass.
     assert abs(spy.calls[0]["temperature"]
                - sb._REFLECTION_TEMPERATURE) < 1e-6
-    # Call #2 is the repair pass: base + bump, clamped at the ceiling.
-    expected_repair_temp = min(
-        sb._REFLECTION_TEMPERATURE + sb._REPAIR_TEMPERATURE_BUMP,
-        sb._REPAIR_TEMPERATURE_CEILING,
+    # Call #2 is the structural retry -- below base, never above.
+    assert spy.calls[1]["temperature"] < spy.calls[0]["temperature"], (
+        f"structural-retry temperature {spy.calls[1]['temperature']} "
+        f"must be below the base temperature {spy.calls[0]['temperature']}"
     )
-    assert abs(spy.calls[1]["temperature"] - expected_repair_temp) < 1e-6, (
-        f"repair-pass temperature {spy.calls[1]['temperature']} does not "
-        f"match the clamped repair temperature {expected_repair_temp}"
+    assert abs(spy.calls[1]["temperature"]
+               - sb._REFLECTION_STRUCTURAL_RETRY_TEMPERATURE) < 1e-6, (
+        f"structural-retry temperature {spy.calls[1]['temperature']} does "
+        f"not match _REFLECTION_STRUCTURAL_RETRY_TEMPERATURE "
+        f"({sb._REFLECTION_STRUCTURAL_RETRY_TEMPERATURE})"
     )
 
 
-def test_schema_repair_pass_invoked_exactly_once(monkeypatch):
-    """Direct spy on `_repair_pass`: a schema-invalid first response
-    must invoke `_repair_pass` exactly once.
+def test_schema_failure_routes_through_structured_call(monkeypatch):
+    """A schema-invalid first response must be handled by the shared
+    `structured_call` ladder -- the entrypoint delegates the call +
+    retry to it rather than hand-rolling a repair pass.
 
-    Pre-fix the call site dies on `NameError: name 'json_str' is not
-    defined` while evaluating the keyword arguments -- so `_repair_pass`
-    is never entered and this spy records zero calls. Post-fix it is
-    invoked once."""
+    Sprint 2A/2D: the former direct `_repair_pass` spy was retired with
+    the hand-rolled repair pass; the ladder is now the single retry
+    surface. This spy confirms `structured_call` is on the path and
+    receives the `StoryBriefModel` schema + the technical slot fn."""
     led = _mk_ledger()
     spy = _make_spy_fn(responses=[_schema_invalid_json(), _valid_brief_json()])
 
-    repair_calls: list[dict] = []
-    real_repair_pass = sb._repair_pass
+    structured_calls: list[dict] = []
+    real_structured_call = sb.structured_call
 
-    def spy_repair_pass(*args, **kwargs):
-        repair_calls.append({"args": args, "kwargs": kwargs})
-        return real_repair_pass(*args, **kwargs)
+    def spy_structured_call(*args, **kwargs):
+        structured_calls.append({"args": args, "kwargs": kwargs})
+        return real_structured_call(*args, **kwargs)
 
-    monkeypatch.setattr(sb, "_repair_pass", spy_repair_pass)
+    monkeypatch.setattr(sb, "structured_call", spy_structured_call)
 
     result = sb.run_story_brief_reflection(led, spy)
 
-    assert len(repair_calls) == 1, (
-        f"_repair_pass was invoked {len(repair_calls)} time(s), "
-        "expected exactly 1. Pre-fix the schema-repair call site raises "
-        "NameError on `json_str` before _repair_pass is entered."
+    assert len(structured_calls) == 1, (
+        f"structured_call was invoked {len(structured_calls)} time(s), "
+        "expected exactly 1 -- the entrypoint must delegate the call + "
+        "retry to the shared ladder"
     )
-    # The repair pass must have received the raw LLM output as
-    # `failed_output` -- the whole point of the json_str -> raw fix.
-    call = repair_calls[0]
-    failed_output = call["kwargs"].get("failed_output")
-    if failed_output is None and call["args"]:
-        failed_output = call["args"][0]
-    assert failed_output == _schema_invalid_json(), (
-        "_repair_pass should receive the raw schema-invalid LLM output "
-        "as `failed_output` (the json_str -> raw fix)"
+    kwargs = structured_calls[0]["kwargs"]
+    assert kwargs.get("schema") is sb.StoryBriefModel, (
+        "structured_call must receive the StoryBriefModel schema"
+    )
+    assert kwargs.get("slot_fn") is spy, (
+        "structured_call must receive the technical slot fn"
     )
     assert result["story_brief_status"] == "ok"

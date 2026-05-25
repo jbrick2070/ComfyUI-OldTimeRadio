@@ -22,15 +22,15 @@ Coverage map (per SPRINT.md C5a1 pytest table):
     7. rejects decade literal
     8. rejects over 300 chars
 
-  Repair pass (refinement section 3.5 + E-18 + R-06):
-    9. runs once when initial validation fails
-   10. uses higher temperature
-   11. clamped to 0.55 ceiling
-   12. prepends CRITICAL prefix
+  Retry ladder (Sprint 2A/2D -- structured_call):
+    9. structural retry re-rolls when initial validation fails
+   10. no retry runs on a clean first pass
+   11. structural retry LOWERS temperature (Sprint 2B contract)
 
-  Sentinel / shape (L-6 + L-8 + E-17 + E-21):
-   13. 3 distinct except arms each returning failure sentinel (AST)
-   14. each try block contains exactly one statement (AST scoped)
+  Sentinel / shape (L-8 + E-21 + structured_call):
+   12. entrypoint routes through structured_call (AST)
+   13. StructuredCallFailedError + broad slot-fn except handled (AST)
+   14. try blocks stay narrowly scoped (AST)
    15. stamps 8 meta keys on success
    16. stamps story_brief_status="failed" on technical_fn raise
    17. signature accepts only technical_fn (no creative_fn) (AST)
@@ -272,63 +272,27 @@ class TestValidation:
 
 
 # ---------------------------------------------------------------------------
-# 9-12. Repair pass
+# 9-11. Retry ladder (structured_call)
 # ---------------------------------------------------------------------------
+# Sprint 2A/2D: the hand-rolled repair pass (_repair_pass /
+# _build_repair_messages) was removed when run_story_brief_reflection
+# was converted onto the shared structured_call retry ladder. The old
+# direct _repair_pass unit tests (raised-temperature + 0.55-clamp +
+# CRITICAL-prefix assertions) tested behavior the ladder deliberately
+# replaces: the ladder LOWERS temperature on a structural retry rather
+# than raising it (the Sprint 2B fix). What survives is the observable
+# contract -- a rejected first response re-rolls the slot fn, a clean
+# first response does not, and the re-roll runs at a lower temperature.
 
 
-class TestRepairPass:
+class TestRetryLadder:
 
-    def test_repair_uses_higher_temperature(self):
-        spy = _make_spy_fn(responses=[_valid_brief_json()])
-        sb._repair_pass(
-            failed_output="bad",
-            rejection_reasons=["named_character"],
-            technical_fn=spy,
-            base_user_message="ignored",
-            reflection_temperature=0.30,
-        )
-        assert len(spy.calls) == 1
-        # 0.30 + 0.15 = 0.45, well under the 0.55 ceiling.
-        assert abs(spy.calls[0]["temperature"] - 0.45) < 1e-6
-
-    def test_repair_temperature_clamped_to_055(self):
-        """E-18 / RR-B5: repair_temperature = min(base + 0.15, 0.55).
-        Base 0.50 -> 0.65 raw -> clamped to 0.55."""
-        spy = _make_spy_fn(responses=[_valid_brief_json()])
-        sb._repair_pass(
-            failed_output="bad",
-            rejection_reasons=["named_character"],
-            technical_fn=spy,
-            base_user_message="ignored",
-            reflection_temperature=0.50,
-        )
-        assert abs(spy.calls[0]["temperature"] - 0.55) < 1e-6, (
-            f"observed temperature {spy.calls[0]['temperature']}; "
-            "should clamp to 0.55"
-        )
-
-    def test_repair_prepends_critical_prefix(self):
-        spy = _make_spy_fn(responses=[_valid_brief_json()])
-        sb._repair_pass(
-            failed_output="bad",
-            rejection_reasons=["named_character", "dialogue_verb"],
-            technical_fn=spy,
-            base_user_message="base context",
-            reflection_temperature=0.30,
-        )
-        user_msg = spy.calls[0]["messages"][0]["content"]
-        assert user_msg.startswith(
-            "CRITICAL: You previously failed validation because:"
-        ), user_msg[:120]
-        # The named-character and dialogue-verb reason codes are in.
-        assert "named_character" in user_msg
-        assert "dialogue_verb" in user_msg
-
-    def test_repair_runs_when_initial_fails(self):
-        """Integration: the main entrypoint runs the repair pass when
-        initial content validation rejects."""
+    def test_retry_runs_when_initial_fails(self):
+        """A content-rejected first response must re-roll the ladder --
+        the entrypoint invokes technical_fn a second time."""
         led = _mk_ledger()
-        # First response mentions a cast name (rejects); second is clean.
+        # First response mentions a cast name (content reject); second
+        # is clean.
         bad_brief = (
             '{"story_brief": "a dim room where Jones leans over a table", '
             '"setting_terms": ["room", "table"], '
@@ -337,15 +301,38 @@ class TestRepairPass:
         )
         spy = _make_spy_fn(responses=[bad_brief, _valid_brief_json()])
         result = sb.run_story_brief_reflection(led, spy)
-        assert len(spy.calls) == 2, "repair pass should have invoked technical_fn twice"
+        assert len(spy.calls) == 2, (
+            "structural retry should have invoked technical_fn twice"
+        )
         assert result["story_brief_status"] == "ok"
 
-    def test_repair_does_not_run_when_initial_passes(self):
+    def test_retry_does_not_run_when_initial_passes(self):
         led = _mk_ledger()
         spy = _make_spy_fn(responses=[_valid_brief_json()])
         result = sb.run_story_brief_reflection(led, spy)
-        assert len(spy.calls) == 1, "no repair should run on clean first pass"
+        assert len(spy.calls) == 1, "no retry should run on clean first pass"
         assert result["story_brief_status"] == "ok"
+
+    def test_structural_retry_lowers_temperature(self):
+        """Sprint 2B contract: the Attempt 2 structural retry runs at a
+        temperature STRICTLY BELOW the base attempt -- a JSON-schema
+        re-roll lowers entropy, it never raises it (the old repair pass
+        RAISED it by +0.15)."""
+        led = _mk_ledger()
+        bad_brief = (
+            '{"story_brief": "a dim room where Jones leans over a table", '
+            '"setting_terms": ["room"], "lighting_terms": ["bulb"], '
+            '"atmosphere_terms": ["tense"]}'
+        )
+        spy = _make_spy_fn(responses=[bad_brief, _valid_brief_json()])
+        sb.run_story_brief_reflection(led, spy)
+        assert len(spy.calls) == 2, "structural retry did not run"
+        assert abs(spy.calls[0]["temperature"]
+                   - sb._REFLECTION_TEMPERATURE) < 1e-6
+        assert spy.calls[1]["temperature"] < spy.calls[0]["temperature"], (
+            f"Attempt 2 temperature {spy.calls[1]['temperature']} must be "
+            f"below base {spy.calls[0]['temperature']}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -364,26 +351,45 @@ def _entrypoint_node() -> ast.FunctionDef:
 
 class TestExceptionStructure:
 
-    def test_three_distinct_except_arms(self):
-        """E-17 / RR-B3 + L-6: the entrypoint has at least 3 distinct
-        try/except blocks, mirroring the run_script_doctor pattern."""
+    def test_entrypoint_routes_through_structured_call(self):
+        """Sprint 2A/2D: the entrypoint delegates the call + retry to
+        the shared structured_call ladder. Lock that it does -- the
+        body must reference `structured_call` rather than re-growing a
+        hand-rolled call/parse/validate sequence."""
         fn = _entrypoint_node()
-        try_blocks = [n for n in ast.walk(fn) if isinstance(n, ast.Try)]
-        # We have 3 primary blocks (LLM call, JSON parse, schema validate)
-        # plus a repair-pass try/except. Asserting >= 3 covers the spec.
-        assert len(try_blocks) >= 3, (
-            f"expected >= 3 try blocks (one per L-6 arm); got {len(try_blocks)}"
+        names = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
+        assert "structured_call" in names, (
+            "run_story_brief_reflection no longer routes through "
+            "structured_call -- the Wave 2 ladder conversion regressed"
+        )
+
+    def test_structured_call_failure_is_handled(self):
+        """The entrypoint must catch StructuredCallFailedError (an
+        exhausted ladder) AND the broad slot-fn exception (structured_
+        call does not catch slot-fn failures) so every path maps to the
+        failure sentinel -- audio is king, this call site never raises."""
+        fn = _entrypoint_node()
+        handled: set[str] = set()
+        for node in ast.walk(fn):
+            if isinstance(node, ast.ExceptHandler) and node.type is not None:
+                for name in ast.walk(node.type):
+                    if isinstance(name, ast.Name):
+                        handled.add(name.id)
+        assert "StructuredCallFailedError" in handled, (
+            "entrypoint does not catch StructuredCallFailedError"
+        )
+        assert "Exception" in handled, (
+            "entrypoint does not catch the broad slot-fn exception"
         )
 
     def test_try_blocks_are_scoped(self):
-        """E-17 / RR-B3: each top-level try block contains a small
-        number of statements (not a broad function-body wrapper).
-        Strict version: each try body has between 1 and 4 statements."""
+        """Each top-level try block stays narrowly scoped (1-4
+        statements), not a broad function-body wrapper."""
         fn = _entrypoint_node()
         for try_node in [n for n in ast.iter_child_nodes(fn) if isinstance(n, ast.Try)]:
             assert 1 <= len(try_node.body) <= 4, (
                 f"try block at line {try_node.lineno} has "
-                f"{len(try_node.body)} statements -- E-17 requires "
+                f"{len(try_node.body)} statements -- requires "
                 "narrow scoped blocks, not broad function-body wraps"
             )
 

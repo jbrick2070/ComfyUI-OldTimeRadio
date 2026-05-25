@@ -54,15 +54,13 @@ _REFLECTION_TEMPERATURE: float = 0.3
 # the 300-char prose brief without leaving room for chatty preamble.
 _REFLECTION_MAX_NEW_TOKENS: int = 160
 
-# Per E-18 / RR-B5: repair clamp upper bound. Even if a future operator
-# sets _REFLECTION_TEMPERATURE above 0.4, the repair pass stays inside
-# the 0.35-0.55 declared-safe range.
-_REPAIR_TEMPERATURE_CEILING: float = 0.55
-
-# Per refinement section 3.2: +0.15 jump on repair breaks the
-# deterministic-retry failure loop characteristic of low-temperature
-# local-model JSON output (R-06).
-_REPAIR_TEMPERATURE_BUMP: float = 0.15
+# Sprint 2A/2B: Attempt 2 structural-retry temperature for the shared
+# structured_call retry ladder. STRICTLY BELOW _REFLECTION_TEMPERATURE
+# -- a JSON-schema re-roll LOWERS entropy, it never raises it.
+# structured_call asserts this invariant at entry. This replaces the
+# old _REPAIR_TEMPERATURE_BUMP (which RAISED repair temperature by
+# +0.15 -- the Sprint 2B bug the ladder conversion corrects).
+_REFLECTION_STRUCTURAL_RETRY_TEMPERATURE: float = 0.15
 
 # Per refinement section 7 hard caps: max 300 chars on the prose brief.
 _BRIEF_HARD_MAX_CHARS: int = 300
@@ -426,75 +424,21 @@ try:
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
 
-
-# ---------------------------------------------------------------------------
-# Repair pass -- refinement section 3.5 + E-18 + R-06
-# ---------------------------------------------------------------------------
-
-
-def _build_repair_messages(
-    failed_output: str,
-    rejection_reasons: list[str],
-    base_user_message: str,
-) -> list[dict]:
-    """Build the repair-pass messages with CRITICAL prefix.
-
-    Per R-06 / C0b refinement section 3.5: the repair prompt prepends
-    an explicit `CRITICAL: You previously failed validation because:
-    <reasons>` directive so the model re-orients toward the actual
-    rejection class rather than re-generating the failed shape.
-    """
-    reasons_str = ", ".join(rejection_reasons) if rejection_reasons else "unknown"
-    critical = (
-        f"CRITICAL: You previously failed validation because: {reasons_str}.\n\n"
-        "Rewrite this visual brief to obey the schema. Remove named "
-        "characters, dialogue verbs, plot actions, unsupported dates "
-        "or locations, extra sentences, quotation marks, and Markdown. "
-        "Return only the JSON object.\n\n"
-        f"Failed brief: {failed_output[:400]}\n"
-        f"Rejection reasons: {reasons_str}\n\n"
+# Sprint 2A/2D: the shared structured-JSON retry ladder. The reflection
+# pass routes its single LLM call through it -- the ladder subsumes the
+# former hand-rolled call -> parse -> validate -> repair sequence.
+# Package import in production; flat import under standalone test.
+try:
+    from ._otr_structured_call import (
+        structured_call,
+        StructuredCallFailedError,
+        PostValidationError,
     )
-    return [
-        {"role": "user", "content": critical + base_user_message},
-    ]
-
-
-def _repair_pass(
-    failed_output: str,
-    rejection_reasons: list[str],
-    technical_fn: Callable[..., str],
-    base_user_message: str,
-    reflection_temperature: float,
-) -> str:
-    """Run ONE repair attempt at the clamped repair temperature.
-
-    Per E-18 / RR-B5: `repair_temperature = min(reflection_temperature
-    + 0.15, 0.55)`. The clamp keeps the repair pass inside the declared
-    0.35-0.55 safe range even if a future operator sets the base
-    temperature above 0.4.
-    """
-    repair_temperature = min(
-        reflection_temperature + _REPAIR_TEMPERATURE_BUMP,
-        _REPAIR_TEMPERATURE_CEILING,
-    )
-    # SA-101 (Sprint D D0c): surface the silent clamp. Logs the
-    # temperature math plus the validator rejection reasons in scope
-    # so Sprint A inspectors can tell a 0.55-ceilinged retry from a
-    # 0.35 retry from a pre-clamp failure. Purely additive emission;
-    # no existing log string modified.
-    log.info(
-        "[OTR_StoryBrief] repair pass clamped: base=%.3f bump=%.3f "
-        "ceiling=%.3f -> repair_temperature=%.3f reasons=%s",
-        reflection_temperature, _REPAIR_TEMPERATURE_BUMP,
-        _REPAIR_TEMPERATURE_CEILING, repair_temperature, rejection_reasons,
-    )
-    messages = _build_repair_messages(
-        failed_output, rejection_reasons, base_user_message,
-    )
-    return technical_fn(
-        messages,
-        temperature=repair_temperature,
-        max_new_tokens=_REFLECTION_MAX_NEW_TOKENS,
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_structured_call import (  # type: ignore
+        structured_call,
+        StructuredCallFailedError,
+        PostValidationError,
     )
 
 
@@ -557,7 +501,7 @@ def _success_delta(
 
 
 # ---------------------------------------------------------------------------
-# Main entrypoint -- L-6 + L-8 + E-17 + E-21
+# Main entrypoint -- structured_call ladder + L-8 + E-21
 # ---------------------------------------------------------------------------
 
 
@@ -577,139 +521,93 @@ def run_story_brief_reflection(
     cannot accidentally route the call through the creative slot
     and burn the creative budget on a JSON validation pass.
 
-    Three SCOPED try/except blocks per E-17 / RR-B3 + L-6 /
-    `run_script_doctor` precedent. Each except arm covers EXACTLY one
-    operation:
+    Sprint 2A/2D: the call routes through the shared `structured_call`
+    4-attempt retry ladder (base -> structural retry -> typed repair
+    -> grammar; grammar Attempt 4 activates once Sprint 2E wires a
+    grammar_path). The ladder subsumes the former three hand-rolled
+    arms -- LLM call, JSON parse, schema validate -- plus the single
+    repair pass. Two failure classes the ladder reports back here:
 
-      Block 1: technical_fn(messages, ...)   -> failure_sentinel
-      Block 2: json.loads(extracted)         -> failure_sentinel
-      Block 3: pydantic validate + content   -> repair_pass once,
-                                                then failure_sentinel
-                                                if still invalid
+      * `post_validator` carries the section-3.4 content gate (named
+        characters, dialogue / plot verbs, unsupported period
+        literals, quote / markup chars). A content rejection re-rolls
+        the ladder exactly like a schema failure.
+      * `structured_call` does NOT catch slot-fn (technical_fn)
+        exceptions -- a VRAM / loader / framework failure inside the
+        LLM closure propagates out, and the broad `except Exception`
+        below catches it.
 
-    On any path the function returns a dict; it never raises.
+    An exhausted ladder (`StructuredCallFailedError`) and a raising
+    slot fn both map to `_failure_sentinel`. On every path the
+    function returns a dict; it never raises.
     """
     ledger = _ledger_data(led)
 
     user_message = _REFLECTION_PROMPT + _build_reflection_input(led)
     messages = [{"role": "user", "content": user_message}]
 
-    # Block 1 -- LLM call only. Catches network / VRAM / framework
-    # failures inside the generate_fn closure. The L-6 pattern (run
-    # script doctor) catches broad Exception here for the same reason:
-    # the LLM call is the most variable-failure-mode part of the
-    # pipeline and a bare reraise would crash the whole script
-    # generation over a 5-second flavor-text failure.
+    # Content gate (refinement section 3.4). structured_call runs this
+    # on every schema-valid instance; a non-None return is a content
+    # rejection (named characters / dialogue + plot verbs / unsupported
+    # period literals / quote chars) and advances the ladder exactly
+    # like a schema failure. Returns None to accept the brief.
+    def _content_validator(model: StoryBriefModel) -> str | None:
+        reasons = _validate_brief(model.story_brief, ledger)
+        if reasons:
+            return ", ".join(reasons)
+        return None
+
+    # LLM slot: technical -- structured JSON validation pass, not
+    # narrative composition; routed through the shared ladder.
     try:
-        raw = technical_fn(
-            messages,
-            temperature=_REFLECTION_TEMPERATURE,
+        brief_model = structured_call(
+            prompt=messages,
+            schema=StoryBriefModel,
+            slot_fn=technical_fn,
+            base_temperature=_REFLECTION_TEMPERATURE,
+            structural_retry_temperature=_REFLECTION_STRUCTURAL_RETRY_TEMPERATURE,
+            post_validator=_content_validator,
             max_new_tokens=_REFLECTION_MAX_NEW_TOKENS,
+            max_attempts=4,
+            helper_name="run_story_brief_reflection",
         )
-    except Exception as exc:  # noqa: BLE001 -- narrow: only the LLM call line
+    except StructuredCallFailedError as exc:
+        # Ladder exhausted. Attribute the failure to its class via the
+        # last error the ladder captured so the sentinel `reason` stays
+        # as forensically specific as the pre-conversion arms did.
+        last = exc.last_error
+        if isinstance(last, json.JSONDecodeError):
+            reason = REJECT_JSON_PARSE
+        elif isinstance(last, PostValidationError):
+            reason = "content_validation_failed_after_repair"
+        elif isinstance(last, ValidationError):
+            reason = REJECT_SCHEMA
+        else:
+            reason = "structured_call_failed"
         log.warning(
-            "[OTR_StoryBrief] technical_fn raised: %s; "
-            "returning failed-status sentinel", exc,
+            "[OTR_StoryBrief] structured_call exhausted the retry ladder "
+            "after %d attempt(s) (last error: %s); returning failed-status "
+            "sentinel (reason=%s)", exc.attempts, exc.last_error, reason,
+        )
+        return _failure_sentinel(
+            reason=reason,
+            technical_model_id=technical_model_id,
+            prompt_version=prompt_version,
+        )
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+        # structured_call does not catch slot-fn exceptions: a network /
+        # VRAM / framework failure inside the technical_fn closure lands
+        # here. A bare reraise would crash the whole script generation
+        # over a flavor-text failure -- the L-6 reason for catching broad.
+        log.warning(
+            "[OTR_StoryBrief] technical_fn raised %s: %s; returning "
+            "failed-status sentinel", type(exc).__name__, exc,
         )
         return _failure_sentinel(
             reason="technical_fn_exception",
             technical_model_id=technical_model_id,
             prompt_version=prompt_version,
         )
-
-    # Block 2 -- JSON parse only. Catches malformed-JSON LLM output.
-    try:
-        data = _otr_json.parse_first_json_object(raw or "")
-    except json.JSONDecodeError as exc:
-        log.warning(
-            "[OTR_StoryBrief] JSON parse failed (%s); raw=%r; "
-            "returning failed-status sentinel",
-            exc, (raw or "")[:200],
-        )
-        return _failure_sentinel(
-            reason=REJECT_JSON_PARSE,
-            technical_model_id=technical_model_id,
-            prompt_version=prompt_version,
-        )
-
-    # Block 3 -- schema validation only. On failure run ONE repair
-    # pass at the clamped repair temperature per E-18, then fall
-    # through to the empty-string sentinel if still invalid.
-    try:
-        brief_model = StoryBriefModel.model_validate(data)
-    except ValidationError as exc:
-        log.warning(
-            "[OTR_StoryBrief] schema validation failed (%s); attempting "
-            "repair pass", exc,
-        )
-        rejection_reasons = [REJECT_SCHEMA]
-        try:
-            repaired = _repair_pass(
-                failed_output=raw,
-                rejection_reasons=rejection_reasons,
-                technical_fn=technical_fn,
-                base_user_message=user_message,
-                reflection_temperature=_REFLECTION_TEMPERATURE,
-            )
-            brief_model = StoryBriefModel.model_validate(
-                _otr_json.parse_first_json_object(repaired or ""),
-            )
-        except (Exception, ValidationError) as exc2:  # noqa: BLE001
-            log.warning(
-                "[OTR_StoryBrief] schema validation failed after repair "
-                "(%s); returning failed-status sentinel", exc2,
-            )
-            return _failure_sentinel(
-                reason=REJECT_SCHEMA,
-                technical_model_id=technical_model_id,
-                prompt_version=prompt_version,
-            )
-
-    # Content-level validation gate (refinement section 3.4). Pydantic
-    # shape passed; now check named characters / dialogue verbs /
-    # plot verbs / unsupported period literals / quote chars / etc.
-    content_reasons = _validate_brief(brief_model.story_brief, ledger)
-    if content_reasons:
-        log.info(
-            "[OTR_StoryBrief] content validation rejected: %s; "
-            "attempting repair pass", content_reasons,
-        )
-        try:
-            repaired = _repair_pass(
-                failed_output=brief_model.story_brief,
-                rejection_reasons=content_reasons,
-                technical_fn=technical_fn,
-                base_user_message=user_message,
-                reflection_temperature=_REFLECTION_TEMPERATURE,
-            )
-            repaired_model = StoryBriefModel.model_validate(
-                _otr_json.parse_first_json_object(repaired or ""),
-            )
-            repaired_reasons = _validate_brief(
-                repaired_model.story_brief, ledger,
-            )
-            if repaired_reasons:
-                log.warning(
-                    "[OTR_StoryBrief] content validation still failed "
-                    "after repair (%s); returning failed-status sentinel",
-                    repaired_reasons,
-                )
-                return _failure_sentinel(
-                    reason="content_validation_failed_after_repair",
-                    technical_model_id=technical_model_id,
-                    prompt_version=prompt_version,
-                )
-            brief_model = repaired_model
-        except (Exception, ValidationError) as exc:  # noqa: BLE001
-            log.warning(
-                "[OTR_StoryBrief] repair pass failed (%s); "
-                "returning failed-status sentinel", exc,
-            )
-            return _failure_sentinel(
-                reason="repair_pass_exception",
-                technical_model_id=technical_model_id,
-                prompt_version=prompt_version,
-            )
 
     return _success_delta(
         brief_model=brief_model,
