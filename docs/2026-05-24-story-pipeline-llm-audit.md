@@ -1,7 +1,7 @@
 # Story-Writing + Cleanup Pipeline -- LLM-Call Audit
 
-- **Date:** 2026-05-24
-- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `2183397`)
+- **Date:** 2026-05-24 (updated 2026-05-25)
+- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `c99fdfb`)
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -10,13 +10,19 @@
 
 ## Architecture summary
 
-All generation routes through `_SlotScheduler` (`OTR_LedgerScriptWriter.py`). Two slots -- `creative` and `technical` -- each a `generate_fn(messages, *, temperature, max_new_tokens, stop=None) -> str` closure. The model id is resolved once from the two writer widgets (`creative_writing_model` / `technical_model`) and threaded to every consumer; no other node exposes a `model_id` widget, and the cleanup cascade reads the technical model from a broadcast socket. **Prime Directive 6's wiring rule is satisfied structurally** -- every call site carries a `# LLM slot:` tag.
+All generation routes through `_SlotScheduler` (`OTR_LedgerScriptWriter.py`). Two slots -- `creative` and `technical` -- each a `generate_fn(messages, *, temperature, max_new_tokens, stop=None) -> str` closure. The model id is resolved once from the two writer widgets (`creative_writing_model` / `technical_model`) and threaded to every consumer; no other node exposes a `model_id` widget, and the cleanup cascade reads the technical model from a broadcast socket. **Prime Directive 6's wiring rule is satisfied structurally** -- every call site carries a `# LLM slot:` tag, now enforced by a CI AST sweep (`docs/_s28_llm_slot_sweep.py`, commit `c99fdfb`).
 
-**Cross-cutting finding -- GBNF is dead scaffolding.** `grammars/news_interpreter.gbnf` and `grammars/style_picker.gbnf` exist on disk, and `news_interpreter.py` even defines a `GRAMMAR_PATH` constant -- but the generate path explicitly does NOT pass a grammar to the model (`news_interpreter.py` ~L527: "does NOT pass model-specific kwargs (grammar_file...)"; `_otr_style_picker.py` ~L36: "Grammar enforcement is the loader's responsibility ... the GBNF file ... is a hint"). The loader never consumes it. So every "structured" pass is plain-text generation + Python-side JSON parsing + Pydantic + reroll. The `.gbnf` files are shipped, referenced in comments, and never enforced.
+**Cross-cutting finding -- GBNF is dead scaffolding.** ~~`grammars/news_interpreter.gbnf` and `grammars/style_picker.gbnf` exist on disk~~ **UPDATE 2026-05-25: Sprint 2E (commit `b8ebdc8`) deleted all `.gbnf` files and scaffolding. This finding is resolved.** The loader never consumed grammar files; all structured passes use plain-text generation + Python-side JSON parsing + Pydantic + reroll via the 3-rung `structured_call` ladder (Sprint 2A/2B/2C).
 
 ---
 
-## Per-call-site inventory (16 calls)
+## Per-call-site inventory (20 sites per AST sweep)
+
+> **UPDATE 2026-05-25:** Sprint 0 CI sweep (`docs/_s28_llm_slot_sweep.py`)
+> finds 20 AST call sites across `nodes/`. All 20 carry a `# LLM slot:` tag.
+> The original manual inventory below identified 15 logical passes (some
+> of which expand to multiple AST call sites, e.g. compose_line has a
+> primary call + a TypeError-fallback call).
 
 | # | Call site | Job | Slot | Output handling | Retry |
 |---|-----------|-----|------|-----------------|-------|
@@ -40,9 +46,11 @@ Between Pass 1 and Pass 2, `apply_deterministic_cast_repairs` runs -- a non-LLM 
 
 ## Findings
 
-### A. Tagging is complete; telemetry attribution is not
+### A. Tagging is complete and CI-enforced
 
-Every call site carries the `# LLM slot:` tag -- the rule itself is met. But `slot_calls_by_helper` only buckets calls made inside a `slot_scheduler.helper_context(...)` block, and **three call sites bypass it**: the outline (`generate_outline` -- its 5 macro/phase/beat calls), title regen (`_generate_title_from_script`), and the story-brief reflection. Their calls fall to the `<unattributed>` bucket. The in-code comment claiming the bucket "should stay at 0 in production" is therefore false. Low severity -- forensic hygiene, not a runtime defect -- but it means per-helper call counts under-report the outline, the single most call-heavy phase.
+Every call site carries the `# LLM slot:` tag -- the rule itself is met. **As of commit `c99fdfb`, this is enforced by a CI AST sweep** (`docs/_s28_llm_slot_sweep.py`) with a 4-test regression suite (`tests/test_llm_slot_sweep.py`). The sweep AST-parses every `*.py` under `nodes/`, finds all `structured_call` / `generate_fn` / `creative_fn` / `technical_fn` / `polish_generate_fn` / `request_slot` invocations, and verifies a `# LLM slot:` tag exists within ±8 lines. Internal plumbing files are exempt. Any new call site without a tag will fail the sweep test.
+
+`slot_calls_by_helper` telemetry attribution is still incomplete -- three call sites bypass `helper_context()`: the outline, title regen, and story-brief reflection. Their calls fall to the `<unattributed>` bucket. Low severity -- forensic hygiene, not a runtime defect.
 
 ### B. Slot assignment -- mostly correct, two latent issues
 
@@ -73,9 +81,9 @@ The LLM cleanup is well-engineered but deliberately narrow (cast hygiene only) a
 ## Recommendations (priority order)
 
 1. **Add a story-quality LLM pass.** The single highest-value gap. A pass that reads the assembled script and judges continuity / voice consistency / dramatic delivery -- at minimum a per-line or per-scene dialogue-quality critic that can flag or trigger a reroll. New LLM call -> Prime Directive 6 applies; an architecture-level addition -> round-robin gated. This is the direct fix for the `ozempics_glitch`-class failure.
-2. **Give the two cleanup passes a 1-repair retry.** Small, consistency fix -- bring the auditor and Script Doctor in line with the 3-attempt discipline used everywhere else, so a transient JSON glitch re-rolls one call instead of forcing a full episode rerun.
-3. **Decide GBNF: wire it or delete it.** Wiring grammar enforcement into the loader would harden every structured pass (news, casting, outline, story brief, reviewer) against the BUG-261 / 263 / 264 class of JSON/schema failures at the source. If that is not on the near roadmap, delete the dead `.gbnf` files and the misleading comments so the codebase does not imply a capability it lacks. Architecture decision -> round-robin gated.
-4. **Wrap the outline, title regen, and story-brief reflection in `helper_context`** so `slot_calls_by_helper` telemetry is accurate. Forensic hygiene; small.
-5. **Clean the two cosmetic issues:** fix the stale pick_style slot comment; drop the dead `technical_fn` parameter from `compose_line`'s signature.
+2. **Give the two cleanup passes a 1-repair retry.** Small, consistency fix -- bring the auditor and Script Doctor in line with the 3-attempt discipline used everywhere else, so a transient JSON glitch re-rolls one call instead of forcing a full episode rerun. **UPDATE: Sprint 2A/2D already did this** -- both `audit_cast_contract` and `run_script_doctor` now route through the 3-rung `structured_call` ladder. This recommendation is resolved.
+3. ~~**Decide GBNF: wire it or delete it.**~~ **RESOLVED: Sprint 2E (commit `b8ebdc8`) deleted all `.gbnf` files and scaffolding.** The 3-rung `structured_call` ladder (Sprint 2A/2B/2C) provides robust JSON/schema failure handling without grammar enforcement.
+4. **Wrap the outline, title regen, and story-brief reflection in `helper_context`** so `slot_calls_by_helper` telemetry is accurate. Forensic hygiene; small. Still open.
+5. **Clean the two cosmetic issues:** fix the stale pick_style slot comment; drop the dead `technical_fn` parameter from `compose_line`'s signature. Still open.
 
-Recommendations 1 and 3 are architecture / new-LLM-call decisions and are round-robin gated per CLAUDE.md. Recommendations 2, 4, and 5 are small and not gated.
+Recommendation 1 is an architecture / new-LLM-call decision and is round-robin gated per CLAUDE.md. Recommendations 2 and 3 are resolved. Recommendations 4 and 5 are small and not gated.
