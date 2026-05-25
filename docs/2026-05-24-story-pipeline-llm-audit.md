@@ -9,6 +9,55 @@
 
 ---
 
+## Next-sprint punch list (added 2026-05-25 -- READ FIRST)
+
+The 3B-3E wave is shipped and live-validated. What the next sprint must
+close, in priority order:
+
+**Bugs to fix**
+
+1. **BUG-LOCAL-271 -- the cast auditor `wrong_char_id` repair is dead.**
+   The auditor flags `wrong_char_id` with `expected` set to a char_id;
+   the repair (`apply_deterministic_cast_repairs`, `_otr_ledger_reviewer.py`
+   ~L815-838) resolves `expected` as a cast NAME, so every `wrong_char_id`
+   violation goes unrepaired and escalates to a Script Doctor that flags
+   none. Fix: make the auditor prompt and the repair branch agree on
+   what `expected` carries (auditor emits a NAME, or the repair accepts
+   a char_id), and tighten the auditor prompt so it stops over-flagging
+   lines that already carry the correct char_id. Full detail in
+   `BUG_LOG.md` -> `### BUG-LOCAL-271`.
+
+**Follow-ups surfaced by the wave**
+
+2. **3C Doctor-row enrichment is 5/7.** `_render_lines_for_doctor` feeds
+   the Script Doctor `beat_id, arc_phase, mood, actual_words, text`;
+   `beat_intent` + `target_words` were deferred -- they are not on the
+   production ledger. Stamping them needs a change in
+   `OTR_LedgerScriptWriter.py` / `production_ledger.py`.
+3. **WORD_BUDGET_DRIFT.** The validation run's outline allocated 60
+   words against a 30-word target (ratio 2.00). Non-fatal warn -- check
+   the Sprint 3B word-budget path.
+4. **Live-validate the cast/style/seed batch.** BUG-LOCAL-269/270 + the
+   `seed`-widget removal (HEAD `d0ea595`) are NOT yet live-validated --
+   one ComfyUI episode on `d0ea595` to confirm the cast now varies and
+   the writer node has no `seed` widget.
+
+**Remaining build -- to "complete" this audit**
+
+5. **Sprint 3A** -- rewrite `compose_line` (`nodes/_otr_line_composer.py`,
+   ~1660 lines). Lead-driven, not a parallel subagent.
+6. **Sprint 4** -- VRAM hardening (verify the existing HuMo VRAM gate).
+7. **Sprint 5** -- continuity ledger + story-quality critic + targeted
+   reroll. This is the direct fix for Finding C below -- the validation
+   run is structurally clean but thin (21 words of character dialogue).
+8. **Sprint 6** -- critic -> render coupling (ships with Sprint 5).
+
+Per-sprint detail is in the "Multi-agent execution plan" section below
+and in `story_pipeline_sprint_plan_v4_audited.md`. Other carried bugs
+(news_interpreter schema, HuMo VRAM probe) stay tracked in `BUG_LOG.md`.
+
+---
+
 ## Architecture summary
 
 All generation routes through `_SlotScheduler` (`OTR_LedgerScriptWriter.py`). Two slots -- `creative` and `technical` -- each a `generate_fn(messages, *, temperature, max_new_tokens, stop=None) -> str` closure. The model id is resolved once from the two writer widgets (`creative_writing_model` / `technical_model`) and threaded to every consumer; no other node exposes a `model_id` widget, and the cleanup cascade reads the technical model from a broadcast socket. **Prime Directive 6's wiring rule is satisfied structurally** -- every call site carries a `# LLM slot:` tag, now enforced by a CI AST sweep (`docs/_s28_llm_slot_sweep.py`, commit `c99fdfb`).
