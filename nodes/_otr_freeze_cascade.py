@@ -68,6 +68,7 @@ from typing import Any, Optional
 
 from . import _otr_ledger_freeze as _LFC
 from . import _otr_ledger_reviewer as _OTRLR
+from . import _otr_story_critic as _OTRSC
 
 log = logging.getLogger("OTR.freeze_cascade")
 
@@ -611,6 +612,38 @@ def run_freeze_cascade(
             interim_verdict,
         )
         return disp
+
+    # ---- Sprint 5B: whole-script story-quality critic --------------
+    # Post-Script-Doctor (review_ledger above ran Phases 1+2), on the
+    # non-terminal path only -- the ledger is cast-clean and
+    # structurally sound, so the critic spends its whole budget on the
+    # one thing no earlier pass judges: DRAMATIC QUALITY (continuity,
+    # voice drift, flat lines, arc verdict -- audit Finding C). For 5B
+    # the report is ADVISORY: it changes no line text. It is stamped on
+    # meta for Sprint 5C (targeted reroll reads `reroll_targets`) and
+    # Sprint 6 (render coupling reads `render_priority` / `flat_lines` /
+    # `arc_verdict`). run_story_critic NEVER raises -- on any failure it
+    # returns StoryCriticReport.clean(), so a critic failure can never
+    # break the freeze (Prime Directive 1). The `# LLM slot: technical`
+    # tag lives at the structured_call site inside run_story_critic;
+    # the critic reuses the technical model already resident in the
+    # cascade -- no new widget, no VRAM swap (Prime Directive 6).
+    story_critic_report = _OTRSC.run_story_critic(
+        generate_fn,
+        ledger_data,
+        ledger_data.get("cast", []) or [],
+    )
+    meta["story_critic_report"] = story_critic_report.model_dump()
+    log.info(
+        "[LFC] Sprint 5B story critic: arc_verdict=%s, %d reroll "
+        "target(s), %d flat line(s), %d continuity issue(s), %d line(s) "
+        "in render priority (advisory -- no line text changed)",
+        story_critic_report.arc_verdict,
+        len(story_critic_report.reroll_targets),
+        len(story_critic_report.flat_lines),
+        len(story_critic_report.continuity_issues),
+        len(story_critic_report.render_priority),
+    )
 
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone
