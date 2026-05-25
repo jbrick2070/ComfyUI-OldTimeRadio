@@ -66,7 +66,7 @@
 | 2B -- repair temp fix | COMPLETE | -- | baked into `structured_call` (structural retry < base, asserted at entry) `61f8cfa` |
 | 2C -- typed repair prompts | NOT STARTED | -- | ledger conversion uses `default_repair_prompt_factory`; bespoke per-failure-class factories still pending |
 | 2D -- cleanup pass retries | COMPLETE | -- | `audit_cast_contract` + `run_script_doctor` -> `structured_call(max_attempts=4)` `7f3b65f` |
-| 2E -- GBNF wire | NOT STARTED | -- | decision 4 resolved -- wire |
+| 2E -- GBNF | COMPLETE | -- | decision 4 re-resolved 2026-05-25: DELETE -- loader (HF Transformers 5.5.0, no llama.cpp / transformers-cfg / outlines) has no GBNF support; dead scaffolding removed |
 | 3A -- split compose_line | NOT STARTED | -- | -- |
 | 3B -- outline Stage 3 | NOT STARTED | -- | -- |
 | 3C -- split Script Doctor | NOT STARTED | -- | -- |
@@ -106,7 +106,7 @@
 | HuMo default tier | `low_vram_default` (existing name -- no `humo_` prefix). |
 | HuMo high tier | Rename `high_quality` -> `high_quality_unsafe_on_16gb`. |
 | HuMo third tier | `experimental_gguf` exists -- leave as-is unless you want it renamed too. |
-| GBNF | Decision required Sprint 2E. Wire (preferred) or delete. |
+| GBNF | Sprint 2E RESOLVED 2026-05-25: DELETE. Loader has no GBNF support; scaffolding removed. |
 
 ---
 
@@ -162,9 +162,9 @@ Repair factory dispatches by class: `json_syntax_repair`, `schema_field_repair`,
 
 - [x] **[DONE 7f3b65f 2026-05-24]** `audit_cast_contract` and `run_script_doctor`: single-shot -> `structured_call` with `max_attempts=4`. Both kept their never-raises contract (`StructuredCallFailedError` + a broad `except Exception` -> the existing `_audit_failed_sentinel` / `needs_full_rerun`). `audit_cast_contract` base 0.2 / structural retry 0.1 / 2000 tok; `run_script_doctor` base 0.5 / structural retry 0.3 / 3500 tok. No node surface touched -- no workflow JSON re-wire.
 
-### 2E. GBNF -- wire or delete
-Confirmed dead scaffolding: `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf` ship, `news_interpreter.py` defines `GRAMMAR_PATH`, the loader never enforces it. Wiring it into `structured_call` Attempt 4 makes every structured pass near-invulnerable to JSON-format failure.
-- [ ] **GBNF: wire** into `structured_call` Attempt 4 (decision 4 -- round-robin waived 2026-05-24; wire was already the chosen path). Delete only if loader work proves blocking.
+### 2E. GBNF -- wire or delete  [COMPLETE 2026-05-25 -- DELETED]
+Confirmed dead scaffolding: `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf` ship, `news_interpreter.py` defines `GRAMMAR_PATH`, the loader never enforces it. Wiring it into `structured_call` Attempt 4 was the v4 preferred path -- but the audit's escape clause ("delete only if loader work proves blocking") triggered at implementation time. The LLM backend is HF Transformers 5.5.0 (`make_generate_fn` -> `model.generate()`), with NO grammar-constrained decoding. GBNF is a llama.cpp format; no `llama-cpp-python`, `transformers-cfg`, or `outlines` is installed. A real wire would need a new dependency (a GBNF `LogitsProcessor`) -- rejected: it breaks offline-first and is a compatibility gamble on the bleeding-edge transformers 5.5.0 stack. Separately, `_otr_style_picker.py` never used `structured_call` at all (it hand-rolls its own two-pass picker), so "wire `style_picker.gbnf` into `structured_call`" was never possible as written. Structural safety already holds without GBNF: the `structured_call` 3-rung ladder + pydantic schema validation + `post_validator`, and the picker's `DESCRIPTOR_RE` regex + distinctness checks.
+- [x] **GBNF: deleted** -- `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf` removed; `GRAMMAR_PATH` constant + `Path` import dropped from `news_interpreter.py`; the dead `grammar_path` plumbing removed from `structured_call` (param, `_GRAMMAR_TEMPERATURE`, the never-reachable Attempt 4 block, `_invoke_slot`'s TypeError fallback). The ladder is now a clean 3-rung ladder (`_DEFAULT_MAX_ATTEMPTS` 4 -> 3); the three `max_attempts=4` call sites (ledger reviewer x2, story brief) dropped to 3 -- behaviour-identical, Attempt 4 never fired without a `grammar_path`. Stale GBNF docstrings in `_otr_style_picker.py` + a false "uses GBNF grammar-constrained generation" claim in `README.md` corrected.
 
 ---
 
@@ -259,7 +259,7 @@ One pass post-Script-Doctor. Structured rubric, one dimension at a time: §1 con
 | 2B | Repair temperature fix | No | Folded into 2A |
 | 2C | Typed repair prompts (reuse existing Levenshtein) | No | 1 day |
 | 2D | Cleanup pass retries via 2A | No | Hours |
-| 2E | GBNF wire | No | Days |
+| 2E | GBNF -- deleted (loader has no grammar support) | No | Done |
 | 3A | Rewrite `compose_line` (~1660-line file) + strips-before-window | No | 2-3 days |
 | 3B | Outline Stage 3 adjacency (+ `target_words` token cleanup) | No | 1 day |
 | 3C | Split Script Doctor (Diagnosis + Edit) + enrich rows | No | 1-2 days |
@@ -281,7 +281,7 @@ Round-robin consultation: WAIVED 2026-05-24 (Jeffrey) -- already done in earlier
 1. **`humo_max_lines_per_process`** -- **RESOLVED 2026-05-24: stays `0`** (logged `BUG_LOG.md:210` decision not reverted; v3's `6` declined).
 2. **`clip_length`** -- **RESOLVED 2026-05-24: leave editable, default `7.0`** (no lock, no code change).
 3. **`experimental_gguf` tier** -- **RESOLVED 2026-05-24: leave untouched** (not renamed).
-4. **GBNF (2E)** -- **RESOLVED 2026-05-24: wire** into `structured_call` Attempt 4 (already the preferred path; round-robin waived).
+4. **GBNF (2E)** -- **RE-RESOLVED 2026-05-25: DELETE.** The 2026-05-24 "wire" decision was overturned at implementation time: the loader (HF Transformers 5.5.0, no llama.cpp / transformers-cfg / outlines) cannot enforce a GBNF grammar, and `_otr_style_picker.py` never used `structured_call`. Per the audit's own escape clause ("delete only if loader work proves blocking"), the scaffolding was removed rather than adding a dependency to a bleeding-edge stack.
 5. **Story-quality critic track (5B)** -- confirm it gets its own roadmap track once this batch lands.
 6. **`technical_fn` on `compose_line` (Sprint 0)** -- **RESOLVED 2026-05-24: option (a) -- keep `technical_fn`; item pulled from Sprint 0.** Background: the v4 audit called it dead weight, but `tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` asserts `technical_fn` MUST exist as a keyword-only param, and the paired `creative_fn`+`technical_fn` contract is deliberate uniformity across 4 sibling helpers, kept for the planned B2/B3/B4 per-sub-pass dispatch. Options: **(a)** keep `technical_fn` -- skip this Sprint 0 item, accept that `compose_line` carries an unused-but-contractual param (recommended -- it stays consistent with its 3 sibling helpers and B2/B3/B4 will need the slot again); **(b)** drop it AND update/retire `test_compose_line_accepts_paired_generators` plus ~21 test call sites across 5 test files, reversing the S32 B1 decision.
 
@@ -329,7 +329,7 @@ reflection_input_sanitization: on
 critic_rubric_mode: dimension_walk
 
 # GBNF (Sprint 2E)
-gbnf_enforcement: wired                               # decision 4: wire
+gbnf_enforcement: removed                             # 2026-05-25: deleted -- loader has no GBNF support
 ```
 
 ---
@@ -406,3 +406,15 @@ gbnf_enforcement: wired                               # decision 4: wire
 - No node `INPUT_TYPES` / widget / socket changed -- no workflow JSON re-wire (Prime Directive 3 N/A).
 - **Regression:** full OTR suite 2636 passed / 21 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green. 0 failed. (The first sweep run surfaced 21 failures in three `compose_line` caller test files -- `test_phase0_name_roster`, `test_phase1_composer_prompt`, `test_vocative_drift` -- all fixed in the same commit.)
 - **New bug ids:** none.
+
+### 2026-05-25 -- Sprint 2E: GBNF scaffolding deleted
+
+- Commit `b2b3f7d` on `v2.0-alpha` (code -- 9 files, +52/-227). Predecessor HEAD `65f586e`.
+- **Sprint 2E COMPLETE -- resolved as DELETE.** Open Decision 4 (2026-05-24: "wire") was overturned at implementation time. The v4 audit's escape clause -- "delete only if loader work proves blocking" -- triggered: the LLM backend is HF Transformers 5.5.0 (`make_generate_fn` -> `model.generate()`) with no grammar-constrained decoding; GBNF is a llama.cpp format and no `llama-cpp-python` / `transformers-cfg` / `outlines` is installed. A genuine wire would need a new dependency (a GBNF `LogitsProcessor`), rejected as offline-first-breaking and a compatibility gamble on the bleeding-edge transformers 5.5.0 stack. Separately, `_otr_style_picker.py` never used `structured_call` -- the plan's "wire `style_picker.gbnf` into `structured_call`" was not possible as written.
+- **Removed:** `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf`; `GRAMMAR_PATH` constant + `Path` import from `news_interpreter.py`; from `_otr_structured_call.py` the `grammar_path` param, `_GRAMMAR_TEMPERATURE`, the never-reachable Attempt 4 block, and `_invoke_slot`'s TypeError fallback. The ladder is now a clean 3-rung ladder (`_DEFAULT_MAX_ATTEMPTS` 4 -> 3); the three `max_attempts=4` call sites (`_otr_ledger_reviewer` x2, `_otr_story_brief`) dropped to 3 -- behaviour-identical, Attempt 4 never fired without a `grammar_path`. Stale GBNF docstrings in `_otr_style_picker.py` and a false "uses GBNF grammar-constrained generation" claim in `README.md` corrected.
+- **Structural safety unaffected:** the `structured_call` 3-rung ladder (base -> structural retry -> typed repair) + pydantic schema validation + `post_validator` content checks, plus the style picker's `DESCRIPTOR_RE` regex + distinctness rule, already cover what GBNF would have enforced.
+- No node `INPUT_TYPES` / widget / socket changed -- no workflow JSON re-wire (Prime Directive 3 N/A).
+- **Regression:** full OTR suite 2635 passed / 21 skipped (baseline 2636; -1 = the removed Attempt-4 test `test_no_grammar_path_ends_ladder_at_attempt_three`); Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical green. 0 failed.
+- **New bug ids:** none.
+- **Sprint state:** 2E COMPLETE. Remaining: Sprint 2C (typed repair prompts), Sprint 0's deferred CI AST `# LLM slot:` sweep, Sprints 3A-3G, 4, 5, 6.
+- Built lead-only (no subagents): a single shared-module change (`_otr_structured_call.py`) plus tightly coupled call-site + docstring edits across five files.
