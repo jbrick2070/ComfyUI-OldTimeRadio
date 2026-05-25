@@ -54,6 +54,7 @@ __all__ = [
     "audit_cast_contract",
     "apply_deterministic_cast_repairs",
     "auto_remap_phantom",
+    "_resolve_cast_member",
     "compute_edit_cap",
     "review_ledger",
 ]
@@ -119,6 +120,19 @@ _DOCTOR_RETRY_TEMPERATURE = 0.3
 
 
 class CastViolation(BaseModel):
+    """Pure anomaly extraction from the Cast Contract Auditor.
+
+    Sprint 3F (2026-05-25): the `confidence: float` field was removed.
+    Small models cannot reliably distinguish 0.7 from 0.8 or 0.8 from
+    0.9, so the auditor no longer scores its own certainty. The
+    auditor's job is anomaly extraction only -- `found` (the literal
+    that drifted), `expected` (the cast member it should have been, or
+    "" when the auditor cannot name one), and `kind`. Python alone
+    decides whether and how to repair: exact case-fold match first,
+    then Levenshtein distance via `auto_remap_phantom`. Per the
+    Operating Philosophy -- the LLM proposes anomalies; deterministic
+    wrappers commit repairs.
+    """
     line_id: str
     kind: Literal[
         "bad_casing",
@@ -130,7 +144,6 @@ class CastViolation(BaseModel):
     ]
     found: str
     expected: str = ""
-    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class PreAuditReport(BaseModel):
@@ -166,7 +179,6 @@ def _audit_failed_sentinel(reason: str) -> "PreAuditReport":
                                       # surfaces via audit_failed flag
             found=reason[:200],
             expected="",
-            confidence=1.0,
         )],
         pass_clean=False,
         audit_failed=True,
@@ -293,6 +305,46 @@ def auto_remap_phantom(
     return best[1]
 
 
+def _resolve_cast_member(
+    candidate: str,
+    cast_roster: Iterable[str],
+) -> Optional[str]:
+    """Resolve an auditor-suggested name to a real cast member.
+
+    Sprint 3F (2026-05-25): the deterministic resolver Python uses in
+    place of the retired `confidence` gate. Strategy:
+
+      1. Exact case-fold match against the roster. If exactly one
+         member case-folds equal to `candidate`, that is the answer
+         (and it is the canonical roster spelling, not the auditor's
+         casing).
+      2. Otherwise fall through to `auto_remap_phantom` (case-fold
+         substring fast-path, then Levenshtein <= 3). Ambiguous ties
+         already resolve to None inside `auto_remap_phantom`.
+
+    Returns the canonical roster spelling, or None when nothing
+    resolves or the match is an ambiguous tie -- the caller escalates
+    a None exactly as it escalates any unresolved violation (leave the
+    row for the Script Doctor). One Levenshtein implementation; this
+    reuses `auto_remap_phantom` / `_levenshtein` rather than adding a
+    second matcher.
+    """
+    if not candidate:
+        return None
+    roster_list = [r for r in (cast_roster or ()) if isinstance(r, str) and r]
+    if not roster_list:
+        return None
+    cand_fold = candidate.casefold()
+    exact = [m for m in roster_list if m.casefold() == cand_fold]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        # Two roster members case-fold identical -- a genuine tie.
+        # Escalate rather than guess.
+        return None
+    return auto_remap_phantom(candidate, roster_list)
+
+
 # ---------------------------------------------------------------------------
 # Cast contract auditor (Pass 1 + Pass 3 use the same function)
 # ---------------------------------------------------------------------------
@@ -335,13 +387,15 @@ You are a cast contract auditor for an audio drama script. Your job is
 to detect deviations from the locked cast contract in the script ledger.
 
 You DO NOT rewrite dialogue. You DO NOT propose creative changes. You
-only flag violations.
+DO NOT score your own certainty. You only extract anomalies: the
+literal that drifted, the cast member it should have been, and the
+kind of drift. Python decides the repair downstream.
 
 VIOLATION TYPES:
 - bad_casing: speaker is the right name but cased wrong (e.g. "alice"
-  when the cast says "ALICE"). High confidence.
+  when the cast says "ALICE").
 - alias_used: line uses an alias (e.g. "AL") that exists in cast_rows
-  but the canonical name should appear. Medium confidence.
+  but the canonical name should appear.
 - invented_name: dialogue text references a proper noun that is
   neither in cast_contract nor in meta.key_terms.
 - wrong_char_id: lines[k].char_id does not correspond to the speaker
@@ -350,14 +404,22 @@ VIOLATION TYPES:
   role in cast_contract.
 - speaker_unknown: speaker field is not in cast_contract at all.
 
-For every violation you find, output one CastViolation object. Set
-confidence based on how certain you are that the violation is real
-(1.0 = certain; 0.5 = ambiguous; below 0.3 = do not report).
+For every violation you find, output one anomaly object:
+- found: the exact literal in the ledger that drifted (the misspelled
+  name, the alias, the invented proper noun, the wrong char_id, etc.).
+- expected: the cast member or canonical value it should have been.
+  Leave it "" when you cannot name one (e.g. an invented_name with no
+  obvious cast match) -- Python resolves it.
+- kind: one of the six violation types above.
+
+Report only anomalies that are real drift from the locked cast
+contract. Do not score, rank, or weight your findings -- emit the
+anomaly facts only and let the downstream step decide the repair.
 
 Return EXACTLY one JSON object matching this schema:
 {
   "violations": [
-    {"line_id": "...", "kind": "...", "found": "...", "expected": "...", "confidence": 0.0-1.0},
+    {"line_id": "...", "kind": "...", "found": "...", "expected": "..."},
     ...
   ],
   "pass_clean": true|false
@@ -519,26 +581,37 @@ def apply_deterministic_cast_repairs(
     Returns the number of violations successfully repaired. Does NOT
     raise on a row lookup miss -- the violation is logged and skipped.
 
-    Per synthesis §3 Phase 3 -- repair table (wiring-review #11
-    tightened):
-        bad_casing (conf >= 0.8)    replace literal in text
-        wrong_char_id (conf >= 0.9) LOOK UP `expected` (LLM name)
-                                    in cast_contract; on match,
-                                    write the canonical char_id.
-                                    On miss, leave for Script Doctor.
-        role_mismatch (conf >= 0.9) Validate `expected` against the
-                                    allowed-role enum. On match,
-                                    write. On miss, leave for Script
-                                    Doctor.
-        alias_used (any conf)       substitute alias -> canonical
-        invented_name (any conf)    auto_remap fuzzy match; on miss,
-                                    leave for Script Doctor
-        speaker_unknown (any conf)  no-op here; flows into Phase 2
-                                    Script Doctor as an ordinary
-                                    violation. S33 B2 (2026-05-15)
-                                    retired the speaker_unknowns
-                                    rollback gate per refined
-                                    no-auditors rule.
+    Sprint 3F (2026-05-25): confidence gating removed. The auditor no
+    longer scores `confidence` (small models cannot reliably tell
+    0.7 from 0.8 or 0.8 from 0.9), so Python alone decides whether a
+    repair is safe to commit. The decision is deterministic:
+
+      * bad_casing / alias_used: the literal-substitution repairs.
+        Python verifies `found` actually appears in the line text and
+        that `expected` is a real cast member (exact case-fold match
+        against the roster, then Levenshtein <= 3 via
+        `auto_remap_phantom`). If the auditor's `expected` does not
+        resolve to a cast member, the repair is NOT applied -- the row
+        falls through to the Script Doctor.
+      * wrong_char_id: resolve `expected` (auditor-suggested NAME) to
+        a cast member by exact case-fold match, then Levenshtein. On a
+        unique resolution, write the canonical char_id. On no match or
+        an ambiguous tie, leave the row for the Script Doctor.
+      * role_mismatch: validate `expected` against the allowed-role
+        enum. On match, write. On miss, leave for the Script Doctor.
+        (Roles are a fixed enum, not a fuzzy-matched name space, so
+        there is nothing for Levenshtein to do here.)
+      * invented_name: `auto_remap_phantom` fuzzy match against the
+        full roster; on a miss or ambiguous tie, leave for the Script
+        Doctor.
+      * speaker_unknown: no-op here; flows into Phase 2 Script Doctor
+        as an ordinary violation. S33 B2 (2026-05-15) retired the
+        speaker_unknowns rollback gate per refined no-auditors rule.
+
+    Ambiguous ties (two cast members equally close to the auditor's
+    `expected` / `found`) escalate exactly as an unresolved violation
+    does: the row is left untouched for the Script Doctor. Python
+    never silently picks one of a tie.
     """
     cast_names = [
         row.get("name", "") for row in cast_rows
@@ -575,21 +648,39 @@ def apply_deterministic_cast_repairs(
             # retired; nothing to patch here either. Phase 2 Script
             # Doctor sees this row as an ordinary violation.
             continue
-        if v.kind == "bad_casing" and v.confidence >= 0.8:
+        if v.kind == "bad_casing":
+            # Sprint 3F: no confidence gate. Python resolves the
+            # auditor's `expected` to a real cast member (exact
+            # case-fold, then Levenshtein <= 3). An unresolved or
+            # ambiguous `expected` escalates -- the row is left for
+            # the Script Doctor.
             text = line.get("text") or ""
-            if v.found and v.expected and v.found in text:
-                line["text"] = text.replace(v.found, v.expected)
+            target = _resolve_cast_member(v.expected, full_roster)
+            if target and v.found and v.found in text:
+                line["text"] = text.replace(v.found, target)
                 repaired += 1
+            elif v.found and v.found in text:
+                log.warning(
+                    "[OTR_LedgerReviewer] bad_casing violation on "
+                    "line_id=%s suggested expected=%r did not resolve "
+                    "to a cast member; leaving row unrepaired for the "
+                    "Script Doctor.",
+                    v.line_id, v.expected,
+                )
             continue
-        if v.kind == "wrong_char_id" and v.confidence >= 0.9:
+        if v.kind == "wrong_char_id":
             # Wiring-review #11: NEVER write violation.expected raw.
-            # Look it up as a NAME in cast_contract and write the
-            # canonical char_id from the lookup. On miss, leave the
-            # row unchanged -- Pass 2 doctor decides.
-            expected_name = (v.expected or "").strip()
-            cid = char_id_by_name.get(expected_name)
-            if cid is None:
-                cid = char_id_by_name.get(expected_name.upper())
+            # Sprint 3F: resolve `expected` (auditor-suggested NAME)
+            # to a real cast member deterministically (exact case-fold
+            # then Levenshtein <= 3), then write that member's
+            # canonical char_id. On no match or an ambiguous tie,
+            # leave the row unchanged -- Pass 2 doctor decides.
+            target_name = _resolve_cast_member(v.expected, full_roster)
+            cid = None
+            if target_name:
+                cid = char_id_by_name.get(target_name)
+                if cid is None:
+                    cid = char_id_by_name.get(target_name.upper())
             if cid:
                 line["char_id"] = cid
                 repaired += 1
@@ -597,15 +688,18 @@ def apply_deterministic_cast_repairs(
                 log.warning(
                     "[OTR_LedgerReviewer] wrong_char_id violation on "
                     "line_id=%s suggested expected=%r but no cast "
-                    "member matches; leaving row unrepaired for the "
+                    "member resolves; leaving row unrepaired for the "
                     "Script Doctor.",
                     v.line_id, v.expected,
                 )
             continue
-        if v.kind == "role_mismatch" and v.confidence >= 0.9:
+        if v.kind == "role_mismatch":
             # Wiring-review #11: validate `expected` against the
             # allowed-role enum. Reject any other string -- the LLM
-            # cannot invent new speaker_role values.
+            # cannot invent new speaker_role values. Sprint 3F: roles
+            # are a fixed enum, not a fuzzy name space, so exact
+            # membership is the only deterministic check -- there is
+            # nothing for Levenshtein to resolve here.
             expected_role = (v.expected or "").strip()
             if expected_role in _ALLOWED_SPEAKER_ROLES:
                 line["speaker_role"] = expected_role
@@ -619,10 +713,23 @@ def apply_deterministic_cast_repairs(
                 )
             continue
         if v.kind == "alias_used":
+            # Sprint 3F: resolve the auditor's `expected` to a real
+            # cast member before substituting. An alias the auditor
+            # cannot map to a cast member escalates to the Script
+            # Doctor rather than writing an unverified literal.
             text = line.get("text") or ""
-            if v.found and v.expected and v.found in text:
-                line["text"] = text.replace(v.found, v.expected)
+            target = _resolve_cast_member(v.expected, full_roster)
+            if target and v.found and v.found in text:
+                line["text"] = text.replace(v.found, target)
                 repaired += 1
+            elif v.found and v.found in text:
+                log.warning(
+                    "[OTR_LedgerReviewer] alias_used violation on "
+                    "line_id=%s suggested expected=%r did not resolve "
+                    "to a cast member; leaving row unrepaired for the "
+                    "Script Doctor.",
+                    v.line_id, v.expected,
+                )
             continue
         if v.kind == "invented_name":
             remap = auto_remap_phantom(v.found, full_roster)

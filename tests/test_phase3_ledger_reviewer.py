@@ -6,6 +6,8 @@ Covers (per script-writing-architecture synthesis §3 Phase 3 + §6.A + M2 + G1-
   * compute_edit_cap scales with voiced beats   G1
   * audit_cast_contract single-fn + label       G4 (Pass 1 + Pass 3 same fn)
   * apply_deterministic_cast_repairs            each repair kind branch
+  * Sprint 3F deterministic resolution           confidence field removed;
+        case-fold / Levenshtein resolution + ambiguous-tie escalation
   * (S33 B4 retired apply_phantom_skip_fallback M2 safety net)
   * review_ledger disposition for each verdict:
         clean_no_edits / improved /
@@ -32,6 +34,7 @@ from nodes._otr_ledger_reviewer import (  # noqa: E402
     PreAuditReport,
     ReviewerEdit,
     ScriptDoctorReport,
+    _resolve_cast_member,
     apply_deterministic_cast_repairs,
     audit_cast_contract,
     auto_remap_phantom,
@@ -99,13 +102,15 @@ def _audit_clean_json():
 
 
 def _audit_phantom_json(line_id, phantom):
+    # Sprint 3F (2026-05-25): the auditor no longer emits a confidence
+    # score -- pure anomaly extraction (line_id / kind / found /
+    # expected) only.
     return json.dumps({
         "violations": [{
             "line_id": line_id,
             "kind": "invented_name",
             "found": phantom,
             "expected": "",
-            "confidence": 0.9,
         }],
         "pass_clean": False,
     })
@@ -247,7 +252,7 @@ class TestDeterministicCastRepairs:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="bad_casing",
-                found="alice", expected="ALICE", confidence=0.95,
+                found="alice", expected="ALICE",
             )
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -271,7 +276,7 @@ class TestDeterministicCastRepairs:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="role_mismatch",
-                found="announcer", expected="character", confidence=0.95,
+                found="announcer", expected="character",
             )
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -287,7 +292,7 @@ class TestDeterministicCastRepairs:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="alias_used",
-                found="AL", expected="ALICE", confidence=0.7,
+                found="AL", expected="ALICE",
             )
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -303,7 +308,7 @@ class TestDeterministicCastRepairs:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="invented_name",
-                found="Allice", expected="", confidence=0.6,
+                found="Allice", expected="",
             )
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -321,7 +326,7 @@ class TestDeterministicCastRepairs:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="invented_name",
-                found="Dr. Patel", expected="", confidence=0.9,
+                found="Dr. Patel", expected="",
             )
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -541,7 +546,7 @@ class TestReviewLedgerDispositions:
         report = PreAuditReport(violations=[
             CastViolation(
                 line_id="b001", kind="wrong_char_id",
-                found="c99", expected="ALICE", confidence=0.99,
+                found="c99", expected="ALICE",
             ),
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -560,7 +565,6 @@ class TestReviewLedgerDispositions:
             CastViolation(
                 line_id="b001", kind="wrong_char_id",
                 found="c99", expected="ZARGON",  # not in cast
-                confidence=0.99,
             ),
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -580,7 +584,6 @@ class TestReviewLedgerDispositions:
             CastViolation(
                 line_id="b001", kind="role_mismatch",
                 found="announcer", expected="character",
-                confidence=0.95,
             ),
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -598,7 +601,6 @@ class TestReviewLedgerDispositions:
             CastViolation(
                 line_id="b001", kind="role_mismatch",
                 found="announcer", expected="lead_singer",  # not in enum
-                confidence=0.95,
             ),
         ], pass_clean=False)
         n = apply_deterministic_cast_repairs(
@@ -606,3 +608,285 @@ class TestReviewLedgerDispositions:
         )
         assert n == 0
         assert led.data["lines"][0]["speaker_role"] == "announcer"
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3F (2026-05-25) -- confidence field removed; Python decides
+# replacement deterministically (exact case-fold / Levenshtein <= 3),
+# escalating ambiguous ties exactly as it escalates an unresolved
+# violation (row left for the Script Doctor, never silently picked).
+# ---------------------------------------------------------------------------
+
+
+class TestCastViolationNoConfidenceField:
+    """The pydantic model must no longer carry a confidence score."""
+
+    def test_confidence_field_removed_from_model(self):
+        assert "confidence" not in CastViolation.model_fields
+
+    def test_violation_constructs_without_confidence(self):
+        v = CastViolation(
+            line_id="b001", kind="bad_casing",
+            found="alice", expected="ALICE",
+        )
+        assert v.found == "alice"
+        assert v.expected == "ALICE"
+        assert not hasattr(v, "confidence")
+
+    def test_auditor_prompt_drops_confidence(self):
+        from nodes._otr_ledger_reviewer import _AUDITOR_SYSTEM_PROMPT
+        assert "confidence" not in _AUDITOR_SYSTEM_PROMPT.lower()
+
+
+class TestResolveCastMember:
+    """`_resolve_cast_member` -- exact case-fold first, then Levenshtein
+    via the existing `auto_remap_phantom` matcher; ambiguous ties to
+    None."""
+
+    def test_exact_case_fold_match_returns_canonical_spelling(self):
+        # Auditor sends a lowercased name -> resolver returns the
+        # canonical roster spelling, not the auditor's casing.
+        assert _resolve_cast_member("alice", ["ALICE", "BOB"]) == "ALICE"
+        assert _resolve_cast_member("ALICE", ["ALICE", "BOB"]) == "ALICE"
+
+    def test_levenshtein_fallback_resolves_close_typo(self):
+        # No exact match; Levenshtein 1 -> resolves.
+        assert _resolve_cast_member("Allice", ["ALICE", "BOB"]) == "ALICE"
+
+    def test_far_name_returns_none(self):
+        assert _resolve_cast_member("Zargon", ["ALICE", "BOB"]) is None
+
+    def test_empty_candidate_returns_none(self):
+        assert _resolve_cast_member("", ["ALICE", "BOB"]) is None
+
+    def test_empty_roster_returns_none(self):
+        assert _resolve_cast_member("ALICE", []) is None
+
+    def test_ambiguous_levenshtein_tie_returns_none(self):
+        # "CARO" is Levenshtein 1 from both "CARL" and "CARA" --
+        # an ambiguous tie escalates to None rather than guessing.
+        assert _resolve_cast_member("CARO", ["CARL", "CARA"]) is None
+
+
+class TestDeterministicRepairResolution:
+    """Sprint 3F: `apply_deterministic_cast_repairs` resolves the
+    auditor's `expected` deterministically -- no confidence gate."""
+
+    def test_bad_casing_resolves_lowercase_expected(self, tmp_path):
+        # Auditor emits a lowercased `expected`; the resolver maps it
+        # to the canonical roster spelling and the repair lands.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "alice waits.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="bad_casing",
+                found="alice", expected="alice",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["text"] == "ALICE waits."
+
+    def test_bad_casing_typo_expected_resolves_via_levenshtein(self, tmp_path):
+        # Auditor's `expected` is itself slightly misspelled
+        # ("ALICEE"); Levenshtein <= 3 still resolves it to ALICE.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "alice waits.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="bad_casing",
+                found="alice", expected="ALICEE",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["text"] == "ALICE waits."
+
+    def test_bad_casing_unresolvable_expected_escalates(self, tmp_path):
+        # Auditor's `expected` is not a cast member and not close to
+        # one -- the repair is NOT applied; the row is left untouched
+        # for the Script Doctor.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "alice waits.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="bad_casing",
+                found="alice", expected="Zargon",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert led.data["lines"][0]["text"] == "alice waits."
+
+    def test_alias_used_resolves_expected_to_cast_member(self, tmp_path):
+        # Lowercased `expected` for an alias still resolves.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "AL is in trouble.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="alias_used",
+                found="AL", expected="alice",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert "ALICE" in led.data["lines"][0]["text"]
+
+    def test_alias_used_unresolvable_expected_escalates(self, tmp_path):
+        # Alias the auditor maps to a non-cast name -> escalate, do
+        # not write an unverified literal.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "AL is in trouble.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="alias_used",
+                found="AL", expected="Mxyzptlk",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert led.data["lines"][0]["text"] == "AL is in trouble."
+
+    def test_wrong_char_id_resolves_typo_expected(self, tmp_path):
+        # Auditor suggests a slightly misspelled name; Levenshtein
+        # resolves it to the canonical cast member, then the canonical
+        # char_id is written.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c99", "Hello.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c99", expected="ALICEE",  # typo of ALICE
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["char_id"] == "c01"
+
+    def test_wrong_char_id_no_confidence_gate(self, tmp_path):
+        # Old behavior gated wrong_char_id on confidence >= 0.9.
+        # Sprint 3F removed the gate -- a clean exact-name match
+        # repairs regardless of any (now absent) score.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c99", "Hello.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c99", expected="ALICE",
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["char_id"] == "c01"
+
+    def test_bad_casing_no_confidence_gate(self, tmp_path):
+        # Old behavior gated bad_casing on confidence >= 0.8. Sprint 3F
+        # removed the gate -- the repair lands on a resolvable
+        # `expected` regardless of any (now absent) score.
+        led = _build_ledger(tmp_path, [
+            _line("b001", "c01", "bob speaks.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="bad_casing",
+                found="bob", expected="BOB",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 1
+        assert led.data["lines"][0]["text"] == "BOB speaks."
+
+
+class TestAmbiguousTieEscalation:
+    """An ambiguous tie (two cast members equally close) must escalate
+    -- the row is left for the Script Doctor, never silently picked."""
+
+    def _build_tie_ledger(self, tmp_path, lines):
+        """Ledger whose cast has two near-identical names so a typo
+        can sit equidistant between them."""
+        d = tmp_path / "audio"
+        d.mkdir(parents=True, exist_ok=True)
+        led = PL.Ledger(episode_id="pending_tie", out_dir=str(d))
+        led.set_cast([
+            {"char_id": "c01", "name": "CARL"},
+            {"char_id": "c02", "name": "CARA"},
+            {"char_id": "c03", "name": "ANNOUNCER"},
+        ])
+        led.data["lines"] = lines
+        return led
+
+    def test_bad_casing_ambiguous_tie_left_for_doctor(self, tmp_path):
+        # `expected="CARO"` is Levenshtein 1 from both CARL and CARA.
+        # No exact match, ambiguous tie -> repair NOT applied.
+        led = self._build_tie_ledger(tmp_path, [
+            _line("b001", "c01", "caro speaks.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="bad_casing",
+                found="caro", expected="CARO",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert led.data["lines"][0]["text"] == "caro speaks."
+
+    def test_wrong_char_id_ambiguous_tie_left_for_doctor(self, tmp_path):
+        # Ambiguous `expected` -> no char_id written; row escalates.
+        led = self._build_tie_ledger(tmp_path, [
+            _line("b001", "c99", "Hello.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="wrong_char_id",
+                found="c99", expected="CARO",  # tie between CARL/CARA
+            ),
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert led.data["lines"][0]["char_id"] == "c99"
+
+    def test_invented_name_ambiguous_tie_left_in_place(self, tmp_path):
+        # invented_name routes through auto_remap_phantom, which
+        # already returns None on a tie -- the phantom stays put.
+        led = self._build_tie_ledger(tmp_path, [
+            _line("b001", "c01", "Caro arrives.", role="character"),
+        ])
+        report = PreAuditReport(violations=[
+            CastViolation(
+                line_id="b001", kind="invented_name",
+                found="Caro", expected="",
+            )
+        ], pass_clean=False)
+        n = apply_deterministic_cast_repairs(
+            led.data, report, led.data["cast"],
+        )
+        assert n == 0
+        assert "Caro" in led.data["lines"][0]["text"]
