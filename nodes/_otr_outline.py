@@ -574,6 +574,16 @@ except ImportError:  # pragma: no cover - standalone / test load
         StructuredCallFailedError,
     )
 
+# Sprint 2C: typed repair-prompt factories. All three outline stages
+# pass a dispatching factory; the phase stage additionally supplies a
+# deterministic cast-membership repair callback (see
+# _phase_cast_phantom_repair in generate_outline). Package import in
+# production; flat import when loaded standalone / under test.
+try:
+    from ._otr_repair_prompts import make_dispatching_repair_factory
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Error class
@@ -1419,6 +1429,7 @@ def generate_outline(
             slot_fn=generate_fn,
             base_temperature=base_temperature,
             structural_retry_temperature=base_temperature / 2.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
             max_new_tokens=250,
             max_attempts=max_attempts,
             helper_name="OTR_Outline.macro",
@@ -1493,6 +1504,46 @@ def generate_outline(
                 )
             return None
 
+        def _phase_cast_phantom_repair(
+            failed_output: str, error: BaseException,
+        ) -> Optional[_PhaseSkeleton]:
+            """Sprint 2C cast_membership deterministic repair.
+
+            When the phase skeleton was rejected for a speaker outside
+            the locked cast, try to remap every phantom speaker to a
+            cast member with the project's one Levenshtein matcher
+            (auto_remap_phantom, threshold 3). If EVERY phantom resolves
+            unambiguously, return the corrected _PhaseSkeleton --
+            structured_call accepts it and makes no LLM repair call.
+            Return None when the output cannot be parsed or any phantom
+            is ambiguous; the dispatcher then builds an LLM cast-
+            membership repair turn instead.
+            """
+            try:  # lazy import: keep _otr_outline off the reviewer import graph
+                from ._otr_ledger_reviewer import auto_remap_phantom
+            except ImportError:  # pragma: no cover - standalone / test load
+                from _otr_ledger_reviewer import (  # type: ignore
+                    auto_remap_phantom,
+                )
+            try:
+                data = _otr_json.parse_first_json_object(failed_output or "")
+                skeleton = _PhaseSkeleton.model_validate(data)
+            except Exception:  # noqa: BLE001 -- unparseable: no deterministic fix
+                return None
+            remaps: list[tuple[int, str]] = []
+            for idx, beat in enumerate(skeleton.beats):
+                if beat.speaker in locked_cast_set:
+                    continue
+                canonical = auto_remap_phantom(
+                    beat.speaker, locked_cast_set, threshold=3,
+                )
+                if canonical is None:
+                    return None  # ambiguous phantom -- fall through to LLM
+                remaps.append((idx, canonical))
+            for idx, canonical in remaps:
+                skeleton.beats[idx].speaker = canonical
+            return skeleton
+
         try:
             skeleton = structured_call(
                 prompt=[
@@ -1505,6 +1556,9 @@ def generate_outline(
                 base_temperature=_STAGE2_BASE_TEMPERATURE,
                 structural_retry_temperature=(
                     _STAGE2_STRUCTURAL_RETRY_TEMPERATURE
+                ),
+                repair_prompt_factory=make_dispatching_repair_factory(
+                    deterministic_repair=_phase_cast_phantom_repair,
                 ),
                 post_validator=_phase_check,
                 max_new_tokens=200,
@@ -1575,6 +1629,7 @@ def generate_outline(
                     slot_fn=generate_fn,
                     base_temperature=base_temperature,
                     structural_retry_temperature=base_temperature / 2.0,
+                    repair_prompt_factory=make_dispatching_repair_factory(),
                     max_new_tokens=150,
                     max_attempts=max_attempts,
                     helper_name=(

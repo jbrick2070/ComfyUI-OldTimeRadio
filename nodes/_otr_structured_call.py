@@ -147,15 +147,20 @@ class RepairPromptFactory(Protocol):
     """Builds the Attempt 3 (typed repair) prompt.
 
     Given the raw failed model output plus the validation / parse error
-    that rejected it, return the messages payload for the repair call.
-    Concrete typed factories (one per structured pass) are a later
-    sprint (2C); for step 1 the parameter is just this Protocol and the
-    ladder supplies `default_repair_prompt_factory` when the caller
-    passes `None`.
+    that rejected it, a factory normally returns the messages payload
+    for the repair LLM call -- in this codebase a list of
+    `{"role": ..., "content": ...}` dicts (a plain string is also
+    accepted and wrapped). The concrete typed factories live in
+    `_otr_repair_prompts.py` (Sprint 2C); the ladder supplies
+    `default_repair_prompt_factory` when the caller passes `None`.
 
-    The return value is whatever shape the project's slot fns accept as
-    their first positional `messages` argument -- in this codebase a
-    list of `{"role": ..., "content": ...}` dicts.
+    A factory MAY instead resolve the failure itself and return a
+    finished, schema-valid pydantic instance of the call's `schema`
+    type. `structured_call` detects that, runs it through
+    `post_validator`, and returns it WITHOUT making an LLM repair call.
+    This is how `cast_membership_repair` short-circuits the LLM when the
+    project's Levenshtein matcher resolves a phantom name
+    deterministically.
     """
 
     def __call__(
@@ -326,7 +331,9 @@ def structured_call(
       repair_prompt_factory
         Callable that builds the Attempt 3 typed-repair prompt from the
         failed output + the validation error. `None` selects
-        `default_repair_prompt_factory`.
+        `default_repair_prompt_factory`. A factory may instead return a
+        finished `schema` instance, which is accepted directly with no
+        LLM repair call (see `RepairPromptFactory`).
       post_validator
         Optional content check run on every schema-valid instance,
         `post_validator(instance) -> str | None`. It returns an error
@@ -352,10 +359,11 @@ def structured_call(
     clears `post_validator`):
       Attempt 1: `slot_fn` at `base_temperature`.
       Attempt 2: SAME prompt at `structural_retry_temperature` (lower).
-      Attempt 3: typed repair -- prompt built via
-                 `repair_prompt_factory`, run at a static low
-                 temperature (`_REPAIR_TEMPERATURE`). The ladder ends
-                 here.
+      Attempt 3: typed repair -- `repair_prompt_factory` either builds
+                 a repair prompt (run at the static low temperature
+                 `_REPAIR_TEMPERATURE`) or hands back a finished
+                 `schema` instance, which is returned directly with no
+                 LLM call. The ladder ends here.
     """
     # --- Invariant: structural retry must LOWER temperature (2B). ---
     # Fail loud at entry. A structural retry at >= base temperature is
@@ -451,6 +459,26 @@ def structured_call(
                 failed_output=last_raw,
                 error=repair_error,
             )
+            # A typed repair factory MAY resolve the failure itself --
+            # e.g. cast_membership_repair remapping a phantom speaker to
+            # a locked-cast member via Levenshtein -- and hand back a
+            # finished `schema` instance instead of a repair prompt.
+            # Accept it directly: no LLM repair call is made. The
+            # instance still passes through post_validator so a
+            # deterministic "fix" that is itself content-invalid fails
+            # the ladder loudly rather than slipping through.
+            if isinstance(repair_prompt, schema):
+                if post_validator is not None:
+                    content_error = post_validator(repair_prompt)
+                    if content_error is not None:
+                        raise PostValidationError(content_error)
+                log.info(
+                    "[OTR_StructuredCall] '%s' attempt 3: repair factory "
+                    "resolved the failure deterministically; no LLM "
+                    "repair call made",
+                    helper_name,
+                )
+                return repair_prompt
             repair_messages = _prompt_to_messages(repair_prompt)
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,

@@ -42,6 +42,15 @@ Coverage map:
    15. a caller-supplied max_new_tokens reaches slot_fn on every
        attempt.
    16. max_new_tokens defaults to _STRUCTURED_MAX_NEW_TOKENS (512).
+
+  repair factory returning a finished instance (Sprint 2C):
+   17. a repair factory that returns a `schema` instance on Attempt 3
+       short-circuits the LLM -- the instance is returned and the slot
+       fn is never called a third time.
+   18. a deterministically-returned instance still runs post_validator;
+       a rejection exhausts the ladder (StructuredCallFailedError).
+   19. a deterministically-returned instance that clears post_validator
+       is returned, and post_validator was consulted.
 """
 
 from __future__ import annotations
@@ -537,3 +546,88 @@ def test_max_new_tokens_defaults_to_structured_constant():
     assert len(slot.calls) == 1
     assert slot.calls[0]["max_new_tokens"] == sc._STRUCTURED_MAX_NEW_TOKENS
     assert sc._STRUCTURED_MAX_NEW_TOKENS == 512
+
+
+# ---------------------------------------------------------------------------
+# 17-19. A repair factory may return a finished schema instance (Sprint 2C)
+# ---------------------------------------------------------------------------
+
+
+def test_repair_factory_returning_instance_skips_the_llm_call():
+    # Attempts 1+2 fail (bad JSON). On Attempt 3 the repair factory does
+    # not build a prompt -- it hands back a finished SampleSchema
+    # instance (the cast_membership deterministic-repair path). The
+    # ladder must return that instance WITHOUT a third slot call.
+    slot = _make_counting_slot_fn(responses=[_bad_json(), _bad_json()])
+    resolved = SampleSchema(title="Deterministically Repaired", score=7)
+
+    def instance_factory(*, original_prompt, failed_output, error):
+        return resolved
+
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=instance_factory,
+        helper_name="cast_membership_pass",
+    )
+    assert result is resolved
+    # Only Attempts 1 and 2 hit the slot fn; Attempt 3 made no LLM call.
+    assert len(slot.calls) == 2
+
+
+def test_repair_factory_instance_still_runs_post_validator():
+    # A deterministic "fix" that is itself content-invalid must not slip
+    # through: the returned instance is still fed to post_validator, and
+    # a rejection exhausts the ladder.
+    slot = _make_counting_slot_fn(responses=[_bad_json(), _bad_json()])
+    resolved = SampleSchema(title="Still Wrong", score=7)
+
+    def instance_factory(*, original_prompt, failed_output, error):
+        return resolved
+
+    post_validator = _make_counting_post_validator(
+        verdicts=["deterministic fix is still content-invalid"],
+    )
+    with pytest.raises(sc.StructuredCallFailedError) as exc_info:
+        sc.structured_call(
+            prompt="produce a title and score",
+            schema=SampleSchema,
+            slot_fn=slot,
+            base_temperature=0.40,
+            structural_retry_temperature=0.20,
+            repair_prompt_factory=instance_factory,
+            post_validator=post_validator,
+            helper_name="cast_membership_pass",
+        )
+    assert len(slot.calls) == 2
+    assert isinstance(exc_info.value.last_error, sc.PostValidationError)
+    # post_validator saw the deterministically-returned instance.
+    assert post_validator.seen[-1] is resolved
+
+
+def test_repair_factory_instance_clearing_post_validator_is_returned():
+    # The deterministic instance clears post_validator -> it is returned
+    # and the validator was consulted exactly once for it.
+    slot = _make_counting_slot_fn(responses=[_bad_json(), _bad_json()])
+    resolved = SampleSchema(title="Clean Repair", score=55)
+
+    def instance_factory(*, original_prompt, failed_output, error):
+        return resolved
+
+    post_validator = _make_counting_post_validator(verdicts=[None])
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=instance_factory,
+        post_validator=post_validator,
+        helper_name="cast_membership_pass",
+    )
+    assert result is resolved
+    assert len(slot.calls) == 2
+    assert post_validator.seen == [resolved]

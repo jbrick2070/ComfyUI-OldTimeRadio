@@ -441,6 +441,16 @@ except ImportError:  # pragma: no cover - standalone / test load
         PostValidationError,
     )
 
+# Sprint 2C: typed repair-prompt factories. run_story_brief_reflection
+# passes a dispatching factory so structured_call's Attempt 3 routes the
+# repair turn by failure class (forbidden name, narration leak, over-
+# length, and so on). Package import in production; flat import under
+# standalone test.
+try:
+    from ._otr_repair_prompts import make_dispatching_repair_factory
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Failure sentinel -- refinement section 4.1 + L-6
@@ -565,6 +575,7 @@ def run_story_brief_reflection(
             slot_fn=technical_fn,
             base_temperature=_REFLECTION_TEMPERATURE,
             structural_retry_temperature=_REFLECTION_STRUCTURAL_RETRY_TEMPERATURE,
+            repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_content_validator,
             max_new_tokens=_REFLECTION_MAX_NEW_TOKENS,
             max_attempts=3,

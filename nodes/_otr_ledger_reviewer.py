@@ -390,6 +390,15 @@ except ImportError:  # pragma: no cover - standalone / test load
         StructuredCallFailedError,
     )
 
+# Sprint 2C: typed repair-prompt factories. audit_cast_contract and
+# run_script_doctor pass a dispatching factory so structured_call's
+# Attempt 3 routes the repair turn by failure class. Package import in
+# production; flat import under standalone test.
+try:
+    from ._otr_repair_prompts import make_dispatching_repair_factory
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+
 
 def audit_cast_contract(
     generate_fn,
@@ -450,6 +459,7 @@ def audit_cast_contract(
             slot_fn=generate_fn,
             base_temperature=_AUDIT_TEMPERATURE,
             structural_retry_temperature=_AUDIT_RETRY_TEMPERATURE,
+            repair_prompt_factory=make_dispatching_repair_factory(),
             max_new_tokens=_AUDIT_MAX_NEW_TOKENS,
             max_attempts=3,
             helper_name=f"audit_cast_contract:{label}",
@@ -847,6 +857,7 @@ def run_script_doctor(
             slot_fn=generate_fn,
             base_temperature=_DOCTOR_TEMPERATURE,
             structural_retry_temperature=_DOCTOR_RETRY_TEMPERATURE,
+            repair_prompt_factory=make_dispatching_repair_factory(),
             max_new_tokens=_DOCTOR_MAX_NEW_TOKENS,
             max_attempts=3,
             helper_name="run_script_doctor",

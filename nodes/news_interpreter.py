@@ -412,6 +412,15 @@ except ImportError:  # pragma: no cover - standalone / test load
         StructuredCallFailedError,
     )
 
+# Sprint 2C: typed repair-prompt factories. build_news_briefs passes a
+# dispatching factory so structured_call's Attempt 3 routes the repair
+# turn by failure class. Package import in production; flat import when
+# loaded standalone / under test.
+try:
+    from ._otr_repair_prompts import make_dispatching_repair_factory
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -610,6 +619,7 @@ def build_news_briefs(
             slot_fn=_counting_slot_fn,
             base_temperature=float(base_temperature),
             structural_retry_temperature=float(base_temperature) / 2.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
             post_validator=_content_validator,
             max_new_tokens=int(max_new_tokens),
             max_attempts=int(max_attempts),
