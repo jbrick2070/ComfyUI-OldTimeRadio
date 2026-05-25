@@ -60,7 +60,7 @@
 
 | Sprint | Status | Bug pointers | Notes |
 |---|---|---|---|
-| 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 3/5 landed `e7a8eb6` (json_str fix + test, helper_context wraps, pick_style comments); `technical_fn` drop BLOCKED -- Open Decision 6; CI AST sweep deferred |
+| 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); `technical_fn` drop PULLED (Decision 6 -- keep); only the deferred CI AST sweep remains |
 | 1 -- render seatbelts | NOT STARTED | -- | ~half already done; blocked on decisions 1-3 |
 | 2A -- structured_call helper | NOT STARTED | -- | |
 | 2B -- repair temp fix | NOT STARTED | -- | folds into 2A |
@@ -116,8 +116,9 @@
   > AUDIT: The content-validation repair arm at L679 already passes `failed_output=brief_model.story_brief` correctly -- the bug is isolated to the schema arm. One-word fix; add a regression test that forces a `ValidationError` and asserts `_repair_pass` actually runs.
 - [x] Wrap `generate_outline`, `_generate_title_from_script`, `run_story_brief_reflection` in `slot_scheduler.helper_context(...)`. `<unattributed>` bucket -> 0. **[DONE e7a8eb6 2026-05-24 -- wrapped at the 3 `OTR_LedgerScriptWriter.py` call sites; helper names `generate_outline` / `generate_title` / `story_brief_reflection`]**
 - [x] Fix stale `pick_style` comment in `OTR_LedgerScriptWriter.py` (Pass 2 / chooser routes to technical, not creative). **[DONE e7a8eb6 2026-05-24 -- two stale comments corrected (S30 routing-table block + the pick_style call-site block); verified against `_otr_style_picker.py:605-624`]**
-- [ ] Drop dead `technical_fn` parameter from `compose_line` signature (`_otr_line_composer.py:1449-1461`). **[BLOCKED 2026-05-24 -- audit miss: `technical_fn` is unused internally but is test-enforced paired-contract surface (`tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` mandates the keyword-only param). Dropping it reverses the S32 B1 decision and turns that test red. See Open Decision 6.]**
+> **PULLED (2026-05-24, Open Decision 6 resolved -- keep).** Sprint 0 originally listed a `technical_fn` drop from `compose_line` as dead weight; pulled after verification -- the param is contractually load-bearing per the S32 B1 paired-contract, retained pending B3/B4 per-sub-pass dispatch. Dropping it now would reverse S32 B1 and force the same uniformity to be re-added when B3/B4 land.
 - [ ] **CI check (scoped down) -- NOT DONE 2026-05-24 (deferred, out of this session's scope; the existing per-file count tests still hold):** per-file `# LLM slot:` count tests already exist (`tests/test_writer_slot_routing.py`, `tests/test_story_brief_c5a1.py`). Remaining work = a single AST-level sweep that walks every `generate_fn`/`technical_fn`/`creative_fn` call site repo-wide and asserts a `# LLM slot:` tag within N lines. Park next to `docs/_s28_forbidden_sweep.py`.
+- [x] **(Added 2026-05-24 -- 5th Sprint 0 item, replaces the pulled `technical_fn` drop.)** **[DONE 51f7226 2026-05-24]** Refresh the stale `test_pick_style_internally_uses_creative_fn_default` test (`tests/test_helper_paired_signatures.py`). It asserts `technical_fn` is never called by `pick_style` -- false since S32 B2 routed pass 2 (chooser) to `technical_fn`. The test passes today only by accident: its inventor mock data trips the mode-collapse reject, so `_run_chooser` is never reached. Same root cause as the stale `pick_style` comments -- both predate S32 B2. Rewrite it to assert the B2 routing (pass 1 inventor -> creative, pass 2 chooser -> technical).
 
 ---
 
@@ -292,7 +293,7 @@ Round-robin gating: 2E, 3A-G, 5A-C, 6.
 3. **`experimental_gguf` tier** -- rename in parallel with the high-tier rename, or leave untouched?
 4. **GBNF (2E)** -- wire or delete? (round-robin gated)
 5. **Story-quality critic track (5B)** -- confirm it gets its own roadmap track once this batch lands.
-6. **`technical_fn` on `compose_line` (Sprint 0)** -- the v4 audit called it dead weight, but `tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` asserts `technical_fn` MUST exist as a keyword-only param, and the paired `creative_fn`+`technical_fn` contract is deliberate uniformity across 4 sibling helpers, kept for the planned B2/B3/B4 per-sub-pass dispatch. Options: **(a)** keep `technical_fn` -- skip this Sprint 0 item, accept that `compose_line` carries an unused-but-contractual param (recommended -- it stays consistent with its 3 sibling helpers and B2/B3/B4 will need the slot again); **(b)** drop it AND update/retire `test_compose_line_accepts_paired_generators` plus ~21 test call sites across 5 test files, reversing the S32 B1 decision.
+6. **`technical_fn` on `compose_line` (Sprint 0)** -- **RESOLVED 2026-05-24: option (a) -- keep `technical_fn`; item pulled from Sprint 0.** Background: the v4 audit called it dead weight, but `tests/test_helper_paired_signatures.py::test_compose_line_accepts_paired_generators` asserts `technical_fn` MUST exist as a keyword-only param, and the paired `creative_fn`+`technical_fn` contract is deliberate uniformity across 4 sibling helpers, kept for the planned B2/B3/B4 per-sub-pass dispatch. Options: **(a)** keep `technical_fn` -- skip this Sprint 0 item, accept that `compose_line` carries an unused-but-contractual param (recommended -- it stays consistent with its 3 sibling helpers and B2/B3/B4 will need the slot again); **(b)** drop it AND update/retire `test_compose_line_accepts_paired_generators` plus ~21 test call sites across 5 test files, reversing the S32 B1 decision.
 
 ---
 
@@ -361,3 +362,12 @@ gbnf_enforcement: wired                               # pending round-robin
 - **Regression:** green 2026-05-24 -- new test 4 passed; `test_core` + `test_audio_byte_identical` + `test_meta_slot_transitions` + `test_writer_slot_routing` + `test_helper_paired_signatures` 89 passed / 2 skipped; story-brief suite 107 passed / 4 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed across every suite.
 - **New bug ids:** `BUG-LOCAL-268` (fixed, verified).
 - Build run with two parallel subagents, one per file (`_otr_story_brief.py` + new test; `OTR_LedgerScriptWriter.py`) -- zero file overlap.
+
+### 2026-05-24 -- Sprint 0 cont.: technical_fn pulled + stale routing test refreshed
+- Commit `51f7226` on `v2.0-alpha` (1 file, +51/-35).
+- **Open Decision 6 resolved (Jeffrey's call):** keep `technical_fn` on `compose_line`. The Sprint 0 `technical_fn`-drop item is PULLED -- the param is test-enforced paired-contract surface, not dead weight. Plan amended: the Sprint 0 checklist item is replaced with a PULLED note; Decision 6 marked RESOLVED; corrections-table row already reclassified.
+- **5th Sprint 0 item landed:** refreshed the stale `test_pick_style_internally_uses_creative_fn_default` (`tests/test_helper_paired_signatures.py`). It asserted `pick_style` never calls `technical_fn` -- false since S32 B2; it passed only because its inventor mock data tripped the mode-collapse reject so `_run_chooser` was never reached. Renamed to `test_pick_style_routes_inventor_creative_and_chooser_technical`, rewritten with valid inventor data so the chooser pass is genuinely exercised, now asserts pass 1 -> creative + pass 2 -> technical. Module docstring corrected.
+- **Regression:** green 2026-05-24 -- `test_helper_paired_signatures` + `test_pick_style_routing` + `test_otr_style_picker` + `test_core` + `test_audio_byte_identical` 125 passed / 2 skipped; Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed.
+- **New bug ids:** none.
+- **Sprint 0 state:** 4/5 items landed; `technical_fn` drop pulled (not a defect); only the deferred CI AST sweep remains before Sprint 0 can formally close.
+- Built with one subagent on `tests/test_helper_paired_signatures.py`.
