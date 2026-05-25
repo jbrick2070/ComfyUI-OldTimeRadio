@@ -50,7 +50,7 @@ Commits `e981db0` / `09c2d49` / `e619ebb` on `v2.0-alpha`. Regression: full `tes
 
 A batch of audio-quality work, parked to be tackled together rather than piecemeal — the operator has further audio updates upcoming. Everything in this track touches the audio path: Prime Directive 1 (audio byte-identical to baseline) applies, and each item is round-robin gated per CLAUDE.md.
 
-- **Per-clip loudness normalization — PARKED 2026-05-24. Round-robin question doc ready; consultation not yet run.** Operator noticed Bark dialogue clips are audibly uneven line-to-line. Not a missing-normalization bug: `BatchBark` (`nodes/batch_bark_generator.py` ~L611) already normalizes every clip — but to a **peak** target (−3 dBFS), and peak normalization cannot equalize *perceived* loudness (Bark's variable crest factor means two clips at the same −3 dBFS peak can sound very different). Fix direction: per-clip **loudness** (RMS/LUFS) normalization, in addition to — not instead of — the final `EpisodeAssembler` −1 dBFS ceiling pass. Full problem statement, the confirmed three-point normalization architecture, constraints (byte-identical baseline, the BUG-031 silent-clip guardrail, crossfade clipping, the separate Kokoro announcer bus), and six consultation questions are in `docs/2026-05-24-per-clip-audio-normalization__00_question.md`. When this track is picked up: run the round-robin (ChatGPT → Gemini → synthesis), then implement gated on a re-blessed `tests/test_audio_byte_identical.py` baseline.
+- **Per-clip loudness normalization — PARKED 2026-05-24. Round-robin question doc ready; consultation not yet run.** Operator noticed Bark dialogue clips are audibly uneven line-to-line. Not a missing-normalization bug: `BatchBark` (`nodes/batch_bark_generator.py` ~L611) already normalizes every clip — but to a **peak** target (−3 dBFS), and peak normalization cannot equalize *perceived* loudness (Bark's variable crest factor means two clips at the same −3 dBFS peak can sound very different). Fix direction: per-clip **loudness** (RMS/LUFS) normalization, in addition to — not instead of — the final `EpisodeAssembler` −1 dBFS ceiling pass. Full problem statement, the confirmed three-point normalization architecture, constraints (byte-identical baseline, the BUG-031 silent-clip guardrail, crossfade clipping, the separate Kokoro announcer bus), and six consultation questions are in `docs/2026-05-24-per-clip-audio-normalization__00_question.md`. When this track is picked up: run the round-robin (ChatGPT → Gemini → synthesis), then implement gated on a re-blessed `tests/test_audio_byte_identical.py` baseline. **Landing site:** Sprint 3 of the "VOICE ABSTRACTION + AUDIO NORMALIZATION" three-sprint plan below; the LUFS-order decision is gated on that sprint's round-robin.
 - **(Further audio updates — to be added by Jeffrey.)**
 
 ---
@@ -68,6 +68,60 @@ Principle: every content type — dialogue, announcer, music, SFX — belongs in
 **Workstream 2 — speaker-label hygiene [bug].** Dialogue `text` / `text_for_tts` must never carry the speaker name. **Primary fix LANDED 2026-05-24 (BUG-LOCAL-267):** the composer always stripped a leading `"SPEAKER:"` prefix via `strip_line_formatting`, but the Phase 3 ScriptDoctor reviewer runs after composition and `apply_doctor_edits` wrote its rewrite payload verbatim into `line["text"]` — re-injecting the label. `apply_doctor_edits` now routes the payload through `strip_line_formatting`. **Remaining (parked):** the strip regexes all require a separator (`:`, `-`, em-dash); a bare `"NAME "` prefix with no punctuation (ozempics b004 `"HAYES VANCE not right."`, b001 `"ANNOUNCER strange..."`) is still uncaught in every path. Closing it means stripping a leading occurrence of the line's *own* speaker name even without a separator — which carries a false-positive risk (a line legitimately opening with the speaker's own name), so it is a small but deliberate fix, not mechanical.
 
 **Status:** PARKED. Workstream 2's primary fix (BUG-LOCAL-267) has landed; its no-separator follow-up and Workstream 1 remain parked — batch Workstream 1 with the Stable Audio 3 SFX work.
+
+---
+
+## VOICE ABSTRACTION + AUDIO NORMALIZATION — three-sprint plan (Jeffrey, 2026-05-24 r2)
+
+**Status:** Forward plan, post round-robin synthesis (r2). Three sequenced sprints that bundle the voice-backend abstraction work with the parked per-clip loudness normalization. **Supersedes** the `Voice Model Agnostic Nodes (Voice Backend Abstraction)` RFC further down this file (engine list narrowed, back-compat shims dropped). **Absorbs** the AUDIO QUALITY TRACK per-clip loudness item as Sprint 3. Architectural skeleton already exists at `dfa9b07` — unregistered `OTR_VoiceRender` + `nodes/_voice_backends/{bark,kokoro}.py` stubs — and is the foundation. Targets v2.2.
+
+**Hard rules (enforced across all three sprints):**
+
+- **No reference clips.** OTR is pure-TTS — the cast voice is chosen, not cloned. Every adopted engine selects voice by one of: preset library / plain-text description / preset + style instruction. Reference-clip, zero-shot, and cloning modes are excluded outright (see Excluded engines below).
+- **No back-compat shims.** `OTR_BatchBarkGenerator` and `OTR_KokoroAnnouncer` are *deleted* once `OTR_VoiceRender` ships and passes byte-identity — no alias / re-export indirection. Workflow JSON is rewired in the same commit window. (This reverses point 5 of the superseded RFC.)
+- **No silent fallbacks.** A missing model, OOM, or an unregistered `(role, backend)` raises — never silently routes back to Bark.
+- **No multi-tenant VRAM.** Every backend driver registers with `free_otr_pipeline_residue()` or `comfy.model_management`; the lever must call `torch.cuda.empty_cache()` + `torch.cuda.ipc_collect()` explicitly — model-variable unload alone leaves the allocator holding reserved blocks (the BUG-LOCAL-231 mechanism).
+- **Registry-keyed renders from Sprint 2 on.** Sprint 1 Bark byte-identity predates the registry; every render from Sprint 2 onward is keyed to a pinned `registry_version`.
+- **Lab isolation.** New engines install into an `otr-tts-lab` ComfyUI Portable instance first; never a production dependency until graduated.
+- **License + ledger discipline.** Verify model + wrapper + deps at driver-add time (OTR core stays MIT). Any audio-altering pass stamps the ledger (Step EditX adds the `voice_postprocess_*` fields).
+
+**Engine candidate pool (no-clip-compliant):**
+
+| Engine | Voice surface | Sprint |
+|--------|---------------|--------|
+| Bark | library speaker ID | retire-target (current default) |
+| Kokoro | preset name | Sprint 1 |
+| Qwen3-TTS VoiceDesign | preset OR text description | Sprint 2 (lab first) |
+| Step Audio EditX | inherited — post-pass paralinguistic tags | Sprint 2 |
+| CosyVoice 3 SFT/Instruct | preset / preset + instruction | spike (conditional) |
+| Piper | preset name | spike |
+| StyleTTS 2 | preset name | spike |
+
+### Sprint 1 — Voice Backend Abstraction
+
+Register `OTR_VoiceRender` (promote the `dfa9b07` skeleton); implement the Bark backend driver wrapping current logic; rewire `workflows/otr_scifi_16gb_full.json` to per-role `OTR_VoiceRender` instances with the `voice_model` widget pre-pinned; **delete `OTR_BatchBarkGenerator` + `OTR_KokoroAnnouncer`** after byte-identity passes (no shims); extend `VoiceSpec` internally to accept structured payloads — no JSON registry / `OTR_CastResolver` yet, cast→engine routing stays at the workflow-graph level. Kokoro cast expansion: Kokoro driver, extend Kokoro from announcer-only to character roles, 6-line Bark-vs-Kokoro A/B logged to `BUG_LOG.md`.
+
+*Exit gate:* full `tests/` walk green; Bug Bible baseline held; audio byte-identical regression PASS vs the pre-Sprint-1 baseline (Bark default path); workflow-migration acceptance checklist met — `OTR_VoiceRender` present in the JSON, old nodes removed, **no `forceInput` added to any STRING input carrying a legacy `widget` sub-key** (the BUG-LOCAL-258 lesson), widget-vector audit clean, graph validates in ComfyUI 0.22.2+, every `OTR_VoiceRender` has `voice_model` explicitly set.
+
+### Sprint 2 — Engine Experiments + Cast Registry
+
+Qwen3-TTS VoiceDesign integrated in the lab first via a pinned community wrapper; new `nodes/_voice_backends/qwen3_design.py` driver. **Sharpened repeatability gate (no waivers):** pinned model-file hash + pinned wrapper-commit hash + a defined voice-description canonicalization rule + 3 cold launches (full restart between) + objective speaker-similarity comparison across runs + subjective A/B notes. **Qwen3 failure hard-stop:** if repeatability fails the gate, Qwen3 is lab/one-off only — no production backend role, no canonical cast entry. **Cast registry built here** (Qwen3 is the first engine that needs per-character voice descriptions): a `cast_registry.json` schema (per role, per backend, a string handle — preset ID or description; no audio files), a new `OTR_CastResolver` node `(cast_role, backend) → payload` that fails loud on an unregistered pair, registry versioned per episode. **Step Audio EditX** integrated as a post-pass (`base TTS line → EditX tags → final audio`), sequential after base TTS never concurrent, restricted starting tag vocabulary, and five new per-line ledger fields: `voice_postprocess_engine`, `voice_postprocess_model_hash`, `voice_postprocess_tags`, `voice_postprocess_pass_count`, `voice_postprocess_restore_used`.
+
+*Exit gate:* Phase 1B repeatability outcome logged (PASS → Qwen3 may hold canonical cast; FAIL → lab/one-off only); cast registry + `OTR_CastResolver` shipped, registry version pinned; EditX ledger stamps verified on lab renders; 6-line A/B logged; no production canon shift unless Qwen3 PASSED.
+
+### Sprint 3 — Audio Normalization (Prime Directive 1 re-bless)
+
+The landing site for the parked per-clip loudness work. New `OTR_VoiceNormalize` node, backend-agnostic — reads the `voice_engine` ledger stamp and applies a per-engine LUFS profile (Bark variable crest factor; Kokoro consistent; Qwen3 measured at Sprint 2 exit). Three-point architecture: per-clip LUFS + announcer-bus separation + the existing `EpisodeAssembler` −1 dBFS ceiling pass. **LUFS calculation order:** runs *before* Step Audio EditX, OR EditX-injected paralinguistic-tag windows (`<snort>`, `<breath>`, …) are explicitly excluded from the integrated-LUFS window — running LUFS after EditX without exclusion would suppress the spoken dialogue whenever a loud tag transient skews the clip's loudness. **Breaks Prime Directive 1 — round-robin re-bless required;** `tests/test_audio_byte_identical.py` baseline regenerated against post-normalization output. Consumes the round-robin question doc `docs/2026-05-24-per-clip-audio-normalization__00_question.md`.
+
+*Exit gate:* round-robin consult complete on the PD1 re-bless (transcript saved under `docs/`); byte-identical baseline regenerated; per-engine LUFS profile table committed; operator-listened pre/post A/B logged.
+
+**Round-robin gates:** Sprint 1 — `OTR_VoiceRender` registration + node-retirement policy; Sprint 2 — cast registry schema + `VoiceSpec` flat-string→structured-dict + Qwen3 adoption & the sharpened repeatability gate; Sprint 3 — `OTR_VoiceNormalize` + PD1 re-bless (including the LUFS-order decision). Sprint 3 blocks without that consult.
+
+**Spike track (post-Sprint 2, conditional, non-blocking):** CosyVoice 3 SFT/Instruct (only if Step EditX degradation proves unworkable), Piper (utility / background characters), StyleTTS 2 (prosody specialist).
+
+**Excluded engines (institutional memory — do not let these drift back into the pool):** IndexTTS-2 (strongest emotion control, 8-vector, but reference-driven — first to revisit if the no-clip rule ever relaxes), Higgs Audio V2.5, F5-TTS, VibeVoice (all variants), CosyVoice 3 zero-shot + cross-lingual modes, RVC. All are reference-clip / cloning primary mode.
+
+**Open questions:** (1) measured Bark / Kokoro / Qwen3 integrated-LUFS profile deltas — input to the Sprint 3 lookup table; (2) the LUFS-order decision (before-EditX vs tag-window-exclusion) — round-robin gated in Sprint 3; (3) whether Kokoro / Qwen3 can register with `comfy.model_management` or must ride the lever like Bark; (4) **synthetic-reference escape hatch** — generating a baseline voice once with Qwen3 and storing the synthetic `.wav` as a registry reference clip could reopen IndexTTS-2 without human recording sessions; flagged for explicit operator decision, **not adopted** — the no-clip rule stands as written; (5) the exact Qwen3 voice-description canonicalization rule (whitespace / casing / punctuation).
 
 ---
 
@@ -2029,7 +2083,9 @@ These are all "edit-locked-file" tasks. They can land in a single follow-up sess
 
 ---
 
-### Voice Model Agnostic Nodes (Voice Backend Abstraction)
+### Voice Model Agnostic Nodes (Voice Backend Abstraction) — SUPERSEDED 2026-05-24
+
+**SUPERSEDED by the "VOICE ABSTRACTION + AUDIO NORMALIZATION — three-sprint plan" section near the top of this file.** The engine list is narrowed against the no-reference-clip rule, and the back-compat-shim approach (point 5 below) is replaced with hard node-retirement. The architectural skeleton at `dfa9b07` remains the foundation; RFC Open Question 2 (flat-string vs structured-dict `VoiceSpec`) is resolved in favour of the structured dict, built in that plan's Sprint 2. The text below is kept for design history.
 
 **Pairs with:** Cast Contract Extensions §3 — character canon entries carry fully-qualified voice specs (`bark:v2/en_speaker_5`, `cosyvoice:robotic_calm`, `kokoro:bm_fable`) once both pieces ship.
 **Source patterns:** existing TTS upgrade backlog at `project_tts_upgrade_candidates_2026-04-23.md` (CosyVoice 2/3 Apache-2.0 first pick); applies `feedback_use_community_nodes_not_custom` (wrap community nodes, don't vendor model code) and `feedback_otr_stays_mit` (license bar per backend).
