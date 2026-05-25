@@ -28,6 +28,23 @@ Coverage map:
 
   Grammar path (not-yet-wired):
    10. grammar_path=None -> ladder ends at Attempt 3 (no Attempt 4).
+
+  post_validator (content validation beyond the pydantic schema):
+   11. post_validator returns None -> the schema-valid instance is
+       accepted; one slot call.
+   12. post_validator rejection advances the ladder past a schema-
+       valid Attempt 1 to Attempt 2.
+   13. a content rejection feeds the typed-repair factory as a
+       PostValidationError carrying the content message.
+   14. all attempts content-rejected -> StructuredCallFailedError
+       whose last_error is a PostValidationError.
+   15. PostValidationError subclasses ValueError (so the ladder's
+       existing except arms catch it unchanged).
+
+  max_new_tokens (per-caller token budget):
+   16. a caller-supplied max_new_tokens reaches slot_fn on every
+       attempt.
+   17. max_new_tokens defaults to _STRUCTURED_MAX_NEW_TOKENS (512).
 """
 
 from __future__ import annotations
@@ -374,3 +391,179 @@ def test_no_grammar_path_ends_ladder_at_attempt_three():
         )
     assert len(slot.calls) == 3, "Attempt 4 must not run without a grammar_path"
     assert exc_info.value.attempts == 3
+
+
+# ---------------------------------------------------------------------------
+# 11-15. post_validator -- content validation beyond the pydantic schema
+# ---------------------------------------------------------------------------
+
+
+def _make_counting_post_validator(*, verdicts: list):
+    """Return a post_validator that records calls and pops queued verdicts.
+
+    Each queued verdict is either None (content accepted) or an error
+    string (content rejected). When `verdicts` is empty the validator
+    accepts -- so an over-run ladder never raises IndexError.
+    """
+    seen: list = []
+
+    def post_validator(instance):
+        seen.append(instance)
+        if not verdicts:
+            return None
+        return verdicts.pop(0)
+
+    post_validator.seen = seen  # type: ignore[attr-defined]
+    return post_validator
+
+
+def test_post_validator_none_return_accepts_instance():
+    # Schema-valid response + a post_validator that accepts -> one call.
+    slot = _make_counting_slot_fn(responses=[_valid_json()])
+    post_validator = _make_counting_post_validator(verdicts=[None])
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        post_validator=post_validator,
+        helper_name="sample_pass",
+    )
+    assert isinstance(result, SampleSchema)
+    assert len(slot.calls) == 1
+    # post_validator saw the schema-valid instance exactly once.
+    assert len(post_validator.seen) == 1
+    assert isinstance(post_validator.seen[0], SampleSchema)
+
+
+def test_post_validator_rejection_advances_the_ladder():
+    # Both responses are schema-valid; the post_validator rejects the
+    # first on content grounds and accepts the second. The ladder must
+    # advance to Attempt 2 even though Attempt 1 was schema-valid.
+    slot = _make_counting_slot_fn(responses=[_valid_json(), _valid_json()])
+    post_validator = _make_counting_post_validator(
+        verdicts=["score is content-invalid for this pass", None],
+    )
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.45,
+        structural_retry_temperature=0.15,
+        post_validator=post_validator,
+        helper_name="sample_pass",
+    )
+    assert isinstance(result, SampleSchema)
+    assert len(slot.calls) == 2, (
+        "a content rejection on Attempt 1 should advance to Attempt 2"
+    )
+    # Attempt 2 ran at the lowered structural retry temperature.
+    assert slot.calls[1]["temperature"] == pytest.approx(0.15)
+    assert len(post_validator.seen) == 2
+
+
+def test_post_validator_failure_feeds_typed_repair_factory():
+    # Attempts 1+2 are schema-valid but content-rejected; Attempt 3
+    # (repair) is accepted. The repair factory must receive a
+    # PostValidationError carrying the content message.
+    slot = _make_counting_slot_fn(
+        responses=[_valid_json(), _valid_json(), _valid_json()],
+    )
+    repair_factory = _make_recording_repair_factory()
+    post_validator = _make_counting_post_validator(
+        verdicts=["too few key terms", "too few key terms", None],
+    )
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        repair_prompt_factory=repair_factory,
+        post_validator=post_validator,
+        helper_name="sample_pass",
+    )
+    assert isinstance(result, SampleSchema)
+    assert len(slot.calls) == 3
+    assert len(repair_factory.invocations) == 1
+    repair_error = repair_factory.invocations[0]["error"]
+    assert isinstance(repair_error, sc.PostValidationError)
+    assert "too few key terms" in str(repair_error)
+
+
+def test_post_validator_exhaustion_raises_with_post_validation_error():
+    # Every attempt is schema-valid but the post_validator rejects all
+    # of them -> StructuredCallFailedError whose last_error is a
+    # PostValidationError.
+    slot = _make_counting_slot_fn(
+        responses=[_valid_json(), _valid_json(), _valid_json()],
+    )
+    post_validator = _make_counting_post_validator(
+        verdicts=["content reject", "content reject", "content reject"],
+    )
+    with pytest.raises(sc.StructuredCallFailedError) as exc_info:
+        sc.structured_call(
+            prompt="produce a title and score",
+            schema=SampleSchema,
+            slot_fn=slot,
+            base_temperature=0.40,
+            structural_retry_temperature=0.20,
+            post_validator=post_validator,
+            helper_name="casting_pass",
+        )
+    assert len(slot.calls) == 3
+    assert isinstance(exc_info.value.last_error, sc.PostValidationError)
+    assert "content reject" in str(exc_info.value.last_error)
+    assert exc_info.value.attempts == 3
+
+
+def test_post_validation_error_is_a_value_error():
+    # PostValidationError subclasses ValueError so the ladder's existing
+    # except (json.JSONDecodeError, ValidationError, ValueError) arms
+    # catch a content rejection with no change.
+    assert issubclass(sc.PostValidationError, ValueError)
+
+
+# ---------------------------------------------------------------------------
+# 16-17. max_new_tokens -- per-caller token budget
+# ---------------------------------------------------------------------------
+
+
+def test_max_new_tokens_passthrough_reaches_slot_fn():
+    # A caller-supplied token budget must reach slot_fn unchanged on
+    # every attempt. The structured passes vary widely (story brief
+    # ~160, cast audit ~2000, script doctor ~3500); the helper must not
+    # clamp them to its 512 default.
+    slot = _make_counting_slot_fn(responses=[_bad_json(), _valid_json()])
+    result = sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        max_new_tokens=3500,
+        helper_name="script_doctor_pass",
+    )
+    assert isinstance(result, SampleSchema)
+    assert len(slot.calls) == 2
+    # Both the base attempt and the structural retry used the budget.
+    assert slot.calls[0]["max_new_tokens"] == 3500
+    assert slot.calls[1]["max_new_tokens"] == 3500
+
+
+def test_max_new_tokens_defaults_to_structured_constant():
+    # When the caller does not set max_new_tokens it falls back to the
+    # module default (512) -- a small JSON object fits comfortably.
+    slot = _make_counting_slot_fn(responses=[_valid_json()])
+    sc.structured_call(
+        prompt="produce a title and score",
+        schema=SampleSchema,
+        slot_fn=slot,
+        base_temperature=0.40,
+        structural_retry_temperature=0.20,
+        helper_name="sample_pass",
+    )
+    assert len(slot.calls) == 1
+    assert slot.calls[0]["max_new_tokens"] == sc._STRUCTURED_MAX_NEW_TOKENS
+    assert sc._STRUCTURED_MAX_NEW_TOKENS == 512

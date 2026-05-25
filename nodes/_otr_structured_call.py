@@ -124,6 +124,27 @@ class StructuredCallFailedError(RuntimeError):
         )
 
 
+class PostValidationError(ValueError):
+    """Raised inside the ladder when `post_validator` rejects a result.
+
+    A response can be JSON-parseable AND schema-valid yet still wrong:
+    a casting pick may name a voice preset outside the runtime pool, a
+    news brief may carry too few key terms, a story brief may mention a
+    character name the brief is forbidden to name, an outline stage may
+    route a line to a speaker outside the locked cast. Those are
+    CONTENT failures, not structural ones -- pydantic cannot see them
+    because they depend on runtime state the schema does not carry.
+
+    `post_validator` reports such a failure by returning an error
+    string (see `structured_call`); the ladder wraps that string in
+    this exception. It subclasses `ValueError` so the ladder's existing
+    `except (json.JSONDecodeError, ValidationError, ValueError)` arms
+    catch it with no change -- a content failure advances the ladder
+    exactly like a schema failure, and is fed to the typed-repair
+    factory as the Attempt 3 error.
+    """
+
+
 # ---------------------------------------------------------------------------
 # repair_prompt_factory -- typed-repair prompt builder contract
 # ---------------------------------------------------------------------------
@@ -223,6 +244,7 @@ def _invoke_slot(
     messages: Any,
     *,
     temperature: float,
+    max_new_tokens: int,
     grammar_path: Optional[str],
 ) -> str:
     """Call the slot fn, passing `grammar_path` best-effort when present.
@@ -238,13 +260,13 @@ def _invoke_slot(
         return slot_fn(
             messages,
             temperature=temperature,
-            max_new_tokens=_STRUCTURED_MAX_NEW_TOKENS,
+            max_new_tokens=max_new_tokens,
         )
     try:
         return slot_fn(
             messages,
             temperature=temperature,
-            max_new_tokens=_STRUCTURED_MAX_NEW_TOKENS,
+            max_new_tokens=max_new_tokens,
             grammar_path=grammar_path,
         )
     except TypeError:
@@ -257,20 +279,37 @@ def _invoke_slot(
         return slot_fn(
             messages,
             temperature=temperature,
-            max_new_tokens=_STRUCTURED_MAX_NEW_TOKENS,
+            max_new_tokens=max_new_tokens,
         )
 
 
-def _parse_and_validate(raw: str, schema: type[T]) -> T:
-    """Extract the first JSON object from `raw` and validate it.
+def _parse_and_validate(
+    raw: str,
+    schema: type[T],
+    post_validator: Optional[Callable[[T], Optional[str]]] = None,
+) -> T:
+    """Extract the first JSON object from `raw`, validate, content-check.
 
     Uses the shared `_otr_json.parse_first_json_object` -- no second
     JSON parser. Raises `json.JSONDecodeError` on unparseable output or
-    `pydantic.ValidationError` on a schema mismatch; the ladder catches
-    both and advances to the next attempt.
+    `pydantic.ValidationError` on a schema mismatch.
+
+    When `post_validator` is supplied it runs on the schema-valid
+    instance: a non-None return value is a content rejection and is
+    raised as `PostValidationError`. All three exception types are
+    caught by the ladder, which advances to the next attempt.
+
+    `post_validator` is expected to RETURN an error string (or None),
+    never to raise -- a raising post_validator is a programming error
+    and is allowed to propagate.
     """
     data = _otr_json.parse_first_json_object(raw or "")
-    return schema.model_validate(data)
+    instance = schema.model_validate(data)
+    if post_validator is not None:
+        content_error = post_validator(instance)
+        if content_error is not None:
+            raise PostValidationError(content_error)
+    return instance
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +325,8 @@ def structured_call(
     base_temperature: float,
     structural_retry_temperature: float,
     repair_prompt_factory: Optional[RepairPromptFactory] = None,
+    post_validator: Optional[Callable[[T], Optional[str]]] = None,
+    max_new_tokens: int = _STRUCTURED_MAX_NEW_TOKENS,
     grammar_path: Optional[str] = None,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     helper_name: str = "structured_call",
@@ -319,6 +360,22 @@ def structured_call(
         Callable that builds the Attempt 3 typed-repair prompt from the
         failed output + the validation error. `None` selects
         `default_repair_prompt_factory`.
+      post_validator
+        Optional content check run on every schema-valid instance,
+        `post_validator(instance) -> str | None`. It returns an error
+        string to REJECT the instance (a content failure pydantic
+        cannot see -- e.g. a voice preset outside the runtime pool, a
+        news brief below the key-term floor, a speaker outside the
+        locked cast) or `None` to ACCEPT it. A rejection is raised as
+        `PostValidationError` and advances the ladder exactly like a
+        schema failure. Mirrors the `extra_check` idiom already used by
+        `_otr_outline._run_call_with_retry`. `None` disables the check.
+      max_new_tokens
+        Token budget passed to `slot_fn` on every attempt. Structured
+        passes vary widely -- a story-brief reflection needs ~160, a
+        cast-contract audit ~2000, a script-doctor pass ~3500 -- so the
+        caller sets its own budget. Defaults to
+        `_STRUCTURED_MAX_NEW_TOKENS` (512) for a small JSON object.
       grammar_path
         Optional path to a GBNF grammar file. Used only by Attempt 4.
         Real grammar enforcement lands in a later sprint; for step 1
@@ -330,7 +387,8 @@ def structured_call(
       helper_name
         Short string for logging / slot attribution.
 
-    The ladder (stops at the first schema-valid result):
+    The ladder (stops at the first schema-valid result that also
+    clears `post_validator`):
       Attempt 1: `slot_fn` at `base_temperature`.
       Attempt 2: SAME prompt at `structural_retry_temperature` (lower).
       Attempt 3: typed repair -- prompt built via
@@ -380,9 +438,10 @@ def structured_call(
         try:
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
-                temperature=base_temperature, grammar_path=None,
+                temperature=base_temperature,
+                max_new_tokens=max_new_tokens, grammar_path=None,
             )
-            return _parse_and_validate(last_raw, schema)
+            return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
             log.warning(
@@ -402,9 +461,10 @@ def structured_call(
         try:
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
-                temperature=structural_retry_temperature, grammar_path=None,
+                temperature=structural_retry_temperature,
+                max_new_tokens=max_new_tokens, grammar_path=None,
             )
-            return _parse_and_validate(last_raw, schema)
+            return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
             log.warning(
@@ -434,9 +494,10 @@ def structured_call(
             repair_messages = _prompt_to_messages(repair_prompt)
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,
-                temperature=_REPAIR_TEMPERATURE, grammar_path=None,
+                temperature=_REPAIR_TEMPERATURE,
+                max_new_tokens=max_new_tokens, grammar_path=None,
             )
-            return _parse_and_validate(last_raw, schema)
+            return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
             log.warning(
@@ -469,9 +530,10 @@ def structured_call(
                 last_raw = _invoke_slot(
                     slot_fn, base_messages,
                     temperature=_GRAMMAR_TEMPERATURE,
+                    max_new_tokens=max_new_tokens,
                     grammar_path=grammar_path,
                 )
-                return _parse_and_validate(last_raw, schema)
+                return _parse_and_validate(last_raw, schema, post_validator)
             except (json.JSONDecodeError, ValidationError, ValueError) as exc:
                 last_error = exc
                 log.warning(
