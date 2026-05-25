@@ -476,7 +476,7 @@ The LLM-based canonical rewrite pass (`_normalize_script_format`) previously cou
 
 #### Director JSON Resilience _(legacy — retained for v1.x history)_
 
-LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the legacy Director path survived malformed output that previously crashed the entire pipeline. (The Director class itself was deleted in voice-path-cleanbreak S2; the L3 ledger writer uses GBNF grammar-constrained generation instead, which makes the comment-stripper obsolete in v2.0.)
+LLMs sometimes emit JavaScript-style `// comments` inside JSON output. A state-machine comment stripper (`_strip_json_comments`) removes `//` line comments outside quoted strings before JSON parsing. Combined with trailing-comma repair and truncation brace-closure, the legacy Director path survived malformed output that previously crashed the entire pipeline. (The Director class itself was deleted in voice-path-cleanbreak S2; the L3 ledger writer routes structured-JSON passes through a schema-validating retry ladder (`_otr_structured_call`) instead, which makes the comment-stripper obsolete in v2.0.)
 
 #### Title Extraction Hardening
 

@@ -59,7 +59,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from pathlib import Path
 from typing import Callable
 
 try:
@@ -106,15 +105,6 @@ FORBIDDEN_ERA_TERMS: tuple[str, ...] = (
     "swing era", "art deco",
     "radio drama", "radio play", "radio hour",
     "brass speaker",
-)
-
-# Grammar file path. Optional / loader-side. The news_interpreter
-# module does NOT pass this to generate_fn -- staying agnostic to
-# the loader -- but it's shipped here so a future llama.cpp-backed
-# loader can pick it up by convention (loader looks under
-# ``<repo>/grammars/<module_name>.gbnf``).
-GRAMMAR_PATH = (
-    Path(__file__).resolve().parent.parent / "grammars" / "news_interpreter.gbnf"
 )
 
 

@@ -436,9 +436,8 @@ def audit_cast_contract(
     # branch retired with the rollback gate); the deterministic
     # cast repairs still consume the sentinel violations list.
     # Sprint 2A/2D: the single-shot call + parse + validate is now the
-    # shared structured_call 4-attempt ladder (base -> structural retry
-    # -> typed repair -> grammar; grammar Attempt 4 activates once
-    # Sprint 2E wires a grammar_path). An exhausted ladder raises
+    # shared structured_call 3-attempt ladder (base -> structural retry
+    # -> typed repair). An exhausted ladder raises
     # StructuredCallFailedError -- the converted form of the prior
     # three failure arms. The slot fn (the LLM call) can still raise
     # arbitrary loader exceptions, which structured_call does not catch;
@@ -452,7 +451,7 @@ def audit_cast_contract(
             base_temperature=_AUDIT_TEMPERATURE,
             structural_retry_temperature=_AUDIT_RETRY_TEMPERATURE,
             max_new_tokens=_AUDIT_MAX_NEW_TOKENS,
-            max_attempts=4,
+            max_attempts=3,
             helper_name=f"audit_cast_contract:{label}",
         )
     except StructuredCallFailedError as exc:
@@ -835,9 +834,8 @@ def run_script_doctor(
         {"role": "user", "content": user_prompt},
     ]
     # Sprint 2A/2D: the single-shot call + parse + validate is now the
-    # shared structured_call 4-attempt ladder (base -> structural retry
-    # -> typed repair -> grammar; Attempt 4 activates once Sprint 2E
-    # wires a grammar_path). S34 B1 (2026-05-15) requires this pass to
+    # shared structured_call 3-attempt ladder (base -> structural retry
+    # -> typed repair). S34 B1 (2026-05-15) requires this pass to
     # fail loud with needs_full_rerun: an exhausted ladder
     # (StructuredCallFailedError) and a raising slot fn -- which
     # structured_call does not catch -- both map to that verdict,
@@ -850,7 +848,7 @@ def run_script_doctor(
             base_temperature=_DOCTOR_TEMPERATURE,
             structural_retry_temperature=_DOCTOR_RETRY_TEMPERATURE,
             max_new_tokens=_DOCTOR_MAX_NEW_TOKENS,
-            max_attempts=4,
+            max_attempts=3,
             helper_name="run_script_doctor",
         )
     except StructuredCallFailedError as exc:

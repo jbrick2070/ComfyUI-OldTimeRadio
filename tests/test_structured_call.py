@@ -1,8 +1,8 @@
 """Sprint 2A step 1: shared structured-LLM-call helper tests.
 
 The module under test (`nodes/_otr_structured_call.py`) is pure -- no
-I/O beyond an optional grammar-path probe, no GPU, no ComfyUI imports.
-Every test here runs against a small pydantic schema and a call-
+I/O, no GPU, no ComfyUI imports. Every test here runs against a small
+pydantic schema and a call-
 counting stub `slot_fn` closure. No existing call site is exercised;
 converting the structured passes onto `structured_call` is later work.
 
@@ -26,25 +26,22 @@ Coverage map:
     8. structural_retry_temperature == base_temperature -> ValueError.
     9. structural_retry_temperature > base_temperature -> ValueError.
 
-  Grammar path (not-yet-wired):
-   10. grammar_path=None -> ladder ends at Attempt 3 (no Attempt 4).
-
   post_validator (content validation beyond the pydantic schema):
-   11. post_validator returns None -> the schema-valid instance is
+   10. post_validator returns None -> the schema-valid instance is
        accepted; one slot call.
-   12. post_validator rejection advances the ladder past a schema-
+   11. post_validator rejection advances the ladder past a schema-
        valid Attempt 1 to Attempt 2.
-   13. a content rejection feeds the typed-repair factory as a
+   12. a content rejection feeds the typed-repair factory as a
        PostValidationError carrying the content message.
-   14. all attempts content-rejected -> StructuredCallFailedError
+   13. all attempts content-rejected -> StructuredCallFailedError
        whose last_error is a PostValidationError.
-   15. PostValidationError subclasses ValueError (so the ladder's
+   14. PostValidationError subclasses ValueError (so the ladder's
        existing except arms catch it unchanged).
 
   max_new_tokens (per-caller token budget):
-   16. a caller-supplied max_new_tokens reaches slot_fn on every
+   15. a caller-supplied max_new_tokens reaches slot_fn on every
        attempt.
-   17. max_new_tokens defaults to _STRUCTURED_MAX_NEW_TOKENS (512).
+   16. max_new_tokens defaults to _STRUCTURED_MAX_NEW_TOKENS (512).
 """
 
 from __future__ import annotations
@@ -87,8 +84,8 @@ def _schema_violating_json() -> str:
 def _make_counting_slot_fn(*, responses: list[str]):
     """Return a slot fn that records every call and pops queued responses.
 
-    Records `(messages, temperature, max_new_tokens, grammar_path)` on
-    each call. When `responses` is empty it returns an empty string,
+    Records `(messages, temperature, max_new_tokens)` on each call.
+    When `responses` is empty it returns an empty string,
     which fails JSON parsing -- so an over-run ladder still fails
     cleanly rather than raising IndexError.
 
@@ -97,12 +94,11 @@ def _make_counting_slot_fn(*, responses: list[str]):
     """
     calls: list[dict] = []
 
-    def slot_fn(messages, *, temperature, max_new_tokens, grammar_path=None):
+    def slot_fn(messages, *, temperature, max_new_tokens):
         calls.append({
             "messages": messages,
             "temperature": temperature,
             "max_new_tokens": max_new_tokens,
-            "grammar_path": grammar_path,
         })
         if not responses:
             return ""
@@ -265,8 +261,8 @@ def test_default_repair_factory_used_when_none_passed():
 
 
 def test_all_attempts_fail_raises_structured_call_failed_error():
-    # Four bad responses -> Attempt 1, 2, 3 all fail; no grammar_path so
-    # the ladder ends after Attempt 3.
+    # Three bad responses -> Attempt 1, 2, 3 all fail; the ladder ends
+    # after Attempt 3.
     slot = _make_counting_slot_fn(
         responses=[_bad_json(), _bad_json(), _bad_json()],
     )
@@ -368,33 +364,7 @@ def test_higher_structural_retry_temperature_fails_loud():
 
 
 # ---------------------------------------------------------------------------
-# 10. grammar_path not-yet-wired -> ladder ends at Attempt 3
-# ---------------------------------------------------------------------------
-
-
-def test_no_grammar_path_ends_ladder_at_attempt_three():
-    # Three bad responses, default max_attempts=4. With no grammar_path
-    # the grammar-enforced Attempt 4 is unavailable, so the ladder ends
-    # after Attempt 3 and only three slot calls were made.
-    slot = _make_counting_slot_fn(
-        responses=[_bad_json(), _bad_json(), _bad_json()],
-    )
-    with pytest.raises(sc.StructuredCallFailedError) as exc_info:
-        sc.structured_call(
-            prompt="produce a title and score",
-            schema=SampleSchema,
-            slot_fn=slot,
-            base_temperature=0.40,
-            structural_retry_temperature=0.20,
-            grammar_path=None,
-            helper_name="sample_pass",
-        )
-    assert len(slot.calls) == 3, "Attempt 4 must not run without a grammar_path"
-    assert exc_info.value.attempts == 3
-
-
-# ---------------------------------------------------------------------------
-# 11-15. post_validator -- content validation beyond the pydantic schema
+# 10-14. post_validator -- content validation beyond the pydantic schema
 # ---------------------------------------------------------------------------
 
 
@@ -526,7 +496,7 @@ def test_post_validation_error_is_a_value_error():
 
 
 # ---------------------------------------------------------------------------
-# 16-17. max_new_tokens -- per-caller token budget
+# 15-16. max_new_tokens -- per-caller token budget
 # ---------------------------------------------------------------------------
 
 

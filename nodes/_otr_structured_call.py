@@ -26,8 +26,8 @@ and returns a raw string. JSON extraction reuses the shared
 `_otr_json.parse_first_json_object` -- this module does NOT hand-roll
 a second JSON parser.
 
-This module is PURE: no I/O beyond an optional grammar-path existence
-probe, no GPU, no ComfyUI imports, no writer imports.
+This module is PURE: no I/O, no GPU, no ComfyUI imports, no writer
+imports.
 
 UTF-8 no BOM. No em-dashes (Windows cp1252 subprocess decode trap).
 4-space indentation.
@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any, Callable, Optional, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -63,9 +62,9 @@ T = TypeVar("T", bound=BaseModel)
 # Constants -- ladder settings shared by every structured pass
 # ---------------------------------------------------------------------------
 
-# Default cap on the retry ladder. Attempt 4 (grammar-enforced) only
-# runs when a `grammar_path` is supplied AND `max_attempts >= 4`.
-_DEFAULT_MAX_ATTEMPTS: int = 4
+# Default cap on the retry ladder: base -> structural retry -> typed
+# repair. Three rungs; the ladder ends at the typed-repair attempt.
+_DEFAULT_MAX_ATTEMPTS: int = 3
 
 # Token budget for a structured-JSON pass. A JSON object plus a short
 # payload fits comfortably here; structured passes are not narrative
@@ -80,12 +79,6 @@ _STRUCTURED_MAX_NEW_TOKENS: int = 512
 # temperature so the repair attempt is the calmest attempt in the
 # ladder.
 _REPAIR_TEMPERATURE: float = 0.10
-
-# Attempt 4 (grammar-enforced) runs at this temperature. With a GBNF
-# grammar constraining the token stream the structural shape is
-# guaranteed by the decoder, so temperature only affects content; a
-# low value keeps content honest.
-_GRAMMAR_TEMPERATURE: float = 0.10
 
 
 # ---------------------------------------------------------------------------
@@ -245,42 +238,17 @@ def _invoke_slot(
     *,
     temperature: float,
     max_new_tokens: int,
-    grammar_path: Optional[str],
 ) -> str:
-    """Call the slot fn, passing `grammar_path` best-effort when present.
+    """Call the slot fn with the standard structured-pass signature.
 
-    Grammar enforcement is not fully wired until a later sprint (2E).
-    For step 1 the call tries to pass `grammar_path` through as a
-    keyword; if the slot fn does not accept it (TypeError on the
-    keyword), the call is retried without it. Either way the slot fn
-    runs -- a slot fn that ignores grammar simply behaves like a normal
-    structured attempt.
+    Every slot fn in this codebase has the signature
+    `slot_fn(messages, *, temperature, max_new_tokens) -> str`.
     """
-    if grammar_path is None:
-        return slot_fn(
-            messages,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-        )
-    try:
-        return slot_fn(
-            messages,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-            grammar_path=grammar_path,
-        )
-    except TypeError:
-        # Slot fn does not yet accept a grammar_path keyword. Grammar
-        # wiring lands in sprint 2E; for now degrade to a plain call.
-        log.info(
-            "[OTR_StructuredCall] slot fn does not accept grammar_path; "
-            "running attempt without grammar enforcement"
-        )
-        return slot_fn(
-            messages,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-        )
+    return slot_fn(
+        messages,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+    )
 
 
 def _parse_and_validate(
@@ -327,7 +295,6 @@ def structured_call(
     repair_prompt_factory: Optional[RepairPromptFactory] = None,
     post_validator: Optional[Callable[[T], Optional[str]]] = None,
     max_new_tokens: int = _STRUCTURED_MAX_NEW_TOKENS,
-    grammar_path: Optional[str] = None,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     helper_name: str = "structured_call",
 ) -> T:
@@ -376,14 +343,8 @@ def structured_call(
         cast-contract audit ~2000, a script-doctor pass ~3500 -- so the
         caller sets its own budget. Defaults to
         `_STRUCTURED_MAX_NEW_TOKENS` (512) for a small JSON object.
-      grammar_path
-        Optional path to a GBNF grammar file. Used only by Attempt 4.
-        Real grammar enforcement lands in a later sprint; for step 1
-        the path is passed through to `slot_fn` best-effort. When
-        `None`, Attempt 4 is unavailable and the ladder ends at
-        Attempt 3.
       max_attempts
-        Caps the ladder (default 4).
+        Caps the ladder (default 3).
       helper_name
         Short string for logging / slot attribution.
 
@@ -393,9 +354,8 @@ def structured_call(
       Attempt 2: SAME prompt at `structural_retry_temperature` (lower).
       Attempt 3: typed repair -- prompt built via
                  `repair_prompt_factory`, run at a static low
-                 temperature (`_REPAIR_TEMPERATURE`).
-      Attempt 4: grammar-enforced via `grammar_path` when available;
-                 otherwise the ladder ends here.
+                 temperature (`_REPAIR_TEMPERATURE`). The ladder ends
+                 here.
     """
     # --- Invariant: structural retry must LOWER temperature (2B). ---
     # Fail loud at entry. A structural retry at >= base temperature is
@@ -439,7 +399,7 @@ def structured_call(
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
                 temperature=base_temperature,
-                max_new_tokens=max_new_tokens, grammar_path=None,
+                max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
@@ -462,7 +422,7 @@ def structured_call(
             last_raw = _invoke_slot(
                 slot_fn, base_messages,
                 temperature=structural_retry_temperature,
-                max_new_tokens=max_new_tokens, grammar_path=None,
+                max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
@@ -495,7 +455,7 @@ def structured_call(
             last_raw = _invoke_slot(
                 slot_fn, repair_messages,
                 temperature=_REPAIR_TEMPERATURE,
-                max_new_tokens=max_new_tokens, grammar_path=None,
+                max_new_tokens=max_new_tokens,
             )
             return _parse_and_validate(last_raw, schema, post_validator)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
@@ -504,43 +464,6 @@ def structured_call(
                 "[OTR_StructuredCall] '%s' attempt 3 (repair) failed: %s",
                 helper_name, exc,
             )
-
-    # --- Attempt 4: grammar-enforced (only when a grammar_path exists). ---
-    if attempts_run < max_attempts:
-        if grammar_path is None:
-            log.info(
-                "[OTR_StructuredCall] '%s': no grammar_path supplied; "
-                "Attempt 4 (grammar-enforced) unavailable -- ladder ends",
-                helper_name,
-            )
-        elif not os.path.isfile(grammar_path):
-            log.warning(
-                "[OTR_StructuredCall] '%s': grammar_path %r does not "
-                "exist; Attempt 4 unavailable -- ladder ends",
-                helper_name, grammar_path,
-            )
-        else:
-            attempts_run += 1
-            log.info(
-                "[OTR_StructuredCall] '%s' attempt 4/%d: grammar-enforced "
-                "call (grammar_path=%r) at temperature=%.3f",
-                helper_name, max_attempts, grammar_path, _GRAMMAR_TEMPERATURE,
-            )
-            try:
-                last_raw = _invoke_slot(
-                    slot_fn, base_messages,
-                    temperature=_GRAMMAR_TEMPERATURE,
-                    max_new_tokens=max_new_tokens,
-                    grammar_path=grammar_path,
-                )
-                return _parse_and_validate(last_raw, schema, post_validator)
-            except (json.JSONDecodeError, ValidationError, ValueError) as exc:
-                last_error = exc
-                log.warning(
-                    "[OTR_StructuredCall] '%s' attempt 4 (grammar) "
-                    "failed: %s",
-                    helper_name, exc,
-                )
 
     # --- Ladder exhausted: fail loud. ---
     log.error(

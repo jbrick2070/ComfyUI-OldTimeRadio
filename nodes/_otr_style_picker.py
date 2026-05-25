@@ -8,7 +8,7 @@ Architecture (Jeffrey 2026-05-10 spec):
     descriptors grounded in the article.
       - temp 0.6 first attempt, 0.7 on retries
       - max_tokens 80, stop on blank line
-      - GBNF + post-hoc regex grammar enforcement
+      - post-hoc regex grammar enforcement (DESCRIPTOR_RE)
       - distinctness: no two descriptors may share more than one
         root word
       - up to 3 attempts; all fail -> raise
@@ -33,10 +33,9 @@ raises StyleGenerationFailedError; the workflow halts. The caller
 
 LLM-agnostic: this module calls
 ``generate_fn(messages, *, temperature, max_new_tokens) -> str``
-only. Grammar enforcement is the loader's responsibility (the
-GBNF file at grammars/style_picker.gbnf is a hint for loaders that
-support guided decoding; this module does post-hoc regex validation
-regardless so models without grammar support still work).
+only. Output shape is enforced post-hoc: every descriptor is
+validated against DESCRIPTOR_RE regardless of the loader, so the
+picker behaves identically on any backend.
 
 Module surface:
     StylePick                     -- pydantic model: forensic record

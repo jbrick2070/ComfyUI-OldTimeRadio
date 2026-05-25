@@ -522,11 +522,10 @@ def run_story_brief_reflection(
     and burn the creative budget on a JSON validation pass.
 
     Sprint 2A/2D: the call routes through the shared `structured_call`
-    4-attempt retry ladder (base -> structural retry -> typed repair
-    -> grammar; grammar Attempt 4 activates once Sprint 2E wires a
-    grammar_path). The ladder subsumes the former three hand-rolled
-    arms -- LLM call, JSON parse, schema validate -- plus the single
-    repair pass. Two failure classes the ladder reports back here:
+    3-attempt retry ladder (base -> structural retry -> typed repair).
+    The ladder subsumes the former three hand-rolled arms -- LLM call,
+    JSON parse, schema validate -- plus the single repair pass. Two
+    failure classes the ladder reports back here:
 
       * `post_validator` carries the section-3.4 content gate (named
         characters, dialogue / plot verbs, unsupported period
@@ -568,7 +567,7 @@ def run_story_brief_reflection(
             structural_retry_temperature=_REFLECTION_STRUCTURAL_RETRY_TEMPERATURE,
             post_validator=_content_validator,
             max_new_tokens=_REFLECTION_MAX_NEW_TOKENS,
-            max_attempts=4,
+            max_attempts=3,
             helper_name="run_story_brief_reflection",
         )
     except StructuredCallFailedError as exc:
