@@ -64,7 +64,7 @@
 | 1 -- render seatbelts | COMPLETE | -- | tier rename landed `df7f9b1`; decisions 1-2 resolved to no-change; render-flag defaults already on |
 | 2A -- structured_call helper | COMPLETE | -- | helper `61f8cfa`; extensions `fed6327`; all call sites converted -- ledger `7f3b65f`, story_brief `3f41fc8`, news `b4c6e83`, casting `6e2950d`, outline `476eabc` |
 | 2B -- repair temp fix | COMPLETE | -- | baked into `structured_call` (structural retry < base, asserted at entry) `61f8cfa` |
-| 2C -- typed repair prompts | NOT STARTED | -- | ledger conversion uses `default_repair_prompt_factory`; bespoke per-failure-class factories still pending |
+| 2C -- typed repair prompts | COMPLETE | -- | `1fa6b40` -- six typed factories + dispatcher in `_otr_repair_prompts.py`; `structured_call` Attempt 3 accepts a factory-returned schema instance (cast_membership deterministic no-LLM path via `auto_remap_phantom`); all 8 call sites wired |
 | 2D -- cleanup pass retries | COMPLETE | -- | `audit_cast_contract` + `run_script_doctor` -> `structured_call(max_attempts=4)` `7f3b65f` |
 | 2E -- GBNF | COMPLETE | -- | decision 4 re-resolved 2026-05-25: DELETE -- loader (HF Transformers 5.5.0, no llama.cpp / transformers-cfg / outlines) has no GBNF support; dead scaffolding removed |
 | 3A -- split compose_line | NOT STARTED | -- | -- |
@@ -153,10 +153,14 @@ Call sites to convert (all verified to exist):
 
 `_otr_story_brief.py` raises repair temperature: `_REPAIR_TEMPERATURE_BUMP = 0.15`, base `_REFLECTION_TEMPERATURE = 0.3`, clamped at `_REPAIR_TEMPERATURE_CEILING = 0.55` -> repair fires at `0.45`. Raising entropy during JSON-schema repair encourages further structural hallucination. Keep temperature static or lower it; change the **payload** instead (inject the exact `ValidationError` trace, rotate the system instruction). Codified in 2A: `structural_retry_temperature` is *below* `base_temperature`; Attempt 3 changes prompt content, not heat.
 
-### 2C. Typed repair prompts by failure class (not gated)
+### 2C. Typed repair prompts by failure class (not gated)  [COMPLETE 2026-05-25 -- `1fa6b40`]
 
 Repair factory dispatches by class: `json_syntax_repair`, `schema_field_repair`, `cast_membership_repair`, `too_many_words_repair`, `narration_leak_repair`, `forbidden_name_repair`. Cast-membership repair never calls the LLM if Levenshtein resolves the typo deterministically.
 > AUDIT: the Levenshtein matcher already exists -- `_levenshtein` + `auto_remap_phantom` in `_otr_ledger_reviewer.py` (threshold 3). Reuse it; do not write a second one.
+
+- [x] **DONE `1fa6b40`.** Six typed builders + `make_dispatching_repair_factory` live in the new pure module `nodes/_otr_repair_prompts.py`. The dispatcher routes by error: `json.JSONDecodeError` -> json_syntax, `pydantic.ValidationError` -> schema_field, `PostValidationError` -> classified by message substring (`locked cast` -> cast_membership, `named_character` -> forbidden_name, `dialogue_verb`/`plot_verb` -> narration_leak, `too_long` -> too_many_words), unrecognised content failure -> `default_repair_prompt_factory`.
+- [x] **Deterministic no-LLM path.** `structured_call` Attempt 3 now accepts a factory-returned `schema` instance and returns it after a `post_validator` re-check, with no LLM repair call. The outline phase stage supplies a `_phase_cast_phantom_repair` callback that reuses the existing `auto_remap_phantom` (threshold 3) -- no second Levenshtein.
+- [x] **Factory -> call-site mapping.** All 8 `structured_call` sites pass `make_dispatching_repair_factory()`: `news_interpreter` (build_news_briefs), `_otr_casting` (cast_one_character), `_otr_ledger_reviewer` x2 (audit_cast_contract + run_script_doctor), `_otr_outline` x3 (macro/phase/beat), `_otr_story_brief` (run_story_brief_reflection). Only the outline phase site -- the one site with a locked cast -- passes a `deterministic_repair` callback. forbidden_name / narration_leak / too_many_words fire at the story_brief site; cast_membership at the outline phase site; json_syntax / schema_field everywhere.
 
 ### 2D. Cleanup pass retries (not gated)
 
@@ -418,3 +422,16 @@ gbnf_enforcement: removed                             # 2026-05-25: deleted -- l
 - **New bug ids:** none.
 - **Sprint state:** 2E COMPLETE. Remaining: Sprint 2C (typed repair prompts), Sprint 0's deferred CI AST `# LLM slot:` sweep, Sprints 3A-3G, 4, 5, 6.
 - Built lead-only (no subagents): a single shared-module change (`_otr_structured_call.py`) plus tightly coupled call-site + docstring edits across five files.
+
+### 2026-05-25 -- Sprint 2C: typed repair prompts by failure class
+
+- Commit `1fa6b40` on `v2.0-alpha` (code -- 9 files, +950/-14). Predecessor HEAD `5f1fca7`.
+- **Sprint 2C COMPLETE.** New pure module `nodes/_otr_repair_prompts.py`: six typed `RepairPromptFactory` builders (`json_syntax_repair`, `schema_field_repair`, `cast_membership_repair`, `too_many_words_repair`, `narration_leak_repair`, `forbidden_name_repair`) plus `make_dispatching_repair_factory`. The dispatcher routes a `structured_call` Attempt 3 failure by inspecting the error: `json.JSONDecodeError` -> json_syntax, `pydantic.ValidationError` -> schema_field, `PostValidationError` -> classified by message substring (`locked cast` -> cast_membership, `named_character` -> forbidden_name, `dialogue_verb`/`plot_verb` -> narration_leak, `too_long` -> too_many_words), any unrecognised content failure -> the generic `default_repair_prompt_factory`.
+- **`structured_call` extension.** A repair factory may now return a finished `schema` instance instead of a repair prompt. The Attempt 3 block detects it, runs it through `post_validator`, and returns it with NO LLM repair call. This is the deterministic cast-membership path the v4 plan requires -- when `auto_remap_phantom` (threshold 3) resolves a phantom speaker unambiguously, no LLM call fires. A deterministic "fix" that is still content-invalid is still caught: it fails `post_validator` and the ladder exhausts loudly.
+- **No second Levenshtein.** The outline phase stage supplies a deterministic callback (`_phase_cast_phantom_repair`) that reuses the project's existing `auto_remap_phantom` from `_otr_ledger_reviewer.py` via a lazy import (keeps `_otr_outline` off the reviewer module-load import graph).
+- **All 8 `structured_call` sites wired** to `make_dispatching_repair_factory()`: `news_interpreter`, `_otr_casting`, `_otr_ledger_reviewer` x2 (audit + doctor), `_otr_outline` x3 (macro/phase/beat), `_otr_story_brief`. Only the outline phase site -- the one call site with a locked cast -- passes a `deterministic_repair` callback.
+- No node `INPUT_TYPES` / widget / socket changed -- all changes are internal helpers -- so no workflow JSON re-wire (Prime Directive 3 N/A). No new LLM call introduced: the typed factories only reshape the prompt of the existing Attempt 3 repair call, and the deterministic path removes a call (Prime Directive 6 `# LLM slot:` tag N/A).
+- **Tests:** new `tests/test_repair_prompts.py` (18 tests -- six builders + dispatch routing + deterministic short-circuit); `tests/test_structured_call.py` +3 (factory-returns-instance path, coverage map renumbered to 19).
+- **Regression:** full OTR suite 2656 passed / 21 skipped (baseline 2635; +21 = the new tests); Bug Bible 16 passed / 7 skipped / 3 xfailed; audio-byte-identical 9 passed / 1 skipped. 0 failed.
+- **New bug ids:** none.
+- **Sprint state:** 2C COMPLETE. Remaining: Sprint 0's deferred CI AST `# LLM slot:` sweep, Sprints 3A-3G, 4, 5, 6.
