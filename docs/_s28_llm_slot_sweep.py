@@ -7,7 +7,14 @@
 # for a ``# LLM slot: (creative|technical|per-sub-pass)`` tag.
 # Any call site missing the tag is reported as an untagged gap.
 #
-# Exit code 0 = all call sites tagged.  Exit code 1 = gaps found.
+# A file that fails to AST-parse is skipped by the call-site walk so a
+# single broken file cannot crash the audit -- but a skipped file is an
+# *invisible* file: its call sites silently vanish and the sweep would
+# report a clean pass for it.  ``find_parse_failures`` surfaces that
+# failure mode loud so CI catches a broken file instead of going blind.
+#
+# Exit code 0 = all call sites tagged and every file parsed.
+# Exit code 1 = untagged call site(s) or unparseable file(s) found.
 from __future__ import annotations
 
 import ast
@@ -102,6 +109,26 @@ def find_llm_call_sites(nodes_dir: str) -> list[tuple[str, int, str]]:
     return results
 
 
+def find_parse_failures(nodes_dir: str) -> list[tuple[str, str]]:
+    """Return ``(filepath, error)`` for every non-exempt *.py file that
+    fails to AST-parse.
+
+    ``find_llm_call_sites`` deliberately *skips* an unparseable file so
+    one broken file cannot crash the audit -- but a skipped file is also
+    invisible: its LLM call sites disappear and the sweep reports a clean
+    pass for it.  This function makes that failure mode loud so CI flags
+    a broken file instead of silently going blind on it.
+    """
+    failures: list[tuple[str, str]] = []
+    for py_file in _iter_py_files(nodes_dir):
+        try:
+            src = py_file.read_text(encoding="utf-8", errors="replace")
+            ast.parse(src, filename=str(py_file))
+        except (SyntaxError, ValueError) as exc:
+            failures.append((str(py_file), f"{type(exc).__name__}: {exc}"))
+    return failures
+
+
 def find_untagged_call_sites(nodes_dir: str) -> list[tuple[str, int, str]]:
     """Return only the call sites missing a ``# LLM slot:`` tag."""
     all_sites = find_llm_call_sites(nodes_dir)
@@ -136,21 +163,31 @@ def find_untagged_call_sites(nodes_dir: str) -> list[tuple[str, int, str]]:
 
 def main() -> int:
     nodes_dir = str(NODES_DIR)
+    parse_failures = find_parse_failures(nodes_dir)
     all_sites = find_llm_call_sites(nodes_dir)
     untagged = find_untagged_call_sites(nodes_dir)
     print(
         f"LLM call sites: {len(all_sites)}  "
         f"tagged: {len(all_sites) - len(untagged)}  "
-        f"untagged: {len(untagged)}"
+        f"untagged: {len(untagged)}  "
+        f"parse failures: {len(parse_failures)}"
     )
+    rc = 0
+    if parse_failures:
+        print("--- unparseable files (call sites invisible to the sweep) ---")
+        for filepath, err in parse_failures:
+            rel = os.path.relpath(filepath, str(ROOT))
+            print(f"  {rel}: {err}")
+        rc = 1
     if untagged:
         print("--- untagged call sites ---")
         for filepath, lineno, call_name in untagged:
             rel = os.path.relpath(filepath, str(ROOT))
             print(f"  {rel}:{lineno} {call_name}")
-        return 1
-    print("All LLM call sites have a # LLM slot: tag.  OK.")
-    return 0
+        rc = 1
+    if rc == 0:
+        print("All LLM call sites have a # LLM slot: tag.  OK.")
+    return rc
 
 
 if __name__ == "__main__":

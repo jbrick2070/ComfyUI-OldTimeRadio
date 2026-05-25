@@ -7,6 +7,9 @@
 #      vacuous passes).
 #   3. The sweep catches a missing tag in a synthetic test file.
 #   4. Exempt files are never scanned.
+#   5. No node file fails to AST-parse (a broken file would silently
+#      drop out of the sweep, hiding its call sites).
+#   6. The sweep catches an unparseable file in a synthetic dir.
 from __future__ import annotations
 
 import pathlib
@@ -27,6 +30,7 @@ from _s28_llm_slot_sweep import (  # noqa: E402
     CALL_SITE_NAMES,
     EXEMPT_FILES,
     find_llm_call_sites,
+    find_parse_failures,
     find_untagged_call_sites,
 )
 
@@ -114,3 +118,46 @@ def test_exempt_files_not_scanned():
             f"Call site found in exempt file {basename} -- "
             f"the sweep should skip it."
         )
+
+
+# ------------------------------------------------------------------
+# 5. No node file may fail to AST-parse
+# ------------------------------------------------------------------
+
+def test_no_node_file_fails_to_parse():
+    """An unparseable node file is skipped by the call-site walk, so its
+    LLM call sites silently vanish and the sweep passes vacuously for it.
+    Guard against that: every file under nodes/ must AST-parse."""
+    failures = find_parse_failures(NODES_DIR)
+    if failures:
+        import os
+        lines = [
+            f"  {os.path.relpath(fp, str(_REPO_ROOT))}: {err}"
+            for fp, err in failures
+        ]
+        pytest.fail(
+            f"{len(failures)} node file(s) failed to AST-parse -- their "
+            f"LLM call sites are invisible to the sweep:\n"
+            + "\n".join(lines)
+        )
+
+
+# ------------------------------------------------------------------
+# 6. The sweep catches an unparseable file
+# ------------------------------------------------------------------
+
+def test_sweep_catches_parse_failure(tmp_path):
+    """A file with a syntax error must be reported by find_parse_failures,
+    and the call-site walk must not crash on it."""
+    broken = tmp_path / "broken_node.py"
+    broken.write_text("def oops(:\n    pass\n", encoding="utf-8")
+    failures = find_parse_failures(str(tmp_path))
+    assert len(failures) == 1, (
+        f"Expected 1 parse failure in synthetic dir, found {len(failures)}"
+    )
+    assert pathlib.Path(failures[0][0]).name == "broken_node.py"
+    # The call-site walk must swallow the broken file, not raise.
+    sites = find_llm_call_sites(str(tmp_path))
+    assert sites == [], (
+        "find_llm_call_sites must skip an unparseable file without crashing"
+    )
