@@ -78,9 +78,16 @@ keep their detail inline for the build record.
 
 **Remaining build -- to "complete" this audit**
 
-5. **Sprint 3A** -- rewrite `compose_line` (`nodes/_otr_line_composer.py`,
-   ~1660 lines). Lead-driven, not a parallel subagent.
-6. **Sprint 4** -- VRAM hardening (verify the existing HuMo VRAM gate).
+5. **Sprint 3A** -- DONE 2026-05-25 (`e24b327`). `compose_line` split
+   into `compose_line_draft` (the creative job) + a thin orchestrator;
+   new `cast_strip` step wraps `auto_remap_phantom` at `threshold=1`.
+   Operator live-run still pending (Prime Directive 1). See the plan's
+   Build Progress Log.
+6. **Sprint 4** -- IN PROGRESS 2026-05-25 (`6b9300e`). Code-side verify
+   done: Zero-Prime Wash / Sovereignty Buffer / 2B-12B caps / bf16+tf32
+   confirmed present; BUG-LOCAL-272 fixed (dead attention selector).
+   Open: 14B 10.1 GiB cap decision, prompt-cache bullet, live-RTX-5080
+   confirm.
 7. **Sprint 5** -- continuity ledger + story-quality critic + targeted
    reroll. This is the direct fix for Finding C below -- the validation
    run is structurally clean but thin (21 words of character dialogue).
