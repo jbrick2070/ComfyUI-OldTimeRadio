@@ -339,8 +339,8 @@
         "Node name for S&R": "WanHuMoImageToVideo"
       },
       "widgets_values": [
-        640,
-        640,
+        480,
+        832,
         97,
         1
       ]
