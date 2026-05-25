@@ -509,7 +509,6 @@ def assemble_pre_locked_rows(
 def lock_cast(
     *,
     creative_fn: Callable[..., str],
-    technical_fn: Callable[..., str],
     num_characters: int,
     news_seed: str,
     style: str,

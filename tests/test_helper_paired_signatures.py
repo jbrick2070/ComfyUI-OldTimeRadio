@@ -1,23 +1,21 @@
-"""S32 B1 -- helper signatures accept paired `creative_fn` +
-`technical_fn` kwargs.
+"""Helper generator-callable signatures -- each helper takes only
+the slot fn(s) it uses.
 
-The four helpers (`pick_style`, `lock_cast`, `compose_line`,
-`build_news_briefs`) post-S32 B1 refactor accept the paired
-generator-callable contract from the writer. B1 routes all
-sub-passes through `creative_fn` (or `technical_fn` for
-`build_news_briefs`); B2/B3/B4 land per-sub-pass dispatches.
+The S32 B1 "paired contract" gave all four helpers (`pick_style`,
+`lock_cast`, `compose_line`, `build_news_briefs`) both `creative_fn`
+and `technical_fn` for uniformity, even where one was never called.
+Sprint 2A/2D removed the unused params (Jeffrey 2026-05-25: ship
+clean code):
+  - `pick_style` keeps BOTH -- pass 1 (inventor) runs on creative,
+    pass 2 (chooser) on technical.
+  - `lock_cast` and `compose_line` take `creative_fn` only.
+  - `build_news_briefs` takes `technical_fn` only.
 
 Tests:
-  1-4. Signature acceptance: each helper exposes `creative_fn` +
-       `technical_fn` as keyword-only parameters.
-  5-8. Internal routing: when called with distinct mock generators,
-       each helper routes its calls to the expected slot.
-       - `pick_style` (test 5) is per-sub-pass post-S32 B2:
-         pass 1 (inventor) routes to `creative_fn`, pass 2
-         (chooser) routes to `technical_fn`.
-       - `lock_cast` and `compose_line` (tests 6-7) route their
-         generation to `creative_fn` by default.
-       - `build_news_briefs` (test 8) routes to `technical_fn`.
+  1-4. Signature: each helper exposes exactly the slot parameter(s)
+       it uses, keyword-only, and no legacy positional `generate_fn`.
+  5-8. Internal routing: distinct mock generators confirm each
+       helper drives the slot it is supposed to.
 """
 
 from __future__ import annotations
@@ -52,25 +50,27 @@ def test_pick_style_accepts_paired_generators():
     assert "generate_fn" not in sig.parameters
 
 
-def test_lock_cast_accepts_paired_generators():
+def test_lock_cast_accepts_creative_fn_only():
     from nodes._otr_casting import lock_cast
 
     sig = inspect.signature(lock_cast)
     assert "creative_fn" in sig.parameters
-    assert "technical_fn" in sig.parameters
     assert sig.parameters["creative_fn"].kind == inspect.Parameter.KEYWORD_ONLY
-    assert sig.parameters["technical_fn"].kind == inspect.Parameter.KEYWORD_ONLY
+    # technical_fn removed -- lock_cast runs every casting attempt on
+    # the creative slot via the structured_call ladder.
+    assert "technical_fn" not in sig.parameters
     assert "generate_fn" not in sig.parameters
 
 
-def test_compose_line_accepts_paired_generators():
+def test_compose_line_accepts_creative_fn_only():
     from nodes._otr_line_composer import compose_line
 
     sig = inspect.signature(compose_line)
     assert "creative_fn" in sig.parameters
-    assert "technical_fn" in sig.parameters
     assert sig.parameters["creative_fn"].kind == inspect.Parameter.KEYWORD_ONLY
-    assert sig.parameters["technical_fn"].kind == inspect.Parameter.KEYWORD_ONLY
+    # technical_fn removed -- every compose_line sub-pass (composer,
+    # critic, grammarian, polish gate) runs on the creative slot.
+    assert "technical_fn" not in sig.parameters
     # S32 B4 (no-widget drift, plan D1 architectural rejection): the
     # originally-projected `use_technical_critic` opt-in parameter was
     # dropped. Critic always routes to creative; the parameter must
@@ -83,14 +83,15 @@ def test_compose_line_accepts_paired_generators():
     assert "generate_fn" not in sig.parameters
 
 
-def test_build_news_briefs_accepts_paired_generators():
+def test_build_news_briefs_accepts_technical_fn_only():
     from nodes.news_interpreter import build_news_briefs
 
     sig = inspect.signature(build_news_briefs)
-    assert "creative_fn" in sig.parameters
     assert "technical_fn" in sig.parameters
-    assert sig.parameters["creative_fn"].kind == inspect.Parameter.KEYWORD_ONLY
     assert sig.parameters["technical_fn"].kind == inspect.Parameter.KEYWORD_ONLY
+    # creative_fn removed -- build_news_briefs runs every V0-V3
+    # sub-pass on the technical slot (structured-output JSON).
+    assert "creative_fn" not in sig.parameters
     assert "generate_fn" not in sig.parameters
 
 
@@ -169,44 +170,30 @@ def test_pick_style_routes_inventor_creative_and_chooser_technical():
     )
 
 
-def test_lock_cast_internally_uses_creative_fn_default():
-    """lock_cast generation (fresh attempts) routes through
-    creative_fn. After S32 B3, the repair attempt flips to
-    technical_fn (D2 schema-validation slot, single-attempt
-    fail-fast). This test asserts ONLY that creative_fn carries
-    the generation -- the B3-specific routing assertions live in
-    `tests/test_lock_cast_routing.py`.
+def test_lock_cast_internally_uses_creative_fn():
+    """lock_cast runs every casting attempt on creative_fn -- the
+    structured_call ladder has a single slot (S32 B3's technical-slot
+    repair routing was retired in the Sprint 2A/2D conversion).
     """
     from nodes import _otr_casting as cast
 
     creative_calls: list[dict] = []
-    technical_calls: list[dict] = []
 
     def creative_fn(messages, *, temperature, max_new_tokens):
         creative_calls.append({"temperature": temperature})
         return "not-valid-json"
 
-    def technical_fn(messages, *, temperature, max_new_tokens):
-        technical_calls.append({"temperature": temperature})
-        return "not-valid-json"
-
     try:
         cast.lock_cast(
             creative_fn=creative_fn,
-            technical_fn=technical_fn,
             num_characters=1,
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
             # force_lemmy=False: the LEMMY ~11% cameo rolls on OS
             # entropy, not the seeded rng (BUG-LOCAL-260), so an unset
-            # force_lemmy makes this routing test flaky -- a LEMMY hit
-            # changes cast assembly and the generation call pattern.
-            # Pinning it OFF keeps the creative/technical-slot assertion
-            # below deterministic.
+            # force_lemmy makes this routing test flaky -- pin it OFF.
             force_lemmy=False,
-            # Single attempt only -- skips the B3 repair branch so
-            # this test stays focused on creative-slot generation.
             max_attempts_per_call=1,
         )
     except Exception:
@@ -216,29 +203,19 @@ def test_lock_cast_internally_uses_creative_fn_default():
     assert len(creative_calls) >= 1, (
         "creative_fn must be called at least once for generation"
     )
-    assert len(technical_calls) == 0, (
-        f"With max_attempts_per_call=1 the B3 repair branch is "
-        f"never reached, so technical_fn should not fire; got "
-        f"{len(technical_calls)} call(s)."
-    )
 
 
-def test_compose_line_internally_uses_creative_fn_default():
-    """At B1 compose_line routes all sub-passes through creative_fn.
-    With `use_technical_critic=False` (default), critic stays on
-    creative. B4 lands the opt-in dispatch."""
+def test_compose_line_internally_uses_creative_fn():
+    """compose_line routes every sub-pass (composer, critic,
+    grammarian, polish gate) through creative_fn -- the S32 B4
+    no-widget decision, now with no technical_fn parameter at all."""
     from nodes import _otr_line_composer as lc
 
     creative_calls: list[dict] = []
-    technical_calls: list[dict] = []
 
     def creative_fn(messages, *, temperature, max_new_tokens, **kw):
         creative_calls.append({"temperature": temperature})
         return "test dialogue"
-
-    def technical_fn(messages, *, temperature, max_new_tokens, **kw):
-        technical_calls.append({"temperature": temperature})
-        return "should_not_be_called"
 
     # Build a minimal LineRequest. Inspect the dataclass for required
     # fields and pass placeholders.
@@ -267,36 +244,21 @@ def test_compose_line_internally_uses_creative_fn_default():
         pytest.skip("LineRequest signature changed; this test needs update")
 
     try:
-        lc.compose_line(
-            creative_fn=creative_fn,
-            technical_fn=technical_fn,
-            req=req,
-        )
+        lc.compose_line(creative_fn=creative_fn, req=req)
     except Exception:
         pass
 
     assert len(creative_calls) >= 1, (
         "creative_fn must be called at least once for the composer pass"
     )
-    assert len(technical_calls) == 0, (
-        f"technical_fn must NEVER be called by compose_line "
-        f"(S32 B4 no-widget decision; critic always routes to "
-        f"creative). Got {len(technical_calls)} call(s)."
-    )
 
 
 def test_build_news_briefs_internally_uses_technical_fn():
-    """build_news_briefs is the ONE helper of the 4 that routes to
-    technical_fn by default. All V0-V3 sub-passes are structured-
-    output GBNF emits; the canonical slot for that is technical."""
+    """build_news_briefs runs every V0-V3 sub-pass on technical_fn --
+    structured-output JSON, the only slot the helper takes."""
     from nodes import news_interpreter as ni
 
-    creative_calls: list[dict] = []
     technical_calls: list[dict] = []
-
-    def creative_fn(messages, *, temperature, max_new_tokens, **kw):
-        creative_calls.append({"temperature": temperature})
-        return "should_not_be_called"
 
     def technical_fn(messages, *, temperature, max_new_tokens, **kw):
         technical_calls.append({"temperature": temperature})
@@ -304,7 +266,6 @@ def test_build_news_briefs_internally_uses_technical_fn():
 
     try:
         ni.build_news_briefs(
-            creative_fn=creative_fn,
             technical_fn=technical_fn,
             full_text="A short news article about radio.",
             headline="Radio Returns",
@@ -319,12 +280,7 @@ def test_build_news_briefs_internally_uses_technical_fn():
 
     assert len(technical_calls) >= 1, (
         "technical_fn must be called at least once for "
-        "build_news_briefs at B1 (all sub-passes route here)"
-    )
-    assert len(creative_calls) == 0, (
-        f"creative_fn must NOT be called at B1 for "
-        f"build_news_briefs (accepted for contract uniformity but "
-        f"unused); got {len(creative_calls)} call(s)."
+        "build_news_briefs (all V0-V3 sub-passes route here)"
     )
 
 
@@ -334,20 +290,14 @@ def test_build_news_briefs_internally_uses_technical_fn():
 
 
 def test_build_news_briefs_all_retries_use_technical():
-    """Plan B5 verification: V0-V3 sub-passes (V0 emit + V1/V2/V3
-    retries on validation failure) ALL route to technical_fn.
-    Drive `build_news_briefs` with always-malformed responses so
-    every retry tier fires; assert zero creative-side calls
-    across the full retry stack.
+    """V0-V3 sub-passes (V0 emit + V1/V2/V3 retries on validation
+    failure) all route to technical_fn. Drive build_news_briefs with
+    always-malformed responses so every retry tier of the
+    structured_call ladder fires.
     """
     from nodes import news_interpreter as ni
 
-    creative_calls: list[float] = []
     technical_calls: list[float] = []
-
-    def creative_fn(messages, *, temperature, max_new_tokens, **kw):
-        creative_calls.append(temperature)
-        return "should_not_be_called"
 
     def technical_fn(messages, *, temperature, max_new_tokens, **kw):
         technical_calls.append(temperature)
@@ -356,7 +306,6 @@ def test_build_news_briefs_all_retries_use_technical():
 
     try:
         ni.build_news_briefs(
-            creative_fn=creative_fn,
             technical_fn=technical_fn,
             full_text="A short news article about radio.",
             headline="Radio Returns",
@@ -365,18 +314,13 @@ def test_build_news_briefs_all_retries_use_technical():
             pub_date="2026-05-14",
             style="noir",
             seed=42,
-            max_attempts=3,  # V0 + V1 retry + V2 repair attempt
+            max_attempts=3,
         )
     except Exception:
         pass
 
     assert len(technical_calls) >= 1, (
-        "All V0-V3 sub-passes must route to technical_fn. Got 0."
-    )
-    assert len(creative_calls) == 0, (
-        f"creative_fn must NOT be called by build_news_briefs at "
-        f"any retry tier; got {len(creative_calls)} call(s). "
-        f"This would break the structured-output slot routing."
+        "all V0-V3 sub-passes must route to technical_fn; got 0"
     )
 
 

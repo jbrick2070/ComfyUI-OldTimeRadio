@@ -1448,8 +1448,7 @@ def polish_line(
 
 def compose_line(
     *,
-    creative_fn,                # S32 B1 paired-contract: creative slot
-    technical_fn,               # S32 B1 paired-contract: technical slot
+    creative_fn,                # the generation slot -- all sub-passes
     req: LineRequest,
     max_attempts: int = 2,
     base_temperature: float = _BASE_TEMPERATURE,

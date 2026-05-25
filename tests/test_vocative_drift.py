@@ -173,7 +173,7 @@ class TestComposeLineVocativeGate:
             canon_header="x", last_lines=[],
             allowed_roster=frozenset({"LEMMY", "ANNOUNCER"}),
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert res.text == "It wasn't just geology. It felt ancient."
         assert "ANNOUNCER" not in res.text
         assert "vocative_drift:ANNOUNCER" in res.compose_flags
@@ -188,7 +188,7 @@ class TestComposeLineVocativeGate:
             canon_header="x", last_lines=[],
             allowed_roster=frozenset({"LEMMY", "ANNOUNCER"}),
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert "ANNOUNCER" in res.text
         assert "vocative_drift:ANNOUNCER" not in res.compose_flags
 
@@ -200,7 +200,7 @@ class TestComposeLineVocativeGate:
             canon_header="x", last_lines=[],
             allowed_roster=frozenset({"LEMMY", "ANNOUNCER"}),
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert res.text == "Hold the line, we still have a chance now."
         assert not any(
             f.startswith("vocative_drift") for f in res.compose_flags
@@ -220,7 +220,7 @@ class TestComposeLineVocativeGate:
             canon_header="x", last_lines=[],
             allowed_roster=frozenset({"LEMMY", "ANNOUNCER"}),
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert "ANNOUNCER" not in res.text
         assert res.text == "This isn't some old rock; this thing has a cadence."
         assert "vocative_drift:ANNOUNCER" in res.compose_flags

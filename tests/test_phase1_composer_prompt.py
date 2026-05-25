@@ -600,7 +600,7 @@ class TestComposeLinePolishGating:
         # output is committed without polish.
         def mock_leak(messages, *, temperature, max_new_tokens, stop=None):
             return 'Then we should go," she said.'
-        res = compose_line(creative_fn=mock_leak, technical_fn=mock_leak, req=self._req())
+        res = compose_line(creative_fn=mock_leak, req=self._req())
         assert res.text == 'Then we should go," she said.'
 
     def test_polish_on_replaces_leaked_line(self):
@@ -615,7 +615,7 @@ class TestComposeLinePolishGating:
             assert temperature < 0.6
             assert "script editor" in messages[0]["content"].lower()
             return "Then we should go now."
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
+        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
         assert res.text == "Then we should go now."
         assert len(calls) == 2
 
@@ -626,7 +626,7 @@ class TestComposeLinePolishGating:
         def mock(messages, *, temperature, max_new_tokens, stop=None):
             calls.append(messages)
             return "Then we should go now."
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
+        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
         assert res.text == "Then we should go now."
         assert len(calls) == 1  # composer only, no polish
 
@@ -641,7 +641,7 @@ class TestComposeLinePolishGating:
             if len(calls) == 1:
                 return 'Then we should go," she said.'
             raise RuntimeError("polish failed")
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
+        res = compose_line(creative_fn=mock, req=self._req(), enable_polish_pass=True, polish_generate_fn=mock)
         # polish_line catches the raise and returns the original (the
         # cleaned compose output) so the leaky line still ships.
         assert "Then we should go" in res.text
@@ -900,7 +900,7 @@ class TestTier2LengthEnforcement:
             speaker="ALICE", intent="reveal", mood="tense",
             target_words=10, canon_header="x", last_lines=[],
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         # Attempt 2 should have happened (drift retry on attempt 1).
         assert len(calls) == 2
         assert res.text.startswith("I will help")
@@ -917,7 +917,7 @@ class TestTier2LengthEnforcement:
             speaker="ALICE", intent="reveal", mood="tense",
             target_words=10, canon_header="x", last_lines=[],
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert len(calls) == 2
 
     def test_in_band_passes_first_try(self):
@@ -930,7 +930,7 @@ class TestTier2LengthEnforcement:
             speaker="ALICE", intent="reveal", mood="tense",
             target_words=10, canon_header="x", last_lines=[],
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req)
+        res = compose_line(creative_fn=mock, req=req)
         assert len(calls) == 1
 
 
@@ -1023,7 +1023,7 @@ class TestPolishBeforePhantom:
             target_words=6, canon_header="x", last_lines=[],
             allowed_roster=roster,
         )
-        res = compose_line(creative_fn=mock, technical_fn=mock, req=req, enable_polish_pass=True, polish_generate_fn=mock)
+        res = compose_line(creative_fn=mock, req=req, enable_polish_pass=True, polish_generate_fn=mock)
         # Polish ran: 2 calls.
         assert len(calls) == 2
         # Polish output was used.

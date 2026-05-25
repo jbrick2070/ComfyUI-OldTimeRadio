@@ -30,23 +30,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def test_compose_line_critic_always_creative():
-    """Distinct creative_fn / technical_fn mocks; assert zero
-    technical calls in compose_line. The critic check (along with
-    composer, grammarian, polish gate) stays on creative
-    regardless of slot configuration -- the no-widget decision.
+    """compose_line runs every sub-pass (composer, critic, grammarian,
+    polish gate) on creative_fn. The S32 B4 no-widget decision is now
+    baked into the signature itself -- there is no technical_fn
+    parameter at all.
     """
     from nodes import _otr_line_composer as lc
 
     creative_calls: list[float] = []
-    technical_calls: list[float] = []
 
     def creative_fn(messages, *, temperature, max_new_tokens, **_kw):
         creative_calls.append(temperature)
         return "test dialogue output."
-
-    def technical_fn(messages, *, temperature, max_new_tokens, **_kw):
-        technical_calls.append(temperature)
-        return "should_not_be_called"
 
     req_cls = lc.LineRequest
     req_fields = {
@@ -74,23 +69,12 @@ def test_compose_line_critic_always_creative():
         pytest.skip("LineRequest signature changed; runtime path skipped")
 
     try:
-        lc.compose_line(
-            creative_fn=creative_fn,
-            technical_fn=technical_fn,
-            req=req,
-        )
+        lc.compose_line(creative_fn=creative_fn, req=req)
     except Exception:
         # Don't care about downstream validator failures here; the
         # routing assertion is the test.
         pass
 
-    assert len(technical_calls) == 0, (
-        f"compose_line must NEVER route to technical_fn -- "
-        f"all sub-passes (composer, critic, grammarian, polish "
-        f"gate) stay creative. The no-widget decision (S32 B4) "
-        f"is baked into code. Got {len(technical_calls)} call(s) "
-        f"to technical_fn."
-    )
     assert len(creative_calls) >= 1, (
         "creative_fn must be called for the composer pass."
     )

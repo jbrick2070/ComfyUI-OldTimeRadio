@@ -1,17 +1,19 @@
-"""S32 B1 -- writer wires paired generators end-to-end.
+"""Writer wires each helper with exactly the slot fn(s) it takes.
 
-`OTR_LedgerScriptWriter._resolve_inputs` returns a dict containing
-`creative_generate_fn` + `technical_generate_fn` (constructed by the
-slot scheduler at write_script entry). The 4 helper call sites
-post-S32 B1 must pass BOTH callables as paired kwargs, not as a
-single positional `generate_fn`.
+The S32 B1 "paired contract" had the writer pass BOTH `creative_fn=`
+and `technical_fn=` to all four helpers. Sprint 2A/2D removed the
+unused params, so each call site now carries only the slot kwargs its
+helper accepts:
+  - pick_style        -- creative_fn + technical_fn (uses both)
+  - lock_cast         -- creative_fn only
+  - compose_line      -- creative_fn only
+  - build_news_briefs -- technical_fn only
 
 Test:
-* `test_writer_passes_paired_generators` -- AST scan over
-  `OTR_LedgerScriptWriter.py` asserts every call to `pick_style`,
-  `lock_cast`, `compose_line`, `build_news_briefs` carries both
-  `creative_fn=` and `technical_fn=` keyword arguments. Tripwire
-  against partial-port states (rule R4 atomicity violation).
+* `test_writer_passes_expected_slot_kwargs` -- AST scan over
+  `OTR_LedgerScriptWriter.py` asserts every helper call site carries
+  exactly the slot kwargs that helper's signature accepts -- a
+  tripwire against partial-port states.
 """
 
 from __future__ import annotations
@@ -29,56 +31,63 @@ REPO = Path(__file__).resolve().parents[1]
 WRITER_PATH = REPO / "nodes" / "OTR_LedgerScriptWriter.py"
 
 
-_HELPER_NAMES = ("pick_style", "lock_cast", "compose_line", "build_news_briefs")
+# helper -> the slot kwargs its signature accepts post-Sprint 2A/2D.
+_EXPECTED_KWARGS = {
+    "pick_style":        {"creative_fn", "technical_fn"},
+    "lock_cast":         {"creative_fn"},
+    "compose_line":      {"creative_fn"},
+    "build_news_briefs": {"technical_fn"},
+}
 
 
-def test_writer_passes_paired_generators():
+def test_writer_passes_expected_slot_kwargs():
     """For every call site in `OTR_LedgerScriptWriter.py` whose
-    callable's terminal attribute is in `_HELPER_NAMES`, assert the
-    keyword arguments include both `creative_fn` and `technical_fn`.
+    callable's terminal attribute is one of the four helpers, assert
+    the slot kwargs present match exactly what the helper accepts --
+    the expected kwarg is present, and the removed one is absent.
     """
     tree = ast.parse(WRITER_PATH.read_text(encoding="utf-8"))
 
     failures: list[str] = []
-    sites_seen: dict[str, int] = {n: 0 for n in _HELPER_NAMES}
+    sites_seen: dict[str, int] = {n: 0 for n in _EXPECTED_KWARGS}
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
         # Match `_OTRSP.pick_style(...)`, `_OTRCAST.lock_cast(...)`, etc.
-        if isinstance(func, ast.Attribute) and func.attr in _HELPER_NAMES:
+        if isinstance(func, ast.Attribute) and func.attr in _EXPECTED_KWARGS:
             helper = func.attr
         # Also catch bare `pick_style(...)` if anyone imports directly.
-        elif isinstance(func, ast.Name) and func.id in _HELPER_NAMES:
+        elif isinstance(func, ast.Name) and func.id in _EXPECTED_KWARGS:
             helper = func.id
         else:
             continue
 
         sites_seen[helper] += 1
         kwarg_names = {kw.arg for kw in node.keywords if kw.arg is not None}
-        missing = []
-        if "creative_fn" not in kwarg_names:
-            missing.append("creative_fn=")
-        if "technical_fn" not in kwarg_names:
-            missing.append("technical_fn=")
-        if missing:
+        expected = _EXPECTED_KWARGS[helper]
+        slot_kwargs = kwarg_names & {"creative_fn", "technical_fn"}
+        if slot_kwargs != expected:
             failures.append(
-                f"line {node.lineno}: `{helper}(...)` missing kwarg(s): "
-                f"{', '.join(missing)}"
+                f"line {node.lineno}: `{helper}(...)` slot kwargs "
+                f"{sorted(slot_kwargs)} != expected {sorted(expected)}"
             )
 
-    # Every helper must have at least one call site in the writer (we
-    # know the writer drives all 4).
+    # Every helper must have at least one call site in the writer.
     not_called = [n for n, count in sites_seen.items() if count == 0]
     assert not not_called, (
-        f"Writer is missing call sites for {not_called}; the paired-"
-        f"contract wiring can't be verified without them."
+        f"Writer is missing call sites for {not_called}; the slot-kwarg "
+        f"wiring can't be verified without them."
     )
 
     assert not failures, (
-        "S32 B1 rule R4 (atomic paired-contract): every helper call "
-        "in the writer must pass BOTH `creative_fn=` and "
-        "`technical_fn=` kwargs.\nOffenders:\n  "
+        "Each writer helper call must pass exactly the slot kwargs the "
+        "helper's signature accepts (Sprint 2A/2D removed the unused "
+        "S32 B1 paired params).\nOffenders:\n  "
         + "\n  ".join(failures)
     )
+
+
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-v"]))

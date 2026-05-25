@@ -1900,13 +1900,11 @@ class OTR_LedgerScriptWriter:
             # output pass; routes to the technical_model slot.
             # slot-interleave: creative (style picker) -> technical
             # (here). One transition when the two slot ids differ.
-            # S32 B1 paired-contract wiring: pass BOTH generators.
-            # build_news_briefs internally routes V0-V3 through
-            # technical_fn (creative_fn accepted for uniformity).
+            # build_news_briefs runs every V0-V3 sub-pass on the
+            # technical slot -- structured-output JSON.
             # S32 B6: helper_context attribution.
             with slot_scheduler.helper_context("build_news_briefs"):
                 briefs = _OTRNI.build_news_briefs(
-                    creative_fn=creative_generate_fn,
                     technical_fn=technical_generate_fn,
                     full_text=article.get("full_text", ""),
                     headline=article.get("headline", ""),
@@ -1973,7 +1971,6 @@ class OTR_LedgerScriptWriter:
         with slot_scheduler.helper_context("lock_cast"):
             cast_rows, cast_meta = _OTRCAST.lock_cast(
                 creative_fn=creative_generate_fn,
-                technical_fn=technical_generate_fn,
                 num_characters=resolved["num_characters"],
                 news_seed=resolved["news_seed"],
                 casting_brief=casting_brief,
@@ -2403,7 +2400,6 @@ class OTR_LedgerScriptWriter:
                 with slot_scheduler.helper_context("compose_line"):
                     line_res = _OTRLC.compose_line(
                         creative_fn=creative_generate_fn,
-                        technical_fn=technical_generate_fn,
                         req=line_req,
                         base_temperature=base_temp,
                         max_new_tokens_cap=resolved["max_new_tokens_cap"],
@@ -2470,7 +2466,6 @@ class OTR_LedgerScriptWriter:
                     with slot_scheduler.helper_context("compose_line"):
                         line_res = _OTRLC.compose_line(
                             creative_fn=creative_generate_fn,
-                            technical_fn=technical_generate_fn,
                             req=line_req,
                             base_temperature=base_temp,
                             max_new_tokens_cap=resolved[

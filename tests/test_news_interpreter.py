@@ -358,7 +358,7 @@ def test_byte_identical_with_mocked_generate_fn():
     gen = _stub_gen(_valid_brief_json())
     results = []
     for _ in range(5):
-        briefs = news_interpreter.build_news_briefs(creative_fn=gen, technical_fn=gen,
+        briefs = news_interpreter.build_news_briefs(technical_fn=gen,
             full_text=_GOOD_SOURCE,
             headline="Signal detected",
             summary=_GOOD_SOURCE[:120],
