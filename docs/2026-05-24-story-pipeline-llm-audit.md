@@ -93,11 +93,16 @@ build record.
    new `cast_strip` step wraps `auto_remap_phantom` at `threshold=1`.
    Operator live-run still pending (Prime Directive 1). See the plan's
    Build Progress Log.
-6. **Sprint 4** -- IN PROGRESS 2026-05-25 (`6b9300e`). Code-side verify
-   done: Zero-Prime Wash / Sovereignty Buffer / 2B-12B caps / bf16+tf32
-   confirmed present; BUG-LOCAL-272 fixed (dead attention selector).
-   Open: 14B 10.1 GiB cap decision, prompt-cache bullet, live-RTX-5080
-   confirm.
+6. **Sprint 4** -- COMPLETE 2026-05-25 (`6b9300e` + docs close-out).
+   Code-side verify done: Zero-Prime Wash / Sovereignty Buffer / 2B-12B
+   caps / bf16+tf32 confirmed present; BUG-LOCAL-272 fixed (dead
+   attention selector). Close-out: the 14B 10.1 GiB cap resolved
+   no-change (keep the Sovereignty branch -- Jeffrey 2026-05-25); the
+   prompt-cache bullet resolved N/A (`cache_prompt` / `n_cache_reuse`
+   are llama.cpp server params with no HF Transformers equivalent --
+   same finding class as Sprint 2E's GBNF). The operator live-RTX-5080
+   VRAM confirmation stays parked -- non-blocking, Prime Directive 1
+   gate, tracked like the 3A operator live-run.
 7. **Sprint 5** -- continuity ledger + story-quality critic + targeted
    reroll. This is the direct fix for Finding C below -- the validation
    run is structurally clean but thin (21 words of character dialogue).
