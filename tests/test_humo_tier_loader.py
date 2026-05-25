@@ -216,5 +216,86 @@ class TestRegistration:
         assert "OTR_BatchHumoRender" in mods
 
 
+# ---------------------------------------------------------------------------
+# _invoke V3 NodeOutput unwrap (BUG-LOCAL-266)
+# ---------------------------------------------------------------------------
+
+class _FakeNodeOutput:
+    """Mimics comfy_api's V3 NodeOutput: positional results live on
+    ``.args`` and are exposed via the ``.result`` property (that tuple
+    when non-empty, else None). ComfyUI 0.22.x V3 loader nodes -- e.g.
+    AudioEncoderLoader -- return this, not a bare tuple."""
+
+    def __init__(self, *args):
+        self.args = args
+
+    @property
+    def result(self):
+        return self.args if len(self.args) > 0 else None
+
+
+class TestInvokeNodeOutputUnwrap:
+    """BUG-LOCAL-266: ComfyUI 0.22.x migrated some core loader nodes to
+    the V3 node API, whose FUNCTION returns a NodeOutput wrapper rather
+    than a bare tuple. ``_invoke`` must unwrap it so both V1 (tuple) and
+    V3 (NodeOutput) loader nodes resolve -- the verification run crashed
+    at AudioEncoderLoader before this fix."""
+
+    def setup_method(self):
+        self._saved_nodes = sys.modules.get("nodes")
+
+    def teardown_method(self):
+        if self._saved_nodes is not None:
+            sys.modules["nodes"] = self._saved_nodes
+        else:
+            sys.modules.pop("nodes", None)
+
+    def _install_fake_nodes(self, mapping):
+        import types
+        fake = types.ModuleType("nodes")
+        fake.NODE_CLASS_MAPPINGS = mapping
+        sys.modules["nodes"] = fake
+
+    def test_v1_node_tuple_return_passes_through(self, H):
+        class V1Loader:
+            FUNCTION = "load"
+
+            def load(self, **kw):
+                return ("v1_model",)
+
+        self._install_fake_nodes({"V1Loader": V1Loader})
+        assert H._invoke("V1Loader")[0] == "v1_model"
+
+    def test_v3_node_nodeoutput_is_unwrapped(self, H):
+        class V3Loader:
+            FUNCTION = "load"
+
+            def load(self, **kw):
+                return _FakeNodeOutput("v3_audio_encoder")
+
+        self._install_fake_nodes({"V3Loader": V3Loader})
+        out = H._invoke("V3Loader")
+        assert isinstance(out, tuple)
+        assert out[0] == "v3_audio_encoder"
+
+    def test_v3_nodeoutput_empty_args_raises(self, H):
+        """An empty NodeOutput is still a loud failure -- the unwrap
+        must not paper over a node that produced nothing."""
+        class EmptyLoader:
+            FUNCTION = "load"
+
+            def load(self, **kw):
+                return _FakeNodeOutput()
+
+        self._install_fake_nodes({"EmptyLoader": EmptyLoader})
+        with pytest.raises(RuntimeError):
+            H._invoke("EmptyLoader")
+
+    def test_unregistered_node_still_raises(self, H):
+        self._install_fake_nodes({})
+        with pytest.raises(RuntimeError):
+            H._invoke("NotARealNode")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

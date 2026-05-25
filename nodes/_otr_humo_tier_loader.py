@@ -387,6 +387,19 @@ class HuMoTierLoader:
                 f"FUNCTION={fn_name!r} but has no such method."
             )
         out = fn(**kwargs)
+        # ComfyUI 0.22.x migrated some core loader nodes (e.g.
+        # AudioEncoderLoader) to the V3 node API. A V3 node's FUNCTION
+        # returns a comfy_api NodeOutput wrapper, not a bare tuple --
+        # the positional results live on `.args` and are exposed via
+        # the `.result` property (that tuple when non-empty, else
+        # None). Unwrap to the results tuple so the validation below
+        # and the `[0]` indexing in the _load_* helpers keep working
+        # for both V1 (tuple) and V3 (NodeOutput) loader nodes.
+        # BUG-LOCAL-266.
+        if not isinstance(out, (tuple, list)):
+            unwrapped = getattr(out, "result", None)
+            if unwrapped is not None:
+                out = unwrapped
         if not isinstance(out, (tuple, list)) or not out:
             raise RuntimeError(
                 f"OTR_HuMoTierLoader: node {node_type!r} returned {out!r}; "
