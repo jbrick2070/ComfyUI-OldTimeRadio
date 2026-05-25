@@ -2247,12 +2247,24 @@ class OTR_LedgerScriptWriter:
             )
 
         # --- E. Word-budget integration check (WARN, do not fail) -----
-        beat_word_sum = sum(b.target_words for b in outline.beats)
+        # Sum VOICED (character) beats only. `resolved["target_words"]`
+        # is a voiced-dialogue-only budget; announcer / music_inter
+        # beats carry a fixed, non-scaling overhead (announcer beats are
+        # hardcoded ~15 words each) and are excluded from the word
+        # budget per outline budget rules §6.G. Summing every beat let
+        # that fixed overhead trip a false WORD_BUDGET_DRIFT on small
+        # targets (ratio 2.00 on the 2026-05-25 30-word smoke run).
+        # Mirrors validate_outline_against_budget validator #1.
+        voiced_beats = [
+            b for b in outline.beats
+            if getattr(b, "speaker_role", "") == "character"
+        ]
+        beat_word_sum = sum(b.target_words for b in voiced_beats)
         ratio = beat_word_sum / max(1, resolved["target_words"])
         if not (WORD_BUDGET_RATIO_LO <= ratio <= WORD_BUDGET_RATIO_HI):
             log.warning(
                 "[OTR_LedgerScriptWriter] WORD_BUDGET_DRIFT: outline "
-                "beats sum to %d words, target %d (ratio=%.2f); "
+                "voiced beats sum to %d words, target %d (ratio=%.2f); "
                 "proceeding anyway",
                 beat_word_sum, resolved["target_words"], ratio,
             )
