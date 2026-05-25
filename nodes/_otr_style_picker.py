@@ -463,6 +463,7 @@ def _run_inventor(
             attempt_idx + 1, max_attempts, temp,
         )
         try:
+            # LLM slot: creative -- inventor pass (5-candidate generation)
             raw = generate_fn(
                 messages,
                 temperature=float(temp),
@@ -514,6 +515,7 @@ def _run_chooser(
 
     log.info("[OTR_StylePicker] chooser (temp=%.2f)", _CHOOSER_TEMPERATURE)
     try:
+        # LLM slot: technical -- chooser pass (single-index pick)
         raw = generate_fn(
             messages,
             temperature=float(_CHOOSER_TEMPERATURE),
@@ -607,6 +609,7 @@ def pick_style(
     # Pass 2 (chooser)  -- technical slot. Index/grammar-checked
     #   chooser is a structured short-output pass; routes to
     #   technical_fn (S32 routing table flip from S31).
+    # LLM slot: creative -- style inventor generates 5 descriptors
     pass1_t0 = time.perf_counter()
     candidates, pass1_attempts = _run_inventor(
         creative_fn,
@@ -615,6 +618,7 @@ def pick_style(
     )
     pass1_duration_ms = int((time.perf_counter() - pass1_t0) * 1000)
 
+    # LLM slot: technical -- style chooser picks the best descriptor
     pass2_t0 = time.perf_counter()
     chosen = _run_chooser(
         technical_fn,

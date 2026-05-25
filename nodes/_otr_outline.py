@@ -1417,6 +1417,7 @@ def generate_outline(
     all_attempts: list[tuple[str, str]] = []
 
     # ----------------------------- Stage 1 ---------------------------------
+    # LLM slot: creative -- macro outline shapes the episode narrative
     macro_user = _build_macro_user_prompt(req)
     try:
         macro = structured_call(
@@ -1544,6 +1545,7 @@ def generate_outline(
                 skeleton.beats[idx].speaker = canonical
             return skeleton
 
+        # LLM slot: creative -- per-phase speaker routing
         try:
             skeleton = structured_call(
                 prompt=[
@@ -1618,6 +1620,7 @@ def generate_outline(
                 (beat_idx, n_beats),
                 words_lo, words_hi,
             )
+            # LLM slot: creative -- per-beat intent/mood/target_words
             try:
                 detail = structured_call(
                     prompt=[

@@ -1413,6 +1413,8 @@ def polish_line(
     mnt = max(40, orig_word_count * _POLISH_MAX_TOKENS_MULTIPLIER)
 
     # section 6.4: polish_generate_fn is required (no fallback).
+    # LLM slot: creative -- polish is a targeted rewrite via the
+    # creative slot's polish variant (polish_generate_fn).
     try:
         try:
             raw = polish_generate_fn(
@@ -1422,6 +1424,7 @@ def polish_line(
                 stop=list(stop_strings) if stop_strings else None,
             )
         except TypeError:
+            # LLM slot: creative -- polish fallback (no stop= kwarg)
             raw = polish_generate_fn(
                 messages, temperature=temperature, max_new_tokens=mnt,
             )
@@ -1501,6 +1504,7 @@ def compose_line(
     # opt-in widget was dropped at S32 B4 (no-widget rule: features
     # that are useful are on; opt-in default-OFF gates on rejected
     # paths are maintenance debt).
+    # LLM slot: creative -- dialogue composition per-beat
     generate_fn = creative_fn
 
     if max_attempts < 1:
@@ -1560,6 +1564,7 @@ def compose_line(
         )
 
         try:
+            # LLM slot: creative -- per-beat dialogue generation
             # Try with stop= first; older generate_fn signatures
             # without the kwarg fall back to the no-stop path.
             try:
@@ -1570,6 +1575,7 @@ def compose_line(
                     stop=list(stop_strings) if stop_strings else None,
                 )
             except TypeError:
+                # LLM slot: creative -- fallback (no stop= kwarg)
                 raw = generate_fn(
                     messages,
                     temperature=temp,
@@ -1951,6 +1957,7 @@ def _announcer_generate(creative_fn, messages) -> Optional[str]:
     not accept it. Returns the raw string, or ``None`` if the call
     raised (the caller then drops to the deterministic fallback).
     """
+    # LLM slot: creative -- announcer dedicated-pass LLM call
     try:
         try:
             return creative_fn(
@@ -1960,6 +1967,7 @@ def _announcer_generate(creative_fn, messages) -> Optional[str]:
                 stop=list(_DEFAULT_STOP_STRINGS),
             )
         except TypeError:
+            # LLM slot: creative -- fallback (no stop= kwarg)
             return creative_fn(
                 messages,
                 temperature=_BASE_TEMPERATURE,

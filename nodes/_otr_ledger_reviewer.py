@@ -452,6 +452,7 @@ def audit_cast_contract(
     # arbitrary loader exceptions, which structured_call does not catch;
     # the broad `except Exception` below keeps this function's
     # never-raises contract (every failure -> _audit_failed_sentinel).
+    # LLM slot: technical -- cast-contract auditor is structured validation
     try:
         report = structured_call(
             prompt=messages,
@@ -850,6 +851,7 @@ def run_script_doctor(
     # (StructuredCallFailedError) and a raising slot fn -- which
     # structured_call does not catch -- both map to that verdict,
     # preserving the loud-failure contract S33 B3/B4 depend on.
+    # LLM slot: technical -- Script Doctor structural edits
     try:
         report = structured_call(
             prompt=messages,
