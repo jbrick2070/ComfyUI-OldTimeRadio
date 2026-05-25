@@ -1,29 +1,48 @@
 r"""
-nodes/_otr_casting.py -- cast contract LLM caller (PROSE-PLANE).
+nodes/_otr_casting.py -- cast contract caller (PROSE-PLANE).
 
-Plane assignment: PROSE (Content LLM). The cast row carries
-audience-facing fields (character_description, gender, voice_preset)
-so the same model that writes dialogue, polishes title, and
-generates visual prompts also makes the casting choices. Voice pool
-validation is a Python concern; it is NOT a reason to route casting
-to the structural LLM.
+Plane assignment: PROSE (Content LLM). The cast row carries an
+audience-facing field (character_description) written by the same
+model that writes dialogue, polishes title, and generates visual
+prompts. Voice-pool validation and ensemble balance are Python
+concerns; they are NOT a reason to route casting to the structural
+LLM.
 See `spaces/.../memory/project_cast_contract_architecture_target.md`
 and `spaces/.../memory/project_llm_agnostic_design_constraint.md`
 for the full architectural spec.
 
-Call shape: ONE LLM CALL PER OPEN CHARACTER.
-  - Smaller prompt per call (~120-150 tokens) than a single call
-    covering all characters together.
-  - Voice collisions impossible by construction: Python pre-filters
-    `available_voices = full_pool - taken_voices` before each call.
-  - Each call sees a "cast so far" context (LEMMY if rolled, plus
-    all previously-cast open characters). ANNOUNCER excluded --
-    narrator role, not part of the dramatic ensemble.
+Sprint 3D -- three-stage split. Casting used to be ONE LLM call per
+open character that produced character_description + gender +
+voice_preset together: the LLM picked the voice and there was no
+Python-side global gender/timbre/role balance, only a static prompt
+line "~40% male / ~40% female / ~20% other". Sprint 3D moves balance
+and voice selection out of the LLM:
+
+  1. precompute_ensemble_slots -- PURE PYTHON. Decides the whole
+     ensemble's gender / timbre / role distribution up front. Python
+     owns balance now, not the LLM.
+  2. llm_write_description -- the LLM writes ONLY the prose character
+     description for one slot. It no longer picks gender or voice.
+  3. python_assign_voice_preset -- PURE PYTHON. Picks the voice preset
+     from the pre-filtered pool by gender + timbre, per slot.
+
+Net effect: voice selection and gender/timbre/role balance leave the
+LLM; the LLM's per-character job shrinks to description-only. The
+total LLM call count is unchanged-or-lower -- still at most one call
+per open character, and no extra call site is added.
+
+Voice collisions remain impossible by construction: Python pre-filters
+`available_voices = full_pool - taken_voices` before each slot, and
+python_assign_voice_preset draws only from that pre-filtered set. The
+post-cast `_assert_unique_bark_voices` invariant is the existing
+uniqueness guard and is NOT duplicated here -- python_assign_voice_preset
+owns DISTRIBUTION, not a second uniqueness check.
 
 Cast assembly order (Python-only, no LLM):
   1. ANNOUNCER pre-baked at char_id="c01"  (always present, bonus)
   2. LEMMY pre-baked at char_id="c02"      (11% roll, consumes a slot)
-  3. Pool-fill open characters             (LLM-cast, c02..cNN
+  3. Pool-fill open characters             (precompute -> describe ->
+                                            assign-voice, c02..cNN
                                             shifted +1 if LEMMY hit)
 
 Era-agnostic: every prompt this module emits passes news_seed AND
@@ -97,13 +116,26 @@ log = logging.getLogger(__name__)
 
 _VALID_GENDERS = {"male", "female", "other"}
 
+# Sprint 3D: the "other" share of the ensemble gender split renders
+# through the Bark voice pool (which today is binary male/female), so
+# an "other"-gender slot is voiced from whichever gender column has the
+# most headroom. Gender on the cast row is the audience-facing label;
+# the voice pool is a TTS implementation detail.
+_DEFAULT_GENDER_WEIGHTS: tuple[tuple[str, float], ...] = (
+    ("male", 0.40),
+    ("female", 0.40),
+    ("other", 0.20),
+)
 
-class CastingResponse(BaseModel):
-    """LLM response shape for one open-character casting call.
 
-    Voice-in-pool validation is NOT done here -- pydantic cannot see
-    the runtime available_voices set. The caller checks separately
-    and rerolls if the response picks a voice outside the pool.
+class DescriptionResponse(BaseModel):
+    """LLM response shape for one open-character DESCRIPTION call.
+
+    Sprint 3D: the LLM's per-character job is description-only. It no
+    longer picks gender or voice_preset -- Python owns the ensemble
+    gender/timbre/role distribution (precompute_ensemble_slots) and
+    voice selection (python_assign_voice_preset). This schema is the
+    full surface the LLM is now asked to produce.
     """
 
     # BUG-LOCAL-263 (2026-05-24): max_length 200 -> 750. The casting
@@ -113,6 +145,31 @@ class CastingResponse(BaseModel):
     # run. 750 is a generous runaway guard, not a content target;
     # _format_prior_entry already trims the echoed description to
     # 60 chars, so the stored length never touches prompt budget.
+    character_description: str = Field(..., min_length=10, max_length=750)
+
+    @field_validator("character_description")
+    @classmethod
+    def _strip_desc(cls, v: str) -> str:
+        return v.strip()
+
+
+class CastingResponse(BaseModel):
+    """Assembled casting result for one open character.
+
+    Sprint 3D: this is no longer a raw LLM-response shape. The LLM
+    now produces only `character_description` (see DescriptionResponse);
+    `gender` is decided by precompute_ensemble_slots and `voice_preset`
+    by python_assign_voice_preset, both pure Python. cast_one_character
+    composes the three stages and returns this combined object so the
+    writer-facing contract (one CastingResponse per open slot) is
+    preserved.
+
+    Voice-in-pool validation is NOT done here -- pydantic cannot see
+    the runtime available_voices set. python_assign_voice_preset draws
+    from the pre-filtered pool, so a pool miss is impossible by
+    construction.
+    """
+
     character_description: str = Field(..., min_length=10, max_length=750)
     gender: str = Field(..., min_length=3, max_length=12)
     voice_preset: str = Field(..., min_length=3, max_length=80)
@@ -200,33 +257,44 @@ def _build_user_prompt(
     news_seed: str,
     style: str,
     prior_cast: List[dict],
-    available_voices: List[tuple[str, str]],
+    *,
+    gender: str = "",
+    timbre: str = "",
+    role: str = "",
     casting_brief: str = "",
 ) -> str:
-    """Build the casting prompt for one open character.
+    """Build the description prompt for one open character.
+
+    Sprint 3D: the LLM writes ONLY the prose character description.
+    Python has already decided this slot's gender / timbre / role
+    (precompute_ensemble_slots); those are handed to the LLM as fixed
+    facts to write into, NOT choices to make. The 'Voices:' block and
+    the 'Aim ~40/40/20' balance line are gone -- voice selection and
+    ensemble balance are now pure-Python concerns.
 
     Layout (every line except 'Cast so far' is mandatory; the cast-
     so-far block is omitted entirely when prior_cast is empty):
 
-      Cast this character in a radio drama.
+      Write a character for a radio drama.
       Story: <casting_brief if non-empty else news_seed[:500]>
       Style: <style>
 
       Name: <NAME>
+      Gender: <male|female|other>
+      Voice: <timbre>
+      Role: <role>
 
       [optional]
       Cast so far:
       - LEMMY (M, gravelly engineer, 50s, gruff mechanic)
       - BOB   (M, weary doctor, 40s, dry humor)
 
-      Voices:
-      - v2/en_speaker_4 (female bright 30s)
-      - v2/en_speaker_6 (female throaty 40s)
-
-      Aim ~40% male, ~40% female, ~20% other.
-
       JSON only:
-      {"character_description":"<vivid, 1-2 sentences>","gender":"male|female|other","voice_preset":"<id>"}
+      {"character_description":"<vivid, 1-2 sentences>"}
+
+    The Gender / Voice / Role lines are emitted only when the caller
+    supplies them; legacy callers and tests that pass none still get a
+    well-formed description prompt.
 
     casting_brief (added in commit 3 of the news_interpreter sprint,
     ADR docs/news_interpreter_adr.md) is the purpose-specific
@@ -244,12 +312,21 @@ def _build_user_prompt(
     style_str = (style or "").strip() or "open"
 
     parts: list[str] = [
-        "Cast this character in a radio drama.",
+        "Write a character for a radio drama.",
         f"Story: {story_text}",
         f"Style: {style_str}",
         "",
         f"Name: {name}",
     ]
+    # Gender / timbre / role are Python-decided facts the LLM writes
+    # into -- emitted only when the caller supplies them so legacy
+    # callers keep a lean prompt.
+    if (gender or "").strip():
+        parts.append(f"Gender: {gender.strip()}")
+    if (timbre or "").strip():
+        parts.append(f"Voice: {timbre.strip()}")
+    if (role or "").strip():
+        parts.append(f"Role: {role.strip()}")
 
     if prior_cast:
         parts.append("")
@@ -258,19 +335,8 @@ def _build_user_prompt(
             parts.append(f"- {_format_prior_entry(c)}")
 
     parts.append("")
-    parts.append("Voices:")
-    for preset, short in available_voices:
-        parts.append(f"- {preset} ({short})")
-
-    parts.append("")
-    parts.append("Aim ~40% male, ~40% female, ~20% other.")
-    parts.append("")
     parts.append("JSON only:")
-    parts.append(
-        '{"character_description":"<vivid, 1-2 sentences>",'
-        '"gender":"male|female|other",'
-        '"voice_preset":"<id>"}'
-    )
+    parts.append('{"character_description":"<vivid, 1-2 sentences>"}')
     return "\n".join(parts)
 
 
@@ -292,7 +358,342 @@ def _format_prior_entry(row: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Per-character LLM caller -- structured_call retry ladder
+# Sprint 3D Stage 1 -- precompute_ensemble_slots (PURE PYTHON)
+#
+# Python owns the ensemble gender / timbre / role distribution. The LLM
+# no longer makes any of these choices; it only writes prose into the
+# facts Python has fixed.
+# ---------------------------------------------------------------------------
+
+
+# Coarse timbre vocabulary. Each entry is a one-word descriptor the LLM
+# can write prose around AND a tunable knob python_assign_voice_preset
+# uses to rank voices within a gender column. The set is intentionally
+# small -- it must read naturally in a prompt and map onto the quality
+# tags already present in cast_pools.VOICE_PROFILES.
+_TIMBRE_VOCAB: tuple[str, ...] = (
+    "warm",
+    "sharp",
+    "deep",
+    "bright",
+    "dry",
+    "gravelly",
+)
+
+# Role vocabulary. A role is a dramatic function, not a job title --
+# it gives the description LLM a hook without prescribing the scene.
+# Python rotates through these so the ensemble is not all "leads".
+_ROLE_VOCAB: tuple[str, ...] = (
+    "lead",
+    "foil",
+    "support",
+    "wildcard",
+)
+
+
+@dataclass(frozen=True)
+class EnsembleSlot:
+    """One open slot after Stage 1. Python has fixed gender / timbre /
+    role; the LLM writes the description, Python assigns the voice.
+    """
+
+    char_id: str
+    name: str
+    gender: str   # one of _VALID_GENDERS
+    timbre: str   # one of _TIMBRE_VOCAB
+    role: str     # one of _ROLE_VOCAB
+
+
+def _plan_gender_distribution(
+    count: int,
+    prior_genders: List[str],
+    rng: random.Random,
+) -> List[str]:
+    """Largest-remainder allocation of the ~40/40/20 male/female/other
+    split across `count` open slots, accounting for genders already
+    locked in the prior cast (LEMMY etc.) so the WHOLE ensemble lands
+    near target -- not just the open slots in isolation.
+
+    Pure Python, deterministic for a given (count, prior_genders, rng).
+    This is the balance the old static prompt line only *asked* the LLM
+    to honour; Python now enforces it.
+    """
+    if count <= 0:
+        return []
+
+    total = count + len(prior_genders)
+    prior_counts = {g: 0 for g, _ in _DEFAULT_GENDER_WEIGHTS}
+    for g in prior_genders:
+        g_norm = (g or "").strip().lower()
+        if g_norm in prior_counts:
+            prior_counts[g_norm] += 1
+
+    # Ideal whole-ensemble count per gender, minus what the prior cast
+    # already supplies; never negative.
+    raw: list[tuple[str, float]] = []
+    for gender, weight in _DEFAULT_GENDER_WEIGHTS:
+        want_total = weight * total
+        want_open = want_total - prior_counts[gender]
+        raw.append((gender, max(0.0, want_open)))
+
+    # Largest-remainder rounding so the parts sum to exactly `count`.
+    floors = {g: int(v) for g, v in raw}
+    assigned = sum(floors.values())
+    remainder = count - assigned
+    # Distribute the leftover to the largest fractional parts.
+    frac_order = sorted(
+        raw,
+        key=lambda gv: (gv[1] - int(gv[1])),
+        reverse=True,
+    )
+    out_counts = dict(floors)
+    idx = 0
+    while remainder > 0 and frac_order:
+        gender = frac_order[idx % len(frac_order)][0]
+        out_counts[gender] += 1
+        remainder -= 1
+        idx += 1
+    # If rounding overshot (rare with non-negative clamps), trim from
+    # whichever gender carries the most.
+    while sum(out_counts.values()) > count:
+        gender = max(out_counts, key=lambda g: out_counts[g])
+        out_counts[gender] -= 1
+
+    genders: list[str] = []
+    for gender, _ in _DEFAULT_GENDER_WEIGHTS:
+        genders.extend([gender] * out_counts[gender])
+    # Shuffle so gender does not correlate with slot order (the cast-so-
+    # far context the LLM sees would otherwise always run M, M, F, ...).
+    rng.shuffle(genders)
+    return genders
+
+
+def precompute_ensemble_slots(
+    open_slots: List["CastSlot"],
+    *,
+    prior_cast: Optional[List[dict]] = None,
+    rng: Optional[random.Random] = None,
+) -> List[EnsembleSlot]:
+    """Stage 1: decide the whole ensemble's gender / timbre / role
+    distribution up front. PURE PYTHON -- no LLM.
+
+    Sprint 3D: this is where ensemble balance now lives. Previously the
+    LLM was merely *asked* (a static "~40% male / ~40% female / ~20%
+    other" prompt line) to honour a split it had no global view of.
+    Python now decides it deterministically:
+
+      * gender -- largest-remainder allocation of the 40/40/20 split
+        across the open slots, offset by the genders the prior cast
+        (LEMMY, etc.) already contributes.
+      * timbre -- round-robin through `_TIMBRE_VOCAB` so the ensemble
+        spans the vocal range instead of clustering.
+      * role  -- round-robin through `_ROLE_VOCAB` so the ensemble is
+        not all leads.
+
+    The rng makes the gender shuffle deterministic for a fixed seed
+    (C7 byte-identity). timbre/role rotation is index-based and needs
+    no rng.
+    """
+    prior_cast = list(prior_cast or [])
+    rng = rng or random.Random()
+    prior_genders = [
+        (row.get("gender") or "") for row in prior_cast
+    ]
+    genders = _plan_gender_distribution(
+        len(open_slots), prior_genders, rng,
+    )
+
+    ensemble: list[EnsembleSlot] = []
+    for i, slot in enumerate(open_slots):
+        ensemble.append(EnsembleSlot(
+            char_id=slot.char_id,
+            name=slot.name,
+            gender=genders[i],
+            timbre=_TIMBRE_VOCAB[i % len(_TIMBRE_VOCAB)],
+            role=_ROLE_VOCAB[i % len(_ROLE_VOCAB)],
+        ))
+    return ensemble
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3D Stage 2 -- llm_write_description (the ONLY LLM call)
+#
+# The LLM's per-character job: write the prose description for one
+# slot. It does NOT pick gender or voice -- Python owns both.
+# ---------------------------------------------------------------------------
+
+
+def llm_write_description(
+    generate_fn: Callable[..., str],
+    *,
+    slot: EnsembleSlot,
+    news_seed: str,
+    style: str,
+    prior_cast: List[dict],
+    max_attempts: int = 3,
+    base_temperature: float = 0.7,
+    max_new_tokens: int = 250,
+    casting_brief: str = "",
+) -> DescriptionResponse:
+    """Stage 2: the LLM writes ONLY the prose description for one slot.
+
+    Sprint 3D: this is the lone LLM call in the casting pipeline. It
+    used to also pick gender and voice_preset; those have moved to
+    pure-Python stages (precompute_ensemble_slots and
+    python_assign_voice_preset). The call still routes through the
+    shared `structured_call` retry ladder (base -> structural retry ->
+    typed repair); the schema is now `DescriptionResponse` (one field),
+    so the voice-pool post_validator is gone -- there is no voice for
+    the LLM to get wrong.
+
+    `max_attempts=1` is allowed (single-shot, no retry). `0` is not.
+
+    Raises CastingFailedError if the ladder is exhausted or the slot fn
+    raises (structured_call does not catch slot-fn failures).
+    """
+    if max_attempts < 1:
+        raise ValueError(
+            f"max_attempts must be >= 1, got {max_attempts}"
+        )
+
+    user_prompt = _build_user_prompt(
+        name=slot.name,
+        news_seed=news_seed,
+        style=style,
+        prior_cast=prior_cast,
+        gender=slot.gender,
+        timbre=slot.timbre,
+        role=slot.role,
+        casting_brief=casting_brief,
+    )
+    messages = [{"role": "user", "content": user_prompt}]
+
+    # LLM slot: creative -- writing the audience-facing prose character
+    # description is a creative pass; it rides the content/creative
+    # plane. (Sprint 3D shrank this call to description-only; gender and
+    # voice are now pure-Python, so the slot stays creative for the same
+    # reason -- prose -- and there is no second call to retag.)
+    # The structural retry runs at half the base temperature: strictly
+    # below base, never above (the Sprint 2B principle).
+    try:
+        response = structured_call(
+            prompt=messages,
+            schema=DescriptionResponse,
+            slot_fn=generate_fn,
+            base_temperature=float(base_temperature),
+            structural_retry_temperature=float(base_temperature) / 2.0,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=int(max_new_tokens),
+            max_attempts=int(max_attempts),
+            helper_name=f"llm_write_description:{slot.name}",
+        )
+    except StructuredCallFailedError as exc:
+        # Ladder exhausted. Rebuild an `attempts` list of the length the
+        # ladder actually ran so lock_cast's CastValidationLLMError
+        # promotion -- which keys on len(attempts) == max_attempts --
+        # still fires on a full exhaustion.
+        last_error_text = (
+            f"{type(exc.last_error).__name__}: {exc.last_error}"
+            if exc.last_error is not None
+            else "no error captured"
+        )
+        raise CastingFailedError(
+            attempts=[("", last_error_text)] * max(exc.attempts, 1),
+            name=slot.name,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM loader) varies
+        # structured_call does not catch slot-fn exceptions: a loader /
+        # VRAM / framework failure inside generate_fn lands here.
+        raise CastingFailedError(
+            attempts=[("", f"slot fn raised: {type(exc).__name__}: {exc}")],
+            name=slot.name,
+        ) from exc
+
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3D Stage 3 -- python_assign_voice_preset (PURE PYTHON)
+#
+# Python picks the voice from the pre-filtered pool by gender + timbre.
+# This stage owns voice DISTRIBUTION. It does NOT re-implement voice
+# uniqueness -- the pool pre-filter (open_voice_pool drops taken
+# voices) plus the post-cast _assert_unique_bark_voices invariant
+# already guarantee uniqueness. Drawing from a pre-filtered pool means
+# a collision is impossible by construction here.
+# ---------------------------------------------------------------------------
+
+
+def python_assign_voice_preset(
+    slot: EnsembleSlot,
+    *,
+    available_voices: List[tuple[str, str]],
+    rng: Optional[random.Random] = None,
+) -> str:
+    """Stage 3: pick the voice preset for one slot. PURE PYTHON.
+
+    Sprint 3D: voice selection has left the LLM. The voice is chosen
+    from `available_voices` -- the pool the caller has ALREADY
+    pre-filtered to exclude every voice taken by an earlier slot, so
+    every candidate here is collision-free by construction.
+
+    Selection ranks candidates by fit to the slot's Python-decided
+    gender + timbre:
+
+      1. Prefer voices whose short-description names the slot gender.
+      2. Among those, prefer voices whose short-description carries the
+         slot timbre word.
+      3. Break ties deterministically with the rng (C7 byte-identity).
+
+    `available_voices` is a list of (preset, short_description) tuples;
+    short_description starts with the voice gender (see
+    cast_pools.open_voice_pool). An empty pool raises CastingFailedError
+    -- the caller's preflight should have caught it first.
+    """
+    rng = rng or random.Random()
+    if not available_voices:
+        raise CastingFailedError(
+            attempts=[("", "available_voices is empty -- nothing to pick")],
+            name=slot.name,
+        )
+
+    gender = (slot.gender or "").strip().lower()
+    timbre = (slot.timbre or "").strip().lower()
+
+    # 1. Gender-matched candidates. The Bark voice pool is binary
+    #    male/female; an "other"-gender slot has no voice column of its
+    #    own, so it draws from the full pool (the cast-row gender label
+    #    still reads "other" -- the voice is a TTS detail).
+    if gender in ("male", "female"):
+        gender_pool = [
+            (p, s) for p, s in available_voices
+            if (s or "").strip().lower().startswith(gender)
+        ]
+    else:
+        gender_pool = list(available_voices)
+    # Defensive fallback: if a gender column is exhausted (more open
+    # slots of one gender than the pool can supply), fall back to the
+    # whole pre-filtered pool rather than failing -- a voiced character
+    # of a slightly-off timbre beats a hard cast failure.
+    candidates = gender_pool or list(available_voices)
+
+    # 2. Timbre-matched subset within the gender pool.
+    timbre_matched = [
+        (p, s) for p, s in candidates
+        if timbre and timbre in (s or "").strip().lower()
+    ]
+    pick_from = timbre_matched or candidates
+
+    # 3. Deterministic tie-break. Sort by preset id first so the rng
+    #    draws from a stable ordering (C7: dict / set iteration order
+    #    is hash-randomized; a sorted list is byte-stable).
+    pick_from = sorted(pick_from, key=lambda ps: ps[0])
+    preset, _short = rng.choice(pick_from)
+    return preset
+
+
+# ---------------------------------------------------------------------------
+# Per-character caller -- composes the three Sprint 3D stages
 # ---------------------------------------------------------------------------
 
 
@@ -308,26 +709,31 @@ def cast_one_character(
     base_temperature: float = 0.7,
     max_new_tokens: int = 250,
     casting_brief: str = "",
+    ensemble_slot: Optional[EnsembleSlot] = None,
+    rng: Optional[random.Random] = None,
 ) -> CastingResponse:
-    """Cast one open character. Returns a validated CastingResponse.
+    """Cast one open character. Returns an assembled CastingResponse.
 
-    Sprint 2A/2D: the call routes through the shared `structured_call`
-    retry ladder (base -> structural retry -> typed repair). The ladder
-    subsumes the former hand-rolled 3-attempt loop. The voice-pool
-    check -- voice_preset must be one of `available_voices`, a runtime
-    set pydantic cannot see -- rides `structured_call.post_validator`;
-    a pool miss re-rolls the ladder exactly like a schema failure.
+    Sprint 3D: this is now a thin composer over the three stages --
 
-    Every attempt -- fresh, structural retry, and typed repair -- runs
-    on `generate_fn`. The S32 B3 routing of the repair attempt to a
-    separate technical slot was retired with the structured_call
-    conversion: a single ladder has one `slot_fn` and cannot switch
-    slots per attempt.
+      1. precompute_ensemble_slots -- Python decides gender/timbre/role
+         (skipped here when `ensemble_slot` is supplied: lock_cast
+         precomputes the WHOLE ensemble once and passes each slot down).
+      2. llm_write_description -- the LLM writes the prose description.
+      3. python_assign_voice_preset -- Python picks the voice.
+
+    The writer-facing contract (one validated CastingResponse per open
+    slot, carrying character_description + gender + voice_preset) is
+    preserved so lock_cast and its callers are unchanged in shape.
+
+    `ensemble_slot`: when None (a standalone single-character call),
+    Stage 1 runs for this one slot so the function still works on its
+    own. lock_cast always passes a precomputed slot.
 
     `max_attempts=1` is allowed (single-shot, no retry). `0` is not.
 
-    Raises CastingFailedError if the ladder is exhausted or the slot fn
-    raises (structured_call does not catch slot-fn failures).
+    Raises CastingFailedError if the ladder is exhausted, the slot fn
+    raises, or the voice pool is empty.
     """
     if max_attempts < 1:
         raise ValueError(
@@ -339,73 +745,49 @@ def cast_one_character(
             name=name,
         )
 
-    available_presets = {p for p, _ in available_voices}
-    user_prompt = _build_user_prompt(
-        name=name,
+    rng = rng or random.Random()
+
+    # Stage 1 -- ensemble plan. lock_cast precomputes the whole ensemble
+    # once and hands each slot down; a standalone call plans just this
+    # one slot so the function keeps working on its own.
+    if ensemble_slot is None:
+        slot = precompute_ensemble_slots(
+            [CastSlot(char_id="", name=name)],
+            prior_cast=prior_cast,
+            rng=rng,
+        )[0]
+    else:
+        slot = ensemble_slot
+
+    # Stage 2 -- the LLM writes the description (and only that).
+    description = llm_write_description(
+        generate_fn,
+        slot=slot,
         news_seed=news_seed,
         style=style,
         prior_cast=prior_cast,
-        available_voices=available_voices,
+        max_attempts=max_attempts,
+        base_temperature=base_temperature,
+        max_new_tokens=max_new_tokens,
         casting_brief=casting_brief,
     )
-    messages = [{"role": "user", "content": user_prompt}]
 
-    # Voice-pool gate: the LLM can return a schema-valid voice_preset
-    # that is outside the runtime available_voices set -- a content
-    # failure pydantic cannot see. structured_call runs this on every
-    # schema-valid instance; a pool miss returns an error string and
-    # re-rolls the ladder exactly like a schema failure.
-    def _voice_pool_validator(response: CastingResponse) -> str | None:
-        if response.voice_preset not in available_presets:
-            return (
-                f"voice_preset {response.voice_preset!r} not in "
-                f"available_voices ({sorted(available_presets)!r})"
-            )
-        return None
+    # Stage 3 -- Python picks the voice from the pre-filtered pool.
+    voice_preset = python_assign_voice_preset(
+        slot,
+        available_voices=available_voices,
+        rng=rng,
+    )
 
-    # LLM slot: creative -- the cast row carries audience-facing prose
-    # (character_description), so casting rides the content/creative
-    # plane. The structural retry runs at half the base temperature:
-    # strictly below base, never above (the Sprint 2B principle; the
-    # old loop RAISED the second attempt to base + 0.1).
-    try:
-        response = structured_call(
-            prompt=messages,
-            schema=CastingResponse,
-            slot_fn=generate_fn,
-            base_temperature=float(base_temperature),
-            structural_retry_temperature=float(base_temperature) / 2.0,
-            repair_prompt_factory=make_dispatching_repair_factory(),
-            post_validator=_voice_pool_validator,
-            max_new_tokens=int(max_new_tokens),
-            max_attempts=int(max_attempts),
-            helper_name=f"cast_one_character:{name}",
-        )
-    except StructuredCallFailedError as exc:
-        # Ladder exhausted. Rebuild an `attempts` list of the length the
-        # ladder actually ran so lock_cast's CastValidationLLMError
-        # promotion -- which keys on len(attempts) == max_attempts --
-        # still fires on a full exhaustion.
-        last_error_text = (
-            f"{type(exc.last_error).__name__}: {exc.last_error}"
-            if exc.last_error is not None
-            else "no error captured"
-        )
-        raise CastingFailedError(
-            attempts=[("", last_error_text)] * max(exc.attempts, 1),
-            name=name,
-        ) from exc
-    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM loader) varies
-        # structured_call does not catch slot-fn exceptions: a loader /
-        # VRAM / framework failure inside generate_fn lands here.
-        raise CastingFailedError(
-            attempts=[("", f"slot fn raised: {type(exc).__name__}: {exc}")],
-            name=name,
-        ) from exc
-
+    response = CastingResponse(
+        character_description=description.character_description,
+        gender=slot.gender,
+        voice_preset=voice_preset,
+    )
     log.info(
-        "[OTR_Casting] cast %s -> voice=%s gender=%s",
+        "[OTR_Casting] cast %s -> voice=%s gender=%s (timbre=%s role=%s)",
         name, response.voice_preset, response.gender,
+        slot.timbre, slot.role,
     )
     return response
 
@@ -417,8 +799,10 @@ def cast_one_character(
 
 @dataclass(frozen=True)
 class CastSlot:
-    """A pool-fill open slot. Python rolls the name; the LLM fills
-    description / gender / voice_preset later via cast_one_character.
+    """A pool-fill open slot. Python rolls the name; Sprint 3D then
+    runs the three-stage fill (precompute_ensemble_slots decides
+    gender/timbre/role, llm_write_description writes the prose,
+    python_assign_voice_preset picks the voice).
     """
 
     char_id: str
@@ -541,17 +925,30 @@ def lock_cast(
 
     meta dict has: lemmy_hit, casting_attempts (list of attempt
     counts per open slot, for telemetry).
+
+    Sprint 3D: lock_cast runs the three-stage fill -- it precomputes the
+    WHOLE ensemble's gender/timbre/role distribution ONCE
+    (precompute_ensemble_slots) so Python balance has a global view,
+    then per slot the LLM writes the description and Python assigns the
+    voice. Each open slot still costs at most one LLM call; no extra
+    call site is introduced.
     """
-    # cast_one_character runs every casting attempt on a single slot
-    # via the shared structured_call ladder. lock_cast feeds it
-    # `creative_fn` -- the cast row carries audience-facing prose, so
-    # casting rides the creative plane. (S32 B3's technical-slot repair
-    # routing was retired in the Sprint 2A/2D structured_call conversion.)
+    # The per-slot fill runs every description attempt via the shared
+    # structured_call ladder. lock_cast feeds it `creative_fn` -- the
+    # cast row carries audience-facing prose, so casting rides the
+    # creative plane. (S32 B3's technical-slot repair routing was
+    # retired in the Sprint 2A/2D structured_call conversion.)
     generate_fn = creative_fn
+
+    # Voice assignment (Stage 3) needs a seeded rng for its deterministic
+    # tie-break; reuse the cast rng so a fixed seed stays byte-identical
+    # (C7). A fresh Random() when the caller passed none keeps the
+    # non-deterministic path working too.
+    cast_rng = rng or random.Random()
 
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
         num_characters=num_characters,
-        rng=rng,
+        rng=cast_rng,
         force_lemmy=force_lemmy,
     )
 
@@ -593,8 +990,18 @@ def lock_cast(
         row for row in pre_locked if row["name"] != "ANNOUNCER"
     ]
 
+    # Sprint 3D Stage 1 -- precompute the WHOLE open ensemble's
+    # gender/timbre/role distribution ONCE, up front, before any LLM
+    # call. Python owns balance here, with a global view of the prior
+    # cast (LEMMY's gender feeds the 40/40/20 allocation).
+    ensemble_slots = precompute_ensemble_slots(
+        open_slots,
+        prior_cast=prior_cast_for_llm,
+        rng=cast_rng,
+    )
+
     casting_attempts: list[int] = []
-    for slot in open_slots:
+    for slot, ens in zip(open_slots, ensemble_slots):
         available_voices = _POOLS.open_voice_pool(taken_voices)
         if not available_voices:
             # Belt-and-braces: should never fire because of the
@@ -615,6 +1022,8 @@ def lock_cast(
                 available_voices=available_voices,
                 max_attempts=max_attempts_per_call,
                 casting_brief=casting_brief,
+                ensemble_slot=ens,
+                rng=cast_rng,
             )
         except CastingFailedError as exc:
             # S32 B3 (D2): if the failure came from the repair-attempt
@@ -884,13 +1293,19 @@ def _assert_unique_bark_voices(cast: List[dict]) -> None:
 
 __all__ = [
     "CastingResponse",
+    "DescriptionResponse",
     "CastingFailedError",
+    "CastValidationLLMError",
     "_assert_unique_bark_voices",
     "_assert_voice_preset_invariant",
     "_assert_no_structural_tokens_in_cast",
     "_looks_like_non_character_cast_name",
     "CastSlot",
+    "EnsembleSlot",
     "assemble_pre_locked_rows",
+    "precompute_ensemble_slots",
+    "llm_write_description",
+    "python_assign_voice_preset",
     "cast_one_character",
     "lock_cast",
 ]

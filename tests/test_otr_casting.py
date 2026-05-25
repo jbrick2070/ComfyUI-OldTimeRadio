@@ -1,15 +1,19 @@
-"""tests/test_otr_casting.py -- unit tests for the cast contract LLM caller.
+"""tests/test_otr_casting.py -- unit tests for the cast contract caller.
 
 Covers:
   - assemble_pre_locked_rows: determinism, slot accounting, LEMMY hit/miss
   - ANNOUNCER 50/50 male/female distribution
   - Voice pre-filter (pre-locked voices excluded from open slot pool)
-  - CastingResponse schema validation (gender enum, length bounds)
-  - cast_one_character validator + reroll: bad JSON, schema fail,
-    voice not in pool, repair on attempt 3
-  - lock_cast end-to-end: pre-locked rows + LLM-cast rows in order
-  - Prompt shape: news_seed + style adjacent, no 1940s literal,
-    Cast-so-far block omitted on first call
+  - CastingResponse / DescriptionResponse schema validation
+  - Sprint 3D three-stage split:
+      * precompute_ensemble_slots -- Python owns gender/timbre/role
+      * llm_write_description     -- LLM writes description only
+      * python_assign_voice_preset -- Python picks the voice
+  - cast_one_character: composes the three stages, reroll on bad JSON,
+    repair on attempt 3
+  - lock_cast end-to-end: pre-locked rows + Python-assembled rows
+  - Prompt shape: description-only, no Voices: block, no balance line
+  - Voice uniqueness still holds (the existing _assert_unique_bark_voices)
 
 Hermetic: no GPU, no I/O, no ComfyUI imports. All LLM calls go
 through stub generate_fn callables.
@@ -56,15 +60,22 @@ def _make_canned_generate_fn(responses):
     return gen_fn
 
 
-def _good_response(name="ALICE",
+def _desc_response(
+    description="Sharp-eyed scientist, 30s, anxious about the data.",
+):
+    """Sprint 3D: the LLM produces description ONLY. Gender and
+    voice_preset are no longer LLM concerns."""
+    return json.dumps({"character_description": description})
+
+
+# Back-compat: some legacy-shaped responses still carry gender +
+# voice_preset. The new DescriptionResponse schema ignores the extra
+# keys (pydantic by default), so a fat response still parses.
+def _good_response(name="ALICE",  # noqa: ARG001
                    description="Sharp-eyed scientist, 30s, anxious about the data.",
-                   gender="female",
-                   voice_preset="v2/en_speaker_4"):
-    return json.dumps({
-        "character_description": description,
-        "gender":                gender,
-        "voice_preset":          voice_preset,
-    })
+                   gender="female",  # noqa: ARG001
+                   voice_preset="v2/en_speaker_4"):  # noqa: ARG001
+    return _desc_response(description)
 
 
 # ---------------------------------------------------------------------------
@@ -225,9 +236,7 @@ def test_lemmy_row_carries_voice_params_none():
 
 def test_lock_cast_open_character_rows_carry_voice_params_none():
     rng = random.Random("voice-params-open")
-    gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_3"),
-    ])
+    gen = _make_canned_generate_fn([_desc_response()])
     cast, _ = _OTRC.lock_cast(creative_fn=gen,
         num_characters=1,
         news_seed="story", style="noir",
@@ -239,14 +248,11 @@ def test_lock_cast_open_character_rows_carry_voice_params_none():
 
 
 def test_lock_cast_open_character_rows_carry_tts_model_bark():
-    """Every LLM-cast open-character row must stamp tts_model="bark"
-    since open characters are drawn from the Bark VOICE_PROFILES
-    pool by construction."""
+    """Every Python-assembled open-character row must stamp
+    tts_model="bark" since open characters are drawn from the Bark
+    VOICE_PROFILES pool by construction."""
     rng = random.Random("tts-model-open")
-    gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_3"),
-        _good_response(voice_preset="v2/en_speaker_5"),
-    ])
+    gen = _make_canned_generate_fn([_desc_response(), _desc_response()])
     cast, _ = _OTRC.lock_cast(creative_fn=gen,
         num_characters=2,
         news_seed="story", style="noir",
@@ -293,116 +299,6 @@ def test_assemble_pre_locked_rows_announcer_picks_each_preset_with_fixed_seeds()
         f"announcer pool not exercised in both directions: {seen_genders!r}"
 
 
-def test_cast_one_character_max_attempts_zero_rejected():
-    """max_attempts=0 is invalid (no attempts to make)."""
-    gen = _make_canned_generate_fn([_good_response()])
-    with pytest.raises(ValueError, match="max_attempts"):
-        _OTRC.cast_one_character(
-            gen,
-            name="ALICE", news_seed="story", style="noir",
-            prior_cast=[], available_voices=_three_voices(),
-            max_attempts=0,
-        )
-
-
-def test_cast_one_character_max_attempts_one_single_shot_no_repair():
-    """max_attempts=1 is allowed (single-shot, no repair branch)."""
-    gen = _make_canned_generate_fn([_good_response()])
-    r = _OTRC.cast_one_character(
-        gen,
-        name="ALICE", news_seed="story", style="noir",
-        prior_cast=[], available_voices=_three_voices(),
-        max_attempts=1,
-    )
-    assert r.voice_preset == "v2/en_speaker_4"
-
-
-def test_cast_one_character_repair_truncates_huge_raw():
-    """A 4000-char garbage response must NOT be embedded whole into the
-    repair prompt -- it would bloat the KV cache against the 14.5 GB
-    VRAM ceiling.
-
-    Sprint 2A/2D: the repair attempt is structured_call's Attempt 3,
-    whose default_repair_prompt_factory embeds only a truncated slice
-    of the prior failed output. Two bad responses then a good one so
-    the repair (third) attempt fires and recovers."""
-    huge_garbage = "x" * 4000
-    captured_messages: list = []
-
-    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        captured_messages.append(messages)
-        if len(captured_messages) <= 2:
-            return huge_garbage
-        return _good_response()
-
-    r = _OTRC.cast_one_character(
-        gen_fn,
-        name="ALICE", news_seed="story", style="noir",
-        prior_cast=[], available_voices=_three_voices(),
-        max_attempts=3,
-    )
-    assert r.voice_preset == "v2/en_speaker_4"
-    # Third call is the repair attempt. The prior 4000-char garbage
-    # must be truncated, not embedded whole.
-    repair_text = "".join(
-        m["content"] for m in captured_messages[-1]
-    )
-    assert huge_garbage not in repair_text, (
-        "repair prompt embedded the full 4000-char garbage -- the "
-        "structured_call repair factory must truncate prior output"
-    )
-    assert len(repair_text) < len(huge_garbage), (
-        f"repair prompt ({len(repair_text)} chars) is not smaller than "
-        f"the 4000-char garbage it was supposed to truncate"
-    )
-
-
-def test_lock_cast_preflight_fails_fast_when_voice_pool_too_small(
-    monkeypatch,
-):
-    """Patch open_voice_pool to return only 1 voice, then ask for 3
-    open slots. lock_cast must raise BEFORE any LLM call fires."""
-    llm_call_count = [0]
-
-    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        llm_call_count[0] += 1
-        return _good_response()
-
-    monkeypatch.setattr(
-        _POOLS, "open_voice_pool",
-        lambda taken: [("v2/en_speaker_4", "female bright 30s")],
-    )
-
-    rng = random.Random("preflight-test")
-    with pytest.raises(_OTRC.CastingFailedError, match="too small"):
-        _OTRC.lock_cast(creative_fn=gen_fn,
-            num_characters=3,
-            news_seed="story", style="noir",
-            rng=rng,
-            force_lemmy=False,
-        )
-    assert llm_call_count[0] == 0, \
-        "preflight should fail BEFORE any LLM call"
-
-
-def test_open_voice_pool_short_descriptions_are_deterministic():
-    """C7 byte-identity guard: open_voice_pool must produce IDENTICAL
-    short-descriptions across runs. Set iteration order in Python is
-    hash-randomization dependent, so without sorted() the rendered
-    short can vary process-to-process. Per round-robin synthesis
-    2026-05-10."""
-    pool_a = _POOLS.open_voice_pool(set())
-    pool_b = _POOLS.open_voice_pool(set())
-    assert pool_a == pool_b, \
-        "open_voice_pool not deterministic across calls in same process"
-    # The short-description for each preset must always render the
-    # same way (sorted-tag invariant).
-    by_preset_a = {p: s for p, s in pool_a}
-    by_preset_b = {p: s for p, s in pool_b}
-    for preset in by_preset_a:
-        assert by_preset_a[preset] == by_preset_b[preset]
-
-
 def test_assemble_pre_locked_rows_num_characters_bounds():
     rng = random.Random("bounds")
     with pytest.raises(ValueError):
@@ -425,6 +321,279 @@ def test_assemble_pre_locked_rows_no_name_collisions_in_pool_fill():
 
 
 # ---------------------------------------------------------------------------
+# Sprint 3D Stage 1 -- precompute_ensemble_slots (Python owns balance)
+# ---------------------------------------------------------------------------
+
+
+def _slots(n):
+    return [_OTRC.CastSlot(char_id=f"c{i+2:02d}", name=f"NAME{i}")
+            for i in range(n)]
+
+
+def test_precompute_ensemble_slots_returns_one_slot_per_open():
+    ensemble = _OTRC.precompute_ensemble_slots(
+        _slots(4), prior_cast=[], rng=random.Random("ens-1"),
+    )
+    assert len(ensemble) == 4
+    for ens in ensemble:
+        assert isinstance(ens, _OTRC.EnsembleSlot)
+        assert ens.gender in _OTRC._VALID_GENDERS
+        assert ens.timbre in _OTRC._TIMBRE_VOCAB
+        assert ens.role in _OTRC._ROLE_VOCAB
+
+
+def test_precompute_ensemble_slots_preserves_char_id_and_name():
+    open_slots = _slots(3)
+    ensemble = _OTRC.precompute_ensemble_slots(
+        open_slots, prior_cast=[], rng=random.Random("ens-2"),
+    )
+    assert [e.char_id for e in ensemble] == [s.char_id for s in open_slots]
+    assert [e.name for e in ensemble] == [s.name for s in open_slots]
+
+
+def test_precompute_ensemble_slots_is_deterministic_for_a_seed():
+    """C7 byte-identity: same open slots + same seed yield an
+    identical ensemble plan (gender shuffle uses the seeded rng)."""
+    a = _OTRC.precompute_ensemble_slots(
+        _slots(6), prior_cast=[], rng=random.Random("det"),
+    )
+    b = _OTRC.precompute_ensemble_slots(
+        _slots(6), prior_cast=[], rng=random.Random("det"),
+    )
+    assert [(e.gender, e.timbre, e.role) for e in a] == \
+           [(e.gender, e.timbre, e.role) for e in b]
+
+
+def test_precompute_ensemble_slots_python_owns_gender_balance():
+    """Python -- not the LLM -- decides the ~40/40/20 gender split.
+    Over a 6-slot ensemble the largest-remainder allocation lands at
+    least one male and one female; 'other' is the 20% minority."""
+    ensemble = _OTRC.precompute_ensemble_slots(
+        _slots(6), prior_cast=[], rng=random.Random("balance"),
+    )
+    counts = Counter(e.gender for e in ensemble)
+    assert counts["male"] >= 1, f"no male slots in {counts!r}"
+    assert counts["female"] >= 1, f"no female slots in {counts!r}"
+    # 6 slots * 40% = 2.4 -> male and female each land near 2-3.
+    assert counts["male"] + counts["female"] >= counts["other"], \
+        f"'other' should be the minority share: {counts!r}"
+    assert sum(counts.values()) == 6
+
+
+def test_precompute_ensemble_slots_accounts_for_prior_cast_gender():
+    """The whole-ensemble balance offsets genders already locked in
+    the prior cast (LEMMY is male), so the open slots compensate."""
+    # 5 open slots + 1 prior male (LEMMY). Whole ensemble = 6.
+    prior = [{"name": "LEMMY", "gender": "male",
+              "character_description": "engineer"}]
+    ensemble = _OTRC.precompute_ensemble_slots(
+        _slots(5), prior_cast=prior, rng=random.Random("prior-gender"),
+    )
+    counts = Counter(e.gender for e in ensemble)
+    # Whole ensemble (6) ideal: ~2.4 M / ~2.4 F / ~1.2 X. LEMMY already
+    # supplies one M, so the open slots should carry <= 2 male.
+    assert counts["male"] <= 2, \
+        f"open slots over-allocated male given LEMMY prior: {counts!r}"
+
+
+def test_precompute_ensemble_slots_timbre_spans_the_range():
+    """timbre rotates through _TIMBRE_VOCAB so the ensemble spans the
+    vocal range rather than clustering on one timbre."""
+    ensemble = _OTRC.precompute_ensemble_slots(
+        _slots(6), prior_cast=[], rng=random.Random("timbre"),
+    )
+    timbres = [e.timbre for e in ensemble]
+    # 6 slots, 6 timbre words -> every timbre used exactly once.
+    assert set(timbres) == set(_OTRC._TIMBRE_VOCAB)
+
+
+def test_precompute_ensemble_slots_empty_open_slots():
+    assert _OTRC.precompute_ensemble_slots(
+        [], prior_cast=[], rng=random.Random("empty"),
+    ) == []
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3D Stage 2 -- llm_write_description (description-only LLM call)
+# ---------------------------------------------------------------------------
+
+
+def _ens_slot(name="ALICE", gender="female", timbre="warm", role="lead"):
+    return _OTRC.EnsembleSlot(
+        char_id="c02", name=name, gender=gender, timbre=timbre, role=role,
+    )
+
+
+def test_llm_write_description_returns_description_response():
+    gen = _make_canned_generate_fn([_desc_response("A keen-eyed pilot.")])
+    r = _OTRC.llm_write_description(
+        gen, slot=_ens_slot(), news_seed="story", style="noir",
+        prior_cast=[],
+    )
+    assert isinstance(r, _OTRC.DescriptionResponse)
+    assert r.character_description == "A keen-eyed pilot."
+
+
+def test_llm_write_description_output_has_no_gender_or_voice():
+    """Sprint 3D core invariant: the LLM's response object exposes
+    ONLY character_description -- gender and voice_preset are NOT
+    fields the LLM produces anymore."""
+    gen = _make_canned_generate_fn([_desc_response()])
+    r = _OTRC.llm_write_description(
+        gen, slot=_ens_slot(), news_seed="story", style="noir",
+        prior_cast=[],
+    )
+    fields = set(type(r).model_fields.keys())
+    assert fields == {"character_description"}, \
+        f"DescriptionResponse must carry description only, got {fields!r}"
+    assert not hasattr(r, "gender")
+    assert not hasattr(r, "voice_preset")
+
+
+def test_llm_write_description_ignores_extra_gender_voice_keys():
+    """If the model emits a legacy fat object with gender/voice_preset,
+    the DescriptionResponse schema silently drops the extra keys --
+    the LLM's voice/gender opinion is discarded, not honoured."""
+    fat = json.dumps({
+        "character_description": "Weathered detective, 50s, gravel voice.",
+        "gender": "male",
+        "voice_preset": "v2/en_speaker_0",
+    })
+    gen = _make_canned_generate_fn([fat])
+    r = _OTRC.llm_write_description(
+        gen, slot=_ens_slot(gender="female"), news_seed="s", style="noir",
+        prior_cast=[],
+    )
+    assert r.character_description.startswith("Weathered detective")
+    assert not hasattr(r, "voice_preset")
+
+
+def test_llm_write_description_rerolls_on_invalid_json():
+    gen = _make_canned_generate_fn([
+        "no json here at all, sorry",
+        _desc_response(),
+    ])
+    r = _OTRC.llm_write_description(
+        gen, slot=_ens_slot(), news_seed="story", style="noir",
+        prior_cast=[],
+    )
+    assert r.character_description
+
+
+def test_llm_write_description_max_attempts_zero_rejected():
+    gen = _make_canned_generate_fn([_desc_response()])
+    with pytest.raises(ValueError, match="max_attempts"):
+        _OTRC.llm_write_description(
+            gen, slot=_ens_slot(), news_seed="s", style="noir",
+            prior_cast=[], max_attempts=0,
+        )
+
+
+def test_llm_write_description_raises_after_all_attempts_fail():
+    gen = _make_canned_generate_fn(["bad", "still bad", "yet again bad"])
+    with pytest.raises(_OTRC.CastingFailedError) as exc:
+        _OTRC.llm_write_description(
+            gen, slot=_ens_slot(), news_seed="s", style="noir",
+            prior_cast=[], max_attempts=3,
+        )
+    assert "ALICE" in str(exc.value)
+    assert len(exc.value.attempts) == 3
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3D Stage 3 -- python_assign_voice_preset (Python picks voice)
+# ---------------------------------------------------------------------------
+
+
+def _mixed_voices():
+    """A gendered pool: 3 female + 3 male voices with descriptive shorts."""
+    return [
+        ("v2/en_speaker_4", "female warm bright 30s"),
+        ("v2/en_speaker_2", "female sharp precise 30s"),
+        ("v2/en_speaker_9", "female deep authoritative 50s"),
+        ("v2/en_speaker_0", "male deep authoritative 50s"),
+        ("v2/en_speaker_3", "male sharp energetic 20s"),
+        ("v2/en_speaker_8", "male gravelly confident 40s"),
+    ]
+
+
+def test_python_assign_voice_preset_picks_from_pool():
+    voice = _OTRC.python_assign_voice_preset(
+        _ens_slot(gender="female"), available_voices=_mixed_voices(),
+        rng=random.Random("v1"),
+    )
+    assert voice in {p for p, _ in _mixed_voices()}
+
+
+def test_python_assign_voice_preset_matches_slot_gender():
+    """A female slot draws a female-column voice when one exists."""
+    voice = _OTRC.python_assign_voice_preset(
+        _ens_slot(gender="female"), available_voices=_mixed_voices(),
+        rng=random.Random("v2"),
+    )
+    female_presets = {p for p, s in _mixed_voices()
+                      if s.startswith("female")}
+    assert voice in female_presets, \
+        f"female slot got a non-female voice: {voice!r}"
+
+
+def test_python_assign_voice_preset_matches_slot_timbre():
+    """When a timbre-matched voice exists in the gender column it is
+    preferred -- a 'gravelly' male slot lands the gravelly voice."""
+    voice = _OTRC.python_assign_voice_preset(
+        _ens_slot(gender="male", timbre="gravelly"),
+        available_voices=_mixed_voices(),
+        rng=random.Random("v3"),
+    )
+    assert voice == "v2/en_speaker_8", \
+        f"gravelly male slot should land the gravelly voice, got {voice!r}"
+
+
+def test_python_assign_voice_preset_is_deterministic_for_a_seed():
+    a = _OTRC.python_assign_voice_preset(
+        _ens_slot(), available_voices=_mixed_voices(),
+        rng=random.Random("det"),
+    )
+    b = _OTRC.python_assign_voice_preset(
+        _ens_slot(), available_voices=_mixed_voices(),
+        rng=random.Random("det"),
+    )
+    assert a == b
+
+
+def test_python_assign_voice_preset_empty_pool_raises():
+    with pytest.raises(_OTRC.CastingFailedError) as exc:
+        _OTRC.python_assign_voice_preset(
+            _ens_slot(), available_voices=[], rng=random.Random("e"),
+        )
+    assert "empty" in str(exc.value).lower()
+
+
+def test_python_assign_voice_preset_other_gender_falls_back_to_full_pool():
+    """The Bark pool is binary male/female; an 'other'-gender slot has
+    no column of its own and draws from the whole pre-filtered pool."""
+    voice = _OTRC.python_assign_voice_preset(
+        _ens_slot(gender="other"), available_voices=_mixed_voices(),
+        rng=random.Random("other"),
+    )
+    assert voice in {p for p, _ in _mixed_voices()}
+
+
+def test_python_assign_voice_preset_gender_column_exhausted_fallback():
+    """If a gender column is empty (more slots of one gender than the
+    pool supplies) python_assign_voice_preset falls back to the whole
+    pre-filtered pool rather than failing -- a voiced character beats
+    a hard cast failure."""
+    female_only = [(p, s) for p, s in _mixed_voices()
+                   if s.startswith("female")]
+    voice = _OTRC.python_assign_voice_preset(
+        _ens_slot(gender="male"), available_voices=female_only,
+        rng=random.Random("exhausted"),
+    )
+    assert voice in {p for p, _ in female_only}
+
+
+# ---------------------------------------------------------------------------
 # Voice pre-filter
 # ---------------------------------------------------------------------------
 
@@ -441,7 +610,7 @@ def test_open_voice_pool_excludes_taken():
 
 def test_open_voice_pool_short_descriptions_have_gender():
     """Each entry is (preset, short) where short starts with the
-    gender so the LLM can read it at a glance."""
+    gender so python_assign_voice_preset can read it at a glance."""
     pool = _POOLS.open_voice_pool(set())
     assert len(pool) == len(_POOLS.VOICE_PROFILES)
     for preset, short in pool:
@@ -449,12 +618,44 @@ def test_open_voice_pool_short_descriptions_have_gender():
             f"short missing gender: {preset!r} -> {short!r}"
 
 
+def test_open_voice_pool_short_descriptions_are_deterministic():
+    """C7 byte-identity guard: open_voice_pool must produce IDENTICAL
+    short-descriptions across runs. Set iteration order in Python is
+    hash-randomization dependent, so without sorted() the rendered
+    short can vary process-to-process. Per round-robin synthesis
+    2026-05-10."""
+    pool_a = _POOLS.open_voice_pool(set())
+    pool_b = _POOLS.open_voice_pool(set())
+    assert pool_a == pool_b, \
+        "open_voice_pool not deterministic across calls in same process"
+    by_preset_a = {p: s for p, s in pool_a}
+    by_preset_b = {p: s for p, s in pool_b}
+    for preset in by_preset_a:
+        assert by_preset_a[preset] == by_preset_b[preset]
+
+
 # ---------------------------------------------------------------------------
-# CastingResponse schema
+# DescriptionResponse / CastingResponse schema
 # ---------------------------------------------------------------------------
+
+
+def test_description_response_accepts_valid():
+    r = _OTRC.DescriptionResponse(
+        character_description="Female, 40s, weary broadcaster",
+    )
+    assert r.character_description.startswith("Female")
+
+
+def test_description_response_rejects_short_description():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        _OTRC.DescriptionResponse(character_description="too short")
 
 
 def test_casting_response_accepts_valid():
+    """CastingResponse is the assembled result (description + gender +
+    voice_preset). Sprint 3D: gender/voice come from Python, not the
+    LLM, but the combined shape is unchanged for the writer."""
     r = _OTRC.CastingResponse(
         character_description="Female, 40s, weary broadcaster",
         gender="female",
@@ -494,7 +695,7 @@ def test_casting_response_normalizes_gender_case():
 
 
 # ---------------------------------------------------------------------------
-# cast_one_character (the LLM call)
+# cast_one_character -- composes the three Sprint 3D stages
 # ---------------------------------------------------------------------------
 
 
@@ -507,79 +708,181 @@ def _three_voices():
 
 
 def test_cast_one_character_first_attempt_success():
-    gen = _make_canned_generate_fn([_good_response()])
+    gen = _make_canned_generate_fn([_desc_response()])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c1"),
     )
-    assert r.gender == "female"
-    assert r.voice_preset == "v2/en_speaker_4"
+    # gender comes from Python's ensemble plan; voice from the pool.
+    assert r.gender in _OTRC._VALID_GENDERS
+    assert r.voice_preset in {p for p, _ in _three_voices()}
+    assert r.character_description
 
 
-def test_cast_one_character_rerolls_on_invalid_json():
+def test_cast_one_character_voice_always_in_pool():
+    """Sprint 3D: Python assigns the voice from the pre-filtered pool,
+    so the assembled CastingResponse always carries an in-pool voice
+    regardless of what the LLM emits."""
+    gen = _make_canned_generate_fn([_desc_response()])
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-pool"),
+    )
+    assert r.voice_preset in {p for p, _ in _three_voices()}
+
+
+def test_cast_one_character_honours_precomputed_ensemble_slot():
+    """When lock_cast passes a precomputed EnsembleSlot, cast_one_character
+    uses that slot's gender (Python-decided) on the cast row -- the LLM
+    has no say."""
+    gen = _make_canned_generate_fn([_desc_response()])
+    ens = _ens_slot(name="ALICE", gender="male", timbre="deep", role="lead")
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_mixed_voices(),
+        ensemble_slot=ens,
+        rng=random.Random("ens-honour"),
+    )
+    assert r.gender == "male", "cast row gender must follow the Python plan"
+
+
+def test_cast_one_character_max_attempts_zero_rejected():
+    """max_attempts=0 is invalid (no attempts to make)."""
+    gen = _make_canned_generate_fn([_desc_response()])
+    with pytest.raises(ValueError, match="max_attempts"):
+        _OTRC.cast_one_character(
+            gen,
+            name="ALICE", news_seed="story", style="noir",
+            prior_cast=[], available_voices=_three_voices(),
+            max_attempts=0,
+        )
+
+
+def test_cast_one_character_max_attempts_one_single_shot_no_repair():
+    """max_attempts=1 is allowed (single-shot, no repair branch)."""
+    gen = _make_canned_generate_fn([_desc_response()])
+    r = _OTRC.cast_one_character(
+        gen,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+        max_attempts=1, rng=random.Random("c-single"),
+    )
+    assert r.voice_preset in {p for p, _ in _three_voices()}
+
+
+def test_cast_one_character_repair_truncates_huge_raw():
+    """A 4000-char garbage response must NOT be embedded whole into the
+    repair prompt -- it would bloat the KV cache against the 14.5 GB
+    VRAM ceiling.
+
+    The repair attempt is structured_call's Attempt 3, whose
+    default_repair_prompt_factory embeds only a truncated slice of the
+    prior failed output. Two bad responses then a good one so the
+    repair (third) attempt fires and recovers."""
+    huge_garbage = "x" * 4000
+    captured_messages: list = []
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        captured_messages.append(messages)
+        if len(captured_messages) <= 2:
+            return huge_garbage
+        return _desc_response()
+
+    r = _OTRC.cast_one_character(
+        gen_fn,
+        name="ALICE", news_seed="story", style="noir",
+        prior_cast=[], available_voices=_three_voices(),
+        max_attempts=3, rng=random.Random("c-huge"),
+    )
+    assert r.voice_preset in {p for p, _ in _three_voices()}
+    repair_text = "".join(m["content"] for m in captured_messages[-1])
+    assert huge_garbage not in repair_text, (
+        "repair prompt embedded the full 4000-char garbage -- the "
+        "structured_call repair factory must truncate prior output"
+    )
+    assert len(repair_text) < len(huge_garbage), (
+        f"repair prompt ({len(repair_text)} chars) is not smaller than "
+        f"the 4000-char garbage it was supposed to truncate"
+    )
+
+
+def test_lock_cast_preflight_fails_fast_when_voice_pool_too_small(
+    monkeypatch,
+):
+    """Patch open_voice_pool to return only 1 voice, then ask for 3
+    open slots. lock_cast must raise BEFORE any LLM call fires."""
+    llm_call_count = [0]
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        llm_call_count[0] += 1
+        return _desc_response()
+
+    monkeypatch.setattr(
+        _POOLS, "open_voice_pool",
+        lambda taken: [("v2/en_speaker_4", "female bright 30s")],
+    )
+
+    rng = random.Random("preflight-test")
+    with pytest.raises(_OTRC.CastingFailedError, match="too small"):
+        _OTRC.lock_cast(creative_fn=gen_fn,
+            num_characters=3,
+            news_seed="story", style="noir",
+            rng=rng,
+            force_lemmy=False,
+        )
+    assert llm_call_count[0] == 0, \
+        "preflight should fail BEFORE any LLM call"
+
+
+def test_cast_one_character_rerolls_on_invalid_description_json():
     """Attempt 1 returns garbage; attempt 2 returns clean JSON."""
     gen = _make_canned_generate_fn([
         "no json here at all, sorry",
-        _good_response(),
+        _desc_response(),
     ])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-reroll"),
     )
-    assert r.voice_preset == "v2/en_speaker_4"
+    assert r.voice_preset in {p for p, _ in _three_voices()}
 
 
 def test_cast_one_character_survives_trailing_object_after_json():
-    """BUG-LOCAL-261: the casting LLM emits a valid cast object, then a
-    SECOND top-level JSON object after it. The old first-'{'-to-last-'}'
-    extractor concatenated both into {...}{...} and json.loads rejected
-    the result as 'Extra data'. The shared _otr_json extractor takes the
-    first complete object and ignores the trailing one -- attempt 1
-    succeeds, no reroll needed."""
-    first = _good_response(voice_preset="v2/en_speaker_4")
-    trailing = (
-        '\n{"character_description":"a stray hallucinated second cast",'
-        '"gender":"other","voice_preset":"v2/en_speaker_9"}'
-    )
+    """BUG-LOCAL-261: the LLM emits a valid object, then a SECOND
+    top-level JSON object. The shared _otr_json extractor takes the
+    first complete object and ignores the trailing one."""
+    first = _desc_response("a sharp-eyed scientist")
+    trailing = '\n{"character_description":"a stray hallucinated second"}'
     gen = _make_canned_generate_fn([first + trailing])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-trailing"),
     )
-    # The FIRST object wins; the trailing object is ignored.
-    assert r.voice_preset == "v2/en_speaker_4"
+    assert r.character_description.startswith("a sharp-eyed scientist")
 
 
 def test_cast_one_character_survives_trailing_prose_after_json():
-    """Trailing prose with no braces after the cast object is tolerated
-    too -- the first complete object parses, the chatter is ignored."""
+    """Trailing prose with no braces after the object is tolerated."""
     gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_6")
+        _desc_response("a weary broadcaster")
         + "\n\nHope this casting fits your radio drama!",
     ])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-prose"),
     )
-    assert r.voice_preset == "v2/en_speaker_6"
-
-
-def test_cast_one_character_rerolls_on_voice_not_in_pool():
-    """Attempt 1 picks a voice not in the available list; attempt 2 fixes it."""
-    gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_8"),  # not in _three_voices()
-        _good_response(voice_preset="v2/en_speaker_6"),
-    ])
-    r = _OTRC.cast_one_character(
-        gen,
-        name="ALICE", news_seed="story", style="noir",
-        prior_cast=[], available_voices=_three_voices(),
-    )
-    assert r.voice_preset == "v2/en_speaker_6"
+    assert r.character_description.startswith("a weary broadcaster")
 
 
 def test_cast_one_character_repair_attempt_used():
@@ -587,15 +890,15 @@ def test_cast_one_character_repair_attempt_used():
     gen = _make_canned_generate_fn([
         "garbage 1",
         "garbage 2",
-        _good_response(),
+        _desc_response(),
     ])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
-        max_attempts=3,
+        max_attempts=3, rng=random.Random("c-repair"),
     )
-    assert r.gender == "female"
+    assert r.character_description
 
 
 def test_cast_one_character_raises_after_all_attempts_fail():
@@ -613,30 +916,32 @@ def test_cast_one_character_raises_after_all_attempts_fail():
 
 def test_cast_one_character_strips_markdown_fences():
     """Some models wrap JSON in ```json ... ```."""
-    fenced = "```json\n" + _good_response() + "\n```"
+    fenced = "```json\n" + _desc_response() + "\n```"
     gen = _make_canned_generate_fn([fenced])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-fence"),
     )
-    assert r.voice_preset == "v2/en_speaker_4"
+    assert r.voice_preset in {p for p, _ in _three_voices()}
 
 
 def test_cast_one_character_handles_prose_preamble():
     """Some models add 'Sure! Here is the cast: { ... }'."""
-    prefixed = "Sure! Here is the cast: " + _good_response()
+    prefixed = "Sure! Here is the cast: " + _desc_response()
     gen = _make_canned_generate_fn([prefixed])
     r = _OTRC.cast_one_character(
         gen,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
+        rng=random.Random("c-preamble"),
     )
-    assert r.voice_preset == "v2/en_speaker_4"
+    assert r.voice_preset in {p for p, _ in _three_voices()}
 
 
 def test_cast_one_character_empty_voice_pool_raises_immediately():
-    gen = _make_canned_generate_fn([_good_response()])
+    gen = _make_canned_generate_fn([_desc_response()])
     with pytest.raises(_OTRC.CastingFailedError) as exc_info:
         _OTRC.cast_one_character(
             gen,
@@ -648,7 +953,7 @@ def test_cast_one_character_empty_voice_pool_raises_immediately():
 
 
 # ---------------------------------------------------------------------------
-# Prompt shape
+# Prompt shape -- Sprint 3D: description-only, no Voices: / balance line
 # ---------------------------------------------------------------------------
 
 
@@ -660,14 +965,12 @@ def test_prompt_has_story_and_style_adjacent_no_period_literal():
         news_seed="A real science story about black holes.",
         style="noir mystery",
         prior_cast=[],
-        available_voices=_three_voices(),
     )
     lines = prompt.splitlines()
     story_idx = next(i for i, l in enumerate(lines) if l.startswith("Story:"))
     style_idx = next(i for i, l in enumerate(lines) if l.startswith("Style:"))
     assert style_idx == story_idx + 1, \
         f"Story and Style must be adjacent (got {story_idx}, {style_idx})"
-    # No baked period literals
     assert "1940" not in prompt
     assert "1903" not in prompt
 
@@ -677,7 +980,6 @@ def test_prompt_omits_cast_so_far_block_when_prior_empty():
         name="ALICE",
         news_seed="story", style="noir",
         prior_cast=[],
-        available_voices=_three_voices(),
     )
     assert "Cast so far:" not in prompt
 
@@ -691,7 +993,6 @@ def test_prompt_includes_cast_so_far_when_prior_nonempty():
         name="ALICE",
         news_seed="story", style="noir",
         prior_cast=prior,
-        available_voices=_three_voices(),
     )
     assert "Cast so far:" in prompt
     assert "LEMMY (M, " in prompt
@@ -703,35 +1004,53 @@ def test_prompt_truncates_news_seed_at_500_chars():
         name="ALICE",
         news_seed=huge_seed, style="noir",
         prior_cast=[],
-        available_voices=_three_voices(),
     )
     story_line = next(l for l in prompt.splitlines() if l.startswith("Story:"))
-    # "Story: " + up to 500 chars
     assert len(story_line) <= len("Story: ") + 500
 
 
-def test_prompt_keeps_voices_in_pool():
+def test_prompt_is_description_only_no_voice_block_no_balance_line():
+    """Sprint 3D: the prompt no longer lists voices and no longer
+    carries the '~40/40/20' balance line -- voice selection and
+    ensemble balance left the LLM."""
     prompt = _OTRC._build_user_prompt(
         name="ALICE",
         news_seed="story", style="noir",
         prior_cast=[],
-        available_voices=_three_voices(),
+        gender="female", timbre="warm", role="lead",
     )
-    for preset, _ in _three_voices():
-        assert preset in prompt
+    assert "Voices:" not in prompt, \
+        "the voice list must not be shown to the LLM anymore"
+    assert "40%" not in prompt and "Aim" not in prompt, \
+        "the ensemble-balance instruction must be gone from the prompt"
+    # The JSON contract asks for description only.
+    assert '"character_description"' in prompt
+    assert '"voice_preset"' not in prompt
+    assert '"gender":"male|female|other"' not in prompt
+
+
+def test_prompt_states_python_decided_gender_timbre_role_as_facts():
+    """The Python-decided gender / timbre / role are handed to the LLM
+    as fixed facts to write into, not choices to make."""
+    prompt = _OTRC._build_user_prompt(
+        name="ALICE",
+        news_seed="story", style="noir",
+        prior_cast=[],
+        gender="female", timbre="bright", role="foil",
+    )
+    assert "Gender: female" in prompt
+    assert "Voice: bright" in prompt
+    assert "Role: foil" in prompt
 
 
 def test_prompt_has_no_system_prompt_baked():
     """Per the lean-prompt rule, _build_user_prompt returns a single
-    user-message body. The role-folding lives at the model loader,
-    NOT here."""
+    user-message body."""
     prompt = _OTRC._build_user_prompt(
         name="ALICE",
         news_seed="story", style="noir",
         prior_cast=[],
-        available_voices=_three_voices(),
     )
-    # Prompt should not contain any role markers
     assert "system:" not in prompt.lower()
     assert "<|system|>" not in prompt.lower()
     assert "you are a casting director" not in prompt.lower()
@@ -751,9 +1070,7 @@ def test_lock_cast_no_lemmy_end_to_end():
     """
     rng = random.Random("e2e-no-lemmy")
     gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_3"),
-        _good_response(voice_preset="v2/en_speaker_5"),
-        _good_response(voice_preset="v2/en_speaker_7"),
+        _desc_response(), _desc_response(), _desc_response(),
     ])
     cast, meta = _OTRC.lock_cast(creative_fn=gen,
         num_characters=3,
@@ -766,9 +1083,8 @@ def test_lock_cast_no_lemmy_end_to_end():
     assert len(cast) == 4
     assert cast[0]["name"] == "ANNOUNCER"
     assert cast[0]["char_id"] == "c01"
-    # Open slots c02, c03, c04
     assert [r["char_id"] for r in cast[1:]] == ["c02", "c03", "c04"]
-    # All voices distinct
+    # All voices distinct (Python pre-filter + uniqueness invariant)
     voices = [r["voice_preset"] for r in cast]
     assert len(set(voices)) == len(voices)
     assert meta["lemmy_hit"] is False
@@ -776,17 +1092,9 @@ def test_lock_cast_no_lemmy_end_to_end():
 
 
 def test_lock_cast_with_lemmy_end_to_end():
-    """3-character episode with LEMMY. ANNOUNCER c01, LEMMY c02, two open.
-
-    Bark voice exclusion when LEMMY hits: LEMMY's v2/en_speaker_8 is
-    added to taken_voices, so the open slots draw from the remaining
-    Bark pool. ANNOUNCER's Kokoro voice never touches the Bark pool.
-    """
+    """3-character episode with LEMMY. ANNOUNCER c01, LEMMY c02, two open."""
     rng = random.Random("e2e-with-lemmy")
-    gen = _make_canned_generate_fn([
-        _good_response(voice_preset="v2/en_speaker_3"),
-        _good_response(voice_preset="v2/en_speaker_6"),
-    ])
+    gen = _make_canned_generate_fn([_desc_response(), _desc_response()])
     cast, meta = _OTRC.lock_cast(creative_fn=gen,
         num_characters=3,
         news_seed="A science article.",
@@ -800,24 +1108,70 @@ def test_lock_cast_with_lemmy_end_to_end():
     assert cast[1]["name"] == "LEMMY"
     assert cast[1]["char_id"] == "c02"
     assert cast[1]["voice_preset"] == "v2/en_speaker_8"
-    # Open slots are c03, c04
     assert [r["char_id"] for r in cast[2:]] == ["c03", "c04"]
     assert meta["lemmy_hit"] is True
-    assert meta["num_characters_locked"] == 3  # LEMMY counts
+    assert meta["num_characters_locked"] == 3
+    # LEMMY's voice must not collide with the open-character voices.
+    voices = [r["voice_preset"] for r in cast]
+    assert len(set(voices)) == len(voices)
+
+
+def test_lock_cast_python_owns_distribution_not_the_llm():
+    """Sprint 3D core proof: lock_cast's stub LLM emits a fixed
+    description with NO gender and NO voice_preset, yet every cast row
+    still carries a valid gender and an in-pool, unique voice -- proof
+    that Python (not the LLM) owns the ensemble distribution."""
+    rng = random.Random("python-owns")
+    # The LLM only ever returns a description; it never names a gender
+    # or a voice.
+    gen = _make_canned_generate_fn([_desc_response()] * 5)
+    cast, _ = _OTRC.lock_cast(creative_fn=gen,
+        num_characters=5,
+        news_seed="story", style="noir",
+        rng=rng,
+        force_lemmy=False,
+    )
+    open_rows = cast[1:]  # drop ANNOUNCER
+    for row in open_rows:
+        assert row["gender"] in _OTRC._VALID_GENDERS, \
+            f"Python must stamp a valid gender: {row!r}"
+        assert row["voice_preset"].startswith("v2/"), \
+            f"Python must stamp a Bark voice: {row!r}"
+    # Voice uniqueness across the whole cast still holds.
+    voices = [r["voice_preset"] for r in open_rows]
+    assert len(set(voices)) == len(voices), \
+        f"Python voice assignment produced a collision: {voices!r}"
+
+
+def test_lock_cast_one_llm_call_per_open_slot():
+    """Sprint 3D: the LLM call count did not go up. Exactly one
+    successful description call per open slot -- no extra call site."""
+    call_count = [0]
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        call_count[0] += 1
+        return _desc_response()
+
+    rng = random.Random("call-count")
+    _OTRC.lock_cast(creative_fn=gen_fn,
+        num_characters=4,
+        news_seed="story", style="noir",
+        rng=rng,
+        force_lemmy=False,
+    )
+    # 4 open slots, each fills on its first attempt -> 4 calls, no more.
+    assert call_count[0] == 4, \
+        f"expected one LLM call per open slot, got {call_count[0]}"
 
 
 def test_lock_cast_open_slots_see_lemmy_in_prior_cast_but_not_announcer():
     """When LEMMY hits, the per-character LLM prompt should include
-    LEMMY in 'Cast so far' (he's ensemble) but NOT ANNOUNCER (he's
-    narrator)."""
+    LEMMY in 'Cast so far' (he's ensemble) but NOT ANNOUNCER."""
     captured_prompts: list[str] = []
 
     def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        # Capture the user-message content so the test can inspect it
         captured_prompts.append(messages[0]["content"])
-        # Any Bark voice works (Kokoro announcer can't collide); pick
-        # one that isn't LEMMY's reserved v2/en_speaker_8.
-        return _good_response(voice_preset="v2/en_speaker_6")
+        return _desc_response()
 
     rng = random.Random("prior-cast-test")
     _OTRC.lock_cast(creative_fn=gen_fn,
@@ -826,36 +1180,26 @@ def test_lock_cast_open_slots_see_lemmy_in_prior_cast_but_not_announcer():
         rng=rng,
         force_lemmy=True,
     )
-    # One open slot when num_characters=2 and LEMMY hits.
     assert len(captured_prompts) == 1
     p = captured_prompts[0]
-    # LEMMY visible
     assert "LEMMY (M, " in p
-    # ANNOUNCER hidden (not in the cast-so-far block)
     assert "ANNOUNCER" not in p
 
 
 def test_lock_cast_voice_pool_pre_filtered_excludes_lemmy_voice():
-    """When LEMMY hits, his v2/en_speaker_8 must not appear in the
-    'Voices:' block of the open-slot prompt."""
-    captured_prompts: list[str] = []
-
-    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        captured_prompts.append(messages[0]["content"])
-        # Any non-LEMMY Bark voice works (Kokoro announcer doesn't
-        # touch the Bark pool).
-        return _good_response(voice_preset="v2/en_speaker_6")
-
+    """When LEMMY hits, his v2/en_speaker_8 must never be assigned to
+    an open character (the pool pre-filter drops it)."""
     rng = random.Random("voice-filter-test")
-    _OTRC.lock_cast(creative_fn=gen_fn,
+    gen = _make_canned_generate_fn([_desc_response()])
+    cast, _ = _OTRC.lock_cast(creative_fn=gen,
         num_characters=2,
         news_seed="story", style="noir",
         rng=rng,
         force_lemmy=True,
     )
-    p = captured_prompts[0]
-    assert "v2/en_speaker_8" not in p, \
-        "LEMMY's voice should be pre-filtered out of the open-slot pool"
+    open_voices = [r["voice_preset"] for r in cast[2:]]  # drop ANNOUNCER+LEMMY
+    assert "v2/en_speaker_8" not in open_voices, \
+        "LEMMY's voice must be pre-filtered out of the open-slot pool"
 
 
 def test_assert_unique_bark_voices_accepts_clean_cast():
@@ -871,7 +1215,6 @@ def test_assert_unique_bark_voices_accepts_clean_cast():
         {"char_id": "c04", "name": "BOB",
          "voice_preset": "v2/en_speaker_6"},
     ]
-    # Should not raise
     _OTRC._assert_unique_bark_voices(cast)
 
 
@@ -886,9 +1229,6 @@ def test_assert_unique_bark_voices_catches_collision():
          "voice_preset": "v2/en_speaker_8"},
         {"char_id": "c03", "name": "ALICE",
          "voice_preset": "v2/en_speaker_4"},
-        # BOB collides with ALICE on en_speaker_4 -- a future
-        # refactor bug that today's pre-filter + validator + reroll
-        # would have prevented.
         {"char_id": "c04", "name": "BOB",
          "voice_preset": "v2/en_speaker_4"},
     ]
@@ -903,23 +1243,13 @@ def test_assert_unique_bark_voices_catches_collision():
 
 def test_assert_unique_bark_voices_ignores_announcer():
     """ANNOUNCER's voice (Kokoro namespace) is exempt from the
-    uniqueness check. A cast where the announcer's Kokoro voice
-    happens to lexically match a Bark voice in another row would
-    NOT trigger the invariant -- but in practice the namespaces
-    don't overlap, so this is a defensive test of the exclusion
-    logic itself.
-    """
+    uniqueness check."""
     cast = [
-        # Made-up matching string just to prove the exclusion holds;
-        # in production an announcer would never have a Bark ID.
         {"char_id": "c01", "name": "ANNOUNCER",
          "voice_preset": "v2/en_speaker_4"},
         {"char_id": "c02", "name": "ALICE",
          "voice_preset": "v2/en_speaker_4"},
     ]
-    # ANNOUNCER is excluded from the check; the second en_speaker_4
-    # (on ALICE) appears only once among non-announcer rows, so the
-    # invariant passes.
     _OTRC._assert_unique_bark_voices(cast)
 
 
@@ -927,16 +1257,10 @@ def test_lock_cast_invariant_fires_at_end_if_voices_collide(
     monkeypatch,
 ):
     """End-to-end fail-safe: simulate a future refactor where the
-    pre-filter no longer excludes already-taken voices AND the
-    validator no longer rejects duplicates. Two open characters
-    pick the SAME Bark voice; the final invariant in lock_cast
-    must raise.
-
-    To get past the new preflight capacity check, the stubbed pool
-    has to be large enough for the requested open-slot count.
+    pre-filter no longer excludes already-taken voices AND voice
+    assignment no longer rejects duplicates. Two open characters get
+    the SAME Bark voice; the final invariant in lock_cast must raise.
     """
-    # Stub: pool always returns BOTH voices regardless of `taken`,
-    # simulating a refactor that broke the pre-filter.
     monkeypatch.setattr(
         _POOLS, "open_voice_pool",
         lambda taken: [
@@ -945,10 +1269,8 @@ def test_lock_cast_invariant_fires_at_end_if_voices_collide(
         ],
     )
 
-    # Stub: cast_one_character always picks the SAME voice -- a
-    # refactor that broke the validator's "voice in available_presets"
-    # check. Returns a valid CastingResponse so the row goes into
-    # the cast.
+    # Stub cast_one_character to always return the SAME voice -- a
+    # refactor that broke distribution. Returns a valid CastingResponse.
     def stub_cast_one_character(generate_fn, **kwargs):  # noqa: ARG001
         return _OTRC.CastingResponse(
             character_description="stub character description text",
@@ -960,7 +1282,7 @@ def test_lock_cast_invariant_fires_at_end_if_voices_collide(
 
     rng = random.Random("invariant-fires")
     with pytest.raises(_OTRC.CastingFailedError) as exc_info:
-        _OTRC.lock_cast(creative_fn=(lambda *_a, **_kw: ""),  # generate_fn unused after stub
+        _OTRC.lock_cast(creative_fn=(lambda *_a, **_kw: ""),
             num_characters=2,
             news_seed="story", style="noir",
             rng=rng,
@@ -971,49 +1293,32 @@ def test_lock_cast_invariant_fires_at_end_if_voices_collide(
 
 
 def test_lock_cast_announcer_kokoro_voice_does_not_filter_bark_pool():
-    """When the announcer takes a Kokoro voice, the open-slot Bark
-    pool must remain unaffected. Kokoro and Bark are separate TTS
-    namespaces -- no collision possible. Per Jeffrey 2026-05-10:
-    'announcer is in Kokoro so there can be no cast overlaps.'
+    """When the announcer takes a Kokoro voice, the open-slot Bark pool
+    must remain unaffected. Kokoro and Bark are separate TTS namespaces.
 
-    Regression guard: if a future refactor accidentally adds the
-    announcer's Kokoro voice to the Bark exclusion set, the
-    open-slot prompt will be missing one Bark voice -- not a
-    correctness bug today (Kokoro IDs don't match Bark presets so
-    the filter is no-op), but a sign of confused intent."""
-    captured_prompts: list[str] = []
-
-    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
-        captured_prompts.append(messages[0]["content"])
-        return _good_response(voice_preset="v2/en_speaker_3")
-
+    With num_characters=6 and no LEMMY there are 6 open slots and 9
+    Bark voices; the announcer's Kokoro voice never reduces that pool.
+    All 6 assigned voices must be distinct Bark presets."""
     rng = random.Random("kokoro-bark-separation")
-    _OTRC.lock_cast(creative_fn=gen_fn,
-        num_characters=1,
+    gen = _make_canned_generate_fn([_desc_response()] * 6)
+    cast, _ = _OTRC.lock_cast(creative_fn=gen,
+        num_characters=6,
         news_seed="story", style="noir",
         rng=rng,
         force_lemmy=False,
     )
-    p = captured_prompts[0]
-    # The full Bark VOICE_PROFILES list (9 voices) should all appear
-    # in the open-slot prompt -- nothing has been pre-filtered out by
-    # the Kokoro announcer.
-    all_bark_presets = [p for p, _, _, _ in _POOLS.VOICE_PROFILES]
-    for preset in all_bark_presets:
-        assert preset in p, \
-            f"Bark preset {preset!r} missing from open-slot prompt -- " \
-            f"announcer's Kokoro voice was wrongly excluding Bark voices"
+    open_voices = [r["voice_preset"] for r in cast[1:]]
+    all_bark_presets = {p for p, _, _, _ in _POOLS.VOICE_PROFILES}
+    assert len(open_voices) == 6
+    assert len(set(open_voices)) == 6, \
+        f"open-character voices collided: {open_voices!r}"
+    for v in open_voices:
+        assert v in all_bark_presets, \
+            f"assigned voice {v!r} is not a Bark preset"
 
 
 # ---------------------------------------------------------------------------
 # BUG-LOCAL-260: LEMMY cameo decoupled from the seed
-#
-# A 2026-05-10 change routed the 11% LEMMY roll through the cast
-# contract's seeded random.Random. The writer's seed widget ships a
-# fixed value, and a fixed seed reproduces ONE roll forever -- so a
-# LEMMY-positive seed (42 was one) cast LEMMY on 100% of runs. The
-# roll is decoupled again: cast_pools.roll_lemmy() always uses OS
-# entropy. force_lemmy stays as the deterministic override.
 # ---------------------------------------------------------------------------
 
 
@@ -1066,8 +1371,6 @@ def test_assemble_lemmy_hit_independent_of_the_cast_seed(monkeypatch):
 def test_assemble_cast_names_still_seed_deterministic(monkeypatch):
     """Decoupling LEMMY must NOT weaken C7 for the rest of the cast:
     the announcer pick and open-slot names stay seed-deterministic."""
-    # Pin OS entropy to a miss so the LEMMY cameo never perturbs the
-    # comparison.
     monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.90))
     pre_a, open_a, _ = _OTRC.assemble_pre_locked_rows(
         num_characters=4, rng=random.Random("c7-seed"),
@@ -1083,13 +1386,11 @@ def test_assemble_cast_names_still_seed_deterministic(monkeypatch):
 def test_force_lemmy_still_overrides_the_os_entropy_roll(monkeypatch):
     """force_lemmy must still win over the OS-entropy roll, so tests
     and the lemmy_cameo writer widget keep deterministic control."""
-    # OS entropy pinned to a guaranteed hit -- force_lemmy=False wins.
     monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.0))
     _pre, _open, hit = _OTRC.assemble_pre_locked_rows(
         num_characters=2, rng=random.Random(1), force_lemmy=False,
     )
     assert hit is False, "force_lemmy=False must override an entropy hit"
-    # OS entropy pinned to a guaranteed miss -- force_lemmy=True wins.
     monkeypatch.setattr(_POOLS, "_LEMMY_RNG_SYSTEM", _FixedRandom(0.99))
     _pre2, _open2, hit2 = _OTRC.assemble_pre_locked_rows(
         num_characters=2, rng=random.Random(1), force_lemmy=True,
