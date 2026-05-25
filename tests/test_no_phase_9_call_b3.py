@@ -169,14 +169,32 @@ def _audit_clean() -> str:
     return json.dumps({"violations": [], "pass_clean": True})
 
 
-def _doctor_clean() -> str:
+def _doctor_diagnosis_clean() -> str:
+    # Sprint 3C: the Script Doctor diagnosis pass output.
+    return json.dumps({"diagnoses": [
+        {"line_id": "b001", "failure": "none", "note": "sound"},
+    ]})
+
+
+def _doctor_edits_clean() -> str:
+    # Sprint 3C: the Script Doctor edits pass output.
     return json.dumps({"edits": [], "overall_verdict": "clean"})
 
 
 class TestReviewLedgerLLMCallCount:
-    def test_happy_path_uses_two_llm_calls(self, tmp_path):
-        """Pass 1 (audit pre) + Pass 2 (doctor) = 2 LLM calls. Pass 3
-        (audit post) retired in B3."""
+    def test_happy_path_uses_three_llm_calls(self, tmp_path):
+        """Pass 1 (audit pre) + Pass 2 Script Doctor (Sprint 3C split:
+        diagnosis + edits) = 3 LLM calls.
+
+        S33 B3 retired the Phase 9 `audit_cast_contract(label="post")`
+        call -- and it stays retired (the call-count is 3, not the
+        pre-B3 4). Sprint 3C (2026-05-25) then split the single Script
+        Doctor call into a diagnosis pass + an edits pass, taking the
+        happy path from 2 LLM calls to 3. The +1 is the new diagnosis
+        call, NOT a Phase 9 regression: this test's `label="post"`
+        guard (in TestReviewLedgerSourceShape / TestStringRefSweep)
+        independently proves Phase 9 stayed deleted.
+        """
         data = {
             "lines": [_line("b001", "c01", "Hello there.", role="character")],
             "cast": [
@@ -191,7 +209,11 @@ class TestReviewLedgerLLMCallCount:
         led = _LedgerStub(data, tmp_path)
 
         call_count = {"n": 0}
-        responses = [_audit_clean(), _doctor_clean()]
+        responses = [
+            _audit_clean(),
+            _doctor_diagnosis_clean(),
+            _doctor_edits_clean(),
+        ]
 
         def fake_generate(messages, *, temperature, max_new_tokens):
             i = call_count["n"]
@@ -199,14 +221,16 @@ class TestReviewLedgerLLMCallCount:
             if i < len(responses):
                 return responses[i]
             pytest.fail(
-                f"review_ledger made {call_count['n']} LLM calls; expected 2 "
-                f"(Phase 1 audit pre + Phase 2 doctor). Phase 9 was retired "
-                f"in S33 B3 -- a third call indicates regression."
+                f"review_ledger made {call_count['n']} LLM calls; expected 3 "
+                f"(Phase 1 audit pre + Phase 2 doctor diagnosis + edits). "
+                f"Phase 9 was retired in S33 B3 -- a fourth call would "
+                f"indicate a Phase 9 regression."
             )
 
         disp = _OTRLR.review_ledger(fake_generate, led)
-        assert call_count["n"] == 2, (
-            f"Expected 2 LLM calls (Phase 1 + Phase 2), got {call_count['n']}"
+        assert call_count["n"] == 3, (
+            f"Expected 3 LLM calls (Phase 1 audit + Sprint 3C Script "
+            f"Doctor diagnosis + edits), got {call_count['n']}"
         )
         assert disp.verdict == "clean_no_edits"
 

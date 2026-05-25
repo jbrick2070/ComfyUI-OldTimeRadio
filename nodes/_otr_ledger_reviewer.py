@@ -12,11 +12,18 @@ Pass 1 (Cast Auditor pre-check) -- LLM #1
     bad_casing / wrong_char_id / role_mismatch / alias_used and runs
     invented-name auto-remap via Levenshtein.
 
-Pass 2 (Script Doctor) -- LLM #2
-    Reads the repaired ledger. Proposes rewrite / skip / annotate
-    edits, bounded by the scaled edit_cap. Python applies the patch
-    to a CANDIDATE copy (the original ledger on disk is untouched
-    until Pass 3 clears).
+Pass 2 (Script Doctor) -- LLM #2 + #3 (Sprint 3C split)
+    Reads the repaired ledger. Sprint 3C (2026-05-25) splits the
+    single doctor call into two passes routed through `structured_call`:
+      * `run_script_doctor_diagnosis` -- NAMES the per-line failure
+        (pacing / voice_drift / flat_exposition / arc / none); no edits.
+      * `run_script_doctor_edits` -- emits the rewrite / skip / annotate
+        edits array, bounded by the scaled edit_cap, and may only act
+        on a line the diagnosis flagged (enforced deterministically in
+        Python, not by prompt instruction alone).
+    `run_script_doctor` orchestrates diagnosis -> edits and keeps the
+    never-raises contract. Python applies the patch to a CANDIDATE copy
+    (the original ledger on disk is untouched until the verdict clears).
 
 Step 2.5 RETIRED in S33 B4 (2026-05-15)
     Phantom-skip fallback was a mute (set line.skip=True), not a
@@ -50,12 +57,17 @@ __all__ = [
     "PreAuditReport",
     "ReviewerEdit",
     "ScriptDoctorReport",
+    "LineDiagnosis",
+    "ScriptDoctorDiagnosis",
     "ReviewerDisposition",
     "audit_cast_contract",
     "apply_deterministic_cast_repairs",
     "auto_remap_phantom",
     "_resolve_cast_member",
     "compute_edit_cap",
+    "run_script_doctor_diagnosis",
+    "run_script_doctor_edits",
+    "run_script_doctor",
     "review_ledger",
 ]
 
@@ -99,12 +111,19 @@ _LEVENSHTEIN_THRESHOLD = 3
 # an active call site.)
 
 
-# Generation params for the three LLM calls (kept conservative; the
-# auditor + doctor benefit from low-temp determinism, not creativity).
+# Generation params for the LLM calls (kept conservative; the auditor
+# + doctor benefit from low-temp determinism, not creativity).
 _AUDIT_TEMPERATURE = 0.2
 _AUDIT_MAX_NEW_TOKENS = 2000
 _DOCTOR_TEMPERATURE = 0.5
 _DOCTOR_MAX_NEW_TOKENS = 3500
+
+# Sprint 3C (2026-05-25): the diagnosis pass is a structured critic
+# pass, not a creative one -- it NAMES per-line failures and produces no
+# edits. It runs cooler than the edits pass and on a smaller token
+# budget (one short row per line, no rewritten text payloads).
+_DOCTOR_DIAGNOSIS_TEMPERATURE = 0.3
+_DOCTOR_DIAGNOSIS_MAX_NEW_TOKENS = 2000
 
 # Structural-retry temperatures for the structured_call ladder (Sprint
 # 2A/2B). Attempt 2 re-rolls at a temperature STRICTLY BELOW the base
@@ -112,6 +131,7 @@ _DOCTOR_MAX_NEW_TOKENS = 3500
 # it. structured_call asserts this invariant at entry.
 _AUDIT_RETRY_TEMPERATURE = 0.1
 _DOCTOR_RETRY_TEMPERATURE = 0.3
+_DOCTOR_DIAGNOSIS_RETRY_TEMPERATURE = 0.1
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +216,64 @@ class ReviewerEdit(BaseModel):
 class ScriptDoctorReport(BaseModel):
     edits: list[ReviewerEdit] = Field(default_factory=list)
     overall_verdict: Literal["clean", "improved", "needs_full_rerun"] = "clean"
+
+
+# Sprint 3C (2026-05-25): the single Script Doctor LLM call is split
+# into a diagnosis pass and an edits pass. The diagnosis pass NAMES the
+# per-line failure; the edits pass takes the diagnosis as input and may
+# only rewrite a line the diagnosis flagged. The two models below carry
+# the diagnosis pass output.
+
+
+# The named per-line failure classes. `none` is the explicit "this line
+# has no failure" verdict -- a diagnosis row carrying `none` (or a line
+# with no diagnosis row at all) means the edits pass MUST NOT touch that
+# line. Keeping `none` in the enum lets the diagnosis pass be exhaustive
+# (one row per inspected line) rather than implicit-by-omission, which a
+# small model handles more reliably.
+DoctorFailureKind = Literal[
+    "pacing",
+    "voice_drift",
+    "flat_exposition",
+    "arc",
+    "none",
+]
+
+
+class LineDiagnosis(BaseModel):
+    """One diagnosis row from the Script Doctor diagnosis pass.
+
+    `failure` names the single dominant problem on the line, or `none`
+    when the line is sound. `note` is a one-sentence prose explanation
+    -- it is read by the edits pass as guidance, never applied verbatim.
+    """
+    line_id: str
+    failure: DoctorFailureKind
+    note: str = ""
+
+
+class ScriptDoctorDiagnosis(BaseModel):
+    """Output of `run_script_doctor_diagnosis`.
+
+    A light schema on purpose: the diagnosis pass produces NO edits, so
+    the only structural contract is a list of per-line diagnosis rows.
+    `structured_call` validates it against this model; the edits pass
+    consumes `diagnoses`.
+    """
+    diagnoses: list[LineDiagnosis] = Field(default_factory=list)
+
+
+# The failure kinds the edits pass is allowed to act on -- every kind
+# except the explicit "no failure" verdict. An edit targeting a line
+# whose diagnosis is `none` (or a line with no diagnosis row) is dropped
+# DETERMINISTICALLY in Python by `run_script_doctor_edits`; the prompt
+# instruction alone is not trusted.
+_DIAGNOSED_FAILURE_KINDS: frozenset[str] = frozenset({
+    "pacing",
+    "voice_drift",
+    "flat_exposition",
+    "arc",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +446,12 @@ def _render_cast_contract_table(cast_rows: list[dict]) -> str:
 
 
 def _render_lines_for_audit(lines: list[dict]) -> str:
-    """Compact one-line-per-line listing for auditor prompts."""
+    """Compact one-line-per-line listing for the CAST AUDITOR prompt.
+
+    The auditor judges cast-contract drift, not pacing or arc, so it
+    only needs the speaker identity fields. The Script Doctor uses the
+    richer `_render_lines_for_doctor` renderer instead (Sprint 3C).
+    """
     if not lines:
         return "(no lines in ledger)"
     out = []
@@ -379,6 +462,67 @@ def _render_lines_for_audit(lines: list[dict]) -> str:
             f"char_id={ln.get('char_id','')} "
             f"text={(ln.get('text') or '')[:200]!r}"
         )
+    return "\n".join(out)
+
+
+# Sprint 3C (2026-05-25): the Script Doctor judges pacing / voice /
+# flat exposition / arc, so its input rows must carry the per-line
+# narrative context the cast auditor never needed. The fields are
+# pulled from the ledger's per-line state that is already available to
+# `review_ledger` -- no new node socket, no fabricated value:
+#
+#   * beat_id      -- line["beat_id"]            (stamped by
+#                     production_ledger.init_lines_from_outline)
+#   * arc_phase    -- line["arc_phase"]          (same)
+#   * mood         -- line["traits"]             (the writer stamps
+#                     beat.mood into the line's `traits` field; see
+#                     OTR_LedgerScriptWriter DEFAULT_TRAITS)
+#   * actual_words -- line["word_count"]         (recomputed in lockstep
+#                     by production_ledger.update_line_text)
+#   * text         -- line["text"]
+#
+# `beat_intent` and `target_words` are NOT carried on the ledger's
+# per-line state (production_ledger normalises beats/lines without
+# them) -- they live only on the transient `outline` object the writer
+# holds at compose time. They are rendered here ONLY when a future
+# stamping change makes them present on the line dict; until then the
+# renderer omits them rather than fabricating a value. See the Sprint
+# 3C report note for the lead.
+def _render_lines_for_doctor(lines: list[dict]) -> str:
+    """One enriched row per line for the SCRIPT DOCTOR prompt.
+
+    Carries the per-line narrative context the Doctor needs to judge
+    pacing / voice / flat exposition / arc. Every field is read from
+    ledger per-line state already available to `review_ledger`; absent
+    fields are rendered as a neutral placeholder, never fabricated.
+    """
+    if not lines:
+        return "(no lines in ledger)"
+    out = []
+    for ln in lines:
+        # `traits` is where the writer stamps the beat's mood.
+        mood = (ln.get("mood") or ln.get("traits") or "").strip()
+        actual_words = ln.get("word_count")
+        if actual_words is None:
+            actual_words = len((ln.get("text") or "").split())
+        parts = [
+            f"- line_id={ln.get('line_id','')}",
+            f"beat_id={ln.get('beat_id','')}",
+            f"arc_phase={ln.get('arc_phase') or '(unset)'}",
+            f"mood={mood or '(unset)'}",
+        ]
+        # beat_intent / target_words are only rendered when a stamping
+        # change has put them on the line dict; omitted otherwise so
+        # the Doctor is never shown a fabricated value.
+        beat_intent = (ln.get("beat_intent") or "").strip()
+        if beat_intent:
+            parts.append(f"beat_intent={beat_intent!r}")
+        target_words = ln.get("target_words")
+        if target_words is not None:
+            parts.append(f"target_words={target_words}")
+        parts.append(f"actual_words={actual_words}")
+        parts.append(f"text={(ln.get('text') or '')[:200]!r}")
+        out.append(" ".join(parts))
     return "\n".join(out)
 
 
@@ -766,11 +910,60 @@ def compute_edit_cap(voiced_beats: int) -> int:
 # ---------------------------------------------------------------------------
 
 
-_DOCTOR_SYSTEM_PROMPT = """\
-You are a script doctor for an audio drama. The cast contract has
-already been validated and any cast drift has been deterministically
-repaired. Your job is to improve the dialogue: pacing, voice
-consistency, arc adherence, beat-intent alignment.
+# Sprint 3C (2026-05-25): the Script Doctor is split into two passes.
+# Pass A (`_DOCTOR_DIAGNOSIS_SYSTEM_PROMPT`) NAMES the per-line failure
+# and produces NO edits. Pass B (`_DOCTOR_EDITS_SYSTEM_PROMPT`) takes
+# the diagnosis as input and emits the edits array, and may only act on
+# a line the diagnosis flagged. Splitting "find the problem" from "fix
+# the problem" is the Operating-Philosophy "one job per call" rule -- a
+# combined ask let a small model drop the diagnosis discipline and just
+# rewrite whatever it felt like.
+_DOCTOR_DIAGNOSIS_SYSTEM_PROMPT = """\
+You are a script doctor running a DIAGNOSIS pass on an audio drama.
+The cast contract has already been validated and any cast drift has
+been deterministically repaired. You do NOT rewrite anything in this
+pass. Your only job is to NAME the single dominant failure on each
+character dialogue line, or to say the line is sound.
+
+For every line you are shown, classify its dominant failure as ONE of:
+- pacing: the line drags, stalls the scene, or rushes a beat that
+  needs room.
+- voice_drift: the line does not sound like this character's
+  established register / vocabulary / attitude.
+- flat_exposition: the line states information with no dramatic life
+  -- a fact delivered, not a moment played.
+- arc: the line does not serve the arc phase it sits in (a rising-
+  tension beat that releases tension, a climax beat that is inert).
+- none: the line is sound -- no rewrite is warranted.
+
+Be honest and sparing. Most lines in a competent script are `none`.
+Only name a real failure when one is genuinely present; do not invent
+problems to look thorough.
+
+Return EXACTLY one JSON object matching this schema:
+{
+  "diagnoses": [
+    {"line_id": "...", "failure": "pacing|voice_drift|flat_exposition|arc|none",
+     "note": "one-sentence explanation"},
+    ...
+  ]
+}
+
+Emit one diagnosis row per line you are shown. No prose outside the
+JSON. No markdown fences.
+"""
+
+
+_DOCTOR_EDITS_SYSTEM_PROMPT = """\
+You are a script doctor for an audio drama, running the EDITS pass.
+A diagnosis pass has already NAMED the failure on each line. You will
+be given that diagnosis. Your job is to fix ONLY the lines the
+diagnosis flagged with a real failure (pacing / voice_drift /
+flat_exposition / arc).
+
+You MUST NOT edit a line whose diagnosis is `none`, and you MUST NOT
+edit a line that has no diagnosis row. Those lines are sound; leave
+them alone.
 
 You may propose: rewrite (replace a line's text), skip (mark a line
 as muted), annotate (leave a diagnostic note for the user, no text
@@ -798,17 +991,30 @@ No prose outside the JSON. No markdown fences.
 """
 
 
-def _render_doctor_user_prompt(
+def _doctor_character_lines(candidate_ledger: dict) -> list[dict]:
+    """Character-role dialogue lines only -- the Doctor's editable scope.
+
+    Fix 4 (post-Phase-3 review, 2026-05-11): the Doctor sees ONLY
+    character-role beats. Announcer / music / sfx beats are locked
+    structural content; showing them tempts the Doctor to invent edits
+    the apply-time guard would reject anyway. Belt + suspenders -- the
+    prompt filter is suspenders, the apply guard at `apply_doctor_edits`
+    is the belt.
+    """
+    return [
+        ln for ln in (candidate_ledger.get("lines", []) or [])
+        if ln.get("speaker_role") == "character"
+    ]
+
+
+def _render_doctor_episode_context(
     candidate_ledger: dict,
     cast_rows: list[dict],
-    titled_phantoms: list[tuple[str, str]],
-    edit_cap: int,
-) -> str:
-    """Build the Script Doctor user prompt.
+) -> list[str]:
+    """Shared header lines for both Doctor passes: budget, summary, cast.
 
-    `titled_phantoms` is a pre-filled work list of (line_id, phantom)
-    tuples the Pass 1 auto-remap couldn't resolve -- the doctor MUST
-    rewrite or skip these per the belt-and-braces guarantee.
+    Returns a list of prompt lines. Reused by the diagnosis prompt and
+    the edits prompt so the two passes see an identical episode frame.
     """
     meta = candidate_ledger.get("meta") or {}
     budget_lines: list[str] = []
@@ -835,6 +1041,55 @@ def _render_doctor_user_prompt(
     parts.append("LOCKED CAST:")
     parts.append(_render_cast_contract_table(cast_rows))
     parts.append("")
+    return parts
+
+
+def _render_doctor_diagnosis_user_prompt(
+    candidate_ledger: dict,
+    cast_rows: list[dict],
+) -> str:
+    """Build the Script Doctor DIAGNOSIS-pass user prompt (Sprint 3C).
+
+    Carries the enriched per-line rows (`beat_id`, `arc_phase`, `mood`,
+    `actual_words`, `text`, plus `beat_intent` / `target_words` when
+    those are present on the ledger line) so the diagnosis pass judges
+    pacing / voice / arc with real per-line context.
+    """
+    parts = _render_doctor_episode_context(candidate_ledger, cast_rows)
+    character_lines = _doctor_character_lines(candidate_ledger)
+    parts.append(
+        "LEDGER (CHARACTER DIALOGUE BEATS ONLY -- post-cast-repair):"
+    )
+    parts.append(_render_lines_for_doctor(character_lines))
+    parts.append("")
+    parts.append(
+        "You are seeing ONLY character dialogue beats. Diagnose each "
+        "line above. Emit one diagnosis row per line_id shown -- name "
+        "its dominant failure, or `none` when the line is sound."
+    )
+    return "\n".join(parts)
+
+
+def _render_doctor_edits_user_prompt(
+    candidate_ledger: dict,
+    cast_rows: list[dict],
+    titled_phantoms: list[tuple[str, str]],
+    diagnosis: "ScriptDoctorDiagnosis",
+    edit_cap: int,
+) -> str:
+    """Build the Script Doctor EDITS-pass user prompt (Sprint 3C).
+
+    `titled_phantoms` is a pre-filled work list of (line_id, phantom)
+    tuples the Pass 1 auto-remap couldn't resolve -- the doctor MUST
+    rewrite or skip these per the belt-and-braces guarantee.
+
+    `diagnosis` is the output of the diagnosis pass; the flagged-line
+    list is rendered into the prompt so the edits pass knows which
+    lines it may touch. The deterministic guard in
+    `run_script_doctor_edits` still drops any edit on an unflagged
+    line -- the prompt instruction is not trusted alone.
+    """
+    parts = _render_doctor_episode_context(candidate_ledger, cast_rows)
     if titled_phantoms:
         parts.append(
             "TITLED PHANTOMS (auto-remap could not resolve -- you MUST "
@@ -844,34 +1099,39 @@ def _render_doctor_user_prompt(
         for line_id, phantom in titled_phantoms:
             parts.append(f"  {line_id}: {phantom!r}")
         parts.append("")
-    # Fix 4 (post-Phase-3 review, 2026-05-11): doctor sees ONLY
-    # character-role beats. Announcer / music / sfx beats are locked
-    # structural content; showing them tempts the doctor to invent
-    # edits the apply-time guard would reject anyway. Belt + suspenders:
-    # the prompt filter is suspenders, the apply guard at
-    # apply_doctor_edits is the belt. Together: the doctor can't see,
-    # can't edit, can't reference structural beats.
-    character_lines = [
-        ln for ln in (candidate_ledger.get("lines", []) or [])
-        if ln.get("speaker_role") == "character"
+    flagged = [
+        d for d in diagnosis.diagnoses
+        if d.failure in _DIAGNOSED_FAILURE_KINDS
     ]
+    parts.append(
+        "DIAGNOSIS (from the diagnosis pass -- you may ONLY edit a "
+        "line that appears in this flagged list):"
+    )
+    if flagged:
+        for d in flagged:
+            parts.append(f"  {d.line_id}: {d.failure} -- {d.note}")
+    else:
+        parts.append("  (no line was flagged with a failure)")
+    parts.append("")
+    character_lines = _doctor_character_lines(candidate_ledger)
     parts.append(
         "LEDGER (CHARACTER DIALOGUE BEATS ONLY -- "
         "post-cast-repair, ready for creative edits):"
     )
-    parts.append(_render_lines_for_audit(character_lines))
+    parts.append(_render_lines_for_doctor(character_lines))
     parts.append("")
     parts.append(
         "You are seeing ONLY character dialogue beats. Announcer "
         "beats, music beats, and SFX beats are locked structural "
         "content and are NOT in your input. Do not propose edits "
-        "referencing line_ids outside the list above."
+        "referencing line_ids outside the list above, and do not edit "
+        "a line absent from the flagged DIAGNOSIS list."
     )
     parts.append("")
     parts.append(
-        f"Propose at most {edit_cap} edits total. Rewrite only when a "
-        f"line fails its beat intent. Provide one-sentence rationale "
-        f"on each edit."
+        f"Propose at most {edit_cap} edits total. Edit only the lines "
+        f"the diagnosis flagged. Provide one-sentence rationale on "
+        f"each edit."
     )
     return "\n".join(parts)
 
@@ -907,30 +1167,16 @@ def _detect_titled_phantoms(
     return found
 
 
-def run_script_doctor(
-    generate_fn,
+def _doctor_full_roster_upper(
     candidate_ledger: dict,
     cast_rows: list[dict],
-    edit_cap: int,
-) -> ScriptDoctorReport:
-    """One LLM call. Returns ScriptDoctorReport.
+) -> set[str]:
+    """Upper-cased allowed roster for titled-phantom detection.
 
-    On LLM / JSON / schema failure, returns a report with
-    overall_verdict="needs_full_rerun" so the caller can branch
-    on the failure (cascade routes to needs_full_rerun verdict;
-    caller decides whether to retry the writer or surface the
-    failure loud).
-
-    S33 B3 + B4 retired Pass 3 post-audit and Step 2.5 phantom-
-    skip fallback. The doctor IS the final structural pass; it
-    must therefore fail loud with needs_full_rerun so downstream
-    commits don't ship corrupted candidates. S34 B1 corrected the
-    prior fail-soft behavior that S33 had assumed was already
-    loud (which it wasn't).
+    Wiring-review #7 / #9 (2026-05-11): prefer canonical
+    meta.allowed_roster (cast + ANNOUNCER + key_terms). Fallback to
+    cast-only matches pre-canonical-roster ledgers.
     """
-    # Wiring-review #7 / #9 (2026-05-11): prefer canonical
-    # meta.allowed_roster (cast + ANNOUNCER + key_terms). Fallback
-    # to cast-only matches pre-canonical-roster ledgers.
     canonical = candidate_ledger.get("meta", {}).get("allowed_roster") or []
     full_roster_upper: set[str] = {
         str(r).strip().upper() for r in canonical if str(r).strip()
@@ -941,24 +1187,171 @@ def run_script_doctor(
             if n:
                 full_roster_upper.add(n.upper())
         full_roster_upper.add("ANNOUNCER")
+    return full_roster_upper
+
+
+def run_script_doctor_diagnosis(
+    generate_fn,
+    candidate_ledger: dict,
+    cast_rows: list[dict],
+) -> Optional["ScriptDoctorDiagnosis"]:
+    """Sprint 3C diagnosis pass. NAMES the per-line failure; no edits.
+
+    The structured pass that runs FIRST in the split Script Doctor.
+    It judges each character line and emits a `ScriptDoctorDiagnosis`
+    (one `LineDiagnosis` per line, `failure` one of pacing /
+    voice_drift / flat_exposition / arc / none). It produces no edits
+    -- the edits pass consumes this diagnosis.
+
+    Returns the diagnosis on success, or `None` on any LLM / JSON /
+    schema failure. A `None` diagnosis tells the orchestrator the
+    diagnosis pass failed; the orchestrator maps that to a
+    needs_full_rerun report -- the same loud-failure contract the
+    pre-split single doctor call honoured.
+    """
+    user_prompt = _render_doctor_diagnosis_user_prompt(
+        candidate_ledger, cast_rows,
+    )
+    messages = [
+        {"role": "system", "content": _DOCTOR_DIAGNOSIS_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+    # Sprint 3C: the diagnosis pass routes through the same shared
+    # structured_call 3-attempt ladder as the edits pass. A light
+    # schema (`ScriptDoctorDiagnosis` -- just a list of per-line
+    # diagnosis rows) is all the ladder needs to validate; it produces
+    # no edits so there is no structural-edit contract to enforce here.
+    # Failure -> None, which the orchestrator maps to needs_full_rerun,
+    # preserving run_script_doctor's never-raises loud-failure contract.
+    #
+    # LLM slot: technical -- this is a reviewer/critic structured pass
+    # (it NAMES per-line failures, emits no creative prose), identical
+    # in kind to the edits pass and to the pre-split run_script_doctor.
+    # The technical model id is the `generate_fn` slot threaded in by
+    # review_ledger -> the freeze cascade, which reads it from the
+    # writer's technical_model broadcast socket -- no new widget, no
+    # new model_id parameter (Prime Directive 6).
+    try:
+        diagnosis = structured_call(
+            prompt=messages,
+            schema=ScriptDoctorDiagnosis,
+            slot_fn=generate_fn,
+            base_temperature=_DOCTOR_DIAGNOSIS_TEMPERATURE,
+            structural_retry_temperature=_DOCTOR_DIAGNOSIS_RETRY_TEMPERATURE,
+            repair_prompt_factory=make_dispatching_repair_factory(),
+            max_new_tokens=_DOCTOR_DIAGNOSIS_MAX_NEW_TOKENS,
+            max_attempts=3,
+            helper_name="run_script_doctor_diagnosis",
+        )
+    except StructuredCallFailedError as exc:
+        log.warning(
+            "[OTR_LedgerReviewer:doctor] diagnosis pass exhausted the "
+            "retry ladder after %d attempt(s) (last error: %s); "
+            "returning None (orchestrator maps to needs_full_rerun)",
+            exc.attempts, exc.last_error,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
+        log.warning(
+            "[OTR_LedgerReviewer:doctor] diagnosis pass raised %s: %s; "
+            "returning None (orchestrator maps to needs_full_rerun)",
+            type(exc).__name__, exc,
+        )
+        return None
+    log.info(
+        "[OTR_LedgerReviewer:doctor] diagnosis complete: %d line(s) "
+        "diagnosed, %d flagged with a failure",
+        len(diagnosis.diagnoses),
+        sum(1 for d in diagnosis.diagnoses
+            if d.failure in _DIAGNOSED_FAILURE_KINDS),
+    )
+    return diagnosis
+
+
+def _drop_undiagnosed_edits(
+    report: ScriptDoctorReport,
+    diagnosis: "ScriptDoctorDiagnosis",
+) -> ScriptDoctorReport:
+    """DETERMINISTIC guard: drop any edit on a line the diagnosis did
+    not flag with a real failure.
+
+    Sprint 3C hard constraint: the edits pass cannot rewrite a line
+    whose diagnosis named no failure. The edits-pass prompt asks the
+    model to honour this, but the prompt is NOT trusted alone -- this
+    Python pass is the enforcement. An edit is kept only when its
+    `line_id` has a diagnosis row whose `failure` is one of the real
+    failure kinds (pacing / voice_drift / flat_exposition / arc); an
+    edit on a `none`-diagnosed line, or on a line with no diagnosis
+    row at all, is dropped.
+
+    Returns a new `ScriptDoctorReport` with the surviving edits and the
+    original `overall_verdict`.
+    """
+    flagged: set[str] = {
+        d.line_id for d in diagnosis.diagnoses
+        if d.failure in _DIAGNOSED_FAILURE_KINDS
+    }
+    kept: list[ReviewerEdit] = []
+    for edit in report.edits:
+        if edit.line_id in flagged:
+            kept.append(edit)
+        else:
+            log.warning(
+                "[OTR_LedgerReviewer:doctor] edits pass proposed an edit "
+                "on line_id=%s which the diagnosis did NOT flag with a "
+                "failure -- dropping it deterministically.",
+                edit.line_id,
+            )
+    return ScriptDoctorReport(
+        edits=kept,
+        overall_verdict=report.overall_verdict,
+    )
+
+
+def run_script_doctor_edits(
+    generate_fn,
+    candidate_ledger: dict,
+    cast_rows: list[dict],
+    diagnosis: "ScriptDoctorDiagnosis",
+    edit_cap: int,
+) -> ScriptDoctorReport:
+    """Sprint 3C edits pass. Strict JSON edit array from the diagnosis.
+
+    Runs SECOND in the split Script Doctor. Takes the diagnosis as
+    input and emits the `edits` array. Hard constraint: it cannot
+    rewrite a line whose diagnosis named no failure -- enforced
+    DETERMINISTICALLY by `_drop_undiagnosed_edits` after the call, not
+    by prompt instruction alone.
+
+    On LLM / JSON / schema failure returns a report with
+    overall_verdict="needs_full_rerun" so the caller branches on the
+    failure -- the same loud-failure contract S33 B3/B4 + S34 B1 set
+    for the pre-split single doctor call.
+    """
+    full_roster_upper = _doctor_full_roster_upper(candidate_ledger, cast_rows)
     titled_phantoms = _detect_titled_phantoms(
         candidate_ledger, full_roster_upper,
     )
-    user_prompt = _render_doctor_user_prompt(
-        candidate_ledger, cast_rows, titled_phantoms, edit_cap,
+    user_prompt = _render_doctor_edits_user_prompt(
+        candidate_ledger, cast_rows, titled_phantoms, diagnosis, edit_cap,
     )
     messages = [
-        {"role": "system", "content": _DOCTOR_SYSTEM_PROMPT},
+        {"role": "system", "content": _DOCTOR_EDITS_SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
-    # Sprint 2A/2D: the single-shot call + parse + validate is now the
+    # Sprint 2A/2D: the call + parse + validate routes through the
     # shared structured_call 3-attempt ladder (base -> structural retry
-    # -> typed repair). S34 B1 (2026-05-15) requires this pass to
-    # fail loud with needs_full_rerun: an exhausted ladder
+    # -> typed repair). S34 B1 (2026-05-15) requires this pass to fail
+    # loud with needs_full_rerun: an exhausted ladder
     # (StructuredCallFailedError) and a raising slot fn -- which
     # structured_call does not catch -- both map to that verdict,
     # preserving the loud-failure contract S33 B3/B4 depend on.
-    # LLM slot: technical -- Script Doctor structural edits
+    #
+    # LLM slot: technical -- Script Doctor structural edits pass; a
+    # reviewer structured pass (strict JSON edit array, no creative
+    # prose), same slot as the pre-split run_script_doctor. The
+    # technical model id is the `generate_fn` slot threaded in by
+    # review_ledger; no new widget, no new model_id parameter.
     try:
         report = structured_call(
             prompt=messages,
@@ -969,11 +1362,11 @@ def run_script_doctor(
             repair_prompt_factory=make_dispatching_repair_factory(),
             max_new_tokens=_DOCTOR_MAX_NEW_TOKENS,
             max_attempts=3,
-            helper_name="run_script_doctor",
+            helper_name="run_script_doctor_edits",
         )
     except StructuredCallFailedError as exc:
         log.warning(
-            "[OTR_LedgerReviewer:doctor] structured_call exhausted the "
+            "[OTR_LedgerReviewer:doctor] edits pass exhausted the "
             "retry ladder after %d attempt(s) (last error: %s); "
             "returning needs_full_rerun report",
             exc.attempts, exc.last_error,
@@ -981,11 +1374,66 @@ def run_script_doctor(
         return ScriptDoctorReport(overall_verdict="needs_full_rerun")
     except Exception as exc:  # noqa: BLE001 -- slot fn (LLM call) varies
         log.warning(
-            "[OTR_LedgerReviewer:doctor] structured_call raised %s: %s; "
+            "[OTR_LedgerReviewer:doctor] edits pass raised %s: %s; "
             "returning needs_full_rerun report", type(exc).__name__, exc,
         )
         return ScriptDoctorReport(overall_verdict="needs_full_rerun")
-    return report
+    # DETERMINISTIC guard: an edits pass that ignores the diagnosis and
+    # rewrites an undiagnosed line has that edit dropped here.
+    return _drop_undiagnosed_edits(report, diagnosis)
+
+
+def run_script_doctor(
+    generate_fn,
+    candidate_ledger: dict,
+    cast_rows: list[dict],
+    edit_cap: int,
+) -> ScriptDoctorReport:
+    """Sprint 3C orchestrator. Diagnosis pass -> edits pass.
+
+    The split Script Doctor: `run_script_doctor_diagnosis` NAMES the
+    per-line failures, then `run_script_doctor_edits` emits the edits
+    array bounded by that diagnosis. This function chains the two and
+    preserves the pre-split contract:
+
+      * Returns a `ScriptDoctorReport`.
+      * NEVER raises -- a `StructuredCallFailedError` or any broad
+        exception inside either pass is converted, by that pass, to a
+        `needs_full_rerun` report (edits pass) or a `None` diagnosis
+        (diagnosis pass). The orchestrator maps a `None` diagnosis to a
+        `needs_full_rerun` report. The outer broad `except` here is a
+        belt-and-suspenders guard against anything else.
+
+    S33 B3 + B4 retired Pass 3 post-audit and Step 2.5 phantom-skip
+    fallback. The doctor IS the final structural pass; it must fail
+    loud with needs_full_rerun so downstream commits don't ship
+    corrupted candidates. S34 B1 corrected the prior fail-soft
+    behavior that S33 had assumed was already loud.
+    """
+    try:
+        diagnosis = run_script_doctor_diagnosis(
+            generate_fn, candidate_ledger, cast_rows,
+        )
+        if diagnosis is None:
+            # Diagnosis pass failed -- the edits pass has no input to
+            # work from. Fail loud with needs_full_rerun.
+            log.warning(
+                "[OTR_LedgerReviewer:doctor] diagnosis pass returned "
+                "None; returning needs_full_rerun report",
+            )
+            return ScriptDoctorReport(overall_verdict="needs_full_rerun")
+        return run_script_doctor_edits(
+            generate_fn, candidate_ledger, cast_rows, diagnosis, edit_cap,
+        )
+    except Exception as exc:  # noqa: BLE001 -- never-raises contract
+        # Both passes already convert their own failures, so this arm
+        # should be unreachable in practice; it is the last guard that
+        # keeps run_script_doctor's never-raises contract absolute.
+        log.warning(
+            "[OTR_LedgerReviewer:doctor] orchestrator caught %s: %s; "
+            "returning needs_full_rerun report", type(exc).__name__, exc,
+        )
+        return ScriptDoctorReport(overall_verdict="needs_full_rerun")
 
 
 # Wiring-review (Pass 2 doctor scope guard) per synthesis §3 Phase 3:

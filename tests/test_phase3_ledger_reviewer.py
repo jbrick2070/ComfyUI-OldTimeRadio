@@ -31,14 +31,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes import production_ledger as PL  # noqa: E402
 from nodes._otr_ledger_reviewer import (  # noqa: E402
     CastViolation,
+    LineDiagnosis,
     PreAuditReport,
     ReviewerEdit,
+    ScriptDoctorDiagnosis,
     ScriptDoctorReport,
+    _render_lines_for_doctor,
     _resolve_cast_member,
     apply_deterministic_cast_repairs,
     audit_cast_contract,
     auto_remap_phantom,
     compute_edit_cap,
+    run_script_doctor,
+    run_script_doctor_diagnosis,
+    run_script_doctor_edits,
     review_ledger,
 )
 # S33 B4 (2026-05-15): `apply_phantom_skip_fallback` retired.
@@ -121,6 +127,15 @@ def _doctor_json(edits=None, verdict="clean"):
         "edits": edits or [],
         "overall_verdict": verdict,
     })
+
+
+def _diagnosis_json(diagnoses=None):
+    """Sprint 3C: a ScriptDoctorDiagnosis JSON payload.
+
+    `diagnoses` is a list of {line_id, failure, note} dicts. With no
+    argument it yields an empty (all-clean) diagnosis.
+    """
+    return json.dumps({"diagnoses": diagnoses or []})
 
 
 # ---------------------------------------------------------------------------
@@ -357,11 +372,14 @@ class TestReviewLedgerDispositions:
             _line("b001", "c01", "Hello there.", role="character"),
             _line("b002", "c02", "Likewise.", role="character"),
         ])
-        # Pass 1 clean, Pass 2 clean no edits.
-        # S33 B3 (2026-05-15): Pass 3 (post-audit) call retired; only
-        # 2 LLM responses needed now.
+        # Pass 1 audit clean; Sprint 3C Pass 2 = diagnosis (all `none`)
+        # then edits (no edits). 3 LLM responses now.
         fn = _mk_generate_fn(
             _audit_clean_json(),
+            _diagnosis_json([
+                {"line_id": "b001", "failure": "none", "note": "sound"},
+                {"line_id": "b002", "failure": "none", "note": "sound"},
+            ]),
             _doctor_json(edits=[], verdict="clean"),
         )
         disp = review_ledger(fn, led)
@@ -374,10 +392,15 @@ class TestReviewLedgerDispositions:
             _line("b001", "c01", "yeah I dunno", role="character"),
             _line("b002", "c02", "OK then.", role="character"),
         ])
-        # S33 B3 (2026-05-15): Pass 3 (post-audit) call retired; only
-        # 2 LLM responses needed now.
+        # Sprint 3C: diagnosis flags b001 (flat_exposition); the edits
+        # pass rewrites it. 3 LLM responses now.
         fn = _mk_generate_fn(
             _audit_clean_json(),
+            _diagnosis_json([
+                {"line_id": "b001", "failure": "flat_exposition",
+                 "note": "no dramatic life"},
+                {"line_id": "b002", "failure": "none", "note": "sound"},
+            ]),
             _doctor_json(edits=[{
                 "line_id": "b001",
                 "action": "rewrite",
@@ -405,14 +428,21 @@ class TestReviewLedgerDispositions:
             for i in range(1, 7)
         ]
         led = _build_ledger(tmp_path, lines)
-        # Doctor proposes 5 edits > cap 3.
+        # Doctor proposes 5 edits > cap 3. Sprint 3C: the diagnosis
+        # must flag all 5 lines so the edits survive the undiagnosed-
+        # edit guard and reach the cap check.
         doctor_edits = [
             {"line_id": f"b{i:03d}", "action": "rewrite",
              "payload": f"new {i}", "rationale": "test"}
             for i in range(1, 6)
         ]
+        diagnoses = [
+            {"line_id": f"b{i:03d}", "failure": "pacing", "note": "drags"}
+            for i in range(1, 6)
+        ]
         fn = _mk_generate_fn(
             _audit_clean_json(),
+            _diagnosis_json(diagnoses),
             _doctor_json(edits=doctor_edits, verdict="improved"),
         )
         disp = review_ledger(fn, led)
@@ -424,12 +454,17 @@ class TestReviewLedgerDispositions:
             assert row["text"] == f"line {i}"
 
     def test_needs_full_rerun(self, tmp_path):
-        """Doctor verdict needs_full_rerun -> verdict propagates."""
+        """Doctor edits-pass verdict needs_full_rerun -> propagates."""
         led = _build_ledger(tmp_path, [
             _line("b001", "c01", "broken structure", role="character"),
         ])
+        # Sprint 3C: audit clean, diagnosis runs, edits pass returns the
+        # needs_full_rerun verdict.
         fn = _mk_generate_fn(
             _audit_clean_json(),
+            _diagnosis_json([
+                {"line_id": "b001", "failure": "arc", "note": "inert"},
+            ]),
             _doctor_json(edits=[], verdict="needs_full_rerun"),
         )
         disp = review_ledger(fn, led)
@@ -890,3 +925,316 @@ class TestAmbiguousTieEscalation:
         )
         assert n == 0
         assert "Caro" in led.data["lines"][0]["text"]
+
+
+# ---------------------------------------------------------------------------
+# Sprint 3C (2026-05-25) -- Script Doctor split: diagnosis then edits.
+#
+#   * Enriched Doctor input rows carry beat_id / arc_phase / mood /
+#     actual_words / text (pulled from ledger per-line state).
+#   * run_script_doctor_diagnosis NAMES the per-line failure, no edits.
+#   * run_script_doctor_edits emits the edits array and cannot rewrite
+#     a line the diagnosis did not flag -- enforced deterministically.
+#   * run_script_doctor orchestrates diagnosis -> edits and preserves
+#     the never-raises / needs_full_rerun loud-failure contract.
+# ---------------------------------------------------------------------------
+
+
+def _doctor_line(line_id, char_id, text, *, beat_id=None, arc_phase=None,
+                 mood=None, word_count=None):
+    """A character line with the per-line state the Doctor enriches on."""
+    row = _line(line_id, char_id, text, role="character", arc_phase=arc_phase)
+    row["beat_id"] = beat_id or line_id
+    # The writer stamps beat.mood into the line's `traits` field.
+    row["traits"] = mood
+    if word_count is not None:
+        row["word_count"] = word_count
+    return row
+
+
+class TestEnrichedDoctorRows:
+    """The Sprint 3C Doctor rows must carry the per-line narrative
+    context the cast-auditor rows never did."""
+
+    def test_rows_carry_beat_id_arc_phase_mood_actual_words(self):
+        lines = [
+            _doctor_line(
+                "b001", "c01", "We have to move now.",
+                beat_id="beat_07", arc_phase="rising_tension",
+                mood="urgent", word_count=5,
+            ),
+        ]
+        rendered = _render_lines_for_doctor(lines)
+        assert "beat_id=beat_07" in rendered
+        assert "arc_phase=rising_tension" in rendered
+        assert "mood=urgent" in rendered
+        assert "actual_words=5" in rendered
+        assert "We have to move now." in rendered
+
+    def test_mood_pulled_from_traits_field(self):
+        # The writer stamps mood into `traits`; the renderer reads it.
+        lines = [_doctor_line("b001", "c01", "Hello.", mood="wistful")]
+        assert "mood=wistful" in _render_lines_for_doctor(lines)
+
+    def test_actual_words_falls_back_to_word_split(self):
+        # No word_count stamped -> renderer counts the text itself.
+        row = _line("b001", "c01", "one two three four", role="character")
+        row["word_count"] = None
+        assert "actual_words=4" in _render_lines_for_doctor([row])
+
+    def test_missing_fields_render_as_placeholder_not_fabricated(self):
+        # arc_phase / mood absent -> a neutral '(unset)' marker, never
+        # an invented value.
+        row = _line("b001", "c01", "Hello.", role="character")
+        row["arc_phase"] = None
+        row["traits"] = None
+        rendered = _render_lines_for_doctor([row])
+        assert "arc_phase=(unset)" in rendered
+        assert "mood=(unset)" in rendered
+
+    def test_beat_intent_rendered_only_when_present(self):
+        # beat_intent is not on the ledger today; the renderer omits it
+        # rather than fabricating. When a future stamping change adds
+        # it to the line dict, the renderer surfaces it.
+        without = _render_lines_for_doctor([
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+        assert "beat_intent" not in without
+        row = _doctor_line("b002", "c01", "Hello.")
+        row["beat_intent"] = "introduce the threat"
+        with_intent = _render_lines_for_doctor([row])
+        assert "beat_intent='introduce the threat'" in with_intent
+
+    def test_doctor_renderer_distinct_from_auditor_renderer(self):
+        # The cast-auditor renderer is unchanged: it must NOT carry the
+        # enriched fields (Sprint 3C only touched the Doctor path).
+        from nodes._otr_ledger_reviewer import _render_lines_for_audit
+        lines = [_doctor_line("b001", "c01", "Hello.", arc_phase="climax")]
+        audit_rendered = _render_lines_for_audit(lines)
+        assert "arc_phase" not in audit_rendered
+        assert "speaker_role" in audit_rendered
+
+
+class TestScriptDoctorDiagnosisPass:
+    """run_script_doctor_diagnosis NAMES the per-line failure."""
+
+    def test_diagnosis_names_failures(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno", mood="flat"),
+            _doctor_line("b002", "c02", "OK then.", mood="flat"),
+        ])
+        fn = _mk_generate_fn(_diagnosis_json([
+            {"line_id": "b001", "failure": "flat_exposition",
+             "note": "states a fact, no life"},
+            {"line_id": "b002", "failure": "none", "note": "sound"},
+        ]))
+        diagnosis = run_script_doctor_diagnosis(
+            fn, led.data, led.data["cast"],
+        )
+        assert isinstance(diagnosis, ScriptDoctorDiagnosis)
+        assert len(diagnosis.diagnoses) == 2
+        by_id = {d.line_id: d for d in diagnosis.diagnoses}
+        assert by_id["b001"].failure == "flat_exposition"
+        assert by_id["b002"].failure == "none"
+
+    def test_diagnosis_produces_no_edits(self, tmp_path):
+        # The diagnosis model has no `edits` field at all -- the pass
+        # cannot emit edits by construction.
+        assert "edits" not in ScriptDoctorDiagnosis.model_fields
+        assert "diagnoses" in ScriptDoctorDiagnosis.model_fields
+
+    def test_diagnosis_llm_failure_returns_none(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+
+        def boom(messages, *, temperature, max_new_tokens):
+            raise RuntimeError("simulated diagnosis OOM")
+
+        diagnosis = run_script_doctor_diagnosis(
+            boom, led.data, led.data["cast"],
+        )
+        assert diagnosis is None
+
+    def test_diagnosis_malformed_json_returns_none(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+        fn = _mk_generate_fn("not json at all")
+        diagnosis = run_script_doctor_diagnosis(
+            fn, led.data, led.data["cast"],
+        )
+        assert diagnosis is None
+
+
+class TestScriptDoctorEditsPass:
+    """run_script_doctor_edits emits the edits array and may NOT touch
+    a line the diagnosis did not flag."""
+
+    def test_edits_pass_can_edit_a_diagnosed_line(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno"),
+        ])
+        diagnosis = ScriptDoctorDiagnosis(diagnoses=[
+            LineDiagnosis(line_id="b001", failure="voice_drift",
+                          note="off register"),
+        ])
+        fn = _mk_generate_fn(_doctor_json(edits=[{
+            "line_id": "b001", "action": "rewrite",
+            "payload": "I cannot say.", "rationale": "voice fit",
+        }], verdict="improved"))
+        report = run_script_doctor_edits(
+            fn, led.data, led.data["cast"], diagnosis, edit_cap=8,
+        )
+        assert len(report.edits) == 1
+        assert report.edits[0].line_id == "b001"
+
+    def test_edits_pass_cannot_touch_an_undiagnosed_line(self, tmp_path):
+        # The diagnosis flagged ONLY b001. The edits pass (a misbehaving
+        # model) also proposes an edit on b002 -- which the diagnosis
+        # marked `none`. The deterministic guard must drop the b002 edit.
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno"),
+            _doctor_line("b002", "c02", "A perfectly fine line."),
+        ])
+        diagnosis = ScriptDoctorDiagnosis(diagnoses=[
+            LineDiagnosis(line_id="b001", failure="flat_exposition",
+                          note="flat"),
+            LineDiagnosis(line_id="b002", failure="none", note="sound"),
+        ])
+        fn = _mk_generate_fn(_doctor_json(edits=[
+            {"line_id": "b001", "action": "rewrite",
+             "payload": "A real line.", "rationale": "fix flat"},
+            {"line_id": "b002", "action": "rewrite",
+             "payload": "MEDDLING WITH A SOUND LINE",
+             "rationale": "should not happen"},
+        ], verdict="improved"))
+        report = run_script_doctor_edits(
+            fn, led.data, led.data["cast"], diagnosis, edit_cap=8,
+        )
+        # Only the diagnosed line's edit survives the guard.
+        kept_ids = {e.line_id for e in report.edits}
+        assert kept_ids == {"b001"}
+
+    def test_edits_pass_drops_edit_on_line_with_no_diagnosis_row(self, tmp_path):
+        # b002 has NO diagnosis row at all (not even `none`). An edit on
+        # it must be dropped exactly as a `none`-diagnosed edit is.
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno"),
+            _doctor_line("b002", "c02", "Untouched."),
+        ])
+        diagnosis = ScriptDoctorDiagnosis(diagnoses=[
+            LineDiagnosis(line_id="b001", failure="pacing", note="drags"),
+        ])
+        fn = _mk_generate_fn(_doctor_json(edits=[
+            {"line_id": "b002", "action": "rewrite",
+             "payload": "SHOULD BE DROPPED", "rationale": "x"},
+        ], verdict="improved"))
+        report = run_script_doctor_edits(
+            fn, led.data, led.data["cast"], diagnosis, edit_cap=8,
+        )
+        assert report.edits == []
+
+    def test_edits_pass_llm_failure_returns_needs_full_rerun(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+        diagnosis = ScriptDoctorDiagnosis(diagnoses=[
+            LineDiagnosis(line_id="b001", failure="arc", note="inert"),
+        ])
+
+        def boom(messages, *, temperature, max_new_tokens):
+            raise RuntimeError("simulated edits OOM")
+
+        report = run_script_doctor_edits(
+            boom, led.data, led.data["cast"], diagnosis, edit_cap=8,
+        )
+        assert report.overall_verdict == "needs_full_rerun"
+
+
+class TestScriptDoctorOrchestrator:
+    """run_script_doctor chains diagnosis -> edits and preserves the
+    never-raises / needs_full_rerun contract."""
+
+    def test_orchestrator_diagnosis_then_edits(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno"),
+        ])
+        # Call 1 = diagnosis, call 2 = edits.
+        fn = _mk_generate_fn(
+            _diagnosis_json([
+                {"line_id": "b001", "failure": "flat_exposition",
+                 "note": "flat"},
+            ]),
+            _doctor_json(edits=[{
+                "line_id": "b001", "action": "rewrite",
+                "payload": "A real line.", "rationale": "fix flat",
+            }], verdict="improved"),
+        )
+        report = run_script_doctor(fn, led.data, led.data["cast"], 8)
+        assert isinstance(report, ScriptDoctorReport)
+        assert len(report.edits) == 1
+        assert report.edits[0].line_id == "b001"
+
+    def test_orchestrator_drops_undiagnosed_edit_end_to_end(self, tmp_path):
+        # End-to-end: the edits pass over-reaches; the orchestrator's
+        # edits pass drops the undiagnosed edit.
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "yeah I dunno"),
+            _doctor_line("b002", "c02", "Fine line."),
+        ])
+        fn = _mk_generate_fn(
+            _diagnosis_json([
+                {"line_id": "b001", "failure": "pacing", "note": "drags"},
+                {"line_id": "b002", "failure": "none", "note": "sound"},
+            ]),
+            _doctor_json(edits=[
+                {"line_id": "b001", "action": "rewrite",
+                 "payload": "Tighter.", "rationale": "pace"},
+                {"line_id": "b002", "action": "rewrite",
+                 "payload": "MEDDLE", "rationale": "x"},
+            ], verdict="improved"),
+        )
+        report = run_script_doctor(fn, led.data, led.data["cast"], 8)
+        assert {e.line_id for e in report.edits} == {"b001"}
+
+    def test_orchestrator_never_raises_on_diagnosis_failure(self, tmp_path):
+        # Diagnosis pass fails -> orchestrator returns needs_full_rerun,
+        # never raises.
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+
+        def boom(messages, *, temperature, max_new_tokens):
+            raise RuntimeError("simulated diagnosis crash")
+
+        report = run_script_doctor(boom, led.data, led.data["cast"], 8)
+        assert isinstance(report, ScriptDoctorReport)
+        assert report.overall_verdict == "needs_full_rerun"
+
+    def test_orchestrator_never_raises_on_edits_failure(self, tmp_path):
+        # Diagnosis succeeds, edits pass fails -> needs_full_rerun.
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+        call_count = {"n": 0}
+
+        def fail_on_edits(messages, *, temperature, max_new_tokens):
+            i = call_count["n"]
+            call_count["n"] += 1
+            if i == 0:
+                return _diagnosis_json([
+                    {"line_id": "b001", "failure": "arc", "note": "inert"},
+                ])
+            raise RuntimeError("simulated edits crash")
+
+        report = run_script_doctor(fail_on_edits, led.data, led.data["cast"], 8)
+        assert report.overall_verdict == "needs_full_rerun"
+
+    def test_orchestrator_malformed_diagnosis_json_needs_full_rerun(self, tmp_path):
+        led = _build_ledger(tmp_path, [
+            _doctor_line("b001", "c01", "Hello."),
+        ])
+        fn = _mk_generate_fn("not json at all")
+        report = run_script_doctor(fn, led.data, led.data["cast"], 8)
+        assert report.overall_verdict == "needs_full_rerun"
