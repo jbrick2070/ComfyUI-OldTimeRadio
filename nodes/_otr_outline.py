@@ -888,9 +888,12 @@ def validate_outline_against_budget(
 #                                  speaker (from cast) per beat. Under
 #                                  200 tokens output, schema:
 #                                  list of {speaker} entries.
-#   Stage 3 (num_voiced_beats):    per-beat fleshout -- intent, mood,
-#                                  target_words for one beat. Under
-#                                  150 tokens output, 3 fields.
+#   Stage 3 (num_voiced_beats):    per-beat fleshout -- intent + mood
+#                                  for one beat. Under 150 tokens
+#                                  output, 2 fields. target_words is
+#                                  Python-owned (Sprint 3B): it left
+#                                  the LLM schema; the combiner stamps
+#                                  the per-phase allocation.
 #   Python combiner:               Stamp beat_id (b001..), arc_phase
 #                                  from budget, speaker_role
 #                                  (character / announcer /
@@ -935,13 +938,25 @@ class _PhaseSkeleton(BaseModel):
     beats: list[_PhaseBeatSeed] = Field(..., min_length=1, max_length=10)
 
 
-# Stage 3 schema -- per-beat fleshout. intent + mood + target_words.
-# target_words bounds match the Beat schema (3..80); the per-call
-# prompt narrows the live range to the budget's words_per_beat_range
-# so the LLM sees the actual operating window for THIS beat.
+# Stage 3 schema -- per-beat fleshout. intent + mood only.
+#
+# Sprint 3B (2026-05-25): `target_words` was dropped from this schema.
+# Python is the sole authority for per-beat word counts -- the Stage 3
+# inline block in generate_outline rebuilds every _BeatFleshout with
+# `_allocate_phase_target_words`' allocation and discards whatever the
+# LLM emitted. The field was therefore pure dead weight on the
+# structured-output token budget: the model spent tokens deciding a
+# number that was always overwritten before assembly. Removing it is a
+# behaviour-neutral cleanup (the LLM-audit reclassified it from "fix"
+# to "token-budget cleanup"). The Beat schema still carries
+# target_words; the combiner stamps Python's allocation onto it.
+#
+# Extra-field tolerance: this model uses pydantic's default
+# `extra="ignore"`, so a transitional model that still emits a
+# `target_words` key parses cleanly -- the stray key is dropped, not
+# rejected.
 class _BeatFleshout(BaseModel):
     intent: str = Field(..., min_length=4, max_length=200)
-    target_words: int = Field(..., ge=3, le=80)
     mood: str = Field(..., min_length=2, max_length=40)
 
 
@@ -977,9 +992,8 @@ You flesh out one beat of a science-fiction audio drama. Return one JSON object 
 
 Schema:
 {
-  "intent":       4-200 chars; one sentence on what this beat accomplishes narratively. NOT dialogue text.
-  "target_words": integer within the per-beat range given below,
-  "mood":         2-40 chars; one tone descriptor.
+  "intent": 4-200 chars; one sentence on what this beat accomplishes narratively. NOT dialogue text.
+  "mood":   2-40 chars; one tone descriptor.
 }
 """
 
@@ -1040,22 +1054,63 @@ def _build_phase_user_prompt(
     return "\n".join(parts)
 
 
+def _phase_summary(phase_name: str) -> str:
+    """One-line directional summary for an arc phase.
+
+    Sprint 3B: reuses the project's existing ARC_PHASE_GUIDANCE table
+    (the same one-liner the line composer's per-beat prompt consumes)
+    so the beat-fleshout prompt and the composer agree on what each
+    phase is FOR. Falls back to the bare phase name when the table has
+    no entry (back-compat / unusual phase labels). No LLM call -- the
+    table is a static dict.
+    """
+    try:  # lazy import: keep module load stdlib + pydantic only
+        from ._otr_episode_budget import ARC_PHASE_GUIDANCE
+    except ImportError:  # pragma: no cover - standalone / test load
+        from _otr_episode_budget import ARC_PHASE_GUIDANCE  # type: ignore
+    return ARC_PHASE_GUIDANCE.get(phase_name, phase_name)
+
+
 def _build_beat_user_prompt(
     req: OutlineRequest,
     macro: _MacroShape,
     phase_name: str,
     beat_speaker: str,
     beat_position: tuple[int, int],
-    words_lo: int,
-    words_hi: int,
+    *,
+    previous_beat_intent: Optional[str] = None,
+    next_beat_speaker: Optional[str] = None,
+    phase_summary: Optional[str] = None,
 ) -> str:
-    """Stage 3 user prompt -- ask for intent + mood + target_words for one beat.
+    """Stage 3 user prompt -- ask for intent + mood for one beat.
 
-    Lean prompt (target <250 tokens). Beat-localized: the LLM sees
-    title + premise + phase + this beat's speaker + position +
-    target_words range. NO other beat context -- the combiner
-    handles cross-beat coherence via the cast-membership + budget
-    validators downstream.
+    Sprint 3B (2026-05-25): the beat is no longer fully isolated. The
+    prompt now carries a 1-beat adjacency window so the LLM can write
+    an intent that connects to its neighbours instead of a generic
+    standalone beat:
+
+      * `previous_beat_intent` -- the narrative intent of the beat
+        immediately before this one (the real, already-generated
+        intent: Stage 3 fleshes beats sequentially, so the previous
+        beat's intent always exists by the time this one is built).
+        Omitted entirely for the first voiced beat of the outline.
+      * `next_beat_speaker` -- who speaks the beat immediately after
+        this one. Stage 3 has not fleshed that beat yet, so its
+        *intent* does not exist; the speaker (known from the phase
+        skeleton) is the available forward signal -- enough for the
+        LLM to land this beat as a hand-off to that speaker. Omitted
+        entirely for the last voiced beat of the outline.
+      * `phase_summary` -- a one-line statement of what the current
+        arc phase is for (from ARC_PHASE_GUIDANCE).
+
+    Each adjacency line is emitted ONLY when its value is present;
+    a missing neighbour produces no line at all (never an empty or
+    "None" placeholder). Adjacency window is 1 -- immediate
+    neighbours only. target_words is intentionally NOT requested:
+    Python owns the per-beat word allocation (see
+    `_allocate_phase_target_words` and the Stage 3 block in
+    generate_outline). Cross-beat coherence beyond the 1-beat window
+    is still handled by the combiner + budget validators downstream.
     """
     beat_idx, beat_total = beat_position
     parts = [
@@ -1064,15 +1119,23 @@ def _build_beat_user_prompt(
         f"Setting: {macro.setting}",
         "",
         f"Phase: {phase_name}",
-        f"Beat {beat_idx + 1} of {beat_total} in this phase",
-        f"Speaker: {beat_speaker}",
-        f"target_words must be an integer between {words_lo} and "
-        f"{words_hi} (inclusive).",
-        "",
-        f"Task: write the intent (one sentence, NOT dialogue), a "
-        f"mood descriptor, and a target_words integer in the range "
-        f"above. Return only the JSON object.",
     ]
+    if phase_summary:
+        parts.append(f"Phase focus: {phase_summary}")
+    parts.append(f"Beat {beat_idx + 1} of {beat_total} in this phase")
+    parts.append(f"Speaker: {beat_speaker}")
+    # Adjacency window (1): only emit a line when the neighbour exists.
+    if previous_beat_intent:
+        parts.append(f"Previous beat intent: {previous_beat_intent}")
+    if next_beat_speaker:
+        parts.append(f"Next beat is spoken by: {next_beat_speaker}")
+    parts.extend([
+        "",
+        "Task: write the intent (one sentence, NOT dialogue) and a "
+        "mood descriptor for this beat. The intent should follow on "
+        "from the previous beat and set up the next where those are "
+        "given. Return only the JSON object.",
+    ])
     return "\n".join(parts)
 
 
@@ -1220,6 +1283,7 @@ def _assemble_outline(
     macro: _MacroShape,
     phase_skeletons: list[_PhaseSkeleton],
     beat_details: list[list[_BeatFleshout]],
+    beat_allocations: list[list[int]],
     req: OutlineRequest,
     budget,
 ) -> Outline:
@@ -1227,9 +1291,16 @@ def _assemble_outline(
 
     Python is authoritative for: beat_id sequence, speaker_role
     assignment, arc_phase tagging, announcer + music_inter beat
-    insertion. The LLM contributes: macro shape (Stage 1), speaker
-    selection per voiced beat (Stage 2), intent / mood / target_words
-    per voiced beat (Stage 3).
+    insertion, AND per-voiced-beat target_words. The LLM contributes:
+    macro shape (Stage 1), speaker selection per voiced beat (Stage 2),
+    intent + mood per voiced beat (Stage 3).
+
+    Sprint 3B (2026-05-25): target_words no longer rides on the
+    _BeatFleshout LLM schema. `beat_allocations` carries Python's
+    per-phase per-beat word allocation (from
+    `_allocate_phase_target_words`) and aligns 1:1 with `beat_details`
+    -- one inner list per phase, one int per voiced beat. The combiner
+    stamps each allocation onto the corresponding Beat.target_words.
     """
     arc_phases = tuple(budget.arc_phases)
     per_phase_beats_target = tuple(budget.per_phase_beats)
@@ -1260,16 +1331,18 @@ def _assemble_outline(
     ))
 
     # Per-phase voiced beats.
-    for phase_idx, (phase_name, skeleton, fleshouts) in enumerate(
-        zip(arc_phases, phase_skeletons, beat_details)
+    for phase_idx, (phase_name, skeleton, fleshouts, allocations) in enumerate(
+        zip(arc_phases, phase_skeletons, beat_details, beat_allocations)
     ):
-        for beat_seed, detail in zip(skeleton.beats, fleshouts):
+        for beat_seed, detail, allocation in zip(
+            skeleton.beats, fleshouts, allocations
+        ):
             beats.append(Beat(
                 beat_id=_next_bid(),
                 speaker=beat_seed.speaker,
                 speaker_role="character",
                 intent=detail.intent,
-                target_words=detail.target_words,
+                target_words=allocation,
                 mood=detail.mood,
                 sfx_cue=None,
                 arc_phase=phase_name,
@@ -1339,11 +1412,12 @@ def generate_outline(
       Stage 1 (1 call):              macro shape (title, premise,
                                      setting, time_of_day).
       Stage 2 (act_count calls):     per-phase speaker assignments.
-      Stage 3 (num_voiced_beats):    per-beat intent + mood +
-                                     target_words.
-      Python combiner:               beat_id, arc_phase, speaker_role
-                                     stamping; announcer + music_inter
-                                     beat insertion.
+      Stage 3 (num_voiced_beats):    per-beat intent + mood (Sprint 3B:
+                                     target_words is Python-owned, not
+                                     in the LLM schema).
+      Python combiner:               beat_id, arc_phase, speaker_role,
+                                     target_words stamping; announcer +
+                                     music_inter beat insertion.
 
     Total LLM calls per outline: 1 + act_count + num_voiced_beats.
     Each call is independently retried (max_attempts each). Failures
@@ -1593,17 +1667,23 @@ def generate_outline(
         phase_skeletons.append(skeleton)
 
     # ----------------------------- Stage 3 ---------------------------------
-    # Per-beat fleshout. Each call sees the budget's words_per_beat_range
-    # so the LLM has the live integer window. Default allocations are
-    # also computed per phase so we can substitute Python's allocation
-    # if a beat's pydantic validation passes (>=3) but the value lands
-    # outside the budget's words_per_beat_range. Path: Python keeps
-    # the LLM's intent + mood but overrides target_words to the
-    # allocation. This is a strict improvement over the legacy
-    # mega-call where the entire outline got rejected on a single
-    # out-of-range beat.
+    # Per-beat fleshout. The LLM contributes intent + mood per voiced
+    # beat. Python owns target_words entirely: _allocate_phase_target_
+    # words computes a per-phase allocation that satisfies the per-beat
+    # range AND the per-phase sum AND the per-episode total by
+    # construction -- a constraint LLMs (Mistral and Gemma alike,
+    # retests #8-#11) cannot satisfy at once.
+    #
+    # Sprint 3B (2026-05-25): target_words left the _BeatFleshout LLM
+    # schema (the model was spending structured-output tokens on a
+    # number that was always discarded). The per-phase `allocations`
+    # list now flows straight to the combiner via `beat_allocations`;
+    # _BeatFleshout carries only the LLM's intent + mood. Sprint 3B
+    # also gives each beat call a 1-beat adjacency window: the previous
+    # beat's already-generated intent, the next beat's speaker, and a
+    # one-line phase summary.
     beat_details: list[list[_BeatFleshout]] = []
-    words_lo, words_hi = words_per_beat_range
+    beat_allocations: list[list[int]] = []
     for phase_idx, (phase_name, phase_skel, phase_total_words) in enumerate(
         zip(arc_phases, phase_skeletons, per_phase_words)
     ):
@@ -1611,16 +1691,39 @@ def generate_outline(
         allocations = _allocate_phase_target_words(
             phase_total_words, n_beats, words_per_beat_range,
         )
+        phase_summary = _phase_summary(phase_name)
         phase_details: list[_BeatFleshout] = []
-        for beat_idx, (beat_seed, allocation) in enumerate(
-            zip(phase_skel.beats, allocations)
-        ):
+        for beat_idx, beat_seed in enumerate(phase_skel.beats):
+            # Adjacency window 1. The previous beat's intent is the
+            # real, already-generated intent (Stage 3 is sequential,
+            # so it always exists by the time this beat is built); for
+            # the very first voiced beat of the outline there is no
+            # previous beat and the line is omitted. The next beat's
+            # intent does not exist yet -- Stage 3 has not reached it
+            # -- so the forward signal is its speaker, read from the
+            # phase skeleton; omitted for the outline's last voiced
+            # beat.
+            previous_beat_intent: Optional[str] = None
+            if phase_details:
+                previous_beat_intent = phase_details[-1].intent
+            elif beat_details and beat_details[-1]:
+                previous_beat_intent = beat_details[-1][-1].intent
+            next_beat_speaker: Optional[str] = None
+            if beat_idx + 1 < n_beats:
+                next_beat_speaker = phase_skel.beats[beat_idx + 1].speaker
+            else:
+                for later_skel in phase_skeletons[phase_idx + 1:]:
+                    if later_skel.beats:
+                        next_beat_speaker = later_skel.beats[0].speaker
+                        break
             beat_user = _build_beat_user_prompt(
                 req, macro, phase_name, beat_seed.speaker,
                 (beat_idx, n_beats),
-                words_lo, words_hi,
+                previous_beat_intent=previous_beat_intent,
+                next_beat_speaker=next_beat_speaker,
+                phase_summary=phase_summary,
             )
-            # LLM slot: creative -- per-beat intent/mood/target_words
+            # LLM slot: creative -- per-beat intent/mood (narrative pass)
             try:
                 detail = structured_call(
                     prompt=[
@@ -1647,37 +1750,14 @@ def generate_outline(
                     attempts=all_attempts, request=req,
                 ) from exc
 
-            # Python is authoritative for target_words. LLMs (both
-            # Mistral and Gemma in retests #8-#11) cannot reliably
-            # satisfy the multi-level constraint:
-            #     per-beat:   target_words in words_per_beat_range
-            #     per-phase:  sum(target_words) ~= per_phase_words
-            #     per-episode: sum(target_words) ~= target_words
-            # all at once. _allocate_phase_target_words() produces
-            # an allocation that satisfies all three by construction.
-            # Keep the LLM's intent + mood; substitute Python's
-            # target_words verbatim. Retest #12 iter 1 surfaced the
-            # need: LLM produced (28, 28, 28, 28) -- each in [20,35]
-            # per-beat range, but sum=112 > 101 phase budget.
-            llm_tw = detail.target_words
-            if llm_tw != allocation:
-                log.info(
-                    "[OTR_Outline.beat[%s.%d]] LLM target_words=%d; "
-                    "Python-authoritative allocation=%d (preserves "
-                    "per-phase sum vs budget)",
-                    phase_name, beat_idx + 1, llm_tw, allocation,
-                )
-            detail = _BeatFleshout(
-                intent=detail.intent,
-                target_words=allocation,
-                mood=detail.mood,
-            )
             phase_details.append(detail)
         beat_details.append(phase_details)
+        beat_allocations.append(allocations)
 
     # ----------------------------- Combine ---------------------------------
     outline = _assemble_outline(
-        macro, phase_skeletons, beat_details, req, budget,
+        macro, phase_skeletons, beat_details, beat_allocations,
+        req, budget,
     )
 
     # Cross-call invariants. Path C's per-stage retries already
