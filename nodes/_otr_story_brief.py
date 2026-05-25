@@ -180,9 +180,21 @@ class StoryBriefModel(BaseModel):
 # Per refinement section 3 + 3.3 + 3.4. Hard-capped at <250 tokens of
 # prompt body (acceptance row implicit in commit gate). Strict JSON
 # output, period-neutral framing, sidecar terms for the helpers.
+#
+# Sprint 3G: the script context handed to the model is pre-sanitized by
+# `_build_reflection_input` -- every cast name and proper noun is
+# replaced with a neutral token (character_a, source_entity) BEFORE the
+# model sees it. The model is no longer staring at names it would then
+# be told to suppress, so the long "no cast names / no proper nouns"
+# suppression list collapses to a single positive instruction: write a
+# visual atmosphere brief, use no names. The dialogue/plot-verb and
+# invented-period guidance stays -- those constrain words the model
+# could still volunteer on its own (they are not in the sanitized
+# input), so they continue to do real work. The schema-side reject
+# lists in `_validate_brief` remain the OUTPUT safety net unchanged.
 _REFLECTION_PROMPT: str = """\
-Write a one-sentence visual brief for this audio drama. Return ONE JSON
-object, no Markdown:
+Write a one-sentence visual atmosphere brief for this audio drama.
+Return ONE JSON object, no Markdown:
 
 {
   "story_brief":      "one clause under 300 chars",
@@ -193,7 +205,8 @@ object, no Markdown:
 
 RULES:
 - ONE sentence, under 300 chars. No quotes. No Markdown.
-- No cast names. No proper nouns.
+- Use no names. The context below is already anonymized; keep it that
+  way -- describe places, light, and mood, never people by name.
 - No dialogue verbs (speaking, arguing) or plot verbs (interrogates,
   discovers).
 - No invented dates / decades / centuries / cities / countries / eras.
@@ -243,12 +256,211 @@ def _format_line(line: dict) -> str:
     return f"[{role}] {text}"
 
 
+# ---------------------------------------------------------------------------
+# Sprint 3G -- input sanitization
+# ---------------------------------------------------------------------------
+# Operating-Philosophy point 3: Python owns name sanitization. The
+# reflection input used to hand the model a CAST: block of real
+# character names plus title / scene / line text rich in proper nouns,
+# then the prompt told the model to suppress exactly those names. The
+# model was staring at names it was told not to use. Sprint 3G runs a
+# deterministic strip BEFORE the LLM sees the text: every cast name and
+# every other proper noun maps to a neutral token (character_a,
+# source_entity). The mapping is stable within one call -- the same
+# surface form always maps to the same token -- so cross-references in
+# the input stay coherent. The OUTPUT safety net (`_validate_brief`
+# reject lists) is untouched: it still catches a name the model
+# volunteers on its own.
+
+# Common-word stoplist for the proper-noun sweep. A single capitalized
+# word that is one of these is NEVER treated as a proper noun even
+# mid-sentence -- structural ledger markers (SCENE / INTERIOR / NIGHT),
+# the section labels the input builder emits, and a handful of common
+# words that show up Title-Cased in headers. Cast names are handled by
+# the dedicated cast pass, so this list never needs to carry a name.
+_PROPER_NOUN_STOPWORDS: frozenset[str] = frozenset({
+    "a", "an", "the", "and", "or", "but", "if", "of", "to", "in", "on",
+    "at", "by", "for", "with", "from", "as", "is", "are", "was", "were",
+    "be", "this", "that", "these", "those", "it", "its", "he", "she",
+    "they", "we", "you", "i", "his", "her", "their", "our", "your",
+    "scene", "interior", "exterior", "int", "ext", "night", "day",
+    "morning", "evening", "afternoon", "dawn", "dusk", "later",
+    "continuous", "sfx", "env", "music", "sound", "opening", "closing",
+    "title", "style", "cast", "rooftop", "interior", "no", "yes",
+    "ok", "okay",
+})
+
+# A multi-word Title Case run (2+ adjacent capitalized words). A run
+# like "Halloran Tower" or "The Bulkhead Closes" is a proper-noun
+# phrase with high confidence regardless of where it sits in a line.
+_PROPER_NOUN_PHRASE_REGEX: re.Pattern[str] = re.compile(
+    r"\b[A-Z][A-Za-z'\-]*(?:\s+[A-Z][A-Za-z'\-]*)+\b",
+)
+
+# A single capitalized word. Used only for the MID-SENTENCE pass -- a
+# lone capitalized word at a line / sentence start is ordinary casing,
+# not a proper noun, and is left alone (over-sanitizing common words
+# like "Tall" or "Quiet" would strip real visual signal).
+_CAPITALIZED_WORD_REGEX: re.Pattern[str] = re.compile(
+    r"\b[A-Z][A-Za-z'\-]*\b",
+)
+
+
+def _neutral_token(prefix: str, index: int) -> str:
+    """Return a stable neutral token: prefix_a, prefix_b, ... prefix_z,
+    then prefix_27 onward. Deterministic for a given index."""
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    if index < len(letters):
+        return f"{prefix}_{letters[index]}"
+    # Past 26 entries fall back to a numeric suffix -- still stable.
+    return f"{prefix}_{index + 1}"
+
+
+def _build_cast_substitution(cast: Sequence[dict]) -> dict[str, str]:
+    """Map each cast name surface form (lowercase) to a neutral token.
+
+    All surface forms of one character collapse onto that character's
+    single `character_x` token, so "Jones" and "Detective Jones" both
+    become `character_a` -- the input stays internally coherent.
+    """
+    mapping: dict[str, str] = {}
+    for char_index, row in enumerate(
+        [r for r in cast if isinstance(r, dict) and (r.get("name") or "").strip()]
+    ):
+        token = _neutral_token("character", char_index)
+        name = (row.get("name") or "").strip()
+        forms = [name]
+        for part in re.split(r"\s+|[-_]", name):
+            part = part.strip()
+            if len(part) >= 3:
+                forms.append(part)
+        for form in forms:
+            mapping.setdefault(form.lower(), token)
+    return mapping
+
+
+def _apply_cast_substitution(text: str, cast_map: dict[str, str]) -> str:
+    """Replace every cast name surface form in `text` with its token.
+
+    Word-boundary, case-insensitive. Longest forms first so a
+    multi-word name is consumed before its parts.
+    """
+    if not text or not cast_map:
+        return text
+    for form in sorted(cast_map, key=len, reverse=True):
+        token = cast_map[form]
+        text = re.sub(
+            rf"\b{re.escape(form)}\b", token, text, flags=re.IGNORECASE,
+        )
+    return text
+
+
+def _proper_noun_token(
+    surface: str, proper_noun_map: dict[str, str],
+) -> str:
+    """Return the stable `source_entity_*` token for `surface`.
+
+    `proper_noun_map` is mutated in place: a proper noun seen for the
+    first time gets a fresh token, every later occurrence within the
+    same call reuses it.
+    """
+    key = surface.lower()
+    token = proper_noun_map.get(key)
+    if token is None:
+        token = _neutral_token("source_entity", len(proper_noun_map))
+        proper_noun_map[key] = token
+    return token
+
+
+def _sanitize_reflection_text(
+    text: str,
+    cast_map: dict[str, str],
+    proper_noun_map: dict[str, str],
+) -> str:
+    """Apply cast-name and proper-noun substitution to one text span.
+
+    Three deterministic passes, conservative by design so the visual
+    signal the brief depends on is not stripped:
+
+      1. Cast names -- the highest-confidence proper nouns; every
+         surface form maps onto its character's `character_*` token.
+      2. Multi-word Title Case runs (e.g. "Halloran Tower") -- a
+         proper-noun phrase with high confidence regardless of
+         position; each non-stopword word in the run maps to its own
+         stable `source_entity_*` token, so a later standalone mention
+         of one of those words reuses the same token.
+      3. Single capitalized words that appear MID-SENTENCE -- a lone
+         capitalized word at a line / sentence start is ordinary
+         casing (e.g. "Tall detective", "Quiet suspect"), so only a
+         capitalized word preceded by other text on the same line is
+         treated as a proper noun. Structural ledger words
+         (`_PROPER_NOUN_STOPWORDS`) are always left alone.
+
+    `proper_noun_map` is mutated in place so a proper noun stays
+    stable across every occurrence within one call.
+    """
+    if not text:
+        return text
+    text = _apply_cast_substitution(text, cast_map)
+
+    # Pass 2: multi-word Title Case phrases. Each capitalized word in
+    # the run is tokenized individually (stopwords left alone), so the
+    # mapping for a single proper-noun word stays consistent whether it
+    # appears inside a phrase here or standalone elsewhere.
+    def _replace_phrase(match: re.Match[str]) -> str:
+        surface = match.group(0)
+        out: list[str] = []
+        for word in re.split(r"(\s+)", surface):
+            if not word or word.isspace():
+                out.append(word)
+                continue
+            if word.lower() in _PROPER_NOUN_STOPWORDS:
+                out.append(word)
+                continue
+            out.append(_proper_noun_token(word, proper_noun_map))
+        return "".join(out)
+
+    text = _PROPER_NOUN_PHRASE_REGEX.sub(_replace_phrase, text)
+
+    # Pass 3: lone capitalized words, but only mid-sentence. A word is
+    # "mid-sentence" when the character before it (skipping spaces) is
+    # not a line / sentence start. Boundary characters: a true line
+    # start, sentence-ending punctuation, and `]` -- the `_format_line`
+    # role marker `[character/...] ` precedes the actual line text, so
+    # the first word AFTER the bracket is a fresh sentence start, not a
+    # mid-sentence proper noun.
+    _BOUNDARY_CHARS = ".!?\n]"
+
+    def _replace_lone(match: re.Match[str]) -> str:
+        surface = match.group(0)
+        if surface.lower() in _PROPER_NOUN_STOPWORDS:
+            return surface
+        # Look back from the match start for the first non-space char.
+        i = match.start() - 1
+        while i >= 0 and text[i] == " ":
+            i -= 1
+        if i < 0 or text[i] in _BOUNDARY_CHARS:
+            # Line / sentence start -- ordinary casing, leave it.
+            return surface
+        return _proper_noun_token(surface, proper_noun_map)
+
+    return _CAPITALIZED_WORD_REGEX.sub(_replace_lone, text)
+
+
 def _build_reflection_input(led: Any) -> str:
-    """Build the capped reflection-prompt input from the ledger.
+    """Build the capped, sanitized reflection-prompt input from the ledger.
 
     Per refinement section 2: title + style slug + cast roster + scene
     headers + opening / closing snippets + non-dialogue rows. Total
     output stays well under 1500 tokens on a typical episode.
+
+    Sprint 3G: before the text is returned, every cast name and proper
+    noun is replaced with a neutral token (character_a, source_entity)
+    so the LLM never sees a real name it is then told to suppress. The
+    mapping is deterministic and stable within one call. This changes
+    only WHAT THE LLM SEES -- the reflection still produces a meta-only
+    visual atmosphere brief, and the output reject-list safety net in
+    `_validate_brief` is unchanged.
 
     Accepts a Ledger object OR a raw dict (`led.data`) -- duck-typed
     via `_ledger_data` so tests can pass a plain dict without
@@ -259,12 +471,41 @@ def _build_reflection_input(led: Any) -> str:
     cast: Sequence[dict] = ledger.get("cast") or []
     meta = ledger.get("meta") or {}
 
+    # Sprint 3G: deterministic substitution maps. The cast map is built
+    # once up front so every cast member has a token before any text is
+    # scanned; the proper-noun map grows as text spans are sanitized,
+    # keeping each proper noun stable across its occurrences.
+    cast_map = _build_cast_substitution(cast)
+    proper_noun_map: dict[str, str] = {}
+
+    def _clean(text: str) -> str:
+        return _sanitize_reflection_text(text, cast_map, proper_noun_map)
+
     parts: list[str] = []
 
+    # The episode title is known structured proper-noun data. Register
+    # each of its non-stopword, non-cast words in the proper-noun map up
+    # front so a single-word title -- which the mid-sentence sweep would
+    # otherwise leave alone at a line start -- is still tokenized, and
+    # so a later mention of a title word in line text reuses the same
+    # `source_entity_*` token.
     title = _meta_title(ledger)
-    parts.append(f"TITLE: {title}")
+    for word in re.findall(r"[A-Za-z][A-Za-z'\-]*", title):
+        if word.lower() in _PROPER_NOUN_STOPWORDS:
+            continue
+        if word.lower() in cast_map:
+            continue
+        _proper_noun_token(word, proper_noun_map)
+    parts.append(f"TITLE: {_clean(title)}")
+    # The style slug is a controlled vocabulary token (e.g.
+    # noir_interrogation), not free prose, so it is passed through as-is
+    # -- it carries genre signal the brief should reflect and contains
+    # no character names.
     parts.append(f"STYLE: {meta.get('style') or ''}")
 
+    # CAST roster: real names are replaced with their neutral tokens so
+    # the roster still tells the model how many distinct people exist
+    # and what each looks like, without naming any of them.
     parts.append("CAST:")
     if not cast:
         parts.append("  (no cast)")
@@ -274,8 +515,11 @@ def _build_reflection_input(led: Any) -> str:
         name = (row.get("name") or "").strip()
         if not name:
             continue
-        desc = _truncate((row.get("character_description") or "").strip(), 200)
-        parts.append(f"  - {name}: {desc}" if desc else f"  - {name}")
+        token = cast_map.get(name.lower(), "character")
+        desc = _clean(
+            _truncate((row.get("character_description") or "").strip(), 200)
+        )
+        parts.append(f"  - {token}: {desc}" if desc else f"  - {token}")
 
     # Scene headers (refinement section 2 says any line with
     # speaker_role == "scene" or section markers).
@@ -283,19 +527,21 @@ def _build_reflection_input(led: Any) -> str:
     if scene_rows:
         parts.append("SCENE HEADERS:")
         for row in scene_rows:
-            parts.append(f"  {_truncate((row.get('text') or '').strip(), 120)}")
+            parts.append(
+                f"  {_clean(_truncate((row.get('text') or '').strip(), 120))}"
+            )
 
     # Opening + closing snippets.
     if lines:
         opening = lines[:_OPENING_LINE_CAP]
         parts.append(f"OPENING ({len(opening)} lines):")
         for ln in opening:
-            parts.append(f"  {_format_line(ln)}")
+            parts.append(f"  {_clean(_format_line(ln))}")
         if len(lines) > _OPENING_LINE_CAP + _CLOSING_LINE_CAP:
             closing = lines[-_CLOSING_LINE_CAP:]
             parts.append(f"CLOSING ({len(closing)} lines):")
             for ln in closing:
-                parts.append(f"  {_format_line(ln)}")
+                parts.append(f"  {_clean(_format_line(ln))}")
 
     # Non-dialogue rows (SFX / MUSIC / ENV / SCENE markers) -- these
     # carry the sonic-architecture signal a visual brief should reflect.
@@ -307,7 +553,7 @@ def _build_reflection_input(led: Any) -> str:
     if non_dialogue:
         parts.append(f"NON-DIALOGUE ROWS ({len(non_dialogue)}):")
         for ln in non_dialogue[:30]:  # cap at 30 to bound the prompt
-            parts.append(f"  {_format_line(ln)}")
+            parts.append(f"  {_clean(_format_line(ln))}")
 
     return "\n".join(parts)
 

@@ -13,14 +13,22 @@ Coverage map (per SPRINT.md C5a1 pytest table):
        opening, closing, non-dialogue rows)
     3. reads lines, not script_text (locks R-02 push-back)
 
-  Prompt body (refinement section 3 + 3.3):
-    4. under 250 tokens
+  Input sanitization (Sprint 3G):
+    cast names + proper nouns are replaced with neutral tokens
+    (character_a, source_entity) BEFORE the LLM sees the text;
+    substitution is deterministic and stable within one call.
+
+  Prompt body (refinement section 3 + 3.3 + 3G):
+    4. under 250 tokens; the redundant name/proper-noun suppression
+       list is trimmed now the input is pre-sanitized.
 
   Validation gate (refinement section 3.4 + 3.3):
     5. rejects named character
     6. rejects dialogue verb
     7. rejects decade literal
     8. rejects over 300 chars
+    The OUTPUT reject-list safety net stays live after 3G input
+    sanitization (TestOutputRejectSafetyNetUnchanged).
 
   Retry ladder (Sprint 2A/2D -- structured_call):
     9. structural retry re-rolls when initial validation fails
@@ -152,18 +160,29 @@ class TestReflectionInputBuilder:
         )
 
     def test_includes_required_fields(self):
+        """The input builder still emits every required section.
+
+        Sprint 3G: the TITLE and CAST sections are now sanitized -- the
+        episode title is a proper-noun phrase and collapses to a
+        `source_entity` token, and cast names collapse to `character_*`
+        tokens. The section HEADERS, the STYLE controlled-vocab slug,
+        and the structural SFX / ENV markers all survive verbatim. The
+        un-sanitized-name assertion is intentionally GONE -- the
+        builder must never hand the LLM a real cast name (see
+        TestReflectionInputSanitization below)."""
         led = _mk_ledger()
         text = sb._build_reflection_input(led)
-        # Title and style.
-        assert "TITLE: The Bulkhead Closes" in text
+        # Section headers + the controlled-vocab style slug pass through.
+        assert "TITLE: " in text
         assert "STYLE: noir_interrogation" in text
-        # Cast roster.
-        assert "Jones" in text and "Smith" in text
+        assert "CAST:" in text
+        # Cast roster present as neutral tokens, not real names.
+        assert "character_a" in text
         # Scene headers.
         assert "SCENE 1" in text
         # Opening lines.
         assert "OPENING" in text
-        # Non-dialogue rows.
+        # Non-dialogue rows -- structural markers, no names.
         assert "[SFX: bulkhead seals" in text
         assert "[ENV: light rain" in text
 
@@ -203,7 +222,146 @@ class TestReflectionInputBuilder:
 
 
 # ---------------------------------------------------------------------------
-# 4. Prompt body length
+# 3G. Input sanitization -- cast names + proper nouns -> neutral tokens
+# ---------------------------------------------------------------------------
+# Sprint 3G: `_build_reflection_input` runs a deterministic strip before
+# the text reaches the LLM. Every cast name and proper noun is replaced
+# with a neutral token (character_a, source_entity) so the model never
+# sees a real name it is then told to suppress. The OUTPUT reject lists
+# in `_validate_brief` stay as the safety net -- proven still live by
+# TestValidation below and TestOutputRejectSafetyNetUnchanged.
+
+
+class TestReflectionInputSanitization:
+
+    def test_cast_names_replaced_with_neutral_tokens(self):
+        """No cast name surface form survives into the LLM-facing text;
+        each maps to a stable `character_*` token instead."""
+        led = _mk_ledger()
+        text = sb._build_reflection_input(led)
+        # The fixture cast is Jones / Smith.
+        assert "Jones" not in text, "real cast name 'Jones' leaked to the LLM"
+        assert "Smith" not in text, "real cast name 'Smith' leaked to the LLM"
+        # char_id tokens are the upper-case form of the same names; the
+        # case-insensitive substitution must catch them too.
+        assert "JONES" not in text
+        assert "SMITH" not in text
+        # Both characters present as distinct neutral tokens.
+        assert "character_a" in text
+        assert "character_b" in text
+
+    def test_cast_substitution_is_deterministic(self):
+        """Same ledger -> byte-identical sanitized input on every call,
+        and the name->token mapping is stable (Jones is always the same
+        token within a build)."""
+        led = _mk_ledger()
+        first = sb._build_reflection_input(led)
+        second = sb._build_reflection_input(led)
+        assert first == second, "sanitized input is not deterministic"
+
+    def test_cast_name_in_line_text_is_sanitized(self):
+        """A cast name appearing inside dialogue / line text -- not just
+        the CAST roster -- is also replaced before the LLM sees it."""
+        led = _mk_ledger(num_lines=2)
+        # Inject a line that names a cast member in its body text.
+        led["lines"].append({
+            "speaker_role": "character",
+            "char_id":      "SMITH",
+            "text":         "Jones already left through the back door.",
+        })
+        text = sb._build_reflection_input(led)
+        assert "Jones" not in text, (
+            "cast name embedded in line text leaked to the LLM unsanitized"
+        )
+        # The neutral token replaces it.
+        assert "character_a" in text
+
+    def test_name_part_is_sanitized(self):
+        """A multi-word cast name is replaced whether it appears in full
+        or by one of its parts -- both collapse onto the SAME token so
+        the input stays internally coherent."""
+        led = _mk_ledger(num_lines=2)
+        led["cast"] = [
+            {"char_id": "DETECTIVE_HALE", "name": "Detective Hale",
+             "character_description": "Weary investigator."},
+        ]
+        led["lines"].append({
+            "speaker_role": "character",
+            "char_id":      "DETECTIVE_HALE",
+            "text":         "Hale studies the rain-streaked glass.",
+        })
+        text = sb._build_reflection_input(led)
+        assert "Hale" not in text, "cast name part 'Hale' leaked unsanitized"
+        assert "Detective Hale" not in text
+        # Full name and bare part both map to character_a.
+        assert "character_a" in text
+        assert "character_b" not in text, (
+            "the two surface forms of one character produced two tokens"
+        )
+
+    def test_proper_noun_replaced_with_source_entity_token(self):
+        """A proper noun that is NOT a cast name (an episode title /
+        place / source entity) is replaced with a `source_entity_*`
+        token before the LLM sees it."""
+        led = _mk_ledger(num_lines=2)
+        led["meta"]["episode_title"] = "The Bulkhead Closes"
+        text = sb._build_reflection_input(led)
+        # The title proper-noun phrase does not survive verbatim.
+        assert "Bulkhead Closes" not in text
+        assert "source_entity" in text, (
+            "no source_entity token emitted; the title proper noun was "
+            "not sanitized"
+        )
+
+    def test_proper_noun_substitution_is_stable_within_a_call(self):
+        """The same proper noun seen twice in one build maps to the
+        SAME token both times -- cross-references stay coherent.
+
+        The title proper noun "Halloran" appears in the TITLE line and
+        again in a scene header. Both occurrences must resolve to the
+        identical `source_entity_*` token, so the substituted token
+        appears at least twice and "Halloran" never leaks."""
+        import re as _re
+        led = _mk_ledger(num_lines=2)
+        led["meta"]["episode_title"] = "Halloran Tower"
+        led["lines"].append({
+            "speaker_role": "scene",
+            "text":         "=== Halloran Tower -- ROOFTOP",
+        })
+        # Resolve which token "Halloran" maps to via the deterministic
+        # substitution helper, then confirm that exact token carries
+        # both occurrences in the built input.
+        cast_map = sb._build_cast_substitution(led["cast"])
+        probe_map: dict[str, str] = {}
+        sb._sanitize_reflection_text("x Halloran x", cast_map, probe_map)
+        halloran_token = probe_map["halloran"]
+
+        text = sb._build_reflection_input(led)
+        assert "Halloran" not in text, "proper noun leaked unsanitized"
+        assert text.count(halloran_token) >= 2, (
+            f"the repeated proper noun did not reuse a stable token "
+            f"({halloran_token!r} appears {text.count(halloran_token)} "
+            "times, expected >= 2)"
+        )
+
+    def test_no_real_name_handed_to_llm_via_entrypoint(self):
+        """End-to-end: the user message `run_story_brief_reflection`
+        actually sends the slot fn contains no real cast name -- the
+        sanitized input is what reaches the LLM, not the raw ledger."""
+        led = _mk_ledger()
+        spy = _make_spy_fn(responses=[_valid_brief_json()])
+        sb.run_story_brief_reflection(led, spy)
+        assert len(spy.calls) == 1
+        sent = spy.calls[0]["messages"][0]["content"]
+        assert "Jones" not in sent and "Smith" not in sent, (
+            "the LLM call carried a real cast name -- 3G sanitization "
+            "did not reach the entrypoint"
+        )
+        assert "character_a" in sent
+
+
+# ---------------------------------------------------------------------------
+# 4. Prompt body length + 3G suppression-text trim
 # ---------------------------------------------------------------------------
 
 
@@ -215,6 +373,24 @@ def test_reflection_prompt_under_250_tokens():
     assert approx_tokens <= 250, (
         f"_REFLECTION_PROMPT is ~{approx_tokens} tokens; cap is 250"
     )
+
+
+def test_reflection_prompt_dropped_name_suppression_list():
+    """Sprint 3G: because the input is pre-sanitized, the prompt no
+    longer needs the verbose 'No cast names. No proper nouns.'
+    suppression list. That redundant text is gone; a concise positive
+    'use no names' instruction replaces it. The dialogue/plot-verb and
+    invented-period guidance STAYS -- those constrain words the model
+    could volunteer that are not in the sanitized input."""
+    prompt = sb._REFLECTION_PROMPT
+    # The redundant suppression line is gone.
+    assert "No cast names. No proper nouns." not in prompt
+    # A positive 'use no names' instruction is present instead.
+    assert "no names" in prompt.lower()
+    # The guidance that still does real work survives.
+    assert "dialogue verbs" in prompt
+    assert "plot verbs" in prompt
+    assert "invented dates" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +445,46 @@ class TestValidation:
                  "rain on tin, sweat and smoke")
         reasons = sb._validate_brief(brief, led)
         assert reasons == []
+
+
+# ---------------------------------------------------------------------------
+# 3G. Output reject-list safety net stays live after input sanitization
+# ---------------------------------------------------------------------------
+# Sprint 3G sanitizes the INPUT. The schema-side reject lists that catch
+# a name in the OUTPUT must STAY exactly as they are -- they are the
+# safety net for a model that volunteers a name on its own. These tests
+# prove the OUTPUT gate is unweakened by the 3G change.
+
+
+class TestOutputRejectSafetyNetUnchanged:
+
+    def test_output_validator_still_rejects_named_character(self):
+        """`_validate_brief` -- the OUTPUT gate -- still flags a cast
+        name in the produced brief, unchanged by 3G input sanitization."""
+        led = _mk_ledger()
+        leaked = "a dim room where Jones leans over the table"
+        reasons = sb._validate_brief(leaked, led)
+        assert sb.REJECT_NAMED_CHARACTER in reasons
+
+    def test_entrypoint_rerolls_when_output_leaks_a_name(self):
+        """End-to-end: even with a sanitized input, if the LLM still
+        emits a cast name in its OUTPUT the content gate fires and the
+        ladder re-rolls. The reject-list safety net is intact."""
+        led = _mk_ledger()
+        name_leaking = (
+            '{"story_brief": "a dim room where Jones leans over a table", '
+            '"setting_terms": ["room", "table"], '
+            '"lighting_terms": ["bare bulb"], '
+            '"atmosphere_terms": ["tense"]}'
+        )
+        spy = _make_spy_fn(responses=[name_leaking, _valid_brief_json()])
+        result = sb.run_story_brief_reflection(led, spy)
+        assert len(spy.calls) == 2, (
+            "output name-leak did not trigger a re-roll -- the OUTPUT "
+            "reject-list safety net regressed"
+        )
+        assert result["story_brief_status"] == "ok"
+        assert "Jones" not in result["story_brief"]
 
 
 # ---------------------------------------------------------------------------
