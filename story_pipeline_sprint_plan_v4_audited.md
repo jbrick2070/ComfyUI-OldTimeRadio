@@ -62,10 +62,10 @@
 |---|---|---|---|
 | 0 -- telemetry + cosmetic + hot bug | IN PROGRESS | BUG-LOCAL-268 | 4/5 items landed (`e7a8eb6` json_str fix + test, helper_context wraps, pick_style comments; `51f7226` pick_style routing-test refresh); `technical_fn` drop PULLED (Decision 6 -- keep); only the deferred CI AST sweep remains |
 | 1 -- render seatbelts | COMPLETE | -- | tier rename landed `df7f9b1`; decisions 1-2 resolved to no-change; render-flag defaults already on |
-| 2A -- structured_call helper | IN PROGRESS | -- | step 1 (module + 11 tests) landed `61f8cfa`; 6 call-site conversions pending |
-| 2B -- repair temp fix | NOT STARTED | -- | folds into 2A |
-| 2C -- typed repair prompts | NOT STARTED | -- | |
-| 2D -- cleanup pass retries | NOT STARTED | -- | |
+| 2A -- structured_call helper | IN PROGRESS | -- | step 1 `61f8cfa`; post_validator + max_new_tokens extensions `fed6327`; `_otr_ledger_reviewer` converted `7f3b65f`; 4 call-site files pending (story_brief, news, casting, outline) |
+| 2B -- repair temp fix | COMPLETE | -- | baked into `structured_call` (structural retry < base, asserted at entry) `61f8cfa` |
+| 2C -- typed repair prompts | NOT STARTED | -- | ledger conversion uses `default_repair_prompt_factory`; bespoke per-failure-class factories still pending |
+| 2D -- cleanup pass retries | IN PROGRESS | -- | `audit_cast_contract` + `run_script_doctor` -> `structured_call(max_attempts=4)` `7f3b65f` |
 | 2E -- GBNF wire | NOT STARTED | -- | decision 4 resolved -- wire |
 | 3A -- split compose_line | NOT STARTED | -- | -- |
 | 3B -- outline Stage 3 | NOT STARTED | -- | -- |
@@ -134,7 +134,7 @@
 
 ## Sprint 2 -- Retry Discipline + GBNF
 
-### 2A. One shared structured-call helper (not gated) -- **[STEP 1 LANDED 61f8cfa 2026-05-24: `nodes/_otr_structured_call.py` + 11 tests. The 6 call-site conversions below are pending.]**
+### 2A. One shared structured-call helper (not gated) -- **[STEP 1 LANDED 61f8cfa: `nodes/_otr_structured_call.py` + 11 tests. EXTENSIONS LANDED fed6327: `post_validator` content-check hook + `max_new_tokens` per-caller budget + 7 tests -- the 4 content-validating call sites and the 160-3500 token spread could not convert without them. CALL SITES: `_otr_ledger_reviewer` (audit + doctor) converted 7f3b65f; `_otr_story_brief` / `news_interpreter` / `_otr_casting` / `_otr_outline` pending.]**
 
 New module `nodes/_otr_structured_call.py`. Single retry ladder for every structured JSON pass. Signature per v3 (a `structured_call(*, prompt, schema, slot_fn, base_temperature, structural_retry_temperature, repair_prompt_factory, grammar_path, max_attempts, helper_name) -> T`).
 
@@ -160,7 +160,7 @@ Repair factory dispatches by class: `json_syntax_repair`, `schema_field_repair`,
 
 ### 2D. Cleanup pass retries (not gated)
 
-- [ ] `audit_cast_contract` and `run_script_doctor` (post-split): single-shot -> `structured_call` with `max_attempts=4`. Confirmed both are currently one call with failure-to-sentinel.
+- [x] **[DONE 7f3b65f 2026-05-24]** `audit_cast_contract` and `run_script_doctor`: single-shot -> `structured_call` with `max_attempts=4`. Both kept their never-raises contract (`StructuredCallFailedError` + a broad `except Exception` -> the existing `_audit_failed_sentinel` / `needs_full_rerun`). `audit_cast_contract` base 0.2 / structural retry 0.1 / 2000 tok; `run_script_doctor` base 0.5 / structural retry 0.3 / 3500 tok. No node surface touched -- no workflow JSON re-wire.
 
 ### 2E. GBNF -- wire or delete
 Confirmed dead scaffolding: `grammars/news_interpreter.gbnf` + `grammars/style_picker.gbnf` ship, `news_interpreter.py` defines `GRAMMAR_PATH`, the loader never enforces it. Wiring it into `structured_call` Attempt 4 makes every structured pass near-invulnerable to JSON-format failure.
@@ -375,3 +375,12 @@ gbnf_enforcement: wired                               # decision 4: wire
 - Jeffrey waived the round-robin consultation requirement -- these changes were round-robined in earlier sessions. Every "round-robin gated" / round-robin-`BLOCKED` marker is removed from this plan: Status Board (2E + 3A-3G + 5 + 6 -> NOT STARTED), the sprint section headers, the Implementation Order "Gated" column (all No), Open Decision 4 (GBNF -> RESOLVED: wire), and the config block. The build now runs sprint-after-sprint with no consultation gate.
 - Plan-only edit; no code touched.
 - Note: `CLAUDE.md` still carries a "## Round-Robin Consultation" section as a general project rule. Not edited here -- the instruction scoped to the sprint plan. Flag for Jeffrey if he wants CLAUDE.md amended to match.
+
+### 2026-05-24 -- Wave 2 prep: structured_call extended + _otr_ledger_reviewer converted
+- Commits `fed6327` (structured_call extensions -- 2 files, +271/-16) and `7f3b65f` (`_otr_ledger_reviewer` conversion -- 1 file, +73/-48) on `v2.0-alpha`. Predecessor HEAD `cc0e85a`.
+- **Wave 2 blocker found + fixed.** Auditing the six call sites against the shipped `structured_call` (`61f8cfa`) surfaced two ways the helper could not host them faithfully: (1) four of the five target files run CONTENT validation beyond the pydantic schema that drives a retry -- casting voice-pool membership, news `v1/v2/v3` validators, story-brief `_validate_brief`, outline `_run_call_with_retry` `extra_check`; (2) the helper hardcoded `max_new_tokens=512` but the real passes need 160 (story brief) to 2000 (cast audit) to 3500 (script doctor) -- 512 would truncate the auditor's violations array and the doctor's edits array. `structured_call` gained two keyword-only params: `post_validator(instance) -> str|None` (a content check; a non-None return raises the new `PostValidationError(ValueError)` and advances the ladder exactly like a schema failure, feeding the typed-repair factory) and `max_new_tokens` (per-caller budget, default 512). 7 new tests (11-17 in `tests/test_structured_call.py`).
+- **Sprint 2D -- `_otr_ledger_reviewer` converted.** `audit_cast_contract` (base 0.2 / structural retry 0.1 / 2000 tok) and `run_script_doctor` (base 0.5 / structural retry 0.3 / 3500 tok) each replaced their single-shot call + 3 hand-rolled failure arms with `structured_call(max_attempts=4)`. Both keep their never-raises contract: `StructuredCallFailedError` -> the existing `_audit_failed_sentinel` / `needs_full_rerun` report, plus a broad `except Exception` so a raising slot fn (LLM loader error) maps to the same verdict the prior `except Exception` on the generate call produced. No node `INPUT_TYPES` / widget / socket changed -- both are internal functions -- so no workflow JSON re-wire (Prime Directive 3 N/A).
+- **Regression:** green 2026-05-24 -- `test_structured_call` 18 passed; ledger suites (`test_phase3_ledger_reviewer`, `test_script_doctor_hardfail`, `test_cast_repair`, `test_cast_contract`, `test_legacy_audit_clean`, `test_no_phase_9_call_b3`) 94 passed; full OTR suite green (exit 0, 2643 passed / 21 skipped); Bug Bible 16 passed / 7 skipped / 3 xfailed. 0 failed.
+- **New bug ids:** none.
+- **Wave 2 state:** 1 of 5 files converted (`_otr_ledger_reviewer.py` -- 2 of 6 call sites). Remaining: `_otr_story_brief.py`, `news_interpreter.py`, `_otr_casting.py`, `_otr_outline.py`. Per-file conversion notes + the two open wrinkles (casting's `validation_fn` repair-slot routing, which `structured_call`'s single `slot_fn` cannot express; news's `NewsBriefs` subset-key construction) are recorded in `session_handoff.md`.
+- Built lead-only (no subagents): the `structured_call` extension is a shared-module change (not file-disjoint, must be serial), and the ledger conversion establishes the conversion pattern for the remaining four files.
