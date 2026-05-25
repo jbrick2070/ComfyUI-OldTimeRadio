@@ -1,8 +1,8 @@
 # Story-Writing + Cleanup Pipeline -- LLM-Call Audit
 
 - **Date:** 2026-05-24 (updated 2026-05-25)
-- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `bb53870`)
-- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. Remaining: 3A, 4, 5, 6. The Sprint 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files; next is one operator-gated live ComfyUI episode run to validate the batch. See the "Multi-agent execution plan" section at the foot of this file for the lane map.
+- **Repo:** ComfyUI-OldTimeRadio @ `v2.0-alpha` (HEAD `d0ea595`)
+- **Build status (2026-05-25):** Sprints 0, 1, 2A-2E, 3B-3G COMPLETE and pushed. The Sprint 3B-3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) is **live-validated** -- the 2026-05-25 `signal_lost_vances_promise` run completed end-to-end (see the "Live-run validation" section below). Post-wave, the cast + style-picker RNGs were decoupled from the `seed` widget (BUG-LOCAL-269/270) and the `seed` widget was removed entirely (HEAD `d0ea595`). Remaining: 3A, 4, 5, 6, plus BUG-LOCAL-271 (cast-auditor `wrong_char_id` repair, fix pending). See the "Multi-agent execution plan" section for the lane map.
 - **Scope:** every LLM call from `OTR_LedgerScriptWriter` (LPL v2.0) through `OTR_LedgerFreezeCascade` -- the path that produces and cleans the episode script. Visual-side LLM calls are out of scope.
 - **Method:** systematic call-site inventory across the writer/outline/casting/composer/reviewer/cascade modules, plus verification of the load-bearing findings (GBNF wiring, slot tags).
 - **Why:** downstream audio + video quality is gated entirely by script quality. The 2026-05-24 `signal_lost_ozempics_glitch` run is the motivating evidence -- a structurally valid, cast-clean, budget-correct script that was dramatically empty (~12 words of character dialogue, one hallucinated line, `freeze_verdict=needs_full_rerun`), and nothing in the pipeline caught it.
@@ -103,6 +103,26 @@ Recommendation 1 is the story-quality critic -- it is **Sprint 5** in `story_pip
 
 ---
 
+## Live-run validation -- 2026-05-25 (3B-3E batch)
+
+Episode `signal_lost_vances_promise_20260525_125401` (episode id `pending_20260525_125025`, commit `1514e11`, 30-word smoke target, `num_characters=1`, `gemma-2-2b-it` on the creative slot) ran end-to-end and is the operator-gated validation of the Sprint 3B-3E wave. `Prompt executed in 00:45:23`; froze `frozen_with_warns` (a PASS verdict, not `needs_full_rerun`); full audio + HuMo/LTX video + final mp4 produced. Prime Directive 1 (audio is king) held.
+
+**3B-3E all confirmed working live:**
+
+- **3B** -- `OTR_Outline` ran the macro / phase / beat stages; the singleton-cast Stage 2 bypass fired (`assigned 'HAYES VANCE' to all 3 beats`); the outline succeeded with 5 beats.
+- **3C** -- the split Script Doctor ran both passes (`run_script_doctor_diagnosis` then `run_script_doctor_edits`). The deterministic guard fired exactly as designed: `edits pass proposed an edit on line_id=b003 which the diagnosis did NOT flag with a failure -- dropping it deterministically`.
+- **3D** -- casting logged the Python-owned ensemble slot: `cast HAYES VANCE -> voice=v2/en_speaker_5 gender=male (timbre=warm role=lead)`.
+- **3E** -- the canon header carried the literal `EPISODE_TITLE: TBD` during composition (late binding); the scratchpad title pass then produced `"Vance's Promise"` from the assembled script.
+
+**Findings from the run:**
+
+1. **BUG-LOCAL-271 -- cast auditor `wrong_char_id` violations all go unrepaired.** `audit_cast_contract:pre` flagged all 5 lines `wrong_char_id` with `expected='c01'/'c02'` (char_ids); `apply_deterministic_cast_repairs` treats `expected` as a NAME and resolved none ("no cast member resolves"); all 5 escalated to the Script Doctor, which flagged 0. Benign on this episode but the `wrong_char_id` auto-repair is dead. See `BUG_LOG.md`.
+2. **`WORD_BUDGET_DRIFT ratio=2.00`** -- the outline allocated 60 words against a 30-word target; the episode landed at 45 words total (character=21, announcer=24). Non-fatal warn; worth tracking against the Sprint 3B word-budget path.
+3. **Finding C confirmed, not yet fixed.** The episode is structurally valid, froze clean, and is still *thin* -- 21 words of character dialogue across 3 lines, one of which carries a phantom name (`Pandora`). This is exactly the Finding-C failure class. 3B-3E hardened the pipeline's *structure* -- it now runs clean and does not crash -- but *quality* (catching a thin or hollow episode) is **Sprint 5**, which is not yet built. The pipeline "works"; making the output consistently good is the remaining 3A / 5 / 6 work.
+4. `post-assembly key_terms ZERO landed` -- none of the 5 news key_terms reached the script. Known + deferred (ADR section 4.4, warn-only); not a regression.
+
+---
+
 ## Multi-agent execution plan (remaining sprints)
 
 As of 2026-05-25, Sprints 0, 1, 2A-2E, 3B-3G are COMPLETE and pushed -- the 3B/3C/3D/3E wave (commits `3992607` / `74438ff` / `5fe9931` / `d230cd6`) shipped via four parallel subagents on disjoint files, validating this method again. The remaining audited work is Sprints 3A, 4, 5, 6. This section's lane map is retained for Sprint 3A and as the build-pattern record.
@@ -131,7 +151,7 @@ Each lane is one parallel subagent. The primary files are mutually disjoint, so 
 | E | 3E -- title scratchpad | `OTR_LedgerScriptWriter.py` + title path | ~1 day | no | Scratchpad before the final title; `EPISODE_TITLE: TBD` in the canon header during composition; late binding removes the fragile post-hoc string substitution. **WARNING:** `OTR_LedgerScriptWriter.py` is EXEMPT from the CI sweep -- a new untagged LLM call here is NOT auto-caught; tag manually. |
 
 **Wave 1 (parallel):** Lanes B + C + D + E -- four disjoint files, four subagents at once. **[COMPLETE 2026-05-25 -- `3992607` / `74438ff` / `5fe9931` / `d230cd6`.]**
-**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave. **[NOT STARTED -- next after the live-run validation of the 3B-3E batch.]**
+**Lane A (3A):** stands alone -- dedicated effort, not in the parallel wave. **[NOT STARTED -- the 3B-3E live-run validation is done (2026-05-25); 3A is the next build lane.]**
 
 ### Dependencies and gating
 
