@@ -1504,23 +1504,6 @@ class OTR_LedgerScriptWriter:
                 }),
             },
             "optional": {
-                "seed": ("INT", {
-                    "default": 42, "min": 0, "max": 2**32 - 1, "step": 1,
-                    "tooltip": (
-                        "Telemetry / cache seed. Stamped to "
-                        "meta.episode_seed and folded into the "
-                        "news-interpreter cache key. It does NOT drive "
-                        "episode variety -- the CAST (character names + "
-                        "announcer voice, BUG-LOCAL-269), the STYLE "
-                        "picker's seed-flavor sampling (BUG-LOCAL-270), "
-                        "and LEMMY's 11% cameo (BUG-LOCAL-260) are each "
-                        "randomized fresh every episode from OS entropy. "
-                        "Leave it at the default for normal runs.\n\n"
-                        "For a byte-identical C7 audio regression only, "
-                        "set the OTR_CAST_SEED and OTR_STYLE_SEED "
-                        "environment variables in ComfyUI's environment."
-                    ),
-                }),
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
                 # cache live and applies the [NOT DOWNLOADED] suffix to
@@ -1803,7 +1786,6 @@ class OTR_LedgerScriptWriter:
         episode_title="",
         target_words=350,
         num_characters=2,
-        seed=0,
         # S30 B2a: single model_id widget split into two surface widgets.
         # Both default to _otr_model_catalog.DEFAULT_LLM so the audio C7 baseline is
         # unchanged when the user accepts defaults. B2b adds the internal
@@ -1954,7 +1936,6 @@ class OTR_LedgerScriptWriter:
         meta = led.data.setdefault("meta", {})
         meta["cast_status"] = "building"
         meta["requested_num_characters"] = resolved["num_characters"]
-        meta["episode_seed"] = int(seed)
 
         # Ledger durability P1 (2026-05-19): persist a skeleton ledger to
         # disk NOW, before the style-picker / news-interpreter / cast /
@@ -2061,7 +2042,10 @@ class OTR_LedgerScriptWriter:
                     outlet=article.get("source", ""),
                     pub_date=article.get("date", ""),
                     style=resolved["style"],
-                    seed=int(seed),
+                    # The `seed` widget was removed (BUG-LOCAL-269/270
+                    # follow-up); a constant keeps the news-interpreter
+                    # cache key stable across the seed dimension.
+                    seed=0,
                     model_id=str(resolved["technical_model"]),
                 )
             meta["news"] = briefs.model_dump()
@@ -2099,11 +2083,10 @@ class OTR_LedgerScriptWriter:
         # decoupling to the cast names + announcer pick: random in
         # production, with an explicit force path for the C7 gate.
         #
-        # The `seed` widget no longer drives any per-episode creative
-        # RNG: the cast (here), the style picker (BUG-LOCAL-270), and
-        # the LEMMY cameo (BUG-LOCAL-260) are all decoupled. The seed
-        # now only feeds meta.episode_seed telemetry + the
-        # news-interpreter cache key.
+        # The legacy `seed` widget has been REMOVED from the node --
+        # it drove no per-episode variety once the cast (here), the
+        # style picker (BUG-LOCAL-270), and the LEMMY cameo
+        # (BUG-LOCAL-260) were each decoupled from it.
         cast_seed, cast_seed_source = _resolve_cast_rng_seed()
         cast_rng = _random.Random(cast_seed)
         log.info(

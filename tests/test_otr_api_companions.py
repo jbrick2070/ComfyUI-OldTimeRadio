@@ -10,44 +10,41 @@ These tests exercise:
 
   1. The synthesis: declaration order + companion injection produces a
      slot list whose length equals `widgets_values` for a clean-saved
-     workflow.
-  2. The canonical workflow shape (19-entry widgets_values on node 1):
-     a `creative_writing_model` patch lands at slot 5, NOT slot 4 (which
-     is the `"fixed"` companion). The companion value is preserved.
-  3. Same for `technical_model` patch -> slot 6.
+     workflow (exercised with synthetic seed-bearing nodes).
+  2. The writer's `creative_writing_model` patch lands at slot 3.
+  3. The writer's `technical_model` patch lands at slot 4.
   4. Narrow loosening: an extra slot in a position OTHER than the
      companion position still rejects with ValueError.
   5. Narrow loosening: a saved array longer than declared + companion
      count still rejects.
 
 The OTR_LedgerScriptWriter schema in the fixtures mirrors node 1's
-widgets_values dump from `workflows/otr_scifi_16gb_full.json`
-(optimization_profile widget removed 2026-05-23, ROADMAP PRIORITY 2):
+widgets_values dump from `workflows/otr_scifi_16gb_full.json`. The
+`seed` widget was removed (BUG-LOCAL-269/270), so the writer no longer
+carries a seed value or a control_after_generate companion:
 
   0  episode_title           STRING        ''
   1  target_words            INT           350
   2  num_characters          INT           2
-  3  seed                    INT           42
-  4  seed companion          (synthetic)   'fixed'
-  5  creative_writing_model  STRING        'google/gemma-4-E4B-it'
-  6  technical_model         STRING        'google/gemma-4-E4B-it'
-  7  custom_premise          STRING        ''
-  8  include_act_breaks      BOOL          True
-  9  act_count               INT           3
-  10 style                   COMBO         'let the story decide'
-  11 style_custom            STRING        ''
-  12 creativity              COMBO         'balanced'
-  13 perfect_run_spacesaver  BOOL          False
-  14 min_p                   FLOAT         0.05
-  15 repetition_penalty      FLOAT         1.03
-  16 max_new_tokens_cap      INT           200
-  17 enable_polish_pass      BOOL          False
-  18 lemmy_cameo             COMBO         'roll (~11% chance)'
+  3  creative_writing_model  STRING        'google/gemma-4-E4B-it'
+  4  technical_model         STRING        'google/gemma-4-E4B-it'
+  5  custom_premise          STRING        ''
+  6  include_act_breaks      BOOL          True
+  7  act_count               INT           3
+  8  style                   COMBO         'let the story decide'
+  9  style_custom            STRING        ''
+  10 creativity              COMBO         'balanced'
+  11 perfect_run_spacesaver  BOOL          False
+  12 min_p                   FLOAT         0.05
+  13 repetition_penalty      FLOAT         1.03
+  14 max_new_tokens_cap      INT           200
+  15 enable_polish_pass      BOOL          False
+  16 lemmy_cameo             COMBO         'roll (~11% chance)'
 
-The `target_words` + `num_characters` + `act_count` INT widgets are
-NOT named "seed" or "noise_seed" -- they do NOT trigger companion
-injection. Only `seed` does. This is the load-bearing invariant the
-mapper depends on.
+The writer has NO seed widget. The mapper's control_after_generate
+companion logic is still load-bearing for other nodes (HuMo / Bark
+seeds) and is exercised below with synthetic seed-bearing nodes
+(MiniNode / OneSeedNode).
 """
 from __future__ import annotations
 
@@ -92,7 +89,6 @@ def _writer_schemas() -> dict:
                     "episode_title": ("STRING", {"default": ""}),
                     "target_words": ("INT", {"default": 350}),
                     "num_characters": ("INT", {"default": 2}),
-                    "seed": ("INT", {"default": 42}),
                     "creative_writing_model": ("STRING", {"default": ""}),
                     "technical_model": ("STRING", {"default": ""}),
                     "custom_premise": ("STRING", {"default": ""}),
@@ -127,9 +123,9 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 19-entry widgets_values
-    layout dumped from workflows/otr_scifi_16gb_full.json (optimization_
-    profile widget removed 2026-05-23, ROADMAP PRIORITY 2).
+    """Workflow fixture with node 1 carrying the 17-entry widgets_values
+    layout dumped from workflows/otr_scifi_16gb_full.json. The `seed`
+    widget + its companion were removed in BUG-LOCAL-269/270.
     """
     return {
         "nodes": [
@@ -141,22 +137,20 @@ def _writer_node_fixture() -> dict:
                     "",                          # 0  episode_title
                     350,                         # 1  target_words
                     2,                           # 2  num_characters
-                    42,                          # 3  seed
-                    "fixed",                     # 4  seed companion
-                    "google/gemma-4-E4B-it",     # 5  creative_writing_model
-                    "google/gemma-4-E4B-it",     # 6  technical_model
-                    "",                          # 7  custom_premise
-                    True,                        # 8  include_act_breaks
-                    3,                           # 9  act_count
-                    "let the story decide",      # 10 style
-                    "",                          # 11 style_custom
-                    "balanced",                  # 12 creativity
-                    False,                       # 13 perfect_run_spacesaver
-                    0.05,                        # 14 min_p
-                    1.03,                        # 15 repetition_penalty
-                    200,                         # 16 max_new_tokens_cap
-                    False,                       # 17 enable_polish_pass
-                    "roll (~11% chance)",        # 18 lemmy_cameo
+                    "google/gemma-4-E4B-it",     # 3  creative_writing_model
+                    "google/gemma-4-E4B-it",     # 4  technical_model
+                    "",                          # 5  custom_premise
+                    True,                        # 6  include_act_breaks
+                    3,                           # 7  act_count
+                    "let the story decide",      # 8  style
+                    "",                          # 9  style_custom
+                    "balanced",                  # 10 creativity
+                    False,                       # 11 perfect_run_spacesaver
+                    0.05,                        # 12 min_p
+                    1.03,                        # 13 repetition_penalty
+                    200,                         # 14 max_new_tokens_cap
+                    False,                       # 15 enable_polish_pass
+                    "roll (~11% chance)",        # 16 lemmy_cameo
                 ],
             }
         ],
@@ -223,19 +217,18 @@ def test_serialized_slots_no_companion_for_non_seed_int():
 
 
 # ---------------------------------------------------------------------------
-# Test 2 -- creative_writing_model patch lands past the companion
+# Test 2 -- creative_writing_model patch lands on the right slot
 # ---------------------------------------------------------------------------
-def test_patch_skips_companion_and_lands_on_correct_index():
-    """Using node 1's actual 19-entry fixture, patch
-    creative_writing_model and assert widgets_values[5] changes
-    (NOT widgets_values[4], which is the companion).
+def test_patch_creative_writing_model_lands_on_correct_index():
+    """Using node 1's 17-entry fixture, patch creative_writing_model
+    and assert widgets_values[3] changes. The writer's seed widget --
+    and its control_after_generate companion -- were removed in
+    BUG-LOCAL-269/270.
     """
     schemas = _writer_schemas()
     workflow = _writer_node_fixture()
 
-    pre_companion = workflow["nodes"][0]["widgets_values"][4]
-    pre_creative = workflow["nodes"][0]["widgets_values"][5]
-    assert pre_companion == "fixed"
+    pre_creative = workflow["nodes"][0]["widgets_values"][3]
     assert pre_creative == "google/gemma-4-E4B-it"
 
     patch_widget_by_name(
@@ -244,25 +237,21 @@ def test_patch_skips_companion_and_lands_on_correct_index():
     )
 
     wv = workflow["nodes"][0]["widgets_values"]
-    assert wv[5] == "mistralai/Mistral-Nemo-Instruct-2407", (
-        f"creative_writing_model patch must land at slot 5; "
-        f"got wv[5] = {wv[5]!r}"
+    assert wv[3] == "mistralai/Mistral-Nemo-Instruct-2407", (
+        f"creative_writing_model patch must land at slot 3; "
+        f"got wv[3] = {wv[3]!r}"
     )
-    assert wv[4] == "fixed", (
-        f"companion at slot 4 must be untouched; got wv[4] = {wv[4]!r}"
-    )
-    # Slot 3 (seed value) also untouched.
-    assert wv[3] == 42
+    # num_characters at slot 2 untouched.
+    assert wv[2] == 2
 
 
 # ---------------------------------------------------------------------------
-# Test 3 -- technical_model patch skips both companion and
-# creative_writing_model
+# Test 3 -- technical_model patch lands on the right slot
 # ---------------------------------------------------------------------------
-def test_patch_technical_model_skips_companion():
-    """Patch technical_model on the same fixture. Assert
-    widgets_values[6] changes and slots 4 (companion) + 5
-    (creative_writing_model) are untouched.
+def test_patch_technical_model_lands_on_correct_index():
+    """Patch technical_model on the same 17-entry fixture. Assert
+    widgets_values[4] changes and slot 3 (creative_writing_model) is
+    untouched.
     """
     schemas = _writer_schemas()
     workflow = _writer_node_fixture()
@@ -273,16 +262,13 @@ def test_patch_technical_model_skips_companion():
     )
 
     wv = workflow["nodes"][0]["widgets_values"]
-    assert wv[6] == "mistralai/Mistral-Nemo-Instruct-2407", (
-        f"technical_model patch must land at slot 6; "
-        f"got wv[6] = {wv[6]!r}"
+    assert wv[4] == "mistralai/Mistral-Nemo-Instruct-2407", (
+        f"technical_model patch must land at slot 4; "
+        f"got wv[4] = {wv[4]!r}"
     )
-    assert wv[4] == "fixed", (
-        f"companion at slot 4 must be untouched; got wv[4] = {wv[4]!r}"
-    )
-    assert wv[5] == "google/gemma-4-E4B-it", (
-        f"creative_writing_model at slot 5 must be untouched; "
-        f"got wv[5] = {wv[5]!r}"
+    assert wv[3] == "google/gemma-4-E4B-it", (
+        f"creative_writing_model at slot 3 must be untouched; "
+        f"got wv[3] = {wv[3]!r}"
     )
 
 
@@ -385,25 +371,18 @@ def _dump_canonical_node1() -> list:
 
 def test_round_trip_canonical_node1_inputs_correct():
     """Round-trip the canonical workflow through the API converter
-    and assert declared inputs land on the right slots, with the
-    companion "fixed" NEVER reaching a declared input.
+    and assert node 1's declared inputs land on the right slots.
 
-    Asserts derived from on-disk dump of node 1 widgets_values:
-        wv[3]   seed value  -> inputs["seed"]
-        wv[5]   creative_writing_model
-        wv[6]   technical_model
-        wv[4]   "fixed" companion (NOT mapped anywhere)
+    Post BUG-LOCAL-269/270 the writer's `seed` widget was removed, so
+    there is no longer a seed value or a "fixed" control_after_generate
+    companion in the writer's widgets_values:
+        wv[3]   creative_writing_model
+        wv[4]   technical_model
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 19, f"node 1 widgets_values length drift: {len(dump)}"
-    expected_seed = dump[3]
-    expected_companion = dump[4]
-    expected_creative = dump[5]
-    expected_technical = dump[6]
-    assert expected_companion == "fixed", (
-        f"node 1 widgets_values[4] expected 'fixed' companion; "
-        f"got {expected_companion!r}"
-    )
+    assert len(dump) == 17, f"node 1 widgets_values length drift: {len(dump)}"
+    expected_creative = dump[3]
+    expected_technical = dump[4]
 
     schemas = _writer_schemas()
     workflow = load_workflow(str(_CANONICAL_WORKFLOW))
@@ -411,10 +390,6 @@ def test_round_trip_canonical_node1_inputs_correct():
 
     n1_inputs = prompt["1"]["inputs"]
 
-    assert n1_inputs["seed"] == expected_seed, (
-        f"inputs['seed'] expected {expected_seed!r}; "
-        f"got {n1_inputs['seed']!r}"
-    )
     assert n1_inputs["creative_writing_model"] == expected_creative, (
         f"inputs['creative_writing_model'] expected {expected_creative!r}; "
         f"got {n1_inputs['creative_writing_model']!r}"
@@ -424,13 +399,18 @@ def test_round_trip_canonical_node1_inputs_correct():
         f"got {n1_inputs['technical_model']!r}"
     )
 
-    # "fixed" must NOT appear in any declared input on node 1. The
-    # companion vocabulary {fixed, randomize, increment, decrement}
-    # is never a legitimate declared-input value for this writer.
+    # The writer no longer declares a `seed` input (BUG-LOCAL-269/270).
+    assert "seed" not in n1_inputs, (
+        f"node 1 still exposes a 'seed' input after the widget removal: "
+        f"{n1_inputs.get('seed')!r}"
+    )
+
+    # A control_after_generate companion token must NEVER reach a
+    # declared input. (The writer has no seed widget now, so no
+    # companion is emitted -- this stays as a defensive guard.)
     for field in (
         "creative_writing_model",
         "technical_model",
-        "seed",
         "target_words",
         "num_characters",
         "act_count",

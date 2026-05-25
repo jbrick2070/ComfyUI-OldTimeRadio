@@ -344,19 +344,18 @@ class TestWorkflowJson:
 # (not imported) so this test stays free of torch / transformers and
 # can run in any CI environment.
 _WRITER_STYLE_SENTINEL = "let the story decide"
-# Slot 9 of OTR_LedgerScriptWriter.widgets_values in the current
-# widget order:
-#   0 episode_title / 1 target_words / 2 num_characters / 3 seed
-#   4 seed_mode / 5 model_id / 6 custom_premise / 7 include_act_breaks
-#   8 act_count / 9 style  <- this slot / 10 style_custom
-#   11 creativity / 12 perfect_run_spacesaver / 13 min_p
-#   14 repetition_penalty / 15 max_new_tokens_cap
-#   (optimization_profile widget removed 2026-05-23, ROADMAP PRIORITY 2)
+# Slot of OTR_LedgerScriptWriter.widgets_values holding the `style`
+# widget, in the current widget order (post BUG-LOCAL-269/270, which
+# removed the `seed` widget and its control_after_generate companion):
+#   0 episode_title / 1 target_words / 2 num_characters
+#   3 creative_writing_model / 4 technical_model / 5 custom_premise
+#   6 include_act_breaks / 7 act_count / 8 style  <- this slot
+#   9 style_custom / 10 creativity / 11 perfect_run_spacesaver
+#   12 min_p / 13 repetition_penalty / 14 max_new_tokens_cap
+#   15 enable_polish_pass / 16 lemmy_cameo
 # If the writer's INPUT_TYPES order changes, update this constant
 # in lockstep so the drift guard keeps catching the real regression.
-# S30 B2a: writer widgets_values vector grew by 1 (technical_model
-# inserted at index 6), so the style widget moved from slot 9 to 10.
-_WRITER_STYLE_SLOT = 10
+_WRITER_STYLE_SLOT = 8
 _CANONICAL_WORKFLOW = "otr_scifi_16gb_full.json"
 
 
@@ -630,61 +629,55 @@ class TestWriterB2aSurface:
             )
 
     def test_writer_widget_migration_preserves_values(self):
-        """The pre-B2a widgets_values vector position 5 carried
-        `model_id`; B2a renames that position to `creative_writing_model`
-        and inserts `technical_model` at position 6. Every value that
-        was at positions 6..17 pre-B2a now lives at 7..18 post-B2a.
+        """Pin the writer's widgets_values layout. Post BUG-LOCAL-269/270
+        the `seed` widget (and its control_after_generate companion) was
+        removed -- the vector dropped 19 -> 17 and every slot from
+        creative_writing_model onward shifted down by 2.
         """
         writer = self._writer()
         wv = writer.get("widgets_values", [])
-        # Post-B2a expected layout:
+        # Current writer widgets_values layout:
         #   0  episode_title           ""
         #   1  target_words            350
         #   2  num_characters          2
-        #   3  seed                    0
-        #   4  seed_mode               "randomize" / "fixed"
-        #   5  creative_writing_model  catalog default repo_id
-        #   6  technical_model         catalog default repo_id
-        #   7  custom_premise          ""
-        #   8  include_act_breaks      True
-        #   9  act_count               3
-        #  10  style                   "let the story decide"
-        #  11  style_custom            ""
-        #  12  creativity              "balanced"
-        #  13  perfect_run_spacesaver  False
-        #  14  min_p                   0.05
-        #  15  repetition_penalty      1.03
-        #  16  max_new_tokens_cap      200
-        #  17  enable_polish_pass      False
-        #  18  lemmy_cameo             "roll (~11% chance)"
-        # optimization_profile widget removed 2026-05-23 (ROADMAP
-        # PRIORITY 2); vector 19 -> 18. lemmy_cameo appended at the
-        # end 2026-05-23 (BUG-LOCAL-260); vector 18 -> 19.
-        assert len(wv) == 19, (
-            f"writer widgets_values length drift: {len(wv)} "
-            f"(expected 19: 18 post-B2a + lemmy_cameo, BUG-LOCAL-260)"
+        #   3  creative_writing_model  catalog default repo_id
+        #   4  technical_model         catalog default repo_id
+        #   5  custom_premise          ""
+        #   6  include_act_breaks      True
+        #   7  act_count               "auto"
+        #   8  style                   "let the story decide"
+        #   9  style_custom            ""
+        #  10  creativity              "balanced"
+        #  11  perfect_run_spacesaver  False
+        #  12  min_p                   0.05
+        #  13  repetition_penalty      1.03
+        #  14  max_new_tokens_cap      200
+        #  15  enable_polish_pass      False
+        #  16  lemmy_cameo             "roll (~11% chance)"
+        # History: optimization_profile removed 2026-05-23; lemmy_cameo
+        # appended 2026-05-23 (BUG-LOCAL-260); `seed` + its companion
+        # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17.
+        assert len(wv) == 17, (
+            f"writer widgets_values length drift: {len(wv)} (expected 17 "
+            f"after the BUG-LOCAL-269/270 seed-widget removal)"
         )
-        # Creative + technical slots both bound to a string repo id
-        # (default = catalog DEFAULT_LLM but any non-empty STRING is
-        # acceptable here -- the catalog validator handles label
-        # suffixes at run time).
-        assert isinstance(wv[5], str) and wv[5], (
+        # Creative + technical slots both bound to a non-empty repo id.
+        assert isinstance(wv[3], str) and wv[3], (
             f"creative_writing_model widget value not a non-empty "
-            f"string: {wv[5]!r}"
+            f"string: {wv[3]!r}"
         )
-        assert isinstance(wv[6], str) and wv[6], (
+        assert isinstance(wv[4], str) and wv[4], (
             f"technical_model widget value not a non-empty string: "
-            f"{wv[6]!r}"
+            f"{wv[4]!r}"
         )
-        assert wv[10] == "let the story decide", (
-            f"style widget drifted from canonical default: {wv[10]!r}"
+        assert wv[8] == "let the story decide", (
+            f"style widget drifted from canonical default: {wv[8]!r}"
         )
-        assert wv[12] == "balanced", (
-            f"creativity widget drifted: {wv[12]!r}"
+        assert wv[10] == "balanced", (
+            f"creativity widget drifted: {wv[10]!r}"
         )
-        assert wv[13] is False, (
-            f"perfect_run_spacesaver widget drifted from slot 13 "
-            f"(optimization_profile removed): {wv[13]!r}"
+        assert wv[11] is False, (
+            f"perfect_run_spacesaver widget drifted from slot 11: {wv[11]!r}"
         )
 
     def test_writer_broadcasts_normalized_model_ids(self):

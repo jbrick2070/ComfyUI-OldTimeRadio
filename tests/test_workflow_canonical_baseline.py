@@ -6,7 +6,8 @@ widgets, this test fails loud so default-config baseline reproduction
 stays unblocked.
 
 Per Sprint E E2 plan (W-1 + W-2):
-- Node 1 (OTR_LedgerScriptWriter) widgets must ship seed=42, control="fixed".
+- Node 1 (OTR_LedgerScriptWriter): the `seed` widget was removed
+  (BUG-LOCAL-269/270); the model-slot widgets must ship the C7 models.
 - Node 51 (OTR_BatchHumoRender) widgets must ship seed=7, control="fixed".
 
 Node 63 (OTR_WorkflowValidator) path widget intentionally ships as
@@ -39,10 +40,21 @@ def _node_by_id(workflow: dict, node_id: int) -> dict:
     raise AssertionError(f"node id {node_id} not present in {CANONICAL_JSON.name}")
 
 
-class TestWriterCanonicalSeed:
-    """W-1 drift guard. Writer Node 1 widgets must ship the C7 baseline."""
+class TestWriterCanonicalModelSlots:
+    """W-1 drift guard. Writer Node 1 model-slot widgets must ship the
+    C7 baseline models.
 
-    def test_writer_seed_is_42(self):
+    The writer's `seed` widget was REMOVED (BUG-LOCAL-269 / 270): the
+    cast + style RNGs are decoupled and draw OS entropy, so there is no
+    longer a seed widget (or its control_after_generate companion) to
+    pin here.
+    """
+
+    def test_writer_both_slots_gemma_4(self):
+        """Sprint C3 destination + 2026-05-18 retest #11 flip:
+        canonical writer model is google/gemma-4-E4B-it on both
+        creative and technical slots.
+        """
         n = _node_by_id(_load_canonical_workflow(), 1)
         assert n.get("type") == "OTR_LedgerScriptWriter"
         widgets = n.get("widgets_values", [])
@@ -50,50 +62,21 @@ class TestWriterCanonicalSeed:
             "writer widgets_values shorter than expected; widget vector "
             "may have drifted"
         )
-        # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES:
+        # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES, post the
+        # BUG-LOCAL-269/270 seed-widget removal:
         #   [0] episode_title
         #   [1] target_words
         #   [2] num_characters
-        #   [3] seed
-        #   [4] seed control (ComfyUI auto-inserts after every INT seed)
-        assert widgets[3] == 42, (
-            f"writer seed widget must be 42 for C7 baseline; got {widgets[3]!r}. "
-            "Drift fails the audio byte-identity contract per "
-            "tests/fixtures/baseline_v1.5.wav."
-        )
-
-    def test_writer_seed_control_is_fixed(self):
-        n = _node_by_id(_load_canonical_workflow(), 1)
-        widgets = n.get("widgets_values", [])
-        assert widgets[4] == "fixed", (
-            f"writer seed control must be 'fixed' for C7 baseline reproduction; "
-            f"got {widgets[4]!r}. 'randomize' rerolls on every Queue Prompt "
-            "and blocks runtime b3sum reproduction."
-        )
-
-    def test_writer_both_slots_gemma_4(self):
-        """Sprint C3 destination + 2026-05-18 retest #11 flip:
-        canonical writer model is google/gemma-4-E4B-it on both
-        creative and technical slots. The Mistral-Nemo baseline
-        was the pre-Sprint-C3 default; reconcile commit 0ce8d2b
-        repointed the harness at _full.json but did NOT flip the
-        writer widgets, so Mistral-Nemo was reactivated as a
-        side effect of the workflow consolidation. This test
-        guards the Sprint C3 destination.
-        """
-        n = _node_by_id(_load_canonical_workflow(), 1)
-        widgets = n.get("widgets_values", [])
-        # Widget order:
-        #   [5] creative_writing_model
-        #   [6] technical_model
+        #   [3] creative_writing_model
+        #   [4] technical_model
         expected = "google/gemma-4-E4B-it"
-        assert widgets[5] == expected, (
+        assert widgets[3] == expected, (
             f"writer creative_writing_model must be {expected!r} for C7 "
-            f"baseline (Sprint C3 destination); got {widgets[5]!r}."
+            f"baseline (Sprint C3 destination); got {widgets[3]!r}."
         )
-        assert widgets[6] == expected, (
+        assert widgets[4] == expected, (
             f"writer technical_model must be {expected!r} for C7 "
-            f"baseline (Sprint C3 destination); got {widgets[6]!r}."
+            f"baseline (Sprint C3 destination); got {widgets[4]!r}."
         )
 
 

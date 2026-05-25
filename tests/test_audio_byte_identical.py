@@ -43,10 +43,9 @@ _WORKFLOW = os.path.join(_HERE, "..", "workflows", "otr_scifi_16gb_full.json")
 # Fixed seed for deterministic audio output.
 # These override the workflow's randomized seeds at runtime.
 FIXED_SEEDS = {
-    # Voice-path-cleanbreak 2026-05-12: legacy OTR_LLMScriptWriter was
-    # renamed/extracted out as OTR_LedgerScriptWriter long before this
-    # commit; the seed target tracks the canonical writer node name.
-    "OTR_LedgerScriptWriter": 42,
+    # BUG-LOCAL-269 / 270: OTR_LedgerScriptWriter no longer has a `seed`
+    # widget -- the cast + style RNGs are decoupled (OS entropy), with
+    # the OTR_CAST_SEED / OTR_STYLE_SEED env vars as the C7 override.
     # OTR_LLMDirector seed entry deleted in voice-path-cleanbreak Sprint 2
     # (2026-05-12). Director class + workflow node are gone; no seed to set.
     "OTR_BatchBarkGenerator": 42,
@@ -55,12 +54,12 @@ FIXED_SEEDS = {
     "OTR_MusicGenTheme": 42,
 }
 
-# BUG-LOCAL-269: the writer's CAST (character names + announcer voice)
-# is decoupled from the `seed` widget -- it is randomized per episode
-# from OS entropy. For a byte-identical C7 run, ComfyUI must be started
-# with the OTR_CAST_SEED environment variable set (e.g. OTR_CAST_SEED=42)
-# so the cast is reproducible. Injecting the writer `seed` above no
-# longer pins the cast on its own.
+# BUG-LOCAL-269 / 270: the writer's CAST (character names + announcer
+# voice) and the STYLE picker's seed-flavor sampling are randomized per
+# episode from OS entropy, and the writer's `seed` widget was removed
+# entirely. For a byte-identical C7 run, ComfyUI must be started with
+# the OTR_CAST_SEED and OTR_STYLE_SEED environment variables set
+# (e.g. =42) so the cast + style are reproducible.
 
 
 def sha256_file(path):
