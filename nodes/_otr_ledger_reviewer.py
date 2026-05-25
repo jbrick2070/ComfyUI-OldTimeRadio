@@ -904,11 +904,29 @@ def apply_doctor_edits(
             })
             continue
         if edit.action == "rewrite":
-            line["text"] = edit.payload
-            # Recompute counts in lockstep with the new text.
-            line["char_count"] = len(edit.payload)
+            # BUG-LOCAL-267: route the doctor's rewrite through the
+            # composer's format strip. This branch previously wrote
+            # `edit.payload` verbatim, so a doctor LLM that emitted a
+            # leading "SPEAKER:" prefix (e.g. "HAYES VANCE: ...")
+            # re-injected the speaker label the composer had already
+            # stripped at compose time -- and Bark then voiced the
+            # character's name aloud. Same strip the composer applies
+            # to its own output; consistency, no behaviour change for
+            # a clean payload.
+            try:
+                from ._otr_line_composer import strip_line_formatting
+                rewritten = strip_line_formatting(edit.payload or "")
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "[OTR_LedgerReviewer:doctor] strip_line_formatting "
+                    "unavailable (%s); applying rewrite payload raw", exc,
+                )
+                rewritten = edit.payload or ""
+            line["text"] = rewritten
+            # Recompute counts in lockstep with the stripped text.
+            line["char_count"] = len(rewritten)
             line["word_count"] = len(re.findall(
-                r"[A-Za-z][A-Za-z0-9'\-]*", edit.payload,
+                r"[A-Za-z][A-Za-z0-9'\-]*", rewritten,
             ))
         elif edit.action == "skip":
             line["skip"] = True
