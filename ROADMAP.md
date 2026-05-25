@@ -8,7 +8,7 @@ This file is the **canonical going-forward plan**. Forward-only. Historical sess
 
 ---
 
-## 2026-05-24 SESSION — LLM-JSON + GEMMA-2 WRITER FIXES LANDED (HEAD `83f2980`)
+## 2026-05-24 SESSION — WRITER FIXES + HuMo TIERING LANDED (HEAD `e619ebb`)
 
 Two writer-path defects fixed and pushed to `v2.0-alpha` this session.
 
@@ -17,12 +17,12 @@ Two writer-path defects fixed and pushed to `v2.0-alpha` this session.
 
 **2026-05-24 follow-up — all three writer fixes VERIFIED.** The operator run (`creativity='maximum chaos'`, `google/gemma-2-2b-it`) cleared the style picker (**BUG-262 [FIXED]**) but surfaced a third defect: casting aborted because `CastingResponse.character_description` overran a hard 200-char schema cap the prompt never stated (placeholder `"<short>"` vs `max_length=200`). Fixed as **BUG-LOCAL-263 [FIXED 2026-05-24, commit `65793c1`]** — `_otr_casting.py` raised the cap to 750 and the prompt placeholder now states a target. A clean re-run verified BUG-261 + BUG-263 (cast lock completes, zero `CastValidationLLMError`, writer ran end-to-end). **BUG-LOCAL-264 [LOGGED]** — non-fatal: `news_interpreter` overruns `NewsBriefs` schema caps with gemma-2-2b and falls back to the raw `news_seed`, degrading the announcer intro/outro to generic text.
 
-**Parked items, ready to resume:**
-- **GGUF workflow rewire** — `workflows/otr_scifi_16gb_full.json` carries an uncommitted `UNETLoader → UnetLoaderGGUF` edit, pending the HuMo soak. While uncommitted it is the sole cause of `test_core.py::test_node_types_otr_or_known` failing; committing it also requires adding `UnetLoaderGGUF` to that test's node-type allowlist.
-- **Flaky `test_lock_cast_generation_uses_creative`** — pre-existing (BUG-260 routed the LEMMY roll to OS entropy, defeating the test's seeded RNG; ~11% false-red). Fix: pass `force_lemmy=False` to `lock_cast` in the test.
+**Parked items:**
+- **GGUF workflow rewire — SUPERSEDED 2026-05-24.** The parked `UNETLoader → UnetLoaderGGUF` edit on `workflows/otr_scifi_16gb_full.json` is moot: the HuMo VRAM-thrash track resolved as Option C (below), and the workflow's HuMo loader chain is now a single `OTR_HuMoTierLoader` node — GGUF is one opt-in tier *inside* that node, not a workflow-level loader swap. No `UnetLoaderGGUF` node in the production JSON; no `test_core.py` allowlist change needed.
+- **Flaky `test_lock_cast_*_uses_creative` — FIXED 2026-05-24, commit `e619ebb`.** `force_lemmy=False` pinned on all five `lock_cast()` calls in `test_helper_paired_signatures.py` + `test_lock_cast_routing.py` (BUG-260 routed the LEMMY roll to OS entropy, defeating the tests' seeded RNG).
 - **ROADMAP staleness audit** — 8 stale-actionable items previously identified; edits not yet applied.
 
-### HuMo VRAM-thrash track — investigated 2026-05-24, fix pending (round-robin gated)
+### HuMo VRAM-thrash track — RESOLVED 2026-05-24 (Option C shipped)
 
 The OTR HuMo render phase thrashes: `BatchHumoRender` Phase C loads HuMo (14B/17B fp8) ~88% offloaded on the 16 GB card (`loaded partially; 1744 MB usable ... 10813 MB offloaded`) and renders at 140-279 s/it. Bracketed this session with bare native-workflow smokes — the stock official ComfyUI HuMo demo, zero OTR code (`workflows/humo_smoke_{14b,gguf,q3,1p7b}.json`):
 
@@ -32,9 +32,17 @@ The OTR HuMo render phase thrashes: `BatchHumoRender` Phase C loads HuMo (14B/17
 
 **Conclusion: it is not the HuMo model — it is the pipeline.** The 14B fp8 runs clean bare; inside the OTR pipeline it thrashes because the writer LLM / MusicGen / FLUX are still resident (~14 GB) when Phase C loads HuMo — loaded via OTR's own loaders, outside `comfy.model_management`, so `BatchHumoRender`'s inter-phase `unload_all_models()` cannot evict them. Same out-of-band-loader mechanism BUG-LOCAL-231 hypothesizes for the FLUX phase.
 
-**Two live paths (round-robin call):** **A —** adopt HuMo-1.7B: it fully fits the card (3.3 GB, zero offload), 4 s/it, and at ~20 steps + cfg with real FLUX reference portraits the output looked acceptable to the operator — sidesteps the VRAM problem outright. **B —** keep the 14B/17B fp8 model (maximum quality) and free the pipeline VRAM residue before Phase C (lever 1).
+**Decision — Option C (round-robin verdict, operator-accepted, shipped 2026-05-24).** Ship HuMo-1.7B as the default, keep HuMo-17B/14B opt-in, do the model tiering upstream. Implemented:
 
-**Next:** a `PHASE-C-VRAM-PROBE` log line was added to `nodes/batch_humo_render.py` (diagnostic, no behavior change). Capture it from a real episode to confirm exactly what holds the ~14 GB, then round-robin the freeing fix (VRAM-budget change). Tracked as **BUG-LOCAL-265**; see also `docs/2026-05-23-humo-vram-thrash-problem-statement.md`.
+- **`OTR_HuMoTierLoader`** (new node, `nodes/_otr_humo_tier_loader.py`) — one upstream loader for the whole HuMo stack with three tiers: `low_vram_default` (HuMo-1.7B fp16, 20 steps, cfg 5.0, no distill LoRA — the shipped default), `high_quality` (HuMo-17B/14B fp8, 6 steps, cfg 1.0, lightx2v 14B distill LoRA — opt-in), `experimental_gguf` (HuMo-17B GGUF — advanced only; GGUF demoted, the per-step dequant tax made it slower than fp8). Emits MODEL/CLIP/VAE/AUDIO_ENCODER + the tier's steps/cfg. `OTR_BatchHumoRender` keeps its pre-loaded-inputs surface; no `model_id` widget.
+- **Hard auto-downgrade rule** — when a high tier is selected but free VRAM after the residue clean is below `vram_safety_threshold_gb` (default 10 GB), the node downgrades to HuMo-1.7B (`auto_downgrade` ON) or stops with a clear error. No user silently hits the 3h43m thrash path.
+- **Lever 1** — `nodes/_otr_vram_levers.free_otr_pipeline_residue()` drains the OTR-owned out-of-band caches `unload_all_models()` cannot see (writer LLM via `unload_llm`, Bark via `_unload_bark`) before the ComfyUI unload + CUDA flush. Called from `BatchHumoRender`'s inter-phase cleanup and `OTR_HuMoTierLoader` pre-load. `OTR_UnloadAll` also extended to drop Bark.
+- **`workflows/otr_scifi_16gb_full.json` rewired** — the 6-node HuMo loader chain (nodes 45-50) collapsed into one `OTR_HuMoTierLoader` (node 72) feeding `OTR_BatchHumoRender`; steps/cfg socket-driven; default tier `low_vram_default`. The FLUX→UnloadAll→HuMo gate (`flux_done_gate`) is preserved and extended — `UnloadAll.unload_done` now also gates the tier loader.
+- **Pre-batch estimate** in `nodes/batch_humo_render.py` updated from the stale ~10-12 min/character-line figure to the bracket figure (~4:23/clip).
+
+Commits `e981db0` / `09c2d49` / `e619ebb` on `v2.0-alpha`. Regression: full `tests/` walk 2617 passed / 21 skipped / 0 failed; Bug Bible 23 passed / 1 skipped / 2 xfailed; new `tests/test_humo_tier_loader.py` 20 passed.
+
+**Still open — operator probe (NOT blocking the 1.7B default).** The HuMo-1.7B default is fully resolved: 3.3 GB, fully resident, zero offload — it cannot thrash. The Lever-1 VRAM-reclaim *numbers* still want one operator real-episode run to capture a `PHASE-C-VRAM-PROBE` log line confirming `free_otr_pipeline_residue` actually reclaims the ~14 GB residue (vs. the CUDA allocator holding reserved blocks). That number matters only for the 17B opt-in tier's viability. BUG-265 Bug Bible promotion is deferred until that probe lands. Tracked as **BUG-LOCAL-265**; see also `docs/2026-05-23-humo-vram-thrash-problem-statement.md` and `docs/2026-05-24-humo-model-choice__00_question.md`.
 
 ---
 
