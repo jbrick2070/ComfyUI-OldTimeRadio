@@ -12,8 +12,9 @@ nodes/_otr_outline.py:
           generate_outline builds a round-robin skeleton instead of
           raising OutlineFailedError. A cast-membership miss never
           crashes a run.
-  Step 3  the Stage 2 temperature schedule is low and monotonically
-          FALLING (0.35 / 0.25 / 0.15), not the legacy rising one.
+  Step 3  the Stage 2 LLM call samples low -- a low base plus a lower
+          structural retry via the structured_call ladder, not the
+          legacy rising schedule.
   Step 5  emitted speakers are normalized (uppercase, strip stray
           surrounding punctuation) before the cast-membership check;
           this is NOT broad edit-distance fuzzy matching.
@@ -38,11 +39,10 @@ from nodes._otr_episode_budget import (  # noqa: E402
 from nodes._otr_outline import (  # noqa: E402
     Outline,
     OutlineRequest,
-    _PhaseSkeleton,
-    _STAGE2_TEMPERATURE_SCHEDULE,
+    _STAGE2_BASE_TEMPERATURE,
+    _STAGE2_STRUCTURAL_RETRY_TEMPERATURE,
     _deterministic_phase_skeleton,
     _normalize_speaker,
-    _run_call_with_retry,
     generate_outline,
 )
 
@@ -164,66 +164,25 @@ class TestNormalizeSpeaker:
 
 
 # ---------------------------------------------------------------------------
-# Step 3 -- Stage 2 temperature schedule
+# Step 3 -- Stage 2 temperature (structured_call ladder, Sprint 2A/2D)
 # ---------------------------------------------------------------------------
-class TestStage2TemperatureSchedule:
+class TestStage2Temperature:
 
-    def test_schedule_is_low_and_monotonically_falling(self):
-        sched = _STAGE2_TEMPERATURE_SCHEDULE
-        assert sched == (0.35, 0.25, 0.15)
-        assert all(
-            sched[i] >= sched[i + 1] for i in range(len(sched) - 1)
-        ), "Stage 2 schedule must be monotonically non-increasing"
-        assert all(t <= 0.5 for t in sched), (
-            "Stage 2 is structured routing -- every retry temperature "
-            "must stay low"
-        )
+    def test_stage2_temperatures_are_low_and_retry_lowers(self):
+        # Stage 2 is structured constraint-routing, not creative prose:
+        # both the base and the structural-retry temperature stay low,
+        # and the structural retry LOWERS temperature (the 2B
+        # principle), never raises it.
+        assert _STAGE2_BASE_TEMPERATURE <= 0.5
+        assert _STAGE2_STRUCTURAL_RETRY_TEMPERATURE <= 0.5
+        assert (
+            _STAGE2_STRUCTURAL_RETRY_TEMPERATURE < _STAGE2_BASE_TEMPERATURE
+        ), "the structural retry must sample more conservatively, not less"
 
-    def test_run_call_with_retry_applies_falling_schedule(self):
-        # A schema that never validates forces all 3 attempts. Record
-        # the temperature the generate_fn sees each attempt.
-        seen = []
-
-        def _gen(messages, *, temperature, max_new_tokens):
-            seen.append(temperature)
-            return "not json at all"
-
-        parsed, _attempts = _run_call_with_retry(
-            _gen,
-            system="sys", user="user",
-            schema_cls=_PhaseSkeleton, label="test",
-            max_attempts=3, base_temperature=0.7, max_new_tokens=200,
-            temperature_schedule=_STAGE2_TEMPERATURE_SCHEDULE,
-        )
-        assert parsed is None
-        assert seen == [0.35, 0.25, 0.15], (
-            f"Stage 2 retries must follow the low falling schedule; "
-            f"saw {seen!r}"
-        )
-
-    def test_legacy_rising_schedule_intact_without_override(self):
-        # Stages 1 and 3 pass no temperature_schedule -- the legacy
-        # rising fresh schedule + fixed 0.3 repair temp are unchanged.
-        seen = []
-
-        def _gen(messages, *, temperature, max_new_tokens):
-            seen.append(temperature)
-            return "not json at all"
-
-        _run_call_with_retry(
-            _gen,
-            system="sys", user="user",
-            schema_cls=_PhaseSkeleton, label="test",
-            max_attempts=3, base_temperature=0.7, max_new_tokens=200,
-        )
-        assert seen[0] == pytest.approx(0.7)
-        assert seen[1] == pytest.approx(0.8)
-        assert seen[2] == pytest.approx(0.3)
-
-    def test_generate_outline_routes_stage2_through_schedule(self):
-        # End-to-end: generate_outline wires _STAGE2_TEMPERATURE_
-        # SCHEDULE into the Stage 2 call, so the first phase attempt
-        # samples at 0.35, not the 0.70 base_temperature.
+    def test_generate_outline_routes_stage2_at_low_base(self):
+        # End-to-end: generate_outline runs the Stage 2 phase call at
+        # _STAGE2_BASE_TEMPERATURE via the structured_call ladder, not
+        # the 0.70 creative base_temperature.
         record = []
         generate_outline(
             _make_gen(lambda n: ["ALICE"] * n, record=record),
@@ -231,7 +190,7 @@ class TestStage2TemperatureSchedule:
         )
         phase_temps = [t for s, t in record if s == "phase"]
         assert phase_temps, "no Stage 2 phase call was recorded"
-        assert phase_temps[0] == pytest.approx(0.35)
+        assert phase_temps[0] == pytest.approx(_STAGE2_BASE_TEMPERATURE)
 
 
 # ---------------------------------------------------------------------------

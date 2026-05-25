@@ -548,19 +548,6 @@ def _format_cast_block(req: OutlineRequest) -> str:
     return "\n".join(lines)
 
 
-_REPAIR_PROMPT_TEMPLATE = """\
-Your previous response did not validate against the required JSON schema.
-
-YOUR PREVIOUS RESPONSE:
-{prev_response}
-
-VALIDATION ERROR:
-{validation_error}
-
-Return ONLY corrected JSON that matches the schema. Do not explain. Do not add prose. Do not wrap in markdown fences. Output the corrected JSON object and nothing else.
-"""
-
-
 # ---------------------------------------------------------------------------
 # JSON extraction
 # ---------------------------------------------------------------------------
@@ -572,6 +559,20 @@ try:
     from . import _otr_json
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
+
+# Sprint 2A/2D: the shared structured-JSON retry ladder. generate_outline's
+# three stages (macro / phase / beat) route through it. Package import in
+# production; flat import when loaded standalone / under test.
+try:
+    from ._otr_structured_call import (
+        structured_call,
+        StructuredCallFailedError,
+    )
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_structured_call import (  # type: ignore
+        structured_call,
+        StructuredCallFailedError,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1115,15 +1116,16 @@ def _allocate_phase_target_words(
 # minimal speaker normalization (step 5).
 # ---------------------------------------------------------------------------
 
-# Step 3: Stage 2 (speaker routing) temperature schedule -- low and
-# monotonically FALLING. Stage 2 assigns speakers from a fixed locked
-# cast; it is structured routing, not creative prose, so each retry
-# must sample MORE conservatively. attempt 1 = 0.35, attempt 2 = 0.25,
-# attempt 3 (repair) = 0.15. Replaces the legacy RISING schedule
-# (base_temperature + 0.1*attempt_idx -> 0.70 / 0.80, repair 0.30),
-# which raised temperature on exactly the constraint-adherence retries
-# that needed it lowered.
-_STAGE2_TEMPERATURE_SCHEDULE: tuple[float, ...] = (0.35, 0.25, 0.15)
+# Step 3 (Sprint 2A/2D): Stage 2 (speaker routing) base + structural-
+# retry temperatures for the structured_call ladder. Stage 2 assigns
+# speakers from a fixed locked cast -- structured routing, not creative
+# prose -- so both run low and the structural retry LOWERS temperature
+# (the 2B principle). The ladder's typed-repair Attempt 3 then runs at
+# its own static low temperature. Replaces the legacy RISING schedule
+# (base + 0.1*attempt_idx -> 0.70 / 0.80) that raised temperature on
+# exactly the constraint-adherence retries that needed it lowered.
+_STAGE2_BASE_TEMPERATURE: float = 0.35
+_STAGE2_STRUCTURAL_RETRY_TEMPERATURE: float = 0.25
 
 # Step 5: characters an LLM strays around a speaker name -- a trailing
 # colon ("LEMMY:"), surrounding quotes / brackets, stray dashes or
@@ -1180,142 +1182,28 @@ def _deterministic_phase_skeleton(
     return _PhaseSkeleton(beats=beats)
 
 
-def _run_call_with_retry(
-    generate_fn,
-    *,
-    system: str,
-    user: str,
-    schema_cls,
-    label: str,
-    max_attempts: int,
-    base_temperature: float,
-    max_new_tokens: int,
-    extra_check=None,
-    temperature_schedule: Optional[tuple[float, ...]] = None,
-) -> tuple[object, list[tuple[str, str]]]:
-    """Single LLM call wrapped in a 3-attempt retry. Returns (parsed,
-    attempts_history). Raises the last error wrapped in a tuple so
-    the caller can decide whether to escalate to OutlineFailedError.
+def _structured_attempt_entry(
+    label: str, exc: BaseException,
+) -> tuple[str, str]:
+    """Collapse a failed structured_call into one OutlineFailedError
+    attempts entry.
 
-    Each attempt: fresh generation at base_temperature + 0.1 *
-    attempt_idx, with the final attempt switching to a repair call
-    at temp 0.3 carrying the previous raw + validation error in the
-    user prompt.
-
-    HOTFIX step 3 (2026-05-23): when `temperature_schedule` is given,
-    it overrides the rising base_temperature schedule -- attempt i
-    uses temperature_schedule[min(i, len-1)] for BOTH fresh and repair
-    calls. Stage 2 (speaker routing) passes the low, monotonically
-    falling _STAGE2_TEMPERATURE_SCHEDULE so a constraint-adherence
-    retry samples more conservatively, not less. Stages 1 and 3 leave
-    it None and keep the legacy rising schedule.
-
-    extra_check is an optional callable (parsed, raw) -> str|None
-    used to apply cross-call invariants (e.g. cast-membership check
-    on Stage 2 outputs). Return None on pass, error string on fail
-    and the loop retries.
+    A stage's structured_call fails one of two ways: the retry ladder
+    is exhausted (StructuredCallFailedError), or the slot fn itself
+    raises and the exception propagates uncaught (structured_call does
+    not catch slot-fn failures). Both map here to a single readable
+    (raw, error) tuple for OutlineFailedError.attempts.
     """
-    base_messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-    ]
-    attempts: list[tuple[str, str]] = []
-    last_raw = ""
-    last_err = ""
-
-    for attempt_idx in range(max_attempts):
-        is_repair = (attempt_idx == max_attempts - 1) and attempt_idx >= 2
-        # HOTFIX step 3: an explicit temperature_schedule (Stage 2)
-        # overrides both the rising fresh schedule and the fixed 0.3
-        # repair temp. The index is clamped to the last entry so a
-        # longer retry budget keeps sampling at the final (lowest)
-        # value rather than running off the end of the schedule.
-        if temperature_schedule is not None:
-            scheduled_temp = temperature_schedule[
-                min(attempt_idx, len(temperature_schedule) - 1)
-            ]
-        else:
-            scheduled_temp = None
-        if is_repair and attempts:
-            prev_raw, prev_err = attempts[-1]
-            repair_user = _REPAIR_PROMPT_TEMPLATE.format(
-                prev_response=prev_raw,
-                validation_error=prev_err,
-            )
-            messages = [
-                {"role": "system", "content": system},
-                {"role": "user", "content": repair_user},
-            ]
-            temp = scheduled_temp if scheduled_temp is not None else 0.3
-            log.info(
-                "[OTR_Outline.%s] attempt %d/%d: repair call (temp=%.2f)",
-                label, attempt_idx + 1, max_attempts, temp,
-            )
-        else:
-            messages = base_messages
-            if scheduled_temp is not None:
-                temp = scheduled_temp
-            else:
-                temp = base_temperature + (0.1 * attempt_idx)
-            log.info(
-                "[OTR_Outline.%s] attempt %d/%d: fresh (temp=%.2f)",
-                label, attempt_idx + 1, max_attempts, temp,
-            )
-
-        try:
-            raw = generate_fn(
-                messages,
-                temperature=temp,
-                max_new_tokens=max_new_tokens,
-            )
-        except Exception as exc:  # noqa: BLE001
-            last_err = f"generate_fn raised: {type(exc).__name__}: {exc}"
-            log.warning("[OTR_Outline.%s] %s", label, last_err)
-            attempts.append(("", last_err))
-            continue
-
-        last_raw = raw or ""
-        try:
-            data = _otr_json.parse_first_json_object(last_raw)
-        except json.JSONDecodeError as exc:
-            last_err = f"json.JSONDecodeError: {exc}"
-            log.warning(
-                "[OTR_Outline.%s] attempt %d failed: %s",
-                label, attempt_idx + 1, last_err,
-            )
-            attempts.append((last_raw, last_err))
-            continue
-
-        try:
-            parsed = schema_cls.model_validate(data)
-        except ValidationError as exc:
-            last_err = f"ValidationError: {exc}"
-            log.warning(
-                "[OTR_Outline.%s] attempt %d failed: %s",
-                label, attempt_idx + 1, last_err,
-            )
-            attempts.append((last_raw, last_err))
-            continue
-
-        if extra_check is not None:
-            check_err = extra_check(parsed, last_raw)
-            if check_err is not None:
-                last_err = check_err
-                log.warning(
-                    "[OTR_Outline.%s] attempt %d failed: %s",
-                    label, attempt_idx + 1, last_err,
-                )
-                attempts.append((last_raw, last_err))
-                continue
-
-        log.info(
-            "[OTR_Outline.%s] success on attempt %d/%d",
-            label, attempt_idx + 1, max_attempts,
+    if isinstance(exc, StructuredCallFailedError):
+        return (
+            "",
+            f"[{label}] structured_call exhausted after {exc.attempts} "
+            f"attempt(s); last error: {exc.last_error}",
         )
-        return parsed, attempts
-
-    # All attempts failed. Caller decides escalation.
-    return None, attempts
+    return (
+        "",
+        f"[{label}] slot fn raised: {type(exc).__name__}: {exc}",
+    )
 
 
 def _assemble_outline(
@@ -1520,19 +1408,24 @@ def generate_outline(
 
     # ----------------------------- Stage 1 ---------------------------------
     macro_user = _build_macro_user_prompt(req)
-    macro, macro_attempts = _run_call_with_retry(
-        generate_fn,
-        system=_make_system(_MACRO_SYSTEM_PROMPT),
-        user=macro_user,
-        schema_cls=_MacroShape,
-        label="macro",
-        max_attempts=max_attempts,
-        base_temperature=base_temperature,
-        max_new_tokens=250,
-    )
-    all_attempts.extend(macro_attempts)
-    if macro is None:
-        raise OutlineFailedError(attempts=all_attempts, request=req)
+    try:
+        macro = structured_call(
+            prompt=[
+                {"role": "system",
+                 "content": _make_system(_MACRO_SYSTEM_PROMPT)},
+                {"role": "user", "content": macro_user},
+            ],
+            schema=_MacroShape,
+            slot_fn=generate_fn,
+            base_temperature=base_temperature,
+            structural_retry_temperature=base_temperature / 2.0,
+            max_new_tokens=250,
+            max_attempts=max_attempts,
+            helper_name="OTR_Outline.macro",
+        )
+    except Exception as exc:  # noqa: BLE001 -- ladder or slot-fn failure
+        all_attempts.append(_structured_attempt_entry("macro", exc))
+        raise OutlineFailedError(attempts=all_attempts, request=req) from exc
 
     # ----------------------------- Stage 2 ---------------------------------
     # HOTFIX 2026-05-23 (BUG-LOCAL-259): the Stage 2 speaker call no
@@ -1571,7 +1464,7 @@ def generate_outline(
             arc_phases, phase_idx,
         )
 
-        def _phase_check(parsed: _PhaseSkeleton, raw: str) -> str | None:
+        def _phase_check(parsed: _PhaseSkeleton) -> str | None:
             # Cast membership AND beat count match.
             if len(parsed.beats) != phase_beat_count:
                 return (
@@ -1600,29 +1493,36 @@ def generate_outline(
                 )
             return None
 
-        skeleton, phase_attempts = _run_call_with_retry(
-            generate_fn,
-            system=_make_system(_PHASE_SYSTEM_PROMPT),
-            user=phase_user,
-            schema_cls=_PhaseSkeleton,
-            label=f"phase[{phase_name}]",
-            max_attempts=max_attempts,
-            base_temperature=base_temperature,
-            max_new_tokens=200,
-            extra_check=_phase_check,
-            temperature_schedule=_STAGE2_TEMPERATURE_SCHEDULE,
-        )
-        all_attempts.extend(phase_attempts)
-        if skeleton is None:
-            # Step 2: deterministic no-crash fallback. The Stage 2
-            # retry budget is exhausted -- almost always a
-            # cast-membership miss the creative LLM would not stop
-            # making. A cast-membership failure is ALWAYS
-            # deterministically recoverable (the legal speaker set is
-            # known), so it must never vaporize the run. Build the
-            # phase skeleton by round-robining the locked cast instead
-            # of raising OutlineFailedError. The failed attempts stay
-            # recorded in all_attempts for diagnostics.
+        try:
+            skeleton = structured_call(
+                prompt=[
+                    {"role": "system",
+                     "content": _make_system(_PHASE_SYSTEM_PROMPT)},
+                    {"role": "user", "content": phase_user},
+                ],
+                schema=_PhaseSkeleton,
+                slot_fn=generate_fn,
+                base_temperature=_STAGE2_BASE_TEMPERATURE,
+                structural_retry_temperature=(
+                    _STAGE2_STRUCTURAL_RETRY_TEMPERATURE
+                ),
+                post_validator=_phase_check,
+                max_new_tokens=200,
+                max_attempts=max_attempts,
+                helper_name=f"OTR_Outline.phase[{phase_name}]",
+            )
+        except Exception as exc:  # noqa: BLE001 -- ladder or slot-fn failure
+            # Step 2: deterministic no-crash fallback. A Stage 2
+            # exhaustion is almost always a cast-membership miss the
+            # creative LLM would not stop making. A cast-membership
+            # failure is ALWAYS deterministically recoverable (the
+            # legal speaker set is known), so it must never vaporize
+            # the run. Build the phase skeleton by round-robining the
+            # locked cast instead of raising OutlineFailedError. The
+            # failure stays recorded in all_attempts for diagnostics.
+            all_attempts.append(
+                _structured_attempt_entry(f"phase[{phase_name}]", exc)
+            )
             skeleton = _deterministic_phase_skeleton(
                 phase_beat_count, req.character_cast,
             )
@@ -1664,21 +1564,30 @@ def generate_outline(
                 (beat_idx, n_beats),
                 words_lo, words_hi,
             )
-            detail, beat_attempts = _run_call_with_retry(
-                generate_fn,
-                system=_make_system(_BEAT_SYSTEM_PROMPT),
-                user=beat_user,
-                schema_cls=_BeatFleshout,
-                label=f"beat[{phase_name}.{beat_idx + 1}]",
-                max_attempts=max_attempts,
-                base_temperature=base_temperature,
-                max_new_tokens=150,
-            )
-            all_attempts.extend(beat_attempts)
-            if detail is None:
+            try:
+                detail = structured_call(
+                    prompt=[
+                        {"role": "system",
+                         "content": _make_system(_BEAT_SYSTEM_PROMPT)},
+                        {"role": "user", "content": beat_user},
+                    ],
+                    schema=_BeatFleshout,
+                    slot_fn=generate_fn,
+                    base_temperature=base_temperature,
+                    structural_retry_temperature=base_temperature / 2.0,
+                    max_new_tokens=150,
+                    max_attempts=max_attempts,
+                    helper_name=(
+                        f"OTR_Outline.beat[{phase_name}.{beat_idx + 1}]"
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001 -- ladder or slot-fn failure
+                all_attempts.append(_structured_attempt_entry(
+                    f"beat[{phase_name}.{beat_idx + 1}]", exc,
+                ))
                 raise OutlineFailedError(
                     attempts=all_attempts, request=req,
-                )
+                ) from exc
 
             # Python is authoritative for target_words. LLMs (both
             # Mistral and Gemma in retests #8-#11) cannot reliably
