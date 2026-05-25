@@ -277,7 +277,11 @@ def load_llm(
 
         load_dtype = torch.bfloat16
 
-        # Flash Attention 2 (preferred) with SDPA fallback.
+        # Attention selector: Flash Attention 2 (preferred) -> SDPA
+        # (mandatory fallback on Blackwell sm_120 / Windows / torch 2.10)
+        # -> SageAttention. The resolved value below is the single
+        # source of truth for `attn_implementation` in common_kwargs --
+        # it is logged on every load so the choice is auditable.
         attn_impl = "sdpa"
         try:
             from importlib.metadata import distribution, PackageNotFoundError
@@ -294,6 +298,7 @@ def load_llm(
                 )
         except Exception as _fa_err:
             log.info("[StoryOrchestrator] FA2 probe failed (%s) - using SDPA fallback", _fa_err)
+        _runtime_log(f"[StoryOrchestrator] Attention selector resolved: attn_implementation={attn_impl}")
 
         # 4-bit / 8-bit quantization config.
         quant_config = None
@@ -383,7 +388,12 @@ def load_llm(
             trust_remote_code=False,
             low_cpu_mem_usage=True,
             torch_dtype=load_dtype,
-            attn_implementation="sdpa",
+            # Consume the resolved attention selector (above). On the
+            # Blackwell sm_120 / Windows / torch 2.10 stack `attn_impl`
+            # is always "sdpa" -- FA2 has no prebuilt wheel -- but the
+            # selector stays the single source of truth so an FA2 wheel
+            # appearing later is honoured without a second edit here.
+            attn_implementation=attn_impl,
         )
 
         if max_memory is not None:
