@@ -87,6 +87,12 @@ def test_lock_cast_generation_uses_creative():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # force_lemmy=False: the LEMMY ~11% cameo rolls on OS
+            # entropy, not the seeded rng (BUG-LOCAL-260). With
+            # num_characters=1 a LEMMY hit consumes the only open slot,
+            # making zero generation calls and flaking these routing
+            # assertions. Pin it OFF for determinism.
+            force_lemmy=False,
             max_attempts_per_call=3,
         )
     except cast.CastingFailedError:
@@ -125,6 +131,12 @@ def test_lock_cast_validation_uses_technical():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # force_lemmy=False: the LEMMY ~11% cameo rolls on OS
+            # entropy, not the seeded rng (BUG-LOCAL-260). With
+            # num_characters=1 a LEMMY hit consumes the only open slot,
+            # making zero generation calls and flaking these routing
+            # assertions. Pin it OFF for determinism.
+            force_lemmy=False,
             max_attempts_per_call=3,  # 2 fresh + 1 repair
         )
     except cast.CastingFailedError:
@@ -155,6 +167,10 @@ def test_lock_cast_validation_failfast_no_internal_retry():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # force_lemmy=False: pin out the LEMMY ~11% cameo (rolls on
+            # OS entropy, not the seeded rng -- BUG-LOCAL-260) so the
+            # raise-expecting assertion stays deterministic.
+            force_lemmy=False,
             max_attempts_per_call=3,
         )
 
@@ -193,6 +209,10 @@ def test_lock_cast_validation_fail_triggers_writer_regen():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # force_lemmy=False: pin out the LEMMY ~11% cameo (rolls on
+            # OS entropy, not the seeded rng -- BUG-LOCAL-260) so the
+            # raise-expecting assertion stays deterministic.
+            force_lemmy=False,
             max_attempts_per_call=3,
         )
     except cast.CastValidationLLMError:

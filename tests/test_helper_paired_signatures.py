@@ -182,6 +182,13 @@ def test_lock_cast_internally_uses_creative_fn_default():
             news_seed="seed",
             style="noir",
             rng=random.Random(7),
+            # force_lemmy=False: the LEMMY ~11% cameo rolls on OS
+            # entropy, not the seeded rng (BUG-LOCAL-260), so an unset
+            # force_lemmy makes this routing test flaky -- a LEMMY hit
+            # changes cast assembly and the generation call pattern.
+            # Pinning it OFF keeps the creative/technical-slot assertion
+            # below deterministic.
+            force_lemmy=False,
             # Single attempt only -- skips the B3 repair branch so
             # this test stays focused on creative-slot generation.
             max_attempts_per_call=1,
