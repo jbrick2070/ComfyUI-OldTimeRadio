@@ -37,14 +37,13 @@ cross-model safety net. See
 """
 from __future__ import annotations
 
-import json
 import logging
 import random
 import re
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 # Shared tolerant JSON extractor (BUG-LOCAL-261 consolidation). Package
 # import in production; flat import when loaded standalone / under test.
@@ -52,6 +51,20 @@ try:
     from . import _otr_json
 except ImportError:  # pragma: no cover - standalone / test load
     import _otr_json  # type: ignore
+
+# Sprint 2A/2D: the shared structured-JSON retry ladder. cast_one_character
+# routes its per-character LLM call through it. Package import in
+# production; flat import when loaded standalone / under test.
+try:
+    from ._otr_structured_call import (
+        structured_call,
+        StructuredCallFailedError,
+    )
+except ImportError:  # pragma: no cover - standalone / test load
+    from _otr_structured_call import (  # type: ignore
+        structured_call,
+        StructuredCallFailedError,
+    )
 
 # Import the cast pools. Try relative first (production: ComfyUI loads
 # this as part of the ComfyUI-OldTimeRadio package); fall back to
@@ -269,17 +282,8 @@ def _format_prior_entry(row: dict) -> str:
     return f"{name} ({g_short}, {desc})"
 
 
-# Cap on how much of a prior raw response we embed into the repair
-# prompt on attempt 3. Local LLMs occasionally babble 4000+ tokens of
-# malformed garbage; passing that into the repair prompt blows the KV
-# cache on the 14.5 GB VRAM ceiling. 1200 chars is plenty for the
-# LLM to see "what it tried last time" without risking OOM. Per
-# round-robin synthesis 2026-05-10 (both ChatGPT and Gemini flagged).
-_REPAIR_RAW_CAP_CHARS = 1200
-
-
 # ---------------------------------------------------------------------------
-# Per-character LLM caller -- validate + 3-attempt reroll
+# Per-character LLM caller -- structured_call retry ladder
 # ---------------------------------------------------------------------------
 
 
@@ -295,19 +299,26 @@ def cast_one_character(
     base_temperature: float = 0.7,
     max_new_tokens: int = 250,
     casting_brief: str = "",
-    validation_fn: Optional[Callable[..., str]] = None,
 ) -> CastingResponse:
     """Cast one open character. Returns a validated CastingResponse.
 
-    Retry strategy mirrors `_otr_outline.generate_outline`:
-      Attempt 1: fresh, base_temperature (0.7).
-      Attempt 2: fresh, base_temperature + 0.1 (0.8).
-      Attempt 3: REPAIR call -- prior raw output (truncated) + the
-                 validation error, temp 0.3.
+    Sprint 2A/2D: the call routes through the shared `structured_call`
+    retry ladder (base -> structural retry -> typed repair). The ladder
+    subsumes the former hand-rolled 3-attempt loop. The voice-pool
+    check -- voice_preset must be one of `available_voices`, a runtime
+    set pydantic cannot see -- rides `structured_call.post_validator`;
+    a pool miss re-rolls the ladder exactly like a schema failure.
 
-    `max_attempts=1` is allowed (single-shot, no repair). `0` is not.
+    Every attempt -- fresh, structural retry, and typed repair -- runs
+    on `generate_fn`. The S32 B3 routing of the repair attempt to a
+    separate technical slot was retired with the structured_call
+    conversion: a single ladder has one `slot_fn` and cannot switch
+    slots per attempt.
 
-    Raises CastingFailedError if all attempts fail.
+    `max_attempts=1` is allowed (single-shot, no retry). `0` is not.
+
+    Raises CastingFailedError if the ladder is exhausted or the slot fn
+    raises (structured_call does not catch slot-fn failures).
     """
     if max_attempts < 1:
         raise ValueError(
@@ -328,96 +339,65 @@ def cast_one_character(
         available_voices=available_voices,
         casting_brief=casting_brief,
     )
-    attempts: list[tuple[str, str]] = []
-    last_raw: str | None = None
+    messages = [{"role": "user", "content": user_prompt}]
 
-    for attempt_idx in range(max_attempts):
-        # Repair branch: only on the final attempt, only when there
-        # IS a prior attempt (so attempt_idx > 0), only when the
-        # prior attempt produced a string we can hand back. Use
-        # `is not None` so an empty-string prior does not silently
-        # change branch semantics. Per round-robin nit 2026-05-10.
-        is_repair = (
-            attempt_idx == max_attempts - 1
-            and attempt_idx > 0
-            and last_raw is not None
-        )
-        if is_repair:
-            # Repair attempt: hand the prior raw (TRUNCATED) + last
-            # error back to the LLM. Lower temperature for a stable
-            # recovery. Truncation is a VRAM ceiling protection --
-            # see _REPAIR_RAW_CAP_CHARS.
-            last_err = attempts[-1][1] if attempts else "validation failed"
-            truncated_raw = last_raw[:_REPAIR_RAW_CAP_CHARS]
-            messages = [
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": truncated_raw},
-                {
-                    "role": "user",
-                    "content": (
-                        "That response did not validate. Error:\n"
-                        f"{last_err}\n\n"
-                        "Return ONLY corrected JSON matching the schema. "
-                        "No prose. No code fences."
-                    ),
-                },
-            ]
-            temperature = 0.3
-        else:
-            # Fresh attempt -- single user message, no system role.
-            # Model loader's chat-template handles role-folding for
-            # models that require a system role.
-            messages = [{"role": "user", "content": user_prompt}]
-            temperature = base_temperature + (0.1 * attempt_idx)
-
-        # S32 B3 (D2): repair attempt routes to `validation_fn`
-        # (technical slot) when provided. Generation attempts
-        # 1..N-1 stay on `generate_fn` (creative slot). When
-        # validation_fn is unset (None), repair falls back to
-        # generate_fn -- preserves the legacy single-fn contract
-        # for any direct caller.
-        active_fn = validation_fn if (is_repair and validation_fn is not None) else generate_fn
-        try:
-            raw = active_fn(
-                messages,
-                temperature=float(temperature),
-                max_new_tokens=int(max_new_tokens),
-            )
-        except Exception as exc:  # noqa: BLE001
-            attempts.append(("", f"generate_fn raised: {exc!r}"))
-            continue
-
-        last_raw = raw or ""
-        try:
-            parsed = _otr_json.parse_first_json_object(last_raw)
-        except json.JSONDecodeError as exc:
-            attempts.append((last_raw, f"json parse failed: {exc!r}"))
-            continue
-
-        try:
-            response = CastingResponse(**parsed)
-        except ValidationError as exc:
-            attempts.append((last_raw, f"schema validation failed: {exc!r}"))
-            continue
-
-        # Voice pool check -- separate from pydantic since the pool
-        # is runtime data, not schema.
+    # Voice-pool gate: the LLM can return a schema-valid voice_preset
+    # that is outside the runtime available_voices set -- a content
+    # failure pydantic cannot see. structured_call runs this on every
+    # schema-valid instance; a pool miss returns an error string and
+    # re-rolls the ladder exactly like a schema failure.
+    def _voice_pool_validator(response: CastingResponse) -> str | None:
         if response.voice_preset not in available_presets:
-            err = (
+            return (
                 f"voice_preset {response.voice_preset!r} not in "
                 f"available_voices ({sorted(available_presets)!r})"
             )
-            attempts.append((last_raw, err))
-            continue
+        return None
 
-        log.info(
-            "[OTR_Casting] cast %s -> voice=%s gender=%s (attempt %d/%d)",
-            name, response.voice_preset, response.gender,
-            attempt_idx + 1, max_attempts,
+    # LLM slot: creative -- the cast row carries audience-facing prose
+    # (character_description), so casting rides the content/creative
+    # plane. The structural retry runs at half the base temperature:
+    # strictly below base, never above (the Sprint 2B principle; the
+    # old loop RAISED the second attempt to base + 0.1).
+    try:
+        response = structured_call(
+            prompt=messages,
+            schema=CastingResponse,
+            slot_fn=generate_fn,
+            base_temperature=float(base_temperature),
+            structural_retry_temperature=float(base_temperature) / 2.0,
+            post_validator=_voice_pool_validator,
+            max_new_tokens=int(max_new_tokens),
+            max_attempts=int(max_attempts),
+            helper_name=f"cast_one_character:{name}",
         )
-        return response
+    except StructuredCallFailedError as exc:
+        # Ladder exhausted. Rebuild an `attempts` list of the length the
+        # ladder actually ran so lock_cast's CastValidationLLMError
+        # promotion -- which keys on len(attempts) == max_attempts --
+        # still fires on a full exhaustion.
+        last_error_text = (
+            f"{type(exc.last_error).__name__}: {exc.last_error}"
+            if exc.last_error is not None
+            else "no error captured"
+        )
+        raise CastingFailedError(
+            attempts=[("", last_error_text)] * max(exc.attempts, 1),
+            name=name,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 -- slot fn (LLM loader) varies
+        # structured_call does not catch slot-fn exceptions: a loader /
+        # VRAM / framework failure inside generate_fn lands here.
+        raise CastingFailedError(
+            attempts=[("", f"slot fn raised: {type(exc).__name__}: {exc}")],
+            name=name,
+        ) from exc
 
-    raise CastingFailedError(attempts=attempts, name=name)
+    log.info(
+        "[OTR_Casting] cast %s -> voice=%s gender=%s",
+        name, response.voice_preset, response.gender,
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -553,11 +533,11 @@ def lock_cast(
     meta dict has: lemmy_hit, casting_attempts (list of attempt
     counts per open slot, for telemetry).
     """
-    # S32 B3 (D2): generation runs through creative_fn; schema-
-    # validation repair attempt routes to technical_fn (single
-    # attempt, fail-fast). The body alias `generate_fn` keeps the
-    # call sites readable; `validation_fn` is threaded into
-    # `cast_one_character` as the dedicated repair-slot callable.
+    # cast_one_character runs every casting attempt on a single slot
+    # via the shared structured_call ladder. lock_cast feeds it
+    # `creative_fn` -- the cast row carries audience-facing prose, so
+    # casting rides the creative plane. (S32 B3's technical-slot repair
+    # routing was retired in the Sprint 2A/2D structured_call conversion.)
     generate_fn = creative_fn
 
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
@@ -626,7 +606,6 @@ def lock_cast(
                 available_voices=available_voices,
                 max_attempts=max_attempts_per_call,
                 casting_brief=casting_brief,
-                validation_fn=technical_fn,
             )
         except CastingFailedError as exc:
             # S32 B3 (D2): if the failure came from the repair-attempt

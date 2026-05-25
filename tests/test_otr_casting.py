@@ -318,10 +318,14 @@ def test_cast_one_character_max_attempts_one_single_shot_no_repair():
 
 
 def test_cast_one_character_repair_truncates_huge_raw():
-    """A 4000-char garbage response on attempt 1 must NOT bloat the
-    repair prompt's KV cache on attempt 2 (max_attempts=2 -> repair
-    fires on attempt 1 since attempt_idx>0 required for repair, so
-    we use max_attempts=3 to make sure repair fires)."""
+    """A 4000-char garbage response must NOT be embedded whole into the
+    repair prompt -- it would bloat the KV cache against the 14.5 GB
+    VRAM ceiling.
+
+    Sprint 2A/2D: the repair attempt is structured_call's Attempt 3,
+    whose default_repair_prompt_factory embeds only a truncated slice
+    of the prior failed output. Two bad responses then a good one so
+    the repair (third) attempt fires and recovers."""
     huge_garbage = "x" * 4000
     captured_messages: list = []
 
@@ -331,20 +335,26 @@ def test_cast_one_character_repair_truncates_huge_raw():
             return huge_garbage
         return _good_response()
 
-    _OTRC.cast_one_character(
+    r = _OTRC.cast_one_character(
         gen_fn,
         name="ALICE", news_seed="story", style="noir",
         prior_cast=[], available_voices=_three_voices(),
         max_attempts=3,
     )
-    # Third call is the repair attempt. Its messages should include
-    # the truncated assistant turn.
-    repair_messages = captured_messages[-1]
-    assistant_turn = next(m for m in repair_messages
-                          if m["role"] == "assistant")
-    assert len(assistant_turn["content"]) <= _OTRC._REPAIR_RAW_CAP_CHARS, \
-        f"repair prompt did not truncate huge raw: " \
-        f"{len(assistant_turn['content'])} chars"
+    assert r.voice_preset == "v2/en_speaker_4"
+    # Third call is the repair attempt. The prior 4000-char garbage
+    # must be truncated, not embedded whole.
+    repair_text = "".join(
+        m["content"] for m in captured_messages[-1]
+    )
+    assert huge_garbage not in repair_text, (
+        "repair prompt embedded the full 4000-char garbage -- the "
+        "structured_call repair factory must truncate prior output"
+    )
+    assert len(repair_text) < len(huge_garbage), (
+        f"repair prompt ({len(repair_text)} chars) is not smaller than "
+        f"the 4000-char garbage it was supposed to truncate"
+    )
 
 
 def test_lock_cast_preflight_fails_fast_when_voice_pool_too_small(

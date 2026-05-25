@@ -1,23 +1,24 @@
-"""S32 B3 -- lock_cast schema-validation (repair) dispatch to technical_fn.
+"""lock_cast slot routing -- all attempts on the creative slot.
 
-Per architectural decision D2:
-* Generation (attempts 1..N-1, fresh calls): creative_fn.
-* Schema validation (repair attempt, the final attempt that hands
-  prior raw + error back to the LLM): technical_fn (single attempt,
-  fail-fast).
-* If the technical-slot repair output also fails validation, raise
-  `CastValidationLLMError` (subclass of `CastingFailedError` so
-  legacy handlers still match; writer-side caller branches on the
-  subclass to trigger creative regen).
+Sprint 2A/2D reversed S32 B3. cast_one_character was converted onto the
+shared structured_call retry ladder, which has a single `slot_fn` and
+cannot switch slots per attempt. Casting now routes EVERY attempt
+(fresh + structural retry + typed repair) to the creative slot:
+* lock_cast passes creative_fn as cast_one_character's generate_fn.
+* `validation_fn` is still accepted by cast_one_character for signature
+  compatibility but is ignored -- the repair attempt no longer routes
+  to the technical slot.
+* When the ladder is fully exhausted, lock_cast still promotes the
+  CastingFailedError to `CastValidationLLMError` (a subclass, keyed on
+  the attempt count) so the writer-side caller can branch on it to
+  trigger creative regen rather than a hard fail.
 
 Tests:
-* `test_lock_cast_generation_uses_creative` -- fresh attempts hit
-  creative_fn.
-* `test_lock_cast_validation_uses_technical` -- repair attempt hits
-  technical_fn.
-* `test_lock_cast_validation_failfast_no_internal_retry` -- when
-  the technical-slot repair output fails validation,
-  `CastValidationLLMError` is raised (no further attempts).
+* `test_lock_cast_generation_uses_creative` -- attempts hit creative_fn.
+* `test_lock_cast_never_routes_to_technical` -- technical_fn is never
+  called (the S32 B3 reversal).
+* `test_lock_cast_validation_failfast_no_internal_retry` -- a fully
+  exhausted ladder raises `CastValidationLLMError`.
 * `test_lock_cast_validation_fail_triggers_writer_regen` --
   `CastValidationLLMError` is a subclass of `CastingFailedError`
   AND distinguishable as a separate class (the writer-visible
@@ -104,11 +105,11 @@ def test_lock_cast_generation_uses_creative():
     )
 
 
-def test_lock_cast_validation_uses_technical():
-    """Repair-attempt (schema-validation slot) routes to
-    technical_fn. The repair fires on the FINAL attempt only,
-    after at least one fresh attempt has produced a `last_raw`
-    string to hand back.
+def test_lock_cast_never_routes_to_technical():
+    """Sprint 2A/2D reversal of S32 B3: cast_one_character runs every
+    attempt -- fresh, structural retry, and typed repair -- on the
+    creative slot via the structured_call ladder. technical_fn is
+    never called, even on a fully-exhausted ladder.
     """
     from nodes import _otr_casting as cast
 
@@ -137,15 +138,18 @@ def test_lock_cast_validation_uses_technical():
             # making zero generation calls and flaking these routing
             # assertions. Pin it OFF for determinism.
             force_lemmy=False,
-            max_attempts_per_call=3,  # 2 fresh + 1 repair
+            max_attempts_per_call=3,
         )
     except cast.CastingFailedError:
         pass
 
-    assert len(technical_calls) >= 1, (
-        "Repair attempt MUST route to technical_fn. Got 0 technical "
-        f"calls (creative_calls={len(creative_calls)}). The B3 "
-        "schema-validation flip did not land."
+    assert len(creative_calls) >= 1, (
+        "every casting attempt must route to the creative slot"
+    )
+    assert len(technical_calls) == 0, (
+        "technical_fn must NEVER be called -- S32 B3's technical-slot "
+        "repair routing was retired in the structured_call conversion. "
+        f"Got {len(technical_calls)} technical call(s)."
     )
 
 
