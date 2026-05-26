@@ -69,6 +69,7 @@ from typing import Any, Optional
 from . import _otr_ledger_freeze as _LFC
 from . import _otr_ledger_reviewer as _OTRLR
 from . import _otr_story_critic as _OTRSC
+from . import _otr_reroll as _OTRRR
 
 log = logging.getLogger("OTR.freeze_cascade")
 
@@ -443,6 +444,67 @@ def _phase_8_video_readiness(led, *, enable: bool = True):
 
 
 # ---------------------------------------------------------------------------
+# Terminal-skip disposition (shared by the reviewer-terminal and the
+# Sprint 5C reroll-exhaustion exits)
+# ---------------------------------------------------------------------------
+
+
+def _build_terminal_skip_disposition(
+    ledger_data: dict,
+    *,
+    verdict: str,
+    reviewer_disp: Optional[_OTRLR.ReviewerDisposition],
+    pre_report: _LFC.GapAuditReport,
+) -> FreezeDisposition:
+    """Stamp the terminal-skip state and build the FreezeDisposition.
+
+    Shared by the two cascade exits that end WITHOUT running Phase 10:
+    the reviewer-terminal path (too_many_edits / needs_full_rerun from
+    review_ledger) and the Sprint 5C reroll-exhaustion path. Both leave
+    the ledger in a state Phase 10 must not freeze, so Phase 7 / 8 / 10
+    are stamped `terminal_skipped` and the audio / video readiness meta
+    keys carry the same reason. The freeze_verdict STRING, the full
+    freeze_disposition dict, and the compact per-phase telemetry are all
+    stamped here so both exits leave an identically shaped meta.
+    """
+    meta = ledger_data.setdefault("meta", {})
+    meta["freeze_verdict"] = verdict
+    # B5: stamp the remaining phases as terminal_skipped so
+    # meta.cleanup_passes / readiness_passes stay contiguous. S30 B4:
+    # phase 4 / 4.5 / 5 / 6 names removed -- those phases no longer exist.
+    for skipped_name in (
+        "phase_7_audio_readiness",
+        "phase_8_video_readiness",
+        "phase_10_gap_audit_post_and_freeze",
+    ):
+        _stamp_stub_or_skipped_phase(
+            ledger_data,
+            phase_name=skipped_name,
+            reason="terminal_skipped",
+        )
+    # Stamp the skipped-phase status on their respective meta keys so
+    # downstream readers see a consistent shape.
+    meta.setdefault("audio_readiness", {
+        "skipped": True, "skipped_reason": "terminal_skipped",
+    })
+    meta.setdefault("video_readiness", {
+        "skipped": True, "skipped_reason": "terminal_skipped",
+    })
+    disp = FreezeDisposition(
+        verdict=verdict,
+        reviewer_disposition=reviewer_disp,
+        gap_audit_pre=pre_report,
+        gap_audit_post=None,
+    )
+    meta["freeze_disposition"] = disp.to_dict()
+    # C3 (clean-break 2026-05-12): compact per-phase telemetry for soak
+    # diagnostics. Lives on meta only -- the freeze_verdict output STRING
+    # stays the verdict literal so graph-canvas previews are readable.
+    meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
+    return disp
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -571,41 +633,16 @@ def run_freeze_cascade(
         reviewer_disp.verdict, "needs_full_rerun",
     )
     if interim_verdict in FREEZE_TERMINAL_FAILURE_VERDICTS:
-        meta = ledger_data.setdefault("meta", {})
-        meta["freeze_verdict"] = interim_verdict
-        # B5: stamp the remaining phases as terminal_skipped so
-        # meta.cleanup_passes stays contiguous. S30 B4: phase 4/4.5/5/6
-        # names removed -- those phases no longer exist.
-        for skipped_name in (
-            "phase_7_audio_readiness",
-            "phase_8_video_readiness",
-            "phase_10_gap_audit_post_and_freeze",
-        ):
-            _stamp_stub_or_skipped_phase(
-                ledger_data,
-                phase_name=skipped_name,
-                reason="terminal_skipped",
-            )
-        # Stamp the skipped-phase status on their respective meta keys
-        # so downstream readers see a consistent shape.
-        meta.setdefault("audio_readiness", {
-            "skipped": True, "skipped_reason": "terminal_skipped",
-        })
-        meta.setdefault("video_readiness", {
-            "skipped": True, "skipped_reason": "terminal_skipped",
-        })
-        disp = FreezeDisposition(
+        # review_ledger has already restored the ledger to its
+        # pre-review state; Phase 10 must not run. Stamp the terminal
+        # skip + build the disposition via the shared helper (the same
+        # path the Sprint 5C reroll-exhaustion exit uses).
+        disp = _build_terminal_skip_disposition(
+            ledger_data,
             verdict=interim_verdict,
-            reviewer_disposition=reviewer_disp,
-            gap_audit_pre=pre_report,
-            gap_audit_post=None,
+            reviewer_disp=reviewer_disp,
+            pre_report=pre_report,
         )
-        meta["freeze_disposition"] = disp.to_dict()
-        # C3 (clean-break 2026-05-12): compact per-phase telemetry
-        # for soak diagnostics. Lives on meta only -- the
-        # freeze_verdict output STRING stays the verdict literal
-        # so graph-canvas previews are readable.
-        meta["freeze_phase_telemetry"] = build_phase_telemetry(meta)
         log.info(
             "[LFC] terminal reviewer verdict %r -- skipping Phase 4..10 "
             "(B7 fix: short-circuit moved before mutation phases)",
@@ -644,6 +681,42 @@ def run_freeze_cascade(
         len(story_critic_report.continuity_issues),
         len(story_critic_report.render_priority),
     )
+
+    # ---- Sprint 5C: targeted reroll loop ---------------------------
+    # The Sprint 5B critic above stamped meta.story_critic_report but
+    # changed no line text (advisory). Sprint 5C ACTS on it:
+    # run_targeted_reroll re-composes every line the critic named in
+    # `reroll_targets`, threading the critic's concrete hint in as a hard
+    # REVISE instruction, then re-runs the critic -- capped at
+    # MAX_REROLL_CYCLES cycles. The re-composition runs on the technical
+    # model already resident here (Sprint 5C fork Option A: no
+    # creative-slot VRAM swap, no node-surface change). It NEVER raises
+    # (Prime Directive 1) -- a failed re-composition keeps the original
+    # line, an unexpected error degrades to freeze-what-we-have. If the
+    # critic still names targets after the cap, the reroll restores the
+    # pre-reroll lines and returns the `needs_full_rerun` terminal
+    # verdict, handled here exactly like a terminal reviewer verdict
+    # (skip Phase 7 / 8 / 10 via the shared terminal-skip helper).
+    reroll_disp = _OTRRR.run_targeted_reroll(generate_fn, led)
+    log.info(
+        "[LFC] Sprint 5C targeted reroll: verdict=%s, %d cycle(s), "
+        "%d line(s) re-composed",
+        reroll_disp.verdict, reroll_disp.cycles_run,
+        reroll_disp.lines_rerolled,
+    )
+    if reroll_disp.verdict == "needs_full_rerun":
+        disp = _build_terminal_skip_disposition(
+            ledger_data,
+            verdict="needs_full_rerun",
+            reviewer_disp=reviewer_disp,
+            pre_report=pre_report,
+        )
+        log.warning(
+            "[LFC] reroll loop exhausted %d cycle(s) with the critic "
+            "still flagging targets -- skipping Phase 7..10, freeze "
+            "verdict needs_full_rerun", reroll_disp.cycles_run,
+        )
+        return disp
 
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone

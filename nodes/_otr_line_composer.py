@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Iterable, Optional
 
 log = logging.getLogger("OTR")
@@ -672,6 +672,13 @@ class LineRequest:
     # drops the block entirely. Default "" keeps every existing caller
     # and test working unchanged.
     continuity_slice: str = ""
+    # Sprint 5C (2026-05-25) -- targeted-reroll revision hint. When the
+    # Sprint 5B story critic flags this line for a reroll, the freeze
+    # cascade threads the critic's concrete `RerollTarget.hint` here.
+    # `_build_user_prompt` renders it as a REVISE block at the WRITE LINE
+    # tail. Empty string means this is a normal first-pass compose (the
+    # block is dropped), so every existing caller / test is unaffected.
+    reroll_hint: str = ""
 
 
 @dataclass(frozen=True)
@@ -1128,6 +1135,22 @@ def _build_user_prompt(req: LineRequest) -> str:
     parts.append(f"Mood: {req.mood}.")
     parts.append(f"Beat: {req.intent}.")
     parts.append(f"Word count target: {req.target_words}.")
+    # REVISE block -- Sprint 5C (2026-05-25). When this beat is being
+    # RE-composed because the Sprint 5B story critic flagged the prior
+    # draft, the freeze cascade threads the critic's concrete instruction
+    # on `req.reroll_hint`. It renders as the last directive before
+    # "Speak now." so the rewrite instruction frames the line with maximum
+    # salience -- the model is fixing a flagged draft and the hint says
+    # exactly how. Empty string -> block dropped (the normal first-pass
+    # compose path), so every existing caller / test is unaffected.
+    if req.reroll_hint:
+        parts.append("")
+        parts.append(
+            "REVISE: the previous draft of this line was flagged by the "
+            "story critic. Rewrite it to address this note directly:"
+        )
+        parts.append(f"  {req.reroll_hint}")
+        parts.append("")
     parts.append("Speak now.")
     return "\n".join(parts)
 
@@ -1623,6 +1646,7 @@ def compose_line_draft(
     max_new_tokens_cap: int = _MAX_NEW_TOKENS_PER_LINE,
     stop_strings: tuple[str, ...] = _DEFAULT_STOP_STRINGS,
     creative_repo_id: str | None = None,
+    reroll_hint: str | None = None,  # Sprint 5C
 ) -> str:
     """Run the creative retry ladder and return ONE draft dialogue line.
 
@@ -1648,7 +1672,15 @@ def compose_line_draft(
     final attempt, where the drifty line ships with a WARNING.
 
     Raises ``LineCompositionFailedError`` after all attempts exhausted.
+
+    Sprint 5C: a non-None ``reroll_hint`` overlays the story critic's
+    concrete revision instruction onto the (frozen) ``req`` so
+    ``_build_user_prompt`` renders the REVISE block. ``None`` leaves
+    ``req`` untouched -- the normal first-pass compose path.
     """
+    if reroll_hint is not None:
+        req = replace(req, reroll_hint=reroll_hint)
+
     # All sub-passes route to creative_fn. Per-beat technical-slot
     # dispatch in differing-slots mode would cost ~3.3 hr VRAM
     # transition overhead per episode -- architecturally rejected at
@@ -1793,6 +1825,7 @@ def compose_line(
     enable_polish_pass: bool = False,
     polish_generate_fn=None,
     creative_repo_id: str | None = None,  # Sprint D D2b
+    reroll_hint: str | None = None,  # Sprint 5C
 ) -> LineResult:
     """Compose one cleaned dialogue line for a beat.
 
@@ -1821,7 +1854,16 @@ def compose_line(
 
     Raises ``LineCompositionFailedError`` if the draft stage exhausts
     its attempts.
+
+    Sprint 5C: a non-None ``reroll_hint`` overlays the story critic's
+    revision instruction onto the (frozen) ``req`` here, before the draft
+    stage, so ``_build_user_prompt`` renders the REVISE block. The
+    already-overlaid ``req`` is what flows into ``compose_line_draft``
+    below -- the hint is NOT forwarded a second time.
     """
+    if reroll_hint is not None:
+        req = replace(req, reroll_hint=reroll_hint)
+
     # Stage 1 -- draft. The one creative job. Raises
     # LineCompositionFailedError on exhaustion (propagated unchanged).
     cleaned = compose_line_draft(

@@ -2534,6 +2534,23 @@ class OTR_LedgerScriptWriter:
         # back-compat for callers without a style picked yet.
         style_descriptor = str(resolved.get("style") or "").strip()
 
+        # --- Sprint 5C (2026-05-25): stamp the composer's static-prefix
+        # context onto meta so a LATER node (OTR_LedgerFreezeCascade)
+        # can reconstruct a LineRequest for a targeted reroll. These four
+        # values are computed writer-locally in section I and were lost
+        # once the per-beat loop ended; the freeze cascade runs in its
+        # own node invocation and reads the ledger from disk, so it needs
+        # them on meta. `allowed_roster` is already stamped above; the
+        # per-line ledger rows already carry beat_intent / mood (traits)
+        # / target_words / arc_phase (Sprint 3C enrichment). Together
+        # that is everything `_otr_reroll.build_reroll_line_request`
+        # needs. Stamped here, after all four exist; persisted by the
+        # ledger saves that follow in the per-beat loop and section J.
+        meta["canon_header"]     = canon_header
+        meta["outline_spine"]    = outline_spine
+        meta["theme"]            = theme
+        meta["style_descriptor"] = style_descriptor
+
         # Announcer dedicated-pass bookend ids (2026-05-22,
         # BUG-LOCAL-255). `_otr_outline._synthesize_outline` always
         # stamps the FIRST and LAST beats as announcer; those two get
