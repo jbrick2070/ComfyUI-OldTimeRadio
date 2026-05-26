@@ -206,6 +206,59 @@ class OTR_LedgerFreezeCascade:
                         "14.5 GB usable cap)."
                     ),
                 }),
+                # ---- Sprint 6 -- critic-to-render coupling --------
+                # These four widgets steer which lines BatchHumoRender
+                # renders downstream. The cascade computes the plan
+                # from the post-reroll critic report + the widgets
+                # and stamps `meta.render_plan`; HuMo reads + honours
+                # it. All four default to behave-as-before so existing
+                # workflows render unchanged unless an operator opts in.
+                "render_selection": (
+                    ("all", "dramatic_peaks_only"),
+                    {
+                        "default": "all",
+                        "tooltip": (
+                            "Sprint 6 -- render selection mode. 'all' "
+                            "(default) keeps every character line; "
+                            "'dramatic_peaks_only' reorders to the "
+                            "critic's render_priority list so the most "
+                            "dramatically loaded lines come first."
+                        ),
+                    },
+                ),
+                "render_max_n": ("INT", {
+                    "default": 6,
+                    "min": 0,
+                    "max": 999,
+                    "step": 1,
+                    "tooltip": (
+                        "Sprint 6 -- cap on plan length. Default 6. "
+                        "0 disables the cap (every selected line "
+                        "renders). Applied after render_selection / "
+                        "protagonist_only / manual_line_ids."
+                    ),
+                }),
+                "protagonist_only": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 6 -- restrict the render plan to the "
+                        "protagonist's lines (the character with the "
+                        "most CHARACTER-role beats, ties broken by "
+                        "cast-roster order). Default OFF."
+                    ),
+                }),
+                "manual_line_ids": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": (
+                        "Sprint 6 -- comma-separated explicit override. "
+                        "When non-empty, supersedes render_selection / "
+                        "flat_lines exclusion / arc_verdict gating. The "
+                        "operator's hand wins -- ship exactly these "
+                        "line_ids, in this order (capped by "
+                        "render_max_n)."
+                    ),
+                }),
             },
         }
 
@@ -227,6 +280,13 @@ class OTR_LedgerFreezeCascade:
         enable_phase_7_audio_readiness: bool = True,
         enable_phase_8_video_readiness: bool = True,
         vram_ceiling_gb: float = 14.0,
+        # Sprint 6 -- critic-to-render coupling widgets. Defaults match
+        # the INPUT_TYPES defaults; the cascade stamps meta.render_plan
+        # from these + the post-reroll critic report.
+        render_selection: str = "all",
+        render_max_n: int = 6,
+        protagonist_only: bool = False,
+        manual_line_ids: str = "",
     ):
         # Lazy imports to keep node-load cheap.
         from . import _otr_freeze_cascade as _LFC_ORCH
@@ -318,6 +378,11 @@ class OTR_LedgerFreezeCascade:
                 enable_phase_7_audio_readiness=enable_phase_7_audio_readiness,
                 enable_phase_8_video_readiness=enable_phase_8_video_readiness,
                 vram_ceiling_gb=float(vram_ceiling_gb),
+                # Sprint 6 -- critic-to-render coupling.
+                render_selection=str(render_selection or "all"),
+                render_max_n=int(render_max_n or 0),
+                protagonist_only=bool(protagonist_only),
+                manual_line_ids=str(manual_line_ids or ""),
             )
             log.info(
                 "[OTR_LedgerFreezeCascade] freeze_verdict=%s "

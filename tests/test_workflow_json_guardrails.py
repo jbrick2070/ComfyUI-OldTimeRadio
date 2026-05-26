@@ -977,8 +977,11 @@ class TestCascadeB3Surface:
     def test_cascade_widget_vector_trimmed_in_canonical_json(self):
         """The 7 widgets deleted from cascade INPUT_TYPES (model_id +
         6 phase toggles) must also be trimmed from `widgets_values`.
-        Post-B3 cascade carries 3 entries: `enable_phase_7`,
-        `enable_phase_8`, `vram_ceiling_gb`.
+
+        Sprint 6 (2026-05-25) added 4 critic-to-render coupling widgets,
+        so the post-B3 floor of 3 widgets grew to 7 (the same trim still
+        holds -- model_id + the 6 phase toggles stay deleted; the 4 new
+        slots are the Sprint 6 render-coupling widgets stacked on top).
         """
         wf_path = WORKFLOWS_DIR / _CANONICAL_WORKFLOW
         doc = _load_json(wf_path)
@@ -987,16 +990,27 @@ class TestCascadeB3Surface:
             if n.get("type") == "OTR_LedgerFreezeCascade"
         )
         wv = cascade.get("widgets_values", [])
-        assert len(wv) == 3, (
+        assert len(wv) == 7, (
             f"cascade widgets_values length drift: {len(wv)} "
-            f"(expected 3 post-B3: phase_7, phase_8, vram_ceiling)"
+            f"(expected 7 post-Sprint-6: phase_7, phase_8, vram_ceiling, "
+            f"render_selection, render_max_n, protagonist_only, "
+            f"manual_line_ids)"
         )
         # 0 = enable_phase_7_audio_readiness  (bool)
         # 1 = enable_phase_8_video_readiness  (bool)
         # 2 = vram_ceiling_gb                 (float)
+        # 3 = render_selection                (str: "all"|"dramatic_peaks_only")
+        # 4 = render_max_n                    (int)
+        # 5 = protagonist_only                (bool)
+        # 6 = manual_line_ids                 (str)
         assert isinstance(wv[0], bool)
         assert isinstance(wv[1], bool)
         assert isinstance(wv[2], (int, float))
+        assert isinstance(wv[3], str)
+        assert wv[3] in ("all", "dramatic_peaks_only")
+        assert isinstance(wv[4], (int, float))
+        assert isinstance(wv[5], bool)
+        assert isinstance(wv[6], str)
 
 
 if __name__ == "__main__":

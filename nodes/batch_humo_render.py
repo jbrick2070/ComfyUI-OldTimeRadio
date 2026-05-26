@@ -1643,6 +1643,48 @@ class BatchHumoRender:
             )
         cast = ledger.get("cast") or []
         lines = ledger.get("lines") or []
+
+        # ---- Sprint 6: read meta.render_plan ------------------------
+        # The freeze cascade (OTR_LedgerFreezeCascade) may have stamped
+        # a plan that selects WHICH character line_ids actually render.
+        # When present, the per-line loop below filters to that set; a
+        # `blocked: True` plan filters every character line (the
+        # arc-verdict gate refused the render). No plan -> render every
+        # line as before (PD1 fallback when build_render_plan degraded).
+        # The filter NEVER touches announcer / music / sfx beats --
+        # those continue per existing HuMo + VideoComposite rules.
+        _render_plan_meta = (
+            ledger.get("meta") if isinstance(ledger.get("meta"), dict) else None
+        )
+        render_plan = (
+            _render_plan_meta.get("render_plan")
+            if isinstance(_render_plan_meta, dict) else None
+        )
+        render_plan_active = isinstance(render_plan, dict)
+        render_plan_blocked = bool(
+            render_plan_active and render_plan.get("blocked")
+        )
+        render_plan_set: set = set()
+        if render_plan_active and not render_plan_blocked:
+            render_plan_set = {
+                str(x) for x in (render_plan.get("line_ids") or [])
+            }
+        if render_plan_blocked:
+            log.warning(
+                "[BatchHumoRender] Sprint 6 render plan: BLOCKED (%s) -- "
+                "every character line will be SKIP'd. Operator can clear "
+                "by re-running with a critic that resolves the arc, or "
+                "by setting manual_line_ids on the cascade node.",
+                render_plan.get("blocked_reason", ""),
+            )
+        elif render_plan_active:
+            log.info(
+                "[BatchHumoRender] Sprint 6 render plan ACTIVE: %d line(s) "
+                "selected (mode=%s, applied_max_n=%s)",
+                len(render_plan_set), render_plan.get("selection_mode"),
+                render_plan.get("applied_max_n"),
+            )
+
         # Sprint C C5f (2026-05-15): surface story_brief_status once per
         # ledger load for E-07 observability. The brief flows into the
         # per-clip prompt via _build_pos_prompt below.
@@ -1950,6 +1992,29 @@ class BatchHumoRender:
         plan: list[dict] = []
         for idx, ln in enumerate(lines):
             line_id = str(ln.get("line_id") or f"l{idx + 1:03d}")
+
+            # ---- Sprint 6 render_plan filter ------------------------
+            # Apply ONLY to character beats; announcer / music / sfx
+            # follow their existing render rules. A blocked plan filters
+            # every character line; a selected-set plan filters lines
+            # not in the set. The skip runs BEFORE timing / chunking /
+            # portrait-resolution so an excluded line costs nothing.
+            _ln_role = str(ln.get("speaker_role") or "")
+            if _ln_role == "character" and render_plan_active and (
+                render_plan_blocked or line_id not in render_plan_set
+            ):
+                _skip_reason = (
+                    "blocked" if render_plan_blocked else "not_in_plan"
+                )
+                report_lines.append(
+                    f"  {line_id}: SKIP (Sprint 6 render_plan {_skip_reason})"
+                )
+                log.info(
+                    "[BatchHumoRender] Sprint 6 SKIP line %s "
+                    "(render_plan %s)", line_id, _skip_reason,
+                )
+                continue
+
             speaker = (
                 ln.get("speaker")
                 or cid_to_name.get(ln.get("char_id") or "", "")

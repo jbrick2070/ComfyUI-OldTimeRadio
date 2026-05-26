@@ -70,6 +70,7 @@ from . import _otr_ledger_freeze as _LFC
 from . import _otr_ledger_reviewer as _OTRLR
 from . import _otr_story_critic as _OTRSC
 from . import _otr_reroll as _OTRRR
+from . import _otr_render_plan as _OTRRP
 
 log = logging.getLogger("OTR.freeze_cascade")
 
@@ -517,6 +518,15 @@ def run_freeze_cascade(
     enable_phase_7_audio_readiness: bool = True,
     enable_phase_8_video_readiness: bool = True,
     vram_ceiling_gb: float = 14.0,
+    # Sprint 6 -- critic-to-render coupling widgets (cascade node
+    # surface). Defaults match the node's INPUT_TYPES defaults so
+    # existing callers / tests are unaffected (render_selection="all"
+    # with no flat_lines / arc-block reduces to "stamp every character
+    # line_id in ledger order" -- HuMo's filter is then a no-op).
+    render_selection: str = "all",
+    render_max_n: int = 6,
+    protagonist_only: bool = False,
+    manual_line_ids: str = "",
 ) -> FreezeDisposition:
     """Orchestrate Phase 0 -> reviewer (Phase 1+2) -> Phase 10.
 
@@ -717,6 +727,35 @@ def run_freeze_cascade(
             "verdict needs_full_rerun", reroll_disp.cycles_run,
         )
         return disp
+
+    # ---- Sprint 6: critic -> render coupling -----------------------
+    # Compute the render plan AFTER the reroll completes (so the plan
+    # sees the FINAL critic report + cycle_count + reroll_history) and
+    # BEFORE Phase 7 / 8 / 10 freeze the ledger. The plan rides on
+    # `meta.render_plan` -- BatchHumoRender reads it to filter which
+    # lines actually get rendered, gate on arc_verdict, and apply
+    # render_max_n. build_render_plan NEVER raises (PD1) -- a degraded
+    # computation returns None and the stamp is skipped, which makes
+    # HuMo fall back to its pre-Sprint-6 render-all behaviour.
+    render_plan = _OTRRP.build_render_plan(
+        ledger_data,
+        render_selection=render_selection,
+        render_max_n=render_max_n,
+        protagonist_only=protagonist_only,
+        manual_line_ids=manual_line_ids,
+    )
+    if render_plan is not None:
+        meta["render_plan"] = render_plan
+        log.info(
+            "[LFC] Sprint 6 render plan: mode=%s, %d line(s) (blocked=%s, "
+            "applied_max_n=%d, arc_verdict=%s, cycle_count=%d, "
+            "%d flat line(s) excluded)",
+            render_plan["selection_mode"], len(render_plan["line_ids"]),
+            render_plan["blocked"], render_plan["applied_max_n"],
+            render_plan["source_arc_verdict"],
+            render_plan["source_cycle_count"],
+            len(render_plan["excluded_flat_lines"]),
+        )
 
     # ---- Non-terminal path: Phase 7 / 8 / 10 ---------------------
     # S30 B4: Phase 4 / 4.5 / 5 / 6 DELETED. The standalone

@@ -1755,7 +1755,11 @@
       "widgets_values": [
         true,
         true,
-        14.0
+        14.0,
+        "all",
+        6,
+        false,
+        ""
       ],
       "inputs": [
         {
