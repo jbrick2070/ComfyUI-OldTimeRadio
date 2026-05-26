@@ -102,6 +102,8 @@ def _build_portrait_prompt(
     appearance: str,
     style_anchor: str,
     lighting: str = "",
+    palette: str = "",
+    atmosphere_line: str = "",
 ) -> str:
     """Compose the FLUX prompt for one cast member's portrait.
 
@@ -118,20 +120,45 @@ def _build_portrait_prompt(
     portraits do not want env / prop noise pulling composition toward
     the scene. Empty string when the brief is absent or failed; the
     portrait falls through to the legacy composition guidance.
+
+    Sprint 8.3 (2026-05-25): the two v2 top-level brief fields the
+    audit recommended land via two new optional kwargs:
+
+      * `palette` -- comma-joined top-3 of `meta.visual_palette`,
+        resolved at the caller via `_read_brief_field`. Empty string
+        on v1-era ledger / failure sentinel.
+      * `atmosphere_line` -- one prose sentence from
+        `meta.atmosphere_line`, resolved the same way. Empty string
+        on v1-era / failure.
+
+    Both new fields land alongside `lighting` in the brief-leads
+    region of the prompt (BUG-LOCAL-250 invariant -- brief stays
+    LEAD), before the style anchor + speaker description + fixed
+    composition tail. Order: lighting -> atmosphere_line -> palette.
+    Empty inputs contribute nothing -- the legacy ordering is
+    structurally identical when all three brief signals are empty.
     """
     speaker = (speaker or "Unnamed character").strip()
     appearance = (appearance or "").strip()
     style_anchor = (style_anchor or "head-and-shoulders studio portrait, neutral lighting").strip()
     lighting = (lighting or "").strip()
+    palette = (palette or "").strip()
+    atmosphere_line = (atmosphere_line or "").strip()
     # Sprint C C5d (2026-05-15): brief-derived lighting + atmosphere,
     # via get_story_brief_lighting (lighting + atmosphere terms only,
     # no setting; refinement section 6.2). BUG-LOCAL-250 follow-up
     # (2026-05-20): the brief now LEADS the prompt -- it used to sit
     # mid-body after the character appearance; meta.story_brief is the
     # primary downstream visual driver so it takes the leading slot.
+    # Sprint 8.3 (2026-05-25): v2 atmosphere_line + visual_palette join
+    # the brief-leads region right after the v1 lighting signal.
     parts: list[str] = []
     if lighting:
         parts.append(lighting)
+    if atmosphere_line:
+        parts.append(atmosphere_line)
+    if palette:
+        parts.append(palette)
     parts.extend([
         style_anchor,
         f"head and shoulders portrait of {speaker}",
@@ -331,9 +358,31 @@ class BatchFluxPortraitRender:
             get_story_brief_lighting,
             get_story_brief_status,
         )
+        # Sprint 8.3: also pull the v2 reader so atmosphere_line +
+        # visual_palette resolve through the canonical helper. Falls
+        # back to safe-empty on v1-era ledger / failure sentinel.
+        from ..nodes._otr_brief_reader import _read_brief_field
         _meta = led.get("meta") if isinstance(led.get("meta"), dict) else {}
         _brief_lighting = get_story_brief_lighting(_meta)
         _brief_status = get_story_brief_status(_meta)
+        # Sprint 8.3 v2 fields.
+        _brief_atmosphere_line = _read_brief_field(
+            _meta, "atmosphere_line", default="",
+        )
+        _palette_raw = _read_brief_field(
+            _meta, "visual_palette", default=[],
+        )
+        if isinstance(_palette_raw, list):
+            _palette_terms = [
+                str(t).strip()
+                for t in _palette_raw
+                if str(t).strip()
+            ][:3]
+        else:
+            _palette_terms = []
+        _brief_palette = ", ".join(_palette_terms)
+        if not isinstance(_brief_atmosphere_line, str):
+            _brief_atmosphere_line = ""
         report_lines.append(
             f"OTR_BatchFluxPortraitRender: loaded ledger "
             f"{led_path.name if led_path else '<inline>'} "
@@ -470,6 +519,8 @@ class BatchFluxPortraitRender:
             prompt = _build_portrait_prompt(
                 speaker, appearance, style_anchor,
                 lighting=_brief_lighting,
+                palette=_brief_palette,
+                atmosphere_line=_brief_atmosphere_line,
             )
             try:
                 positive = text_enc.encode(clip, prompt)[0]
