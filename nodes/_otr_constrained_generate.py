@@ -35,7 +35,7 @@ from typing import Any, Callable, List, Type
 
 from pydantic import BaseModel
 
-from . import _otr_lmfe_compat  # noqa: F401  (compat shim, must be first lmfe import)
+from . import _otr_lmfe_compat  # compat shim; ensure_lmfe_transformers_compat() called inside factory below
 from ._otr_model_loader import (
     ModelLoaderError,
     _normalize_messages_for_cache_entry,
@@ -106,6 +106,14 @@ def make_constrained_generate_fn(
     # closes over the tokenizer + parser and is reusable across many
     # generate() invocations with different messages but the same
     # schema.
+    #
+    # Re-apply the lm-format-enforcer / transformers v5 compat shim
+    # at factory time. Some test fixtures elsewhere in the suite
+    # reload transformers.tokenization_utils and strip the v4 alias
+    # we wired at module-import time; this call re-establishes it
+    # before the lmformatenforcer import below. Cheap (single
+    # hasattr check) and idempotent.
+    _otr_lmfe_compat.ensure_lmfe_transformers_compat()
     from lmformatenforcer import JsonSchemaParser
     from lmformatenforcer.integrations.transformers import (
         build_transformers_prefix_allowed_tokens_fn,

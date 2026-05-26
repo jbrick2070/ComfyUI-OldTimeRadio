@@ -36,5 +36,31 @@ hyworld_2_pivot for context).
 import transformers
 import transformers.tokenization_utils as _tu
 
-if not hasattr(_tu, "PreTrainedTokenizerBase"):
-    _tu.PreTrainedTokenizerBase = transformers.PreTrainedTokenizerBase
+
+def ensure_lmfe_transformers_compat() -> None:
+    """Idempotently re-apply the v4 PreTrainedTokenizerBase alias.
+
+    The first import of this module wires the alias at module-load
+    time. Some test fixtures elsewhere in the suite reload
+    `transformers.tokenization_utils` (or restore it from a cached
+    state) which strips the alias and breaks lm-format-enforcer's
+    import path on subsequent tests in the same pytest process.
+
+    Call this function at every use site that imports
+    lmformatenforcer (typically once at the top of a factory
+    function). The check is cheap (single hasattr) and the alias
+    assignment is idempotent.
+    """
+    # Re-resolve transformers.tokenization_utils every call because
+    # an importlib.reload would have replaced the module object in
+    # sys.modules; our cached `_tu` would then point at the stale
+    # (but still in-memory) module.
+    import transformers as _t
+    import transformers.tokenization_utils as _live_tu
+    if not hasattr(_live_tu, "PreTrainedTokenizerBase"):
+        _live_tu.PreTrainedTokenizerBase = _t.PreTrainedTokenizerBase
+
+
+# Apply at module-import time as well so simple consumers that don't
+# call ensure_lmfe_transformers_compat() still see the alias.
+ensure_lmfe_transformers_compat()

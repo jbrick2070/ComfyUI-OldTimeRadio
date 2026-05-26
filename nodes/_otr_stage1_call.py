@@ -150,7 +150,9 @@ The plan binds together: a one-sentence premise, a three-act arc, a cast list wi
 You do NOT write any dialogue at this stage. You produce the SKELETON the dialogue stage will later fill in.
 
 Hard rules:
-  - Every cast member gets a unique Bark voice_id from the v2/en_speaker_0 through v2/en_speaker_9 pool.
+  - length_target_words MUST be an integer between 5 and 200 inclusive. Never emit 0, negative numbers, or values above 200. A typical beat is 15 to 45 words.
+  - Every cast member gets a unique Bark voice_id from the v2/en_speaker_0 through v2/en_speaker_9 pool. The Bark v2 pool is binary: voice_id 0, 1, 3, 5, 6, 8 are male-coded; voice_id 2, 4, 7, 9 are female-coded. Pick a voice_id whose coded gender matches the cast member's gender.
+  - Cast gender must match conventional name expectations. ROBINSON, COLE, NELSON, OSCAR, REGINALD, VANCE, HAYES are conventionally male first names; ANYA, MARGOT, NORA, MIRA, ALICE, EDNA are conventionally female. Do NOT cast a male-coded first name as gender=female or a female-coded first name as gender=male.
   - Cast gender + pronouns must match (male -> he/him, female -> she/her, nonbinary -> they/them).
   - beat_id format is bNNN, three-digit padded, monotonically increasing.
   - Every beat's speaker is either a cast member name (exact match) OR the literal 'ANNOUNCER' (bookend lines) OR the literal 'MUSIC' (music_inter cue beats).

@@ -45,12 +45,20 @@ class TestImport:
         assert hasattr(cg, "ConstrainedGenerateFn")
 
     def test_compat_shim_alias_in_place(self):
-        # After importing the constrained-generate module the v4
-        # alias must be on transformers.tokenization_utils so lmfe
-        # can find it.
-        import transformers
-        from nodes import _otr_constrained_generate  # noqa: F401
+        # After calling the public helper, the v4 alias must be on
+        # transformers.tokenization_utils so lmfe can find it.
+        #
+        # The module-import side-effect alone is not load-bearing
+        # any more: some test fixtures elsewhere in the suite reload
+        # transformers.tokenization_utils between this test and the
+        # module's initial import, which would clobber a one-shot
+        # alias. The helper is idempotent and is called at every
+        # factory use site -- this test exercises that contract
+        # directly so it stays green regardless of test ordering.
+        from nodes import _otr_lmfe_compat
 
+        _otr_lmfe_compat.ensure_lmfe_transformers_compat()
+        import transformers
         assert hasattr(transformers.tokenization_utils, "PreTrainedTokenizerBase")
 
 
