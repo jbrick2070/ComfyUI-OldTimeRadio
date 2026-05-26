@@ -369,11 +369,52 @@ class BatchBarkGenerator:
                     "default": 0.7, "min": 0.1, "max": 1.5, "step": 0.05,
                     "tooltip": "Bark generation temperature (0.7 = balanced)"
                 }),
+                # 2026-05-26 operator-flagged regression workaround.
+                # The BUG-LOCAL-276 halt (added 2026-05-26 hotfix
+                # 9a77144) refuses to render TTS when the freeze
+                # cascade stamped meta.freeze_verdict='needs_full_rerun'.
+                # This is correct production-safe behavior, but
+                # smoke-budget runs (target_words=30, 100) routinely
+                # trip needs_full_rerun because the legacy story
+                # critic can't find an arc in 3 character lines and
+                # the reroll loop can't converge -- so the halt now
+                # blocks the fast-iteration soak loop the operator
+                # was using to verify wiring changes.
+                #
+                # When this widget is True, the halt fires a loud
+                # WARNING log line naming the freeze_verdict but
+                # ALLOWS Bark to proceed. Audio renders even on a
+                # flagged ledger; downstream gates (BatchHumoRender,
+                # etc.) may still find issues, but the TTS bus is
+                # unblocked so the operator can hear what the smoke
+                # run actually produced.
+                #
+                # Default is False (production-safe halt preserved).
+                # The widget is intended for sprint-time iteration
+                # and should be flipped back OFF before any
+                # broadcast-ready episode.
+                "bypass_freeze_halt": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "When OFF (default): halt at BatchBarkGenerator "
+                        "entry if the freeze cascade stamped "
+                        "meta.freeze_verdict='needs_full_rerun' (the "
+                        "BUG-LOCAL-276 production safety halt). "
+                        "When ON: log a loud WARNING but proceed to "
+                        "render TTS anyway -- audio ships even on a "
+                        "ledger the cascade flagged as unrenderable. "
+                        "Use ON for fast-iteration soak runs with "
+                        "smoke-budget target_words (30, 100) where "
+                        "the legacy critic predictably stamps "
+                        "needs_full_rerun. Use OFF for any "
+                        "broadcast-ready episode."
+                    ),
+                }),
             },
         }
 
     @vram_sentinel("bark_batch", max_entry_gb=6.0)
-    def generate_batch(self, script_json, temperature=0.7):
+    def generate_batch(self, script_json, temperature=0.7, bypass_freeze_halt=False):
 
         # MANDATORY VRAM POWER WASH (clean slate before start).
         force_vram_offload()
@@ -401,13 +442,30 @@ class BatchBarkGenerator:
         # before. Only an explicit 'needs_full_rerun' verdict halts.
         _verdict = _meta.get("freeze_verdict")
         if _verdict == "needs_full_rerun":
-            raise ValueError(
-                "BatchBarkGenerator: freeze cascade stamped "
-                "meta.freeze_verdict='needs_full_rerun' (writer left the "
-                "ledger in an unrenderable state). Refusing to render TTS "
-                "on a flagged ledger. Re-run the writer phase; do not "
-                "bypass this halt. See BUG-LOCAL-276."
-            )
+            if bypass_freeze_halt:
+                # Operator-opted bypass for sprint-time iteration.
+                # Loud WARNING so the soak log shows the halt was
+                # bypassed; downstream consumers can still surface
+                # issues on the flagged ledger.
+                log.warning(
+                    "[BatchBark] FREEZE HALT BYPASSED: cascade "
+                    "stamped meta.freeze_verdict='needs_full_rerun' "
+                    "but bypass_freeze_halt widget is ON. Audio "
+                    "WILL render on a flagged ledger; this is "
+                    "intended for fast-iteration smoke runs only. "
+                    "Flip the widget OFF for any broadcast-ready "
+                    "episode. See BUG-LOCAL-276."
+                )
+            else:
+                raise ValueError(
+                    "BatchBarkGenerator: freeze cascade stamped "
+                    "meta.freeze_verdict='needs_full_rerun' (writer left the "
+                    "ledger in an unrenderable state). Refusing to render TTS "
+                    "on a flagged ledger. Re-run the writer phase; do not "
+                    "bypass this halt. See BUG-LOCAL-276. "
+                    "(For sprint-time smoke iteration, flip the "
+                    "bypass_freeze_halt widget on BatchBarkGenerator.)"
+                )
 
         # Sprint E E9 / M2: check meta.freeze_unload_ok. The cascade
         # stamps this at the finally block of run_freeze_cascade; False

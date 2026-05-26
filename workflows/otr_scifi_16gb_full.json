@@ -340,7 +340,8 @@
       },
       "widgets_values": [
         "[]",
-        0.7
+        0.7,
+        false
       ],
       "inputs": [
         {
