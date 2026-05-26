@@ -1170,6 +1170,18 @@ def _build_pos_prompt(
     appended BEFORE _DEFAULT_POS_SUFFIX so HuMo's lip-sync clip
     inherits the post-script reflection's mood without losing the
     composition guidance that _DEFAULT_POS_SUFFIX provides.
+
+    Sprint 8.6 (2026-05-25): the v2 `meta.atmosphere_line` field --
+    one prose sentence of mood from the post-script reflection -- is
+    read via the canonical `_read_brief_field` reader and inserted
+    BEFORE the v1 lighting/atmosphere terms. Order in the composed
+    prompt: speaker_desc -> atmosphere_line -> lighting -> suffix.
+    The v1 lighting + atmosphere path is preserved unchanged so the
+    HuMo lip-sync clip still inherits both signals when the v2
+    producer ran (atmosphere_line is the prose register, the v1
+    terms are the term-level register). A v1-era ledger or a v2
+    failure sentinel returns empty atmosphere_line and the function
+    falls through to the legacy lighting-only / suffix-only paths.
     """
     speaker_desc = ""
     for c in cast:
@@ -1190,10 +1202,29 @@ def _build_pos_prompt(
     # relative import breaks when this file is loaded standalone (tests,
     # ad-hoc scripts) with no parent package.
     from _otr_story_brief_helpers import get_story_brief_lighting
-    lighting = get_story_brief_lighting(meta or {})
+    # Sprint 8.6: canonical v2 reader. Same absolute-import pattern.
+    from _otr_brief_reader import _read_brief_field
+    meta_dict = meta or {}
+    lighting = get_story_brief_lighting(meta_dict)
+    atmosphere_line_raw = _read_brief_field(
+        meta_dict, "atmosphere_line", default="",
+    )
+    atmosphere_line = (
+        atmosphere_line_raw.strip()
+        if isinstance(atmosphere_line_raw, str)
+        else ""
+    )
+    # Compose: speaker_desc -> atmosphere_line -> lighting -> suffix.
+    # Each signal contributes only when non-empty, so the legacy
+    # composition (atmosphere_line empty, lighting non-empty) and
+    # the v2 + v1 dual-signal composition both render cleanly.
+    parts: list[str] = [speaker_desc]
+    if atmosphere_line:
+        parts.append(atmosphere_line)
     if lighting:
-        return f"{speaker_desc}, {lighting}, {_DEFAULT_POS_SUFFIX}"
-    return f"{speaker_desc}, {_DEFAULT_POS_SUFFIX}"
+        parts.append(lighting)
+    parts.append(_DEFAULT_POS_SUFFIX)
+    return ", ".join(parts)
 
 
 def _lazy_humo_nodes() -> dict[str, Any]:
