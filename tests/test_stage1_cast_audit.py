@@ -156,6 +156,61 @@ class TestNameGenderOracle:
         assert lookup_first_name_gender("'Dale' Porter") == "male"
         assert lookup_first_name_gender("Alice, Carter") == "female"
 
+    # ---- Honorifics handling (real-world from live soak run) ----
+
+    def test_doctor_honorific_skipped(self):
+        """Operator-flagged on signal_lost_deciphering_the_ice_
+        20260526_143355: the LLM emitted 'Dr. Anya Hayes' and the
+        audit fired name_unknown_soft because 'Dr.' was extracted
+        as the first token. Honorifics-aware lookup must skip 'Dr.'
+        and resolve to 'Anya'."""
+        # 'Anya' is in the pool, female.
+        assert lookup_first_name_gender("Dr. Anya Hayes") == "female"
+        assert lookup_first_name_gender("dr anya hayes") == "female"
+        # 'Margot' female-coded in pool.
+        assert lookup_first_name_gender("Dr. Margot Stone") == "female"
+
+    def test_other_civilian_honorifics_skipped(self):
+        # 'Stone' is unisex in pool.
+        assert lookup_first_name_gender("Mr. Stone") == "unisex"
+        assert lookup_first_name_gender("Mrs. Margot") == "female"
+        assert lookup_first_name_gender("Ms. Alice Carter") == "female"
+        assert lookup_first_name_gender("Miss Wendy") == "female"
+
+    def test_military_honorifics_skipped(self):
+        assert lookup_first_name_gender("Lt. Vance") == "male"
+        assert lookup_first_name_gender("Captain Cole") == "male"
+        assert lookup_first_name_gender("Major Margot") == "female"
+        assert lookup_first_name_gender("Sergeant Drake") == "male"
+        assert lookup_first_name_gender("Admiral Robinson") == "male"
+
+    def test_religious_honorifics_skipped(self):
+        assert lookup_first_name_gender("Father John") == "male"
+        assert lookup_first_name_gender("Sister Alice") == "female"
+        assert lookup_first_name_gender("Reverend Edward") == "male"
+
+    def test_stacked_honorifics_skipped(self):
+        """'Lt. Col. Vance' -> skip both ranks, resolve 'Vance'."""
+        assert lookup_first_name_gender("Lt. Col. Vance") == "male"
+        assert lookup_first_name_gender("Dr. Prof. Margot") == "female"
+
+    def test_unknown_name_after_honorific_still_unknown(self):
+        # 'Anya' is in the pool. 'Frellnax' is not. The honorific
+        # being stripped doesn't manufacture a hit.
+        assert lookup_first_name_gender("Dr. Frellnax") == "unknown"
+        assert lookup_first_name_gender("Captain Zog") == "unknown"
+
+    def test_only_honorifics_returns_unknown(self):
+        # A name that is ONLY honorifics (degenerate LLM output)
+        # falls through to unknown.
+        assert lookup_first_name_gender("Dr.") == "unknown"
+        assert lookup_first_name_gender("Lt. Col.") == "unknown"
+
+    def test_honorifics_case_insensitive(self):
+        assert lookup_first_name_gender("DR. ANYA HAYES") == "female"
+        assert lookup_first_name_gender("dr. anya hayes") == "female"
+        assert lookup_first_name_gender("Dr. anya HAYES") == "female"
+
     def test_is_inversion_unisex_carveout(self):
         # Unisex name + either gender -> not an inversion.
         assert is_inversion("unisex", "male") is False

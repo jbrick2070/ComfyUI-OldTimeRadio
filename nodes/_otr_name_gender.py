@@ -240,6 +240,73 @@ NAME_GENDER: dict[str, GENDER_LITERAL] = {
 
 
 # ---------------------------------------------------------------------------
+# Honorifics + titles -- skipped when extracting the first name
+# ---------------------------------------------------------------------------
+#
+# When the LLM prefixes a cast name with an honorific or title
+# ('Dr. Anya Hayes', 'Mr. Stone', 'Lieutenant Vance'), the first
+# whitespace token is the honorific, not the actual first name. The
+# audit then resolves to "unknown" and stamps a name_unknown_soft
+# warn -- caught on the live run
+# signal_lost_deciphering_the_ice_20260526_143355 (2026-05-26) where
+# 'Dr. Anya Hayes' triggered the warn for the missing 'dr' entry.
+#
+# Fix: maintain a set of common English honorifics + titles to skip
+# when the first token matches one of them. The next non-honorific
+# token is used as the first name. Multiple stacked honorifics are
+# handled by iterative skipping (e.g. 'Lt. Col. Vance' -> 'Vance').
+HONORIFICS: frozenset[str] = frozenset({
+    # Standard civilian
+    "mr", "mrs", "ms", "miss", "mx",
+    # Academic + professional
+    "dr", "doctor", "prof", "professor",
+    # Religious
+    "father", "sister", "brother", "rev", "reverend",
+    "pastor", "rabbi", "imam", "monk", "nun",
+    # Honorific
+    "sir", "madam", "madame", "dame",
+    "lord", "lady",
+    # Military (common ranks the LLM tends to reach for)
+    "general", "gen",
+    "colonel", "col",
+    "lieutenant", "lt",
+    "major", "maj",
+    "captain", "capt", "cap",
+    "commander", "cmdr",
+    "sergeant", "sgt",
+    "corporal", "cpl",
+    "private", "pvt",
+    "admiral", "adm",
+    "officer",
+})
+
+
+def _strip_token(tok: str) -> str:
+    """Strip surrounding punctuation from a name token."""
+    return tok.strip("'\"-.,;:!?")
+
+
+def _resolve_first_name_token(full_name: str) -> str:
+    """Walk whitespace tokens skipping honorifics; return the first
+    non-honorific token (lowercased, punctuation-stripped). Empty
+    string if the entire name was honorifics or punctuation.
+    """
+    if not isinstance(full_name, str):
+        return ""
+    s = full_name.strip()
+    if not s:
+        return ""
+    for raw in s.split():
+        tok = _strip_token(raw).lower()
+        if not tok:
+            continue
+        if tok in HONORIFICS:
+            continue
+        return tok
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -247,35 +314,36 @@ NAME_GENDER: dict[str, GENDER_LITERAL] = {
 def lookup_first_name_gender(full_name: str) -> GENDER_LITERAL:
     """Look up the canonical gender for a cast member's full name.
 
-    Splits on whitespace and looks up the FIRST token (case-
-    insensitive). Returns one of "male" / "female" / "unisex" /
-    "unknown".
+    Walks whitespace tokens skipping honorifics ('Dr.', 'Mr.', 'Lt.',
+    'Father', etc.); first non-honorific token is the lookup key
+    (case-insensitive). Returns one of "male" / "female" / "unisex"
+    / "unknown".
 
     Args:
-        full_name: cast name, typically "FIRST LAST" but tolerant of
-            "FIRST", "FIRST MIDDLE LAST", or punctuation. Empty
-            strings + None-equivalents return "unknown".
+        full_name: cast name. Tolerant of:
+          * "FIRST LAST"            -> uses FIRST
+          * "Dr. Anya Hayes"        -> skips 'Dr', uses 'Anya'
+          * "Lt. Col. Vance"        -> skips both ranks, uses 'Vance'
+          * "FIRST"                 -> uses FIRST
+          * ""                      -> "unknown"
+          * None / non-strings      -> "unknown"
 
     Returns:
         GENDER_LITERAL.
 
-    Behavior:
-        * "ROBINSON VOSS" -> "male" (first token 'robinson')
-        * "Mira Drake"    -> "female" (first token 'mira')
-        * "Zog Frellnax"  -> "unknown" (LLM-invented name not in pool)
-        * ""              -> "unknown"
+    Behavior examples:
+        * "ROBINSON VOSS"           -> "male"
+        * "Mira Drake"              -> "female"
+        * "Dr. Anya Hayes"          -> "unknown" (Anya not in pool)
+        * "Dr. Margot Stone"        -> "female"
+        * "Lt. Vance"               -> "male"
+        * "Zog Frellnax"            -> "unknown"
+        * ""                        -> "unknown"
     """
-    if not isinstance(full_name, str):
-        return "unknown"
-    s = full_name.strip()
-    if not s:
-        return "unknown"
-    # First whitespace-separated token; strip surrounding punctuation
-    # (apostrophes, periods, commas) that names sometimes carry.
-    first = s.split()[0].strip("'\"-.,;:")
+    first = _resolve_first_name_token(full_name)
     if not first:
         return "unknown"
-    return NAME_GENDER.get(first.lower(), "unknown")
+    return NAME_GENDER.get(first, "unknown")
 
 
 def is_inversion(canonical: GENDER_LITERAL, llm_gender: str) -> bool:
