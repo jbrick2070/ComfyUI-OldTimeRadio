@@ -632,34 +632,45 @@ class TestWriterB2aSurface:
         """Pin the writer's widgets_values layout. Post BUG-LOCAL-269/270
         the `seed` widget (and its control_after_generate companion) was
         removed -- the vector dropped 19 -> 17 and every slot from
-        creative_writing_model onward shifted down by 2.
+        creative_writing_model onward shifted down by 2. Sprint 10A
+        step 3-C (2026-05-26) appends enable_stage1_shadow_pass at slot
+        17, raising the vector 17 -> 18.
         """
         writer = self._writer()
         wv = writer.get("widgets_values", [])
         # Current writer widgets_values layout:
-        #   0  episode_title           ""
-        #   1  target_words            350
-        #   2  num_characters          2
-        #   3  creative_writing_model  catalog default repo_id
-        #   4  technical_model         catalog default repo_id
-        #   5  custom_premise          ""
-        #   6  include_act_breaks      True
-        #   7  act_count               "auto"
-        #   8  style                   "let the story decide"
-        #   9  style_custom            ""
-        #  10  creativity              "balanced"
-        #  11  perfect_run_spacesaver  False
-        #  12  min_p                   0.05
-        #  13  repetition_penalty      1.03
-        #  14  max_new_tokens_cap      200
-        #  15  enable_polish_pass      False
-        #  16  lemmy_cameo             "roll (~11% chance)"
+        #   0  episode_title              ""
+        #   1  target_words               350
+        #   2  num_characters             2
+        #   3  creative_writing_model     catalog default repo_id
+        #   4  technical_model            catalog default repo_id
+        #   5  custom_premise             ""
+        #   6  include_act_breaks         True
+        #   7  act_count                  "auto"
+        #   8  style                      "let the story decide"
+        #   9  style_custom               ""
+        #  10  creativity                 "balanced"
+        #  11  perfect_run_spacesaver     False
+        #  12  min_p                      0.05
+        #  13  repetition_penalty         1.03
+        #  14  max_new_tokens_cap         200
+        #  15  enable_polish_pass         False
+        #  16  lemmy_cameo                "roll (~11% chance)"
+        #  17  enable_stage1_shadow_pass  False     (Sprint 10A step 3-C)
         # History: optimization_profile removed 2026-05-23; lemmy_cameo
         # appended 2026-05-23 (BUG-LOCAL-260); `seed` + its companion
-        # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17.
-        assert len(wv) == 17, (
-            f"writer widgets_values length drift: {len(wv)} (expected 17 "
-            f"after the BUG-LOCAL-269/270 seed-widget removal)"
+        # removed 2026-05-25 (BUG-LOCAL-269/270) -- vector 19 -> 17;
+        # enable_stage1_shadow_pass appended 2026-05-26 (Sprint 10A step
+        # 3-C) -- vector 17 -> 18.
+        assert len(wv) == 18, (
+            f"writer widgets_values length drift: {len(wv)} (expected 18 "
+            f"after the Sprint 10A step 3-C shadow-pass widget addition)"
+        )
+        # Slot 17: enable_stage1_shadow_pass must default to False so
+        # the existing pipeline keeps its bit-identical behaviour.
+        assert wv[17] is False, (
+            f"enable_stage1_shadow_pass widget must default to False "
+            f"(slot 17); got {wv[17]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[3], str) and wv[3], (

@@ -115,6 +115,12 @@ def _writer_schemas() -> dict:
                          "never include"],
                         {"default": "roll (~11% chance)"},
                     ),
+                    # Sprint 10A step 3-C (2026-05-26): shadow-pass widget
+                    # appended at slot 17 -- vector 17 -> 18. Fixture
+                    # mirror of nodes/OTR_LedgerScriptWriter.INPUT_TYPES.
+                    "enable_stage1_shadow_pass": (
+                        "BOOLEAN", {"default": False},
+                    ),
                 },
                 "optional": {},
             }
@@ -123,9 +129,14 @@ def _writer_schemas() -> dict:
 
 
 def _writer_node_fixture() -> dict:
-    """Workflow fixture with node 1 carrying the 17-entry widgets_values
+    """Workflow fixture with node 1 carrying the 18-entry widgets_values
     layout dumped from workflows/otr_scifi_16gb_full.json. The `seed`
-    widget + its companion were removed in BUG-LOCAL-269/270.
+    widget + its companion were removed in BUG-LOCAL-269/270 (vector
+    19 -> 17). Sprint 10A step 3-C (2026-05-26) appended
+    enable_stage1_shadow_pass at slot 17 (vector 17 -> 18). The string
+    model ids reflect the slot-2 reconciliation in step 2 of the same
+    sprint -- 'mistralai/Mistral-Nemo-Instruct-2407' is the new
+    canonical, replacing the prior 'google/gemma-4-E4B-it' destination.
     """
     return {
         "nodes": [
@@ -134,23 +145,24 @@ def _writer_node_fixture() -> dict:
                 "type": "OTR_LedgerScriptWriter",
                 "inputs": [],
                 "widgets_values": [
-                    "",                          # 0  episode_title
-                    350,                         # 1  target_words
-                    2,                           # 2  num_characters
-                    "google/gemma-4-E4B-it",     # 3  creative_writing_model
-                    "google/gemma-4-E4B-it",     # 4  technical_model
-                    "",                          # 5  custom_premise
-                    True,                        # 6  include_act_breaks
-                    3,                           # 7  act_count
-                    "let the story decide",      # 8  style
-                    "",                          # 9  style_custom
-                    "balanced",                  # 10 creativity
-                    False,                       # 11 perfect_run_spacesaver
-                    0.05,                        # 12 min_p
-                    1.03,                        # 13 repetition_penalty
-                    200,                         # 14 max_new_tokens_cap
-                    False,                       # 15 enable_polish_pass
-                    "roll (~11% chance)",        # 16 lemmy_cameo
+                    "",                                       # 0  episode_title
+                    350,                                      # 1  target_words
+                    2,                                        # 2  num_characters
+                    "mistralai/Mistral-Nemo-Instruct-2407",   # 3  creative_writing_model
+                    "mistralai/Mistral-Nemo-Instruct-2407",   # 4  technical_model
+                    "",                                       # 5  custom_premise
+                    True,                                     # 6  include_act_breaks
+                    3,                                        # 7  act_count
+                    "let the story decide",                   # 8  style
+                    "",                                       # 9  style_custom
+                    "balanced",                               # 10 creativity
+                    False,                                    # 11 perfect_run_spacesaver
+                    0.05,                                     # 12 min_p
+                    1.03,                                     # 13 repetition_penalty
+                    200,                                      # 14 max_new_tokens_cap
+                    False,                                    # 15 enable_polish_pass
+                    "roll (~11% chance)",                     # 16 lemmy_cameo
+                    False,                                    # 17 enable_stage1_shadow_pass
                 ],
             }
         ],
@@ -220,24 +232,26 @@ def test_serialized_slots_no_companion_for_non_seed_int():
 # Test 2 -- creative_writing_model patch lands on the right slot
 # ---------------------------------------------------------------------------
 def test_patch_creative_writing_model_lands_on_correct_index():
-    """Using node 1's 17-entry fixture, patch creative_writing_model
+    """Using node 1's 18-entry fixture, patch creative_writing_model
     and assert widgets_values[3] changes. The writer's seed widget --
     and its control_after_generate companion -- were removed in
-    BUG-LOCAL-269/270.
+    BUG-LOCAL-269/270. Sprint 10A step 2 reconciliation flipped the
+    canonical model to Mistral-Nemo; step 3-C appended the shadow-
+    pass widget at slot 17 (vector 17 -> 18).
     """
     schemas = _writer_schemas()
     workflow = _writer_node_fixture()
 
     pre_creative = workflow["nodes"][0]["widgets_values"][3]
-    assert pre_creative == "google/gemma-4-E4B-it"
+    assert pre_creative == "mistralai/Mistral-Nemo-Instruct-2407"
 
     patch_widget_by_name(
         workflow, 1, "creative_writing_model",
-        "mistralai/Mistral-Nemo-Instruct-2407", schemas,
+        "google/gemma-4-E4B-it", schemas,
     )
 
     wv = workflow["nodes"][0]["widgets_values"]
-    assert wv[3] == "mistralai/Mistral-Nemo-Instruct-2407", (
+    assert wv[3] == "google/gemma-4-E4B-it", (
         f"creative_writing_model patch must land at slot 3; "
         f"got wv[3] = {wv[3]!r}"
     )
@@ -249,24 +263,25 @@ def test_patch_creative_writing_model_lands_on_correct_index():
 # Test 3 -- technical_model patch lands on the right slot
 # ---------------------------------------------------------------------------
 def test_patch_technical_model_lands_on_correct_index():
-    """Patch technical_model on the same 17-entry fixture. Assert
+    """Patch technical_model on the 18-entry fixture. Assert
     widgets_values[4] changes and slot 3 (creative_writing_model) is
-    untouched.
+    untouched. Sprint 10A step 2 reconciliation flipped the canonical
+    model to Mistral-Nemo; step 3-C appended slot 17.
     """
     schemas = _writer_schemas()
     workflow = _writer_node_fixture()
 
     patch_widget_by_name(
         workflow, 1, "technical_model",
-        "mistralai/Mistral-Nemo-Instruct-2407", schemas,
+        "google/gemma-4-E4B-it", schemas,
     )
 
     wv = workflow["nodes"][0]["widgets_values"]
-    assert wv[4] == "mistralai/Mistral-Nemo-Instruct-2407", (
+    assert wv[4] == "google/gemma-4-E4B-it", (
         f"technical_model patch must land at slot 4; "
         f"got wv[4] = {wv[4]!r}"
     )
-    assert wv[3] == "google/gemma-4-E4B-it", (
+    assert wv[3] == "mistralai/Mistral-Nemo-Instruct-2407", (
         f"creative_writing_model at slot 3 must be untouched; "
         f"got wv[3] = {wv[3]!r}"
     )
@@ -378,9 +393,12 @@ def test_round_trip_canonical_node1_inputs_correct():
     companion in the writer's widgets_values:
         wv[3]   creative_writing_model
         wv[4]   technical_model
+
+    Sprint 10A step 3-C (2026-05-26) appended enable_stage1_shadow_pass
+    at slot 17, bringing the vector length to 18.
     """
     dump = _dump_canonical_node1()
-    assert len(dump) == 17, f"node 1 widgets_values length drift: {len(dump)}"
+    assert len(dump) == 18, f"node 1 widgets_values length drift: {len(dump)}"
     expected_creative = dump[3]
     expected_technical = dump[4]
 

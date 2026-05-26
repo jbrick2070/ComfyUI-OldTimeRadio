@@ -1192,6 +1192,9 @@ def _resolve_inputs(
     repetition_penalty: float = 1.03,
     max_new_tokens_cap: int = 200,
     enable_polish_pass: bool = False,
+    # Sprint 10A step 3-C: shadow-pass flag propagated into resolved
+    # dict so the writer's main flow can branch on it after cast lock.
+    enable_stage1_shadow_pass: bool = False,
 ) -> dict:
     """Resolve raw widget values into the effective set used by the run.
 
@@ -1352,6 +1355,8 @@ def _resolve_inputs(
             max_new_tokens_cap or 200,
         ))),
         "enable_polish_pass":   bool(enable_polish_pass),
+        # Sprint 10A step 3-C shadow-pass flag.
+        "enable_stage1_shadow_pass": bool(enable_stage1_shadow_pass),
     }
 
 
@@ -1755,6 +1760,45 @@ class OTR_LedgerScriptWriter:
                         ),
                     },
                 ),
+                # Sprint 10A step 3-C (2026-05-26): shadow-pass for
+                # the new Stage 1 grammar-constrained plan generator.
+                # When OFF (default), the writer's existing outline +
+                # casting + dialogue pipeline runs unchanged. When ON,
+                # AFTER the cast lock the writer ALSO runs Stage 1 as
+                # a measurement-only pass: a single LLM call producing
+                # the structured plan, validated through pydantic +
+                # cross-field semantic checks, with the per-attempt
+                # records stamped on meta.stage1_shadow_attempts.
+                # The shadow pass does NOT replace the existing
+                # outline / cast / dialogue flow; it only measures
+                # whether Stage 1 can produce schema-valid plans
+                # first-attempt on this model. The Sprint 10A step 3
+                # operator gate is >=19/20 episodes with
+                # attempts[0].status == 'valid_first_attempt'.
+                "enable_stage1_shadow_pass": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Sprint 10A step 3 measurement pass. OFF "
+                        "(default) keeps the writer's current "
+                        "outline + casting + dialogue flow. ON adds "
+                        "a single Stage 1 LLM call AFTER the cast "
+                        "lock; the call uses lm-format-enforcer to "
+                        "constrain the model to a JSON-schema-valid "
+                        "structural plan (premise + arc + cast + "
+                        "beats + running_facts). The pass is "
+                        "diagnostic only -- the rendered episode is "
+                        "still produced by the existing pipeline; "
+                        "only the shadow plan and per-attempt records "
+                        "are stamped on the ledger (meta."
+                        "stage1_shadow_attempts). Use during the "
+                        "Sprint 10A step 3 soak to measure first-"
+                        "attempt valid-plan rate; the operator gate "
+                        "is >=19/20 episodes returning status="
+                        "'valid_first_attempt'. Adds one technical-"
+                        "slot LLM call per episode (~3-15s on "
+                        "Mistral-Nemo)."
+                    ),
+                }),
             },
         }
 
@@ -1814,6 +1858,10 @@ class OTR_LedgerScriptWriter:
         # BUG-LOCAL-260: operator control for the LEMMY cameo. Maps to
         # force_lemmy (None = natural ~11% OS-entropy roll).
         lemmy_cameo="roll (~11% chance)",
+        # Sprint 10A step 3-C: shadow-pass flag. Default False keeps
+        # the existing pipeline behaviour bit-identical; True adds a
+        # measurement-only Stage 1 LLM call after cast lock.
+        enable_stage1_shadow_pass=False,
     ):
         """Generate a v2.0 LPL script. See module docstring for pipeline."""
 
@@ -1837,6 +1885,8 @@ class OTR_LedgerScriptWriter:
             repetition_penalty=repetition_penalty,
             max_new_tokens_cap=max_new_tokens_cap,
             enable_polish_pass=enable_polish_pass,
+            # Sprint 10A step 3-C: propagate shadow-pass flag.
+            enable_stage1_shadow_pass=enable_stage1_shadow_pass,
         )
 
         log.info(
@@ -2133,6 +2183,128 @@ class OTR_LedgerScriptWriter:
             len(cast_rows), cast_meta["num_characters_locked"],
             cast_meta["lemmy_hit"],
         )
+
+        # ----------------------------------------------------------
+        # Sprint 10A step 3-C: optional Stage 1 shadow pass
+        # ----------------------------------------------------------
+        # When the operator flips enable_stage1_shadow_pass ON, run a
+        # MEASUREMENT-ONLY pass of the new grammar-constrained Stage 1
+        # plan generator. This does NOT drive the rest of the
+        # pipeline -- the existing outline + dialogue path continues
+        # uninterrupted -- but it stamps the per-attempt records on
+        # meta.stage1_shadow_attempts so the Sprint 10A step 3
+        # operator gate (>=19/20 episodes with first-attempt valid
+        # plans) can be measured directly from the saved ledger.
+        #
+        # The wiring that REPLACES outline + cast with the Stage 1
+        # plan lives in a later step (after step 4 cast audit + step
+        # 5 validators define the translation shape). Until then the
+        # shadow pass is the only consumer of Stage 1.
+        #
+        # PD1 (audio is king): the shadow pass touches no audio path.
+        # PD3 (workflow JSON): the new widget is appended at the end
+        # of the optional widgets list, slot 17, and the workflow
+        # JSON canonical_widgets test pins the new vector length.
+        if resolved.get("enable_stage1_shadow_pass"):
+            try:
+                from . import _otr_constrained_generate as _OTRCG
+                from . import _otr_stage1_call as _OTRS1
+                from . import _otr_stage1_plan as _OTRS1P
+
+                # Request the technical-slot cache_entry directly --
+                # the shadow pass does NOT need the writer's sampling
+                # config (the constrained generator overrides sampling
+                # via its own kwargs).
+                _shadow_cache_entry = _OTRML.request_slot(
+                    "technical", resolved["technical_model"],
+                )
+                _shadow_gen_fn = _OTRCG.make_constrained_generate_fn(
+                    _shadow_cache_entry, _OTRS1P.Stage1Plan,
+                )
+                log.info(
+                    "[Stage1Shadow] enabled; running constrained-"
+                    "decoding plan generator on technical_model=%r "
+                    "(news_seed length=%d chars, num_characters=%d, "
+                    "target_words=%d)",
+                    resolved["technical_model"],
+                    len(resolved["news_seed"]),
+                    resolved["num_characters"],
+                    resolved["target_words"],
+                )
+                _shadow_plan, _shadow_attempts = (
+                    _OTRS1.generate_stage1_plan(
+                        _shadow_gen_fn,
+                        news_seed=resolved["news_seed"],
+                        num_characters=resolved["num_characters"],
+                        target_words=resolved["target_words"],
+                        episode_title_hint=(
+                            resolved.get("episode_title") or ""
+                        ),
+                    )
+                )
+                meta["stage1_shadow_attempts"] = [
+                    {
+                        "attempt": a.attempt,
+                        "status": a.status,
+                        "elapsed_seconds": a.elapsed_seconds,
+                        "error_type": a.error_type,
+                        "error_message": a.error_message,
+                    }
+                    for a in _shadow_attempts
+                ]
+                meta["stage1_shadow_plan_present"] = True
+                log.info(
+                    "[Stage1Shadow] success: attempts=%d, "
+                    "first_attempt_status=%s, cast=%d, beats=%d, "
+                    "running_facts=%d",
+                    len(_shadow_attempts),
+                    _shadow_attempts[0].status,
+                    len(_shadow_plan.cast),
+                    len(_shadow_plan.beats),
+                    len(_shadow_plan.running_facts),
+                )
+            except _OTRS1.Stage1PlanGenerationError as _exc:
+                # Shadow pass exhausted its retry budget. Stamp the
+                # attempt list for soak forensics; the existing
+                # pipeline continues unchanged so the episode still
+                # ships.
+                meta["stage1_shadow_attempts"] = [
+                    {
+                        "attempt": getattr(_exc, "attempts", -1),
+                        "status": "exhausted",
+                        "elapsed_seconds": 0.0,
+                        "error_type": type(_exc.last_error).__name__,
+                        "error_message": str(_exc.last_error)[:300],
+                    }
+                ]
+                meta["stage1_shadow_plan_present"] = False
+                log.warning(
+                    "[Stage1Shadow] exhausted retry budget after %d "
+                    "attempt(s); last_error=%s. Existing pipeline "
+                    "continues unaffected.",
+                    getattr(_exc, "attempts", -1),
+                    type(_exc.last_error).__name__,
+                )
+            except Exception as _exc:
+                # Any other failure: log + stamp + continue. The
+                # shadow pass is diagnostic; it must NEVER halt the
+                # main pipeline.
+                meta["stage1_shadow_attempts"] = [
+                    {
+                        "attempt": -1,
+                        "status": "shadow_setup_failed",
+                        "elapsed_seconds": 0.0,
+                        "error_type": type(_exc).__name__,
+                        "error_message": str(_exc)[:300],
+                    }
+                ]
+                meta["stage1_shadow_plan_present"] = False
+                log.warning(
+                    "[Stage1Shadow] setup or unexpected runtime "
+                    "failure: %s: %s. Existing pipeline continues "
+                    "unaffected.",
+                    type(_exc).__name__, str(_exc)[:200],
+                )
 
         # Build the name->char_id index the per-beat composer needs.
         # Excludes ANNOUNCER (announcer-role beats hardcode "announcer"

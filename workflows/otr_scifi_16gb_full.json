@@ -70,7 +70,8 @@
         1.03,
         200,
         false,
-        "roll (~11% chance)"
+        "roll (~11% chance)",
+        false
       ],
       "inputs": [],
       "outputs": [
